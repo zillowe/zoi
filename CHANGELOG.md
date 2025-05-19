@@ -10,7 +10,7 @@ On the production branch.
 
 #### `Alpha 1.0.0`
 
-- **[Release](https://codeberg.org/Zusty/Zoi/commit/ca69280ea5d4646443f802d8d93b4d41329201d4)**: Refurbished for production.
+- **[Release](https://codeberg.org/Zusty/Zoi/commit/954706a8151564bd9ccbb10abc394b40553aa423)**: Refurbished for production.
 
 ### `Development`
 
