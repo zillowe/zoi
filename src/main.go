@@ -3,75 +3,101 @@ package main
 import (
 	"fmt"
 	"os"
+	"zoi/src/commands"
 
 	"github.com/fatih/color"
 )
 
 var (
 	VerBranch = "Dev."
-	VerStatus = "Pre-Alpha"
-	VerNumber = "2.4.0"
+	VerStatus = "Alpha"
+	VerNumber = "3.1.0"
 	VerCommit = "dev"
 )
 
 var requiredTools = map[string]string{
-	"git": ">=2.25",
+	"git": "<=2.25.0",
 }
 
 func main() {
-	if len(os.Args) < 2 {
-		PrintUsage()
+	if len(os.Args) < 2 || os.Args[1] == "help" {
+		commands.PrintUsage()
 		return
 	}
 
-	switch os.Args[1] {
+	if os.Args[1] == "--version" || os.Args[1] == "-v" {
+		commands.VersionCommand(VerBranch, VerStatus, VerNumber, VerCommit)
+		return
+	}
+
+	command := os.Args[1]
+	args := os.Args[2:]
+
+	switch command {
 	case "create":
-		if len(os.Args) < 4 {
-			yellow := color.New(color.FgYellow).SprintFunc()
-
-			fmt.Println(yellow("Usage: zoi create <app-template> <app-name>"))
+		if len(args) < 2 {
+			fmt.Println(color.YellowString("Usage: zoi create <app-template> <app-name>"))
 			return
 		}
-		CreateCommand(os.Args[2], os.Args[3])
+		commands.CreateCommand(args[0], args[1])
 	case "make":
-		if len(os.Args) < 3 {
-			yellow := color.New(color.FgYellow).SprintFunc()
-
-			fmt.Println(yellow("Usage: zoi make <config.yaml>"))
+		if len(args) < 1 {
+			fmt.Println(color.YellowString("Usage: zoi make <config.yaml>"))
 			return
 		}
-		MakeCommand(os.Args[2])
+		commands.MakeCommand(args[0])
 	case "set":
-		if len(os.Args) < 4 {
-			yellow := color.New(color.FgYellow).SprintFunc()
-
-			fmt.Println(yellow("Usage: zoi set <key> <value>"))
+		if len(args) < 2 {
+			fmt.Println(color.YellowString("Usage: zoi set <key> <value>"))
+			fmt.Println(color.CyanString("       Available keys: appsUrl"))
 			return
 		}
-		SetCommand(os.Args[2], os.Args[3])
+		commands.SetCommand(args[0], args[1])
 	case "install":
-		if len(os.Args) < 3 {
-			yellow := color.New(color.FgYellow).SprintFunc()
-
-			fmt.Println(yellow("Usage: zoi install <package>[@version]"))
+		if len(args) < 1 {
+			fmt.Println(color.YellowString("Usage: zoi install <package>[@version]"))
 			return
 		}
-		InstallCommand(os.Args[2])
+		commands.InstallCommand(args[0])
+	case "vm":
+		commands.VmCommand(args)
 	case "check":
-		CheckCommand()
-	// case "update":
-	// 	UpdateCommand()
-	case "info":
-		InfoCommand()
+		if len(args) > 0 {
+			fmt.Println(color.YellowString("Usage: zoi check (no arguments expected)"))
+			return
+		}
+		commands.CheckCommand(requiredTools)
+	case "env":
+		if len(args) > 1 {
+			fmt.Println(color.YellowString("Usage: zoi env [<environment-name>]"))
+			return
+		}
+		commands.EnvCommand(args)
 	case "version":
-		VersionCommand()
+		if len(args) > 0 {
+			fmt.Println(color.YellowString("Usage: zoi version (no arguments expected)"))
+			return
+		}
+		commands.VersionCommand(VerBranch, VerStatus, VerNumber, VerCommit)
 	case "about":
-		AboutCommand()
-	case "help":
-		PrintUsage()
-	case "--version", "-v":
-		VersionCommand()
+		if len(args) > 0 {
+			fmt.Println(color.YellowString("Usage: zoi about (no arguments expected)"))
+			return
+		}
+		commands.AboutCommand()
+	case "update":
+		if len(args) > 0 {
+			fmt.Println(color.YellowString("Usage: zoi update (no arguments expected)"))
+			return
+		}
+		commands.UpdateCommand(VerBranch, VerStatus, VerNumber)
+	case "run":
+		if len(args) < 1 {
+			fmt.Println(color.YellowString("Usage: zoi run <command-name>"))
+			return
+		}
+		commands.RunCommand(args[0])
 	default:
-		NotFoundCommand()
+		commands.NotFoundCommand()
 	}
 }

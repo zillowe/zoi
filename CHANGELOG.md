@@ -1,10 +1,42 @@
 ## Zoi Changelog
 
-Latest Version: Dev. Pre-Alpha 2.4.0
+Latest Production Version: Prod. Alpha 1.0.0
+
+Latest Development Version: Dev. Alpha 3.1.0
+
+### `Production`
+
+On the production branch.
+
+#### `Alpha 1.0.0`
+
+- **[Release](https://codeberg.org/Zusty/Zoi/commit/ca69280ea5d4646443f802d8d93b4d41329201d4)**: Refurbished for production.
 
 ### `Development`
 
 On the development branch.
+
+#### `Alpha 3.1.0`
+
+- **[Feat](https://codeberg.org/Zusty/Zoi/commit/ca69280ea5d4646443f802d8d93b4d41329201d4)**: Added `uninstall` subcommand to `zoi vm`.
+
+#### `Alpha 3.0.0`
+
+- **[Feat](https://codeberg.org/Zusty/Zoi/commit/ca69280ea5d4646443f802d8d93b4d41329201d4)**: Added `uninstall` subcommand to `zoi vm`.
+  - Allows users to remove specific installed language versions (e.g. `zoi vm uninstall go@1.20.0`).
+- **[Refactor](https://codeberg.org/Zusty/Zoi/commit/fdf6829e6f4d38d132d390ee2ab8db4b5908757b)**: Improved main `zoi` help message clarity.
+  - Refined command descriptions in the global `zoi help` output for better readability and understanding.
+
+#### `Alpha 2.0.0`
+
+- **[Feat](https://codeberg.org/Zusty/Zoi/commit/10bb62995a36af7ac7a40189f61da3ea3d32f22c)**: Added version managing command.
+  - Added Go and Python version managing.
+
+#### `Alpha 1.0.0`
+
+- **[Refactor](https://codeberg.org/Zusty/Zoi/commit/dd14259cbc068a909f8f199d18e74336974c3509)**: Major code rewrite and reformat.
+  - Moved the commands to a `commands` folder.
+  - Better code structure and better code overall.
 
 #### `Pre-Alpha 2.4.0`
 

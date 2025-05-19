@@ -1,0 +1,18 @@
+name: "Zoi"
+packages:
+  - name: "go"
+    check: "go version"
+
+commands:
+  - cmd: "build"
+    run: "./build/build"
+  - cmd: "build-all"
+    run: "./build/build-all"
+
+environments:
+  - name: "Development"
+    cmd: "dev"
+    run: ["./build/build"]
+  - name: "Production"
+    cmd: "prod"
+    run: ["./build/build-all"]

@@ -1,16 +1,22 @@
-# Security
-
-Zoi Security.
+# Zoi Security Policy
 
 ## Supported Versions
 
-This section is used to tell people about which versions of your project are
-currently being supported with security updates.
+| Version           | Supported          |
+| ----------------- | ------------------ |
+| Prod. Alpha 1.X.X | :white_check_mark: |
 
-| Version               | Supported          |
-| --------------------- | ------------------ |
-| Prod. Pre-Alpha 1.X.X | :white_check_mark: |
+## Security Updates
+
+We take security seriously. Security updates are released as soon as possible after a vulnerability is discovered and verified.
 
 ## Reporting a Vulnerability
 
-If you have any vulnerability please report to me, Matrix [@ZilloweZ:matrix.org](https://matrix.to/#/@ZilloweZ:matrix.org).
+If you discover a security vulnerability, please follow these steps:
+
+1. **DO NOT** disclose the vulnerability publicly.
+2. Send a detailed report to: [@ZilloweZ:matrix.org](https://matrix.to/#/@ZilloweZ:matrix.org).
+3. Include in your report:
+   - A description of the vulnerability
+   - Steps to reproduce the issue
+   - Potential impact

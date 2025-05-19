@@ -9,9 +9,9 @@
 <br/>
 More links
 <br/>
-<a href="https://codeberg.org/Zusty/Zoi/src/branch/main/CHANGELOG.md">Changelog</a> • 
-<a href="https://codeberg.org/Zusty/Zoi/src/branch/main/SECURITY.md">Security</a> • 
-<a href="https://codeberg.org/Zusty/Zoi/src/branch/main/CODE_OF_CONDUCT.md">Code of Conduct</a> • 
+<a href="https://codeberg.org/Zusty/Zoi/src/branch/main/CHANGELOG.md">Changelog</a> •
+<a href="https://codeberg.org/Zusty/Zoi/src/branch/main/SECURITY.md">Security</a> •
+<a href="https://codeberg.org/Zusty/Zoi/src/branch/main/CODE_OF_CONDUCT.md">Code of Conduct</a> •
 <a href="https://codeberg.org/Zusty/Zoi/src/branch/main/CONTRIBUTING.md">Contribution</a>
 
 </div>
@@ -42,7 +42,7 @@ powershell -c "irm zusty.codeberg.page/Zoi/@app/install.ps1|iex"
 
 ### Build
 
-To build Zoi from source you need to have [`go`](https://go.dev/) installed.
+To build Zoi from source you need to have [`go`](https://go.dev) installed.
 
 then run this command to build it:
 
@@ -68,7 +68,7 @@ To get started with Zoi please refer to the [Zoi Wiki](https://codeberg.org/Zust
 
 ## Footer
 
-Zoi is developed by Zusty < Zillowe Foundation
+Zoi is developed by Zusty < Zillowe Foundation, part of the Zillowe Developer Suite (ZDS)
 
 ### License
 

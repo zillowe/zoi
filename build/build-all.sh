@@ -16,6 +16,7 @@ TARGETS=(
   "darwin/amd64/"
   "darwin/arm64/"
   "windows/amd64/.exe"
+  "windows/arm64/.exe"
 )
 
 echo -e "${CYAN}🏗 Starting build process...${NC}"

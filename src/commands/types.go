@@ -1,4 +1,4 @@
-package main
+package commands
 
 import (
 	"encoding/json"
@@ -23,6 +23,22 @@ type InstallSpec struct {
 	Darwin  string            `json:"darwin,omitempty"`
 	Win32   string            `json:"win32,omitempty"`
 	Default string            `json:"default,omitempty"`
+}
+
+func (i *InstallSpec) UnmarshalJSON(data []byte) error {
+	var defaultCmd string
+	if err := json.Unmarshal(data, &defaultCmd); err == nil {
+		i.Default = defaultCmd
+		return nil
+	}
+
+	type Alias InstallSpec
+	var tmp Alias
+	if err := json.Unmarshal(data, &tmp); err != nil {
+		return err
+	}
+	*i = InstallSpec(tmp)
+	return nil
 }
 
 type YamlConfig struct {
@@ -62,7 +78,7 @@ var packageManagers = map[string]PackageManager{
 		Name:         "apt",
 		CheckCommand: "dpkg -s %s",
 		InstallCmd:   "sudo apt install -y %s",
-		VersionRegex: regexp.MustCompile(`Version: (.+)`),
+		VersionRegex: regexp.MustCompile(`Version:\s+(.+)`),
 	},
 	"pacman": {
 		Name:         "pacman",
@@ -86,13 +102,13 @@ var packageManagers = map[string]PackageManager{
 		Name:         "apk",
 		CheckCommand: "apk info -e %s",
 		InstallCmd:   "sudo apk add %s",
-		VersionRegex: regexp.MustCompile(`([\d.]+[a-zA-Z]*)`),
+		VersionRegex: regexp.MustCompile(`-\s*([\d.]+[a-zA-Z]*)`),
 	},
 	"brew": {
 		Name:         "brew",
 		CheckCommand: "brew list --versions %s",
 		InstallCmd:   "brew install %s",
-		VersionRegex: regexp.MustCompile(`(\d+\.\d+\.\d+|\d+\.\d+)`),
+		VersionRegex: regexp.MustCompile(`\s+(\d+\.\d+\.\d+|\d+\.\d+)`),
 	},
 }
 
@@ -106,7 +122,6 @@ const (
 	configFile     = "config.yaml"
 )
 
-// Add this to your types.go or commands.go
 type Version struct {
 	Branch string
 	Status string
@@ -133,13 +148,18 @@ func parseVersion(branch, status, number string) Version {
 }
 
 func (v Version) Compare(other Version) int {
-	currentRank := statusOrder[v.Status]
-	otherRank := statusOrder[other.Status]
+	currentRank, okCurrent := statusOrder[v.Status]
+	otherRank, okOther := statusOrder[other.Status]
+	if !okCurrent {
+		currentRank = -1
+	}
+	if !okOther {
+		otherRank = -1
+	}
 
 	if otherRank > currentRank {
 		return 1
 	}
-
 	if otherRank < currentRank {
 		return -1
 	}
@@ -148,43 +168,72 @@ func (v Version) Compare(other Version) int {
 }
 
 func compareSemver(a, b string) int {
-	aParts := strings.Split(a, ".")
-	bParts := strings.Split(b, ".")
+	cleanRegex := regexp.MustCompile(`^(\d+\.\d+(?:\.\d+)?)?.*`)
+	aClean := cleanRegex.ReplaceAllString(a, "$1")
+	bClean := cleanRegex.ReplaceAllString(b, "$1")
 
-	for i := 0; i < len(aParts) && i < len(bParts); i++ {
-		aNum, _ := strconv.Atoi(aParts[i])
-		bNum, _ := strconv.Atoi(bParts[i])
+	aParts := strings.Split(aClean, ".")
+	bParts := strings.Split(bClean, ".")
 
-		if aNum > bNum {
+	maxLen := len(aParts)
+	if len(bParts) > maxLen {
+		maxLen = len(bParts)
+	}
+
+	for i := 0; i < maxLen; i++ {
+		var aNum, bNum int
+		if i < len(aParts) {
+			numStr := regexp.MustCompile(`^(\d+).*`).ReplaceAllString(aParts[i], "$1")
+			aNum, _ = strconv.Atoi(numStr)
+		}
+		if i < len(bParts) {
+			numStr := regexp.MustCompile(`^(\d+).*`).ReplaceAllString(bParts[i], "$1")
+			bNum, _ = strconv.Atoi(numStr)
+		}
+
+		if bNum > aNum {
 			return 1
 		}
-		if aNum < bNum {
+		if bNum < aNum {
 			return -1
 		}
-	}
-
-	if len(aParts) > len(bParts) {
-		return 1
-	}
-	if len(aParts) < len(bParts) {
-		return -1
 	}
 
 	return 0
 }
 
-func (i *InstallSpec) UnmarshalJSON(data []byte) error {
-	var defaultCmd string
-	if err := json.Unmarshal(data, &defaultCmd); err == nil {
-		i.Default = defaultCmd
-		return nil
-	}
+type VersionInfo struct {
+	Latest struct {
+		Production struct {
+			Version string `json:"version"`
+			Status  string `json:"status"`
+		} `json:"production"`
+		Development struct {
+			Version string `json:"version"`
+			Status  string `json:"status"`
+		} `json:"development"`
+	} `json:"latest"`
+}
 
-	type Alias InstallSpec
-	var tmp Alias
-	if err := json.Unmarshal(data, &tmp); err != nil {
-		return err
-	}
-	*i = InstallSpec(tmp)
-	return nil
+type RunCommandItem struct {
+	Cmd string `yaml:"cmd"`
+	Run string `yaml:"run"`
+}
+
+type RunConfig struct {
+	Commands []RunCommandItem `yaml:"commands"`
+}
+
+type ZoiFileConfig struct {
+	Name         string            `yaml:"name,omitempty"`
+	Packages     []YamlPackage     `yaml:"packages,omitempty"`
+	Commands     []RunCommandItem  `yaml:"commands,omitempty"`
+	Environments []EnvironmentSpec `yaml:"environments,omitempty"`
+}
+
+type EnvironmentSpec struct {
+	Name  string   `yaml:"name"`
+	Cmd   string   `yaml:"cmd"`
+	Run   []string `yaml:"run,omitempty"`
+	Check []string `yaml:"check,omitempty"`
 }
