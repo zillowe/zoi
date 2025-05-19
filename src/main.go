@@ -9,9 +9,9 @@ import (
 )
 
 var (
-	VerBranch = "Dev."
+	VerBranch = "Prod."
 	VerStatus = "Alpha"
-	VerNumber = "3.1.0"
+	VerNumber = "1.0.0"
 	VerCommit = "dev"
 )
 

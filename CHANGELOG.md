@@ -18,7 +18,7 @@ On the development branch.
 
 #### `Alpha 3.1.0`
 
-- **[Feat](https://codeberg.org/Zusty/Zoi/commit/ca69280ea5d4646443f802d8d93b4d41329201d4)**: Added `uninstall` subcommand to `zoi vm`.
+- **[Feat](https://codeberg.org/Zusty/Zoi/commit/d65011791c625875a62c6f3e913ab603363ed1c5)**: Added more features.
 
 #### `Alpha 3.0.0`
 
