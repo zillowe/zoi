@@ -11,7 +11,7 @@ import (
 var (
 	VerBranch = "Prod."
 	VerStatus = "Alpha"
-	VerNumber = "1.0.0"
+	VerNumber = "1.0.1"
 	VerCommit = "dev"
 )
 
@@ -69,7 +69,7 @@ func main() {
 		commands.CheckCommand(requiredTools)
 	case "env":
 		if len(args) > 1 {
-			fmt.Println(color.YellowString("Usage: zoi env [<environment-name>]"))
+			fmt.Println(color.YellowString("Usage: zoi env <environment-name>"))
 			return
 		}
 		commands.EnvCommand(args)
@@ -85,6 +85,12 @@ func main() {
 			return
 		}
 		commands.AboutCommand()
+	case "info":
+		if len(args) > 0 {
+			fmt.Println(color.YellowString("Usage: zoi info (no arguments expected)"))
+			return
+		}
+		commands.InfoCommand()
 	case "update":
 		if len(args) > 0 {
 			fmt.Println(color.YellowString("Usage: zoi update (no arguments expected)"))
