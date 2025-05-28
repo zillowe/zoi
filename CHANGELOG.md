@@ -1,6 +1,6 @@
 ## Zoi Changelog
 
-Latest Production Version: Prod. Alpha 1.0.3
+Latest Production Version: Prod. Alpha 1.1.0
 
 Latest Development Version: Dev. Alpha 3.1.0
 
@@ -9,6 +9,8 @@ Latest Development Version: Dev. Alpha 3.1.0
 On the production branch.
 
 #### `Alpha 1.0.0`
+
+- **[Feat](https://codeberg.org/Zusty/Zoi/commit/954706a8151564bd9ccbb10abc394b40553aa423)**: Added `uninstall` command.
 
 - **[Release](https://codeberg.org/Zusty/Zoi/commit/954706a8151564bd9ccbb10abc394b40553aa423)**: Refurbished for production.
 

@@ -11,7 +11,7 @@ import (
 var (
 	VerBranch = "Prod."
 	VerStatus = "Alpha"
-	VerNumber = "1.0.3"
+	VerNumber = "1.1.0"
 	VerCommit = "dev"
 )
 
@@ -59,6 +59,12 @@ func main() {
 			return
 		}
 		commands.InstallCommand(args[0])
+	case "uninstall":
+		if len(args) < 1 {
+			fmt.Println(color.YellowString("Usage: zoi uninstall <package>"))
+			return
+		}
+		commands.UninstallCommand(args[0])
 	case "vm":
 		commands.VmCommand(args)
 	case "check":

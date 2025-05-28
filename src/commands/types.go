@@ -64,6 +64,7 @@ type PackageManager struct {
 	Name         string
 	CheckCommand string
 	InstallCmd   string
+	UninstallCmd string
 	VersionRegex *regexp.Regexp
 }
 
@@ -72,42 +73,49 @@ var packageManagers = map[string]PackageManager{
 		Name:         "scoop",
 		CheckCommand: "scoop which %s",
 		InstallCmd:   "scoop install %s",
+		UninstallCmd: "scoop uninstall %s",
 		VersionRegex: regexp.MustCompile(`Version:\s+([\d.]+)`),
 	},
 	"apt": {
 		Name:         "apt",
 		CheckCommand: "dpkg -s %s",
 		InstallCmd:   "sudo apt install -y %s",
+		UninstallCmd: "sudo apt remove -y %s",
 		VersionRegex: regexp.MustCompile(`Version:\s+(.+)`),
 	},
 	"pacman": {
 		Name:         "pacman",
 		CheckCommand: "pacman -Qi %s",
 		InstallCmd:   "sudo pacman -S --noconfirm %s",
+		UninstallCmd: "sudo pacman -Rns --noconfirm %s",
 		VersionRegex: regexp.MustCompile(`Version\s+:\s+([\d\w.:-]+)`),
 	},
 	"dnf": {
 		Name:         "dnf",
 		CheckCommand: "dnf list installed %s",
 		InstallCmd:   "sudo dnf install -y %s",
+		UninstallCmd: "sudo dnf remove -y %s",
 		VersionRegex: regexp.MustCompile(`([\d.]+)-\d+\..+`),
 	},
 	"yum": {
 		Name:         "yum",
 		CheckCommand: "yum list installed %s",
 		InstallCmd:   "sudo yum install -y %s",
+		UninstallCmd: "sudo yum remove -y %s",
 		VersionRegex: regexp.MustCompile(`([\d.]+)-\d+\..+`),
 	},
 	"apk": {
 		Name:         "apk",
 		CheckCommand: "apk info -e %s",
 		InstallCmd:   "sudo apk add %s",
+		UninstallCmd: "sudo apk del %s",
 		VersionRegex: regexp.MustCompile(`-\s*([\d.]+[a-zA-Z]*)`),
 	},
 	"brew": {
 		Name:         "brew",
 		CheckCommand: "brew list --versions %s",
 		InstallCmd:   "brew install %s",
+		UninstallCmd: "brew uninstall %s",
 		VersionRegex: regexp.MustCompile(`\s+(\d+\.\d+\.\d+|\d+\.\d+)`),
 	},
 }
