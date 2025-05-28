@@ -30,7 +30,7 @@ for target in "${TARGETS[@]}"; do
   EXT="${parts[2]:-}"
 
   OUTPUT="zoi-${GOOS}-${GOARCH}${EXT}"
-  LDFLAGS="-X main.VerCommit=${COMMIT}"
+  LDFLAGS="-s -w -X main.VerCommit=${COMMIT}"
 
   echo -e "${CYAN}🔧 Building ${OUTPUT}...${NC}"
   
