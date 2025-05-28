@@ -73,9 +73,9 @@ func getArch() string {
 func executeCommand(command string) error {
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
-		cmd = exec.Command("cmd", "/C", command)
+		cmd = exec.Command("pwsh", "/C", command)
 	} else {
-		cmd = exec.Command("sh", "-c", command)
+		cmd = exec.Command("bash", "-c", command)
 	}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

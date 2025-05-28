@@ -1,6 +1,6 @@
 ## Zoi Changelog
 
-Latest Production Version: Prod. Alpha 1.0.2
+Latest Production Version: Prod. Alpha 1.0.3
 
 Latest Development Version: Dev. Alpha 3.1.0
 

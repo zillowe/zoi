@@ -80,10 +80,10 @@ func UpdateCommand(VerBranch, VerStatus, VerNumber string) {
 	var installURL string
 	if runtime.GOOS == "windows" {
 		installURL = "https://zusty.codeberg.page/Zoi/@app/install.ps1"
-		installCmd = fmt.Sprintf(`powershell -NoProfile -ExecutionPolicy Bypass -Command "irm '%s' | iex"`, installURL)
+		installCmd = "irm 'https://zusty.codeberg.page/Zoi/@app/install.ps1' | iex"
 	} else {
 		installURL = "https://zusty.codeberg.page/Zoi/@app/install.sh"
-		installCmd = fmt.Sprintf("curl -fsSL %s | bash", installURL)
+		installCmd = "curl -fsSL https://zusty.codeberg.page/Zoi/@app/install.sh | bash"
 	}
 
 	fmt.Printf("%s Running install script from: %s\n", cyan("▸"), installURL)
