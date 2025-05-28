@@ -10,7 +10,7 @@ On the production branch.
 
 #### `Alpha 1.0.0`
 
-- **[Feat](https://codeberg.org/Zusty/Zoi/commit/954706a8151564bd9ccbb10abc394b40553aa423)**: Added `uninstall` command.
+- **[Feat](https://codeberg.org/Zusty/Zoi/commit/45d4d74fbdbf3cdb47e055ce07a93435e69f7da2)**: Added `uninstall` command.
 
 - **[Release](https://codeberg.org/Zusty/Zoi/commit/954706a8151564bd9ccbb10abc394b40553aa423)**: Refurbished for production.
 
