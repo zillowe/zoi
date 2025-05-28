@@ -19,7 +19,7 @@ func PrintUsage() {
 	fmt.Printf("  %s               Display project and environment information from zoi.yaml, check packages, and run setup commands\n", green("env"))
 	fmt.Printf("  %s           Show Zoi version information\n", green("version"))
 	fmt.Printf("  %s             Display details and information about Zoi\n", green("about"))
-	fmt.Printf("  %s             Display details and information about the system\n", green("info"))
+	fmt.Printf("  %s              Display details and information about the system\n", green("info"))
 	fmt.Printf("  %s             Verify system health and check for tool requirements\n", green("check"))
 	fmt.Printf("  %s                (Still in development) Manage language versions (e.g. Go, Python) via subcommands\n", green("vm"))
 	fmt.Printf("  %s           Install system-wide packages or tools (e.g. 'zoi install node@18')\n", green("install"))
