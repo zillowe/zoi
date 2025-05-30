@@ -1,5 +1,5 @@
 <div align="center">
-    <img width="120" height="120" hspace="10" alt="Zoi Logo" src="https://codeberg.org/Zusty/Zoi/media/branch/main/img/zoi.png"/>
+    <img width="120" height="120" hspace="10" alt="ZDS Logo" src="https://codeberg.org/Zusty/ZDS/media/branch/main/img/zds.png"/>
     <h1>Zoi</h1>
     A universal environment setup tool for developers.
 <br/>
@@ -68,7 +68,7 @@ To get started with Zoi please refer to the [Zoi Wiki](https://codeberg.org/Zust
 
 ## Footer
 
-Zoi is developed by Zusty < Zillowe Foundation, part of the Zillowe Developer Suite (ZDS)
+Zoi is developed by Zusty < Zillowe Foundation, part of the Zillowe Development Suite (ZDS)
 
 ### License
 
