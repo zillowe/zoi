@@ -23,7 +23,7 @@ func InstallCommand(pkg string) {
 	}
 	fmt.Printf("%s Attempting to install %s%s\n", cyan("ℹ"), cyan(pkgName), func() string {
 		if wantVersion != "" {
-			return cyan("@"+wantVersion)
+			return cyan("@" + wantVersion)
 		}
 		return ""
 	}())
@@ -66,14 +66,14 @@ func InstallCommand(pkg string) {
 	proceedWithInstall := false
 	installReason := ""
 
-	if directErr == nil { 
+	if directErr == nil {
 		source := fmt.Sprintf("PATH (%s)", pkgPath)
 		satisfied := false
-		if wantVersion == "" { 
+		if wantVersion == "" {
 			satisfied = true
 			fmt.Printf("%s %s@%s is already available and satisfies the request (Found via %s)\n",
 				green("✓"), cyan(pkgName), green(directVersion), cyan(source))
-		} else { 
+		} else {
 			if versionMatches(wantVersion, directVersion) {
 				satisfied = true
 				fmt.Printf("%s %s@%s is already available and satisfies requested version %s (Found via %s)\n",
@@ -87,8 +87,8 @@ func InstallCommand(pkg string) {
 					proceedWithInstall = true
 					installReason = fmt.Sprintf("User chose to install requested version %s over existing %s.", wantVersion, directVersion)
 				} else if pmErr != nil {
-                     fmt.Printf("%s Cannot attempt installation as no supported package manager was found.\n", red("✗"))
-                } else {
+					fmt.Printf("%s Cannot attempt installation as no supported package manager was found.\n", red("✗"))
+				} else {
 					fmt.Printf("%s Installation cancelled. Please manage existing installations manually.\n", yellow("!"))
 					return
 				}
@@ -98,34 +98,36 @@ func InstallCommand(pkg string) {
 			if pmErr == nil && !pmInstalled {
 				fmt.Printf("%s Note: %s thinks '%s' is installed, but %s does not report managing it.\n", yellow("!"), source, pkgName, pm.Name)
 			}
-			if !proceedWithInstall { 
-                 return 
-            }
+			if !proceedWithInstall {
+				return
+			}
 		}
 	} else {
-		if pmErr == nil { 
-			if pmInstalled { 
+		if pmErr == nil {
+			if pmInstalled {
 				fmt.Printf("%s Tool '%s' not found directly, but package manager '%s' reports it installed.\n", yellow("!"), pkgName, pm.Name)
 				fmt.Printf("%s This might indicate a broken installation or PATH issue.\n", yellow("!"))
 				promptMsg := fmt.Sprintf("Attempt to (re)install %s%s using %s?", pkgName, func() string {
-					if wantVersion != "" { return "@"+wantVersion }
+					if wantVersion != "" {
+						return "@" + wantVersion
+					}
 					return ""
-                }(), pm.Name)
+				}(), pm.Name)
 				if confirmPrompt(promptMsg) {
 					proceedWithInstall = true
 					installReason = fmt.Sprintf("Tool not working directly, user chose to (re)install via %s.", pm.Name)
 				} else {
 					fmt.Printf("%s Installation cancelled.\n", yellow("!"))
-					return 
+					return
 				}
-			} else { 
+			} else {
 				fmt.Printf("%s Tool '%s' not found via PATH or package manager '%s'.\n", yellow("!"), pkgName, pm.Name)
-				proceedWithInstall = true 
+				proceedWithInstall = true
 				installReason = fmt.Sprintf("Tool not found, proceeding with installation via %s.", pm.Name)
 			}
 		} else {
 			fmt.Printf("%s Cannot find '%s' and no supported package manager detected. Please install manually.\n", red("✗"), pkgName)
-			return 
+			return
 		}
 	}
 
@@ -138,7 +140,7 @@ func InstallCommand(pkg string) {
 		fmt.Printf("%s %s\n", cyan("ℹ"), installReason)
 
 		installPkgArg := formatInstallArg(pm, pkgName, wantVersion)
-		if wantVersion != "" && !strings.Contains(installPkgArg, wantVersion) { 
+		if wantVersion != "" && !strings.Contains(installPkgArg, wantVersion) {
 			fmt.Printf("%s Warning: Could not format specific version '%s' for package manager '%s'. Attempting install using '%s'.\n", yellow("!"), wantVersion, pm.Name, installPkgArg)
 		} else if wantVersion != "" {
 			fmt.Printf("%s Using formatted package argument for %s: '%s'\n", cyan("ℹ"), pm.Name, installPkgArg)
@@ -157,9 +159,8 @@ func InstallCommand(pkg string) {
 		if err := executeCommand(installCmd); err != nil {
 			fmt.Printf("%s Installation command failed: %v\n", red("✗"), err)
 		} else {
-			fmt.Printf("%s Installation command executed successfully.\n", green("✓")) 
+			fmt.Printf("%s Installation command executed successfully.\n", green("✓"))
 		}
-
 
 		fmt.Printf("%s Verifying installation after attempt...\n", cyan("ℹ"))
 		finalVersion, finalErr := checkToolDirectly(pkgName)
@@ -173,8 +174,8 @@ func InstallCommand(pkg string) {
 			fmt.Printf("%s Please check the installation manually.\n", yellow("!"))
 		}
 	} else {
-        fmt.Printf("%s No installation action performed.\n", cyan("ℹ"))
-    }
+		fmt.Printf("%s No installation action performed.\n", cyan("ℹ"))
+	}
 }
 
 func formatInstallArg(pm PackageManager, pkgName, version string) string {
