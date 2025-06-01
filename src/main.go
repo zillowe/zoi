@@ -11,7 +11,7 @@ import (
 var (
 	VerBranch = "Prod."
 	VerStatus = "Alpha"
-	VerNumber = "1.1.0"
+	VerNumber = "1.2.0"
 	VerCommit = "dev"
 )
 
@@ -41,7 +41,7 @@ func main() {
 		}
 		commands.CreateCommand(args[0], args[1])
 	case "make":
-		if len(args) < 1 {
+		if len(args) < 1 || args[0] == "--help" {
 			fmt.Println(color.YellowString("Usage: zoi make <config.yaml>"))
 			return
 		}
@@ -54,13 +54,13 @@ func main() {
 		}
 		commands.SetCommand(args[0], args[1])
 	case "install":
-		if len(args) < 1 {
+		if len(args) < 1 || args[0] == "--help" {
 			fmt.Println(color.YellowString("Usage: zoi install <package>[@version]"))
 			return
 		}
 		commands.InstallCommand(args[0])
 	case "uninstall":
-		if len(args) < 1 {
+		if len(args) < 1 || args[0] == "--help" {
 			fmt.Println(color.YellowString("Usage: zoi uninstall <package>"))
 			return
 		}
@@ -104,7 +104,7 @@ func main() {
 		}
 		commands.UpdateCommand(VerBranch, VerStatus, VerNumber)
 	case "run":
-		if len(args) < 1 {
+		if len(args) < 1 || args[0] == "--help" {
 			fmt.Println(color.YellowString("Usage: zoi run <command-name>"))
 			return
 		}

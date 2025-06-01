@@ -8,6 +8,8 @@ commands:
     run: "./build/build"
   - cmd: "build-all"
     run: "./build/build-all"
+  - cmd: "test"
+    run: "./tests/run"
 
 environments:
   - name: "Development"
@@ -16,3 +18,6 @@ environments:
   - name: "Production"
     cmd: "prod"
     run: ["./build/build-all"]
+  - name: "Test"
+    cmd: "test"
+    run: ["./tests/run"]
