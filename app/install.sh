@@ -5,6 +5,8 @@ REPO_BASE_URL="https://codeberg.org/Zusty/Zoi/releases/download/latest"
 INSTALL_DIR="${HOME}/.local/bin"
 BIN_NAME="zoi"
 
+COMMENT_LINE="# Zoi PATH addition"
+
 info() {
     printf "\033[0;36m[INFO] %s\033[0m\n" "$1"
 }
@@ -130,9 +132,9 @@ if [[ ":$PATH:" != *":${INSTALL_DIR}:"* ]]; then
     info "Attempting to add it to your shell profile..."
 
     PROFILE_FILE=""
-    if [ -n "${ZSH_VERSION-}" ]; then
+    if [ -n "${ZSH_VERSION+x}" ] && [ -n "$ZSH_VERSION" ]; then
         PROFILE_FILE="${ZDOTDIR:-$HOME}/.zshrc"
-    elif [ -n "${BASH_VERSION-}" ]; then
+    elif [ -n "${BASH_VERSION+x}" ] && [ -n "$BASH_VERSION" ]; then
         PROFILE_FILE="$HOME/.bashrc"
     elif [ -f "$HOME/.profile" ]; then
         PROFILE_FILE="$HOME/.profile"
