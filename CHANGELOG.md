@@ -6,7 +6,7 @@ Latest Development Version: Dev. Beta 1.1.0
 
 ## `Production`
 
-Just refurbished for production
+Refurbished for production
 
 ## `Development`
 
