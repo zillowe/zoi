@@ -5,6 +5,7 @@ set -euo pipefail
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
+YELLOW='\033[1;33m'
 NC='\033[0m'
 
 COMPILED_DIR="./build/compiled"
@@ -17,8 +18,24 @@ if [ ! -d "$COMPILED_DIR" ]; then
     exit 1
 fi
 
+if ! command -v 7z &> /dev/null; then
+    echo -e "${RED}Error: '7z' command is not found.${NC}"
+    echo -e "${YELLOW}Please install 7-Zip (e.g. 'p7zip-full' on Debian/Ubuntu, 'p7zip' on Arch) and ensure it's in your PATH.${NC}"
+    exit 1
+fi
+
 rm -rf "$ARCHIVE_DIR"
-mkdir -p "$ARCHIVE_DIR"
+if ! mkdir -p "$ARCHIVE_DIR"; then
+    echo -e "${RED}Error: Failed to create archive directory '${ARCHIVE_DIR}'.${NC}"
+    exit 1
+fi
+
+if ! touch "${ARCHIVE_DIR}/.test" 2>/dev/null; then
+    echo -e "${RED}Error: No write permission for archive directory '${ARCHIVE_DIR}'.${NC}"
+    exit 1
+fi
+rm -f "${ARCHIVE_DIR}/.test"
+
 echo -e "${CYAN}📦 Starting archival process...${NC}"
 
 for binary_path in "$COMPILED_DIR"/*; do
@@ -37,17 +54,31 @@ for binary_path in "$COMPILED_DIR"/*; do
     echo -e "${CYAN}  -> Archiving ${filename}...${NC}"
     
     if [[ "$filename" == *"windows"* ]]; then
-        (cd "$TMP_ARCHIVE_DIR" && zip -q "${ARCHIVE_DIR}/${archive_basename}.zip" "$final_binary_name")
+        (cd "$TMP_ARCHIVE_DIR" && 7z a -tzip -mx=9 "${archive_basename}.zip" "$final_binary_name" >/dev/null)
+        mv "${TMP_ARCHIVE_DIR}/${archive_basename}.zip" "${ARCHIVE_DIR}/"
     else
-        (cd "$TMP_ARCHIVE_DIR" && tar -cJf "${ARCHIVE_DIR}/${archive_basename}.tar.xz" "$final_binary_name")
+        if [ ! -d "$ARCHIVE_DIR" ]; then
+            echo -e "${RED}Error: Archive directory '${ARCHIVE_DIR}' was removed during execution.${NC}"
+            rm -rf "$TMP_ARCHIVE_DIR"
+            exit 1
+        fi
+        (cd "$TMP_ARCHIVE_DIR" && tar -cf "${archive_basename}.tar" "$final_binary_name")
+        xz -T0 "${TMP_ARCHIVE_DIR}/${archive_basename}.tar"
+        mv "${TMP_ARCHIVE_DIR}/${archive_basename}.tar.xz" "${ARCHIVE_DIR}/"
     fi
 
     rm -rf "$TMP_ARCHIVE_DIR"
 done
 
 echo -e "${CYAN}🔐 Generating checksums...${NC}"
-(cd "$ARCHIVE_DIR" && shasum -a 256 ./* > "$CHECKSUM_FILE")
-
+(
+  cd "$ARCHIVE_DIR" || exit 1
+  for file in *; do
+    if [ "$file" != "checksums.txt" ]; then
+      shasum -a 256 "$file"
+    fi
+  done
+) > "$CHECKSUM_FILE"
 
 echo -e "\n${GREEN}✅ Archiving and checksum generation complete!${NC}"
 echo -e "${CYAN}Output files are in the '${ARCHIVE_DIR}' directory.${NC}"
