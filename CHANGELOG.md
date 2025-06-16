@@ -1,28 +1,26 @@
 # Zoi Changelog
 
-Latest Production Version: Prod. Alpha 1.2.0
+Latest Production Version: Prod. Beta 1.1.0
 
-Latest Development Version: Dev. Pre-Beta 3.2.0
+Latest Development Version: Dev. Beta 1.1.0
 
 ## `Production`
 
-On the production branch.
-
-### `Alpha 1.2.0`
-
-- **Release**: Refurbished Dev. Alpha 3.2.0 for production.
-
-### `Alpha 1.0.0`
-
-- **Feat**: Added `uninstall` command.
-
-- **Release**: Refurbished for production.
+Just refurbished for production
 
 ## `Development`
 
 On the development branch.
 
-### `Pre-Beta 1.0.0`
+### `Beta 1.1.0`
+
+- **[✨ Feat(update)](https://codeberg.org/Zusty/Zoi/commit/7ac47821df5e5d2e9b7cec11265b688e2ffd1267)**: Added --force flag for reinstallation.
+
+- **[✨ Feat(set)](https://codeberg.org/Zusty/Zoi/commit/bd6265c53aad0a696c72f4185220aa0614a4e894)**: Added interactive mode for config values.
+
+- **[✨ Feat(run)](https://codeberg.org/Zusty/Zoi/commit/efd9b7a3118626b64d63afe4b2e14b9c9e4a5b3e)**: Allow interactive command selection.
+
+### `Beta 1.0.0`
 
 - **[♻️ Refactor](https://codeberg.org/Zusty/Zoi/commit/7972a3ab92978d44e38e8cff49651f5eb1d59dc7)**: Moved to Cobra for command-line tool and Viper for config.
 
