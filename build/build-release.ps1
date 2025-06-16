@@ -10,9 +10,9 @@ catch {
     $commit = "dev"
 }
 
-Write-Host "Building Zoi for Windows..." -ForegroundColor Cyan
-go build -o "./build/compiled/zoi.exe" `
-    -ldflags "-X main.VerCommit=$commit" `
+Write-Host "Building Zoi release for Windows..." -ForegroundColor Cyan
+go build -o "./build/compiled/zoi-r.exe" `
+    -ldflags "-s -w -X main.VerCommit=$commit" `
     ./src
 
 if ($LASTEXITCODE -eq 0) {

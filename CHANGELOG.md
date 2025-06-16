@@ -2,7 +2,7 @@
 
 Latest Production Version: Prod. Alpha 1.2.0
 
-Latest Development Version: Dev. Alpha 3.2.0
+Latest Development Version: Dev. Pre-Beta 3.2.0
 
 ## `Production`
 
@@ -21,6 +21,10 @@ On the production branch.
 ## `Development`
 
 On the development branch.
+
+### `Pre-Beta 1.0.0`
+
+- **[♻️ Refactor](https://codeberg.org/Zusty/Zoi/commit/32d2706782eaf015a1660656e9922eb28c50a7fe)**: Moved to Cobra for command-line tool and Viper for config.
 
 ### `Alpha 3.2.0`
 

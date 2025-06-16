@@ -4,7 +4,7 @@
 
 | Version           | Supported          |
 | ----------------- | ------------------ |
-| Prod. Alpha 1.X.X | :white_check_mark: |
+| Prod. Beta 1.X.X | :white_check_mark: |
 
 ## Security Updates
 

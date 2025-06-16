@@ -1,0 +1,21 @@
+package main
+
+import (
+	"zoi/cmd"
+)
+
+var (
+	VerBranch = "Dev."
+	VerStatus = "Beta"
+	VerNumber = "1.0.0"
+	VerCommit = "dev"
+)
+
+func main() {
+	cmd.Execute(cmd.VersionInfo{
+		Branch: VerBranch,
+		Status: VerStatus,
+		Number: VerNumber,
+		Commit: VerCommit,
+	})
+}
