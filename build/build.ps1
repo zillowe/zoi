@@ -13,7 +13,7 @@ catch {
 Write-Host "Building Zoi for Windows..." -ForegroundColor Cyan
 go build -o "./build/compiled/zoi.exe" `
     -ldflags "-X main.VerCommit=$commit" `
-    ./src
+    .
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "Build successful! Commit: $commit" -ForegroundColor Green

@@ -21,7 +21,7 @@ foreach ($target in $targets) {
   Write-Host "Building $output..." -ForegroundColor Cyan
   go build -o "./build/compiled/$output" `
     -ldflags "-s -w -X main.VerCommit=$COMMIT" `
-    ./src 
+    .
 
   if ($LASTEXITCODE -ne 0) {
     Write-Host "Build failed for $output" -ForegroundColor Red

@@ -20,7 +20,6 @@ TARGETS=(
 )
 
 echo -e "${CYAN}🏗 Starting build process...${NC}"
-echo -e "${CYAN}▸ Version: ${VERSION}${NC}"
 echo -e "${CYAN}▸ Commit: ${COMMIT}${NC}\n"
 
 for target in "${TARGETS[@]}"; do
@@ -37,7 +36,7 @@ for target in "${TARGETS[@]}"; do
   if ! GOOS=$GOOS GOARCH=$GOARCH go build \
     -ldflags "$LDFLAGS" \
     -o "build/compiled/${OUTPUT}" \
-    ./src; then
+    .; then
     echo -e "${RED}❌ Build failed for ${OUTPUT}${NC}"
     exit 1
   fi
