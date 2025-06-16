@@ -24,7 +24,7 @@ On the development branch.
 
 ### `Pre-Beta 1.0.0`
 
-- **[♻️ Refactor](https://codeberg.org/Zusty/Zoi/commit/32d2706782eaf015a1660656e9922eb28c50a7fe)**: Moved to Cobra for command-line tool and Viper for config.
+- **[♻️ Refactor](https://codeberg.org/Zusty/Zoi/commit/7972a3ab92978d44e38e8cff49651f5eb1d59dc7)**: Moved to Cobra for command-line tool and Viper for config.
 
 ### `Alpha 3.2.0`
 
