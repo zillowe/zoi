@@ -216,33 +216,6 @@
     "installCmd": "composer -v",
     "createCommand": "composer create-project codeigniter4/appstarter ${appName}"
   },
-  "django": {
-    "packages": {
-      "python": {
-        "apt": "python3-pip",
-        "pacman": "python-pip",
-        "scoop": "python",
-        "brew": "pip",
-        "yum": "python3-pip",
-        "dnf": "python3-pip",
-        "apk": "py3-pip",
-        "checkCmd": "python --version"
-      },
-      "pip": {
-        "apt": "python3",
-        "pacman": "python",
-        "scoop": "python",
-        "brew": "python",
-        "yum": "python3",
-        "dnf": "python3",
-        "apk": "python3",
-        "checkCmd": "python --version"
-      }
-    },
-    "checkCmd": "python -v",
-    "installCmd": "pip -v",
-    "createCommand": "django-admin startproject ${appName}"
-  },
   "angular": {
     "packages": {
       "node": {
@@ -292,5 +265,32 @@
     "checkCmd": "hugo version",
     "installCmd": "hugo version",
     "createCommand": "hugo new site ${appName}"
+  },
+  "django": {
+    "packages": {
+      "python": {
+        "apt": "python3-pip",
+        "pacman": "python-pip",
+        "scoop": "python",
+        "brew": "pip",
+        "yum": "python3-pip",
+        "dnf": "python3-pip",
+        "apk": "py3-pip",
+        "checkCmd": "python --version"
+      },
+      "pip": {
+        "apt": "python3",
+        "pacman": "python",
+        "scoop": "python",
+        "brew": "python",
+        "yum": "python3",
+        "dnf": "python3",
+        "apk": "python3",
+        "checkCmd": "python --version"
+      }
+    },
+    "checkCmd": "python -m django --version",
+    "installCmd": "python -m pip install Django",
+    "createCommand": "django-admin startproject ${appName}"
   }
 }
