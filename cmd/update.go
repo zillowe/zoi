@@ -20,6 +20,14 @@ var updateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Update Zoi to the latest version",
 	Run: func(cmd *cobra.Command, args []string) {
+		forceUpdate, _ := cmd.Flags().GetBool("force")
+
+		if forceUpdate {
+			src.PrintInfo("Force flag detected. Skipping version check and reinstalling...")
+			runInstaller()
+			return
+		}
+
 		src.PrintInfo("Checking for new versions...")
 
 		remoteConfig, err := src.FetchRemoteVersionInfo()
@@ -50,6 +58,7 @@ var updateCmd = &cobra.Command{
 
 		if !updateAvailable {
 			src.PrintSuccess("You are already on the latest version (%s %s).", currentVersionInfo.Status, currentVersionInfo.Number)
+			src.PrintInfo("Use 'zoi update --force' to reinstall anyway.")
 			return
 		}
 
@@ -125,5 +134,6 @@ func runInstaller() {
 }
 
 func init() {
+	updateCmd.Flags().BoolP("force", "f", false, "Force re-installation by skipping the version check")
 	rootCmd.AddCommand(updateCmd)
 }
