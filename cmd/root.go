@@ -18,7 +18,7 @@ type VersionInfo struct {
 
 var rootCmd = &cobra.Command{
 	Use:          "zoi",
-	Short:        "Zoi is a Universal Environment Setup Tool.",
+	Short:        "Zoi - Universal Environment Setup Tool.",
 	SilenceUsage: true,
 }
 

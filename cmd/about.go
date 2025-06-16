@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	author   = "Zusty"
+	author   = "Zusty < Zillowe Foundation"
 	homepage = "https://codeberg.org/Zusty/Zoi"
 	license  = "ZFPL-1.0"
 )
