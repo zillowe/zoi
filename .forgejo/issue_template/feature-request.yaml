@@ -1,0 +1,31 @@
+name: 💡 Feature Request
+description: Got an idea for a feature that Zoi doesn't have yet? Suggest it here!
+title: "[FEAT] "
+labels: ["Kind/Feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        - Please speak English, as this is the language all maintainers can speak and write.
+        - Be as clear and concise as possible. A very verbose report is harder to interpret in a concrete way.
+        - Be civil, and follow the [Zoi Code of Conduct](https://codeberg.org/Zusty/Zoi/src/branch/main/CODE_OF_CONDUCT.md).
+        - Please make sure you are using the latest release of Zoi and take a moment to [check that your feature hasn't been requested before](https://codeberg.org/Zusty/Zoi/issues?q=&type=all&sort=&labels=206503).
+  - type: textarea
+    id: needs-benefits
+    attributes:
+      label: Needs and benefits
+      description: As concisely as possible, describe the benefits your feature request will provide or the problems it will try to solve.
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Feature Description
+      description: As concisely as possible, describe the feature you would like to see added.
+    validations:
+      required: true
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: If you can, provide screenshots of an implementation on another tool.
