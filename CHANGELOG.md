@@ -1,8 +1,8 @@
 # Zoi Changelog
 
-Latest Production Version: Prod. Beta 1.1.0
+Latest Production Version: Prod. Beta 1.2.0
 
-Latest Development Version: Dev. Beta 1.1.0
+Latest Development Version: Dev. Beta 1.2.0
 
 ## `Production`
 
@@ -12,13 +12,17 @@ Refurbished for production
 
 On the development branch.
 
+### `Beta 1.2.0`
+
+- **[✨ Feat(env):](https://codeberg.org/Zusty/Zoi/commit/1d1178f93f9492301351ba014fdf22d3d9b453cb)**: Made command interactive
+
 ### `Beta 1.1.0`
 
 - **[✨ Feat(update)](https://codeberg.org/Zusty/Zoi/commit/7ac47821df5e5d2e9b7cec11265b688e2ffd1267)**: Added --force flag for reinstallation.
 
 - **[✨ Feat(set)](https://codeberg.org/Zusty/Zoi/commit/bd6265c53aad0a696c72f4185220aa0614a4e894)**: Added interactive mode for config values.
 
-- **[✨ Feat(run)](https://codeberg.org/Zusty/Zoi/commit/efd9b7a3118626b64d63afe4b2e14b9c9e4a5b3e)**: Allow interactive command selection.
+- **[✨ Feat(run)](https://codeberg.org/Zusty/Zoi/commit/efd9b7a3118626b64d63afe4b2e14b9c9e4a5b3e)**: Allowed interactive command selection.
 
 ### `Beta 1.0.0`
 

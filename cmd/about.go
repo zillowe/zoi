@@ -35,7 +35,8 @@ var aboutCmd = &cobra.Command{
 		`)
 		fmt.Println()
 
-		fmt.Printf("  %s\n\n", cmd.Root().Short)
+		fmt.Printf("  %s\n", cmd.Root().Short)
+		fmt.Printf("  Part of the Zillowe Development Suite (ZDS)\n\n")
 
 		fmt.Printf("  %-12s %s\n", "Version:", yellow.Sprint(cmd.Root().Version))
 		fmt.Printf("  %-12s %s\n", "Author:", yellow.Sprint(author))
