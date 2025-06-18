@@ -14,7 +14,8 @@ On the development branch.
 
 ### `Beta 1.2.0`
 
-- **[✨ Feat(env):](https://codeberg.org/Zusty/Zoi/commit/1d1178f93f9492301351ba014fdf22d3d9b453cb)**: Made command interactive
+- **[✨ Feat(env)](https://codeberg.org/Zusty/Zoi/commit/1d1178f93f9492301351ba014fdf22d3d9b453cb)**: Made command interactive
+- **[✨ Feat(vm)](https://codeberg.org/Zusty/Zoi/commit/e0289860409d116f83662b7c1620f953e77e4d1)**: Implemented Go version manager.
 
 ### `Beta 1.1.0`
 
