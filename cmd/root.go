@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"zoi/src"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -32,7 +31,6 @@ func Execute(versionInfo VersionInfo) {
 	rootCmd.Version = fullVersion
 
 	if err := rootCmd.Execute(); err != nil {
-		src.PrintError("%v", err)
 		os.Exit(1)
 	}
 }
