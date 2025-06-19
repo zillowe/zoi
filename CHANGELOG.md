@@ -12,9 +12,15 @@ Refurbished for production
 
 On the development branch.
 
+### `Beta 1.2.1`
+
+- **[♻️ Refactor(info)](https://codeberg.org/Zusty/Zoi/commit/db4f8544994e7e5c74f3e97f33280b957fd1add9)**: Source system details from configuration.
+
+- **[🩹 Fix(cmd)](https://codeberg.org/Zusty/Zoi/commit/07546f3e6769b20c0cdcf7ebee191f4e59acc0a6)**: Removed redundant error print and unused import.
+
 ### `Beta 1.2.0`
 
-- **[✨ Feat(env)](https://codeberg.org/Zusty/Zoi/commit/1d1178f93f9492301351ba014fdf22d3d9b453cb)**: Made command interactive
+- **[✨ Feat(env)](https://codeberg.org/Zusty/Zoi/commit/1d1178f93f9492301351ba014fdf22d3d9b453cb)**: Made command interactive.
 - **[✨ Feat(vm)](https://codeberg.org/Zusty/Zoi/commit/e0289860409d116f83662b7c1620f953e77e4d1)**: Implemented Go version manager.
 
 ### `Beta 1.1.0`
