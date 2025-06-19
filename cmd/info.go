@@ -12,15 +12,27 @@ var infoCmd = &cobra.Command{
 	Use:   "info",
 	Short: "Display details and information about the system",
 	Run: func(cmd *cobra.Command, args []string) {
-		osName, arch, distro, pkgManager := src.GetSystemInfo()
+		osName := viper.GetString("os")
+		arch := viper.GetString("arch")
+		distro := viper.GetString("distro")
+		pkgManager := viper.GetString("pkgManager")
+
 		appsUrl := viper.GetString("appsUrl")
 		configFile := viper.ConfigFileUsed()
 
 		yellow := src.Yellow()
 
 		src.PrintHighlight("--- System Information ---")
-		fmt.Printf("OS:               %s\n", yellow.Sprint(osName))
-		fmt.Printf("Architecture:     %s\n", yellow.Sprint(arch))
+		osVal := "Not Found"
+		if osName != "" {
+			osVal = osName
+		}
+		fmt.Printf("OS:               %s\n", yellow.Sprint(osVal))
+		archVal := "Not Found"
+		if arch != "" {
+			archVal = arch
+		}
+		fmt.Printf("Architecture:     %s\n", yellow.Sprint(archVal))
 
 		if osName == "linux" {
 			distroVal := "Unknown"

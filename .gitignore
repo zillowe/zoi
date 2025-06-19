@@ -5,3 +5,5 @@ build/archived
 
 # Added by GCT
 gct.yaml
+
+/.gct/
