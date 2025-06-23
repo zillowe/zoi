@@ -1,6 +1,0 @@
-on: [push]
-jobs:
-  test:
-    runs-on: codeberg-tiny-lazy
-    steps:
-      - run: echo All Good
