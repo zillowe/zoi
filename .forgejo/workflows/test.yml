@@ -1,11 +1,4 @@
-name: Zoi Test
-
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-
+on: [push]
 jobs:
   build-and-test:
     runs-on: codeberg-tiny-lazy
