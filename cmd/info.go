@@ -18,6 +18,7 @@ var infoCmd = &cobra.Command{
 		pkgManager := viper.GetString("pkgManager")
 
 		appsUrl := viper.GetString("appsUrl")
+		packageUrl := viper.GetString("pkg.endpoint")
 		configFile := viper.ConfigFileUsed()
 
 		yellow := src.Yellow()
@@ -56,6 +57,7 @@ var infoCmd = &cobra.Command{
 			fmt.Printf("Config File:  %s\n", yellow.Sprint("Not found (using defaults)"))
 		}
 		fmt.Printf("Apps URL:     %s\n", yellow.Sprint(appsUrl))
+		fmt.Printf("Packages URL: %s\n", yellow.Sprint(packageUrl))
 
 	},
 }

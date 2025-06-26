@@ -6,8 +6,10 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
+	"io"
 
 	"github.com/fatih/color"
 	"github.com/spf13/viper"
@@ -121,7 +123,7 @@ func GetSystemInfo() (string, string, string, string) {
 			} else {
 				PrintInfo("Could not determine distribution ID. Probing for common package managers...")
 			}
-			managersToProbe := []string{"apt", "pacman", "yum", "dnf", "apk"}
+			managersToProbe := []string{"apt", "pacman", "yum", "dnf", "apk", "zypper"}
 			for _, pm := range managersToProbe {
 				if CheckCommand(pm) {
 					PrintSuccess("Detected package manager: %s", pm)
@@ -181,4 +183,120 @@ func PrintInfo(format string, a ...interface{}) {
 func PrintHighlight(format string, a ...interface{}) {
 	magenta := color.New(color.FgMagenta).SprintFunc()
 	fmt.Println(magenta(fmt.Sprintf(format, a...)))
+}
+
+func UpdateSymlink(targetPath, linkPath string) error {
+	if err := os.MkdirAll(filepath.Dir(linkPath), 0755); err != nil {
+		return err
+	}
+	if _, err := os.Lstat(linkPath); err == nil {
+		if err := os.Remove(linkPath); err != nil {
+			return fmt.Errorf("failed to remove existing symlink at %s: %w", linkPath, err)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to check symlink status at %s: %w", linkPath, err)
+	}
+
+	return os.Symlink(targetPath, linkPath)
+}
+
+func GetShellExtension() string {
+	if runtime.GOOS == "windows" {
+		return "ps1"
+	}
+	return "sh"
+}
+
+func AddPkgPathToShell(shellName string) error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	pathToAdd := filepath.Join(home, ".zoi", "pkgs", "bins")
+	comment := "# Added by Zoi Package Manager to enable its commands"
+	var profilePath, pathCmd string
+
+	switch strings.ToLower(shellName) {
+	case "bash":
+		profilePath = filepath.Join(home, ".bashrc")
+		pathCmd = fmt.Sprintf("export PATH=\"%s:$PATH\"", pathToAdd)
+	case "zsh":
+		profilePath = filepath.Join(home, ".zshrc")
+		pathCmd = fmt.Sprintf("export PATH=\"%s:$PATH\"", pathToAdd)
+	case "fish":
+		profilePath = filepath.Join(home, ".config", "fish", "config.fish")
+		pathCmd = fmt.Sprintf("fish_add_path \"%s\"", pathToAdd)
+	default:
+		return fmt.Errorf("unsupported shell '%s'. Supported shells are: bash, zsh, fish", shellName)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(profilePath), 0755); err != nil {
+		return fmt.Errorf("failed to create profile directory: %w", err)
+	}
+
+	content, err := os.ReadFile(profilePath)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("could not read profile file %s: %w", profilePath, err)
+	}
+
+	if strings.Contains(string(content), pathToAdd) {
+		PrintSuccess("PATH already configured in %s. No changes needed.", profilePath)
+		return nil
+	}
+
+	f, err := os.OpenFile(profilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open profile file %s: %w", profilePath, err)
+	}
+	defer f.Close()
+
+	lineToAdd := fmt.Sprintf("\n%s\n%s\n", comment, pathCmd)
+	if _, err := f.WriteString(lineToAdd); err != nil {
+		return fmt.Errorf("failed to write to profile file: %w", err)
+	}
+
+	PrintSuccess("Successfully updated %s!", profilePath)
+	PrintInfo("Please restart your shell or run 'source %s' for the changes to take effect.", profilePath)
+
+	return nil
+}
+
+func DownloadAndExecuteScript(scriptURL string) error {
+	PrintInfo("Downloading installer script from %s...", scriptURL)
+
+	resp, err := http.Get(scriptURL)
+	if err != nil {
+		return fmt.Errorf("failed to start download: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to download script: received status code %d", resp.StatusCode)
+	}
+
+	filePattern := "zoi-installer-*" + GetShellExtension()
+	tempFile, err := os.CreateTemp("", filePattern)
+	if err != nil {
+		return fmt.Errorf("failed to create temporary file for installer: %w", err)
+	}
+	defer os.Remove(tempFile.Name())
+
+	if _, err := io.Copy(tempFile, resp.Body); err != nil {
+		return fmt.Errorf("failed to write installer script to disk: %w", err)
+	}
+
+	if err := tempFile.Close(); err != nil {
+		return fmt.Errorf("failed to close temporary file: %w", err)
+	}
+
+	if runtime.GOOS != "windows" {
+		if err := os.Chmod(tempFile.Name(), 0755); err != nil {
+			return fmt.Errorf("failed to make installer script executable: %w", err)
+		}
+	}
+
+	PrintInfo("\nExecuting installer script...")
+	PrintInfo("The script may prompt for your password to complete the installation.")
+	return ExecuteCommand(tempFile.Name())
 }

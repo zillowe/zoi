@@ -10,9 +10,23 @@ import (
 )
 
 var initCmd = &cobra.Command{
-	Use:   "init",
-	Short: "Initialize Zoi configuration",
+	Use:   "init [shell]",
+	Short: "Initialize Zoi configuration or shell environment",
+	Long: `Initializes Zoi's main configuration file in ~/.zoi/config.yaml.
+
+If a shell name (bash, zsh, fish) is provided as an argument,
+it will attempt to add the Zoi package binary path to your shell's PATH.`,
+	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		if len(args) > 0 {
+			shellName := args[0]
+			src.PrintInfo("Configuring shell environment for '%s'...", shellName)
+			if err := src.AddPkgPathToShell(shellName); err != nil {
+				src.PrintError("Failed to configure shell: %v", err)
+			}
+			return
+		}
+
 		home, err := os.UserHomeDir()
 		cobra.CheckErr(err)
 		configPath := filepath.Join(home, ".zoi")
@@ -25,20 +39,23 @@ var initCmd = &cobra.Command{
 
 		if osName == "linux" && pkgManager == "" {
 			src.PrintError("WARNING: Could not auto-detect a supported package manager.")
-			src.PrintInfo("You may need to set it manually via 'zoi set pkgManager <manager>' (e.g. apt, dnf, pacman).")
+			src.PrintInfo("You may need to set it manually via 'zoi set pkgManager <manager>'")
 		}
 
 		viper.Set("os", osName)
 		viper.Set("arch", arch)
 		viper.Set("distro", distro)
 		viper.Set("pkgManager", pkgManager)
-		viper.SetDefault("appsUrl", "https://zusty.codeberg.page/Zoi/@main/app/apps.json")
+		viper.SetDefault("appsUrl", "https://gitlab.com/Zusty/Zoi/-/raw/main/app/apps.json")
+		viper.SetDefault("pkg.endpoint", "https://gitlab.com/Zusty/Zoi-Pkgs.git")
 
-		if err := viper.WriteConfigAs(filepath.Join(configPath, "config.yaml")); err != nil {
+		configFile := filepath.Join(configPath, "config.yaml")
+		if err := viper.WriteConfigAs(configFile); err != nil {
 			src.PrintError("Error initializing Zoi: %v", err)
 			return
 		}
-		src.PrintSuccess("Zoi configuration file created at %s", viper.ConfigFileUsed())
+		src.PrintSuccess("Zoi configuration file created at %s", configFile)
+		src.PrintInfo("\nTo enable the 'zoi pkg' commands, run 'zoi init <your-shell>' (e.g. 'zoi init bash').")
 	},
 }
 

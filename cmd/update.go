@@ -2,9 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"io"
-	"net/http"
-	"os"
 	"runtime"
 	"zoi/src"
 
@@ -12,8 +9,8 @@ import (
 )
 
 const (
-	installScriptURL     = "https://zusty.codeberg.page/Zoi/@main/app/install.sh"
-	installPowershellURL = "https://zusty.codeberg.page/Zoi/@main/app/install.ps1"
+	installScriptURL     = "https://gitlab.com/Zusty/Zoi/-/raw/main/app/install.sh"
+	installPowershellURL = "https://gitlab.com/Zusty/Zoi/-/raw/main/app/install.ps1"
 )
 
 var updateCmd = &cobra.Command{
@@ -71,59 +68,14 @@ var updateCmd = &cobra.Command{
 }
 
 func runInstaller() {
-	src.PrintInfo("Starting Zoi update process...")
-	var scriptURL, filePattern string
-
+	var scriptURL string
 	if runtime.GOOS == "windows" {
 		scriptURL = installPowershellURL
-		filePattern = "zoi-installer-*.ps1"
 	} else {
 		scriptURL = installScriptURL
-		filePattern = "zoi-installer-*.sh"
 	}
 
-	src.PrintInfo("Downloading update script from %s...", scriptURL)
-	resp, err := http.Get(scriptURL)
-	if err != nil {
-		src.PrintError("Failed to start download: %v", err)
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		src.PrintError("Failed to download script: received status code %d", resp.StatusCode)
-		return
-	}
-
-	tempFile, err := os.CreateTemp("", filePattern)
-	if err != nil {
-		src.PrintError("Failed to create temporary file for installer: %v", err)
-		return
-	}
-	defer os.Remove(tempFile.Name())
-
-	_, err = io.Copy(tempFile, resp.Body)
-	if err != nil {
-		src.PrintError("Failed to write update script to disk: %v", err)
-		return
-	}
-
-	if err := tempFile.Close(); err != nil {
-		src.PrintError("Failed to close temporary file: %v", err)
-		return
-	}
-
-	if runtime.GOOS != "windows" {
-		if err := os.Chmod(tempFile.Name(), 0755); err != nil {
-			src.PrintError("Failed to make update script executable: %v", err)
-			return
-		}
-	}
-
-	fmt.Println()
-	src.PrintInfo("Executing update script...")
-	src.PrintInfo("You may be prompted for your password to install to a system directory.")
-	if err := src.ExecuteCommand(tempFile.Name()); err != nil {
+	if err := src.DownloadAndExecuteScript(scriptURL); err != nil {
 		src.PrintError("Update script failed during execution: %v", err)
 		return
 	}

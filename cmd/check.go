@@ -13,7 +13,6 @@ var checkCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		toolsToCheck := []string{
 			"git",
-			"curl",
 		}
 
 		yellow := src.Yellow()

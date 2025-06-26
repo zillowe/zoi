@@ -27,7 +27,7 @@ var setCmd = &cobra.Command{
 			return
 		}
 
-		configurableKeys := []string{"os", "arch", "distro", "pkgManager", "appsUrl"}
+		configurableKeys := []string{"os", "arch", "distro", "pkgManager", "appsUrl", "pkg.endpoint"}
 
 		templates := &promptui.SelectTemplates{
 			Label:    "{{ . }}",
@@ -71,7 +71,11 @@ var setCmd = &cobra.Command{
 
 func setKeyValue(key, value string) {
 	if key == "appsUrl" && value == "default" {
-		value = "https://zusty.codeberg.page/Zoi/@app/apps.json"
+		value = "https://gitlab.com/Zusty/Zoi/-/raw/main/app/apps.json"
+	}
+
+	if key == "pkg.endpoint" && value == "default" {
+		value = "https://gitlab.com/Zusty/Zoi-Pkgs.git"
 	}
 
 	viper.Set(key, value)
