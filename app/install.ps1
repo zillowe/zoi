@@ -1,35 +1,52 @@
 #!/usr/bin/env pwsh
+
 param(
-    [Switch]$NoPathUpdate = $false 
+    [Switch]$NoPathUpdate = $false
 )
 
 $ErrorActionPreference = "Stop"
 
-$RepoOwner = "Zusty"
-$RepoName = "Zoi"
-$BaseUrl = "https://codeberg.org/$RepoOwner/$RepoName/releases/download/latest"
-$BinName = "zoi.exe"                             
+$GitLabProjectPath = "Zusty/Zoi"
+$Tag = "latest"
+
+$BaseUrl = "https://gitlab.com/$GitLabProjectPath/-/releases/$Tag/downloads"
+$InstallDir = Join-Path $env:USERPROFILE ".zoi\bin"
+$BinName = "zoi.exe"
+
+function Write-Info { param($Message) Write-Host "[INFO] $Message" -ForegroundColor Cyan }
+function Write-Success { param($Message) Write-Host "[SUCCESS] $Message" -ForegroundColor Green }
+function Write-Error-Exit {
+    param($Message, $Exception = $null)
+    Write-Host "[ERROR] $Message" -ForegroundColor Red
+    if ($Exception) {
+        Write-Host "  $($Exception.Message)" -ForegroundColor Red
+    }
+    exit 1
+}
+
 
 $Os = "windows"
 $Arch = ""
 try {
-    $SystemType = (Get-CimInstance Win32_ComputerSystem).SystemType
-    if ($SystemType -match "x64-based") {
-        $Arch = "amd64"
+    if (Get-Command Get-ComputerInfo -ErrorAction SilentlyContinue) {
+        $OsInfo = Get-ComputerInfo | Select-Object -ExpandProperty "OsArchitecture"
+    } else {
+        $OsInfo = (Get-CimInstance Win32_OperatingSystem).OSArchitecture
     }
-    elseif ($SystemType -match "ARM64") {
-        $Arch = "arm64" 
-    }
-    else {
-        throw "Unsupported architecture: $SystemType"
+
+    if ($OsInfo -match "64-bit") {
+        if ((Get-CimInstance Win32_Processor).Architecture -eq 9) {
+            $Arch = "arm64"
+        } else {
+            $Arch = "amd64"
+        }
+    } else {
+        throw "Zoi currently requires a 64-bit (x64 or ARM64) Windows system."
     }
 }
 catch {
-    Write-Error "Install Failed: Zoi currently requires a 64-bit (x64 or ARM64) Windows system."
-    Write-Error $_.Exception.Message
-    exit 1
+    Write-Error-Exit "Architecture detection failed." $_.Exception
 }
-
 
 $TargetArchive = "zoi-${Os}-${Arch}.zip"
 $DownloadUrl = "$BaseUrl/$TargetArchive"
@@ -41,31 +58,25 @@ New-Item -ItemType Directory -Path $TempDir -Force | Out-Null
 $TempZipPath = Join-Path $TempDir $TargetArchive
 $TempChecksumPath = Join-Path $TempDir "checksums.txt"
 
-
-Write-Host "Installing/Updating Zoi for $Os ($Arch)..."
+Write-Info "Installing/Updating Zoi for $Os ($Arch)..."
+Write-Info "Target: $InstallDir"
 
 if (-not (Test-Path $InstallDir)) {
-    Write-Host "Creating installation directory: $InstallDir"
+    Write-Info "Creating installation directory: $InstallDir"
     New-Item -Path $InstallDir -ItemType Directory -Force | Out-Null
 }
 
-Write-Host "Downloading Zoi from: $DownloadUrl"
+Write-Info "Downloading Zoi from: $DownloadUrl"
 try {
-    if (Get-Command Start-BitsTransfer -ErrorAction SilentlyContinue) {
-        Start-BitsTransfer -Source $DownloadUrl -Destination $TempZipPath
-    } else {
-        Invoke-WebRequest -Uri $DownloadUrl -OutFile $TempZipPath -UseBasicParsing
-    }
-    Write-Host "Downloaded successfully to: $TempZipPath"
+    Invoke-WebRequest -Uri $DownloadUrl -OutFile $TempZipPath -UseBasicParsing
+    Write-Info "Downloaded successfully to: $TempZipPath"
 }
 catch {
-    Write-Error "Install Failed: Could not download Zoi from $DownloadUrl"
-    Write-Error $_.Exception.Message
     if (Test-Path $TempDir) { Remove-Item $TempDir -Recurse -Force }
-    exit 1
+    Write-Error-Exit "Could not download Zoi from $DownloadUrl" $_.Exception
 }
 
-Write-Host "Verifying checksum..."
+Write-Info "Verifying checksum..."
 try {
     Invoke-WebRequest -Uri $ChecksumUrl -OutFile $TempChecksumPath -UseBasicParsing
     
@@ -80,56 +91,50 @@ try {
         throw "Checksum mismatch! The downloaded file may be corrupt or tampered with."
     }
 
-    Write-Host "Checksum verified successfully."
+    Write-Success "Checksum verified successfully."
 }
 catch {
-    Write-Error "Security Verification Failed: $($_.Exception.Message)"
     if (Test-Path $TempDir) { Remove-Item $TempDir -Recurse -Force }
-    exit 1
+    Write-Error-Exit "Security Verification Failed:" $_.Exception
 }
 
 if (Test-Path $OutputPath) {
-    Write-Host "Removing existing binary at $OutputPath..."
+    Write-Info "Removing existing binary at $OutputPath..."
     Remove-Item $OutputPath -Force -ErrorAction SilentlyContinue | Out-Null
 }
 
-Write-Host "Extracting archive..."
+Write-Info "Extracting archive to $InstallDir..."
 try {
     Expand-Archive -Path $TempZipPath -DestinationPath $InstallDir -Force
     
-    $ExtractedExe = Join-Path $InstallDir "zoi.exe"
-    if (-not (Test-Path $ExtractedExe)) {
-        throw "Could not find 'zoi.exe' in the extracted archive."
+    if (-not (Test-Path $OutputPath)) {
+        throw "Could not find '$BinName' in the extracted archive."
     }
     
-    
-    Write-Host "Extraction successful to $InstallDir."
+    Write-Success "Extraction successful."
 }
 catch {
-    Write-Error "Install Failed: Could not extract archive $TempZipPath"
-    Write-Error $_.Exception.Message
-    exit 1
+    Write-Error-Exit "Could not extract archive $TempZipPath" $_.Exception
 }
 finally {
     if (Test-Path $TempDir) { Remove-Item $TempDir -Recurse -Force }
 }
 
 if (-not $NoPathUpdate) {
-    Write-Host "Checking user PATH environment variable..."
+    Write-Info "Checking user PATH environment variable..."
     try {
         $UserPath = [Environment]::GetEnvironmentVariable('Path', 'User')
         if ($UserPath -notlike "*$InstallDir*") {
-            Write-Host "Adding '$InstallDir' to user PATH..."
-            $Separator = ""
+            Write-Info "Adding '$InstallDir' to user PATH..."
             if (-not ([string]::IsNullOrEmpty($UserPath)) -and (-not $UserPath.EndsWith(";"))) {
-                $Separator = ";"
+                $UserPath += ";"
             }
-            $NewPath = $UserPath + $Separator + $InstallDir
+            $NewPath = $UserPath + $InstallDir
             [Environment]::SetEnvironmentVariable('Path', $NewPath, 'User')
-            Write-Host "PATH updated. You need to restart your terminal for the change to take effect." -ForegroundColor Green
+            Write-Success "PATH updated. You must restart your terminal for the change to take effect."
         }
         else {
-            Write-Host "'$InstallDir' is already in the user PATH."
+            Write-Info "'$InstallDir' is already in the user PATH."
         }
     }
     catch {
@@ -138,9 +143,9 @@ if (-not $NoPathUpdate) {
     }
 }
 else {
-    Write-Host "Skipping PATH update as requested. Add '$InstallDir' to your PATH manually."
+    Write-Info "Skipping PATH update as requested. Add '$InstallDir' to your PATH manually."
 }
 
 Write-Host ""
-Write-Host "Zoi ($TargetArchive) installed/updated successfully to: $InstallDir" -ForegroundColor Green
-Write-Host "Run 'zoi --version' in a *new* terminal window to verify."
+Write-Success "Zoi ($TargetArchive) installed/updated successfully to: $InstallDir"
+Write-Info "Run 'zoi --version' in a *new* terminal window to verify."

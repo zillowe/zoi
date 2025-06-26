@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
+
 set -euo pipefail
 
-REPO_BASE_URL="https://codeberg.org/Zusty/Zoi/releases/download/latest"
+GITLAB_PROJECT_PATH="Zusty/Zoi"
+TAG="latest"
+
+REPO_BASE_URL="https://gitlab.com/${GITLAB_PROJECT_PATH}/-/releases/${TAG}/downloads"
+
 INSTALL_DIR="${HOME}/.local/bin"
 BIN_NAME="zoi"
-
 COMMENT_LINE="# Zoi PATH addition"
 
 info() {
@@ -20,6 +24,7 @@ warn() {
 require_util() {
     command -v "$1" >/dev/null 2>&1 || error "'$1' command is required but not found. Please install it."
 }
+
 
 require_util "curl"
 require_util "uname"
@@ -45,6 +50,7 @@ esac
 
 TARGET_ARCHIVE="zoi-${os}-${arch}.tar.xz"
 DOWNLOAD_URL="${REPO_BASE_URL}/${TARGET_ARCHIVE}"
+CHECKSUM_URL="${REPO_BASE_URL}/checksums.txt"
 INSTALL_PATH="${INSTALL_DIR}/${BIN_NAME}"
 
 TEMP_DIR=$(mktemp -d)
@@ -68,8 +74,6 @@ else
 fi
 
 info "Verifying checksum..."
-CHECKSUM_URL="${REPO_BASE_URL}/checksums.txt"
-
 if ! curl --fail --location --progress-bar --output "$TEMP_CHECKSUMS" "$CHECKSUM_URL"; then
     rm -rf "$TEMP_DIR"
     error "Failed to download checksums file: ${CHECKSUM_URL}"
