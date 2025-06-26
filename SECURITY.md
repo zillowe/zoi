@@ -4,7 +4,7 @@
 
 | Version           | Supported          |
 | ----------------- | ------------------ |
-| Prod. Beta 1.X.X | :white_check_mark: |
+| Prod. Beta 2.X.X  | :white_check_mark: |
 
 ## Security Updates
 
@@ -15,7 +15,7 @@ We take security seriously. Security updates are released as soon as possible af
 If you discover a security vulnerability, please follow these steps:
 
 1. **DO NOT** disclose the vulnerability publicly.
-2. Send a detailed report to: [@ZilloweZ:matrix.org](https://matrix.to/#/@ZilloweZ:matrix.org).
+2. Send a detailed report to: [GitLab Vulnerability](https://gitlab.com/Zusty/Zoi/-/security/vulnerability_report) or [@ZilloweZ:matrix.org](https://matrix.to/#/@ZilloweZ:matrix.org).
 3. Include in your report:
    - A description of the vulnerability
    - Steps to reproduce the issue

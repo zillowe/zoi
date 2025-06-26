@@ -1,26 +1,45 @@
 <div align="center">
-    <img width="120" height="120" hspace="10" alt="ZDS Logo" src="https://codeberg.org/Zusty/ZDS/media/branch/main/img/zds.png"/>
+    <img width="120" height="120" hspace="10" alt="ZDS Logo" src="https://gitlab.com/Zusty/ZDS/-/raw/main/img/zds.png"/>
     <h1>Zoi</h1>
-    A universal environment setup tool for developers.
-<br/>
-<a href="https://codeberg.org/Zillowe/ZFPL">
-<img alt="ZFPL-1.0" src="https://codeberg.org/Zillowe/ZFPL/raw/branch/main/badges/1-0/dark.svg"/>
-</a>
+    Universal Package Manager & Environment Setup Tool
 <br/>
 More links
 <br/>
-<a href="https://codeberg.org/Zusty/Zoi/src/branch/main/CHANGELOG.md">Changelog</a> •
-<a href="https://codeberg.org/Zusty/Zoi/src/branch/main/SECURITY.md">Security</a> •
-<a href="https://codeberg.org/Zusty/Zoi/src/branch/main/CODE_OF_CONDUCT.md">Code of Conduct</a> •
-<a href="https://codeberg.org/Zusty/Zoi/src/branch/main/CONTRIBUTING.md">Contribution</a>
+<a href="https://gitlab.com/Zusty/Zoi/-/blob/main/SECURITY.md">Security</a>
 
 </div>
 
 <hr/>
 
+## Overview
+
+Zoi is a universal package manager and environment setup tool.
+It aims to simplify package management and environment configuration for various operating systems.
+
+Table of Contents
+
+- [Overview](#overview)
+- [Installation](#installation)
+  - [Package Managers](#package-managers)
+  - [Scripts](#scripts)
+  - [Build](#build)
+- [Update](#update)
+- [Documentation](#documentation)
+- [Footer](#footer)
+  - [License](#license)
+
 ## Installation
 
 You can either build it from source or install it using installer scripts
+
+### Package Managers
+
+You can install Zoi via these package managers:
+
+```sh
+# AUR
+yay -Sy zoi # or paru
+```
 
 ### Scripts
 
@@ -28,9 +47,9 @@ To install Zoi, you need to run this command:
 
 ```sh
 # For Linux/macOS
-curl -fsSL https://zusty.codeberg.page/Zoi/@app/install.sh | bash
+curl -fsSL https://gitlab.com/Zusty/Zoi/-/raw/main/app/install.sh | bash
 # For Windows
-powershell -c "irm zusty.codeberg.page/Zoi/@app/install.ps1|iex"
+powershell -c "irm gitlab.com/Zusty/Zoi/-/raw/main/app/install.ps1|iex"
 ```
 
 ### Build
@@ -41,23 +60,28 @@ then run this command to build it:
 
 ```sh
 # For Linux/macOS
-./build/build.sh
+./build/build-release.sh
 # For Windows
-./build/build.ps1
+./build/build-release.ps1
 ```
 
-To build it for all run this:
+or using Go CLI:
 
 ```sh
-# For Linux/macOS
-./build/build-all.sh
-# For Windows
-./build/build-all.ps1
+go install https://gitlab.com/Zusty/Zoi
+```
+
+## Update
+
+You can update Zoi by running this command:
+
+```sh
+zoi update
 ```
 
 ## Documentation
 
-To get started with Zoi please refer to the [Zoi Wiki](https://codeberg.org/Zusty/Zoi/wiki).
+To get started with Zoi please refer to the [Wiki](https://gitlab.com/Zusty/Zoi/-/wikis/home).
 
 ## Footer
 
@@ -65,4 +89,4 @@ Zoi is developed by Zusty < Zillowe Foundation, part of the Zillowe Development 
 
 ### License
 
-Zoi is licensed under the [ZFPL](https://codeberg.org/Zillowe/ZFPL)-1.0 (Zillowe Foundation Public License, Version 1.0).
+Zoi is licensed under the [Apache-2.0](https://gitlab.com/Zusty/Zoi/-/blob/main/LICENSE) License.
