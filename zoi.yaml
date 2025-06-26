@@ -14,6 +14,8 @@ commands:
     run: "./build/archive.sh"
   - cmd: "publish"
     run: "./build/publish.sh"
+  - cmd: "test"
+    run: "go test -v ./tests"
 
 environments:
   - name: "Development"
@@ -22,3 +24,29 @@ environments:
   - name: "Production"
     cmd: "prod"
     run: ["./build/build-all.sh"]
+
+package:
+  name: "Zoi"
+  desc: "Universal Package Manager & Environment Setup Tool"
+  handle: "zoi"
+  website: "https://gitlab.com/Zusty/Zoi"
+  repo: "https://gitlab.com/Zusty/Zoi.git"
+  version: "1.0.0"
+  installer: "https://gitlab.com/Zusty/Zoi/-/raw/main/app/install.{shellExt}"
+
+depends:
+  - handle: "git"
+    version: "2.40.0"
+    install:
+      pm: "native"
+      handle: "git"
+
+build:
+  cmd: "./build/build-release.{shellExt}"
+  bin: "./build/compiled/zoi"
+  depends:
+    - handle: "go"
+      version: "1.24.4"
+      install:
+        pm: "native"
+        handle: "go"

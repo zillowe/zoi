@@ -1,8 +1,8 @@
 # Zoi Changelog
 
-Latest Production Version: Prod. Beta 1.2.0
+Latest Production Version: Public Release 1.0.0
 
-Latest Development Version: Dev. Beta 1.2.0
+Latest Development Version: Dev. Release 1.0.0
 
 ## `Production`
 
@@ -11,6 +11,16 @@ Refurbished for production
 ## `Development`
 
 On the development branch.
+
+### `Release 1.0.0`
+
+- **[🛠 Build(install)](https://gitlab.com/Zusty/Zoi/-/commit/df1aa2ddb949f7afc1a6d958b64f3fcc32f11fec)**: Migrated release source to GitLab.
+
+- **[✨ Feat(pkg)](https://gitlab.com/Zusty/Zoi/-/commit/3f15fb1c3aa1f115c887498b330d47e8301e3d6f)**: Introduced universal package manager commands.
+
+- **[🏗️ Struct](https://gitlab.com/Zusty/Zoi/-/commit/edc21bcf870ac2c6001d8281e7b157cf52445a48)**: Adopted Apache 2.0 license.
+
+- **[🔀 Git](https://gitlab.com/Zusty/Zoi/-/commit/da6e8f258760508740a4be3ed26a2b6a4cfa1424)**: Moved to GitLab.
 
 ### `Beta 1.2.1`
 
