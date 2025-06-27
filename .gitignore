@@ -2,8 +2,12 @@ etc
 test
 build/compiled
 build/archived
+.env
 
 # Added by GCT
 gct.yaml
 
 /.gct/
+
+cmd/tui_form.go
+cmd/pkg_new.go

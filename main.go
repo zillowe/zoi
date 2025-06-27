@@ -7,7 +7,7 @@ import (
 var (
 	VerBranch = "Prod."
 	VerStatus = "Release"
-	VerNumber = "1.0.0"
+	VerNumber = "1.0.1"
 	VerCommit = "dev"
 )
 
