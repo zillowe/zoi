@@ -44,7 +44,7 @@ var pkgListCmd = &cobra.Command{
 		packages := make([]pkgmanager.Package, 0, len(dbConfig.Packages))
 		for handle, pkg := range dbConfig.Packages {
 			pkg.Name = handle
-			
+
 			if listInstalledOnly {
 				if _, ok := installedHandles[handle]; ok {
 					packages = append(packages, pkg)
@@ -58,12 +58,13 @@ var pkgListCmd = &cobra.Command{
 			return packages[i].Name < packages[j].Name
 		})
 
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
+		w := tabwriter.NewWriter(os.Stdout, 0, 8, 4, ' ', 0)
+
 		fmt.Fprintln(w, "HANDLE\tVERSION\tDESCRIPTION")
 		fmt.Fprintln(w, "------\t-------\t-----------")
 
 		for _, pkg := range packages {
-			fmt.Fprintf(w, "%s\t%s\t%s\n", src.Yellow().Sprint(pkg.Name), pkg.Version, pkg.Desc)
+			fmt.Fprintf(w, "%s\t%s\t%s\n", pkg.Name, pkg.Version, pkg.Desc)
 		}
 
 		w.Flush()
@@ -86,7 +87,6 @@ func getInstalledHandles(homeDir string) map[string]bool {
 	}
 	return installed
 }
-
 
 func init() {
 	pkgListCmd.Flags().BoolVarP(&listInstalledOnly, "installed", "I", false, "Only show installed packages")

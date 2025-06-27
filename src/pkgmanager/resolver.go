@@ -1,14 +1,16 @@
 package pkgmanager
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"zoi/src"
 
 	"github.com/go-git/go-git/v5"
 	"gopkg.in/yaml.v2"
-	"encoding/json"
 )
 
 type DependencyResolver struct {
@@ -46,43 +48,58 @@ func (dr *DependencyResolver) ResolveAndInstall(recipe *PackageRecipe, handle st
 		return nil
 	}
 
-	isBuildFromSource := recipe.PackageInfo.Bin == ""
+	isBuildFromSource := recipe.PackageInfo.Bin == "" && recipe.PackageInfo.Installer == ""
 	if isBuildFromSource {
 		src.PrintInfo("Build from source detected. Resolving build dependencies...")
-		if err := dr.resolveDependencyList(recipe.Build.Depends); err != nil {
+		if err := dr.resolveDependencyList(recipe.Build.Depends, noCache); err != nil {
 			return err
 		}
 	}
 
 	src.PrintInfo("Resolving runtime dependencies...")
-	if err := dr.resolveDependencyList(recipe.Depends); err != nil {
+	if err := dr.resolveDependencyList(recipe.Depends, noCache); err != nil {
 		return err
 	}
 
 	src.PrintHighlight("--- Installing: %s ---", handle)
 	var installedBinPath string
-	var err error	
+	var err error
 
-	if isBuildFromSource {
+	if recipe.PackageInfo.Installer != "" {
+		err = installFromInstaller(recipe, handle)
+		if err == nil {
+			dr.processed[handle] = true
+		}
+		return err
+	} else if isBuildFromSource {
 		installedBinPath, err = installFromSource(recipe, handle, !noCache)
 	} else {
 		installedBinPath, err = installFromBinary(recipe, handle)
-	}	
+	}
 
 	if err != nil {
 		return err
 	}
 
-
 	binsPath := filepath.Join(dr.homeDir, ".zoi", "pkgs", "bins")
 	os.MkdirAll(binsPath, 0755)
 	symlinkPath := filepath.Join(binsPath, handle)
 
-	if err := src.UpdateSymlink(installedBinPath, symlinkPath); err != nil {
-		return fmt.Errorf("failed to create symlink: %w", err)
+	if recipe.PackageInfo.Installer == "" {
+		if err := src.UpdateSymlink(installedBinPath, symlinkPath); err != nil {
+			return fmt.Errorf("failed to create symlink: %w", err)
+		}
+		src.PrintSuccess("Binary for '%s' linked to %s", handle, symlinkPath)
 	}
-	src.PrintSuccess("Binary for '%s' linked to %s", handle, symlinkPath)
 
+	recipePath := filepath.Join(dr.homeDir, ".zoi", "pkgs", "store", handle, "zoi.yaml")
+	recipeData, err := yaml.Marshal(recipe)
+	if err != nil {
+		return fmt.Errorf("failed to serialize recipe for saving: %w", err)
+	}
+	if err := os.WriteFile(recipePath, recipeData, 0644); err != nil {
+		return fmt.Errorf("failed to save recipe metadata: %w", err)
+	}
 
 	dr.processed[handle] = true
 	return nil
@@ -96,18 +113,18 @@ func (dr *DependencyResolver) resolveDependencyList(dependencies []Dependency, n
 
 	for _, dep := range dependencies {
 		if dep.Install.PM == "native" {
-			src.PrintInfo("Native dependency found: '%s'", dep.Handle)
+			src.PrintInfo("Native dependency check for '%s' assumed to be met by the user.", dep.Handle)
 			continue
 		}
 
-		depRecipe, err := loadPackageRecipe(dep.Handle)
+		depRecipe, err := LoadPackageRecipe(dep.Handle)
 		if err != nil {
 			return fmt.Errorf("could not load recipe for dependency '%s': %w", dep.Handle, err)
 		}
 
 		if err := dr.ResolveAndInstall(depRecipe, dep.Handle, noCache); err != nil {
 			return fmt.Errorf("failed to resolve dependency '%s': %w", dep.Handle, err)
-		}	
+		}
 	}
 	return nil
 }
@@ -143,6 +160,34 @@ func LoadPackageRecipe(handle string) (*PackageRecipe, error) {
 	return &recipe, nil
 }
 
+func LoadInstalledRecipe(handle string) (*PackageRecipe, error) {
+	home, _ := os.UserHomeDir()
+	recipePath := filepath.Join(home, ".zoi", "pkgs", "store", handle, "zoi.yaml")
+
+	data, err := os.ReadFile(recipePath)
+	if err != nil {
+		return nil, fmt.Errorf("could not read installed recipe for '%s'. It may be corrupted or was installed with an older Zoi version", handle)
+	}
+
+	var recipe PackageRecipe
+	if err := yaml.Unmarshal(data, &recipe); err != nil {
+		return nil, fmt.Errorf("failed to parse installed recipe for '%s': %w", handle, err)
+	}
+	return &recipe, nil
+}
+
+func installFromInstaller(recipe *PackageRecipe, handle string) error {
+	replacer := strings.NewReplacer(
+		"{version}", recipe.PackageInfo.Version,
+		"{os}", runtime.GOOS,
+		"{arch}", runtime.GOARCH,
+		"{shellExt}", src.GetShellExtension(),
+	)
+	url := replacer.Replace(recipe.PackageInfo.Installer)
+
+	return src.DownloadAndExecuteScript(url)
+}
+
 func installFromSource(recipe *PackageRecipe, handle string, useCache bool) (string, error) {
 	home, _ := os.UserHomeDir()
 	pkgStorePath := filepath.Join(home, ".zoi", "pkgs", "store", handle)
@@ -151,7 +196,7 @@ func installFromSource(recipe *PackageRecipe, handle string, useCache bool) (str
 	destBinPath := filepath.Join(binStoreDir, handle)
 
 	src.PrintInfo("Cloning source code from %s...", recipe.PackageInfo.Repo)
-	os.RemoveAll(codePath) // Clear any previous attempts
+	os.RemoveAll(codePath)
 	_, err := git.PlainClone(codePath, false, &git.CloneOptions{
 		URL: recipe.PackageInfo.Repo, Progress: os.Stdout,
 	})
@@ -181,13 +226,12 @@ func installFromSource(recipe *PackageRecipe, handle string, useCache bool) (str
 		return "", fmt.Errorf("failed to move compiled binary: %w", err)
 	}
 
-	if !useCache { // Note: logic is inverted from --no-cache
+	if !useCache {
 		src.PrintInfo("Removing source code due to --no-cache flag...")
 		os.RemoveAll(codePath)
 	}
 	return destBinPath, nil
 }
-
 
 func installFromBinary(recipe *PackageRecipe, handle string) (string, error) {
 	home, _ := os.UserHomeDir()
@@ -196,4 +240,3 @@ func installFromBinary(recipe *PackageRecipe, handle string) (string, error) {
 
 	return DownloadAndExtractBinary(*recipe, binStoreDir)
 }
-
