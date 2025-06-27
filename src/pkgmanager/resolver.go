@@ -14,8 +14,9 @@ import (
 )
 
 type DependencyResolver struct {
-	processed map[string]bool
-	homeDir   string
+	processed            map[string]bool
+	homeDir              string
+	systemPackageManager string
 }
 
 func NewResolver() (*DependencyResolver, error) {
@@ -23,9 +24,12 @@ func NewResolver() (*DependencyResolver, error) {
 	if err != nil {
 		return nil, err
 	}
+	_, _, _, pkgManager := src.GetSystemInfo()
+
 	return &DependencyResolver{
-		processed: make(map[string]bool),
-		homeDir:   home,
+		processed:            make(map[string]bool),
+		homeDir:              home,
+		systemPackageManager: pkgManager,
 	}, nil
 }
 
@@ -107,23 +111,36 @@ func (dr *DependencyResolver) ResolveAndInstall(recipe *PackageRecipe, handle st
 
 func (dr *DependencyResolver) resolveDependencyList(dependencies []Dependency, noCache bool) error {
 	if len(dependencies) == 0 {
-		src.PrintInfo("No dependencies in this list.")
+		src.PrintInfo("No dependencies in this list to process.")
 		return nil
 	}
 
 	for _, dep := range dependencies {
-		if dep.Install.PM == "native" {
-			src.PrintInfo("Native dependency check for '%s' assumed to be met by the user.", dep.Handle)
+		targetPM := dep.Install.PM
+		targetHandle := dep.Install.Handle
+		if targetHandle == "" {
+			targetHandle = dep.Handle
+		}
+
+		if targetPM == "" || targetPM == "zoi" {
+			src.PrintInfo("Resolving Zoi package dependency: '%s'", dep.Handle)
+			depRecipe, err := LoadPackageRecipe(dep.Handle)
+			if err != nil {
+				return fmt.Errorf("could not load recipe for dependency '%s': %w", dep.Handle, err)
+			}
+			if err := dr.ResolveAndInstall(depRecipe, dep.Handle, noCache); err != nil {
+				return fmt.Errorf("failed to resolve dependency '%s': %w", dep.Handle, err)
+			}
 			continue
 		}
 
-		depRecipe, err := LoadPackageRecipe(dep.Handle)
-		if err != nil {
-			return fmt.Errorf("could not load recipe for dependency '%s': %w", dep.Handle, err)
-		}
-
-		if err := dr.ResolveAndInstall(depRecipe, dep.Handle, noCache); err != nil {
-			return fmt.Errorf("failed to resolve dependency '%s': %w", dep.Handle, err)
+		if targetPM == dr.systemPackageManager {
+			src.PrintInfo("System dependency found for '%s': ensuring '%s' is installed...", targetPM, targetHandle)
+			if err := src.InstallPackage(targetPM, targetHandle); err != nil {
+				return fmt.Errorf("failed to install system dependency '%s' with %s: %w", targetHandle, targetPM, err)
+			}
+		} else {
+			src.PrintInfo("Skipping dependency '%s' (for %s); not applicable to your system (%s).", targetHandle, targetPM, dr.systemPackageManager)
 		}
 	}
 	return nil
