@@ -2,7 +2,6 @@ etc
 test
 build/compiled
 build/archived
-.env
 
 # Added by GCT
 gct.yaml
