@@ -1,0 +1,72 @@
+package pkgmanager
+
+import (
+	"bytes"
+	"fmt"
+	"os/exec"
+	"strings"
+)
+
+const ZoiPublicKey = `-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+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
+TQfdqL9GgARmtqgzq9tPy0n7wm17en8w7Dk=
+=UH78
+-----END PGP PUBLIC KEY BLOCK-----`
+
+func ImportZoiSigningKey() error {
+	cmd := exec.Command("gpg", "--import", "-")
+	cmd.Stdin = strings.NewReader(ZoiPublicKey)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	if err != nil {
+		return fmt.Errorf("gpg command failed: %w. Stderr: %s", err, stderr.String())
+	}
+	return nil
+}

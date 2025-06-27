@@ -10,6 +10,7 @@ type Package struct {
 	Name    string `json:"name"`
 	Desc    string `json:"desc"`
 	PkgFile string `json:"pkgFile"`
+	SigFile string `json:"sigFile"`
 	Version string `json:"version"`
 }
 
@@ -20,14 +21,15 @@ type PackageRecipe struct {
 }
 
 type PackageDetails struct {
-	Name    string `yaml:"name"`
-	Desc    string `yaml:"desc"`
-	Handle  string `yaml:"handle"`
-	Website string `yaml:"website"`
-	Repo    string `yaml:"repo"`
-	Version string `yaml:"version"`
-	Bin       string `yaml:"bin,omitempty"`
-	Installer string `yaml:"installer,omitempty"`
+	Name         string `yaml:"name"`
+	Desc         string `yaml:"desc"`
+	Handle       string `yaml:"handle"`
+	Website      string `yaml:"website"`
+	Repo         string `yaml:"repo"`
+	Version      string `yaml:"version"`
+	Installer    string `yaml:"installer,omitempty"`
+	InstallerSig string `yaml:"installerSig,omitempty"`
+	Bin          string `yaml:"bin,omitempty"`
 }
 
 type BuildInfo struct {

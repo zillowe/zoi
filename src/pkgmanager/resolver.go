@@ -3,6 +3,8 @@ package pkgmanager
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -70,42 +72,37 @@ func (dr *DependencyResolver) ResolveAndInstall(recipe *PackageRecipe, handle st
 	var err error
 
 	if recipe.PackageInfo.Installer != "" {
-		err = installFromInstaller(recipe, handle)
-		if err == nil {
-			dr.processed[handle] = true
-		}
-		return err
-	} else if isBuildFromSource {
-		installedBinPath, err = installFromSource(recipe, handle, !noCache)
-	} else {
+		err = installFromSignedInstaller(recipe)
+	} else if recipe.PackageInfo.Bin != "" {
 		installedBinPath, err = installFromBinary(recipe, handle)
+	} else {
+		installedBinPath, err = installFromSource(recipe, handle, !noCache)
 	}
 
 	if err != nil {
 		return err
 	}
 
-	binsPath := filepath.Join(dr.homeDir, ".zoi", "pkgs", "bins")
-	os.MkdirAll(binsPath, 0755)
-	symlinkPath := filepath.Join(binsPath, handle)
-
 	if recipe.PackageInfo.Installer == "" {
+		binsPath := filepath.Join(dr.homeDir, ".zoi", "pkgs", "bins")
+		os.MkdirAll(binsPath, 0755)
+		symlinkPath := filepath.Join(binsPath, handle)
 		if err := src.UpdateSymlink(installedBinPath, symlinkPath); err != nil {
 			return fmt.Errorf("failed to create symlink: %w", err)
 		}
 		src.PrintSuccess("Binary for '%s' linked to %s", handle, symlinkPath)
-	}
-
-	recipePath := filepath.Join(dr.homeDir, ".zoi", "pkgs", "store", handle, "zoi.yaml")
-	recipeData, err := yaml.Marshal(recipe)
-	if err != nil {
-		return fmt.Errorf("failed to serialize recipe for saving: %w", err)
-	}
-	if err := os.WriteFile(recipePath, recipeData, 0644); err != nil {
-		return fmt.Errorf("failed to save recipe metadata: %w", err)
+	} else {
+		src.PrintSuccess("Package '%s' installed successfully via its installer script.", handle)
 	}
 
 	dr.processed[handle] = true
+	recipePath := filepath.Join(dr.homeDir, ".zoi", "pkgs", "store", handle, "zoi.yaml")
+	recipeData, ymlErr := yaml.Marshal(recipe)
+	if ymlErr == nil {
+		os.MkdirAll(filepath.Dir(recipePath), 0755)
+		os.WriteFile(recipePath, recipeData, 0644)
+	}
+
 	return nil
 }
 
@@ -203,6 +200,66 @@ func installFromInstaller(recipe *PackageRecipe, handle string) error {
 	url := replacer.Replace(recipe.PackageInfo.Installer)
 
 	return src.DownloadAndExecuteScript(url)
+}
+
+func installFromSignedInstaller(recipe *PackageRecipe) error {
+	replacer := strings.NewReplacer(
+		"{shellExt}", src.GetShellExtension(),
+	)
+	installerURL := replacer.Replace(recipe.PackageInfo.Installer)
+	signatureURL := replacer.Replace(recipe.PackageInfo.InstallerSig)
+
+	src.PrintInfo("Downloading installer from: %s", installerURL)
+	src.PrintInfo("Downloading signature from: %s", signatureURL)
+
+	installerResp, err := http.Get(installerURL)
+	if err != nil || installerResp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to download installer script: %v", err)
+	}
+	defer installerResp.Body.Close()
+	installerData, err := io.ReadAll(installerResp.Body)
+	if err != nil {
+		return err
+	}
+
+	sigResp, err := http.Get(signatureURL)
+	if err != nil || sigResp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to download signature file: %v", err)
+	}
+	defer sigResp.Body.Close()
+	sigData, err := io.ReadAll(sigResp.Body)
+	if err != nil {
+		return err
+	}
+
+	src.PrintInfo("Verifying installer script signature...")
+	signerName, err := verifySignature(installerData, sigData)
+	if err != nil {
+		return fmt.Errorf("installer script signature verification failed: %w", err)
+	}
+	src.PrintSuccess("Installer script signature verified by: %s", signerName)
+
+	filePattern := "zoi-installer-*" + src.GetShellExtension()
+	tempFile, err := os.CreateTemp("", filePattern)
+	if err != nil {
+		return fmt.Errorf("failed to create temporary file for installer: %w", err)
+	}
+	defer os.Remove(tempFile.Name())
+
+	if _, err := tempFile.Write(installerData); err != nil {
+		return err
+	}
+	if err := tempFile.Close(); err != nil {
+		return err
+	}
+	if runtime.GOOS != "windows" {
+		if err := os.Chmod(tempFile.Name(), 0755); err != nil {
+			return fmt.Errorf("failed to make installer script executable: %w", err)
+		}
+	}
+
+	src.PrintInfo("\nExecuting verified installer script...")
+	return src.ExecuteCommand(tempFile.Name())
 }
 
 func installFromSource(recipe *PackageRecipe, handle string, useCache bool) (string, error) {

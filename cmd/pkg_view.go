@@ -19,12 +19,12 @@ var (
 	viewProviderGitlab  bool
 	viewProviderGitea   bool
 	viewProviderForgejo bool
-	viewRaw bool
+	viewRaw             bool
 )
 
 var pkgViewCmd = &cobra.Command{
-	Use:     "view [handle] <endpoint-url> | [git-url]",
-	Short:   "Display information about a package",
+	Use:   "view [handle] <endpoint-url> | [git-url]",
+	Short: "Display information about a package",
 	Long: `Displays information about a package recipe.
 
 By default, it shows a formatted, human-readable summary.
@@ -39,7 +39,7 @@ Use the --raw flag to view the raw zoi.yaml file with syntax highlighting.
 - View the zoi.yaml from the root of a git repository:
   zoi pkg view <git-url>`,
 	Aliases: []string{"v"},
-	Args: cobra.RangeArgs(1, 2),
+	Args:    cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
 		var yamlContent []byte
 		var err error
@@ -65,6 +65,15 @@ Use the --raw flag to view the raw zoi.yaml file with syntax highlighting.
 		if err != nil {
 			src.PrintError("%v", err)
 			return
+		}
+
+		if len(args) == 2 {
+			handle := args[0]
+			endpointURL := args[1]
+			src.PrintInfo("Verifying recipe signature...")
+			if err := pkgmanager.VerifyRecipeSignature(yamlContent, handle, endpointURL, providerHint); err != nil {
+				src.PrintError("SECURITY WARNING: Recipe signature verification failed: %v", err)
+			}
 		}
 
 		if viewRaw {
@@ -123,7 +132,6 @@ func printFormattedRecipe(recipe pkgmanager.PackageRecipe) {
 	fmt.Println()
 }
 
-
 func getViewProviderFromFlags() pkgmanager.Provider {
 	if viewProviderGithub {
 		return pkgmanager.ProviderGitHub
@@ -162,10 +170,9 @@ func loadRecipeContentFromDB(handle string) ([]byte, error) {
 	return os.ReadFile(recipePath)
 }
 
-
 func init() {
 	pkgViewCmd.Flags().BoolVar(&viewRaw, "raw", false, "Display the raw zoi.yaml file with syntax highlighting")
-	
+
 	pkgViewCmd.Flags().BoolVar(&viewProviderGithub, "github", false, "Hint that the URL is a GitHub-style repository")
 	pkgViewCmd.Flags().BoolVar(&viewProviderGitlab, "gitlab", false, "Hint that the URL is a GitLab-style repository")
 	pkgViewCmd.Flags().BoolVar(&viewProviderGitea, "gitea", false, "Hint that the URL is a Gitea-style repository (e.g. Codeberg)")
