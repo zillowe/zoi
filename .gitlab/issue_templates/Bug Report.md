@@ -1,6 +1,6 @@
 <!-- Please prefix your title with "[BUG]" -->
 
-**NOTE: If your issue is a security concern, please contact me on [Matrix](https://matrix.to/#/@ZilloweZ:matrix.org>) or open a [Vulnerability Report](https://gitlab.com/Zillwen/Zusty/Zoi-Pkgs/-/security/vulnerability_report) instead of opening a public issue.**
+**NOTE: If your issue is a security concern, please contact me on [Matrix](https://matrix.to/#/@ZilloweZ:matrix.org>) or open a [Vulnerability Report](https://gitlab.com/Zillwen/Zusty/Zoi/-/security/vulnerability_report) instead of opening a public issue.**
 
 ---
 
