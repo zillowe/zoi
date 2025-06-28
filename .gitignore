@@ -2,6 +2,7 @@ etc
 test
 build/compiled
 build/archived
+packages
 
 # Added by GCT
 gct.yaml

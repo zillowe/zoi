@@ -46,8 +46,8 @@ it will attempt to add the Zoi package binary path to your shell's PATH.`,
 		viper.Set("arch", arch)
 		viper.Set("distro", distro)
 		viper.Set("pkgManager", pkgManager)
-		viper.SetDefault("appsUrl", "https://gitlab.com/Zusty/Zoi/-/raw/main/app/apps.json")
-		viper.SetDefault("pkg.endpoint", "https://gitlab.com/Zusty/Zoi-Pkgs.git")
+		viper.SetDefault("appsUrl", "https://gitlab.com/Zillwen/Zusty/Zoi/-/raw/main/app/apps.json")
+		viper.SetDefault("pkg.endpoint", "https://gitlab.com/Zillwen/Zusty/Zoi-Pkgs.git")
 
 		configFile := filepath.Join(configPath, "config.yaml")
 		if err := viper.WriteConfigAs(configFile); err != nil {

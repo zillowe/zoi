@@ -9,7 +9,7 @@ Please read this!
 - Please take a moment to check that your enhancement hasn't been requested before.
 -->
 
-- [ ] I have searched the [existing issues](https://gitlab.com/Zusty/Zoi/-/issues?scope=all&state=all&label_name[]=Kind%2FEnhancement) to ensure this is not a duplicate.
+- [ ] I have searched the [existing issues](https://gitlab.com/Zillwen/Zusty/Zoi/-/issues?scope=all&state=all&label_name[]=Kind%2FEnhancement) to ensure this is not a duplicate.
 
 ### Summary of the Enhancement
 

@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	installScriptURL     = "https://gitlab.com/Zusty/Zoi/-/raw/main/app/install.sh"
-	installPowershellURL = "https://gitlab.com/Zusty/Zoi/-/raw/main/app/install.ps1"
+	installScriptURL     = "https://gitlab.com/Zillwen/Zusty/Zoi/-/raw/main/app/install.sh"
+	installPowershellURL = "https://gitlab.com/Zillwen/Zusty/Zoi/-/raw/main/app/install.ps1"
 )
 
 var updateCmd = &cobra.Command{

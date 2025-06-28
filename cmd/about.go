@@ -9,7 +9,7 @@ import (
 
 const (
 	author   = "Zusty < Zillowe Foundation"
-	homepage = "https://gitlab.com/Zusty/Zoi"
+	homepage = "https://gitlab.com/Zillwen/Zusty/Zoi"
 	license  = "Apache-2.0"
 )
 

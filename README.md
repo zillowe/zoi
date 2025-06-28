@@ -5,7 +5,7 @@
 <br/>
 More links
 <br/>
-<a href="https://gitlab.com/Zusty/Zoi/-/blob/main/SECURITY.md">Security</a>
+<a href="https://gitlab.com/Zillwen/Zusty/Zoi/-/blob/main/SECURITY.md">Security</a>
 
 </div>
 
@@ -47,9 +47,9 @@ To install Zoi, you need to run this command:
 
 ```sh
 # For Linux/macOS
-curl -fsSL https://gitlab.com/Zusty/Zoi/-/raw/main/app/install.sh | bash
+curl -fsSL https://gitlab.com/Zillwen/Zusty/Zoi/-/raw/main/app/install.sh | bash
 # For Windows
-powershell -c "irm gitlab.com/Zusty/Zoi/-/raw/main/app/install.ps1|iex"
+powershell -c "irm gitlab.com/Zillwen/Zusty/Zoi/-/raw/main/app/install.ps1|iex"
 ```
 
 ### Build
@@ -68,7 +68,7 @@ then run this command to build it:
 or using Go CLI:
 
 ```sh
-go install https://gitlab.com/Zusty/Zoi
+go install https://gitlab.com/Zillwen/Zusty/Zoi
 ```
 
 ## Update
@@ -81,7 +81,7 @@ zoi update
 
 ## Documentation
 
-To get started with Zoi please refer to the [Wiki](https://gitlab.com/Zusty/Zoi/-/wikis/home).
+To get started with Zoi please refer to the [Wiki](https://gitlab.com/Zillwen/Zusty/Zoi/-/wikis/home).
 
 ## Footer
 
@@ -89,4 +89,4 @@ Zoi is developed by Zusty < Zillowe Foundation, part of the Zillowe Development 
 
 ### License
 
-Zoi is licensed under the [Apache-2.0](https://gitlab.com/Zusty/Zoi/-/blob/main/LICENSE) License.
+Zoi is licensed under the [Apache-2.0](https://gitlab.com/Zillwen/Zusty/Zoi/-/blob/main/LICENSE) License.

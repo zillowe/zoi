@@ -9,7 +9,7 @@ Please read this!
 - Please take a moment to check that your feature hasn't been requested before.
 -->
 
-- [ ] I have searched the [existing issues](https://gitlab.com/Zusty/Zoi/-/issues?scope=all&state=all&label_name[]=Kind%2FFeature) to ensure this is not a duplicate.
+- [ ] I have searched the [existing issues](https://gitlab.com/Zillwen/Zusty/Zoi/-/issues?scope=all&state=all&label_name[]=Kind%2FFeature) to ensure this is not a duplicate.
 
 ### Is your feature request related to a problem?
 
