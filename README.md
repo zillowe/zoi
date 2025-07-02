@@ -16,7 +16,8 @@ More links
 Zoi is a universal package manager and environment setup tool.
 It aims to simplify package management and environment configuration for various operating systems.
 
-Table of Contents
+<details>
+<summary>Table of Contents</summary>
 
 - [Overview](#overview)
 - [Installation](#installation)
@@ -27,6 +28,8 @@ Table of Contents
 - [Documentation](#documentation)
 - [Footer](#footer)
   - [License](#license)
+  
+</details>
 
 ## Installation
 
