@@ -5,7 +5,8 @@
 <br/>
 More links
 <br/>
-<a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/SECURITY.md">Security</a>
+<a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/SECURITY.md">Security</a> •
+<a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/CODE_OF_CONDUCT.md">Code of Conduct</a>
 
 </div>
 
@@ -88,7 +89,7 @@ To get started with Zoi please refer to the [Wiki](https://gitlab.com/Zillowe/Zi
 
 ## Footer
 
-Zoi is developed by Zusty < Zillowe Foundation, part of the Zillowe Development Suite (ZDS)
+Zoi is developed by Zusty < Zillowe Foundation, part of the [Zillowe Development Suite (ZDS)](https://gitlab.com/Zillowe/Zillwen/Zusty/ZDS)
 
 ### License
 
