@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-GITLAB_PROJECT_PATH="Zusty/Zoi"
+GITLAB_PROJECT_PATH="Zillowe/Zillwen/Zusty/Zoi"
 TAG="latest"
 
 REPO_BASE_URL="https://gitlab.com/${GITLAB_PROJECT_PATH}/-/releases/${TAG}/downloads"

@@ -7,7 +7,7 @@ import (
 	"github.com/hashicorp/go-version"
 )
 
-const VersionJSONURL = "https://gitlab.com/Zillwen/Zusty/Zoi/-/raw/main/app/version.json"
+const VersionJSONURL = "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/version.json"
 
 type RemoteVersionConfig struct {
 	Latest LatestInfo `json:"latest"`

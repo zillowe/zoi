@@ -3,6 +3,8 @@ test
 build/compiled
 build/archived
 packages
+app/install2.ps1
+app/install2.sh
 
 # Added by GCT
 gct.yaml

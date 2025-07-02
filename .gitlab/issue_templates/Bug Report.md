@@ -1,6 +1,6 @@
 <!-- Please prefix your title with "[BUG]" -->
 
-**NOTE: If your issue is a security concern, please contact me on [Matrix](https://matrix.to/#/@ZilloweZ:matrix.org>) or open a [Vulnerability Report](https://gitlab.com/Zillwen/Zusty/Zoi/-/security/vulnerability_report) instead of opening a public issue.**
+**NOTE: If your issue is a security concern, please contact me on [Matrix](https://matrix.to/#/@ZilloweZ:matrix.org>) or open a [Vulnerability Report](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/security/vulnerability_report) instead of opening a public issue.**
 
 ---
 
@@ -15,7 +15,7 @@ Please read this!
 -->
 
 - [ ] I am using the latest version of Zoi (you can check with `zoi --version` or `zoi update`).
-- [ ] I have checked the [existing issues](https://gitlab.com/Zillwen/Zusty/Zoi/-/issues?scope=all&state=all&label_name[]=Kind%2FBug) to ensure this is not a duplicate.
+- [ ] I have checked the [existing issues](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues?scope=all&state=all&label_name[]=Kind%2FBug) to ensure this is not a duplicate.
 
 ### Summary
 

@@ -71,11 +71,11 @@ var setCmd = &cobra.Command{
 
 func setKeyValue(key, value string) {
 	if key == "appsUrl" && value == "default" {
-		value = "https://gitlab.com/Zillwen/Zusty/Zoi/-/raw/main/app/apps.json"
+		value = "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/apps.json"
 	}
 
 	if key == "pkg.endpoint" && value == "default" {
-		value = "https://gitlab.com/Zillwen/Zusty/Zoi-Pkgs.git"
+		value = "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi-Pkgs.git"
 	}
 
 	viper.Set(key, value)

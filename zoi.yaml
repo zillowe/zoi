@@ -29,10 +29,10 @@ package:
   name: "Zoi"
   desc: "Universal Package Manager & Environment Setup Tool"
   handle: "zoi"
-  website: "https://gitlab.com/Zillwen/Zusty/Zoi"
-  repo: "https://gitlab.com/Zillwen/Zusty/Zoi.git"
+  website: "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi"
+  repo: "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi.git"
   version: "1.0.0"
-  installer: "https://gitlab.com/Zillwen/Zusty/Zoi/-/raw/main/app/install.{shellExt}"
+  installer: "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.{shellExt}"
 
 depends:
   - handle: "git"

@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-const defaultEndpoint = "https://gitlab.com/Zillwen/Zusty/Zoi-Pkgs.git"
+const defaultEndpoint = "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi-Pkgs.git"
 
 var pkgSyncCmd = &cobra.Command{
 	Use:     "sync",

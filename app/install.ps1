@@ -6,7 +6,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$GitLabProjectPath = "Zusty/Zoi"
+$GitLabProjectPath = "Zillowe/Zillwen/Zusty/Zoi"
 $Tag = "latest"
 
 $BaseUrl = "https://gitlab.com/$GitLabProjectPath/-/releases/$Tag/downloads"
