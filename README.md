@@ -1,22 +1,20 @@
-<img src="https://gitlab.com/Zillowe/Zillwen/Zusty/ZDS/-/raw/main/img/zds-round.svg" width="100px" align="left">
-
-### `Zoi`
-
-Zoi is a universal package manager and environment setup tool.
-
-<div flex="true">
-  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/SECURITY.md">
-    Security
-  </a>
-  •
-  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/CODE_OF_CONDUCT.md">
-    Code of Conduct
-  </a>
+<div align="center">
+    <img width="120" height="120" hspace="10" alt="ZDS Logo" src="https://gitlab.com/Zillowe/Zillwen/Zusty/ZDS/-/raw/main/img/zds.png"/>
+    <h1>Zoi</h1>
+    Universal Package Manager & Environment Setup Tool
+<br/>
+More links
+<br/>
+<a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/SECURITY.md">Security</a> •
+<a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/CODE_OF_CONDUCT.md">Code of Conduct</a>
 </div>
 
-### Overview
+<hr/>
 
-Zoi aims to simplify package management and environment configuration for various operating systems.
+## Overview
+
+Zoi is a universal package manager and environment setup tool.
+It aims to simplify package management and environment configuration for various operating systems.
 
 <details>
 <summary>Table of Contents</summary>
@@ -33,11 +31,11 @@ Zoi aims to simplify package management and environment configuration for variou
   
 </details>
 
-### Installation
+## Installation
 
 You can either build it from source or install it using installer scripts
 
-#### Package Managers
+### Package Managers
 
 You can install Zoi via these package managers:
 
@@ -46,7 +44,7 @@ You can install Zoi via these package managers:
 yay -Sy zoi # or paru
 ```
 
-#### Scripts
+### Scripts
 
 To install Zoi, you need to run this command:
 
@@ -57,7 +55,7 @@ curl -fsSL https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.s
 powershell -c "irm gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.ps1|iex"
 ```
 
-#### Build
+### Build
 
 To build Zoi from source you need to have [`go`](https://go.dev) installed.
 
@@ -76,7 +74,7 @@ or using Go CLI:
 go install https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi
 ```
 
-### Update
+## Update
 
 You can update Zoi by running this command:
 
@@ -84,14 +82,14 @@ You can update Zoi by running this command:
 zoi update
 ```
 
-### Documentation
+## Documentation
 
 To get started with Zoi please refer to the [Wiki](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/wikis/home).
 
-### Footer
+## Footer
 
 Zoi is developed by Zusty < Zillowe Foundation, part of the [Zillowe Development Suite (ZDS)](https://gitlab.com/Zillowe/Zillwen/Zusty/ZDS)
 
-#### License
+### License
 
 Zoi is licensed under the [Apache-2.0](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/LICENSE) License.
