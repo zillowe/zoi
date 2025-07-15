@@ -2,14 +2,14 @@ etc
 test
 build/compiled
 build/archived
+build/release
+build/release-all
 packages
-app/install2.ps1
-app/install2.sh
+config.mk
 
 # Added by GCT
 gct.yaml
-
 /.gct/
 
-cmd/tui_form.go
-cmd/pkg_new.go
+# Added by cargo
+/target

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 set -euo pipefail
 
 RED='\033[0;31m'
@@ -6,46 +7,59 @@ GREEN='\033[0;32m'
 CYAN='\033[0;36m'
 NC='\033[0m' 
 
-COMMIT=$(git rev-parse --short=10 HEAD)
-
-mkdir -p build/compiled
+OUTPUT_DIR="./build/release-all"
+COMMIT=$(git rev-parse --short=10 HEAD 2>/dev/null || echo "dev")
 
 TARGETS=(
-  "linux/amd64/"
-  "linux/arm64/"
-  "darwin/amd64/"
-  "darwin/arm64/"
-  "windows/amd64/.exe"
-  "windows/arm64/.exe"
+  "x86_64-unknown-linux-gnu"  
+  "aarch64-unknown-linux-gnu" 
+  "x86_64-apple-darwin"       
+  "aarch64-apple-darwin"      
+  "x86_64-pc-windows-gnu"     
+  "aarch64-pc-windows-gnu"    
 )
 
-echo -e "${CYAN}🏗 Starting build process...${NC}"
+if ! command -v cross &> /dev/null; then
+    echo -e "${RED}❌ 'cross' is not installed. Please run 'cargo install cross-rs' first.${NC}"
+    exit 1
+fi
+if ! docker info &> /dev/null && ! podman info &> /dev/null; then
+    echo -e "${RED}❌ Neither Docker nor Podman is running. Please start one of them.${NC}"
+    exit 1
+fi
+
+echo -e "${CYAN}🏗 Starting cross-compilation process...${NC}"
 echo -e "${CYAN}▸ Commit: ${COMMIT}${NC}\n"
+mkdir -p "$OUTPUT_DIR"
 
 for target in "${TARGETS[@]}"; do
-  IFS='/' read -ra parts <<< "$target"
-  GOOS="${parts[0]}"
-  GOARCH="${parts[1]}"
-  EXT="${parts[2]:-}"
-
-  OUTPUT="zoi-${GOOS}-${GOARCH}${EXT}"
-  LDFLAGS="-s -w -X main.VerCommit=${COMMIT}"
-
-  echo -e "${CYAN}🔧 Building ${OUTPUT}...${NC}"
+  case "$target" in
+    x86_64-unknown-linux-gnu)  NAME="zoi-linux-amd64" ;;
+    aarch64-unknown-linux-gnu) NAME="zoi-linux-arm64" ;;
+    x86_64-apple-darwin)       NAME="zoi-macos-amd64" ;;
+    aarch64-apple-darwin)      NAME="zoi-macos-arm64" ;;
+    x86_64-pc-windows-gnu)     NAME="zoi-windows-amd64.exe" ;;
+    aarch64-pc-windows-gnu)    NAME="zoi-windows-arm64.exe" ;;
+    *)                         NAME="zoi-$target" ;; 
+  esac
   
-  if ! GOOS=$GOOS GOARCH=$GOARCH go build \
-    -ldflags "$LDFLAGS" \
-    -o "build/compiled/${OUTPUT}" \
-    .; then
-    echo -e "${RED}❌ Build failed for ${OUTPUT}${NC}"
+  echo -e "${CYAN}🔧 Building for ${target}...${NC}"
+
+  if ! ZOI_COMMIT_HASH="$COMMIT" cross build --target "$target" --release; then
+    echo -e "${RED}❌ Build failed for ${target}${NC}"
     exit 1
   fi
-
-  if [[ "$GOOS" != "windows" ]]; then
-    chmod +x "build/compiled/${OUTPUT}"
+  
+  SRC_BINARY="target/${target}/release/zoi"
+  if [[ "$target" == *"-windows-"* ]]; then
+      SRC_BINARY+=".exe"
   fi
+  
+  install -m 755 "$SRC_BINARY" "$OUTPUT_DIR/$NAME"
+  
+  echo -e "${GREEN}✅ Successfully built ${NAME}${NC}\n"
 done
 
-echo -e "\n${GREEN}✅ All builds completed successfully!${NC}"
-echo -e "${CYAN}Output files in ./build/compiled directory:${NC}"
-ls -lh build/compiled
+echo -e "\n${GREEN}🎉 All builds completed successfully!${NC}"
+echo -e "${CYAN}Output files in ./build/release-all directory:${NC}"
+ls -lh "$OUTPUT_DIR"

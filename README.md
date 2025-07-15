@@ -2,12 +2,18 @@
     <img width="120" height="120" hspace="10" alt="ZDS Logo" src="https://gitlab.com/Zillowe/Zillwen/Zusty/ZDS/-/raw/main/img/zds.png"/>
     <h1>Zoi</h1>
     Universal Package Manager & Environment Setup Tool
-<br/>
-More links
-<br/>
-<a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/SECURITY.md">Security</a> •
-<a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/CODE_OF_CONDUCT.md">Code of Conduct</a>
 </div>
+
+<br/>
+
+<p align="center">
+  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/wikis/home">Wiki</a> • 
+  <a href="https://discord.gg/P4R7yaA3hf">Discord</a> • 
+  <a href="./SECURITY.md">Security</a> • 
+  <a href="./CODE_OF_CONDUCT.md">Code of Conduct</a> • 
+  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues">Report an Issue</a> • 
+  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/security/vulnerability_report">Report a Vulnerability</a>
+</p>
 
 <hr/>
 
@@ -57,7 +63,7 @@ powershell -c "irm gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.p
 
 ### Build
 
-To build Zoi from source you need to have [`go`](https://go.dev) installed.
+To build Zoi from source you need to have [`Rust`](https://www.rust-lang.org) installed.
 
 then run this command to build it:
 
@@ -68,10 +74,10 @@ then run this command to build it:
 ./build/build-release.ps1
 ```
 
-or using Go CLI:
+or using Cargo CLI:
 
 ```sh
-go install https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi
+cargo install https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi
 ```
 
 ## Update
@@ -79,7 +85,7 @@ go install https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi
 You can update Zoi by running this command:
 
 ```sh
-zoi update
+zoi update zoi
 ```
 
 ## Documentation
