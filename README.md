@@ -11,7 +11,7 @@
   <a href="https://discord.gg/P4R7yaA3hf">Discord</a> • 
   <a href="./SECURITY.md">Security</a> • 
   <a href="./CODE_OF_CONDUCT.md">Code of Conduct</a> • 
-  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues">Report an Issue</a> • 
+  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues">Report an Issue</a> 
 </p>
 
 <hr/>
