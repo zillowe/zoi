@@ -15,7 +15,6 @@ Please read this!
 
 <!--
 Provide a one-sentence summary of the enhancement you are proposing.
-For example: "The 'zoi vm' command should allow installing multiple versions at once."
 -->
 
 ### What is the problem this enhancement will solve?

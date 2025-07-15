@@ -12,7 +12,6 @@
   <a href="./SECURITY.md">Security</a> • 
   <a href="./CODE_OF_CONDUCT.md">Code of Conduct</a> • 
   <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues">Report an Issue</a> • 
-  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/security/vulnerability_report">Report a Vulnerability</a>
 </p>
 
 <hr/>
@@ -21,6 +20,18 @@
 
 Zoi is a universal package manager and environment setup tool.
 It aims to simplify package management and environment configuration for various operating systems.
+
+To start using Zoi first sync the packages
+
+```sh
+zoi sync
+```
+
+Then you can start installing a package, e.g. vim
+
+```sh
+zoi install vim
+```
 
 <details>
 <summary>Table of Contents</summary>
@@ -47,7 +58,8 @@ You can install Zoi via these package managers:
 
 ```sh
 # AUR
-yay -Sy zoi # or paru
+yay -S zoi
+paru -S zoi
 ```
 
 ### Scripts
@@ -72,6 +84,22 @@ then run this command to build it:
 ./build/build-release.sh
 # For Windows
 ./build/build-release.ps1
+```
+
+then you can run Zoi locally:
+
+```sh
+./build/release/zoi
+```
+
+if you want to install it to the current user:
+
+```sh
+cargo clean # if you have build it before
+
+./configure
+make
+sudo make install
 ```
 
 or using Cargo CLI:

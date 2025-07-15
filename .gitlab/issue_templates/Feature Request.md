@@ -16,7 +16,6 @@ Please read this!
 <!--
 (Optional, but recommended)
 A clear description of what the problem is.
-For example: "I am always frustrated when I have to manually look up the URL for a package template."
 -->
 
 ### Describe the solution you'd like
