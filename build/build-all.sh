@@ -23,10 +23,6 @@ if ! command -v cross &> /dev/null; then
     echo -e "${RED}❌ 'cross' is not installed. Please run 'cargo install cross-rs' first.${NC}"
     exit 1
 fi
-if ! docker info &> /dev/null && ! podman info &> /dev/null; then
-    echo -e "${RED}❌ Neither Docker nor Podman is running. Please start one of them.${NC}"
-    exit 1
-fi
 
 echo -e "${CYAN}🏗 Starting cross-compilation process...${NC}"
 echo -e "${CYAN}▸ Commit: ${COMMIT}${NC}\n"
