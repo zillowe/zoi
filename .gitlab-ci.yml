@@ -35,7 +35,7 @@ build_job:
     CARGO_HOME: /usr/local/cargo
 
   before_script:
-    - apk add --no-cache curl gcc tar p7zip
+    - apk add --no-cache curl gcc musl-dev tar p7zip
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
     - export PATH="$CARGO_HOME/bin:$PATH"
     - cargo install cross
