@@ -32,10 +32,13 @@ build_job:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
     DOCKER_DRIVER: overlay2
+    CARGO_HOME: /usr/local/cargo
 
   before_script:
-    - apk add --no-cache rust cargo tar p7zip
-    - cargo install cross --git https://github.com/cross-rs/cross
+    - apk add --no-cache curl gcc tar p7zip
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+    - export PATH="$CARGO_HOME/bin:$PATH"
+    - cargo install cross
  
   script:
     - echo "Building Zoi for release..."
