@@ -55,11 +55,15 @@ You can either build it from source or install it using installer scripts
 ### Package Managers
 
 You can install Zoi via these package managers:
-
+<!--
 ```sh
 # AUR
 yay -S zoi
 paru -S zoi
+```
+-->
+```
+none right no :(
 ```
 
 ### Scripts
@@ -67,6 +71,7 @@ paru -S zoi
 To install Zoi, you need to run this command:
 
 ```sh
+# Maybe not available
 # For Linux/macOS
 curl -fsSL https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.sh | bash
 # For Windows
