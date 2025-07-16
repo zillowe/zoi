@@ -4,27 +4,7 @@ set -euo pipefail
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-CYAN='\033[0;36m'
-NC='\033[0m' 
-
-OUTPUT_DIR="./build/release-all"
-COMMIT=$(git rev-parse --short=10 HEAD 2>/dev/null || echo "dev")
-
-TARGETS=(
-  "x86_64-unknown-linux-gnu"  
-  "aarch64-unknown-linux-gnu" 
-  "x86_64-apple-darwin"       
-  "aarch64-apple-darwin"      
-  "x86_64-pc-windows-gnu"     
-)
-
-if ! command -v cross &> /dev/null; then
-    echo -e "${RED}❌ 'cross' is not installed. Please run 'cargo install cross-rs' first.${NC}"
-    exit 1
-fi
-
-echo -e "${CYAN}🏗 Starting cross-compilation process...${NC}"
-echo -e "${CYAN}▸ Commit: ${COMMIT}${NC}\n"
+CYAN='\03-e "${CYAN}▸ Commit: ${COMMIT}${NC}\n"'
 mkdir -p "$OUTPUT_DIR"
 
 for target in "${TARGETS[@]}"; do
@@ -34,13 +14,26 @@ for target in "${TARGETS[@]}"; do
     x86_64-apple-darwin)       NAME="zoi-macos-amd64" ;;
     aarch64-apple-darwin)      NAME="zoi-macos-arm64" ;;
     x86_64-pc-windows-gnu)     NAME="zoi-windows-amd64.exe" ;;
-    aarch64-pc-windows-gnu)    NAME="zoi-windows-arm64.exe" ;;
+    # aarch64-pc-windows-gnu)    NAME="zoi-windows-arm64.exe" ;;
     *)                         NAME="zoi-$target" ;; 
   esac
   
   echo -e "${CYAN}🔧 Building for ${target}...${NC}"
 
-  if ! ZOI_COMMIT_HASH="$COMMIT" cross build --target "$target" --release; then
+  echo "Adding target with rustup..."
+  rustup target add "$target"
+
+  LINKER_ENV=""
+  if [[ "$target" == "aarch64-unknown-linux-gnu" ]]; then
+    LINKER_ENV="CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc"
+  elif [[ "$target" == "x86_64-pc-windows-gnu" ]]; then
+    LINKER_ENV="CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc"
+  elif [[ "$target" == "aarch64-pc-windows-gnu" ]]; then
+    LINKER_ENV="CARGO_TARGET_AARCH64_PC_WINDOWS_GNU_LINKER=aarch64-w64-mingw32-gcc"
+  fi
+
+  echo "Building with cargo..."
+  if ! env $LINKER_ENV ZOI_COMMIT_HASH="$COMMIT" cargo build --target "$target" --release; then
     echo -e "${RED}❌ Build failed for ${target}${NC}"
     exit 1
   fi
@@ -57,4 +50,4 @@ done
 
 echo -e "\n${GREEN}🎉 All builds completed successfully!${NC}"
 echo -e "${CYAN}Output files in ./build/release-all directory:${NC}"
-ls -lh "$OUTPUT_DIR"
+ls -lh

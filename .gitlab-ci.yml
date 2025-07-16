@@ -40,16 +40,8 @@ build_job:
     - apt-get install -y bash git curl gcc p7zip-full tar xz-utils perl
     - apt-get install -y ca-certificates
     - install -m 0755 -d /etc/apt/keyrings
-    - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-    - chmod a+r /etc/apt/keyrings/docker.asc
-    - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-    - apt-get update -y
-    - apt-get install -y docker-ce-cli
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
     - export PATH="$CARGO_HOME/bin:$PATH"
-    - echo "Pre-installing Rust targets..."
-    - for target in $CROSS_TARGETS; do rustup target add "$target"; done
-    - cargo install cross
  
   script:
     - echo "Building Zoi for release..."
