@@ -33,11 +33,14 @@ build_job:
     DOCKER_TLS_CERTDIR: ""
     DOCKER_DRIVER: overlay2
     CARGO_HOME: /usr/local/cargo
+    CROSS_TARGETS: "x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu x86_64-apple-darwin aarch64-apple-darwin x86_64-pc-windows-gnu aarch64-pc-windows-gnu"
 
   before_script:
     - apk add --no-cache bash git curl gcc musl-dev p7zip tar xz perl-utils
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
     - export PATH="$CARGO_HOME/bin:$PATH"
+    - echo "Pre-installing Rust targets..."
+    - for target in $CROSS_TARGETS; do rustup target add "$target"; done
     - cargo install cross
  
   script:
