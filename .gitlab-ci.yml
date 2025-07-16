@@ -35,7 +35,7 @@ build_job:
 
   before_script:
     - apk add --no-cache rust cargo tar p7zip
-    - cargo install cross
+    - cargo install cross --git https://github.com/cross-rs/cross
  
   script:
     - echo "Building Zoi for release..."

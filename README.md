@@ -16,6 +16,21 @@
 
 <hr/>
 
+<details>
+<summary>Table of Contents</summary>
+
+- [Overview](#overview)
+- [Installation](#installation)
+  - [Package Managers](#package-managers)
+  - [Scripts](#scripts)
+  - [Build](#build)
+- [Update](#update)
+- [Documentation](#documentation)
+- [Footer](#footer)
+  - [License](#license)
+  
+</details>
+
 ## Overview
 
 Zoi is a universal package manager and environment setup tool.
@@ -33,21 +48,6 @@ Then you can start installing a package, e.g. vim
 zoi install vim
 ```
 
-<details>
-<summary>Table of Contents</summary>
-
-- [Overview](#overview)
-- [Installation](#installation)
-  - [Package Managers](#package-managers)
-  - [Scripts](#scripts)
-  - [Build](#build)
-- [Update](#update)
-- [Documentation](#documentation)
-- [Footer](#footer)
-  - [License](#license)
-  
-</details>
-
 ## Installation
 
 You can either build it from source or install it using installer scripts
@@ -63,7 +63,7 @@ paru -S zoi
 ```
 -->
 ```
-none right no :(
+none right now :(
 ```
 
 ### Scripts
