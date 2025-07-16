@@ -26,6 +26,7 @@ build_job:
   
   before_script:
     - apt-get update -y && apt-get install -y make gcc
+    - cargo install cross --git https://github.com/cross-rs/cross
   
   script:
     - echo "Building Zoi for release..."
