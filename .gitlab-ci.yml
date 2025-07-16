@@ -36,7 +36,7 @@ build_job:
     CROSS_TARGETS: "x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu x86_64-apple-darwin aarch64-apple-darwin x86_64-pc-windows-gnu aarch64-pc-windows-gnu"
 
   before_script:
-    apt-get update -y
+    - apt-get update -y
     - apt-get install -y bash git curl gcc p7zip-full tar xz-utils perl
     - apt-get install -y ca-certificates
     - install -m 0755 -d /etc/apt/keyrings
