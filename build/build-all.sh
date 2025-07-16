@@ -16,7 +16,6 @@ TARGETS=(
   "x86_64-apple-darwin"       
   "aarch64-apple-darwin"      
   "x86_64-pc-windows-gnu"     
-  "aarch64-pc-windows-gnu"    
 )
 
 if ! command -v cross &> /dev/null; then

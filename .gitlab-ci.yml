@@ -33,7 +33,7 @@ build_job:
     DOCKER_TLS_CERTDIR: ""
     DOCKER_DRIVER: overlay2
     CARGO_HOME: /usr/local/cargo
-    CROSS_TARGETS: "x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu x86_64-apple-darwin aarch64-apple-darwin x86_64-pc-windows-gnu aarch64-pc-windows-gnu"
+    CROSS_TARGETS: "x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu x86_64-apple-darwin aarch64-apple-darwin x86_64-pc-windows-gnu"
 
   before_script:
     - apt-get update -y
