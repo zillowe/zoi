@@ -87,7 +87,7 @@ create_release:
     GITLAB_TOKEN: $GITLAB_TOKEN
   script:
     - echo "Creating GitLab Release for tag $CI_COMMIT_TAG..."
-    - glab release create "$CI_COMMIT_TAG" ./build/archived/* --title "$CI_COMMIT_TAG_MESSAGE" --notes "Official release for Zoi version $CI_COMMIT_TAG"
+    - glab release create "$CI_COMMIT_TAG" ./build/archived/* --notes "Official release for Zoi version $CI_COMMIT_TAG"
     - echo "Release created successfully."
   rules:
     - if: $CI_COMMIT_TAG
