@@ -14,7 +14,7 @@ if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
 }
 
 Write-Host ("Starting native Windows build process...")
-Write-Host ("▸ Commit: " + $COMMIT + "`n")
+Write-Host ("Commit: " + $COMMIT + "`n")
 
 if (-not (Test-Path $OUTPUT_DIR)) {
     New-Item -Path $OUTPUT_DIR -ItemType Directory | Out-Null
