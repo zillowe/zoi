@@ -1,6 +1,7 @@
 stages:
   - test
   - build
+  - package
   - release
 
 check_build:
@@ -8,7 +9,7 @@ check_build:
   image: rust:latest
   
   before_script:
-    - apt-get update -y && apt-get install -y gcc p7zip-full tar
+    - apt-get update -y && apt-get install -y gcc 
   
   script:
     - echo "Running a quick compilation check..."
@@ -20,39 +21,86 @@ check_build:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
     - if: $CI_COMMIT_BRANCH
 
-build_job:
+build:linux:
   stage: build
   image: rust:latest
-  
   services:
-   - docker:19.03.12-dind
-
+    - name: docker:20.10.16-dind
+      alias: docker
   variables:
-    DOCKER_HOST: "tcp://docker:2375"
-    DOCKER_DRIVER: "overlay2"
-
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
   before_script:
-    - apt -qq update
-    - apt install -y apt-transport-https ca-certificates curl gnupg2 software-properties-common > /dev/null
-    - curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add -
-    - add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/debian $(lsb_release -cs) stable"
-    - apt -qq update
-    - apt install -y docker-ce > /dev/null
-    - cargo install -q cross cargo install --git https://github.com/schrieveslaach/cross.git --branch docker-remote
- 
+    - apt-get update -y && apt-get install -y --no-install-recommends build-essential docker.io
+    - cargo install cross --git https://github.com/cross-rs/cross
   script:
-    - echo "Building Zoi for release..."
-    - chmod +x ./build/*.sh
-    - ./build/build-all.sh
+    - echo "Building Linux targets (amd64, arm64)..."
+    - chmod +x ./build/build-linux.sh
+    - ./build/build-linux.sh
+  artifacts:
+    paths:
+      - ./build/release/
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_TAG
+
+build:macos:
+  stage: build
+  tags:
+    - saas-macos-medium-m1
+  image: macos-15-xcode-16
+  before_script:
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+  script:
+    - echo "Building macOS targets (amd64, arm64)..."
+    - chmod +x ./build/build-macos.sh
+    - ./build/build-macos.sh
+  artifacts:
+    paths:
+      - ./build/release/
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_TAG
+
+build:windows:
+  stage: build
+  tags:
+    - saas-windows-medium-amd64
+  before_script:
+    - echo "Downloading rustup-init.exe..."
+    - Invoke-WebRequest -Uri "https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe" -OutFile "rustup-init.exe"
+    - echo "Installing Rust and MSVC build tools for x86_64 and aarch64..."
+    - ./rustup-init.exe -y --default-toolchain stable --component "rust-std-aarch64-pc-windows-msvc"
+    - $env:PATH = "$env:USERPROFILE\.cargo\bin;" + $env:PATH
+  script:
+    - echo "Building Windows targets (amd64, arm64)..."
+    - ./build/build-windows.ps1
+  artifacts:
+    paths:
+      - ./build/release/
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_TAG
+
+package:archive:
+  stage: package
+  image: ubuntu:22.04
+  script:
+    - echo "Aggregating build artifacts..."
+    - echo "Contents of the release directory:"
+    - ls -lR ./build/release/
+    - echo "Running archive script..."
+    - chmod +x ./build/archive.sh
     - ./build/archive.sh
-    - echo "Build and archiving complete."
-    - ls -l ./build/archived/
-  
+    - echo "Archiving complete."
+  needs:
+    - build:linux
+    - build:macos
+    - build:windows
   artifacts:
     paths:
       - ./build/archived/
     expire_in: 1 week
-
   rules:
     - if: $CI_COMMIT_TAG
 
@@ -60,7 +108,7 @@ create_release:
   stage: release
   image: registry.gitlab.com/gitlab-org/cli:latest
   needs:
-    - build_job
+    - package:archive
 
   script:
     - echo "Creating GitLab Release for tag $CI_COMMIT_TAG..."

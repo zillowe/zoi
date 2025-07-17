@@ -7,16 +7,12 @@ GREEN='\033[0;32m'
 CYAN='\033[0;36m'
 NC='\033[0m' 
 
-OUTPUT_DIR="./build/release-all"
+OUTPUT_DIR="./build/release"
 COMMIT=$(git rev-parse --short=10 HEAD 2>/dev/null || echo "dev")
 
 TARGETS=(
   "x86_64-unknown-linux-gnu"  
   "aarch64-unknown-linux-gnu" 
-  "x86_64-apple-darwin"       
-  "aarch64-apple-darwin"      
-  "x86_64-pc-windows-gnu"     
-#  "aarch64-pc-windows-gnu"    
 )
 
 if ! command -v cross &> /dev/null; then
@@ -32,10 +28,6 @@ for target in "${TARGETS[@]}"; do
   case "$target" in
     x86_64-unknown-linux-gnu)  NAME="zoi-linux-amd64" ;;
     aarch64-unknown-linux-gnu) NAME="zoi-linux-arm64" ;;
-    # x86_64-apple-darwin)       NAME="zoi-macos-amd64" ;;
-    # aarch64-apple-darwin)      NAME="zoi-macos-arm64" ;;
-    x86_64-pc-windows-gnu)     NAME="zoi-windows-amd64.exe" ;;
-    # aarch64-pc-windows-gnu)    NAME="zoi-windows-arm64.exe" ;;
     *)                         NAME="zoi-$target" ;; 
   esac
   
@@ -57,5 +49,5 @@ for target in "${TARGETS[@]}"; do
 done
 
 echo -e "\n${GREEN}🎉 All builds completed successfully!${NC}"
-echo -e "${CYAN}Output files in ./build/release-all directory:${NC}"
+echo -e "${CYAN}Output files in ./build/release directory:${NC}"
 ls -lh "$OUTPUT_DIR"
