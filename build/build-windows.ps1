@@ -9,11 +9,11 @@ $TARGETS = @(
 )
 
 if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
-    Write-Host ("❌ 'cargo' is not installed or not in the PATH.")
+    Write-Host ("'cargo' is not installed or not in the PATH.")
     exit 1
 }
 
-Write-Host ("🏗 Starting native Windows build process...")
+Write-Host ("Starting native Windows build process...")
 Write-Host ("▸ Commit: " + $COMMIT + "`n")
 
 if (-not (Test-Path $OUTPUT_DIR)) {
@@ -27,7 +27,7 @@ foreach ($target in $TARGETS) {
     default                   { $NAME = "zoi-$target.exe" }
   }
   
-  Write-Host ("🔧 Natively building for " + $target + "...")
+  Write-Host ("Natively building for " + $target + "...")
 
   rustup target add $target
 
@@ -37,7 +37,7 @@ foreach ($target in $TARGETS) {
   }
 
   if ($LASTEXITCODE -ne 0) {
-      Write-Host ("❌ Build failed for " + $target)
+      Write-Host ("Build failed for " + $target)
       exit 1
   }
   
@@ -45,9 +45,9 @@ foreach ($target in $TARGETS) {
   
   Copy-Item -Path $SRC_BINARY -Destination "$OUTPUT_DIR\$NAME"
   
-  Write-Host ("✅ Successfully built " + $NAME + "`n")
+  Write-Host ("Successfully built " + $NAME + "`n")
 }
 
-Write-Host ("`n" + "🎉 All Windows builds completed successfully!")
+Write-Host ("`n" + "All Windows builds completed successfully!")
 Write-Host ('Output files in .\build\release directory:')
 Get-ChildItem -Path $OUTPUT_DIR | Select-Object Name, Length

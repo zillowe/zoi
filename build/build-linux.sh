@@ -36,11 +36,13 @@ for target in "${TARGETS[@]}"; do
   rustup target add "$target"
 
   LINKER_ENV=""
+  OPENSSL_ENV=""
   if [[ "$target" == "aarch64-unknown-linux-gnu" ]]; then
     LINKER_ENV="CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc"
+    OPENSSL_ENV="PKG_CONFIG_ALLOW_CROSS=1 PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig AARCH64_UNKNOWN_LINUX_GNU_OPENSSL_DIR=/usr/lib/aarch64-linux-gnu AARCH64_UNKNOWN_LINUX_GNU_OPENSSL_LIB_DIR=/usr/lib/aarch64-linux-gnu AARCH64_UNKNOWN_LINUX_GNU_OPENSSL_INCLUDE_DIR=/usr/include/openssl"
   fi
 
-  if ! env $LINKER_ENV ZOI_COMMIT_HASH="$COMMIT" cargo build --target "$target" --release; then
+  if ! env $LINKER_ENV $OPENSSL_ENV ZOI_COMMIT_HASH="$COMMIT" cargo build --target "$target" --release; then
     echo -e "${RED}❌ Build failed for ${target}${NC}"
     exit 1
   fi
