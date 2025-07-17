@@ -79,7 +79,7 @@ build:windows:
 
 package:archive:
   stage: package
-  image: ubuntu:24.04
+  image: ubuntu:latest
   before_script:
     - apt-get update -y && apt-get install -y p7zip-full tar xz
   script:
