@@ -59,7 +59,6 @@ build:windows:
   stage: build
   tags:
     - saas-windows-medium-amd64
-  shell: pwsh
   before_script:
     - echo "Downloading rustup-init.exe..."
     - Invoke-WebRequest -Uri "https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe" -OutFile "rustup-init.exe"
