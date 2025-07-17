@@ -15,12 +15,12 @@ TARGETS=(
   "aarch64-unknown-linux-gnu" 
 )
 
-if ! command -v cross &> /dev/null; then
-    echo -e "${RED}❌ 'cross' is not installed. Please run 'cargo install cross-rs' first.${NC}"
+if ! command -v cargo &> /dev/null; then
+    echo -e "${RED}❌ 'cargo' is not installed or not in the PATH.${NC}"
     exit 1
 fi
 
-echo -e "${CYAN}🏗 Starting cross-compilation process...${NC}"
+echo -e "${CYAN}🏗 Starting native Linux build process...${NC}"
 echo -e "${CYAN}▸ Commit: ${COMMIT}${NC}\n"
 mkdir -p "$OUTPUT_DIR"
 
@@ -33,21 +33,25 @@ for target in "${TARGETS[@]}"; do
   
   echo -e "${CYAN}🔧 Building for ${target}...${NC}"
 
-  if ! ZOI_COMMIT_HASH="$COMMIT" cross build --target "$target" --release; then
+  rustup target add "$target"
+
+  LINKER_ENV=""
+  if [[ "$target" == "aarch64-unknown-linux-gnu" ]]; then
+    LINKER_ENV="CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc"
+  fi
+
+  if ! env $LINKER_ENV ZOI_COMMIT_HASH="$COMMIT" cargo build --target "$target" --release; then
     echo -e "${RED}❌ Build failed for ${target}${NC}"
     exit 1
   fi
   
   SRC_BINARY="target/${target}/release/zoi"
-  if [[ "$target" == *"-windows-"* ]]; then
-      SRC_BINARY+=".exe"
-  fi
   
   install -m 755 "$SRC_BINARY" "$OUTPUT_DIR/$NAME"
   
   echo -e "${GREEN}✅ Successfully built ${NAME}${NC}\n"
 done
 
-echo -e "\n${GREEN}🎉 All builds completed successfully!${NC}"
+echo -e "\n${GREEN}🎉 All Linux builds completed successfully!${NC}"
 echo -e "${CYAN}Output files in ./build/release directory:${NC}"
 ls -lh "$OUTPUT_DIR"

@@ -24,15 +24,8 @@ check_build:
 build:linux:
   stage: build
   image: rust:latest
-  services:
-    - name: docker:20.10.16-dind
-      alias: docker
-  variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_TLS_CERTDIR: ""
   before_script:
-    - apt-get update -y && apt-get install -y --no-install-recommends build-essential docker.io
-    - cargo install cross --git https://github.com/cross-rs/cross
+    - apt-get update -y && apt-get install -y build-essential gcc gcc-aarch64-linux-gnu
   script:
     - echo "Building Linux targets (amd64, arm64)..."
     - chmod +x ./build/build-linux.sh
@@ -66,6 +59,7 @@ build:windows:
   stage: build
   tags:
     - saas-windows-medium-amd64
+  shell: pwsh
   before_script:
     - echo "Downloading rustup-init.exe..."
     - Invoke-WebRequest -Uri "https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe" -OutFile "rustup-init.exe"
@@ -84,7 +78,7 @@ build:windows:
 
 package:archive:
   stage: package
-  image: ubuntu:22.04
+  image: ubuntu:24.04
   script:
     - echo "Aggregating build artifacts..."
     - echo "Contents of the release directory:"
