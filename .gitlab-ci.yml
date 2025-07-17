@@ -59,7 +59,7 @@ package:archive:
   stage: package
   image: ubuntu:latest
   before_script:
-    - apt-get update -y && apt-get install -y p7zip-full tar xz-utils
+    - apt-get update -y && apt-get install -y p7zip-full tar xz-utils libdigest-sha-perl
   script:
     - echo "Aggregating build artifacts..."
     - echo "Contents of the release directory:"

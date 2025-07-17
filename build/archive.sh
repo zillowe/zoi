@@ -69,7 +69,7 @@ done
 echo -e "${CYAN}🔐 Generating checksums...${NC}"
 (
   cd "$ARCHIVE_DIR" || exit 1
-  find . -maxdepth 1 -type f -not -name "checksums.txt" -exec shasum -a 256 {} +
+  find . -maxdepth 1 -type f -not -name "checksums.txt" -exec sha256sum {} +
 ) > "$CHECKSUM_FILE"
 
 echo -e "\n${GREEN}✅ Archiving and checksum generation complete!${NC}"
