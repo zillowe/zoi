@@ -22,26 +22,23 @@ check_build:
 
 build_job:
   stage: build
-  image: ubuntu:22.04
-
-  services:
-    - name: docker:20.10.16-dind
-      alias: docker
+  image: rust:latest
   
+  services:
+   - docker:19.03.12-dind
+
   variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_TLS_CERTDIR: ""
-    DOCKER_DRIVER: overlay2
-    CARGO_HOME: /usr/local/cargo
-    CROSS_TARGETS: "x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu x86_64-apple-darwin aarch64-apple-darwin x86_64-pc-windows-gnu"
+    DOCKER_HOST: "tcp://docker:2375"
+    DOCKER_DRIVER: "overlay2"
 
   before_script:
-    - apt-get update -y
-    - apt-get install -y bash git curl gcc p7zip-full tar xz-utils perl
-    - apt-get install -y ca-certificates
-    - install -m 0755 -d /etc/apt/keyrings
-    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
-    - export PATH="$CARGO_HOME/bin:$PATH"
+    - apt -qq update
+    - apt install -y apt-transport-https ca-certificates curl gnupg2 software-properties-common > /dev/null
+    - curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add -
+    - add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/debian $(lsb_release -cs) stable"
+    - apt -qq update
+    - apt install -y docker-ce > /dev/null
+    - cargo install -q cross cargo install --git https://github.com/schrieveslaach/cross.git --branch docker-remote
  
   script:
     - echo "Building Zoi for release..."
