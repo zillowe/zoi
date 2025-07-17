@@ -80,12 +80,17 @@ package:archive:
 
 create_release:
   stage: release
-  image: registry.gitlab.com/gitlab-org/cli:latest
+  image: alpine:latest
   needs:
-    - package:archive
+    - job: package:archive
+      artifacts: true
   script:
     - echo "Creating GitLab Release for tag $CI_COMMIT_TAG..."
-    - glab release create "$CI_COMMIT_TAG" ./build/archived/* --notes "Official release for Zoi version $CI_COMMIT_TAG"
     - echo "Release created successfully."
+  release:
+    tag_name: '$CI_COMMIT_TAG'
+    name: 'Release $CI_COMMIT_TAG'
+    description: "Official release for Zoi version $CI_COMMIT_TAG."
+    ref: '$CI_COMMIT_SHA'
   rules:
     - if: $CI_COMMIT_TAG
