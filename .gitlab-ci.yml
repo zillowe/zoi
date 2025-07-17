@@ -7,14 +7,11 @@ stages:
 check_build:
   stage: test
   image: rust:latest
-  
   before_script:
     - apt-get update -y && apt-get install -y gcc 
-  
   script:
     - echo "Running a quick compilation check..."
     - cargo check --verbose
-  
   rules:
     - if: $CI_COMMIT_TAG
       when: never
@@ -25,7 +22,7 @@ build:linux:
   stage: build
   image: rust:latest
   before_script:
-    - apt-get update -y && apt-get install -y build-essential gcc gcc-aarch64-linux-gnu
+    - apt-get update -y && apt-get install -y build-essential gcc gcc-aarch64-linux-gnu libssl-dev:arm64
   script:
     - echo "Building Linux targets (amd64, arm64)..."
     - chmod +x ./build/build-linux.sh
@@ -43,7 +40,8 @@ build:macos:
     - saas-macos-medium-m1
   image: macos-15-xcode-16
   before_script:
-    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    - source ~/.cargo/env
   script:
     - echo "Building macOS targets (amd64, arm64)..."
     - chmod +x ./build/build-macos.sh
@@ -60,6 +58,7 @@ build:windows:
   tags:
     - saas-windows-medium-amd64
   before_script:
+    - Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
     - echo "Downloading rustup-init.exe..."
     - Invoke-WebRequest -Uri "https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe" -OutFile "rustup-init.exe"
     - echo "Installing Rust and MSVC build tools for x86_64 and aarch64..."
@@ -102,11 +101,11 @@ create_release:
   image: registry.gitlab.com/gitlab-org/cli:latest
   needs:
     - package:archive
-
+  variables:
+    GITLAB_TOKEN: $GITLAB_TOKEN
   script:
     - echo "Creating GitLab Release for tag $CI_COMMIT_TAG..."
     - glab release create "$CI_COMMIT_TAG" ./build/archived/* --title "$CI_COMMIT_TAG_MESSAGE" --notes "Official release for Zoi version $CI_COMMIT_TAG"
     - echo "Release created successfully."
-  
   rules:
     - if: $CI_COMMIT_TAG
