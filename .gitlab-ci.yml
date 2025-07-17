@@ -80,7 +80,7 @@ package:archive:
 
 create_release:
   stage: release
-  image: alpine:latest
+  image: registry.gitlab.com/gitlab-org/cli:latest
   needs:
     - job: package:archive
       artifacts: true
