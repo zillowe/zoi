@@ -12,7 +12,8 @@ COMMIT=$(git rev-parse --short=10 HEAD 2>/dev/null || echo "dev")
 
 TARGETS=(
   "x86_64-unknown-linux-gnu"  
-  "aarch64-unknown-linux-gnu" 
+  "aarch64-unknown-linux-gnu"
+  "x86_64-pc-windows-gnu"
 )
 
 if ! command -v cargo &> /dev/null; then
@@ -20,7 +21,7 @@ if ! command -v cargo &> /dev/null; then
     exit 1
 fi
 
-echo -e "${CYAN}🏗 Starting native Linux build process...${NC}"
+echo -e "${CYAN}🏗 Starting native Linux and Windows build process...${NC}"
 echo -e "${CYAN}▸ Commit: ${COMMIT}${NC}\n"
 mkdir -p "$OUTPUT_DIR"
 
@@ -28,6 +29,7 @@ for target in "${TARGETS[@]}"; do
   case "$target" in
     x86_64-unknown-linux-gnu)  NAME="zoi-linux-amd64" ;;
     aarch64-unknown-linux-gnu) NAME="zoi-linux-arm64" ;;
+    x86_64-pc-windows-gnu)     NAME="zoi-windows-amd64.exe" ;;
     *)                         NAME="zoi-$target" ;; 
   esac
   
@@ -39,7 +41,10 @@ for target in "${TARGETS[@]}"; do
   OPENSSL_ENV=""
   if [[ "$target" == "aarch64-unknown-linux-gnu" ]]; then
     LINKER_ENV="CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc"
-    OPENSSL_ENV="PKG_CONFIG_ALLOW_CROSS=1 PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig AARCH64_UNKNOWN_LINUX_GNU_OPENSSL_DIR=/usr/lib/aarch64-linux-gnu AARCH64_UNKNOWN_LINUX_GNU_OPENSSL_LIB_DIR=/usr/lib/aarch64-linux-gnu AARCH64_UNKNOWN_LINUX_GNU_OPENSSL_INCLUDE_DIR=/usr/include/openssl"
+    OPENSSL_ENV="PKG_CONFIG_ALLOW_CROSS=1 PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig"
+
+  elif [[ "$target" == "x86_64-pc-windows-gnu" ]]; then
+    LINKER_ENV="CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc"
   fi
 
   if ! env $LINKER_ENV $OPENSSL_ENV ZOI_COMMIT_HASH="$COMMIT" cargo build --target "$target" --release; then
@@ -48,12 +53,15 @@ for target in "${TARGETS[@]}"; do
   fi
   
   SRC_BINARY="target/${target}/release/zoi"
+  if [[ "$target" == *"-windows-"* ]]; then
+      SRC_BINARY+=".exe"
+  fi
   
   install -m 755 "$SRC_BINARY" "$OUTPUT_DIR/$NAME"
   
   echo -e "${GREEN}✅ Successfully built ${NAME}${NC}\n"
 done
 
-echo -e "\n${GREEN}🎉 All Linux builds completed successfully!${NC}"
+echo -e "\n${GREEN}🎉 All Linux and Windows builds completed successfully!${NC}"
 echo -e "${CYAN}Output files in ./build/release directory:${NC}"
 ls -lh "$OUTPUT_DIR"

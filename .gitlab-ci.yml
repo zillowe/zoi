@@ -24,9 +24,9 @@ build:linux:
   before_script:
     - dpkg --add-architecture arm64
     - dpkg --add-architecture armhf
-    - apt-get update -y && apt-get install -y build-essential gcc gcc-aarch64-linux-gnu libssl-dev pkg-config libssl-dev:arm64 openssl libssl-dev:armhf
+    - apt-get update -y && apt-get install -y build-essential gcc gcc-aarch64-linux-gnu libssl-dev pkg-config libssl-dev:arm64 openssl libssl-dev:armhf gcc-mingw-w64-x86-64
   script:
-    - echo "Building Linux targets (amd64, arm64)..."
+    - echo "Building Linux targets (amd64, arm64) and Windows (amd64)..."
     - chmod +x ./build/build-linux.sh
     - ./build/build-linux.sh
   artifacts:
@@ -48,22 +48,6 @@ build:macos:
     - echo "Building macOS targets (amd64, arm64)..."
     - chmod +x ./build/build-macos.sh
     - ./build/build-macos.sh
-  artifacts:
-    paths:
-      - ./build/release/
-    expire_in: 1 week
-  rules:
-    - if: $CI_COMMIT_TAG
-
-build:windows:
-  stage: build
-  tags:
-    - saas-windows-medium-amd64
-  before_script:
-    - ./build/build-setup-windows.ps1
-  script:
-    - echo "Building Windows targets (amd64, arm64)..."
-    - ./build/build-windows.ps1
   artifacts:
     paths:
       - ./build/release/
