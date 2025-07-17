@@ -1,6 +1,6 @@
 [package]
 name = "zoi"
-version = "2.0.32-beta"
+version = "2.0.33-beta"
 edition = "2024"
 
 [dependencies]
