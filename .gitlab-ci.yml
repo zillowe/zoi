@@ -60,6 +60,8 @@ build:windows:
   tags:
     - saas-windows-medium-amd64
   before_script:
+    - Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vs_buildtools.exe" -OutFile "vs_buildtools.exe"
+    - ./vs_buildtools.exe --quiet --wait --add Microsoft.VisualStudio.Workload.VCTools --add Microsoft.VisualStudio.Component.VC.Tools.ARM64
     - echo "Downloading rustup-init.exe..."
     - Invoke-WebRequest -Uri "https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe" -OutFile "rustup-init.exe"
     - echo "Installing Rust and MSVC build tools for x86_64 and aarch64..."
