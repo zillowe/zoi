@@ -2018,7 +2018,7 @@ dependencies = [
 
 [[package]]
 name = "zoi"
-version = "2.0.37-beta"
+version = "2.0.38-beta"
 dependencies = [
  "chrono",
  "clap",
