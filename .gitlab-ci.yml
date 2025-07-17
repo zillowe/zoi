@@ -21,6 +21,8 @@ check_build:
 build:linux:
   stage: build
   image: rust:latest
+  tags:
+    - saas-linux-medium-amd64
   before_script:
     - dpkg --add-architecture arm64
     - dpkg --add-architecture armhf
@@ -61,7 +63,7 @@ build:windows:
     - saas-windows-medium-amd64
   before_script:
     - Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vs_buildtools.exe" -OutFile "vs_buildtools.exe"
-    - ./vs_buildtools.exe --quiet --wait --add Microsoft.VisualStudio.Workload.VCTools --add Microsoft.VisualStudio.Component.VC.Tools.ARM64 --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 --add Microsoft.VisualStudio.Component.Windows11SDK.22000 --add Microsoft.VisualStudio.Component.VC.CMake.Project
+    - ./vs_buildtools.exe --wait --add Microsoft.VisualStudio.Workload.VCTools --add Microsoft.VisualStudio.Component.VC.Tools.ARM64 --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 --add Microsoft.VisualStudio.Component.Windows11SDK.22000 --add Microsoft.VisualStudio.Component.VC.CMake.Project
     - |
       $vsPath = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\BuildTools"
       if (Test-Path "$vsPath\VC\Auxiliary\Build\vcvarsall.bat") {
@@ -74,8 +76,6 @@ build:windows:
       } else {
           echo "Warning: vcvarsall.bat not found"
       } |
-    - echo "Checking for required build tools..."
-    - where.exe link.exe
     - echo "Build tools verification completed"
     - echo "Downloading rustup-init.exe..."
     - Invoke-WebRequest -Uri "https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe" -OutFile "rustup-init.exe"
