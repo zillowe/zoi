@@ -23,7 +23,7 @@ build:linux:
   image: rust:latest
   before_script:
     - dpkg --add-architecture arm64
-    - apt-get update -y && apt-get install -y build-essential gcc gcc-aarch64-linux-gnu libssl-dev pkg-config libssl-dev:arm64 openssl libssl-dev:armhf
+    - apt-get update -y && apt-get install -y build-essential gcc gcc-aarch64-linux-gnu libssl-dev pkg-config libssl-dev:arm64 openssl
   script:
     - echo "Building Linux targets (amd64, arm64)..."
     - chmod +x ./build/build-linux.sh
