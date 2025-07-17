@@ -8,7 +8,7 @@ CYAN='\033[0;36m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-COMPILED_DIR="./build/release-all"
+COMPILED_DIR="./build/release"
 ARCHIVE_DIR="./build/archived"
 CHECKSUM_FILE="${ARCHIVE_DIR}/checksums.txt"
 
