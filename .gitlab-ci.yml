@@ -22,7 +22,8 @@ build:linux:
   stage: build
   image: rust:latest
   before_script:
-    - apt-get update -y && apt-get install -y build-essential gcc gcc-aarch64-linux-gnu libssl-dev:arm64
+    - dpkg --add-architecture arm64
+    - apt-get update -y && apt-get install -y build-essential gcc gcc-aarch64-linux-gnu libssl-dev libssl-dev:arm64
   script:
     - echo "Building Linux targets (amd64, arm64)..."
     - chmod +x ./build/build-linux.sh
