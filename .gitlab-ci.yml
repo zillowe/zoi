@@ -71,7 +71,6 @@ package:archive:
   needs:
     - build:linux
     - build:macos
-    - build:windows
   artifacts:
     paths:
       - ./build/archived/
