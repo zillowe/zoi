@@ -59,7 +59,6 @@ build:windows:
   tags:
     - saas-windows-medium-amd64
   before_script:
-    - Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
     - echo "Downloading rustup-init.exe..."
     - Invoke-WebRequest -Uri "https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe" -OutFile "rustup-init.exe"
     - echo "Installing Rust and MSVC build tools for x86_64 and aarch64..."
