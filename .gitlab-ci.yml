@@ -83,15 +83,8 @@ create_release:
   image: registry.gitlab.com/gitlab-org/cli:latest
   needs:
     - package:archive
-  variables:
-    GITLAB_TOKEN: $GITLAB_TOKEN
-  before_script:
-    - sleep 5
-    - export GLAB_DEBUG=1
-    - glab auth login --token $GITLAB_TOKEN
   script:
     - echo "Creating GitLab Release for tag $CI_COMMIT_TAG..."
-    - sleep 5
     - glab release create "$CI_COMMIT_TAG" ./build/archived/* --notes "Official release for Zoi version $CI_COMMIT_TAG"
     - echo "Release created successfully."
   rules:
