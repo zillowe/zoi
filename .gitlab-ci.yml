@@ -82,8 +82,8 @@ create_release:
   stage: release
   image: gitlab/glab
   script:
-    - glab auth login --job-token $CI_JOB_TOKEN
-    - glab release create "$CI_COMMIT_TAG" ./build/archived/* --notes "Official release for Zoi version $CI_COMMIT_TAG"
+    - glab auth login --job-token $GITLAB_TOKEN
+    - glab release create "$CI_COMMIT_TAG" ./build/archived/* --name "$CI_COMMIT_TAG_MESSAGE" --notes "Zoi release for $CI_COMMIT_TAG_MESSAGE"
   needs:
     - package:archive
   rules:

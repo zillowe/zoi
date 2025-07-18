@@ -14,7 +14,7 @@ Please read this!
 - Please give all relevant information below for bug reports, as incomplete details may result in the issue not being considered.
 -->
 
-- [ ] I am using the latest version of Zoi (you can check with `zoi --version` or `zoi update`).
+- [ ] I am using the latest version of Zoi (you can check with `zoi --version` or `zoi update zoi`).
 - [ ] I have checked the [existing issues](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues?scope=all&state=all&label_name[]=Kind%2FBug) to ensure this is not a duplicate.
 
 ### Summary

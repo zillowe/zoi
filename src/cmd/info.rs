@@ -2,7 +2,7 @@ use crate::utils;
 use colored::*;
 use std::env;
 
-pub fn run() {
+pub fn run(branch: &str, status: &str, number: &str, commit: &str) {
     println!("{}", "--- System Information ---".yellow().bold());
 
     let os = env::consts::OS;
@@ -23,4 +23,22 @@ pub fn run() {
     } else {
         utils::print_aligned_info("Package Manager", "Not available");
     }
+
+    let _branch_short = if branch == "Production" {
+        "Prod."
+    } else if branch == "Development" {
+        "Dev."
+    } else {
+        branch
+    };
+
+    let key_with_colon = format!("{}:", "Version");
+    println!(
+        "{:<18}{} {} {} {}",
+        key_with_colon.cyan(),
+        branch,
+        status,
+        number,
+        commit.green()
+    );
 }
