@@ -82,7 +82,6 @@ create_release:
   stage: release
   image: gitlab/glab
   script:
-    - echo "Token length: ${#GITLAB_TOKEN}"
     - glab auth login --token $GITLAB_TOKEN_RELEASE
     - glab release create "$CI_COMMIT_TAG" ./build/archived/* --name "$CI_COMMIT_TAG_MESSAGE" --notes "Zoi release for $CI_COMMIT_TAG_MESSAGE"
   needs:
