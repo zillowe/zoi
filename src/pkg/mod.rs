@@ -6,3 +6,4 @@ pub mod resolve;
 pub mod sync;
 pub mod types;
 pub mod uninstall;
+pub mod upgrade;

@@ -7,9 +7,6 @@ param(
 $ErrorActionPreference = "Stop"
 
 $GitLabProjectPath = "Zillowe/Zillwen/Zusty/Zoi"
-$Tag = "latest"
-
-$BaseUrl = "https://gitlab.com/$GitLabProjectPath/-/releases/$Tag/downloads"
 $InstallDir = Join-Path $env:USERPROFILE ".zoi\bin"
 $BinName = "zoi.exe"
 
@@ -24,30 +21,40 @@ function Write-Error-Exit {
     exit 1
 }
 
+Write-Info "Fetching the latest release tag from GitLab API..."
+try {
+    $EncodedProjectPath = [System.Web.HttpUtility]::UrlEncode($GitLabProjectPath)
+    $ApiUrl = "https://gitlab.com/api/v4/projects/$EncodedProjectPath/releases"
+    
+    $Releases = Invoke-RestMethod -Uri $ApiUrl -Method Get
+    
+    $LatestTag = $Releases[0].tag_name
+
+
+    if ([string]::IsNullOrEmpty($LatestTag)) {
+        throw "API response did not contain a valid tag name."
+    }
+    Write-Info "Latest tag found: $LatestTag"
+}
+catch {
+    Write-Error-Exit "Could not fetch the latest release tag. Please check the repository path and network." $_.Exception
+}
 
 $Os = "windows"
 $Arch = ""
 try {
-    if (Get-Command Get-ComputerInfo -ErrorAction SilentlyContinue) {
-        $OsInfo = Get-ComputerInfo | Select-Object -ExpandProperty "OsArchitecture"
-    } else {
-        $OsInfo = (Get-CimInstance Win32_OperatingSystem).OSArchitecture
-    }
-
-    if ($OsInfo -match "64-bit") {
-        if ((Get-CimInstance Win32_Processor).Architecture -eq 9) {
-            $Arch = "arm64"
-        } else {
-            $Arch = "amd64"
-        }
+    if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') {
+        $Arch = 'arm64'
+    } elseif ($env:PROCESSOR_ARCHITECTURE -eq 'AMD64') {
+        $Arch = 'amd64'
     } else {
         throw "Zoi currently requires a 64-bit (x64 or ARM64) Windows system."
     }
-}
-catch {
+} catch {
     Write-Error-Exit "Architecture detection failed." $_.Exception
 }
 
+$BaseUrl = "https://gitlab.com/$GitLabProjectPath/-/releases/$LatestTag/downloads"
 $TargetArchive = "zoi-${Os}-${Arch}.zip"
 $DownloadUrl = "$BaseUrl/$TargetArchive"
 $ChecksumUrl = "$BaseUrl/checksums.txt"

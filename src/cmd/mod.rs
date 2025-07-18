@@ -10,6 +10,7 @@ pub mod show;
 pub mod sync;
 pub mod uninstall;
 pub mod update;
+pub mod upgrade;
 
 pub mod env;
 pub mod run;

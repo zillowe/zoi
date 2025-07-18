@@ -7,7 +7,7 @@ mod utils;
 
 const BRANCH: &str = "Production";
 const STATUS: &str = "Beta";
-const NUMBER: &str = "2.1.0";
+const NUMBER: &str = "2.1.1";
 
 /// Zoi - The Universal Package Manager & Environment Setup Tool.
 ///
@@ -141,6 +141,12 @@ enum Commands {
         #[arg(value_name = "TARGET_DIRECTORY")]
         target_directory: Option<String>,
     },
+
+    /// Upgrades the Zoi binary to the latest version
+    #[command(
+        long_about = "Downloads the latest release from GitLab, verifies its checksum, and replaces the current executable."
+    )]
+    Upgrade,
 }
 
 fn main() {
@@ -171,6 +177,7 @@ fn main() {
                 source,
                 target_directory,
             } => cmd::clone::run(source, target_directory),
+            Commands::Upgrade => cmd::upgrade::run(),
         }
     } else {
         Cli::command().print_help().unwrap();

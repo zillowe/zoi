@@ -3,11 +3,6 @@
 set -euo pipefail
 
 GITLAB_PROJECT_PATH="Zillowe/Zillwen/Zusty/Zoi"
-TAG="latest"
-
-REPO_BASE_URL="https://gitlab.com/${GITLAB_PROJECT_PATH}/-/releases/${TAG}/downloads"
-
-INSTALL_DIR="${HOME}/.local/bin"
 BIN_NAME="zoi"
 COMMENT_LINE="# Zoi PATH addition"
 
@@ -25,29 +20,45 @@ require_util() {
     command -v "$1" >/dev/null 2>&1 || error "'$1' command is required but not found. Please install it."
 }
 
-
 require_util "curl"
 require_util "uname"
 require_util "chmod"
 require_util "mkdir"
 require_util "tar"
 require_util "xz"
+require_util "grep"
+require_util "sed"
+require_util "tr"
+
+info "Fetching the latest release tag from GitLab API..."
+LATEST_TAG=$(curl --silent "https://gitlab.com/api/v4/projects/${GITLAB_PROJECT_PATH//\//%2F}/releases" | tr ',' '\n' | grep '"tag_name"' | sed 's/.*"tag_name":"\([^"]*\)".*/\1/' | head -n 1)
+
+if [ -z "$LATEST_TAG" ]; then
+    error "Could not fetch the latest release tag. Please check the repository path and network."
+fi
+info "Latest tag found: ${LATEST_TAG}"
 
 os=""
 arch=""
 case "$(uname -s)" in
     Linux*)  os="linux" ;;
     Darwin*) os="darwin" ;;
-    MINGW*|CYGWIN*|MSYS*) error "Windows detected. Please use the 'install.ps1' script in PowerShell." ;;
-    *)       error "Unsupported Operating System: $(uname -s)" ;;
+    *)       error "Unsupported OS: $(uname -s)" ;;
 esac
-
 case "$(uname -m)" in
     x86_64|amd64) arch="amd64" ;;
     arm64|aarch64) arch="arm64" ;;
-    *)          error "Unsupported Architecture: $(uname -m)" ;;
+    *)          error "Unsupported Arch: $(uname -m)" ;;
 esac
 
+INSTALL_DIR="${HOME}/.local/bin" 
+SUDO_CMD=""
+if [ "$(id -u)" -eq 0 ] || [ -n "${SUDO_USER-}" ]; then
+    INSTALL_DIR="/usr/local/bin"
+    if [ "$(id -u)" -ne 0 ]; then SUDO_CMD="sudo"; fi
+fi
+
+REPO_BASE_URL="https://gitlab.com/${GITLAB_PROJECT_PATH}/-/releases/${LATEST_TAG}/downloads"
 TARGET_ARCHIVE="zoi-${os}-${arch}.tar.xz"
 DOWNLOAD_URL="${REPO_BASE_URL}/${TARGET_ARCHIVE}"
 CHECKSUM_URL="${REPO_BASE_URL}/checksums.txt"
