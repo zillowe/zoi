@@ -32,13 +32,11 @@ pub fn run(branch: &str, status: &str, number: &str, commit: &str) {
         utils::print_aligned_info("Package Manager", "Not available");
     }
 
-    println!("");
-
     let key_with_colon = format!("{}:", "Version");
     println!(
         "{:<18}{} {} {} {}",
         key_with_colon.cyan(),
-        branch,
+        _branch_short,
         status,
         number,
         commit.green()
