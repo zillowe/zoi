@@ -156,7 +156,7 @@ fn main() {
         match command {
             Commands::Version => cmd::version::run(BRANCH, STATUS, NUMBER, commit),
             Commands::About => cmd::about::run(BRANCH, STATUS, NUMBER, commit),
-            Commands::Info => cmd::info::run(),
+            Commands::Info => cmd::info::run(BRANCH, STATUS, NUMBER, commit),
             Commands::Check => cmd::check::run(),
             Commands::Sync => cmd::sync::run(),
             Commands::List { all } => cmd::list::run(all.is_some()),
