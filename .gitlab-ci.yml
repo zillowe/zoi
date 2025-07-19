@@ -21,6 +21,8 @@ check_build:
 build:linux:
   stage: build
   image: rust:latest
+  tags:
+    - saas-linux-large-amd64
   before_script:
     - dpkg --add-architecture arm64
     - dpkg --add-architecture armhf
