@@ -32,9 +32,9 @@ check_build:
         git checkout -b "$BRANCH_NAME"
         git add .
         git commit -m "chore(ci): Apply automated fixes for ${CI_COMMIT_REF_NAME}" -m "This MR contains automated code style and linting fixes applied by the CI pipeline." -m "[skip ci]"
-        git push "https://gitlab-ci-token:${CI_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" "${SOURCE_BRANCH_NAME}"
+        git push "https://gitlab-ci-token:${CI_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" "${BRANCH_NAME}"
         glab mr create \
-          --source-branch "${SOURCE_BRANCH_NAME}" \
+          --source-branch "${BRANCH_NAME}" \
           --target-branch "${CI_COMMIT_REF_NAME}" \
           --title "chore: Automated CI fixes for '${CI_COMMIT_REF_NAME}'" \
           --description "This MR was created by the CI pipeline to apply automated `rustfmt` and `clippy` fixes. Please review and merge." \
