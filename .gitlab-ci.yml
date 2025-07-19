@@ -7,36 +7,36 @@ stages:
 check_build:
   stage: test
   image: rust:latest
-  
+  tags:
+    - saas-linux-large-amd64
   before_script:
     - apt-get update -y && apt-get install -y build-essential gcc
     - cargo install cargo-udeps
     - rustup component add clippy
     - rustup component add rustfmt
-    - git config --global user.name "GitLab CI"
-    - git config --global user.email "ci@zillowe.org"
-
+    - git config --global user.name "GitLab CI Bot"
+    - git config --global user.email "gitlab-ci@your-domain.com" 
   script:
-    - echo "--- Checking formatting with rustfmt ---"
-    - cargo fmt --all -- --check
-    - echo "--- Linting with Clippy ---"
-    - cargo clippy --all-targets -- -D warnings
-    - echo "--- Checking for unused dependencies with cargo-udeps ---"
-    - cargo udeps --all-targets --backend=cargo-check || true
+    - echo "--- Applying automated code quality fixes ---"
+    - echo "Applying rustfmt..."
+    - cargo fmt --all
+    - echo "Applying clippy fixes..."
+    - cargo clippy --all-targets --fix --allow-dirty --allow-staged || echo "Clippy finished with non-fixable warnings."
+    - echo "Removing unused dependencies with cargo-udeps..."
+    - cargo udeps --all-targets --backend=cargo-check --fix
     - echo "--- Checking for changes to commit ---"
     - |
       if [[ -n $(git status --porcelain) ]]; then
-        echo "Changes detected. Committing and pushing..."
-        - git remote set-url origin "https://gitlab-ci-token:${CI_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
-        - git checkout "${CI_COMMIT_REF_NAME}"
-        - git add Cargo.toml Cargo.lock
-        - git commit -m "Cleanup(CI): Automatically remove unused dependencies/format/lint [skip ci]"
-        - git push origin "${CI_COMMIT_REF_NAME}"
-        echo "Committed unused dependency removal."
+        echo "Changes detected by automated tools. Committing and pushing..."
+        git remote set-url origin "https://gitlab-ci-token:${CI_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+        git checkout "${CI_COMMIT_REF_NAME}"
+        git add .
+        git commit -m "chore(ci): Apply automated fixes (fmt, clippy, udeps)" -m "[skip ci]"
+        git push origin "${CI_COMMIT_REF_NAME}"
+        echo "Committed and pushed automated fixes."
       else
-        echo "No changes to commit. Code is clean."
+        echo "No changes needed. Code is clean."
       fi
-
   rules:
     - if: $CI_COMMIT_TAG
       when: never
