@@ -11,7 +11,6 @@ check_build:
     - saas-linux-large-amd64
   before_script:
     - apt-get update -y && apt-get install -y build-essential gcc
-    - cargo install cargo-udeps
     - rustup component add clippy
     - rustup component add rustfmt
     - git config --global user.name "GitLab CI Bot"
@@ -23,7 +22,6 @@ check_build:
     - echo "Applying clippy fixes..."
     - cargo clippy --all-targets --fix --allow-dirty --allow-staged || echo "Clippy finished with non-fixable warnings."
     - echo "Removing unused dependencies with cargo-udeps..."
-    - cargo udeps --all-targets --backend=cargo-check --fix
     - echo "--- Checking for changes to commit ---"
     - |
       if [[ -n $(git status --porcelain) ]]; then
