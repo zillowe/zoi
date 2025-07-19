@@ -13,6 +13,7 @@ check_build:
     - apt-get update -y && apt-get install -y build-essential gcc
     - rustup component add clippy
     - rustup component add rustfmt
+    - cargo install clippy
     - git config --global user.name "Zoi CI Bot"
     - git config --global user.email "bot@${CI_SERVER_HOST}"
     - curl -sL "https://gitlab.com/gitlab-org/cli/-/releases/v1.63.0/downloads/glab_1.63.0_linux_amd64.deb" -o glab.deb
