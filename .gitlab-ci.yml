@@ -7,11 +7,36 @@ stages:
 check_build:
   stage: test
   image: rust:latest
+  
   before_script:
-    - apt-get update -y && apt-get install -y gcc 
+    - apt-get update -y && apt-get install -y build-essential gcc
+    - cargo install cargo-udeps
+    - rustup component add clippy
+    - rustup component add rustfmt
+    - git config --global user.name "GitLab CI"
+    - git config --global user.email "ci@zillowe.org"
+
   script:
-    - echo "Running a quick compilation check..."
-    - cargo check --verbose
+    - echo "--- Checking formatting with rustfmt ---"
+    - cargo fmt --all -- --check
+    - echo "--- Linting with Clippy ---"
+    - cargo clippy --all-targets -- -D warnings
+    - echo "--- Checking for unused dependencies with cargo-udeps ---"
+    - cargo udeps --all-targets --backend=cargo-check || true
+    - echo "--- Checking for changes to commit ---"
+    - |
+      if [[ -n $(git status --porcelain) ]]; then
+        echo "Changes detected. Committing and pushing..."
+        - git remote set-url origin "https://gitlab-ci-token:${CI_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+        - git checkout "${CI_COMMIT_REF_NAME}"
+        - git add Cargo.toml Cargo.lock
+        - git commit -m "Cleanup(CI): Automatically remove unused dependencies/format/lint [skip ci]"
+        - git push origin "${CI_COMMIT_REF_NAME}"
+        echo "Committed unused dependency removal."
+      else
+        echo "No changes to commit. Code is clean."
+      fi
+
   rules:
     - if: $CI_COMMIT_TAG
       when: never
@@ -71,6 +96,7 @@ package:archive:
     - ./build/archive.sh
     - echo "Archiving complete."
   needs:
+    - check_build
     - build:linux
     - build:macos
   artifacts:
