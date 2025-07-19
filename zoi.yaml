@@ -14,6 +14,18 @@ commands:
     run: "./build/build-all.sh"
   - cmd: "archive"
     run: "./build/archive.sh"
+  - cmd: "major-prod"
+    run: "bun ./version/version.js set branch prod && bun ./version/version.js bump prod major"
+  - cmd: "major-dev"
+    run: "bun ./version/version.js set branch dev && bun ./version/version.js bump dev major"
+  - cmd: "minor-prod"
+    run: "bun ./version/version.js set branch prod && bun ./version/version.js bump prod minor"
+  - cmd: "minor-dev"
+    run: "bun ./version/version.js set branch dev && bun ./version/version.js bump dev minor"
+  - cmd: "patch-prod"
+    run: "bun ./version/version.js set branch prod && bun ./version/version.js bump prod patch"
+  - cmd: "patch-dev"
+    run: "bun ./version/version.js set branch dev && bun ./version/version.js bump dev patch"
 
 environments:
   - name: "Development"
