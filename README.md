@@ -118,7 +118,7 @@ cargo install https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi
 You can update Zoi by running this command:
 
 ```sh
-zoi update zoi
+zoi upgrade
 ```
 
 ## Documentation
