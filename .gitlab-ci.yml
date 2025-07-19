@@ -15,6 +15,7 @@ check_build:
     - git config --global user.email "gitlab-ci@your-domain.com" 
   script:
     - echo "--- Applying automated code quality fixes ---"
+    - cargo check --verbose
     - echo "Applying rustfmt..."
     - cargo fmt --all
     - echo "Applying clippy fixes..."
