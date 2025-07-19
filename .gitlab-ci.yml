@@ -21,7 +21,7 @@ check_build:
     - echo "Applying rustfmt..."
     - cargo fmt --all
     - echo "Applying clippy fixes..."
-    - cargo clippy --all-targets --fix --allow-dirty --allow-staged || echo "Clippy finished."
+    #- cargo clippy --all-targets --fix --allow-dirty --allow-staged || echo "Clippy finished."
     - echo "--- Checking for changes to commit ---"
     - |
       if [[ -n $(git status --porcelain) ]]; then
