@@ -7,8 +7,6 @@ stages:
 check_build:
   stage: test
   image: rust:latest
-  tags:
-    - saas-linux-large-amd64
   before_script:
     - apt-get update -y && apt-get install -y build-essential gcc
     - rustup component add clippy
