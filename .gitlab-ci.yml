@@ -45,7 +45,7 @@ check_build:
           --target-branch "${CI_COMMIT_REF_NAME}" \
           --title "chore: Automated CI fixes for '${CI_COMMIT_REF_NAME}'" \
           --description "This MR was created by the CI pipeline to apply automated `rustfmt` and `clippy` fixes. Please review and merge." \
-      --description "This MR was created by the CI pipeline to apply automated \`rustfmt\` and \`clippy\` fixes. It may also remove unused dependencies detected by \`cargo-machete\`. Please review and merge. **Pipeline:** ${CI_SERVER_URL}/${CI_PROJECT_PATH}/-/pipelines/${CI_PIPELINE_ID}"
+      --description "This MR was created by the CI pipeline to apply automated \`rustfmt\` and \`clippy\` fixes. It may also remove unused dependencies detected by \`cargo-machete\`. Please review and merge. **Pipeline:** ${CI_SERVER_URL}/${CI_PROJECT_PATH}/-/pipelines/${CI_PIPELINE_ID}" \
           --label "Bot/Automated Fix" \
           --label "Kind/Enhancement" \
           --remove-source-branch \
