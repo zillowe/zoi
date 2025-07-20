@@ -13,12 +13,15 @@ check_build:
     - apt-get update -y && apt-get install -y build-essential gcc
     - rustup component add clippy
     - rustup component add rustfmt
+    - cargo install cargo-machete
     - git config --global user.name "Zoi CI Bot"
     - git config --global user.email "bot@${CI_SERVER_HOST}"
     - curl -sL "https://gitlab.com/gitlab-org/cli/-/releases/v1.63.0/downloads/glab_1.63.0_linux_amd64.deb" -o glab.deb
     - dpkg -i glab.deb && rm glab.deb
     - glab auth login --token $GITLAB_TOKEN_RELEASE
   script:
+    - echo "--- Checking for unused dependencies ---"
+    - cargo machete --fix
     - echo "--- Applying automated code quality fixes ---"
     - cargo check --verbose
     - echo "Applying rustfmt..."
@@ -39,6 +42,7 @@ check_build:
           --target-branch "${CI_COMMIT_REF_NAME}" \
           --title "chore: Automated CI fixes for '${CI_COMMIT_REF_NAME}'" \
           --description "This MR was created by the CI pipeline to apply automated `rustfmt` and `clippy` fixes. Please review and merge." \
+      --description "This MR was created by the CI pipeline to apply automated \`rustfmt\` and \`clippy\` fixes. It may also remove unused dependencies detected by \`cargo-machete\`. Please review and merge. **Pipeline:** ${CI_SERVER_URL}/${CI_PROJECT_PATH}/-/pipelines/${CI_PIPELINE_ID}"
           --label "Bot/Automated Fix" \
           --label "Kind/Enhancement" \
           --remove-source-branch \
