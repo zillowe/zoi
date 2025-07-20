@@ -28,6 +28,7 @@ check_build:
     - cargo fmt --all
     - echo "Applying clippy fixes..."
     - cargo clippy --all-targets --fix --allow-dirty --allow-staged || echo "Clippy finished."
+    - cargo check --verbose
     - echo "--- Checking for changes to commit ---"
     - |
       if [[ -n $(git status --porcelain) ]]; then
