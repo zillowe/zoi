@@ -14,7 +14,6 @@ check_build:
   before_script:
     - apt-get update -y && apt-get install -y build-essential gcc
     - rustup component add clippy
-    - rustup component add rustfmt
     - cargo install cargo-machete
     - git config --global user.name "Zoi CI Bot"
     - git config --global user.email "bot@${CI_SERVER_HOST}"

@@ -33,16 +33,16 @@ pub fn run(search_term: &str) {
             table
                 .load_preset(UTF8_FULL)
                 .set_content_arrangement(ContentArrangement::Dynamic)
-                .set_header(vec!["Package", "Version", "Description"]);
+                .set_header(vec!["Package", "Version", "Repo", "Description"]);
 
             for pkg in matches {
                 let mut desc = pkg.description.replace('\n', " ");
-                if desc.len() > 70 {
-                    desc.truncate(67);
+                if desc.len() > 60 {
+                    desc.truncate(57);
                     desc.push_str("...");
                 }
 
-                table.add_row(vec![pkg.name.green().to_string(), pkg.version, desc]);
+                table.add_row(vec![pkg.name, pkg.version, pkg.repo, desc]);
             }
 
             println!("{table}");

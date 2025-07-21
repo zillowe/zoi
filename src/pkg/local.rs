@@ -1,3 +1,4 @@
+use crate::pkg::config;
 use crate::pkg::types::InstallManifest;
 use std::error::Error;
 use std::fs;
@@ -51,14 +52,23 @@ pub fn get_all_available_packages() -> Result<Vec<super::types::Package>, Box<dy
         return Err("Package database not found. Please run 'zoi sync' first.".into());
     }
 
+    let config = config::read_config()?;
     let mut available = Vec::new();
-    for entry in WalkDir::new(db_root).into_iter().filter_map(Result::ok) {
-        if entry.file_name().to_string_lossy().ends_with(".pkg.yaml") {
-            let content = fs::read_to_string(entry.path())?;
-            let pkg: super::types::Package = serde_yaml::from_str(&content)?;
-            available.push(pkg);
+
+    for repo_name in config.repos {
+        let repo_path = db_root.join(repo_name);
+        if !repo_path.exists() {
+            continue;
+        }
+        for entry in WalkDir::new(repo_path).into_iter().filter_map(Result::ok) {
+            if entry.file_name().to_string_lossy().ends_with(".pkg.yaml") {
+                let content = fs::read_to_string(entry.path())?;
+                let pkg: super::types::Package = serde_yaml::from_str(&content)?;
+                available.push(pkg);
+            }
         }
     }
+
     available.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(available)
 }

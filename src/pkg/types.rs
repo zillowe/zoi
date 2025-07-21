@@ -52,3 +52,8 @@ pub struct InstallManifest {
     pub installed_at: String,
     pub reason: InstallReason,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Config {
+    pub repos: Vec<String>,
+}

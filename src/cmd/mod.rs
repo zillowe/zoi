@@ -9,6 +9,7 @@ pub mod exec;
 pub mod install;
 pub mod list;
 pub mod pin;
+pub mod repo;
 pub mod search;
 pub mod show;
 pub mod sync;

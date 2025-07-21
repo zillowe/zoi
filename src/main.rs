@@ -177,6 +177,7 @@ enum Commands {
     /// Removes packages that were installed as dependencies but are no longer needed
     Autoremove,
 
+    /// Searches for packages by name or description
     #[command(
         long_about = "Searches for a case-insensitive term in the name and description of all available packages in the database."
     )]
@@ -199,6 +200,18 @@ enum Commands {
         #[arg(value_name = "ARGS")]
         args: Vec<String>,
     },
+
+    /// Manage package repositories
+    #[command(
+        long_about = "Manages the list of package repositories that Zoi uses to find and install packages. By default, Zoi is configured with 'main' and 'extra' repositories.
+
+Commands:
+- add: Adds a new repository from the available sources. Can be interactive.
+- remove: Deletes a repository from the active list.
+- list: Shows all currently active repositories.
+- list all: Displays all available repositories and their status (active/inactive)."
+    )]
+    Repo(cmd::repo::RepoCommand),
 }
 
 fn main() {
@@ -240,6 +253,7 @@ fn main() {
             Commands::Autoremove => cmd::autoremove::run(),
             Commands::Search { term } => cmd::search::run(&term),
             Commands::Exec { source, args } => cmd::exec::run(source, args),
+            Commands::Repo(args) => cmd::repo::run(args),
         }
     } else {
         Cli::command().print_help().unwrap();

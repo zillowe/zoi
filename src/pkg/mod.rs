@@ -1,5 +1,6 @@
 pub mod autoremove;
 pub mod clone;
+pub mod config;
 pub mod dependencies;
 pub mod exec;
 pub mod install;
