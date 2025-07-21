@@ -38,10 +38,17 @@ pub struct Dependencies {
     pub build: Option<Vec<String>>,
 }
 
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum InstallReason {
+    Direct,
+    Dependency,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InstallManifest {
     pub name: String,
     pub version: String,
     pub repo: String,
     pub installed_at: String,
+    pub reason: InstallReason,
 }

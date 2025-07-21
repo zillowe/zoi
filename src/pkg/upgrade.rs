@@ -1,12 +1,13 @@
 use colored::*;
 use hex;
+use indicatif::{ProgressBar, ProgressStyle};
 use self_update::{cargo_crate_version, self_replace};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::env;
 use std::error::Error;
 use std::fs::File;
-use std::io;
+use std::io::{self, Read, Write};
 use std::path::Path;
 use tar::Archive;
 use tempfile::Builder;
@@ -47,8 +48,26 @@ fn download_file(url: &str, path: &Path) -> Result<(), Box<dyn Error>> {
     if !response.status().is_success() {
         return Err(format!("Failed to download file: HTTP {}", response.status()).into());
     }
+
+    let total_size = response.content_length().unwrap_or(0);
+    let pb = ProgressBar::new(total_size);
+    pb.set_style(ProgressStyle::default_bar()
+        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})")?
+        .progress_chars("#>-"));
+
     let mut dest = File::create(path)?;
-    io::copy(&mut response, &mut dest)?;
+    let mut buffer = [0; 8192];
+
+    loop {
+        let bytes_read = response.read(&mut buffer)?;
+        if bytes_read == 0 {
+            break;
+        }
+        dest.write_all(&buffer[..bytes_read])?;
+        pb.inc(bytes_read as u64);
+    }
+
+    pb.finish_with_message("Download complete.");
     Ok(())
 }
 

@@ -4,7 +4,7 @@ use std::fs;
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
-fn get_store_root() -> Result<PathBuf, Box<dyn Error>> {
+pub fn get_store_root() -> Result<PathBuf, Box<dyn Error>> {
     let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
     Ok(home_dir.join(".zoi").join("pkgs").join("store"))
 }
@@ -61,4 +61,13 @@ pub fn get_all_available_packages() -> Result<Vec<super::types::Package>, Box<dy
     }
     available.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(available)
+}
+
+pub fn write_manifest(manifest: &InstallManifest) -> Result<(), Box<dyn Error>> {
+    let store_dir = get_store_root()?.join(&manifest.name);
+    fs::create_dir_all(&store_dir)?;
+    let manifest_path = store_dir.join("manifest.yaml");
+    let content = serde_yaml::to_string(&manifest)?;
+    fs::write(manifest_path, content)?;
+    Ok(())
 }

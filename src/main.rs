@@ -1,20 +1,24 @@
 use clap::{CommandFactory, Parser, Subcommand};
-
+use clap_complete::Shell;
+use clap_complete::generate;
+use std::io;
 mod cmd;
 mod pkg;
 mod project;
 mod utils;
 
-const BRANCH: &str = "Production";
+const BRANCH: &str = "Development";
 const STATUS: &str = "Beta";
-const NUMBER: &str = "2.1.3";
+const NUMBER: &str = "2.2.0";
 
 /// Zoi - The Universal Package Manager & Environment Setup Tool.
 ///
 /// Part of the Zillowe Development Suite (ZDS), Zoi is designed to streamline
 /// your development workflow by managing tools and project environments.
 #[derive(Parser)]
-#[command(author, about, long_about, disable_version_flag = true)]
+#[command(author, about, long_about = None, disable_version_flag = true,
+    trailing_var_arg = true,
+)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
@@ -29,6 +33,14 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Generates shell completion scripts
+    #[command(hide = true)]
+    GenerateCompletions {
+        /// The shell to generate completions for
+        #[arg(value_enum)]
+        shell: Shell,
+    },
+
     /// Prints concise version and build information
     #[command(
         alias = "v",
@@ -73,6 +85,20 @@ enum Commands {
         /// Display the raw package file content
         #[arg(long)]
         raw: bool,
+    },
+
+    /// Pins a package to a specific version
+    Pin {
+        /// The package to pin, e.g. "vim@1.8.0"
+        #[arg(value_name = "PACKAGE")]
+        package: String,
+    },
+
+    /// Unpins a package
+    Unpin {
+        /// The package to unpin
+        #[arg(value_name = "PACKAGE")]
+        package: String,
     },
 
     /// Updates an installed package to the latest version
@@ -147,6 +173,32 @@ enum Commands {
         long_about = "Downloads the latest release from GitLab, verifies its checksum, and replaces the current executable."
     )]
     Upgrade,
+
+    /// Removes packages that were installed as dependencies but are no longer needed
+    Autoremove,
+
+    #[command(
+        long_about = "Searches for a case-insensitive term in the name and description of all available packages in the database."
+    )]
+    Search {
+        /// The term to search for (e.g. 'editor', 'cli')
+        #[arg(value_name = "SEARCH_TERM")]
+        term: String,
+    },
+
+    /// Download and execute a binary package without installing it
+    #[command(
+        long_about = "Downloads a binary to a temporary cache and runs it. All arguments after the package name are passed directly to the executed command."
+    )]
+    Exec {
+        /// Package name, local path, or URL to execute
+        #[arg(value_name = "SOURCE")]
+        source: String,
+
+        /// Arguments to pass to the executed command
+        #[arg(value_name = "ARGS")]
+        args: Vec<String>,
+    },
 }
 
 fn main() {
@@ -160,6 +212,11 @@ fn main() {
 
     if let Some(command) = cli.command {
         match command {
+            Commands::GenerateCompletions { shell } => {
+                let mut cmd = Cli::command();
+                let bin_name = cmd.get_name().to_string();
+                generate(shell, &mut cmd, bin_name, &mut io::stdout());
+            }
             Commands::Version => cmd::version::run(BRANCH, STATUS, NUMBER, commit),
             Commands::About => cmd::about::run(BRANCH, STATUS, NUMBER, commit),
             Commands::Info => cmd::info::run(BRANCH, STATUS, NUMBER, commit),
@@ -167,6 +224,8 @@ fn main() {
             Commands::Sync => cmd::sync::run(),
             Commands::List { all } => cmd::list::run(all.is_some()),
             Commands::Show { package_name, raw } => cmd::show::run(&package_name, raw),
+            Commands::Pin { package } => cmd::pin::run(&package),
+            Commands::Unpin { package } => cmd::unpin::run(&package),
             Commands::Update { package_name } => cmd::update::run(&package_name),
             Commands::Install { source, force } => cmd::install::run(&source, force),
             Commands::Build { source } => cmd::build::run(&source),
@@ -178,6 +237,9 @@ fn main() {
                 target_directory,
             } => cmd::clone::run(source, target_directory),
             Commands::Upgrade => cmd::upgrade::run(),
+            Commands::Autoremove => cmd::autoremove::run(),
+            Commands::Search { term } => cmd::search::run(&term),
+            Commands::Exec { source, args } => cmd::exec::run(source, args),
         }
     } else {
         Cli::command().print_help().unwrap();

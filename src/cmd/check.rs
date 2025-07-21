@@ -1,6 +1,6 @@
 use crate::utils;
 use colored::*;
-use std::io::{stdout, Write};
+use std::io::{Write, stdout};
 pub fn run() {
     println!(
         "\n{}",

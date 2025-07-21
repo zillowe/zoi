@@ -7,6 +7,7 @@ build/release-all
 packages
 config.mk
 version/node_modules
+.env
 
 # Added by GCT
 gct.yaml

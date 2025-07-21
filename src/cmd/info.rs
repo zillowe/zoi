@@ -14,9 +14,8 @@ pub fn run(branch: &str, status: &str, number: &str, commit: &str) {
     println!("{}", "--- System Information ---".yellow().bold());
 
     let os = env::consts::OS;
-    let arch = match env::consts::ARCH {
-        other => other,
-    };
+    let other = env::consts::ARCH;
+    let arch = other;
 
     utils::print_aligned_info("OS", os);
     utils::print_aligned_info("Architecture", arch);

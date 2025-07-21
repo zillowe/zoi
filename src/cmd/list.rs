@@ -1,6 +1,6 @@
 use crate::pkg::local;
 use colored::*;
-use comfy_table::{presets::UTF8_FULL, Table};
+use comfy_table::{Table, presets::UTF8_FULL};
 use std::collections::HashSet;
 
 pub fn run(list_all: bool) {
@@ -8,10 +8,8 @@ pub fn run(list_all: bool) {
         if let Err(e) = run_list_all() {
             eprintln!("{}: {}", "Error".red(), e);
         }
-    } else {
-        if let Err(e) = run_list_installed() {
-            eprintln!("{}: {}", "Error".red(), e);
-        }
+    } else if let Err(e) = run_list_installed() {
+        eprintln!("{}: {}", "Error".red(), e);
     }
 }
 

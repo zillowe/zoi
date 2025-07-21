@@ -10,7 +10,7 @@ else
     $(error config.mk not found. Please run ./configure first.)
 endif
 
-.PHONY: all install uninstall clean
+.PHONY: all install uninstall clean install-completions
 
 all: $(SRC_BIN)
 
@@ -34,3 +34,22 @@ clean:
 	@echo "Cleaning project artifacts..."
 	@cargo clean
 	@rm -f config.mk
+
+install-completions: all
+	@echo "Installing shell completions..."
+	
+	@echo "  -> Bash"
+	@mkdir -p ~/.local/share/bash-completion/completions
+	@./target/release/$(NAME) generate-completions bash > ~/.local/share/bash-completion/completions/$(NAME)
+
+	@echo "  -> Zsh"
+	@mkdir -p ~/.zsh/completions
+	@./target/release/$(NAME) generate-completions zsh > ~/.zsh/completions/_$(NAME)
+
+	@echo "  -> Fish"
+	@mkdir -p ~/.config/fish/completions
+	@./target/release/$(NAME) generate-completions fish > ~/.config/fish/completions/$(NAME).fish
+	
+	@echo ""
+	@echo "Completion scripts installed."
+	@echo "Please restart your shell or source your shell's profile to activate them."

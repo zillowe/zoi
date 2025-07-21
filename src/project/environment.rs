@@ -1,6 +1,6 @@
 use super::{config::ProjectConfig, executor};
 use colored::*;
-use dialoguer::{theme::ColorfulTheme, Select};
+use dialoguer::{Select, theme::ColorfulTheme};
 use std::error::Error;
 use std::process::Command;
 

@@ -1,4 +1,4 @@
-use crate::pkg::{install, resolve};
+use crate::pkg::{install, resolve, types::InstallReason};
 use crate::utils;
 use colored::*;
 
@@ -21,6 +21,7 @@ pub fn run(source: &str, force: bool) {
                 &resolved_source.path,
                 install::InstallMode::PreferBinary,
                 force,
+                InstallReason::Direct,
             ) {
                 eprintln!("\n{}: {}", "Installation failed".red().bold(), e);
                 std::process::exit(1);

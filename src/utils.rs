@@ -3,7 +3,7 @@ use colored::*;
 use std::error::Error;
 use std::fmt::Display;
 use std::fs;
-use std::io::{stdin, stdout, Write};
+use std::io::{Write, stdin, stdout};
 use std::process::Command;
 
 pub fn print_info<T: Display>(key: &str, value: T) {
@@ -46,7 +46,7 @@ pub fn command_exists(command: &str) -> bool {
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status()
-            .map_or(false, |status| status.success())
+            .is_ok_and(|status| status.success())
     } else {
         Command::new("sh")
             .arg("-c")
@@ -54,7 +54,7 @@ pub fn command_exists(command: &str) -> bool {
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status()
-            .map_or(false, |status| status.success())
+            .is_ok_and(|status| status.success())
     }
 }
 
@@ -140,4 +140,11 @@ pub fn confirm_untrusted_source(source_type: &SourceType) -> Result<(), Box<dyn 
     } else {
         Err("Operation aborted by user.".into())
     }
+}
+
+pub fn is_platform_compatible(current_platform: &str, allowed_platforms: &[String]) -> bool {
+    let os = std::env::consts::OS;
+    allowed_platforms
+        .iter()
+        .any(|p| p == "all" || p == os || p == current_platform)
 }

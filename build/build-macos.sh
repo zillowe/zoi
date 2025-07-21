@@ -17,7 +17,7 @@ TARGETS=(
 
 if ! command -v cargo &> /dev/null; then
     echo -e "${RED}❌ 'cargo' is not installed or not in the PATH.${NC}"
-    echo -e "${RED}Please ensure the runner has Rust/Cargo installed (e.g., via rustup or Homebrew).${NC}"
+    echo -e "${RED}Please ensure the runner has Rust/Cargo installed (e.g. via rustup or Homebrew).${NC}"
     exit 1
 fi
 

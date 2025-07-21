@@ -2,9 +2,14 @@ use crate::pkg::{dependencies, local, types};
 use crate::utils;
 use chrono::Utc;
 use colored::*;
+use indicatif::{ProgressBar, ProgressStyle};
+use std::env;
 use std::error::Error;
-use std::fs;
+use std::fs::{self, File};
+use std::io::{Read, Write};
 use std::path::Path;
+use std::process::Command;
+use tempfile::Builder;
 
 #[derive(PartialEq, Eq)]
 pub enum InstallMode {
@@ -16,9 +21,20 @@ pub fn run_installation(
     package_file: &Path,
     mode: InstallMode,
     force: bool,
+    reason: types::InstallReason,
 ) -> Result<(), Box<dyn Error>> {
     let yaml_content = fs::read_to_string(package_file)?;
     let pkg: types::Package = serde_yaml::from_str(&yaml_content)?;
+
+    if let Some(mut manifest) = local::is_package_installed(&pkg.name)? {
+        if manifest.reason == types::InstallReason::Dependency
+            && reason == types::InstallReason::Direct
+        {
+            println!("Updating package '{}' to be directly managed.", pkg.name);
+            manifest.reason = types::InstallReason::Direct;
+            local::write_manifest(&manifest)?;
+        }
+    }
 
     if !force {
         if let Some(manifest) = local::is_package_installed(&pkg.name)? {
@@ -49,11 +65,11 @@ pub fn run_installation(
     if let Some(deps) = &pkg.dependencies {
         if mode == InstallMode::ForceSource {
             if let Some(build_deps) = &deps.build {
-                dependencies::resolve_and_install(build_deps)?;
+                dependencies::resolve_and_install(build_deps, &pkg.name)?;
             }
         }
         if let Some(runtime_deps) = &deps.runtime {
-            dependencies::resolve_and_install(runtime_deps)?;
+            dependencies::resolve_and_install(runtime_deps, &pkg.name)?;
         }
     }
 
@@ -67,7 +83,7 @@ pub fn run_installation(
     };
 
     if result.is_ok() {
-        write_manifest(&pkg)?;
+        write_manifest(&pkg, reason)?;
     }
 
     result
@@ -104,35 +120,23 @@ fn find_method<'a>(
     type_name: &str,
     platform: &str,
 ) -> Option<&'a types::InstallationMethod> {
-    pkg.installation
-        .iter()
-        .find(|m| m.install_type == type_name && is_platform_compatible(platform, &m.platforms))
+    pkg.installation.iter().find(|m| {
+        m.install_type == type_name && crate::utils::is_platform_compatible(platform, &m.platforms)
+    })
 }
 
-fn write_manifest(pkg: &types::Package) -> Result<(), Box<dyn Error>> {
+fn write_manifest(
+    pkg: &types::Package,
+    reason: types::InstallReason,
+) -> Result<(), Box<dyn Error>> {
     let manifest = types::InstallManifest {
         name: pkg.name.clone(),
         version: pkg.version.clone(),
         repo: pkg.repo.clone(),
         installed_at: Utc::now().to_rfc3339(),
+        reason,
     };
-    let store_dir = home::home_dir()
-        .ok_or("No home dir")?
-        .join(".zoi/pkgs/store")
-        .join(&pkg.name);
-    fs::create_dir_all(&store_dir)?;
-    let manifest_path = store_dir.join("manifest.yaml");
-    let content = serde_yaml::to_string(&manifest)?;
-    fs::write(manifest_path, content)?;
-    println!("{}", "Wrote installation manifest.".green());
-    Ok(())
-}
-
-fn is_platform_compatible(current_platform: &str, allowed_platforms: &[String]) -> bool {
-    let os = std::env::consts::OS;
-    allowed_platforms
-        .iter()
-        .any(|p| p == "all" || p == os || p == current_platform)
+    local::write_manifest(&manifest)
 }
 
 fn handle_binary_install(
@@ -143,17 +147,21 @@ fn handle_binary_install(
     url = url.replace("{name}", &pkg.name);
     url = url.replace(
         "{platforms}",
-        &format!("{}-{}", std::env::consts::OS, std::env::consts::ARCH),
+        &format!("{}-{}", env::consts::OS, env::consts::ARCH),
     );
 
     println!("Downloading from: {}", url);
 
-    let response = reqwest::blocking::get(url)?;
+    let mut response = reqwest::blocking::get(url)?;
     if !response.status().is_success() {
-        return Err(format!("Failed to download binary: {}", response.status()).into());
+        return Err(format!("Failed to download binary: HTTP {}", response.status()).into());
     }
 
-    let bytes = response.bytes()?;
+    let total_size = response.content_length().unwrap_or(0);
+    let pb = ProgressBar::new(total_size);
+    pb.set_style(ProgressStyle::default_bar()
+        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})")?
+        .progress_chars("#>-"));
 
     let store_dir = home::home_dir()
         .ok_or("No home dir")?
@@ -163,7 +171,19 @@ fn handle_binary_install(
     fs::create_dir_all(&store_dir)?;
 
     let bin_path = store_dir.join(&pkg.name);
-    fs::write(&bin_path, &bytes)?;
+    let mut dest = File::create(&bin_path)?;
+    let mut buffer = [0; 8192];
+
+    loop {
+        let bytes_read = response.read(&mut buffer)?;
+        if bytes_read == 0 {
+            break;
+        }
+        dest.write_all(&buffer[..bytes_read])?;
+        pb.inc(bytes_read as u64);
+    }
+
+    pb.finish_with_message("Download complete.");
 
     #[cfg(unix)]
     {
@@ -196,17 +216,66 @@ fn handle_binary_install(
 }
 
 fn handle_script_install(
-    _method: &types::InstallationMethod,
-    _pkg: &types::Package,
+    method: &types::InstallationMethod,
+    pkg: &types::Package,
 ) -> Result<(), Box<dyn Error>> {
-    Err("Script installation is not yet implemented.".into())
+    println!("Using 'script' installation method...");
+
+    let platform_ext = if cfg!(target_os = "windows") {
+        "ps1"
+    } else {
+        "sh"
+    };
+
+    let resolved_url = method
+        .url
+        .replace("{platformExt}", platform_ext)
+        .replace("{website}", &pkg.website);
+
+    let temp_dir = Builder::new().prefix("zoi-script-install").tempdir()?;
+    let script_filename = format!("install.{}", platform_ext);
+    let script_path = temp_dir.path().join(script_filename);
+
+    println!("Downloading script from: {}", resolved_url.cyan());
+    let response = reqwest::blocking::get(&resolved_url)?;
+    if !response.status().is_success() {
+        return Err(format!("Failed to download script: HTTP {}", response.status()).into());
+    }
+    fs::write(&script_path, response.bytes()?)?;
+    println!("Script downloaded to temporary location.");
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        println!("Setting execute permissions...");
+        fs::set_permissions(&script_path, fs::Permissions::from_mode(0o755))?;
+    }
+
+    println!("Executing installation script...");
+    let status = if cfg!(target_os = "windows") {
+        Command::new("powershell")
+            .arg("-ExecutionPolicy")
+            .arg("Bypass")
+            .arg("-File")
+            .arg(&script_path)
+            .status()?
+    } else {
+        Command::new("sh").arg(&script_path).status()?
+    };
+
+    if !status.success() {
+        return Err("Installation script failed to execute successfully.".into());
+    }
+
+    println!("{}", "Script executed successfully.".green());
+    Ok(())
 }
 
 fn handle_source_install(
     method: &types::InstallationMethod,
     pkg: &types::Package,
 ) -> Result<(), Box<dyn Error>> {
-    println!("{}", "    Building from source...".bold());
+    println!("{}", "Building from source...".bold());
     let store_path = home::home_dir()
         .ok_or("No home dir")?
         .join(".zoi/pkgs/store")
