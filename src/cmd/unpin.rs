@@ -14,7 +14,7 @@ fn run_unpin_logic(package_name: &str) -> Result<(), Box<dyn std::error::Error>>
     pinned_packages.retain(|p| p.name != package_name);
 
     if pinned_packages.len() == initial_len {
-        println!("Package '{}' was not pinned.", package_name);
+        println!("Package '{package_name}' was not pinned.");
         return Ok(());
     }
 

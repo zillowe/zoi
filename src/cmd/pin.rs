@@ -20,8 +20,7 @@ fn run_pin_logic(package: &str) -> Result<(), Box<dyn std::error::Error>> {
 
     if pinned_packages.iter().any(|p| p.name == name) {
         println!(
-            "Package '{}' is already pinned. Unpin it first to change the version.",
-            name
+            "Package '{name}' is already pinned. Unpin it first to change the version."
         );
         return Ok(());
     }

@@ -37,7 +37,7 @@ fn get_latest_tag(is_dev_build: bool) -> Result<String, Box<dyn Error>> {
         .into_iter()
         .find(|r| r.tag_name.starts_with(tag_prefix))
         .map(|r| r.tag_name)
-        .ok_or_else(|| format!("No release found with prefix '{}'", tag_prefix))?;
+        .ok_or_else(|| format!("No release found with prefix '{tag_prefix}'"))?;
 
     println!("Found latest tag: {}", latest_tag.green());
     Ok(latest_tag)
@@ -134,20 +134,18 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     };
 
     let archive_ext = if os == "windows" { "zip" } else { "tar.xz" };
-    let archive_filename = format!("zoi-{}-{}.{}", os, arch, archive_ext);
+    let archive_filename = format!("zoi-{os}-{arch}.{archive_ext}");
     let base_url = format!(
-        "https://gitlab.com/{}/-/releases/{}/downloads",
-        GITLAB_PROJECT_PATH, latest_tag
+        "https://gitlab.com/{GITLAB_PROJECT_PATH}/-/releases/{latest_tag}/downloads"
     );
-    let download_url = format!("{}/{}", base_url, archive_filename);
-    let checksums_url = format!("{}/checksums.txt", base_url);
+    let download_url = format!("{base_url}/{archive_filename}");
+    let checksums_url = format!("{base_url}/checksums.txt");
 
     let temp_dir = Builder::new().prefix("zoi-upgrade").tempdir()?;
     let temp_archive_path = temp_dir.path().join(&archive_filename);
 
     println!(
-        "Downloading Zoi v{} from: {}",
-        latest_version_str, download_url
+        "Downloading Zoi v{latest_version_str} from: {download_url}"
     );
     download_file(&download_url, &temp_archive_path)?;
 

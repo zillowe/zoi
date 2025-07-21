@@ -24,8 +24,7 @@ fn run_update_single_logic(package_name: &str) -> Result<(), Box<dyn std::error:
     }
 
     let manifest = local::is_package_installed(package_name)?.ok_or(format!(
-        "Package '{}' is not installed. Use 'zoi install' instead.",
-        package_name
+        "Package '{package_name}' is not installed. Use 'zoi install' instead."
     ))?;
 
     println!("Currently installed version: {}", manifest.version.yellow());

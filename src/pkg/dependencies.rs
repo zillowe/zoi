@@ -107,8 +107,7 @@ fn install_dependency(dep: &Dependency, parent_pkg_name: &str) -> Result<(), Box
                 if let Some(req) = &dep.req {
                     if req.matches(&installed_version) {
                         println!(
-                            "Already installed (version {} satisfies {}). Skipping.",
-                            installed_version, req
+                            "Already installed (version {installed_version} satisfies {req}). Skipping."
                         );
                         return Ok(());
                     } else {
@@ -120,8 +119,7 @@ fn install_dependency(dep: &Dependency, parent_pkg_name: &str) -> Result<(), Box
                     }
                 } else {
                     println!(
-                        "Already installed (version {}). Skipping.",
-                        installed_version
+                        "Already installed (version {installed_version}). Skipping."
                     );
                     return Ok(());
                 }
@@ -135,8 +133,7 @@ fn install_dependency(dep: &Dependency, parent_pkg_name: &str) -> Result<(), Box
                 if let Some(req) = &dep.req {
                     if req.matches(&installed_version) {
                         println!(
-                            "Already installed (version {} satisfies {}). Skipping.",
-                            installed_version, req
+                            "Already installed (version {installed_version} satisfies {req}). Skipping."
                         );
                         return Ok(());
                     } else {
@@ -149,8 +146,7 @@ fn install_dependency(dep: &Dependency, parent_pkg_name: &str) -> Result<(), Box
                     }
                 } else {
                     println!(
-                        "Already installed (version {}). Skipping.",
-                        installed_version
+                        "Already installed (version {installed_version}). Skipping."
                     );
                     return Ok(());
                 }
@@ -165,7 +161,7 @@ fn install_dependency(dep: &Dependency, parent_pkg_name: &str) -> Result<(), Box
 
             let pm =
                 utils::get_native_package_manager().ok_or("Native package manager not found")?;
-            println!("       (Using native manager: {})", pm);
+            println!("       (Using native manager: {pm})");
             let args = match pm.as_str() {
                 "apt" | "apt-get" => vec!["install", "-y"],
                 "pacman" => vec!["-S", "--noconfirm"],
@@ -174,7 +170,7 @@ fn install_dependency(dep: &Dependency, parent_pkg_name: &str) -> Result<(), Box
                 "scoop" => vec!["install"],
                 "choco" => vec!["install", "-y"],
                 "apk" => vec!["add"],
-                _ => return Err(format!("Unsupported native package manager: {}", pm).into()),
+                _ => return Err(format!("Unsupported native package manager: {pm}").into()),
             };
 
             let package_to_install = dep.package;

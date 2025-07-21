@@ -34,7 +34,7 @@ fn remove_dependent_record(
 
 pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
     let manifest = local::is_package_installed(package_name)?
-        .ok_or_else(|| format!("Package '{}' is not installed by Zoi.", package_name))?;
+        .ok_or_else(|| format!("Package '{package_name}' is not installed by Zoi."))?;
 
     let dependents_dir = get_store_root()?.join(package_name).join("dependents");
     if dependents_dir.exists() {
@@ -52,8 +52,7 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
     }
 
     println!(
-        "No packages depend on '{}'. Proceeding with uninstallation.",
-        package_name
+        "No packages depend on '{package_name}'. Proceeding with uninstallation."
     );
 
     println!("Cleaning up dependency records...");

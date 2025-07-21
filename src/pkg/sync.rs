@@ -38,8 +38,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
 
         if remote_url != DB_URL {
             return Err(format!(
-                "Remote URL mismatch! Expected '{}', but found '{}'.",
-                DB_URL, remote_url
+                "Remote URL mismatch! Expected '{DB_URL}', but found '{remote_url}'."
             )
             .into());
         }

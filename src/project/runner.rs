@@ -13,7 +13,7 @@ pub fn run(cmd_alias: Option<&str>, config: &ProjectConfig) -> Result<(), Box<dy
             .commands
             .iter()
             .find(|c| c.cmd == alias)
-            .ok_or_else(|| format!("Command alias '{}' not found in zoi.yaml", alias))?
+            .ok_or_else(|| format!("Command alias '{alias}' not found in zoi.yaml"))?
             .clone(),
         None => {
             let selections: Vec<&str> = config.commands.iter().map(|c| c.cmd.as_str()).collect();

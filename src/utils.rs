@@ -35,7 +35,7 @@ pub fn format_version_full(branch: &str, status: &str, number: &str, commit: &st
 }
 
 pub fn print_aligned_info(key: &str, value: &str) {
-    let key_with_colon = format!("{}:", key);
+    let key_with_colon = format!("{key}:");
     println!("{:<18}{}", key_with_colon.cyan(), value);
 }
 
@@ -50,7 +50,7 @@ pub fn command_exists(command: &str) -> bool {
     } else {
         Command::new("sh")
             .arg("-c")
-            .arg(format!("command -v {}", command))
+            .arg(format!("command -v {command}"))
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status()
@@ -121,8 +121,7 @@ pub fn confirm_untrusted_source(source_type: &SourceType) -> Result<(), Box<dyn 
         SourceType::OfficialRepo => return Ok(()),
         SourceType::UntrustedRepo(repo) => {
             format!(
-                "The package from repository '@{}' is not an official Zoi repository.",
-                repo
+                "The package from repository '@{repo}' is not an official Zoi repository."
             )
         }
         SourceType::LocalFile => "You are installing from a local file.".to_string(),

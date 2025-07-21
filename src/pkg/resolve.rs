@@ -44,10 +44,10 @@ fn find_package_in_db(pkg_str: &str) -> Result<ResolvedSource, Box<dyn Error>> {
     };
 
     for repo_name in &search_repos {
-        let pkg_file_name = format!("{}.pkg.yaml", pkg_name);
+        let pkg_file_name = format!("{pkg_name}.pkg.yaml");
         let path = db_root.join(repo_name).join(&pkg_file_name);
         if path.exists() {
-            println!("Found package '{}' in repo '{}'", pkg_name, repo_name);
+            println!("Found package '{pkg_name}' in repo '{repo_name}'");
             let source_type = if repo_name == "main" || repo_name == "extra" {
                 SourceType::OfficialRepo
             } else {
@@ -57,7 +57,7 @@ fn find_package_in_db(pkg_str: &str) -> Result<ResolvedSource, Box<dyn Error>> {
         }
     }
 
-    Err(format!("Package '{}' not found in local database.", pkg_str).into())
+    Err(format!("Package '{pkg_str}' not found in local database.").into())
 }
 
 fn download_from_url(url: &str) -> Result<ResolvedSource, Box<dyn Error>> {
@@ -85,7 +85,7 @@ pub fn resolve_source(source: &str) -> Result<ResolvedSource, Box<dyn Error>> {
     } else if source.ends_with(".yaml") || source.ends_with(".yml") {
         let path = PathBuf::from(source);
         if !path.exists() {
-            return Err(format!("Local file not found at '{}'", source).into());
+            return Err(format!("Local file not found at '{source}'").into());
         }
         println!("Using local package file: {}", path.display());
         Ok(ResolvedSource {

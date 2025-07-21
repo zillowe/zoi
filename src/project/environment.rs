@@ -14,7 +14,7 @@ pub fn setup(env_alias: Option<&str>, config: &ProjectConfig) -> Result<(), Box<
             .environments
             .iter()
             .find(|e| e.cmd == alias)
-            .ok_or_else(|| format!("Environment '{}' not found in zoi.yaml", alias))?
+            .ok_or_else(|| format!("Environment '{alias}' not found in zoi.yaml"))?
             .clone(),
         None => {
             let selections: Vec<&str> = config

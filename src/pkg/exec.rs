@@ -42,7 +42,7 @@ fn ensure_binary_is_cached(pkg: &types::Package) -> Result<PathBuf, Box<dyn Erro
     url = url.replace("{name}", &pkg.name);
     url = url.replace("{platforms}", &platform);
 
-    println!("Downloading from: {}", url);
+    println!("Downloading from: {url}");
 
     let mut response = reqwest::blocking::get(url)?;
     if !response.status().is_success() {

@@ -7,7 +7,7 @@ pub fn run(source: &str, raw: bool) {
         Ok(resolved_source) => {
             let content = fs::read_to_string(&resolved_source.path).unwrap();
             if raw {
-                println!("{}", content);
+                println!("{content}");
                 return;
             }
             let pkg: Package = serde_yaml::from_str(&content).unwrap();

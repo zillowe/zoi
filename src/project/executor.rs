@@ -7,7 +7,7 @@ pub fn run_shell_command(command_str: &str) -> Result<(), Box<dyn Error>> {
     let status = Command::new("sh").arg("-c").arg(command_str).status()?;
 
     if !status.success() {
-        return Err(format!("Command failed with exit code {}", status).into());
+        return Err(format!("Command failed with exit code {status}").into());
     }
     Ok(())
 }

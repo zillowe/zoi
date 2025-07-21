@@ -74,7 +74,7 @@ pub fn run_installation(
     }
 
     let platform = format!("{}-{}", std::env::consts::OS, std::env::consts::ARCH);
-    println!("Current platform: {}", platform);
+    println!("Current platform: {platform}");
 
     let result = if mode == InstallMode::ForceSource {
         run_source_flow(&pkg, &platform)
@@ -150,7 +150,7 @@ fn handle_binary_install(
         &format!("{}-{}", env::consts::OS, env::consts::ARCH),
     );
 
-    println!("Downloading from: {}", url);
+    println!("Downloading from: {url}");
 
     let mut response = reqwest::blocking::get(url)?;
     if !response.status().is_success() {
@@ -233,7 +233,7 @@ fn handle_script_install(
         .replace("{website}", &pkg.website);
 
     let temp_dir = Builder::new().prefix("zoi-script-install").tempdir()?;
-    let script_filename = format!("install.{}", platform_ext);
+    let script_filename = format!("install.{platform_ext}");
     let script_path = temp_dir.path().join(script_filename);
 
     println!("Downloading script from: {}", resolved_url.cyan());
@@ -285,7 +285,7 @@ fn handle_source_install(
     fs::create_dir_all(&bin_path)?;
 
     let repo_url = method.url.replace("{git}", &pkg.git);
-    println!("Cloning from {}...", repo_url);
+    println!("Cloning from {repo_url}...");
     let status = std::process::Command::new("git")
         .arg("clone")
         .arg(&repo_url)
@@ -305,7 +305,7 @@ fn handle_source_install(
                 .current_dir(&git_path)
                 .status()?;
             if !status.success() {
-                return Err(format!("Build command failed: '{}'", final_cmd).into());
+                return Err(format!("Build command failed: '{final_cmd}'").into());
             }
         }
     }
