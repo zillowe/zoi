@@ -51,9 +51,7 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
         }
     }
 
-    println!(
-        "No packages depend on '{package_name}'. Proceeding with uninstallation."
-    );
+    println!("No packages depend on '{package_name}'. Proceeding with uninstallation.");
 
     println!("Cleaning up dependency records...");
     let pkg_path = crate::pkg::resolve::resolve_source(&manifest.name)?;
@@ -88,10 +86,7 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
         fs::remove_dir_all(&store_dir)?;
         println!("{}", "Successfully removed stored files.".green());
     } else {
-        println!(
-            "{} No stored files found (was already partially removed).",
-            "Warning:".yellow()
-        );
+        println!("{} No stored files found (was already partially removed).", "Warning:".yellow());
     }
 
     let symlink_path = get_bin_root()?.join(package_name);

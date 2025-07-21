@@ -16,16 +16,12 @@ pub fn run(package_name: &str) {
 
 fn run_update_single_logic(package_name: &str) -> Result<(), Box<dyn std::error::Error>> {
     if pin::is_pinned(package_name)? {
-        println!(
-            "Package '{}' is pinned. Skipping update.",
-            package_name.yellow()
-        );
+        println!("Package '{}' is pinned. Skipping update.", package_name.yellow());
         return Ok(());
     }
 
-    let manifest = local::is_package_installed(package_name)?.ok_or(format!(
-        "Package '{package_name}' is not installed. Use 'zoi install' instead."
-    ))?;
+    let manifest = local::is_package_installed(package_name)?
+        .ok_or(format!("Package '{package_name}' is not installed. Use 'zoi install' instead."))?;
 
     println!("Currently installed version: {}", manifest.version.yellow());
 
@@ -76,10 +72,7 @@ fn run_update_all_logic() -> Result<(), Box<dyn std::error::Error>> {
         let resolved_source = match resolve::resolve_source(&manifest.name) {
             Ok(source) => source,
             Err(_) => {
-                println!(
-                    "- Could not resolve source for {}, skipping.",
-                    manifest.name.red()
-                );
+                println!("- Could not resolve source for {}, skipping.", manifest.name.red());
                 continue;
             }
         };

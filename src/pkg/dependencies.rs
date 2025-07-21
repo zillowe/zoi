@@ -21,16 +21,8 @@ fn parse_dependency_string(dep_str: &str) -> Result<Dependency, Box<dyn Error>> 
     } else {
         (rest, "*")
     };
-    let req = if req_str == "*" {
-        None
-    } else {
-        Some(VersionReq::parse(req_str)?)
-    };
-    Ok(Dependency {
-        manager,
-        package,
-        req,
-    })
+    let req = if req_str == "*" { None } else { Some(VersionReq::parse(req_str)?) };
+    Ok(Dependency { manager, package, req })
 }
 
 fn get_native_command_version(command_name: &str) -> Result<Option<Version>, Box<dyn Error>> {
@@ -74,10 +66,7 @@ fn get_native_command_version(command_name: &str) -> Result<Option<Version>, Box
 
 fn record_dependent(dependency_name: &str, dependent_pkg_name: &str) -> Result<(), Box<dyn Error>> {
     let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
-    let dependents_dir = home_dir
-        .join(".zoi/pkgs/store")
-        .join(dependency_name)
-        .join("dependents");
+    let dependents_dir = home_dir.join(".zoi/pkgs/store").join(dependency_name).join("dependents");
 
     fs::create_dir_all(&dependents_dir)?;
 
@@ -87,10 +76,7 @@ fn record_dependent(dependency_name: &str, dependent_pkg_name: &str) -> Result<(
 }
 
 fn install_dependency(dep: &Dependency, parent_pkg_name: &str) -> Result<(), Box<dyn Error>> {
-    let version_info = dep
-        .req
-        .as_ref()
-        .map_or("any".to_string(), |r| r.to_string());
+    let version_info = dep.req.as_ref().map_or("any".to_string(), |r| r.to_string());
     println!(
         "-> Checking dependency: {} (version: {}) via {}",
         dep.package.cyan(),
@@ -118,9 +104,7 @@ fn install_dependency(dep: &Dependency, parent_pkg_name: &str) -> Result<(), Box
                         .into());
                     }
                 } else {
-                    println!(
-                        "Already installed (version {installed_version}). Skipping."
-                    );
+                    println!("Already installed (version {installed_version}). Skipping.");
                     return Ok(());
                 }
             }
@@ -145,9 +129,7 @@ fn install_dependency(dep: &Dependency, parent_pkg_name: &str) -> Result<(), Box
                         );
                     }
                 } else {
-                    println!(
-                        "Already installed (version {installed_version}). Skipping."
-                    );
+                    println!("Already installed (version {installed_version}). Skipping.");
                     return Ok(());
                 }
             }
@@ -186,10 +168,7 @@ fn install_dependency(dep: &Dependency, parent_pkg_name: &str) -> Result<(), Box
             }
         }
         "cargo" => {
-            let status = Command::new("cargo")
-                .arg("install")
-                .arg(dep.package)
-                .status()?;
+            let status = Command::new("cargo").arg("install").arg(dep.package).status()?;
             if !status.success() {
                 return Err("Cargo dependency failed".into());
             }

@@ -23,11 +23,7 @@ struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
 
-    #[arg(
-        short = 'v',
-        long = "version",
-        help = "Print detailed version information"
-    )]
+    #[arg(short = 'v', long = "version", help = "Print detailed version information")]
     version_flag: bool,
 }
 
@@ -232,10 +228,9 @@ fn main() {
             Commands::Uninstall { package_name } => cmd::uninstall::run(&package_name),
             Commands::Run { cmd_alias } => cmd::run::run(cmd_alias),
             Commands::Env { env_alias } => cmd::env::run(env_alias),
-            Commands::Clone {
-                source,
-                target_directory,
-            } => cmd::clone::run(source, target_directory),
+            Commands::Clone { source, target_directory } => {
+                cmd::clone::run(source, target_directory)
+            }
             Commands::Upgrade => cmd::upgrade::run(),
             Commands::Autoremove => cmd::autoremove::run(),
             Commands::Search { term } => cmd::search::run(&term),

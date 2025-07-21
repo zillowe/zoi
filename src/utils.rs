@@ -18,20 +18,11 @@ pub fn format_version_summary(branch: &str, status: &str, number: &str) -> Strin
     } else {
         branch
     };
-    format!(
-        "{} {} {}",
-        branch_short.blue().bold().italic(),
-        status,
-        number,
-    )
+    format!("{} {} {}", branch_short.blue().bold().italic(), status, number,)
 }
 
 pub fn format_version_full(branch: &str, status: &str, number: &str, commit: &str) -> String {
-    format!(
-        "{} {}",
-        format_version_summary(branch, status, number),
-        commit.green()
-    )
+    format!("{} {}", format_version_summary(branch, status, number), commit.green())
 }
 
 pub fn print_aligned_info(key: &str, value: &str) {
@@ -120,19 +111,13 @@ pub fn confirm_untrusted_source(source_type: &SourceType) -> Result<(), Box<dyn 
     let warning_message = match source_type {
         SourceType::OfficialRepo => return Ok(()),
         SourceType::UntrustedRepo(repo) => {
-            format!(
-                "The package from repository '@{repo}' is not an official Zoi repository."
-            )
+            format!("The package from repository '@{repo}' is not an official Zoi repository.")
         }
         SourceType::LocalFile => "You are installing from a local file.".to_string(),
         SourceType::Url => "You are installing from a remote URL.".to_string(),
     };
 
-    println!(
-        "\n{}: {}",
-        "SECURITY WARNING".yellow().bold(),
-        warning_message
-    );
+    println!("\n{}: {}", "SECURITY WARNING".yellow().bold(), warning_message);
 
     if ask_for_confirmation("This source is not trusted. Are you sure you want to continue?") {
         Ok(())
@@ -143,7 +128,5 @@ pub fn confirm_untrusted_source(source_type: &SourceType) -> Result<(), Box<dyn 
 
 pub fn is_platform_compatible(current_platform: &str, allowed_platforms: &[String]) -> bool {
     let os = std::env::consts::OS;
-    allowed_platforms
-        .iter()
-        .any(|p| p == "all" || p == os || p == current_platform)
+    allowed_platforms.iter().any(|p| p == "all" || p == os || p == current_platform)
 }

@@ -43,11 +43,8 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             .into());
         }
 
-        let pull_status = Command::new("git")
-            .arg("-C")
-            .arg(db_path.to_str().unwrap())
-            .arg("pull")
-            .status()?;
+        let pull_status =
+            Command::new("git").arg("-C").arg(db_path.to_str().unwrap()).arg("pull").status()?;
 
         if !pull_status.success() {
             return Err("Failed to pull changes from the remote repository.".into());
@@ -61,11 +58,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             fs::create_dir_all(parent)?;
         }
 
-        let clone_status = Command::new("git")
-            .arg("clone")
-            .arg(DB_URL)
-            .arg(&db_path)
-            .status()?;
+        let clone_status = Command::new("git").arg("clone").arg(DB_URL).arg(&db_path).status()?;
 
         if !clone_status.success() {
             return Err("Failed to clone the package repository.".into());

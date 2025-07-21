@@ -27,9 +27,7 @@ fn get_latest_tag(is_dev_build: bool) -> Result<String, Box<dyn Error>> {
         "https://gitlab.com/api/v4/projects/{}/releases",
         GITLAB_PROJECT_PATH.replace('/', "%2F")
     );
-    let client = reqwest::blocking::Client::builder()
-        .user_agent("Zoi-Upgrader")
-        .build()?;
+    let client = reqwest::blocking::Client::builder().user_agent("Zoi-Upgrader").build()?;
     let releases: Vec<GitLabRelease> = client.get(&api_url).send()?.json()?;
 
     let tag_prefix = if is_dev_build { "Dev-" } else { "Prod-" };
@@ -135,18 +133,15 @@ pub fn run() -> Result<(), Box<dyn Error>> {
 
     let archive_ext = if os == "windows" { "zip" } else { "tar.xz" };
     let archive_filename = format!("zoi-{os}-{arch}.{archive_ext}");
-    let base_url = format!(
-        "https://gitlab.com/{GITLAB_PROJECT_PATH}/-/releases/{latest_tag}/downloads"
-    );
+    let base_url =
+        format!("https://gitlab.com/{GITLAB_PROJECT_PATH}/-/releases/{latest_tag}/downloads");
     let download_url = format!("{base_url}/{archive_filename}");
     let checksums_url = format!("{base_url}/checksums.txt");
 
     let temp_dir = Builder::new().prefix("zoi-upgrade").tempdir()?;
     let temp_archive_path = temp_dir.path().join(&archive_filename);
 
-    println!(
-        "Downloading Zoi v{latest_version_str} from: {download_url}"
-    );
+    println!("Downloading Zoi v{latest_version_str} from: {download_url}");
     download_file(&download_url, &temp_archive_path)?;
 
     let checksums_content = reqwest::blocking::get(&checksums_url)?.text()?;
@@ -154,9 +149,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
 
     extract_archive(&temp_archive_path, temp_dir.path())?;
 
-    let new_binary_path = temp_dir
-        .path()
-        .join(if os == "windows" { "zoi.exe" } else { "zoi" });
+    let new_binary_path = temp_dir.path().join(if os == "windows" { "zoi.exe" } else { "zoi" });
     if !new_binary_path.exists() {
         return Err("Could not find executable in the extracted archive.".into());
     }

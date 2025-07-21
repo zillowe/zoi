@@ -19,16 +19,11 @@ fn run_pin_logic(package: &str) -> Result<(), Box<dyn std::error::Error>> {
     let mut pinned_packages = pin::get_pinned_packages()?;
 
     if pinned_packages.iter().any(|p| p.name == name) {
-        println!(
-            "Package '{name}' is already pinned. Unpin it first to change the version."
-        );
+        println!("Package '{name}' is already pinned. Unpin it first to change the version.");
         return Ok(());
     }
 
-    let new_pin = pin::PinnedPackage {
-        name: name.clone(),
-        version: version.clone(),
-    };
+    let new_pin = pin::PinnedPackage { name: name.clone(), version: version.clone() };
     pinned_packages.push(new_pin);
     pin::write_pinned_packages(&pinned_packages)?;
 

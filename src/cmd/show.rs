@@ -18,12 +18,7 @@ pub fn run(source: &str, raw: bool) {
 }
 
 fn print_beautiful(pkg: &crate::pkg::types::Package) {
-    println!(
-        "{} {} - {}",
-        pkg.name.bold().green(),
-        pkg.version.dimmed(),
-        pkg.repo
-    );
+    println!("{} {} - {}", pkg.name.bold().green(), pkg.version.dimmed(), pkg.repo);
     println!("Website");
     println!("{}", pkg.website.cyan().underline());
     println!("Git Repo");
@@ -31,10 +26,5 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
     println!("\n{}\n", pkg.description);
 
     println!("{}: {}", "License".bold(), pkg.license);
-    println!(
-        "{}: {} <{}>",
-        "Maintainer".bold(),
-        pkg.maintainer.name,
-        pkg.maintainer.email
-    );
+    println!("{}: {} <{}>", "Maintainer".bold(), pkg.maintainer.name, pkg.maintainer.email);
 }

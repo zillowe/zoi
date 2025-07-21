@@ -3,12 +3,7 @@ use crate::utils;
 use colored::*;
 
 pub fn run(source: &str, force: bool) {
-    println!(
-        "{}{}{}",
-        "--- Installing package '".yellow(),
-        source.blue().bold(),
-        "' ---".yellow()
-    );
+    println!("{}{}{}", "--- Installing package '".yellow(), source.blue().bold(), "' ---".yellow());
 
     match resolve::resolve_source(source) {
         Ok(resolved_source) => {

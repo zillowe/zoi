@@ -67,16 +67,11 @@ fn download_from_url(url: &str) -> Result<ResolvedSource, Box<dyn Error>> {
         return Err(format!("Failed to download file: HTTP {}", response.status()).into());
     }
 
-    let temp_path = env::temp_dir().join(format!(
-        "zoi-temp-{}.yaml",
-        Utc::now().timestamp_nanos_opt().unwrap_or(0)
-    ));
+    let temp_path = env::temp_dir()
+        .join(format!("zoi-temp-{}.yaml", Utc::now().timestamp_nanos_opt().unwrap_or(0)));
     fs::write(&temp_path, response.text()?)?;
 
-    Ok(ResolvedSource {
-        path: temp_path,
-        source_type: SourceType::Url,
-    })
+    Ok(ResolvedSource { path: temp_path, source_type: SourceType::Url })
 }
 
 pub fn resolve_source(source: &str) -> Result<ResolvedSource, Box<dyn Error>> {
@@ -88,10 +83,7 @@ pub fn resolve_source(source: &str) -> Result<ResolvedSource, Box<dyn Error>> {
             return Err(format!("Local file not found at '{source}'").into());
         }
         println!("Using local package file: {}", path.display());
-        Ok(ResolvedSource {
-            path,
-            source_type: SourceType::LocalFile,
-        })
+        Ok(ResolvedSource { path, source_type: SourceType::LocalFile })
     } else {
         find_package_in_db(source)
     }
