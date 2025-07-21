@@ -1,6 +1,6 @@
 use super::{config::ProjectConfig, executor};
 use colored::*;
-use dialoguer::{Select, theme::ColorfulTheme};
+use dialoguer::{theme::ColorfulTheme, Select};
 use std::error::Error;
 
 pub fn run(cmd_alias: Option<&str>, config: &ProjectConfig) -> Result<(), Box<dyn Error>> {

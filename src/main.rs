@@ -1,6 +1,6 @@
 use clap::{CommandFactory, Parser, Subcommand};
-use clap_complete::Shell;
 use clap_complete::generate;
+use clap_complete::Shell;
 use std::io;
 mod cmd;
 mod pkg;
@@ -9,7 +9,7 @@ mod utils;
 
 const BRANCH: &str = "Development";
 const STATUS: &str = "Beta";
-const NUMBER: &str = "2.2.0";
+const NUMBER: &str = "2.3.0";
 
 /// Zoi - The Universal Package Manager & Environment Setup Tool.
 ///
@@ -23,7 +23,11 @@ struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
 
-    #[arg(short = 'v', long = "version", help = "Print detailed version information")]
+    #[arg(
+        short = 'v',
+        long = "version",
+        help = "Print detailed version information"
+    )]
     version_flag: bool,
 }
 
@@ -228,9 +232,10 @@ fn main() {
             Commands::Uninstall { package_name } => cmd::uninstall::run(&package_name),
             Commands::Run { cmd_alias } => cmd::run::run(cmd_alias),
             Commands::Env { env_alias } => cmd::env::run(env_alias),
-            Commands::Clone { source, target_directory } => {
-                cmd::clone::run(source, target_directory)
-            }
+            Commands::Clone {
+                source,
+                target_directory,
+            } => cmd::clone::run(source, target_directory),
             Commands::Upgrade => cmd::upgrade::run(),
             Commands::Autoremove => cmd::autoremove::run(),
             Commands::Search { term } => cmd::search::run(&term),

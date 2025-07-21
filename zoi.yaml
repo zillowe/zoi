@@ -19,7 +19,7 @@ commands:
   - cmd: "deps"
     run: "cargo machete"
   - cmd: "prepare"
-    run: "cargo fmt --all && cargo clippy --all-targets --fix --allow-dirty --allow-staged && cargo check --verbose"
+    run: "cargo clippy --all-targets --fix --allow-dirty --allow-staged && cargo check --verbose"
 
 environments:
   - name: "Development"

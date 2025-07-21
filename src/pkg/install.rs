@@ -145,7 +145,10 @@ fn handle_binary_install(
 ) -> Result<(), Box<dyn Error>> {
     let mut url = method.url.replace("{version}", &pkg.version);
     url = url.replace("{name}", &pkg.name);
-    url = url.replace("{platforms}", &format!("{}-{}", env::consts::OS, env::consts::ARCH));
+    url = url.replace(
+        "{platforms}",
+        &format!("{}-{}", env::consts::OS, env::consts::ARCH),
+    );
 
     println!("Downloading from: {url}");
 
@@ -160,8 +163,11 @@ fn handle_binary_install(
         .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})")?
         .progress_chars("#>-"));
 
-    let store_dir =
-        home::home_dir().ok_or("No home dir")?.join(".zoi/pkgs/store").join(&pkg.name).join("bin");
+    let store_dir = home::home_dir()
+        .ok_or("No home dir")?
+        .join(".zoi/pkgs/store")
+        .join(&pkg.name)
+        .join("bin");
     fs::create_dir_all(&store_dir)?;
 
     let bin_path = store_dir.join(&pkg.name);
@@ -215,10 +221,16 @@ fn handle_script_install(
 ) -> Result<(), Box<dyn Error>> {
     println!("Using 'script' installation method...");
 
-    let platform_ext = if cfg!(target_os = "windows") { "ps1" } else { "sh" };
+    let platform_ext = if cfg!(target_os = "windows") {
+        "ps1"
+    } else {
+        "sh"
+    };
 
-    let resolved_url =
-        method.url.replace("{platformExt}", platform_ext).replace("{website}", &pkg.website);
+    let resolved_url = method
+        .url
+        .replace("{platformExt}", platform_ext)
+        .replace("{website}", &pkg.website);
 
     let temp_dir = Builder::new().prefix("zoi-script-install").tempdir()?;
     let script_filename = format!("install.{platform_ext}");
@@ -264,15 +276,21 @@ fn handle_source_install(
     pkg: &types::Package,
 ) -> Result<(), Box<dyn Error>> {
     println!("{}", "Building from source...".bold());
-    let store_path = home::home_dir().ok_or("No home dir")?.join(".zoi/pkgs/store").join(&pkg.name);
+    let store_path = home::home_dir()
+        .ok_or("No home dir")?
+        .join(".zoi/pkgs/store")
+        .join(&pkg.name);
     let git_path = store_path.join("git");
     let bin_path = store_path.join("bin");
     fs::create_dir_all(&bin_path)?;
 
     let repo_url = method.url.replace("{git}", &pkg.git);
     println!("Cloning from {repo_url}...");
-    let status =
-        std::process::Command::new("git").arg("clone").arg(&repo_url).arg(&git_path).status()?;
+    let status = std::process::Command::new("git")
+        .arg("clone")
+        .arg(&repo_url)
+        .arg(&git_path)
+        .status()?;
     if !status.success() {
         return Err("Failed to clone source repository.".into());
     }

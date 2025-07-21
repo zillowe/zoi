@@ -1,6 +1,6 @@
 use super::{config::ProjectConfig, executor};
 use colored::*;
-use dialoguer::{Select, theme::ColorfulTheme};
+use dialoguer::{theme::ColorfulTheme, Select};
 use std::error::Error;
 use std::process::Command;
 
@@ -17,8 +17,11 @@ pub fn setup(env_alias: Option<&str>, config: &ProjectConfig) -> Result<(), Box<
             .ok_or_else(|| format!("Environment '{alias}' not found in zoi.yaml"))?
             .clone(),
         None => {
-            let selections: Vec<&str> =
-                config.environments.iter().map(|e| e.name.as_str()).collect();
+            let selections: Vec<&str> = config
+                .environments
+                .iter()
+                .map(|e| e.name.as_str())
+                .collect();
             let selection = Select::with_theme(&ColorfulTheme::default())
                 .with_prompt("Choose an environment to set up")
                 .items(&selections)
@@ -30,7 +33,10 @@ pub fn setup(env_alias: Option<&str>, config: &ProjectConfig) -> Result<(), Box<
         }
     };
 
-    println!("\n--- Setting up environment: {} ---", env_to_setup.name.bold());
+    println!(
+        "\n--- Setting up environment: {} ---",
+        env_to_setup.name.bold()
+    );
 
     check_packages(config)?;
 

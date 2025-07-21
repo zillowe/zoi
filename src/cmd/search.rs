@@ -1,6 +1,6 @@
 use crate::pkg::local;
 use colored::*;
-use comfy_table::{ContentArrangement, Table, presets::UTF8_FULL};
+use comfy_table::{presets::UTF8_FULL, ContentArrangement, Table};
 
 pub fn run(search_term: &str) {
     println!(

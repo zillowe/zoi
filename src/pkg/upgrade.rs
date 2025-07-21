@@ -27,7 +27,9 @@ fn get_latest_tag(is_dev_build: bool) -> Result<String, Box<dyn Error>> {
         "https://gitlab.com/api/v4/projects/{}/releases",
         GITLAB_PROJECT_PATH.replace('/', "%2F")
     );
-    let client = reqwest::blocking::Client::builder().user_agent("Zoi-Upgrader").build()?;
+    let client = reqwest::blocking::Client::builder()
+        .user_agent("Zoi-Upgrader")
+        .build()?;
     let releases: Vec<GitLabRelease> = client.get(&api_url).send()?.json()?;
 
     let tag_prefix = if is_dev_build { "Dev-" } else { "Prod-" };
@@ -149,7 +151,9 @@ pub fn run() -> Result<(), Box<dyn Error>> {
 
     extract_archive(&temp_archive_path, temp_dir.path())?;
 
-    let new_binary_path = temp_dir.path().join(if os == "windows" { "zoi.exe" } else { "zoi" });
+    let new_binary_path = temp_dir
+        .path()
+        .join(if os == "windows" { "zoi.exe" } else { "zoi" });
     if !new_binary_path.exists() {
         return Err("Could not find executable in the extracted archive.".into());
     }

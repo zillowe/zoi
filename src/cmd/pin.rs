@@ -23,7 +23,10 @@ fn run_pin_logic(package: &str) -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    let new_pin = pin::PinnedPackage { name: name.clone(), version: version.clone() };
+    let new_pin = pin::PinnedPackage {
+        name: name.clone(),
+        version: version.clone(),
+    };
     pinned_packages.push(new_pin);
     pin::write_pinned_packages(&pinned_packages)?;
 

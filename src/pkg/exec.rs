@@ -23,7 +23,10 @@ fn ensure_binary_is_cached(pkg: &types::Package) -> Result<PathBuf, Box<dyn Erro
         return Ok(bin_path);
     }
 
-    println!("No cached binary found for '{}'. Downloading...", pkg.name.cyan());
+    println!(
+        "No cached binary found for '{}'. Downloading...",
+        pkg.name.cyan()
+    );
     fs::create_dir_all(&cache_dir)?;
 
     let platform = format!("{}-{}", env::consts::OS, env::consts::ARCH);

@@ -105,6 +105,7 @@ cargo clean # if you have build it before
 ./configure
 make
 sudo make install
+make install-completion # to install cli completion for your shell (bash, zsh or fish)
 ```
 
 or using Cargo CLI:

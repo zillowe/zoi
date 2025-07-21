@@ -86,7 +86,10 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
         fs::remove_dir_all(&store_dir)?;
         println!("{}", "Successfully removed stored files.".green());
     } else {
-        println!("{} No stored files found (was already partially removed).", "Warning:".yellow());
+        println!(
+            "{} No stored files found (was already partially removed).",
+            "Warning:".yellow()
+        );
     }
 
     let symlink_path = get_bin_root()?.join(package_name);

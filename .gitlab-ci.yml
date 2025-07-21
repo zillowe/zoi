@@ -26,8 +26,6 @@ check_build:
     - cargo machete --fix
     - echo "--- Applying automated code quality fixes ---"
     - cargo check --verbose
-    - echo "Applying rustfmt..."
-    - cargo fmt --all
     - echo "Applying clippy fixes..."
     - cargo clippy --all-targets --fix --allow-dirty --allow-staged || echo "Clippy finished."
     - cargo check --verbose
@@ -38,13 +36,13 @@ check_build:
         BRANCH_NAME="chore/ci-fixes-main-$(date +%s)-${CI_JOB_ID}"
         git checkout -b "$BRANCH_NAME"
         git add .
-        git commit -m "chore(ci): Apply automated fixes for ${CI_COMMIT_REF_NAME}" -m "This MR contains automated code style and linting fixes applied by the CI pipeline." -m "[skip ci]"
+        git commit -m "chore(ci): Apply automated fixes for ${CI_COMMIT_REF_NAME}" -m "This MR contains automated linting fixes applied by the CI pipeline." -m "[skip ci]"
         git push "https://gitlab-ci-token:${CI_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" "${BRANCH_NAME}"
         glab mr create \
           --source-branch "${BRANCH_NAME}" \
           --target-branch "${CI_COMMIT_REF_NAME}" \
           --title "chore: Automated CI fixes for '${CI_COMMIT_REF_NAME}'" \
-          --description "This MR was created by the CI pipeline to apply automated \`rustfmt\` and \`clippy\` fixes. It may also remove unused dependencies detected by \`cargo-machete\`. Please review and merge. **Pipeline:** ${CI_SERVER_URL}/${CI_PROJECT_PATH}/-/pipelines/${CI_PIPELINE_ID}" \
+          --description "This MR was created by the CI pipeline to apply automated \`clippy\` fixes. It may also remove unused dependencies detected by \`cargo-machete\`. Please review and merge. **Pipeline:** ${CI_SERVER_URL}/${CI_PROJECT_PATH}/-/pipelines/${CI_PIPELINE_ID}" \
           --label "Bot/Automated Fix" \
           --label "Kind/Enhancement" \
           --remove-source-branch \

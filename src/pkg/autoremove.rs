@@ -14,7 +14,9 @@ pub fn run() -> Result<(), Box<dyn Error>> {
             continue;
         }
 
-        let dependents_dir = local::get_store_root()?.join(&package.name).join("dependents");
+        let dependents_dir = local::get_store_root()?
+            .join(&package.name)
+            .join("dependents");
         let has_dependents = if dependents_dir.exists() {
             fs::read_dir(dependents_dir)?.next().is_some()
         } else {
