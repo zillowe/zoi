@@ -73,7 +73,8 @@ package:archive:
     - ./build/archive.sh
     - echo "Archiving complete."
   needs:
-    - check_build
+    - job: check_build
+      optional: true
     - build:linux
     - build:macos
   artifacts:
