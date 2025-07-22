@@ -48,6 +48,31 @@ Then you can start installing a package, e.g. vim
 zoi install vim
 ```
 
+To uninstall a package
+
+```sh
+zoi uninstall vim
+```
+
+To add a repo
+
+```sh
+zoi repo list all # to list all the repos
+zoi repo add <repo-name>
+```
+
+Or run
+
+```sh
+zoi repo add # it will brings the available repos
+```
+
+To remove a repo run
+```sh
+zoi repo rm <repo-name> # or remove
+```
+
+
 ## Installation
 
 You can either build it from source or install it using installer scripts
@@ -71,7 +96,6 @@ none right now :(
 To install Zoi, you need to run this command:
 
 ```sh
-# Maybe not available
 # For Linux/macOS
 curl -fsSL https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.sh | bash
 # For Windows
