@@ -22,6 +22,8 @@
 - [Overview](#overview)
 - [Installation](#installation)
   - [Package Managers](#package-managers)
+    - [AUR](#aur)
+    - [Homebrew](#homebrew)
   - [Scripts](#scripts)
   - [Build](#build)
 - [Update](#update)
@@ -61,17 +63,16 @@ zoi repo list all # to list all the repos
 zoi repo add <repo-name>
 ```
 
-Or run
+Or run this to bring the available repos
 
 ```sh
-zoi repo add # it will brings the available repos
+zoi repo add
 ```
 
 To remove a repo run
 ```sh
 zoi repo rm <repo-name> # or remove
 ```
-
 
 ## Installation
 
@@ -80,16 +81,38 @@ You can either build it from source or install it using installer scripts
 ### Package Managers
 
 You can install Zoi via these package managers:
-<!--
+
+#### AUR
+
+You can install Zoi via AUR helpers, like [yay](https://github.com/Jguer/yay)
+
 ```sh
-# AUR
-yay -S zoi
-paru -S zoi
+yay -S zoi-bin
 ```
--->
+
+Or [paru](https://github.com/Morganamilo/paru)
+
+```sh
+paru -S zoi-bin
 ```
-none right now :(
+
+Or manually
+
+```sh
+git clone https://aur.archlinux.org/zoi-bin.git
+cd zoi-bin
+makepkg -si
 ```
+
+#### Homebrew
+
+You can install Zoi via [homebrew]()
+
+```sh
+brew tap Zillowe/zoi
+brew install zoi
+```
+
 
 ### Scripts
 
@@ -106,7 +129,7 @@ powershell -c "irm gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.p
 
 To build Zoi from source you need to have [`Rust`](https://www.rust-lang.org) installed.
 
-then run this command to build it:
+Then run this command to build it:
 
 ```sh
 # For Linux/macOS
@@ -115,13 +138,13 @@ then run this command to build it:
 ./build/build-release.ps1
 ```
 
-then you can run Zoi locally:
+Then you can run Zoi locally:
 
 ```sh
 ./build/release/zoi
 ```
 
-if you want to install it to the current user:
+If you want to install it to the current user:
 
 ```sh
 cargo clean # if you have build it before
@@ -132,7 +155,7 @@ sudo make install
 make install-completion # to install cli completion for your shell (bash, zsh or fish)
 ```
 
-or using Cargo CLI:
+Or using Cargo CLI:
 
 ```sh
 cargo install https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi

@@ -1,6 +1,6 @@
 use clap::{CommandFactory, Parser, Subcommand};
-use clap_complete::generate;
 use clap_complete::Shell;
+use clap_complete::generate;
 use std::io;
 mod cmd;
 mod pkg;
