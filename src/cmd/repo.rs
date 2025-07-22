@@ -95,7 +95,7 @@ fn run_list_all() -> Result<(), Box<dyn std::error::Error>> {
 
     for repo in all_repos {
         let status = if active_repos.contains(&repo) {
-            "✓"
+            "Added"
         } else {
             ""
         };

@@ -59,14 +59,8 @@ pub fn remove_repo(repo_name: &str) -> Result<(), Box<dyn Error>> {
 }
 
 pub fn interactive_add_repo() -> Result<(), Box<dyn Error>> {
-    let db_root = get_db_root()?;
     let config = read_config()?;
-
-    let all_repos: Vec<String> = fs::read_dir(db_root)?
-        .filter_map(Result::ok)
-        .filter(|entry| entry.path().is_dir())
-        .map(|entry| entry.file_name().to_string_lossy().into_owned())
-        .collect();
+    let all_repos = get_all_repos()?;
 
     let available_repos: Vec<_> = all_repos
         .into_iter()
