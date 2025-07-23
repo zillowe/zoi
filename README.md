@@ -24,6 +24,7 @@
   - [Package Managers](#package-managers)
     - [AUR](#aur)
     - [Homebrew](#homebrew)
+    - [Scoop](#scoop)
   - [Scripts](#scripts)
   - [Build](#build)
 - [Update](#update)
@@ -106,22 +107,42 @@ makepkg -si
 
 #### Homebrew
 
-You can install Zoi via [homebrew]()
+You can install Zoi via [Homebrew](https://brew.sh) (MacOS only)
 
 ```sh
 brew tap Zillowe/zoi
 brew install zoi
 ```
 
+#### Scoop
+
+You can install Zoi via [Scoop]()
+
+First add Zillowe Scoop Bucket
+
+```powershell
+scoop bucket add scoop-bucket https://github.com/Zillowe/scoop-bucket.git
+```
+
+Then install Zoi
+
+```powershell
+scoop install zoi
+```
 
 ### Scripts
 
 To install Zoi, you need to run this command:
 
+For Linux/MaOS
+
 ```sh
-# For Linux/macOS
 curl -fsSL https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.sh | bash
-# For Windows
+```
+
+For Windows
+
+```powershell
 powershell -c "irm gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.ps1|iex"
 ```
 

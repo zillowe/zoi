@@ -7,10 +7,6 @@ build/release-all
 config.mk
 version/node_modules
 .env
-packages/aur/zoi-bin/zoi-*
-package/aur/zoi-bin/LICENSE
-packages/aur/zoi/zoi-*
-package/aur/zoi/LICENSE
 
 # Added by GCT
 gct.yaml
