@@ -1,10 +1,12 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+use serde_json;
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct Package {
     pub name: String,
     pub repo: String,
+    #[serde(deserialize_with = "deserialize_version")]
     pub version: String,
     pub description: String,
     pub website: String,
@@ -13,6 +15,35 @@ pub struct Package {
     pub license: String,
     pub installation: Vec<InstallationMethod>,
     pub dependencies: Option<Dependencies>,
+}
+
+fn deserialize_version<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: String = Deserialize::deserialize(deserializer)?;
+    if s.starts_with("http") {
+        let resp = reqwest::blocking::get(&s)
+            .map_err(serde::de::Error::custom)?
+            .text()
+            .map_err(serde::de::Error::custom)?;
+        let json: serde_json::Value =
+            serde_json::from_str(&resp).map_err(serde::de::Error::custom)?;
+        if let Some(tag) = json
+            .get("latest")
+            .and_then(|l| l.get("production"))
+            .and_then(|p| p.get("tag"))
+            .and_then(|t| t.as_str())
+        {
+            Ok(tag.to_string())
+        } else {
+            Err(serde::de::Error::custom(
+                "Failed to extract version from JSON URL",
+            ))
+        }
+    } else {
+        Ok(s)
+    }
 }
 
 #[derive(Debug, Deserialize)]

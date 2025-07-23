@@ -37,4 +37,12 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
         pkg.maintainer.name,
         pkg.maintainer.email
     );
+
+    println!("\n{}:", "Available installation methods".bold());
+    let platform = format!("{}-{}", std::env::consts::OS, std::env::consts::ARCH);
+    for method in &pkg.installation {
+        if crate::utils::is_platform_compatible(&platform, &method.platforms) {
+            println!("  - {}", method.install_type.yellow());
+        }
+    }
 }

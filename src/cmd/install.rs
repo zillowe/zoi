@@ -2,7 +2,7 @@ use crate::pkg::{install, resolve, types::InstallReason};
 use crate::utils;
 use colored::*;
 
-pub fn run(source: &str, force: bool) {
+pub fn run(source: &str, force: bool, interactive: bool) {
     println!(
         "{}{}{}",
         "--- Installing package '".yellow(),
@@ -17,9 +17,15 @@ pub fn run(source: &str, force: bool) {
                 return;
             }
 
+            let mode = if interactive {
+                install::InstallMode::Interactive
+            } else {
+                install::InstallMode::PreferBinary
+            };
+
             if let Err(e) = install::run_installation(
                 &resolved_source.path,
-                install::InstallMode::PreferBinary,
+                mode,
                 force,
                 InstallReason::Direct,
             ) {

@@ -50,7 +50,7 @@ fn run_update_single_logic(package_name: &str) -> Result<(), Box<dyn std::error:
         return Ok(());
     }
 
-    super::install::run(package_name, true);
+    super::install::run(package_name, true, false);
 
     println!("\n{}", "Update complete.".green());
     Ok(())
@@ -112,7 +112,7 @@ fn run_update_all_logic() -> Result<(), Box<dyn std::error::Error>> {
 
     for (name, version) in packages_to_upgrade {
         println!("\n--- Upgrading {} to {} ---", name.cyan(), version.green());
-        super::install::run(&name, true);
+        super::install::run(&name, true, false);
     }
 
     println!("\n{}", "Upgrade complete.".green());

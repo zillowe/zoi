@@ -10,7 +10,7 @@ mod utils;
 // Production or Development
 const BRANCH: &str = "Production";
 const STATUS: &str = "Beta";
-const NUMBER: &str = "2.4.0";
+const NUMBER: &str = "2.5.0";
 
 /// Zoi - The Universal Package Manager & Environment Setup Tool.
 ///
@@ -116,6 +116,9 @@ enum Commands {
         /// Reinstall the package even if it's already present
         #[arg(long)]
         force: bool,
+        /// Interactive mode to select installation method
+        #[arg(short, long)]
+        interactive: bool,
     },
 
     /// Builds and installs a package from a name, local file, or URL
@@ -241,7 +244,11 @@ fn main() {
             Commands::Pin { package } => cmd::pin::run(&package),
             Commands::Unpin { package } => cmd::unpin::run(&package),
             Commands::Update { package_name } => cmd::update::run(&package_name),
-            Commands::Install { source, force } => cmd::install::run(&source, force),
+            Commands::Install {
+                source,
+                force,
+                interactive,
+            } => cmd::install::run(&source, force, interactive),
             Commands::Build { source } => cmd::build::run(&source),
             Commands::Uninstall { package_name } => cmd::uninstall::run(&package_name),
             Commands::Run { cmd_alias } => cmd::run::run(cmd_alias),

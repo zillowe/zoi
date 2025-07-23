@@ -1,6 +1,6 @@
 [package]
 name = "zoi"
-version = "2.4.0-beta-prod"
+version = "2.5.0-beta-prod"
 edition = "2024"
 
 [dependencies]
@@ -11,6 +11,7 @@ colored = "3.0.0"
 comfy-table = "7.1.4"
 dialoguer = "0.11.0"
 dirs = "6.0.0"
+flate2 = "1.1.2"
 hex = "0.4.3"
 home = "0.5.11"
 indicatif = "0.18.0"
