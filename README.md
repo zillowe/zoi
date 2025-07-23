@@ -7,6 +7,17 @@
 <br/>
 
 <div align="center">
+  <a href="https://aur.archlinux.org/packages/zoi-bin">
+    <img alt="AUR Version" src="https://img.shields.io/aur/version/zoi-bin?style=flat&logo=archlinux&logoColor=%23ffff&label=AUR&labelColor=5452f1&color=282696"/>
+  </a> •
+  <a href="https://github.com/Zillowe/scoop">
+    <img alt="Scoop Version" src="https://img.shields.io/scoop/v/zoi?bucket=https%3A%2F%2Fgithub.com%2FZillowe%2Fscoop&style=flat&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPCFET0NUWVBFIHN2ZyBQVUJMSUMgIi0vL1czQy8vRFREIFNWRyAxLjEvL0VOIiAiaHR0cDovL3d3dy53My5vcmcvR3JhcGhpY3MvU1ZHLzEuMS9EVEQvc3ZnMTEuZHRkIj4NCjwhLS0gVXBsb2FkZWQgdG86IFNWRyBSZXBvLCB3d3cuc3ZncmVwby5jb20sIFRyYW5zZm9ybWVkIGJ5OiBTVkcgUmVwbyBNaXhlciBUb29scyAtLT4KPHN2ZyB3aWR0aD0iODAwcHgiIGhlaWdodD0iODAwcHgiIHZpZXdCb3g9IjAgMCAyNCAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiBmaWxsPSIjZmZmZmZmIj4KDTxnIGlkPSJTVkdSZXBvX2JnQ2FycmllciIgc3Ryb2tlLXdpZHRoPSIwIi8%2BCg08ZyBpZD0iU1ZHUmVwb190cmFjZXJDYXJyaWVyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KDTxnIGlkPSJTVkdSZXBvX2ljb25DYXJyaWVyIj4gPHRpdGxlPm1pY3Jvc29mdDwvdGl0bGU%2BIDxyZWN0IHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgZmlsbD0ibm9uZSIvPiA8cGF0aCBkPSJNMiwzaDl2OUgyVjNtOSwxOUgyVjEzaDl2OU0yMSwzdjlIMTJWM2g5bTAsMTlIMTJWMTNoOVoiLz4gPC9nPgoNPC9zdmc%2B&logoColor=%23ffff&label=Scoop&labelColor=%235452f1&color=%23282696"/>
+  </a>
+</div>
+
+<br/>
+
+<div align="center">
   <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/wikis/home">Wiki</a> • 
   <a href="https://discord.gg/P4R7yaA3hf">Discord</a> • 
   <a href="./SECURITY.md">Security</a> • 
@@ -110,8 +121,7 @@ makepkg -si
 You can install Zoi via [Homebrew](https://brew.sh) (MacOS only)
 
 ```sh
-brew tap Zillowe/zoi
-brew install zoi
+brew install Zillowe/tap/zoi
 ```
 
 #### Scoop
@@ -121,7 +131,7 @@ You can install Zoi via [Scoop]()
 First add Zillowe Scoop Bucket
 
 ```powershell
-scoop bucket add scoop-bucket https://github.com/Zillowe/scoop-bucket.git
+scoop bucket add zillowe https://github.com/Zillowe/scoop.git
 ```
 
 Then install Zoi
@@ -134,7 +144,7 @@ scoop install zoi
 
 To install Zoi, you need to run this command:
 
-For Linux/MaOS
+For Linux/MacOS
 
 ```sh
 curl -fsSL https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.sh | bash
@@ -152,17 +162,22 @@ To build Zoi from source you need to have [`Rust`](https://www.rust-lang.org) in
 
 Then run this command to build it:
 
+For Linux/MacOS
+
 ```sh
-# For Linux/macOS
 ./build/build-release.sh
-# For Windows
+```
+
+For Windows
+
+```sh
 ./build/build-release.ps1
 ```
 
 Then you can run Zoi locally:
 
 ```sh
-./build/release/zoi
+./build/release/zoi # or .exe if you're on Windows
 ```
 
 If you want to install it to the current user:
@@ -200,4 +215,4 @@ Zoi is developed by Zusty < Zillowe Foundation, part of the [Zillowe Development
 
 ### License
 
-Zoi is licensed under the [Apache-2.0](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/LICENSE) License.
+Zoi is licensed under the [Apache-2.0](./LICENSE) License.
