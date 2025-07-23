@@ -59,31 +59,43 @@ zoi sync
 Then you can start installing a package, e.g. vim
 
 ```sh
-zoi install vim
+zoi install hello
 ```
 
 To uninstall a package
 
 ```sh
-zoi uninstall vim
+zoi uninstall hello
 ```
 
-To add a repo
+Install a package from a repo
+
+```sh
+zoi install @hola/hola
+```
+
+To add a repo to defaults
 
 ```sh
 zoi repo list all # to list all the repos
-zoi repo add <repo-name>
+zoi repo add hola
+```
+
+Then install it
+
+```sh
+zoi install hola
 ```
 
 Or run this to bring the available repos
 
 ```sh
-zoi repo add
+zoi repo add # interactive
 ```
 
 To remove a repo run
 ```sh
-zoi repo rm <repo-name> # or remove
+zoi repo rm hola # or remove
 ```
 
 ## Installation
