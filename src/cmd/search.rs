@@ -2,7 +2,28 @@ use crate::pkg::local;
 use colored::*;
 use comfy_table::{presets::UTF8_FULL, ContentArrangement, Table};
 
-pub fn run(search_term: &str) {
+pub fn run(args: Vec<String>) {
+    if args.is_empty() {
+        eprintln!("{}: {}", "Error".red(), "Please provide a search term.");
+        return;
+    }
+
+    let mut search_term = "";
+    let mut repo_filter: Option<String> = None;
+
+    for arg in &args {
+        if arg.starts_with('@') {
+            repo_filter = Some(arg.strip_prefix('@').unwrap().to_string());
+        } else {
+            search_term = arg;
+        }
+    }
+
+    if search_term.is_empty() {
+        eprintln!("{}: {}", "Error".red(), "Please provide a search term.");
+        return;
+    }
+
     println!(
         "{}{}{}",
         "--- Searching for packages matching '".yellow(),
@@ -10,7 +31,13 @@ pub fn run(search_term: &str) {
         "' ---".yellow()
     );
 
-    match local::get_all_available_packages() {
+    let packages = if let Some(repo) = &repo_filter {
+        local::get_packages_from_repo(repo)
+    } else {
+        local::get_all_available_packages()
+    };
+
+    match packages {
         Ok(all_packages) => {
             let search_term_lower = search_term.to_lowercase();
 

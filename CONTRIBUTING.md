@@ -1,61 +1,75 @@
-# Contributing
+# Contributing to Zoi
 
-We'll be more than happy if you want to contribute to our project and make it better.
+First of all, thank you for considering contributing to Zoi! We're excited to have you on board and appreciate your help in making our project better. Every contribution, no matter how small, is valuable to us.
 
-You can find the code on [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi),
-And if you don't have a GitLab account, you can easily sign up using GitHub.
+## 🤝 How to Contribute
 
-## Building from Source
+We welcome contributions in many forms, including bug reports, feature requests, documentation improvements, and code contributions.
 
-To develop and build Zoi, you'll need the following prerequisites:
+### Reporting Bugs or Requesting Features
 
-*   **Rust**: Make sure you have a recent version of Rust and Cargo installed. You can find installation instructions at [rust-lang.org](https://www.rust-lang.org/tools/install).
-*   **Make**: The `make` command is required for the Makefile-based build process.
+If you find a bug or have an idea for a new feature, please check our [**issue tracker**](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues) to see if it has already been reported. If not, feel free to open a new issue.
 
-### Using Make (Recommended)
+- [**Report a Bug**](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Bug%20Report)
+- [**Request a Feature**](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Feature%20Request)
 
-1.  **Clean (Optional)**: If you have a previous build, clean the project directory:
-    ```bash
-    cargo clean
+### Contributing Code
+
+If you'd like to contribute code, please follow these steps:
+
+1.  **Fork the repository** on [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi).
+2.  **Clone your fork** to your local machine.
+3.  **Create a new branch** for your changes.
+    ```sh
+    git checkout -b my-feature-branch
     ```
-2.  **Configure**:
-    ```bash
+4.  **Make your changes** and commit them with a clear and descriptive message.
+5.  **Push your changes** to your fork.
+6.  **Open a merge request** to the `main` branch of the original repository.
+
+## 🛠️ Development Setup
+
+To get started with developing Zoi, you'll need to set up your local environment.
+
+### Prerequisites
+
+- **Rust:** Make sure you have the latest version of Rust and Cargo installed. You can find instructions at [rust-lang.org](https://www.rust-lang.org/tools/install).
+- **Make:** The `make` command is required for our Makefile-based build process.
+
+### Building from Source
+
+We recommend using `make` to build the project, as it simplifies the process.
+
+1.  **Configure the build:**
+    ```sh
     ./configure
     ```
-3.  **Build and Install**:
-    ```bash
+2.  **Build and install:**
+    ```sh
     make
     sudo make install
     ```
-4.  **Install Shell Completions (Optional)**:
-    ```bash
+3.  **Install shell completions (optional):**
+    ```sh
     make install-completions
     ```
 
-### Using Build Scripts
+If you don't have `make`, you can use the provided build scripts in the `./build` directory.
 
-If you don't have `make`, you can use the provided build scripts:
+## 🎨 Code Style
 
-*   **For Linux/macOS**:
-    ```bash
-    ./build/build.sh
-    ```
-*   **For Windows (PowerShell)**:
-    ```powershell
-    ./build/build.ps1
-    ```
+To maintain consistency across the codebase, please follow the existing code style and conventions. We use `rustfmt` to format our code, so please make sure to run it before committing your changes.
 
-After building, you can run the executable directly:
-
-*   **Linux/macOS**: `./build/compiled/zoi`
-*   **Windows**: `./build/compiled/zoi.exe`
-
-### Zoi Commands
-
-Once Zoi is installed, you can use the commands defined in `zoi.yaml` to manage the project. For example, to run the build command:
-
-```bash
-zoi run build
+```sh
+cargo fmt
 ```
 
-Or run `zoi run` to view the available commands.
+## 💬 Commit Messages
+
+Please write clear and descriptive commit messages. A good commit message should explain the "what" and "why" of your changes.
+
+## 📜 Code of Conduct
+
+By contributing to Zoi, you agree to abide by our [**Code of Conduct**](./CODE_OF_CONDUCT.md). Please read it to understand our community standards.
+
+Thank you again for your interest in contributing to Zoi! We look forward to your contributions.

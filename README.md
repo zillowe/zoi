@@ -1,7 +1,7 @@
 <div align="center">
     <img width="120" height="120" hspace="10" alt="ZDS Logo" src="https://gitlab.com/Zillowe/Zillwen/Zusty/ZDS/-/raw/main/img/zds.png"/>
     <h1>Zoi</h1>
-    Universal Package Manager & Environment Setup Tool
+    <p><strong>Universal Package Manager & Environment Setup Tool</strong></p>
 </div>
 
 <br/>
@@ -18,11 +18,11 @@
 <br/>
 
 <div align="center">
-  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/wikis/home">Wiki</a> • 
-  <a href="https://discord.gg/P4R7yaA3hf">Discord</a> • 
-  <a href="./SECURITY.md">Security</a> • 
-  <a href="./CODE_OF_CONDUCT.md">Code of Conduct</a> • 
-  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues">Report an Issue</a> 
+  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/wikis/home"><strong>Wiki</strong></a> • 
+  <a href="https://discord.gg/P4R7yaA3hf"><strong>Discord</strong></a> • 
+  <a href="./SECURITY.md"><strong>Security</strong></a> • 
+  <a href="./CODE_OF_CONDUCT.md"><strong>Code of Conduct</strong></a> • 
+  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues"><strong>Report an Issue</strong></a> 
 </div>
 
 <hr/>
@@ -30,201 +30,171 @@
 <details>
 <summary>Table of Contents</summary>
 
-- [Overview](#overview)
-- [Installation](#installation)
+- [Features](#-features)
+- [Getting Started](#-getting-started)
+- [Installation](#-installation)
   - [Package Managers](#package-managers)
-    - [AUR](#aur)
-    - [Homebrew](#homebrew)
-    - [Scoop](#scoop)
-  - [Scripts](#scripts)
-  - [Build](#build)
-- [Update](#update)
-- [Documentation](#documentation)
-- [Footer](#footer)
-  - [License](#license)
+    - [Arch Linux (AUR)](#arch-linux-aur)
+    - [macOS (Homebrew)](#macos-homebrew)
+    - [Windows (Scoop)](#windows-scoop)
+  - [Scripts](#-scripts)
+  - [Build from Source](#%EF%B8%8F-build-from-source)
+- [Usage](#-usage)
+- [Contributing](#-contributing)
+- [License](#-license)
   
 </details>
 
-## Overview
+Zoi is a universal package manager and environment setup tool, designed to simplify package management and environment configuration across multiple operating systems.
 
-Zoi is a universal package manager and environment setup tool.
-It aims to simplify package management and environment configuration for various operating systems.
+## ✨ Features
 
-To start using Zoi first sync the packages
+- **Universal:** Works on Linux, macOS, and Windows.
+- **Repository-based:** Manage packages from different sources.
+- **Environment Setup:** Configure project environments with ease.
+- **Extensible:** Add your own repositories and packages.
+- **Simple CLI:** An intuitive and easy-to-use command-line interface.
 
-```sh
-zoi sync
-```
+## 🚀 Getting Started
 
-Then you can start installing a package, e.g. vim
+Getting started with Zoi is simple. Just follow these three steps:
 
-```sh
-zoi install hello
-```
+1.  **Install Zoi:**
+    Choose one of the [installation methods](#installation) below.
 
-To uninstall a package
+2.  **Sync Repositories:**
+    Before you can install packages, you need to sync the package repositories.
+    ```sh
+    zoi sync
+    ```
 
-```sh
-zoi uninstall hello
-```
+3.  **Install a Package:**
+    Now you can install any package you want. For example, to install `hello`:
+    ```sh
+    zoi install hello
+    ```
 
-Install a package from a repo
+## 📦 Installation
 
-```sh
-zoi install @hola/hola
-```
-
-To add a repo to defaults
-
-```sh
-zoi repo list all # to list all the repos
-zoi repo add hola
-```
-
-Then install it
-
-```sh
-zoi install hola
-```
-
-Or run this to bring the available repos
-
-```sh
-zoi repo add # interactive
-```
-
-To remove a repo run
-```sh
-zoi repo rm hola # or remove
-```
-
-## Installation
-
-You can either build it from source or install it using installer scripts
+You can install Zoi using a package manager, an installer script, or by building it from source.
 
 ### Package Managers
 
-You can install Zoi via these package managers:
-
-#### AUR
-
-You can install Zoi via AUR helpers, like [yay](https://github.com/Jguer/yay)
-
+#### Arch Linux (AUR)
+Install `zoi-bin` from the AUR using your favorite helper (e.g. `yay`, `paru`):
 ```sh
 yay -S zoi-bin
 ```
 
-Or [paru](https://github.com/Morganamilo/paru)
-
-```sh
-paru -S zoi-bin
-```
-
-Or manually
-
-```sh
-git clone https://aur.archlinux.org/zoi-bin.git
-cd zoi-bin
-makepkg -si
-```
-
-#### Homebrew
-
-You can install Zoi via [Homebrew](https://brew.sh) (MacOS only)
-
+#### macOS (Homebrew)
+Install Zoi using [Homebrew](https://brew.sh):
 ```sh
 brew install Zillowe/tap/zoi
 ```
 
-#### Scoop
-
-You can install Zoi via [Scoop]()
-
-First add Zillowe Scoop Bucket
-
+#### Windows (Scoop)
+Install Zoi using [Scoop](https://scoop.sh):
 ```powershell
 scoop bucket add zillowe https://github.com/Zillowe/scoop.git
-```
-
-Then install Zoi
-
-```powershell
 scoop install zoi
 ```
 
-### Scripts
+### 📜 Scripts
 
-To install Zoi, you need to run this command:
+You can also use our installer scripts for a quick setup.
 
-For Linux/MacOS
-
+**Linux / macOS:**
 ```sh
 curl -fsSL https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.sh | bash
 ```
 
-For Windows
-
+**Windows:**
 ```powershell
 powershell -c "irm gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.ps1|iex"
 ```
 
-### Build
+### 🛠️ Build from Source
 
-To build Zoi from source you need to have [`Rust`](https://www.rust-lang.org) installed.
+If you prefer, you can build Zoi from source. You'll need [Rust](https://www.rust-lang.org) installed.
 
-Then run this command to build it:
-
-For Linux/MacOS
-
+**Build the release binary:**
 ```sh
+# For Linux/macOS
 ./build/build-release.sh
-```
 
-For Windows
-
-```sh
+# For Windows
 ./build/build-release.ps1
 ```
 
-Then you can run Zoi locally:
-
+**Install it locally:**
 ```sh
-./build/release/zoi # or .exe if you're on Windows
-```
-
-If you want to install it to the current user:
-
-```sh
-cargo clean # if you have build it before
-
+# For Linux/macOS
 ./configure
 make
 sudo make install
-make install-completion # to install cli completion for your shell (bash, zsh or fish)
+make install-completion # Install CLI completions
 ```
 
-Or using Cargo CLI:
+## 💡 Usage
 
-```sh
-cargo install https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi
-```
+Here are some common commands to get you started.
 
-## Update
+- **Install a package:**
+  ```sh
+  zoi install <package_name>
+  ```
 
-You can update Zoi by running this command:
+- **Uninstall a package:**
+  ```sh
+  zoi uninstall <package_name>
+  ```
 
-```sh
-zoi upgrade
-```
+- **Install from a specific repository:**
+  ```sh
+  zoi install @<repo_name>/<package_name>
+  ```
 
-## Documentation
+- **List all available packages from active repos:**
+  ```sh
+  zoi list all
+  ```
 
-To get started with Zoi please refer to the [Wiki](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/wikis/home).
+- **List packages from a specific repo:**
+  ```sh
+  zoi list all @<repo_name>
+  ```
 
-## Footer
+- **Search for a package:**
+  ```sh
+  zoi search <term>
+  ```
 
-Zoi is developed by Zusty < Zillowe Foundation, part of the [Zillowe Development Suite (ZDS)](https://gitlab.com/Zillowe/Zillwen/Zusty/ZDS)
+- **Add a new repository:**
+  ```sh
+  # Interactively
+  zoi repo add
+  
+  # By name
+  zoi repo add <repo_name>
+  ```
 
-### License
+- **Update Zoi to the latest version:**
+  ```sh
+  zoi upgrade
+  ```
 
-Zoi is licensed under the [Apache-2.0](./LICENSE) License.
+For more detailed information, please refer to the [**Wiki**](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/wikis/home).
+
+## 🤝 Contributing
+
+We welcome contributions from the community! If you'd like to contribute, please read our [**Contributing Guidelines**](./CONTRIBUTING.md) for more information.
+
+## 📜 License
+
+Zoi is licensed under the [Apache-2.0 License](./LICENSE).
+
+<hr/>
+
+<div align="center">
+  <p>Zoi is developed by Zusty & Zillowe Foundation, part of the <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/ZDS">Zillowe Development Suite (ZDS)</a></p>
+</div>

@@ -1,3 +1,4 @@
+use crate::pkg::config;
 use chrono::Utc;
 use std::env;
 use std::error::Error;
@@ -34,13 +35,14 @@ fn parse_db_pkg_string(pkg_str: &str) -> (Option<&str>, &str) {
 }
 
 fn find_package_in_db(pkg_str: &str) -> Result<ResolvedSource, Box<dyn Error>> {
+    let pkg_str = pkg_str.trim();
     let (repo, pkg_name) = parse_db_pkg_string(pkg_str);
     let db_root = get_db_root()?;
 
     let search_repos = if let Some(r) = repo {
         vec![r.to_string()]
     } else {
-        vec!["main".to_string(), "extra".to_string()]
+        config::get_all_repos()?
     };
 
     for repo_name in &search_repos {

@@ -3,6 +3,7 @@ use colored::*;
 use std::fs;
 
 pub fn run(source: &str, raw: bool) {
+    let source = source.trim();
     match resolve::resolve_source(source) {
         Ok(resolved_source) => {
             let content = fs::read_to_string(&resolved_source.path).unwrap();

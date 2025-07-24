@@ -10,7 +10,7 @@ mod utils;
 // Production or Development
 const BRANCH: &str = "Production";
 const STATUS: &str = "Beta";
-const NUMBER: &str = "2.5.0";
+const NUMBER: &str = "2.5.1";
 
 /// Zoi - The Universal Package Manager & Environment Setup Tool.
 ///
@@ -75,9 +75,9 @@ enum Commands {
 
     /// Lists installed or all available packages
     List {
-        /// Use 'all' to list all packages from the database
-        #[arg(value_name = "all")]
-        all: Option<String>,
+        /// Use 'all' to list all packages from the database and/or filter by repo
+        #[arg()]
+        args: Vec<String>,
     },
 
     /// Displays detailed information about a package
@@ -186,9 +186,9 @@ enum Commands {
         long_about = "Searches for a case-insensitive term in the name and description of all available packages in the database."
     )]
     Search {
-        /// The term to search for (e.g. 'editor', 'cli')
-        #[arg(value_name = "SEARCH_TERM")]
-        term: String,
+        /// The term to search for (e.g. 'editor', 'cli') and an optional repo to search in (e.g. '@main')
+        #[arg()]
+        args: Vec<String>,
     },
 
     /// Download and execute a binary package without installing it
@@ -239,7 +239,7 @@ fn main() {
             Commands::Info => cmd::info::run(BRANCH, STATUS, NUMBER, commit),
             Commands::Check => cmd::check::run(),
             Commands::Sync => cmd::sync::run(),
-            Commands::List { all } => cmd::list::run(all.is_some()),
+            Commands::List { args } => cmd::list::run(args),
             Commands::Show { package_name, raw } => cmd::show::run(&package_name, raw),
             Commands::Pin { package } => cmd::pin::run(&package),
             Commands::Unpin { package } => cmd::unpin::run(&package),
@@ -259,7 +259,7 @@ fn main() {
             } => cmd::clone::run(source, target_directory),
             Commands::Upgrade => cmd::upgrade::run(),
             Commands::Autoremove => cmd::autoremove::run(),
-            Commands::Search { term } => cmd::search::run(&term),
+            Commands::Search { args } => cmd::search::run(args),
             Commands::Exec { source, args } => cmd::exec::run(source, args),
             Commands::Repo(args) => cmd::repo::run(args),
         }
