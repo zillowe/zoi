@@ -3,43 +3,33 @@
 class Zoi < Formula
   desc "Universal Package Manager & Environment Setup Tool"
   homepage "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi"
-  version "2.5.0-beta" 
-  _tag = "Prod-Beta-2.5.0"
+  version "2.5.1-beta" 
+  _tag = "Prod-Beta-2.5.1"
   license "Apache-2.0"
 
   on_macos do
     if Hardware::CPU.arm?
       url "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/#{_tag}/downloads/zoi-macos-arm64.tar.xz"
-      sha256 "7f01a764d6612ce2e0a934cdc88168080b290f0452e9cacaf99eab182c4c92e9"
+      sha256 "d3933f2d6f3dfea0473698dcfbf66006d86e483b21a436e32f6d7d98e21f7c47"
     end
 
     if Hardware::CPU.intel?
       url "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/#{_tag}/downloads/zoi-macos-amd64.tar.xz"
-      sha256 "f5e04a0bc7db13393946fad4b86871999c1b1a536d87d3faf3f0220ae8d103a5"
+      sha256 "f4bafe547394984a4d3ed9d1affb259521ca0dcba41a56b8aab07993d0120f54"
     end
 
     on_linux do
       if Hardware::CPU.intel? and Hardware::CPU.is_64_bit?
         url "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/#{_tag}/downloads/zoi-linux-amd64.tar.xz"
-        sha256 "b6875dcd382dc41014eef9723f6fb765b3d27c7ca736730e68aa0f762f0810eb"
+        sha256 "ad125f52a4b9ac91093c0ee5afe97df23d2d53de712d2226376376b5fc65b0e1"
       end
 
       if Hardware::CPU.arm? and Hardware::CPU.is_64_bit?
         url "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/#{_tag}/downloads/zoi-linux-arm64.tar.xz"
-        sha256 "86ba3cae6c40d8788cac88d39694149e5443f095d99f5016adbd9c1311faa9c2"
+        sha256 "adc55caffb8ff218f4362a0fc02581188552548bc1f8c7e475eec72ce15b49ac"
       end
     end
 
-  end
-
-  on_linux do
-    if Hardware::CPU.arm?
-      url "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/#{_tag}/downloads/zoi-macos-arm64.tar.xz"
-      sha256 "7f01a764d6612ce2e0a934cdc88168080b290f0452e9cacaf99eab182c4c92e9"
-    else
-      url "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/#{_tag}/downloads/zoi-macos-amd64.tar.xz"
-      sha256 "f5e04a0bc7db13393946fad4b86871999c1b1a536d87d3faf3f0220ae8d103a5"
-    end
   end
 
   def install
