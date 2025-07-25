@@ -46,6 +46,11 @@ build:macos:
     - saas-macos-medium-m1
   image: macos-15-xcode-16
   before_script:
+    - brew install openssl
+    - export OPENSSL_DIR=$(brew --prefix openssl)
+    - export PKG_CONFIG_ALLOW_CROSS=1
+    - export PATH="$OPENSSL_DIR/bin:$PATH"
+    - export PKG_CONFIG_PATH="$OPENSSL_DIR/lib/pkgconfig:$PKG_CONFIG_PATH"
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
     - source ~/.cargo/env
   script:
