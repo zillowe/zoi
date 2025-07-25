@@ -3,8 +3,8 @@ use crate::utils;
 use chrono::Utc;
 use colored::*;
 use dialoguer::{Select, theme::ColorfulTheme};
+use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
-use std::env;
 use std::error::Error;
 use std::fs::{self, File};
 use std::io::{Cursor, Read, Write};
@@ -20,6 +20,7 @@ pub enum InstallMode {
     PreferBinary,
     ForceSource,
     Interactive,
+    Updater(String),
 }
 
 pub fn run_installation(
@@ -78,13 +79,14 @@ pub fn run_installation(
         }
     }
 
-    let platform = format!("{}-{}", std::env::consts::OS, std::env::consts::ARCH);
-    println!("Current platform: {platform}");
+    let platform = utils::get_platform()?;
+    println!("Current platform: {}", &platform);
 
     let result = match mode {
         InstallMode::ForceSource => run_source_flow(&pkg, &platform),
         InstallMode::PreferBinary => run_default_flow(&pkg, &platform),
         InstallMode::Interactive => run_interactive_flow(&pkg, &platform),
+        InstallMode::Updater(ref method_name) => run_updater_flow(&pkg, &platform, method_name),
     };
 
     if result.is_ok() {
@@ -92,6 +94,32 @@ pub fn run_installation(
     }
 
     result
+}
+
+fn run_updater_flow(
+    pkg: &types::Package,
+    platform: &str,
+    method_name: &str,
+) -> Result<(), Box<dyn Error>> {
+    if let Some(method) = find_method(pkg, method_name, platform) {
+        println!("Using '{}' method specified by updater.", method_name);
+        return match method_name {
+            "binary" => handle_binary_install(method, pkg),
+            "com_binary" => handle_com_binary_install(method, pkg),
+            "script" => handle_script_install(method, pkg),
+            "source" => handle_source_install(method, pkg),
+            _ => Err(format!(
+                "Invalid installation method '{}' specified in updater.",
+                method_name
+            )
+            .into()),
+        };
+    }
+    Err(format!(
+        "Specified updater method '{}' not found or not compatible.",
+        method_name
+    )
+    .into())
 }
 
 fn run_interactive_flow(pkg: &types::Package, platform: &str) -> Result<(), Box<dyn Error>> {
@@ -186,12 +214,15 @@ fn handle_com_binary_install(
     method: &types::InstallationMethod,
     pkg: &types::Package,
 ) -> Result<(), Box<dyn Error>> {
-    let platform = format!("{}-{}", env::consts::OS, env::consts::ARCH);
-    let com_ext = if cfg!(target_os = "windows") {
-        "zip"
-    } else {
-        "tar.xz"
-    };
+    let platform = utils::get_platform()?;
+    let os = std::env::consts::OS;
+
+    let com_ext = method
+        .platform_com_ext
+        .as_ref()
+        .and_then(|ext_map| ext_map.get(os))
+        .map(|s| s.as_str())
+        .unwrap_or(if os == "windows" { "zip" } else { "tar.xz" });
 
     let mut url = method.url.replace("{version}", &pkg.version);
     url = url.replace("{name}", &pkg.name);
@@ -229,10 +260,16 @@ fn handle_com_binary_install(
     if com_ext == "zip" {
         let mut archive = ZipArchive::new(Cursor::new(downloaded_bytes))?;
         archive.extract(temp_dir.path())?;
-    } else {
+    } else if com_ext == "tar.xz" {
         let tar = XzDecoder::new(Cursor::new(downloaded_bytes));
         let mut archive = Archive::new(tar);
         archive.unpack(temp_dir.path())?;
+    } else if com_ext == "tar.gz" {
+        let tar = GzDecoder::new(Cursor::new(downloaded_bytes));
+        let mut archive = Archive::new(tar);
+        archive.unpack(temp_dir.path())?;
+    } else {
+        return Err(format!("Unsupported compression format: {}", com_ext).into());
     }
 
     let store_dir = home::home_dir()
@@ -241,17 +278,28 @@ fn handle_com_binary_install(
         .join(&pkg.name)
         .join("bin");
     fs::create_dir_all(&store_dir)?;
-    let bin_path = store_dir.join(&pkg.name);
+    let binary_filename = if cfg!(target_os = "windows") {
+        format!("{}.exe", pkg.name)
+    } else {
+        pkg.name.clone()
+    };
+    let bin_path = store_dir.join(&binary_filename);
 
     let binary_name = &pkg.name;
+    let binary_name_with_ext = format!("{}.exe", pkg.name);
     let mut found_binary = false;
     for entry in fs::read_dir(temp_dir.path())? {
         let entry = entry?;
         let path = entry.path();
-        if path.is_file() && path.file_name().unwrap_or_default() == binary_name.as_str() {
-            fs::rename(path, &bin_path)?;
-            found_binary = true;
-            break;
+        if path.is_file() {
+            let file_name = path.file_name().unwrap_or_default();
+            if file_name == binary_name.as_str()
+                || (cfg!(target_os = "windows") && file_name == binary_name_with_ext.as_str())
+            {
+                fs::rename(path, &bin_path)?;
+                found_binary = true;
+                break;
+            }
         }
     }
 
@@ -299,10 +347,8 @@ fn handle_binary_install(
 ) -> Result<(), Box<dyn Error>> {
     let mut url = method.url.replace("{version}", &pkg.version);
     url = url.replace("{name}", &pkg.name);
-    url = url.replace(
-        "{platforms}",
-        &format!("{}-{}", env::consts::OS, env::consts::ARCH),
-    );
+    let platform = utils::get_platform()?;
+    url = url.replace("{platform}", &platform);
 
     println!("Downloading from: {url}");
 
@@ -324,7 +370,12 @@ fn handle_binary_install(
         .join("bin");
     fs::create_dir_all(&store_dir)?;
 
-    let bin_path = store_dir.join(&pkg.name);
+    let binary_filename = if cfg!(target_os = "windows") {
+        format!("{}.exe", pkg.name)
+    } else {
+        pkg.name.clone()
+    };
+    let bin_path = store_dir.join(&binary_filename);
     let mut dest = File::create(&bin_path)?;
     let mut buffer = [0; 8192];
 

@@ -1,4 +1,4 @@
-use crate::pkg::{local, pin, resolve, sync};
+use crate::pkg::{install, local, pin, resolve, sync, types};
 use crate::utils;
 use colored::*;
 
@@ -50,7 +50,18 @@ fn run_update_single_logic(package_name: &str) -> Result<(), Box<dyn std::error:
         return Ok(());
     }
 
-    super::install::run(package_name, true, false);
+    let mode = if let Some(updater_method) = &new_pkg.updater {
+        install::InstallMode::Updater(updater_method.clone())
+    } else {
+        install::InstallMode::PreferBinary
+    };
+
+    install::run_installation(
+        &resolved_source.path,
+        mode,
+        true,
+        types::InstallReason::Direct,
+    )?;
 
     println!("\n{}", "Update complete.".green());
     Ok(())
@@ -94,7 +105,12 @@ fn run_update_all_logic() -> Result<(), Box<dyn std::error::Error>> {
                 manifest.version.yellow(),
                 new_pkg.version.green()
             );
-            packages_to_upgrade.push((manifest.name.clone(), new_pkg.version.clone()));
+            packages_to_upgrade.push((
+                manifest.name.clone(),
+                new_pkg.version.clone(),
+                resolved_source.path.clone(),
+                new_pkg.updater.clone(),
+            ));
         } else {
             println!("- {} is up to date.", manifest.name.cyan());
         }
@@ -110,9 +126,14 @@ fn run_update_all_logic() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    for (name, version) in packages_to_upgrade {
+    for (name, version, path, updater) in packages_to_upgrade {
         println!("\n--- Upgrading {} to {} ---", name.cyan(), version.green());
-        super::install::run(&name, true, false);
+        let mode = if let Some(updater_method) = updater {
+            install::InstallMode::Updater(updater_method)
+        } else {
+            install::InstallMode::PreferBinary
+        };
+        install::run_installation(&path, mode, true, types::InstallReason::Direct)?;
     }
 
     println!("\n{}", "Upgrade complete.".green());

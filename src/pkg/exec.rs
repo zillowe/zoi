@@ -2,7 +2,6 @@ use crate::pkg::{resolve, types};
 use crate::utils;
 use colored::*;
 use indicatif::{ProgressBar, ProgressStyle};
-use std::env;
 use std::error::Error;
 use std::fs::{self, File};
 use std::io::{Read, Write};
@@ -16,7 +15,12 @@ fn get_cache_root() -> Result<PathBuf, Box<dyn Error>> {
 
 fn ensure_binary_is_cached(pkg: &types::Package) -> Result<PathBuf, Box<dyn Error>> {
     let cache_dir = get_cache_root()?;
-    let bin_path = cache_dir.join(&pkg.name);
+    let binary_filename = if cfg!(target_os = "windows") {
+        format!("{}.exe", pkg.name)
+    } else {
+        pkg.name.clone()
+    };
+    let bin_path = cache_dir.join(&binary_filename);
 
     if bin_path.exists() {
         println!("Using cached binary for '{}'.", pkg.name.cyan());
@@ -29,7 +33,7 @@ fn ensure_binary_is_cached(pkg: &types::Package) -> Result<PathBuf, Box<dyn Erro
     );
     fs::create_dir_all(&cache_dir)?;
 
-    let platform = format!("{}-{}", env::consts::OS, env::consts::ARCH);
+    let platform = utils::get_platform()?;
     let method = pkg
         .installation
         .iter()
@@ -40,7 +44,7 @@ fn ensure_binary_is_cached(pkg: &types::Package) -> Result<PathBuf, Box<dyn Erro
 
     let mut url = method.url.replace("{version}", &pkg.version);
     url = url.replace("{name}", &pkg.name);
-    url = url.replace("{platforms}", &platform);
+    url = url.replace("{platform}", &platform);
 
     println!("Downloading from: {url}");
 

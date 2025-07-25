@@ -1,6 +1,5 @@
 use crate::utils;
 use colored::*;
-use std::env;
 
 pub fn run(branch: &str, status: &str, number: &str, commit: &str) {
     let _branch_short = if branch == "Production" {
@@ -13,9 +12,10 @@ pub fn run(branch: &str, status: &str, number: &str, commit: &str) {
 
     println!("{}", "--- System Information ---".yellow().bold());
 
-    let os = env::consts::OS;
-    let other = env::consts::ARCH;
-    let arch = other;
+    let platform = utils::get_platform().unwrap_or_else(|e| e.to_string());
+    let parts: Vec<&str> = platform.split('-').collect();
+    let os = parts.get(0).cloned().unwrap_or("unknown");
+    let arch = parts.get(1).cloned().unwrap_or("unknown");
 
     utils::print_aligned_info("OS", os);
     utils::print_aligned_info("Architecture", arch);

@@ -145,3 +145,20 @@ pub fn is_platform_compatible(current_platform: &str, allowed_platforms: &[Strin
         .iter()
         .any(|p| p == "all" || p == os || p == current_platform)
 }
+
+pub fn get_platform() -> Result<String, String> {
+    let os = match std::env::consts::OS {
+        "linux" => "linux",
+        "macos" | "darwin" => "macos",
+        "windows" => "windows",
+        unsupported_os => return Err(format!("Unsupported operating system: {}", unsupported_os)),
+    };
+
+    let arch = match std::env::consts::ARCH {
+        "x86_64" => "amd64",
+        "aarch64" => "arm64",
+        unsupported_arch => return Err(format!("Unsupported architecture: {}", unsupported_arch)),
+    };
+
+    Ok(format!("{}-{}", os, arch))
+}

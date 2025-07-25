@@ -1,5 +1,6 @@
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json;
+use std::collections::HashMap;
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
@@ -15,6 +16,7 @@ pub struct Package {
     pub license: String,
     pub installation: Vec<InstallationMethod>,
     pub dependencies: Option<Dependencies>,
+    pub updater: Option<String>,
 }
 
 fn deserialize_version<'de, D>(deserializer: D) -> Result<String, D::Error>
@@ -61,6 +63,8 @@ pub struct InstallationMethod {
     pub url: String,
     pub platforms: Vec<String>,
     pub commands: Option<Vec<String>>,
+    #[serde(rename = "platformComExt")]
+    pub platform_com_ext: Option<HashMap<String, String>>,
 }
 
 #[derive(Debug, Deserialize)]
