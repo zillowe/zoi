@@ -2,7 +2,7 @@
 
 First of all, thank you for considering contributing to Zoi! We're excited to have you on board and appreciate your help in making our project better. Every contribution, no matter how small, is valuable to us.
 
-## 🤝 How to Contribute
+## How to Contribute
 
 We welcome contributions in many forms, including bug reports, feature requests, documentation improvements, and code contributions.
 
@@ -27,7 +27,7 @@ If you'd like to contribute code, please follow these steps:
 5.  **Push your changes** to your fork.
 6.  **Open a merge request** to the `main` branch of the original repository.
 
-## 🛠️ Development Setup
+## Development Setup
 
 To get started with developing Zoi, you'll need to set up your local environment.
 
@@ -56,19 +56,11 @@ We recommend using `make` to build the project, as it simplifies the process.
 
 If you don't have `make`, you can use the provided build scripts in the `./build` directory.
 
-## 🎨 Code Style
-
-To maintain consistency across the codebase, please follow the existing code style and conventions. We use `rustfmt` to format our code, so please make sure to run it before committing your changes.
-
-```sh
-cargo fmt
-```
-
-## 💬 Commit Messages
+## Commit Messages
 
 Please write clear and descriptive commit messages. A good commit message should explain the "what" and "why" of your changes.
 
-## 📜 Code of Conduct
+## Code of Conduct
 
 By contributing to Zoi, you agree to abide by our [**Code of Conduct**](./CODE_OF_CONDUCT.md). Please read it to understand our community standards.
 
