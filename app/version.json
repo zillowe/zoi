@@ -1,13 +1,13 @@
 {
   "latest": {
     "production": {
-      "tag": "Prod-Beta-2.5.2",
+      "tag": "Prod-Beta-2.5.3",
       "status": "Beta",
-      "version": "2.5.2"
+      "version": "2.5.3"
     },
     "development": {
       "status": "Beta",
-      "version": "2.5.2"
+      "version": "2.5.3"
     }
   }
 }
