@@ -7,7 +7,7 @@ use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::error::Error;
 use std::fs::{self, File};
-use std::io::{Cursor, Read, Write};
+use std::io::{self, Cursor, Read, Write};
 use std::path::Path;
 use std::process::Command;
 use tar::Archive;
@@ -28,6 +28,7 @@ pub fn run_installation(
     mode: InstallMode,
     force: bool,
     reason: types::InstallReason,
+    yes: bool,
 ) -> Result<(), Box<dyn Error>> {
     let yaml_content = fs::read_to_string(package_file)?;
     let pkg: types::Package = serde_yaml::from_str(&yaml_content)?;
@@ -59,8 +60,10 @@ pub fn run_installation(
                 "Warning: Command '{}' exists but was not installed by Zoi.",
                 pkg.name.yellow()
             );
-            if !utils::ask_for_confirmation("Do you want to continue and potentially overwrite it?")
-            {
+            if !utils::ask_for_confirmation(
+                "Do you want to continue and potentially overwrite it?",
+                yes,
+            ) {
                 return Ok(());
             }
         }
@@ -71,11 +74,11 @@ pub fn run_installation(
     if let Some(deps) = &pkg.dependencies {
         if mode == InstallMode::ForceSource {
             if let Some(build_deps) = &deps.build {
-                dependencies::resolve_and_install(build_deps, &pkg.name)?;
+                dependencies::resolve_and_install(build_deps, &pkg.name, yes)?;
             }
         }
         if let Some(runtime_deps) = &deps.runtime {
-            dependencies::resolve_and_install(runtime_deps, &pkg.name)?;
+            dependencies::resolve_and_install(runtime_deps, &pkg.name, yes)?;
         }
     }
 
@@ -84,7 +87,7 @@ pub fn run_installation(
 
     let result = match mode {
         InstallMode::ForceSource => run_source_flow(&pkg, &platform),
-        InstallMode::PreferBinary => run_default_flow(&pkg, &platform),
+        InstallMode::PreferBinary => run_default_flow(&pkg, &platform, yes),
         InstallMode::Interactive => run_interactive_flow(&pkg, &platform),
         InstallMode::Updater(ref method_name) => run_updater_flow(&pkg, &platform, method_name),
     };
@@ -156,7 +159,11 @@ fn run_interactive_flow(pkg: &types::Package, platform: &str) -> Result<(), Box<
     }
 }
 
-fn run_default_flow(pkg: &types::Package, platform: &str) -> Result<(), Box<dyn Error>> {
+fn run_default_flow(
+    pkg: &types::Package,
+    platform: &str,
+    yes: bool,
+) -> Result<(), Box<dyn Error>> {
     if let Some(method) = find_method(pkg, "binary", platform) {
         println!("Found 'binary' method. Installing...");
         return handle_binary_install(method, pkg);
@@ -166,13 +173,16 @@ fn run_default_flow(pkg: &types::Package, platform: &str) -> Result<(), Box<dyn 
         return handle_com_binary_install(method, pkg);
     }
     if let Some(method) = find_method(pkg, "script", platform) {
-        if utils::ask_for_confirmation("Found a 'script' method. Do you want to execute it?") {
+        if utils::ask_for_confirmation("Found a 'script' method. Do you want to execute it?", yes)
+        {
             return handle_script_install(method, pkg);
         }
     }
     if let Some(method) = find_method(pkg, "source", platform) {
-        if utils::ask_for_confirmation("Found a 'source' method. Do you want to build from source?")
-        {
+        if utils::ask_for_confirmation(
+            "Found a 'source' method. Do you want to build from source?",
+            yes,
+        ) {
             return handle_source_install(method, pkg);
         }
     }
@@ -457,18 +467,33 @@ fn handle_script_install(
     }
 
     println!("Executing installation script...");
-    let status = if cfg!(target_os = "windows") {
-        Command::new("powershell")
-            .arg("-ExecutionPolicy")
+    let pb = ProgressBar::new_spinner();
+    pb.set_style(
+        ProgressStyle::default_spinner()
+            .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
+            .template("{spinner:.green} {msg}")?,
+    );
+    pb.set_message("Running script...");
+
+    let mut command = if cfg!(target_os = "windows") {
+        let mut cmd = Command::new("powershell");
+        cmd.arg("-ExecutionPolicy")
             .arg("Bypass")
             .arg("-File")
-            .arg(&script_path)
-            .status()?
+            .arg(&script_path);
+        cmd
     } else {
-        Command::new("sh").arg(&script_path).status()?
+        let mut cmd = Command::new("sh");
+        cmd.arg(&script_path);
+        cmd
     };
 
-    if !status.success() {
+    let output = command.output()?;
+    pb.finish_and_clear();
+
+    if !output.status.success() {
+        io::stdout().write_all(&output.stdout)?;
+        io::stderr().write_all(&output.stderr)?;
         return Err("Installation script failed to execute successfully.".into());
     }
 
@@ -491,12 +516,25 @@ fn handle_source_install(
 
     let repo_url = method.url.replace("{git}", &pkg.git);
     println!("Cloning from {repo_url}...");
-    let status = std::process::Command::new("git")
+
+    let pb = ProgressBar::new_spinner();
+    pb.set_style(
+        ProgressStyle::default_spinner()
+            .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
+            .template("{spinner:.green} {msg}")?,
+    );
+    pb.set_message(format!("Cloning {}...", pkg.name));
+
+    let output = std::process::Command::new("git")
         .arg("clone")
         .arg(&repo_url)
         .arg(&git_path)
-        .status()?;
-    if !status.success() {
+        .output()?;
+    pb.finish_and_clear();
+
+    if !output.status.success() {
+        io::stdout().write_all(&output.stdout)?;
+        io::stderr().write_all(&output.stderr)?;
         return Err("Failed to clone source repository.".into());
     }
 
@@ -504,12 +542,25 @@ fn handle_source_install(
         for cmd_str in commands {
             let final_cmd = cmd_str.replace("{store}", bin_path.to_str().unwrap());
             println!("Executing: {}", final_cmd.cyan());
-            let status = std::process::Command::new("sh")
+
+            let pb_cmd = ProgressBar::new_spinner();
+            pb_cmd.set_style(
+                ProgressStyle::default_spinner()
+                    .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
+                    .template("{spinner:.green} {msg}")?,
+            );
+            pb_cmd.set_message(format!("Running: {}", final_cmd));
+
+            let output = std::process::Command::new("sh")
                 .arg("-c")
                 .arg(&final_cmd)
                 .current_dir(&git_path)
-                .status()?;
-            if !status.success() {
+                .output()?;
+            pb_cmd.finish_and_clear();
+
+            if !output.status.success() {
+                io::stdout().write_all(&output.stdout)?;
+                io::stderr().write_all(&output.stderr)?;
                 return Err(format!("Build command failed: '{final_cmd}'").into());
             }
         }

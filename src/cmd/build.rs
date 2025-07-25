@@ -2,7 +2,7 @@ use crate::pkg::{install, resolve, types::InstallReason};
 use crate::utils;
 use colored::*;
 
-pub fn run(source: &str) {
+pub fn run(source: &str, yes: bool) {
     println!(
         "{}{}{}",
         "--- Building package '".yellow(),
@@ -12,7 +12,7 @@ pub fn run(source: &str) {
 
     match resolve::resolve_source(source) {
         Ok(resolved_source) => {
-            if let Err(e) = utils::confirm_untrusted_source(&resolved_source.source_type) {
+            if let Err(e) = utils::confirm_untrusted_source(&resolved_source.source_type, yes) {
                 eprintln!("\n{}", e.to_string().red());
                 return;
             }
@@ -22,6 +22,7 @@ pub fn run(source: &str) {
                 install::InstallMode::ForceSource,
                 true,
                 InstallReason::Direct,
+                yes,
             ) {
                 eprintln!("\n{}: {}", "Build failed".red().bold(), e);
                 std::process::exit(1);

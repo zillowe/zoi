@@ -2,7 +2,7 @@ use crate::pkg::{clone, resolve};
 use crate::utils;
 use colored::*;
 
-pub fn run(source: String, target_dir: Option<String>) {
+pub fn run(source: String, target_dir: Option<String>, yes: bool) {
     println!(
         "{}{}{}",
         "--- Cloning package source '".yellow(),
@@ -12,7 +12,7 @@ pub fn run(source: String, target_dir: Option<String>) {
 
     match resolve::resolve_source(&source) {
         Ok(resolved_source) => {
-            if let Err(e) = utils::confirm_untrusted_source(&resolved_source.source_type) {
+            if let Err(e) = utils::confirm_untrusted_source(&resolved_source.source_type, yes) {
                 eprintln!("\n{}", e.to_string().red());
                 return;
             }

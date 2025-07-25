@@ -1,11 +1,13 @@
 use crate::pkg::config;
 use chrono::Utc;
+use indicatif::{ProgressBar, ProgressStyle};
 use std::env;
 use std::error::Error;
 use std::fs;
+use std::io::Read;
 use std::path::PathBuf;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum SourceType {
     OfficialRepo,
     UntrustedRepo(String),
@@ -68,16 +70,36 @@ fn find_package_in_db(pkg_str: &str) -> Result<ResolvedSource, Box<dyn Error>> {
 
 fn download_from_url(url: &str) -> Result<ResolvedSource, Box<dyn Error>> {
     println!("Downloading package definition from URL...");
-    let response = reqwest::blocking::get(url)?;
+    let mut response = reqwest::blocking::get(url)?;
     if !response.status().is_success() {
         return Err(format!("Failed to download file: HTTP {}", response.status()).into());
     }
+
+    let total_size = response.content_length().unwrap_or(0);
+    let pb = ProgressBar::new(total_size);
+    pb.set_style(ProgressStyle::default_bar()
+        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})")?
+        .progress_chars("#>-"));
+
+    let mut downloaded_bytes = Vec::new();
+    let mut buffer = [0; 8192];
+    loop {
+        let bytes_read = response.read(&mut buffer)?;
+        if bytes_read == 0 {
+            break;
+        }
+        downloaded_bytes.extend_from_slice(&buffer[..bytes_read]);
+        pb.inc(bytes_read as u64);
+    }
+    pb.finish_with_message("Download complete.");
+
+    let content = String::from_utf8(downloaded_bytes)?;
 
     let temp_path = env::temp_dir().join(format!(
         "zoi-temp-{}.yaml",
         Utc::now().timestamp_nanos_opt().unwrap_or(0)
     ));
-    fs::write(&temp_path, response.text()?)?;
+    fs::write(&temp_path, content)?;
 
     Ok(ResolvedSource {
         path: temp_path,
@@ -88,7 +110,7 @@ fn download_from_url(url: &str) -> Result<ResolvedSource, Box<dyn Error>> {
 pub fn resolve_source(source: &str) -> Result<ResolvedSource, Box<dyn Error>> {
     if source.starts_with("http://") || source.starts_with("https://") {
         download_from_url(source)
-    } else if source.ends_with(".yaml") || source.ends_with(".yml") {
+    } else if source.ends_with(".pkg.yaml") {
         let path = PathBuf::from(source);
         if !path.exists() {
             return Err(format!("Local file not found at '{source}'").into());

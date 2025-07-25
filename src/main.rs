@@ -30,6 +30,14 @@ struct Cli {
         help = "Print detailed version information"
     )]
     version_flag: bool,
+
+    #[arg(
+        short = 'y',
+        long,
+        help = "Automatically answer yes to all prompts",
+        global = true
+    )]
+    yes: bool,
 }
 
 #[derive(Subcommand)]
@@ -211,13 +219,7 @@ enum Commands {
 
     /// Manage package repositories
     #[command(
-        long_about = "Manages the list of package repositories that Zoi uses to find and install packages. By default, Zoi is configured with 'main' and 'extra' repositories.
-
-Commands:
-- add: Adds a new repository from the available sources. Can be interactive.
-- remove: Deletes a repository from the active list.
-- list: Shows all currently active repositories.
-- list all: Displays all available repositories and their status (active/inactive)."
+        long_about = "Manages the list of package repositories that Zoi uses to find and install packages. By default, Zoi is configured with 'main' and 'extra' repositories.\n\nCommands:\n- add: Adds a new repository from the available sources. Can be interactive.\n- remove: Deletes a repository from the active list.\n- list: Shows all currently active repositories.\n- list all: Displays all available repositories and their status (active/inactive)."
     )]
     Repo(cmd::repo::RepoCommand),
 }
@@ -247,22 +249,22 @@ fn main() {
             Commands::Show { package_name, raw } => cmd::show::run(&package_name, raw),
             Commands::Pin { package } => cmd::pin::run(&package),
             Commands::Unpin { package } => cmd::unpin::run(&package),
-            Commands::Update { package_name } => cmd::update::run(&package_name),
+            Commands::Update { package_name } => cmd::update::run(&package_name, cli.yes),
             Commands::Install {
                 source,
                 force,
                 interactive,
-            } => cmd::install::run(&source, force, interactive),
-            Commands::Build { source } => cmd::build::run(&source),
+            } => cmd::install::run(&source, force, interactive, cli.yes),
+            Commands::Build { source } => cmd::build::run(&source, cli.yes),
             Commands::Uninstall { package_name } => cmd::uninstall::run(&package_name),
             Commands::Run { cmd_alias } => cmd::run::run(cmd_alias),
             Commands::Env { env_alias } => cmd::env::run(env_alias),
             Commands::Clone {
                 source,
                 target_directory,
-            } => cmd::clone::run(source, target_directory),
+            } => cmd::clone::run(source, target_directory, cli.yes),
             Commands::Upgrade => cmd::upgrade::run(),
-            Commands::Autoremove => cmd::autoremove::run(),
+            Commands::Autoremove => cmd::autoremove::run(cli.yes),
             Commands::Search { args } => cmd::search::run(args),
             Commands::Exec { source, args } => cmd::exec::run(source, args),
             Commands::Repo(args) => cmd::repo::run(args),

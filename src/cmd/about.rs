@@ -3,7 +3,7 @@ use colored::*;
 
 const DESCRIPTION: &str = "Zoi - Universal Package Manager & Environment Setup Tool.\n  Part of the Zillowe Development Suite (ZDS)";
 const AUTHOR: &str = "Zusty < Zillowe Foundation";
-const HOMEPAGE: &str = "https://gitlab.com/Zusty/Zoi";
+const HOMEPAGE: &str = "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi";
 const LICENSE: &str = "Apache-2.0";
 
 pub fn run(branch: &str, status: &str, number: &str, commit: &str) {

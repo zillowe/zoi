@@ -14,3 +14,4 @@ pub fn run() {
         "Zoi upgraded successfully! Please restart your shell for changes to take effect.".green()
     );
 }
+

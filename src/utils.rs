@@ -58,7 +58,10 @@ pub fn command_exists(command: &str) -> bool {
     }
 }
 
-pub fn ask_for_confirmation(prompt: &str) -> bool {
+pub fn ask_for_confirmation(prompt: &str, yes: bool) -> bool {
+    if yes {
+        return true;
+    }
     print!("{} [y/N]: ", prompt.yellow());
     let _ = stdout().flush();
     let mut input = String::new();
@@ -116,14 +119,18 @@ pub fn get_native_package_manager() -> Option<String> {
     }
 }
 
-pub fn confirm_untrusted_source(source_type: &SourceType) -> Result<(), Box<dyn Error>> {
+pub fn confirm_untrusted_source(source_type: &SourceType, yes: bool) -> Result<(), Box<dyn Error>> {
+    if source_type == &SourceType::OfficialRepo {
+        return Ok(());
+    }
+
     let warning_message = match source_type {
-        SourceType::OfficialRepo => return Ok(()),
         SourceType::UntrustedRepo(repo) => {
             format!("The package from repository '@{repo}' is not an official Zoi repository.")
         }
         SourceType::LocalFile => "You are installing from a local file.".to_string(),
         SourceType::Url => "You are installing from a remote URL.".to_string(),
+        _ => return Ok(()),
     };
 
     println!(
@@ -132,7 +139,10 @@ pub fn confirm_untrusted_source(source_type: &SourceType) -> Result<(), Box<dyn 
         warning_message
     );
 
-    if ask_for_confirmation("This source is not trusted. Are you sure you want to continue?") {
+    if ask_for_confirmation(
+        "This source is not trusted. Are you sure you want to continue?",
+        yes,
+    ) {
         Ok(())
     } else {
         Err("Operation aborted by user.".into())
@@ -140,7 +150,10 @@ pub fn confirm_untrusted_source(source_type: &SourceType) -> Result<(), Box<dyn 
 }
 
 pub fn is_platform_compatible(current_platform: &str, allowed_platforms: &[String]) -> bool {
-    let os = std::env::consts::OS;
+    let os = match std::env::consts::OS {
+        "darwin" => "macos",
+        other => other,
+    };
     allowed_platforms
         .iter()
         .any(|p| p == "all" || p == os || p == current_platform)

@@ -86,7 +86,11 @@ fn record_dependent(dependency_name: &str, dependent_pkg_name: &str) -> Result<(
     Ok(())
 }
 
-fn install_dependency(dep: &Dependency, parent_pkg_name: &str) -> Result<(), Box<dyn Error>> {
+fn install_dependency(
+    dep: &Dependency,
+    parent_pkg_name: &str,
+    yes: bool,
+) -> Result<(), Box<dyn Error>> {
     let version_info = dep
         .req
         .as_ref()
@@ -124,7 +128,7 @@ fn install_dependency(dep: &Dependency, parent_pkg_name: &str) -> Result<(), Box
             }
 
             println!("Not installed. Proceeding with installation...");
-            install_zoi_dependency(dep.package)?;
+            install_zoi_dependency(dep.package, yes)?;
         }
         "native" => {
             if let Some(installed_version) = get_native_command_version(dep.package)? {
@@ -195,7 +199,11 @@ fn install_dependency(dep: &Dependency, parent_pkg_name: &str) -> Result<(), Box
     Ok(())
 }
 
-pub fn resolve_and_install(deps: &[String], parent_pkg_name: &str) -> Result<(), Box<dyn Error>> {
+pub fn resolve_and_install(
+    deps: &[String],
+    parent_pkg_name: &str,
+    yes: bool,
+) -> Result<(), Box<dyn Error>> {
     if deps.is_empty() {
         return Ok(());
     }
@@ -203,13 +211,13 @@ pub fn resolve_and_install(deps: &[String], parent_pkg_name: &str) -> Result<(),
     println!("{}", "Resolving dependencies...".bold());
     for dep_str in deps {
         let dependency = parse_dependency_string(dep_str)?;
-        install_dependency(&dependency, parent_pkg_name)?;
+        install_dependency(&dependency, parent_pkg_name, yes)?;
     }
     println!("{}", "All dependencies resolved.".green());
     Ok(())
 }
 
-fn install_zoi_dependency(package_name: &str) -> Result<(), Box<dyn Error>> {
+fn install_zoi_dependency(package_name: &str, yes: bool) -> Result<(), Box<dyn Error>> {
     use crate::pkg::{install, resolve};
     let resolved_source = resolve::resolve_source(package_name)?;
 
@@ -218,5 +226,6 @@ fn install_zoi_dependency(package_name: &str) -> Result<(), Box<dyn Error>> {
         install::InstallMode::PreferBinary,
         false,
         crate::pkg::types::InstallReason::Dependency,
+        yes,
     )
 }

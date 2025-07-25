@@ -1,12 +1,13 @@
 use crate::pkg::{install, local, pin, resolve, sync, types};
 use crate::utils;
 use colored::*;
+use indicatif::{ProgressBar, ProgressStyle};
 
-pub fn run(package_name: &str) {
+pub fn run(package_name: &str, yes: bool) {
     let result = if package_name == "all" {
-        run_update_all_logic()
+        run_update_all_logic(yes)
     } else {
-        run_update_single_logic(package_name)
+        run_update_single_logic(package_name, yes)
     };
 
     if let Err(e) = result {
@@ -14,7 +15,10 @@ pub fn run(package_name: &str) {
     }
 }
 
-fn run_update_single_logic(package_name: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn run_update_single_logic(
+    package_name: &str,
+    yes: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
     if pin::is_pinned(package_name)? {
         println!(
             "Package '{}' is pinned. Skipping update.",
@@ -43,10 +47,13 @@ fn run_update_single_logic(package_name: &str) -> Result<(), Box<dyn std::error:
         return Ok(());
     }
 
-    if !utils::ask_for_confirmation(&format!(
-        "Update from {} to {}?",
-        manifest.version, new_pkg.version
-    )) {
+    if !utils::ask_for_confirmation(
+        &format!(
+            "Update from {} to {}?",
+            manifest.version, new_pkg.version
+        ),
+        yes,
+    ) {
         return Ok(());
     }
 
@@ -61,13 +68,14 @@ fn run_update_single_logic(package_name: &str) -> Result<(), Box<dyn std::error:
         mode,
         true,
         types::InstallReason::Direct,
+        yes,
     )?;
 
     println!("\n{}", "Update complete.".green());
     Ok(())
 }
 
-fn run_update_all_logic() -> Result<(), Box<dyn std::error::Error>> {
+fn run_update_all_logic(yes: bool) -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", "--- Syncing Package Database ---".yellow().bold());
     sync::run(false)?;
 
@@ -76,21 +84,30 @@ fn run_update_all_logic() -> Result<(), Box<dyn std::error::Error>> {
     let pinned_names: Vec<String> = pinned_packages.into_iter().map(|p| p.name).collect();
 
     let mut packages_to_upgrade = Vec::new();
+    let mut upgrade_messages = Vec::new();
 
     println!("\n{}", "--- Checking for Upgrades ---".yellow().bold());
+    let pb = ProgressBar::new_spinner();
+    pb.set_style(
+        ProgressStyle::default_spinner()
+            .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
+            .template("{spinner:.green} {msg}")?,
+    );
+    pb.set_message("Checking for available updates...");
+
     for manifest in installed_packages {
         if pinned_names.contains(&manifest.name) {
-            println!("- {} is pinned, skipping.", manifest.name.cyan());
+            upgrade_messages.push(format!("- {} is pinned, skipping.", manifest.name.cyan()));
             continue;
         }
 
         let resolved_source = match resolve::resolve_source(&manifest.name) {
             Ok(source) => source,
             Err(_) => {
-                println!(
+                upgrade_messages.push(format!(
                     "- Could not resolve source for {}, skipping.",
                     manifest.name.red()
-                );
+                ));
                 continue;
             }
         };
@@ -99,12 +116,12 @@ fn run_update_all_logic() -> Result<(), Box<dyn std::error::Error>> {
         let new_pkg: crate::pkg::types::Package = serde_yaml::from_str(&content)?;
 
         if manifest.version != new_pkg.version {
-            println!(
+            upgrade_messages.push(format!(
                 "- {} can be upgraded from {} to {}",
                 manifest.name.cyan(),
                 manifest.version.yellow(),
                 new_pkg.version.green()
-            );
+            ));
             packages_to_upgrade.push((
                 manifest.name.clone(),
                 new_pkg.version.clone(),
@@ -112,8 +129,13 @@ fn run_update_all_logic() -> Result<(), Box<dyn std::error::Error>> {
                 new_pkg.updater.clone(),
             ));
         } else {
-            println!("- {} is up to date.", manifest.name.cyan());
+            upgrade_messages.push(format!("- {} is up to date.", manifest.name.cyan()));
         }
+    }
+    pb.finish_and_clear();
+
+    for msg in upgrade_messages {
+        println!("{}", msg);
     }
 
     if packages_to_upgrade.is_empty() {
@@ -122,7 +144,7 @@ fn run_update_all_logic() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!();
-    if !utils::ask_for_confirmation("Do you want to upgrade these packages?") {
+    if !utils::ask_for_confirmation("Do you want to upgrade these packages?", yes) {
         return Ok(());
     }
 
@@ -133,7 +155,7 @@ fn run_update_all_logic() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             install::InstallMode::PreferBinary
         };
-        install::run_installation(&path, mode, true, types::InstallReason::Direct)?;
+        install::run_installation(&path, mode, true, types::InstallReason::Direct, yes)?;
     }
 
     println!("\n{}", "Upgrade complete.".green());

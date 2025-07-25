@@ -1,10 +1,10 @@
 use crate::pkg;
 use colored::*;
 
-pub fn run() {
+pub fn run(yes: bool) {
     println!("{}", "\n--- Autoremoving Unused Packages ---".yellow());
 
-    if let Err(e) = pkg::autoremove::run() {
+    if let Err(e) = pkg::autoremove::run(yes) {
         eprintln!("\n{}: {}", "Error".red().bold(), e);
         std::process::exit(1);
     }

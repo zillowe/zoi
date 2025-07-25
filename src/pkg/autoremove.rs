@@ -4,10 +4,10 @@ use colored::*;
 use std::error::Error;
 use std::fs;
 
-pub fn run() -> Result<(), Box<dyn Error>> {
+pub fn run(yes: bool) -> Result<(), Box<dyn Error>> {
     println!("Checking for unused dependencies...");
     let all_installed = local::get_installed_packages()?;
-    let mut packages_to_remove = Vec::new();
+    let mut packages_to_remove: Vec<String> = Vec::new();
 
     for package in &all_installed {
         if package.reason != InstallReason::Dependency {
@@ -38,7 +38,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         println!("    - {}", pkg_name.yellow());
     }
 
-    if !utils::ask_for_confirmation("\nDo you want to continue?") {
+    if !utils::ask_for_confirmation("\nDo you want to continue?", yes) {
         println!("Operation aborted.");
         return Ok(());
     }
