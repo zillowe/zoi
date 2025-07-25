@@ -210,5 +210,5 @@ Zoi is licensed under the [Apache-2.0 License](./LICENSE).
 <hr/>
 
 <div align="center">
-  <p>Zoi is developed by Zusty & Zillowe Foundation, part of the <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/ZDS">Zillowe Development Suite (ZDS)</a></p>
+  <p>Zoi is developed by Zusty < Zillowe Foundation, part of the <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/ZDS">Zillowe Development Suite (ZDS)</a></p>
 </div>
