@@ -71,7 +71,11 @@ enum Commands {
     #[command(
         long_about = "Clones the official package database from GitLab to your local machine (~/.zoi/pkgs/db). If the database already exists, it verifies the remote URL and pulls the latest changes."
     )]
-    Sync,
+    Sync {
+        /// Show the full git output
+        #[arg(short, long)]
+        verbose: bool,
+    },
 
     /// Lists installed or all available packages
     List {
@@ -238,7 +242,7 @@ fn main() {
             Commands::About => cmd::about::run(BRANCH, STATUS, NUMBER, commit),
             Commands::Info => cmd::info::run(BRANCH, STATUS, NUMBER, commit),
             Commands::Check => cmd::check::run(),
-            Commands::Sync => cmd::sync::run(),
+            Commands::Sync { verbose } => cmd::sync::run(verbose),
             Commands::List { args } => cmd::list::run(args),
             Commands::Show { package_name, raw } => cmd::show::run(&package_name, raw),
             Commands::Pin { package } => cmd::pin::run(&package),

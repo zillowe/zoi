@@ -30,7 +30,7 @@ fn run_update_single_logic(package_name: &str) -> Result<(), Box<dyn std::error:
     println!("Currently installed version: {}", manifest.version.yellow());
 
     println!("\n{}", "--- Syncing Package Database ---".yellow().bold());
-    sync::run()?;
+    sync::run(false)?;
 
     let resolved_source = resolve::resolve_source(package_name)?;
     let content = std::fs::read_to_string(&resolved_source.path)?;
@@ -69,7 +69,7 @@ fn run_update_single_logic(package_name: &str) -> Result<(), Box<dyn std::error:
 
 fn run_update_all_logic() -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", "--- Syncing Package Database ---".yellow().bold());
-    sync::run()?;
+    sync::run(false)?;
 
     let installed_packages = local::get_installed_packages()?;
     let pinned_packages = pin::get_pinned_packages()?;

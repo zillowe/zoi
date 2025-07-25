@@ -42,7 +42,7 @@ fn find_package_in_db(pkg_str: &str) -> Result<ResolvedSource, Box<dyn Error>> {
     let search_repos = if let Some(r) = repo {
         vec![r.to_string()]
     } else {
-        config::get_all_repos()?
+        config::read_config()?.repos
     };
 
     for repo_name in &search_repos {
@@ -59,7 +59,11 @@ fn find_package_in_db(pkg_str: &str) -> Result<ResolvedSource, Box<dyn Error>> {
         }
     }
 
-    Err(format!("Package '{pkg_str}' not found in local database.").into())
+    if repo.is_some() {
+        Err(format!("Package '{pkg_name}' not found in repository '@{}'.", repo.unwrap()).into())
+    } else {
+        Err(format!("Package '{pkg_name}' not found in any active repositories.").into())
+    }
 }
 
 fn download_from_url(url: &str) -> Result<ResolvedSource, Box<dyn Error>> {
