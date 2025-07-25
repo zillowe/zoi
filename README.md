@@ -142,11 +142,11 @@ If you prefer, you can build Zoi from source. You'll need [Rust](https://www.rus
 
 **Install it locally:**
 ```sh
-# For Linux/macOS
+# For Windows/Linux/macOS
 ./configure
 make
 sudo make install
-make install-completion # Install CLI completions
+make install-completion # Install CLI completions (bash, elvish, fish, powershell, zsh)
 ```
 
 ## 💡 Usage
@@ -181,6 +181,11 @@ Here are some common commands to get you started.
 - **Search for a package:**
   ```sh
   zoi search <term>
+  ```
+
+- **Search for a package from a specific repo:**
+  ```sh
+  zoi search <term> @<repo_name>
   ```
 
 - **Add a new repository:**
