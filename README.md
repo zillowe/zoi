@@ -7,14 +7,15 @@
 <br/>
 
 <div align="center">
-  <a href="https://aur.archlinux.org/packages/zoi-bin">
-    <img alt="AUR Version" src="https://img.shields.io/aur/version/zoi-bin?style=flat&logo=archlinux&logoColor=%23ffff&label=AUR&labelColor=5452f1&color=282696"/>
-  </a>
   <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases">
-    <img alt="GitLab Latest Release" src="https://img.shields.io/gitlab/v/release/Zillowe%2FZillwen%2FZusty%2FZoi?sort=date&display_name=release&style=flat&logo=gitlab&logoColor=%23fff&label=Release&labelColor=%235452f1&color=%23282696"/>
+    <img alt="GitLab Latest Release" src="https://img.shields.io/gitlab/v/release/Zillowe%2FZillwen%2FZusty%2FZoi?sort=date&display_name=release&style=flat&logo=gitlab&logoColor=%23fff&label=Latest%20Release&labelColor=%235452f1&color=%23282696"/>
   </a>
   <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/pipelines">
     <img alt="GitLab Pipeline Status" src="https://img.shields.io/gitlab/pipeline-status/Zillowe%2FZillwen%2FZusty%2FZoi?style=flat&logo=gitlab&logoColor=%23fff&label=Pipeline&labelColor=%235452f1&color=%23282696"/>
+  </a>
+  <br/>
+  <a href="https://aur.archlinux.org/packages/zoi-bin">
+    <img alt="AUR Version" src="https://img.shields.io/aur/version/zoi-bin?style=flat&logo=archlinux&logoColor=%23ffff&label=AUR&labelColor=5452f1&color=282696"/>
   </a>
   <a href="https://github.com/Zillowe/scoop">
     <img alt="Scoop Version" src="https://img.shields.io/scoop/v/zoi?bucket=https%3A%2F%2Fgithub.com%2FZillowe%2Fscoop&style=flat&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPCFET0NUWVBFIHN2ZyBQVUJMSUMgIi0vL1czQy8vRFREIFNWRyAxLjEvL0VOIiAiaHR0cDovL3d3dy53My5vcmcvR3JhcGhpY3MvU1ZHLzEuMS9EVEQvc3ZnMTEuZHRkIj4NCjwhLS0gVXBsb2FkZWQgdG86IFNWRyBSZXBvLCB3d3cuc3ZncmVwby5jb20sIFRyYW5zZm9ybWVkIGJ5OiBTVkcgUmVwbyBNaXhlciBUb29scyAtLT4KPHN2ZyB3aWR0aD0iODAwcHgiIGhlaWdodD0iODAwcHgiIHZpZXdCb3g9IjAgMCAyNCAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiBmaWxsPSIjZmZmZmZmIj4KDTxnIGlkPSJTVkdSZXBvX2JnQ2FycmllciIgc3Ryb2tlLXdpZHRoPSIwIi8%2BCg08ZyBpZD0iU1ZHUmVwb190cmFjZXJDYXJyaWVyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KDTxnIGlkPSJTVkdSZXBvX2ljb25DYXJyaWVyIj4gPHRpdGxlPm1pY3Jvc29mdDwvdGl0bGU%2BIDxyZWN0IHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgZmlsbD0ibm9uZSIvPiA8cGF0aCBkPSJNMiwzaDl2OUgyVjNtOSwxOUgyVjEzaDl2OU0yMSwzdjlIMTJWM2g5bTAsMTlIMTJWMTNoOVoiLz4gPC9nPgoNPC9zdmc%2B&logoColor=%23ffff&label=Scoop&labelColor=%235452f1&color=%23282696"/>
