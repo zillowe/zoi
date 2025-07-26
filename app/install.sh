@@ -42,7 +42,7 @@ os=""
 arch=""
 case "$(uname -s)" in
     Linux*)  os="linux" ;;
-    Darwin*) os="darwin" ;;
+    Darwin*) os="macos" ;;
     *)       error "Unsupported OS: $(uname -s)" ;;
 esac
 case "$(uname -m)" in
