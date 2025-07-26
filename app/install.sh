@@ -141,6 +141,34 @@ rm -rf "$TEMP_DIR"
 info "Making binary executable..."
 chmod +x "$INSTALL_PATH" || error "Failed to set execute permission on: ${INSTALL_PATH}"
 
+info "Installing shell completions..."
+if command -v bash >/dev/null 2>&1; then
+    info "  -> Bash"
+    BASH_COMPLETION_DIR="${HOME}/.local/share/bash-completion/completions"
+    mkdir -p "$BASH_COMPLETION_DIR"
+    "$INSTALL_PATH" generate-completions bash > "${BASH_COMPLETION_DIR}/zoi"
+fi
+if command -v zsh >/dev/null 2>&1; then
+    info "  -> Zsh"
+    ZSH_COMPLETION_DIR="${ZDOTDIR:-$HOME}/.zsh/completions"
+    mkdir -p "$ZSH_COMPLETION_DIR"
+    "$INSTALL_PATH" generate-completions zsh > "${ZSH_COMPLETION_DIR}/_zoi"
+fi
+if command -v fish >/dev/null 2>&1; then
+    info "  -> Fish"
+    FISH_COMPLETION_DIR="${HOME}/.config/fish/completions"
+    mkdir -p "$FISH_COMPLETION_DIR"
+    "$INSTALL_PATH" generate-completions fish > "${FISH_COMPLETION_DIR}/zoi.fish"
+fi
+if command -v elvish >/dev/null 2>&1; then
+    info "  -> Elvish"
+    ELVISH_COMPLETION_DIR="${HOME}/.config/elvish/completions"
+    mkdir -p "$ELVISH_COMPLETION_DIR"
+    "$INSTALL_PATH" generate-completions elvish > "${ELVISH_COMPLETION_DIR}/zoi.elv"
+fi
+info "Completion scripts installed for detected shells."
+warn "You may need to restart your shell for them to take effect."
+
 info "Checking if '${INSTALL_DIR}' is in PATH..."
 if [[ ":$PATH:" != *":${INSTALL_DIR}:"* ]]; then
     warn "'${INSTALL_DIR}' is not found in your current PATH."

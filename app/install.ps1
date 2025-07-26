@@ -153,6 +153,35 @@ else {
     Write-Info "Skipping PATH update as requested. Add '$InstallDir' to your PATH manually."
 }
 
+Write-Info "Installing PowerShell completions..."
+try {
+    $ProfilePath = $PROFILE
+    if (-not (Test-Path (Split-Path $ProfilePath -Parent -ErrorAction SilentlyContinue))) {
+        New-Item -ItemType Directory -Path (Split-Path $ProfilePath -Parent) -Force | Out-Null
+    }
+    
+    $CompletionScript = & "$OutputPath" generate-completions powershell
+    $Comment = "# Zoi PowerShell completion"
+    
+    if (Test-Path $ProfilePath) {
+        $ProfileContent = Get-Content $ProfilePath -Raw -ErrorAction SilentlyContinue
+        if ($ProfileContent -notlike "*$Comment*") {
+            Add-Content -Path $ProfilePath -Value ([System.Environment]::NewLine + $Comment + [System.Environment]::NewLine + $CompletionScript)
+            Write-Success "Completion script added to your PowerShell profile."
+        } else {
+            Write-Info "Completion script already present in your PowerShell profile."
+        }
+    } else {
+        Set-Content -Path $ProfilePath -Value ($Comment + [System.Environment]::NewLine + $CompletionScript)
+        Write-Success "Created PowerShell profile and added completion script."
+    }
+    Write-Info "Please restart your shell or run '. `$PROFILE' to activate it."
+}
+catch {
+    Write-Warning "Could not install PowerShell completions. Error: $($_.Exception.Message)"
+    Write-Warning "You can install them manually by adding the output of 'zoi generate-completions powershell' to your profile."
+}
+
 Write-Host ""
 Write-Success "Zoi ($TargetArchive) installed/updated successfully to: $InstallDir"
 Write-Info "Run 'zoi --version' in a *new* terminal window to verify."
