@@ -7,6 +7,8 @@ stages:
 check_build:
   stage: test
   image: rust:latest
+  tags:
+    - saas-linux-large-amd64
   variables:
     RUSTFLAGS: "-Dwarnings"
   before_script:
