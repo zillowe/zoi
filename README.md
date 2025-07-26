@@ -8,7 +8,7 @@
 
 <div align="center">
   <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases">
-    <img alt="GitLab Latest Release" src="https://img.shields.io/gitlab/v/release/Zillowe%2FZillwen%2FZusty%2FZoi?sort=date&display_name=release&style=flat&logo=gitlab&logoColor=%23fff&label=Latest%20Release&labelColor=%235452f1&color=%23282696"/>
+    <img alt="GitLab Latest Release" src="https://img.shields.io/gitlab/v/release/Zillowe%2FZillwen%2FZusty%2FZoi?sort=date&display_name=release&style=flat&logo=gitlab&logoColor=%23fff&label=Release&labelColor=%235452f1&color=%23282696"/>
   </a>
   <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/pipelines">
     <img alt="GitLab Pipeline Status" src="https://img.shields.io/gitlab/pipeline-status/Zillowe%2FZillwen%2FZusty%2FZoi?style=flat&logo=gitlab&logoColor=%23fff&label=Pipeline&labelColor=%235452f1"/>
