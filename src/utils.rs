@@ -159,9 +159,127 @@ pub fn is_platform_compatible(current_platform: &str, allowed_platforms: &[Strin
         .any(|p| p == "all" || p == os || p == current_platform)
 }
 
+use std::path::PathBuf;
+
+pub fn setup_path() -> Result<(), Box<dyn Error>> {
+    let zoi_bin_dir = home::home_dir()
+        .ok_or("Could not find home directory.")?
+        .join(".zoi")
+        .join("pkgs")
+        .join("bin");
+
+    if !zoi_bin_dir.exists() {
+        fs::create_dir_all(&zoi_bin_dir)?;
+    }
+
+    println!("{}", "Ensuring Zoi bin directory is in your PATH...".bold());
+
+    #[cfg(unix)]
+    {
+        use std::fs::{File, OpenOptions};
+        let zoi_bin_str = "$HOME/.zoi/pkgs/bin";
+        
+        let shell_name = std::env::var("SHELL").unwrap_or_default();
+        let profile_file_path = if shell_name.contains("bash") {
+            if cfg!(target_os = "macos") {
+                home::home_dir().unwrap().join(".bash_profile")
+            } else {
+                home::home_dir().unwrap().join(".bashrc")
+            }
+        } else if shell_name.contains("zsh") {
+            home::home_dir().unwrap().join(".zshrc")
+        } else if shell_name.contains("fish") {
+            home::home_dir().unwrap().join(".config/fish/config.fish")
+        } else {
+            home::home_dir().unwrap().join(".profile")
+        };
+
+        if !profile_file_path.exists() {
+            File::create(&profile_file_path)?;
+        }
+
+        let content = fs::read_to_string(&profile_file_path)?;
+        if content.contains(zoi_bin_str) {
+            println!("Zoi bin directory is already in your shell's config.");
+            return Ok(());
+        }
+
+        let mut file = OpenOptions::new().append(true).open(&profile_file_path)?;
+        
+        let cmd_to_write = if shell_name.contains("fish") {
+            format!("\n# Added by Zoi\nset -gx PATH \"{}\" $PATH\n", zoi_bin_str)
+        } else {
+            format!("\n# Added by Zoi\nexport PATH=\"{}:$PATH\"\n", zoi_bin_str)
+        };
+
+        file.write_all(cmd_to_write.as_bytes())?;
+
+        println!(
+            "{} Zoi bin directory has been added to your PATH in '{}'.",
+            "Success:".green(),
+            profile_file_path.display()
+        );
+        println!("Please restart your shell or run `source {}` for the changes to take effect.", profile_file_path.display());
+    }
+
+    #[cfg(windows)]
+    {
+        use winreg::enums::*;
+        use winreg::RegKey;
+
+        let zoi_bin_path_str = zoi_bin_dir.to_str().ok_or("Invalid path string")?;
+
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let env = hkcu.open_subkey_with_flags("Environment", KEY_READ | KEY_WRITE)?;
+        let current_path: String = env.get_value("Path")?;
+
+        if current_path.split(';').any(|p| p.eq_ignore_ascii_case(zoi_bin_path_str)) {
+            println!("Zoi bin directory is already in your PATH.");
+            return Ok(());
+        }
+
+        let new_path = if current_path.is_empty() {
+            zoi_bin_path_str.to_string()
+        } else {
+            format!("{};{}", current_path, zoi_bin_path_str)
+        };
+
+        env.set_value("Path", &new_path)?;
+        
+        println!(
+            "{} Zoi bin directory has been added to your user PATH environment variable.",
+            "Success:".green()
+        );
+        println!("Please restart your shell or log out and log back in for the changes to take effect.");
+    }
+
+    Ok(())
+}
+
+pub fn check_path() {
+    if let Some(home) = home::home_dir() {
+        let zoi_bin_dir = home.join(".zoi/pkgs/bin");
+        if !zoi_bin_dir.exists() {
+            return;
+        }
+
+        if let Ok(path_var) = std::env::var("PATH") {
+            if !path_var.split(std::path::MAIN_SEPARATOR_STR).any(|p| PathBuf::from(p) == zoi_bin_dir) {
+                eprintln!(
+                    "{}: zoi's bin directory `{}` is not in your PATH.",
+                    "Warning".yellow(),
+                    zoi_bin_dir.display()
+                );
+                eprintln!("Please restart your terminal, or add it to your PATH manually for commands to be available.");
+            }
+        }
+    }
+}
+
 pub fn get_platform() -> Result<String, String> {
     let os = match std::env::consts::OS {
         "linux" => "linux",
+
         "macos" | "darwin" => "macos",
         "windows" => "windows",
         unsupported_os => return Err(format!("Unsupported operating system: {}", unsupported_os)),

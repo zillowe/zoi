@@ -1,6 +1,6 @@
 use clap::{CommandFactory, Parser, Subcommand};
-use clap_complete::Shell;
 use clap_complete::generate;
+use clap_complete::Shell;
 use std::io;
 mod cmd;
 mod pkg;
@@ -10,7 +10,7 @@ mod utils;
 // Production or Development
 const BRANCH: &str = "Production";
 const STATUS: &str = "Beta";
-const NUMBER: &str = "2.5.5";
+const NUMBER: &str = "2.5.6";
 
 /// Zoi - The Universal Package Manager & Environment Setup Tool.
 ///
@@ -227,6 +227,8 @@ enum Commands {
 fn main() {
     let commit: &str = option_env!("ZOI_COMMIT_HASH").unwrap_or("dev");
     let cli = Cli::parse();
+
+    utils::check_path();
 
     if cli.version_flag {
         cmd::version::run(BRANCH, STATUS, NUMBER, commit);

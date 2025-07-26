@@ -14,6 +14,7 @@ use tar::Archive;
 use tempfile::Builder;
 use xz2::read::XzDecoder;
 use zip::ZipArchive;
+use walkdir::WalkDir;
 
 #[derive(PartialEq, Eq)]
 pub enum InstallMode {
@@ -94,6 +95,9 @@ pub fn run_installation(
 
     if result.is_ok() {
         write_manifest(&pkg, reason)?;
+        if let Err(e) = utils::setup_path() {
+            eprintln!("{} Failed to configure PATH: {}", "Warning:".yellow(), e);
+        }
     }
 
     result
@@ -297,23 +301,42 @@ fn handle_com_binary_install(
 
     let binary_name = &pkg.name;
     let binary_name_with_ext = format!("{}.exe", pkg.name);
-    let mut found_binary = false;
-    for entry in fs::read_dir(temp_dir.path())? {
-        let entry = entry?;
+    let mut found_binary_path = None;
+    let mut files_in_archive = Vec::new();
+
+    for entry in WalkDir::new(temp_dir.path())
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_file())
+    {
         let path = entry.path();
-        if path.is_file() {
-            let file_name = path.file_name().unwrap_or_default();
-            if file_name == binary_name.as_str()
-                || (cfg!(target_os = "windows") && file_name == binary_name_with_ext.as_str())
-            {
-                fs::rename(path, &bin_path)?;
-                found_binary = true;
-                break;
-            }
+        files_in_archive.push(path.to_path_buf());
+        let file_name = path.file_name().unwrap_or_default();
+        if file_name == binary_name.as_str()
+            || (cfg!(target_os = "windows") && file_name == binary_name_with_ext.as_str())
+        {
+            found_binary_path = Some(path.to_path_buf());
         }
     }
 
-    if !found_binary {
+    if let Some(found_path) = found_binary_path {
+        fs::copy(found_path, &bin_path)?;
+    } else if files_in_archive.len() == 1 {
+        println!(
+            "{}",
+            "Could not find binary by package name. Found one file, assuming it's the correct one."
+                .yellow()
+        );
+        fs::copy(&files_in_archive[0], &bin_path)?;
+    } else {
+        eprintln!(
+            "Error: Could not find binary '{}' in the extracted archive.",
+            binary_name
+        );
+        eprintln!("Listing contents of the extracted archive:");
+        for path in files_in_archive {
+            eprintln!("- {}", path.display());
+        }
         return Err(format!(
             "Could not find binary '{}' in the extracted archive.",
             binary_name
