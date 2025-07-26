@@ -1,6 +1,6 @@
 [package]
 name = "zoi"
-version = "2.5.3-beta-prod"
+version = "2.5.4-beta-prod"
 edition = "2024"
 
 [dependencies]
@@ -16,6 +16,7 @@ git2 = "0.20.2"
 hex = "0.4.3"
 home = "0.5.11"
 indicatif = "0.18.0"
+openssl = { version = "0.10.73", features = ["vendored"] }
 regex = "1.11.1"
 reqwest = { version = "0.12.22", features = ["blocking"] }
 self_update = "0.42.0"
