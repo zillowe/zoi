@@ -77,6 +77,7 @@ Getting started with Zoi is simple. Just follow these three steps:
 
 2.  **Sync Repositories:**
     Before you can install packages, you need to sync the package repositories.
+
     ```sh
     zoi sync
     ```
@@ -94,12 +95,15 @@ You can install Zoi using a package manager, an installer script, or by building
 ### Package Managers
 
 #### Arch Linux (AUR)
-Install `zoi-bin` from the AUR using your favorite helper (e.g. `yay`, `paru`):
+
+Install [`zoi-bin`](https://aur.archlinux.org/packages/zoi-bin) from the AUR using your favorite helper (e.g. `yay`, `paru`):
+
 ```sh
 yay -S zoi-bin
 ```
 
 Or manually without any helpers:
+
 ```sh
 git clone https://aur.archlinux.org/zoi-bin.git
 cd zoi-bin
@@ -107,13 +111,17 @@ makepkg -si
 ```
 
 #### macOS (Homebrew)
-Install Zoi using [Homebrew](https://brew.sh):
+
+Install Zoi using Homebrew:
+
 ```sh
 brew install Zillowe/tap/zoi
 ```
 
 #### Windows (Scoop)
-Install Zoi using [Scoop](https://scoop.sh):
+
+Install Zoi using Scoop:
+
 ```powershell
 scoop bucket add zillowe https://github.com/Zillowe/scoop.git
 scoop install zoi
@@ -124,11 +132,13 @@ scoop install zoi
 You can also use our installer scripts for a quick setup.
 
 **Linux / macOS:**
+
 ```sh
 curl -fsSL https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.sh | bash
 ```
 
 **Windows:**
+
 ```powershell
 powershell -c "irm gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.ps1|iex"
 ```
@@ -138,6 +148,7 @@ powershell -c "irm gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.p
 If you prefer, you can build Zoi from source. You'll need [Rust](https://www.rust-lang.org) installed.
 
 **Build the release binary:**
+
 ```sh
 # For Linux/macOS
 ./build/build-release.sh
@@ -147,6 +158,7 @@ If you prefer, you can build Zoi from source. You'll need [Rust](https://www.rus
 ```
 
 **Install it locally:**
+
 ```sh
 # For Windows/Linux/macOS
 ./configure
@@ -160,45 +172,53 @@ make install-completion # Install CLI completions (bash, elvish, fish, powershel
 Here are some common commands to get you started.
 
 - **Install a package:**
+
   ```sh
   zoi install <package_name>
   ```
 
 - **Uninstall a package:**
+
   ```sh
   zoi uninstall <package_name>
   ```
 
 - **Install from a specific repository:**
+
   ```sh
   zoi install @<repo_name>/<package_name>
   ```
 
 - **List all available packages from active repos:**
+
   ```sh
   zoi list all
   ```
 
 - **List packages from a specific repo:**
+
   ```sh
   zoi list all @<repo_name>
   ```
 
 - **Search for a package:**
+
   ```sh
   zoi search <term>
   ```
 
 - **Search for a package from a specific repo:**
+
   ```sh
   zoi search <term> @<repo_name>
   ```
 
 - **Add a new repository:**
+
   ```sh
   # Interactively
   zoi repo add
-  
+
   # By name
   zoi repo add <repo_name>
   ```
@@ -221,5 +241,5 @@ Zoi is licensed under the [Apache-2.0 License](./LICENSE).
 <hr/>
 
 <div align="center">
-  <p>Zoi is developed by Zusty < Zillowe Foundation, part of the <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/ZDS">Zillowe Development Suite (ZDS)</a></p>
+  <p>Zoi is developed by Zusty < Zillowe Foundation<br/>Part of the <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/ZDS">Zillowe Development Suite (ZDS)</a></p>
 </div>
