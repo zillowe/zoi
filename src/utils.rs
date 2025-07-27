@@ -178,7 +178,7 @@ pub fn setup_path() -> Result<(), Box<dyn Error>> {
     {
         use std::fs::{File, OpenOptions};
         let zoi_bin_str = "$HOME/.zoi/pkgs/bin";
-        
+
         let shell_name = std::env::var("SHELL").unwrap_or_default();
         let profile_file_path = if shell_name.contains("bash") {
             if cfg!(target_os = "macos") {
@@ -205,7 +205,7 @@ pub fn setup_path() -> Result<(), Box<dyn Error>> {
         }
 
         let mut file = OpenOptions::new().append(true).open(&profile_file_path)?;
-        
+
         let cmd_to_write = if shell_name.contains("fish") {
             format!("\n# Added by Zoi\nset -gx PATH \"{}\" $PATH\n", zoi_bin_str)
         } else {
@@ -219,7 +219,10 @@ pub fn setup_path() -> Result<(), Box<dyn Error>> {
             "Success:".green(),
             profile_file_path.display()
         );
-        println!("Please restart your shell or run `source {}` for the changes to take effect.", profile_file_path.display());
+        println!(
+            "Please restart your shell or run `source {}` for the changes to take effect.",
+            profile_file_path.display()
+        );
     }
 
     #[cfg(windows)]
@@ -233,7 +236,10 @@ pub fn setup_path() -> Result<(), Box<dyn Error>> {
         let env = hkcu.open_subkey_with_flags("Environment", KEY_READ | KEY_WRITE)?;
         let current_path: String = env.get_value("Path")?;
 
-        if current_path.split(';').any(|p| p.eq_ignore_ascii_case(zoi_bin_path_str)) {
+        if current_path
+            .split(';')
+            .any(|p| p.eq_ignore_ascii_case(zoi_bin_path_str))
+        {
             println!("Zoi bin directory is already in your PATH.");
             return Ok(());
         }
@@ -245,12 +251,14 @@ pub fn setup_path() -> Result<(), Box<dyn Error>> {
         };
 
         env.set_value("Path", &new_path)?;
-        
+
         println!(
             "{} Zoi bin directory has been added to your user PATH environment variable.",
             "Success:".green()
         );
-        println!("Please restart your shell or log out and log back in for the changes to take effect.");
+        println!(
+            "Please restart your shell or log out and log back in for the changes to take effect."
+        );
     }
 
     Ok(())
@@ -264,7 +272,29 @@ pub fn check_path() {
         }
 
         if let Ok(path_var) = std::env::var("PATH") {
-            if !path_var.split(std::path::MAIN_SEPARATOR_STR).any(|p| PathBuf::from(p) == zoi_bin_dir) {
+            let zoi_bin_dir_canon =
+                fs::canonicalize(&zoi_bin_dir).unwrap_or_else(|_| zoi_bin_dir.clone());
+
+            let is_in_path = path_var.split(std::path::MAIN_SEPARATOR_STR).any(|p| {
+                if p.is_empty() {
+                    return false;
+                }
+                let p_path = PathBuf::from(p);
+
+                if p_path == zoi_bin_dir {
+                    return true;
+                }
+
+                if let Ok(p_canon) = fs::canonicalize(&p_path) {
+                    if p_canon == zoi_bin_dir_canon {
+                        return true;
+                    }
+                }
+
+                false
+            });
+
+            if !is_in_path {
                 eprintln!(
                     "{}: zoi's bin directory `{}` is not in your PATH.",
                     "Warning".yellow(),
