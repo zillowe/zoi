@@ -228,11 +228,11 @@ Here are some common commands to get you started.
   zoi upgrade
   ```
 
-For more detailed information, please refer to the [**Wiki**](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/wikis/home).
+For more detailed information, please refer to the [Wiki](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/wikis/home).
 
 ## 🤝 Contributing
 
-We welcome contributions from the community! If you'd like to contribute, please read our [**Contributing Guidelines**](./CONTRIBUTING.md) for more information.
+We welcome contributions from the community! If you'd like to contribute, please read our [Contributing Guidelines](./CONTRIBUTING.md) for more information.
 
 ## 📜 License
 
