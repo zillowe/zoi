@@ -53,6 +53,7 @@
   - [Scripts](#-scripts)
   - [Build from Source](#%EF%B8%8F-build-from-source)
 - [Platforms](#-platforms)
+- [Dependencies Support](#-dependencies-support)
 - [Usage](#-usage)
 - [Contributing](#-contributing)
 - [License](#-license)
@@ -162,7 +163,6 @@ If you prefer, you can build Zoi from source. You'll need [Rust](https://www.rus
 **Install it locally:**
 
 ```sh
-# For Windows/Linux/macOS
 ./configure
 make
 sudo make install
@@ -185,6 +185,39 @@ What platforms we currently support.
 | FreeBSD | arm64 | ✔️         | ✔️               |
 | OpenBSD | amd64 | ✔️         | ✔️               |
 | OpenBSD | arm64 | ❌         | ✔️               |
+
+We're planning to add support for more platforms.
+
+## 🔗 Dependencies Support
+
+What dependency installation we support.
+
+| Package Manager                                        | OS                                 | Support | Note               |
+| ------------------------------------------------------ | ---------------------------------- | ------- | ------------------ |
+| `zoi`                                                  | Universal[\*](#-platforms)         | ✔️      |                    |
+| [`brew`](https://brew.sh)                              | macOS only                         | ✔️      |                    |
+| [`winget`](https://github.com/microsoft/winget-cli)    | Windows                            | ❌      |
+| [`scoop`](https://scoop.sh)                            | Windows                            | ✔️      |                    |
+| [`choco`](https://chocolatey.org/)                     | Windows                            | ✔️      |                    |
+| `npm`                                                  | Where NodeJS runs                  | ✔️      |                    |
+| [`jsr`](https://jsr.io)                                | Where NodeJS runs                  | ✔️      | Uses `npx jsr add` |
+| [`bun`](https://bun.com)                               | Where Bun runs                     | ❌      |                    |
+| `go`                                                   | Where Go runs                      | ✔️      |                    |
+| `cargo`                                                | Where Rust Cargo runs              | ✔️      |                    |
+| [`cargo-bin`](https://crates.io/crates/cargo-binstall) | Where Rust runs                    | ❌      | Must be installed  |
+| `pip`                                                  | Where Python runs                  | ❌      |                    |
+| [`pipx`](https://github.com/pypa/pipx)                 | Where Python runs                  | ❌      | Must be installed  |
+| `pkg`                                                  | FreeBSD                            | ✔️      |                    |
+| `pkg_add`                                              | OpenBSD                            | ✔️      |                    |
+| `pacman`                                               | Arch-Based Linux Distros           | ✔️      |                    |
+| `portage`                                              | Gentoo                             | ❌      |                    |
+| `apt`                                                  | Debian-Based Linux Distros         | ✔️      |                    |
+| `dnf`, `yum`                                           | Fedora/Redhat/CentOS Linux Distros | ✔️      |                    |
+| `zypper`                                               | OpenSUSE Linux Distro              | ✔️      |                    |
+| `apk`                                                  | Alpine Linux Distro                | ✔️      |                    |
+
+Some of the package manager are OS specific, so when a dependency is in that package manager it only installs it for that OS.
+But some other package managers like `npm`, it installs the dependency if the package manager is available.
 
 ## 💡 Usage
 
