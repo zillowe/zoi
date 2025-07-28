@@ -52,10 +52,11 @@
     - [Windows (Scoop)](#windows-scoop)
   - [Scripts](#-scripts)
   - [Build from Source](#%EF%B8%8F-build-from-source)
+- [Platforms](#-platforms)
 - [Usage](#-usage)
 - [Contributing](#-contributing)
 - [License](#-license)
-  
+
 </details>
 
 Zoi is a universal package manager and environment setup tool, designed to simplify package management and environment configuration across multiple operating systems.
@@ -166,6 +167,23 @@ make
 sudo make install
 make install-completion # Install CLI completions (bash, elvish, fish, powershell, zsh)
 ```
+
+## 💻 Platforms
+
+What platforms we currently support.
+
+| OS      | Arch  | Zoi Binary | Packages Support |
+| ------- | ----- | ---------- | ---------------- |
+| Linux   | amd64 | ✓          | ✓                |
+| Linux   | arm64 | ✓          | ✓                |
+| macOS   | arm64 | ✓          | ✓                |
+| macOS   | amd64 | ✓          | ✓                |
+| Windows | amd64 | ✓          | ✓                |
+| Windows | arm64 | ×          | ✓                |
+| FreeBSD | amd64 | ×          | ×                |
+| FreeBSD | arm64 | ×          | ×                |
+| OpenBSD | amd64 | ×          | ×                |
+| OpenBSD | arm64 | ×          | ×                |
 
 ## 💡 Usage
 
