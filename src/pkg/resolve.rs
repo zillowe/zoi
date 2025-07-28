@@ -1,5 +1,6 @@
 use crate::pkg::config;
 use chrono::Utc;
+use colored::*;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::env;
 use std::error::Error;
@@ -114,20 +115,47 @@ fn download_from_url(url: &str) -> Result<ResolvedSource, Box<dyn Error>> {
 }
 
 pub fn resolve_source(source: &str) -> Result<ResolvedSource, Box<dyn Error>> {
-    if source.starts_with("http://") || source.starts_with("https://") {
-        download_from_url(source)
+    resolve_source_recursive(source, 0)
+}
+
+fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, Box<dyn Error>> {
+    if depth > 5 {
+        return Err("Exceeded max resolution depth, possible circular 'alt' reference.".into());
+    }
+
+    let resolved_source = if source.starts_with("http://") || source.starts_with("https://") {
+        download_from_url(source)?
     } else if source.ends_with(".pkg.yaml") {
         let path = PathBuf::from(source);
         if !path.exists() {
             return Err(format!("Local file not found at '{source}'").into());
         }
         println!("Using local package file: {}", path.display());
-        Ok(ResolvedSource {
+        ResolvedSource {
             path,
             source_type: SourceType::LocalFile,
             repo_name: None,
-        })
+        }
     } else {
-        find_package_in_db(source)
+        find_package_in_db(source)?
+    };
+
+    let content = fs::read_to_string(&resolved_source.path)?;
+
+    #[derive(serde::Deserialize)]
+    struct AltCheck {
+        alt: Option<String>,
     }
+    let alt_check: AltCheck = match serde_yaml::from_str(&content) {
+        Ok(ac) => ac,
+        Err(e) => return Err(format!("Failed to parse package file for 'alt' check: {}", e).into()),
+    };
+
+    if let Some(alt_url) = alt_check.alt {
+        println!("Found 'alt' source. Resolving from URL: {}", alt_url.cyan());
+        return resolve_source_recursive(&alt_url, depth + 1);
+    }
+
+    Ok(resolved_source)
 }
+

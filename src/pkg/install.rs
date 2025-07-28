@@ -35,6 +35,26 @@ pub fn run_installation(
     let yaml_content = fs::read_to_string(package_file)?;
     let pkg: types::Package = serde_yaml::from_str(&yaml_content)?;
 
+    if pkg.package_type == types::PackageType::Collection {
+        println!("Installing package collection '{}'...", pkg.name.bold());
+        if let Some(deps) = &pkg.dependencies {
+            if let Some(runtime_deps) = &deps.runtime {
+                if !runtime_deps.is_empty() {
+                    dependencies::resolve_and_install(runtime_deps, &pkg.name, yes)?;
+                } else {
+                    println!("Collection has no runtime dependencies to install.");
+                }
+            } else {
+                println!("Collection has no runtime dependencies to install.");
+            }
+        } else {
+            println!("Collection has no dependencies to install.");
+        }
+        write_manifest(&pkg, reason)?;
+        println!("Collection '{}' installed successfully.", pkg.name.green());
+        return Ok(());
+    }
+
     if let Some(mut manifest) = local::is_package_installed(&pkg.name)? {
         if manifest.reason == types::InstallReason::Dependency
             && reason == types::InstallReason::Direct

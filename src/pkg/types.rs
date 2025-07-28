@@ -2,21 +2,41 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_json;
 use std::collections::HashMap;
 
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
+#[serde(rename_all = "lowercase")]
+pub enum PackageType {
+    Package,
+    Collection,
+}
+
+impl Default for PackageType {
+    fn default() -> Self {
+        PackageType::Package
+    }
+}
+
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct Package {
     pub name: String,
     pub repo: String,
-    #[serde(deserialize_with = "deserialize_version")]
+    #[serde(default, deserialize_with = "deserialize_version")]
     pub version: String,
     pub description: String,
+    #[serde(default)]
     pub website: String,
+    #[serde(default)]
     pub git: String,
     pub maintainer: Maintainer,
+    #[serde(default)]
     pub license: String,
+    #[serde(default)]
     pub installation: Vec<InstallationMethod>,
     pub dependencies: Option<Dependencies>,
     pub updater: Option<String>,
+    #[serde(rename = "type", default)]
+    pub package_type: PackageType,
+    pub alt: Option<String>,
 }
 
 fn deserialize_version<'de, D>(deserializer: D) -> Result<String, D::Error>
