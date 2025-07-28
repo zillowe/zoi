@@ -2,12 +2,12 @@ NAME = zoi
 
 COMMIT_HASH := $(shell git rev-parse --short=10 HEAD)
 
-ifeq ($(OS),Windows_NT)
+IS_WINDOWS := 0
+SRC_BIN = target/release/$(NAME)
+
+ifeq ($(OS_NAME),windows)
     IS_WINDOWS := 1
     SRC_BIN = target/release/$(NAME).exe
-else
-    IS_WINDOWS := 0
-    SRC_BIN = target/release/$(NAME)
 endif
 
 ifneq (,$(wildcard config.mk))
@@ -19,6 +19,7 @@ endif
 .PHONY: all install uninstall clean install-completions
 
 all: $(SRC_BIN)
+	@echo "Build complete for $(OS_NAME) ($(ARCH_NAME))."
 
 $(SRC_BIN):
 	@echo "Building Zoi in release mode (commit: $(COMMIT_HASH))..."

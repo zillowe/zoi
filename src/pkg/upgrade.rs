@@ -152,6 +152,10 @@ pub fn run(branch: &str, status: &str, number: &str) -> Result<(), Box<dyn Error
         _ => return Err(format!("Unsupported architecture: {}", env::consts::ARCH).into()),
     };
 
+    if os == "openbsd" && arch == "arm64" {
+        return Err("arm64 is not supported on OpenBSD for this application.".into());
+    }
+
     let archive_ext = if os == "windows" { "zip" } else { "tar.zst" };
     let archive_filename = format!("zoi-{os}-{arch}.{archive_ext}");
     let base_url =
