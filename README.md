@@ -175,16 +175,16 @@ What platforms we currently support.
 
 | OS      | Arch  | Zoi Binary | Packages Support |
 | ------- | ----- | ---------- | ---------------- |
-| Linux   | amd64 | ✓          | ✓                |
-| Linux   | arm64 | ✓          | ✓                |
-| macOS   | arm64 | ✓          | ✓                |
-| macOS   | amd64 | ✓          | ✓                |
-| Windows | amd64 | ✓          | ✓                |
-| Windows | arm64 | ×          | ✓                |
-| FreeBSD | amd64 | ✓          | ✓                |
-| FreeBSD | arm64 | ✓          | ✓                |
-| OpenBSD | amd64 | ✓          | ✓                |
-| OpenBSD | arm64 | ×          | ✓                |
+| Linux   | amd64 | ✔️         | ✔️               |
+| Linux   | arm64 | ✔️         | ✔️               |
+| macOS   | arm64 | ✔️         | ✔️               |
+| macOS   | amd64 | ✔️         | ✔️               |
+| Windows | amd64 | ✔️         | ✔️               |
+| Windows | arm64 | ❌         | ✔️               |
+| FreeBSD | amd64 | ✔️         | ✔️               |
+| FreeBSD | arm64 | ✔️         | ✔️               |
+| OpenBSD | amd64 | ✔️         | ✔️               |
+| OpenBSD | arm64 | ❌         | ✔️               |
 
 ## 💡 Usage
 
