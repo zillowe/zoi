@@ -1,7 +1,7 @@
 use colored::*;
 use hex;
 use indicatif::{ProgressBar, ProgressStyle};
-use self_update::{cargo_crate_version, self_replace};
+use self_update::{self_replace};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::env;
@@ -110,20 +110,37 @@ fn verify_checksum(
     Ok(())
 }
 
-pub fn run() -> Result<(), Box<dyn Error>> {
-    let current_version = cargo_crate_version!();
-    let is_dev_build = current_version.contains("-dev");
-    let latest_tag = get_latest_tag(is_dev_build)?;
-    let latest_version_str = latest_tag.trim_start_matches(|c: char| !c.is_numeric());
+pub fn run(branch: &str, status: &str, number: &str) -> Result<(), Box<dyn Error>> {
+    let current_version = if status.is_empty() || status.eq_ignore_ascii_case("stable") {
+        number.to_string()
+    } else {
+        format!("{}-{}", number, status.to_lowercase())
+    };
 
-    if !self_update::version::bump_is_greater(current_version, latest_version_str)? {
+    let is_dev_build = branch.eq_ignore_ascii_case("development");
+    let latest_tag = get_latest_tag(is_dev_build)?;
+
+    let parts: Vec<&str> = latest_tag.split('-').collect();
+    let latest_version_num = parts
+        .last()
+        .ok_or("Could not get version number from tag")?
+        .to_string();
+
+    let latest_version_str = if parts.len() > 2 {
+        let prerelease = parts[1];
+        format!("{}-{}", latest_version_num, prerelease.to_lowercase())
+    } else {
+        latest_version_num
+    };
+
+    if !self_update::version::bump_is_greater(&current_version, &latest_version_str)? {
         println!("\n{}", "You are already on the latest version!".green());
         return Ok(());
     }
 
     let os = match env::consts::OS {
         "linux" => "linux",
-        "macos" => "darwin",
+        "macos" | "darwin" => "macos",
         "windows" => "windows",
         _ => return Err(format!("Unsupported OS: {}", env::consts::OS).into()),
     };
