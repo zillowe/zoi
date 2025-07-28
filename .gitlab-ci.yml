@@ -61,11 +61,51 @@ build:macos:
   rules:
     - if: $CI_COMMIT_TAG
 
+build:freebsd:
+  stage: build
+  image: freebsd:latest
+  tags:
+    - saas-linux-large-amd64
+  before_script:
+    - env ASSUME_ALWAYS_YES=YES pkg install -y rust git gcc
+    - env ASSUME_ALWAYS_YES=YES pkg install -y aarch64-binutils
+    - rustup target add aarch64-unknown-freebsd
+  script:
+    - echo "Building FreeBSD targets (amd64, arm64)..."
+    - chmod +x ./build/build-bsd.sh
+    - ./build/build-bsd.sh amd64
+    - ./build/build-bsd.sh arm64
+  artifacts:
+    paths:
+      - ./build/release/
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_TAG
+
+build:openbsd:
+  stage: build
+  image: openbsd/latest
+  tags:
+    - saas-linux-large-amd64
+  before_script:
+    - pkg_add -I rust git gcc
+  script:
+    - echo "Building OpenBSD targets (amd64, arm64)..."
+    - chmod +x ./build/build-bsd.sh
+    - ./build/build-bsd.sh amd64
+    - ./build/build-bsd.sh arm64
+  artifacts:
+    paths:
+      - ./build/release/
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_TAG
+
 package:archive:
   stage: package
   image: ubuntu:latest
   before_script:
-    - apt-get update -y && apt-get install -y p7zip-full tar xz-utils libdigest-sha-perl
+    - apt-get update -y && apt-get install -y p7zip-full tar zstd libdigest-sha-perl
   script:
     - echo "Aggregating build artifacts..."
     - echo "Contents of the release directory:"
@@ -79,6 +119,8 @@ package:archive:
       optional: true
     - build:linux
     - build:macos
+    - build:freebsd
+    - build:openbsd
   artifacts:
     paths:
       - ./build/archived/

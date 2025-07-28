@@ -170,6 +170,8 @@ fn install_dependency(
                 "scoop" => vec!["install"],
                 "choco" => vec!["install", "-y"],
                 "apk" => vec!["add"],
+                "pkg" => vec!["install", "-y"],
+                "pkg_add" => vec!["-I"],
                 _ => return Err(format!("Unsupported native package manager: {pm}").into()),
             };
 

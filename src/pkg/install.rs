@@ -13,6 +13,7 @@ use std::process::Command;
 use tar::Archive;
 use tempfile::Builder;
 use xz2::read::XzDecoder;
+use zstd::stream::read::Decoder as ZstdDecoder;
 use zip::ZipArchive;
 use walkdir::WalkDir;
 
@@ -236,7 +237,7 @@ fn handle_com_binary_install(
         .as_ref()
         .and_then(|ext_map| ext_map.get(os))
         .map(|s| s.as_str())
-        .unwrap_or(if os == "windows" { "zip" } else { "tar.xz" });
+        .unwrap_or(if os == "windows" { "zip" } else { "tar.zst" });
 
     let mut url = method.url.replace("{version}", &pkg.version);
     url = url.replace("{name}", &pkg.name);
@@ -274,6 +275,10 @@ fn handle_com_binary_install(
     if com_ext == "zip" {
         let mut archive = ZipArchive::new(Cursor::new(downloaded_bytes))?;
         archive.extract(temp_dir.path())?;
+    } else if com_ext == "tar.zst" {
+        let tar = ZstdDecoder::new(Cursor::new(downloaded_bytes))?;
+        let mut archive = Archive::new(tar);
+        archive.unpack(temp_dir.path())?;
     } else if com_ext == "tar.xz" {
         let tar = XzDecoder::new(Cursor::new(downloaded_bytes));
         let mut archive = Archive::new(tar);

@@ -1,7 +1,7 @@
 use colored::*;
 use hex;
 use indicatif::{ProgressBar, ProgressStyle};
-use self_update::{self_replace};
+use self_update::self_replace;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::env;
@@ -11,8 +11,8 @@ use std::io::{self, Read, Write};
 use std::path::Path;
 use tar::Archive;
 use tempfile::Builder;
-use xz2::read::XzDecoder;
 use zip::ZipArchive;
+use zstd::stream::read::Decoder as ZstdDecoder;
 
 const GITLAB_PROJECT_PATH: &str = "Zillowe/Zillwen/Zusty/Zoi";
 
@@ -79,7 +79,7 @@ fn extract_archive(archive_path: &Path, target_dir: &Path) -> Result<(), Box<dyn
         let mut archive = ZipArchive::new(file)?;
         archive.extract(target_dir)?;
     } else {
-        let tar = XzDecoder::new(file);
+        let tar = ZstdDecoder::new(file)?;
         let mut archive = Archive::new(tar);
         archive.unpack(target_dir)?;
     }
@@ -142,6 +142,8 @@ pub fn run(branch: &str, status: &str, number: &str) -> Result<(), Box<dyn Error
         "linux" => "linux",
         "macos" | "darwin" => "macos",
         "windows" => "windows",
+        "freebsd" => "freebsd",
+        "openbsd" => "openbsd",
         _ => return Err(format!("Unsupported OS: {}", env::consts::OS).into()),
     };
     let arch = match env::consts::ARCH {
@@ -150,7 +152,7 @@ pub fn run(branch: &str, status: &str, number: &str) -> Result<(), Box<dyn Error
         _ => return Err(format!("Unsupported architecture: {}", env::consts::ARCH).into()),
     };
 
-    let archive_ext = if os == "windows" { "zip" } else { "tar.xz" };
+    let archive_ext = if os == "windows" { "zip" } else { "tar.zst" };
     let archive_filename = format!("zoi-{os}-{arch}.{archive_ext}");
     let base_url =
         format!("https://gitlab.com/{GITLAB_PROJECT_PATH}/-/releases/{latest_tag}/downloads");

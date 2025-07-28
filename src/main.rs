@@ -1,6 +1,6 @@
 use clap::{CommandFactory, Parser, Subcommand};
-use clap_complete::generate;
 use clap_complete::Shell;
+use clap_complete::generate;
 use std::io;
 mod cmd;
 mod pkg;
@@ -265,7 +265,7 @@ fn main() {
                 source,
                 target_directory,
             } => cmd::clone::run(source, target_directory, cli.yes),
-            Commands::Upgrade => cmd::upgrade::run(),
+            Commands::Upgrade => cmd::upgrade::run(BRANCH, STATUS, NUMBER),
             Commands::Autoremove => cmd::autoremove::run(cli.yes),
             Commands::Search { args } => cmd::search::run(args),
             Commands::Exec { source, args } => cmd::exec::run(source, args),

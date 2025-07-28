@@ -25,6 +25,12 @@ if ! command -v 7z &> /dev/null; then
     exit 1
 fi
 
+if ! command -v zstd &> /dev/null; then
+    echo -e "${RED}Error: 'zstd' command is not found.${NC}"
+    echo -e "${YELLOW}Please install zstd (e.g. 'zstd' on Debian/Ubuntu, 'zstd' on Arch) and ensure it's in your PATH.${NC}"
+    exit 1
+fi
+
 
 rm -rf "$ARCHIVE_DIR"
 mkdir -p "$ARCHIVE_DIR"
@@ -58,8 +64,8 @@ for binary_path in "$COMPILED_DIR"/*; do
         mv "${TMP_ARCHIVE_DIR}/${archive_basename}.zip" "${ARCHIVE_DIR}/"
     else
         (cd "$TMP_ARCHIVE_DIR" && tar -cf "${archive_basename}.tar" "$final_binary_name")
-        xz -T0 "${TMP_ARCHIVE_DIR}/${archive_basename}.tar"
-        mv "${TMP_ARCHIVE_DIR}/${archive_basename}.tar.xz" "${ARCHIVE_DIR}/"
+        zstd -T0 "${TMP_ARCHIVE_DIR}/${archive_basename}.tar"
+        mv "${TMP_ARCHIVE_DIR}/${archive_basename}.tar.zst" "${ARCHIVE_DIR}/"
     fi
 
     rm -rf "$TMP_ARCHIVE_DIR"

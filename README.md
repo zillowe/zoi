@@ -25,11 +25,11 @@
 <br/>
 
 <div align="center">
-  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/wikis/home"><strong>Wiki</strong></a> • 
-  <a href="https://discord.gg/P4R7yaA3hf"><strong>Discord</strong></a> • 
-  <a href="./SECURITY.md"><strong>Security</strong></a> • 
-  <a href="./CODE_OF_CONDUCT.md"><strong>Code of Conduct</strong></a> • 
-  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues"><strong>Report an Issue</strong></a> 
+  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/wikis/home"><strong>Wiki</strong></a> •
+  <a href="https://discord.gg/P4R7yaA3hf"><strong>Discord</strong></a> •
+  <a href="./SECURITY.md"><strong>Security</strong></a> •
+  <a href="./CODE_OF_CONDUCT.md"><strong>Code of Conduct</strong></a> •
+  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues"><strong>Report an Issue</strong></a>
 </div>
 
 <hr/>
@@ -73,21 +73,22 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
 
 Getting started with Zoi is simple. Just follow these three steps:
 
-1.  **Install Zoi:**
-    Choose one of the [installation methods](#-installation) below.
+1. **Install Zoi:**
+   Choose one of the [installation methods](#-installation) below.
 
-2.  **Sync Repositories:**
-    Before you can install packages, you need to sync the package repositories.
+2. **Sync Repositories:**
+   Before you can install packages, you need to sync the package repositories.
 
-    ```sh
-    zoi sync
-    ```
+   ```sh
+   zoi sync
+   ```
 
-3.  **Install a Package:**
-    Now you can install any package you want. For example, to install `hello`:
-    ```sh
-    zoi install hello
-    ```
+3. **Install a Package:**
+   Now you can install any package you want. For example, to install `hello`:
+
+   ```sh
+   zoi install hello
+   ```
 
 ## 📦 Installation
 
@@ -132,7 +133,7 @@ scoop install zoi
 
 You can also use our installer scripts for a quick setup.
 
-**Linux / macOS:**
+**Linux / macOS / FreeBSD / OpenBSD (amd64):**
 
 ```sh
 curl -fsSL https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.sh | bash
@@ -180,10 +181,10 @@ What platforms we currently support.
 | macOS   | amd64 | ✓          | ✓                |
 | Windows | amd64 | ✓          | ✓                |
 | Windows | arm64 | ×          | ✓                |
-| FreeBSD | amd64 | ×          | ×                |
-| FreeBSD | arm64 | ×          | ×                |
-| OpenBSD | amd64 | ×          | ×                |
-| OpenBSD | arm64 | ×          | ×                |
+| FreeBSD | amd64 | ✓          | ✓                |
+| FreeBSD | arm64 | ✓          | ✓                |
+| OpenBSD | amd64 | ✓          | ✓                |
+| OpenBSD | arm64 | ×          | ✓                |
 
 ## 💡 Usage
 
@@ -242,6 +243,7 @@ Here are some common commands to get you started.
   ```
 
 - **Update Zoi to the latest version:**
+
   ```sh
   zoi upgrade
   ```

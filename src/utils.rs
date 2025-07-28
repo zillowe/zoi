@@ -309,9 +309,10 @@ pub fn check_path() {
 pub fn get_platform() -> Result<String, String> {
     let os = match std::env::consts::OS {
         "linux" => "linux",
-
         "macos" | "darwin" => "macos",
         "windows" => "windows",
+        "freebsd" => "freebsd",
+        "openbsd" => "openbsd",
         unsupported_os => return Err(format!("Unsupported operating system: {}", unsupported_os)),
     };
 
