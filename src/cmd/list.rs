@@ -2,6 +2,8 @@ use crate::pkg::local;
 use colored::*;
 use comfy_table::{presets::UTF8_FULL, Table};
 use std::collections::HashSet;
+use std::io::{self, Write};
+use std::process::{Command, Stdio};
 
 pub fn run(args: Vec<String>) {
     let mut list_all = false;
@@ -24,6 +26,35 @@ pub fn run(args: Vec<String>) {
             eprintln!("{}: {}", "Error".red(), e);
         }
     }
+}
+
+fn print_with_pager(content: &str) -> io::Result<()> {
+    let pager = if crate::utils::command_exists("bat") {
+        "bat"
+    } else if crate::utils::command_exists("less") {
+        "less"
+    } else if crate::utils::command_exists("more") {
+        "more"
+    } else {
+        print!("{}", content);
+        return Ok(());
+    };
+
+    let mut command = Command::new(pager);
+    if pager == "bat" {
+        command.args(["--paging=always", "--color=always"]);
+    } else if pager == "less" {
+        command.arg("-R");
+    }
+
+    let mut child = command.stdin(Stdio::piped()).spawn()?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(content.as_bytes());
+    }
+
+    child.wait()?;
+    Ok(())
 }
 
 fn run_list_installed(repo_filter: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
@@ -56,7 +87,7 @@ fn run_list_installed(repo_filter: Option<String>) -> Result<(), Box<dyn std::er
             println!("No packages installed from repo '{}'.", repo);
         }
     } else {
-        println!("{table}");
+        print_with_pager(&table.to_string())?;
     }
 
     Ok(())
@@ -97,6 +128,6 @@ fn run_list_all(repo_filter: Option<String>) -> Result<(), Box<dyn std::error::E
         table.add_row(vec![status.to_string(), pkg.name, pkg.version, pkg.repo]);
     }
 
-    println!("{table}");
+    print_with_pager(&table.to_string())?;
     Ok(())
 }

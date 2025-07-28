@@ -19,6 +19,7 @@ pub enum SourceType {
 pub struct ResolvedSource {
     pub path: PathBuf,
     pub source_type: SourceType,
+    pub repo_name: Option<String>,
 }
 
 fn get_db_root() -> Result<PathBuf, Box<dyn Error>> {
@@ -57,7 +58,11 @@ fn find_package_in_db(pkg_str: &str) -> Result<ResolvedSource, Box<dyn Error>> {
             } else {
                 SourceType::UntrustedRepo(repo_name.clone())
             };
-            return Ok(ResolvedSource { path, source_type });
+            return Ok(ResolvedSource {
+                path,
+                source_type,
+                repo_name: Some(repo_name.clone()),
+            });
         }
     }
 
@@ -104,6 +109,7 @@ fn download_from_url(url: &str) -> Result<ResolvedSource, Box<dyn Error>> {
     Ok(ResolvedSource {
         path: temp_path,
         source_type: SourceType::Url,
+        repo_name: None,
     })
 }
 
@@ -119,6 +125,7 @@ pub fn resolve_source(source: &str) -> Result<ResolvedSource, Box<dyn Error>> {
         Ok(ResolvedSource {
             path,
             source_type: SourceType::LocalFile,
+            repo_name: None,
         })
     } else {
         find_package_in_db(source)

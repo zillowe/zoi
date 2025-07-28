@@ -17,6 +17,8 @@ pub fn run(source: &str, force: bool, interactive: bool, yes: bool) {
                 return;
             }
 
+            utils::print_repo_warning(&resolved_source.repo_name);
+
             let mode = if interactive {
                 install::InstallMode::Interactive
             } else {

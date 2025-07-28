@@ -17,6 +17,8 @@ pub fn run(source: String, target_dir: Option<String>, yes: bool) {
                 return;
             }
 
+            utils::print_repo_warning(&resolved_source.repo_name);
+
             if let Err(e) = clone::run(&resolved_source.path, target_dir.as_deref()) {
                 eprintln!("\n{}: {}", "Error".red().bold(), e);
                 std::process::exit(1);

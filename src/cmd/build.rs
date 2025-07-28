@@ -17,6 +17,8 @@ pub fn run(source: &str, yes: bool) {
                 return;
             }
 
+            utils::print_repo_warning(&resolved_source.repo_name);
+
             if let Err(e) = install::run_installation(
                 &resolved_source.path,
                 install::InstallMode::ForceSource,

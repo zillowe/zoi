@@ -119,10 +119,25 @@ pub fn get_native_package_manager() -> Option<String> {
     }
 }
 
+pub fn print_repo_warning(repo_name: &Option<String>) {
+    if let Some(repo) = repo_name {
+        let warning_message = match repo.as_str() {
+            "test" => Some("This package is in a testing phase and may not function correctly."),
+            "archive" => Some("This package is outdated and no longer receives updates."),
+            _ => None,
+        };
+
+        if let Some(message) = warning_message {
+            println!("\n{}: {}", "NOTE".yellow().bold(), message.yellow());
+        }
+    }
+}
+
 pub fn confirm_untrusted_source(source_type: &SourceType, yes: bool) -> Result<(), Box<dyn Error>> {
     if source_type == &SourceType::OfficialRepo {
         return Ok(());
     }
+
 
     let warning_message = match source_type {
         SourceType::UntrustedRepo(repo) => {

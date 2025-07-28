@@ -82,6 +82,9 @@ fn ensure_binary_is_cached(pkg: &types::Package) -> Result<PathBuf, Box<dyn Erro
 
 pub fn run(source: &str, args: Vec<String>) -> Result<(), Box<dyn Error>> {
     let resolved_source = resolve::resolve_source(source)?;
+
+    utils::print_repo_warning(&resolved_source.repo_name);
+
     let content = fs::read_to_string(&resolved_source.path)?;
     let pkg: types::Package = serde_yaml::from_str(&content)?;
 
