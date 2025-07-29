@@ -55,6 +55,25 @@ for target in "${TARGETS[@]}"; do
     LINKER_ENV="CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc"
   fi
 
+  if [[ "$target" == "x86_64-unknown-freebsd" ]]; then
+    export CC_x86_64_unknown_freebsd=clang
+    export AR_x86_64_unknown_freebsd=llvm-ar
+  elif [[ "$target" == "aarch64-unknown-freebsd" ]]; then
+    export CC_aarch64_unknown_freebsd=clang
+    export AR_aarch64_unknown_freebsd=llvm-ar
+    export CARGO_TARGET_AARCH64_UNKNOWN_FREEBSD_LINKER=clang
+    export CFLAGS_aarch64_unknown_freebsd="-target aarch64-unknown-freebsd"
+    export CXXFLAGS_aarch64_unknown_freebsd="-target aarch64-unknown-freebsd"
+  elif [[ "$target" == "x86_64-unknown-openbsd" ]]; then
+    export CC_x86_64_unknown_openbsd=clang
+    export AR_x86_64_unknown_openbsd=llvm-ar
+    export CARGO_TARGET_X86_64_UNKNOWN_OPENBSD_LINKER=clang
+  elif [[ "$target" == "aarch64-unknown-openbsd" ]]; then
+    export CC_aarch64_unknown_openbsd=clang
+    export AR_aarch64_unknown_openbsd=llvm-ar
+    export CARGO_TARGET_AARCH64_UNKNOWN_OPENBSD_LINKER=clang
+  fi
+
   if ! env $LINKER_ENV $OPENSSL_ENV ZOI_COMMIT_HASH="$COMMIT" cargo build --target "$target" --release; then
     echo -e "${RED}❌ Build failed for ${target}${NC}"
     exit 1
