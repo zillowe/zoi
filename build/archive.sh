@@ -11,46 +11,36 @@ NC='\033[0m'
 COMPILED_DIR="./build/release"
 ARCHIVE_DIR="./build/archived"
 CHECKSUM_FILE="${ARCHIVE_DIR}/checksums.txt"
+GITLAB_PROJECT_PATH="Zillowe/Zillwen/Zusty/Zoi"
 
+function check_command() {
+    if ! command -v "$1" &> /dev/null; then
+        echo -e "${RED}Error: '$1' command is not found.${NC}"
+        echo -e "${YELLOW}Please install it and ensure it's in your PATH.${NC}"
+        exit 1
+    fi
+}
+
+check_command "7z"
+check_command "zstd"
+check_command "bsdiff"
+check_command "glab"
+check_command "curl"
 
 if [ ! -d "$COMPILED_DIR" ]; then
     echo -e "${RED}Error: Compiled directory '${COMPILED_DIR}' not found.${NC}"
-    echo -e "${CYAN}Hint: Run ./build-all.sh first to cross-compile the binaries.${NC}"
     exit 1
-fi
-
-if ! command -v 7z &> /dev/null; then
-    echo -e "${RED}Error: '7z' command is not found.${NC}"
-    echo -e "${YELLOW}Please install 7-Zip (e.g. 'p7zip-full' on Debian/Ubuntu, 'p7zip' on Arch) and ensure it's in your PATH.${NC}"
-    exit 1
-fi
-
-if ! command -v zstd &> /dev/null; then
-    echo -e "${RED}Error: 'zstd' command is not found.${NC}"
-    echo -e "${YELLOW}Please install zstd (e.g. 'zstd' on Debian/Ubuntu, 'zstd' on Arch) and ensure it's in your PATH.${NC}"
-    exit 1
-fi
-
+}
 
 rm -rf "$ARCHIVE_DIR"
 mkdir -p "$ARCHIVE_DIR"
-
-if ! touch "${ARCHIVE_DIR}/.test" 2>/dev/null; then
-    echo -e "${RED}Error: No write permission for archive directory '${ARCHIVE_DIR}'.${NC}"
-    exit 1
-fi
-rm -f "${ARCHIVE_DIR}/.test"
-
 
 echo -e "${CYAN}📦 Starting archival process...${NC}"
 
 for binary_path in "$COMPILED_DIR"/*; do
     filename=$(basename "$binary_path")
-    
     final_binary_name="zoi"
-    if [[ "$filename" == *".exe" ]]; then
-        final_binary_name="zoi.exe"
-    fi
+    [[ "$filename" == *".exe" ]] && final_binary_name="zoi.exe"
 
     TMP_ARCHIVE_DIR=$(mktemp -d)
     cp "$binary_path" "${TMP_ARCHIVE_DIR}/${final_binary_name}"
@@ -71,6 +61,34 @@ for binary_path in "$COMPILED_DIR"/*; do
     rm -rf "$TMP_ARCHIVE_DIR"
 done
 
+echo -e "${CYAN}🔗 Generating binary diffs...${NC}"
+
+glab auth login --token "$GITLAB_TOKEN_RELEASE"
+
+LATEST_TAG=$(glab release list --order asc --sort "released_at" -L 1 | awk 'NR==1 {print $1}')
+
+if [ -z "$LATEST_TAG" ]; then
+    echo -e "${YELLOW}Could not find a previous release. Skipping diff generation.${NC}"
+else
+    echo -e "${CYAN}Found previous release tag: ${LATEST_TAG}${NC}"
+    
+    for new_binary_path in "$COMPILED_DIR"/*; do
+        filename=$(basename "$new_binary_path")
+        
+        OLD_BINARY_URL="https://gitlab.com/${GITLAB_PROJECT_PATH}/-/releases/${LATEST_TAG}/downloads/${filename}"
+        OLD_BINARY_TMP=$(mktemp)
+
+        echo -e "  -> Downloading old binary for ${filename} from ${LATEST_TAG}..."
+        if curl --fail -sL -o "$OLD_BINARY_TMP" "$OLD_BINARY_URL"; then
+            PATCH_FILE="${ARCHIVE_DIR}/${filename}.patch"
+            echo -e "  -> Creating patch for ${filename}..."
+            bsdiff "$OLD_BINARY_TMP" "$new_binary_path" "$PATCH_FILE"
+        else
+            echo -e "${YELLOW}  -> Could not download old binary for ${filename}. Skipping patch.${NC}"
+        fi
+        rm -f "$OLD_BINARY_TMP"
+    done
+fi
 
 echo -e "${CYAN}🔐 Generating checksums...${NC}"
 (
@@ -78,6 +96,6 @@ echo -e "${CYAN}🔐 Generating checksums...${NC}"
   find . -maxdepth 1 -type f -not -name "checksums.txt" -exec sha512sum {} +
 ) > "$CHECKSUM_FILE"
 
-echo -e "\n${GREEN}✅ Archiving and checksum generation complete!${NC}"
+echo -e "\n${GREEN}✅ Archiving, diffing, and checksum generation complete!${NC}"
 echo -e "${CYAN}Output files are in the '${ARCHIVE_DIR}' directory.${NC}"
 ls -lh "$ARCHIVE_DIR"

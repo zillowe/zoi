@@ -9,6 +9,8 @@ pub fn run(branch: &str, status: &str, number: &str) {
         std::process::exit(1);
     }
 
+
+
     println!(
         "\n{}",
         "Zoi upgraded successfully! Please restart your shell for changes to take effect.".green()

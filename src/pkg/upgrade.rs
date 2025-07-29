@@ -6,13 +6,15 @@ use serde::Deserialize;
 use sha2::{Digest, Sha512};
 use std::env;
 use std::error::Error;
-use std::fs::File;
-use std::io::{self, Read, Write};
-use std::path::Path;
+use std::fs::{self, File};
+use std::io::{self, Read, Write, Cursor};
+use std::path::{Path, PathBuf};
 use tar::Archive;
 use tempfile::Builder;
 use zip::ZipArchive;
 use zstd::stream::read::Decoder as ZstdDecoder;
+use bsdiff;
+use std::convert::TryInto;
 
 const GITLAB_PROJECT_PATH: &str = "Zillowe/Zillwen/Zusty/Zoi";
 
@@ -87,27 +89,116 @@ fn extract_archive(archive_path: &Path, target_dir: &Path) -> Result<(), Box<dyn
 }
 
 fn verify_checksum(
-    archive_path: &Path,
+    file_path: &Path,
     checksums_content: &str,
-    archive_filename: &str,
+    filename: &str,
 ) -> Result<(), Box<dyn Error>> {
-    println!("Verifying checksum...");
+    println!("Verifying checksum for {}...", filename);
     let expected_hash = checksums_content
         .lines()
-        .find(|line| line.contains(archive_filename))
+        .find(|line| line.contains(filename))
         .and_then(|line| line.split_whitespace().next())
-        .ok_or("Checksum not found for the archive.")?;
+        .ok_or(format!("Checksum not found for {}.", filename))?;
 
-    let mut file = File::open(archive_path)?;
+    let mut file = File::open(file_path)?;
     let mut hasher = Sha512::new();
     io::copy(&mut file, &mut hasher)?;
     let actual_hash = hex::encode(hasher.finalize());
 
     if actual_hash != expected_hash {
-        return Err("Checksum mismatch! The downloaded file may be corrupt.".into());
+        return Err(format!(
+            "Checksum mismatch for {}! The file may be corrupt.",
+            filename
+        )
+        .into());
     }
-    println!("{}", "Checksum verified successfully.".green());
+    println!("Checksum verified successfully for {}.", filename.green());
     Ok(())
+}
+
+fn get_platform_info() -> Result<(&'static str, &'static str), Box<dyn Error>> {
+    let os = match env::consts::OS {
+        "linux" => "linux",
+        "macos" | "darwin" => "macos",
+        "windows" => "windows",
+        "freebsd" => "freebsd",
+        "openbsd" => "openbsd",
+        _ => return Err(format!("Unsupported OS: {}", env::consts::OS).into()),
+    };
+    let arch = match env::consts::ARCH {
+        "x86_64" => "amd64",
+        "aarch64" => "arm64",
+        _ => return Err(format!("Unsupported architecture: {}", env::consts::ARCH).into()),
+    };
+    if os == "openbsd" && arch == "arm64" {
+        return Err("arm64 is not supported on OpenBSD for this application.".into());
+    }
+    Ok((os, arch))
+}
+
+fn attempt_patch_upgrade(
+    base_url: &str,
+    checksums_content: &str,
+    binary_filename: &str,
+) -> Result<PathBuf, Box<dyn Error>> {
+    println!("\nAttempting patch-based upgrade...");
+    let patch_filename = format!("{}.patch", binary_filename);
+    let patch_url = format!("{}/{}", base_url, patch_filename);
+    let temp_dir = Builder::new().prefix("zoi-patch-upgrade").tempdir()?;
+    let patch_path = temp_dir.path().join(&patch_filename);
+
+    println!("Downloading patch from: {}", patch_url);
+    download_file(&patch_url, &patch_path)?;
+    verify_checksum(&patch_path, checksums_content, &patch_filename)?;
+
+    let current_exe_path = env::current_exe()?;
+    let new_binary_path = temp_dir.path().join(binary_filename);
+
+    println!("Applying patch to create new binary...");
+    let patch_data = fs::read(&patch_path)?;
+    let old_data = fs::read(&current_exe_path)?;
+
+    // Read the size of the new file from the patch header (offset 8, 8 bytes, little-endian)
+    let new_file_size_bytes: [u8; 8] = patch_data[8..16].try_into()?;
+    let new_file_size = u64::from_le_bytes(new_file_size_bytes) as usize;
+    
+    let mut new_data = vec![0; new_file_size];
+    let mut patch_reader = Cursor::new(&patch_data);
+    bsdiff::patch(&old_data, &mut patch_reader, &mut new_data)?;
+    
+    fs::write(&new_binary_path, new_data)?;
+
+    println!("Verifying patched binary...");
+    verify_checksum(&new_binary_path, checksums_content, binary_filename)?;
+
+    Ok(new_binary_path)
+}
+
+fn fallback_full_upgrade(
+    base_url: &str,
+    checksums_content: &str,
+    os: &str,
+    arch: &str,
+) -> Result<PathBuf, Box<dyn Error>> {
+    println!("\nFalling back to full binary download...");
+    let archive_ext = if os == "windows" { "zip" } else { "tar.zst" };
+    let archive_filename = format!("zoi-{os}-{arch}.{archive_ext}");
+    let download_url = format!("{base_url}/{archive_filename}");
+    let temp_dir = Builder::new().prefix("zoi-full-upgrade").tempdir()?;
+    let temp_archive_path = temp_dir.path().join(&archive_filename);
+
+    println!("Downloading Zoi from: {download_url}");
+    download_file(&download_url, &temp_archive_path)?;
+    verify_checksum(&temp_archive_path, checksums_content, &archive_filename)?;
+
+    extract_archive(&temp_archive_path, temp_dir.path())?;
+
+    let binary_filename = if os == "windows" { "zoi.exe" } else { "zoi" };
+    let new_binary_path = temp_dir.path().join(binary_filename);
+    if !new_binary_path.exists() {
+        return Err("Could not find executable in the extracted archive.".into());
+    }
+    Ok(new_binary_path)
 }
 
 pub fn run(branch: &str, status: &str, number: &str) -> Result<(), Box<dyn Error>> {
@@ -123,14 +214,13 @@ pub fn run(branch: &str, status: &str, number: &str) -> Result<(), Box<dyn Error
     let parts: Vec<&str> = latest_tag.split('-').collect();
     let latest_version_num = parts
         .last()
-        .ok_or("Could not get version number from tag")?
-        .to_string();
+        .ok_or("Could not get version number from tag")?;
 
     let latest_version_str = if parts.len() > 2 {
         let prerelease = parts[1];
         format!("{}-{}", latest_version_num, prerelease.to_lowercase())
     } else {
-        latest_version_num
+        latest_version_num.to_string()
     };
 
     if !self_update::version::bump_is_greater(&current_version, &latest_version_str)? {
@@ -138,49 +228,38 @@ pub fn run(branch: &str, status: &str, number: &str) -> Result<(), Box<dyn Error
         return Ok(());
     }
 
-    let os = match env::consts::OS {
-        "linux" => "linux",
-        "macos" | "darwin" => "macos",
-        "windows" => "windows",
-        "freebsd" => "freebsd",
-        "openbsd" => "openbsd",
-        _ => return Err(format!("Unsupported OS: {}", env::consts::OS).into()),
-    };
-    let arch = match env::consts::ARCH {
-        "x86_64" => "amd64",
-        "aarch64" => "arm64",
-        _ => return Err(format!("Unsupported architecture: {}", env::consts::ARCH).into()),
+    let (os, arch) = get_platform_info()?;
+    let binary_filename = if os == "windows" {
+        format!("zoi-windows-{}.exe", arch)
+    } else {
+        format!("zoi-{}-{}", os, arch)
     };
 
-    if os == "openbsd" && arch == "arm64" {
-        return Err("arm64 is not supported on OpenBSD for this application.".into());
-    }
-
-    let archive_ext = if os == "windows" { "zip" } else { "tar.zst" };
-    let archive_filename = format!("zoi-{os}-{arch}.{archive_ext}");
     let base_url =
         format!("https://gitlab.com/{GITLAB_PROJECT_PATH}/-/releases/{latest_tag}/downloads");
-    let download_url = format!("{base_url}/{archive_filename}");
     let checksums_url = format!("{base_url}/checksums.txt");
 
-    let temp_dir = Builder::new().prefix("zoi-upgrade").tempdir()?;
-    let temp_archive_path = temp_dir.path().join(&archive_filename);
-
-    println!("Downloading Zoi v{latest_version_str} from: {download_url}");
-    download_file(&download_url, &temp_archive_path)?;
-
+    println!("Downloading checksums from: {}", checksums_url);
     let checksums_content = reqwest::blocking::get(&checksums_url)?.text()?;
-    verify_checksum(&temp_archive_path, &checksums_content, &archive_filename)?;
 
-    extract_archive(&temp_archive_path, temp_dir.path())?;
+    let new_binary_path =
+        match attempt_patch_upgrade(&base_url, &checksums_content, &binary_filename) {
+            Ok(path) => {
+                println!("{}", "Patch upgrade successful!".green());
+                path
+            }
+            Err(e) => {
+                println!(
+                    "{}: {}. {}",
+                    "Patch upgrade failed".yellow(),
+                    e,
+                    "Attempting full download.".yellow()
+                );
+                fallback_full_upgrade(&base_url, &checksums_content, os, arch)?
+            }
+        };
 
-    let new_binary_path = temp_dir
-        .path()
-        .join(if os == "windows" { "zoi.exe" } else { "zoi" });
-    if !new_binary_path.exists() {
-        return Err("Could not find executable in the extracted archive.".into());
-    }
-
+    println!("Replacing current executable...");
     self_replace::self_replace(&new_binary_path)?;
 
     Ok(())
