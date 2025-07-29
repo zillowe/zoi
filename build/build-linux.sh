@@ -14,6 +14,9 @@ TARGETS=(
   "x86_64-unknown-linux-gnu"  
   "aarch64-unknown-linux-gnu"
   "x86_64-pc-windows-gnu"
+  "x86_64-unknown-freebsd"
+  "aarch64-unknown-freebsd"
+  "x86_64-unknown-openbsd"
 )
 
 if ! command -v cargo &> /dev/null; then

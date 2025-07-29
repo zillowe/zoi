@@ -2805,7 +2805,7 @@ checksum = "626bd9fa9734751fc50d6060752170984d7053f5a39061f524cda68023d4db8a"
 
 [[package]]
 name = "zoi"
-version = "3.0.0-beta-prod"
+version = "3.0.1-beta-prod"
 dependencies = [
  "bsdiff",
  "chrono",

@@ -17,14 +17,14 @@ optdepends=(
 )
 _license_url='http://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/LICENSE'
 
-source_x86_64=("${pkgname%-bin}-linux-amd64.tar.xz::$url/-/releases/$_tag/downloads/${pkgname%-bin}-linux-amd64.tar.xz"
+source_x86_64=("${pkgname%-bin}-linux-amd64.tar.zst::$url/-/releases/$_tag/downloads/${pkgname%-bin}-linux-amd64.tar.zst"
               "LICENSE::$_license_url")
-source_aarch64=("${pkgname%-bin}-linux-arm64.tar.xz::$url/-/releases/$_tag/downloads/${pkgname%-bin}-linux-arm64.tar.xz"
+source_aarch64=("${pkgname%-bin}-linux-arm64.tar.zst::$url/-/releases/$_tag/downloads/${pkgname%-bin}-linux-arm64.tar.zst"
                "LICENSE::$_license_url")
 
-sha256sums_x86_64=('dfb529f977a5e2b212ef26bf2351f929ee5d1c4cc0c4312c5e05bba6b0c34be1'
+sha512sums_x86_64=('SKIP'
                    'ef33a32348e2f527ff6b3d923e75a8f96e7a72de51b6665f2f79fffd991c938f')
-sha256sums_aarch64=('f1271e13c1c58f784d2b79b1c8601ba1b5b2f0d31462aac277b09c140a4bdd12'
+sha512sums_aarch64=('SKIP'
                     'ef33a32348e2f527ff6b3d923e75a8f96e7a72de51b6665f2f79fffd991c938f')
 
 package() {
