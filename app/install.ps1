@@ -92,7 +92,7 @@ try {
         throw "Could not find checksum for '$TargetArchive' in the checksums file."
     }
 
-    $ActualHash = (Get-FileHash -Path $TempZipPath -Algorithm SHA256).Hash.ToLower()
+    $ActualHash = (Get-FileHash -Path $TempZipPath -Algorithm SHA512).Hash.ToLower()
 
     if ($ActualHash -ne $ExpectedHash) {
         throw "Checksum mismatch! The downloaded file may be corrupt or tampered with."

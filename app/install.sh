@@ -25,7 +25,7 @@ require_util "uname"
 require_util "chmod"
 require_util "mkdir"
 require_util "tar"
-require_util "xz"
+require_util "zstd"
 require_util "grep"
 require_util "sed"
 require_util "tr"
@@ -43,6 +43,8 @@ arch=""
 case "$(uname -s)" in
     Linux*)  os="linux" ;;
     Darwin*) os="macos" ;;
+    FreeBSD*) os="freebsd" ;;
+    OpenBSD*) os="openbsd" ;;
     *)       error "Unsupported OS: $(uname -s)" ;;
 esac
 case "$(uname -m)" in
@@ -50,6 +52,10 @@ case "$(uname -m)" in
     arm64|aarch64) arch="arm64" ;;
     *)          error "Unsupported Arch: $(uname -m)" ;;
 esac
+
+if [ "$os" = "openbsd" ] && [ "$arch" = "arm64" ]; then
+    error "arm64 is not supported on OpenBSD for this application."
+fi
 
 INSTALL_DIR="${HOME}/.local/bin" 
 SUDO_CMD=""
@@ -59,7 +65,7 @@ if [ "$(id -u)" -eq 0 ] || [ -n "${SUDO_USER-}" ]; then
 fi
 
 REPO_BASE_URL="https://gitlab.com/${GITLAB_PROJECT_PATH}/-/releases/${LATEST_TAG}/downloads"
-TARGET_ARCHIVE="zoi-${os}-${arch}.tar.xz"
+TARGET_ARCHIVE="zoi-${os}-${arch}.tar.zst"
 DOWNLOAD_URL="${REPO_BASE_URL}/${TARGET_ARCHIVE}"
 CHECKSUM_URL="${REPO_BASE_URL}/checksums.txt"
 INSTALL_PATH="${INSTALL_DIR}/${BIN_NAME}"
@@ -91,12 +97,12 @@ if ! curl --fail --location --progress-bar --output "$TEMP_CHECKSUMS" "$CHECKSUM
 fi
 
 CHECKSUM_CMD=""
-if command -v shasum >/dev/null 2>&1; then
-    CHECKSUM_CMD="shasum -a 256"
-elif command -v sha256sum >/dev/null 2>&1; then
-    CHECKSUM_CMD="sha256sum"
+if command -v sha512sum >/dev/null 2>&1; then
+    CHECKSUM_CMD="sha512sum"
+elif command -v shasum >/dev/null 2>&1; then
+    CHECKSUM_CMD="shasum -a 512"
 else
-    error "'shasum' or 'sha256sum' command is required for verification. Please install it."
+    error "'sha512sum' or 'shasum' command is required for verification. Please install it."
 fi
 
 expected_hash=$(grep "$TARGET_ARCHIVE" "$TEMP_CHECKSUMS" | awk '{print $1}')
@@ -120,7 +126,7 @@ if [ -f "$INSTALL_PATH" ]; then
 fi
 
 info "Extracting binary..."
-if tar -xf "$TEMP_ARCHIVE" -C "$TEMP_DIR"; then
+if zstd -dc "$TEMP_ARCHIVE" | tar -xf - -C "$TEMP_DIR"; then
     info "Extraction successful."
 else
     rm -rf "$TEMP_DIR"

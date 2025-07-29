@@ -14,14 +14,16 @@ installation:
   - type: com_binary
     url: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/{version}/downloads/zoi_{platform}.{platformComExt}
     platforms: [linux, macos, windows-amd64, freebsd, openbsd-amd64]
+    checksums: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/{version}/downloads/checksums.txt
 
   - type: script
     url: "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.{platformExt}"
     platforms: [linux, macos, windows-amd64, freebsd, openbsd-amd64]
+    checksums: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/checksums.txt
 
   - type: source
     url: "{git}"
-    platforms: [linux, macos, windows, freebsd, openbsd]
+    platforms: [all]
     commands:
       - ./configure --prefix={prefix}
       - make
