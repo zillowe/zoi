@@ -8,7 +8,7 @@ mod project;
 mod utils;
 
 // Production or Development
-const BRANCH: &str = "Development";
+const BRANCH: &str = "Production";
 const STATUS: &str = "Beta";
 const NUMBER: &str = "3.0.0";
 
