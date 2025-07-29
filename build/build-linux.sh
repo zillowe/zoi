@@ -14,6 +14,7 @@ TARGETS=(
   "x86_64-unknown-linux-gnu"  
   "aarch64-unknown-linux-gnu"
   "x86_64-pc-windows-gnu"
+  "x86_64-unknown-freebsd"
 )
 
 if ! command -v cargo &> /dev/null; then
@@ -21,7 +22,7 @@ if ! command -v cargo &> /dev/null; then
     exit 1
 fi
 
-echo -e "${CYAN}🏗 Starting native Linux and Windows build process...${NC}"
+echo -e "${CYAN}🏗 Starting native Linux, Windows, and FreeBSD build process...${NC}"
 echo -e "${CYAN}▸ Commit: ${COMMIT}${NC}\n"
 mkdir -p "$OUTPUT_DIR"
 
@@ -30,26 +31,34 @@ for target in "${TARGETS[@]}"; do
     x86_64-unknown-linux-gnu)  NAME="zoi-linux-amd64" ;;
     aarch64-unknown-linux-gnu) NAME="zoi-linux-arm64" ;;
     x86_64-pc-windows-gnu)     NAME="zoi-windows-amd64.exe" ;;
-    *)                         NAME="zoi-$target" ;; 
+    x86_64-unknown-freebsd)    NAME="zoi-freebsd-amd64" ;;
+    *)                         NAME="zoi-$target" ;;
   esac
   
   echo -e "${CYAN}🔧 Building for ${target}...${NC}"
 
-  rustup target add "$target"
+  if [[ "$target" == "x86_64-unknown-freebsd" ]]; then
+    if ! ZOI_COMMIT_HASH="$COMMIT" cross build --target "$target" --release; then
+      echo -e "${RED}❌ Build failed for ${target}${NC}"
+      exit 1
+    fi
+  else
+    rustup target add "$target"
 
-  LINKER_ENV=""
-  OPENSSL_ENV=""
-  if [[ "$target" == "aarch64-unknown-linux-gnu" ]]; then
-    LINKER_ENV="CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc"
-    OPENSSL_ENV="PKG_CONFIG_ALLOW_CROSS=1 PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig"
+    LINKER_ENV=""
+    OPENSSL_ENV=""
+    if [[ "$target" == "aarch64-unknown-linux-gnu" ]]; then
+      LINKER_ENV="CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc"
+      OPENSSL_ENV="PKG_CONFIG_ALLOW_CROSS=1 PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig"
 
-  elif [[ "$target" == "x86_64-pc-windows-gnu" ]]; then
-    LINKER_ENV="CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc"
-  fi
+    elif [[ "$target" == "x86_64-pc-windows-gnu" ]]; then
+      LINKER_ENV="CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc"
+    fi
 
-  if ! env $LINKER_ENV $OPENSSL_ENV ZOI_COMMIT_HASH="$COMMIT" cargo build --target "$target" --release; then
-    echo -e "${RED}❌ Build failed for ${target}${NC}"
-    exit 1
+    if ! env $LINKER_ENV $OPENSSL_ENV ZOI_COMMIT_HASH="$COMMIT" cargo build --target "$target" --release; then
+      echo -e "${RED}❌ Build failed for ${target}${NC}"
+      exit 1
+    fi
   fi
   
   SRC_BINARY="target/${target}/release/zoi"
@@ -62,6 +71,6 @@ for target in "${TARGETS[@]}"; do
   echo -e "${GREEN}✅ Successfully built ${NAME}${NC}\n"
 done
 
-echo -e "\n${GREEN}🎉 All Linux and Windows builds completed successfully!${NC}"
+echo -e "\n${GREEN}🎉 All Linux, Windows, and FreeBSD builds completed successfully!${NC}"
 echo -e "${CYAN}Output files in ./build/release directory:${NC}"
 ls -lh "$OUTPUT_DIR"

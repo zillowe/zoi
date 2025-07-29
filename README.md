@@ -180,11 +180,11 @@ What platforms we currently support.
 | macOS   | arm64 | ✔️         | ✔️               |
 | macOS   | amd64 | ✔️         | ✔️               |
 | Windows | amd64 | ✔️         | ✔️               |
-| Windows | arm64 | ✔️         | ✔️               |
+| Windows | arm64 | ❌         | ✔️               |
 | FreeBSD | amd64 | ✔️         | ✔️               |
-| FreeBSD | arm64 | ✔️         | ✔️               |
-| OpenBSD | amd64 | ✔️         | ✔️               |
-| OpenBSD | arm64 | ✔️         | ✔️               |
+| FreeBSD | arm64 | ❌         | ✔️               |
+| OpenBSD | amd64 | ❌         | ✔️               |
+| OpenBSD | arm64 | ❌         | ✔️               |
 
 We're planning to add support for more platforms.
 

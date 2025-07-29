@@ -22,56 +22,24 @@ check_build:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
     - if: $CI_COMMIT_BRANCH
 
-# build:linux:
-#   stage: build
-#   image: rust:latest
-#   tags:
-#     - saas-linux-large-amd64
-#   before_script:
-#     - dpkg --add-architecture arm64
-#     - dpkg --add-architecture armhf
-#     - apt-get update -y && apt-get install -y build-essential gcc gcc-aarch64-linux-gnu libssl-dev pkg-config libssl-dev:arm64 openssl libssl-dev:armhf gcc-mingw-w64-x86-64 liblzma-dev:arm64
-#   script:
-#     - echo "Building Linux targets (amd64, arm64) and Windows (amd64)..."
-#     - chmod +x ./build/build-linux.sh
-#     - ./build/build-linux.sh
-#   artifacts:
-#     paths:
-#       - ./build/release/
-#     expire_in: 1 week
-#   rules:
-#     - if: $CI_COMMIT_TAG
-#
-# build:macos:
-#   stage: build
-#   tags:
-#     - saas-macos-medium-m1
-#   image: macos-15-xcode-16
-#   before_script:
-#     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-#     - source ~/.cargo/env
-#   script:
-#     - echo "Building macOS targets (amd64, arm64)..."
-#     - chmod +x ./build/build-macos.sh
-#     - ./build/build-macos.sh
-#   artifacts:
-#     paths:
-#       - ./build/release/
-#     expire_in: 1 week
-#   rules:
-#     - if: $CI_COMMIT_TAG
-
-build:freebsd-amd64:
+build:linux:
   stage: build
-  image: ghcr.io/taiki-e/rust-cross-toolchain:x86_64-unknown-freebsd-dev-arm64v8
+  image: rust:latest
   tags:
     - saas-linux-large-amd64
+  services:
+    - docker:dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
   before_script:
-    - rustup update nightly && rustup default nightly
+    - dpkg --add-architecture arm64
+    - dpkg --add-architecture armhf
+    - apt-get update -y && apt-get install -y build-essential gcc gcc-aarch64-linux-gnu libssl-dev pkg-config libssl-dev:arm64 openssl libssl-dev:armhf gcc-mingw-w64-x86-64 liblzma-dev:arm64
+    - cargo install cross --git https://github.com/cross-rs/cross
   script:
-    - echo "Building FreeBSD targets (amd64)..."
-    - chmod +x ./build/bsd/freebsd-amd64.sh
-    - ./build/bsd/freebsd-amd64.sh
+    - echo "Building Linux (amd64, arm64), Windows (amd64), and FreeBSD (amd64) targets..."
+    - chmod +x ./build/build-linux.sh
+    - ./build/build-linux.sh
   artifacts:
     paths:
       - ./build/release/
@@ -79,17 +47,18 @@ build:freebsd-amd64:
   rules:
     - if: $CI_COMMIT_TAG
 
-build:freebsd-arm64:
+build:macos:
   stage: build
-  image: ghcr.io/taiki-e/rust-cross-toolchain:aarch64-unknown-freebsd-dev-amd64
   tags:
-    - saas-linux-large-amd64
+    - saas-macos-medium-m1
+  image: macos-15-xcode-16
   before_script:
-    - rustup update nightly && rustup default nightly
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    - source ~/.cargo/env
   script:
-    - echo "Building FreeBSD targets (arm64)..."
-    - chmod +x ./build/bsd/freebsd-arm64.sh
-    - ./build/bsd/freebsd-arm64.sh
+    - echo "Building macOS targets (amd64, arm64)..."
+    - chmod +x ./build/build-macos.sh
+    - ./build/build-macos.sh
   artifacts:
     paths:
       - ./build/release/
@@ -97,57 +66,21 @@ build:freebsd-arm64:
   rules:
     - if: $CI_COMMIT_TAG
 
-build:openbsd-amd64:
+build:windows:
   stage: build
-  image: ghcr.io/taiki-e/rust-cross-toolchain:x86_64-unknown-openbsd-dev-arm64v8
   tags:
-    - saas-linux-large-amd64
-  before_script:
-    - rustup update nightly && rustup default nightly
+    - saas-windows-medium-amd64
+  variables:
+    GIT_STRATEGY: fetch
   script:
-    - echo "Building OpenBSD targets (amd64)..."
-    - chmod +x ./build/bsd/openbsd-amd64.sh
-    - ./build/bsd/openbsd-amd64.sh
+    - echo "Building for Windows ARM64..."
+    - pwsh -File ./build/build-win.ps1
   artifacts:
     paths:
       - ./build/release/
     expire_in: 1 week
   rules:
     - if: $CI_COMMIT_TAG
-
-build:openbsd-arm64:
-  stage: build
-  image: ghcr.io/taiki-e/rust-cross-toolchain:aarch64-unknown-openbsd-dev-amd64
-  tags:
-    - saas-linux-large-amd64
-  before_script:
-    - rustup update nightly && rustup default nightly
-  script:
-    - echo "Building OpenBSD targets (arm64)..."
-    - chmod +x ./build/bsd/openbsd-arm64.sh
-    - ./build/bsd/openbsd-arm64.sh
-  artifacts:
-    paths:
-      - ./build/release/
-    expire_in: 1 week
-  rules:
-    - if: $CI_COMMIT_TAG
-
-# build:windows:
-#   stage: build
-#   tags:
-#     - saas-windows-medium-amd64
-#   variables:
-#     GIT_STRATEGY: fetch
-#   script:
-#     - echo "Building for Windows ARM64..."
-#     - pwsh -File ./build/build-win.ps1
-#   artifacts:
-#     paths:
-#       - ./build/release/
-#     expire_in: 1 week
-#   rules:
-#     - if: $CI_COMMIT_TAG
 
 package:archive:
   stage: package
@@ -167,13 +100,9 @@ package:archive:
   needs:
     - job: check_build
       optional: true
-    # - build:linux
-    # - build:macos
-    - build:freebsd-amd64
-    - build:freebsd-arm64
-    - build:openbsd-amd64
-    - build:openbsd-arm64
-    # - build:windows
+    - build:linux
+    - build:macos
+    - build:windows
   artifacts:
     paths:
       - ./build/archived/
