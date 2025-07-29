@@ -37,12 +37,7 @@ for target in "${TARGETS[@]}"; do
   
   echo -e "${CYAN}🔧 Building for ${target}...${NC}"
 
-  if [[ "$target" == "x86_64-unknown-freebsd" ]]; then
-    if ! ZOI_COMMIT_HASH="$COMMIT" cross build --target "$target" --release; then
-      echo -e "${RED}❌ Build failed for ${target}${NC}"
-      exit 1
-    fi
-  else
+  
     rustup target add "$target"
 
     LINKER_ENV=""
@@ -59,7 +54,6 @@ for target in "${TARGETS[@]}"; do
       echo -e "${RED}❌ Build failed for ${target}${NC}"
       exit 1
     fi
-  fi
   
   SRC_BINARY="target/${target}/release/zoi"
   if [[ "$target" == *"-windows-"* ]]; then

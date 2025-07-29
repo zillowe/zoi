@@ -15,7 +15,6 @@ pub fn is_admin() -> bool {
         use winapi::um::processthreadsapi::GetCurrentProcess;
         use winapi::um::processthreadsapi::OpenProcessToken;
         use winapi::um::securitybaseapi::CheckTokenMembership;
-        use winapi::um::securitybaseapi::CreateWellKnownSid;
         use winapi::um::winnt::{PSID, TOKEN_QUERY};
 
         let mut token = ptr::null_mut();
