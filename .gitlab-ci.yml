@@ -66,6 +66,10 @@ build:freebsd-amd64:
   image: ghcr.io/taiki-e/rust-cross-toolchain:x86_64-unknown-freebsd-dev-arm64v8
   tags:
     - saas-linux-large-amd64
+  before_script:
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    - source ~/.cargo/env
+    - export PATH="$HOME/.cargo/bin:$PATH"
   script:
     - echo "Building FreeBSD targets (amd64)..."
     - chmod +x ./build/bsd/freebsd-amd64.sh
@@ -82,6 +86,10 @@ build:freebsd-arm64:
   image: ghcr.io/taiki-e/rust-cross-toolchain:aarch64-unknown-freebsd-dev-amd64
   tags:
     - saas-linux-large-amd64
+  before_script:
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    - source ~/.cargo/env
+    - export PATH="$HOME/.cargo/bin:$PATH"
   script:
     - echo "Building FreeBSD targets (arm64)..."
     - chmod +x ./build/bsd/freebsd-arm64.sh
@@ -98,6 +106,10 @@ build:openbsd-amd64:
   image: ghcr.io/taiki-e/rust-cross-toolchain:x86_64-unknown-openbsd-dev-arm64v8
   tags:
     - saas-linux-large-amd64
+  before_script:
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    - source ~/.cargo/env
+    - export PATH="$HOME/.cargo/bin:$PATH"
   script:
     - echo "Building OpenBSD targets (amd64)..."
     - chmod +x ./build/bsd/openbsd-amd64.sh
@@ -114,6 +126,10 @@ build:openbsd-arm64:
   image: ghcr.io/taiki-e/rust-cross-toolchain:aarch64-unknown-openbsd-dev-amd64
   tags:
     - saas-linux-large-amd64
+  before_script:
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    - source ~/.cargo/env
+    - export PATH="$HOME/.cargo/bin:$PATH"
   script:
     - echo "Building OpenBSD targets (arm64)..."
     - chmod +x ./build/bsd/openbsd-arm64.sh
