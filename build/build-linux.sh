@@ -56,14 +56,17 @@ for target in "${TARGETS[@]}"; do
   fi
 
   if [[ "$target" == "x86_64-unknown-freebsd" ]]; then
-    export CC_x86_64_unknown_freebsd=clang
+    export CC_x86_64_unknown_freebsd="clang --sysroot=/usr/local/freebsd-sysroot --target=x86_64-unknown-freebsd"
+    export CXX_x86_64_unknown_freebsd="clang++ --sysroot=/usr/local/freebsd-sysroot --target=x86_64-unknown-freebsd"
     export AR_x86_64_unknown_freebsd=llvm-ar
+    export CARGO_TARGET_X86_64_UNKNOWN_FREEBSD_LINKER=clang
+    export CARGO_TARGET_X86_64_UNKNOWN_FREEBSD_RUSTFLAGS="-C link-arg=--sysroot=/usr/local/freebsd-sysroot -C link-arg=--target=x86_64-unknown-freebsd"
   elif [[ "$target" == "aarch64-unknown-freebsd" ]]; then
-    export CC_aarch64_unknown_freebsd=clang
+    export CC_aarch64_unknown_freebsd="clang --sysroot=/usr/local/freebsd-sysroot-arm64 --target=aarch64-unknown-freebsd"
+    export CXX_aarch64_unknown_freebsd="clang++ --sysroot=/usr/local/freebsd-sysroot-arm64 --target=aarch64-unknown-freebsd"
     export AR_aarch64_unknown_freebsd=llvm-ar
     export CARGO_TARGET_AARCH64_UNKNOWN_FREEBSD_LINKER=clang
-    export CFLAGS_aarch64_unknown_freebsd="-target aarch64-unknown-freebsd"
-    export CXXFLAGS_aarch64_unknown_freebsd="-target aarch64-unknown-freebsd"
+    export CARGO_TARGET_AARCH64_UNKNOWN_FREEBSD_RUSTFLAGS="-C link-arg=--sysroot=/usr/local/freebsd-sysroot-arm64 -C link-arg=--target=aarch64-unknown-freebsd"
   elif [[ "$target" == "x86_64-unknown-openbsd" ]]; then
     export CC_x86_64_unknown_openbsd=clang
     export AR_x86_64_unknown_openbsd=llvm-ar

@@ -30,7 +30,13 @@ build:linux:
   before_script:
     - dpkg --add-architecture arm64
     - dpkg --add-architecture armhf
-    - apt-get update -y && apt-get install -y build-essential gcc gcc-aarch64-linux-gnu libssl-dev pkg-config libssl-dev:arm64 openssl libssl-dev:armhf gcc-mingw-w64-x86-64 liblzma-dev:arm64 clang llvm
+    - apt-get update -y && apt-get install -y build-essential gcc gcc-aarch64-linux-gnu libssl-dev pkg-config libssl-dev:arm64 openssl libssl-dev:armhf gcc-mingw-w64-x86-64 liblzma-dev:arm64 clang llvm lld wget xz-utils
+    - mkdir -p /usr/local/freebsd-sysroot
+    - wget -q https://download.freebsd.org/releases/amd64/13.2-RELEASE/base.txz
+    - tar -xf base.txz -C /usr/local/freebsd-sysroot
+    - wget -q https://download.freebsd.org/releases/arm64/13.2-RELEASE/base.txz -O base-arm64.txz
+    - mkdir -p /usr/local/freebsd-sysroot-arm64
+    - tar -xf base-arm64.txz -C /usr/local/freebsd-sysroot-arm64
   script:
     - echo "Building Linux targets (amd64, arm64) and Windows (amd64)..."
     - chmod +x ./build/build-linux.sh
