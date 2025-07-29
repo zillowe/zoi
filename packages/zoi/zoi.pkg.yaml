@@ -1,6 +1,8 @@
 name: zoi
 repo: main
-version: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/version.json
+versions:
+  stable: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/version.json
+  public: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/version.json
 description: Universal Package Manager & Environment Setup Tool
 website: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi
 git: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi.git
