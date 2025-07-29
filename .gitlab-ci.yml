@@ -67,6 +67,7 @@ build:freebsd-amd64:
   tags:
     - saas-linux-large-amd64
   before_script:
+    - pkg install -y curl
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
     - source ~/.cargo/env
     - export PATH="$HOME/.cargo/bin:$PATH"
@@ -87,6 +88,7 @@ build:freebsd-arm64:
   tags:
     - saas-linux-large-amd64
   before_script:
+    - pkg install -y curl
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
     - source ~/.cargo/env
     - export PATH="$HOME/.cargo/bin:$PATH"
@@ -107,6 +109,7 @@ build:openbsd-amd64:
   tags:
     - saas-linux-large-amd64
   before_script:
+    - pkg_add -I curl
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
     - source ~/.cargo/env
     - export PATH="$HOME/.cargo/bin:$PATH"
@@ -127,6 +130,7 @@ build:openbsd-arm64:
   tags:
     - saas-linux-large-amd64
   before_script:
+    - pkg_add -I curl
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
     - source ~/.cargo/env
     - export PATH="$HOME/.cargo/bin:$PATH"
