@@ -81,8 +81,6 @@ package:archive:
       optional: true
     - build:linux
     - build:macos
-    - build:freebsd
-    - build:openbsd
   artifacts:
     paths:
       - ./build/archived/

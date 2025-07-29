@@ -15,8 +15,6 @@ TARGETS=(
   "aarch64-unknown-linux-gnu"
   "x86_64-pc-windows-gnu"
   "x86_64-unknown-freebsd"
-  "aarch64-unknown-freebsd"
-  "x86_64-unknown-openbsd"
 )
 
 if ! command -v cargo &> /dev/null; then
@@ -32,6 +30,7 @@ for target in "${TARGETS[@]}"; do
   case "$target" in
     x86_64-unknown-linux-gnu)  NAME="zoi-linux-amd64" ;;
     aarch64-unknown-linux-gnu) NAME="zoi-linux-arm64" ;;
+    x86_64-unknown-freebsd)    NAME="zoi-freebsd-amd64" ;;
     x86_64-pc-windows-gnu)     NAME="zoi-windows-amd64.exe" ;;
     *)                         NAME="zoi-$target" ;; 
   esac
