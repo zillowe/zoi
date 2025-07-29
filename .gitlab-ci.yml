@@ -61,20 +61,30 @@ check_build:
 #   rules:
 #     - if: $CI_COMMIT_TAG
 
-build:freebsd:
+build:freebsd-amd64:
   stage: build
-  image: freebsd/freebsd-static
+  image: ghcr.io/taiki-e/rust-cross-toolchain:x86_64-unknown-freebsd
   tags:
     - saas-linux-large-amd64
-  before_script:
-    - env ASSUME_ALWAYS_YES=YES pkg install -y rust git gcc
-    - env ASSUME_ALWAYS_YES=YES pkg install -y aarch64-binutils
-    - rustup target add aarch64-unknown-freebsd
-    - pkg add bash
   script:
     - echo "Building FreeBSD targets (amd64, arm64)..."
     - chmod +x ./build/build-bsd.sh
     - ./build/build-bsd.sh amd64
+  artifacts:
+    paths:
+      - ./build/release/
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_TAG
+
+build:freebsd-arm64:
+  stage: build
+  image: ghcr.io/taiki-e/rust-cross-toolchain:aarch64-unknown-freebsd
+  tags:
+    - saas-linux-large-amd64
+  script:
+    - echo "Building FreeBSD targets (amd64, arm64)..."
+    - chmod +x ./build/build-bsd.sh
     - ./build/build-bsd.sh arm64
   artifacts:
     paths:
@@ -83,17 +93,30 @@ build:freebsd:
   rules:
     - if: $CI_COMMIT_TAG
 
-build:openbsd:
+build:openbsd-amd64:
   stage: build
-  image: anak10thn/openbsd
+  image: ghcr.io/taiki-e/rust-cross-toolchain:x86_64-unknown-openbsd
   tags:
     - saas-linux-large-amd64
-  before_script:
-    - pkg_add -I rust git gcc bash
   script:
     - echo "Building OpenBSD targets (amd64, arm64)..."
     - chmod +x ./build/build-bsd.sh
     - ./build/build-bsd.sh amd64
+  artifacts:
+    paths:
+      - ./build/release/
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_TAG
+
+build:openbsd-amd64:
+  stage: build
+  image: ghcr.io/taiki-e/rust-cross-toolchain:aarc64-unknown-openbsd
+  tags:
+    - saas-linux-large-amd64
+  script:
+    - echo "Building OpenBSD targets (amd64, arm64)..."
+    - chmod +x ./build/build-bsd.sh
     - ./build/build-bsd.sh arm64
   artifacts:
     paths:

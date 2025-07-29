@@ -2,6 +2,12 @@ param(
     [string]$TargetArch = "aarch64-pc-windows-msvc"
 )
 
+# Install Visual C++ Build Tools
+Write-Output "Installing Visual C++ Build Tools..."
+$VSBuildToolsInstaller = "vs_buildtools.exe"
+Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vs_buildtools.exe" -OutFile $VSBuildToolsInstaller
+Start-Process -FilePath $VSBuildToolsInstaller -ArgumentList "--quiet", "--wait", "--norestart", "--nocache", "--add", "Microsoft.VisualStudio.Workload.VCTools", "--includeRecommended" -Wait
+
 # Install Rust
 Write-Output "Installing Rust..."
 $RustupInitExe = "rustup-init.exe"
