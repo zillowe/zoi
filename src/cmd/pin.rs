@@ -1,21 +1,13 @@
 use crate::pkg::pin;
 use colored::*;
 
-pub fn run(package: &str) {
-    if let Err(e) = run_pin_logic(package) {
+pub fn run(package: &str, version: &str) {
+    if let Err(e) = run_pin_logic(package, version) {
         eprintln!("{}: {}", "Pin failed".red().bold(), e);
     }
 }
 
-fn run_pin_logic(package: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let mut parts = package.splitn(2, '@');
-    let name = parts.next().unwrap_or("").to_string();
-    let version = parts.next().unwrap_or("").to_string();
-
-    if name.is_empty() || version.is_empty() {
-        return Err("Invalid package format. Use 'name@version'.".into());
-    }
-
+fn run_pin_logic(name: &str, version: &str) -> Result<(), Box<dyn std::error::Error>> {
     let mut pinned_packages = pin::get_pinned_packages()?;
 
     if pinned_packages.iter().any(|p| p.name == name) {
@@ -24,8 +16,8 @@ fn run_pin_logic(package: &str) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let new_pin = pin::PinnedPackage {
-        name: name.clone(),
-        version: version.clone(),
+        name: name.to_string(),
+        version: version.to_string(),
     };
     pinned_packages.push(new_pin);
     pin::write_pinned_packages(&pinned_packages)?;

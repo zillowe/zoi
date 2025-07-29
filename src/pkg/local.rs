@@ -1,13 +1,24 @@
 use crate::pkg::config;
-use crate::pkg::types::InstallManifest;
+use crate::pkg::types::{InstallManifest, Scope};
 use std::error::Error;
 use std::fs;
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
-pub fn get_store_root() -> Result<PathBuf, Box<dyn Error>> {
-    let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
-    Ok(home_dir.join(".zoi").join("pkgs").join("store"))
+pub fn get_store_root(scope: Scope) -> Result<PathBuf, Box<dyn Error>> {
+    match scope {
+        Scope::User => {
+            let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
+            Ok(home_dir.join(".zoi").join("pkgs").join("store"))
+        }
+        Scope::System => {
+            if cfg!(target_os = "windows") {
+                Ok(PathBuf::from("C:\\ProgramData\\zoi\\pkgs\\store"))
+            } else {
+                Ok(PathBuf::from("/var/lib/zoi/pkgs/store"))
+            }
+        }
+    }
 }
 
 fn get_db_root() -> Result<PathBuf, Box<dyn Error>> {
@@ -16,27 +27,44 @@ fn get_db_root() -> Result<PathBuf, Box<dyn Error>> {
 }
 
 pub fn get_installed_packages() -> Result<Vec<InstallManifest>, Box<dyn Error>> {
-    let store_root = get_store_root()?;
-    if !store_root.exists() {
-        return Ok(Vec::new());
-    }
-
     let mut installed = Vec::new();
-    for entry in fs::read_dir(store_root)? {
-        let entry = entry?;
-        let manifest_path = entry.path().join("manifest.yaml");
-        if manifest_path.exists() {
-            let content = fs::read_to_string(manifest_path)?;
-            let manifest: InstallManifest = serde_yaml::from_str(&content)?;
-            installed.push(manifest);
+    let user_store_root = get_store_root(Scope::User)?;
+    if user_store_root.exists() {
+        for entry in fs::read_dir(user_store_root)? {
+            let entry = entry?;
+            let manifest_path = entry.path().join("manifest.yaml");
+            if manifest_path.exists() {
+                let content = fs::read_to_string(manifest_path)?;
+                let manifest: InstallManifest = serde_yaml::from_str(&content)?;
+                installed.push(manifest);
+            }
         }
     }
+
+    let system_store_root = get_store_root(Scope::System)?;
+    if system_store_root.exists() {
+        for entry in fs::read_dir(system_store_root)? {
+            let entry = entry?;
+            let manifest_path = entry.path().join("manifest.yaml");
+            if manifest_path.exists() {
+                let content = fs::read_to_string(manifest_path)?;
+                let manifest: InstallManifest = serde_yaml::from_str(&content)?;
+                installed.push(manifest);
+            }
+        }
+    }
+
     installed.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(installed)
 }
 
-pub fn is_package_installed(package_name: &str) -> Result<Option<InstallManifest>, Box<dyn Error>> {
-    let manifest_path = get_store_root()?.join(package_name).join("manifest.yaml");
+pub fn is_package_installed(
+    package_name: &str,
+    scope: Scope,
+) -> Result<Option<InstallManifest>, Box<dyn Error>> {
+    let manifest_path = get_store_root(scope)?
+        .join(package_name)
+        .join("manifest.yaml");
     if manifest_path.exists() {
         let content = fs::read_to_string(manifest_path)?;
         let manifest: InstallManifest = serde_yaml::from_str(&content)?;
@@ -95,9 +123,8 @@ pub fn get_packages_from_repo(
     Ok(available)
 }
 
-
 pub fn write_manifest(manifest: &InstallManifest) -> Result<(), Box<dyn Error>> {
-    let store_dir = get_store_root()?.join(&manifest.name);
+    let store_dir = get_store_root(manifest.scope)?.join(&manifest.name);
     fs::create_dir_all(&store_dir)?;
     let manifest_path = store_dir.join("manifest.yaml");
     let content = serde_yaml::to_string(&manifest)?;

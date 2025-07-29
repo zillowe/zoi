@@ -42,6 +42,14 @@ pub fn write_pinned_packages(packages: &[PinnedPackage]) -> Result<(), io::Error
     Ok(())
 }
 
+pub fn get_pinned_version(package_name: &str) -> Result<Option<String>, io::Error> {
+    let pinned_packages = get_pinned_packages()?;
+    Ok(pinned_packages
+        .iter()
+        .find(|p| p.name == package_name)
+        .map(|p| p.version.clone()))
+}
+
 pub fn is_pinned(package_name: &str) -> Result<bool, io::Error> {
     let pinned_packages = get_pinned_packages()?;
     Ok(pinned_packages.iter().any(|p| p.name == package_name))

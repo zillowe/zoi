@@ -1,15 +1,17 @@
 pub mod about;
-pub mod check;
-pub mod info;
-
 pub mod autoremove;
 pub mod build;
+pub mod check;
+pub mod clean;
 pub mod clone;
+pub mod env;
 pub mod exec;
+pub mod info;
 pub mod install;
 pub mod list;
 pub mod pin;
 pub mod repo;
+pub mod run;
 pub mod search;
 pub mod show;
 pub mod sync;
@@ -17,8 +19,5 @@ pub mod uninstall;
 pub mod unpin;
 pub mod update;
 pub mod upgrade;
-
-pub mod env;
-pub mod run;
-
 pub mod version;
+

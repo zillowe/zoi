@@ -69,7 +69,9 @@ pub fn run(args: Vec<String>) {
                     desc.push_str("...");
                 }
 
-                table.add_row(vec![pkg.name, pkg.version, pkg.repo, desc]);
+                let version =
+                    crate::pkg::resolve::get_default_version(&pkg).unwrap_or_else(|_| "N/A".to_string());
+                table.add_row(vec![pkg.name, version, pkg.repo, desc]);
             }
 
             println!("{table}");

@@ -1,13 +1,8 @@
-use crate::pkg::local;
+use crate::pkg::{local, types};
 use colored::*;
 use std::error::Error;
 use std::fs;
 use std::path::PathBuf;
-
-fn get_store_root() -> Result<PathBuf, Box<dyn Error>> {
-    let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
-    Ok(home_dir.join(".zoi").join("pkgs").join("store"))
-}
 
 fn get_bin_root() -> Result<PathBuf, Box<dyn Error>> {
     let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
@@ -17,10 +12,9 @@ fn get_bin_root() -> Result<PathBuf, Box<dyn Error>> {
 fn remove_dependent_record(
     dependency_name: &str,
     dependent_pkg_name: &str,
+    scope: types::Scope,
 ) -> Result<(), Box<dyn Error>> {
-    let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
-    let dependent_file = home_dir
-        .join(".zoi/pkgs/store")
+    let dependent_file = local::get_store_root(scope)?
         .join(dependency_name)
         .join("dependents")
         .join(dependent_pkg_name);
@@ -33,10 +27,18 @@ fn remove_dependent_record(
 }
 
 pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
-    let manifest = local::is_package_installed(package_name)?
-        .ok_or_else(|| format!("Package '{package_name}' is not installed by Zoi."))?;
+    let (manifest, scope) =
+        if let Some(m) = local::is_package_installed(package_name, types::Scope::User)? {
+            (m, types::Scope::User)
+        } else if let Some(m) = local::is_package_installed(package_name, types::Scope::System)? {
+            (m, types::Scope::System)
+        } else {
+            return Err(format!("Package '{package_name}' is not installed by Zoi.").into());
+        };
 
-    let dependents_dir = get_store_root()?.join(package_name).join("dependents");
+    let dependents_dir = local::get_store_root(scope)?
+        .join(package_name)
+        .join("dependents");
     if dependents_dir.exists() {
         let entries: Vec<String> = fs::read_dir(&dependents_dir)?
             .filter_map(Result::ok)
@@ -62,7 +64,7 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
         if !dep_str.contains(':') || dep_str.starts_with("zoi:") {
             let dep_name = dep_str.split(['=', '>', '<', '~', '^']).next().unwrap();
             let final_dep_name = dep_name.strip_prefix("zoi:").unwrap_or(dep_name);
-            remove_dependent_record(final_dep_name, package_name)?;
+            remove_dependent_record(final_dep_name, package_name, scope)?;
         }
         Ok(())
     };
@@ -80,7 +82,7 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
         }
     }
 
-    let store_dir = get_store_root()?.join(package_name);
+    let store_dir = local::get_store_root(scope)?.join(package_name);
     if store_dir.exists() {
         println!("Removing stored files from {}...", store_dir.display());
         fs::remove_dir_all(&store_dir)?;
@@ -101,3 +103,4 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
+

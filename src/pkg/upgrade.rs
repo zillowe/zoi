@@ -3,7 +3,7 @@ use hex;
 use indicatif::{ProgressBar, ProgressStyle};
 use self_update::self_replace;
 use serde::Deserialize;
-use sha2::{Digest, Sha256};
+use sha2::{Digest, Sha512};
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -99,7 +99,7 @@ fn verify_checksum(
         .ok_or("Checksum not found for the archive.")?;
 
     let mut file = File::open(archive_path)?;
-    let mut hasher = Sha256::new();
+    let mut hasher = Sha512::new();
     io::copy(&mut file, &mut hasher)?;
     let actual_hash = hex::encode(hasher.finalize());
 

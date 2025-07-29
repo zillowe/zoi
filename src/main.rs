@@ -100,11 +100,14 @@ enum Commands {
         raw: bool,
     },
 
-    /// Pins a package to a specific version
+    /// Pins a package to a specific version or channel
     Pin {
-        /// The package to pin, e.g. "vim@1.8.0"
-        #[arg(value_name = "PACKAGE")]
+        /// The name of the package to pin
+        #[arg(value_name = "PACKAGE_NAME")]
         package: String,
+        /// The version (e.g. 'v1.2.0') or channel (e.g. '@nightly') to pin to
+        #[arg(value_name = "VERSION_OR_CHANNEL")]
+        version: String,
     },
 
     /// Unpins a package
@@ -217,6 +220,9 @@ enum Commands {
         args: Vec<String>,
     },
 
+    /// Clears the cache of downloaded package binaries
+    Clean,
+
     /// Manage package repositories
     #[command(
         long_about = "Manages the list of package repositories that Zoi uses to find and install packages. By default, Zoi is configured with 'main' and 'extra' repositories.\n\nCommands:\n- add: Adds a new repository from the available sources. Can be interactive.\n- remove: Deletes a repository from the active list.\n- list: Shows all currently active repositories.\n- list all: Displays all available repositories and their status (active/inactive)."
@@ -249,7 +255,7 @@ fn main() {
             Commands::Sync { verbose } => cmd::sync::run(verbose),
             Commands::List { args } => cmd::list::run(args),
             Commands::Show { package_name, raw } => cmd::show::run(&package_name, raw),
-            Commands::Pin { package } => cmd::pin::run(&package),
+            Commands::Pin { package, version } => cmd::pin::run(&package, &version),
             Commands::Unpin { package } => cmd::unpin::run(&package),
             Commands::Update { package_name } => cmd::update::run(&package_name, cli.yes),
             Commands::Install {
@@ -269,6 +275,7 @@ fn main() {
             Commands::Autoremove => cmd::autoremove::run(cli.yes),
             Commands::Search { args } => cmd::search::run(args),
             Commands::Exec { source, args } => cmd::exec::run(source, args),
+            Commands::Clean => cmd::clean::run(),
             Commands::Repo(args) => cmd::repo::run(args),
         }
     } else {

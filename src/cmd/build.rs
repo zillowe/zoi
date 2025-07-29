@@ -20,7 +20,7 @@ pub fn run(source: &str, yes: bool) {
             utils::print_repo_warning(&resolved_source.repo_name);
 
             if let Err(e) = install::run_installation(
-                &resolved_source.path,
+                resolved_source.path.to_str().unwrap(),
                 install::InstallMode::ForceSource,
                 true,
                 InstallReason::Direct,

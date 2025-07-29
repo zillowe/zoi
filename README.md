@@ -192,29 +192,35 @@ We're planning to add support for more platforms.
 
 What dependency installation we support.
 
-| Package Manager                                        | OS                                 | Support |
-| ------------------------------------------------------ | ---------------------------------- | ------- |
-| `zoi`                                                  | Universal[\*](#-platforms)         | ✔️      |
-| [`brew`](https://brew.sh)                              | macOS only                         | ✔️      |
-| [`winget`](https://github.com/microsoft/winget-cli)    | Windows                            | ❌      |
-| [`scoop`](https://scoop.sh)                            | Windows                            | ✔️      |
-| [`choco`](https://chocolatey.org/)                     | Windows                            | ✔️      |
-| `npm`                                                  | Where NodeJS runs                  | ✔️      |
-| [`jsr`](https://jsr.io)                                | Where NodeJS runs                  | ✔️      |
-| [`bun`](https://bun.com)                               | Where Bun runs                     | ❌      |
-| `go`                                                   | Where Go runs                      | ✔️      |
-| `cargo`                                                | Where Rust Cargo runs              | ✔️      |
-| [`cargo-bin`](https://crates.io/crates/cargo-binstall) | Where Rust runs                    | ❌      |
-| `pip`                                                  | Where Python runs                  | ❌      |
-| [`pipx`](https://github.com/pypa/pipx)                 | Where Python runs                  | ❌      |
-| `pkg`                                                  | FreeBSD                            | ✔️      |
-| `pkg_add`                                              | OpenBSD                            | ✔️      |
-| `pacman`                                               | Arch-Based Linux Distros           | ✔️      |
-| `portage`                                              | Gentoo                             | ❌      |
-| `apt`                                                  | Debian-Based Linux Distros         | ✔️      |
-| `dnf`, `yum`                                           | Fedora/Redhat/CentOS Linux Distros | ✔️      |
-| `zypper`                                               | OpenSUSE Linux Distro              | ✔️      |
-| `apk`                                                  | Alpine Linux Distro                | ✔️      |
+| Package Manager                                             | OS                                 | Support |
+| ----------------------------------------------------------- | ---------------------------------- | ------- |
+| `zoi`                                                       | Universal[\*](#-platforms)         | ✔️      |
+| [`brew`](https://brew.sh)                                   | macOS only                         | ✔️      |
+| [`winget`](https://github.com/microsoft/winget-cli)         | Windows                            | ✔️      |
+| [`scoop`](https://scoop.sh)                                 | Windows                            | ✔️      |
+| [`choco`](https://chocolatey.org/)                          | Windows                            | ✔️      |
+| `npm`                                                       | Where NodeJS runs                  | ✔️      |
+| [`jsr`](https://jsr.io)                                     | Where NodeJS runs                  | ✔️      |
+| [`bun`](https://bun.com)                                    | Where Bun runs                     | ✔️      |
+| `yarn`                                                      | Where Yarn runs                    | ✔️      |
+| `pnpm`                                                      | Where PNPM runs                    | ✔️      |
+| `go`                                                        | Where Go runs                      | ✔️      |
+| `cargo`                                                     | Where Rust Cargo runs              | ✔️      |
+| [`cargo-binstall`](https://crates.io/crates/cargo-binstall) | Where Rust runs                    | ✔️      |
+| `pip`                                                       | Where Python runs                  | ✔️      |
+| `gem`                                                       | Where Ruby runs                    | ✔️      |
+| `composer`                                                  | Where PHP runs                     | ✔️      |
+| `dotnet`                                                    | Where .NET runs                    | ✔️      |
+| `nix`                                                       | Where Nix runs                     | ✔️      |
+| [`pipx`](https://github.com/pypa/pipx)                      | Where Python runs                  | ✔️      |
+| `pkg`                                                       | FreeBSD                            | ✔️      |
+| `pkg_add`                                                   | OpenBSD                            | ✔️      |
+| `pacman`                                                    | Arch-Based Linux Distros           | ✔️      |
+| `portage`                                                   | Gentoo Linux Distro                | ✔️      |
+| `apt`                                                       | Debian-Based Linux Distros         | ✔️      |
+| `dnf`, `yum`                                                | Fedora/Redhat/CentOS Linux Distros | ✔️      |
+| `zypper`                                                    | OpenSUSE Linux Distro              | ✔️      |
+| `apk`                                                       | Alpine Linux Distro                | ✔️      |
 
 Some of the package manager are OS specific, so when a dependency is in that package manager it only installs it for that OS.
 

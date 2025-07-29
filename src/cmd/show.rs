@@ -11,7 +11,10 @@ pub fn run(source: &str, raw: bool) {
                 println!("{content}");
                 return;
             }
-            let pkg: Package = serde_yaml::from_str(&content).unwrap();
+            let mut pkg: Package = serde_yaml::from_str(&content).unwrap();
+            pkg.version = Some(
+                resolve::get_default_version(&pkg).unwrap_or_else(|_| "N/A".to_string()),
+            );
             print_beautiful(&pkg);
         }
         Err(e) => eprintln!("{}: {}", "Error".red(), e),
@@ -22,11 +25,13 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
     println!(
         "{} {} - {}",
         pkg.name.bold().green(),
-        pkg.version.dimmed(),
+        pkg.version.as_deref().unwrap_or("").dimmed(),
         pkg.repo
     );
-    println!("Website");
-    println!("{}", pkg.website.cyan().underline());
+    if let Some(website) = &pkg.website {
+        println!("Website");
+        println!("{}", website.cyan().underline());
+    }
     println!("Git Repo");
     println!("{}", pkg.git.cyan().underline());
     println!("\n{}\n", pkg.description);
@@ -44,6 +49,12 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
         crate::pkg::types::PackageType::Collection => "Collection",
     };
     println!("{}: {}", "Type".bold(), type_display);
+
+    let scope_display = match pkg.scope {
+        crate::pkg::types::Scope::User => "User",
+        crate::pkg::types::Scope::System => "System",
+    };
+    println!("{}: {}", "Scope".bold(), scope_display);
 
     if pkg.package_type == crate::pkg::types::PackageType::Package {
         println!("\n{}:", "Available installation methods".bold());

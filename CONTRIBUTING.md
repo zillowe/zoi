@@ -10,8 +10,8 @@ We welcome contributions in many forms, including bug reports, feature requests,
 
 If you find a bug or have an idea for a new feature, please check our [**issue tracker**](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues) to see if it has already been reported. If not, feel free to open a new issue.
 
-- [**Report a Bug**](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Bug%20Report)
-- [**Request a Feature**](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Feature%20Request)
+- [Report a Bug](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Bug%20Report)
+- [Request a Feature](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Feature%20Request)
 
 ### Contributing Code
 
@@ -62,6 +62,6 @@ Please write clear and descriptive commit messages. A good commit message should
 
 ## Code of Conduct
 
-By contributing to Zoi, you agree to abide by our [**Code of Conduct**](./CODE_OF_CONDUCT.md). Please read it to understand our community standards.
+By contributing to Zoi, you agree to abide by our [Code of Conduct](./CODE_OF_CONDUCT.md). Please read it to understand our community standards.
 
 Thank you again for your interest in contributing to Zoi! We look forward to your contributions.

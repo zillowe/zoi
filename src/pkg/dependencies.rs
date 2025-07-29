@@ -1,4 +1,4 @@
-use crate::pkg::local;
+use crate::pkg::{local, types};
 use crate::utils;
 use colored::*;
 use regex::Regex;
@@ -72,10 +72,12 @@ fn get_native_command_version(command_name: &str) -> Result<Option<Version>, Box
     Ok(None)
 }
 
-fn record_dependent(dependency_name: &str, dependent_pkg_name: &str) -> Result<(), Box<dyn Error>> {
-    let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
-    let dependents_dir = home_dir
-        .join(".zoi/pkgs/store")
+fn record_dependent(
+    dependency_name: &str,
+    dependent_pkg_name: &str,
+    scope: types::Scope,
+) -> Result<(), Box<dyn Error>> {
+    let dependents_dir = local::get_store_root(scope)?
         .join(dependency_name)
         .join("dependents");
 
@@ -89,6 +91,7 @@ fn record_dependent(dependency_name: &str, dependent_pkg_name: &str) -> Result<(
 fn install_dependency(
     dep: &Dependency,
     parent_pkg_name: &str,
+    scope: types::Scope,
     yes: bool,
 ) -> Result<(), Box<dyn Error>> {
     let version_info = dep
@@ -102,11 +105,77 @@ fn install_dependency(
         dep.manager.yellow()
     );
 
-    match dep.manager {
+    let os = std::env::consts::OS;
+    let manager = dep.manager;
+
+    let is_compatible = match manager {
+        "brew" => os == "macos",
+        "scoop" | "choco" | "winget" => os == "windows",
+        "apt" | "apt-get" => {
+            if let Some(distro) = utils::get_linux_distribution() {
+                matches!(
+                    distro.as_str(),
+                    "ubuntu" | "debian" | "linuxmint" | "pop" | "kali"
+                )
+            } else {
+                false
+            }
+        }
+        "pacman" => {
+            if let Some(distro) = utils::get_linux_distribution() {
+                matches!(distro.as_str(), "arch" | "manjaro" | "cachyos")
+            } else {
+                false
+            }
+        }
+        "dnf" | "yum" => {
+            if let Some(distro) = utils::get_linux_distribution() {
+                matches!(distro.as_str(), "fedora" | "centos" | "rhel")
+            } else {
+                false
+            }
+        }
+        "zypper" => {
+            if let Some(distro) = utils::get_linux_distribution() {
+                matches!(distro.as_str(), "opensuse-tumbleweed" | "opensuse-leap")
+            } else {
+                false
+            }
+        }
+        "apk" => {
+            if let Some(distro) = utils::get_linux_distribution() {
+                matches!(distro.as_str(), "alpine")
+            } else {
+                false
+            }
+        }
+        "portage" => {
+            if let Some(distro) = utils::get_linux_distribution() {
+                matches!(distro.as_str(), "gentoo")
+            } else {
+                false
+            }
+        }
+        "pkg" => os == "freebsd",
+        "pkg_add" => os == "openbsd",
+        "zoi" | "cargo" | "native" | "go" | "npm" | "jsr" | "bun" | "pip" | "pipx"
+        | "cargo-binstall" | "gem" | "yarn" | "pnpm" | "composer" | "dotnet" | "nix" => true,
+        _ => false,
+    };
+
+    if !is_compatible {
+        println!(
+            "Skipping dependency '{}' for manager '{}' on an incompatible OS.",
+            dep.package, manager
+        );
+        return Ok(());
+    }
+
+    match manager {
         "zoi" => {
             let zoi_dep_name = dep.package;
-            record_dependent(zoi_dep_name, parent_pkg_name)?;
-            if let Some(manifest) = local::is_package_installed(zoi_dep_name)? {
+            record_dependent(zoi_dep_name, parent_pkg_name, scope)?;
+            if let Some(manifest) = local::is_package_installed(zoi_dep_name, scope)? {
                 let installed_version = Version::parse(&manifest.version)?;
                 if let Some(req) = &dep.req {
                     if req.matches(&installed_version) {
@@ -161,7 +230,7 @@ fn install_dependency(
 
             let pm =
                 utils::get_native_package_manager().ok_or("Native package manager not found")?;
-            println!("       (Using native manager: {pm})");
+            println!("(Using native manager: {pm})");
             let args = match pm.as_str() {
                 "apt" | "apt-get" => vec!["install", "-y"],
                 "pacman" => vec!["-S", "--noconfirm"],
@@ -193,7 +262,257 @@ fn install_dependency(
                 .arg(dep.package)
                 .status()?;
             if !status.success() {
-                return Err("Cargo dependency failed".into());
+                return Err(format!("Cargo dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "cargo-binstall" => {
+            let status = Command::new("cargo")
+                .arg("binstall")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("cargo-binstall dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "go" => {
+            let package_with_version = format!("{}@latest", dep.package);
+            let status = Command::new("go")
+                .arg("install")
+                .arg(package_with_version)
+                .status()?;
+            if !status.success() {
+                return Err(format!("Go dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "npm" => {
+            let status = Command::new("npm")
+                .arg("install")
+                .arg("-g")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("NPM dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "yarn" => {
+            let status = Command::new("yarn")
+                .arg("global")
+                .arg("add")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("Yarn dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "pnpm" => {
+            let status = Command::new("pnpm")
+                .arg("add")
+                .arg("-g")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("pnpm dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "bun" => {
+            let status = Command::new("bun")
+                .arg("install")
+                .arg("-g")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("Bun dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "pip" => {
+            let status = Command::new("pip")
+                .arg("install")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("pip dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "pipx" => {
+            let status = Command::new("pipx")
+                .arg("install")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("pipx dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "gem" => {
+            let status = Command::new("gem")
+                .arg("install")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("gem dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "composer" => {
+            let status = Command::new("composer")
+                .arg("global")
+                .arg("require")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("composer dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "dotnet" => {
+            let status = Command::new("dotnet")
+                .arg("tool")
+                .arg("install")
+                .arg("-g")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("dotnet dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "nix" => {
+            let status = Command::new("nix-env")
+                .arg("-iA")
+                .arg(format!("nixpkgs.{}", dep.package))
+                .status()?;
+            if !status.success() {
+                return Err(format!("nix dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "jsr" => {
+            let status = Command::new("npx")
+                .arg("jsr")
+                .arg("add")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("JSR dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "apt" | "apt-get" => {
+            let status = Command::new("sudo")
+                .arg(manager)
+                .arg("install")
+                .arg("-y")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("{} dependency failed for '{}'", manager, dep.package).into());
+            }
+        }
+        "pacman" => {
+            let status = Command::new("sudo")
+                .arg("pacman")
+                .arg("-S")
+                .arg("--noconfirm")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("pacman dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "dnf" | "yum" => {
+            let status = Command::new("sudo")
+                .arg(manager)
+                .arg("install")
+                .arg("-y")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("{} dependency failed for '{}'", manager, dep.package).into());
+            }
+        }
+        "brew" => {
+            let status = Command::new("brew")
+                .arg("install")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("brew dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "scoop" => {
+            let status = Command::new("scoop")
+                .arg("install")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("scoop dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "choco" => {
+            let status = Command::new("choco")
+                .arg("install")
+                .arg("-y")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("choco dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "apk" => {
+            let status = Command::new("sudo")
+                .arg("apk")
+                .arg("add")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("apk dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "pkg" => {
+            let status = Command::new("sudo")
+                .arg("pkg")
+                .arg("install")
+                .arg("-y")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("pkg dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "pkg_add" => {
+            let status = Command::new("sudo")
+                .arg("pkg_add")
+                .arg("-I")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("pkg_add dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "zypper" => {
+            let status = Command::new("sudo")
+                .arg("zypper")
+                .arg("install")
+                .arg("-y")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("zypper dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "portage" => {
+            let status = Command::new("sudo")
+                .arg("emerge")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("Portage dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "winget" => {
+            let status = Command::new("winget")
+                .arg("install")
+                .arg(dep.package)
+                .arg("--silent")
+                .arg("--accept-package-agreements")
+                .arg("--accept-source-agreements")
+                .status()?;
+            if !status.success() {
+                return Err(format!("winget dependency failed for '{}'", dep.package).into());
             }
         }
         _ => return Err(format!("Unknown package manager in dependency: {}", dep.manager).into()),
@@ -204,6 +523,7 @@ fn install_dependency(
 pub fn resolve_and_install(
     deps: &[String],
     parent_pkg_name: &str,
+    scope: types::Scope,
     yes: bool,
 ) -> Result<(), Box<dyn Error>> {
     if deps.is_empty() {
@@ -213,7 +533,7 @@ pub fn resolve_and_install(
     println!("{}", "Resolving dependencies...".bold());
     for dep_str in deps {
         let dependency = parse_dependency_string(dep_str)?;
-        install_dependency(&dependency, parent_pkg_name, yes)?;
+        install_dependency(&dependency, parent_pkg_name, scope, yes)?;
     }
     println!("{}", "All dependencies resolved.".green());
     Ok(())
@@ -224,7 +544,7 @@ fn install_zoi_dependency(package_name: &str, yes: bool) -> Result<(), Box<dyn E
     let resolved_source = resolve::resolve_source(package_name)?;
 
     install::run_installation(
-        &resolved_source.path,
+        resolved_source.path.to_str().unwrap(),
         install::InstallMode::PreferBinary,
         false,
         crate::pkg::types::InstallReason::Dependency,

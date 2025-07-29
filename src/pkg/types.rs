@@ -1,6 +1,18 @@
-use serde::{Deserialize, Deserializer, Serialize};
-use serde_json;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
+#[serde(rename_all = "lowercase")]
+pub enum Scope {
+    User,
+    System,
+}
+
+impl Default for Scope {
+    fn default() -> Self {
+        Scope::User
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
@@ -15,16 +27,15 @@ impl Default for PackageType {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[allow(dead_code)]
 pub struct Package {
     pub name: String,
     pub repo: String,
-    #[serde(default, deserialize_with = "deserialize_version")]
-    pub version: String,
+    pub version: Option<String>,
+    pub versions: Option<HashMap<String, String>>,
     pub description: String,
-    #[serde(default)]
-    pub website: String,
+    pub website: Option<String>,
     #[serde(default)]
     pub git: String,
     pub maintainer: Maintainer,
@@ -37,45 +48,31 @@ pub struct Package {
     #[serde(rename = "type", default)]
     pub package_type: PackageType,
     pub alt: Option<String>,
+    #[serde(default)]
+    pub scope: Scope,
 }
 
-fn deserialize_version<'de, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s: String = Deserialize::deserialize(deserializer)?;
-    if s.starts_with("http") {
-        let resp = reqwest::blocking::get(&s)
-            .map_err(serde::de::Error::custom)?
-            .text()
-            .map_err(serde::de::Error::custom)?;
-        let json: serde_json::Value =
-            serde_json::from_str(&resp).map_err(serde::de::Error::custom)?;
-        if let Some(tag) = json
-            .get("latest")
-            .and_then(|l| l.get("production"))
-            .and_then(|p| p.get("tag"))
-            .and_then(|t| t.as_str())
-        {
-            Ok(tag.to_string())
-        } else {
-            Err(serde::de::Error::custom(
-                "Failed to extract version from JSON URL",
-            ))
-        }
-    } else {
-        Ok(s)
-    }
-}
-
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[allow(dead_code)]
 pub struct Maintainer {
     pub name: String,
     pub email: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum Checksums {
+    Url(String),
+    List(Vec<ChecksumInfo>),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ChecksumInfo {
+    pub file: String,
+    pub checksum: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
 #[allow(dead_code)]
 pub struct InstallationMethod {
     #[serde(rename = "type")]
@@ -85,9 +82,10 @@ pub struct InstallationMethod {
     pub commands: Option<Vec<String>>,
     #[serde(rename = "platformComExt")]
     pub platform_com_ext: Option<HashMap<String, String>>,
+    pub checksums: Option<Checksums>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Dependencies {
     pub runtime: Option<Vec<String>>,
     pub build: Option<Vec<String>>,
@@ -106,6 +104,7 @@ pub struct InstallManifest {
     pub repo: String,
     pub installed_at: String,
     pub reason: InstallReason,
+    pub scope: Scope,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

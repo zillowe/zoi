@@ -1,7 +1,7 @@
 {
   "versions": {
     "stable": "Prod-Beta-2.5.6",
-    "public": "Public-Beta.3.0.0"
+    "public": "Public-Beta-3.0.0"
   },
   "latest": {
     "production": {

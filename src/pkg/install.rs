@@ -1,21 +1,21 @@
-use crate::pkg::{dependencies, local, types};
+use crate::pkg::{dependencies, local, resolve, types};
 use crate::utils;
 use chrono::Utc;
 use colored::*;
 use dialoguer::{Select, theme::ColorfulTheme};
 use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
+use sha2::{Digest, Sha512};
 use std::error::Error;
 use std::fs::{self, File};
 use std::io::{self, Cursor, Read, Write};
-use std::path::Path;
 use std::process::Command;
 use tar::Archive;
 use tempfile::Builder;
-use xz2::read::XzDecoder;
-use zstd::stream::read::Decoder as ZstdDecoder;
-use zip::ZipArchive;
 use walkdir::WalkDir;
+use xz2::read::XzDecoder;
+use zip::ZipArchive;
+use zstd::stream::read::Decoder as ZstdDecoder;
 
 #[derive(PartialEq, Eq)]
 pub enum InstallMode {
@@ -26,26 +26,35 @@ pub enum InstallMode {
 }
 
 pub fn run_installation(
-    package_file: &Path,
+    source: &str,
     mode: InstallMode,
     force: bool,
     reason: types::InstallReason,
     yes: bool,
 ) -> Result<(), Box<dyn Error>> {
-    let yaml_content = fs::read_to_string(package_file)?;
-    let pkg: types::Package = serde_yaml::from_str(&yaml_content)?;
+    let (pkg, version) = resolve::resolve_package_and_version(source)?;
+
+    if pkg.scope == types::Scope::System {
+        if !utils::is_admin() {
+            return Err("System-wide installation requires administrative privileges. Please run with sudo or as an administrator.".into());
+        }
+        if !utils::ask_for_confirmation(
+            "This package will be installed system-wide. Are you sure you want to continue?",
+            yes,
+        ) {
+            return Err("Operation aborted by user.".into());
+        }
+    }
 
     if pkg.package_type == types::PackageType::Collection {
         println!("Installing package collection '{}'...", pkg.name.bold());
         if let Some(deps) = &pkg.dependencies {
             if let Some(runtime_deps) = &deps.runtime {
                 if !runtime_deps.is_empty() {
-                    dependencies::resolve_and_install(runtime_deps, &pkg.name, yes)?;
+                    dependencies::resolve_and_install(runtime_deps, &pkg.name, pkg.scope, yes)?;
                 } else {
                     println!("Collection has no runtime dependencies to install.");
                 }
-            } else {
-                println!("Collection has no runtime dependencies to install.");
             }
         } else {
             println!("Collection has no dependencies to install.");
@@ -55,7 +64,7 @@ pub fn run_installation(
         return Ok(());
     }
 
-    if let Some(mut manifest) = local::is_package_installed(&pkg.name)? {
+    if let Some(mut manifest) = local::is_package_installed(&pkg.name, pkg.scope)? {
         if manifest.reason == types::InstallReason::Dependency
             && reason == types::InstallReason::Direct
         {
@@ -66,7 +75,7 @@ pub fn run_installation(
     }
 
     if !force {
-        if let Some(manifest) = local::is_package_installed(&pkg.name)? {
+        if let Some(manifest) = local::is_package_installed(&pkg.name, pkg.scope)? {
             println!(
                 "{}",
                 format!(
@@ -91,16 +100,16 @@ pub fn run_installation(
         }
     }
 
-    println!("Installing '{}' version '{}'", pkg.name, pkg.version);
+    println!("Installing '{}' version '{}'", pkg.name, version);
 
     if let Some(deps) = &pkg.dependencies {
         if mode == InstallMode::ForceSource {
             if let Some(build_deps) = &deps.build {
-                dependencies::resolve_and_install(build_deps, &pkg.name, yes)?;
+                dependencies::resolve_and_install(build_deps, &pkg.name, pkg.scope, yes)?;
             }
         }
         if let Some(runtime_deps) = &deps.runtime {
-            dependencies::resolve_and_install(runtime_deps, &pkg.name, yes)?;
+            dependencies::resolve_and_install(runtime_deps, &pkg.name, pkg.scope, yes)?;
         }
     }
 
@@ -116,7 +125,7 @@ pub fn run_installation(
 
     if result.is_ok() {
         write_manifest(&pkg, reason)?;
-        if let Err(e) = utils::setup_path() {
+        if let Err(e) = utils::setup_path(pkg.scope) {
             eprintln!("{} Failed to configure PATH: {}", "Warning:".yellow(), e);
         }
     }
@@ -193,16 +202,22 @@ fn run_default_flow(
         println!("Found 'binary' method. Installing...");
         return handle_binary_install(method, pkg);
     }
+
+    println!("No binary found, checking for compressed binary...");
     if let Some(method) = find_method(pkg, "com_binary", platform) {
         println!("Found 'com_binary' method. Installing...");
         return handle_com_binary_install(method, pkg);
     }
+
+    println!("No compressed binary found, checking for script...");
     if let Some(method) = find_method(pkg, "script", platform) {
         if utils::ask_for_confirmation("Found a 'script' method. Do you want to execute it?", yes)
         {
             return handle_script_install(method, pkg);
         }
     }
+
+    println!("No script found, checking for source...");
     if let Some(method) = find_method(pkg, "source", platform) {
         if utils::ask_for_confirmation(
             "Found a 'source' method. Do you want to build from source?",
@@ -211,6 +226,7 @@ fn run_default_flow(
             return handle_source_install(method, pkg);
         }
     }
+
     Err("No compatible and accepted installation method found for your platform.".into())
 }
 
@@ -237,12 +253,103 @@ fn write_manifest(
 ) -> Result<(), Box<dyn Error>> {
     let manifest = types::InstallManifest {
         name: pkg.name.clone(),
-        version: pkg.version.clone(),
+        version: pkg.version.clone().expect("Version should be resolved"),
         repo: pkg.repo.clone(),
         installed_at: Utc::now().to_rfc3339(),
         reason,
+        scope: pkg.scope,
     };
     local::write_manifest(&manifest)
+}
+
+fn get_filename_from_url(url: &str) -> &str {
+    url.split('/').last().unwrap_or("")
+}
+
+fn get_expected_checksum(
+    checksums: &types::Checksums,
+    file_to_verify: &str,
+    pkg: &types::Package,
+    platform: &str,
+) -> Result<Option<String>, Box<dyn Error>> {
+    match checksums {
+        types::Checksums::Url(url) => {
+            let mut url = url.replace("{version}", pkg.version.as_deref().unwrap_or(""));
+            url = url.replace("{name}", &pkg.name);
+            url = url.replace("{platform}", platform);
+
+            println!("Downloading checksums from: {}", url.cyan());
+            let response = reqwest::blocking::get(&url)?.text()?;
+            for line in response.lines() {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() == 2 && parts[1] == file_to_verify {
+                    return Ok(Some(parts[0].to_string()));
+                }
+            }
+            if response.lines().count() == 1 && response.split_whitespace().count() == 1 {
+                return Ok(Some(response.trim().to_string()));
+            }
+            Ok(None)
+        }
+        types::Checksums::List(list) => {
+            for item in list {
+                let mut file_pattern = item.file.replace("{version}", pkg.version.as_deref().unwrap_or(""));
+                file_pattern = file_pattern.replace("{name}", &pkg.name);
+                file_pattern = file_pattern.replace("{platform}", platform);
+
+                if file_pattern == file_to_verify {
+                    if item.checksum.starts_with("http") {
+                        println!("Downloading checksum from: {}", item.checksum.cyan());
+                        let response = reqwest::blocking::get(&item.checksum)?.text()?;
+                        return Ok(Some(response.trim().to_string()));
+                    } else {
+                        return Ok(Some(item.checksum.clone()));
+                    }
+                }
+            }
+            Ok(None)
+        }
+    }
+}
+
+fn verify_checksum(
+    data: &[u8],
+    method: &types::InstallationMethod,
+    pkg: &types::Package,
+    file_to_verify: &str,
+) -> Result<(), Box<dyn Error>> {
+    if let Some(checksums) = &method.checksums {
+        println!("Verifying checksum for {}...", file_to_verify);
+        let platform = utils::get_platform()?;
+        if let Some(expected_checksum) =
+            get_expected_checksum(checksums, file_to_verify, pkg, &platform)?
+        {
+            let mut hasher = Sha512::new();
+            hasher.update(data);
+            let result = hasher.finalize();
+            let computed_checksum = format!("{:x}", result);
+
+            if computed_checksum.eq_ignore_ascii_case(&expected_checksum) {
+                println!("{}", "Checksum verified successfully.".green());
+                Ok(())
+            } else {
+                Err(format!(
+                    "Checksum mismatch for {}.\nExpected: {}\nComputed: {}",
+                    file_to_verify, expected_checksum, computed_checksum
+                )
+                .into())
+            }
+        } else {
+            println!(
+                "{} No checksum found for file '{}'. Skipping verification.",
+                "Warning:".yellow(),
+                file_to_verify
+            );
+            Ok(())
+        }
+    } else {
+        Ok(())
+    }
 }
 
 fn handle_com_binary_install(
@@ -259,7 +366,7 @@ fn handle_com_binary_install(
         .map(|s| s.as_str())
         .unwrap_or(if os == "windows" { "zip" } else { "tar.zst" });
 
-    let mut url = method.url.replace("{version}", &pkg.version);
+    let mut url = method.url.replace("{version}", pkg.version.as_deref().unwrap_or(""));
     url = url.replace("{name}", &pkg.name);
     url = url.replace("{platform}", &platform);
     url = url.replace("{platformComExt}", com_ext);
@@ -275,7 +382,7 @@ fn handle_com_binary_install(
     let pb = ProgressBar::new(total_size);
     pb.set_style(ProgressStyle::default_bar()
         .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})")?
-        .progress_chars("#>-"));
+        .progress_chars("#>- "));
 
     let mut downloaded_bytes = Vec::new();
     let mut stream = response;
@@ -289,6 +396,9 @@ fn handle_com_binary_install(
         pb.inc(bytes_read as u64);
     }
     pb.finish_with_message("Download complete.");
+
+    let file_to_verify = get_filename_from_url(&url);
+    verify_checksum(&downloaded_bytes, method, pkg, file_to_verify)?;
 
     let temp_dir = Builder::new().prefix("zoi-com-binary").tempdir()?;
 
@@ -403,14 +513,14 @@ fn handle_binary_install(
     method: &types::InstallationMethod,
     pkg: &types::Package,
 ) -> Result<(), Box<dyn Error>> {
-    let mut url = method.url.replace("{version}", &pkg.version);
+    let mut url = method.url.replace("{version}", pkg.version.as_deref().unwrap_or(""));
     url = url.replace("{name}", &pkg.name);
     let platform = utils::get_platform()?;
     url = url.replace("{platform}", &platform);
 
     println!("Downloading from: {url}");
 
-    let mut response = reqwest::blocking::get(url)?;
+    let response = reqwest::blocking::get(&url)?;
     if !response.status().is_success() {
         return Err(format!("Failed to download binary: HTTP {}", response.status()).into());
     }
@@ -419,7 +529,23 @@ fn handle_binary_install(
     let pb = ProgressBar::new(total_size);
     pb.set_style(ProgressStyle::default_bar()
         .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})")?
-        .progress_chars("#>-"));
+        .progress_chars("#>- "));
+
+    let mut downloaded_bytes = Vec::new();
+    let mut stream = response;
+    let mut buffer = [0; 8192];
+    loop {
+        let bytes_read = stream.read(&mut buffer)?;
+        if bytes_read == 0 {
+            break;
+        }
+        downloaded_bytes.extend_from_slice(&buffer[..bytes_read]);
+        pb.inc(bytes_read as u64);
+    }
+    pb.finish_with_message("Download complete.");
+
+    let file_to_verify = get_filename_from_url(&url);
+    verify_checksum(&downloaded_bytes, method, pkg, file_to_verify)?;
 
     let store_dir = home::home_dir()
         .ok_or("No home dir")?
@@ -435,18 +561,7 @@ fn handle_binary_install(
     };
     let bin_path = store_dir.join(&binary_filename);
     let mut dest = File::create(&bin_path)?;
-    let mut buffer = [0; 8192];
-
-    loop {
-        let bytes_read = response.read(&mut buffer)?;
-        if bytes_read == 0 {
-            break;
-        }
-        dest.write_all(&buffer[..bytes_read])?;
-        pb.inc(bytes_read as u64);
-    }
-
-    pb.finish_with_message("Download complete.");
+    dest.write_all(&downloaded_bytes)?;
 
     #[cfg(unix)]
     {
@@ -493,7 +608,7 @@ fn handle_script_install(
     let resolved_url = method
         .url
         .replace("{platformExt}", platform_ext)
-        .replace("{website}", &pkg.website);
+        .replace("{website}", pkg.website.as_deref().unwrap_or_default());
 
     let temp_dir = Builder::new().prefix("zoi-script-install").tempdir()?;
     let script_filename = format!("install.{platform_ext}");
@@ -504,7 +619,12 @@ fn handle_script_install(
     if !response.status().is_success() {
         return Err(format!("Failed to download script: HTTP {}", response.status()).into());
     }
-    fs::write(&script_path, response.bytes()?)?;
+    let script_bytes = response.bytes()?.to_vec();
+
+    let file_to_verify = get_filename_from_url(&resolved_url);
+    verify_checksum(&script_bytes, method, pkg, file_to_verify)?;
+
+    fs::write(&script_path, script_bytes)?;
     println!("Script downloaded to temporary location.");
 
     #[cfg(unix)]

@@ -3,8 +3,53 @@ use colored::*;
 use std::error::Error;
 use std::fmt::Display;
 use std::fs;
-use std::io::{stdin, stdout, Write};
+use std::io::{Write, stdin, stdout};
 use std::process::Command;
+
+pub fn is_admin() -> bool {
+    #[cfg(windows)]
+    {
+        use std::mem;
+        use std::ptr;
+        use winapi::um::handleapi::CloseHandle;
+        use winapi::um::processthreadsapi::GetCurrentProcess;
+        use winapi::um::processthreadsapi::OpenProcessToken;
+        use winapi::um::securitybaseapi::CheckTokenMembership;
+        use winapi::um::winnt::{PSID, TOKEN_QUERY};
+
+        let mut token = ptr::null_mut();
+        let process = unsafe { GetCurrentProcess() };
+        if unsafe { OpenProcessToken(process, TOKEN_QUERY, &mut token) } == 0 {
+            return false;
+        }
+
+        let mut sid: [u8; 8] = [0; 8];
+        let mut sid_size = mem::size_of_val(&sid) as u32;
+        if unsafe {
+            winapi::um::winuser::CreateWellKnownSid(
+                winapi::um::winnt::WinBuiltinAdministratorsSid,
+                ptr::null_mut(),
+                sid.as_mut_ptr() as PSID,
+                &mut sid_size,
+            )
+        } == 0
+        {
+            unsafe { CloseHandle(token) };
+            return false;
+        }
+
+        let mut is_member = 0;
+        let result =
+            unsafe { CheckTokenMembership(token, sid.as_mut_ptr() as PSID, &mut is_member) };
+        unsafe { CloseHandle(token) };
+
+        result != 0 && is_member != 0
+    }
+    #[cfg(unix)]
+    {
+        nix::unistd::getuid().is_root()
+    }
+}
 
 pub fn print_info<T: Display>(key: &str, value: T) {
     println!("{}: {}", key.cyan(), value);
@@ -88,8 +133,8 @@ pub fn get_native_package_manager() -> Option<String> {
         "linux" => {
             if let Some(distro) = get_linux_distribution() {
                 match distro.as_str() {
-                    "arch" => Some("pacman".to_string()),
-                    "ubuntu" | "debian" | "linuxmint" | "pop" => Some("apt".to_string()),
+                    "arch" | "manjaro" | "cachyos" => Some("pacman".to_string()),
+                    "ubuntu" | "debian" | "linuxmint" | "pop" | "kali" => Some("apt".to_string()),
                     "fedora" | "centos" | "rhel" => Some("dnf".to_string()),
                     "opensuse-tumbleweed" | "opensuse-leap" => Some("zypper".to_string()),
                     "alpine" => Some("apk".to_string()),
@@ -115,6 +160,8 @@ pub fn get_native_package_manager() -> Option<String> {
                 None
             }
         }
+        "freebsd" => Some("pkg".to_string()),
+        "openbsd" => Some("pkg_add".to_string()),
         _ => None,
     }
 }
@@ -137,7 +184,6 @@ pub fn confirm_untrusted_source(source_type: &SourceType, yes: bool) -> Result<(
     if source_type == &SourceType::OfficialRepo {
         return Ok(());
     }
-
 
     let warning_message = match source_type {
         SourceType::UntrustedRepo(repo) => {
@@ -174,17 +220,35 @@ pub fn is_platform_compatible(current_platform: &str, allowed_platforms: &[Strin
         .any(|p| p == "all" || p == os || p == current_platform)
 }
 
+use crate::pkg::types::Scope;
 use std::path::PathBuf;
 
-pub fn setup_path() -> Result<(), Box<dyn Error>> {
-    let zoi_bin_dir = home::home_dir()
-        .ok_or("Could not find home directory.")?
-        .join(".zoi")
-        .join("pkgs")
-        .join("bin");
+pub fn setup_path(scope: Scope) -> Result<(), Box<dyn Error>> {
+    let zoi_bin_dir = match scope {
+        Scope::User => home::home_dir()
+            .ok_or("Could not find home directory.")?
+            .join(".zoi")
+            .join("pkgs")
+            .join("bin"),
+        Scope::System => {
+            if cfg!(target_os = "windows") {
+                PathBuf::from("C:\\ProgramData\\zoi\\pkgs\\bin")
+            } else {
+                PathBuf::from("/usr/local/bin")
+            }
+        }
+    };
 
     if !zoi_bin_dir.exists() {
         fs::create_dir_all(&zoi_bin_dir)?;
+    }
+
+    if scope == Scope::System {
+        println!(
+            "{}",
+            "System-wide installation complete. Binaries are in the system PATH.".green()
+        );
+        return Ok(());
     }
 
     println!("{}", "Ensuring Zoi bin directory is in your PATH...".bold());
@@ -192,21 +256,34 @@ pub fn setup_path() -> Result<(), Box<dyn Error>> {
     #[cfg(unix)]
     {
         use std::fs::{File, OpenOptions};
+        let home = home::home_dir().ok_or("Could not find home directory.")?;
         let zoi_bin_str = "$HOME/.zoi/pkgs/bin";
 
         let shell_name = std::env::var("SHELL").unwrap_or_default();
-        let profile_file_path = if shell_name.contains("bash") {
-            if cfg!(target_os = "macos") {
-                home::home_dir().unwrap().join(".bash_profile")
+        let (profile_file_path, cmd_to_write) = if shell_name.contains("bash") {
+            let path = if cfg!(target_os = "macos") {
+                home.join(".bash_profile")
             } else {
-                home::home_dir().unwrap().join(".bashrc")
-            }
+                home.join(".bashrc")
+            };
+            let cmd = format!("\n# Added by Zoi\nexport PATH=\"{}:$PATH\"\n", zoi_bin_str);
+            (path, cmd)
         } else if shell_name.contains("zsh") {
-            home::home_dir().unwrap().join(".zshrc")
+            let path = home.join(".zshrc");
+            let cmd = format!("\n# Added by Zoi\nexport PATH=\"{}:$PATH\"\n", zoi_bin_str);
+            (path, cmd)
         } else if shell_name.contains("fish") {
-            home::home_dir().unwrap().join(".config/fish/config.fish")
+            let path = home.join(".config/fish/config.fish");
+            let cmd = format!("\n# Added by Zoi\nset -gx PATH \"{}\" $PATH\n", zoi_bin_str);
+            (path, cmd)
+        } else if shell_name.contains("csh") || shell_name.contains("tcsh") {
+            let path = home.join(".cshrc");
+            let cmd = format!("\n# Added by Zoi\nsetenv PATH \"{}:$PATH\"\n", zoi_bin_str);
+            (path, cmd)
         } else {
-            home::home_dir().unwrap().join(".profile")
+            let path = home.join(".profile");
+            let cmd = format!("\n# Added by Zoi\nexport PATH=\"{}:$PATH\"\n", zoi_bin_str);
+            (path, cmd)
         };
 
         if !profile_file_path.exists() {
@@ -220,12 +297,6 @@ pub fn setup_path() -> Result<(), Box<dyn Error>> {
         }
 
         let mut file = OpenOptions::new().append(true).open(&profile_file_path)?;
-
-        let cmd_to_write = if shell_name.contains("fish") {
-            format!("\n# Added by Zoi\nset -gx PATH \"{}\" $PATH\n", zoi_bin_str)
-        } else {
-            format!("\n# Added by Zoi\nexport PATH=\"{}:$PATH\"\n", zoi_bin_str)
-        };
 
         file.write_all(cmd_to_write.as_bytes())?;
 
@@ -242,8 +313,8 @@ pub fn setup_path() -> Result<(), Box<dyn Error>> {
 
     #[cfg(windows)]
     {
-        use winreg::enums::*;
         use winreg::RegKey;
+        use winreg::enums::*;
 
         let zoi_bin_path_str = zoi_bin_dir.to_str().ok_or("Invalid path string")?;
 
@@ -290,17 +361,20 @@ pub fn check_path() {
             let zoi_bin_dir_canon =
                 fs::canonicalize(&zoi_bin_dir).unwrap_or_else(|_| zoi_bin_dir.clone());
 
-            let is_in_path = path_var.split(std::path::MAIN_SEPARATOR_STR).any(|p| {
+            let _is_in_path = path_var.split(std::path::MAIN_SEPARATOR).any(|p| {
                 if p.is_empty() {
                     return false;
                 }
-                let p_path = PathBuf::from(p);
 
-                if p_path == zoi_bin_dir {
-                    return true;
-                }
+                let p_expanded = if p.starts_with("~/") {
+                    home.join(&p[2..])
+                } else if p == "~" {
+                    home.clone()
+                } else {
+                    PathBuf::from(p)
+                };
 
-                if let Ok(p_canon) = fs::canonicalize(&p_path) {
+                if let Ok(p_canon) = fs::canonicalize(&p_expanded) {
                     if p_canon == zoi_bin_dir_canon {
                         return true;
                     }
@@ -309,14 +383,16 @@ pub fn check_path() {
                 false
             });
 
-            if !is_in_path {
-                eprintln!(
-                    "{}: zoi's bin directory `{}` is not in your PATH.",
-                    "Warning".yellow(),
-                    zoi_bin_dir.display()
-                );
-                eprintln!("Please restart your terminal, or add it to your PATH manually for commands to be available.");
-            }
+            // if !is_in_path {
+            //     eprintln!(
+            //         "{}: zoi's bin directory `{}` is not in your PATH.",
+            //         "Warning".yellow(),
+            //         zoi_bin_dir.display()
+            //     );
+            //     eprintln!(
+            //         "Please restart your terminal, or add it to your PATH manually for commands to be available."
+            //     );
+            // }
         }
     }
 }

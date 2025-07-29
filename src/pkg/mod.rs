@@ -1,4 +1,5 @@
 pub mod autoremove;
+pub mod cache;
 pub mod clone;
 pub mod config;
 pub mod dependencies;
@@ -11,3 +12,4 @@ pub mod sync;
 pub mod types;
 pub mod uninstall;
 pub mod upgrade;
+

@@ -1,7 +1,8 @@
-use crate::pkg::config;
+use crate::pkg::{cache, config, pin, types};
 use chrono::Utc;
 use colored::*;
 use indicatif::{ProgressBar, ProgressStyle};
+use std::collections::HashMap;
 use std::env;
 use std::error::Error;
 use std::fs;
@@ -23,37 +24,75 @@ pub struct ResolvedSource {
     pub repo_name: Option<String>,
 }
 
+#[derive(Debug, Default)]
+struct PackageRequest {
+    repo: Option<String>,
+    name: String,
+    version_spec: Option<String>,
+}
+
 fn get_db_root() -> Result<PathBuf, Box<dyn Error>> {
     let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
     Ok(home_dir.join(".zoi").join("pkgs").join("db"))
 }
 
-fn parse_db_pkg_string(pkg_str: &str) -> (Option<&str>, &str) {
-    if let Some(stripped) = pkg_str.strip_prefix('@') {
-        if let Some(split_index) = stripped.find('/') {
-            let (repo, pkg_name) = stripped.split_at(split_index);
-            return (Some(repo), &pkg_name[1..]);
-        }
+fn parse_source_string(source_str: &str) -> Result<PackageRequest, Box<dyn Error>> {
+    let mut repo = None;
+    let name: &str;
+    let mut version_spec = None;
+
+    let mut parts = source_str.split('@');
+    let first_part = parts.next().unwrap_or("");
+
+    if source_str.starts_with('@') {
+        let mut repo_pkg_parts = first_part.trim_start_matches('@').splitn(2, '/');
+        repo = Some(
+            repo_pkg_parts
+                .next()
+                .ok_or("Invalid format: missing repo name.")?
+                .to_string(),
+        );
+        name = repo_pkg_parts
+            .next()
+            .ok_or("Invalid format: missing package name after repo.")?;
+    } else {
+        name = first_part;
     }
-    (None, pkg_str)
+
+    if let Some(v_spec) = parts.next() {
+        let mut final_spec = v_spec.to_string();
+        if parts.next().is_some() {
+            // This handles the `pkg@@channel` case
+            final_spec.insert(0, '@');
+        }
+        version_spec = Some(final_spec);
+    }
+
+    if name.is_empty() {
+        return Err("Invalid source string: package name is empty.".into());
+    }
+
+    Ok(PackageRequest {
+        repo,
+        name: name.to_string(),
+        version_spec,
+    })
 }
 
-fn find_package_in_db(pkg_str: &str) -> Result<ResolvedSource, Box<dyn Error>> {
-    let pkg_str = pkg_str.trim();
-    let (repo, pkg_name) = parse_db_pkg_string(pkg_str);
+fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dyn Error>> {
     let db_root = get_db_root()?;
 
-    let search_repos = if let Some(r) = repo {
-        vec![r.to_string()]
+    let search_repos = if let Some(r) = &request.repo {
+        vec![r.clone()]
     } else {
         config::read_config()?.repos
     };
 
     for repo_name in &search_repos {
-        let pkg_file_name = format!("{pkg_name}.pkg.yaml");
+        let pkg_file_name = format!("{}.pkg.yaml", request.name);
         let path = db_root.join(repo_name).join(&pkg_file_name);
         if path.exists() {
-            println!("Found package '{pkg_name}' in repo '{repo_name}'");
+            println!("Found package '{}' in repo '{}'", request.name, repo_name);
             let source_type = if repo_name == "main" || repo_name == "extra" {
                 SourceType::OfficialRepo
             } else {
@@ -67,10 +106,18 @@ fn find_package_in_db(pkg_str: &str) -> Result<ResolvedSource, Box<dyn Error>> {
         }
     }
 
-    if repo.is_some() {
-        Err(format!("Package '{pkg_name}' not found in repository '@{}'.", repo.unwrap()).into())
+    if let Some(repo) = &request.repo {
+        Err(format!(
+            "Package '{}' not found in repository '@{}'.",
+            request.name, repo
+        )
+        .into())
     } else {
-        Err(format!("Package '{pkg_name}' not found in any active repositories.").into())
+        Err(format!(
+            "Package '{}' not found in any active repositories.",
+            request.name
+        )
+        .into())
     }
 }
 
@@ -114,14 +161,149 @@ fn download_from_url(url: &str) -> Result<ResolvedSource, Box<dyn Error>> {
     })
 }
 
+fn resolve_version_from_url(url: &str, channel: &str) -> Result<String, Box<dyn Error>> {
+    println!("Resolving version for channel '{}' from {}", channel.cyan(), url.cyan());
+    let resp = reqwest::blocking::get(url)?.text()?;
+    let json: serde_json::Value = serde_json::from_str(&resp)?;
+
+    // New format: { "versions": { "stable": "...", "public": "..." } }
+    if let Some(version) = json
+        .get("versions")
+        .and_then(|v| v.get(channel))
+        .and_then(|c| c.as_str())
+    {
+        return Ok(version.to_string());
+    }
+
+    // Old format: { "latest": { "production": { "tag": "..." } } }
+    if let Some(tag) = json
+        .get("latest")
+        .and_then(|l| l.get("production"))
+        .and_then(|p| p.get("tag"))
+        .and_then(|t| t.as_str())
+    {
+        return Ok(tag.to_string());
+    }
+
+    Err(format!("Failed to extract version for channel '{channel}' from JSON URL: {url}").into())
+}
+
+fn resolve_channel(
+    versions: &HashMap<String, String>,
+    channel: &str,
+) -> Result<String, Box<dyn Error>> {
+    if let Some(url_or_version) = versions.get(channel) {
+        if url_or_version.starts_with("http") {
+            resolve_version_from_url(url_or_version, channel)
+        } else {
+            Ok(url_or_version.clone())
+        }
+    } else {
+        Err(format!("Channel '@{channel}' not found in versions map.").into())
+    }
+}
+
+pub fn get_default_version(pkg: &types::Package) -> Result<String, Box<dyn Error>> {
+    if let Some(pinned_version) = pin::get_pinned_version(&pkg.name)? {
+        println!("Using pinned version '{}' for {}.", pinned_version.yellow(), pkg.name.cyan());
+        return if pinned_version.starts_with('@') {
+            let channel = pinned_version.trim_start_matches('@');
+            let versions = pkg
+                .versions
+                .as_ref()
+                .ok_or_else(|| format!("Package '{}' has no 'versions' map to resolve pinned channel '{}'.", pkg.name, pinned_version))?;
+            resolve_channel(versions, channel)
+        } else {
+            Ok(pinned_version)
+        };
+    }
+
+    if let Some(versions) = &pkg.versions {
+        if versions.contains_key("stable") {
+            return resolve_channel(versions, "stable");
+        }
+        if let Some((channel, _)) = versions.iter().next() {
+            println!("No 'stable' channel found, using first available channel: '@{}'", channel.cyan());
+            return resolve_channel(versions, channel);
+        }
+        return Err("Package has a 'versions' map but no versions were found in it.".into());
+    }
+
+    if let Some(ver) = &pkg.version {
+        if ver.starts_with("http") {
+             let resp = reqwest::blocking::get(ver)?.text()?;
+             if let Ok(json) = serde_json::from_str::<serde_json::Value>(&resp) {
+                 if let Some(tag) = json
+                    .get("latest")
+                    .and_then(|l| l.get("production"))
+                    .and_then(|p| p.get("tag"))
+                    .and_then(|t| t.as_str())
+                 {
+                     return Ok(tag.to_string());
+                 }
+             }
+             return Ok(resp.trim().to_string());
+        } else {
+            return Ok(ver.clone());
+        }
+    }
+
+    Err(format!("Could not determine a version for package '{}'.", pkg.name).into())
+}
+
+fn get_version_for_install(
+    pkg: &types::Package,
+    version_spec: &Option<String>,
+) -> Result<String, Box<dyn Error>> {
+    if let Some(spec) = version_spec {
+        if spec.starts_with('@') {
+            let channel = spec.trim_start_matches('@');
+            let versions = pkg
+                .versions
+                .as_ref()
+                .ok_or_else(|| format!("Package '{}' has no 'versions' map to resolve channel '@{}'.", pkg.name, channel))?;
+            return resolve_channel(versions, channel);
+        }
+
+        if let Some(versions) = &pkg.versions {
+            if versions.contains_key(spec) {
+                println!("Found '{}' as a channel, resolving...", spec.cyan());
+                return resolve_channel(versions, spec);
+            }
+        }
+
+        return Ok(spec.clone());
+    }
+
+    get_default_version(pkg)
+}
+
 pub fn resolve_source(source: &str) -> Result<ResolvedSource, Box<dyn Error>> {
     resolve_source_recursive(source, 0)
+}
+
+pub fn resolve_package_and_version(
+    source_str: &str,
+) -> Result<(types::Package, String), Box<dyn Error>> {
+    let request = parse_source_string(source_str)?;
+    let resolved_source = resolve_source_recursive(source_str, 0)?;
+
+    let content = fs::read_to_string(&resolved_source.path)?;
+    let mut pkg: types::Package = serde_yaml::from_str(&content)?;
+    pkg.repo = resolved_source.repo_name.clone().unwrap_or_default();
+
+    let version_string = get_version_for_install(&pkg, &request.version_spec)?;
+
+    pkg.version = Some(version_string.clone());
+    Ok((pkg, version_string))
 }
 
 fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, Box<dyn Error>> {
     if depth > 5 {
         return Err("Exceeded max resolution depth, possible circular 'alt' reference.".into());
     }
+
+    let request = parse_source_string(source)?;
 
     let resolved_source = if source.starts_with("http://") || source.starts_with("https://") {
         download_from_url(source)?
@@ -137,7 +319,7 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, B
             repo_name: None,
         }
     } else {
-        find_package_in_db(source)?
+        find_package_in_db(&request)?
     };
 
     let content = fs::read_to_string(&resolved_source.path)?;
@@ -153,9 +335,18 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, B
 
     if let Some(alt_url) = alt_check.alt {
         println!("Found 'alt' source. Resolving from URL: {}", alt_url.cyan());
-        return resolve_source_recursive(&alt_url, depth + 1);
+
+        if let Some(cached_path) = cache::get_cached_alt_source_path(&alt_url)? {
+            println!("Found cached 'alt' source for URL: {}", alt_url.cyan());
+            return resolve_source_recursive(cached_path.to_str().unwrap(), depth + 1);
+        }
+
+        println!("Downloading and caching 'alt' source from: {}", alt_url.cyan());
+        let downloaded_content = reqwest::blocking::get(&alt_url)?.text()?;
+        let cached_path = cache::cache_alt_source(&alt_url, &downloaded_content)?;
+
+        return resolve_source_recursive(cached_path.to_str().unwrap(), depth + 1);
     }
 
     Ok(resolved_source)
 }
-

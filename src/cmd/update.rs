@@ -27,9 +27,12 @@ fn run_update_single_logic(
         return Ok(());
     }
 
-    let manifest = local::is_package_installed(package_name)?.ok_or(format!(
-        "Package '{package_name}' is not installed. Use 'zoi install' instead."
-    ))?;
+    let manifest =
+        local::is_package_installed(package_name, types::Scope::User)?
+            .or(local::is_package_installed(package_name, types::Scope::System)?)
+            .ok_or(format!(
+                "Package '{package_name}' is not installed. Use 'zoi install' instead."
+            ))?;
 
     println!("Currently installed version: {}", manifest.version.yellow());
 
@@ -40,9 +43,9 @@ fn run_update_single_logic(
     let content = std::fs::read_to_string(&resolved_source.path)?;
     let new_pkg: crate::pkg::types::Package = serde_yaml::from_str(&content)?;
 
-    println!("Available version: {}", new_pkg.version.green());
+    println!("Available version: {}", new_pkg.version.as_deref().unwrap_or("N/A").green());
 
-    if manifest.version == new_pkg.version {
+    if manifest.version == new_pkg.version.as_deref().unwrap_or_default() {
         println!("\nPackage is already up to date.");
         return Ok(());
     }
@@ -50,7 +53,8 @@ fn run_update_single_logic(
     if !utils::ask_for_confirmation(
         &format!(
             "Update from {} to {}?",
-            manifest.version, new_pkg.version
+            manifest.version,
+            new_pkg.version.as_deref().unwrap_or("N/A")
         ),
         yes,
     ) {
@@ -64,7 +68,7 @@ fn run_update_single_logic(
     };
 
     install::run_installation(
-        &resolved_source.path,
+        resolved_source.path.to_str().unwrap(),
         mode,
         true,
         types::InstallReason::Direct,
@@ -115,12 +119,12 @@ fn run_update_all_logic(yes: bool) -> Result<(), Box<dyn std::error::Error>> {
         let content = std::fs::read_to_string(&resolved_source.path)?;
         let new_pkg: crate::pkg::types::Package = serde_yaml::from_str(&content)?;
 
-        if manifest.version != new_pkg.version {
+        if manifest.version != new_pkg.version.as_deref().unwrap_or_default() {
             upgrade_messages.push(format!(
                 "- {} can be upgraded from {} to {}",
                 manifest.name.cyan(),
                 manifest.version.yellow(),
-                new_pkg.version.green()
+                new_pkg.version.as_deref().unwrap_or("N/A").green()
             ));
             packages_to_upgrade.push((
                 manifest.name.clone(),
@@ -149,13 +153,23 @@ fn run_update_all_logic(yes: bool) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     for (name, version, path, updater) in packages_to_upgrade {
-        println!("\n--- Upgrading {} to {} ---", name.cyan(), version.green());
+        println!(
+            "\n--- Upgrading {} to {} ---",
+            name.cyan(),
+            version.as_deref().unwrap_or("N/A").green()
+        );
         let mode = if let Some(updater_method) = updater {
             install::InstallMode::Updater(updater_method)
         } else {
             install::InstallMode::PreferBinary
         };
-        install::run_installation(&path, mode, true, types::InstallReason::Direct, yes)?;
+        install::run_installation(
+            path.to_str().unwrap(),
+            mode,
+            true,
+            types::InstallReason::Direct,
+            yes,
+        )?;
     }
 
     println!("\n{}", "Upgrade complete.".green());
