@@ -30,7 +30,7 @@ build:linux:
   before_script:
     - dpkg --add-architecture arm64
     - dpkg --add-architecture armhf
-    - apt-get update -y && apt-get install -y build-essential gcc gcc-aarch64-linux-gnu libssl-dev pkg-config libssl-dev:arm64 openssl libssl-dev:armhf gcc-mingw-w64-x86-64 liblzma-dev:arm64
+    - apt-get update -y && apt-get install -y build-essential gcc gcc-aarch64-linux-gnu libssl-dev pkg-config libssl-dev:arm64 openssl libssl-dev:armhf gcc-mingw-w64-x86-64 liblzma-dev:arm64 freebsd-buildutils
   script:
     - echo "Building Linux targets (amd64, arm64) and Windows (amd64)..."
     - chmod +x ./build/build-linux.sh
@@ -42,24 +42,24 @@ build:linux:
   rules:
     - if: $CI_COMMIT_TAG
 
-build:macos:
-  stage: build
-  tags:
-    - saas-macos-medium-m1
-  image: macos-15-xcode-16
-  before_script:
-    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-    - source ~/.cargo/env
-  script:
-    - echo "Building macOS targets (amd64, arm64)..."
-    - chmod +x ./build/build-macos.sh
-    - ./build/build-macos.sh
-  artifacts:
-    paths:
-      - ./build/release/
-    expire_in: 1 week
-  rules:
-    - if: $CI_COMMIT_TAG
+# build:macos:
+#   stage: build
+#   tags:
+#     - saas-macos-medium-m1
+#   image: macos-15-xcode-16
+#   before_script:
+#     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+#     - source ~/.cargo/env
+#   script:
+#     - echo "Building macOS targets (amd64, arm64)..."
+#     - chmod +x ./build/build-macos.sh
+#     - ./build/build-macos.sh
+#   artifacts:
+#     paths:
+#       - ./build/release/
+#     expire_in: 1 week
+#   rules:
+#     - if: $CI_COMMIT_TAG
 
 package:archive:
   stage: package
@@ -80,7 +80,7 @@ package:archive:
     - job: check_build
       optional: true
     - build:linux
-    - build:macos
+    # - build:macos
   artifacts:
     paths:
       - ./build/archived/
