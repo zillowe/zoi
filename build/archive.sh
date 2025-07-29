@@ -24,8 +24,8 @@ function check_command() {
 check_command "7z"
 check_command "zstd"
 check_command "bsdiff"
-check_command "glab"
 check_command "curl"
+check_command "jq"
 
 if [ ! -d "$COMPILED_DIR" ]; then
     echo -e "${RED}Error: Compiled directory '${COMPILED_DIR}' not found.${NC}"
@@ -64,16 +64,33 @@ done
 echo -e "${CYAN}🔗 Generating binary diffs...${NC}"
 
 echo -e "${CYAN}Fetching the latest release tag from GitLab API...${NC}"
-LATEST_TAG=$(curl --silent --fail "https://gitlab.com/api/v4/projects/${GITLAB_PROJECT_PATH//\//%2F}/releases" \
-    | jq -r '.[0].tag_name // empty' 2>/dev/null)
 
-if [ -z "$LATEST_TAG" ] && command -v jq >/dev/null 2>&1; then
-    LATEST_TAG=$(curl --silent --fail "https://gitlab.com/api/v4/projects/${GITLAB_PROJECT_PATH//\//%2F}/releases" \
-        | tr ',' '\n' | grep '"tag_name"' | sed 's/.*"tag_name":"\([^"]*\)".*/\1/' | head -n 1)
+if [ -n "${CI_PROJECT_ID:-}" ]; then
+    PROJECT_IDENTIFIER="$CI_PROJECT_ID"
+else
+    PROJECT_IDENTIFIER="${GITLAB_PROJECT_PATH//\//%2F}"
 fi
 
+LATEST_TAG=""
+API_URL="https://gitlab.com/api/v4/projects/${PROJECT_IDENTIFIER}/releases"
+
+echo -e "${CYAN}Trying API URL: ${API_URL}${NC}"
+
+if RESPONSE=$(curl --silent --show-error --fail "$API_URL" 2>&1); then
+    if [ -n "$RESPONSE" ] && [ "$RESPONSE" != "[]" ]; then
+        LATEST_TAG=$(echo "$RESPONSE" | jq -r '.[0].tag_name // empty' 2>/dev/null || echo "")
+    fi
+else
+    echo -e "${YELLOW}API call failed: $RESPONSE${NC}"
+fi
+
+
 if [ -z "$LATEST_TAG" ]; then
-    echo -e "${YELLOW}Could not fetch the latest release tag. Skipping diff generation.${NC}"
+    echo -e "${YELLOW}Could not fetch the latest release tag. This might be because:${NC}"
+    echo -e "${YELLOW}  - No releases exist yet${NC}"
+    echo -e "${YELLOW}  - API requires authentication${NC}"
+    echo -e "${YELLOW}  - Network connectivity issues${NC}"
+    echo -e "${YELLOW}Skipping diff generation.${NC}"
 else
     echo -e "${CYAN}Latest tag found: ${LATEST_TAG}${NC}"
     
