@@ -63,7 +63,7 @@ check_build:
 
 build:freebsd-amd64:
   stage: build
-  image: ghcr.io/taiki-e/rust-cross-toolchain:x86_64-unknown-freebsd
+  image: ghcr.io/taiki-e/rust-cross-toolchain:x86_64-unknown-freebsd-dev-arm64v8
   tags:
     - saas-linux-large-amd64
   script:
@@ -79,7 +79,7 @@ build:freebsd-amd64:
 
 build:freebsd-arm64:
   stage: build
-  image: ghcr.io/taiki-e/rust-cross-toolchain:aarch64-unknown-freebsd
+  image: ghcr.io/taiki-e/rust-cross-toolchain:aarch64-unknown-freebsd-dev-amd64
   tags:
     - saas-linux-large-amd64
   script:
@@ -95,7 +95,7 @@ build:freebsd-arm64:
 
 build:openbsd-amd64:
   stage: build
-  image: ghcr.io/taiki-e/rust-cross-toolchain:x86_64-unknown-openbsd
+  image: ghcr.io/taiki-e/rust-cross-toolchain:x86_64-unknown-openbsd-dev-arm64v8
   tags:
     - saas-linux-large-amd64
   script:
@@ -111,7 +111,7 @@ build:openbsd-amd64:
 
 build:openbsd-arm64:
   stage: build
-  image: ghcr.io/taiki-e/rust-cross-toolchain:aarc64-unknown-openbsd
+  image: ghcr.io/taiki-e/rust-cross-toolchain:aarch64-unknown-openbsd-dev-amd64
   tags:
     - saas-linux-large-amd64
   script:
