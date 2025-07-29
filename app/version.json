@@ -1,12 +1,12 @@
 {
   "versions": {
-    "stable": "Prod-Beta-3.1.2",
+    "stable": "Prod-Beta-3.1.3",
     "public": "Public-Beta-3.0.0"
   },
   "latest": {
     "production": {
       "status": "Beta",
-      "version": "3.1.2"
+      "version": "3.1.3"
     },
     "development": {
       "status": "Beta",

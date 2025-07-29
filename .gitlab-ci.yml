@@ -66,8 +66,8 @@ package:archive:
   image: ubuntu:latest
   before_script:
     - apt-get update -y && apt-get install -y p7zip-full tar zstd bsdiff curl git
-    - curl -sSL "https://raw.githubusercontent.com/upciti/wakemeops/main/assets/install_repository" | sudo bash
-    - apt-get update -y && apt-get install glab
+    - curl -sL https://gitlab.com/gitlab-org/cli/-/releases/v1.64.0/downloads/glab_1.64.0_linux_amd64.deb -o glab.deb
+    - dpkg -i glab.deb
   script:
     - echo "Aggregating build artifacts..."
     - echo "Contents of the release directory:"
