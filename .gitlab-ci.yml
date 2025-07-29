@@ -63,7 +63,7 @@ check_build:
 
 build:freebsd:
   stage: build
-  image: freebsd/freebsd-runtime
+  image: freebsd/freebsd-static
   tags:
     - saas-linux-large-amd64
   before_script:
@@ -85,7 +85,7 @@ build:freebsd:
 
 build:openbsd:
   stage: build
-  image: toolbelt/netcat
+  image: anak10thn/openbsd
   tags:
     - saas-linux-large-amd64
   before_script:
@@ -101,6 +101,22 @@ build:openbsd:
     expire_in: 1 week
   rules:
     - if: $CI_COMMIT_TAG
+
+# build:windows:
+#   stage: build
+#   tags:
+#     - saas-windows-medium-amd64
+#   variables:
+#     GIT_STRATEGY: fetch
+#   script:
+#     - echo "Building for Windows ARM64..."
+#     - pwsh -File ./build/build-win.ps1
+#   artifacts:
+#     paths:
+#       - ./build/release/
+#     expire_in: 1 week
+#   rules:
+#     - if: $CI_COMMIT_TAG
 
 package:archive:
   stage: package
@@ -124,6 +140,7 @@ package:archive:
     # - build:macos
     - build:freebsd
     - build:openbsd
+    # - build:windows
   artifacts:
     paths:
       - ./build/archived/
