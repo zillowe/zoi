@@ -96,19 +96,34 @@ else
     
     for new_binary_path in "$COMPILED_DIR"/*; do
         filename=$(basename "$new_binary_path")
-        
-        OLD_BINARY_URL="https://gitlab.com/${GITLAB_PROJECT_PATH}/-/releases/${LATEST_TAG}/downloads/${filename}"
+        if [[ "$filename" == *"windows"* ]]; then
+            archive_name="${filename%.exe}.zip"
+        else
+            archive_name="${filename}.tar.zst"
+        fi
+    
+        OLD_ARCHIVE_URL="https://gitlab.com/${GITLAB_PROJECT_PATH}/-/releases/${LATEST_TAG}/downloads/${archive_name}"
+        OLD_ARCHIVE_TMP=$(mktemp)
         OLD_BINARY_TMP=$(mktemp)
 
-        echo -e "  -> Downloading old binary for ${filename} from ${LATEST_TAG}..."
-        if curl --fail -sL -o "$OLD_BINARY_TMP" "$OLD_BINARY_URL"; then
+        echo -e "  -> Downloading old archive for ${filename} from ${LATEST_TAG}..."
+        if curl --fail -sL -o "$OLD_ARCHIVE_TMP" "$OLD_ARCHIVE_URL"; then
+            if [[ "$filename" == *"windows"* ]]; then
+                unzip -j "$OLD_ARCHIVE_TMP" -d "$(dirname "$OLD_BINARY_TMP")" >/dev/null
+                mv "$(dirname "$OLD_BINARY_TMP")/zoi.exe" "$OLD_BINARY_TMP"
+            else
+                zstd -d "$OLD_ARCHIVE_TMP" -o "${OLD_ARCHIVE_TMP%.zst}"
+                tar -xf "${OLD_ARCHIVE_TMP%.zst}" -C "$(dirname "$OLD_BINARY_TMP")" --strip-components=0
+                mv "$(dirname "$OLD_BINARY_TMP")/zoi" "$OLD_BINARY_TMP"
+            fi
+        
             PATCH_FILE="${ARCHIVE_DIR}/${filename}.patch"
             echo -e "  -> Creating patch for ${filename}..."
             bsdiff "$OLD_BINARY_TMP" "$new_binary_path" "$PATCH_FILE"
         else
-            echo -e "${YELLOW}  -> Could not download old binary for ${filename}. Skipping patch.${NC}"
+            echo -e "${YELLOW}  -> Could not download old archive for ${filename}. Skipping patch.${NC}"
         fi
-        rm -f "$OLD_BINARY_TMP"
+        rm -f "$OLD_ARCHIVE_TMP" "$OLD_BINARY_TMP"
     done
 fi
 
