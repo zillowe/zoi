@@ -11,13 +11,9 @@ OUTPUT_DIR="./build/release"
 COMMIT=$(git rev-parse --short=10 HEAD 2>/dev/null || echo "dev")
 
 TARGETS=(
-  # "x86_64-unknown-linux-gnu"  
-  # "aarch64-unknown-linux-gnu"
-  # "x86_64-pc-windows-gnu"
-  "x86_64-unknown-freebsd"
-  "aarch64-unknown-freebsd"
-  "x86_64-unknown-openbsd"
-  "aarch64-unknown-openbsd"
+  "x86_64-unknown-linux-gnu"  
+  "aarch64-unknown-linux-gnu"
+  "x86_64-pc-windows-gnu"
 )
 
 if ! command -v cargo &> /dev/null; then
@@ -31,13 +27,9 @@ mkdir -p "$OUTPUT_DIR"
 
 for target in "${TARGETS[@]}"; do
   case "$target" in
-    # x86_64-unknown-linux-gnu)  NAME="zoi-linux-amd64" ;;
-    # aarch64-unknown-linux-gnu) NAME="zoi-linux-arm64" ;;
-    x86_64-unknown-freebsd)    NAME="zoi-freebsd-amd64" ;;
-    aarch64-unknown-freebsd)    NAME="zoi-freebsd-arm64" ;;
-    x86_64-unknown-openbsd)    NAME="zoi-openbsd-amd64" ;;
-    aarch64-unknown-openbsd)    NAME="zoi-openbsd-arm64" ;;
-    # x86_64-pc-windows-gnu)     NAME="zoi-windows-amd64.exe" ;;
+    x86_64-unknown-linux-gnu)  NAME="zoi-linux-amd64" ;;
+    aarch64-unknown-linux-gnu) NAME="zoi-linux-arm64" ;;
+    x86_64-pc-windows-gnu)     NAME="zoi-windows-amd64.exe" ;;
     *)                         NAME="zoi-$target" ;; 
   esac
   
@@ -53,28 +45,6 @@ for target in "${TARGETS[@]}"; do
 
   elif [[ "$target" == "x86_64-pc-windows-gnu" ]]; then
     LINKER_ENV="CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc"
-  fi
-
-  if [[ "$target" == "x86_64-unknown-freebsd" ]]; then
-    export CC_x86_64_unknown_freebsd="clang --sysroot=/usr/local/freebsd-sysroot --target=x86_64-unknown-freebsd"
-    export CXX_x86_64_unknown_freebsd="clang++ --sysroot=/usr/local/freebsd-sysroot --target=x86_64-unknown-freebsd"
-    export AR_x86_64_unknown_freebsd=llvm-ar
-    export CARGO_TARGET_X86_64_UNKNOWN_FREEBSD_LINKER=clang
-    export CARGO_TARGET_X86_64_UNKNOWN_FREEBSD_RUSTFLAGS="-C link-arg=--sysroot=/usr/local/freebsd-sysroot -C link-arg=--target=x86_64-unknown-freebsd"
-  elif [[ "$target" == "aarch64-unknown-freebsd" ]]; then
-    export CC_aarch64_unknown_freebsd="clang --sysroot=/usr/local/freebsd-sysroot-arm64 --target=aarch64-unknown-freebsd"
-    export CXX_aarch64_unknown_freebsd="clang++ --sysroot=/usr/local/freebsd-sysroot-arm64 --target=aarch64-unknown-freebsd"
-    export AR_aarch64_unknown_freebsd=llvm-ar
-    export CARGO_TARGET_AARCH64_UNKNOWN_FREEBSD_LINKER=clang
-    export CARGO_TARGET_AARCH64_UNKNOWN_FREEBSD_RUSTFLAGS="-C link-arg=--sysroot=/usr/local/freebsd-sysroot-arm64 -C link-arg=--target=aarch64-unknown-freebsd"
-  elif [[ "$target" == "x86_64-unknown-openbsd" ]]; then
-    export CC_x86_64_unknown_openbsd=clang
-    export AR_x86_64_unknown_openbsd=llvm-ar
-    export CARGO_TARGET_X86_64_UNKNOWN_OPENBSD_LINKER=clang
-  elif [[ "$target" == "aarch64-unknown-openbsd" ]]; then
-    export CC_aarch64_unknown_openbsd=clang
-    export AR_aarch64_unknown_openbsd=llvm-ar
-    export CARGO_TARGET_AARCH64_UNKNOWN_OPENBSD_LINKER=clang
   fi
 
   if ! env $LINKER_ENV $OPENSSL_ENV ZOI_COMMIT_HASH="$COMMIT" cargo build --target "$target" --release; then
