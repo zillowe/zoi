@@ -15,7 +15,7 @@ pub fn is_admin() -> bool {
         use winapi::um::processthreadsapi::GetCurrentProcess;
         use winapi::um::processthreadsapi::OpenProcessToken;
         use winapi::um::securitybaseapi::CheckTokenMembership;
-        use winapi::um::winnt::CreateWellKnownSid;
+        use winapi::um::securitybaseapi::CreateWellKnownSid;
         use winapi::um::winnt::{PSID, TOKEN_QUERY};
 
         let mut token = ptr::null_mut();
@@ -27,7 +27,7 @@ pub fn is_admin() -> bool {
         let mut sid: [u8; 8] = [0; 8];
         let mut sid_size = mem::size_of_val(&sid) as u32;
         if unsafe {
-            winapi::um::winnt::CreateWellKnownSid(
+            winapi::um::securitybaseapi::CreateWellKnownSid(
                 winapi::um::winnt::WinBuiltinAdministratorsSid,
                 ptr::null_mut(),
                 sid.as_mut_ptr() as PSID,
