@@ -63,14 +63,19 @@ done
 
 echo -e "${CYAN}🔗 Generating binary diffs...${NC}"
 
-glab auth login --token "$GITLAB_TOKEN_RELEASE"
+echo -e "${CYAN}Fetching the latest release tag from GitLab API...${NC}"
+LATEST_TAG=$(curl --silent --fail "https://gitlab.com/api/v4/projects/${GITLAB_PROJECT_PATH//\//%2F}/releases" \
+    | jq -r '.[0].tag_name // empty' 2>/dev/null)
 
-LATEST_TAG=$(glab release list --order asc --sort "released_at" -L 1 | awk 'NR==1 {print $1}')
+if [ -z "$LATEST_TAG" ] && command -v jq >/dev/null 2>&1; then
+    LATEST_TAG=$(curl --silent --fail "https://gitlab.com/api/v4/projects/${GITLAB_PROJECT_PATH//\//%2F}/releases" \
+        | tr ',' '\n' | grep '"tag_name"' | sed 's/.*"tag_name":"\([^"]*\)".*/\1/' | head -n 1)
+fi
 
 if [ -z "$LATEST_TAG" ]; then
-    echo -e "${YELLOW}Could not find a previous release. Skipping diff generation.${NC}"
+    echo -e "${YELLOW}Could not fetch the latest release tag. Skipping diff generation.${NC}"
 else
-    echo -e "${CYAN}Found previous release tag: ${LATEST_TAG}${NC}"
+    echo -e "${CYAN}Latest tag found: ${LATEST_TAG}${NC}"
     
     for new_binary_path in "$COMPILED_DIR"/*; do
         filename=$(basename "$new_binary_path")
