@@ -30,7 +30,7 @@ check_command "curl"
 if [ ! -d "$COMPILED_DIR" ]; then
     echo -e "${RED}Error: Compiled directory '${COMPILED_DIR}' not found.${NC}"
     exit 1
-}
+fi
 
 rm -rf "$ARCHIVE_DIR"
 mkdir -p "$ARCHIVE_DIR"
