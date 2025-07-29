@@ -1,6 +1,6 @@
 use clap::{CommandFactory, Parser, Subcommand};
-use clap_complete::Shell;
 use clap_complete::generate;
+use clap_complete::Shell;
 use std::io;
 mod cmd;
 mod pkg;
@@ -10,7 +10,7 @@ mod utils;
 // Production or Development
 const BRANCH: &str = "Production";
 const STATUS: &str = "Beta";
-const NUMBER: &str = "3.1.0";
+const NUMBER: &str = "3.1.1";
 
 /// Zoi - The Universal Package Manager & Environment Setup Tool.
 ///

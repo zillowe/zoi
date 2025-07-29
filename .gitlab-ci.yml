@@ -27,16 +27,12 @@ build:linux:
   image: rust:latest
   tags:
     - saas-linux-large-amd64
-  services:
-    - docker:dind
-  variables:
-    DOCKER_HOST: tcp://docker:2375
   before_script:
     - dpkg --add-architecture arm64
     - dpkg --add-architecture armhf
     - apt-get update -y && apt-get install -y build-essential gcc gcc-aarch64-linux-gnu libssl-dev pkg-config libssl-dev:arm64 openssl libssl-dev:armhf gcc-mingw-w64-x86-64 liblzma-dev:arm64
   script:
-    - echo "Building Linux (amd64, arm64), Windows (amd64), and FreeBSD (amd64) targets..."
+    - echo "Building Linux (amd64, arm64) and Windows (amd64) targets..."
     - chmod +x ./build/build-linux.sh
     - ./build/build-linux.sh
   artifacts:
@@ -65,29 +61,6 @@ build:macos:
   rules:
     - if: $CI_COMMIT_TAG
 
-build:windows:
-  stage: build
-  tags:
-    - saas-windows-medium-amd64
-  variables:
-    GIT_STRATEGY: fetch
-  before_script:
-    - echo "Installing Rust..."
-    - Invoke-WebRequest -Uri "https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe" -OutFile rustup-init.exe
-    - '.\rustup-init.exe -y --no-modify-path'
-    - '$env:Path = "$env:USERPROFILE\.cargo\bin;" + $env:Path'
-    - rustc --version
-    - cargo --version
-  script:
-    - echo "Building for Windows ARM64..."
-    - pwsh -File ./build/build-win.ps1
-  artifacts:
-    paths:
-      - ./build/release/
-    expire_in: 1 week
-  rules:
-    - if: $CI_COMMIT_TAG
-
 package:archive:
   stage: package
   image: ubuntu:latest
@@ -108,7 +81,6 @@ package:archive:
       optional: true
     - build:linux
     - build:macos
-    - build:windows
   artifacts:
     paths:
       - ./build/archived/

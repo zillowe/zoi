@@ -14,7 +14,6 @@ TARGETS=(
   "x86_64-unknown-linux-gnu"  
   "aarch64-unknown-linux-gnu"
   "x86_64-pc-windows-gnu"
-  "x86_64-unknown-freebsd"
 )
 
 if ! command -v cargo &> /dev/null; then
@@ -22,7 +21,7 @@ if ! command -v cargo &> /dev/null; then
     exit 1
 fi
 
-echo -e "${CYAN}🏗 Starting native Linux, Windows, and FreeBSD build process...${NC}"
+echo -e "${CYAN}🏗 Starting native Linux and Windows build process...${NC}"
 echo -e "${CYAN}▸ Commit: ${COMMIT}${NC}\n"
 mkdir -p "$OUTPUT_DIR"
 
@@ -31,12 +30,10 @@ for target in "${TARGETS[@]}"; do
     x86_64-unknown-linux-gnu)  NAME="zoi-linux-amd64" ;;
     aarch64-unknown-linux-gnu) NAME="zoi-linux-arm64" ;;
     x86_64-pc-windows-gnu)     NAME="zoi-windows-amd64.exe" ;;
-    x86_64-unknown-freebsd)    NAME="zoi-freebsd-amd64" ;;
     *)                         NAME="zoi-$target" ;;
   esac
   
   echo -e "${CYAN}🔧 Building for ${target}...${NC}"
-
   
     rustup target add "$target"
 
@@ -65,6 +62,6 @@ for target in "${TARGETS[@]}"; do
   echo -e "${GREEN}✅ Successfully built ${NAME}${NC}\n"
 done
 
-echo -e "\n${GREEN}🎉 All Linux, Windows, and FreeBSD builds completed successfully!${NC}"
+echo -e "\n${GREEN}🎉 All Linux and Windows builds completed successfully!${NC}"
 echo -e "${CYAN}Output files in ./build/release directory:${NC}"
 ls -lh "$OUTPUT_DIR"
