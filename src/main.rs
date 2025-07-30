@@ -1,6 +1,6 @@
 use clap::{CommandFactory, Parser, Subcommand};
-use clap_complete::generate;
 use clap_complete::Shell;
+use clap_complete::generate;
 use std::io;
 mod cmd;
 mod pkg;
@@ -10,7 +10,7 @@ mod utils;
 // Production or Development
 const BRANCH: &str = "Production";
 const STATUS: &str = "Beta";
-const NUMBER: &str = "3.1.11";
+const NUMBER: &str = "3.2.0";
 
 /// Zoi - The Universal Package Manager & Environment Setup Tool.
 ///
@@ -87,51 +87,55 @@ enum Commands {
 
     /// Lists installed or all available packages
     List {
-        /// Use 'all' to list all packages from the database and/or filter by repo
-        #[arg()]
-        args: Vec<String>,
+        /// List all packages from the database, not just installed ones
+        #[arg(long)]
+        all: bool,
+        /// Filter by repository (e.g., 'main', 'extra')
+        #[arg(long)]
+        repo: Option<String>,
+        /// Filter by package type (package, service, config, collection)
+        #[arg(short = 't', long = "type")]
+        package_type: Option<String>,
     },
 
-    /// Displays detailed information about a package
+    /// Shows detailed information about a package
     Show {
+        /// The name of the package to show
         package_name: String,
-        /// Display the raw package file content
+        /// Display the raw, unformatted package file
         #[arg(long)]
         raw: bool,
     },
 
-    /// Pins a package to a specific version or channel
+    /// Pin a package to a specific version
     Pin {
         /// The name of the package to pin
-        #[arg(value_name = "PACKAGE_NAME")]
         package: String,
-        /// The version (e.g. 'v1.2.0') or channel (e.g. '@nightly') to pin to
-        #[arg(value_name = "VERSION_OR_CHANNEL")]
+        /// The version to pin the package to
         version: String,
     },
 
-    /// Unpins a package
+    /// Unpin a package, allowing it to be updated
     Unpin {
-        /// The package to unpin
-        #[arg(value_name = "PACKAGE")]
+        /// The name of the package to unpin
         package: String,
     },
 
-    /// Updates an installed package to the latest version
-    Update { package_name: String },
+    /// Update a package to the latest version
+    Update {
+        /// The name of the package to update
+        package_name: String,
+    },
 
     /// Installs a package from a name, local file, or URL
-    #[command(
-        long_about = "Installs a package from various sources:\n- A package name from the database (e.g. 'vim')\n- A local .pkg.yaml file (e.g. './my-package.pkg.yaml')\n- A URL pointing to a raw .pkg.yaml file"
-    )]
     Install {
         /// Package name, local path, or URL to a .pkg.yaml file
         #[arg(value_name = "SOURCE")]
         source: String,
-        /// Reinstall the package even if it's already present
+        /// Force re-installation even if the package is already installed
         #[arg(long)]
         force: bool,
-        /// Interactive mode to select installation method
+        /// Run in interactive mode
         #[arg(short, long)]
         interactive: bool,
     },
@@ -201,9 +205,14 @@ enum Commands {
         long_about = "Searches for a case-insensitive term in the name and description of all available packages in the database."
     )]
     Search {
-        /// The term to search for (e.g. 'editor', 'cli') and an optional repo to search in (e.g. '@main')
-        #[arg()]
-        args: Vec<String>,
+        /// The term to search for (e.g. 'editor', 'cli')
+        search_term: String,
+        /// Filter by repository (e.g., 'main', 'extra')
+        #[arg(long)]
+        repo: Option<String>,
+        /// Filter by package type (package, service, config, collection)
+        #[arg(short = 't', long = "type")]
+        package_type: Option<String>,
     },
 
     /// Download and execute a binary package without installing it
@@ -228,6 +237,20 @@ enum Commands {
         long_about = "Manages the list of package repositories that Zoi uses to find and install packages. By default, Zoi is configured with 'main' and 'extra' repositories.\n\nCommands:\n- add: Adds a new repository from the available sources. Can be interactive.\n- remove: Deletes a repository from the active list.\n- list: Shows all currently active repositories.\n- list all: Displays all available repositories and their status (active/inactive)."
     )]
     Repo(cmd::repo::RepoCommand),
+
+    /// Starts a service
+    Start {
+        /// The name of the service to start
+        #[arg(value_name = "PACKAGE_NAME")]
+        package: String,
+    },
+
+    /// Stops a service
+    Stop {
+        /// The name of the service to stop
+        #[arg(value_name = "PACKAGE_NAME")]
+        package: String,
+    },
 }
 
 fn main() {
@@ -242,41 +265,114 @@ fn main() {
     }
 
     if let Some(command) = cli.command {
-        match command {
+        let result = match command {
             Commands::GenerateCompletions { shell } => {
                 let mut cmd = Cli::command();
                 let bin_name = cmd.get_name().to_string();
                 generate(shell, &mut cmd, bin_name, &mut io::stdout());
+                Ok(())
             }
-            Commands::Version => cmd::version::run(BRANCH, STATUS, NUMBER, commit),
-            Commands::About => cmd::about::run(BRANCH, STATUS, NUMBER, commit),
-            Commands::Info => cmd::info::run(BRANCH, STATUS, NUMBER, commit),
-            Commands::Check => cmd::check::run(),
-            Commands::Sync { verbose } => cmd::sync::run(verbose),
-            Commands::List { args } => cmd::list::run(args),
-            Commands::Show { package_name, raw } => cmd::show::run(&package_name, raw),
-            Commands::Pin { package, version } => cmd::pin::run(&package, &version),
-            Commands::Unpin { package } => cmd::unpin::run(&package),
-            Commands::Update { package_name } => cmd::update::run(&package_name, cli.yes),
+            Commands::Version => {
+                cmd::version::run(BRANCH, STATUS, NUMBER, commit);
+                Ok(())
+            }
+            Commands::About => {
+                cmd::about::run(BRANCH, STATUS, NUMBER, commit);
+                Ok(())
+            }
+            Commands::Info => {
+                cmd::info::run(BRANCH, STATUS, NUMBER, commit);
+                Ok(())
+            }
+            Commands::Check => {
+                cmd::check::run();
+                Ok(())
+            }
+            Commands::Sync { verbose } => {
+                cmd::sync::run(verbose);
+                Ok(())
+            }
+            Commands::List { all, repo, package_type } => {
+                let _ = cmd::list::run(all, repo, package_type);
+                Ok(())
+            }
+            Commands::Show { package_name, raw } => {
+                cmd::show::run(&package_name, raw);
+                Ok(())
+            }
+            Commands::Pin { package, version } => {
+                cmd::pin::run(&package, &version);
+                Ok(())
+            }
+            Commands::Unpin { package } => {
+                cmd::unpin::run(&package);
+                Ok(())
+            }
+            Commands::Update { package_name } => {
+                cmd::update::run(&package_name, cli.yes);
+                Ok(())
+            }
             Commands::Install {
                 source,
                 force,
                 interactive,
-            } => cmd::install::run(&source, force, interactive, cli.yes),
-            Commands::Build { source } => cmd::build::run(&source, cli.yes),
-            Commands::Uninstall { package_name } => cmd::uninstall::run(&package_name),
-            Commands::Run { cmd_alias } => cmd::run::run(cmd_alias),
-            Commands::Env { env_alias } => cmd::env::run(env_alias),
+            } => {
+                cmd::install::run(&source, force, interactive, cli.yes);
+                Ok(())
+            }
+            Commands::Build { source } => {
+                cmd::build::run(&source, cli.yes);
+                Ok(())
+            }
+            Commands::Uninstall { package_name } => {
+                cmd::uninstall::run(&package_name);
+                Ok(())
+            }
+            Commands::Run { cmd_alias } => {
+                cmd::run::run(cmd_alias);
+                Ok(())
+            }
+            Commands::Env { env_alias } => {
+                cmd::env::run(env_alias);
+                Ok(())
+            }
             Commands::Clone {
                 source,
                 target_directory,
-            } => cmd::clone::run(source, target_directory, cli.yes),
-            Commands::Upgrade => cmd::upgrade::run(BRANCH, STATUS, NUMBER),
-            Commands::Autoremove => cmd::autoremove::run(cli.yes),
-            Commands::Search { args } => cmd::search::run(args),
-            Commands::Exec { source, args } => cmd::exec::run(source, args),
-            Commands::Clean => cmd::clean::run(),
-            Commands::Repo(args) => cmd::repo::run(args),
+            } => {
+                cmd::clone::run(source, target_directory, cli.yes);
+                Ok(())
+            }
+            Commands::Upgrade => {
+                cmd::upgrade::run(BRANCH, STATUS, NUMBER);
+                Ok(())}
+            Commands::Autoremove => {
+                cmd::autoremove::run(cli.yes);
+                Ok(())
+            }
+            Commands::Search { search_term, repo, package_type } => {
+                cmd::search::run(search_term, repo, package_type);
+                Ok(())
+            }
+            Commands::Exec { source, args } => {
+                cmd::exec::run(source, args);
+                Ok(())
+            }
+            Commands::Clean => {
+                cmd::clean::run();
+                Ok(())
+            }
+            Commands::Repo(args) => {
+                cmd::repo::run(args);
+                Ok(())
+            }
+            Commands::Start { package } => cmd::start::run(&package, cli.yes),
+            Commands::Stop { package } => cmd::stop::run(&package),
+        };
+
+        if let Err(e) = result {
+            eprintln!("Error: {}", e);
+            std::process::exit(1);
         }
     } else {
         Cli::command().print_help().unwrap();

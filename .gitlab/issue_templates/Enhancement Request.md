@@ -1,4 +1,4 @@
-<!-- Please prefix your title with "[FEAT]" -->
+<!-- Please prefix your title with "[ENCH]" -->
 
 ### Pre-submission Checklist
 

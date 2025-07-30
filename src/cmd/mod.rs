@@ -20,4 +20,5 @@ pub mod unpin;
 pub mod update;
 pub mod upgrade;
 pub mod version;
-
+pub mod start;
+pub mod stop;

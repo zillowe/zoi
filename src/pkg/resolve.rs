@@ -41,31 +41,33 @@ fn parse_source_string(source_str: &str) -> Result<PackageRequest, Box<dyn Error
     let name: &str;
     let mut version_spec = None;
 
-    let mut parts = source_str.split('@');
-    let first_part = parts.next().unwrap_or("");
+    let mut main_part = source_str;
 
-    if source_str.starts_with('@') {
-        let mut repo_pkg_parts = first_part.trim_start_matches('@').splitn(2, '/');
+    // Check for version spec at the end
+    if let Some(at_pos) = source_str.rfind('@') {
+        if at_pos > 0 {
+            // to avoid parsing the repo scope as version
+            let (pkg_part, ver_part) = source_str.split_at(at_pos);
+            main_part = pkg_part;
+            version_spec = Some(ver_part[1..].to_string());
+        }
+    }
+
+    if main_part.starts_with('@') {
+        let mut repo_pkg_parts = main_part.trim_start_matches('@').splitn(2, '/');
         repo = Some(
             repo_pkg_parts
                 .next()
+                .filter(|s| !s.is_empty())
                 .ok_or("Invalid format: missing repo name.")?
                 .to_string(),
         );
         name = repo_pkg_parts
             .next()
+            .filter(|s| !s.is_empty())
             .ok_or("Invalid format: missing package name after repo.")?;
     } else {
-        name = first_part;
-    }
-
-    if let Some(v_spec) = parts.next() {
-        let mut final_spec = v_spec.to_string();
-        if parts.next().is_some() {
-            // This handles the `pkg@@channel` case
-            final_spec.insert(0, '@');
-        }
-        version_spec = Some(final_spec);
+        name = main_part;
     }
 
     if name.is_empty() {
@@ -166,7 +168,6 @@ fn resolve_version_from_url(url: &str, channel: &str) -> Result<String, Box<dyn 
     let resp = reqwest::blocking::get(url)?.text()?;
     let json: serde_json::Value = serde_json::from_str(&resp)?;
 
-    // New format: { "versions": { "stable": "...", "public": "..." } }
     if let Some(version) = json
         .get("versions")
         .and_then(|v| v.get(channel))

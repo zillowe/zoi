@@ -1,5 +1,5 @@
 use crate::pkg::config;
-use crate::pkg::types::{InstallManifest, Scope};
+use crate::pkg::types::{InstallManifest, Package, Scope};
 use std::error::Error;
 use std::fs;
 use std::path::PathBuf;
@@ -56,6 +56,34 @@ pub fn get_installed_packages() -> Result<Vec<InstallManifest>, Box<dyn Error>> 
 
     installed.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(installed)
+}
+
+#[derive(Debug)]
+pub struct InstalledPackage {
+    pub name: String,
+    pub version: String,
+    pub repo: String,
+    pub package_type: super::types::PackageType,
+}
+
+pub fn get_installed_packages_with_type() -> Result<Vec<InstalledPackage>, Box<dyn Error>> {
+    let manifests = get_installed_packages()?;
+    let mut packages = Vec::new();
+
+    for manifest in manifests {
+        let pkg_path = get_db_root()?;
+        if pkg_path.exists() {
+            let content = fs::read_to_string(pkg_path.join(&manifest.repo).join(format!("{}.pkg.yaml", manifest.name)))?;
+            let pkg: Package = serde_yaml::from_str(&content)?;
+            packages.push(InstalledPackage {
+                name: manifest.name,
+                version: manifest.version,
+                repo: manifest.repo,
+                package_type: pkg.package_type,
+            });
+        }
+    }
+    Ok(packages)
 }
 
 pub fn is_package_installed(

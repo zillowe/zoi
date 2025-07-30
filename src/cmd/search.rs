@@ -1,29 +1,8 @@
-use crate::pkg::local;
+use crate::pkg::{local, types::PackageType};
 use colored::*;
 use comfy_table::{presets::UTF8_FULL, ContentArrangement, Table};
 
-pub fn run(args: Vec<String>) {
-    if args.is_empty() {
-        eprintln!("{}: {}", "Error".red(), "Please provide a search term.");
-        return;
-    }
-
-    let mut search_term = "";
-    let mut repo_filter: Option<String> = None;
-
-    for arg in &args {
-        if arg.starts_with('@') {
-            repo_filter = Some(arg.strip_prefix('@').unwrap().to_string());
-        } else {
-            search_term = arg;
-        }
-    }
-
-    if search_term.is_empty() {
-        eprintln!("{}: {}", "Error".red(), "Please provide a search term.");
-        return;
-    }
-
+pub fn run(search_term: String, repo: Option<String>, package_type: Option<String>) {
     println!(
         "{}{}{}",
         "--- Searching for packages matching '".yellow(),
@@ -31,8 +10,8 @@ pub fn run(args: Vec<String>) {
         "' ---".yellow()
     );
 
-    let packages = if let Some(repo) = &repo_filter {
-        local::get_packages_from_repo(repo)
+    let packages = if let Some(repo_name) = &repo {
+        local::get_packages_from_repo(repo_name)
     } else {
         local::get_all_available_packages()
     };
@@ -41,9 +20,23 @@ pub fn run(args: Vec<String>) {
         Ok(all_packages) => {
             let search_term_lower = search_term.to_lowercase();
 
+            let type_filter = package_type.and_then(|s| match s.to_lowercase().as_str() {
+                "package" => Some(PackageType::Package),
+                "collection" => Some(PackageType::Collection),
+                "service" => Some(PackageType::Service),
+                "config" => Some(PackageType::Config),
+                _ => None,
+            });
+
             let matches: Vec<_> = all_packages
                 .into_iter()
                 .filter(|pkg| {
+                    if let Some(ptype) = type_filter {
+                        if pkg.package_type != ptype {
+                            return false;
+                        }
+                    }
+
                     let name_match = pkg.name.to_lowercase().contains(&search_term_lower);
                     let description_match =
                         pkg.description.to_lowercase().contains(&search_term_lower);

@@ -19,12 +19,30 @@ impl Default for Scope {
 pub enum PackageType {
     Package,
     Collection,
+    Service,
+    Config,
 }
 
 impl Default for PackageType {
     fn default() -> Self {
         PackageType::Package
     }
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)]
+pub struct ServiceMethod {
+    pub platforms: Vec<String>,
+    pub start: Vec<String>,
+    pub stop: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)]
+pub struct ConfigCommands {
+    pub platforms: Vec<String>,
+    pub install: Vec<String>,
+    pub uninstall: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -50,6 +68,8 @@ pub struct Package {
     pub alt: Option<String>,
     #[serde(default)]
     pub scope: Scope,
+    pub service: Option<Vec<ServiceMethod>>,
+    pub config: Option<Vec<ConfigCommands>>,
 }
 
 #[derive(Debug, Deserialize, Clone)]

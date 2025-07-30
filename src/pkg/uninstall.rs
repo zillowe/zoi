@@ -1,4 +1,4 @@
-use crate::pkg::{local, types};
+use crate::pkg::{config_handler, local, resolve, types};
 use colored::*;
 use std::error::Error;
 use std::fs;
@@ -27,7 +27,7 @@ fn remove_dependent_record(
 }
 
 pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
-    let (manifest, scope) =
+    let (_manifest, scope) =
         if let Some(m) = local::is_package_installed(package_name, types::Scope::User)? {
             (m, types::Scope::User)
         } else if let Some(m) = local::is_package_installed(package_name, types::Scope::System)? {
@@ -35,6 +35,12 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
         } else {
             return Err(format!("Package '{package_name}' is not installed by Zoi.").into());
         };
+
+    let (pkg, _) = resolve::resolve_package_and_version(package_name)?;
+
+    if pkg.package_type == types::PackageType::Config {
+        config_handler::run_uninstall_commands(&pkg)?;
+    }
 
     let dependents_dir = local::get_store_root(scope)?
         .join(package_name)
@@ -56,9 +62,6 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
     println!("No packages depend on '{package_name}'. Proceeding with uninstallation.");
 
     println!("Cleaning up dependency records...");
-    let pkg_path = crate::pkg::resolve::resolve_source(&manifest.name)?;
-    let content = fs::read_to_string(pkg_path.path)?;
-    let pkg_def: crate::pkg::types::Package = serde_yaml::from_str(&content)?;
 
     let cleanup = |dep_str: &String| -> Result<(), Box<dyn Error>> {
         if !dep_str.contains(':') || dep_str.starts_with("zoi:") {
@@ -69,7 +72,7 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
         Ok(())
     };
 
-    if let Some(deps) = pkg_def.dependencies {
+    if let Some(deps) = pkg.dependencies {
         if let Some(runtime_deps) = deps.runtime {
             for dep_str in &runtime_deps {
                 cleanup(dep_str)?;

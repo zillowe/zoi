@@ -47,6 +47,8 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
     let type_display = match pkg.package_type {
         crate::pkg::types::PackageType::Package => "Package",
         crate::pkg::types::PackageType::Collection => "Collection",
+        crate::pkg::types::PackageType::Service => "Service",
+        crate::pkg::types::PackageType::Config => "Config",
     };
     println!("{}: {}", "Type".bold(), type_display);
 

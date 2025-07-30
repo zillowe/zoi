@@ -1,20 +1,20 @@
+use bsdiff;
 use colored::*;
 use hex;
 use indicatif::{ProgressBar, ProgressStyle};
 use self_update::self_replace;
 use serde::Deserialize;
 use sha2::{Digest, Sha512};
+use std::convert::TryInto;
 use std::env;
 use std::error::Error;
 use std::fs::{self, File};
-use std::io::{self, Read, Write, Cursor};
+use std::io::{self, Cursor, Read, Write};
 use std::path::{Path, PathBuf};
 use tar::Archive;
 use tempfile::Builder;
 use zip::ZipArchive;
 use zstd::stream::read::Decoder as ZstdDecoder;
-use bsdiff;
-use std::convert::TryInto;
 
 const GITLAB_PROJECT_PATH: &str = "Zillowe/Zillwen/Zusty/Zoi";
 
@@ -158,14 +158,16 @@ fn attempt_patch_upgrade(
     let patch_data = fs::read(&patch_path)?;
     let old_data = fs::read(&current_exe_path)?;
 
-    // Read the size of the new file from the patch header (offset 8, 8 bytes, little-endian)
-    let new_file_size_bytes: [u8; 8] = patch_data[8..16].try_into()?;
+    if patch_data.len() < 32 {
+        return Err("Patch file is too small to contain a valid header.".into());
+    }
+    let new_file_size_bytes: [u8; 8] = patch_data[24..32].try_into()?;
     let new_file_size = u64::from_le_bytes(new_file_size_bytes) as usize;
-    
-    let mut new_data = vec![0; new_file_size];
+
+    let mut new_data = Vec::with_capacity(new_file_size);
     let mut patch_reader = Cursor::new(&patch_data);
     bsdiff::patch(&old_data, &mut patch_reader, &mut new_data)?;
-    
+
     fs::write(&new_binary_path, new_data)?;
 
     println!("Verifying patched binary...");
@@ -264,3 +266,4 @@ pub fn run(branch: &str, status: &str, number: &str) -> Result<(), Box<dyn Error
 
     Ok(())
 }
+

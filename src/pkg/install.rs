@@ -1,4 +1,4 @@
-use crate::pkg::{dependencies, local, resolve, types};
+use crate::pkg::{config_handler, dependencies, local, resolve, service, types};
 use crate::utils;
 use chrono::Utc;
 use colored::*;
@@ -64,6 +64,22 @@ pub fn run_installation(
         return Ok(());
     }
 
+    if pkg.package_type == types::PackageType::Config {
+        println!("Installing configuration '{}'...", pkg.name.bold());
+        if let Some(deps) = &pkg.dependencies {
+            if let Some(runtime_deps) = &deps.runtime {
+                dependencies::resolve_and_install(runtime_deps, &pkg.name, pkg.scope, yes)?;
+            }
+        }
+        write_manifest(&pkg, reason)?;
+        println!("Configuration '{}' registered.", pkg.name.green());
+
+        if utils::ask_for_confirmation("Do you want to run the setup commands now?", yes) {
+            config_handler::run_install_commands(&pkg)?;
+        }
+        return Ok(());
+    }
+
     if let Some(mut manifest) = local::is_package_installed(&pkg.name, pkg.scope)? {
         if manifest.reason == types::InstallReason::Dependency
             && reason == types::InstallReason::Direct
@@ -84,6 +100,11 @@ pub fn run_installation(
                 )
                 .yellow()
             );
+            if pkg.package_type == types::PackageType::Service {
+                if utils::ask_for_confirmation("Do you want to start the service?", yes) {
+                    service::start_service(&pkg)?;
+                }
+            }
             return Ok(());
         }
         if utils::command_exists(&pkg.name) {
@@ -127,6 +148,11 @@ pub fn run_installation(
         write_manifest(&pkg, reason)?;
         if let Err(e) = utils::setup_path(pkg.scope) {
             eprintln!("{} Failed to configure PATH: {}", "Warning:".yellow(), e);
+        }
+        if pkg.package_type == types::PackageType::Service {
+            if utils::ask_for_confirmation("Do you want to start the service now?", yes) {
+                service::start_service(&pkg)?;
+            }
         }
     }
 
