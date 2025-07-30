@@ -104,7 +104,6 @@ release:packages:
     - pacman -S --needed pacman-contrib base-devel sed git
   script:
     - |
-      set -e
       echo "--- Updating package manager files ---"
       mkdir -p ~/.ssh
       echo "$SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/id_rsa
@@ -147,4 +146,4 @@ release:packages:
       git push origin main
       cd ../..
   rules:
-    - if: $CI_COMMIT_MESSAGE =~ /^Release: Bump packages version to .*/
+    - if: "$CI_COMMIT_MESSAGE =~ /^Release: Bump packages version to .*/"
