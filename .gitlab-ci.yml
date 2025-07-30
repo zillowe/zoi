@@ -102,7 +102,7 @@ release:packages:
   stage: release-package
   image: archlinux:latest
   before_script:
-    - pacman -Sy --needed --noconfirm pacman-contrib base-devel sed git openssh
+    - pacman -Sy --needed --noconfirm base-devel sed git openssh
   script:
     - |
       echo "--- Updating package manager files ---"
@@ -119,7 +119,7 @@ release:packages:
       git clone "ssh://aur@aur.archlinux.org/zoi-bin.git" aur_zoi_bin
       cd aur_zoi_bin
       curl -o PKGBUILD https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/packages/aur/zoi-bin/PKGBUILD
-      makepkg --printsrcinfo > .SRCINFO
+      curl -o .SRCINFO https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/packages/aur/zoi-bin/.SRCINFO
       echo "Committing and pushing package updates..."
       git add .
       git commit -m "Release: Bump package version to ${VERSION}"
