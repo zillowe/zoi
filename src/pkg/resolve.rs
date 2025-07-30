@@ -175,16 +175,6 @@ fn resolve_version_from_url(url: &str, channel: &str) -> Result<String, Box<dyn 
         return Ok(version.to_string());
     }
 
-    // Old format: { "latest": { "production": { "tag": "..." } } }
-    if let Some(tag) = json
-        .get("latest")
-        .and_then(|l| l.get("production"))
-        .and_then(|p| p.get("tag"))
-        .and_then(|t| t.as_str())
-    {
-        return Ok(tag.to_string());
-    }
-
     Err(format!("Failed to extract version for channel '{channel}' from JSON URL: {url}").into())
 }
 
@@ -233,6 +223,14 @@ pub fn get_default_version(pkg: &types::Package) -> Result<String, Box<dyn Error
         if ver.starts_with("http") {
              let resp = reqwest::blocking::get(ver)?.text()?;
              if let Ok(json) = serde_json::from_str::<serde_json::Value>(&resp) {
+                if let Some(version) = json
+                    .get("versions")
+                    .and_then(|v| v.get("stable"))
+                    .and_then(|s| s.as_str())
+                {
+                    return Ok(version.to_string());
+                }
+
                  if let Some(tag) = json
                     .get("latest")
                     .and_then(|l| l.get("production"))
@@ -241,6 +239,7 @@ pub fn get_default_version(pkg: &types::Package) -> Result<String, Box<dyn Error
                  {
                      return Ok(tag.to_string());
                  }
+                return Err(format!("Could not determine a version from the JSON content at {}", ver).into());
              }
              return Ok(resp.trim().to_string());
         } else {
