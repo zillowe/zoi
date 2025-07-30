@@ -34,12 +34,6 @@
 
 <hr/>
 
-<div align="center">
-  <a href="https://www.producthunt.com/products/zoi-6?embed=true&utm_source=badge-featured&utm_medium=badge&utm_source=badge-zoi&#0045;6" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=998138&theme=dark&t=1753606521540" alt="Zoi - Universal&#0032;Package&#0032;Manager&#0032;&#0038;&#0032;Environment&#0032;Setup&#0032;Tool | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a>
-</div>
-
-<br/>
-
 <details>
 <summary>Table of Contents</summary>
 
