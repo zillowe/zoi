@@ -101,7 +101,7 @@ release:packages:
   stage: release
   image: archlinux:latest
   before_script:
-    - pacman -S --needed pacman-contrib base-devel sed git
+    - pacman -Sy --needed pacman-contrib base-devel sed git
   script:
     - |
       echo "--- Updating package manager files ---"
