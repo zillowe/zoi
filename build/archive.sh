@@ -113,7 +113,7 @@ else
                 mv "$(dirname "$OLD_BINARY_TMP")/zoi.exe" "$OLD_BINARY_TMP"
             else
                 OLD_TAR_TMP=$(mktemp)
-                zstd -d "$OLD_ARCHIVE_TMP" -o "$OLD_TAR_TMP"
+                zstd -d -f "$OLD_ARCHIVE_TMP" -o "$OLD_TAR_TMP"
                 tar -xf "$OLD_TAR_TMP" -C "$(dirname "$OLD_BINARY_TMP")" --strip-components=0
                 mv "$(dirname "$OLD_BINARY_TMP")/zoi" "$OLD_BINARY_TMP"
                 rm -f "$OLD_TAR_TMP"
