@@ -15,12 +15,12 @@ updater: script
 installation:
   - type: com_binary
     url: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/{version}/downloads/zoi_{platform}.{platformComExt}
-    platforms: [linux, macos, windows-amd64, freebsd, openbsd-amd64]
+    platforms: [linux, macos, windows-amd64]
     checksums: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/{version}/downloads/checksums.txt
 
   - type: script
     url: "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.{platformExt}"
-    platforms: [linux, macos, windows-amd64, freebsd, openbsd-amd64]
+    platforms: [linux, macos, windows-amd64]
     checksums: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/checksums.txt
 
   - type: source
