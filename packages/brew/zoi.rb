@@ -3,30 +3,30 @@
 class Zoi < Formula
   desc "Universal Package Manager & Environment Setup Tool"
   homepage "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi"
-  version "3.2.1-beta" 
-  _tag = "Prod-Beta-3.2.1"
+  version "3.2.2-beta" 
+  _tag = "Prod-Beta-3.2.2"
   license "Apache-2.0"
 
   on_macos do
     if Hardware::CPU.arm?
       url "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/#{_tag}/downloads/zoi-macos-arm64.tar.zst"
-      sha512 "f171b47804d93620345e5eb5d5ec9f46237fc01c7469f72152f118920ad9f4a48ebbf584797085e3d0d3a6283c2b724bb81d01ec88cb3389d39c2ae6be43e24c"
+      sha512 "51d26c15e8a43b7cdc6b2282e649ff9e7cecd282f8c672852cf8ac742ba6d15d1909d76c826afd94154c28be0731d3c819469b03b9b2678b561c570eff303d03"
     end
 
     if Hardware::CPU.intel?
       url "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/#{_tag}/downloads/zoi-macos-amd64.tar.zst"
-      sha512 "34d697bc70cd0a642d253b40af106d93e81028b2d56a176f136241f52b189bc2a0ad3cac0ffa8676acb3fb97602eb85e1aacca0fef4c028722e3241f4a76a06d"
+      sha512 "78414772273910c3e951a28d4937bcbf5f81cc84df4b0be515d44b8c7ec9680026bfe9292009fad3a9b07a6f582286f8d55659d12ab8cbaa8cc7e90df0901b38"
     end
 
     on_linux do
       if Hardware::CPU.intel? and Hardware::CPU.is_64_bit?
         url "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/#{_tag}/downloads/zoi-linux-amd64.tar.zst"
-        sha512 "ca463d2bf78792aaf3b922cf8685a21b08ec8b0dd8903b298617a1f2af9cec9eb46d8804e2ee4082d99264e84fe7a99eb1144495d7bd074993a87089c9ba2b23"
+        sha512 "6ad4ec82769eca5e8ccee2fbd8169ca9c13843d008baf0ff50f807fc4d5d199c848ac7b3c8af159b51229a4b55b57f887bc5ef7f2f0002632f4d3d75d78b70eb"
       end
 
       if Hardware::CPU.arm? and Hardware::CPU.is_64_bit?
         url "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/#{_tag}/downloads/zoi-linux-arm64.tar.zst"
-        sha512 "ad81d8071b83542406cd9c4d0415d7e82e066bc87fe959cba8e61077fd667dbf053bc5b2cecf7bb1badfe29bb9dc642216996a5051774ea7368a7954cc427a48"
+        sha512 "7e09fa8c580c0b2bc1bac693d1e16d1890615d0ce1933b636d4b25ca1f7762ee2743e157e942dc1300e1c3c9f3b45ac0b87710279bbf6894fc1dac80ef066d78"
       end
     end
 

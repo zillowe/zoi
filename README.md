@@ -49,6 +49,7 @@
 - [Platforms](#-platforms)
 - [Dependencies Support](#-dependencies-support)
 - [Usage](#-usage)
+- [Packaging Status](#-packaging-status)
 - [Contributing](#-contributing)
 - [License](#-license)
 
@@ -288,6 +289,10 @@ Here are some common commands to get you started.
   ```
 
 For more detailed information, please refer to the [Wiki](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/wikis/home).
+
+## 📦 Packaging Status
+
+[![Packaging status](https://repology.org/badge/vertical-allrepos/zoi.svg)](https://repology.org/project/zoi/versions)
 
 ## 🤝 Contributing
 
