@@ -120,20 +120,28 @@ release:packages:
       cd aur_zoi_bin
       curl -o PKGBUILD https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/packages/aur/zoi-bin/PKGBUILD
       curl -o .SRCINFO https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/packages/aur/zoi-bin/.SRCINFO
-      echo "Committing and pushing package updates..."
-      git add .
-      git commit -m "Release: Bump package version to ${VERSION}"
-      git push origin master
+      if ! git diff; then
+        echo "Committing and pushing package updates..."
+        git add .
+        git commit -m "Release: Bump package version to ${VERSION}"
+        git push origin master
+      else
+        echo "No changes detected, skipping commit"
+      fi
       cd ..
 
       echo "--- Homebrew ---"
       git clone "ssh://git@github.com/Zillowe/homebrew-tap" brew_zoi
       cd brew_zoi
       curl -o zoi.rb https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/packages/brew/zoi.rb
-      echo "Committing and pushing package updates..."
-      git add .
-      git commit -m "Release: Bump package version to ${VERSION}"
-      git push origin main
+      if ! git diff; then
+        echo "Committing and pushing package updates..."
+        git add .
+        git commit -m "Release: Bump package version to ${VERSION}"
+        git push origin main
+      else
+        echo "No changes detected, skipping commit"
+      fi
       cd ..
 
       echo "--- Scoop ---"
@@ -141,10 +149,14 @@ release:packages:
       cd scoop_zoi
       cd bucket
       curl -o zoi.json https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/packages/scoop/zoi.json
-      echo "Committing and pushing package updates..."
-      git add .
-      git commit -m "Release: Bump package version to ${VERSION}"
-      git push origin main
+      if ! git diff; then
+        echo "Committing and pushing package updates..."
+        git add .
+        git commit -m "Release: Bump package version to ${VERSION}"
+        git push origin main
+        else
+        echo "No changes detected, skipping commit"
+      fi
       cd ../..
   rules:
     - if: "$CI_COMMIT_MESSAGE =~ /^Release: Bump packages version to .*/"
