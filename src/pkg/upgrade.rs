@@ -186,7 +186,6 @@ fn attempt_patch_upgrade(
     verify_checksum(&patch_path, checksums_content, &patch_filename)?;
 
     let current_exe_path = env::current_exe()?;
-}
     let new_binary_path = temp_dir.path().join(binary_filename);
 
     println!("Applying patch to create new binary...");
