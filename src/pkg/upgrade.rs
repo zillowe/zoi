@@ -73,6 +73,40 @@ fn download_file(url: &str, path: &Path) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn download_patch_file(url: &str, path: &Path) -> Result<(), Box<dyn Error>> {
+    let client = reqwest::blocking::Client::builder()
+        .user_agent("Zoi-Upgrader")
+        .gzip(false)
+        .brotli(false)
+        .deflate(false)
+        .build()?;
+    let mut response = client.get(url).send()?;
+    if !response.status().is_success() {
+        return Err(format!("Failed to download file: HTTP {}", response.status()).into());
+    }
+
+    let total_size = response.content_length().unwrap_or(0);
+    let pb = ProgressBar::new(total_size);
+    pb.set_style(ProgressStyle::default_bar()
+        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})")?
+        .progress_chars("#>-"));
+
+    let mut dest = File::create(path)?;
+    let mut buffer = [0; 8192];
+
+    loop {
+        let bytes_read = response.read(&mut buffer)?;
+        if bytes_read == 0 {
+            break;
+        }
+        dest.write_all(&buffer[..bytes_read])?;
+        pb.inc(bytes_read as u64);
+    }
+
+    pb.finish_with_message("Download complete.");
+    Ok(())
+}
+
 fn extract_archive(archive_path: &Path, target_dir: &Path) -> Result<(), Box<dyn Error>> {
     println!("Extracting binary...");
     let file = File::open(archive_path)?;
@@ -148,10 +182,11 @@ fn attempt_patch_upgrade(
     let patch_path = temp_dir.path().join(&patch_filename);
 
     println!("Downloading patch from: {}", patch_url);
-    download_file(&patch_url, &patch_path)?;
+    download_patch_file(&patch_url, &patch_path)?;
     verify_checksum(&patch_path, checksums_content, &patch_filename)?;
 
     let current_exe_path = env::current_exe()?;
+}
     let new_binary_path = temp_dir.path().join(binary_filename);
 
     println!("Applying patch to create new binary...");
