@@ -127,7 +127,7 @@ release:packages:
       cd ..
 
       echo "--- Homebrew ---"
-      git clone "ssh://git@github.com:Zillowe/homebrew-tap" brew_zoi
+      git clone "ssh://git@github.com/Zillowe/homebrew-tap" brew_zoi
       cd brew_zoi
       curl -o zoi.rb https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/packages/brew/zoi.rb
       echo "Committing and pushing package updates..."
@@ -137,7 +137,7 @@ release:packages:
       cd ..
 
       echo "--- Scoop ---"
-      git clone "ssh://git@github.com:Zillowe/scoop.git" scoop_zoi
+      git clone "ssh://git@github.com/Zillowe/scoop.git" scoop_zoi
       cd scoop_zoi
       cd bucket
       curl -o zoi.json https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/packages/scoop/zoi.json
