@@ -76,9 +76,9 @@ fn download_file(url: &str, path: &Path) -> Result<(), Box<dyn Error>> {
 fn download_patch_file(url: &str, path: &Path) -> Result<(), Box<dyn Error>> {
     let client = reqwest::blocking::Client::builder()
         .user_agent("Zoi-Upgrader")
-        .gzip(false)
-        .brotli(false)
-        .deflate(false)
+        .no_gzip()
+        .no_brotli()
+        .no_deflate()
         .build()?;
     let mut response = client.get(url).send()?;
     if !response.status().is_success() {
