@@ -121,7 +121,7 @@ fn install_dependency(
                 false
             }
         }
-        "pacman" => {
+        "pacman" | "yay" | "paru" | "aur" => {
             if let Some(distro) = utils::get_linux_distribution() {
                 matches!(distro.as_str(), "arch" | "manjaro" | "cachyos")
             } else {
@@ -156,6 +156,7 @@ fn install_dependency(
                 false
             }
         }
+        "snap" | "flatpak" => os == "linux",
         "pkg" => os == "freebsd",
         "pkg_add" => os == "openbsd",
         "zoi" | "cargo" | "native" | "go" | "npm" | "jsr" | "bun" | "pip" | "pipx"
@@ -413,6 +414,57 @@ fn install_dependency(
                 return Err(format!("pacman dependency failed for '{}'", dep.package).into());
             }
         }
+        "yay" => {
+            let status = Command::new("yay")
+                .arg("-S")
+                .arg("--noconfirm")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("yay dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "paru" => {
+            let status = Command::new("paru")
+                .arg("-S")
+                .arg("--noconfirm")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("paru dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "aur" => {
+            let temp_dir = std::env::temp_dir().join(format!("zoi-aur-{}", dep.package));
+            if temp_dir.exists() {
+                fs::remove_dir_all(&temp_dir)?;
+            }
+            fs::create_dir_all(&temp_dir)?;
+
+            let url = format!("https://aur.archlinux.org/{}.git", dep.package);
+            let clone_status = Command::new("git")
+                .arg("clone")
+                .arg("--depth=1")
+                .arg(&url)
+                .arg(&temp_dir)
+                .status()?;
+
+            if !clone_status.success() {
+                return Err(format!("Failed to clone AUR package '{}' from '{}'", dep.package, url).into());
+            }
+
+            let makepkg_status = Command::new("makepkg")
+                .arg("-si")
+                .arg("--noconfirm")
+                .current_dir(&temp_dir)
+                .status()?;
+
+            if !makepkg_status.success() {
+                return Err(format!("Failed to build and install AUR package '{}'", dep.package).into());
+            }
+
+            fs::remove_dir_all(&temp_dir)?;
+        }
         "dnf" | "yum" => {
             let status = Command::new("sudo")
                 .arg(manager)
@@ -501,6 +553,28 @@ fn install_dependency(
                 .status()?;
             if !status.success() {
                 return Err(format!("Portage dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "snap" => {
+            let status = Command::new("sudo")
+                .arg("snap")
+                .arg("install")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("snap dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "flatpak" => {
+            let status = Command::new("sudo")
+                .arg("flatpak")
+                .arg("install")
+                .arg("flathub")
+                .arg(dep.package)
+                .arg("-y")
+                .status()?;
+            if !status.success() {
+                return Err(format!("flatpak dependency failed for '{}'", dep.package).into());
             }
         }
         "winget" => {

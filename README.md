@@ -210,6 +210,11 @@ What dependency installation we support.
 | `pkg`                                                       | FreeBSD                            | ✔️      |
 | `pkg_add`                                                   | OpenBSD                            | ✔️      |
 | `pacman`                                                    | Arch-Based Linux Distros           | ✔️      |
+| `aur`                                                       | Arch-Based Linux Distros           | ✔️      |
+| `yay`                                                       | Arch-Based Linux Distros           | ✔️      |
+| `paru`                                                      | Arch-Based Linux Distros           | ✔️      |
+| `snap`                                                      | Where Snap is installed            | ✔️      |
+| `flatpak`                                                   | Where Flatpak is installed         | ✔️      |
 | `portage`                                                   | Gentoo Linux Distro                | ✔️      |
 | `apt`                                                       | Debian-Based Linux Distros         | ✔️      |
 | `dnf`, `yum`                                                | Fedora/Redhat/CentOS Linux Distros | ✔️      |
