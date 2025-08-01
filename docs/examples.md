@@ -162,28 +162,34 @@ installation:
 A `collection` is a meta-package that doesn't install any files itself but groups other packages as dependencies. This is useful for setting up development environments.
 
 ```yaml
-# packages/collections/rust-dev-tools.pkg.yaml
-name: rust-dev-tools
+# packages/collections/web-dev-essentials.pkg.yaml
+name: web-dev-essentials
 type: collection # Set the package type to 'collection'.
 version: "1.0"
-description: A collection of essential tools for Rust development.
+description: A collection of essential tools for web development.
 maintainer:
   name: "Community"
   email: "community@example.com"
 
 # The 'runtime' dependencies are the packages that will be installed.
+# This collection demonstrates pulling tools from different package managers.
 dependencies:
   runtime:
-    - rustup
-    - cargo-edit
-    - cargo-watch
-    - clippy
+    # Install 'node' and 'bun' using Zoi for version management
+    - zoi:node
+    - zoi:bun
+    # Install 'git' using the system's native package manager
+    - native:git
+    # Install some useful npm packages globally
+    - npm:pnpm
+    - npm:serve
+    - npm:typescript
 ```
 
 **Key Fields:**
 
 - `type: collection`: Defines this as a collection package.
-- `dependencies.runtime`: The list of Zoi packages to install when this collection is installed.
+- `dependencies.runtime`: The list of packages to install when this collection is installed. Note the `manager:package` format.
 
 ---
 
