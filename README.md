@@ -94,7 +94,7 @@ You can install Zoi using a package manager, an installer script, or by building
 
 #### Arch Linux (AUR)
 
-Install [`zoi-bin`](https://aur.archlinux.org/packages/zoi-bin) from the AUR using your favorite helper (e.g. `yay`, `paru`):
+Install [`zoi-bin`](https://aur.archlinux.org/packages/zoi-bin) (Pre-compiler binary) or [`zoi`](https://aur.archlinux.org/packages/zoi) (built from source) from the AUR using your favorite helper (e.g. `yay`, `paru`):
 
 ```sh
 yay -S zoi-bin
