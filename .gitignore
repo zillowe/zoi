@@ -5,7 +5,6 @@ build/archived
 build/release
 build/release-all
 config.mk
-version/node_modules
 .env
 
 # Added by GCT
