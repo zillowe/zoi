@@ -35,12 +35,12 @@ installation:
 
 **Key Fields:**
 
--   `name`, `version`, `description`: Basic package metadata.
--   `installation`: A list of methods to install the package.
--   `type: binary`: Specifies that Zoi should download the file from the `url` and make it executable.
--   `url`: The download link for the binary. Notice the use of placeholders like `{version}` and `{platform}` which Zoi replaces at runtime.
--   `platforms`: A list of platforms this installation method supports.
--   `checksums`: (Optional but recommended) A way to verify the integrity of the downloaded file. It can be a direct URL to a checksums file or a list of file/checksum pairs.
+- `name`, `version`, `description`: Basic package metadata.
+- `installation`: A list of methods to install the package.
+- `type: binary`: Specifies that Zoi should download the file from the `url` and make it executable.
+- `url`: The download link for the binary. Notice the use of placeholders like `{version}` and `{platform}` which Zoi replaces at runtime.
+- `platforms`: A list of platforms this installation method supports.
+- `checksums`: (Optional but recommended) A way to verify the integrity of the downloaded file. It can be a direct URL to a checksums file or a list of file/checksum pairs.
 
 ---
 
@@ -73,8 +73,8 @@ installation:
 
 **Key Fields:**
 
--   `type: com_binary`: Tells Zoi to download and extract the file. Zoi will then look for a file inside the archive that matches the package `name`.
--   `platformComExt`: A map that defines the file extension for the compressed archive based on the operating system (`linux`, `macos`, `windows`).
+- `type: com_binary`: Tells Zoi to download and extract the file. Zoi will then look for a file inside the archive that matches the package `name`.
+- `platformComExt`: A map that defines the file extension for the compressed archive based on the operating system (`linux`, `macos`, `windows`).
 
 ---
 
@@ -92,11 +92,18 @@ maintainer:
   name: "Your Name"
   email: "your.email@example.com"
 
-# Dependencies required to build the package.
+# Dependencies required to build or run the package.
+# Zoi can install dependencies from other package managers.
+# The format is `manager:package-name[version]`.
 dependencies:
+  # Build-time dependencies
   build:
-    - go
-    - make
+    - zoi:go # Assumes 'go' is a Zoi package.
+    - native:make # Assumes 'make' is available via the system's native package manager.
+    - cargo:some-build-tool
+  # Run-time dependencies
+  runtime:
+    - native:openssl # A runtime dependency needed by the compiled binary.
 
 installation:
   - type: source
@@ -110,11 +117,43 @@ installation:
 
 **Key Fields:**
 
--   `dependencies.build`: A list of packages required to *build* this package. Zoi will ensure they are installed first.
--   `type: source`: Indicates that Zoi needs to clone a git repository and run build commands.
--   `url`: The URL of the source code repository. `{git}` is a placeholder for the `git` field at the top level.
--   `commands`: A list of shell commands to run inside the cloned repository.
--   `{store}`: A placeholder for the directory where the final executable should be placed.
+- `dependencies`: A map of dependencies.
+  - `build`: A list of packages required to _build_ this package. Zoi will ensure they are installed first.
+  - `runtime`: A list of packages required to _run_ this package.
+- `type: source`: Indicates that Zoi needs to clone a git repository and run build commands.
+- `url`: The URL of the source code repository. `{git}` is a placeholder for the `git` field at the top level.
+- `commands`: A list of shell commands to run inside the cloned repository.
+- `{store}`: A placeholder for the directory where the final executable should be placed.
+
+---
+
+## Script-Based Package
+
+For installers that provide a shell script (e.g. `install.sh` or `install.ps1`), you can use the `script` installation type. This is common for tools like `nvm` or `rustup`.
+
+```yaml
+# packages/tools/dev-env-installer.pkg.yaml
+name: dev-env-installer
+version: "1.0"
+description: An example of a script-based installer.
+website: https://example.com/dev-env-installer
+maintainer:
+  name: "Your Name"
+  email: "your.email@example.com"
+license: MIT
+
+installation:
+  - type: script
+    # The URL to the installation script.
+    # Zoi replaces {platformExt} with 'sh' on Linux/macOS and 'ps1' on Windows.
+    url: "https://example.com/install.{platformExt}"
+    platforms: ["linux-amd64", "macos-amd64", "windows-amd64"]
+```
+
+**Key Fields:**
+
+- `type: script`: Tells Zoi to download the script from the `url` and execute it.
+- `url`: The download link for the script. `{platformExt}` is a placeholder that resolves to the correct script extension for the user's OS.
 
 ---
 
@@ -143,14 +182,14 @@ dependencies:
 
 **Key Fields:**
 
--   `type: collection`: Defines this as a collection package.
--   `dependencies.runtime`: The list of Zoi packages to install when this collection is installed.
+- `type: collection`: Defines this as a collection package.
+- `dependencies.runtime`: The list of Zoi packages to install when this collection is installed.
 
 ---
 
 ## Service Package
 
-A `service` package is for applications that need to run in the background (e.g., databases, web servers). Zoi can manage starting and stopping these services.
+A `service` package is for applications that need to run in the background (e.g. databases, web servers). Zoi can manage starting and stopping these services.
 
 ```yaml
 # packages/services/my-database.pkg.yaml
@@ -178,10 +217,10 @@ service:
 
 **Key Fields:**
 
--   `type: service`: Defines this as a service package.
--   `service`: A list of service definitions for different platforms.
--   `start`: A list of commands to run to start the service.
--   `stop`: A list of commands to run to stop the service.
+- `type: service`: Defines this as a service package.
+- `service`: A list of service definitions for different platforms.
+- `start`: A list of commands to run to start the service.
+- `stop`: A list of commands to run to stop the service.
 
 ---
 
@@ -218,8 +257,8 @@ config:
 
 **Key Fields:**
 
--   `type: config`: Defines this as a configuration package.
--   `dependencies.runtime`: It's good practice to make the config depend on the application it's for.
--   `config`: A list of configuration definitions for different platforms.
--   `install`: A list of commands to copy or create the configuration files.
--   `uninstall`: (Optional) A list of commands to clean up the configuration files upon uninstallation.
+- `type: config`: Defines this as a configuration package.
+- `dependencies.runtime`: It's good practice to make the config depend on the application it's for.
+- `config`: A list of configuration definitions for different platforms.
+- `install`: A list of commands to copy or create the configuration files.
+- `uninstall`: (Optional) A list of commands to clean up the configuration files upon uninstallation.

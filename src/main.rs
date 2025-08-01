@@ -90,7 +90,7 @@ enum Commands {
         /// List all packages from the database, not just installed ones
         #[arg(long)]
         all: bool,
-        /// Filter by repository (e.g., 'main', 'extra')
+        /// Filter by repository (e.g. 'main', 'extra')
         #[arg(long)]
         repo: Option<String>,
         /// Filter by package type (package, service, config, collection)
@@ -207,7 +207,7 @@ enum Commands {
     Search {
         /// The term to search for (e.g. 'editor', 'cli')
         search_term: String,
-        /// Filter by repository (e.g., 'main', 'extra')
+        /// Filter by repository (e.g. 'main', 'extra')
         #[arg(long)]
         repo: Option<String>,
         /// Filter by package type (package, service, config, collection)
@@ -292,7 +292,11 @@ fn main() {
                 cmd::sync::run(verbose);
                 Ok(())
             }
-            Commands::List { all, repo, package_type } => {
+            Commands::List {
+                all,
+                repo,
+                package_type,
+            } => {
                 let _ = cmd::list::run(all, repo, package_type);
                 Ok(())
             }
@@ -345,12 +349,17 @@ fn main() {
             }
             Commands::Upgrade => {
                 cmd::upgrade::run(BRANCH, STATUS, NUMBER);
-                Ok(())}
+                Ok(())
+            }
             Commands::Autoremove => {
                 cmd::autoremove::run(cli.yes);
                 Ok(())
             }
-            Commands::Search { search_term, repo, package_type } => {
+            Commands::Search {
+                search_term,
+                repo,
+                package_type,
+            } => {
                 cmd::search::run(search_term, repo, package_type);
                 Ok(())
             }
