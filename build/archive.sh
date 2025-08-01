@@ -135,6 +135,18 @@ echo -e "${CYAN}🔐 Generating checksums...${NC}"
   find . -maxdepth 1 -type f -not -name "checksums.txt" -exec sha512sum {} +
 ) > "$CHECKSUM_FILE"
 
+if [ -n "${CI_COMMIT_TAG:-}" ]; then
+    echo -e "${CYAN}🔐 Generating checksum for source archive ${CI_COMMIT_TAG}...${NC}"
+    SOURCE_ARCHIVE_URL="https://gitlab.com/${GITLAB_PROJECT_PATH}/-/archive/${CI_COMMIT_TAG}/Zoi-${CI_COMMIT_TAG}.tar.gz"
+    SOURCE_ARCHIVE_FILE=$(mktemp)
+    if curl --fail -sL -o "$SOURCE_ARCHIVE_FILE" "$SOURCE_ARCHIVE_URL"; then
+        sha512sum "$SOURCE_ARCHIVE_FILE" | sed "s|$(basename "$SOURCE_ARCHIVE_FILE")|Zoi-${CI_COMMIT_TAG}.tar.gz|" >> "$CHECKSUM_FILE"
+    else
+        echo -e "${YELLOW}Could not download source archive. Skipping its checksum.${NC}"
+    fi
+    rm -f "$SOURCE_ARCHIVE_FILE"
+fi
+
 echo -e "\n${GREEN}✅ Archiving, diffing, and checksum generation complete!${NC}"
 echo -e "${CYAN}Output files are in the '${ARCHIVE_DIR}' directory.${NC}"
 ls -lh "$ARCHIVE_DIR"
