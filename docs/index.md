@@ -1,16 +1,17 @@
 ---
-title: Zoi Documentation
+title: Zoi
+description: Universal Package Manager & Environment Setup Tool.
 ---
 
-# Zoi Documentation
+This guide will provide you with everything you need to know to get started, from installation to advanced usage.
 
-Welcome to the official documentation for Zoi, the Universal Package Manager & Environment Setup Tool. This guide will provide you with everything you need to know to get started, from installation to advanced usage.
+[Repository](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi)
 
 ## Introduction
 
 Zoi is a universal package manager and environment setup tool, designed to simplify package management and environment configuration across multiple operating systems. It's part of the Zillowe Development Suite (ZDS) and aims to streamline your development workflow by managing tools and project environments with ease.
 
-## ✨ Features
+## Features
 
 - **Universal:** Works on Linux, macOS, and Windows.
 - **Repository-based:** Manage packages from different sources.
@@ -18,7 +19,7 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
 - **Extensible:** Add your own repositories and packages.
 - **Simple CLI:** An intuitive and easy-to-use command-line interface.
 
-## 🚀 Getting Started
+## Getting Started
 
 Getting started with Zoi is simple. Just follow these three steps:
 
@@ -39,7 +40,7 @@ Getting started with Zoi is simple. Just follow these three steps:
     zoi install hello
     ```
 
-## 📦 Installation
+## Installation
 
 You can install Zoi using a package manager, an installer script, or by building it from source.
 
@@ -95,7 +96,7 @@ make
 sudo make install
 ```
 
-## 💡 Usage & Commands
+## Usage & Commands
 
 Zoi provides a wide range of commands to manage your packages and environment.
 
@@ -125,6 +126,7 @@ Zoi provides a wide range of commands to manage your packages and environment.
 | `update`    | Updates a package to the latest version.                                                    |
 | `pin`       | Pins a package to a specific version to prevent updates.                                    |
 | `unpin`     | Unpins a package, allowing it to be updated again.                                          |
+| `why`       | Explains why a package is installed (e.g. as a dependency or directly).                     |
 | `clone`     | Clones the source code repository of a package.                                             |
 | `exec`      | Downloads a binary to a temporary cache and runs it without installing it.                  |
 
@@ -161,8 +163,6 @@ zoi repo remove community
 zoi repo list
 ```
 
-## Package Types
-
 Zoi supports different types of packages, defined in the `.pkg.yaml` file.
 
 | Type         | Description                                                                                                         |
@@ -174,7 +174,7 @@ Zoi supports different types of packages, defined in the `.pkg.yaml` file.
 
 ## Creating Packages (`pkg.yaml`)
 
-Creating a package for Zoi is done by defining a `pkg.yaml` file. This file contains all the metadata and instructions Zoi needs to install your software. For more examples, see the [Package Examples](./examples.md) page.
+Creating a package for Zoi is done by defining a `pkg.yaml` file. This file contains all the metadata and instructions Zoi needs to install your software. For more examples, see the [Package Examples](./examples) page.
 
 ### `pkg.yaml` Structure
 
@@ -278,21 +278,39 @@ The format for a dependency is `manager:package-name`, where `manager` is one of
 
 ## FAQ
 
-**Q: How do I create my own package for Zoi?**
-
-A: You can create a `.pkg.yaml` file that defines your package. This file includes metadata like the package name, version, description, and installation instructions. The `Package` struct in `src/pkg/types.rs` shows all available fields.
-
-**Q: How do I add a new repository?**
-
-A: You can add a new repository using the `zoi repo add` command. You can run it without arguments for an interactive prompt, or provide the name of the repository to add it directly.
-
-**Q: What platforms does Zoi support?**
-
-A: Zoi is designed to be cross-platform. For a detailed list of supported operating systems and architectures, please refer to the "Platforms" section in the [README](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/README.md#%EF%B8%8F-platforms).
-
-**Q: Can I install packages from other package managers?**
-
-A: Yes, Zoi supports installing dependencies from a wide range of other package managers like `brew`, `winget`, `scoop`, `npm`, `cargo`, `pip`, and many more. These are defined in the `dependencies` section of a package's `.pkg.yaml` file.
+<Accordions type="single">
+  <Accordion title="How do I create my own package for Zoi?">
+    You can create a `.pkg.yaml` file that defines your package. This file
+    includes metadata like the package name, version, description, and
+    installation instructions. The `Package` struct in `src/pkg/types.rs` shows
+    all available fields.
+  </Accordion>
+</Accordions>
+<br />
+<Accordions type="single">
+  <Accordion title="How do I add a new repository?">
+    You can add a new repository using the `zoi repo add` command. You can run
+    it without arguments for an interactive prompt, or provide the name of the
+    repository to add it directly.
+  </Accordion>
+</Accordions>
+<br />
+<Accordions type="single">
+  <Accordion title="What platforms does Zoi support?">
+    Zoi is designed to be cross-platform. For a detailed list of supported
+    operating systems and architectures, please refer to the "Platforms" section
+    in the [README](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi#-platforms).
+  </Accordion>
+</Accordions>
+<br />
+<Accordions type="single">
+  <Accordion title="Can I install packages from other package managers?">
+    Yes, Zoi supports installing dependencies from a wide range of other package
+    managers like `brew`, `winget`, `scoop`, `npm`, `cargo`, `pip`, and many
+    more. These are defined in the `dependencies` section of a package's
+    `.pkg.yaml` file.
+  </Accordion>
+</Accordions>
 
 ## Examples
 
@@ -321,6 +339,12 @@ A: Yes, Zoi supports installing dependencies from a wide range of other package 
   ```
 
 - **Search for a package:**
+
   ```sh
   zoi search <term>
+  ```
+
+- **Check why a package is installed:**
+  ```sh
+  zoi why <package_name>
   ```

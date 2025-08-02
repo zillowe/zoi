@@ -1,8 +1,7 @@
 ---
 title: Package Examples
+description: Set of packages examples
 ---
-
-# `pkg.yaml` Examples
 
 This document provides a set of examples for creating `pkg.yaml` files. These files are the core of Zoi's packaging system, defining everything from metadata to installation methods.
 
@@ -11,7 +10,7 @@ This document provides a set of examples for creating `pkg.yaml` files. These fi
 This is the most common type of package. It downloads a pre-compiled binary from a URL and places it in the user's path.
 
 ```yaml
-# packages/utils/my-cli.pkg.yaml
+# utils/my-cli.pkg.yaml
 name: my-cli
 version: 1.2.3
 description: A simple command-line utility.
@@ -44,12 +43,12 @@ installation:
 
 ---
 
-## Compressed Binary Package (`com_binary`)
+## Compressed Binary Package
 
 Sometimes, binaries are distributed within a compressed archive (like `.zip` or `.tar.gz`). The `com_binary` type handles this by extracting the archive and finding the executable.
 
 ```yaml
-# packages/tools/archiver.pkg.yaml
+# tools/archiver.pkg.yaml
 name: archiver
 version: 2.0.0
 description: A tool for creating and extracting archives.
@@ -83,7 +82,7 @@ installation:
 For packages that need to be compiled on the user's machine, you can use the `source` installation type.
 
 ```yaml
-# packages/dev/compiler.pkg.yaml
+# dev/compiler.pkg.yaml
 name: compiler
 version: 0.1.0
 description: A new programming language compiler.
@@ -132,7 +131,7 @@ installation:
 For installers that provide a shell script (e.g. `install.sh` or `install.ps1`), you can use the `script` installation type. This is common for tools like `nvm` or `rustup`.
 
 ```yaml
-# packages/tools/dev-env-installer.pkg.yaml
+# tools/dev-env-installer.pkg.yaml
 name: dev-env-installer
 version: "1.0"
 description: An example of a script-based installer.
@@ -162,7 +161,7 @@ installation:
 A `collection` is a meta-package that doesn't install any files itself but groups other packages as dependencies. This is useful for setting up development environments.
 
 ```yaml
-# packages/collections/web-dev-essentials.pkg.yaml
+# collections/web-dev-essentials.pkg.yaml
 name: web-dev-essentials
 type: collection # Set the package type to 'collection'.
 version: "1.0"
@@ -198,7 +197,7 @@ dependencies:
 A `service` package is for applications that need to run in the background (e.g. databases, web servers). Zoi can manage starting and stopping these services.
 
 ```yaml
-# packages/services/my-database.pkg.yaml
+# services/my-database.pkg.yaml
 name: my-database
 type: service # Set the package type to 'service'.
 version: "5.7"
@@ -235,7 +234,7 @@ service:
 A `config` package manages the installation and removal of configuration files. It doesn't install an executable itself but can depend on the application it configures. When installed, Zoi will ask the user if they want to run the setup commands.
 
 ```yaml
-# packages/configs/my-app-config.pkg.yaml
+# configs/my-app-config.pkg.yaml
 name: my-app-config
 type: config # Set the package type to 'config'.
 version: "1.0"

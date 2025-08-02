@@ -200,6 +200,12 @@ enum Commands {
     /// Removes packages that were installed as dependencies but are no longer needed
     Autoremove,
 
+    /// Explains why a package is installed
+    Why {
+        /// The name of the package to inspect
+        package_name: String,
+    },
+
     /// Searches for packages by name or description
     #[command(
         long_about = "Searches for a case-insensitive term in the name and description of all available packages in the database."
@@ -355,6 +361,7 @@ fn main() {
                 cmd::autoremove::run(cli.yes);
                 Ok(())
             }
+            Commands::Why { package_name } => cmd::why::run(&package_name),
             Commands::Search {
                 search_term,
                 repo,
