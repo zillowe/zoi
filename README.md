@@ -253,13 +253,13 @@ Here are some common commands to get you started.
 - **List all available packages from active repos:**
 
   ```sh
-  zoi list all
+  zoi list --all
   ```
 
 - **List packages from a specific repo:**
 
   ```sh
-  zoi list all @<repo_name>
+  zoi list --all --repo <repo_name>
   ```
 
 - **Search for a package:**

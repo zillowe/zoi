@@ -96,6 +96,25 @@ make
 sudo make install
 ```
 
+## Platforms
+
+What platforms we currently support.
+
+| OS      | Arch  | Zoi Binary | Packages Support |
+| ------- | ----- | ---------- | ---------------- |
+| Linux   | amd64 | ✔️         | ✔️               |
+| Linux   | arm64 | ✔️         | ✔️               |
+| macOS   | amd64 | ✔️         | ✔️               |
+| macOS   | arm64 | ✔️         | ✔️               |
+| Windows | amd64 | ✔️         | ✔️               |
+| Windows | arm64 | ❌         | ✔️               |
+| FreeBSD | amd64 | ❌         | ✔️               |
+| FreeBSD | arm64 | ❌         | ✔️               |
+| OpenBSD | amd64 | ❌         | ✔️               |
+| OpenBSD | arm64 | ❌         | ✔️               |
+
+We're planning to add support for more platforms.
+
 ## Usage & Commands
 
 Zoi provides a wide range of commands to manage your packages and environment.
@@ -141,11 +160,11 @@ Zoi provides a wide range of commands to manage your packages and environment.
 
 Manages the list of package repositories that Zoi uses.
 
-| Subcommand    | Description                                                                                                 |
-| ------------- | ----------------------------------------------------------------------------------------------------------- |
-| `repo add`    | Adds a new repository from the available sources. Can be run interactively.                                 |
-| `repo remove` | Deletes a repository from the active list.                                                                  |
-| `repo list`   | Shows all currently active repositories. Use `list all` to see all available repositories and their status. |
+| Subcommand    | Description                                                                                                   |
+| ------------- | ------------------------------------------------------------------------------------------------------------- |
+| `repo add`    | Adds a new repository from the available sources. Can be run interactively.                                   |
+| `repo remove` | Deletes a repository from the active list.                                                                    |
+| `repo list`   | Shows all currently active repositories. Use `list --all` to see all available repositories and their status. |
 
 **Example:**
 
@@ -300,8 +319,8 @@ The format for a dependency is `manager:package-name`, where `manager` is one of
 <Accordions type="single">
   <Accordion title="What platforms does Zoi support?">
     Zoi is designed to be cross-platform. For a detailed list of supported
-    operating systems and architectures, please refer to the "Platforms" section
-    in the [README](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi#-platforms).
+    operating systems and architectures, please refer to the
+    "[Platforms](#platforms)" section.
   </Accordion>
 </Accordions>
 <br />
