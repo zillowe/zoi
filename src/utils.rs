@@ -116,37 +116,100 @@ pub fn ask_for_confirmation(prompt: &str, yes: bool) -> bool {
     input.trim().eq_ignore_ascii_case("y")
 }
 
-pub fn get_linux_distribution() -> Option<String> {
+use std::collections::HashMap;
+
+pub fn get_linux_distribution_info() -> Option<HashMap<String, String>> {
     if let Ok(contents) = fs::read_to_string("/etc/os-release") {
-        for line in contents.lines() {
-            if let Some(id) = line.strip_prefix("ID=") {
-                return Some(id.trim_matches('"').to_string());
+        let info: HashMap<String, String> = contents
+            .lines()
+            .filter_map(|line| {
+                let mut parts = line.splitn(2, '=');
+                let key = parts.next()?;
+                let value = parts.next()?.trim_matches('"').to_string();
+                if key.is_empty() {
+                    None
+                } else {
+                    Some((key.to_string(), value))
+                }
+            })
+            .collect();
+        if info.is_empty() {
+            None
+        } else {
+            Some(info)
+        }
+    } else {
+        None
+    }
+}
+
+pub fn get_linux_distro_family() -> Option<String> {
+    if let Some(info) = get_linux_distribution_info() {
+        if let Some(id_like) = info.get("ID_LIKE") {
+            let families: Vec<&str> = id_like.split_whitespace().collect();
+            if families.contains(&"debian") {
+                return Some("debian".to_string());
             }
+            if families.contains(&"arch") {
+                return Some("arch".to_string());
+            }
+            if families.contains(&"fedora") {
+                return Some("fedora".to_string());
+            }
+            if families.contains(&"rhel") {
+                return Some("fedora".to_string());
+            }
+            if families.contains(&"suse") {
+                return Some("suse".to_string());
+            }
+            if families.contains(&"gentoo") {
+                return Some("gentoo".to_string());
+            }
+        }
+        if let Some(id) = info.get("ID") {
+            return match id.as_str() {
+                "debian" | "ubuntu" | "linuxmint" | "pop" | "kali" | "kubuntu" | "lubuntu"
+                | "xubuntu" | "zorin" | "elementary" => Some("debian".to_string()),
+                "arch" | "manjaro" | "cachyos" | "endeavouros" | "garuda" => {
+                    Some("arch".to_string())
+                }
+                "fedora" | "centos" | "rhel" | "rocky" | "almalinux" => Some("fedora".to_string()),
+                "opensuse" | "opensuse-tumbleweed" | "opensuse-leap" => Some("suse".to_string()),
+                "gentoo" => Some("gentoo".to_string()),
+                "alpine" => Some("alpine".to_string()),
+                _ => None,
+            };
         }
     }
     None
 }
 
+pub fn get_linux_distribution() -> Option<String> {
+    get_linux_distribution_info().and_then(|info| info.get("ID").cloned())
+}
+
 pub fn get_native_package_manager() -> Option<String> {
     let os = std::env::consts::OS;
     match os {
-        "linux" => {
-            if let Some(distro) = get_linux_distribution() {
-                match distro.as_str() {
-                    "arch" | "manjaro" | "cachyos" => Some("pacman".to_string()),
-                    "ubuntu" | "debian" | "linuxmint" | "pop" | "kali" => Some("apt".to_string()),
-                    "fedora" | "centos" | "rhel" => Some("dnf".to_string()),
-                    "opensuse-tumbleweed" | "opensuse-leap" => Some("zypper".to_string()),
-                    "alpine" => Some("apk".to_string()),
-                    _ => None,
+        "linux" => get_linux_distro_family()
+            .map(|family| {
+                match family.as_str() {
+                    "debian" => "apt",
+                    "arch" => "pacman",
+                    "fedora" => "dnf",
+                    "suse" => "zypper",
+                    "gentoo" => "portage",
+                    "alpine" => "apk",
+                    _ => "unknown",
                 }
-            } else {
-                None
-            }
-        }
+                .to_string()
+            })
+            .filter(|s| s != "unknown"),
         "macos" => {
             if command_exists("brew") {
                 Some("brew".to_string())
+            } else if command_exists("port") {
+                Some("macports".to_string())
             } else {
                 None
             }
@@ -156,6 +219,8 @@ pub fn get_native_package_manager() -> Option<String> {
                 Some("scoop".to_string())
             } else if command_exists("choco") {
                 Some("choco".to_string())
+            } else if command_exists("winget") {
+                Some("winget".to_string())
             } else {
                 None
             }

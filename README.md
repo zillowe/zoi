@@ -191,6 +191,7 @@ What dependency installation we support.
 | ----------------------------------------------------------- | ---------------------------------- | ------- |
 | `zoi`                                                       | Universal[\*](#-platforms)         | ✔️      |
 | [`brew`](https://brew.sh)                                   | macOS only                         | ✔️      |
+| [`macports`](https://www.macports.org/)                     | macOS only                         | ✔️      |
 | [`winget`](https://github.com/microsoft/winget-cli)         | Windows                            | ✔️      |
 | [`scoop`](https://scoop.sh)                                 | Windows                            | ✔️      |
 | [`choco`](https://chocolatey.org/)                          | Windows                            | ✔️      |
@@ -208,6 +209,7 @@ What dependency installation we support.
 | `dotnet`                                                    | Where .NET runs                    | ✔️      |
 | `nix`                                                       | Where Nix runs                     | ✔️      |
 | [`pipx`](https://github.com/pypa/pipx)                      | Where Python runs                  | ✔️      |
+| [`conda`](https://docs.conda.io/en/latest/)                 | Where Conda runs                   | ✔️      |
 | `pkg`                                                       | FreeBSD                            | ✔️      |
 | `pkg_add`                                                   | OpenBSD                            | ✔️      |
 | `pacman`                                                    | Arch-Based Linux Distros           | ✔️      |

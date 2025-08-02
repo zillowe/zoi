@@ -109,58 +109,21 @@ fn install_dependency(
     let manager = dep.manager;
 
     let is_compatible = match manager {
-        "brew" => os == "macos",
+        "brew" | "macports" => os == "macos",
         "scoop" | "choco" | "winget" => os == "windows",
-        "apt" | "apt-get" => {
-            if let Some(distro) = utils::get_linux_distribution() {
-                matches!(
-                    distro.as_str(),
-                    "ubuntu" | "debian" | "linuxmint" | "pop" | "kali"
-                )
-            } else {
-                false
-            }
-        }
+        "apt" | "apt-get" => utils::get_linux_distro_family().as_deref() == Some("debian"),
         "pacman" | "yay" | "paru" | "aur" => {
-            if let Some(distro) = utils::get_linux_distribution() {
-                matches!(distro.as_str(), "arch" | "manjaro" | "cachyos")
-            } else {
-                false
-            }
+            utils::get_linux_distro_family().as_deref() == Some("arch")
         }
-        "dnf" | "yum" => {
-            if let Some(distro) = utils::get_linux_distribution() {
-                matches!(distro.as_str(), "fedora" | "centos" | "rhel")
-            } else {
-                false
-            }
-        }
-        "zypper" => {
-            if let Some(distro) = utils::get_linux_distribution() {
-                matches!(distro.as_str(), "opensuse-tumbleweed" | "opensuse-leap")
-            } else {
-                false
-            }
-        }
-        "apk" => {
-            if let Some(distro) = utils::get_linux_distribution() {
-                matches!(distro.as_str(), "alpine")
-            } else {
-                false
-            }
-        }
-        "portage" => {
-            if let Some(distro) = utils::get_linux_distribution() {
-                matches!(distro.as_str(), "gentoo")
-            } else {
-                false
-            }
-        }
+        "dnf" | "yum" => utils::get_linux_distro_family().as_deref() == Some("fedora"),
+        "zypper" => utils::get_linux_distro_family().as_deref() == Some("suse"),
+        "apk" => utils::get_linux_distro_family().as_deref() == Some("alpine"),
+        "portage" => utils::get_linux_distro_family().as_deref() == Some("gentoo"),
         "snap" | "flatpak" => os == "linux",
         "pkg" => os == "freebsd",
         "pkg_add" => os == "openbsd",
         "zoi" | "cargo" | "native" | "go" | "npm" | "jsr" | "bun" | "pip" | "pipx"
-        | "cargo-binstall" | "gem" | "yarn" | "pnpm" | "composer" | "dotnet" | "nix" => true,
+        | "cargo-binstall" | "gem" | "yarn" | "pnpm" | "composer" | "dotnet" | "nix" | "conda" => true,
         _ => false,
     };
 
@@ -587,6 +550,26 @@ fn install_dependency(
                 .status()?;
             if !status.success() {
                 return Err(format!("winget dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "conda" => {
+            let status = Command::new("conda")
+                .arg("install")
+                .arg("-y")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("conda dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "macports" => {
+            let status = Command::new("sudo")
+                .arg("port")
+                .arg("install")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("macports dependency failed for '{}'", dep.package).into());
             }
         }
         _ => return Err(format!("Unknown package manager in dependency: {}", dep.manager).into()),

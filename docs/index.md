@@ -254,6 +254,7 @@ The format for a dependency is `manager:package-name`, where `manager` is one of
 | `apk`            | Alpine Linux                    | `apk:git`                             |
 | `portage`        | Gentoo                          | `portage:dev-libs/openssl`            |
 | `brew`           | macOS (Homebrew)                | `brew:node`                           |
+| `macports`       | macOS (MacPorts)                | `macports:git`                        |
 | `scoop`          | Windows                         | `scoop:git`                           |
 | `choco`          | Windows (Chocolatey)            | `choco:git`                           |
 | `winget`         | Windows                         | `winget:Git.Git`                      |
@@ -271,6 +272,7 @@ The format for a dependency is `manager:package-name`, where `manager` is one of
 | `jsr`            | JavaScript Registry             | `jsr:@std/http`                       |
 | `pip`            | Python                          | `pip:requests`                        |
 | `pipx`           | Python                          | `pipx:black`                          |
+| `conda`          | Conda                           | `conda:numpy`                         |
 | `gem`            | Ruby                            | `gem:rails`                           |
 | `composer`       | PHP                             | `composer:laravel/installer`          |
 | `dotnet`         | .NET                            | `dotnet:csharp-ls`                    |
