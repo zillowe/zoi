@@ -6,7 +6,12 @@ use std::collections::HashSet;
 
 #[derive(Parser)]
 pub struct RepoCommand {
-    #[arg(short = 'y', long, help = "Automatically answer yes to all prompts", global = true)]
+    #[arg(
+        short = 'y',
+        long,
+        help = "Automatically answer yes to all prompts",
+        global = true
+    )]
     yes: bool,
     #[command(subcommand)]
     command: Commands,

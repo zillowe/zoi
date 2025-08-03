@@ -116,14 +116,21 @@ pub fn get_all_available_packages() -> Result<Vec<super::types::Package>, Box<dy
     let mut available = Vec::new();
 
     for repo_name in config.repos {
-        let repo_path = db_root.join(repo_name);
+        let repo_path = db_root.join(&repo_name);
         if !repo_path.exists() {
             continue;
         }
         for entry in WalkDir::new(repo_path).into_iter().filter_map(Result::ok) {
             if entry.file_name().to_string_lossy().ends_with(".pkg.yaml") {
                 let content = fs::read_to_string(entry.path())?;
-                let pkg: super::types::Package = serde_yaml::from_str(&content)?;
+                let mut pkg: super::types::Package = serde_yaml::from_str(&content)?;
+
+                if let Some(parent_dir) = entry.path().parent() {
+                    if let Ok(repo_subpath) = parent_dir.strip_prefix(&db_root) {
+                        pkg.repo = repo_subpath.to_string_lossy().to_string();
+                    }
+                }
+
                 available.push(pkg);
             }
         }
@@ -133,27 +140,7 @@ pub fn get_all_available_packages() -> Result<Vec<super::types::Package>, Box<dy
     Ok(available)
 }
 
-pub fn get_packages_from_repo(
-    repo_name: &str,
-) -> Result<Vec<super::types::Package>, Box<dyn Error>> {
-    let db_root = get_db_root()?;
-    let repo_path = db_root.join(repo_name);
-    if !repo_path.exists() {
-        return Err(format!("Repository '{}' not found.", repo_name).into());
-    }
 
-    let mut available = Vec::new();
-    for entry in WalkDir::new(repo_path).into_iter().filter_map(Result::ok) {
-        if entry.file_name().to_string_lossy().ends_with(".pkg.yaml") {
-            let content = fs::read_to_string(entry.path())?;
-            let pkg: super::types::Package = serde_yaml::from_str(&content)?;
-            available.push(pkg);
-        }
-    }
-
-    available.sort_by(|a, b| a.name.cmp(&b.name));
-    Ok(available)
-}
 
 pub fn write_manifest(manifest: &InstallManifest) -> Result<(), Box<dyn Error>> {
     let store_dir = get_store_root(manifest.scope)?.join(&manifest.name);

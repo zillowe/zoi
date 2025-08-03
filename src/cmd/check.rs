@@ -31,7 +31,7 @@ pub fn run() {
 {}",
         "--- Checking for Recommended Tools ---".yellow().bold()
     );
-    let recommended_tools = ["bat", "less"];
+    let recommended_tools = ["less"];
     for tool in recommended_tools {
         print!("Checking for {}... ", tool.cyan());
         let _ = stdout().flush();

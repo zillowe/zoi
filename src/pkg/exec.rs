@@ -3,7 +3,7 @@ use crate::utils;
 use colored::*;
 use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
-use sha2::{Digest, Sha512};
+use sha2::{Digest, Sha256, Sha512};
 use std::error::Error;
 use std::fs::{self, File};
 use std::io::{Cursor, Read, Write};
@@ -45,8 +45,8 @@ fn get_expected_checksum(
             }
             Ok(None)
         }
-        types::Checksums::List(list) => {
-            for item in list {
+        types::Checksums::List { checksum_type, items } => {
+            for item in items {
                 let mut file_pattern = item
                     .file
                     .replace("{version}", pkg.version.as_deref().unwrap_or(""));
@@ -57,9 +57,9 @@ fn get_expected_checksum(
                     if item.checksum.starts_with("http") {
                         println!("Downloading checksum from: {}", item.checksum.cyan());
                         let response = reqwest::blocking::get(&item.checksum)?.text()?;
-                        return Ok(Some(response.trim().to_string()));
+                        return Ok(Some(format!("{}:{}", checksum_type, response.trim())));
                     } else {
-                        return Ok(Some(item.checksum.clone()));
+                        return Ok(Some(format!("{}:{}", checksum_type, item.checksum.clone())));
                     }
                 }
             }
@@ -80,18 +80,31 @@ fn verify_checksum(
         if let Some(expected_checksum) =
             get_expected_checksum(checksums, file_to_verify, pkg, &platform)?
         {
-            let mut hasher = Sha512::new();
-            hasher.update(data);
-            let result = hasher.finalize();
-            let computed_checksum = format!("{:x}", result);
+            let (algo, expected) = if let Some((a, b)) = expected_checksum.split_once(':') {
+                (a.to_lowercase(), b.to_string())
+            } else {
+                ("sha512".to_string(), expected_checksum)
+            };
+            let computed_checksum = match algo.as_str() {
+                "sha256" => {
+                    let mut hasher = Sha256::new();
+                    hasher.update(data);
+                    format!("{:x}", hasher.finalize())
+                }
+                _ => {
+                    let mut hasher = Sha512::new();
+                    hasher.update(data);
+                    format!("{:x}", hasher.finalize())
+                }
+            };
 
-            if computed_checksum.eq_ignore_ascii_case(&expected_checksum) {
+            if computed_checksum.eq_ignore_ascii_case(&expected) {
                 println!("{}", "Checksum verified successfully.".green());
                 Ok(())
             } else {
                 Err(format!(
                     "Checksum mismatch for {}.\nExpected: {}\nComputed: {}",
-                    file_to_verify, expected_checksum, computed_checksum
+                    file_to_verify, expected, computed_checksum
                 )
                 .into())
             }

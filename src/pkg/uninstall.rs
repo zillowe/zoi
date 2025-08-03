@@ -59,7 +59,10 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
         }
     }
 
-    println!("No packages depend on '{}'. Proceeding with uninstallation.", &pkg.name);
+    println!(
+        "No packages depend on '{}'. Proceeding with uninstallation.",
+        &pkg.name
+    );
 
     println!("Cleaning up dependency records...");
 
@@ -112,4 +115,3 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
-

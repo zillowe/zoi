@@ -261,7 +261,7 @@ pub fn run(branch: &str, status: &str, number: &str) -> Result<(), Box<dyn Error
 
     if !self_update::version::bump_is_greater(&current_version, &latest_version_str)? {
         println!("\n{}", "You are already on the latest version!".green());
-        return Ok(())
+        return Ok(());
     }
 
     let (os, arch) = get_platform_info()?;
@@ -279,26 +279,29 @@ pub fn run(branch: &str, status: &str, number: &str) -> Result<(), Box<dyn Error
     println!("Downloading checksums from: {}", checksums_url);
     let checksums_content = reqwest::blocking::get(&checksums_url)?.text()?;
 
-    let new_binary_path =
-        match attempt_patch_upgrade(&base_url, &checksums_content, &binary_filename, &patch_filename) {
-            Ok(path) => {
-                println!("{}", "Patch upgrade successful!".green());
-                path
-            }
-            Err(e) => {
-                println!(
-                    "{}: {}. {}",
-                    "Patch upgrade failed".yellow(),
-                    e,
-                    "Attempting full download.".yellow()
-                );
-                fallback_full_upgrade(&base_url, &checksums_content, os, arch)?
-            }
-        };
+    let new_binary_path = match attempt_patch_upgrade(
+        &base_url,
+        &checksums_content,
+        &binary_filename,
+        &patch_filename,
+    ) {
+        Ok(path) => {
+            println!("{}", "Patch upgrade successful!".green());
+            path
+        }
+        Err(e) => {
+            println!(
+                "{}: {}. {}",
+                "Patch upgrade failed".yellow(),
+                e,
+                "Attempting full download.".yellow()
+            );
+            fallback_full_upgrade(&base_url, &checksums_content, os, arch)?
+        }
+    };
 
     println!("Replacing current executable...");
     self_replace::self_replace(&new_binary_path)?;
 
     Ok(())
 }
-

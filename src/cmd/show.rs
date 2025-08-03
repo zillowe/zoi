@@ -12,6 +12,7 @@ pub fn run(source: &str, raw: bool) {
                 return;
             }
             let mut pkg: Package = serde_yaml::from_str(&content).unwrap();
+            pkg.repo = resolved_source.repo_name.unwrap_or_default();
             pkg.version =
                 Some(resolve::get_default_version(&pkg).unwrap_or_else(|_| "N/A".to_string()));
             print_beautiful(&pkg);
@@ -31,8 +32,10 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
         println!("Website");
         println!("{}", website.cyan().underline());
     }
-    println!("Git Repo");
-    println!("{}", pkg.git.cyan().underline());
+    if !pkg.git.is_empty() {
+        println!("Git Repo");
+        println!("{}", pkg.git.cyan().underline());
+    }
     println!("\n{}\n", pkg.description);
 
     println!("{}: {}", "License".bold(), pkg.license);
@@ -72,12 +75,12 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
                 }
             };
 
-            let platforms_str = if method.platforms.is_empty()
-                || method.platforms.iter().any(|p| p == "any")
+            let platforms_str = if method.platforms.is_empty() 
+                || method.platforms.iter().any(|p| p == "any") 
             {
                 "any".italic().to_string()
             } else {
-                let mut platform_map: std::collections::HashMap<String, Vec<String>> =
+                let mut platform_map: std::collections::HashMap<String, Vec<String>> = 
                     std::collections::HashMap::new();
                 for p in &method.platforms {
                     let parts: Vec<&str> = p.split('-').collect();
@@ -115,6 +118,40 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
             };
 
             println!("  - {}: {}", display_type.yellow(), platforms_str);
+        }
+    }
+
+    if let Some(deps) = &pkg.dependencies {
+        println!("\n{}:", "Dependencies".bold());
+
+        if let Some(build) = &deps.build {
+            println!("  {}:", "Build".bold());
+            for dep in build.get_required() {
+                println!("    - {}", dep);
+            }
+            for dep in build.get_optional() {
+                let parts: Vec<&str> = dep.split(':').collect();
+                if parts.len() >= 3 {
+                    println!("    - {} (optional): {}", parts[0..2].join(":"), parts[2..].join(":"));
+                } else {
+                    println!("    - {} (optional)", dep);
+                }
+            }
+        }
+
+        if let Some(runtime) = &deps.runtime {
+            println!("  {}:", "Runtime".bold());
+            for dep in runtime.get_required() {
+                println!("    - {}", dep);
+            }
+            for dep in runtime.get_optional() {
+                let parts: Vec<&str> = dep.split(':').collect();
+                if parts.len() >= 3 {
+                    println!("    - {} (optional): {}", parts[0..2].join(":"), parts[2..].join(":"));
+                } else {
+                    println!("    - {} (optional)", dep);
+                }
+            }
         }
     }
 }

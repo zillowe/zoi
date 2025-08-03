@@ -5,7 +5,7 @@ use colored::*;
 use dialoguer::{Select, theme::ColorfulTheme};
 use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
-use sha2::{Digest, Sha512};
+use sha2::{Digest, Sha256, Sha512};
 use std::error::Error;
 use std::fs::{self, File};
 use std::io::{self, Cursor, Read, Write};
@@ -196,9 +196,71 @@ pub fn run_installation(
                 service::start_service(&pkg)?;
             }
         }
+        if pkg.post_install.is_some()
+            && utils::ask_for_confirmation(
+                "This package has post-installation commands. Do you want to run them?",
+                yes,
+            )
+        {
+            if let Err(e) = run_post_install_hooks(&pkg) {
+                eprintln!(
+                    "{} Post-installation commands failed: {}",
+                    "Warning:".yellow(),
+                    e
+                );
+            }
+        }
     }
 
     result
+}
+
+fn run_post_install_hooks(pkg: &types::Package) -> Result<(), Box<dyn Error>> {
+    if let Some(hooks) = &pkg.post_install {
+        println!("\n{}", "Running post-installation commands...".bold());
+        let platform = utils::get_platform()?;
+        let version = pkg.version.as_deref().unwrap_or("");
+
+        for hook in hooks {
+            if utils::is_platform_compatible(&platform, &hook.platforms) {
+                for cmd_str in &hook.commands {
+                    let final_cmd = cmd_str
+                        .replace("{version}", version)
+                        .replace("{name}", &pkg.name);
+
+                    println!("Executing: {}", final_cmd.cyan());
+
+                    let pb = ProgressBar::new_spinner();
+                    pb.set_style(
+                        ProgressStyle::default_spinner()
+                            .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
+                            .template("{spinner:.green} {msg}")?,
+                    );
+                    pb.set_message(format!("Running: {}", final_cmd));
+
+                    let output = if cfg!(target_os = "windows") {
+                        Command::new("cmd").arg("/C").arg(&final_cmd).output()? 
+                    } else {
+                        Command::new("sh").arg("-c").arg(&final_cmd).output()? 
+                    };
+
+                    pb.finish_and_clear();
+
+                    if !output.status.success() {
+                        io::stdout().write_all(&output.stdout)?;
+                        io::stderr().write_all(&output.stderr)?;
+                        return Err(format!("Post-install command failed: '{}'", final_cmd).into());
+                    } else {
+                        let stdout = String::from_utf8_lossy(&output.stdout);
+                        if !stdout.trim().is_empty() {
+                            println!("{}", stdout.trim());
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 fn run_updater_flow(
@@ -334,7 +396,7 @@ fn get_expected_checksum(
     file_to_verify: &str,
     pkg: &types::Package,
     platform: &str,
-) -> Result<Option<String>, Box<dyn Error>> {
+) -> Result<Option<(String, String)>, Box<dyn Error>> {
     match checksums {
         types::Checksums::Url(url) => {
             let mut url = url.replace("{version}", pkg.version.as_deref().unwrap_or(""));
@@ -346,16 +408,19 @@ fn get_expected_checksum(
             for line in response.lines() {
                 let parts: Vec<&str> = line.split_whitespace().collect();
                 if parts.len() == 2 && parts[1] == file_to_verify {
-                    return Ok(Some(parts[0].to_string()));
+                    return Ok(Some((parts[0].to_string(), "sha512".to_string())));
                 }
             }
             if response.lines().count() == 1 && response.split_whitespace().count() == 1 {
-                return Ok(Some(response.trim().to_string()));
+                return Ok(Some((response.trim().to_string(), "sha512".to_string())));
             }
             Ok(None)
         }
-        types::Checksums::List(list) => {
-            for item in list {
+        types::Checksums::List {
+            checksum_type,
+            items,
+        } => {
+            for item in items {
                 let mut file_pattern = item
                     .file
                     .replace("{version}", pkg.version.as_deref().unwrap_or(""));
@@ -366,9 +431,9 @@ fn get_expected_checksum(
                     if item.checksum.starts_with("http") {
                         println!("Downloading checksum from: {}", item.checksum.cyan());
                         let response = reqwest::blocking::get(&item.checksum)?.text()?;
-                        return Ok(Some(response.trim().to_string()));
+                        return Ok(Some((response.trim().to_string(), checksum_type.clone())));
                     } else {
-                        return Ok(Some(item.checksum.clone()));
+                        return Ok(Some((item.checksum.clone(), checksum_type.clone())));
                     }
                 }
             }
@@ -386,13 +451,20 @@ fn verify_checksum(
     if let Some(checksums) = &method.checksums {
         println!("Verifying checksum for {}...", file_to_verify);
         let platform = utils::get_platform()?;
-        if let Some(expected_checksum) =
-            get_expected_checksum(checksums, file_to_verify, pkg, &platform)?
+        if let Some((expected_checksum, checksum_type)) =            get_expected_checksum(checksums, file_to_verify, pkg, &platform)?
         {
-            let mut hasher = Sha512::new();
-            hasher.update(data);
-            let result = hasher.finalize();
-            let computed_checksum = format!("{:x}", result);
+            let computed_checksum = match checksum_type.as_str() {
+                "sha256" => {
+                    let mut hasher = Sha256::new();
+                    hasher.update(data);
+                    format!("{:x}", hasher.finalize())
+                }
+                "sha512" | _ => {
+                    let mut hasher = Sha512::new();
+                    hasher.update(data);
+                    format!("{:x}", hasher.finalize())
+                }
+            };
 
             if computed_checksum.eq_ignore_ascii_case(&expected_checksum) {
                 println!("{}", "Checksum verified successfully.".green());

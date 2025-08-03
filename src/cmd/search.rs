@@ -4,20 +4,20 @@ use comfy_table::{ContentArrangement, Table, presets::UTF8_FULL};
 
 pub fn run(search_term: String, repo: Option<String>, package_type: Option<String>) {
     println!(
-        "{}{}{}",
+        "{}{} {}",
         "--- Searching for packages matching '".yellow(),
         search_term.blue().bold(),
         "' ---".yellow()
     );
 
-    let packages = if let Some(repo_name) = &repo {
-        local::get_packages_from_repo(repo_name)
-    } else {
-        local::get_all_available_packages()
-    };
+    let packages = local::get_all_available_packages();
 
     match packages {
-        Ok(all_packages) => {
+        Ok(mut all_packages) => {
+            if let Some(repo_name) = &repo {
+                all_packages.retain(|pkg| pkg.repo.starts_with(repo_name));
+            }
+
             let search_term_lower = search_term.to_lowercase();
 
             let type_filter = package_type.and_then(|s| match s.to_lowercase().as_str() {
@@ -67,7 +67,7 @@ pub fn run(search_term: String, repo: Option<String>, package_type: Option<Strin
                 table.add_row(vec![pkg.name, version, pkg.repo, desc]);
             }
 
-            println!("{table}");
+            println!("{}", table);
         }
         Err(e) => {
             eprintln!("\n{}: {}", "Error".red().bold(), e);

@@ -55,18 +55,20 @@ fn parse_source_string(source_str: &str) -> Result<PackageRequest, Box<dyn Error
     }
 
     if main_part.starts_with('@') {
-        let mut repo_pkg_parts = main_part.trim_start_matches('@').splitn(2, '/');
-        repo = Some(
-            repo_pkg_parts
-                .next()
-                .filter(|s| !s.is_empty())
-                .ok_or("Invalid format: missing repo name.")?
-                .to_string(),
-        );
-        name = repo_pkg_parts
-            .next()
-            .filter(|s| !s.is_empty())
-            .ok_or("Invalid format: missing package name after repo.")?;
+        let s = main_part.trim_start_matches('@');
+        if let Some(pos) = s.rfind('/') {
+            let (repo_str, name_str) = s.split_at(pos);
+            if !name_str[1..].is_empty() {
+                repo = Some(repo_str.to_string());
+                name = &name_str[1..];
+            } else {
+                return Err("Invalid format: missing package name after repo path.".into());
+            }
+        } else {
+            return Err(
+                "Invalid format: must be in the form @repo/package or @repo/path/to/package".into(),
+            );
+        }
     } else {
         name = main_part;
     }
@@ -96,11 +98,13 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
         let path = db_root.join(repo_name).join(&pkg_file_name);
         if path.exists() {
             println!("Found package '{}' in repo '{}'", request.name, repo_name);
-            let source_type = if repo_name == "core" || repo_name == "main" || repo_name == "extra" {
-                SourceType::OfficialRepo
-            } else {
-                SourceType::UntrustedRepo(repo_name.clone())
-            };
+            let major_repo = repo_name.split('/').next().unwrap_or("");
+            let source_type =
+                if major_repo == "core" || major_repo == "main" || major_repo == "extra" {
+                    SourceType::OfficialRepo
+                } else {
+                    SourceType::UntrustedRepo(repo_name.clone())
+                };
             return Ok(ResolvedSource {
                 path,
                 source_type,

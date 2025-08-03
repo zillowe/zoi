@@ -28,9 +28,7 @@ pub fn run(
 }
 
 fn print_with_pager(content: &str) -> io::Result<()> {
-    let pager = if crate::utils::command_exists("bat") {
-        "bat"
-    } else if crate::utils::command_exists("less") {
+    let pager = if crate::utils::command_exists("less") {
         "less"
     } else if crate::utils::command_exists("more") {
         "more"
@@ -40,9 +38,7 @@ fn print_with_pager(content: &str) -> io::Result<()> {
     };
 
     let mut command = Command::new(pager);
-    if pager == "bat" {
-        command.args(["--paging=always", "--color=always"]);
-    } else if pager == "less" {
+    if pager == "less" {
         command.arg("-R");
     }
 
@@ -73,8 +69,10 @@ fn run_list_installed(
 
     let mut found_packages = false;
     for pkg in packages {
-        if repo_filter.is_some() && pkg.repo != repo_filter.as_deref().unwrap() {
-            continue;
+        if let Some(repo) = &repo_filter {
+            if !pkg.repo.starts_with(repo) {
+                continue;
+            }
         }
         if type_filter.is_some() && pkg.package_type != type_filter.unwrap() {
             continue;
@@ -107,11 +105,11 @@ fn run_list_all(
         .map(|p| p.name)
         .collect::<HashSet<_>>();
 
-    let available_pkgs = if let Some(repo) = &repo_filter {
-        local::get_packages_from_repo(repo)?
-    } else {
-        local::get_all_available_packages()?
-    };
+    let mut available_pkgs = local::get_all_available_packages()?;
+
+    if let Some(repo) = &repo_filter {
+        available_pkgs.retain(|pkg| pkg.repo.starts_with(repo));
+    }
 
     if available_pkgs.is_empty() {
         if let Some(repo) = repo_filter {

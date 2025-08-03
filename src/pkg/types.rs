@@ -47,6 +47,13 @@ pub struct ConfigCommands {
 
 #[derive(Debug, Deserialize, Clone)]
 #[allow(dead_code)]
+pub struct PostInstallHook {
+    pub platforms: Vec<String>,
+    pub commands: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)]
 pub struct Package {
     pub name: String,
     pub repo: String,
@@ -70,6 +77,8 @@ pub struct Package {
     pub scope: Scope,
     pub service: Option<Vec<ServiceMethod>>,
     pub config: Option<Vec<ConfigCommands>>,
+    #[serde(default)]
+    pub post_install: Option<Vec<PostInstallHook>>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -83,7 +92,16 @@ pub struct Maintainer {
 #[serde(untagged)]
 pub enum Checksums {
     Url(String),
-    List(Vec<ChecksumInfo>),
+    List {
+        #[serde(rename = "type", default = "default_checksum_type")]
+        checksum_type: String,
+        #[serde(rename = "list")]
+        items: Vec<ChecksumInfo>,
+    },
+}
+
+fn default_checksum_type() -> String {
+    "sha512".to_string()
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

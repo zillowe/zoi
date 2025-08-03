@@ -24,14 +24,29 @@ pub fn read_config() -> Result<Config, Box<dyn Error>> {
     let config_path = get_config_path()?;
     if !config_path.exists() {
         let default_config = Config {
-            repos: vec!["core".to_string(), "main".to_string(), "extra".to_string()],
+            repos: vec![
+                "core".to_string(),
+                "main".to_string(),
+                "extra".to_string(),
+            ],
         };
         write_config(&default_config)?;
         return Ok(default_config);
     }
 
     let content = fs::read_to_string(config_path)?;
-    let config: Config = serde_yaml::from_str(&content)?;
+    let mut config: Config = serde_yaml::from_str(&content)?;
+
+    let mut needs_update = false;
+    if !config.repos.contains(&"core".to_string()) {
+        config.repos.insert(0, "core".to_string());
+        needs_update = true;
+    }
+
+    if needs_update {
+        write_config(&config)?;
+    }
+
     Ok(config)
 }
 
