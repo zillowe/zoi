@@ -50,11 +50,18 @@ pub fn run_installation(
         println!("Installing package collection '{}'...", pkg.name.bold());
         if let Some(deps) = &pkg.dependencies {
             if let Some(runtime_deps) = &deps.runtime {
-                if !runtime_deps.is_empty() {
-                    dependencies::resolve_and_install(runtime_deps, &pkg.name, pkg.scope, yes)?;
-                } else {
-                    println!("Collection has no runtime dependencies to install.");
-                }
+                dependencies::resolve_and_install_required(
+                    runtime_deps.get_required(),
+                    &pkg.name,
+                    pkg.scope,
+                    yes,
+                )?;
+                dependencies::resolve_and_install_optional(
+                    runtime_deps.get_optional(),
+                    &pkg.name,
+                    pkg.scope,
+                    yes,
+                )?;
             }
         } else {
             println!("Collection has no dependencies to install.");
@@ -68,7 +75,18 @@ pub fn run_installation(
         println!("Installing configuration '{}'...", pkg.name.bold());
         if let Some(deps) = &pkg.dependencies {
             if let Some(runtime_deps) = &deps.runtime {
-                dependencies::resolve_and_install(runtime_deps, &pkg.name, pkg.scope, yes)?;
+                dependencies::resolve_and_install_required(
+                    runtime_deps.get_required(),
+                    &pkg.name,
+                    pkg.scope,
+                    yes,
+                )?;
+                dependencies::resolve_and_install_optional(
+                    runtime_deps.get_optional(),
+                    &pkg.name,
+                    pkg.scope,
+                    yes,
+                )?;
             }
         }
         write_manifest(&pkg, reason)?;
@@ -124,13 +142,37 @@ pub fn run_installation(
     println!("Installing '{}' version '{}'", pkg.name, version);
 
     if let Some(deps) = &pkg.dependencies {
+        let mut optional_deps_to_install = Vec::new();
+
         if mode == InstallMode::ForceSource {
             if let Some(build_deps) = &deps.build {
-                dependencies::resolve_and_install(build_deps, &pkg.name, pkg.scope, yes)?;
+                dependencies::resolve_and_install_required(
+                    build_deps.get_required(),
+                    &pkg.name,
+                    pkg.scope,
+                    yes,
+                )?;
+                optional_deps_to_install.extend(build_deps.get_optional().clone());
             }
         }
+
         if let Some(runtime_deps) = &deps.runtime {
-            dependencies::resolve_and_install(runtime_deps, &pkg.name, pkg.scope, yes)?;
+            dependencies::resolve_and_install_required(
+                runtime_deps.get_required(),
+                &pkg.name,
+                pkg.scope,
+                yes,
+            )?;
+            optional_deps_to_install.extend(runtime_deps.get_optional().clone());
+        }
+
+        if !optional_deps_to_install.is_empty() {
+            dependencies::resolve_and_install_optional(
+                &optional_deps_to_install,
+                &pkg.name,
+                pkg.scope,
+                yes,
+            )?;
         }
     }
 

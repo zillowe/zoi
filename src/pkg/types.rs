@@ -106,9 +106,45 @@ pub struct InstallationMethod {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum DependencyGroup {
+    Simple(Vec<String>),
+    Complex(ComplexDependencyGroup),
+}
+
+impl DependencyGroup {
+    pub fn get_required(&self) -> &Vec<String> {
+        match self {
+            DependencyGroup::Simple(deps) => deps,
+            DependencyGroup::Complex(group) => &group.required,
+        }
+    }
+
+    pub fn get_optional(&self) -> &Vec<String> {
+        match self {
+            DependencyGroup::Simple(_) => {
+                static EMPTY_VEC: Vec<String> = Vec::new();
+                &EMPTY_VEC
+            }
+            DependencyGroup::Complex(group) => &group.optional,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Clone, Default)]
+pub struct ComplexDependencyGroup {
+    #[serde(default)]
+    pub required: Vec<String>,
+    #[serde(default)]
+    pub optional: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
 pub struct Dependencies {
-    pub runtime: Option<Vec<String>>,
-    pub build: Option<Vec<String>>,
+    #[serde(default)]
+    pub runtime: Option<DependencyGroup>,
+    #[serde(default)]
+    pub build: Option<DependencyGroup>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]

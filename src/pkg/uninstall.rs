@@ -74,12 +74,18 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
 
     if let Some(deps) = pkg.dependencies {
         if let Some(runtime_deps) = deps.runtime {
-            for dep_str in &runtime_deps {
+            for dep_str in runtime_deps.get_required() {
+                cleanup(dep_str)?;
+            }
+            for dep_str in runtime_deps.get_optional() {
                 cleanup(dep_str)?;
             }
         }
         if let Some(build_deps) = deps.build {
-            for dep_str in &build_deps {
+            for dep_str in build_deps.get_required() {
+                cleanup(dep_str)?;
+            }
+            for dep_str in build_deps.get_optional() {
                 cleanup(dep_str)?;
             }
         }

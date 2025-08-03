@@ -10,7 +10,7 @@ mod utils;
 // Production or Development
 const BRANCH: &str = "Production";
 const STATUS: &str = "Beta";
-const NUMBER: &str = "3.2.7";
+const NUMBER: &str = "3.3.0";
 
 /// Zoi - The Universal Package Manager & Environment Setup Tool.
 ///
@@ -77,6 +77,7 @@ enum Commands {
 
     /// Downloads or updates the package database from the remote repository
     #[command(
+        alias = "sy",
         long_about = "Clones the official package database from GitLab to your local machine (~/.zoi/pkgs/db). If the database already exists, it verifies the remote URL and pulls the latest changes."
     )]
     Sync {
@@ -86,9 +87,10 @@ enum Commands {
     },
 
     /// Lists installed or all available packages
+    #[command(alias = "ls")]
     List {
         /// List all packages from the database, not just installed ones
-        #[arg(long)]
+        #[arg(short, long)]
         all: bool,
         /// Filter by repository (e.g. 'main', 'extra')
         #[arg(long)]
@@ -122,12 +124,14 @@ enum Commands {
     },
 
     /// Update a package to the latest version
+    #[command(alias = "up")]
     Update {
         /// The name of the package to update
         package_name: String,
     },
 
     /// Installs a package from a name, local file, or URL
+    #[command(alias = "i")]
     Install {
         /// Package name, local path, or URL to a .pkg.yaml file
         #[arg(value_name = "SOURCE")]
@@ -152,6 +156,7 @@ enum Commands {
 
     /// Uninstalls a package previously installed by Zoi
     #[command(
+        aliases = ["un", "rm", "remove"],
         long_about = "Removes a package's files from the Zoi store and deletes its symlink from the bin directory. This command will fail if the package was not installed by Zoi."
     )]
     Uninstall {
@@ -193,6 +198,7 @@ enum Commands {
 
     /// Upgrades the Zoi binary to the latest version
     #[command(
+        alias = "ug",
         long_about = "Downloads the latest release from GitLab, verifies its checksum, and replaces the current executable."
     )]
     Upgrade,
@@ -208,6 +214,7 @@ enum Commands {
 
     /// Searches for packages by name or description
     #[command(
+        alias = "s",
         long_about = "Searches for a case-insensitive term in the name and description of all available packages in the database."
     )]
     Search {
@@ -223,6 +230,7 @@ enum Commands {
 
     /// Download and execute a binary package without installing it
     #[command(
+        alias = "x",
         long_about = "Downloads a binary to a temporary cache and runs it. All arguments after the package name are passed directly to the executed command."
     )]
     Exec {
@@ -240,7 +248,7 @@ enum Commands {
 
     /// Manage package repositories
     #[command(
-        long_about = "Manages the list of package repositories that Zoi uses to find and install packages. By default, Zoi is configured with 'main' and 'extra' repositories.\n\nCommands:\n- add: Adds a new repository from the available sources. Can be interactive.\n- remove: Deletes a repository from the active list.\n- list: Shows all currently active repositories.\n- list all: Displays all available repositories and their status (active/inactive)."
+        long_about = "Manages the list of package repositories that Zoi uses to find and install packages. By default, Zoi is configured with 'main' and 'extra' repositories.\n\nCommands:\n- add: Adds a new repository from the available sources. Can be interactive.\n- remove: Deletes a repository from the active list.\n- list: Shows all currently active repositories.\n- list --all: Displays all available repositories and their status (active/inactive)."
     )]
     Repo(cmd::repo::RepoCommand),
 

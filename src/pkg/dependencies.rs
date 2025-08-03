@@ -1,6 +1,7 @@
 use crate::pkg::{local, types};
 use crate::utils;
 use colored::*;
+use dialoguer::{Input, theme::ColorfulTheme};
 use regex::Regex;
 use semver::{Version, VersionReq};
 use std::error::Error;
@@ -12,24 +13,43 @@ struct Dependency<'a> {
     manager: &'a str,
     package: &'a str,
     req: Option<VersionReq>,
+    description: Option<&'a str>,
 }
 
 fn parse_dependency_string(dep_str: &str) -> Result<Dependency, Box<dyn Error>> {
     let (manager, rest) = dep_str.split_once(':').unwrap_or(("zoi", dep_str));
-    let (package, req_str) = if let Some(idx) = rest.find(['=', '>', '<', '~', '^']) {
-        rest.split_at(idx)
+
+    let (package_and_version, description) = if manager != "go" {
+        if let Some((main, desc)) = rest.rsplit_once(':') {
+            if main.is_empty() || desc.contains(['=', '>', '<', '~', '^']) {
+                (rest, None)
+            } else {
+                (main, Some(desc))
+            }
+        } else {
+            (rest, None)
+        }
     } else {
-        (rest, "*")
+        (rest, None)
     };
+
+    let (package, req_str) = if let Some(idx) = package_and_version.find(['=', '>', '<', '~', '^']) {
+        package_and_version.split_at(idx)
+    } else {
+        (package_and_version, "*")
+    };
+
     let req = if req_str == "*" {
         None
     } else {
         Some(VersionReq::parse(req_str)?)
     };
+
     Ok(Dependency {
         manager,
         package,
         req,
+        description,
     })
 }
 
@@ -577,7 +597,7 @@ fn install_dependency(
     Ok(())
 }
 
-pub fn resolve_and_install(
+pub fn resolve_and_install_required(
     deps: &[String],
     parent_pkg_name: &str,
     scope: types::Scope,
@@ -587,14 +607,88 @@ pub fn resolve_and_install(
         return Ok(());
     }
 
-    println!("{}", "Resolving dependencies...".bold());
+    println!("{}", "Resolving required dependencies...".bold());
     for dep_str in deps {
         let dependency = parse_dependency_string(dep_str)?;
         install_dependency(&dependency, parent_pkg_name, scope, yes)?;
     }
-    println!("{}", "All dependencies resolved.".green());
+    println!("{}", "All required dependencies resolved.".green());
     Ok(())
 }
+
+pub fn resolve_and_install_optional(
+    deps: &[String],
+    parent_pkg_name: &str,
+    scope: types::Scope,
+    yes: bool,
+) -> Result<(), Box<dyn Error>> {
+    if deps.is_empty() {
+        return Ok(());
+    }
+
+    if yes {
+        println!("{}", "Installing all optional dependencies...".bold());
+        for dep_str in deps {
+            let dependency = parse_dependency_string(dep_str)?;
+            install_dependency(&dependency, parent_pkg_name, scope, true)?;
+        }
+        return Ok(());
+    }
+
+    println!("{}", "This package has optional dependencies:".bold());
+    let mut parsed_deps = Vec::new();
+    for (i, dep_str) in deps.iter().enumerate() {
+        let dep = parse_dependency_string(dep_str)?;
+        let desc = dep.description.unwrap_or("No description");
+        println!(
+            "  {}. {} - {}",
+            (i + 1).to_string().cyan(),
+            dep_str.bold(),
+            desc.italic()
+        );
+        parsed_deps.push(dep);
+    }
+
+    let input: String = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Choose which to install (e.g. '1,3', 'all', 'none')")
+        .default("none".into())
+        .interact_text()?;
+
+    let trimmed_input = input.trim().to_lowercase();
+
+    if trimmed_input == "none" || trimmed_input == "n" {
+        println!("Skipping optional dependencies.");
+        return Ok(());
+    }
+
+    let mut to_install = Vec::new();
+    if trimmed_input == "all" || trimmed_input == "y" {
+        to_install.extend(0..parsed_deps.len());
+    } else {
+        for part in trimmed_input.split([',', ' ']).filter(|s| !s.is_empty()) {
+            if let Ok(num) = part.parse::<usize>() {
+                if num > 0 && num <= parsed_deps.len() {
+                    to_install.push(num - 1);
+                } else {
+                    println!("Invalid number: {}", num);
+                }
+            } else {
+                println!("Invalid input: {}", part);
+            }
+        }
+    }
+    
+    to_install.sort();
+    to_install.dedup();
+
+    for index in to_install {
+        let dep = &parsed_deps[index];
+        install_dependency(dep, parent_pkg_name, scope, yes)?;
+    }
+
+    Ok(())
+}
+
 
 fn install_zoi_dependency(package_name: &str, yes: bool) -> Result<(), Box<dyn Error>> {
     use crate::pkg::{install, resolve};

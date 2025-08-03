@@ -1,7 +1,7 @@
 use crate::pkg::config;
 use clap::{Parser, Subcommand};
 use colored::*;
-use comfy_table::{presets::UTF8_FULL, Table};
+use comfy_table::{Table, presets::UTF8_FULL};
 use std::collections::HashSet;
 
 #[derive(Parser)]
