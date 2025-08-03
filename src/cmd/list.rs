@@ -1,6 +1,6 @@
 use crate::pkg::{local, types};
 
-use comfy_table::{presets::UTF8_FULL, Table};
+use comfy_table::{Table, presets::UTF8_FULL};
 use std::collections::HashSet;
 use std::io::{self, Write};
 use std::process::{Command, Stdio};
@@ -151,4 +151,3 @@ fn run_list_all(
     print_with_pager(&table.to_string())?;
     Ok(())
 }
-

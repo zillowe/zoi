@@ -27,12 +27,14 @@ fn run_update_single_logic(
         return Ok(());
     }
 
-    let manifest =
-        local::is_package_installed(package_name, types::Scope::User)?
-            .or(local::is_package_installed(package_name, types::Scope::System)?)
-            .ok_or(format!(
-                "Package '{package_name}' is not installed. Use 'zoi install' instead."
-            ))?;
+    let manifest = local::is_package_installed(package_name, types::Scope::User)?
+        .or(local::is_package_installed(
+            package_name,
+            types::Scope::System,
+        )?)
+        .ok_or(format!(
+            "Package '{package_name}' is not installed. Use 'zoi install' instead."
+        ))?;
 
     println!("Currently installed version: {}", manifest.version.yellow());
 
@@ -43,7 +45,10 @@ fn run_update_single_logic(
     let content = std::fs::read_to_string(&resolved_source.path)?;
     let new_pkg: crate::pkg::types::Package = serde_yaml::from_str(&content)?;
 
-    println!("Available version: {}", new_pkg.version.as_deref().unwrap_or("N/A").green());
+    println!(
+        "Available version: {}",
+        new_pkg.version.as_deref().unwrap_or("N/A").green()
+    );
 
     if manifest.version == new_pkg.version.as_deref().unwrap_or_default() {
         println!("\nPackage is already up to date.");

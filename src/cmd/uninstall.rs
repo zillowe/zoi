@@ -2,8 +2,9 @@ use crate::pkg;
 use colored::*;
 
 pub fn run(package_name: &str) {
+    let package_name = package_name.trim();
     println!(
-        "{}{}{}",
+        "{}{} {}",
         "--- Uninstalling package '".yellow(),
         package_name.blue().bold(),
         "' ---".yellow()

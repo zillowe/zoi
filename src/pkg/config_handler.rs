@@ -36,13 +36,11 @@ pub fn run_install_commands(pkg: &types::Package) -> Result<(), Box<dyn Error>> 
             );
             Ok(())
         } else {
-            Err(
-                format!(
-                    "No compatible config method found for platform '{}'.",
-                    platform
-                )
-                .into(),
+            Err(format!(
+                "No compatible config method found for platform '{}'.",
+                platform
             )
+            .into())
         }
     } else {
         Err(format!(
@@ -87,13 +85,11 @@ pub fn run_uninstall_commands(pkg: &types::Package) -> Result<(), Box<dyn Error>
             }
             Ok(())
         } else {
-            Err(
-                format!(
-                    "No compatible config method found for platform '{}'.",
-                    platform
-                )
-                .into(),
+            Err(format!(
+                "No compatible config method found for platform '{}'.",
+                platform
             )
+            .into())
         }
     } else {
         Err(format!(

@@ -261,11 +261,7 @@ fn run_interactive_flow(pkg: &types::Package, platform: &str) -> Result<(), Box<
     }
 }
 
-fn run_default_flow(
-    pkg: &types::Package,
-    platform: &str,
-    yes: bool,
-) -> Result<(), Box<dyn Error>> {
+fn run_default_flow(pkg: &types::Package, platform: &str, yes: bool) -> Result<(), Box<dyn Error>> {
     if let Some(method) = find_method(pkg, "binary", platform) {
         println!("Found 'binary' method. Installing...");
         return handle_binary_install(method, pkg);
@@ -279,8 +275,7 @@ fn run_default_flow(
 
     println!("No compressed binary found, checking for script...");
     if let Some(method) = find_method(pkg, "script", platform) {
-        if utils::ask_for_confirmation("Found a 'script' method. Do you want to execute it?", yes)
-        {
+        if utils::ask_for_confirmation("Found a 'script' method. Do you want to execute it?", yes) {
             return handle_script_install(method, pkg);
         }
     }
@@ -361,7 +356,9 @@ fn get_expected_checksum(
         }
         types::Checksums::List(list) => {
             for item in list {
-                let mut file_pattern = item.file.replace("{version}", pkg.version.as_deref().unwrap_or(""));
+                let mut file_pattern = item
+                    .file
+                    .replace("{version}", pkg.version.as_deref().unwrap_or(""));
                 file_pattern = file_pattern.replace("{name}", &pkg.name);
                 file_pattern = file_pattern.replace("{platform}", platform);
 
@@ -434,7 +431,9 @@ fn handle_com_binary_install(
         .map(|s| s.as_str())
         .unwrap_or(if os == "windows" { "zip" } else { "tar.zst" });
 
-    let mut url = method.url.replace("{version}", pkg.version.as_deref().unwrap_or(""));
+    let mut url = method
+        .url
+        .replace("{version}", pkg.version.as_deref().unwrap_or(""));
     url = url.replace("{name}", &pkg.name);
     url = url.replace("{platform}", &platform);
     url = url.replace("{platformComExt}", com_ext);
@@ -581,7 +580,9 @@ fn handle_binary_install(
     method: &types::InstallationMethod,
     pkg: &types::Package,
 ) -> Result<(), Box<dyn Error>> {
-    let mut url = method.url.replace("{version}", pkg.version.as_deref().unwrap_or(""));
+    let mut url = method
+        .url
+        .replace("{version}", pkg.version.as_deref().unwrap_or(""));
     url = url.replace("{name}", &pkg.name);
     let platform = utils::get_platform()?;
     url = url.replace("{platform}", &platform);

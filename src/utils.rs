@@ -133,11 +133,7 @@ pub fn get_linux_distribution_info() -> Option<HashMap<String, String>> {
                 }
             })
             .collect();
-        if info.is_empty() {
-            None
-        } else {
-            Some(info)
-        }
+        if info.is_empty() { None } else { Some(info) }
     } else {
         None
     }

@@ -1,6 +1,6 @@
 use crate::pkg::{local, types::PackageType};
 use colored::*;
-use comfy_table::{presets::UTF8_FULL, ContentArrangement, Table};
+use comfy_table::{ContentArrangement, Table, presets::UTF8_FULL};
 
 pub fn run(search_term: String, repo: Option<String>, package_type: Option<String>) {
     println!(
@@ -62,8 +62,8 @@ pub fn run(search_term: String, repo: Option<String>, package_type: Option<Strin
                     desc.push_str("...");
                 }
 
-                let version =
-                    crate::pkg::resolve::get_default_version(&pkg).unwrap_or_else(|_| "N/A".to_string());
+                let version = crate::pkg::resolve::get_default_version(&pkg)
+                    .unwrap_or_else(|_| "N/A".to_string());
                 table.add_row(vec![pkg.name, version, pkg.repo, desc]);
             }
 

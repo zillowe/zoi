@@ -27,23 +27,23 @@ fn remove_dependent_record(
 }
 
 pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
+    let (pkg, _) = resolve::resolve_package_and_version(package_name)?;
+
     let (_manifest, scope) =
-        if let Some(m) = local::is_package_installed(package_name, types::Scope::User)? {
+        if let Some(m) = local::is_package_installed(&pkg.name, types::Scope::User)? {
             (m, types::Scope::User)
-        } else if let Some(m) = local::is_package_installed(package_name, types::Scope::System)? {
+        } else if let Some(m) = local::is_package_installed(&pkg.name, types::Scope::System)? {
             (m, types::Scope::System)
         } else {
-            return Err(format!("Package '{package_name}' is not installed by Zoi.").into());
+            return Err(format!("Package '{}' is not installed by Zoi.", pkg.name).into());
         };
-
-    let (pkg, _) = resolve::resolve_package_and_version(package_name)?;
 
     if pkg.package_type == types::PackageType::Config {
         config_handler::run_uninstall_commands(&pkg)?;
     }
 
     let dependents_dir = local::get_store_root(scope)?
-        .join(package_name)
+        .join(&pkg.name)
         .join("dependents");
     if dependents_dir.exists() {
         let entries: Vec<String> = fs::read_dir(&dependents_dir)?
@@ -54,12 +54,12 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
         if !entries.is_empty() {
             return Err(format!(
                 "Cannot uninstall '{}' because other packages depend on it:\n  - {}\n\nPlease uninstall these packages first.",
-                package_name, entries.join("\n  - ")
+                &pkg.name, entries.join("\n  - ")
             ).into());
         }
     }
 
-    println!("No packages depend on '{package_name}'. Proceeding with uninstallation.");
+    println!("No packages depend on '{}'. Proceeding with uninstallation.", &pkg.name);
 
     println!("Cleaning up dependency records...");
 
@@ -67,7 +67,7 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
         if !dep_str.contains(':') || dep_str.starts_with("zoi:") {
             let dep_name = dep_str.split(['=', '>', '<', '~', '^']).next().unwrap();
             let final_dep_name = dep_name.strip_prefix("zoi:").unwrap_or(dep_name);
-            remove_dependent_record(final_dep_name, package_name, scope)?;
+            remove_dependent_record(final_dep_name, &pkg.name, scope)?;
         }
         Ok(())
     };
@@ -91,7 +91,7 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
         }
     }
 
-    let store_dir = local::get_store_root(scope)?.join(package_name);
+    let store_dir = local::get_store_root(scope)?.join(&pkg.name);
     if store_dir.exists() {
         println!("Removing stored files from {}...", store_dir.display());
         fs::remove_dir_all(&store_dir)?;
@@ -103,7 +103,7 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
         );
     }
 
-    let symlink_path = get_bin_root()?.join(package_name);
+    let symlink_path = get_bin_root()?.join(&pkg.name);
     if symlink_path.exists() {
         println!("Removing symlink from {}...", symlink_path.display());
         fs::remove_file(&symlink_path)?;

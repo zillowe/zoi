@@ -47,7 +47,9 @@ fn get_expected_checksum(
         }
         types::Checksums::List(list) => {
             for item in list {
-                let mut file_pattern = item.file.replace("{version}", pkg.version.as_deref().unwrap_or(""));
+                let mut file_pattern = item
+                    .file
+                    .replace("{version}", pkg.version.as_deref().unwrap_or(""));
                 file_pattern = file_pattern.replace("{name}", &pkg.name);
                 file_pattern = file_pattern.replace("{platform}", platform);
 
@@ -131,7 +133,9 @@ fn ensure_binary_is_cached(pkg: &types::Package) -> Result<PathBuf, Box<dyn Erro
     if let Some(method) = pkg.installation.iter().find(|m| {
         m.install_type == "binary" && utils::is_platform_compatible(&platform, &m.platforms)
     }) {
-        let mut url = method.url.replace("{version}", pkg.version.as_deref().unwrap_or(""));
+        let mut url = method
+            .url
+            .replace("{version}", pkg.version.as_deref().unwrap_or(""));
         url = url.replace("{name}", &pkg.name);
         url = url.replace("{platform}", &platform);
 
@@ -187,7 +191,9 @@ fn ensure_binary_is_cached(pkg: &types::Package) -> Result<PathBuf, Box<dyn Erro
             .map(|s| s.as_str())
             .unwrap_or(if os == "windows" { "zip" } else { "tar.zst" });
 
-        let mut url = method.url.replace("{version}", pkg.version.as_deref().unwrap_or(""));
+        let mut url = method
+            .url
+            .replace("{version}", pkg.version.as_deref().unwrap_or(""));
         url = url.replace("{name}", &pkg.name);
         url = url.replace("{platform}", &platform);
         url = url.replace("{platformComExt}", com_ext);

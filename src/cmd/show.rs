@@ -12,9 +12,8 @@ pub fn run(source: &str, raw: bool) {
                 return;
             }
             let mut pkg: Package = serde_yaml::from_str(&content).unwrap();
-            pkg.version = Some(
-                resolve::get_default_version(&pkg).unwrap_or_else(|_| "N/A".to_string()),
-            );
+            pkg.version =
+                Some(resolve::get_default_version(&pkg).unwrap_or_else(|_| "N/A".to_string()));
             print_beautiful(&pkg);
         }
         Err(e) => eprintln!("{}: {}", "Error".red(), e),

@@ -1,5 +1,5 @@
 use colored::*;
-use git2::{build::CheckoutBuilder, build::RepoBuilder, FetchOptions, RemoteCallbacks, Repository};
+use git2::{FetchOptions, RemoteCallbacks, Repository, build::CheckoutBuilder, build::RepoBuilder};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use std::fs;
 use std::path::PathBuf;
@@ -106,7 +106,10 @@ pub fn run(verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
             checkout_pb.finish_with_message("Checked out.");
         } else {
             checkout_pb.finish_with_message("Cannot fast-forward.");
-            println!("{}", "Cannot fast-forward. Please run `git pull` manually.".yellow());
+            println!(
+                "{}",
+                "Cannot fast-forward. Please run `git pull` manually.".yellow()
+            );
         }
     } else {
         println!("No local database found. Cloning from remote...");
@@ -144,7 +147,7 @@ pub fn run(verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
         fetch_pb.finish_with_message("Fetched.");
         checkout_pb.finish_with_message("Checked out.");
     }
-    
+
     m.clear().ok();
     Ok(())
 }

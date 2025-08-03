@@ -1,7 +1,7 @@
+use sha2::{Digest, Sha256};
 use std::error::Error;
 use std::fs;
 use std::path::PathBuf;
-use sha2::{Sha256, Digest};
 
 pub fn get_cache_root() -> Result<PathBuf, Box<dyn Error>> {
     let home_dir = home::home_dir().ok_or("Could not find home directory.")?;

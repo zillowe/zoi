@@ -33,7 +33,8 @@ fn parse_dependency_string(dep_str: &str) -> Result<Dependency, Box<dyn Error>> 
         (rest, None)
     };
 
-    let (package, req_str) = if let Some(idx) = package_and_version.find(['=', '>', '<', '~', '^']) {
+    let (package, req_str) = if let Some(idx) = package_and_version.find(['=', '>', '<', '~', '^'])
+    {
         package_and_version.split_at(idx)
     } else {
         (package_and_version, "*")
@@ -143,7 +144,9 @@ fn install_dependency(
         "pkg" => os == "freebsd",
         "pkg_add" => os == "openbsd",
         "zoi" | "cargo" | "native" | "go" | "npm" | "jsr" | "bun" | "pip" | "pipx"
-        | "cargo-binstall" | "gem" | "yarn" | "pnpm" | "composer" | "dotnet" | "nix" | "conda" => true,
+        | "cargo-binstall" | "gem" | "yarn" | "pnpm" | "composer" | "dotnet" | "nix" | "conda" => {
+            true
+        }
         _ => false,
     };
 
@@ -255,7 +258,9 @@ fn install_dependency(
                 .arg(dep.package)
                 .status()?;
             if !status.success() {
-                return Err(format!("cargo-binstall dependency failed for '{}'", dep.package).into());
+                return Err(
+                    format!("cargo-binstall dependency failed for '{}'", dep.package).into(),
+                );
             }
         }
         "go" => {
@@ -433,7 +438,11 @@ fn install_dependency(
                 .status()?;
 
             if !clone_status.success() {
-                return Err(format!("Failed to clone AUR package '{}' from '{}'", dep.package, url).into());
+                return Err(format!(
+                    "Failed to clone AUR package '{}' from '{}'",
+                    dep.package, url
+                )
+                .into());
             }
 
             let makepkg_status = Command::new("makepkg")
@@ -443,7 +452,9 @@ fn install_dependency(
                 .status()?;
 
             if !makepkg_status.success() {
-                return Err(format!("Failed to build and install AUR package '{}'", dep.package).into());
+                return Err(
+                    format!("Failed to build and install AUR package '{}'", dep.package).into(),
+                );
             }
 
             fs::remove_dir_all(&temp_dir)?;
@@ -677,7 +688,7 @@ pub fn resolve_and_install_optional(
             }
         }
     }
-    
+
     to_install.sort();
     to_install.dedup();
 
@@ -688,7 +699,6 @@ pub fn resolve_and_install_optional(
 
     Ok(())
 }
-
 
 fn install_zoi_dependency(package_name: &str, yes: bool) -> Result<(), Box<dyn Error>> {
     use crate::pkg::{install, resolve};

@@ -15,11 +15,16 @@ fn get_db_root() -> Result<PathBuf, Box<dyn Error>> {
     Ok(home_dir.join(".zoi").join("pkgs").join("db"))
 }
 
+fn get_git_root() -> Result<PathBuf, Box<dyn Error>> {
+    let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
+    Ok(home_dir.join(".zoi").join("pkgs").join("git"))
+}
+
 pub fn read_config() -> Result<Config, Box<dyn Error>> {
     let config_path = get_config_path()?;
     if !config_path.exists() {
         let default_config = Config {
-            repos: vec!["main".to_string(), "extra".to_string()],
+            repos: vec!["core".to_string(), "main".to_string(), "extra".to_string()],
         };
         write_config(&default_config)?;
         return Ok(default_config);
@@ -125,4 +130,39 @@ pub fn get_all_repos() -> Result<Vec<String>, Box<dyn Error>> {
         .collect();
 
     Ok(all_repos)
+}
+
+pub fn clone_git_repo(url: &str) -> Result<(), Box<dyn Error>> {
+    let git_root = get_git_root()?;
+    fs::create_dir_all(&git_root)?;
+    let repo_name = url
+        .trim_end_matches('/')
+        .split('/')
+        .last()
+        .unwrap_or("repo")
+        .trim_end_matches(".git");
+    let target = git_root.join(repo_name);
+    if target.exists() {
+        return Err(format!(
+            "Git repo '{}' already exists at {}",
+            repo_name,
+            target.display()
+        )
+        .into());
+    }
+    println!("Cloning '{}' into {}...", url.cyan(), target.display());
+    let status = std::process::Command::new("git")
+        .arg("clone")
+        .arg(url)
+        .arg(&target)
+        .status()?;
+    if !status.success() {
+        return Err("git clone failed".into());
+    }
+    println!(
+        "Cloned git repo as '{}' (use with '@git/{}/<pkg>')",
+        repo_name.green(),
+        repo_name
+    );
+    Ok(())
 }

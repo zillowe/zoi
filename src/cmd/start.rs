@@ -1,4 +1,4 @@
-use crate::pkg::install::{run_installation, InstallMode};
+use crate::pkg::install::{InstallMode, run_installation};
 use crate::pkg::{local, resolve, service, types};
 use crate::utils;
 use colored::*;

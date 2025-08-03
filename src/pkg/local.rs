@@ -73,7 +73,11 @@ pub fn get_installed_packages_with_type() -> Result<Vec<InstalledPackage>, Box<d
     for manifest in manifests {
         let pkg_path = get_db_root()?;
         if pkg_path.exists() {
-            let content = fs::read_to_string(pkg_path.join(&manifest.repo).join(format!("{}.pkg.yaml", manifest.name)))?;
+            let content = fs::read_to_string(
+                pkg_path
+                    .join(&manifest.repo)
+                    .join(format!("{}.pkg.yaml", manifest.name)),
+            )?;
             let pkg: Package = serde_yaml::from_str(&content)?;
             packages.push(InstalledPackage {
                 name: manifest.name,

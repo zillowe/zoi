@@ -33,13 +33,11 @@ pub fn start_service(pkg: &types::Package) -> Result<(), Box<dyn Error>> {
             println!("Service '{}' started successfully.", pkg.name.green());
             Ok(())
         } else {
-            Err(
-                format!(
-                    "No compatible service method found for platform '{}'.",
-                    platform
-                )
-                .into(),
+            Err(format!(
+                "No compatible service method found for platform '{}'.",
+                platform
             )
+            .into())
         }
     } else {
         Err(format!(
@@ -79,13 +77,11 @@ pub fn stop_service(pkg: &types::Package) -> Result<(), Box<dyn Error>> {
             println!("Service '{}' stopped successfully.", pkg.name.green());
             Ok(())
         } else {
-            Err(
-                format!(
-                    "No compatible service method found for platform '{}'.",
-                    platform
-                )
-                .into(),
+            Err(format!(
+                "No compatible service method found for platform '{}'.",
+                platform
             )
+            .into())
         }
     } else {
         Err(format!(

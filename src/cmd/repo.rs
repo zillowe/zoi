@@ -6,16 +6,18 @@ use std::collections::HashSet;
 
 #[derive(Parser)]
 pub struct RepoCommand {
+    #[arg(short = 'y', long, help = "Automatically answer yes to all prompts", global = true)]
+    yes: bool,
     #[command(subcommand)]
     command: Commands,
 }
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Add a repository to the configuration
+    /// Add a repository to the configuration or clone from a git URL
     Add {
-        /// The name of the repository to add
-        repo_name: Option<String>,
+        /// The name of the repository to add or a git URL to clone
+        repo_or_url: Option<String>,
     },
     /// Remove a repository from the configuration
     #[command(alias = "rm")]
@@ -32,13 +34,27 @@ enum Commands {
 }
 
 pub fn run(args: RepoCommand) {
+    let yes = args.yes;
     match args.command {
-        Commands::Add { repo_name } => {
-            if let Some(name) = repo_name {
-                if let Err(e) = config::add_repo(&name) {
-                    eprintln!("{}: {}", "Error".red().bold(), e);
+        Commands::Add { repo_or_url } => {
+            if let Some(val) = repo_or_url {
+                if val.starts_with("http://")
+                    || val.starts_with("https://")
+                    || val.ends_with(".git")
+                {
+                    if let Err(e) = config::clone_git_repo(&val) {
+                        eprintln!("{}: {}", "Error".red().bold(), e);
+                    }
                 } else {
-                    println!("Repository '{}' added successfully.", name.green());
+                    if let Err(e) = config::add_repo(&val) {
+                        eprintln!("{}: {}", "Error".red().bold(), e);
+                    } else {
+                        println!("Repository '{}' added successfully.", val.green());
+                    }
+                }
+            } else if !yes {
+                if let Err(e) = config::interactive_add_repo() {
+                    eprintln!("{}: {}", "Error".red().bold(), e);
                 }
             } else if let Err(e) = config::interactive_add_repo() {
                 eprintln!("{}: {}", "Error".red().bold(), e);

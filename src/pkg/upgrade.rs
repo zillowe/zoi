@@ -174,16 +174,16 @@ fn attempt_patch_upgrade(
     base_url: &str,
     checksums_content: &str,
     binary_filename: &str,
+    patch_filename: &str,
 ) -> Result<PathBuf, Box<dyn Error>> {
     println!("\nAttempting patch-based upgrade...");
-    let patch_filename = format!("{}.patch", binary_filename);
     let patch_url = format!("{}/{}", base_url, patch_filename);
     let temp_dir = Builder::new().prefix("zoi-patch-upgrade").tempdir()?;
-    let patch_path = temp_dir.path().join(&patch_filename);
+    let patch_path = temp_dir.path().join(patch_filename);
 
     println!("Downloading patch from: {}", patch_url);
     download_patch_file(&patch_url, &patch_path)?;
-    verify_checksum(&patch_path, checksums_content, &patch_filename)?;
+    verify_checksum(&patch_path, checksums_content, patch_filename)?;
 
     let current_exe_path = env::current_exe()?;
     let new_binary_path = temp_dir.path().join(binary_filename);
@@ -261,15 +261,16 @@ pub fn run(branch: &str, status: &str, number: &str) -> Result<(), Box<dyn Error
 
     if !self_update::version::bump_is_greater(&current_version, &latest_version_str)? {
         println!("\n{}", "You are already on the latest version!".green());
-        return Ok(());
+        return Ok(())
     }
 
     let (os, arch) = get_platform_info()?;
     let binary_filename = if os == "windows" {
-        format!("zoi-windows-{}.exe", arch)
+        "zoi.exe".to_string()
     } else {
-        format!("zoi-{}-{}", os, arch)
+        "zoi".to_string()
     };
+    let patch_filename = format!("zoi-{}-{}.patch", os, arch);
 
     let base_url =
         format!("https://gitlab.com/{GITLAB_PROJECT_PATH}/-/releases/{latest_tag}/downloads");
@@ -279,7 +280,7 @@ pub fn run(branch: &str, status: &str, number: &str) -> Result<(), Box<dyn Error
     let checksums_content = reqwest::blocking::get(&checksums_url)?.text()?;
 
     let new_binary_path =
-        match attempt_patch_upgrade(&base_url, &checksums_content, &binary_filename) {
+        match attempt_patch_upgrade(&base_url, &checksums_content, &binary_filename, &patch_filename) {
             Ok(path) => {
                 println!("{}", "Patch upgrade successful!".green());
                 path
