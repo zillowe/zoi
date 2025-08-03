@@ -267,3 +267,42 @@ config:
 - `config`: A list of configuration definitions for different platforms.
 - `install`: A list of commands to copy or create the configuration files.
 - `uninstall`: (Optional) A list of commands to clean up the configuration files upon uninstallation.
+
+---
+
+## Package with Optional Dependencies
+
+You can define optional dependencies that the user will be prompted to install. This is useful for adding extra functionality without bloating the default installation.
+
+```yaml
+# dev/my-dev-tool.pkg.yaml
+name: my-dev-tool
+version: 3.0.0
+description: A developer tool with optional integrations.
+git: https://github.com/user/my-dev-tool
+maintainer:
+  name: "Your Name"
+  email: "your.email@example.com"
+
+dependencies:
+  build:
+    required:
+      - native:make
+      - native:gcc
+    optional:
+      - native:rust:for rust language support
+      - native:go:for go language support
+  runtime:
+    required:
+      - zoi:some-base-library
+    optional:
+      - zoi:plugin-A:adds feature X
+      - zoi:plugin-B:adds feature Y
+```
+
+**Key Fields:**
+
+- `dependencies`: Can now be split into `required` and `optional` groups.
+  - `required`: A list of dependencies that are always installed.
+  - `optional`: A list of dependencies that the user is prompted to install.
+- **Description Format**: For optional dependencies, you can add a description of its purpose using the format `manager:package-name:description`. Zoi will display this description to the user.

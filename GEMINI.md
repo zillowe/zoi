@@ -10,3 +10,11 @@ Before completing a task, ensure that:
 2.  Usage examples are updated to reflect the changes.
 3.  The FAQ section is updated if the changes are likely to raise new questions.
 4.  Add title and description in the `---`.
+
+Docs
+
+- Docs live in docs folder (@docs) (Fumadocs).
+- Update docs for any new commands/flags/functionality.
+- Refresh usage examples to reflect changes.
+- Update FAQ for likely new questions.
+- Add title and description in frontmatter (---) for new/updated docs.

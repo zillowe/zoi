@@ -50,6 +50,7 @@
 - [Dependencies Support](#-dependencies-support)
 - [Usage](#-usage)
 - [Packaging Status](#-packaging-status)
+- [Mirrors](#-mirrors)
 - [Contributing](#-contributing)
 - [License](#-license)
 
@@ -59,11 +60,14 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
 
 ## ✨ Features
 
-- **Universal:** Works on Linux, macOS, and Windows.
-- **Repository-based:** Manage packages from different sources.
-- **Environment Setup:** Configure project environments with ease.
-- **Extensible:** Add your own repositories and packages.
-- **Simple CLI:** An intuitive and easy-to-use command-line interface.
+- **Cross-Platform:** Works seamlessly on Linux, macOS, and Windows.
+- **Universal Package Support:** Install packages from various sources: binaries, compressed archives, build from source, or installer scripts.
+- **Extensive Dependency Management:** Integrates with over 30+ package managers (`apt`, `brew`, `cargo`, `npm`, `pip`, `scoop`, etc.) to handle dependencies.
+- **Optional Dependencies:** Packages can define optional dependencies for extra features, which users can select during installation.
+- **Project Environments:** Easily define and manage project-specific environments and commands using `zoi.yaml`.
+- **Repository-Based:** Manage packages from official or community repositories. Easily add your own.
+- **Intuitive CLI:** A simple and powerful command-line interface with helpful aliases for a better developer experience.
+- **Package Types:** Supports standard packages, meta-packages (collections), background services, and configuration file management.
 
 ## 🚀 Getting Started
 
@@ -299,6 +303,20 @@ For more detailed information, please refer to the [Docs](https://zillowe.rf.gd/
 ## 🤝 Contributing
 
 We welcome contributions from the community! If you'd like to contribute, please read our [Contributing Guidelines](./CONTRIBUTING.md) for more information.
+
+## 🪞 Mirrors
+
+Zoi host it's main repo [this] and packages database repo on:
+
+Main Repo:
+
+- [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi) Main
+- [GitHub](https://github.com/Zillowe/Zoi) Mirror
+
+Packages Repo:
+
+- [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi-Pkgs) Main
+- [GitHub](https://github.com/Zillowe/Zoi-Pkgs) Mirror
 
 ## 📜 License
 

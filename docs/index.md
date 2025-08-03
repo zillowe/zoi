@@ -13,11 +13,14 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
 
 ## Features
 
-- **Universal:** Works on Linux, macOS, and Windows.
-- **Repository-based:** Manage packages from different sources.
-- **Environment Setup:** Configure project environments with ease.
-- **Extensible:** Add your own repositories and packages.
-- **Simple CLI:** An intuitive and easy-to-use command-line interface.
+- **Cross-Platform:** Works seamlessly on Linux, macOS, and Windows.
+- **Universal Package Support:** Install packages from various sources: binaries, compressed archives, build from source, or installer scripts.
+- **Extensive Dependency Management:** Integrates with over 30+ package managers (`apt`, `brew`, `cargo`, `npm`, `pip`, `scoop`, etc.) to handle dependencies.
+- **Optional Dependencies:** Packages can define optional dependencies for extra features, which users can select during installation.
+- **Project Environments:** Easily define and manage project-specific environments and commands using `zoi.yaml`.
+- **Repository-Based:** Manage packages from official or community repositories. Easily add your own.
+- **Intuitive CLI:** A simple and powerful command-line interface with helpful aliases for a better developer experience.
+- **Package Types:** Supports standard packages, meta-packages (collections), background services, and configuration file management.
 
 ## Getting Started
 
@@ -162,7 +165,7 @@ Manages the list of package repositories that Zoi uses.
 
 | Subcommand    | Description                                                                                                   |
 | ------------- | ------------------------------------------------------------------------------------------------------------- |
-| `repo add`    | Adds a new repository from the available sources. Can be run interactively.                                   |
+| `repo add`    | Adds a new repository from the available sources or clones a repository from a git URL. Can be run interactively. |
 | `repo remove` | Deletes a repository from the active list.                                                                    |
 | `repo list`   | Shows all currently active repositories. Use `list --all` to see all available repositories and their status. |
 
@@ -174,6 +177,9 @@ zoi repo add
 
 # Add a repository by name
 zoi repo add community
+
+# Add a repository by git URL (auto-clone)
+zoi repo add https://example.com/my-zoi-repo.git
 
 # Remove a repository
 zoi repo remove community
@@ -237,12 +243,18 @@ installation:
 
 # (Optional) Dependencies required by the package.
 dependencies:
-  # Dependencies needed to build the package (for 'source' installations).
+  # Dependencies are split into 'build' and 'runtime'.
+  # Each can have 'required' and 'optional' dependencies.
   build:
-    - native:cmake
-  # Dependencies needed to run the package.
+    required:
+      - native:cmake
+    optional:
+      - native:doxygen:for generating documentation
   runtime:
-    - zoi:another-zoi-package
+    required:
+      - zoi:another-zoi-package
+    optional:
+      - zoi:awesome-plugin:to enable the awesome feature
 ```
 
 ### Installation Methods
@@ -258,7 +270,7 @@ Zoi supports four types of installation methods within the `installation` list:
 
 Zoi can manage dependencies from a wide variety of external package managers. You can specify them in the `build` or `runtime` sections of the `dependencies` map.
 
-The format for a dependency is `manager:package-name`, where `manager` is one of the supported managers listed below.
+The format for a dependency is `manager:package-name`. For optional dependencies, you can add a description like so: `manager:package-name:description`.
 
 | Manager          | Ecosystem / OS                  | Example                               |
 | ---------------- | ------------------------------- | ------------------------------------- |
@@ -305,6 +317,17 @@ The format for a dependency is `manager:package-name`, where `manager` is one of
     includes metadata like the package name, version, description, and
     installation instructions. The `Package` struct in `src/pkg/types.rs` shows
     all available fields.
+  </Accordion>
+</Accordions>
+<br />
+<Accordions type="single">
+  <Accordion title="How do optional dependencies work?">
+    You can specify `optional` dependencies in your `pkg.yaml` under the `build`
+    or `runtime` sections. When a user installs your package, they will be shown
+    the list of optional dependencies and their descriptions, and they can
+
+    choose which ones to install. This is great for plugins or extra features.
+
   </Accordion>
 </Accordions>
 <br />
