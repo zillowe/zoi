@@ -15,7 +15,6 @@ optdepends=(
     'bash-completion: for bash shell completion'
     'zsh: for zsh shell completion'
     'fish: for fish shell completion'
-    'bat: for prettier viewing files'
     'less: for viewing files'
 )
 _license_url='http://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/LICENSE'

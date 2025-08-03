@@ -12,6 +12,7 @@ This is the most common type of package. It downloads a pre-compiled binary from
 ```yaml
 # utils/my-cli.pkg.yaml
 name: my-cli
+repo: community
 version: 1.2.3
 description: A simple command-line utility.
 website: https://example.com/my-cli
@@ -29,7 +30,13 @@ installation:
     platforms: ["linux-amd64", "macos-amd64", "windows-amd64"]
     # Optional: Verify the download against a checksum.
     checksums:
+      # Option A: simple URL (defaults to sha512)
       url: "https://github.com/user/my-cli/releases/download/v{version}/checksums.txt"
+      # Option B: explicit list with algorithm type
+      # type: sha256 # or sha512 (default)
+      # list:
+      #   - file: "my-cli-zip"
+      #     checksum: "<hex-digest-or-url>"
 ```
 
 **Key Fields:**
@@ -50,6 +57,7 @@ Sometimes, binaries are distributed within a compressed archive (like `.zip` or 
 ```yaml
 # tools/archiver.pkg.yaml
 name: archiver
+repo: community
 version: 2.0.0
 description: A tool for creating and extracting archives.
 website: https://example.com/archiver
@@ -84,6 +92,7 @@ For packages that need to be compiled on the user's machine, you can use the `so
 ```yaml
 # dev/compiler.pkg.yaml
 name: compiler
+repo: community
 version: 0.1.0
 description: A new programming language compiler.
 git: https://github.com/user/compiler
@@ -133,6 +142,7 @@ For installers that provide a shell script (e.g. `install.sh` or `install.ps1`),
 ```yaml
 # tools/dev-env-installer.pkg.yaml
 name: dev-env-installer
+repo: community
 version: "1.0"
 description: An example of a script-based installer.
 website: https://example.com/dev-env-installer
@@ -163,6 +173,7 @@ A `collection` is a meta-package that doesn't install any files itself but group
 ```yaml
 # collections/web-dev-essentials.pkg.yaml
 name: web-dev-essentials
+repo: community
 type: collection # Set the package type to 'collection'.
 version: "1.0"
 description: A collection of essential tools for web development.
@@ -199,6 +210,7 @@ A `service` package is for applications that need to run in the background (e.g.
 ```yaml
 # services/my-database.pkg.yaml
 name: my-database
+repo: community
 type: service # Set the package type to 'service'.
 version: "5.7"
 description: A lightweight database server.
@@ -236,6 +248,7 @@ A `config` package manages the installation and removal of configuration files. 
 ```yaml
 # configs/my-app-config.pkg.yaml
 name: my-app-config
+repo: community
 type: config # Set the package type to 'config'.
 version: "1.0"
 description: "Configuration files for my-app."
@@ -277,6 +290,7 @@ You can define optional dependencies that the user will be prompted to install. 
 ```yaml
 # dev/my-dev-tool.pkg.yaml
 name: my-dev-tool
+repo: community
 version: 3.0.0
 description: A developer tool with optional integrations.
 git: https://github.com/user/my-dev-tool
@@ -306,3 +320,77 @@ dependencies:
   - `required`: A list of dependencies that are always installed.
   - `optional`: A list of dependencies that the user is prompted to install.
 - **Description Format**: For optional dependencies, you can add a description of its purpose using the format `manager:package-name:description`. Zoi will display this description to the user.
+
+---
+
+## Nested Repository Package
+
+You can organize packages into nested subdirectories within a repository for better organization. To install a package from a nested repository, you must specify the full path.
+
+```yaml
+# drivers/nvidia.pkg.yaml
+# This file would be located at: Zoi-Pkgs/core/linux/amd64/nvidia.pkg.yaml
+name: nvidia-driver
+repo: core/linux/amd64
+version: "550.78"
+description: "NVIDIA driver for Linux."
+website: https://www.nvidia.com/
+git: https://github.com/NVIDIA/open-gpu-kernel-modules
+maintainer:
+  name: "Zoi Community"
+  email: "community@example.com"
+license: "MIT"
+
+installation:
+  - type: binary
+    url: "https://us.download.nvidia.com/XFree86/Linux-x86_64/{version}/NVIDIA-Linux-x86_64-{version}.run"
+    platforms: ["linux-amd64"]
+```
+
+**Key Fields:**
+
+- `repo`: The full path to the nested repository.
+- To install this package, you would run: `zoi install @core/linux/amd64/nvidia-driver`.
+
+---
+
+## Package with Post-Install Commands
+
+You can define platform-specific commands to be run after a successful installation using the `post_install` field. This is useful for tasks like setting up shell completions, running initialization scripts, or displaying important information to the user.
+
+Zoi will prompt the user for confirmation before executing these commands.
+
+```yaml
+# utils/my-cli-with-hooks.pkg.yaml
+name: my-cli-with-hooks
+repo: community
+version: 1.5.0
+description: A CLI tool that sets up its own shell completions.
+website: https://example.com/my-cli-with-hooks
+git: https://github.com/user/my-cli-with-hooks
+maintainer:
+  name: "Your Name"
+  email: "your.email@example.com"
+license: MIT
+
+installation:
+  - type: binary
+    url: "https://github.com/user/my-cli/releases/download/v{version}/my-cli-{platform}"
+    platforms: ["linux-amd64", "macos-amd64", "windows-amd64"]
+
+# The 'post_install' section defines commands to run after installation.
+post_install:
+  - platforms: ["linux", "macos"] # For Linux and macOS
+    commands:
+      - "echo 'To finish setup, run the following command in your shell:'"
+      - "echo 'eval \"$({name} completion bash)\"'
+  - platforms: ["windows"] # For Windows
+    commands:
+      - "echo 'Installation of {name} v{version} complete!'"
+```
+
+**Key Fields:**
+
+- `post_install`: A list of post-installation hooks.
+- `platforms`: Specifies which platforms the commands apply to.
+- `commands`: A list of shell commands to be executed. Placeholders like `{name}` and `{version}` are available.

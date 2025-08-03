@@ -163,11 +163,11 @@ Zoi provides a wide range of commands to manage your packages and environment.
 
 Manages the list of package repositories that Zoi uses.
 
-| Subcommand    | Description                                                                                                   |
-| ------------- | ------------------------------------------------------------------------------------------------------------- |
+| Subcommand    | Description                                                                                                       |
+| ------------- | ----------------------------------------------------------------------------------------------------------------- |
 | `repo add`    | Adds a new repository from the available sources or clones a repository from a git URL. Can be run interactively. |
-| `repo remove` | Deletes a repository from the active list.                                                                    |
-| `repo list`   | Shows all currently active repositories. Use `list --all` to see all available repositories and their status. |
+| `repo remove` | Deletes a repository from the active list.                                                                        |
+| `repo list`   | Shows all currently active repositories. Use `list --all` to see all available repositories and their status.     |
 
 **Example:**
 
@@ -208,6 +208,8 @@ Here is a comprehensive overview of the fields available in a `pkg.yaml` file.
 ```yaml
 # The name of the package. This is required and should be unique.
 name: my-awesome-app
+# The repository where the package is located (e.g. 'core', 'community', 'core/linux/amd64').
+repo: community
 # The version of the package. Can be a static version number or a URL to a file containing the version.
 version: 1.0.0
 # (Optional) A map of version channels to version numbers or URLs.
@@ -239,7 +241,13 @@ installation:
     platforms: ["linux-amd64", "macos-amd64", "windows-amd64"]
     # (Optional) Checksum verification for the downloaded file.
     checksums:
+      # Option A: simple URL to a checksums file (defaults to sha512)
       url: "https://github.com/user/my-awesome-app/releases/download/v{version}/checksums.txt"
+      # Option B: explicit list with type (supports sha512 or sha256)
+      # type: sha256
+      # list:
+      #   - file: "my-awesome-app-zip"
+      #     checksum: "<hex-digest-or-url>"
 
 # (Optional) Dependencies required by the package.
 dependencies:
@@ -255,6 +263,17 @@ dependencies:
       - zoi:another-zoi-package
     optional:
       - zoi:awesome-plugin:to enable the awesome feature
+
+# (Optional) Post-installation commands to run after a successful installation.
+post_install:
+  - platforms: ["linux", "macos"]
+    commands:
+      - "{name} generate-completions bash > ~/.local/share/bash-completion/completions/{name} || true"
+      - "{name} generate-completions zsh > ~/.zsh/completions/_{name} || true"
+      - "{name} generate-completions fish > ~/.config/fish/completions/{name}.fish || true"
+  - platforms: ["windows-amd64"]
+    commands:
+      - "powershell -NoProfile -Command \"$p=\"$env:USERPROFILE\\Documents\\PowerShell\"; if(!(Test-Path $p)){New-Item -ItemType Directory -Path $p|Out-Null}; {name}.exe generate-completions powershell >> \"$p\\Microsoft.PowerShell_profile.ps1\"\""
 ```
 
 ### Installation Methods
@@ -373,7 +392,11 @@ The format for a dependency is `manager:package-name`. For optional dependencies
 - **Install from a specific repository:**
 
   ```sh
-  zoi install @<repo_name>/<package_name>
+  # Install from a top-level repository
+  zoi install @community/htop
+
+  # Install from a nested repository
+  zoi install @core/linux/amd64/nvidia-driver
   ```
 
 - **List all available packages from active repos:**

@@ -1,4 +1,4 @@
-# Project Guidelines for Gemini
+# Project Guidelines
 
 This project uses Fumadocs for its documentation. The main documentation file is located at `docs/index.md` and the examples file is located at `docs/examples.md` .
 

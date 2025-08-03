@@ -133,7 +133,7 @@ scoop install zoi
 
 You can also use our installer scripts for a quick setup.
 
-**Linux / macOS / FreeBSD / OpenBSD (amd64):**
+**Linux / macOS :**
 
 ```sh
 curl -fsSL https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.sh | bash
@@ -191,42 +191,42 @@ We're planning to add support for more platforms.
 
 What dependency installation we support.
 
-| Package Manager                                             | OS                                 | Support |
-| ----------------------------------------------------------- | ---------------------------------- | ------- |
-| `zoi`                                                       | Universal[\*](#-platforms)         | ✔️      |
-| [`brew`](https://brew.sh)                                   | macOS only                         | ✔️      |
-| [`macports`](https://www.macports.org/)                     | macOS only                         | ✔️      |
-| [`winget`](https://github.com/microsoft/winget-cli)         | Windows                            | ✔️      |
-| [`scoop`](https://scoop.sh)                                 | Windows                            | ✔️      |
-| [`choco`](https://chocolatey.org/)                          | Windows                            | ✔️      |
-| `npm`                                                       | Where NodeJS runs                  | ✔️      |
-| [`jsr`](https://jsr.io)                                     | Where NodeJS runs                  | ✔️      |
-| [`bun`](https://bun.com)                                    | Where Bun runs                     | ✔️      |
-| `yarn`                                                      | Where Yarn runs                    | ✔️      |
-| `pnpm`                                                      | Where PNPM runs                    | ✔️      |
-| `go`                                                        | Where Go runs                      | ✔️      |
-| `cargo`                                                     | Where Rust Cargo runs              | ✔️      |
-| [`cargo-binstall`](https://crates.io/crates/cargo-binstall) | Where Rust runs                    | ✔️      |
-| `pip`                                                       | Where Python runs                  | ✔️      |
-| `gem`                                                       | Where Ruby runs                    | ✔️      |
-| `composer`                                                  | Where PHP runs                     | ✔️      |
-| `dotnet`                                                    | Where .NET runs                    | ✔️      |
-| `nix`                                                       | Where Nix runs                     | ✔️      |
-| [`pipx`](https://github.com/pypa/pipx)                      | Where Python runs                  | ✔️      |
-| [`conda`](https://docs.conda.io/en/latest/)                 | Where Conda runs                   | ✔️      |
-| `pkg`                                                       | FreeBSD                            | ✔️      |
-| `pkg_add`                                                   | OpenBSD                            | ✔️      |
-| `pacman`                                                    | Arch-Based Linux Distros           | ✔️      |
-| `aur`                                                       | Arch-Based Linux Distros           | ✔️      |
-| `yay`                                                       | Arch-Based Linux Distros           | ✔️      |
-| `paru`                                                      | Arch-Based Linux Distros           | ✔️      |
-| `snap`                                                      | Where Snap is installed            | ✔️      |
-| `flatpak`                                                   | Where Flatpak is installed         | ✔️      |
-| `portage`                                                   | Gentoo Linux Distro                | ✔️      |
-| `apt`                                                       | Debian-Based Linux Distros         | ✔️      |
-| `dnf`, `yum`                                                | Fedora/Redhat/CentOS Linux Distros | ✔️      |
-| `zypper`                                                    | OpenSUSE Linux Distro              | ✔️      |
-| `apk`                                                       | Alpine Linux Distro                | ✔️      |
+| Manager          | Ecosystem / OS                  | Example                               |
+| ---------------- | ------------------------------- | ------------------------------------- |
+| `zoi`            | Zoi                             | `zoi:my-other-package`                |
+| `native`         | System's native package manager | `native:openssl`                      |
+| `apt`, `apt-get` | Debian, Ubuntu, etc.            | `apt:libssl-dev`                      |
+| `pacman`         | Arch Linux                      | `pacman:base-devel`                   |
+| `yay`, `paru`    | Arch Linux (AUR)                | `yay:google-chrome`                   |
+| `aur`            | Arch Linux (AUR)                | `aur:visual-studio-code-bin`          |
+| `dnf`, `yum`     | Fedora, CentOS, RHEL            | `dnf:openssl-devel`                   |
+| `zypper`         | openSUSE                        | `zypper:libopenssl-devel`             |
+| `apk`            | Alpine Linux                    | `apk:git`                             |
+| `portage`        | Gentoo                          | `portage:dev-libs/openssl`            |
+| `brew`           | macOS (Homebrew)                | `brew:node`                           |
+| `macports`       | macOS (MacPorts)                | `macports:git`                        |
+| `scoop`          | Windows                         | `scoop:git`                           |
+| `choco`          | Windows (Chocolatey)            | `choco:git`                           |
+| `winget`         | Windows                         | `winget:Git.Git`                      |
+| `snap`           | Linux (Snapcraft)               | `snap:node`                           |
+| `flatpak`        | Linux (Flathub)                 | `flatpak:org.gimp.GIMP`               |
+| `pkg`            | FreeBSD                         | `pkg:git`                             |
+| `pkg_add`        | OpenBSD                         | `pkg_add:git`                         |
+| `cargo`          | Rust                            | `cargo:ripgrep`                       |
+| `cargo-binstall` | Rust (pre-compiled binaries)    | `cargo-binstall:ripgrep`              |
+| `go`             | Go                              | `go:golang.org/x/tools/cmd/goimports` |
+| `npm`            | Node.js                         | `npm:typescript`                      |
+| `yarn`           | Node.js                         | `yarn:react`                          |
+| `pnpm`           | Node.js                         | `pnpm:vite`                           |
+| `bun`            | Bun                             | `bun:elysia`                          |
+| `jsr`            | JavaScript Registry             | `jsr:@std/http`                       |
+| `pip`            | Python                          | `pip:requests`                        |
+| `pipx`           | Python                          | `pipx:black`                          |
+| `conda`          | Conda                           | `conda:numpy`                         |
+| `gem`            | Ruby                            | `gem:rails`                           |
+| `composer`       | PHP                             | `composer:laravel/installer`          |
+| `dotnet`         | .NET                            | `dotnet:csharp-ls`                    |
+| `nix`            | NixOS / Nix                     | `nix:nixpkgs.hello`                   |
 
 Some of the package manager are OS specific, so when a dependency is in that package manager it only installs it for that OS.
 
@@ -286,6 +286,8 @@ Here are some common commands to get you started.
 
   # By name
   zoi repo add <repo_name>
+
+  zoi repo add https://github.com/<user_name>/<repo_name>.git
   ```
 
 - **Update Zoi to the latest version:**

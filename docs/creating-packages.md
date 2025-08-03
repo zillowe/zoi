@@ -31,6 +31,7 @@ At a minimum, your package needs these fields:
 ```yaml
 # my-cli.pkg.yaml
 name: my-cli
+repo: community
 version: 1.2.3
 description: A simple command-line utility.
 maintainer:
@@ -129,19 +130,21 @@ Zoi uses placeholders to make your URLs dynamic:
 
 It is **highly recommended** to include checksums to verify the integrity of downloaded files.
 
-```yaml
+````yaml
 installation:
   - type: binary
     url: "..."
     platforms: ["..."]
-    checksums:
-      # Option 1: URL to a checksums file (e.g. checksums.txt)
-      url: "https://github.com/user/my-cli/releases/download/v{version}/checksums.txt"
-      # Option 2: A list of file/checksum pairs
-      # list:
-      #   - file: "my-cli-linux-amd64"
-      #     checksum: "sha512-checksum-here"
-```
+     checksums:
+       # Option 1: URL to a checksums file (e.g. checksums.txt)
+       # Defaults to sha512 algorithm
+       url: "https://github.com/user/my-cli/releases/download/v{version}/checksums.txt"
+       # Option 2: Explicit list with algorithm type
+       # type: sha256 # or sha512 (default)
+       # list:
+       #   - file: "my-cli-zip"
+       #     # Hex digest or URL to a file containing the digest
+       #     checksum: "<hex-digest-or-url>"```
 
 ## Step 3: Adding Dependencies
 
@@ -166,9 +169,29 @@ dependencies:
     optional:
       - zoi:plugin-A:adds feature X
       - zoi:plugin-B:adds feature Y
+````
+
+## Step 4: Adding Post-Installation Hooks
+
+Some packages may require additional setup steps after the main installation is complete, such as setting up shell completions or running a configuration wizard. The `post_install` field allows you to define platform-specific commands that run after a successful installation.
+
+Zoi will ask for user confirmation before running these commands for security.
+
+```yaml
+post_install:
+  - platforms: ["linux", "macos"]
+    commands:
+      - "echo 'Heads up! {name} needs to do some post-install setup.'"
+      - "{name} --setup-completions"
+  - platforms: ["windows"]
+    commands:
+      - "echo 'Successfully installed {name} v{version}!'"
 ```
 
-## Step 4: Testing Your Package Locally
+- `platforms`: A list of platforms where these commands should run (e.g. `linux`, `macos`, `windows`, `linux-amd64`).
+- `commands`: A list of shell commands to execute. You can use the `{name}` and `{version}` placeholders.
+
+## Step 5: Testing Your Package Locally
 
 Before you publish your package, you **must** test it locally to ensure it installs correctly.
 
@@ -218,11 +241,20 @@ You can contribute by opening a **Merge/Pull Request** to either repository, or 
 3.  **Choose the Right Directory:**
     As discussed in the first section, you should almost always add new packages to the `community` directory.
 
+    You can also create nested directories to better organize packages. For example, you could place a Linux-specific editor in `community/editors/linux/my-editor.pkg.yaml`. The `repo` field in your package file should then be `community/editors/linux`.
+
 4.  **Add Your Package File:**
     Copy your `my-package.pkg.yaml` file into the `community/` directory.
 
     ```sh
     cp /path/to/my-package.pkg.yaml community/
+    ```
+
+    For a nested repository, create the directory structure and place your file inside:
+
+    ```sh
+    mkdir -p community/editors/linux
+    cp /path/to/my-editor.pkg.yaml community/editors/linux/
     ```
 
 5.  **Commit and Push:**
@@ -231,6 +263,14 @@ You can contribute by opening a **Merge/Pull Request** to either repository, or 
     ```sh
     git add community/my-package.pkg.yaml
     git commit -m "feat(community): add my-package v1.2.3"
+    git push origin main
+    ```
+
+    For a nested package, your commit might look like this:
+
+    ```sh
+    git add community/editors/linux/my-editor.pkg.yaml
+    git commit -m "feat(community): add my-editor v1.0.0"
     git push origin main
     ```
 

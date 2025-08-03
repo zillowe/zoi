@@ -16,7 +16,6 @@ optdepends=(
     'bash-completion: for bash shell completion'
     'zsh: for zsh shell completion'
     'fish: for fish shell completion'
-    'bat: for prettier viewing files'
     'less: for viewing files'
 )
 
