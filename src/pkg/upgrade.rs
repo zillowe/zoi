@@ -192,14 +192,8 @@ fn attempt_patch_upgrade(
     let patch_data = fs::read(&patch_path)?;
     let old_data = fs::read(&current_exe_path)?;
 
-    if patch_data.len() < 32 {
-        return Err("Patch file is too small to contain a valid header.".into());
-    }
-    let new_file_size_bytes: [u8; 8] = patch_data[24..32].try_into()?;
-    let new_file_size = u64::from_le_bytes(new_file_size_bytes) as usize;
-
-    let mut new_data = Vec::with_capacity(new_file_size);
-    let mut patch_reader = Cursor::new(&patch_data);
+    let mut new_data = Vec::new();
+    let mut patch_reader = Cursor::new(patch_data);
     bsdiff::patch(&old_data, &mut patch_reader, &mut new_data)?;
 
     fs::write(&new_binary_path, new_data)?;

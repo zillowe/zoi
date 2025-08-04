@@ -122,7 +122,7 @@ else
         
             PATCH_FILE="${ARCHIVE_DIR}/${filename}.patch"
             echo -e "  -> Creating patch for ${filename}..."
-            bsdiff "$OLD_BINARY_TMP" "$new_binary_path" "$PATCH_FILE"
+            bsdiff -b "$OLD_BINARY_TMP" "$new_binary_path" "$PATCH_FILE"
         else
             echo -e "${YELLOW}  -> Could not download old archive for ${filename}. Skipping patch.${NC}"
         fi
