@@ -15,7 +15,8 @@ CHECKSUM_SHA256_FILE="${ARCHIVE_DIR}/checksums-256.txt"
 GITLAB_PROJECT_PATH="Zillowe/Zillwen/Zusty/Zoi"
 
 function check_command() {
-    if ! command -v "$1" &> /dev/null; then
+    if ! command -v "$1" &> /dev/null;
+ then
         echo -e "${RED}Error: '$1' command is not found.${NC}"
         echo -e "${YELLOW}Please install it and ensure it's in your PATH.${NC}"
         exit 1
@@ -36,7 +37,30 @@ fi
 rm -rf "$ARCHIVE_DIR"
 mkdir -p "$ARCHIVE_DIR"
 
+echo -e "${CYAN}Fetching the latest release tag from GitLab API...${NC}"
+
+if [ -n "${CI_PROJECT_ID:-}" ]; then
+    PROJECT_IDENTIFIER="$CI_PROJECT_ID"
+else
+    PROJECT_IDENTIFIER="${GITLAB_PROJECT_PATH//\/\%2F}"
+fi
+
+LATEST_TAG=""
+API_URL="https://gitlab.com/api/v4/projects/${PROJECT_IDENTIFIER}/releases"
+
+echo -e "${CYAN}Trying API URL: ${API_URL}${NC}"
+
+if RESPONSE=$(curl --silent --show-error --fail "$API_URL" 2>&1); then
+    if [ -n "$RESPONSE" ] && [ "$RESPONSE" != "[]" ]; then
+        LATEST_TAG=$(echo "$RESPONSE" | jq -r '.[0].tag_name // empty' 2>/dev/null || echo "")
+    fi
+else
+    echo -e "${YELLOW}API call failed: $RESPONSE${NC}"
+fi
+
 echo -e "${CYAN}🔐 Generating sha512 checksums for raw binaries...${NC}"
+rm -f "${ARCHIVE_DIR}/checksums-bin.txt"
+
 (
   cd "$COMPILED_DIR" || exit 1
   for f in *; do
@@ -45,6 +69,36 @@ echo -e "${CYAN}🔐 Generating sha512 checksums for raw binaries...${NC}"
     sha512sum "$f" | awk -v name="$final_name" '{print $1 "  " name}'
   done
 ) > "${ARCHIVE_DIR}/checksums-bin.txt"
+
+if [ -n "${CI_COMMIT_TAG:-}" ]; then
+    VERSION=${CI_COMMIT_TAG#v}
+    echo -e "${CYAN}Adding versioned checksums for version ${VERSION}...${NC}"
+    (
+      cd "$COMPILED_DIR" || exit 1
+      for f in *; do
+        os_arch_part=$(basename "$f" .exe)
+        os_arch_part=${os_arch_part#zoi-}
+        versioned_name="zoi-${os_arch_part}-v${VERSION}"
+        sha512sum "$f" | awk -v name="$versioned_name" '{print $1 "  " name}'
+      done
+    ) >> "${ARCHIVE_DIR}/checksums-bin.txt"
+fi
+
+if [ -n "$LATEST_TAG" ]; then
+    echo -e "${CYAN}Downloading and appending checksums from latest release ${LATEST_TAG}...${NC}"
+    OLD_CHECKSUMS_URL="https://gitlab.com/${GITLAB_PROJECT_PATH}/-/releases/${LATEST_TAG}/downloads/checksums-bin.txt"
+    TEMP_OLD_CHECKSUMS=$(mktemp)
+    if curl --fail -sL -o "$TEMP_OLD_CHECKSUMS" "$OLD_CHECKSUMS_URL"; then
+        cat "$TEMP_OLD_CHECKSUMS" >> "${ARCHIVE_DIR}/checksums-bin.txt"
+        sort -u -k2,2 -o "${ARCHIVE_DIR}/checksums-bin.txt" "${ARCHIVE_DIR}/checksums-bin.txt"
+        echo -e "${GREEN}Successfully appended and deduplicated old checksums.${NC}"
+    else
+        echo -e "${YELLOW}Could not download old checksums-bin.txt. Patching from older versions might fail.${NC}"
+    fi
+    rm -f "$TEMP_OLD_CHECKSUMS"
+else
+    echo -e "${YELLOW}No latest tag found, skipping checksum accumulation. This is normal for a first release.${NC}"
+fi
 
 echo -e "${CYAN}📦 Starting archival process...${NC}"
 
@@ -73,28 +127,6 @@ for binary_path in "$COMPILED_DIR"/*; do
 done
 
 echo -e "${CYAN}🔗 Generating binary diffs...${NC}"
-
-echo -e "${CYAN}Fetching the latest release tag from GitLab API...${NC}"
-
-if [ -n "${CI_PROJECT_ID:-}" ]; then
-    PROJECT_IDENTIFIER="$CI_PROJECT_ID"
-else
-    PROJECT_IDENTIFIER="${GITLAB_PROJECT_PATH//\//%2F}"
-fi
-
-LATEST_TAG=""
-API_URL="https://gitlab.com/api/v4/projects/${PROJECT_IDENTIFIER}/releases"
-
-echo -e "${CYAN}Trying API URL: ${API_URL}${NC}"
-
-if RESPONSE=$(curl --silent --show-error --fail "$API_URL" 2>&1); then
-    if [ -n "$RESPONSE" ] && [ "$RESPONSE" != "[]" ]; then
-        LATEST_TAG=$(echo "$RESPONSE" | jq -r '.[0].tag_name // empty' 2>/dev/null || echo "")
-    fi
-else
-    echo -e "${YELLOW}API call failed: $RESPONSE${NC}"
-fi
-
 
 if [ -z "$LATEST_TAG" ]; then
     echo -e "${YELLOW}Could not fetch the latest release tag. This might be because:${NC}"

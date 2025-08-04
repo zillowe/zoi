@@ -172,20 +172,30 @@ fn get_platform_info() -> Result<(&'static str, &'static str), Box<dyn Error>> {
 
 fn attempt_patch_upgrade(
     base_url: &str,
-    checksums_content: &str,
+    bin_checksums: &str,
+    patch_checksums: &str,
     binary_filename: &str,
     patch_filename: &str,
+    old_binary_checksum_name: &str,
 ) -> Result<PathBuf, Box<dyn Error>> {
     println!("\nAttempting patch-based upgrade...");
-    let patch_url = format!("{}/{}", base_url, patch_filename);
     let temp_dir = Builder::new().prefix("zoi-patch-upgrade").tempdir()?;
+
+    let current_exe_path = env::current_exe()?;
+    println!("Verifying checksum for current binary...");
+    verify_checksum(
+        &current_exe_path,
+        bin_checksums,
+        old_binary_checksum_name,
+    )?;
+
+    let patch_url = format!("{}/{}", base_url, patch_filename);
     let patch_path = temp_dir.path().join(patch_filename);
 
     println!("Downloading patch from: {}", patch_url);
     download_patch_file(&patch_url, &patch_path)?;
-    verify_checksum(&patch_path, checksums_content, patch_filename)?;
+    verify_checksum(&patch_path, patch_checksums, patch_filename)?;
 
-    let current_exe_path = env::current_exe()?;
     let new_binary_path = temp_dir.path().join(binary_filename);
 
     println!("Applying patch to create new binary...");
@@ -199,7 +209,7 @@ fn attempt_patch_upgrade(
     fs::write(&new_binary_path, new_data)?;
 
     println!("Verifying patched binary...");
-    verify_checksum(&new_binary_path, checksums_content, binary_filename)?;
+    verify_checksum(&new_binary_path, bin_checksums, binary_filename)?;
 
     Ok(new_binary_path)
 }
@@ -268,16 +278,27 @@ pub fn run(branch: &str, status: &str, number: &str) -> Result<(), Box<dyn Error
 
     let base_url =
         format!("https://gitlab.com/{GITLAB_PROJECT_PATH}/-/releases/{latest_tag}/downloads");
-    let checksums_url = format!("{base_url}/checksums-bin.txt");
+    let checksums_bin_url = format!("{base_url}/checksums-bin.txt");
+    let checksums_txt_url = format!("{base_url}/checksums.txt");
 
-    println!("Downloading checksums from: {}", checksums_url);
-    let checksums_content = reqwest::blocking::get(&checksums_url)?.text()?;
+    println!("Downloading binary checksums from: {}", checksums_bin_url);
+    let checksums_bin_content = reqwest::blocking::get(&checksums_bin_url)?.text()?;
+
+    println!(
+        "Downloading archive and patch checksums from: {}",
+        checksums_txt_url
+    );
+    let checksums_txt_content = reqwest::blocking::get(&checksums_txt_url)?.text()?;
+
+    let old_binary_checksum_name = format!("zoi-{}-{}-v{}", os, arch, current_version);
 
     let new_binary_path = match attempt_patch_upgrade(
         &base_url,
-        &checksums_content,
+        &checksums_bin_content,
+        &checksums_txt_content,
         &binary_filename,
         &patch_filename,
+        &old_binary_checksum_name,
     ) {
         Ok(path) => {
             println!("{}", "Patch upgrade successful!".green());
@@ -290,7 +311,7 @@ pub fn run(branch: &str, status: &str, number: &str) -> Result<(), Box<dyn Error
                 e,
                 "Attempting full download.".yellow()
             );
-            fallback_full_upgrade(&base_url, &checksums_content, os, arch)?
+            fallback_full_upgrade(&base_url, &checksums_txt_content, os, arch)?
         }
     };
 
