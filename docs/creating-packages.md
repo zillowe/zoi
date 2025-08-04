@@ -130,7 +130,7 @@ Zoi uses placeholders to make your URLs dynamic:
 
 It is **highly recommended** to include checksums to verify the integrity of downloaded files.
 
-````yaml
+```yaml
 installation:
   - type: binary
     url: "..."
@@ -144,7 +144,8 @@ installation:
        # list:
        #   - file: "my-cli-zip"
        #     # Hex digest or URL to a file containing the digest
-       #     checksum: "<hex-digest-or-url>"```
+       #     checksum: "<hex-digest-or-url>"
+```
 
 ## Step 3: Adding Dependencies
 
@@ -169,7 +170,7 @@ dependencies:
     optional:
       - zoi:plugin-A:adds feature X
       - zoi:plugin-B:adds feature Y
-````
+```
 
 ## Step 4: Adding Post-Installation Hooks
 
