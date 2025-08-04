@@ -1,4 +1,4 @@
-use colored::*; 
+use colored::*;
 use git2::{FetchOptions, RemoteCallbacks, Repository, build::CheckoutBuilder, build::RepoBuilder};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use std::fs;
@@ -20,7 +20,7 @@ fn get_git_root() -> Result<PathBuf, Box<dyn std::error::Error>> {
 fn sync_git_repos(verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
     let git_root = get_git_root()?;
     if !git_root.exists() {
-        return Ok(())
+        return Ok(());
     }
 
     println!("\n{}", "Syncing external git repositories...".green());
@@ -36,7 +36,10 @@ fn sync_git_repos(verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
             cmd.arg("-C").arg(&path).arg("pull");
 
             if verbose {
-                let status = cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit()).status()?;
+                let status = cmd
+                    .stdout(Stdio::inherit())
+                    .stderr(Stdio::inherit())
+                    .status()?;
                 if !status.success() {
                     eprintln!(
                         "{}: Failed to pull changes for '{}'.",

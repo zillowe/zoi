@@ -8,7 +8,8 @@ pub fn run(branch: &str, status: &str, number: &str) {
         Ok(()) => {
             println!(
                 "\n{}",
-                "Zoi upgraded successfully! Please restart your shell for changes to take effect.".green()
+                "Zoi upgraded successfully! Please restart your shell for changes to take effect."
+                    .green()
             );
         }
         Err(e) if e.to_string() == "already_on_latest" => {}

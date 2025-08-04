@@ -183,11 +183,7 @@ fn attempt_patch_upgrade(
 
     let current_exe_path = env::current_exe()?;
     println!("Verifying checksum for current binary...");
-    verify_checksum(
-        &current_exe_path,
-        bin_checksums,
-        old_binary_checksum_name,
-    )?;
+    verify_checksum(&current_exe_path, bin_checksums, old_binary_checksum_name)?;
 
     let patch_url = format!("{}/{}", base_url, patch_filename);
     let patch_path = temp_dir.path().join(patch_filename);

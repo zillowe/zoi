@@ -17,7 +17,7 @@ use xz2::read::XzDecoder;
 use zip::ZipArchive;
 use zstd::stream::read::Decoder as ZstdDecoder;
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 pub enum InstallMode {
     PreferBinary,
     ForceSource,

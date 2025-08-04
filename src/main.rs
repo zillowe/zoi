@@ -130,12 +130,12 @@ enum Commands {
         package_name: String,
     },
 
-    /// Installs a package from a name, local file, or URL
+    /// Installs one or more packages from a name, local file, or URL
     #[command(alias = "i")]
     Install {
-        /// Package name, local path, or URL to a .pkg.yaml file
-        #[arg(value_name = "SOURCE")]
-        source: String,
+        /// Package names, local paths, or URLs to .pkg.yaml files
+        #[arg(value_name = "SOURCES", required = true)]
+        sources: Vec<String>,
         /// Force re-installation even if the package is already installed
         #[arg(long)]
         force: bool,
@@ -331,11 +331,11 @@ fn main() {
                 Ok(())
             }
             Commands::Install {
-                source,
+                sources,
                 force,
                 interactive,
             } => {
-                cmd::install::run(&source, force, interactive, cli.yes);
+                cmd::install::run(&sources, force, interactive, cli.yes);
                 Ok(())
             }
             Commands::Build { source } => {
