@@ -6,6 +6,8 @@ build/release
 build/release-all
 config.mk
 .env
+packages/js/node_modules
+packages/js/dist
 
 # Added by GCT
 gct.yaml

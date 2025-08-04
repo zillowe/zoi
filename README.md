@@ -156,10 +156,21 @@ powershell -c "irm gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.p
 
 ### From Crates.io
 
-You can also install `zoi-cli` directly from [crates.io](https://crates.io/crates/zoi) using `cargo`:
+You can install `zoi-cli` directly from [crates.io](https://crates.io/crates/zoi) using `cargo`:
 
 ```sh
 cargo install zoi-cli
+```
+
+### From NPM
+
+You can install `@zillowe/zoi` from `npm` also.
+
+```sh
+npx @zillowe/zoi
+bunx @zillowe/zoi
+pnpm dlx @zillowe/zoi
+yarn dlx @zillowe/zoi
 ```
 
 ### 🛠️ Build from Source

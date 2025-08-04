@@ -1,0 +1,38 @@
+{
+  "name": "@zillowe/zoi",
+  "description": "Universal Package Manager & Environment Setup Tool",
+  "version": "0.2.0",
+  "main": "./dist/index.js",
+  "bin": {
+    "zoi-installer": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "homepage": "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi",
+  "bugs": {
+    "url": "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues",
+    "email": "zillowez@gmail.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "start": "ts-node src/index.ts",
+    "publish:all": "npx jsr publish",
+    "postinstall": "node ./dist/index.js"
+  },
+  "keywords": [
+    "cli",
+    "zillowe"
+  ],
+  "author": "Zillowe Foundation",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@types/node": "^20.11.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
