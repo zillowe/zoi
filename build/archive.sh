@@ -36,6 +36,16 @@ fi
 rm -rf "$ARCHIVE_DIR"
 mkdir -p "$ARCHIVE_DIR"
 
+echo -e "${CYAN}🔐 Generating sha512 checksums for raw binaries...${NC}"
+(
+  cd "$COMPILED_DIR" || exit 1
+  for f in *; do
+    final_name="zoi"
+    [[ "$f" == *".exe" ]] && final_name="zoi.exe"
+    sha512sum "$f" | awk -v name="$final_name" '{print $1 "  " name}'
+  done
+) > "${ARCHIVE_DIR}/checksums-bin.txt"
+
 echo -e "${CYAN}📦 Starting archival process...${NC}"
 
 for binary_path in "$COMPILED_DIR"/*; do
@@ -122,7 +132,7 @@ else
         
             PATCH_FILE="${ARCHIVE_DIR}/${filename}.patch"
             echo -e "  -> Creating patch for ${filename}..."
-            bsdiff -b "$OLD_BINARY_TMP" "$new_binary_path" "$PATCH_FILE"
+            bsdiff "$OLD_BINARY_TMP" "$new_binary_path" "$PATCH_FILE"
         else
             echo -e "${YELLOW}  -> Could not download old archive for ${filename}. Skipping patch.${NC}"
         fi

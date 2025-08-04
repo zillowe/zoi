@@ -268,7 +268,7 @@ pub fn run(branch: &str, status: &str, number: &str) -> Result<(), Box<dyn Error
 
     let base_url =
         format!("https://gitlab.com/{GITLAB_PROJECT_PATH}/-/releases/{latest_tag}/downloads");
-    let checksums_url = format!("{base_url}/checksums.txt");
+    let checksums_url = format!("{base_url}/checksums-bin.txt");
 
     println!("Downloading checksums from: {}", checksums_url);
     let checksums_content = reqwest::blocking::get(&checksums_url)?.text()?;
