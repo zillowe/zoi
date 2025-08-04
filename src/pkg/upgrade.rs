@@ -255,7 +255,7 @@ pub fn run(branch: &str, status: &str, number: &str) -> Result<(), Box<dyn Error
 
     if !self_update::version::bump_is_greater(&current_version, &latest_version_str)? {
         println!("\n{}", "You are already on the latest version!".green());
-        return Ok(());
+        return Err("already_on_latest".into());
     }
 
     let (os, arch) = get_platform_info()?;

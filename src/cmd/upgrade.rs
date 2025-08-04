@@ -4,13 +4,17 @@ use colored::*;
 pub fn run(branch: &str, status: &str, number: &str) {
     println!("{}", "--- Upgrading Zoi ---".yellow());
 
-    if let Err(e) = pkg::upgrade::run(branch, status, number) {
-        eprintln!("\n{}: {}", "Error".red().bold(), e);
-        std::process::exit(1);
+    match pkg::upgrade::run(branch, status, number) {
+        Ok(()) => {
+            println!(
+                "\n{}",
+                "Zoi upgraded successfully! Please restart your shell for changes to take effect.".green()
+            );
+        }
+        Err(e) if e.to_string() == "already_on_latest" => {}
+        Err(e) => {
+            eprintln!("\n{}: {}", "Error".red().bold(), e);
+            std::process::exit(1);
+        }
     }
-
-    println!(
-        "\n{}",
-        "Zoi upgraded successfully! Please restart your shell for changes to take effect.".green()
-    );
 }
