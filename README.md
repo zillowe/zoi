@@ -320,11 +320,13 @@ Main Repo:
 
 - [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi) Main
 - [GitHub](https://github.com/Zillowe/Zoi) Mirror
+- [Codeberg](https://codeberg.org/Zillowe/Zoi) Mirror
 
 Packages Repo:
 
 - [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi-Pkgs) Main
 - [GitHub](https://github.com/Zillowe/Zoi-Pkgs) Mirror
+- [Codeberg](https://codeberg.org/Zillowe/Zoi-Pkgs) Mirror
 
 ## 📜 License
 
