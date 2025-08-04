@@ -2,6 +2,14 @@
 name = "zoi"
 version = "3.3.6-beta-prod"
 edition = "2024"
+description = "Universal Package Manager & Environment Setup Tool"
+license = "Apache-2.0"
+repository = "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi"
+homepage = "https://zillowe.rf.gd/zds/zoi"
+documentation = "https://zillowe.rf.gd/docs/zds/zoi"
+keywords = ["cli", "package-manager", "dev-tools", "universal", "environment"]
+categories = ["command-line-utilities", "development-tools"]
+readme = "README.md"
 
 [dependencies]
 bsdiff = "0.2.1"
