@@ -52,7 +52,7 @@ for target in "${TARGETS[@]}"; do
       exit 1
     fi
   
-  SRC_BINARY="target/${target}/release/zoi"
+  SRC_BINARY="target/${target}/release/zoi-cli"
   if [[ "$target" == *"-windows-"* ]]; then
       SRC_BINARY+=".exe"
   fi

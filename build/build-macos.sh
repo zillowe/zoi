@@ -41,7 +41,7 @@ for target in "${TARGETS[@]}"; do
     exit 1
   fi
   
-  SRC_BINARY="target/${target}/release/zoi"
+  SRC_BINARY="target/${target}/release/zoi-cli"
   
   install -m 755 "$SRC_BINARY" "$OUTPUT_DIR/$NAME"
   

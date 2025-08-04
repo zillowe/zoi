@@ -84,6 +84,14 @@ curl -fsSL https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.s
 powershell -c "irm gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.ps1|iex"
 ```
 
+### From Crates.io
+
+You can also install `zoi-cli` directly from [crates.io](https://crates.io/crates/zoi) using `cargo`:
+
+```sh
+cargo install zoi-cli
+```
+
 ### Build from Source
 
 You'll need [Rust](https://www.rust-lang.org) installed.
@@ -97,9 +105,6 @@ You'll need [Rust](https://www.rust-lang.org) installed.
 ./configure
 make
 sudo make install
-
-# Using Cargo
-cargo install https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi
 ```
 
 ## Platforms

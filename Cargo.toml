@@ -1,5 +1,5 @@
 [package]
-name = "zoi"
+name = "zoi-cli"
 version = "3.3.6-beta-prod"
 edition = "2024"
 description = "Universal Package Manager & Environment Setup Tool"
@@ -10,6 +10,10 @@ documentation = "https://zillowe.rf.gd/docs/zds/zoi"
 keywords = ["cli", "package-manager", "dev-tools", "universal", "environment"]
 categories = ["command-line-utilities", "development-tools"]
 readme = "README.md"
+
+[[bin]]
+name = "zoi"
+path = "src/main.rs"
 
 [dependencies]
 bsdiff = "0.2.1"
