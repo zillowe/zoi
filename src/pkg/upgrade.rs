@@ -5,7 +5,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use self_update::self_replace;
 use serde::Deserialize;
 use sha2::{Digest, Sha512};
-use std::convert::TryInto;
+
 use std::env;
 use std::error::Error;
 use std::fs::{self, File};

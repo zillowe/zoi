@@ -239,9 +239,9 @@ fn run_post_install_hooks(pkg: &types::Package) -> Result<(), Box<dyn Error>> {
                     pb.set_message(format!("Running: {}", final_cmd));
 
                     let output = if cfg!(target_os = "windows") {
-                        Command::new("cmd").arg("/C").arg(&final_cmd).output()? 
+                        Command::new("cmd").arg("/C").arg(&final_cmd).output()?
                     } else {
-                        Command::new("sh").arg("-c").arg(&final_cmd).output()? 
+                        Command::new("sh").arg("-c").arg(&final_cmd).output()?
                     };
 
                     pb.finish_and_clear();
@@ -451,7 +451,8 @@ fn verify_checksum(
     if let Some(checksums) = &method.checksums {
         println!("Verifying checksum for {}...", file_to_verify);
         let platform = utils::get_platform()?;
-        if let Some((expected_checksum, checksum_type)) =            get_expected_checksum(checksums, file_to_verify, pkg, &platform)?
+        if let Some((expected_checksum, checksum_type)) =
+            get_expected_checksum(checksums, file_to_verify, pkg, &platform)?
         {
             let computed_checksum = match checksum_type.as_str() {
                 "sha256" => {

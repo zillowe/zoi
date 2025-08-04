@@ -75,12 +75,12 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
                 }
             };
 
-            let platforms_str = if method.platforms.is_empty() 
-                || method.platforms.iter().any(|p| p == "any") 
+            let platforms_str = if method.platforms.is_empty()
+                || method.platforms.iter().any(|p| p == "any")
             {
                 "any".italic().to_string()
             } else {
-                let mut platform_map: std::collections::HashMap<String, Vec<String>> = 
+                let mut platform_map: std::collections::HashMap<String, Vec<String>> =
                     std::collections::HashMap::new();
                 for p in &method.platforms {
                     let parts: Vec<&str> = p.split('-').collect();
@@ -132,7 +132,11 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
             for dep in build.get_optional() {
                 let parts: Vec<&str> = dep.split(':').collect();
                 if parts.len() >= 3 {
-                    println!("    - {} (optional): {}", parts[0..2].join(":"), parts[2..].join(":"));
+                    println!(
+                        "    - {} (optional): {}",
+                        parts[0..2].join(":"),
+                        parts[2..].join(":")
+                    );
                 } else {
                     println!("    - {} (optional)", dep);
                 }
@@ -147,7 +151,11 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
             for dep in runtime.get_optional() {
                 let parts: Vec<&str> = dep.split(':').collect();
                 if parts.len() >= 3 {
-                    println!("    - {} (optional): {}", parts[0..2].join(":"), parts[2..].join(":"));
+                    println!(
+                        "    - {} (optional): {}",
+                        parts[0..2].join(":"),
+                        parts[2..].join(":")
+                    );
                 } else {
                     println!("    - {} (optional)", dep);
                 }

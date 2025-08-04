@@ -24,11 +24,7 @@ pub fn read_config() -> Result<Config, Box<dyn Error>> {
     let config_path = get_config_path()?;
     if !config_path.exists() {
         let default_config = Config {
-            repos: vec![
-                "core".to_string(),
-                "main".to_string(),
-                "extra".to_string(),
-            ],
+            repos: vec!["core".to_string(), "main".to_string(), "extra".to_string()],
         };
         write_config(&default_config)?;
         return Ok(default_config);

@@ -140,8 +140,6 @@ pub fn get_all_available_packages() -> Result<Vec<super::types::Package>, Box<dy
     Ok(available)
 }
 
-
-
 pub fn write_manifest(manifest: &InstallManifest) -> Result<(), Box<dyn Error>> {
     let store_dir = get_store_root(manifest.scope)?.join(&manifest.name);
     fs::create_dir_all(&store_dir)?;

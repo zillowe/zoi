@@ -45,7 +45,10 @@ fn get_expected_checksum(
             }
             Ok(None)
         }
-        types::Checksums::List { checksum_type, items } => {
+        types::Checksums::List {
+            checksum_type,
+            items,
+        } => {
             for item in items {
                 let mut file_pattern = item
                     .file
