@@ -176,14 +176,12 @@ fn attempt_patch_upgrade(
     patch_checksums: &str,
     binary_filename: &str,
     patch_filename: &str,
-    old_binary_checksum_name: &str,
+    new_binary_checksum_name: &str,
 ) -> Result<PathBuf, Box<dyn Error>> {
     println!("\nAttempting patch-based upgrade...");
     let temp_dir = Builder::new().prefix("zoi-patch-upgrade").tempdir()?;
 
     let current_exe_path = env::current_exe()?;
-    println!("Verifying checksum for current binary...");
-    verify_checksum(&current_exe_path, bin_checksums, old_binary_checksum_name)?;
 
     let patch_url = format!("{}/{}", base_url, patch_filename);
     let patch_path = temp_dir.path().join(patch_filename);
@@ -205,7 +203,7 @@ fn attempt_patch_upgrade(
     fs::write(&new_binary_path, new_data)?;
 
     println!("Verifying patched binary...");
-    verify_checksum(&new_binary_path, bin_checksums, binary_filename)?;
+    verify_checksum(&new_binary_path, bin_checksums, new_binary_checksum_name)?;
 
     Ok(new_binary_path)
 }
@@ -253,8 +251,8 @@ pub fn run(branch: &str, status: &str, number: &str) -> Result<(), Box<dyn Error
         .ok_or("Could not get version number from tag")?;
 
     let latest_version_str = if parts.len() > 2 {
-        let prerelease = parts[1];
-        format!("{}-{}", latest_version_num, prerelease.to_lowercase())
+        let prerelease = parts[1].to_lowercase();
+        format!("{}-{}", latest_version_num, prerelease)
     } else {
         latest_version_num.to_string()
     };
@@ -286,7 +284,7 @@ pub fn run(branch: &str, status: &str, number: &str) -> Result<(), Box<dyn Error
     );
     let checksums_txt_content = reqwest::blocking::get(&checksums_txt_url)?.text()?;
 
-    let old_binary_checksum_name = format!("zoi-{}-{}-v{}", os, arch, current_version);
+    let new_binary_checksum_name = format!("zoi-{}-{}-v{}", os, arch, latest_version_str);
 
     let new_binary_path = match attempt_patch_upgrade(
         &base_url,
@@ -294,7 +292,7 @@ pub fn run(branch: &str, status: &str, number: &str) -> Result<(), Box<dyn Error
         &checksums_txt_content,
         &binary_filename,
         &patch_filename,
-        &old_binary_checksum_name,
+        &new_binary_checksum_name,
     ) {
         Ok(path) => {
             println!("{}", "Patch upgrade successful!".green());

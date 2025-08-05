@@ -71,7 +71,21 @@ rm -f "${ARCHIVE_DIR}/checksums-bin.txt"
 ) > "${ARCHIVE_DIR}/checksums-bin.txt"
 
 if [ -n "${CI_COMMIT_TAG:-}" ]; then
-    VERSION=${CI_COMMIT_TAG#v}
+    IFS='-' read -ra parts <<< "$CI_COMMIT_TAG"
+    num_parts=${#parts[@]}
+    
+    version_num=""
+    if [ $num_parts -gt 0 ]; then
+        version_num=${parts[$num_parts-1]}
+    fi
+
+    if [ $num_parts -gt 2 ]; then
+        prerelease=$(echo "${parts[1]}" | tr '[:upper:]' '[:lower:]')
+        VERSION="${version_num}-${prerelease}"
+    else
+        VERSION="$version_num"
+    fi
+
     echo -e "${CYAN}Adding versioned checksums for version ${VERSION}...${NC}"
     (
       cd "$COMPILED_DIR" || exit 1
