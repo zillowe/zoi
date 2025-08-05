@@ -1,3 +1,4 @@
+use crate::pkg;
 use crate::utils;
 use colored::*;
 
@@ -25,10 +26,32 @@ pub fn run(branch: &str, status: &str, number: &str, commit: &str) {
             utils::print_aligned_info("Distribution", &dist);
         }
     }
-    if let Some(pm) = utils::get_native_package_manager() {
-        utils::print_aligned_info("Package Manager", &pm);
+
+    let config = pkg::config::read_config();
+    let (native_pm, all_pms) = if let Ok(config) = config {
+        (
+            config.native_package_manager,
+            config.package_managers.unwrap_or_default(),
+        )
     } else {
-        utils::print_aligned_info("Package Manager", "Not available");
+        (None, Vec::new())
+    };
+
+    if !all_pms.is_empty() {
+        let pm_list: Vec<String> = all_pms
+            .into_iter()
+            .map(|pm| {
+                if Some(pm.clone()) == native_pm {
+                    format!("{} (native)", pm.green())
+                } else {
+                    pm
+                }
+            })
+            .collect();
+        let pm_list_str = pm_list.join(", ");
+        utils::print_aligned_info("Package Managers", &pm_list_str);
+    } else {
+        utils::print_aligned_info("Package Managers", "Not available (run 'zoi sync')");
     }
 
     let key_with_colon = format!("{}:", "Version");

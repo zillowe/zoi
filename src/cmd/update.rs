@@ -2,16 +2,53 @@ use crate::pkg::{install, local, pin, resolve, sync, types};
 use crate::utils;
 use colored::*;
 use indicatif::{ProgressBar, ProgressStyle};
+use std::collections::HashSet;
 
-pub fn run(package_name: &str, yes: bool) {
-    let result = if package_name == "all" {
-        run_update_all_logic(yes)
-    } else {
-        run_update_single_logic(package_name, yes)
-    };
+pub fn run(package_names: &[String], yes: bool) {
+    if package_names.len() == 1 && package_names[0] == "all" {
+        if let Err(e) = run_update_all_logic(yes) {
+            eprintln!("{}: {}", "Update failed".red().bold(), e);
+        }
+        return;
+    }
 
-    if let Err(e) = result {
-        eprintln!("{}: {}", "Update failed".red().bold(), e);
+    println!("{}", "--- Syncing Package Database ---".yellow().bold());
+    if let Err(e) = sync::run(false) {
+        eprintln!("{}: {}", "Sync failed".red().bold(), e);
+        std::process::exit(1);
+    }
+
+    let mut failed_packages = Vec::new();
+
+    for (i, package_name) in package_names.iter().enumerate() {
+        if i > 0 {
+            println!();
+        }
+        if let Err(e) = run_update_single_logic(package_name, yes) {
+            eprintln!(
+                "{}: Failed to update '{}': {}",
+                "Error".red().bold(),
+                package_name,
+                e
+            );
+            failed_packages.push(package_name.clone());
+        }
+    }
+
+    if !failed_packages.is_empty() {
+        eprintln!(
+            "\n{}: The following packages failed to update:",
+            "Error".red().bold()
+        );
+        for pkg in &failed_packages {
+            eprintln!("  - {}", pkg);
+        }
+        std::process::exit(1);
+    } else if !package_names.is_empty() {
+        println!(
+            "\n{}",
+            "Update process finished for all specified packages.".green()
+        );
     }
 }
 
@@ -19,7 +56,10 @@ fn run_update_single_logic(
     package_name: &str,
     yes: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    if pin::is_pinned(package_name)? {
+    println!("--- Updating package '{}' ---", package_name.blue().bold());
+    let lower_package_name = package_name.to_lowercase();
+
+    if pin::is_pinned(&lower_package_name)? {
         println!(
             "Package '{}' is pinned. Skipping update.",
             package_name.yellow()
@@ -27,40 +67,28 @@ fn run_update_single_logic(
         return Ok(());
     }
 
-    let manifest = local::is_package_installed(package_name, types::Scope::User)?
+    let manifest = local::is_package_installed(&lower_package_name, types::Scope::User)?
         .or(local::is_package_installed(
-            package_name,
+            &lower_package_name,
             types::Scope::System,
-        )?)
+        )?) 
         .ok_or(format!(
             "Package '{package_name}' is not installed. Use 'zoi install' instead."
         ))?;
 
     println!("Currently installed version: {}", manifest.version.yellow());
 
-    println!("\n{}", "--- Syncing Package Database ---".yellow().bold());
-    sync::run(false)?;
+    let (new_pkg, new_version) = resolve::resolve_package_and_version(&lower_package_name)?;
 
-    let resolved_source = resolve::resolve_source(package_name)?;
-    let content = std::fs::read_to_string(&resolved_source.path)?;
-    let new_pkg: crate::pkg::types::Package = serde_yaml::from_str(&content)?;
+    println!("Available version: {}", new_version.green());
 
-    println!(
-        "Available version: {}",
-        new_pkg.version.as_deref().unwrap_or("N/A").green()
-    );
-
-    if manifest.version == new_pkg.version.as_deref().unwrap_or_default() {
+    if manifest.version == new_version {
         println!("\nPackage is already up to date.");
         return Ok(());
     }
 
     if !utils::ask_for_confirmation(
-        &format!(
-            "Update from {} to {}?",
-            manifest.version,
-            new_pkg.version.as_deref().unwrap_or("N/A")
-        ),
+        &format!("Update from {} to {}?", manifest.version, new_version),
         yes,
     ) {
         return Ok(());
@@ -72,17 +100,20 @@ fn run_update_single_logic(
         install::InstallMode::PreferBinary
     };
 
+    let mut processed_deps = HashSet::new();
     install::run_installation(
-        resolved_source.path.to_str().unwrap(),
+        &lower_package_name,
         mode,
         true,
         types::InstallReason::Direct,
         yes,
+        &mut processed_deps,
     )?;
 
     println!("\n{}", "Update complete.".green());
     Ok(())
 }
+
 
 fn run_update_all_logic(yes: bool) -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", "--- Syncing Package Database ---".yellow().bold());
@@ -96,13 +127,15 @@ fn run_update_all_logic(yes: bool) -> Result<(), Box<dyn std::error::Error>> {
     let mut upgrade_messages = Vec::new();
 
     println!("\n{}", "--- Checking for Upgrades ---".yellow().bold());
-    let pb = ProgressBar::new_spinner();
+    let pb = ProgressBar::new(installed_packages.len() as u64);
     pb.set_style(
-        ProgressStyle::default_spinner()
-            .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
-            .template("{spinner:.green} {msg}")?,
+        ProgressStyle::default_bar()
+            .template(
+                "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({msg})",
+            )?
+            .progress_chars("#>-"),
     );
-    pb.set_message("Checking for available updates...");
+    pb.set_message("Checking packages...");
 
     for manifest in installed_packages {
         if pinned_names.contains(&manifest.name) {
@@ -168,12 +201,14 @@ fn run_update_all_logic(yes: bool) -> Result<(), Box<dyn std::error::Error>> {
         } else {
             install::InstallMode::PreferBinary
         };
+        let mut processed_deps = HashSet::new();
         install::run_installation(
             path.to_str().unwrap(),
             mode,
             true,
             types::InstallReason::Direct,
             yes,
+            &mut processed_deps,
         )?;
     }
 

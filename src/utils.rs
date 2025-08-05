@@ -52,7 +52,7 @@ pub fn is_admin() -> bool {
 }
 
 pub fn print_info<T: Display>(key: &str, value: T) {
-    println!("{}: {}", key.cyan(), value);
+    println!("{}: {}", key, value);
 }
 
 pub fn format_version_summary(branch: &str, status: &str, number: &str) -> String {
@@ -80,7 +80,7 @@ pub fn format_version_full(branch: &str, status: &str, number: &str, commit: &st
 }
 
 pub fn print_aligned_info(key: &str, value: &str) {
-    let key_with_colon = format!("{key}:");
+    let key_with_colon = format!("{}:", key);
     println!("{:<18}{}", key_with_colon.cyan(), value);
 }
 
@@ -95,7 +95,7 @@ pub fn command_exists(command: &str) -> bool {
     } else {
         Command::new("sh")
             .arg("-c")
-            .arg(format!("command -v {command}"))
+            .arg(format!("command -v {}", command))
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status()
@@ -229,9 +229,15 @@ pub fn get_native_package_manager() -> Option<String> {
 
 pub fn print_repo_warning(repo_name: &Option<String>) {
     if let Some(repo) = repo_name {
-        let warning_message = match repo.as_str() {
-            "test" => Some("This package is in a testing phase and may not function correctly."),
-            "archive" => Some("This package is outdated and no longer receives updates."),
+        let major_repo = repo.split('/').next().unwrap_or("");
+        let warning_message = match major_repo {
+            "community" => Some("This package is from a community repository. Use with caution."),
+            "test" => {
+                Some("This package is from a testing repository and may not function correctly.")
+            }
+            "archive" => {
+                Some("This package is from an archive repository and is no longer maintained.")
+            }
             _ => None,
         };
 
@@ -248,7 +254,10 @@ pub fn confirm_untrusted_source(source_type: &SourceType, yes: bool) -> Result<(
 
     let warning_message = match source_type {
         SourceType::UntrustedRepo(repo) => {
-            format!("The package from repository '@{repo}' is not an official Zoi repository.")
+            format!(
+                "The package from repository '@{}' is not an official Zoi repository.",
+                repo
+            )
         }
         SourceType::LocalFile => "You are installing from a local file.".to_string(),
         SourceType::Url => "You are installing from a remote URL.".to_string(),
@@ -336,10 +345,11 @@ pub fn setup_path(scope: Scope) -> Result<(), Box<dyn Error>> {
         } else if shell_name.contains("fish") {
             let path = home.join(".config/fish/config.fish");
             let cmd = format!("\n# Added by Zoi\nset -gx PATH \"{}\" $PATH\n", zoi_bin_str);
+
             (path, cmd)
         } else if shell_name.contains("csh") || shell_name.contains("tcsh") {
             let path = home.join(".cshrc");
-            let cmd = format!("\n# Added by Zoi\nsetenv PATH \"{}:$PATH\"\n", zoi_bin_str);
+            let cmd = format!("\n# Added by Zoi\nsetenv PATH=\"{}:$PATH\"\n", zoi_bin_str);
             (path, cmd)
         } else {
             let path = home.join(".profile");
@@ -396,7 +406,6 @@ pub fn setup_path(scope: Scope) -> Result<(), Box<dyn Error>> {
         } else {
             format!("{};{}", current_path, zoi_bin_path_str)
         };
-
         env.set_value("Path", &new_path)?;
 
         println!(
@@ -475,4 +484,21 @@ pub fn get_platform() -> Result<String, String> {
     };
 
     Ok(format!("{}-{}", os, arch))
+}
+
+pub fn get_all_available_package_managers() -> Vec<String> {
+    let mut managers = Vec::new();
+    let all_possible_managers = [
+        "apt", "apt-get", "pacman", "yay", "paru", "dnf", "yum", "zypper", "portage", "apk",
+        "snap", "flatpak", "nix", "brew", "port", "scoop", "choco", "winget", "pkg", "pkg_add",
+    ];
+
+    for manager in &all_possible_managers {
+        if command_exists(manager) {
+            managers.push(manager.to_string());
+        }
+    }
+    managers.sort();
+    managers.dedup();
+    managers
 }

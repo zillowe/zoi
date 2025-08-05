@@ -6,6 +6,7 @@ use dialoguer::{Select, theme::ColorfulTheme};
 use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
 use sha2::{Digest, Sha256, Sha512};
+use std::collections::HashSet;
 use std::error::Error;
 use std::fs::{self, File};
 use std::io::{self, Cursor, Read, Write};
@@ -31,6 +32,7 @@ pub fn run_installation(
     force: bool,
     reason: types::InstallReason,
     yes: bool,
+    processed_deps: &mut HashSet<String>,
 ) -> Result<(), Box<dyn Error>> {
     let (pkg, version) = resolve::resolve_package_and_version(source)?;
 
@@ -55,12 +57,14 @@ pub fn run_installation(
                     &pkg.name,
                     pkg.scope,
                     yes,
+                    processed_deps,
                 )?;
                 dependencies::resolve_and_install_optional(
                     runtime_deps.get_optional(),
                     &pkg.name,
                     pkg.scope,
                     yes,
+                    processed_deps,
                 )?;
             }
         } else {
@@ -80,12 +84,14 @@ pub fn run_installation(
                     &pkg.name,
                     pkg.scope,
                     yes,
+                    processed_deps,
                 )?;
                 dependencies::resolve_and_install_optional(
                     runtime_deps.get_optional(),
                     &pkg.name,
                     pkg.scope,
                     yes,
+                    processed_deps,
                 )?;
             }
         }
@@ -151,6 +157,7 @@ pub fn run_installation(
                     &pkg.name,
                     pkg.scope,
                     yes,
+                    processed_deps,
                 )?;
                 optional_deps_to_install.extend(build_deps.get_optional().clone());
             }
@@ -162,6 +169,7 @@ pub fn run_installation(
                 &pkg.name,
                 pkg.scope,
                 yes,
+                processed_deps,
             )?;
             optional_deps_to_install.extend(runtime_deps.get_optional().clone());
         }
@@ -172,6 +180,7 @@ pub fn run_installation(
                 &pkg.name,
                 pkg.scope,
                 yes,
+                processed_deps,
             )?;
         }
     }
@@ -521,7 +530,7 @@ fn handle_com_binary_install(
     let total_size = response.content_length().unwrap_or(0);
     let pb = ProgressBar::new(total_size);
     pb.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})")?
+        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})")? 
         .progress_chars("#>- "));
 
     let mut downloaded_bytes = Vec::new();
@@ -670,7 +679,7 @@ fn handle_binary_install(
     let total_size = response.content_length().unwrap_or(0);
     let pb = ProgressBar::new(total_size);
     pb.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})")?
+        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})")? 
         .progress_chars("#>- "));
 
     let mut downloaded_bytes = Vec::new();
@@ -871,7 +880,7 @@ fn handle_source_install(
             if !output.status.success() {
                 io::stdout().write_all(&output.stdout)?;
                 io::stderr().write_all(&output.stderr)?;
-                return Err(format!("Build command failed: '{final_cmd}'").into());
+                return Err(format!("Build command failed: '{}'", final_cmd).into());
             }
         }
     }

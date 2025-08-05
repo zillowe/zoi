@@ -71,18 +71,48 @@ pub fn get_installed_packages_with_type() -> Result<Vec<InstalledPackage>, Box<d
     let mut packages = Vec::new();
 
     for manifest in manifests {
-        let pkg_path = get_db_root()?;
-        if pkg_path.exists() {
-            let content = fs::read_to_string(
-                pkg_path
-                    .join(&manifest.repo)
-                    .join(format!("{}.pkg.yaml", manifest.name)),
-            )?;
+        let db_root = get_db_root()?;
+        if !db_root.exists() {
+            continue;
+        }
+
+        let mut pkg_file: Option<PathBuf> = None;
+
+        if !manifest.repo.is_empty() {
+            let path = db_root
+                .join(&manifest.repo)
+                .join(format!("{}.pkg.yaml", manifest.name));
+            if path.exists() {
+                pkg_file = Some(path);
+            }
+        }
+
+        if pkg_file.is_none() {
+            for entry in WalkDir::new(&db_root).into_iter().filter_map(Result::ok) {
+                if entry.file_name().to_string_lossy() == format!("{}.pkg.yaml", manifest.name) {
+                    pkg_file = Some(entry.path().to_path_buf());
+                    break;
+                }
+            }
+        }
+
+        if let Some(path) = pkg_file {
+            let content = fs::read_to_string(&path)?;
             let pkg: Package = serde_yaml::from_str(&content)?;
+
+            let mut repo_field = manifest.repo.clone();
+            if repo_field.is_empty() {
+                if let Some(parent_dir) = path.parent() {
+                    if let Ok(repo_subpath) = parent_dir.strip_prefix(&db_root) {
+                        repo_field = repo_subpath.to_string_lossy().to_string();
+                    }
+                }
+            }
+
             packages.push(InstalledPackage {
                 name: manifest.name,
                 version: manifest.version,
-                repo: manifest.repo,
+                repo: repo_field,
                 package_type: pkg.package_type,
             });
         }

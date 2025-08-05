@@ -1,5 +1,9 @@
+use crate::{pkg::config, utils};
 use colored::*;
-use git2::{FetchOptions, RemoteCallbacks, Repository, build::CheckoutBuilder, build::RepoBuilder};
+use git2::{
+    FetchOptions, RemoteCallbacks, Repository,
+    build::{CheckoutBuilder, RepoBuilder},
+};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use std::fs;
 use std::path::PathBuf;
@@ -202,6 +206,13 @@ pub fn run(verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     sync_git_repos(verbose)?;
+
+    println!("\n{}", "Updating system configuration...".green());
+    let mut config_data = config::read_config()?;
+    config_data.native_package_manager = utils::get_native_package_manager();
+    config_data.package_managers = Some(utils::get_all_available_package_managers());
+    config::write_config(&config_data)?;
+    println!("{}", "System configuration updated.");
 
     Ok(())
 }

@@ -10,14 +10,14 @@ mod utils;
 // Production or Development
 const BRANCH: &str = "Production";
 const STATUS: &str = "Beta";
-const NUMBER: &str = "3.3.6";
+const NUMBER: &str = "3.4.0";
 
 /// Zoi - The Universal Package Manager & Environment Setup Tool.
 ///
 /// Part of the Zillowe Development Suite (ZDS), Zoi is designed to streamline
 /// your development workflow by managing tools and project environments.
 #[derive(Parser)]
-#[command(author, about, long_about = None, disable_version_flag = true,
+#[command(name = "zoi", author, about, long_about = None, disable_version_flag = true,
     trailing_var_arg = true,
 )]
 struct Cli {
@@ -123,11 +123,12 @@ enum Commands {
         package: String,
     },
 
-    /// Update a package to the latest version
+    /// Updates one or more packages to their latest versions
     #[command(alias = "up")]
     Update {
-        /// The name of the package to update
-        package_name: String,
+        /// The name(s) of the package(s) to update. Use 'all' to update all installed packages.
+        #[arg(value_name = "PACKAGES", required = true)]
+        package_names: Vec<String>,
     },
 
     /// Installs one or more packages from a name, local file, or URL
@@ -144,24 +145,28 @@ enum Commands {
         interactive: bool,
     },
 
-    /// Builds and installs a package from a name, local file, or URL
+    /// Builds and installs one or more packages from a name, local file, or URL
     #[command(
-        long_about = "Builds a package from various sources using the 'source' installation method:\n- A package name from the database (e.g. 'vim')\n- A local .pkg.yaml file (e.g. './my-package.pkg.yaml')\n- A URL pointing to a raw .pkg.yaml file"
+        long_about = "Builds one or more packages from various sources using the 'source' installation method:\n- A package name from the database (e.g. 'vim')\n- A local .pkg.yaml file (e.g. './my-package.pkg.yaml')\n- A URL pointing to a raw .pkg.yaml file"
     )]
     Build {
-        /// Package name, local path, or URL to a .pkg.yaml file
-        #[arg(value_name = "SOURCE")]
-        source: String,
+        /// Package names, local paths, or URLs to .pkg.yaml files
+        #[arg(value_name = "SOURCES", required = true)]
+        sources: Vec<String>,
+        /// Force re-installation even if the package is already installed
+        #[arg(long)]
+        force: bool,
     },
 
-    /// Uninstalls a package previously installed by Zoi
+    /// Uninstalls one or more packages previously installed by Zoi
     #[command(
         aliases = ["un", "rm", "remove"],
-        long_about = "Removes a package's files from the Zoi store and deletes its symlink from the bin directory. This command will fail if the package was not installed by Zoi."
+        long_about = "Removes one or more packages' files from the Zoi store and deletes their symlinks from the bin directory. This command will fail if a package was not installed by Zoi."
     )]
     Uninstall {
-        /// The name of the package to uninstall
-        package_name: String,
+        /// One or more packages to uninstall
+        #[arg(value_name = "PACKAGES", required = true)]
+        packages: Vec<String>,
     },
 
     /// Execute a command defined in a local zoi.yaml file
@@ -182,17 +187,17 @@ enum Commands {
         env_alias: Option<String>,
     },
 
-    /// Clones the source code repository of a package
+    /// Clones the source code repository of one or more packages
     #[command(
-        long_about = "Finds a package's definition, extracts its git repository URL, and clones it into a new directory."
+        long_about = "Clones the source code repository of one or more packages. A target directory can only be specified when cloning a single package."
     )]
     Clone {
-        /// Package name, local path, or URL to resolve the git repo from
-        #[arg(value_name = "SOURCE")]
-        source: String,
+        /// Package names, local paths, or URLs to resolve the git repo from
+        #[arg(value_name = "SOURCES", required = true)]
+        sources: Vec<String>,
 
         /// Optional directory to clone into. Defaults to the package name.
-        #[arg(value_name = "TARGET_DIRECTORY")]
+        #[arg(value_name = "TARGET_DIRECTORY", last = true)]
         target_directory: Option<String>,
     },
 
@@ -326,8 +331,8 @@ fn main() {
                 cmd::unpin::run(&package);
                 Ok(())
             }
-            Commands::Update { package_name } => {
-                cmd::update::run(&package_name, cli.yes);
+            Commands::Update { package_names } => {
+                cmd::update::run(&package_names, cli.yes);
                 Ok(())
             }
             Commands::Install {
@@ -338,12 +343,12 @@ fn main() {
                 cmd::install::run(&sources, force, interactive, cli.yes);
                 Ok(())
             }
-            Commands::Build { source } => {
-                cmd::build::run(&source, cli.yes);
+            Commands::Build { sources, force } => {
+                cmd::build::run(&sources, force, cli.yes);
                 Ok(())
             }
-            Commands::Uninstall { package_name } => {
-                cmd::uninstall::run(&package_name);
+            Commands::Uninstall { packages } => {
+                cmd::uninstall::run(&packages);
                 Ok(())
             }
             Commands::Run { cmd_alias } => {
@@ -355,10 +360,10 @@ fn main() {
                 Ok(())
             }
             Commands::Clone {
-                source,
+                sources,
                 target_directory,
             } => {
-                cmd::clone::run(source, target_directory, cli.yes);
+                cmd::clone::run(sources, target_directory, cli.yes);
                 Ok(())
             }
             Commands::Upgrade => {

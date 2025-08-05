@@ -44,10 +44,8 @@ fn parse_source_string(source_str: &str) -> Result<PackageRequest, Box<dyn Error
 
     let mut main_part = source_str;
 
-    // Check for version spec at the end
     if let Some(at_pos) = source_str.rfind('@') {
         if at_pos > 0 {
-            // to avoid parsing the repo scope as version
             let (pkg_part, ver_part) = source_str.split_at(at_pos);
             main_part = pkg_part;
             version_spec = Some(ver_part[1..].to_string());
@@ -79,7 +77,7 @@ fn parse_source_string(source_str: &str) -> Result<PackageRequest, Box<dyn Error
 
     Ok(PackageRequest {
         repo,
-        name: name.to_string(),
+        name: name.to_lowercase(),
         version_spec,
     })
 }
@@ -95,10 +93,10 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
 
     for repo_name in &search_repos {
         let pkg_file_name = format!("{}.pkg.yaml", request.name);
-        let path = db_root.join(repo_name).join(&pkg_file_name);
+        let path = db_root.join(repo_name.to_lowercase()).join(&pkg_file_name);
         if path.exists() {
             println!("Found package '{}' in repo '{}'", request.name, repo_name);
-            let major_repo = repo_name.split('/').next().unwrap_or("");
+            let major_repo = repo_name.split('/').next().unwrap_or("").to_lowercase();
             let source_type =
                 if major_repo == "core" || major_repo == "main" || major_repo == "extra" {
                     SourceType::OfficialRepo
@@ -391,22 +389,32 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, B
         }
     };
 
-    if let Some(alt_url) = alt_check.alt {
-        println!("Found 'alt' source. Resolving from URL: {}", alt_url.cyan());
+    if let Some(alt_source) = alt_check.alt {
+        println!("Found 'alt' source. Resolving from: {}", alt_source.cyan());
 
-        if let Some(cached_path) = cache::get_cached_alt_source_path(&alt_url)? {
-            println!("Found cached 'alt' source for URL: {}", alt_url.cyan());
-            return resolve_source_recursive(cached_path.to_str().unwrap(), depth + 1);
+        let mut alt_resolved_source =
+            if alt_source.starts_with("http://") || alt_source.starts_with("https://") {
+                if let Some(cached_path) = cache::get_cached_alt_source_path(&alt_source)? {
+                    println!("Found cached 'alt' source for URL: {}", alt_source.cyan());
+                    resolve_source_recursive(cached_path.to_str().unwrap(), depth + 1)?
+                } else {
+                    println!(
+                        "Downloading and caching 'alt' source from: {}",
+                        alt_source.cyan()
+                    );
+                    let downloaded_content = reqwest::blocking::get(&alt_source)?.text()?;
+                    let cached_path = cache::cache_alt_source(&alt_source, &downloaded_content)?;
+                    resolve_source_recursive(cached_path.to_str().unwrap(), depth + 1)?
+                }
+            } else {
+                resolve_source_recursive(&alt_source, depth + 1)?
+            };
+
+        if resolved_source.source_type == SourceType::OfficialRepo {
+            alt_resolved_source.source_type = SourceType::OfficialRepo;
         }
 
-        println!(
-            "Downloading and caching 'alt' source from: {}",
-            alt_url.cyan()
-        );
-        let downloaded_content = reqwest::blocking::get(&alt_url)?.text()?;
-        let cached_path = cache::cache_alt_source(&alt_url, &downloaded_content)?;
-
-        return resolve_source_recursive(cached_path.to_str().unwrap(), depth + 1);
+        return Ok(alt_resolved_source);
     }
 
     Ok(resolved_source)

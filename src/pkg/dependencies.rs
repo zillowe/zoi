@@ -1,9 +1,10 @@
-use crate::pkg::{local, types};
+use crate::pkg::{install, local, resolve, types};
 use crate::utils;
 use colored::*;
 use dialoguer::{Input, theme::ColorfulTheme};
 use regex::Regex;
 use semver::{Version, VersionReq};
+use std::collections::HashSet;
 use std::error::Error;
 use std::fs;
 use std::process::Command;
@@ -114,7 +115,13 @@ fn install_dependency(
     parent_pkg_name: &str,
     scope: types::Scope,
     yes: bool,
+    processed_deps: &mut HashSet<String>,
 ) -> Result<(), Box<dyn Error>> {
+    let dep_id = format!("{}:{}", dep.manager, dep.package);
+    if !processed_deps.insert(dep_id) {
+        return Ok(());
+    }
+
     let version_info = dep
         .req
         .as_ref()
@@ -184,7 +191,7 @@ fn install_dependency(
             }
 
             println!("Not installed. Proceeding with installation...");
-            install_zoi_dependency(dep.package, yes)?;
+            install_zoi_dependency(dep.package, yes, processed_deps)?;
         }
         "native" => {
             if let Some(installed_version) = get_native_command_version(dep.package)? {
@@ -220,7 +227,7 @@ fn install_dependency(
             println!("(Using native manager: {pm})");
             let args = match pm.as_str() {
                 "apt" | "apt-get" => vec!["install", "-y"],
-                "pacman" => vec!["-S", "--noconfirm"],
+                "pacman" => vec!["-S", "--needed", "--noconfirm"],
                 "dnf" | "yum" => vec!["install", "-y"],
                 "brew" => vec!["install"],
                 "scoop" => vec!["install"],
@@ -395,6 +402,7 @@ fn install_dependency(
             let status = Command::new("sudo")
                 .arg("pacman")
                 .arg("-S")
+                .arg("--needed")
                 .arg("--noconfirm")
                 .arg(dep.package)
                 .status()?;
@@ -405,6 +413,7 @@ fn install_dependency(
         "yay" => {
             let status = Command::new("yay")
                 .arg("-S")
+                .arg("--needed")
                 .arg("--noconfirm")
                 .arg(dep.package)
                 .status()?;
@@ -415,6 +424,7 @@ fn install_dependency(
         "paru" => {
             let status = Command::new("paru")
                 .arg("-S")
+                .arg("--needed")
                 .arg("--noconfirm")
                 .arg(dep.package)
                 .status()?;
@@ -613,6 +623,7 @@ pub fn resolve_and_install_required(
     parent_pkg_name: &str,
     scope: types::Scope,
     yes: bool,
+    processed_deps: &mut HashSet<String>,
 ) -> Result<(), Box<dyn Error>> {
     if deps.is_empty() {
         return Ok(());
@@ -621,7 +632,7 @@ pub fn resolve_and_install_required(
     println!("{}", "Resolving required dependencies...".bold());
     for dep_str in deps {
         let dependency = parse_dependency_string(dep_str)?;
-        install_dependency(&dependency, parent_pkg_name, scope, yes)?;
+        install_dependency(&dependency, parent_pkg_name, scope, yes, processed_deps)?;
     }
     println!("{}", "All required dependencies resolved.".green());
     Ok(())
@@ -632,6 +643,7 @@ pub fn resolve_and_install_optional(
     parent_pkg_name: &str,
     scope: types::Scope,
     yes: bool,
+    processed_deps: &mut HashSet<String>,
 ) -> Result<(), Box<dyn Error>> {
     if deps.is_empty() {
         return Ok(());
@@ -641,7 +653,7 @@ pub fn resolve_and_install_optional(
         println!("{}", "Installing all optional dependencies...".bold());
         for dep_str in deps {
             let dependency = parse_dependency_string(dep_str)?;
-            install_dependency(&dependency, parent_pkg_name, scope, true)?;
+            install_dependency(&dependency, parent_pkg_name, scope, true, processed_deps)?;
         }
         return Ok(());
     }
@@ -694,14 +706,17 @@ pub fn resolve_and_install_optional(
 
     for index in to_install {
         let dep = &parsed_deps[index];
-        install_dependency(dep, parent_pkg_name, scope, yes)?;
+        install_dependency(dep, parent_pkg_name, scope, yes, processed_deps)?;
     }
 
     Ok(())
 }
 
-fn install_zoi_dependency(package_name: &str, yes: bool) -> Result<(), Box<dyn Error>> {
-    use crate::pkg::{install, resolve};
+fn install_zoi_dependency(
+    package_name: &str,
+    yes: bool,
+    processed_deps: &mut HashSet<String>,
+) -> Result<(), Box<dyn Error>> {
     let resolved_source = resolve::resolve_source(package_name)?;
 
     install::run_installation(
@@ -710,5 +725,6 @@ fn install_zoi_dependency(package_name: &str, yes: bool) -> Result<(), Box<dyn E
         false,
         crate::pkg::types::InstallReason::Dependency,
         yes,
+        processed_deps,
     )
 }

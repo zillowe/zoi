@@ -10,9 +10,10 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
     } else {
         trimmed_source
     };
+    let lower_name_only = name_only.to_lowercase();
 
-    let user_manifest = local::is_package_installed(name_only, types::Scope::User)?;
-    let system_manifest = local::is_package_installed(name_only, types::Scope::System)?;
+    let user_manifest = local::is_package_installed(&lower_name_only, types::Scope::User)?;
+    let system_manifest = local::is_package_installed(&lower_name_only, types::Scope::System)?;
 
     let manifest = match (user_manifest, system_manifest) {
         (Some(m), None) => m,
@@ -20,16 +21,16 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
         (Some(_), Some(_)) => {
             return Err(format!(
                 "Package '{}' is installed in both user and system scopes. This is an ambiguous state.",
-                name_only
+                package_name
             )
             .into());
         }
         (None, None) => {
-            return Err(format!("Package '{}' is not installed.", name_only).into());
+            return Err(format!("Package '{}' is not installed.", package_name).into());
         }
     };
 
-    let pkg_dir = local::get_store_root(manifest.scope)?.join(name_only);
+    let pkg_dir = local::get_store_root(manifest.scope)?.join(&lower_name_only);
     let mut reasons = Vec::new();
 
     if manifest.reason == types::InstallReason::Direct {

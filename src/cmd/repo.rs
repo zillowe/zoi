@@ -115,7 +115,7 @@ fn run_list_all() -> Result<(), Box<dyn std::error::Error>> {
         .set_header(vec!["Status", "Repository"]);
 
     for repo in all_repos {
-        let status = if active_repos.contains(&repo) {
+        let status = if active_repos.contains(&repo.to_lowercase()) {
             "Added"
         } else {
             ""

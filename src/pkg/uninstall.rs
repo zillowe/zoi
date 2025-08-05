@@ -1,8 +1,12 @@
 use crate::pkg::{config_handler, local, resolve, types};
+use crate::utils;
 use colored::*;
+use indicatif::{ProgressBar, ProgressStyle};
 use std::error::Error;
 use std::fs;
+use std::io::{self, Write};
 use std::path::PathBuf;
+use std::process::Command;
 
 fn get_bin_root() -> Result<PathBuf, Box<dyn Error>> {
     let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
@@ -23,6 +27,56 @@ fn remove_dependent_record(
         fs::remove_file(dependent_file)?;
     }
 
+    Ok(())
+}
+
+fn run_post_uninstall_hooks(pkg: &types::Package) -> Result<(), Box<dyn Error>> {
+    if let Some(hooks) = &pkg.post_uninstall {
+        println!("\n{}", "Running post-uninstallation commands...".bold());
+        let platform = utils::get_platform()?;
+        let version = pkg.version.as_deref().unwrap_or("");
+
+        for hook in hooks {
+            if utils::is_platform_compatible(&platform, &hook.platforms) {
+                for cmd_str in &hook.commands {
+                    let final_cmd = cmd_str
+                        .replace("{version}", version)
+                        .replace("{name}", &pkg.name);
+
+                    println!("Executing: {}", final_cmd.cyan());
+
+                    let pb = ProgressBar::new_spinner();
+                    pb.set_style(
+                        ProgressStyle::default_spinner()
+                            .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
+                            .template("{spinner:.green} {msg}")?,
+                    );
+                    pb.set_message(format!("Running: {}", final_cmd));
+
+                    let output = if cfg!(target_os = "windows") {
+                        Command::new("cmd").arg("/C").arg(&final_cmd).output()?
+                    } else {
+                        Command::new("sh").arg("-c").arg(&final_cmd).output()?
+                    };
+
+                    pb.finish_and_clear();
+
+                    if !output.status.success() {
+                        io::stdout().write_all(&output.stdout)?;
+                        io::stderr().write_all(&output.stderr)?;
+                        return Err(
+                            format!("Post-uninstall command failed: '{}'", final_cmd).into()
+                        );
+                    } else {
+                        let stdout = String::from_utf8_lossy(&output.stdout);
+                        if !stdout.trim().is_empty() {
+                            println!("{}", stdout.trim());
+                        }
+                    }
+                }
+            }
+        }
+    }
     Ok(())
 }
 
@@ -54,7 +108,8 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
         if !entries.is_empty() {
             return Err(format!(
                 "Cannot uninstall '{}' because other packages depend on it:\n  - {}\n\nPlease uninstall these packages first.",
-                &pkg.name, entries.join("\n  - ")
+                &pkg.name,
+                entries.join("\n  - ")
             ).into());
         }
     }
@@ -75,8 +130,8 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
         Ok(())
     };
 
-    if let Some(deps) = pkg.dependencies {
-        if let Some(runtime_deps) = deps.runtime {
+    if let Some(ref deps) = pkg.dependencies {
+        if let Some(ref runtime_deps) = deps.runtime {
             for dep_str in runtime_deps.get_required() {
                 cleanup(dep_str)?;
             }
@@ -84,7 +139,7 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
                 cleanup(dep_str)?;
             }
         }
-        if let Some(build_deps) = deps.build {
+        if let Some(ref build_deps) = deps.build {
             for dep_str in build_deps.get_required() {
                 cleanup(dep_str)?;
             }
@@ -111,6 +166,14 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
         println!("Removing symlink from {}...", symlink_path.display());
         fs::remove_file(&symlink_path)?;
         println!("{}", "Successfully removed symlink.".green());
+    }
+
+    if let Err(e) = run_post_uninstall_hooks(&pkg) {
+        eprintln!(
+            "{} Post-uninstallation commands failed: {}",
+            "Warning:".yellow(),
+            e
+        );
     }
 
     Ok(())

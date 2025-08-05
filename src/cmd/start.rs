@@ -2,10 +2,10 @@ use crate::pkg::install::{InstallMode, run_installation};
 use crate::pkg::{local, resolve, service, types};
 use crate::utils;
 use colored::*;
+use std::collections::HashSet;
 use std::error::Error;
 
 pub fn run(package_name: &str, yes: bool) -> Result<(), Box<dyn Error>> {
-    // Resolve the package definition first to check its type.
     let (pkg, _) = resolve::resolve_package_and_version(package_name)?;
 
     if pkg.package_type != types::PackageType::Service {
@@ -18,19 +18,19 @@ pub fn run(package_name: &str, yes: bool) -> Result<(), Box<dyn Error>> {
         println!("Service '{}' is not installed.", package_name.cyan());
         if utils::ask_for_confirmation("Do you want to install it now?", yes) {
             println!("Installing '{}'...", package_name.cyan());
+            let mut processed_deps = HashSet::new();
             run_installation(
                 package_name,
                 InstallMode::PreferBinary,
-                false, // force
+                false,
                 types::InstallReason::Direct,
                 yes,
+                &mut processed_deps,
             )?;
         } else {
             return Err("Service not installed, aborting.".into());
         }
     }
 
-    // After ensuring it's installed, start the service.
-    // The `pkg` object from the initial resolution is used here.
     service::start_service(&pkg)
 }

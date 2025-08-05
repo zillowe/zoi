@@ -19,27 +19,63 @@ pub fn run(pkg_path: &Path, target_dir: Option<&str>) -> Result<(), Box<dyn Erro
     }
 
     let final_target = target_dir.unwrap_or(&pkg.name);
+    let target_path = Path::new(final_target);
 
-    println!("Cloning into directory: '{}'...", final_target.bold());
+    if target_path.exists() {
+        if target_path.join(".git").exists() {
+            println!(
+                "Directory '{}' already exists and is a git repository. Pulling latest changes...",
+                final_target.bold()
+            );
+            let pb = ProgressBar::new_spinner();
+            pb.set_style(
+                ProgressStyle::default_spinner()
+                    .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
+                    .template("{spinner:.green} {msg}")?,
+            );
+            pb.set_message(format!("Pulling changes for {}...", pkg.name));
 
-    let pb = ProgressBar::new_spinner();
-    pb.set_style(
-        ProgressStyle::default_spinner()
-            .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
-            .template("{spinner:.green} {msg}")?,
-    );
-    pb.set_message(format!("Cloning {}...", pkg.name));
+            let mut command = Command::new("git");
+            command.arg("pull");
+            command.current_dir(target_path);
 
-    let mut command = Command::new("git");
-    command.arg("clone").arg(&git_url).arg(final_target);
+            let output = command.output()?;
+            pb.finish_and_clear();
 
-    let output = command.output()?;
-    pb.finish_and_clear();
+            if !output.status.success() {
+                io::stdout().write_all(&output.stdout)?;
+                io::stderr().write_all(&output.stderr)?;
+                return Err("`git pull` command failed.".into());
+            }
+        } else {
+            return Err(format!(
+                "Directory '{}' already exists and is not a git repository.",
+                final_target
+            )
+            .into());
+        }
+    } else {
+        println!("Cloning into directory: '{}'...", final_target.bold());
 
-    if !output.status.success() {
-        io::stdout().write_all(&output.stdout)?;
-        io::stderr().write_all(&output.stderr)?;
-        return Err("`git clone` command failed.".into());
+        let pb = ProgressBar::new_spinner();
+        pb.set_style(
+            ProgressStyle::default_spinner()
+                .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
+                .template("{spinner:.green} {msg}")?,
+        );
+        pb.set_message(format!("Cloning {}...", pkg.name));
+
+        let mut command = Command::new("git");
+        command.arg("clone").arg(&git_url).arg(final_target);
+
+        let output = command.output()?;
+        pb.finish_and_clear();
+
+        if !output.status.success() {
+            io::stdout().write_all(&output.stdout)?;
+            io::stderr().write_all(&output.stderr)?;
+            return Err("`git clone` command failed.".into());
+        }
     }
 
     Ok(())

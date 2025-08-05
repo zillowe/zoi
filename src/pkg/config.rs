@@ -25,6 +25,8 @@ pub fn read_config() -> Result<Config, Box<dyn Error>> {
     if !config_path.exists() {
         let default_config = Config {
             repos: vec!["core".to_string(), "main".to_string(), "extra".to_string()],
+            package_managers: None,
+            native_package_manager: None,
         };
         write_config(&default_config)?;
         return Ok(default_config);
@@ -33,7 +35,20 @@ pub fn read_config() -> Result<Config, Box<dyn Error>> {
     let content = fs::read_to_string(config_path)?;
     let mut config: Config = serde_yaml::from_str(&content)?;
 
-    let mut needs_update = false;
+    let original_repos = config.repos.clone();
+
+    let mut new_repos = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for repo in &original_repos {
+        let lower = repo.to_lowercase();
+        if seen.insert(lower.clone()) {
+            new_repos.push(lower);
+        }
+    }
+    config.repos = new_repos;
+
+    let mut needs_update = config.repos != original_repos;
+
     if !config.repos.contains(&"core".to_string()) {
         config.repos.insert(0, "core".to_string());
         needs_update = true;
@@ -57,16 +72,18 @@ pub fn write_config(config: &Config) -> Result<(), Box<dyn Error>> {
 
 pub fn add_repo(repo_name: &str) -> Result<(), Box<dyn Error>> {
     let mut config = read_config()?;
-    if config.repos.contains(&repo_name.to_string()) {
+    let lower_repo_name = repo_name.to_lowercase();
+    if config.repos.contains(&lower_repo_name) {
         return Err(format!("Repository '{}' already exists.", repo_name).into());
     }
-    config.repos.push(repo_name.to_string());
+    config.repos.push(lower_repo_name);
     write_config(&config)
 }
 
 pub fn remove_repo(repo_name: &str) -> Result<(), Box<dyn Error>> {
     let mut config = read_config()?;
-    if let Some(pos) = config.repos.iter().position(|r| r == repo_name) {
+    let lower_repo_name = repo_name.to_lowercase();
+    if let Some(pos) = config.repos.iter().position(|r| r == &lower_repo_name) {
         config.repos.remove(pos);
         write_config(&config)
     } else {
@@ -80,7 +97,7 @@ pub fn interactive_add_repo() -> Result<(), Box<dyn Error>> {
 
     let available_repos: Vec<_> = all_repos
         .into_iter()
-        .filter(|r| !config.repos.contains(r))
+        .filter(|r| !config.repos.contains(&r.to_lowercase()))
         .collect();
 
     if available_repos.is_empty() {

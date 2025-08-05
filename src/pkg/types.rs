@@ -79,6 +79,8 @@ pub struct Package {
     pub config: Option<Vec<ConfigCommands>>,
     #[serde(default)]
     pub post_install: Option<Vec<PostInstallHook>>,
+    #[serde(default)]
+    pub post_uninstall: Option<Vec<PostInstallHook>>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -184,4 +186,6 @@ pub struct InstallManifest {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub repos: Vec<String>,
+    pub package_managers: Option<Vec<String>>,
+    pub native_package_manager: Option<String>,
 }
