@@ -71,7 +71,7 @@ fn run_update_single_logic(
         .or(local::is_package_installed(
             &lower_package_name,
             types::Scope::System,
-        )?) 
+        )?)
         .ok_or(format!(
             "Package '{package_name}' is not installed. Use 'zoi install' instead."
         ))?;
@@ -113,7 +113,6 @@ fn run_update_single_logic(
     println!("\n{}", "Update complete.".green());
     Ok(())
 }
-
 
 fn run_update_all_logic(yes: bool) -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", "--- Syncing Package Database ---".yellow().bold());
