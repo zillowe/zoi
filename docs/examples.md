@@ -354,9 +354,9 @@ installation:
 
 ---
 
-## Package with Post-Install Commands
+## Package with Post-Install/Uninstall Hooks
 
-You can define platform-specific commands to be run after a successful installation using the `post_install` field. This is useful for tasks like setting up shell completions, running initialization scripts, or displaying important information to the user.
+You can define platform-specific commands to be run after a successful installation (`post_install`) or before uninstallation (`post_uninstall`). This is useful for tasks like setting up shell completions, running initialization scripts, or cleaning up resources.
 
 Zoi will prompt the user for confirmation before executing these commands.
 
@@ -387,10 +387,114 @@ post_install:
   - platforms: ["windows"] # For Windows
     commands:
       - "echo 'Installation of {name} v{version} complete!'"
+
+# The 'post_uninstall' section defines commands to run before uninstallation.
+post_uninstall:
+  - platforms: ["linux", "macos"]
+    commands:
+      - "echo 'Note: Shell completions may need to be removed manually.'"
 ```
 
 **Key Fields:**
 
 - `post_install`: A list of post-installation hooks.
+- `post_uninstall`: A list of pre-uninstallation hooks.
 - `platforms`: Specifies which platforms the commands apply to.
 - `commands`: A list of shell commands to be executed. Placeholders like `{name}` and `{version}` are available.
+
+---
+
+## Package with Custom Updater
+
+The `updater` field allows you to specify which installation method `zoi update` should use. This is useful if you want to provide a binary for initial installation but force a build from source during updates to ensure the user has the latest code.
+
+```yaml
+# dev/my-language-server.pkg.yaml
+name: my-language-server
+repo: community
+version: 0.5.0
+description: A language server that should be updated from source.
+maintainer:
+  name: "Your Name"
+  email: "your.email@example.com"
+
+# This tells 'zoi update' to always use the 'source' method.
+updater: source
+
+installation:
+  # The source method will be used for updates.
+  - type: source
+    url: "https://github.com/user/my-language-server"
+    platforms: ["linux-amd64", "macos-amd64", "windows-amd64"]
+    commands:
+      - "cargo build --release"
+      - "mv ./target/release/my-language-server {store}/my-language-server"
+
+  # The binary method is a fast option for the first install.
+  - type: binary
+    url: "https://github.com/user/my-language-server/releases/download/v{version}/my-language-server-{platform}"
+    platforms: ["linux-amd64", "macos-amd64"]
+```
+
+**Key Fields:**
+
+- `updater: source`: This line instructs Zoi to ignore other installation methods when the user runs `zoi update my-language-server` and instead use the one with `type: source`.
+
+---
+
+## Package with `alt` Redirection
+
+The `alt` field redirects Zoi to install a different package. This is perfect for creating aliases or pointing to a package definition hosted elsewhere. The value can be another package name, a URL to a raw `.pkg.yaml` file, or a local file path.
+
+### Example 1: Alias to Another Package
+
+This is useful for creating a simpler name for a package.
+
+First, the actual binary package, `my-app-bin.pkg.yaml`:
+
+```yaml
+# utils/my-app-bin.pkg.yaml
+name: my-app-bin
+repo: community
+version: 1.0.0
+description: The actual binary for my-app.
+# ... (rest of the installation details)
+```
+
+Second, the alias package, `my-app.pkg.yaml`:
+
+```yaml
+# utils/my-app.pkg.yaml
+name: my-app
+repo: community
+version: 1.0.0
+description: A friendly alias for my-app-bin.
+maintainer:
+  name: "Your Name"
+  email: "your.email@example.com"
+
+# This tells Zoi to install 'my-app-bin' instead of this package.
+alt: my-app-bin
+```
+
+### Example 2: Redirecting to a URL
+
+You can also use `alt` to point to a package file hosted on a different server or in a gist. This is useful for testing or for packages that are not in an official repository.
+
+```yaml
+# utils/my-remote-app.pkg.yaml
+name: my-remote-app
+repo: community
+version: 1.0.0
+description: An alias for a package hosted on a remote server.
+maintainer:
+  name: "Your Name"
+  email: "your.email@example.com"
+
+# Zoi will download and install the package from this URL.
+alt: https://example.com/my-app.pkg.yaml
+```
+
+**Key Fields:**
+
+- `alt`: When a user runs `zoi install my-app` or `zoi install my-remote-app`, Zoi sees this field, stops processing the current file, and immediately starts resolving the source specified in `alt`.

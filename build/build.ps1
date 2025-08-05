@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 $outputDir = ".\build\compiled"
-$binaryName = "zoi-cli.exe"
+$binaryName = "zoi.exe"
 $finalBinaryName = "zoi.exe"
 $finalBinaryPath = Join-Path -Path $outputDir -ChildPath $finalBinaryName
 $srcBinaryPath = ".\target\release\$binaryName"

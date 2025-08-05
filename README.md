@@ -156,7 +156,7 @@ powershell -c "irm gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.p
 
 ### From Crates.io
 
-You can install `zoi-cli` directly from [crates.io](https://crates.io/crates/zoi) using `cargo`:
+You can install `zoi-cli` directly from [crates.io](https://crates.io/crates/zoi-cli) using `cargo`:
 
 ```sh
 cargo install zoi-cli
@@ -193,7 +193,8 @@ If you prefer, you can build Zoi from source. You'll need [Rust](https://www.rus
 ./configure
 make
 sudo make install
-make install-completion # Install CLI completions (bash, elvish, fish, powershell, zsh)
+# Install CLI completions (bash, zsh, fist, elvish, powershell)
+make install-completion
 ```
 
 ## 💻 Platforms
@@ -314,7 +315,7 @@ Here are some common commands to get you started.
 
   # By name
   zoi repo add <repo_name>
-
+  # From a git repo
   zoi repo add https://github.com/<user_name>/<repo_name>.git
   ```
 

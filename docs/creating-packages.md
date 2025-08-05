@@ -172,11 +172,15 @@ dependencies:
       - zoi:plugin-B:adds feature Y
 ```
 
-## Step 4: Adding Post-Installation Hooks
+## Step 4: Adding Post-Installation & Uninstallation Hooks
 
-Some packages may require additional setup steps after the main installation is complete, such as setting up shell completions or running a configuration wizard. The `post_install` field allows you to define platform-specific commands that run after a successful installation.
+Some packages may require additional setup steps after installation is complete, or cleanup steps during uninstallation. The `post_install` and `post_uninstall` fields allow you to define platform-specific commands.
 
 Zoi will ask for user confirmation before running these commands for security.
+
+### `post_install`
+
+These commands run after a successful installation. This is useful for setting up shell completions or running a configuration wizard.
 
 ```yaml
 post_install:
@@ -191,6 +195,88 @@ post_install:
 
 - `platforms`: A list of platforms where these commands should run (e.g. `linux`, `macos`, `windows`, `linux-amd64`).
 - `commands`: A list of shell commands to execute. You can use the `{name}` and `{version}` placeholders.
+
+### `post_uninstall`
+
+These commands run before a package is uninstalled. This is useful for cleaning up configuration files, removing system services, or deregistering components.
+
+```yaml
+post_uninstall:
+  - platforms: ["linux", "macos"]
+    commands:
+      - "echo 'Running cleanup tasks for {name}...'"
+      - "{name} --remove-completions"
+```
+
+The structure is identical to `post_install`.
+
+## Advanced `pkg.yaml` Features
+
+Beyond the basics, `pkg.yaml` offers powerful fields for more complex scenarios like package aliasing and defining specific update behaviors.
+
+### The `alt` Field: Aliasing and Redirection
+
+The `alt` field allows you to redirect Zoi to resolve a different package source. This is incredibly useful for creating aliases or maintaining multiple versions of a package. When a user tries to install the current package, Zoi will instead fetch and install the one specified in the `alt` field.
+
+The value of `alt` can be:
+
+- Another package name (e.g. `my-app-git`).
+- A URL to a raw `.pkg.yaml` file.
+- A local file path to a `.pkg.yaml` file.
+
+**Use Case: Creating a "latest" alias**
+
+Imagine you have a package `my-app` that is built from source, but you also want to provide a pre-compiled version for users who don't want to build it. You can create two package files:
+
+1.  `my-app-bin.pkg.yaml`: Installs the pre-compiled binary.
+2.  `my-app.pkg.yaml`: An alias that points to the binary version.
+
+```yaml
+# my-app.pkg.yaml
+name: my-app
+repo: community
+version: 1.0.0
+description: A simple command-line utility (alias for binary).
+# ... other metadata ...
+alt: my-app-bin # Redirects to the 'my-app-bin' package
+```
+
+Now, when a user runs `zoi install my-app`, Zoi will automatically resolve and install `my-app-bin` instead.
+
+### The `updater` Field: Custom Update Logic
+
+The `updater` field gives you control over how `zoi update` behaves for your package. By default, Zoi will try to find a `binary` or `com_binary` to perform an update. However, you can force it to use a different method.
+
+The value of `updater` can be one of the installation types: `binary`, `com_binary`, `script`, or `source`.
+
+**Use Case: Forcing a source build on update**
+
+If your package must always be compiled from the latest source code to function correctly, you can ensure that `zoi update` always pulls and rebuilds it.
+
+```yaml
+# my-compiler.pkg.yaml
+name: my-compiler
+repo: community
+version: 0.2.0
+description: A compiler that needs to be built from the latest source.
+# ...
+updater: source # Force 'zoi update' to use the 'source' method
+
+installation:
+  - type: source
+    url: "https://github.com/{git}"
+    commands:
+      - "make clean"
+      - "make build"
+      - "mv ./bin/compiler {store}/compiler"
+  - type: binary
+    # This binary is provided as an initial install option,
+    # but updates will always use the source method above.
+    url: "https://github.com/user/compiler/releases/download/v{version}/compiler-{platform}"
+    platforms: ["linux-amd64", "macos-amd64"]
+```
+
+In this example, a user can get a pre-compiled binary on their first `zoi install`, but every subsequent `zoi update my-compiler` will trigger a fresh build from the source repository, ensuring they always have the latest version.
 
 ## Step 5: Testing Your Package Locally
 
@@ -220,10 +306,11 @@ Before you publish your package, you **must** test it locally to ensure it insta
 
 Once your package works locally, it's time to share it with the world! This is done by adding your `pkg.yaml` file to the official Zoi packages database.
 
-The Zoi package database is hosted on GitLab and mirrored on GitHub.
+The Zoi package database is hosted on GitLab and mirrored on GitHub and Codeberg.
 
 - **GitLab (Primary):** [Zillowe/Zillwen/Zusty/Zoi-Pkgs](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi-Pkgs)
 - **GitHub (Mirror):** [Zillowe/Zoi-Pkgs](https://github.com/Zillowe/Zoi-Pkgs)
+- **Codeberg (Mirror):** [Zillowe/Zoi-Pkgs](https://codeberg.org/Zillowe/Zoi-Pkgs)
 
 You can contribute by opening a **Merge/Pull Request** to either repository, or by **opening an issue** to request a new package. The following steps outline the process for creating a Merge Request on GitLab, which is very similar to the process on GitHub.
 

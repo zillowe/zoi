@@ -9,7 +9,7 @@ This guide will provide you with everything you need to know to get started, fro
 
 ## Introduction
 
-Zoi is a universal package manager and environment setup tool, designed to simplify package management and environment configuration across multiple operating systems. It's part of the Zillowe Development Suite (ZDS) and aims to streamline your development workflow by managing tools and project environments with ease.
+Zoi is a universal package manager and environment setup tool, designed to simplify package management and environment configuration across multiple operating systems. It's part of the [Zillowe Development Suite (ZDS)](/docs/zds) and aims to streamline your development workflow by managing tools and project environments with ease.
 
 ## Features
 
@@ -86,7 +86,7 @@ powershell -c "irm gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.p
 
 ### From Crates.io
 
-You can install `zoi-cli` directly from [crates.io](https://crates.io/crates/zoi) using `cargo`
+You can install `zoi-cli` directly from [crates.io](https://crates.io/crates/zoi-cli) using `cargo`
 
 ```sh
 cargo install zoi-cli
@@ -166,13 +166,17 @@ You'll need [Rust](https://www.rust-lang.org) installed.
 
 ```sh
 # Build the release binary
-./build/build-release.sh # For Linux/macOS
-./build/build-release.ps1 # For Windows
+# For Linux/macOS
+./build/build-release.sh
+# For Windows
+./build/build-release.ps1
 
 # Install it locally
 ./configure
 make
 sudo make install
+# Install CLI completions (bash, zsh, fist, elvish, powershell)
+make install-completion
 ```
 
 ## Platforms
@@ -196,44 +200,51 @@ We're planning to add support for more platforms.
 
 ## Usage & Commands
 
-Zoi provides a wide range of commands to manage your packages and environment.
+Zoi provides a wide range of commands to manage your packages and environment. For a full list of commands and their options, you can always run `zoi --help`.
 
 ### General Commands
 
-| Command      | Description                                                                                        |
-| ------------ | -------------------------------------------------------------------------------------------------- |
-| `version`    | Displays the version number, build status, and branch.                                             |
-| `about`      | Displays the full application name, description, author, license, and homepage.                    |
-| `info`       | Detects and displays key system details like OS, CPU architecture, and available package managers. |
-| `check`      | Verifies that all required dependencies (like git) are installed.                                  |
-| `sync`       | Clones or updates the package database from the remote repository.                                 |
-| `upgrade`    | Downloads the latest release of Zoi and replaces the current executable.                           |
-| `clean`      | Clears the cache of downloaded package binaries.                                                   |
-| `autoremove` | Removes packages that were installed as dependencies but are no longer needed.                     |
+| Command      | Description                                                                                                                                                |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version`    | Displays the version number, build status, branch, and commit hash.                                                                                        |
+| `about`      | Displays the full application name, description, author, license, and homepage.                                                                            |
+| `info`       | Displays key system details like OS, CPU architecture, and available package managers (requires 'zoi sync' to be run first for package manager detection). |
+| `check`      | Verifies that all required dependencies (like git) are installed.                                                                                          |
+| `sync`       | Clones or updates the package database, and updates the local system configuration by detecting available package managers.                                |
+| `upgrade`    | Downloads the latest release of Zoi and replaces the current executable.                                                                                   |
+| `clean`      | Clears the cache of downloaded package binaries.                                                                                                           |
+| `autoremove` | Removes packages that were installed as dependencies but are no longer needed.                                                                             |
 
 ### Package Management
 
-| Command     | Description                                                                                 |
-| ----------- | ------------------------------------------------------------------------------------------- |
-| `list`      | Lists installed or all available packages. Use `--all` to see all packages.                 |
-| `show`      | Shows detailed information about a package.                                                 |
-| `search`    | Searches for a case-insensitive term in the name and description of all available packages. |
-| `install`   | Installs a package from a name, local file, or URL.                                         |
-| `build`     | Builds and installs a package from a source.                                                |
-| `uninstall` | Removes a package's files from the Zoi store.                                               |
-| `update`    | Updates a package to the latest version.                                                    |
-| `pin`       | Pins a package to a specific version to prevent updates.                                    |
-| `unpin`     | Unpins a package, allowing it to be updated again.                                          |
-| `why`       | Explains why a package is installed (e.g. as a dependency or directly).                     |
-| `clone`     | Clones the source code repository of a package.                                             |
-| `exec`      | Downloads a binary to a temporary cache and runs it without installing it.                  |
+| Command     | Description                                                                                                                                                                               |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list`      | Lists installed or all available packages. <br/>`--all`: List all packages, not just installed. <br/>`--repo <repo>`: Filter by repository. <br/>`--type <type>`: Filter by package type. |
+| `show`      | Shows detailed information about a package. <br/>`--raw`: Display the raw, unformatted package file.                                                                                      |
+| `search`    | Searches for a package by name or description. <br/>`--repo <repo>`: Filter by repository. <br/>`--type <type>`: Filter by package type.                                                  |
+| `install`   | Installs one or more packages. <br/>`--force`: Force re-installation if the package already exists. <br/>`--interactive`: Choose the installation method interactively.                   |
+| `build`     | Builds and installs one or more packages from source. <br/>`--force`: Force the package to be rebuilt.                                                                                    |
+| `uninstall` | Removes one or more packages' files and symlinks from the Zoi store.                                                                                                                      |
+| `update`    | Updates one or more packages to the latest version.                                                                                                                                       |
+| `pin`       | Pins a package to a specific version to prevent updates.                                                                                                                                  |
+| `unpin`     | Unpins a package, allowing it to be updated again.                                                                                                                                        |
+| `why`       | Explains why a package is installed (e.g. as a dependency or directly).                                                                                                                   |
+| `clone`     | Clones the source code repository of one or more packages. A target directory can only be specified when cloning a single package.                                                        |
+| `exec`      | Downloads a binary to a temporary cache and runs it without installing it.                                                                                                                |
 
 ### Project Environment
 
-| Command | Description                                                            |
-| ------- | ---------------------------------------------------------------------- |
-| `run`   | Executes a command from a local `zoi.yaml` file.                       |
-| `env`   | Manages and sets up project environments from a local `zoi.yaml` file. |
+| Command | Description                                                                    |
+| ------- | ------------------------------------------------------------------------------ |
+| `run`   | Executes a command from a local 'zoi.yaml' file. Can be run interactively.     |
+| `env`   | Sets up project environments from a 'zoi.yaml' file. Can be run interactively. |
+
+### Service Management
+
+| Command | Description                         |
+| ------- | ----------------------------------- |
+| `start` | Starts a package that is a service. |
+| `stop`  | Stops a running service package.    |
 
 ### Repository Management (`repo`)
 
@@ -243,7 +254,7 @@ Manages the list of package repositories that Zoi uses.
 | ------------- | ----------------------------------------------------------------------------------------------------------------- |
 | `repo add`    | Adds a new repository from the available sources or clones a repository from a git URL. Can be run interactively. |
 | `repo remove` | Deletes a repository from the active list.                                                                        |
-| `repo list`   | Shows all currently active repositories. Use `list --all` to see all available repositories and their status.     |
+| `repo list`   | Shows all currently active repositories. Use `list all` to see all available repositories and their status.       |
 
 **Example:**
 
@@ -309,6 +320,12 @@ license: MIT
 scope: user
 # (Optional) The package type. Can be 'package' (default), 'collection', 'service', or 'config'.
 type: package
+# (Optional) An alternate source to resolve this package from. Can be another
+# package name (e.g. 'my-app-git'), a URL to a raw .pkg.yaml file, or a local file path.
+alt: my-app-v2
+# (Optional) The installation method to use for `zoi update`.
+# Can be 'binary', 'com_binary', 'script', or 'source'.
+updater: binary
 
 # A list of methods to install the package. Zoi will try them in order.
 installation:
@@ -350,6 +367,14 @@ post_install:
   - platforms: ["windows-amd64"]
     commands:
       - "powershell -NoProfile -Command \"$p=\"$env:USERPROFILE\\Documents\\PowerShell\"; if(!(Test-Path $p)){New-Item -ItemType Directory -Path $p|Out-Null}; {name}.exe generate-completions powershell >> \"$p\\Microsoft.PowerShell_profile.ps1\"\""
+
+# (Optional) Post-uninstallation commands to run before the package is removed.
+post_uninstall:
+  - platforms: ["linux", "macos"]
+    commands:
+      - "rm -f ~/.local/share/bash-completion/completions/{name}"
+      - "rm -f ~/.zsh/completions/_{name}"
+      - "rm -f ~/.config/fish/completions/{name}.fish"
 ```
 
 ### Installation Methods
@@ -459,10 +484,40 @@ The format for a dependency is `manager:package-name`. For optional dependencies
   zoi install <package_name>
   ```
 
+- **Install multiple packages:**
+
+  ```sh
+  zoi install <package_1> <package_2>
+  ```
+
+- **Update a package:**
+
+  ```sh
+  zoi update <package_name>
+  ```
+
+- **Update multiple packages:**
+
+  ```sh
+  zoi update <package_1> <package_2>
+  ```
+
+- **Update all packages:**
+
+  ```sh
+  zoi update all
+  ```
+
 - **Uninstall a package:**
 
   ```sh
   zoi uninstall <package_name>
+  ```
+
+- **Uninstall multiple packages:**
+
+  ```sh
+  zoi uninstall <package_1> <package_2>
   ```
 
 - **Install from a specific repository:**
