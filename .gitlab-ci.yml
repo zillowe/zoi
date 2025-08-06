@@ -13,7 +13,7 @@ check_build:
   variables:
     RUSTFLAGS: "-Dwarnings"
   before_script:
-    - apt-get update -y && apt-get install -y build-essential gcc
+    - apt-get update -y && apt-get install -y build-essential gcc libgpg-error-dev
   script:
     - echo "--- Checking build ---"
     - cargo check --verbose
@@ -31,7 +31,7 @@ build:linux:
   before_script:
     - dpkg --add-architecture arm64
     - dpkg --add-architecture armhf
-    - apt-get update -y && apt-get install -y build-essential gcc gcc-aarch64-linux-gnu libssl-dev pkg-config libssl-dev:arm64 openssl libssl-dev:armhf gcc-mingw-w64-x86-64 liblzma-dev:arm64
+    - apt-get update -y && apt-get install -y build-essential gcc gcc-aarch64-linux-gnu libssl-dev pkg-config libssl-dev:arm64 openssl libssl-dev:armhf gcc-mingw-w64-x86-64 liblzma-dev:arm64 libgpg-error-dev
   script:
     - echo "Building Linux (amd64, arm64) and Windows (amd64) targets..."
     - chmod +x ./build/build-linux.sh
@@ -51,6 +51,7 @@ build:macos:
   before_script:
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
     - source ~/.cargo/env
+    - brew install libgpg-error
   script:
     - echo "Building macOS targets (amd64, arm64)..."
     - chmod +x ./build/build-macos.sh
