@@ -4,9 +4,10 @@ use colored::*;
 use dialoguer::{Input, theme::ColorfulTheme};
 use regex::Regex;
 use semver::{Version, VersionReq};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs;
+use std::path::PathBuf;
 use std::process::Command;
 
 #[derive(Debug)]
@@ -15,6 +16,56 @@ struct Dependency<'a> {
     package: &'a str,
     req: Option<VersionReq>,
     description: Option<&'a str>,
+}
+
+fn get_dependency_graph_path() -> Result<PathBuf, Box<dyn Error>> {
+    let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
+    let path = home_dir.join(".zoi").join("pkgs").join("dependencies.json");
+    fs::create_dir_all(path.parent().unwrap())?;
+    Ok(path)
+}
+
+fn read_dependency_graph() -> Result<HashMap<String, Vec<String>>, Box<dyn Error>> {
+    let path = get_dependency_graph_path()?;
+    if !path.exists() {
+        return Ok(HashMap::new());
+    }
+    let content = fs::read_to_string(path)?;
+    if content.trim().is_empty() {
+        return Ok(HashMap::new());
+    }
+    let graph: HashMap<String, Vec<String>> = serde_json::from_str(&content)?;
+    Ok(graph)
+}
+
+fn write_dependency_graph(graph: &HashMap<String, Vec<String>>) -> Result<(), Box<dyn Error>> {
+    let path = get_dependency_graph_path()?;
+    let content = serde_json::to_string_pretty(graph)?;
+    fs::write(path, content)?;
+    Ok(())
+}
+
+fn add_dependency_link(dependent: &str, dependency: &str) -> Result<(), Box<dyn Error>> {
+    let mut graph = read_dependency_graph()?;
+    let dependents = graph.entry(dependency.to_string()).or_default();
+    if !dependents.contains(&dependent.to_string()) {
+        dependents.push(dependent.to_string());
+    }
+    write_dependency_graph(&graph)
+}
+
+pub fn remove_dependency_link(dependent: &str, dependency: &str) -> Result<(), Box<dyn Error>> {
+    let mut graph = read_dependency_graph()?;
+    if let Some(dependents) = graph.get_mut(dependency) {
+        dependents.retain(|d| d != dependent);
+    }
+    graph.retain(|_, dependents| !dependents.is_empty());
+    write_dependency_graph(&graph)
+}
+
+pub fn get_dependents(dependency: &str) -> Result<Vec<String>, Box<dyn Error>> {
+    let graph = read_dependency_graph()?;
+    Ok(graph.get(dependency).cloned().unwrap_or_default())
 }
 
 fn parse_dependency_string(dep_str: &str) -> Result<Dependency, Box<dyn Error>> {
@@ -94,22 +145,6 @@ fn get_native_command_version(command_name: &str) -> Result<Option<Version>, Box
     Ok(None)
 }
 
-fn record_dependent(
-    dependency_name: &str,
-    dependent_pkg_name: &str,
-    scope: types::Scope,
-) -> Result<(), Box<dyn Error>> {
-    let dependents_dir = local::get_store_root(scope)?
-        .join(dependency_name)
-        .join("dependents");
-
-    fs::create_dir_all(&dependents_dir)?;
-
-    fs::File::create(dependents_dir.join(dependent_pkg_name))?;
-
-    Ok(())
-}
-
 fn install_dependency(
     dep: &Dependency,
     parent_pkg_name: &str,
@@ -118,7 +153,7 @@ fn install_dependency(
     processed_deps: &mut HashSet<String>,
 ) -> Result<(), Box<dyn Error>> {
     let dep_id = format!("{}:{}", dep.manager, dep.package);
-    if !processed_deps.insert(dep_id) {
+    if !processed_deps.insert(dep_id.clone()) {
         return Ok(());
     }
 
@@ -150,7 +185,7 @@ fn install_dependency(
         "snap" | "flatpak" => os == "linux",
         "pkg" => os == "freebsd",
         "pkg_add" => os == "openbsd",
-        "zoi" | "cargo" | "native" | "go" | "npm" | "jsr" | "bun" | "pip" | "pipx"
+        "zoi" | "cargo" | "native" | "go" | "npm" | "deno" | "jsr" | "bun" | "pip" | "pipx"
         | "cargo-binstall" | "gem" | "yarn" | "pnpm" | "composer" | "dotnet" | "nix" | "conda" => {
             true
         }
@@ -165,10 +200,11 @@ fn install_dependency(
         return Ok(());
     }
 
+    add_dependency_link(parent_pkg_name, &dep_id)?;
+
     match manager {
         "zoi" => {
             let zoi_dep_name = dep.package;
-            record_dependent(zoi_dep_name, parent_pkg_name, scope)?;
             if let Some(manifest) = local::is_package_installed(zoi_dep_name, scope)? {
                 let installed_version = Version::parse(&manifest.version)?;
                 if let Some(req) = &dep.req {
@@ -288,6 +324,16 @@ fn install_dependency(
                 .status()?;
             if !status.success() {
                 return Err(format!("NPM dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "deno" => {
+            let status = Command::new("deno")
+                .arg("install")
+                .arg("-g")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("Deno dependency failed for '{}'", dep.package).into());
             }
         }
         "yarn" => {
@@ -727,4 +773,207 @@ fn install_zoi_dependency(
         yes,
         processed_deps,
     )
+}
+
+pub fn uninstall_dependency(
+    dep_str: &str,
+    zoi_uninstaller: &dyn Fn(&str) -> Result<(), Box<dyn Error>>,
+) -> Result<(), Box<dyn Error>> {
+    let dep = parse_dependency_string(dep_str)?;
+    println!(
+        "-> Attempting to uninstall dependency: {} via {}",
+        dep.package.cyan(),
+        dep.manager.yellow()
+    );
+
+    let manager = dep.manager;
+    let status = match manager {
+        "zoi" => {
+            let zoi_dep_name = dep.package;
+            return zoi_uninstaller(zoi_dep_name);
+        }
+        "native" => {
+            let pm =
+                utils::get_native_package_manager().ok_or("Native package manager not found")?;
+            println!("(Using native manager: {pm})");
+            let (cmd, args) = match pm.as_str() {
+                "apt" | "apt-get" => ("sudo", vec![pm.as_str(), "remove", "-y"]),
+                "pacman" => ("sudo", vec!["pacman", "-Rns", "--noconfirm"]),
+                "dnf" | "yum" => ("sudo", vec![pm.as_str(), "remove", "-y"]),
+                "brew" => ("brew", vec!["uninstall"]),
+                "scoop" => ("scoop", vec!["uninstall"]),
+                "choco" => ("choco", vec!["uninstall", "-y"]),
+                "apk" => ("sudo", vec!["apk", "del"]),
+                "pkg" => ("sudo", vec!["pkg", "delete", "-y"]),
+                "pkg_add" => ("sudo", vec!["pkg_delete"]),
+                _ => return Err(format!("Unsupported native package manager: {pm}").into()),
+            };
+
+            let mut command = Command::new(cmd);
+            command.args(args).arg(dep.package).status()?
+        }
+        "cargo" | "cargo-binstall" => Command::new("cargo")
+            .arg("uninstall")
+            .arg(dep.package)
+            .status()?,
+        "go" => {
+            println!("Skipping uninstall for Go, please remove binary manually.");
+            return Ok(());
+        }
+        "npm" => Command::new("npm")
+            .arg("uninstall")
+            .arg("-g")
+            .arg(dep.package)
+            .status()?,
+        "deno" => Command::new("deno")
+            .arg("uninstall")
+            .arg(dep.package)
+            .status()?,
+        "yarn" => Command::new("yarn")
+            .arg("global")
+            .arg("remove")
+            .arg(dep.package)
+            .status()?,
+        "pnpm" => Command::new("pnpm")
+            .arg("remove")
+            .arg("-g")
+            .arg(dep.package)
+            .status()?,
+        "bun" => Command::new("bun")
+            .arg("remove")
+            .arg("-g")
+            .arg(dep.package)
+            .status()?,
+        "pip" | "pipx" => Command::new(manager)
+            .arg("uninstall")
+            .arg(dep.package)
+            .arg("-y")
+            .status()?,
+        "gem" => Command::new("gem")
+            .arg("uninstall")
+            .arg(dep.package)
+            .status()?,
+        "composer" => Command::new("composer")
+            .arg("global")
+            .arg("remove")
+            .arg(dep.package)
+            .status()?,
+        "dotnet" => Command::new("dotnet")
+            .arg("tool")
+            .arg("uninstall")
+            .arg("-g")
+            .arg(dep.package)
+            .status()?,
+        "nix" => Command::new("nix-env")
+            .arg("-e")
+            .arg(dep.package)
+            .status()?,
+        "jsr" => {
+            println!("Skipping uninstall for JSR.");
+            return Ok(());
+        }
+        "apt" | "apt-get" => Command::new("sudo")
+            .arg(manager)
+            .arg("remove")
+            .arg("-y")
+            .arg(dep.package)
+            .status()?,
+        "pacman" => Command::new("sudo")
+            .arg("pacman")
+            .arg("-Rns")
+            .arg("--noconfirm")
+            .arg(dep.package)
+            .status()?,
+        "yay" | "paru" => Command::new(manager)
+            .arg("-Rns")
+            .arg("--noconfirm")
+            .arg(dep.package)
+            .status()?,
+        "aur" => {
+            println!("AUR packages are uninstalled via pacman. Trying with pacman...");
+            Command::new("sudo")
+                .arg("pacman")
+                .arg("-Rns")
+                .arg("--noconfirm")
+                .arg(dep.package)
+                .status()?
+        }
+        "dnf" | "yum" => Command::new("sudo")
+            .arg(manager)
+            .arg("remove")
+            .arg("-y")
+            .arg(dep.package)
+            .status()?,
+        "brew" => Command::new("brew")
+            .arg("uninstall")
+            .arg(dep.package)
+            .status()?,
+        "scoop" => Command::new("scoop")
+            .arg("uninstall")
+            .arg(dep.package)
+            .status()?,
+        "choco" => Command::new("choco")
+            .arg("uninstall")
+            .arg("-y")
+            .arg(dep.package)
+            .status()?,
+        "apk" => Command::new("sudo")
+            .arg("apk")
+            .arg("del")
+            .arg(dep.package)
+            .status()?,
+        "pkg" => Command::new("sudo")
+            .arg("pkg")
+            .arg("delete")
+            .arg("-y")
+            .arg(dep.package)
+            .status()?,
+        "pkg_add" => Command::new("sudo")
+            .arg("pkg_delete")
+            .arg(dep.package)
+            .status()?,
+        "zypper" => Command::new("sudo")
+            .arg("zypper")
+            .arg("remove")
+            .arg("-y")
+            .arg(dep.package)
+            .status()?,
+        "portage" => Command::new("sudo")
+            .arg("emerge")
+            .arg("--unmerge")
+            .arg(dep.package)
+            .status()?,
+        "snap" => Command::new("sudo")
+            .arg("snap")
+            .arg("remove")
+            .arg(dep.package)
+            .status()?,
+        "flatpak" => Command::new("flatpak")
+            .arg("uninstall")
+            .arg(dep.package)
+            .arg("-y")
+            .status()?,
+        "winget" => Command::new("winget")
+            .arg("uninstall")
+            .arg(dep.package)
+            .arg("--silent")
+            .status()?,
+        "conda" => Command::new("conda")
+            .arg("uninstall")
+            .arg("-y")
+            .arg(dep.package)
+            .status()?,
+        "macports" => Command::new("sudo")
+            .arg("port")
+            .arg("uninstall")
+            .arg(dep.package)
+            .status()?,
+        _ => return Err(format!("Unknown package manager for uninstall: {}", dep.manager).into()),
+    };
+
+    if !status.success() {
+        return Err(format!("Failed to uninstall dependency: {}", dep.package).into());
+    }
+
+    Ok(())
 }

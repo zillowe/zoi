@@ -1,8 +1,7 @@
-use crate::pkg::{local, types, types::InstallReason};
+use crate::pkg::{dependencies, local, types::InstallReason};
 use crate::utils;
 use colored::*;
 use std::error::Error;
-use std::fs;
 
 pub fn run(yes: bool) -> Result<(), Box<dyn Error>> {
     println!("Checking for unused dependencies...");
@@ -14,26 +13,10 @@ pub fn run(yes: bool) -> Result<(), Box<dyn Error>> {
             continue;
         }
 
-        let user_dependents_dir = local::get_store_root(types::Scope::User)?
-            .join(&package.name)
-            .join("dependents");
-        let system_dependents_dir = local::get_store_root(types::Scope::System)?
-            .join(&package.name)
-            .join("dependents");
+        let pkg_id = format!("zoi:{}", package.name);
+        let dependents = dependencies::get_dependents(&pkg_id)?;
 
-        let has_user_dependents = if user_dependents_dir.exists() {
-            fs::read_dir(user_dependents_dir)?.next().is_some()
-        } else {
-            false
-        };
-
-        let has_system_dependents = if system_dependents_dir.exists() {
-            fs::read_dir(system_dependents_dir)?.next().is_some()
-        } else {
-            false
-        };
-
-        if !has_user_dependents && !has_system_dependents {
+        if dependents.is_empty() {
             packages_to_remove.push(package.name.clone());
         }
     }

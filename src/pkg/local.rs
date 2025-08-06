@@ -178,3 +178,13 @@ pub fn write_manifest(manifest: &InstallManifest) -> Result<(), Box<dyn Error>> 
     fs::write(manifest_path, content)?;
     Ok(())
 }
+
+pub fn remove_manifest(package_name: &str, scope: Scope) -> Result<(), Box<dyn Error>> {
+    let manifest_path = get_store_root(scope)?
+        .join(package_name)
+        .join("manifest.yaml");
+    if manifest_path.exists() {
+        fs::remove_file(manifest_path)?;
+    }
+    Ok(())
+}
