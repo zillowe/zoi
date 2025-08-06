@@ -4,7 +4,7 @@ echo "$SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/id_rsa
 chmod 600 ~/.ssh/id_rsa
 ssh-keyscan -H aur.archlinux.org >> ~/.ssh/known_hosts
 ssh-keyscan -H github.com >> ~/.ssh/known_hosts
-git config --global user.email "ci@zillowe.rf.gd"
+git config --global user.email "contact@zillowe.rf.gd"
 git config --global user.name "Zillowe CI/CD"
 VERSION=$(echo "$CI_COMMIT_MESSAGE" | sed 's/Release: Bump packages version to //')
 
