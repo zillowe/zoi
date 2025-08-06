@@ -498,3 +498,42 @@ alt: https://example.com/my-app.pkg.yaml
 **Key Fields:**
 
 - `alt`: When a user runs `zoi install my-app` or `zoi install my-remote-app`, Zoi sees this field, stops processing the current file, and immediately starts resolving the source specified in `alt`.
+
+---
+
+## Package with Conflict Detection
+
+You can define `bins` and `conflicts` to help Zoi prevent conflicts between packages. Zoi will warn the user if an installation would cause a conflict and ask for confirmation.
+
+```yaml
+# utils/my-cli-v2.pkg.yaml
+name: my-cli-v2
+repo: community
+version: 2.0.0
+description: A new version of my-cli that conflicts with the old one.
+maintainer:
+  name: "Your Name"
+  email: "your.email@example.com"
+license: MIT
+
+# This package provides two binaries: 'my-cli' and 'mcli'.
+# If another installed package also provides 'my-cli', Zoi will warn you.
+bins:
+  - my-cli
+  - mcli
+
+# This package explicitly conflicts with the 'my-cli-legacy' package.
+# If 'my-cli-legacy' is installed, Zoi will warn you.
+conflicts:
+  - my-cli-legacy
+
+installation:
+  - type: binary
+    url: "https://github.com/user/my-cli/releases/download/v{version}/my-cli-{platform}"
+    platforms: ["linux-amd64", "macos-amd64"]
+```
+
+**Key Fields:**
+
+- `bins`: A list of the executable files the package provides. Zoi checks if any of these binaries are already provided by another installed package.
+- `conflicts`: A list of other Zoi package names that are incompatible with this one.

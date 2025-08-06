@@ -53,6 +53,8 @@
     - [Arch Linux (AUR)](#arch-linux-aur)
     - [macOS (Homebrew)](#macos-homebrew)
     - [Windows (Scoop)](#windows-scoop)
+    - [From Crates.io](#from-cratesio)
+    - [From NPM](#from-npm)
   - [Scripts](#-scripts)
   - [Build from Source](#%EF%B8%8F-build-from-source)
 - [Platforms](#-platforms)
@@ -138,6 +140,25 @@ scoop bucket add zillowe https://github.com/Zillowe/scoop.git
 scoop install zoi
 ```
 
+#### From Crates.io
+
+You can install `zoi-cli` directly from [crates.io](https://crates.io/crates/zoi-cli) using `cargo`:
+
+```sh
+cargo install zoi-cli
+```
+
+#### From NPM
+
+You can install `@zillowe/zoi` from `npm` also.
+
+```sh
+npx @zillowe/zoi
+bunx @zillowe/zoi
+pnpm dlx @zillowe/zoi
+yarn dlx @zillowe/zoi
+```
+
 ### 📜 Scripts
 
 You can also use our installer scripts for a quick setup.
@@ -152,25 +173,6 @@ curl -fsSL https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.s
 
 ```powershell
 powershell -c "irm gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.ps1|iex"
-```
-
-### From Crates.io
-
-You can install `zoi-cli` directly from [crates.io](https://crates.io/crates/zoi-cli) using `cargo`:
-
-```sh
-cargo install zoi-cli
-```
-
-### From NPM
-
-You can install `@zillowe/zoi` from `npm` also.
-
-```sh
-npx @zillowe/zoi
-bunx @zillowe/zoi
-pnpm dlx @zillowe/zoi
-yarn dlx @zillowe/zoi
 ```
 
 ### 🛠️ Build from Source
@@ -334,6 +336,8 @@ For more detailed information, please refer to the [Docs](https://zillowe.rf.gd/
 ## 🤝 Contributing
 
 We welcome contributions from the community! If you'd like to contribute, please read our [Contributing Guidelines](./CONTRIBUTING.md) for more information.
+
+New features, enhancements and bug reports are welcome.
 
 ## 🪞 Mirrors
 

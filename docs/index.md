@@ -70,21 +70,7 @@ scoop bucket add zillowe https://github.com/Zillowe/scoop.git
 scoop install zoi
 ```
 
-### Scripts
-
-**Linux / macOS:**
-
-```sh
-curl -fsSL https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.sh | bash
-```
-
-**Windows:**
-
-```powershell
-powershell -c "irm gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.ps1|iex"
-```
-
-### From Crates.io
+#### From Crates.io
 
 You can install `zoi-cli` directly from [crates.io](https://crates.io/crates/zoi-cli) using `cargo`
 
@@ -92,7 +78,7 @@ You can install `zoi-cli` directly from [crates.io](https://crates.io/crates/zoi
 cargo install zoi-cli
 ```
 
-### From NPM
+#### From NPM
 
 You can install `@zillowe/zoi` from `npm` also.
 
@@ -160,6 +146,20 @@ You can install `@zillowe/zoi` from `npm` also.
 </TabsContent>
 </Tabs>
 
+### Scripts
+
+**Linux / macOS:**
+
+```sh
+curl -fsSL https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.sh | bash
+```
+
+**Windows:**
+
+```powershell
+powershell -c "irm gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.ps1|iex"
+```
+
 ### Build from Source
 
 You'll need [Rust](https://www.rust-lang.org) installed.
@@ -224,7 +224,7 @@ Zoi provides a wide range of commands to manage your packages and environment. F
 | `search`    | Searches for a package by name or description. <br/>`--repo <repo>`: Filter by repository. <br/>`--type <type>`: Filter by package type.                                                  |
 | `install`   | Installs one or more packages. <br/>`--force`: Force re-installation if the package already exists. <br/>`--interactive`: Choose the installation method interactively.                   |
 | `build`     | Builds and installs one or more packages from source. <br/>`--force`: Force the package to be rebuilt.                                                                                    |
-| `uninstall` | Removes one or more packages' files and symlinks from the Zoi store.                                                                                                                      |
+| `uninstall` | Removes one or more packages. Also removes any of its dependencies that are no longer needed. For collections, it removes all of its dependencies. |
 | `update`    | Updates one or more packages to the latest version.                                                                                                                                       |
 | `pin`       | Pins a package to a specific version to prevent updates.                                                                                                                                  |
 | `unpin`     | Unpins a package, allowing it to be updated again.                                                                                                                                        |
@@ -326,6 +326,13 @@ alt: my-app-v2
 # (Optional) The installation method to use for `zoi update`.
 # Can be 'binary', 'com_binary', 'script', or 'source'.
 updater: binary
+
+# (Optional) A list of binaries this package provides. Used for conflict detection.
+bins:
+  - my-awesome-app
+# (Optional) A list of package names that this package conflicts with.
+conflicts:
+  - my-awesome-app-legacy
 
 # A list of methods to install the package. Zoi will try them in order.
 installation:

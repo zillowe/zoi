@@ -278,6 +278,43 @@ installation:
 
 In this example, a user can get a pre-compiled binary on their first `zoi install`, but every subsequent `zoi update my-compiler` will trigger a fresh build from the source repository, ensuring they always have the latest version.
 
+### Handling Conflicts: `bins` and `conflicts`
+
+To prevent issues where two different packages provide the same command-line tool or are otherwise incompatible, Zoi offers two fields to manage conflicts. If a conflict is detected, Zoi will warn the user and ask for confirmation before proceeding with the installation.
+
+If these fields are not present, Zoi falls back to its default behavior of checking if a command with the same name as the package already exists on the system.
+
+#### The `conflicts` Field
+
+This field lets you declare that your package is incompatible with a list of other Zoi packages.
+
+```yaml
+# my-new-editor.pkg.yaml
+name: my-new-editor
+version: 1.0.0
+# ...
+conflicts:
+  - old-editor # This package cannot be installed if 'old-editor' is present
+  - another-editor
+```
+
+#### The `bins` Field
+
+This field lists the executable files (binaries) that your package installs. Zoi uses this to detect if another installed package provides a binary with the same name.
+
+```yaml
+# my-utils.pkg.yaml
+name: my-utils
+version: 1.0.0
+# ...
+# This package installs two commands: 'mu' and 'mu-helper'
+bins:
+  - mu
+  - mu-helper
+```
+
+If a user tries to install `my-utils` while another package that also provides a `mu` binary is already installed, Zoi will detect the conflict. This is different from the package name; for example, the `vim` package might provide the `vi` binary, which could conflict with a separate `vi` package.
+
 ## Step 5: Testing Your Package Locally
 
 Before you publish your package, you **must** test it locally to ensure it installs correctly.
