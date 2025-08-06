@@ -11,6 +11,8 @@ maintainer:
   email: zillowez@gmail.com
 license: Apache-2.0
 updater: script
+bins: ["zoi"]
+conflicts: ["zoi"]
 
 installation:
   - type: com_binary
@@ -49,7 +51,7 @@ post_install:
 dependencies:
   runtime:
     - "native:git"
-
+    - "native:less"
   build:
     - "native:rust"
     - "native:cargo"
