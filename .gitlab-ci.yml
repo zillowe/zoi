@@ -34,6 +34,8 @@ build:linux:
     - apt-get update -y
     - apt-get install -y build-essential gcc libssl-dev pkg-config openssl gcc-mingw-w64-x86-64 libgpg-error-dev libgpgme-dev
     - apt-get install -y gcc-aarch64-linux-gnu libssl-dev:arm64 libssl-dev:armhf liblzma-dev:arm64 libgpg-error-dev:arm64 libgpgme-dev:arm64
+    - export PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:$PKG_CONFIG_PATH"
+    - pkg-config --exists gpg-error || echo "gpg-error.pc not found"
   script:
     - echo "Building Linux (amd64, arm64) and Windows (amd64) targets..."
     - chmod +x ./build/build-linux.sh
