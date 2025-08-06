@@ -81,6 +81,7 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
 - **Repository-Based:** Manage packages from official or community repositories. Easily add your own.
 - **Intuitive CLI:** A simple and powerful command-line interface with helpful aliases for a better developer experience.
 - **Package Types:** Supports standard packages, meta-packages (collections), background services, and configuration file management.
+- **Secure Package Distribution:** Support for checksums and GPG signatures to verify package integrity and authenticity.
 
 ## 🚀 Getting Started
 
@@ -224,42 +225,43 @@ We're planning to add support for more platforms.
 
 What dependency installation we support.
 
-| Manager          | Ecosystem / OS                  | Example                               |
-| ---------------- | ------------------------------- | ------------------------------------- |
-| `zoi`            | Zoi                             | `zoi:my-other-package`                |
-| `native`         | System's native package manager | `native:openssl`                      |
-| `apt`, `apt-get` | Debian, Ubuntu, etc.            | `apt:libssl-dev`                      |
-| `pacman`         | Arch Linux                      | `pacman:base-devel`                   |
-| `yay`, `paru`    | Arch Linux (AUR)                | `yay:google-chrome`                   |
-| `aur`            | Arch Linux (AUR)                | `aur:visual-studio-code-bin`          |
-| `dnf`, `yum`     | Fedora, CentOS, RHEL            | `dnf:openssl-devel`                   |
-| `zypper`         | openSUSE                        | `zypper:libopenssl-devel`             |
-| `apk`            | Alpine Linux                    | `apk:git`                             |
-| `portage`        | Gentoo                          | `portage:dev-libs/openssl`            |
-| `brew`           | macOS (Homebrew)                | `brew:node`                           |
-| `macports`       | macOS (MacPorts)                | `macports:git`                        |
-| `scoop`          | Windows                         | `scoop:git`                           |
-| `choco`          | Windows (Chocolatey)            | `choco:git`                           |
-| `winget`         | Windows                         | `winget:Git.Git`                      |
-| `snap`           | Linux (Snapcraft)               | `snap:node`                           |
-| `flatpak`        | Linux (Flathub)                 | `flatpak:org.gimp.GIMP`               |
-| `pkg`            | FreeBSD                         | `pkg:git`                             |
-| `pkg_add`        | OpenBSD                         | `pkg_add:git`                         |
-| `cargo`          | Rust                            | `cargo:ripgrep`                       |
-| `cargo-binstall` | Rust (pre-compiled binaries)    | `cargo-binstall:ripgrep`              |
-| `go`             | Go                              | `go:golang.org/x/tools/cmd/goimports` |
-| `npm`            | Node.js                         | `npm:typescript`                      |
-| `yarn`           | Node.js                         | `yarn:react`                          |
-| `pnpm`           | Node.js                         | `pnpm:vite`                           |
-| `bun`            | Bun                             | `bun:elysia`                          |
-| `jsr`            | JavaScript Registry             | `jsr:@std/http`                       |
-| `pip`            | Python                          | `pip:requests`                        |
-| `pipx`           | Python                          | `pipx:black`                          |
-| `conda`          | Conda                           | `conda:numpy`                         |
-| `gem`            | Ruby                            | `gem:rails`                           |
-| `composer`       | PHP                             | `composer:laravel/installer`          |
-| `dotnet`         | .NET                            | `dotnet:csharp-ls`                    |
-| `nix`            | NixOS / Nix                     | `nix:nixpkgs.hello`                   |
+| Manager          | Ecosystem / OS                  | Example                                   |
+| ---------------- | ------------------------------- | ----------------------------------------- |
+| `zoi`            | Zoi                             | `zoi:my-other-package`                    |
+| `native`         | System's native package manager | `native:openssl`                          |
+| `apt`, `apt-get` | Debian, Ubuntu, etc.            | `apt:libssl-dev`                          |
+| `pacman`         | Arch Linux                      | `pacman:base-devel`                       |
+| `yay`, `paru`    | Arch Linux (AUR)                | `yay:google-chrome`                       |
+| `aur`            | Arch Linux (AUR)                | `aur:visual-studio-code-bin`              |
+| `dnf`, `yum`     | Fedora, CentOS, RHEL            | `dnf:openssl-devel`                       |
+| `zypper`         | openSUSE                        | `zypper:libopenssl-devel`                 |
+| `apk`            | Alpine Linux                    | `apk:git`                                 |
+| `portage`        | Gentoo                          | `portage:dev-libs/openssl`                |
+| `brew`           | macOS (Homebrew)                | `brew:node`                               |
+| `macports`       | macOS (MacPorts)                | `macports:git`                            |
+| `scoop`          | Windows                         | `scoop:git`                               |
+| `choco`          | Windows (Chocolatey)            | `choco:git`                               |
+| `winget`         | Windows                         | `winget:Git.Git`                          |
+| `snap`           | Linux (Snapcraft)               | `snap:node`                               |
+| `flatpak`        | Linux (Flathub)                 | `flatpak:org.gimp.GIMP`                   |
+| `pkg`            | FreeBSD                         | `pkg:git`                                 |
+| `pkg_add`        | OpenBSD                         | `pkg_add:git`                             |
+| `cargo`          | Rust                            | `cargo:ripgrep`                           |
+| `cargo-binstall` | Rust (pre-compiled binaries)    | `cargo-binstall:ripgrep`                  |
+| `go`             | Go                              | `go:golang.org/x/tools/cmd/goimports`     |
+| `npm`            | Node.js                         | `npm:typescript`                          |
+| `yarn`           | Node.js                         | `yarn:react`                              |
+| `pnpm`           | Node.js                         | `pnpm:vite`                               |
+| `bun`            | Bun                             | `bun:elysia`                              |
+| `deno`           | Deno                            | `deno:npm:chalk` or `deno:jsr:@std/bytes` |
+| `jsr`            | JavaScript Registry             | `jsr:@std/http`                           |
+| `pip`            | Python                          | `pip:requests`                            |
+| `pipx`           | Python                          | `pipx:black`                              |
+| `conda`          | Conda                           | `conda:numpy`                             |
+| `gem`            | Ruby                            | `gem:rails`                               |
+| `composer`       | PHP                             | `composer:laravel/installer`              |
+| `dotnet`         | .NET                            | `dotnet:csharp-ls`                        |
+| `nix`            | NixOS / Nix                     | `nix:nixpkgs.hello`                       |
 
 Some of the package manager are OS specific, so when a dependency is in that package manager it only installs it for that OS.
 

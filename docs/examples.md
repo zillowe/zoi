@@ -20,6 +20,14 @@ git: https://github.com/user/my-cli
 maintainer:
   name: "Your Name"
   email: "your.email@example.com"
+  # URL to the maintainer's public GPG key.
+  key: "https://keys.example.com/your-name.gpg"
+  # (Optional) Website of the maintainer
+  website: "https://maintainer.com"
+# If the author is different from the maintainer.
+author:
+  name: "Original Author"
+  key: "https://keys.example.com/author.gpg"
 license: MIT
 
 # The 'installation' section defines how to install the package.
@@ -37,16 +45,22 @@ installation:
       # list:
       #   - file: "my-cli-zip"
       #     checksum: "<hex-digest-or-url>"
+    # Optional: Verify the download against a GPG signature.
+    sigs:
+      - file: "my-cli-{platform}"
+        sig: "https://github.com/user/my-cli/releases/download/v{version}/my-cli-{platform}.sig"
 ```
 
 **Key Fields:**
 
 - `name`, `version`, `description`: Basic package metadata.
+- `maintainer`, `author`: Information about who maintains and created the package. The `key` field should be a URL to a public GPG key used for signature verification.
 - `installation`: A list of methods to install the package.
 - `type: binary`: Specifies that Zoi should download the file from the `url` and make it executable.
 - `url`: The download link for the binary. Notice the use of placeholders like `{version}` and `{platform}` which Zoi replaces at runtime.
 - `platforms`: A list of platforms this installation method supports.
 - `checksums`: (Optional but recommended) A way to verify the integrity of the downloaded file. It can be a direct URL to a checksums file or a list of file/checksum pairs.
+- `sigs`: (Optional but highly recommended) A list defining GPG signatures for downloaded files. Zoi uses the `key` from the `maintainer` or `author` to verify the signature.
 
 ---
 

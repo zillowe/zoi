@@ -37,13 +37,21 @@ description: A simple command-line utility.
 maintainer:
   name: "Your Name"
   email: "your.email@example.com"
+  # Optional: URL to your public GPG key
+  key: "https://keys.example.com/your-key.gpg"
+  # (Optional) Website of the maintainer
+  website: "https://maintainer.com"
+# Optional: if the package author is different
+author:
+  name: "Original Author"
+  key: "https://keys.example.com/author-key.gpg"
 license: MIT
 ```
 
 - `name`: The unique identifier for your package.
 - `version`: The current version of the software.
 - `description`: A short, one-sentence summary of what the package does.
-- `maintainer`: Your name and email.
+- `maintainer`: Your name, website and email.
 - `license`: The software's license (e.g. `MIT`, `GPL-3.0-or-later`).
 
 It's also highly recommended to add:
@@ -146,6 +154,40 @@ installation:
        #     # Hex digest or URL to a file containing the digest
        #     checksum: "<hex-digest-or-url>"
 ```
+
+### Security: Signatures
+
+For an even higher level of security, you can add GPG signature verification. This ensures that the package was published by a trusted developer.
+
+This requires two parts:
+
+1.  **Provide a GPG Key:** Add a `key` field to the `maintainer` or `author` sections. The value should be a URL pointing to the public GPG key.
+
+    ```yaml
+    maintainer:
+      name: "Your Name"
+      email: "your.email@example.com"
+      key: "https://keys.example.com/your-key.gpg"
+
+    author:
+      name: "Original Author"
+      key: "https://keys.example.com/author-key.gpg"
+    ```
+
+2.  **Add Signature Information:** In the `installation` method, add a `sigs` list. Each item specifies a file and a URL to its corresponding `.sig` file.
+
+    ```yaml
+    installation:
+      - type: binary
+        url: "..."
+        platforms: ["..."]
+        # ... checksums ...
+        sigs:
+          - file: "my-cli-{platform}" # The file to verify
+            sig: "https://github.com/user/my-cli/releases/download/v{version}/my-cli-{platform}.sig" # URL to the signature
+    ```
+
+Zoi will download the key from the URL, import it, and use it to verify the signature of the downloaded file.
 
 ## Step 3: Adding Dependencies
 

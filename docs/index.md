@@ -21,6 +21,7 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
 - **Repository-Based:** Manage packages from official or community repositories. Easily add your own.
 - **Intuitive CLI:** A simple and powerful command-line interface with helpful aliases for a better developer experience.
 - **Package Types:** Supports standard packages, meta-packages (collections), background services, and configuration file management.
+- **Secure Package Distribution:** Support for checksums and GPG signatures to verify package integrity and authenticity.
 
 ## Getting Started
 
@@ -224,7 +225,7 @@ Zoi provides a wide range of commands to manage your packages and environment. F
 | `search`    | Searches for a package by name or description. <br/>`--repo <repo>`: Filter by repository. <br/>`--type <type>`: Filter by package type.                                                  |
 | `install`   | Installs one or more packages. <br/>`--force`: Force re-installation if the package already exists. <br/>`--interactive`: Choose the installation method interactively.                   |
 | `build`     | Builds and installs one or more packages from source. <br/>`--force`: Force the package to be rebuilt.                                                                                    |
-| `uninstall` | Removes one or more packages. Also removes any of its dependencies that are no longer needed. For collections, it removes all of its dependencies. |
+| `uninstall` | Removes one or more packages. Also removes any of its dependencies that are no longer needed. For collections, it removes all of its dependencies.                                        |
 | `update`    | Updates one or more packages to the latest version.                                                                                                                                       |
 | `pin`       | Pins a package to a specific version to prevent updates.                                                                                                                                  |
 | `unpin`     | Unpins a package, allowing it to be updated again.                                                                                                                                        |
@@ -314,6 +315,17 @@ git: https://github.com/user/my-awesome-app
 maintainer:
   name: "Your Name"
   email: "your@email.com"
+  # (Optional) URL to the maintainer's public GPG key for signature verification.
+  key: "https://example.com/maintainer.gpg"
+  # (Optional) Website of the maintainer
+  website: "https://maintainer.com"
+# (Optional) Information about the original author, if different from the maintainer.
+author:
+  name: "Author Name"
+  email: "author@email.com"
+  website: "https://author.com"
+  # (Optional) URL to the author's public GPG key for signature verification.
+  key: "https://example.com/author.gpg"
 # (Optional) The license of the package.
 license: MIT
 # (Optional) The installation scope. Can be 'user' (default) or 'system'.
@@ -348,6 +360,11 @@ installation:
       # list:
       #   - file: "my-awesome-app-zip"
       #     checksum: "<hex-digest-or-url>"
+    # (Optional) GPG signature verification for the downloaded file.
+    # Zoi will use the 'key' from the 'maintainer' or 'author' fields.
+    sigs:
+      - file: "my-awesome-app-{platform}"
+        sig: "https://github.com/user/my-awesome-app/releases/download/v{version}/my-awesome-app-{platform}.sig"
 
 # (Optional) Dependencies required by the package.
 dependencies:
@@ -399,42 +416,43 @@ Zoi can manage dependencies from a wide variety of external package managers. Yo
 
 The format for a dependency is `manager:package-name`. For optional dependencies, you can add a description like so: `manager:package-name:description`.
 
-| Manager          | Ecosystem / OS                  | Example                               |
-| ---------------- | ------------------------------- | ------------------------------------- |
-| `zoi`            | Zoi                             | `zoi:my-other-package`                |
-| `native`         | System's native package manager | `native:openssl`                      |
-| `apt`, `apt-get` | Debian, Ubuntu, etc.            | `apt:libssl-dev`                      |
-| `pacman`         | Arch Linux                      | `pacman:base-devel`                   |
-| `yay`, `paru`    | Arch Linux (AUR)                | `yay:google-chrome`                   |
-| `aur`            | Arch Linux (AUR)                | `aur:visual-studio-code-bin`          |
-| `dnf`, `yum`     | Fedora, CentOS, RHEL            | `dnf:openssl-devel`                   |
-| `zypper`         | openSUSE                        | `zypper:libopenssl-devel`             |
-| `apk`            | Alpine Linux                    | `apk:git`                             |
-| `portage`        | Gentoo                          | `portage:dev-libs/openssl`            |
-| `brew`           | macOS (Homebrew)                | `brew:node`                           |
-| `macports`       | macOS (MacPorts)                | `macports:git`                        |
-| `scoop`          | Windows                         | `scoop:git`                           |
-| `choco`          | Windows (Chocolatey)            | `choco:git`                           |
-| `winget`         | Windows                         | `winget:Git.Git`                      |
-| `snap`           | Linux (Snapcraft)               | `snap:node`                           |
-| `flatpak`        | Linux (Flathub)                 | `flatpak:org.gimp.GIMP`               |
-| `pkg`            | FreeBSD                         | `pkg:git`                             |
-| `pkg_add`        | OpenBSD                         | `pkg_add:git`                         |
-| `cargo`          | Rust                            | `cargo:ripgrep`                       |
-| `cargo-binstall` | Rust (pre-compiled binaries)    | `cargo-binstall:ripgrep`              |
-| `go`             | Go                              | `go:golang.org/x/tools/cmd/goimports` |
-| `npm`            | Node.js                         | `npm:typescript`                      |
-| `yarn`           | Node.js                         | `yarn:react`                          |
-| `pnpm`           | Node.js                         | `pnpm:vite`                           |
-| `bun`            | Bun                             | `bun:elysia`                          |
-| `jsr`            | JavaScript Registry             | `jsr:@std/http`                       |
-| `pip`            | Python                          | `pip:requests`                        |
-| `pipx`           | Python                          | `pipx:black`                          |
-| `conda`          | Conda                           | `conda:numpy`                         |
-| `gem`            | Ruby                            | `gem:rails`                           |
-| `composer`       | PHP                             | `composer:laravel/installer`          |
-| `dotnet`         | .NET                            | `dotnet:csharp-ls`                    |
-| `nix`            | NixOS / Nix                     | `nix:nixpkgs.hello`                   |
+| Manager          | Ecosystem / OS                  | Example                                   |
+| ---------------- | ------------------------------- | ----------------------------------------- |
+| `zoi`            | Zoi                             | `zoi:my-other-package`                    |
+| `native`         | System's native package manager | `native:openssl`                          |
+| `apt`, `apt-get` | Debian, Ubuntu, etc.            | `apt:libssl-dev`                          |
+| `pacman`         | Arch Linux                      | `pacman:base-devel`                       |
+| `yay`, `paru`    | Arch Linux (AUR)                | `yay:google-chrome`                       |
+| `aur`            | Arch Linux (AUR)                | `aur:visual-studio-code-bin`              |
+| `dnf`, `yum`     | Fedora, CentOS, RHEL            | `dnf:openssl-devel`                       |
+| `zypper`         | openSUSE                        | `zypper:libopenssl-devel`                 |
+| `apk`            | Alpine Linux                    | `apk:git`                                 |
+| `portage`        | Gentoo                          | `portage:dev-libs/openssl`                |
+| `brew`           | macOS (Homebrew)                | `brew:node`                               |
+| `macports`       | macOS (MacPorts)                | `macports:git`                            |
+| `scoop`          | Windows                         | `scoop:git`                               |
+| `choco`          | Windows (Chocolatey)            | `choco:git`                               |
+| `winget`         | Windows                         | `winget:Git.Git`                          |
+| `snap`           | Linux (Snapcraft)               | `snap:node`                               |
+| `flatpak`        | Linux (Flathub)                 | `flatpak:org.gimp.GIMP`                   |
+| `pkg`            | FreeBSD                         | `pkg:git`                                 |
+| `pkg_add`        | OpenBSD                         | `pkg_add:git`                             |
+| `cargo`          | Rust                            | `cargo:ripgrep`                           |
+| `cargo-binstall` | Rust (pre-compiled binaries)    | `cargo-binstall:ripgrep`                  |
+| `go`             | Go                              | `go:golang.org/x/tools/cmd/goimports`     |
+| `npm`            | Node.js                         | `npm:typescript`                          |
+| `yarn`           | Node.js                         | `yarn:react`                              |
+| `pnpm`           | Node.js                         | `pnpm:vite`                               |
+| `bun`            | Bun                             | `bun:elysia`                              |
+| `deno`           | Deno                            | `deno:npm:chalk` or `deno:jsr:@std/bytes` |
+| `jsr`            | JavaScript Registry             | `jsr:@std/http`                           |
+| `pip`            | Python                          | `pip:requests`                            |
+| `pipx`           | Python                          | `pipx:black`                              |
+| `conda`          | Conda                           | `conda:numpy`                             |
+| `gem`            | Ruby                            | `gem:rails`                               |
+| `composer`       | PHP                             | `composer:laravel/installer`              |
+| `dotnet`         | .NET                            | `dotnet:csharp-ls`                        |
+| `nix`            | NixOS / Nix                     | `nix:nixpkgs.hello`                       |
 
 ## FAQ
 
