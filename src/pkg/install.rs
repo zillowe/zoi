@@ -4,6 +4,7 @@ use chrono::Utc;
 use colored::*;
 use dialoguer::{Select, theme::ColorfulTheme};
 use flate2::read::GzDecoder;
+use gpgme::{Context, Data, Protocol, SignatureSummary};
 use indicatif::{ProgressBar, ProgressStyle};
 use sha2::{Digest, Sha256, Sha512};
 use std::collections::HashSet;
@@ -562,6 +563,97 @@ fn verify_checksum(
     }
 }
 
+fn verify_signatures(
+    data: &[u8],
+    method: &types::InstallationMethod,
+    pkg: &types::Package,
+    file_to_verify: &str,
+) -> Result<(), Box<dyn Error>> {
+    if let Some(sigs) = &method.sigs {
+        let sig_info = sigs.iter().find(|s| {
+            let platform = utils::get_platform().unwrap_or_default();
+            let version = pkg.version.as_deref().unwrap_or("");
+            let file_pattern = s
+                .file
+                .replace("{version}", version)
+                .replace("{name}", &pkg.name)
+                .replace("{platform}", &platform);
+            file_pattern == file_to_verify
+        });
+
+        if let Some(sig_info) = sig_info {
+            println!("Verifying signature for {}...", file_to_verify);
+
+            let keys = [
+                pkg.maintainer.key.as_deref(),
+                pkg.author.as_ref().and_then(|a| a.key.as_deref()),
+            ]
+            .iter()
+            .filter_map(|&k| k)
+            .collect::<Vec<_>>();
+
+            if keys.is_empty() {
+                println!(
+                    "{} Signature found for '{}', but no maintainer or author key is defined. Skipping verification.",
+                    "Warning:".yellow(),
+                    file_to_verify
+                );
+                return Ok(());
+            }
+
+            let temp_gpg_dir = Builder::new().prefix("zoi-gpg").tempdir()?;
+            let mut ctx = Context::from_protocol(Protocol::OpenPgp)?;
+            ctx.set_engine_home_dir(
+                temp_gpg_dir
+                    .path()
+                    .to_str()
+                    .ok_or("Temporary GPG directory path is not valid UTF-8")?,
+            )?;
+
+            for key_source in &keys {
+                if key_source.starts_with("http://") || key_source.starts_with("https://") {
+                    println!("Importing key from URL: {}", key_source);
+                    let key_bytes = reqwest::blocking::get(*key_source)?.bytes()?;
+                    let mut key_data = Data::from_bytes(&key_bytes)?;
+                    ctx.import(&mut key_data)?;
+                } else {
+                    println!(
+                        "{} Key source '{}' is not a URL. Skipping.",
+                        "Warning:".yellow(),
+                        key_source
+                    );
+                }
+            }
+
+            println!("Downloading signature from: {}", sig_info.sig);
+            let sig_bytes = reqwest::blocking::get(&sig_info.sig)?.bytes()?;
+            let mut sig_data = Data::from_bytes(&sig_bytes)?;
+            let mut text_data = Data::from_bytes(data)?;
+
+            let verification_result = ctx.verify_detached(&mut sig_data, &mut text_data);
+
+            match verification_result {
+                Ok(verification) => {
+                    if verification
+                        .signatures()
+                        .any(|s| s.summary().contains(SignatureSummary::VALID))
+                    {
+                        println!("{}", "Signature verified successfully.".green());
+                        Ok(())
+                    } else {
+                        Err("Signature is not valid.".into())
+                    }
+                }
+                Err(e) => Err(format!("Signature verification failed: {}", e).into()),
+            }
+        } else {
+            Ok(())
+        }
+    } else {
+        Ok(())
+    }
+}
+
 fn handle_com_binary_install(
     method: &types::InstallationMethod,
     pkg: &types::Package,
@@ -611,6 +703,7 @@ fn handle_com_binary_install(
 
     let file_to_verify = get_filename_from_url(&url);
     verify_checksum(&downloaded_bytes, method, pkg, file_to_verify)?;
+    verify_signatures(&downloaded_bytes, method, pkg, file_to_verify)?;
 
     let temp_dir = Builder::new().prefix("zoi-com-binary").tempdir()?;
 
@@ -760,6 +853,7 @@ fn handle_binary_install(
 
     let file_to_verify = get_filename_from_url(&url);
     verify_checksum(&downloaded_bytes, method, pkg, file_to_verify)?;
+    verify_signatures(&downloaded_bytes, method, pkg, file_to_verify)?;
 
     let store_dir = home::home_dir()
         .ok_or("No home dir")?
@@ -837,6 +931,7 @@ fn handle_script_install(
 
     let file_to_verify = get_filename_from_url(&resolved_url);
     verify_checksum(&script_bytes, method, pkg, file_to_verify)?;
+    verify_signatures(&script_bytes, method, pkg, file_to_verify)?;
 
     fs::write(&script_path, script_bytes)?;
     println!("Script downloaded to temporary location.");

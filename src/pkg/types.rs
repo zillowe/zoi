@@ -64,6 +64,7 @@ pub struct Package {
     #[serde(default)]
     pub git: String,
     pub maintainer: Maintainer,
+    pub author: Option<Author>,
     #[serde(default)]
     pub license: String,
     #[serde(default)]
@@ -92,6 +93,24 @@ pub struct Package {
 pub struct Maintainer {
     pub name: String,
     pub email: String,
+    pub website: Option<String>,
+    pub key: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)]
+pub struct Author {
+    pub name: String,
+    pub email: Option<String>,
+    pub website: Option<String>,
+    pub key: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[allow(dead_code)]
+pub struct Signature {
+    pub file: String,
+    pub sig: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -127,6 +146,7 @@ pub struct InstallationMethod {
     #[serde(rename = "platformComExt")]
     pub platform_com_ext: Option<HashMap<String, String>>,
     pub checksums: Option<Checksums>,
+    pub sigs: Option<Vec<Signature>>,
 }
 
 #[derive(Debug, Deserialize, Clone)]

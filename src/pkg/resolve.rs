@@ -312,7 +312,9 @@ pub fn resolve_package_and_version(
 
     let content = fs::read_to_string(&resolved_source.path)?;
     let mut pkg: types::Package = serde_yaml::from_str(&content)?;
-    pkg.repo = resolved_source.repo_name.clone().unwrap_or_default();
+    if let Some(repo_name) = resolved_source.repo_name.clone() {
+        pkg.repo = repo_name;
+    }
 
     let version_string = get_version_for_install(&pkg, &request.version_spec)?;
 

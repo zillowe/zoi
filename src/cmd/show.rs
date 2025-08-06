@@ -12,7 +12,9 @@ pub fn run(source: &str, raw: bool) {
                 return;
             }
             let mut pkg: Package = serde_yaml::from_str(&content).unwrap();
-            pkg.repo = resolved_source.repo_name.unwrap_or_default();
+            if let Some(repo_name) = resolved_source.repo_name {
+                pkg.repo = repo_name;
+            }
             pkg.version =
                 Some(resolve::get_default_version(&pkg).unwrap_or_else(|_| "N/A".to_string()));
             print_beautiful(&pkg);
@@ -29,22 +31,44 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
         pkg.repo
     );
     if let Some(website) = &pkg.website {
-        println!("Website");
-        println!("{}", website.cyan().underline());
+        println!("Website: {}", website.cyan().underline());
     }
     if !pkg.git.is_empty() {
-        println!("Git Repo");
-        println!("{}", pkg.git.cyan().underline());
+        println!("Git Repo: {}", pkg.git.cyan().underline());
     }
     println!("\n{}\n", pkg.description);
 
     println!("{}: {}", "License".bold(), pkg.license);
-    println!(
+
+    // Maintainer
+    let mut maintainer_line = format!(
         "{}: {} <{}>",
         "Maintainer".bold(),
         pkg.maintainer.name,
         pkg.maintainer.email
     );
+    if let Some(website) = &pkg.maintainer.website {
+        maintainer_line.push_str(&format!(" - {}", website.cyan().underline()));
+    }
+    if pkg.maintainer.key.is_some() {
+        maintainer_line.push_str(&format!(" {}", "(Has Key)".dimmed()));
+    }
+    println!("{}", maintainer_line);
+
+    // Author
+    if let Some(author) = &pkg.author {
+        let mut author_line = format!("{}: {}", "Author".bold(), author.name);
+        if let Some(email) = &author.email {
+            author_line.push_str(&format!(" <{}>", email));
+        }
+        if let Some(website) = &author.website {
+            author_line.push_str(&format!(" - {}", website.cyan().underline()));
+        }
+        if author.key.is_some() {
+            author_line.push_str(&format!(" {}", "(Has Key)".dimmed()));
+        }
+        println!("{}", author_line);
+    }
 
     let type_display = match pkg.package_type {
         crate::pkg::types::PackageType::Package => "Package",
@@ -75,12 +99,12 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
                 }
             };
 
-            let platforms_str = if method.platforms.is_empty()
+            let platforms_str = if method.platforms.is_empty() 
                 || method.platforms.iter().any(|p| p == "any")
             {
                 "any".italic().to_string()
             } else {
-                let mut platform_map: std::collections::HashMap<String, Vec<String>> =
+                let mut platform_map: std::collections::HashMap<String, Vec<String>> = 
                     std::collections::HashMap::new();
                 for p in &method.platforms {
                     let parts: Vec<&str> = p.split('-').collect();
@@ -163,3 +187,4 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
         }
     }
 }
+
