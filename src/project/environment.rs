@@ -51,11 +51,14 @@ fn check_packages(config: &ProjectConfig) -> Result<(), Box<dyn Error>> {
     if config.packages.is_empty() {
         return Ok(());
     }
-    println!("\n  Checking required packages...");
+    println!("\nChecking required packages...");
     let mut all_ok = true;
     for package in &config.packages {
-        print!("    - Checking for '{}': ", package.name.cyan());
-        let status = Command::new("sh").arg("-c").arg(&package.check).output()?;
+        print!("- Checking for '{}': ", package.name.cyan());
+        let status = Command::new("bash")
+            .arg("-c")
+            .arg(&package.check)
+            .output()?;
         if status.status.success() {
             println!("{}", "OK".green());
         } else {

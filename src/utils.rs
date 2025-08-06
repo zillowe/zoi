@@ -93,7 +93,7 @@ pub fn command_exists(command: &str) -> bool {
             .status()
             .is_ok_and(|status| status.success())
     } else {
-        Command::new("sh")
+        Command::new("bash")
             .arg("-c")
             .arg(format!("command -v {}", command))
             .stdout(std::process::Stdio::null())

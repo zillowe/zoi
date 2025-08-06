@@ -19,9 +19,9 @@ pub fn run_install_commands(pkg: &types::Package) -> Result<(), Box<dyn Error>> 
             for cmd_str in &method.install {
                 println!("Executing: {}", cmd_str.cyan());
                 let output = if cfg!(target_os = "windows") {
-                    Command::new("cmd").arg("/C").arg(cmd_str).output()?
+                    Command::new("pwsh").arg("-Command").arg(cmd_str).output()?
                 } else {
-                    Command::new("sh").arg("-c").arg(cmd_str).output()?
+                    Command::new("bash").arg("-c").arg(cmd_str).output()?
                 };
 
                 if !output.status.success() {
@@ -67,9 +67,9 @@ pub fn run_uninstall_commands(pkg: &types::Package) -> Result<(), Box<dyn Error>
                 for cmd_str in uninstall_commands {
                     println!("Executing: {}", cmd_str.cyan());
                     let output = if cfg!(target_os = "windows") {
-                        Command::new("cmd").arg("/C").arg(cmd_str).output()?
+                        Command::new("pwsh").arg("-Command").arg(cmd_str).output()?
                     } else {
-                        Command::new("sh").arg("-c").arg(cmd_str).output()?
+                        Command::new("bash").arg("-c").arg(cmd_str).output()?
                     };
 
                     if !output.status.success() {

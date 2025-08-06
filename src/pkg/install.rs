@@ -307,9 +307,12 @@ fn run_post_install_hooks(pkg: &types::Package) -> Result<(), Box<dyn Error>> {
                     pb.set_message(format!("Running: {}", final_cmd));
 
                     let output = if cfg!(target_os = "windows") {
-                        Command::new("cmd").arg("/C").arg(&final_cmd).output()?
+                        Command::new("pwsh")
+                            .arg("-Command")
+                            .arg(&final_cmd)
+                            .output()?
                     } else {
-                        Command::new("sh").arg("-c").arg(&final_cmd).output()?
+                        Command::new("bash").arg("-c").arg(&final_cmd).output()?
                     };
 
                     pb.finish_and_clear();
@@ -862,7 +865,7 @@ fn handle_script_install(
             .arg(&script_path);
         cmd
     } else {
-        let mut cmd = Command::new("sh");
+        let mut cmd = Command::new("bash");
         cmd.arg(&script_path);
         cmd
     };
@@ -930,7 +933,7 @@ fn handle_source_install(
             );
             pb_cmd.set_message(format!("Running: {}", final_cmd));
 
-            let output = std::process::Command::new("sh")
+            let output = std::process::Command::new("bash")
                 .arg("-c")
                 .arg(&final_cmd)
                 .current_dir(&git_path)

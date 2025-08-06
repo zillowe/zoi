@@ -52,9 +52,12 @@ fn run_post_uninstall_hooks(pkg: &types::Package) -> Result<(), Box<dyn Error>> 
                     pb.set_message(format!("Running: {}", final_cmd));
 
                     let output = if cfg!(target_os = "windows") {
-                        Command::new("cmd").arg("/C").arg(&final_cmd).output()?
+                        Command::new("pwsh")
+                            .arg("-Command")
+                            .arg(&final_cmd)
+                            .output()?
                     } else {
-                        Command::new("sh").arg("-c").arg(&final_cmd).output()?
+                        Command::new("bash").arg("-c").arg(&final_cmd).output()?
                     };
 
                     pb.finish_and_clear();
