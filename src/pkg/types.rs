@@ -81,6 +81,10 @@ pub struct Package {
     pub post_install: Option<Vec<PostInstallHook>>,
     #[serde(default)]
     pub post_uninstall: Option<Vec<PostInstallHook>>,
+    #[serde(default)]
+    pub bins: Option<Vec<String>>,
+    #[serde(default)]
+    pub conflicts: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -181,6 +185,8 @@ pub struct InstallManifest {
     pub installed_at: String,
     pub reason: InstallReason,
     pub scope: Scope,
+    #[serde(default)]
+    pub bins: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

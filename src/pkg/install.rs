@@ -36,6 +36,8 @@ pub fn run_installation(
 ) -> Result<(), Box<dyn Error>> {
     let (pkg, version) = resolve::resolve_package_and_version(source)?;
 
+    check_for_conflicts(&pkg, yes)?;
+
     if pkg.scope == types::Scope::System {
         if !utils::is_admin() {
             return Err("System-wide installation requires administrative privileges. Please run with sudo or as an administrator.".into());
@@ -131,18 +133,6 @@ pub fn run_installation(
             }
             return Ok(());
         }
-        if utils::command_exists(&pkg.name) {
-            println!(
-                "Warning: Command '{}' exists but was not installed by Zoi.",
-                pkg.name.yellow()
-            );
-            if !utils::ask_for_confirmation(
-                "Do you want to continue and potentially overwrite it?",
-                yes,
-            ) {
-                return Ok(());
-            }
-        }
     }
 
     println!("Installing '{}' version '{}'", pkg.name, version);
@@ -222,6 +212,75 @@ pub fn run_installation(
     }
 
     result
+}
+
+fn check_for_conflicts(pkg: &types::Package, yes: bool) -> Result<(), Box<dyn Error>> {
+    let installed_packages = local::get_installed_packages()?;
+
+    if pkg.conflicts.is_some() || pkg.bins.is_some() {
+        let mut conflict_messages = Vec::new();
+
+        if let Some(conflicts_with) = &pkg.conflicts {
+            for conflict_pkg_name in conflicts_with {
+                if installed_packages
+                    .iter()
+                    .any(|p| &p.name == conflict_pkg_name)
+                {
+                    conflict_messages.push(format!(
+                        "Package '{}' conflicts with installed package '{}'.",
+                        pkg.name.cyan(),
+                        conflict_pkg_name.cyan()
+                    ));
+                }
+            }
+        }
+
+        if let Some(bins_provided) = &pkg.bins {
+            for bin in bins_provided {
+                for installed_pkg in &installed_packages {
+                    if let Some(installed_bins) = &installed_pkg.bins {
+                        if installed_bins.contains(bin) {
+                            conflict_messages.push(format!(
+                                "Binary '{}' provided by '{}' is already provided by installed package '{}'.",
+                                bin.cyan(),
+                                pkg.name.cyan(),
+                                installed_pkg.name.cyan()
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+
+        if !conflict_messages.is_empty() {
+            println!("{}", "Conflict Detected:".red().bold());
+            for msg in conflict_messages {
+                println!("- {}", msg);
+            }
+            if !utils::ask_for_confirmation(
+                "Do you want to continue with the installation anyway?",
+                yes,
+            ) {
+                return Err("Operation aborted by user due to conflicts.".into());
+            }
+        }
+        return Ok(());
+    }
+
+    if utils::command_exists(&pkg.name) {
+        println!(
+            "Warning: Command '{}' exists but was not installed by Zoi.",
+            pkg.name.yellow()
+        );
+        if !utils::ask_for_confirmation(
+            "Do you want to continue and potentially overwrite it?",
+            yes,
+        ) {
+            return Err("Operation aborted by user.".into());
+        }
+    }
+
+    Ok(())
 }
 
 fn run_post_install_hooks(pkg: &types::Package) -> Result<(), Box<dyn Error>> {
@@ -392,6 +451,7 @@ fn write_manifest(
         installed_at: Utc::now().to_rfc3339(),
         reason,
         scope: pkg.scope,
+        bins: pkg.bins.clone(),
     };
     local::write_manifest(&manifest)
 }
