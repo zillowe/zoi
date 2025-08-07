@@ -41,8 +41,8 @@ for target in "${TARGETS[@]}"; do
     OPENSSL_ENV=""
     if [[ "$target" == "aarch64-unknown-linux-gnu" ]]; then
       LINKER_ENV="CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc"
-      OPENSSL_ENV="PKG_CONFIG_ALLOW_CROSS=1 PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig"
-
+      OPENSSL_ENV="PKG_CONFIG_ALLOW_CROSS=1 PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH"
+      export RUSTFLAGS="-L /usr/lib/aarch64-linux-gnu $RUSTFLAGS"
     elif [[ "$target" == "x86_64-pc-windows-gnu" ]]; then
       LINKER_ENV="CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc"
     fi
