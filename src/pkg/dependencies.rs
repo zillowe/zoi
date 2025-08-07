@@ -709,10 +709,14 @@ pub fn resolve_and_install_optional(
     for (i, dep_str) in deps.iter().enumerate() {
         let dep = parse_dependency_string(dep_str)?;
         let desc = dep.description.unwrap_or("No description");
+        let mut dep_display = format!("{}:{}", dep.manager, dep.package);
+        if let Some(req) = &dep.req {
+            dep_display.push_str(&req.to_string());
+        }
         println!(
             "  {}. {} - {}",
             (i + 1).to_string().cyan(),
-            dep_str.bold(),
+            dep_display.bold(),
             desc.italic()
         );
         parsed_deps.push(dep);
