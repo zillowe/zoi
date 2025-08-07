@@ -24,12 +24,12 @@ conflicts:
 installation:
   - type: com_binary
     url: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/{version}/downloads/zoi-{platform}.{platformComExt}
-    platforms: [linux, macos, windows-amd64]
+    platforms: [linux-amd64, macos, windows-amd64]
     checksums: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/{version}/downloads/checksums.txt
 
   - type: script
     url: "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.{platformExt}"
-    platforms: [linux, macos, windows-amd64]
+    platforms: [linux-amd64, macos, windows-amd64]
     checksums: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/checksums.txt
 
   - type: source
@@ -48,7 +48,7 @@ post_install:
       - "{name} generate-completions bash > ~/.local/share/bash-completion/completions/{name} || true"
       - "{name} generate-completions zsh > ~/.zsh/completions/_{name} || true"
       - "{name} generate-completions fish > ~/.config/fish/completions/{name}.fish || true"
-  - platforms: [windows-amd64]
+  - platforms: [windows]
     commands:
       - "echo Installing PowerShell profile completions for {name} {version}"
       - "powershell -NoProfile -Command \"$p=\"$env:USERPROFILE\\Documents\\PowerShell\"; if(!(Test-Path $p)){New-Item -ItemType Directory -Path $p|Out-Null}; {name}.exe generate-completions powershell >> \"$p\\Microsoft.PowerShell_profile.ps1\"\""

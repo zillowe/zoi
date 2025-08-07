@@ -12,7 +12,7 @@ COMMIT=$(git rev-parse --short=10 HEAD 2>/dev/null || echo "dev")
 
 TARGETS=(
   "x86_64-unknown-linux-gnu"  
-  "aarch64-unknown-linux-gnu"
+  # "aarch64-unknown-linux-gnu"
   "x86_64-pc-windows-gnu"
 )
 
@@ -28,7 +28,7 @@ mkdir -p "$OUTPUT_DIR"
 for target in "${TARGETS[@]}"; do
   case "$target" in
     x86_64-unknown-linux-gnu)  NAME="zoi-linux-amd64" ;;
-    aarch64-unknown-linux-gnu) NAME="zoi-linux-arm64" ;;
+    # aarch64-unknown-linux-gnu) NAME="zoi-linux-arm64" ;;
     x86_64-pc-windows-gnu)     NAME="zoi-windows-amd64.exe" ;;
     *)                         NAME="zoi-$target" ;;
   esac
