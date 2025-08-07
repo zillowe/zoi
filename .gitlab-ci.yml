@@ -32,6 +32,9 @@ build:linux:
     - dpkg --add-architecture arm64
     - dpkg --add-architecture armhf
     - apt-get update -y && apt-get install -y build-essential gcc gcc-aarch64-linux-gnu libssl-dev libssl-dev:arm64 openssl libssl-dev:armhf gcc-mingw-w64-x86-64 liblzma-dev:arm64 clang llvm pkg-config nettle-dev nettle-dev:arm64 libgmp-dev libgmp-dev:arm64 libnettle8:arm64
+    - export PKG_CONFIG_ALLOW_CROSS=1
+    - export PKG_CONFIG_PATH_x86_64_pc_windows_gnu="/usr/x86_64-w64-mingw32/lib/pkgconfig"
+    - export PKG_CONFIG_x86_64_pc_windows_gnu="x86_64-w64-mingw32-pkg-config"
   script:
     - echo "Building Linux (amd64, arm64) and Windows (amd64) targets..."
     - chmod +x ./build/build-linux.sh

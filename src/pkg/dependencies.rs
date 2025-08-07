@@ -68,7 +68,7 @@ pub fn get_dependents(dependency: &str) -> Result<Vec<String>, Box<dyn Error>> {
     Ok(graph.get(dependency).cloned().unwrap_or_default())
 }
 
-fn parse_dependency_string(dep_str: &str) -> Result<Dependency, Box<dyn Error>> {
+fn parse_dependency_string(dep_str: &str) -> Result<Dependency<'_>, Box<dyn Error>> {
     let (manager, rest) = dep_str.split_once(':').unwrap_or(("zoi", dep_str));
 
     let (package_and_version, description) = if manager != "go" {
