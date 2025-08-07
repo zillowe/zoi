@@ -161,16 +161,18 @@ For an even higher level of security, you can add GPG signature verification. Th
 
 This requires two parts:
 
-1.  **Provide a GPG Key:** Add a `key` field to the `maintainer` or `author` sections. The value should be a URL pointing to the public GPG key.
+1.  **Provide a GPG Key:** Add a `key` field to the `maintainer` or `author` sections. The value can be a URL pointing to the public GPG key, or the key's 40-character fingerprint. Zoi will fetch fingerprints from `keys.openpgp.org`.
 
     ```yaml
     maintainer:
       name: "Your Name"
       email: "your.email@example.com"
-      key: "https://keys.example.com/your-key.gpg"
+      # Can be a URL to the key, or the key's fingerprint
+      key: "DEADC0DEDEADBEEFDEADC0DEDEADBEEFDEADC0DE"
 
     author:
       name: "Original Author"
+      # A URL is also valid
       key: "https://keys.example.com/author-key.gpg"
     ```
 

@@ -20,13 +20,14 @@ git: https://github.com/user/my-cli
 maintainer:
   name: "Your Name"
   email: "your.email@example.com"
-  # URL to the maintainer's public GPG key.
-  key: "https://keys.example.com/your-name.gpg"
+  # URL to the maintainer's public GPG key, or the key's 40-character fingerprint.
+  key: "DEADC0DEDEADBEEFDEADC0DEDEADBEEFDEADC0DE"
   # (Optional) Website of the maintainer
   website: "https://maintainer.com"
 # If the author is different from the maintainer.
 author:
   name: "Original Author"
+  # A URL is also valid.
   key: "https://keys.example.com/author.gpg"
 license: MIT
 

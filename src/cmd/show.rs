@@ -40,7 +40,6 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
 
     println!("{}: {}", "License".bold(), pkg.license);
 
-    // Maintainer
     let mut maintainer_line = format!(
         "{}: {} <{}>",
         "Maintainer".bold(),
@@ -55,7 +54,6 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
     }
     println!("{}", maintainer_line);
 
-    // Author
     if let Some(author) = &pkg.author {
         let mut author_line = format!("{}: {}", "Author".bold(), author.name);
         if let Some(email) = &author.email {
@@ -99,12 +97,12 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
                 }
             };
 
-            let platforms_str = if method.platforms.is_empty() 
+            let platforms_str = if method.platforms.is_empty()
                 || method.platforms.iter().any(|p| p == "any")
             {
                 "any".italic().to_string()
             } else {
-                let mut platform_map: std::collections::HashMap<String, Vec<String>> = 
+                let mut platform_map: std::collections::HashMap<String, Vec<String>> =
                     std::collections::HashMap::new();
                 for p in &method.platforms {
                     let parts: Vec<&str> = p.split('-').collect();
@@ -187,4 +185,3 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
         }
     }
 }
-

@@ -315,8 +315,8 @@ git: https://github.com/user/my-awesome-app
 maintainer:
   name: "Your Name"
   email: "your@email.com"
-  # (Optional) URL to the maintainer's public GPG key for signature verification.
-  key: "https://example.com/maintainer.gpg"
+  # (Optional) URL to the maintainer's public GPG key or the 40-character fingerprint.
+  key: "DEADC0DEDEADBEEFDEADC0DEDEADBEEFDEADC0DE"
   # (Optional) Website of the maintainer
   website: "https://maintainer.com"
 # (Optional) Information about the original author, if different from the maintainer.
@@ -324,7 +324,7 @@ author:
   name: "Author Name"
   email: "author@email.com"
   website: "https://author.com"
-  # (Optional) URL to the author's public GPG key for signature verification.
+  # (Optional) URL to the author's public GPG key or the 40-character fingerprint.
   key: "https://example.com/author.gpg"
 # (Optional) The license of the package.
 license: MIT
