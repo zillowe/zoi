@@ -187,7 +187,7 @@ What platforms we currently support.
 | OS      | Arch  | Zoi Binary | Packages Support |
 | ------- | ----- | ---------- | ---------------- |
 | Linux   | amd64 | ✔️         | ✔️               |
-| Linux   | arm64 | ✔️         | ✔️               |
+| Linux   | arm64 | ❌         | ✔️               |
 | macOS   | amd64 | ✔️         | ✔️               |
 | macOS   | arm64 | ✔️         | ✔️               |
 | Windows | amd64 | ✔️         | ✔️               |
