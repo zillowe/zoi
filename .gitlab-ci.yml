@@ -31,7 +31,8 @@ build:linux:
   before_script:
     - dpkg --add-architecture arm64
     - dpkg --add-architecture armhf
-    - apt-get update -y && apt-get install -y build-essential gcc gcc-aarch64-linux-gnu libssl-dev libssl-dev:arm64 openssl libssl-dev:armhf gcc-mingw-w64-x86-64 liblzma-dev:arm64 clang llvm pkg-config nettle-dev nettle-dev:arm64 libgmp-dev libgmp-dev:arm64 libnettle8:arm64
+    - apt-get update -y
+    - apt-get install -y build-essential gcc gcc-aarch64-linux-gnu libssl-dev libssl-dev:arm64 openssl libssl-dev:armhf gcc-mingw-w64-x86-64 liblzma-dev:arm64 clang llvm pkg-config nettle-dev nettle-dev:arm64 libgmp-dev libgmp-dev:arm64 libnettle8:arm64 mingw-w64-x86_64-pkg-config
     - export PKG_CONFIG_ALLOW_CROSS=1
     - export PKG_CONFIG_PATH_x86_64_pc_windows_gnu="/usr/x86_64-w64-mingw32/lib/pkgconfig"
     - export PKG_CONFIG_x86_64_pc_windows_gnu="x86_64-w64-mingw32-pkg-config"
@@ -56,7 +57,7 @@ build:macos:
     - source ~/.cargo/env
     - export HOMEBREW_NO_AUTO_UPDATE=1
     - export HOMEBREW_NO_INSTALL_CLEANUP=1
-    - brew install gmp nettle pkg-config
+    - brew install gmp nettle pkg-config clang llvm
     - export PKG_CONFIG_ALLOW_CROSS=1
     - export PKG_CONFIG_PATH="/opt/homebrew/lib/pkgconfig:$PKG_CONFIG_PATH"
     - export LIBRARY_PATH="/opt/homebrew/lib:$LIBRARY_PATH"
