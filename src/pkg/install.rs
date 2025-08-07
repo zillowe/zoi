@@ -654,19 +654,35 @@ fn verify_signatures(
             rt.block_on(async {
                 let mut certs = Vec::new();
                 for key_source in &keys {
-                    if key_source.starts_with("http") {
-                        println!("Importing key from URL: {}", key_source);
-                        let key_bytes = reqwest::get(*key_source).await?.bytes().await?;
-                        if let Ok(cert) = Cert::from_bytes(&key_bytes) {
-                            certs.push(cert);
-                        } else {
-                            println!("Failed to parse cert from {}", key_source);
+                    let key_bytes_result = if key_source.starts_with("http") {
+                        println!("Importing key from URL: {}", key_source.cyan());
+                        reqwest::get(*key_source).await?.bytes().await
+                    } else if key_source.len() == 40 && key_source.chars().all(|c| c.is_ascii_hexdigit()) {
+                        let fingerprint = key_source.to_uppercase();
+                        let key_server_url = format!("https://keys.openpgp.org/vks/v1/by-fingerprint/{}", fingerprint);
+                        println!("Importing key for fingerprint {} from keyserver...", fingerprint.cyan());
+                        reqwest::get(&key_server_url).await?.bytes().await
+                    } else {
+                        println!("{} Invalid key source: '{}'. Must be a URL or a 40-character GPG fingerprint.", "Warning:".yellow(), key_source);
+                        continue;
+                    };
+
+                    match key_bytes_result {
+                        Ok(key_bytes) => {
+                            if let Ok(cert) = Cert::from_bytes(&key_bytes) {
+                                certs.push(cert);
+                            } else {
+                                println!("{} Failed to parse certificate from source: {}", "Warning:".yellow(), key_source);
+                            }
+                        },
+                        Err(e) => {
+                             println!("{} Failed to download key from source {}: {}", "Warning:".yellow(), key_source, e);
                         }
                     }
                 }
 
                 if certs.is_empty() {
-                    return Err(anyhow::anyhow!("No valid certificates found."));
+                    return Err(anyhow::anyhow!("No valid public keys found to verify signature."));
                 }
 
                 println!("Downloading signature from: {}", sig_info.sig);
