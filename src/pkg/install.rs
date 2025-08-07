@@ -1,11 +1,20 @@
 use crate::pkg::{config_handler, dependencies, local, resolve, service, types};
 use crate::utils;
+use anyhow::Result;
 use chrono::Utc;
 use colored::*;
 use dialoguer::{Select, theme::ColorfulTheme};
 use flate2::read::GzDecoder;
-use gpgme::{Context, Data, Protocol, SignatureSummary};
 use indicatif::{ProgressBar, ProgressStyle};
+use sequoia_openpgp::{
+    KeyHandle,
+    cert::Cert,
+    parse::{
+        Parse,
+        stream::{DetachedVerifierBuilder, MessageLayer, MessageStructure, VerificationHelper},
+    },
+    policy::StandardPolicy,
+};
 use sha2::{Digest, Sha256, Sha512};
 use std::collections::HashSet;
 use std::error::Error;
@@ -14,6 +23,7 @@ use std::io::{self, Cursor, Read, Write};
 use std::process::Command;
 use tar::Archive;
 use tempfile::Builder;
+use tokio::runtime::Runtime;
 use walkdir::WalkDir;
 use xz2::read::XzDecoder;
 use zip::ZipArchive;
@@ -563,6 +573,45 @@ fn verify_checksum(
     }
 }
 
+struct Helper {
+    certs: Vec<Cert>,
+}
+
+impl VerificationHelper for Helper {
+    fn get_certs(&mut self, ids: &[KeyHandle]) -> anyhow::Result<Vec<Cert>> {
+        let matching_certs: Vec<Cert> = self
+            .certs
+            .iter()
+            .filter(|cert| {
+                ids.iter().any(|id| {
+                    cert.keys().any(|key| match *id {
+                        KeyHandle::KeyID(ref keyid) => key.key().keyid() == *keyid,
+                        KeyHandle::Fingerprint(ref fp) => key.key().fingerprint() == *fp,
+                    })
+                })
+            })
+            .cloned()
+            .collect();
+        Ok(matching_certs)
+    }
+
+    fn check(&mut self, structure: MessageStructure) -> anyhow::Result<()> {
+        for layer in structure.into_iter() {
+            match layer {
+                MessageLayer::SignatureGroup { results } => {
+                    if results.iter().any(|r| r.is_ok()) {
+                        return Ok(());
+                    } else {
+                        return Err(anyhow::anyhow!("No valid signature found"));
+                    }
+                }
+                _ => return Err(anyhow::anyhow!("Unexpected message structure")),
+            }
+        }
+        Err(anyhow::anyhow!("No signature layer found"))
+    }
+}
+
 fn verify_signatures(
     data: &[u8],
     method: &types::InstallationMethod,
@@ -601,57 +650,42 @@ fn verify_signatures(
                 return Ok(());
             }
 
-            let temp_gpg_dir = Builder::new().prefix("zoi-gpg").tempdir()?;
-            let mut ctx = Context::from_protocol(Protocol::OpenPgp)?;
-            ctx.set_engine_home_dir(
-                temp_gpg_dir
-                    .path()
-                    .to_str()
-                    .ok_or("Temporary GPG directory path is not valid UTF-8")?,
-            )?;
-
-            for key_source in &keys {
-                if key_source.starts_with("http://") || key_source.starts_with("https://") {
-                    println!("Importing key from URL: {}", key_source);
-                    let key_bytes = reqwest::blocking::get(*key_source)?.bytes()?;
-                    let mut key_data = Data::from_bytes(&key_bytes)?;
-                    ctx.import(&mut key_data)?;
-                } else {
-                    println!(
-                        "{} Key source '{}' is not a URL. Skipping.",
-                        "Warning:".yellow(),
-                        key_source
-                    );
-                }
-            }
-
-            println!("Downloading signature from: {}", sig_info.sig);
-            let sig_bytes = reqwest::blocking::get(&sig_info.sig)?.bytes()?;
-            let mut sig_data = Data::from_bytes(&sig_bytes)?;
-            let mut text_data = Data::from_bytes(data)?;
-
-            let verification_result = ctx.verify_detached(&mut sig_data, &mut text_data);
-
-            match verification_result {
-                Ok(verification) => {
-                    if verification
-                        .signatures()
-                        .any(|s| s.summary().contains(SignatureSummary::VALID))
-                    {
-                        println!("{}", "Signature verified successfully.".green());
-                        Ok(())
-                    } else {
-                        Err("Signature is not valid.".into())
+            let rt = Runtime::new()?;
+            rt.block_on(async {
+                let mut certs = Vec::new();
+                for key_source in &keys {
+                    if key_source.starts_with("http") {
+                        println!("Importing key from URL: {}", key_source);
+                        let key_bytes = reqwest::get(*key_source).await?.bytes().await?;
+                        if let Ok(cert) = Cert::from_bytes(&key_bytes) {
+                            certs.push(cert);
+                        } else {
+                            println!("Failed to parse cert from {}", key_source);
+                        }
                     }
                 }
-                Err(e) => Err(format!("Signature verification failed: {}", e).into()),
-            }
-        } else {
-            Ok(())
+
+                if certs.is_empty() {
+                    return Err(anyhow::anyhow!("No valid certificates found."));
+                }
+
+                println!("Downloading signature from: {}", sig_info.sig);
+                let sig_bytes = reqwest::get(&sig_info.sig).await?.bytes().await?;
+
+                let policy = &StandardPolicy::new();
+                let helper = Helper { certs };
+
+                let mut verifier = DetachedVerifierBuilder::from_bytes(&sig_bytes)?
+                    .with_policy(policy, None, helper)?;
+
+                verifier.verify_bytes(data)?;
+
+                println!("{}", "Signature verified successfully.".green());
+                Ok(())
+            })?;
         }
-    } else {
-        Ok(())
     }
+    Ok(())
 }
 
 fn handle_com_binary_install(

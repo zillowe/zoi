@@ -13,7 +13,7 @@ check_build:
   variables:
     RUSTFLAGS: "-Dwarnings"
   before_script:
-    - apt-get update -y && apt-get install -y build-essential gcc libgpg-error-dev libgpgme-dev
+    - apt-get update -y && apt-get install -y build-essential gcc
   script:
     - echo "--- Checking build ---"
     - cargo check --verbose
@@ -29,11 +29,11 @@ build:linux:
   tags:
     - saas-linux-large-amd64
   before_script:
-    - apt-get update -y
-    - apt-get install -y build-essential gcc libssl-dev pkg-config openssl gcc-mingw-w64-x86-64 libgpg-error-dev libgpgme-dev libassuan-dev
-    - apt-get install -y libgpg-error-mingw-w64-dev libassuan-mingw-w64-dev
+    - dpkg --add-architecture arm64
+    - dpkg --add-architecture armhf
+    - apt-get update -y && apt-get install -y build-essential gcc gcc-aarch64-linux-gnu libssl-dev pkg-config libssl-dev:arm64 openssl libssl-dev:armhf gcc-mingw-w64-x86-64 liblzma-dev:arm64
   script:
-    - echo "Building Linux (amd64) and Windows (amd64) targets..."
+    - echo "Building Linux (amd64, arm64) and Windows (amd64) targets..."
     - chmod +x ./build/build-linux.sh
     - ./build/build-linux.sh
   artifacts:
@@ -51,17 +51,6 @@ build:macos:
   before_script:
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
     - source ~/.cargo/env
-    - export MACOSX_DEPLOYMENT_TARGET="11.0"
-    - export HOMEBREW_NO_AUTO_UPDATE=1
-    - brew install libgpg-error gpgme xz
-    - arch -x86_64 brew install libgpg-error gpgme xz
-    - export PKG_CONFIG_ALLOW_CROSS=1
-    - export PKG_CONFIG_PATH="/opt/homebrew/lib/pkgconfig:/usr/local/lib/pkgconfig"
-    - export LIBRARY_PATH="/opt/homebrew/lib:/usr/local/lib:$LIBRARY_PATH"
-    - export LDFLAGS="-L/opt/homebrew/lib -L/usr/local/lib"
-    - export CPPFLAGS="-I/opt/homebrew/include -I/usr/local/include"
-    - export CC_x86_64_apple_darwin="clang -target x86_64-apple-darwin"
-    - export CXX_x86_64_apple_darwin="clang++ -target x86_64-apple-darwin"
   script:
     - echo "Building macOS targets (amd64, arm64)..."
     - chmod +x ./build/build-macos.sh
