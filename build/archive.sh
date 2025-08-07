@@ -165,20 +165,9 @@ else
 
         echo -e "  -> Downloading old archive for ${filename} from ${LATEST_TAG}..."
         if curl --fail -sL -o "$OLD_ARCHIVE_TMP" "$OLD_ARCHIVE_URL"; then
-            if [[ "$filename" == *"windows"* ]]; then
-                unzip -j "$OLD_ARCHIVE_TMP" -d "$(dirname "$OLD_BINARY_TMP")" >/dev/null
-                mv "$(dirname "$OLD_BINARY_TMP")/zoi.exe" "$OLD_BINARY_TMP"
-            else
-                OLD_TAR_TMP=$(mktemp)
-                zstd -d -f "$OLD_ARCHIVE_TMP" -o "$OLD_TAR_TMP"
-                tar -xf "$OLD_TAR_TMP" -C "$(dirname "$OLD_BINARY_TMP")" --strip-components=0
-                mv "$(dirname "$OLD_BINARY_TMP")/zoi" "$OLD_BINARY_TMP"
-                rm -f "$OLD_TAR_TMP"
-            fi
-        
             PATCH_FILE="${ARCHIVE_DIR}/${filename}.patch"
             echo -e "  -> Creating patch for ${filename}..."
-            bsdiff "$OLD_BINARY_TMP" "$new_binary_path" "$PATCH_FILE"
+            bsdiff "$OLD_ARCHIVE_TMP" "$new_binary_path" "$PATCH_FILE"
         else
             echo -e "${YELLOW}  -> Could not download old archive for ${filename}. Skipping patch.${NC}"
         fi

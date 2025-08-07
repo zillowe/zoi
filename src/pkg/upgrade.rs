@@ -174,14 +174,16 @@ fn attempt_patch_upgrade(
     base_url: &str,
     bin_checksums: &str,
     patch_checksums: &str,
-    binary_filename: &str,
+    archive_filename: &str,
     patch_filename: &str,
     new_binary_checksum_name: &str,
 ) -> Result<PathBuf, Box<dyn Error>> {
     println!("\nAttempting patch-based upgrade...");
     let temp_dir = Builder::new().prefix("zoi-patch-upgrade").tempdir()?;
 
-    let current_exe_path = env::current_exe()?;
+    let (os, arch) = get_platform_info()?;
+    let old_archive_ext = if os == "windows" { "zip" } else { "tar.zst" };
+    let old_archive_filename = format!("zoi-{os}-{arch}.{old_archive_ext}");
 
     let patch_url = format!("{}/{}", base_url, patch_filename);
     let patch_path = temp_dir.path().join(patch_filename);
@@ -190,20 +192,32 @@ fn attempt_patch_upgrade(
     download_patch_file(&patch_url, &patch_path)?;
     verify_checksum(&patch_path, patch_checksums, patch_filename)?;
 
-    let new_binary_path = temp_dir.path().join(binary_filename);
+    let old_archive_path = temp_dir.path().join(old_archive_filename);
+    let current_exe_path = env::current_exe()?;
+    fs::copy(&current_exe_path, &old_archive_path)?;
 
-    println!("Applying patch to create new binary...");
+    let new_archive_path = temp_dir.path().join(archive_filename);
+
+    println!("Applying patch to create new archive...");
     let patch_data = fs::read(&patch_path)?;
-    let old_data = fs::read(&current_exe_path)?;
+    let old_data = fs::read(&old_archive_path)?;
 
     let mut new_data = Vec::new();
     let mut patch_reader = Cursor::new(patch_data);
     bsdiff::patch(&old_data, &mut patch_reader, &mut new_data)?;
 
-    fs::write(&new_binary_path, new_data)?;
+    fs::write(&new_archive_path, new_data)?;
 
-    println!("Verifying patched binary...");
-    verify_checksum(&new_binary_path, bin_checksums, new_binary_checksum_name)?;
+    println!("Verifying patched archive...");
+    verify_checksum(&new_archive_path, bin_checksums, new_binary_checksum_name)?;
+
+    extract_archive(&new_archive_path, temp_dir.path())?;
+
+    let binary_filename = if os == "windows" { "zoi.exe" } else { "zoi" };
+    let new_binary_path = temp_dir.path().join(binary_filename);
+    if !new_binary_path.exists() {
+        return Err("Could not find executable in the extracted archive.".into());
+    }
 
     Ok(new_binary_path)
 }
@@ -263,11 +277,6 @@ pub fn run(branch: &str, status: &str, number: &str) -> Result<(), Box<dyn Error
     }
 
     let (os, arch) = get_platform_info()?;
-    let binary_filename = if os == "windows" {
-        "zoi.exe".to_string()
-    } else {
-        "zoi".to_string()
-    };
     let patch_filename = format!("zoi-{}-{}.patch", os, arch);
 
     let base_url =
@@ -286,11 +295,14 @@ pub fn run(branch: &str, status: &str, number: &str) -> Result<(), Box<dyn Error
 
     let new_binary_checksum_name = format!("zoi-{}-{}-v{}", os, arch, latest_version_str);
 
+    let archive_ext = if os == "windows" { "zip" } else { "tar.zst" };
+    let archive_filename = format!("zoi-{os}-{arch}.{archive_ext}");
+
     let new_binary_path = match attempt_patch_upgrade(
         &base_url,
         &checksums_bin_content,
         &checksums_txt_content,
-        &binary_filename,
+        &archive_filename,
         &patch_filename,
         &new_binary_checksum_name,
     ) {
