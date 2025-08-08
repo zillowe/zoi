@@ -34,11 +34,13 @@ Note: Packages from `community`, `test`, and `archive` may carry higher risk. Zo
 
 ## Managing repositories with the CLI
 
-| Command                  | Description                                                                 |
-| ------------------------ | --------------------------------------------------------------------------- |
-| `zoi repo add`           | Add an official repo by name or a git repo by URL (interactive if no args). |
-| `zoi repo remove <name>` | Remove a repository from the active list.                                   |
-| `zoi repo list`          | List active repositories. Use `zoi repo list all` to see all available.     |
+| Command                       | Description                                                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------------------------- |
+| `zoi repo add`                | Add an official repo by name or a git repo by URL (interactive if no args).                       |
+| `zoi repo rm <name>`          | Remove a repository from the active list.                                                         |
+| `zoi repo list` (alias: `ls`) | Show active repositories from config. Use `zoi repo list all` to show all available repositories. |
+| `zoi repo git ls`             | List cloned git repositories under `~/.zoi/pkgs/git`.                                             |
+| `zoi repo git rm <repo>`      | Remove a cloned git repository directory.                                                         |
 
 ### Examples
 
@@ -55,9 +57,11 @@ zoi repo add community
 zoi repo add https://github.com/YourOrg/my-zoi-repo.git
 
 # Remove and list
-zoi repo remove community
+zoi repo rm community
 zoi repo list
 zoi repo list all
+zoi repo git ls
+zoi repo git rm my-zoi-repo
 ```
 
 ## Installing from a specific repository

@@ -194,3 +194,35 @@ pub fn clone_git_repo(url: &str) -> Result<(), Box<dyn Error>> {
     );
     Ok(())
 }
+
+pub fn list_git_repos() -> Result<Vec<String>, Box<dyn Error>> {
+    let git_root = get_git_root()?;
+    if !git_root.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut repos = Vec::new();
+    for entry in fs::read_dir(git_root)? {
+        let entry = entry?;
+        if entry.path().is_dir() {
+            repos.push(entry.file_name().to_string_lossy().into_owned());
+        }
+    }
+    repos.sort();
+    Ok(repos)
+}
+
+pub fn remove_git_repo(repo_name: &str) -> Result<(), Box<dyn Error>> {
+    let git_root = get_git_root()?;
+    let target = git_root.join(repo_name);
+    if !target.exists() {
+        return Err(format!("Git repository '{}' not found.", repo_name).into());
+    }
+    fs::remove_dir_all(&target)?;
+    println!(
+        "Removed git repository '{}' from {}",
+        repo_name.green(),
+        target.display()
+    );
+    Ok(())
+}

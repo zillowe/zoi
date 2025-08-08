@@ -20,22 +20,23 @@ pub struct RepoCommand {
 #[derive(Subcommand)]
 enum Commands {
     /// Add a repository to the configuration or clone from a git URL
+    #[command(alias = "a")]
     Add {
         /// The name of the repository to add or a git URL to clone
         repo_or_url: Option<String>,
     },
-    /// Remove a repository from the configuration
+    /// Remove a repository from the active configuration
     #[command(alias = "rm")]
-    Remove {
-        /// The name of the repository to remove
-        repo_name: String,
-    },
-    /// List active or all available repositories
+    Remove { repo_name: String },
+    /// List repositories (active by default); use `list all` to show all
+    #[command(alias = "ls")]
     List {
-        /// Use 'all' to list all available repositories
-        #[arg(value_name = "all")]
-        all: Option<String>,
+        #[command(subcommand)]
+        which: Option<ListSub>,
     },
+    /// Manage cloned git repositories
+    #[command(subcommand)]
+    Git(GitCommand),
 }
 
 pub fn run(args: RepoCommand) {
@@ -72,15 +73,30 @@ pub fn run(args: RepoCommand) {
                 println!("Repository '{}' removed successfully.", repo_name.green());
             }
         }
-        Commands::List { all } => {
-            if all.is_some() {
+        Commands::List { which } => match which {
+            None => {
+                if let Err(e) = run_list_active() {
+                    eprintln!("{}: {}", "Error".red().bold(), e);
+                }
+            }
+            Some(ListSub::All) => {
                 if let Err(e) = run_list_all() {
                     eprintln!("{}: {}", "Error".red().bold(), e);
                 }
-            } else if let Err(e) = run_list_active() {
-                eprintln!("{}: {}", "Error".red().bold(), e);
             }
-        }
+        },
+        Commands::Git(cmd) => match cmd {
+            GitCommand::List => {
+                if let Err(e) = run_list_git_only() {
+                    eprintln!("{}: {}", "Error".red().bold(), e);
+                }
+            }
+            GitCommand::Rm { repo_name } => {
+                if let Err(e) = config::remove_git_repo(&repo_name) {
+                    eprintln!("{}: {}", "Error".red().bold(), e);
+                }
+            }
+        },
     }
 }
 
@@ -121,6 +137,39 @@ fn run_list_all() -> Result<(), Box<dyn std::error::Error>> {
             ""
         };
         table.add_row(vec![status.to_string(), repo]);
+    }
+    println!("{table}");
+    Ok(())
+}
+
+#[derive(Subcommand)]
+enum ListSub {
+    /// Show all available repositories (active + discovered)
+    All,
+}
+
+#[derive(Subcommand)]
+enum GitCommand {
+    /// Show only cloned git repositories (~/.zoi/pkgs/git)
+    #[command(alias = "ls")]
+    List,
+    /// Remove a cloned git repository directory (~/.zoi/pkgs/git/<repo-name>)
+    Rm { repo_name: String },
+}
+
+fn run_list_git_only() -> Result<(), Box<dyn std::error::Error>> {
+    let repos = config::list_git_repos()?;
+    if repos.is_empty() {
+        println!("No cloned git repositories.");
+        return Ok(());
+    }
+
+    let mut table = Table::new();
+    table
+        .load_preset(UTF8_FULL)
+        .set_header(vec!["Cloned Git Repositories (~/.zoi/pkgs/git)"]);
+    for repo in repos {
+        table.add_row(vec![repo]);
     }
     println!("{table}");
     Ok(())

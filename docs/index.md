@@ -253,11 +253,13 @@ See the full schema and examples in [Project Configuration (zoi.yaml)](./project
 
 Manages the list of package repositories that Zoi uses.
 
-| Subcommand    | Description                                                                                                       |
-| ------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `repo add`    | Adds a new repository from the available sources or clones a repository from a git URL. Can be run interactively. |
-| `repo remove` | Deletes a repository from the active list.                                                                        |
-| `repo list`   | Shows all currently active repositories. Use `list all` to see all available repositories and their status.       |
+| Subcommand                 | Description                                                                                      |
+| -------------------------- | ------------------------------------------------------------------------------------------------ |
+| `repo add <name-or-url>`   | Add an official repo by name or clone from a git URL (interactive if no args).                  |
+| `repo rm <name>`           | Remove a repository from the active list.                                                        |
+| `repo ls`                  | Show active repositories. Use `repo ls all` to show all available repositories.                  |
+| `repo git ls`              | List cloned git repositories under `~/.zoi/pkgs/git`.                                           |
+| `repo git rm <repo-name>`  | Remove a cloned git repository directory (`~/.zoi/pkgs/git/<repo-name>`).                        |
 
 **Example:**
 
@@ -272,10 +274,10 @@ zoi repo add community
 zoi repo add https://example.com/my-zoi-repo.git
 
 # Remove a repository
-zoi repo remove community
+zoi repo rm community
 
 # List active repositories
-zoi repo list
+zoi repo ls
 ```
 
 For an overview of official repositories, mirrors, and repository tiers, see [Repositories](./repositories).
