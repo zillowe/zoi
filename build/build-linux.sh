@@ -11,10 +11,9 @@ OUTPUT_DIR="./build/release"
 COMMIT=$(git rev-parse --short=10 HEAD 2>/dev/null || echo "dev")
 
 TARGETS=(
-  # "x86_64-unknown-linux-gnu"  
-  # "aarch64-unknown-linux-gnu"
-  # "x86_64-pc-windows-gnu"
-  "aarch64-pc-windows-gnullvm"
+  "x86_64-unknown-linux-gnu"  
+  "aarch64-unknown-linux-gnu"
+  "x86_64-pc-windows-gnu"
 )
 
 if ! command -v cargo &> /dev/null; then
@@ -28,11 +27,10 @@ mkdir -p "$OUTPUT_DIR"
 
 for target in "${TARGETS[@]}"; do
   case "$target" in
-    # x86_64-unknown-linux-gnu)   NAME="zoi-linux-amd64" ;;
-    # aarch64-unknown-linux-gnu)  NAME="zoi-linux-arm64" ;;
-    # x86_64-pc-windows-gnu)      NAME="zoi-windows-amd64.exe" ;;
-    aarch64-pc-windows-gnullvm) NAME="zoi-windows-arm64.exe" ;;
-    *)                          NAME="zoi-$target" ;;
+    x86_64-unknown-linux-gnu)  NAME="zoi-linux-amd64" ;;
+    aarch64-unknown-linux-gnu) NAME="zoi-linux-arm64" ;;
+    x86_64-pc-windows-gnu)     NAME="zoi-windows-amd64.exe" ;;
+    *)                         NAME="zoi-$target" ;;
   esac
   
   echo -e "${CYAN}🔧 Building for ${target}...${NC}"
@@ -46,10 +44,6 @@ for target in "${TARGETS[@]}"; do
       OPENSSL_ENV="PKG_CONFIG_ALLOW_CROSS=1 PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig"
     elif [[ "$target" == "x86_64-pc-windows-gnu" ]]; then
       LINKER_ENV="CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc"
-    elif [[ "$target" == "aarch64-pc-windows-gnullvm" ]]; then
-      export CC_aarch64_pc_windows_gnullvm=clang
-      export CXX_aarch64_pc_windows_gnullvm=clang++
-      export AR_aarch64_pc_windows_gnullvm=llvm-ar
     fi
 
     if ! env $LINKER_ENV $OPENSSL_ENV ZOI_COMMIT_HASH="$COMMIT" cargo build --target "$target" --release; then
