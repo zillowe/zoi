@@ -173,6 +173,9 @@ pub fn get_linux_distro_family() -> Option<String> {
                 "opensuse" | "opensuse-tumbleweed" | "opensuse-leap" => Some("suse".to_string()),
                 "gentoo" => Some("gentoo".to_string()),
                 "alpine" => Some("alpine".to_string()),
+                "void" => Some("void".to_string()),
+                "solus" => Some("solus".to_string()),
+                "guix" => Some("guix".to_string()),
                 _ => None,
             };
         }
@@ -196,6 +199,9 @@ pub fn get_native_package_manager() -> Option<String> {
                     "suse" => "zypper",
                     "gentoo" => "portage",
                     "alpine" => "apk",
+                    "void" => "xbps-install",
+                    "solus" => "eopkg",
+                    "guix" => "guix",
                     _ => "unknown",
                 }
                 .to_string()
@@ -489,8 +495,33 @@ pub fn get_platform() -> Result<String, String> {
 pub fn get_all_available_package_managers() -> Vec<String> {
     let mut managers = Vec::new();
     let all_possible_managers = [
-        "apt", "apt-get", "pacman", "yay", "paru", "dnf", "yum", "zypper", "portage", "apk",
-        "snap", "flatpak", "nix", "brew", "port", "scoop", "choco", "winget", "pkg", "pkg_add",
+        "apt",
+        "apt-get",
+        "pacman",
+        "yay",
+        "paru",
+        "pikaur",
+        "trizen",
+        "dnf",
+        "yum",
+        "zypper",
+        "portage",
+        "apk",
+        "snap",
+        "flatpak",
+        "nix",
+        "brew",
+        "port",
+        "scoop",
+        "choco",
+        "winget",
+        "pkg",
+        "pkg_add",
+        "xbps-install",
+        "eopkg",
+        "guix",
+        "mas",
+        "uv",
     ];
 
     for manager in &all_possible_managers {

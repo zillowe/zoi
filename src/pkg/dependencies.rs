@@ -173,16 +173,19 @@ fn install_dependency(
     let manager = dep.manager;
 
     let is_compatible = match manager {
-        "brew" | "macports" => os == "macos",
+        "brew" | "macports" | "brew-cask" | "mas" => os == "macos",
         "scoop" | "choco" | "winget" => os == "windows",
         "apt" | "apt-get" => utils::get_linux_distro_family().as_deref() == Some("debian"),
-        "pacman" | "yay" | "paru" | "aur" => {
+        "pacman" | "yay" | "paru" | "pikaur" | "trizen" | "aur" => {
             utils::get_linux_distro_family().as_deref() == Some("arch")
         }
         "dnf" | "yum" => utils::get_linux_distro_family().as_deref() == Some("fedora"),
         "zypper" => utils::get_linux_distro_family().as_deref() == Some("suse"),
         "apk" => utils::get_linux_distro_family().as_deref() == Some("alpine"),
         "portage" => utils::get_linux_distro_family().as_deref() == Some("gentoo"),
+        "xbps" | "xbps-install" => utils::get_linux_distribution().as_deref() == Some("void"),
+        "eopkg" => utils::get_linux_distribution().as_deref() == Some("solus"),
+        "guix" => utils::get_linux_distribution().as_deref() == Some("guix"),
         "snap" | "flatpak" => os == "linux",
         "pkg" => os == "freebsd",
         "pkg_add" => os == "openbsd",
@@ -368,6 +371,16 @@ fn install_dependency(
                 return Err(format!("Bun dependency failed for '{}'", dep.package).into());
             }
         }
+        "uv" => {
+            let status = Command::new("uv")
+                .arg("tool")
+                .arg("install")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("uv tool install failed for '{}'", dep.package).into());
+            }
+        }
         "pip" => {
             let status = Command::new("pip")
                 .arg("install")
@@ -375,6 +388,19 @@ fn install_dependency(
                 .status()?;
             if !status.success() {
                 return Err(format!("pip dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "dart-pub" => {
+            let status = Command::new("dart")
+                .arg("pub")
+                .arg("global")
+                .arg("activate")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(
+                    format!("dart pub global activate failed for '{}'", dep.package).into(),
+                );
             }
         }
         "pipx" => {
@@ -537,6 +563,25 @@ fn install_dependency(
                 return Err(format!("brew dependency failed for '{}'", dep.package).into());
             }
         }
+        "brew-cask" => {
+            let status = Command::new("brew")
+                .arg("install")
+                .arg("--cask")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("brew --cask dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "mas" => {
+            let status = Command::new("mas")
+                .arg("install")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("mas dependency failed for '{}'", dep.package).into());
+            }
+        }
         "scoop" => {
             let status = Command::new("scoop")
                 .arg("install")
@@ -564,6 +609,36 @@ fn install_dependency(
                 .status()?;
             if !status.success() {
                 return Err(format!("apk dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "xbps" | "xbps-install" => {
+            let status = Command::new("sudo")
+                .arg("xbps-install")
+                .arg("-S")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("xbps-install dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "eopkg" => {
+            let status = Command::new("sudo")
+                .arg("eopkg")
+                .arg("it")
+                .arg("-y")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("eopkg dependency failed for '{}'", dep.package).into());
+            }
+        }
+        "guix" => {
+            let status = Command::new("guix")
+                .arg("install")
+                .arg(dep.package)
+                .status()?;
+            if !status.success() {
+                return Err(format!("guix dependency failed for '{}'", dep.package).into());
             }
         }
         "pkg" => {
@@ -1080,6 +1155,15 @@ pub fn uninstall_dependency(
             .arg("uninstall")
             .arg(dep.package)
             .status()?,
+        "brew-cask" => Command::new("brew")
+            .arg("uninstall")
+            .arg("--cask")
+            .arg(dep.package)
+            .status()?,
+        "mas" => Command::new("mas")
+            .arg("remove")
+            .arg(dep.package)
+            .status()?,
         "scoop" => Command::new("scoop")
             .arg("uninstall")
             .arg(dep.package)
@@ -1092,6 +1176,21 @@ pub fn uninstall_dependency(
         "apk" => Command::new("sudo")
             .arg("apk")
             .arg("del")
+            .arg(dep.package)
+            .status()?,
+        "xbps" | "xbps-install" => Command::new("sudo")
+            .arg("xbps-remove")
+            .arg("-R")
+            .arg(dep.package)
+            .status()?,
+        "eopkg" => Command::new("sudo")
+            .arg("eopkg")
+            .arg("rm")
+            .arg("-y")
+            .arg(dep.package)
+            .status()?,
+        "guix" => Command::new("guix")
+            .arg("remove")
             .arg(dep.package)
             .status()?,
         "pkg" => Command::new("sudo")

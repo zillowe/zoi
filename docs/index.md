@@ -253,13 +253,13 @@ See the full schema and examples in [Project Configuration (zoi.yaml)](./project
 
 Manages the list of package repositories that Zoi uses.
 
-| Subcommand                 | Description                                                                                      |
-| -------------------------- | ------------------------------------------------------------------------------------------------ |
-| `repo add <name-or-url>`   | Add an official repo by name or clone from a git URL (interactive if no args).                  |
-| `repo rm <name>`           | Remove a repository from the active list.                                                        |
-| `repo ls`                  | Show active repositories. Use `repo ls all` to show all available repositories.                  |
-| `repo git ls`              | List cloned git repositories under `~/.zoi/pkgs/git`.                                           |
-| `repo git rm <repo-name>`  | Remove a cloned git repository directory (`~/.zoi/pkgs/git/<repo-name>`).                        |
+| Subcommand                | Description                                                                     |
+| ------------------------- | ------------------------------------------------------------------------------- |
+| `repo add <name-or-url>`  | Add an official repo by name or clone from a git URL (interactive if no args).  |
+| `repo rm <name>`          | Remove a repository from the active list.                                       |
+| `repo ls`                 | Show active repositories. Use `repo ls all` to show all available repositories. |
+| `repo git ls`             | List cloned git repositories under `~/.zoi/pkgs/git`.                           |
+| `repo git rm <repo-name>` | Remove a cloned git repository directory (`~/.zoi/pkgs/git/<repo-name>`).       |
 
 **Example:**
 
@@ -424,51 +424,9 @@ Zoi supports four types of installation methods within the `installation` list:
 3.  **`source`**: Clones a git repository and runs a series of build commands you define.
 4.  **`script`**: Downloads and executes an installation script (e.g. `install.sh`).
 
-### Supported Dependencies & Schema
+### Dependencies
 
-Zoi can manage dependencies from a wide variety of external package managers. Define them under `dependencies.runtime` and `dependencies.build`.
-
-- `required`: always installed (simple list of `manager:package`).
-- `optional`: prompted to install (supports inline descriptions: `manager:package:description`).
-- `required.options`: selectable providers with `name`, `desc`, `all` (boolean), and `depends` (each item may include an inline description).
-
-| Manager          | Ecosystem / OS                  | Example                                   |
-| ---------------- | ------------------------------- | ----------------------------------------- |
-| `zoi`            | Zoi                             | `zoi:my-other-package`                    |
-| `native`         | System's native package manager | `native:openssl`                          |
-| `apt`, `apt-get` | Debian, Ubuntu, etc.            | `apt:libssl-dev`                          |
-| `pacman`         | Arch Linux                      | `pacman:base-devel`                       |
-| `yay`, `paru`    | Arch Linux (AUR)                | `yay:google-chrome`                       |
-| `aur`            | Arch Linux (AUR)                | `aur:visual-studio-code-bin`              |
-| `dnf`, `yum`     | Fedora, CentOS, RHEL            | `dnf:openssl-devel`                       |
-| `zypper`         | openSUSE                        | `zypper:libopenssl-devel`                 |
-| `apk`            | Alpine Linux                    | `apk:git`                                 |
-| `portage`        | Gentoo                          | `portage:dev-libs/openssl`                |
-| `brew`           | macOS (Homebrew)                | `brew:node`                               |
-| `macports`       | macOS (MacPorts)                | `macports:git`                            |
-| `scoop`          | Windows                         | `scoop:git`                               |
-| `choco`          | Windows (Chocolatey)            | `choco:git`                               |
-| `winget`         | Windows                         | `winget:Git.Git`                          |
-| `snap`           | Linux (Snapcraft)               | `snap:node`                               |
-| `flatpak`        | Linux (Flathub)                 | `flatpak:org.gimp.GIMP`                   |
-| `pkg`            | FreeBSD                         | `pkg:git`                                 |
-| `pkg_add`        | OpenBSD                         | `pkg_add:git`                             |
-| `cargo`          | Rust                            | `cargo:ripgrep`                           |
-| `cargo-binstall` | Rust (pre-compiled binaries)    | `cargo-binstall:ripgrep`                  |
-| `go`             | Go                              | `go:golang.org/x/tools/cmd/goimports`     |
-| `npm`            | Node.js                         | `npm:typescript`                          |
-| `yarn`           | Node.js                         | `yarn:react`                              |
-| `pnpm`           | Node.js                         | `pnpm:vite`                               |
-| `bun`            | Bun                             | `bun:elysia`                              |
-| `deno`           | Deno                            | `deno:npm:chalk` or `deno:jsr:@std/bytes` |
-| `jsr`            | JavaScript Registry             | `jsr:@std/http`                           |
-| `pip`            | Python                          | `pip:requests`                            |
-| `pipx`           | Python                          | `pipx:black`                              |
-| `conda`          | Conda                           | `conda:numpy`                             |
-| `gem`            | Ruby                            | `gem:rails`                               |
-| `composer`       | PHP                             | `composer:laravel/installer`              |
-| `dotnet`         | .NET                            | `dotnet:csharp-ls`                        |
-| `nix`            | NixOS / Nix                     | `nix:nixpkgs.hello`                       |
+For the full list of supported dependency managers, usage semantics, and commands Zoi runs, see [Dependencies & Supported Package Managers](./dependencies).
 
 ## FAQ
 
