@@ -11,9 +11,9 @@ OUTPUT_DIR="./build/release"
 COMMIT=$(git rev-parse --short=10 HEAD 2>/dev/null || echo "dev")
 
 TARGETS=(
-  "x86_64-unknown-linux-gnu"  
-  "aarch64-unknown-linux-gnu"
-  "x86_64-pc-windows-gnu"
+  # "x86_64-unknown-linux-gnu"  
+  # "aarch64-unknown-linux-gnu"
+  # "x86_64-pc-windows-gnu"
   "aarch64-pc-windows-gnullvm"
 )
 
@@ -28,11 +28,11 @@ mkdir -p "$OUTPUT_DIR"
 
 for target in "${TARGETS[@]}"; do
   case "$target" in
-    x86_64-unknown-linux-gnu)  NAME="zoi-linux-amd64" ;;
-    aarch64-unknown-linux-gnu) NAME="zoi-linux-arm64" ;;
-    x86_64-pc-windows-gnu)     NAME="zoi-windows-amd64.exe" ;;
-    aarch64-pc-windows-gnullvm) NAME="zoi-windows-arm64.exe"
-    *)                         NAME="zoi-$target" ;;
+    # x86_64-unknown-linux-gnu)   NAME="zoi-linux-amd64" ;;
+    # aarch64-unknown-linux-gnu)  NAME="zoi-linux-arm64" ;;
+    # x86_64-pc-windows-gnu)      NAME="zoi-windows-amd64.exe" ;;
+    aarch64-pc-windows-gnullvm) NAME="zoi-windows-arm64.exe" ;;
+    *)                          NAME="zoi-$target" ;;
   esac
   
   echo -e "${CYAN}🔧 Building for ${target}...${NC}"
