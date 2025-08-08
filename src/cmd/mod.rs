@@ -17,6 +17,7 @@ pub mod show;
 pub mod start;
 pub mod stop;
 pub mod sync;
+pub mod telemetry;
 pub mod uninstall;
 pub mod unpin;
 pub mod update;

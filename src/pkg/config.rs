@@ -27,6 +27,7 @@ pub fn read_config() -> Result<Config, Box<dyn Error>> {
             repos: vec!["core".to_string(), "main".to_string(), "extra".to_string()],
             package_managers: None,
             native_package_manager: None,
+            telemetry_enabled: false,
         };
         write_config(&default_config)?;
         return Ok(default_config);

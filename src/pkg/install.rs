@@ -37,6 +37,17 @@ pub enum InstallMode {
     Updater(String),
 }
 
+fn send_install_telemetry(pkg: &types::Package) {
+    match crate::pkg::telemetry::posthog_capture_install(pkg, env!("CARGO_PKG_VERSION")) {
+        Ok(true) => println!("{} telemetry sent", "Info:".green()),
+        Ok(false) => println!(
+            "{} telemetry disabled (enable with 'zoi telemetry enable')",
+            "Info:".yellow()
+        ),
+        Err(e) => eprintln!("{} telemetry failed: {}", "Warning:".yellow(), e),
+    }
+}
+
 pub fn run_installation(
     source: &str,
     mode: InstallMode,
@@ -124,6 +135,7 @@ pub fn run_installation(
         }
         write_manifest(&pkg, reason, installed_deps_list)?;
         println!("Collection '{}' installed successfully.", pkg.name.green());
+        send_install_telemetry(&pkg);
         return Ok(());
     }
 
@@ -186,6 +198,8 @@ pub fn run_installation(
         }
         write_manifest(&pkg, reason, installed_deps_list)?;
         println!("Configuration '{}' registered.", pkg.name.green());
+
+        send_install_telemetry(&pkg);
 
         if utils::ask_for_confirmation("Do you want to run the setup commands now?", yes) {
             config_handler::run_install_commands(&pkg)?;
@@ -306,6 +320,7 @@ pub fn run_installation(
         if let Err(e) = utils::setup_path(pkg.scope) {
             eprintln!("{} Failed to configure PATH: {}", "Warning:".yellow(), e);
         }
+        send_install_telemetry(&pkg);
         if pkg.package_type == types::PackageType::Service {
             if utils::ask_for_confirmation("Do you want to start the service now?", yes) {
                 service::start_service(&pkg)?;

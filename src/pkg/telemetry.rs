@@ -1,0 +1,144 @@
+use serde::Serialize;
+use std::{error::Error, fs};
+
+#[derive(Debug, Serialize)]
+pub struct InstallEvent<'a> {
+    pub client_id: &'a str,
+    pub event: &'a str,
+    pub ts: String,
+    pub app_version: &'a str,
+    pub os: &'a str,
+    pub arch: &'a str,
+    pub package: MinimalPackage<'a>,
+    pub package_type: &'a str,
+}
+
+#[derive(Debug, Serialize)]
+pub struct MinimalPackage<'a> {
+    pub name: &'a str,
+    pub repo: &'a str,
+    pub description: &'a str,
+    pub maintainer: MinimalPerson<'a>,
+    pub author: Option<MinimalPerson<'a>>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct MinimalPerson<'a> {
+    pub name: &'a str,
+    pub email: &'a str,
+    pub website: Option<&'a String>,
+}
+
+fn get_client_id_path() -> Result<std::path::PathBuf, Box<dyn Error>> {
+    let home = home::home_dir().ok_or("Could not find home directory")?;
+    Ok(home.join(".zoi").join("telemetry").join("client_id"))
+}
+
+fn ensure_client_id() -> Result<String, Box<dyn Error>> {
+    let path = get_client_id_path()?;
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir)?;
+    }
+    if path.exists() {
+        let id = fs::read_to_string(&path)?;
+        Ok(id.trim().to_string())
+    } else {
+        let id = {
+            use uuid::Timestamp;
+            let ts = Timestamp::from_unix(
+                &uuid::NoContext,
+                chrono::Utc::now().timestamp_millis() as u64,
+                0,
+            );
+            uuid::Uuid::new_v7(ts).to_string()
+        };
+        fs::write(&path, &id)?;
+        Ok(id)
+    }
+}
+
+pub fn posthog_capture_install(
+    pkg: &crate::pkg::types::Package,
+    app_version: &str,
+) -> Result<bool, Box<dyn Error>> {
+    let config = crate::pkg::config::read_config()?;
+    if !config.telemetry_enabled {
+        return Ok(false);
+    }
+
+    let client_id = ensure_client_id()?;
+
+    let platform = crate::utils::get_platform().unwrap_or_else(|_| "unknown-unknown".into());
+    let mut parts = platform.split('-');
+    let os = parts.next().unwrap_or("unknown");
+    let arch = parts.next().unwrap_or("unknown");
+
+    let package_type_str = match pkg.package_type {
+        crate::pkg::types::PackageType::Package => "package",
+        crate::pkg::types::PackageType::Collection => "collection",
+        crate::pkg::types::PackageType::Service => "service",
+        crate::pkg::types::PackageType::Config => "config",
+    };
+
+    let ev = InstallEvent {
+        client_id: &client_id,
+        event: "install",
+        ts: chrono::Utc::now().to_rfc3339(),
+        app_version,
+        os,
+        arch,
+        package: MinimalPackage {
+            name: &pkg.name,
+            repo: &pkg.repo,
+            description: &pkg.description,
+            maintainer: MinimalPerson {
+                name: &pkg.maintainer.name,
+                email: &pkg.maintainer.email,
+                website: pkg.maintainer.website.as_ref(),
+            },
+            author: pkg.author.as_ref().map(|a| MinimalPerson {
+                name: &a.name,
+                email: a.email.as_deref().unwrap_or(""),
+                website: a.website.as_ref(),
+            }),
+        },
+        package_type: package_type_str,
+    };
+
+    let ph_host = option_env!("POSTHOG_HOST").unwrap_or("https://eu.i.posthog.com");
+    let ph_key = option_env!("POSTHOG_API_KEY").unwrap_or_default();
+    if ph_key.is_empty() {
+        return Err("Telemetry enabled but POSTHOG_API_KEY is not set".into());
+    }
+
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(4))
+        .build()?;
+    #[derive(Serialize)]
+    struct PosthogEvent<'a> {
+        event: &'a str,
+        distinct_id: &'a str,
+        properties: &'a InstallEvent<'a>,
+        timestamp: &'a str,
+    }
+    #[derive(Serialize)]
+    struct Batch<'a> {
+        api_key: &'a str,
+        batch: Vec<PosthogEvent<'a>>,
+    }
+    let payload = Batch {
+        api_key: &ph_key,
+        batch: vec![PosthogEvent {
+            event: ev.event,
+            distinct_id: ev.client_id,
+            properties: &ev,
+            timestamp: &ev.ts,
+        }],
+    };
+    let url = format!("{}/batch", ph_host.trim_end_matches('/'));
+    let resp = client.post(url).json(&payload).send()?;
+    if !resp.status().is_success() {
+        return Err(format!("PostHog HTTP {}", resp.status()).into());
+    }
+    Ok(true)
+}

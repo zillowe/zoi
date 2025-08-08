@@ -274,6 +274,22 @@ enum Commands {
         #[arg(value_name = "PACKAGE_NAME")]
         package: String,
     },
+
+    /// Manage telemetry settings (opt-in analytics)
+    #[command(
+        long_about = "Manage opt-in anonymous telemetry used to understand package popularity. Default is disabled."
+    )]
+    Telemetry {
+        #[arg(value_enum)]
+        action: TelemetryAction,
+    },
+}
+
+#[derive(clap::ValueEnum, Clone)]
+enum TelemetryAction {
+    Status,
+    Enable,
+    Disable,
 }
 
 fn main() {
@@ -402,6 +418,16 @@ fn main() {
             }
             Commands::Start { package } => cmd::start::run(&package, cli.yes),
             Commands::Stop { package } => cmd::stop::run(&package),
+            Commands::Telemetry { action } => {
+                use cmd::telemetry::{TelemetryCommand, run};
+                let cmd = match action {
+                    TelemetryAction::Status => TelemetryCommand::Status,
+                    TelemetryAction::Enable => TelemetryCommand::Enable,
+                    TelemetryAction::Disable => TelemetryCommand::Disable,
+                };
+                run(cmd);
+                Ok(())
+            }
         };
 
         if let Err(e) = result {

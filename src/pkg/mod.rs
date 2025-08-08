@@ -11,6 +11,7 @@ pub mod pin;
 pub mod resolve;
 pub mod service;
 pub mod sync;
+pub mod telemetry;
 pub mod types;
 pub mod uninstall;
 pub mod upgrade;

@@ -34,12 +34,20 @@ pub fn run(sources: &[String], force: bool, interactive: bool, yes: bool) {
                     yes,
                     &mut processed_deps,
                 ) {
-                    eprintln!(
-                        "{}: Failed to install '{}': {}",
-                        "Error".red().bold(),
-                        source,
-                        e
-                    );
+                    if e.to_string().contains("aborted by user") {
+                        eprintln!("\n{}", e.to_string().yellow());
+                    } else {
+                        eprintln!(
+                            "{}: Failed to install '{}': {}",
+                            "Error".red().bold(),
+                            source,
+                            e
+                        );
+                        eprintln!(
+                            "{} telemetry not sent due to install failure",
+                            "Info:".yellow()
+                        );
+                    }
                     failed_packages.push(source.to_string());
                 }
             }

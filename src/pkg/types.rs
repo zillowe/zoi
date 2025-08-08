@@ -243,4 +243,6 @@ pub struct Config {
     pub repos: Vec<String>,
     pub package_managers: Option<Vec<String>>,
     pub native_package_manager: Option<String>,
+    #[serde(default)]
+    pub telemetry_enabled: bool,
 }

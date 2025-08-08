@@ -10,6 +10,7 @@ documentation = "https://zillowe.rf.gd/docs/zds/zoi"
 keywords = ["cli", "package-manager", "dev-tools", "universal", "environment"]
 categories = ["command-line-utilities", "development-tools"]
 readme = "README.md"
+build = "build.rs"
 
 [[bin]]
 name = "zoi"
@@ -32,6 +33,7 @@ home = "0.5.11"
 indicatif = "0.18.0"
 nix = { version = "0.30.1", features = ["user"] }
 openssl = { version = "0.10.73", features = ["vendored"] }
+posthog-rs = "0.3.7"
 regex = "1.11.1"
 reqwest = { version = "0.12.22", features = ["blocking"] }
 self_update = "0.42.0"
@@ -44,6 +46,7 @@ sha2 = "0.10.9"
 tar = "0.4.44"
 tempfile = "3.20.0"
 tokio = { version = "1.47.1", features = ["macros", "rt-multi-thread"] }
+uuid = "1.17.0"
 walkdir = "2.5.0"
 winapi = { version = "0.3.9", features = ["securitybaseapi", "winnt"] }
 xz2 = "0.1.7"

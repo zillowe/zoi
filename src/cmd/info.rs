@@ -54,6 +54,15 @@ pub fn run(branch: &str, status: &str, number: &str, commit: &str) {
         utils::print_aligned_info("Package Managers", "Not available (run 'zoi sync')");
     }
 
+    if let Ok(config) = pkg::config::read_config() {
+        let tel = if config.telemetry_enabled {
+            "Enabled".green()
+        } else {
+            "Disabled".yellow()
+        };
+        utils::print_aligned_info("Telemetry", &tel.to_string());
+    }
+
     let key_with_colon = format!("{}:", "Version");
     println!(
         "{:<18}{} {} {} {}",
