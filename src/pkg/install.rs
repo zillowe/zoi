@@ -832,6 +832,13 @@ fn handle_com_binary_install(
     url = url.replace("{platform}", &platform);
     url = url.replace("{platformComExt}", com_ext);
 
+    if url.starts_with("http://") {
+        println!(
+            "{} downloading over insecure HTTP: {}",
+            "Warning:".yellow(),
+            url
+        );
+    }
     println!("Downloading from: {url}");
 
     let client = crate::utils::build_blocking_http_client(60)?;
@@ -1049,6 +1056,13 @@ fn handle_binary_install(
     let platform = utils::get_platform()?;
     url = url.replace("{platform}", &platform);
 
+    if url.starts_with("http://") {
+        println!(
+            "{} downloading over insecure HTTP: {}",
+            "Warning:".yellow(),
+            url
+        );
+    }
     println!("Downloading from: {url}");
 
     let client = crate::utils::build_blocking_http_client(60)?;
@@ -1175,6 +1189,13 @@ fn handle_script_install(
     let script_filename = format!("install.{platform_ext}");
     let script_path = temp_dir.path().join(script_filename);
 
+    if resolved_url.starts_with("http://") {
+        println!(
+            "{} downloading over insecure HTTP: {}",
+            "Warning:".yellow(),
+            resolved_url
+        );
+    }
     println!("Downloading script from: {}", resolved_url.cyan());
     let response = reqwest::blocking::get(&resolved_url)?;
     if !response.status().is_success() {

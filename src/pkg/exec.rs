@@ -155,6 +155,13 @@ fn ensure_binary_is_cached(pkg: &types::Package) -> Result<PathBuf, Box<dyn Erro
         url = url.replace("{name}", &pkg.name);
         url = url.replace("{platform}", &platform);
 
+        if url.starts_with("http://") {
+            println!(
+                "{} downloading over insecure HTTP: {}",
+                "Warning:".yellow(),
+                url
+            );
+        }
         println!("Downloading from: {url}");
 
         let response = reqwest::blocking::get(&url)?;
@@ -214,6 +221,13 @@ fn ensure_binary_is_cached(pkg: &types::Package) -> Result<PathBuf, Box<dyn Erro
         url = url.replace("{platform}", &platform);
         url = url.replace("{platformComExt}", com_ext);
 
+        if url.starts_with("http://") {
+            println!(
+                "{} downloading over insecure HTTP: {}",
+                "Warning:".yellow(),
+                url
+            );
+        }
         println!("Downloading from: {url}");
 
         let client = crate::utils::build_blocking_http_client(60)?;
