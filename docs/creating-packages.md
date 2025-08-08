@@ -138,6 +138,8 @@ Zoi uses placeholders to make your URLs dynamic:
 - `{git}`: The value of the top-level `git` field.
 - `{store}`: The path where the final binary should be placed (for `source` builds).
 
+For resolving a package version from a remote URL (plain text or JSON), see the example in [Package with Remote Version URL](./examples#package-with-remote-version-url-json-or-plain-text).
+
 ### Security: Checksums
 
 It is **highly recommended** to include checksums to verify the integrity of downloaded files.

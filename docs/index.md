@@ -209,7 +209,7 @@ Zoi provides a wide range of commands to manage your packages and environment. F
 | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `version`    | Displays the version number, build status, branch, and commit hash.                                                                                        |
 | `about`      | Displays the full application name, description, author, license, and homepage.                                                                            |
-| `info`       | Displays key system details like OS, CPU architecture, and available package managers (requires 'zoi sync' to be run first for package manager detection). |
+| `info`       | Displays key system details like OS, CPU architecture, and available package managers (requires `zoi sync` to be run first for package manager detection). |
 | `check`      | Verifies that all required dependencies (like git) are installed.                                                                                          |
 | `sync`       | Clones or updates the package database, and updates the local system configuration by detecting available package managers.                                |
 | `upgrade`    | Downloads the latest release of Zoi and replaces the current executable.                                                                                   |
@@ -237,8 +237,8 @@ Zoi provides a wide range of commands to manage your packages and environment. F
 
 | Command | Description                                                                    |
 | ------- | ------------------------------------------------------------------------------ |
-| `run`   | Executes a command from a local 'zoi.yaml' file. Can be run interactively.     |
-| `env`   | Sets up project environments from a 'zoi.yaml' file. Can be run interactively. |
+| `run`   | Executes a command from a local `zoi.yaml` file. Can be run interactively.     |
+| `env`   | Sets up project environments from a `zoi.yaml` file. Can be run interactively. |
 
 See the full schema and examples in [Project Configuration (zoi.yaml)](./project-config).
 
@@ -474,6 +474,58 @@ For the full list of supported dependency managers, usage semantics, and command
     managers like `brew`, `winget`, `scoop`, `npm`, `cargo`, `pip`, and many
     more. These are defined in the `dependencies` section of a package's
     `.pkg.yaml` file.
+  </Accordion>
+</Accordions>
+<br />
+<Accordions type="single">
+  <Accordion title="How do I install a specific version or channel?">
+    You can append a version or channel after an '@' in the source string.
+    Examples: `zoi install my-app@1.2.3` or use channels defined in
+    `versions` like `my-app@stable`. You can also pin a resolved
+    version to prevent updates: `zoi pin my-app VERSION` and later
+    `zoi unpin my-app`.
+  </Accordion>
+</Accordions>
+<br />
+<Accordions type="single">
+  <Accordion title="How do I run a tool without installing it?">
+    Use `zoi exec &lt;package&gt;`. Zoi will fetch a temporary binary and run it
+    without adding it to your PATH or installed set.
+  </Accordion>
+</Accordions>
+<br />
+<Accordions type="single">
+  <Accordion title="How do I use a custom git package repository?">
+    Add it with `zoi repo add https://github.com/you/your-zoi-repo.git`.
+    Install packages from it using `@git/&lt;repo-name&gt;/&lt;pkg-name&gt;`.
+    List/remove cloned git repos with `zoi repo git ls` and
+    `zoi repo git rm &lt;repo-name&gt;`.
+  </Accordion>
+</Accordions>
+<br />
+<Accordions type="single">
+  <Accordion title="Where are binaries installed and how do I fix PATH?">
+    Binaries are placed in `~/.zoi/pkgs/store/&lt;name&gt;/bin` and linked into
+    `~/.zoi/pkgs/bin`. Zoi attempts to add this to your shell PATH on Unix and user PATH on Windows.
+    If commands are not found, add `~/.zoi/pkgs/bin`` to your PATH manually.
+  </Accordion>
+</Accordions>
+<br />
+<Accordions type="single">
+  <Accordion title="How do I accept all prompts (non-interactive)?">
+    Pass `--yes` to installation commands to auto-accept confirmations and optional dependency prompts.
+  </Accordion>
+</Accordions>
+<br />
+<Accordions type="single">
+  <Accordion title="How do I install from a nested repository path?">
+    Use the full path in the source, e.g. `@core/linux/amd64/nvidia-driver`.
+  </Accordion>
+</Accordions>
+<br />
+<Accordions type="single">
+  <Accordion title="How do I update Zoi itself?">
+    Run `zoi upgrade`. Zoi attempts a patch (delta) upgrade first and falls back to a full binary download if needed.
   </Accordion>
 </Accordions>
 

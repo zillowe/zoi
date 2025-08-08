@@ -548,6 +548,70 @@ zoi env        # interactive environment chooser
 
 See full schema and best practices in [Project Configuration (zoi.yaml)](./project-config).
 
+---
+
+## Package with Remote Version URL (JSON or Plain Text)
+
+You can point the `version` field (or a channel under `versions`) to a URL. Zoi will fetch the URL and resolve the version.
+
+Accepted responses at the URL:
+- Plain text containing a version string, e.g. `1.2.3`
+- JSON with either:
+  - `{ "versions": { "stable": "1.2.3" } }` (for channel resolution)
+  - `{ "latest": { "production": { "tag": "v1.2.3" } } }`
+
+Example layout and package file:
+
+```yaml
+# packages/zoi/zoi.pkg.yaml
+name: zoi
+repo: core
+description: Zoi CLI packaged via remote version metadata
+
+# Option A: Direct version URL (plain text or acceptable JSON)
+version: https://example.com/app/version.json
+
+# Option B: Channel map pointing to a JSON URL (recommended)
+# versions:
+#   stable: https://example.com/app/version.json
+#   beta: https://example.com/app/beta.json
+
+installation:
+  - type: binary
+    url: "https://downloads.example.com/zoi-{platform}-{version}"
+    platforms: ["linux-amd64", "macos-arm64", "windows-amd64"]
+
+# Alternatively, use a compressed archive
+#  - type: com_binary
+#    url: "https://downloads.example.com/zoi-{version}-{platform}.{platformComExt}"
+#    platforms: ["linux-amd64", "macos-arm64", "windows-amd64"]
+#    platformComExt:
+#      linux: tar.zst
+#      macos: tar.zst
+#      windows: zip
+```
+
+Example `app/version.json` payloads that Zoi understands:
+
+```json
+{
+  "versions": {
+    "stable": "3.8.0",
+    "beta": "3.9.0-beta"
+  }
+}
+```
+
+```json
+{
+  "latest": {
+    "production": { "tag": "v3.8.0" }
+  }
+}
+```
+
+If the URL returns plain text, it should be a single version string like `3.8.0`.
+
 ## Package with `alt` Redirection
 
 The `alt` field redirects Zoi to install a different package. This is perfect for creating aliases or pointing to a package definition hosted elsewhere. The value can be another package name, a URL to a raw `.pkg.yaml` file, or a local file path.
