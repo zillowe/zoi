@@ -146,6 +146,9 @@ installation:
     url: "https://github.com/{git}" # URL to the git repository.
     platforms: ["linux-amd64", "macos-amd64", "windows-amd64"]
     # Commands to execute in the cloned repository to build and install.
+    # Optionally pick a tag or branch (only one). {version} will be expanded.
+    # tag: "v{version}"
+    # branch: "release/{version}"
     commands:
       - "make build"
       - "mv ./bin/compiler {store}/compiler" # Move the final binary to the Zoi store.

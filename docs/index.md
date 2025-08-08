@@ -219,20 +219,20 @@ Zoi provides a wide range of commands to manage your packages and environment. F
 
 ### Package Management
 
-| Command     | Description                                                                                                                                                                               |
-| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `list`      | Lists installed or all available packages. <br/>`--all`: List all packages, not just installed. <br/>`--repo <repo>`: Filter by repository. <br/>`--type <type>`: Filter by package type. |
-| `show`      | Shows detailed information about a package. <br/>`--raw`: Display the raw, unformatted package file.                                                                                      |
+| Command     | Description                                                                                                                                                                                                                |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list`      | Lists installed or all available packages. <br/>`--all`: List all packages, not just installed. <br/>`--repo <repo>`: Filter by repository. <br/>`--type <type>`: Filter by package type.                                  |
+| `show`      | Shows detailed information about a package. <br/>`--raw`: Display the raw, unformatted package file.                                                                                                                       |
 | `search`    | Searches packages by name, description, and tags. <br/>`--repo <repo>`: Filter by repository. <br/>`--type <type>`: Filter by package type. <br/>`-t, --tag <tag>`: Filter by one or more tags (repeat or comma-separate). |
-| `install`   | Installs one or more packages. <br/>`--force`: Force re-installation if the package already exists. <br/>`--interactive`: Choose the installation method interactively.                   |
-| `build`     | Builds and installs one or more packages from source. <br/>`--force`: Force the package to be rebuilt.                                                                                    |
-| `uninstall` | Removes one or more packages. Also removes any of its dependencies that are no longer needed. For collections, it removes all of its dependencies.                                        |
-| `update`    | Updates one or more packages to the latest version.                                                                                                                                       |
-| `pin`       | Pins a package to a specific version to prevent updates.                                                                                                                                  |
-| `unpin`     | Unpins a package, allowing it to be updated again.                                                                                                                                        |
-| `why`       | Explains why a package is installed (e.g. as a dependency or directly).                                                                                                                   |
-| `clone`     | Clones the source code repository of one or more packages. A target directory can only be specified when cloning a single package.                                                        |
-| `exec`      | Downloads a binary to a temporary cache and runs it without installing it.                                                                                                                |
+| `install`   | Installs one or more packages. <br/>`--force`: Force re-installation if the package already exists. <br/>`--interactive`: Choose the installation method interactively.                                                    |
+| `build`     | Builds and installs one or more packages from source. <br/>`--force`: Force the package to be rebuilt.                                                                                                                     |
+| `uninstall` | Removes one or more packages. Also removes any of its dependencies that are no longer needed. For collections, it removes all of its dependencies.                                                                         |
+| `update`    | Updates one or more packages to the latest version.                                                                                                                                                                        |
+| `pin`       | Pins a package to a specific version to prevent updates.                                                                                                                                                                   |
+| `unpin`     | Unpins a package, allowing it to be updated again.                                                                                                                                                                         |
+| `why`       | Explains why a package is installed (e.g. as a dependency or directly).                                                                                                                                                    |
+| `clone`     | Clones the source code repository of one or more packages. A target directory can only be specified when cloning a single package.                                                                                         |
+| `exec`      | Downloads a binary to a temporary cache and runs it without installing it.                                                                                                                                                 |
 
 ### Project Environment
 
@@ -379,6 +379,15 @@ installation:
         sig: "https://github.com/user/my-awesome-app/releases/download/v{version}/my-awesome-app-{platform}.sig"
 
   - type: com_binary
+  - type: source
+    url: "https://github.com/{git}"
+    platforms: ["linux-amd64", "macos-amd64", "windows-amd64"]
+    # (Optional) Use only one of these. {version} will be expanded.
+    # tag: "v{version}"
+    # branch: "release/{version}"
+    commands:
+      - "make build"
+      - "mv ./bin/my-awesome-app {store}/my-awesome-app"
     url: "https://github.com/user/my-awesome-app/releases/download/v{version}/my-awesome-app-v{version}-{platform}.{platformComExt}"
     platforms: ["linux-amd64", "macos-amd64", "windows-amd64"]
     platformComExt:
@@ -441,7 +450,7 @@ Zoi supports four types of installation methods within the `installation` list:
 
 1.  **`binary`**: Downloads a pre-compiled binary directly from a URL.
 2.  **`com_binary`**: Downloads a compressed archive (`.zip`, `.tar.gz`, etc.), extracts it, and finds the binary within. Supports `binary_path` to point to the executable inside the archive.
-3.  **`source`**: Clones a git repository and runs a series of build commands you define.
+3.  **`source`**: Clones a git repository and runs a series of build commands you define. Supports optional `tag` or `branch` (use only one). If none is provided, the default branch HEAD is used. `tag` can include placeholders like `v{version}`.
 4.  **`script`**: Downloads and executes an installation script (e.g. `install.sh`).
 
 For the list of supported archive formats for `com_binary`, see [Supported Archives for Compressed Binaries](./archives).
@@ -620,7 +629,7 @@ For the full list of supported dependency managers, usage semantics, and command
   ```sh
   # The term matches tags too
   zoi search editor
-  
+
   # Require specific tag(s)
   zoi search editor -t cli,devtools
   zoi search editor -t cli -t devtools

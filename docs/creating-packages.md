@@ -126,6 +126,10 @@ installation:
   - type: source
     url: "https://github.com/{git}" # {git} is a placeholder for the top-level git field
     platforms: ["linux-amd64", "macos-amd64", "windows-amd64"]
+    # (Optional) One of these may be specified to pick a ref
+    # tag can include placeholders like v{version}
+    # tag: "v{version}"
+    # branch: "release/{version}"
     commands:
       - "make build"
       - "mv ./bin/compiler {store}/compiler" # {store} is the path to Zoi's install directory
