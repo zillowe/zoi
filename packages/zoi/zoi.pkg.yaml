@@ -1,5 +1,5 @@
 name: zoi
-repo: main
+repo: core
 versions:
   stable: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/version.json
   public: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/version.json
