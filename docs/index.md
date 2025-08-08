@@ -17,7 +17,7 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
 - **Universal Package Support:** Install packages from various sources: binaries, compressed archives, build from source, or installer scripts.
 - **Extensive Dependency Management:** Integrates with over 30+ package managers (`apt`, `brew`, `cargo`, `npm`, `pip`, `scoop`, etc.) to handle dependencies.
 - **Rich Dependencies:** Packages can define runtime and build dependencies with required, optional, and selectable options groups.
-- **Project Environments:** Easily define and manage project-specific environments and commands using `zoi.yaml`.
+- **Project Environments:** Easily define and manage project-specific environments and commands using [`zoi.yaml`](./project-config).
 - **Repository-Based:** Manage packages from official or community repositories. Easily add your own.
 - **Intuitive CLI:** A simple and powerful command-line interface with helpful aliases for a better developer experience.
 - **Package Types:** Supports standard packages, meta-packages (collections), background services, and configuration file management.
@@ -176,7 +176,7 @@ You'll need [Rust](https://www.rust-lang.org) installed.
 ./configure
 make
 sudo make install
-# Install CLI completions (bash, zsh, fist, elvish, powershell)
+# Install CLI completions (bash, zsh, fish, elvish, powershell)
 make install-completion
 ```
 
@@ -240,6 +240,8 @@ Zoi provides a wide range of commands to manage your packages and environment. F
 | `run`   | Executes a command from a local 'zoi.yaml' file. Can be run interactively.     |
 | `env`   | Sets up project environments from a 'zoi.yaml' file. Can be run interactively. |
 
+See the full schema and examples in [Project Configuration (zoi.yaml)](./project-config).
+
 ### Service Management
 
 | Command | Description                         |
@@ -275,6 +277,8 @@ zoi repo remove community
 # List active repositories
 zoi repo list
 ```
+
+For an overview of official repositories, mirrors, and repository tiers, see [Repositories](./repositories).
 
 Zoi supports different types of packages, defined in the `.pkg.yaml` file.
 

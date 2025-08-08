@@ -9,16 +9,18 @@ This guide provides a start-to-finish walkthrough of creating a new package, tes
 
 Zoi organizes its packages into several repositories, each with a specific purpose. When you contribute a new package, you'll need to decide which repository is the best fit.
 
-| Repository  | Description                                                                                                                             |
-| ----------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `core`      | Contains essential, fundamental packages that are often dependencies for other tools (e.g. `vim`, `git`). These are tightly maintained. |
-| `main`      | A curated set of popular, high-quality, and well-maintained packages that are useful for a wide audience (e.g. `node`, `go`).           |
-| `extra`     | A broader collection of useful packages that may not be as universally applicable as those in `main`.                                   |
-| `community` | The primary repository for packages submitted by the community. This is the best place for new contributions.                           |
-| `test`      | Used internally for testing new Zoi features and package builds. Not intended for general use.                                          |
-| `archive`   | Contains older or deprecated packages that are no longer maintained but are kept for historical purposes.                               |
+| Repository  | Description                                                                       |
+| ----------- | --------------------------------------------------------------------------------- |
+| `core`      | Essential packages and libraries; very common and well-maintained.                |
+| `main`      | Important packages that don’t fit in `core` but are essential for most users.     |
+| `extra`     | New or niche packages; less common and may be less actively maintained.           |
+| `community` | User-submitted packages. New entries start here and may graduate to higher tiers. |
+| `test`      | Testing ground for new Zoi features and packages prior to release.                |
+| `archive`   | Archived packages that are no longer maintained.                                  |
 
 For your first contribution, you will almost always be adding your package to the **`community`** repository.
+
+For more information about repositories [visit here](./repositories.md)
 
 ## Step 1: Creating Your `pkg.yaml` File
 
@@ -445,7 +447,7 @@ Before you publish your package, you **must** test it locally to ensure it insta
     zoi uninstall my-package
     ```
 
-## Step 5: Publishing Your Package
+## Step 6: Publishing Your Package
 
 Once your package works locally, it's time to share it with the world! This is done by adding your `pkg.yaml` file to the official Zoi packages database.
 

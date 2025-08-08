@@ -504,6 +504,50 @@ installation:
 
 ---
 
+## Project `zoi.yaml` Example
+
+Use `zoi.yaml` to define project commands and environment setups that can be executed with `zoi run` and `zoi env`.
+
+```yaml
+# zoi.yaml (placed at your project root)
+name: my-project
+
+packages:
+  - name: git
+    check: git --version
+  - name: node
+    check: node --version
+
+commands:
+  - cmd: dev
+    run: npm run dev
+  - cmd: test
+    run: npm test
+
+environments:
+  - name: Web build
+    cmd: web
+    run:
+      - npm ci
+      - npm run build
+  - name: Rust toolchain
+    cmd: rust
+    run:
+      - rustup toolchain install stable
+      - rustup component add clippy rustfmt
+```
+
+Run with:
+
+```sh
+zoi run dev    # execute a command by alias
+zoi run        # interactive command chooser
+zoi env web    # set up an environment by alias
+zoi env        # interactive environment chooser
+```
+
+See full schema and best practices in [Project Configuration (zoi.yaml)](./project-config).
+
 ## Package with `alt` Redirection
 
 The `alt` field redirects Zoi to install a different package. This is perfect for creating aliases or pointing to a package definition hosted elsewhere. The value can be another package name, a URL to a raw `.pkg.yaml` file, or a local file path.

@@ -55,15 +55,15 @@
     - [Arch Linux (AUR)](#arch-linux-aur)
     - [macOS (Homebrew)](#macos-homebrew)
     - [Windows (Scoop)](#windows-scoop)
-    - [From Crates.io](#from-cratesio)
-    - [From NPM](#from-npm)
+    - [Crates.io](#cratesio)
+    - [NPM](#npm)
   - [Scripts](#-scripts)
   - [Build from Source](#%EF%B8%8F-build-from-source)
 - [Platforms](#-platforms)
 - [Dependencies Support](#-dependencies-support)
 - [Usage](#-usage)
 - [Packaging Status](#-packaging-status)
-- [Mirrors](#-mirrors)
+- [Repositories & Mirrors](#-repositories-mirrors)
 - [Contributing](#-contributing)
 - [License](#-license)
 
@@ -76,8 +76,8 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
 - **Cross-Platform:** Works seamlessly on Linux, macOS, and Windows.
 - **Universal Package Support:** Install packages from various sources: binaries, compressed archives, build from source, or installer scripts.
 - **Extensive Dependency Management:** Integrates with over 30+ package managers (`apt`, `brew`, `cargo`, `npm`, `pip`, `scoop`, etc.) to handle dependencies.
-- **Optional Dependencies:** Packages can define optional dependencies for extra features, which users can select during installation.
-- **Project Environments:** Easily define and manage project-specific environments and commands using `zoi.yaml`.
+- **Rich Dependencies:** Packages can define runtime and build dependencies with required, optional, and selectable options groups.
+- **Project Environments:** Easily define and manage project-specific environments and commands using [`zoi.yaml`](https://zillowe.rf.gd/docs/zdz/zoi/project-config).
 - **Repository-Based:** Manage packages from official or community repositories. Easily add your own.
 - **Intuitive CLI:** A simple and powerful command-line interface with helpful aliases for a better developer experience.
 - **Package Types:** Supports standard packages, meta-packages (collections), background services, and configuration file management.
@@ -143,7 +143,7 @@ scoop bucket add zillowe https://github.com/Zillowe/scoop.git
 scoop install zoi
 ```
 
-#### From Crates.io
+#### Crates.io
 
 You can install `zoi-cli` directly from [crates.io](https://crates.io/crates/zoi-cli) using `cargo`:
 
@@ -151,7 +151,7 @@ You can install `zoi-cli` directly from [crates.io](https://crates.io/crates/zoi
 cargo install zoi-cli
 ```
 
-#### From NPM
+#### NPM
 
 You can install `@zillowe/zoi` from `npm` also.
 
@@ -198,7 +198,7 @@ If you prefer, you can build Zoi from source. You'll need [Rust](https://www.rus
 ./configure
 make
 sudo make install
-# Install CLI completions (bash, zsh, fist, elvish, powershell)
+# Install CLI completions (bash, zsh, fish, elvish, powershell)
 make install-completion
 ```
 
@@ -343,21 +343,28 @@ We welcome contributions from the community! If you'd like to contribute, please
 
 New features, enhancements and bug reports are welcome.
 
-## 🪞 Mirrors
+## 📚 Repositories & Mirrors
 
-Zoi host it's main repo [this] and packages database repo on:
+Zoi is hosted on multiple forges. The primary locations and mirrors are:
 
-Main Repo:
+- Zoi Source Code (this repo)
+  - Primary: [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi)
+  - Mirrors: [GitHub](https://github.com/Zillowe/Zoi), [Codeberg](https://codeberg.org/Zillowe/Zoi)
 
-- [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi) Main
-- [GitHub](https://github.com/Zillowe/Zoi) Mirror
-- [Codeberg](https://codeberg.org/Zillowe/Zoi) Mirror
+- Packages Database (`Zoi-Pkgs`)
+  - Primary: [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi-Pkgs)
+  - Mirrors: [GitHub](https://github.com/Zillowe/Zoi-Pkgs), [Codeberg](https://codeberg.org/Zillowe/Zoi-Pkgs)
 
-Packages Repo:
+### Repository tiers
 
-- [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi-Pkgs) Main
-- [GitHub](https://github.com/Zillowe/Zoi-Pkgs) Mirror
-- [Codeberg](https://codeberg.org/Zillowe/Zoi-Pkgs) Mirror
+- Core: Essential packages, libraries and very common/maintained packages.
+- Main: Packages that don't fit in Core but are essential for most people.
+- Extra: Packages that are new, not very common or maintained, not preferable.
+- Community: User submitted packages that are new, can be upgraded to a higher repo.
+- Test: Testing repo for new Zoi features and for new packages before release.
+- Archive: Archived packages that are no longer maintained.
+
+For details and CLI usage examples, see the docs page: [Repositories](https://zillowe.rf.gd/docs/zds/zoi/repositories).
 
 ## 📜 License
 
