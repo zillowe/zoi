@@ -489,7 +489,7 @@ For the full list of supported dependency managers, usage semantics, and command
 <br />
 <Accordions type="single">
   <Accordion title="How do I run a tool without installing it?">
-    Use `zoi exec &lt;package&gt;`. Zoi will fetch a temporary binary and run it
+    Use `zoi exec <package>`. Zoi will fetch a temporary binary and run it
     without adding it to your PATH or installed set.
   </Accordion>
 </Accordions>
@@ -497,15 +497,15 @@ For the full list of supported dependency managers, usage semantics, and command
 <Accordions type="single">
   <Accordion title="How do I use a custom git package repository?">
     Add it with `zoi repo add https://github.com/you/your-zoi-repo.git`.
-    Install packages from it using `@git/&lt;repo-name&gt;/&lt;pkg-name&gt;`.
+    Install packages from it using `@git/<repo-name>/<pkg-name>`.
     List/remove cloned git repos with `zoi repo git ls` and
-    `zoi repo git rm &lt;repo-name&gt;`.
+    `zoi repo git rm <repo-name>`.
   </Accordion>
 </Accordions>
 <br />
 <Accordions type="single">
   <Accordion title="Where are binaries installed and how do I fix PATH?">
-    Binaries are placed in `~/.zoi/pkgs/store/&lt;name&gt;/bin` and linked into
+    Binaries are placed in `~/.zoi/pkgs/store/<name>/bin` and linked into
     `~/.zoi/pkgs/bin`. Zoi attempts to add this to your shell PATH on Unix and user PATH on Windows.
     If commands are not found, add `~/.zoi/pkgs/bin`` to your PATH manually.
   </Accordion>
