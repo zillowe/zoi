@@ -379,15 +379,6 @@ installation:
         sig: "https://github.com/user/my-awesome-app/releases/download/v{version}/my-awesome-app-{platform}.sig"
 
   - type: com_binary
-  - type: source
-    url: "https://github.com/{git}"
-    platforms: ["linux-amd64", "macos-amd64", "windows-amd64"]
-    # (Optional) Use only one of these. {version} will be expanded.
-    # tag: "v{version}"
-    # branch: "release/{version}"
-    commands:
-      - "make build"
-      - "mv ./bin/my-awesome-app {store}/my-awesome-app"
     url: "https://github.com/user/my-awesome-app/releases/download/v{version}/my-awesome-app-v{version}-{platform}.{platformComExt}"
     platforms: ["linux-amd64", "macos-amd64", "windows-amd64"]
     platformComExt:
@@ -400,6 +391,16 @@ installation:
     # binary_path: "bin/my-awesome-app"
     # binary_path: "my-awesome-app.exe"
     binary_path: "bin/my-awesome-app"
+
+  - type: source
+    url: "https://github.com/{git}"
+    platforms: ["linux-amd64", "macos-amd64", "windows-amd64"]
+    # (Optional) Use only one of these. {version} will be expanded.
+    # tag: "v{version}"
+    # branch: "release/{version}"
+    commands:
+      - "make build"
+      - "mv ./bin/my-awesome-app {store}/my-awesome-app"
 
 # (Optional) Dependencies required by the package.
 dependencies:
