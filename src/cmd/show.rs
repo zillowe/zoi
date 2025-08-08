@@ -82,6 +82,18 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
     };
     println!("{}: {}", "Scope".bold(), scope_display);
 
+    if let Some(bins) = &pkg.bins {
+        if !bins.is_empty() {
+            println!("{}: {}", "Provides".bold(), bins.join(", ").blue());
+        }
+    }
+
+    if let Some(conflicts) = &pkg.conflicts {
+        if !conflicts.is_empty() {
+            println!("{}: {}", "Conflicts".bold(), conflicts.join(", ").red());
+        }
+    }
+
     if pkg.package_type == crate::pkg::types::PackageType::Package {
         println!("\n{}:", "Available installation methods".bold());
         for method in &pkg.installation {
@@ -148,17 +160,35 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
 
         if let Some(build) = &deps.build {
             println!("  {}:", "Build".bold());
-            for dep in build.get_required() {
+            for dep in build.get_required_simple() {
                 println!("    - {}", dep);
             }
+            for group in build.get_required_options() {
+                println!(
+                    "    - {}: {} (choose {})",
+                    group.name.bold(),
+                    group.desc,
+                    if group.all { "any" } else { "one" }
+                );
+                for dep in &group.depends {
+                    let parts: Vec<&str> = dep.rsplitn(2, ':').collect();
+                    if parts.len() == 2
+                        && !parts[0].contains(['=', '>', '<', '~', '^'])
+                        && !parts[1].is_empty()
+                    {
+                        println!("      - {}: {}", parts[1], parts[0].italic());
+                    } else {
+                        println!("      - {}", dep);
+                    }
+                }
+            }
             for dep in build.get_optional() {
-                let parts: Vec<&str> = dep.split(':').collect();
-                if parts.len() >= 3 {
-                    println!(
-                        "    - {} (optional): {}",
-                        parts[0..2].join(":"),
-                        parts[2..].join(":")
-                    );
+                let parts: Vec<&str> = dep.rsplitn(2, ':').collect();
+                if parts.len() == 2
+                    && !parts[0].contains(['=', '>', '<', '~', '^'])
+                    && !parts[1].is_empty()
+                {
+                    println!("    - {} (optional): {}", parts[1], parts[0].italic());
                 } else {
                     println!("    - {} (optional)", dep);
                 }
@@ -167,17 +197,35 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
 
         if let Some(runtime) = &deps.runtime {
             println!("  {}:", "Runtime".bold());
-            for dep in runtime.get_required() {
+            for dep in runtime.get_required_simple() {
                 println!("    - {}", dep);
             }
+            for group in runtime.get_required_options() {
+                println!(
+                    "    - {}: {} (choose {})",
+                    group.name.bold(),
+                    group.desc,
+                    if group.all { "any" } else { "one" }
+                );
+                for dep in &group.depends {
+                    let parts: Vec<&str> = dep.rsplitn(2, ':').collect();
+                    if parts.len() == 2
+                        && !parts[0].contains(['=', '>', '<', '~', '^'])
+                        && !parts[1].is_empty()
+                    {
+                        println!("      - {}: {}", parts[1], parts[0].italic());
+                    } else {
+                        println!("      - {}", dep);
+                    }
+                }
+            }
             for dep in runtime.get_optional() {
-                let parts: Vec<&str> = dep.split(':').collect();
-                if parts.len() >= 3 {
-                    println!(
-                        "    - {} (optional): {}",
-                        parts[0..2].join(":"),
-                        parts[2..].join(":")
-                    );
+                let parts: Vec<&str> = dep.rsplitn(2, ':').collect();
+                if parts.len() == 2
+                    && !parts[0].contains(['=', '>', '<', '~', '^'])
+                    && !parts[1].is_empty()
+                {
+                    println!("    - {} (optional): {}", parts[1], parts[0].italic());
                 } else {
                     println!("    - {} (optional)", dep);
                 }

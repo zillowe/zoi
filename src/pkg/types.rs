@@ -150,6 +150,16 @@ pub struct InstallationMethod {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)]
+pub struct DependencyOptionGroup {
+    pub name: String,
+    pub desc: String,
+    #[serde(default)]
+    pub all: bool,
+    pub depends: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum DependencyGroup {
     Simple(Vec<String>),
@@ -157,10 +167,17 @@ pub enum DependencyGroup {
 }
 
 impl DependencyGroup {
-    pub fn get_required(&self) -> &Vec<String> {
+    pub fn get_required_simple(&self) -> Vec<String> {
         match self {
-            DependencyGroup::Simple(deps) => deps,
-            DependencyGroup::Complex(group) => &group.required,
+            DependencyGroup::Simple(deps) => deps.clone(),
+            DependencyGroup::Complex(group) => group.required.clone(),
+        }
+    }
+
+    pub fn get_required_options(&self) -> Vec<DependencyOptionGroup> {
+        match self {
+            DependencyGroup::Simple(_) => Vec::new(),
+            DependencyGroup::Complex(group) => group.options.clone(),
         }
     }
 
@@ -179,6 +196,8 @@ impl DependencyGroup {
 pub struct ComplexDependencyGroup {
     #[serde(default)]
     pub required: Vec<String>,
+    #[serde(default)]
+    pub options: Vec<DependencyOptionGroup>,
     #[serde(default)]
     pub optional: Vec<String>,
 }
@@ -207,6 +226,8 @@ pub struct InstallManifest {
     pub scope: Scope,
     #[serde(default)]
     pub bins: Option<Vec<String>>,
+    #[serde(default)]
+    pub installed_dependencies: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

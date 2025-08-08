@@ -13,21 +13,6 @@ fn get_bin_root() -> Result<PathBuf, Box<dyn Error>> {
     Ok(home_dir.join(".zoi").join("pkgs").join("bin"))
 }
 
-fn get_all_dependencies(pkg: &types::Package) -> Vec<String> {
-    let mut all_deps = Vec::new();
-    if let Some(ref deps) = pkg.dependencies {
-        if let Some(ref runtime_deps) = deps.runtime {
-            all_deps.extend(runtime_deps.get_required().clone());
-            all_deps.extend(runtime_deps.get_optional().clone());
-        }
-        if let Some(ref build_deps) = deps.build {
-            all_deps.extend(build_deps.get_required().clone());
-            all_deps.extend(build_deps.get_optional().clone());
-        }
-    }
-    all_deps
-}
-
 fn run_post_uninstall_hooks(pkg: &types::Package) -> Result<(), Box<dyn Error>> {
     if let Some(hooks) = &pkg.post_uninstall {
         println!("\n{}", "Running post-uninstallation commands...".bold());
@@ -81,16 +66,20 @@ fn run_post_uninstall_hooks(pkg: &types::Package) -> Result<(), Box<dyn Error>> 
     Ok(())
 }
 
-fn uninstall_collection(pkg: &types::Package, scope: types::Scope) -> Result<(), Box<dyn Error>> {
+fn uninstall_collection(
+    pkg: &types::Package,
+    manifest: &types::InstallManifest,
+    scope: types::Scope,
+) -> Result<(), Box<dyn Error>> {
     println!("Uninstalling collection '{}'...", pkg.name.bold());
 
-    let dependencies_to_uninstall = get_all_dependencies(pkg);
+    let dependencies_to_uninstall = &manifest.installed_dependencies;
 
     if dependencies_to_uninstall.is_empty() {
         println!("Collection has no dependencies to uninstall.");
     } else {
         println!("Uninstalling dependencies of the collection...");
-        for dep_str in &dependencies_to_uninstall {
+        for dep_str in dependencies_to_uninstall {
             println!("\n--- Uninstalling dependency: {} ---", dep_str.bold());
             if let Err(e) = dependencies::uninstall_dependency(dep_str, &run) {
                 eprintln!(
@@ -109,7 +98,7 @@ fn uninstall_collection(pkg: &types::Package, scope: types::Scope) -> Result<(),
 
 pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
     let (pkg, _) = resolve::resolve_package_and_version(package_name)?;
-    let (_manifest, scope) =
+    let (manifest, scope) =
         if let Some(m) = local::is_package_installed(&pkg.name, types::Scope::User)? {
             (m, types::Scope::User)
         } else if let Some(m) = local::is_package_installed(&pkg.name, types::Scope::System)? {
@@ -119,7 +108,7 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
         };
 
     if pkg.package_type == types::PackageType::Collection {
-        return uninstall_collection(&pkg, scope);
+        return uninstall_collection(&pkg, &manifest, scope);
     }
 
     let pkg_id = format!("zoi:{}", pkg.name);
@@ -131,7 +120,7 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
             dependents.join("\n  - ")
         ).into());
     }
-    let dependencies_to_check = get_all_dependencies(&pkg);
+    let dependencies_to_check = &manifest.installed_dependencies;
     println!(
         "Uninstalling '{}' and its unused dependencies...",
         pkg.name.bold()
@@ -158,7 +147,7 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
             e
         );
     }
-    for dep_str in &dependencies_to_check {
+    for dep_str in dependencies_to_check {
         dependencies::remove_dependency_link(&pkg.name, dep_str)?;
         let other_dependents = dependencies::get_dependents(dep_str)?;
         if other_dependents.is_empty() {

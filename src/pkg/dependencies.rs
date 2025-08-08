@@ -1,7 +1,7 @@
 use crate::pkg::{install, local, resolve, types};
 use crate::utils;
 use colored::*;
-use dialoguer::{Input, theme::ColorfulTheme};
+use dialoguer::{Input, Select, theme::ColorfulTheme};
 use regex::Regex;
 use semver::{Version, VersionReq};
 use std::collections::{HashMap, HashSet};
@@ -151,6 +151,7 @@ fn install_dependency(
     scope: types::Scope,
     yes: bool,
     processed_deps: &mut HashSet<String>,
+    installed_deps: &mut Vec<String>,
 ) -> Result<(), Box<dyn Error>> {
     let dep_id = format!("{}:{}", dep.manager, dep.package);
     if !processed_deps.insert(dep_id.clone()) {
@@ -201,6 +202,7 @@ fn install_dependency(
     }
 
     add_dependency_link(parent_pkg_name, &dep_id)?;
+    installed_deps.push(dep_id.clone());
 
     match manager {
         "zoi" => {
@@ -670,6 +672,7 @@ pub fn resolve_and_install_required(
     scope: types::Scope,
     yes: bool,
     processed_deps: &mut HashSet<String>,
+    installed_deps: &mut Vec<String>,
 ) -> Result<(), Box<dyn Error>> {
     if deps.is_empty() {
         return Ok(());
@@ -678,9 +681,159 @@ pub fn resolve_and_install_required(
     println!("{}", "Resolving required dependencies...".bold());
     for dep_str in deps {
         let dependency = parse_dependency_string(dep_str)?;
-        install_dependency(&dependency, parent_pkg_name, scope, yes, processed_deps)?;
+        install_dependency(
+            &dependency,
+            parent_pkg_name,
+            scope,
+            yes,
+            processed_deps,
+            installed_deps,
+        )?;
     }
     println!("{}", "All required dependencies resolved.".green());
+    Ok(())
+}
+
+pub fn resolve_and_install_required_options(
+    option_groups: &[types::DependencyOptionGroup],
+    parent_pkg_name: &str,
+    scope: types::Scope,
+    yes: bool,
+    processed_deps: &mut HashSet<String>,
+    installed_deps: &mut Vec<String>,
+) -> Result<(), Box<dyn Error>> {
+    if option_groups.is_empty() {
+        return Ok(());
+    }
+
+    for group in option_groups {
+        println!(
+            "[{}] There are {} options available for {}",
+            group.name.bold(),
+            group.depends.len(),
+            group.desc.italic()
+        );
+
+        let mut parsed_deps = Vec::new();
+        for (i, dep_str) in group.depends.iter().enumerate() {
+            let dep = parse_dependency_string(dep_str)?;
+            let desc = dep.description.unwrap_or("No description");
+            let mut dep_display = format!("{}:{}", dep.manager, dep.package);
+            if let Some(req) = &dep.req {
+                dep_display.push_str(&req.to_string());
+            }
+            println!(
+                "  {}. {} - {}",
+                (i + 1).to_string().cyan(),
+                dep_display.bold(),
+                desc.italic()
+            );
+            parsed_deps.push(dep);
+        }
+
+        if yes {
+            if group.all {
+                println!(
+                    "--yes provided, installing all options for '{}'",
+                    group.name
+                );
+                for dep in &parsed_deps {
+                    install_dependency(
+                        dep,
+                        parent_pkg_name,
+                        scope,
+                        yes,
+                        processed_deps,
+                        installed_deps,
+                    )?;
+                }
+            } else {
+                println!(
+                    "--yes provided, installing the first option for '{}'",
+                    group.name
+                );
+                if let Some(dep) = parsed_deps.get(0) {
+                    install_dependency(
+                        dep,
+                        parent_pkg_name,
+                        scope,
+                        yes,
+                        processed_deps,
+                        installed_deps,
+                    )?;
+                }
+            }
+            continue;
+        }
+
+        if group.all {
+            let input: String = Input::with_theme(&ColorfulTheme::default())
+                .with_prompt("Choose which to install (e.g. '1,3', 'all')")
+                .default("1".into())
+                .interact_text()?;
+
+            let trimmed_input = input.trim().to_lowercase();
+            let mut to_install = Vec::new();
+
+            if trimmed_input == "all" {
+                to_install.extend(0..parsed_deps.len());
+            } else {
+                for part in trimmed_input.split([',', ' ']).filter(|s| !s.is_empty()) {
+                    if let Ok(num) = part.parse::<usize>() {
+                        if num > 0 && num <= parsed_deps.len() {
+                            to_install.push(num - 1);
+                        } else {
+                            println!("Invalid number: {}", num);
+                        }
+                    } else {
+                        println!("Invalid input: {}", part);
+                    }
+                }
+            }
+            to_install.sort();
+            to_install.dedup();
+
+            for index in to_install {
+                let dep = &parsed_deps[index];
+                install_dependency(
+                    dep,
+                    parent_pkg_name,
+                    scope,
+                    yes,
+                    processed_deps,
+                    installed_deps,
+                )?;
+            }
+        } else {
+            let items: Vec<_> = parsed_deps
+                .iter()
+                .map(|d| {
+                    let desc = d.description.unwrap_or("No description");
+                    let mut dep_display = format!("{}:{}", d.manager, d.package);
+                    if let Some(req) = &d.req {
+                        dep_display.push_str(&req.to_string());
+                    }
+                    format!("{} - {}", dep_display, desc)
+                })
+                .collect();
+
+            let selection = Select::with_theme(&ColorfulTheme::default())
+                .with_prompt("Choose which to install")
+                .items(&items)
+                .default(0)
+                .interact()?;
+
+            let dep = &parsed_deps[selection];
+            install_dependency(
+                dep,
+                parent_pkg_name,
+                scope,
+                yes,
+                processed_deps,
+                installed_deps,
+            )?;
+        }
+    }
     Ok(())
 }
 
@@ -690,6 +843,7 @@ pub fn resolve_and_install_optional(
     scope: types::Scope,
     yes: bool,
     processed_deps: &mut HashSet<String>,
+    installed_deps: &mut Vec<String>,
 ) -> Result<(), Box<dyn Error>> {
     if deps.is_empty() {
         return Ok(());
@@ -699,7 +853,14 @@ pub fn resolve_and_install_optional(
         println!("{}", "Installing all optional dependencies...".bold());
         for dep_str in deps {
             let dependency = parse_dependency_string(dep_str)?;
-            install_dependency(&dependency, parent_pkg_name, scope, true, processed_deps)?;
+            install_dependency(
+                &dependency,
+                parent_pkg_name,
+                scope,
+                true,
+                processed_deps,
+                installed_deps,
+            )?;
         }
         return Ok(());
     }
@@ -756,7 +917,14 @@ pub fn resolve_and_install_optional(
 
     for index in to_install {
         let dep = &parsed_deps[index];
-        install_dependency(dep, parent_pkg_name, scope, yes, processed_deps)?;
+        install_dependency(
+            dep,
+            parent_pkg_name,
+            scope,
+            yes,
+            processed_deps,
+            installed_deps,
+        )?;
     }
 
     Ok(())

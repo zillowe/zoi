@@ -16,7 +16,7 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
 - **Cross-Platform:** Works seamlessly on Linux, macOS, and Windows.
 - **Universal Package Support:** Install packages from various sources: binaries, compressed archives, build from source, or installer scripts.
 - **Extensive Dependency Management:** Integrates with over 30+ package managers (`apt`, `brew`, `cargo`, `npm`, `pip`, `scoop`, etc.) to handle dependencies.
-- **Optional Dependencies:** Packages can define optional dependencies for extra features, which users can select during installation.
+- **Rich Dependencies:** Packages can define runtime and build dependencies with required, optional, and selectable options groups.
 - **Project Environments:** Easily define and manage project-specific environments and commands using `zoi.yaml`.
 - **Repository-Based:** Manage packages from official or community repositories. Easily add your own.
 - **Intuitive CLI:** A simple and powerful command-line interface with helpful aliases for a better developer experience.
@@ -369,7 +369,6 @@ installation:
 # (Optional) Dependencies required by the package.
 dependencies:
   # Dependencies are split into 'build' and 'runtime'.
-  # Each can have 'required' and 'optional' dependencies.
   build:
     required:
       - native:cmake
@@ -377,7 +376,16 @@ dependencies:
       - native:doxygen:for generating documentation
   runtime:
     required:
+      # Simple required dependency
       - zoi:another-zoi-package
+      # A group of selectable required dependencies
+      options:
+        - name: "GUI Toolkit"
+          desc: "Choose a GUI provider"
+          all: no # User must choose one
+          depends:
+            - native:qt6:for KDE desktops
+            - native:gtk4:for GNOME desktops
     optional:
       - zoi:awesome-plugin:to enable the awesome feature
 
@@ -410,11 +418,13 @@ Zoi supports four types of installation methods within the `installation` list:
 3.  **`source`**: Clones a git repository and runs a series of build commands you define.
 4.  **`script`**: Downloads and executes an installation script (e.g. `install.sh`).
 
-### Supported Dependencies
+### Supported Dependencies & Schema
 
-Zoi can manage dependencies from a wide variety of external package managers. You can specify them in the `build` or `runtime` sections of the `dependencies` map.
+Zoi can manage dependencies from a wide variety of external package managers. Define them under `dependencies.runtime` and `dependencies.build`.
 
-The format for a dependency is `manager:package-name`. For optional dependencies, you can add a description like so: `manager:package-name:description`.
+- `required`: always installed (simple list of `manager:package`).
+- `optional`: prompted to install (supports inline descriptions: `manager:package:description`).
+- `required.options`: selectable providers with `name`, `desc`, `all` (boolean), and `depends` (each item may include an inline description).
 
 | Manager          | Ecosystem / OS                  | Example                                   |
 | ---------------- | ------------------------------- | ----------------------------------------- |

@@ -193,14 +193,9 @@ Zoi will download the key from the URL, import it, and use it to verify the sign
 
 ## Step 3: Adding Dependencies
 
-If your package requires other tools to be installed, define them in the `dependencies` section.
+If your package requires other tools to be installed, define them in the `dependencies` section. Dependencies are split between `build` (needed to compile from source) and `runtime` (needed to run the application).
 
-- `build`: Dependencies needed only to compile the package (for `source` builds).
-- `runtime`: Dependencies needed to run the package.
-- `required`: Dependencies that are always installed.
-- `optional`: Dependencies that the user is prompted to install, useful for plugins or extra features.
-
-The format is `manager:package-name:description` (the description is for optional dependencies).
+Both `build` and `runtime` dependencies can be further divided into `required` and `optional`.
 
 ```yaml
 dependencies:
@@ -215,6 +210,73 @@ dependencies:
       - zoi:plugin-A:adds feature X
       - zoi:plugin-B:adds feature Y
 ```
+
+- `required`: Dependencies that are always installed.
+- `optional`: Dependencies that the user is prompted to install. The format is `manager:package-name:description`, where the description explains what the dependency provides.
+
+### Selectable Required Dependencies
+
+For more complex scenarios, you can offer the user a choice between different providers for a required dependency. This is useful when your application supports multiple backends (e.g. different GUI toolkits or database drivers).
+
+You can structure the `required` section with an `options` block:
+
+```yaml
+dependencies:
+  runtime:
+    required:
+      # You can mix simple required dependencies...
+      - zoi:core-library
+      # ...with selectable options.
+      options:
+        - name: "GUI"
+          desc: "GUI Providers"
+          all: no # 'no' means the user must choose only one. 'yes' allows multiple selections.
+          depends:
+            - native:qt6:for KDE desktop environments
+            - native:gtk4:for GNOME-based desktop environments
+```
+
+When a user installs this package, Zoi will prompt them to choose a GUI provider, ensuring the necessary dependency is met while giving the user control.
+
+### Advanced: Full dependency schema
+
+Both `runtime` and `build` support the same structure: a simple list, or an advanced object with `required`, `options`, and `optional` all at once.
+
+```yaml
+dependencies:
+  runtime:
+    required:
+      - zoi:core-utils
+    options:
+      - name: "GUI Toolkit"
+        desc: "Choose a GUI provider for the application"
+        all: false
+        depends:
+          - native:qt6:Recommended for KDE Plasma
+          - native:gtk4:Recommended for GNOME
+          - native:libadwaita:For a modern GNOME look and feel
+    optional:
+      - zoi:extra-utils:handy extras
+  build:
+    required:
+      - zoi:build-utils
+    options:
+      - name: "Build GUI Toolkit"
+        desc: "Choose GUI dev libraries"
+        all: true
+        depends:
+          - native:qt6-dev:KDE toolkit headers and libs
+          - native:gtk4-dev:GNOME toolkit headers and libs
+    optional:
+      - zoi:extra-build-utils:extra helpers
+```
+
+- Required entries cannot have inline descriptions. If you need description and choice, use an `options` group.
+- Optional entries can have inline descriptions using `manager:package:description`.
+- In an `options` group, each `depends` item can include an inline description after the second `:`.
+- During installation:
+  - For normal packages, `build` dependencies are installed when a source build is selected/required (no compatible `binary`/`com_binary`), or when forcing source.
+  - For `collection` and `config` packages, both `runtime` and `build` dependencies are honored directly.
 
 ## Step 4: Adding Post-Installation & Uninstallation Hooks
 
