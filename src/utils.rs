@@ -521,7 +521,6 @@ pub fn get_all_available_package_managers() -> Vec<String> {
         "eopkg",
         "guix",
         "mas",
-        "uv",
     ];
 
     for manager in &all_possible_managers {
