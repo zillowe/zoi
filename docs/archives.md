@@ -44,6 +44,8 @@ These formats are confirmed in the code paths that read and unpack archives:
 - tar.xz via `xz2::read::XzDecoder` + `tar::Archive`
 - tar.zst via `zstd::stream::read::Decoder` + `tar::Archive`
 
+Note: For source-based installations (`type: source`), you can specify optional `tag` or `branch` in the method to select a specific ref to build from. Only one may be provided. Both support `{version}` placeholders like `v{version}`.
+
 ## Tips
 
 - Choose `zip` for Windows for best compatibility; use `tar.*` on Unix-like systems.
