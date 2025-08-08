@@ -155,23 +155,37 @@ else
         filename=$(basename "$new_binary_path")
         if [[ "$filename" == *"windows"* ]]; then
             archive_name="${filename%.exe}.zip"
+            old_bin_name="zoi.exe"
         else
             archive_name="${filename}.tar.zst"
+            old_bin_name="zoi"
         fi
-    
+
         OLD_ARCHIVE_URL="https://gitlab.com/${GITLAB_PROJECT_PATH}/-/releases/${LATEST_TAG}/downloads/${archive_name}"
         OLD_ARCHIVE_TMP=$(mktemp)
-        OLD_BINARY_TMP=$(mktemp)
+        OLD_EXTRACT_DIR=$(mktemp -d)
 
         echo -e "  -> Downloading old archive for ${filename} from ${LATEST_TAG}..."
         if curl --fail -sL -o "$OLD_ARCHIVE_TMP" "$OLD_ARCHIVE_URL"; then
-            PATCH_FILE="${ARCHIVE_DIR}/${filename}.patch"
-            echo -e "  -> Creating patch for ${filename}..."
-            bsdiff "$OLD_ARCHIVE_TMP" "$new_binary_path" "$PATCH_FILE"
+            echo -e "  -> Extracting old archive..."
+            if [[ "$archive_name" == *.zip ]]; then
+                7z x -y -o"$OLD_EXTRACT_DIR" "$OLD_ARCHIVE_TMP" >/dev/null
+            else
+                tar --use-compress-program=zstd -xf "$OLD_ARCHIVE_TMP" -C "$OLD_EXTRACT_DIR"
+            fi
+
+            OLD_BINARY_PATH="${OLD_EXTRACT_DIR}/${old_bin_name}"
+            if [[ ! -f "$OLD_BINARY_PATH" ]]; then
+                echo -e "${YELLOW}  -> Could not locate old binary (${old_bin_name}) inside archive. Skipping patch for ${filename}.${NC}"
+            else
+                PATCH_FILE="${ARCHIVE_DIR}/${filename}.patch"
+                echo -e "  -> Creating patch (old binary -> new binary) for ${filename}..."
+                bsdiff "$OLD_BINARY_PATH" "$new_binary_path" "$PATCH_FILE"
+            fi
         else
             echo -e "${YELLOW}  -> Could not download old archive for ${filename}. Skipping patch.${NC}"
         fi
-        rm -f "$OLD_ARCHIVE_TMP" "$OLD_BINARY_TMP"
+        rm -rf "$OLD_ARCHIVE_TMP" "$OLD_EXTRACT_DIR"
     done
 fi
 

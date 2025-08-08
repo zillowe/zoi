@@ -93,7 +93,6 @@ pub fn run_installation(
                 )?;
             }
 
-            // For collections, also honor build dependencies when specified
             if let Some(build_deps) = &deps.build {
                 dependencies::resolve_and_install_required(
                     &build_deps.get_required_simple(),
@@ -158,7 +157,6 @@ pub fn run_installation(
                 )?;
             }
 
-            // For configs, also honor build dependencies when specified
             if let Some(build_deps) = &deps.build {
                 dependencies::resolve_and_install_required(
                     &build_deps.get_required_simple(),
@@ -229,12 +227,10 @@ pub fn run_installation(
     if let Some(deps) = &pkg.dependencies {
         let mut optional_deps_to_install = Vec::new();
 
-        // Determine whether we will need build dependencies
         let platform = utils::get_platform()?;
         let should_include_build = match mode {
             InstallMode::ForceSource => true,
             InstallMode::PreferBinary | InstallMode::Interactive | InstallMode::Updater(_) => {
-                // If no binary or compressed binary exists but a source method does, prepare build deps
                 find_method(&pkg, "source", &platform).is_some()
                     && find_method(&pkg, "binary", &platform).is_none()
                     && find_method(&pkg, "com_binary", &platform).is_none()
