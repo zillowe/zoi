@@ -24,7 +24,7 @@ Zoi organizes packages into tiers. Use these to decide where a package belongs a
 | Repository  | Purpose                                                                           |
 | ----------- | --------------------------------------------------------------------------------- |
 | `core`      | Essential packages and libraries; very common and well-maintained.                |
-| `main`      | Important packages that don’t fit in `core` but are essential for most users.     |
+| `main`      | Important packages that don't fit in `core` but are essential for most users.     |
 | `extra`     | New or niche packages; less common and may be less actively maintained.           |
 | `community` | User-submitted packages. New entries start here and may graduate to higher tiers. |
 | `test`      | Testing ground for new Zoi features and packages prior to release.                |

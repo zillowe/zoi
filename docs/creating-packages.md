@@ -12,7 +12,7 @@ Zoi organizes its packages into several repositories, each with a specific purpo
 | Repository  | Description                                                                       |
 | ----------- | --------------------------------------------------------------------------------- |
 | `core`      | Essential packages and libraries; very common and well-maintained.                |
-| `main`      | Important packages that don’t fit in `core` but are essential for most users.     |
+| `main`      | Important packages that don't fit in `core` but are essential for most users.     |
 | `extra`     | New or niche packages; less common and may be less actively maintained.           |
 | `community` | User-submitted packages. New entries start here and may graduate to higher tiers. |
 | `test`      | Testing ground for new Zoi features and packages prior to release.                |
@@ -99,6 +99,8 @@ installation:
       macos: "tar.gz"
       windows: "zip"
 ```
+
+Supported archive formats for `com_binary` are documented in [Supported Archives for Compressed Binaries](./archives).
 
 #### `source`
 

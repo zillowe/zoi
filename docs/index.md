@@ -424,6 +424,8 @@ Zoi supports four types of installation methods within the `installation` list:
 3.  **`source`**: Clones a git repository and runs a series of build commands you define.
 4.  **`script`**: Downloads and executes an installation script (e.g. `install.sh`).
 
+For the list of supported archive formats for `com_binary`, see [Supported Archives for Compressed Binaries](./archives).
+
 ### Dependencies
 
 For the full list of supported dependency managers, usage semantics, and commands Zoi runs, see [Dependencies & Supported Package Managers](./dependencies).
