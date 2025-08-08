@@ -164,9 +164,6 @@ fn get_platform_info() -> Result<(&'static str, &'static str), Box<dyn Error>> {
         "aarch64" => "arm64",
         _ => return Err(format!("Unsupported architecture: {}", env::consts::ARCH).into()),
     };
-    if os == "openbsd" && arch == "arm64" {
-        return Err("arm64 is not supported on OpenBSD for this application.".into());
-    }
     Ok((os, arch))
 }
 

@@ -53,10 +53,6 @@ case "$(uname -m)" in
     *)          error "Unsupported Arch: $(uname -m)" ;;
 esac
 
-if [ "$os" = "openbsd" ] && [ "$arch" = "arm64" ]; then
-    error "arm64 is not supported on OpenBSD for this application."
-fi
-
 INSTALL_DIR="${HOME}/.local/bin" 
 SUDO_CMD=""
 if [ "$(id -u)" -eq 0 ] || [ -n "${SUDO_USER-}" ]; then
