@@ -3,8 +3,8 @@
 class Zoi < Formula
   desc "Universal Package Manager & Environment Setup Tool"
   homepage "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi"
-  version "3.7.2-beta" 
-  _tag = "Prod-Beta-3.7.2"
+  version "3.8.1-beta" 
+  _tag = "Prod-Beta-3.8.1"
   license "Apache-2.0"
 
   on_macos do
