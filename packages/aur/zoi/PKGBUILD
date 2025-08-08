@@ -21,7 +21,7 @@ optdepends=(
 
 source=("$url/-/archive/$_tag/Zoi-$_tag.tar.gz"
         "LICENSE::$url/-/raw/main/LICENSE")
-sha512sums=(''
+sha512sums=('8c74341f8b1f6e500f43478964ce6d0d6fbef20a4180fa00d097a055947d935c4178fe421675d6b28e5d6a2c7bd4d57b0c9a15776a256e6e1371dd0082ab0dcf'
             'b3923750b32ac92a6305437fec688b51fdd2083f2fa51a5a5ac87a0359937e574edf909b02cfc7f26197df730810102572944fe294a0f8f605fe8264ab825afb')
 
 build() {
