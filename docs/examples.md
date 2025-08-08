@@ -17,6 +17,7 @@ version: 1.2.3
 description: A simple command-line utility.
 website: https://example.com/my-cli
 git: https://github.com/user/my-cli
+tags: [cli, tools]
 maintainer:
   name: "Your Name"
   email: "your.email@example.com"
@@ -50,6 +51,16 @@ installation:
     sigs:
       - file: "my-cli-{platform}"
         sig: "https://github.com/user/my-cli/releases/download/v{version}/my-cli-{platform}.sig"
+
+  - type: com_binary
+    url: "https://github.com/user/my-cli/releases/download/v{version}/my-cli-v{version}-{platform}.{platformComExt}"
+    platforms: ["linux-amd64", "macos-amd64", "windows-amd64"]
+    platformComExt:
+      linux: tar.gz
+      macos: tar.gz
+      windows: zip
+    # The executable lives at this path inside the archive.
+    binary_path: "bin/my-cli"
 ```
 
 **Key Fields:**
@@ -77,6 +88,9 @@ version: 2.0.0
 description: A tool for creating and extracting archives.
 website: https://example.com/archiver
 git: https://github.com/user/archiver
+tags:
+  - cli
+  - archiver
 maintainer:
   name: "Your Name"
   email: "your.email@example.com"
@@ -111,6 +125,7 @@ repo: community
 version: 0.1.0
 description: A new programming language compiler.
 git: https://github.com/user/compiler
+tags: [compiler, devtools]
 maintainer:
   name: "Your Name"
   email: "your.email@example.com"
@@ -159,6 +174,7 @@ repo: community
 version: "1.0"
 description: An example of a script-based installer.
 website: https://example.com/dev-env-installer
+tags: [installer, env]
 maintainer:
   name: "Your Name"
   email: "your.email@example.com"
@@ -190,6 +206,7 @@ repo: community
 type: collection # Set the package type to 'collection'.
 version: "1.0"
 description: A collection of essential tools for web development.
+tags: [collection, web, devtools]
 maintainer:
   name: "Community"
   email: "community@example.com"
@@ -226,6 +243,7 @@ repo: community
 type: service # Set the package type to 'service'.
 version: "5.7"
 description: A lightweight database server.
+tags: [service, database]
 maintainer:
   name: "Your Name"
   email: "your.email@example.com"
@@ -264,6 +282,7 @@ repo: community
 type: config # Set the package type to 'config'.
 version: "1.0"
 description: "Configuration files for my-app."
+tags: [config]
 maintainer:
   name: "Your Name"
   email: "your.email@example.com"
@@ -306,6 +325,9 @@ repo: community
 version: 3.0.0
 description: A developer tool with optional integrations.
 git: https://github.com/user/my-dev-tool
+tags:
+  - cli
+  - devtools
 maintainer:
   name: "Your Name"
   email: "your.email@example.com"
@@ -344,6 +366,7 @@ name: my-cross-platform-app
 repo: community
 version: 1.0.0
 description: An application that supports multiple GUI toolkits.
+tags: [gui]
 maintainer:
   name: "Your Name"
   email: "your.email@example.com"
@@ -398,6 +421,7 @@ version: "550.78"
 description: "NVIDIA driver for Linux."
 website: https://www.nvidia.com/
 git: https://github.com/NVIDIA/open-gpu-kernel-modules
+tags: [driver, gpu]
 maintainer:
   name: "Zoi Community"
   email: "community@example.com"
@@ -430,6 +454,7 @@ version: 1.5.0
 description: A CLI tool that sets up its own shell completions.
 website: https://example.com/my-cli-with-hooks
 git: https://github.com/user/my-cli-with-hooks
+tags: [cli]
 maintainer:
   name: "Your Name"
   email: "your.email@example.com"
@@ -476,6 +501,7 @@ name: my-language-server
 repo: community
 version: 0.5.0
 description: A language server that should be updated from source.
+tags: [language-server, devtools]
 maintainer:
   name: "Your Name"
   email: "your.email@example.com"

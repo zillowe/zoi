@@ -2,9 +2,14 @@ use crate::pkg::{local, types::PackageType};
 use colored::*;
 use comfy_table::{ContentArrangement, Table, presets::UTF8_FULL};
 
-pub fn run(search_term: String, repo: Option<String>, package_type: Option<String>) {
+pub fn run(
+    search_term: String,
+    repo: Option<String>,
+    package_type: Option<String>,
+    tags: Option<Vec<String>>,
+) {
     println!(
-        "{}{} {}",
+        "{}{}{}",
         "--- Searching for packages matching '".yellow(),
         search_term.blue().bold(),
         "' ---".yellow()
@@ -28,6 +33,12 @@ pub fn run(search_term: String, repo: Option<String>, package_type: Option<Strin
                 _ => None,
             });
 
+            let wanted_tags: Vec<String> = tags
+                .unwrap_or_default()
+                .into_iter()
+                .map(|t| t.to_lowercase())
+                .collect();
+
             let matches: Vec<_> = all_packages
                 .into_iter()
                 .filter(|pkg| {
@@ -37,10 +48,31 @@ pub fn run(search_term: String, repo: Option<String>, package_type: Option<Strin
                         }
                     }
 
+                    if !wanted_tags.is_empty() {
+                        if pkg.tags.is_empty() {
+                            return false;
+                        }
+                        let pkg_tags_lower: Vec<String> =
+                            pkg.tags.iter().map(|t| t.to_lowercase()).collect();
+                        let has_any = wanted_tags
+                            .iter()
+                            .any(|wanted| pkg_tags_lower.iter().any(|pt| pt == wanted));
+                        if !has_any {
+                            return false;
+                        }
+                    }
+
                     let name_match = pkg.name.to_lowercase().contains(&search_term_lower);
                     let description_match =
                         pkg.description.to_lowercase().contains(&search_term_lower);
-                    name_match || description_match
+                    let tags_match = if pkg.tags.is_empty() {
+                        false
+                    } else {
+                        pkg.tags
+                            .iter()
+                            .any(|t| t.to_lowercase().contains(&search_term_lower))
+                    };
+                    name_match || description_match || tags_match
                 })
                 .collect();
 
@@ -53,7 +85,7 @@ pub fn run(search_term: String, repo: Option<String>, package_type: Option<Strin
             table
                 .load_preset(UTF8_FULL)
                 .set_content_arrangement(ContentArrangement::Dynamic)
-                .set_header(vec!["Package", "Version", "Repo", "Description"]);
+                .set_header(vec!["Package", "Version", "Repo", "Tags", "Description"]);
 
             for pkg in matches {
                 let mut desc = pkg.description.replace('\n', " ");
@@ -64,7 +96,18 @@ pub fn run(search_term: String, repo: Option<String>, package_type: Option<Strin
 
                 let version = crate::pkg::resolve::get_default_version(&pkg)
                     .unwrap_or_else(|_| "N/A".to_string());
-                table.add_row(vec![pkg.name, version, pkg.repo, desc]);
+                let tags_display = if pkg.tags.is_empty() {
+                    String::from("")
+                } else {
+                    let mut tags = pkg.tags.clone();
+                    tags.sort();
+                    if tags.len() > 4 {
+                        format!("{}…", tags[..4].join(", "))
+                    } else {
+                        tags.join(", ")
+                    }
+                };
+                table.add_row(vec![pkg.name, version, pkg.repo, tags_display, desc]);
             }
 
             println!("{}", table);

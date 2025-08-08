@@ -82,6 +82,7 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
 - **Intuitive CLI:** A simple and powerful command-line interface with helpful aliases for a better developer experience.
 - **Package Types:** Supports standard packages, meta-packages (collections), background services, and configuration file management.
 - **Secure Package Distribution:** Support for checksums and GPG signatures to verify package integrity and authenticity.
+- **Tag-based Discovery:** Search by and filter packages using tags for faster discovery.
 
 ## 🚀 Getting Started
 

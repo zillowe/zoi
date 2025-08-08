@@ -86,6 +86,8 @@ pub struct Package {
     pub bins: Option<Vec<String>>,
     #[serde(default)]
     pub conflicts: Option<Vec<String>>,
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -147,6 +149,8 @@ pub struct InstallationMethod {
     pub platform_com_ext: Option<HashMap<String, String>>,
     pub checksums: Option<Checksums>,
     pub sigs: Option<Vec<Signature>>,
+    #[serde(default)]
+    pub binary_path: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]

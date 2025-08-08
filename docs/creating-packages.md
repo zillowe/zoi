@@ -70,6 +70,17 @@ Zoi supports different types of packages. You can specify the type using the `ty
 - `service`: A package that runs as a background service (e.g. a database).
 - `config`: A package that manages configuration files for another application.
 
+### Tags (Recommended)
+
+Add a `tags` list to improve discoverability in `zoi search` and to let users filter by tags.
+
+```yaml
+tags:
+  - cli
+  - devtools
+  - editor
+```
+
 ## Step 2: Defining an Installation Method
 
 The `installation` section tells Zoi how to get the software onto a user's machine. You can provide multiple methods, and Zoi will pick the best one for the user's platform.
@@ -98,6 +109,10 @@ installation:
       linux: "tar.gz"
       macos: "tar.gz"
       windows: "zip"
+    # (Optional) Path or filename of the executable inside the archive.
+    # If this ends with .exe, Zoi installs it as <package>.exe; otherwise <package>.
+    # Can be a relative path (bin/tool) or just a filename (tool.exe)
+    binary_path: "bin/tool"
 ```
 
 Supported archive formats for `com_binary` are documented in [Supported Archives for Compressed Binaries](./archives).

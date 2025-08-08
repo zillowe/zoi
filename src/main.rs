@@ -10,7 +10,7 @@ mod utils;
 // Production or Development
 const BRANCH: &str = "Production";
 const STATUS: &str = "Beta";
-const NUMBER: &str = "3.8.5";
+const NUMBER: &str = "4.0.0";
 
 /// Zoi - The Universal Package Manager & Environment Setup Tool.
 ///
@@ -220,7 +220,7 @@ enum Commands {
     /// Searches for packages by name or description
     #[command(
         alias = "s",
-        long_about = "Searches for a case-insensitive term in the name and description of all available packages in the database."
+        long_about = "Searches for a case-insensitive term in the name, description, and tags of all available packages in the database. Filter by repo, type, or tags."
     )]
     Search {
         /// The term to search for (e.g. 'editor', 'cli')
@@ -229,8 +229,11 @@ enum Commands {
         #[arg(long)]
         repo: Option<String>,
         /// Filter by package type (package, service, config, collection)
-        #[arg(short = 't', long = "type")]
+        #[arg(long = "type")]
         package_type: Option<String>,
+        /// Filter by tags (any match). Multiple via comma or repeated -t
+        #[arg(short = 't', long = "tag", value_delimiter = ',', num_args = 1..)]
+        tags: Option<Vec<String>>,
     },
 
     /// Download and execute a binary package without installing it
@@ -380,8 +383,9 @@ fn main() {
                 search_term,
                 repo,
                 package_type,
+                tags,
             } => {
-                cmd::search::run(search_term, repo, package_type);
+                cmd::search::run(search_term, repo, package_type, tags);
                 Ok(())
             }
             Commands::Exec { source, args } => {

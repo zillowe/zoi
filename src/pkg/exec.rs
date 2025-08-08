@@ -216,9 +216,33 @@ fn ensure_binary_is_cached(pkg: &types::Package) -> Result<PathBuf, Box<dyn Erro
 
         println!("Downloading from: {url}");
 
-        let response = reqwest::blocking::get(&url)?;
+        let client = crate::utils::build_blocking_http_client(60)?;
+        let mut attempt = 0u32;
+        let response = loop {
+            attempt += 1;
+            match client.get(&url).send() {
+                Ok(resp) => break resp,
+                Err(e) => {
+                    if attempt < 3 {
+                        eprintln!(
+                            "{}: download failed ({}). Retrying...",
+                            "Network".yellow(),
+                            e
+                        );
+                        crate::utils::retry_backoff_sleep(attempt);
+                        continue;
+                    } else {
+                        return Err(format!(
+                            "Failed to download '{}' after {} attempts: {}",
+                            url, attempt, e
+                        )
+                        .into());
+                    }
+                }
+            }
+        };
         if !response.status().is_success() {
-            return Err(format!("Failed to download: HTTP {}", response.status()).into());
+            return Err(format!("Failed to download (HTTP {}): {}", response.status(), url).into());
         }
 
         let total_size = response.content_length().unwrap_or(0);
@@ -266,6 +290,7 @@ fn ensure_binary_is_cached(pkg: &types::Package) -> Result<PathBuf, Box<dyn Erro
 
         let binary_name = &pkg.name;
         let binary_name_with_ext = format!("{}.exe", pkg.name);
+        let declared_binary_path = method.binary_path.as_deref();
         let mut found_binary_path = None;
         let mut files_in_archive = Vec::new();
 
@@ -276,15 +301,51 @@ fn ensure_binary_is_cached(pkg: &types::Package) -> Result<PathBuf, Box<dyn Erro
         {
             let path = entry.path();
             files_in_archive.push(path.to_path_buf());
-            let file_name = path.file_name().unwrap_or_default();
-            if file_name == binary_name.as_str()
-                || (cfg!(target_os = "windows") && file_name == binary_name_with_ext.as_str())
-            {
-                found_binary_path = Some(path.to_path_buf());
+            if let Some(bp) = declared_binary_path {
+                let rel = path
+                    .strip_prefix(temp_dir.path())
+                    .unwrap_or(path)
+                    .to_path_buf();
+                let rel_str = rel.to_string_lossy().replace('\\', "/");
+                let bp_norm = bp.replace('\\', "/");
+                let file_name = path.file_name().and_then(|o| o.to_str()).unwrap_or("");
+                let mut matched = rel_str == bp_norm;
+                if !matched && !bp_norm.contains('/') {
+                    matched = file_name == bp_norm
+                        || (cfg!(target_os = "windows")
+                            && bp_norm == binary_name.as_str()
+                            && file_name == binary_name_with_ext.as_str());
+                }
+                if matched {
+                    found_binary_path = Some(path.to_path_buf());
+                }
+            } else {
+                let file_name = path.file_name().unwrap_or_default();
+                if file_name == binary_name.as_str()
+                    || (cfg!(target_os = "windows") && file_name == binary_name_with_ext.as_str())
+                {
+                    found_binary_path = Some(path.to_path_buf());
+                }
             }
         }
 
         if let Some(found_path) = found_binary_path {
+            if found_path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .map(|n| n.ends_with(".exe"))
+                .unwrap_or(false)
+            {
+                let cache_dir = cache::get_cache_root()?;
+                let bin_path_new = cache_dir.join(format!("{}.exe", pkg.name));
+                fs::copy(found_path, &bin_path_new)?;
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    fs::set_permissions(&bin_path_new, fs::Permissions::from_mode(0o755))?;
+                }
+                return Ok(bin_path_new);
+            }
             fs::copy(found_path, &bin_path)?;
         } else if files_in_archive.len() == 1 {
             println!(
@@ -292,7 +353,24 @@ fn ensure_binary_is_cached(pkg: &types::Package) -> Result<PathBuf, Box<dyn Erro
                 "Could not find binary by package name. Found one file, assuming it's the correct one."
                     .yellow()
             );
-            fs::copy(&files_in_archive[0], &bin_path)?;
+            let only = &files_in_archive[0];
+            if only
+                .file_name()
+                .and_then(|n| n.to_str())
+                .map(|n| n.ends_with(".exe"))
+                .unwrap_or(false)
+            {
+                let cache_dir = cache::get_cache_root()?;
+                let bin_path_new = cache_dir.join(format!("{}.exe", pkg.name));
+                fs::copy(only, &bin_path_new)?;
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    fs::set_permissions(&bin_path_new, fs::Permissions::from_mode(0o755))?;
+                }
+                return Ok(bin_path_new);
+            }
+            fs::copy(only, &bin_path)?;
         } else {
             return Err(format!(
                 "Could not find binary '{}' in the extracted archive.",

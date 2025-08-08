@@ -17,9 +17,13 @@ author:
   email: "contact@zillowe.rf.gd"
 license: Apache-2.0
 updater: script
-bins:
-  - zoi
-conflicts:
+bins: ["zoi"]
+conflicts: ["zoi"]
+tags:
+  - cli
+  - package-manager
+  - rust
+  - zillowe
   - zoi
 
 installation:
@@ -27,6 +31,7 @@ installation:
     url: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/{version}/downloads/zoi-{platform}.{platformComExt}
     platforms: [linux, macos, windows-amd64]
     checksums: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/{version}/downloads/checksums.txt
+    binary_path: "binariy-bin" # or .exe, user defines it, zoi renames it to the <package-name>, and doesnt change or remove it if it has .exe it the end
 
   - type: script
     url: "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.{platformExt}"

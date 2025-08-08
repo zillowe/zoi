@@ -22,6 +22,7 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
 - **Intuitive CLI:** A simple and powerful command-line interface with helpful aliases for a better developer experience.
 - **Package Types:** Supports standard packages, meta-packages (collections), background services, and configuration file management.
 - **Secure Package Distribution:** Support for checksums and GPG signatures to verify package integrity and authenticity.
+- **Tag-based Discovery:** Search by and filter packages using tags for faster discovery.
 
 ## Getting Started
 
@@ -222,7 +223,7 @@ Zoi provides a wide range of commands to manage your packages and environment. F
 | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `list`      | Lists installed or all available packages. <br/>`--all`: List all packages, not just installed. <br/>`--repo <repo>`: Filter by repository. <br/>`--type <type>`: Filter by package type. |
 | `show`      | Shows detailed information about a package. <br/>`--raw`: Display the raw, unformatted package file.                                                                                      |
-| `search`    | Searches for a package by name or description. <br/>`--repo <repo>`: Filter by repository. <br/>`--type <type>`: Filter by package type.                                                  |
+| `search`    | Searches packages by name, description, and tags. <br/>`--repo <repo>`: Filter by repository. <br/>`--type <type>`: Filter by package type. <br/>`-t, --tag <tag>`: Filter by one or more tags (repeat or comma-separate). |
 | `install`   | Installs one or more packages. <br/>`--force`: Force re-installation if the package already exists. <br/>`--interactive`: Choose the installation method interactively.                   |
 | `build`     | Builds and installs one or more packages from source. <br/>`--force`: Force the package to be rebuilt.                                                                                    |
 | `uninstall` | Removes one or more packages. Also removes any of its dependencies that are no longer needed. For collections, it removes all of its dependencies.                                        |
@@ -352,6 +353,11 @@ bins:
 conflicts:
   - my-awesome-app-legacy
 
+# (Optional) A list of tags for discovery and filters.
+tags:
+  - cli
+  - devtools
+
 # A list of methods to install the package. Zoi will try them in order.
 installation:
   - type: binary
@@ -371,6 +377,20 @@ installation:
     sigs:
       - file: "my-awesome-app-{platform}"
         sig: "https://github.com/user/my-awesome-app/releases/download/v{version}/my-awesome-app-{platform}.sig"
+
+  - type: com_binary
+    url: "https://github.com/user/my-awesome-app/releases/download/v{version}/my-awesome-app-v{version}-{platform}.{platformComExt}"
+    platforms: ["linux-amd64", "macos-amd64", "windows-amd64"]
+    platformComExt:
+      linux: tar.zst
+      macos: tar.zst
+      windows: zip
+    # (Optional) The path or filename of the binary inside the archive.
+    # If it ends with .exe, Zoi will name the installed file <package>.exe; otherwise <package>.
+    # Examples:
+    # binary_path: "bin/my-awesome-app"
+    # binary_path: "my-awesome-app.exe"
+    binary_path: "bin/my-awesome-app"
 
 # (Optional) Dependencies required by the package.
 dependencies:
@@ -420,7 +440,7 @@ post_uninstall:
 Zoi supports four types of installation methods within the `installation` list:
 
 1.  **`binary`**: Downloads a pre-compiled binary directly from a URL.
-2.  **`com_binary`**: Downloads a compressed archive (`.zip`, `.tar.gz`, etc.), extracts it, and finds the binary within.
+2.  **`com_binary`**: Downloads a compressed archive (`.zip`, `.tar.gz`, etc.), extracts it, and finds the binary within. Supports `binary_path` to point to the executable inside the archive.
 3.  **`source`**: Clones a git repository and runs a series of build commands you define.
 4.  **`script`**: Downloads and executes an installation script (e.g. `install.sh`).
 
@@ -593,6 +613,17 @@ For the full list of supported dependency managers, usage semantics, and command
 
   ```sh
   zoi search <term>
+  ```
+
+- **Search by tag directly:**
+
+  ```sh
+  # The term matches tags too
+  zoi search editor
+  
+  # Require specific tag(s)
+  zoi search editor -t cli,devtools
+  zoi search editor -t cli -t devtools
   ```
 
 - **Check why a package is installed:**

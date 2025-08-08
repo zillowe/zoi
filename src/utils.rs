@@ -5,6 +5,7 @@ use std::fmt::Display;
 use std::fs;
 use std::io::{Write, stdin, stdout};
 use std::process::Command;
+use std::time::Duration;
 
 pub fn is_admin() -> bool {
     #[cfg(windows)]
@@ -531,4 +532,24 @@ pub fn get_all_available_package_managers() -> Vec<String> {
     managers.sort();
     managers.dedup();
     managers
+}
+
+pub fn build_blocking_http_client(
+    timeout_secs: u64,
+) -> Result<reqwest::blocking::Client, Box<dyn Error>> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(timeout_secs))
+        .build()?;
+    Ok(client)
+}
+
+pub fn retry_backoff_sleep(attempt: u32) {
+    let base_ms = 500u64.saturating_mul(1u64 << (attempt.saturating_sub(1)));
+    let jitter = (std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or(Duration::from_secs(0))
+        .subsec_millis()
+        % 200) as u64;
+    let sleep_ms = (base_ms + jitter).min(8000);
+    std::thread::sleep(Duration::from_millis(sleep_ms));
 }

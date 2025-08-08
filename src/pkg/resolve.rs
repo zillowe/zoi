@@ -128,9 +128,38 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
 
 fn download_from_url(url: &str) -> Result<ResolvedSource, Box<dyn Error>> {
     println!("Downloading package definition from URL...");
-    let mut response = reqwest::blocking::get(url)?;
+    let client = crate::utils::build_blocking_http_client(20)?;
+    let mut attempt = 0u32;
+    let mut response = loop {
+        attempt += 1;
+        match client.get(url).send() {
+            Ok(resp) => break resp,
+            Err(e) => {
+                if attempt < 3 {
+                    eprintln!(
+                        "{}: download failed ({}). Retrying...",
+                        "Network".yellow(),
+                        e
+                    );
+                    crate::utils::retry_backoff_sleep(attempt);
+                    continue;
+                } else {
+                    return Err(format!(
+                        "Failed to download file after {} attempts: {}",
+                        attempt, e
+                    )
+                    .into());
+                }
+            }
+        }
+    };
     if !response.status().is_success() {
-        return Err(format!("Failed to download file: HTTP {}", response.status()).into());
+        return Err(format!(
+            "Failed to download file (HTTP {}): {}",
+            response.status(),
+            url
+        )
+        .into());
     }
 
     let total_size = response.content_length().unwrap_or(0);
@@ -172,7 +201,38 @@ fn resolve_version_from_url(url: &str, channel: &str) -> Result<String, Box<dyn 
         channel.cyan(),
         url.cyan()
     );
-    let resp = reqwest::blocking::get(url)?.text()?;
+    let client = crate::utils::build_blocking_http_client(15)?;
+    let mut attempt = 0u32;
+    let resp = loop {
+        attempt += 1;
+        match client.get(url).send() {
+            Ok(r) => match r.text() {
+                Ok(t) => break t,
+                Err(e) => {
+                    if attempt < 3 {
+                        eprintln!("{}: read failed ({}). Retrying...", "Network".yellow(), e);
+                        crate::utils::retry_backoff_sleep(attempt);
+                        continue;
+                    } else {
+                        return Err(format!(
+                            "Failed to read response after {} attempts: {}",
+                            attempt, e
+                        )
+                        .into());
+                    }
+                }
+            },
+            Err(e) => {
+                if attempt < 3 {
+                    eprintln!("{}: fetch failed ({}). Retrying...", "Network".yellow(), e);
+                    crate::utils::retry_backoff_sleep(attempt);
+                    continue;
+                } else {
+                    return Err(format!("Failed to fetch after {} attempts: {}", attempt, e).into());
+                }
+            }
+        }
+    };
     let json: serde_json::Value = serde_json::from_str(&resp)?;
 
     if let Some(version) = json
@@ -238,7 +298,46 @@ pub fn get_default_version(pkg: &types::Package) -> Result<String, Box<dyn Error
 
     if let Some(ver) = &pkg.version {
         if ver.starts_with("http") {
-            let resp = reqwest::blocking::get(ver)?.text()?;
+            let client = crate::utils::build_blocking_http_client(15)?;
+            let mut attempt = 0u32;
+            let resp = loop {
+                attempt += 1;
+                match client.get(ver).send() {
+                    Ok(r) => match r.text() {
+                        Ok(t) => break t,
+                        Err(e) => {
+                            if attempt < 3 {
+                                eprintln!(
+                                    "{}: read failed ({}). Retrying...",
+                                    "Network".yellow(),
+                                    e
+                                );
+                                crate::utils::retry_backoff_sleep(attempt);
+                                continue;
+                            } else {
+                                return Err(format!(
+                                    "Failed to read response after {} attempts: {}",
+                                    attempt, e
+                                )
+                                .into());
+                            }
+                        }
+                    },
+                    Err(e) => {
+                        if attempt < 3 {
+                            eprintln!("{}: fetch failed ({}). Retrying...", "Network".yellow(), e);
+                            crate::utils::retry_backoff_sleep(attempt);
+                            continue;
+                        } else {
+                            return Err(format!(
+                                "Failed to fetch after {} attempts: {}",
+                                attempt, e
+                            )
+                            .into());
+                        }
+                    }
+                }
+            };
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(&resp) {
                 if let Some(version) = json
                     .get("versions")
