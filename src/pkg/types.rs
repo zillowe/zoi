@@ -151,6 +151,10 @@ pub struct InstallationMethod {
     pub sigs: Option<Vec<Signature>>,
     #[serde(default)]
     pub binary_path: Option<String>,
+    #[serde(default)]
+    pub tag: Option<String>,
+    #[serde(default)]
+    pub branch: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]

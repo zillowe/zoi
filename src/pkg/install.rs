@@ -1268,6 +1268,41 @@ fn handle_source_install(
         return Err("Failed to clone source repository.".into());
     }
 
+    if method.tag.is_some() && method.branch.is_some() {
+        return Err(
+            "Invalid source method: both 'tag' and 'branch' specified. Use only one.".into(),
+        );
+    }
+    if let Some(tag_tmpl) = &method.tag {
+        let version = pkg.version.as_deref().unwrap_or("");
+        let tag = tag_tmpl.replace("{version}", version);
+        println!("Checking out tag {}...", tag.cyan());
+        let out = std::process::Command::new("git")
+            .current_dir(&git_path)
+            .arg("checkout")
+            .arg(format!("tags/{}", tag))
+            .output()?;
+        if !out.status.success() {
+            io::stdout().write_all(&out.stdout)?;
+            io::stderr().write_all(&out.stderr)?;
+            return Err(format!("Failed to checkout tag '{}'", tag).into());
+        }
+    } else if let Some(branch_tmpl) = &method.branch {
+        let version = pkg.version.as_deref().unwrap_or("");
+        let branch = branch_tmpl.replace("{version}", version);
+        println!("Checking out branch {}...", branch.cyan());
+        let out = std::process::Command::new("git")
+            .current_dir(&git_path)
+            .arg("checkout")
+            .arg(&branch)
+            .output()?;
+        if !out.status.success() {
+            io::stdout().write_all(&out.stdout)?;
+            io::stderr().write_all(&out.stderr)?;
+            return Err(format!("Failed to checkout branch '{}'", branch).into());
+        }
+    }
+
     if let Some(commands) = &method.commands {
         for cmd_str in commands {
             let final_cmd = cmd_str.replace("{store}", bin_path.to_str().unwrap());
