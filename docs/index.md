@@ -216,6 +216,7 @@ Zoi provides a wide range of commands to manage your packages and environment. F
 | `upgrade`    | Downloads the latest release of Zoi and replaces the current executable.                                                                                   |
 | `clean`      | Clears the cache of downloaded package binaries.                                                                                                           |
 | `autoremove` | Removes packages that were installed as dependencies but are no longer needed.                                                                             |
+| `telemetry`  | Manages [opt-in telemetry](./telemetry).                                                                                                                   |
 
 ### Package Management
 
@@ -556,6 +557,12 @@ For the full list of supported dependency managers, usage semantics, and command
 <Accordions type="single">
   <Accordion title="How do I update Zoi itself?">
     Run `zoi upgrade`. Zoi attempts a patch (delta) upgrade first and falls back to a full binary download if needed.
+  </Accordion>
+</Accordions>
+<br />
+<Accordions type="single">
+  <Accordion title="Does Zoi collect your data?">
+    We believe in privacy by design. Zoi does **not** collect any data by default. You can choose to opt-in to our anonymous telemetry to help us improve the application. To learn more about what we collect and why, please see our [Telemetry & Analytics](./telemetry) page.
   </Accordion>
 </Accordions>
 
