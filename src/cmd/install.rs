@@ -43,10 +43,6 @@ pub fn run(sources: &[String], force: bool, interactive: bool, yes: bool) {
                             source,
                             e
                         );
-                        eprintln!(
-                            "{} telemetry not sent due to install failure",
-                            "Info:".yellow()
-                        );
                     }
                     failed_packages.push(source.to_string());
                 }

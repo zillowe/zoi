@@ -15,6 +15,7 @@ struct Dependency<'a> {
     manager: &'a str,
     package: &'a str,
     req: Option<VersionReq>,
+    version_str: Option<String>,
     description: Option<&'a str>,
 }
 
@@ -68,12 +69,12 @@ pub fn get_dependents(dependency: &str) -> Result<Vec<String>, Box<dyn Error>> {
     Ok(graph.get(dependency).cloned().unwrap_or_default())
 }
 
-fn parse_dependency_string(dep_str: &str) -> Result<Dependency<'_>, Box<dyn Error>> {
+fn parse_dependency_string(dep_str: &str) -> Result<Dependency, Box<dyn Error>> {
     let (manager, rest) = dep_str.split_once(':').unwrap_or(("zoi", dep_str));
 
     let (package_and_version, description) = if manager != "go" {
         if let Some((main, desc)) = rest.rsplit_once(':') {
-            if main.is_empty() || desc.contains(['=', '>', '<', '~', '^']) {
+            if main.is_empty() || desc.contains(['=', '>', '<', '~', '^', '@']) {
                 (rest, None)
             } else {
                 (main, Some(desc))
@@ -85,23 +86,37 @@ fn parse_dependency_string(dep_str: &str) -> Result<Dependency<'_>, Box<dyn Erro
         (rest, None)
     };
 
-    let (package, req_str) = if let Some(idx) = package_and_version.find(['=', '>', '<', '~', '^'])
-    {
-        package_and_version.split_at(idx)
-    } else {
-        (package_and_version, "*")
-    };
+    let (package, version_str) =
+        if let Some(at_pos) = package_and_version.rfind('@') {
+            if at_pos > 0 || (at_pos == 0 && package_and_version.contains('/')) {
+                let (p, v) = package_and_version.split_at(at_pos);
+                (p, Some(v[1..].to_string()))
+            } else {
+                (package_and_version, None)
+            }
+        } else if let Some(idx) = package_and_version.find(['=', '>', '<', '~', '^']) {
+            let (p, v) = package_and_version.split_at(idx);
+            (p, Some(v.to_string()))
+        } else {
+            (package_and_version, None)
+        };
 
-    let req = if req_str == "*" {
-        None
+    let req = if let Some(v_str) = &version_str {
+        let req_parse_str = if v_str.chars().next().unwrap().is_ascii_digit() {
+            format!("={}", v_str)
+        } else {
+            v_str.to_string()
+        };
+        Some(VersionReq::parse(&req_parse_str)?)
     } else {
-        Some(VersionReq::parse(req_str)?)
+        None
     };
 
     Ok(Dependency {
         manager,
         package,
         req,
+        version_str,
         description,
     })
 }
@@ -159,7 +174,7 @@ fn install_dependency(
     }
 
     let version_info = dep
-        .req
+        .version_str
         .as_ref()
         .map_or("any".to_string(), |r| r.to_string());
     println!(
@@ -209,8 +224,12 @@ fn install_dependency(
 
     match manager {
         "zoi" => {
-            let zoi_dep_name = dep.package;
-            if let Some(manifest) = local::is_package_installed(zoi_dep_name, scope)? {
+            let zoi_dep_name = if let Some(v) = &dep.version_str {
+                format!("{}@{}", dep.package, v)
+            } else {
+                dep.package.to_string()
+            };
+            if let Some(manifest) = local::is_package_installed(dep.package, scope)? {
                 let installed_version = Version::parse(&manifest.version)?;
                 if let Some(req) = &dep.req {
                     if req.matches(&installed_version) {
@@ -232,7 +251,7 @@ fn install_dependency(
             }
 
             println!("Not installed. Proceeding with installation...");
-            install_zoi_dependency(dep.package, yes, processed_deps)?;
+            install_zoi_dependency(&zoi_dep_name, yes, processed_deps)?;
         }
         "native" => {
             if let Some(installed_version) = get_native_command_version(dep.package)? {
@@ -279,7 +298,16 @@ fn install_dependency(
                 _ => return Err(format!("Unsupported native package manager: {pm}").into()),
             };
 
-            let package_to_install = dep.package;
+            let package_to_install = if let Some(v) = &dep.version_str {
+                println!("{} Version specifications for native dependencies are not guaranteed to work.", "Warning:".yellow());
+                match pm.as_str() {
+                    "apt" | "apt-get" | "zypper" => format!("{}={}", dep.package, v),
+                    "dnf" | "yum" => format!("{}-{}", dep.package, v),
+                    _ => dep.package.to_string(),
+                }
+            } else {
+                dep.package.to_string()
+            };
 
             let mut command = Command::new("sudo");
             command.arg(&pm);
@@ -292,19 +320,25 @@ fn install_dependency(
             }
         }
         "cargo" => {
-            let status = Command::new("cargo")
-                .arg("install")
-                .arg(dep.package)
-                .status()?;
+            let mut command = Command::new("cargo");
+            command.arg("install");
+            if let Some(v) = &dep.version_str {
+                command.arg("--version").arg(v);
+            }
+            command.arg(dep.package);
+            let status = command.status()?;
             if !status.success() {
                 return Err(format!("Cargo dependency failed for '{}'", dep.package).into());
             }
         }
         "cargo-binstall" => {
-            let status = Command::new("cargo")
-                .arg("binstall")
-                .arg(dep.package)
-                .status()?;
+            let mut command = Command::new("cargo");
+            command.arg("binstall");
+            if let Some(v) = &dep.version_str {
+                command.arg("--version").arg(v);
+            }
+            command.arg(dep.package);
+            let status = command.status()?;
             if !status.success() {
                 return Err(
                     format!("cargo-binstall dependency failed for '{}'", dep.package).into(),
@@ -312,7 +346,11 @@ fn install_dependency(
             }
         }
         "go" => {
-            let package_with_version = format!("{}@latest", dep.package);
+            let package_with_version = if let Some(v) = &dep.version_str {
+                format!("{}@{}", dep.package, v)
+            } else {
+                format!("{}@latest", dep.package)
+            };
             let status = Command::new("go")
                 .arg("install")
                 .arg(package_with_version)
@@ -321,14 +359,23 @@ fn install_dependency(
                 return Err(format!("Go dependency failed for '{}'", dep.package).into());
             }
         }
-        "npm" => {
-            let status = Command::new("npm")
-                .arg("install")
-                .arg("-g")
-                .arg(dep.package)
-                .status()?;
+        "npm" | "yarn" | "pnpm" | "bun" => {
+            let package_to_install = if let Some(v) = &dep.version_str {
+                format!("{}@{}", dep.package, v)
+            } else {
+                dep.package.to_string()
+            };
+            let mut command = Command::new(manager);
+            match manager {
+                "npm" => command.args(["install", "-g"]),
+                "yarn" => command.args(["global", "add"]),
+                "pnpm" => command.args(["add", "-g"]),
+                "bun" => command.args(["install", "-g"]),
+                _ => unreachable!(),
+            };
+            let status = command.arg(package_to_install).status()?;
             if !status.success() {
-                return Err(format!("NPM dependency failed for '{}'", dep.package).into());
+                return Err(format!("{} dependency failed for '{}'", manager, dep.package).into());
             }
         }
         "deno" => {
@@ -341,36 +388,6 @@ fn install_dependency(
                 return Err(format!("Deno dependency failed for '{}'", dep.package).into());
             }
         }
-        "yarn" => {
-            let status = Command::new("yarn")
-                .arg("global")
-                .arg("add")
-                .arg(dep.package)
-                .status()?;
-            if !status.success() {
-                return Err(format!("Yarn dependency failed for '{}'", dep.package).into());
-            }
-        }
-        "pnpm" => {
-            let status = Command::new("pnpm")
-                .arg("add")
-                .arg("-g")
-                .arg(dep.package)
-                .status()?;
-            if !status.success() {
-                return Err(format!("pnpm dependency failed for '{}'", dep.package).into());
-            }
-        }
-        "bun" => {
-            let status = Command::new("bun")
-                .arg("install")
-                .arg("-g")
-                .arg(dep.package)
-                .status()?;
-            if !status.success() {
-                return Err(format!("Bun dependency failed for '{}'", dep.package).into());
-            }
-        }
         "uv" => {
             let status = Command::new("uv")
                 .arg("tool")
@@ -381,13 +398,18 @@ fn install_dependency(
                 return Err(format!("uv tool install failed for '{}'", dep.package).into());
             }
         }
-        "pip" => {
-            let status = Command::new("pip")
+        "pip" | "pipx" => {
+            let package_to_install = if let Some(v) = &dep.version_str {
+                format!("{}=={}", dep.package, v)
+            } else {
+                dep.package.to_string()
+            };
+            let status = Command::new(manager)
                 .arg("install")
-                .arg(dep.package)
+                .arg(package_to_install)
                 .status()?;
             if !status.success() {
-                return Err(format!("pip dependency failed for '{}'", dep.package).into());
+                return Err(format!("{} dependency failed for '{}'", manager, dep.package).into());
             }
         }
         "dart-pub" => {
@@ -403,46 +425,49 @@ fn install_dependency(
                 );
             }
         }
-        "pipx" => {
-            let status = Command::new("pipx")
-                .arg("install")
-                .arg(dep.package)
-                .status()?;
-            if !status.success() {
-                return Err(format!("pipx dependency failed for '{}'", dep.package).into());
-            }
-        }
         "gem" => {
-            let status = Command::new("gem")
-                .arg("install")
-                .arg(dep.package)
-                .status()?;
+            let mut command = Command::new("gem");
+            command.arg("install");
+            if let Some(v) = &dep.version_str {
+                command.arg("-v").arg(v);
+            }
+            command.arg(dep.package);
+            let status = command.status()?;
             if !status.success() {
                 return Err(format!("gem dependency failed for '{}'", dep.package).into());
             }
         }
         "composer" => {
+            let package_to_install = if let Some(v) = &dep.version_str {
+                format!("{}:{}", dep.package, v)
+            } else {
+                dep.package.to_string()
+            };
             let status = Command::new("composer")
                 .arg("global")
                 .arg("require")
-                .arg(dep.package)
+                .arg(package_to_install)
                 .status()?;
             if !status.success() {
                 return Err(format!("composer dependency failed for '{}'", dep.package).into());
             }
         }
         "dotnet" => {
-            let status = Command::new("dotnet")
-                .arg("tool")
-                .arg("install")
-                .arg("-g")
-                .arg(dep.package)
-                .status()?;
+            let mut command = Command::new("dotnet");
+            command.args(["tool", "install", "-g"]);
+            if let Some(v) = &dep.version_str {
+                command.arg("--version").arg(v);
+            }
+            command.arg(dep.package);
+            let status = command.status()?;
             if !status.success() {
                 return Err(format!("dotnet dependency failed for '{}'", dep.package).into());
             }
         }
         "nix" => {
+            if dep.version_str.is_some() {
+                println!("{} Version specifications for nix are not supported. Installing latest.", "Warning:".yellow());
+            }
             let status = Command::new("nix-env")
                 .arg("-iA")
                 .arg(format!("nixpkgs.{}", dep.package))
@@ -462,17 +487,25 @@ fn install_dependency(
             }
         }
         "apt" | "apt-get" => {
+            let package_to_install = if let Some(v) = &dep.version_str {
+                format!("{}={}", dep.package, v)
+            } else {
+                dep.package.to_string()
+            };
             let status = Command::new("sudo")
                 .arg(manager)
                 .arg("install")
                 .arg("-y")
-                .arg(dep.package)
+                .arg(package_to_install)
                 .status()?;
             if !status.success() {
                 return Err(format!("{} dependency failed for '{}'", manager, dep.package).into());
             }
         }
         "pacman" => {
+            if dep.version_str.is_some() {
+                println!("{} Version specifications for pacman are not supported. Installing latest.", "Warning:".yellow());
+            }
             let status = Command::new("sudo")
                 .arg("pacman")
                 .arg("-S")
@@ -484,26 +517,18 @@ fn install_dependency(
                 return Err(format!("pacman dependency failed for '{}'", dep.package).into());
             }
         }
-        "yay" => {
-            let status = Command::new("yay")
-                .arg("-S")
-                .arg("--needed")
-                .arg("--noconfirm")
-                .arg(dep.package)
-                .status()?;
-            if !status.success() {
-                return Err(format!("yay dependency failed for '{}'", dep.package).into());
+        "yay" | "paru" => {
+            if dep.version_str.is_some() {
+                println!("{} Version specifications for {} are not supported. Installing latest.", "Warning:".yellow(), manager);
             }
-        }
-        "paru" => {
-            let status = Command::new("paru")
+            let status = Command::new(manager)
                 .arg("-S")
                 .arg("--needed")
                 .arg("--noconfirm")
                 .arg(dep.package)
                 .status()?;
             if !status.success() {
-                return Err(format!("paru dependency failed for '{}'", dep.package).into());
+                return Err(format!("{} dependency failed for '{}'", manager, dep.package).into());
             }
         }
         "aur" => {
@@ -544,30 +569,45 @@ fn install_dependency(
             fs::remove_dir_all(&temp_dir)?;
         }
         "dnf" | "yum" => {
+            let package_to_install = if let Some(v) = &dep.version_str {
+                format!("{}-{}", dep.package, v)
+            } else {
+                dep.package.to_string()
+            };
             let status = Command::new("sudo")
                 .arg(manager)
                 .arg("install")
                 .arg("-y")
-                .arg(dep.package)
+                .arg(package_to_install)
                 .status()?;
             if !status.success() {
                 return Err(format!("{} dependency failed for '{}'", manager, dep.package).into());
             }
         }
         "brew" => {
+            let package_to_install = if let Some(v) = &dep.version_str {
+                format!("{}@{}", dep.package, v)
+            } else {
+                dep.package.to_string()
+            };
             let status = Command::new("brew")
                 .arg("install")
-                .arg(dep.package)
+                .arg(package_to_install)
                 .status()?;
             if !status.success() {
                 return Err(format!("brew dependency failed for '{}'", dep.package).into());
             }
         }
         "brew-cask" => {
+            let package_to_install = if let Some(v) = &dep.version_str {
+                format!("{}@{}", dep.package, v)
+            } else {
+                dep.package.to_string()
+            };
             let status = Command::new("brew")
                 .arg("install")
                 .arg("--cask")
-                .arg(dep.package)
+                .arg(package_to_install)
                 .status()?;
             if !status.success() {
                 return Err(format!("brew --cask dependency failed for '{}'", dep.package).into());
@@ -583,25 +623,35 @@ fn install_dependency(
             }
         }
         "scoop" => {
+            let package_to_install = if let Some(v) = &dep.version_str {
+                format!("{}@{}", dep.package, v)
+            } else {
+                dep.package.to_string()
+            };
             let status = Command::new("scoop")
                 .arg("install")
-                .arg(dep.package)
+                .arg(package_to_install)
                 .status()?;
             if !status.success() {
                 return Err(format!("scoop dependency failed for '{}'", dep.package).into());
             }
         }
         "choco" => {
-            let status = Command::new("choco")
-                .arg("install")
-                .arg("-y")
-                .arg(dep.package)
-                .status()?;
+            let mut command = Command::new("choco");
+            command.args(["install", "-y"]);
+            if let Some(v) = &dep.version_str {
+                command.arg("--version").arg(v);
+            }
+            command.arg(dep.package);
+            let status = command.status()?;
             if !status.success() {
                 return Err(format!("choco dependency failed for '{}'", dep.package).into());
             }
         }
         "apk" => {
+            if dep.version_str.is_some() {
+                println!("{} Version specifications for apk are not supported. Installing latest.", "Warning:".yellow());
+            }
             let status = Command::new("sudo")
                 .arg("apk")
                 .arg("add")
@@ -612,6 +662,9 @@ fn install_dependency(
             }
         }
         "xbps" | "xbps-install" => {
+            if dep.version_str.is_some() {
+                println!("{} Version specifications for xbps are not supported. Installing latest.", "Warning:".yellow());
+            }
             let status = Command::new("sudo")
                 .arg("xbps-install")
                 .arg("-S")
@@ -622,6 +675,9 @@ fn install_dependency(
             }
         }
         "eopkg" => {
+            if dep.version_str.is_some() {
+                println!("{} Version specifications for eopkg are not supported. Installing latest.", "Warning:".yellow());
+            }
             let status = Command::new("sudo")
                 .arg("eopkg")
                 .arg("it")
@@ -633,6 +689,9 @@ fn install_dependency(
             }
         }
         "guix" => {
+            if dep.version_str.is_some() {
+                println!("{} Version specifications for guix are not supported. Installing latest.", "Warning:".yellow());
+            }
             let status = Command::new("guix")
                 .arg("install")
                 .arg(dep.package)
@@ -642,6 +701,9 @@ fn install_dependency(
             }
         }
         "pkg" => {
+            if dep.version_str.is_some() {
+                println!("{} Version specifications for pkg are not supported. Installing latest.", "Warning:".yellow());
+            }
             let status = Command::new("sudo")
                 .arg("pkg")
                 .arg("install")
@@ -653,6 +715,9 @@ fn install_dependency(
             }
         }
         "pkg_add" => {
+            if dep.version_str.is_some() {
+                println!("{} Version specifications for pkg_add are not supported. Installing latest.", "Warning:".yellow());
+            }
             let status = Command::new("sudo")
                 .arg("pkg_add")
                 .arg("-I")
@@ -663,17 +728,25 @@ fn install_dependency(
             }
         }
         "zypper" => {
+            let package_to_install = if let Some(v) = &dep.version_str {
+                format!("'{}={}'", dep.package, v)
+            } else {
+                dep.package.to_string()
+            };
             let status = Command::new("sudo")
                 .arg("zypper")
                 .arg("install")
                 .arg("-y")
-                .arg(dep.package)
+                .arg(package_to_install)
                 .status()?;
             if !status.success() {
                 return Err(format!("zypper dependency failed for '{}'", dep.package).into());
             }
         }
         "portage" => {
+            if dep.version_str.is_some() {
+                println!("{} Version specifications for portage are not supported. Installing latest.", "Warning:".yellow());
+            }
             let status = Command::new("sudo")
                 .arg("emerge")
                 .arg(dep.package)
@@ -683,6 +756,9 @@ fn install_dependency(
             }
         }
         "snap" => {
+            if dep.version_str.is_some() {
+                println!("{} Version specifications for snap are not supported. Installing latest.", "Warning:".yellow());
+            }
             let status = Command::new("sudo")
                 .arg("snap")
                 .arg("install")
@@ -693,6 +769,9 @@ fn install_dependency(
             }
         }
         "flatpak" => {
+            if dep.version_str.is_some() {
+                println!("{} Version specifications for flatpak are not supported. Installing latest.", "Warning:".yellow());
+            }
             let status = Command::new("sudo")
                 .arg("flatpak")
                 .arg("install")
@@ -705,18 +784,22 @@ fn install_dependency(
             }
         }
         "winget" => {
-            let status = Command::new("winget")
-                .arg("install")
-                .arg(dep.package)
-                .arg("--silent")
-                .arg("--accept-package-agreements")
-                .arg("--accept-source-agreements")
-                .status()?;
+            let mut command = Command::new("winget");
+            command.arg("install").arg(dep.package).arg("--silent");
+            if let Some(v) = &dep.version_str {
+                command.arg("--version").arg(v);
+            }
+            command.arg("--accept-package-agreements")
+                .arg("--accept-source-agreements");
+            let status = command.status()?;
             if !status.success() {
                 return Err(format!("winget dependency failed for '{}'", dep.package).into());
             }
         }
         "conda" => {
+            if dep.version_str.is_some() {
+                println!("{} Version specifications for conda are not supported. Installing latest.", "Warning:".yellow());
+            }
             let status = Command::new("conda")
                 .arg("install")
                 .arg("-y")
@@ -727,6 +810,9 @@ fn install_dependency(
             }
         }
         "macports" => {
+            if dep.version_str.is_some() {
+                println!("{} Version specifications for macports are not supported. Installing latest.", "Warning:".yellow());
+            }
             let status = Command::new("sudo")
                 .arg("port")
                 .arg("install")
@@ -744,6 +830,7 @@ fn install_dependency(
 pub fn resolve_and_install_required(
     deps: &[String],
     parent_pkg_name: &str,
+    parent_version: &str,
     scope: types::Scope,
     yes: bool,
     processed_deps: &mut HashSet<String>,
@@ -754,8 +841,9 @@ pub fn resolve_and_install_required(
     }
 
     println!("{}", "Resolving required dependencies...".bold());
-    for dep_str in deps {
-        let dependency = parse_dependency_string(dep_str)?;
+    for dep_str_template in deps {
+        let dep_str = dep_str_template.replace("{version}", parent_version);
+        let dependency = parse_dependency_string(&dep_str)?;
         install_dependency(
             &dependency,
             parent_pkg_name,
@@ -772,6 +860,7 @@ pub fn resolve_and_install_required(
 pub fn resolve_and_install_required_options(
     option_groups: &[types::DependencyOptionGroup],
     parent_pkg_name: &str,
+    parent_version: &str,
     scope: types::Scope,
     yes: bool,
     processed_deps: &mut HashSet<String>,
@@ -789,8 +878,14 @@ pub fn resolve_and_install_required_options(
             group.desc.italic()
         );
 
+        let dep_strs: Vec<String> = group
+            .depends
+            .iter()
+            .map(|dep_str_template| dep_str_template.replace("{version}", parent_version))
+            .collect();
+
         let mut parsed_deps = Vec::new();
-        for (i, dep_str) in group.depends.iter().enumerate() {
+        for (i, dep_str) in dep_strs.iter().enumerate() {
             let dep = parse_dependency_string(dep_str)?;
             let desc = dep.description.unwrap_or("No description");
             let mut dep_display = format!("{}:{}", dep.manager, dep.package);
@@ -914,6 +1009,7 @@ pub fn resolve_and_install_required_options(
 pub fn resolve_and_install_optional(
     deps: &[String],
     parent_pkg_name: &str,
+    parent_version: &str,
     scope: types::Scope,
     yes: bool,
     processed_deps: &mut HashSet<String>,
@@ -923,9 +1019,14 @@ pub fn resolve_and_install_optional(
         return Ok(());
     }
 
+    let dep_strs: Vec<String> = deps
+        .iter()
+        .map(|dep_str_template| dep_str_template.replace("{version}", parent_version))
+        .collect();
+
     if yes {
         println!("{}", "Installing all optional dependencies...".bold());
-        for dep_str in deps {
+        for dep_str in &dep_strs {
             let dependency = parse_dependency_string(dep_str)?;
             install_dependency(
                 &dependency,
@@ -941,7 +1042,7 @@ pub fn resolve_and_install_optional(
 
     println!("{}", "This package has optional dependencies:".bold());
     let mut parsed_deps = Vec::new();
-    for (i, dep_str) in deps.iter().enumerate() {
+    for (i, dep_str) in dep_strs.iter().enumerate() {
         let dep = parse_dependency_string(dep_str)?;
         let desc = dep.description.unwrap_or("No description");
         let mut dep_display = format!("{}:{}", dep.manager, dep.package);

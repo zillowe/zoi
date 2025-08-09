@@ -78,6 +78,7 @@ pub fn run_installation(
                 dependencies::resolve_and_install_required(
                     &runtime_deps.get_required_simple(),
                     &pkg.name,
+                    &version,
                     pkg.scope,
                     yes,
                     processed_deps,
@@ -86,6 +87,7 @@ pub fn run_installation(
                 dependencies::resolve_and_install_required_options(
                     &runtime_deps.get_required_options(),
                     &pkg.name,
+                    &version,
                     pkg.scope,
                     yes,
                     processed_deps,
@@ -94,6 +96,7 @@ pub fn run_installation(
                 dependencies::resolve_and_install_optional(
                     runtime_deps.get_optional(),
                     &pkg.name,
+                    &version,
                     pkg.scope,
                     yes,
                     processed_deps,
@@ -105,6 +108,7 @@ pub fn run_installation(
                 dependencies::resolve_and_install_required(
                     &build_deps.get_required_simple(),
                     &pkg.name,
+                    &version,
                     pkg.scope,
                     yes,
                     processed_deps,
@@ -113,6 +117,7 @@ pub fn run_installation(
                 dependencies::resolve_and_install_required_options(
                     &build_deps.get_required_options(),
                     &pkg.name,
+                    &version,
                     pkg.scope,
                     yes,
                     processed_deps,
@@ -121,6 +126,7 @@ pub fn run_installation(
                 dependencies::resolve_and_install_optional(
                     build_deps.get_optional(),
                     &pkg.name,
+                    &version,
                     pkg.scope,
                     yes,
                     processed_deps,
@@ -143,6 +149,7 @@ pub fn run_installation(
                 dependencies::resolve_and_install_required(
                     &runtime_deps.get_required_simple(),
                     &pkg.name,
+                    &version,
                     pkg.scope,
                     yes,
                     processed_deps,
@@ -151,6 +158,7 @@ pub fn run_installation(
                 dependencies::resolve_and_install_required_options(
                     &runtime_deps.get_required_options(),
                     &pkg.name,
+                    &version,
                     pkg.scope,
                     yes,
                     processed_deps,
@@ -159,6 +167,7 @@ pub fn run_installation(
                 dependencies::resolve_and_install_optional(
                     runtime_deps.get_optional(),
                     &pkg.name,
+                    &version,
                     pkg.scope,
                     yes,
                     processed_deps,
@@ -170,6 +179,7 @@ pub fn run_installation(
                 dependencies::resolve_and_install_required(
                     &build_deps.get_required_simple(),
                     &pkg.name,
+                    &version,
                     pkg.scope,
                     yes,
                     processed_deps,
@@ -178,6 +188,7 @@ pub fn run_installation(
                 dependencies::resolve_and_install_required_options(
                     &build_deps.get_required_options(),
                     &pkg.name,
+                    &version,
                     pkg.scope,
                     yes,
                     processed_deps,
@@ -186,6 +197,7 @@ pub fn run_installation(
                 dependencies::resolve_and_install_optional(
                     build_deps.get_optional(),
                     &pkg.name,
+                    &version,
                     pkg.scope,
                     yes,
                     processed_deps,
@@ -253,6 +265,7 @@ pub fn run_installation(
                 dependencies::resolve_and_install_required(
                     &build_deps.get_required_simple(),
                     &pkg.name,
+                    &version,
                     pkg.scope,
                     yes,
                     processed_deps,
@@ -261,6 +274,7 @@ pub fn run_installation(
                 dependencies::resolve_and_install_required_options(
                     &build_deps.get_required_options(),
                     &pkg.name,
+                    &version,
                     pkg.scope,
                     yes,
                     processed_deps,
@@ -274,6 +288,7 @@ pub fn run_installation(
             dependencies::resolve_and_install_required(
                 &runtime_deps.get_required_simple(),
                 &pkg.name,
+                &version,
                 pkg.scope,
                 yes,
                 processed_deps,
@@ -282,6 +297,7 @@ pub fn run_installation(
             dependencies::resolve_and_install_required_options(
                 &runtime_deps.get_required_options(),
                 &pkg.name,
+                &version,
                 pkg.scope,
                 yes,
                 processed_deps,
@@ -294,6 +310,7 @@ pub fn run_installation(
             dependencies::resolve_and_install_optional(
                 &optional_deps_to_install,
                 &pkg.name,
+                &version,
                 pkg.scope,
                 yes,
                 processed_deps,
