@@ -62,6 +62,8 @@ pub struct Package {
     pub description: String,
     pub website: Option<String>,
     #[serde(default)]
+    pub readme: Option<String>,
+    #[serde(default)]
     pub git: String,
     pub maintainer: Maintainer,
     pub author: Option<Author>,
