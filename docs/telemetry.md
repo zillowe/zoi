@@ -7,11 +7,18 @@ At Zoi, we are committed to protecting your privacy while also working to improv
 
 ## What We Collect
 
-When you choose to enable telemetry, Zoi sends a secure, anonymous event to our cloud-hosted PostHog instance after a successful package installation. The data we collect is strictly limited to the following:
+When you choose to enable telemetry, Zoi sends a secure, anonymous event to our cloud-hosted PostHog instance when you perform certain actions. The data we collect is strictly limited to the following:
 
+- **Event Type:** The action you performed. This can be one of the following:
+  - `install`: A package was successfully installed.
+  - `build`: A package was successfully built from source.
+  - `uninstall`: A package was uninstalled.
+  - `clone`: A package's source code was cloned.
+  - `exec`: A package was executed without being installed.
 - **A unique, anonymous client ID:** This is a randomly generated UUID that is not tied to any of your personal information.
-- **The name of the package being installed.**
-- **The package's repository, description, maintainer, and author.**
+- **Package Details:**
+  - The name of the package.
+  - The package's repository, description, maintainer, and author.
 - **The type of package** (e.g. `package`, `collection`, `service`).
 - **Your operating system and CPU architecture** (e.g. `linux-amd64`, `windows-amd64`).
 - **The version of the Zoi application you are using.**
