@@ -102,7 +102,8 @@ Notes:
 
 - AUR: `aur:<pkg>`builds from source using`makepkg`; uninstall is done with `pacman`.
 - `native:<pkg>` selects the appropriate system manager based on OS/distro; if none can be detected, Zoi errors.
-- Some managers (e.g. `go`, `jsr`) do not provide reliable uninstall; Zoi prints a notice and skips.
+- Some managers (e.g. `go`, `jsr`, `volta`) do not provide reliable uninstall; Zoi prints a notice and skips.
+- The `script` manager takes a URL as the package name (e.g. `script:https://example.com/install`). It appends `.sh` for Linux/macOS and `.ps1` for Windows, then downloads and executes the script. There is no automatic uninstallation.
 
 ## Troubleshooting
 

@@ -136,6 +136,7 @@ dependencies:
     required:
       - zoi:go
       - native:make
+      - script:https://get.some.sdk/install # Example of a script dependency
     optional:
       - cargo:some-build-tool:additional build helper
   runtime:
@@ -585,6 +586,7 @@ See full schema and best practices in [Project Configuration (zoi.yaml)](./proje
 You can point the `version` field (or a channel under `versions`) to a URL. Zoi will fetch the URL and resolve the version.
 
 Accepted responses at the URL:
+
 - Plain text containing a version string, e.g. `1.2.3`
 - JSON with either:
   - `{ "versions": { "stable": "1.2.3" } }` (for channel resolution)
@@ -610,7 +612,6 @@ installation:
   - type: binary
     url: "https://downloads.example.com/zoi-{platform}-{version}"
     platforms: ["linux-amd64", "macos-arm64", "windows-amd64"]
-
 # Alternatively, use a compressed archive
 #  - type: com_binary
 #    url: "https://downloads.example.com/zoi-{version}-{platform}.{platformComExt}"

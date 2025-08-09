@@ -230,6 +230,7 @@ What dependency installation we support.
 | --------------------------------- | ------------------------------- | ----------------------------------------- |
 | `zoi`                             | Zoi                             | `zoi:my-other-package`                    |
 | `native`                          | System's native package manager | `native:openssl`                          |
+| `script`                          | Script execution                | `script:website.com/install`              |
 | `apt`, `apt-get`                  | Debian, Ubuntu, etc.            | `apt:libssl-dev`                          |
 | `pacman`                          | Arch Linux                      | `pacman:base-devel`                       |
 | `yay`, `paru`, `pikaur`, `trizen` | Arch Linux (AUR)                | `yay:google-chrome`                       |
@@ -255,6 +256,7 @@ What dependency installation we support.
 | `npm`                             | Node.js                         | `npm:typescript`                          |
 | `yarn`                            | Node.js                         | `yarn:react`                              |
 | `pnpm`                            | Node.js                         | `pnpm:vite`                               |
+| `volta`                           | JavaScript                      | `volta:node`                              |
 | `bun`                             | Bun                             | `bun:elysia`                              |
 | `deno`                            | Deno                            | `deno:npm:chalk` or `deno:jsr:@std/bytes` |
 | `jsr`                             | JavaScript Registry             | `jsr:@std/http`                           |
