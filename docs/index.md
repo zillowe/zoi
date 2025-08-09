@@ -317,6 +317,8 @@ versions:
 description: My awesome application does awesome things.
 # (Optional) The official website for the package.
 website: https://my-awesome-app.com
+# (Optional) A URL to a README file for the package.
+readme: https://my-awesome-app.com/README.md
 # (Optional) The source code repository URL.
 git: https://github.com/user/my-awesome-app
 # Information about the package maintainer.

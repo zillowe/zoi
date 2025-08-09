@@ -1,6 +1,6 @@
 [package]
 name = "zoi-cli"
-version = "4.0.1-beta-prod"
+version = "4.0.2-beta-prod"
 edition = "2024"
 description = "Universal Package Manager & Environment Setup Tool"
 license = "Apache-2.0"

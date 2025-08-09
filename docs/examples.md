@@ -16,6 +16,7 @@ repo: community
 version: 1.2.3
 description: A simple command-line utility.
 website: https://example.com/my-cli
+readme: https://example.com/my-cli/README.md
 git: https://github.com/user/my-cli
 tags: [cli, tools]
 maintainer:
