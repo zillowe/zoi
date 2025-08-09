@@ -453,6 +453,12 @@ pub fn run(source: &str, args: Vec<String>) -> Result<(), Box<dyn Error>> {
 
     let bin_path = find_executable(&pkg)?;
 
+    match crate::pkg::telemetry::posthog_capture_event("exec", &pkg, env!("CARGO_PKG_VERSION")) {
+        Ok(true) => println!("{} telemetry sent", "Info:".green()),
+        Ok(false) => (),
+        Err(e) => eprintln!("{} telemetry failed: {}", "Warning:".yellow(), e),
+    }
+
     println!("\n--- Executing '{}' ---\n", pkg.name.bold());
     let status = Command::new(bin_path).args(args).status()?;
 

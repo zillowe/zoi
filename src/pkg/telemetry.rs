@@ -2,7 +2,7 @@ use serde::Serialize;
 use std::{error::Error, fs};
 
 #[derive(Debug, Serialize)]
-pub struct InstallEvent<'a> {
+pub struct PackageEvent<'a> {
     pub client_id: &'a str,
     pub event: &'a str,
     pub ts: String,
@@ -57,7 +57,8 @@ fn ensure_client_id() -> Result<String, Box<dyn Error>> {
     }
 }
 
-pub fn posthog_capture_install(
+pub fn posthog_capture_event(
+    event_name: &str,
     pkg: &crate::pkg::types::Package,
     app_version: &str,
 ) -> Result<bool, Box<dyn Error>> {
@@ -80,9 +81,9 @@ pub fn posthog_capture_install(
         crate::pkg::types::PackageType::Config => "config",
     };
 
-    let ev = InstallEvent {
+    let ev = PackageEvent {
         client_id: &client_id,
-        event: "install",
+        event: event_name,
         ts: chrono::Utc::now().to_rfc3339(),
         app_version,
         os,
@@ -118,7 +119,7 @@ pub fn posthog_capture_install(
     struct PosthogEvent<'a> {
         event: &'a str,
         distinct_id: &'a str,
-        properties: &'a InstallEvent<'a>,
+        properties: &'a PackageEvent<'a>,
         timestamp: &'a str,
     }
     #[derive(Serialize)]

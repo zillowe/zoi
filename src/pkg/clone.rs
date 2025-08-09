@@ -78,5 +78,11 @@ pub fn run(pkg_path: &Path, target_dir: Option<&str>) -> Result<(), Box<dyn Erro
         }
     }
 
+    match crate::pkg::telemetry::posthog_capture_event("clone", &pkg, env!("CARGO_PKG_VERSION")) {
+        Ok(true) => println!("{} telemetry sent", "Info:".green()),
+        Ok(false) => (),
+        Err(e) => eprintln!("{} telemetry failed: {}", "Warning:".yellow(), e),
+    }
+
     Ok(())
 }

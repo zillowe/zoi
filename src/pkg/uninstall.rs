@@ -93,6 +93,13 @@ fn uninstall_collection(
     local::remove_manifest(&pkg.name, scope)?;
     println!("\nRemoved manifest for collection '{}'.", pkg.name);
 
+    match crate::pkg::telemetry::posthog_capture_event("uninstall", pkg, env!("CARGO_PKG_VERSION"))
+    {
+        Ok(true) => println!("{} telemetry sent", "Info:".green()),
+        Ok(false) => (),
+        Err(e) => eprintln!("{} telemetry failed: {}", "Warning:".yellow(), e),
+    }
+
     Ok(())
 }
 
@@ -171,5 +178,13 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
     }
     local::remove_manifest(&pkg.name, scope)?;
     println!("Removed manifest for '{}'.", pkg.name);
+
+    match crate::pkg::telemetry::posthog_capture_event("uninstall", &pkg, env!("CARGO_PKG_VERSION"))
+    {
+        Ok(true) => println!("{} telemetry sent", "Info:".green()),
+        Ok(false) => (),
+        Err(e) => eprintln!("{} telemetry failed: {}", "Warning:".yellow(), e),
+    }
+
     Ok(())
 }
