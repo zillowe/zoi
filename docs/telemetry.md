@@ -18,6 +18,7 @@ When you choose to enable telemetry, Zoi sends a secure, anonymous event to our 
 - **A unique, anonymous client ID:** This is a randomly generated UUID that is not tied to any of your personal information.
 - **Package Details:**
   - The name of the package.
+  - The version of the package.
   - The package's repository, description, maintainer, and author.
 - **The type of package** (e.g. `package`, `collection`, `service`).
 - **Your operating system and CPU architecture** (e.g. `linux-amd64`, `windows-amd64`).

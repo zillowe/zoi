@@ -17,6 +17,7 @@ pub struct PackageEvent<'a> {
 pub struct MinimalPackage<'a> {
     pub name: &'a str,
     pub repo: &'a str,
+    pub version: &'a str,
     pub description: &'a str,
     pub maintainer: MinimalPerson<'a>,
     pub author: Option<MinimalPerson<'a>>,
@@ -91,6 +92,7 @@ pub fn posthog_capture_event(
         package: MinimalPackage {
             name: &pkg.name,
             repo: &pkg.repo,
+            version: pkg.version.as_deref().unwrap_or("unknown"),
             description: &pkg.description,
             maintainer: MinimalPerson {
                 name: &pkg.maintainer.name,
