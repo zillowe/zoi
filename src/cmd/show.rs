@@ -88,7 +88,7 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
 
     if let Some(bins) = &pkg.bins {
         if !bins.is_empty() {
-            println!("{}: {}", "Provides".bold(), bins.join(", ").blue());
+            println!("{}: {}", "Provides".bold(), bins.join(", ").green());
         }
     }
 

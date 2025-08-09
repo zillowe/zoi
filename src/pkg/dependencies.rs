@@ -858,10 +858,10 @@ pub fn resolve_and_install_required_options(
                         if num > 0 && num <= parsed_deps.len() {
                             to_install.push(num - 1);
                         } else {
-                            println!("Invalid number: {}", num);
+                            return Err(format!("Invalid number: {}", num).into());
                         }
                     } else {
-                        println!("Invalid input: {}", part);
+                        return Err(format!("Invalid input: {}", part).into());
                     }
                 }
             }
@@ -883,12 +883,11 @@ pub fn resolve_and_install_required_options(
             let items: Vec<_> = parsed_deps
                 .iter()
                 .map(|d| {
-                    let desc = d.description.unwrap_or("No description");
                     let mut dep_display = format!("{}:{}", d.manager, d.package);
                     if let Some(req) = &d.req {
                         dep_display.push_str(&req.to_string());
                     }
-                    format!("{} - {}", dep_display, desc)
+                    dep_display
                 })
                 .collect();
 
@@ -965,7 +964,7 @@ pub fn resolve_and_install_optional(
 
     let trimmed_input = input.trim().to_lowercase();
 
-    if trimmed_input == "none" || trimmed_input == "n" {
+    if trimmed_input == "none" || trimmed_input == "n" || trimmed_input == "0" {
         println!("Skipping optional dependencies.");
         return Ok(());
     }
@@ -979,10 +978,10 @@ pub fn resolve_and_install_optional(
                 if num > 0 && num <= parsed_deps.len() {
                     to_install.push(num - 1);
                 } else {
-                    println!("Invalid number: {}", num);
+                    return Err(format!("Invalid number: {}", num).into());
                 }
             } else {
-                println!("Invalid input: {}", part);
+                return Err(format!("Invalid input: {}", part).into());
             }
         }
     }
