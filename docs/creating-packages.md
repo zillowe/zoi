@@ -20,7 +20,7 @@ Zoi organizes its packages into several repositories, each with a specific purpo
 
 For your first contribution, you will almost always be adding your package to the **`community`** repository.
 
-For more information about repositories [visit here](./repositories.md)
+For more information about repositories [visit here](./repositories/)
 
 ## Step 1: Creating Your `pkg.yaml` File
 
@@ -119,7 +119,7 @@ installation:
     binary_path: "bin/tool"
 ```
 
-Supported archive formats for `com_binary` are documented in [Supported Archives for Compressed Binaries](./archives).
+Supported archive formats for `com_binary` are documented in [Supported Archives for Compressed Binaries](./archives/).
 
 #### `source`
 
@@ -161,7 +161,7 @@ Zoi uses placeholders to make your URLs dynamic:
 - `{git}`: The value of the top-level `git` field.
 - `{store}`: The path where the final binary should be placed (for `source` builds).
 
-For resolving a package version from a remote URL (plain text or JSON), see the example in [Package with Remote Version URL](./examples#package-with-remote-version-url-json-or-plain-text).
+For resolving a package version from a remote URL (plain text or JSON), see the example in [Package with Remote Version URL](./examples/#package-with-remote-version-url-json-or-plain-text).
 
 ### Security: Checksums
 

@@ -15,8 +15,6 @@ This page explains Zoi's official repositories and mirrors, and how package repo
   - Primary: [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi-Pkgs)
   - Mirrors: [GitHub](https://github.com/Zillowe/Zoi-Pkgs), [Codeberg](https://codeberg.org/Zillowe/Zoi-Pkgs)
 
-Related links: [Homepage](https://zillowe.rf.gd/zds/zoi)
-
 ## Repository tiers
 
 Zoi organizes packages into tiers. Use these to decide where a package belongs and to assess stability.
@@ -78,4 +76,4 @@ zoi install @community/htop
 zoi install @core/linux/amd64/nvidia-driver
 ```
 
-For creating and publishing packages, see [Creating & Publishing Packages](./creating-packages).
+For creating and publishing packages, see [Creating & Publishing Packages](./creating-packages/).

@@ -9,7 +9,7 @@ This guide will provide you with everything you need to know to get started, fro
 
 ## Introduction
 
-Zoi is a universal package manager and environment setup tool, designed to simplify package management and environment configuration across multiple operating systems. It's part of the [Zillowe Development Suite (ZDS)](/docs/zds) and aims to streamline your development workflow by managing tools and project environments with ease.
+Zoi is a universal package manager and environment setup tool, designed to simplify package management and environment configuration across multiple operating systems. It's part of the [Zillowe Development Suite (ZDS)](/docs/zds/) and aims to streamline your development workflow by managing tools and project environments with ease.
 
 ## Features
 
@@ -17,7 +17,7 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
 - **Universal Package Support:** Install packages from various sources: binaries, compressed archives, build from source, or installer scripts.
 - **Extensive Dependency Management:** Integrates with over 30+ package managers (`apt`, `brew`, `cargo`, `npm`, `pip`, `scoop`, etc.) to handle dependencies.
 - **Rich Dependencies:** Packages can define runtime and build dependencies with required, optional, and selectable options groups.
-- **Project Environments:** Easily define and manage project-specific environments and commands using [`zoi.yaml`](./project-config).
+- **Project Environments:** Easily define and manage project-specific environments and commands using [`zoi.yaml`](./project-config/).
 - **Repository-Based:** Manage packages from official or community repositories. Easily add your own.
 - **Intuitive CLI:** A simple and powerful command-line interface with helpful aliases for a better developer experience.
 - **Package Types:** Supports standard packages, meta-packages (collections), background services, and configuration file management.
@@ -242,7 +242,7 @@ Zoi provides a wide range of commands to manage your packages and environment. F
 | `run`   | Executes a command from a local `zoi.yaml` file. Can be run interactively.     |
 | `env`   | Sets up project environments from a `zoi.yaml` file. Can be run interactively. |
 
-See the full schema and examples in [Project Configuration (zoi.yaml)](./project-config).
+See the full schema and examples in [Project Configuration (zoi.yaml)](./project-config/).
 
 ### Service Management
 
@@ -282,7 +282,7 @@ zoi repo rm community
 zoi repo ls
 ```
 
-For an overview of official repositories, mirrors, and repository tiers, see [Repositories](./repositories).
+For an overview of official repositories, mirrors, and repository tiers, see [Repositories](./repositories/).
 
 Zoi supports different types of packages, defined in the `.pkg.yaml` file.
 
@@ -295,7 +295,7 @@ Zoi supports different types of packages, defined in the `.pkg.yaml` file.
 
 ## Creating Packages (`pkg.yaml`)
 
-Creating a package for Zoi is done by defining a `pkg.yaml` file. This file contains all the metadata and instructions Zoi needs to install your software. For more examples, see the [Package Examples](./examples) page.
+Creating a package for Zoi is done by defining a `pkg.yaml` file. This file contains all the metadata and instructions Zoi needs to install your software. For more examples, see the [Package Examples](./examples/) page.
 
 ### `pkg.yaml` Structure
 
@@ -457,11 +457,11 @@ Zoi supports four types of installation methods within the `installation` list:
 3.  **`source`**: Clones a git repository and runs a series of build commands you define. Supports optional `tag` or `branch` (use only one). If none is provided, the default branch HEAD is used. `tag` can include placeholders like `v{version}`.
 4.  **`script`**: Downloads and executes an installation script (e.g. `install.sh`).
 
-For the list of supported archive formats for `com_binary`, see [Supported Archives for Compressed Binaries](./archives).
+For the list of supported archive formats for `com_binary`, see [Supported Archives for Compressed Binaries](./archives/).
 
 ### Dependencies
 
-For the full list of supported dependency managers, usage semantics, and commands Zoi runs, see [Dependencies & Supported Package Managers](./dependencies).
+For the full list of supported dependency managers, usage semantics, and commands Zoi runs, see [Dependencies & Supported Package Managers](./dependencies/).
 
 ## FAQ
 
@@ -564,7 +564,7 @@ For the full list of supported dependency managers, usage semantics, and command
 <br />
 <Accordions type="single">
   <Accordion title="Does Zoi collect your data?">
-    We believe in privacy by design. Zoi does **not** collect any data by default. You can choose to opt-in to our anonymous telemetry to help us improve the application. To learn more about what we collect and why, please see our [Telemetry & Analytics](./telemetry) page.
+    We believe in privacy by design. Zoi does **not** collect any data by default. You can choose to opt-in to our anonymous telemetry to help us improve the application. To learn more about what we collect and why, please see our [Telemetry & Analytics](./telemetry/) page.
   </Accordion>
 </Accordions>
 
