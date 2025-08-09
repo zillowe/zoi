@@ -2,13 +2,16 @@ use crate::pkg::{install, local, resolve, types};
 use crate::utils;
 use colored::*;
 use dialoguer::{Input, Select, theme::ColorfulTheme};
+use indicatif::{ProgressBar, ProgressStyle};
 use regex::Regex;
 use semver::{Version, VersionReq};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs;
+use std::io::Read;
 use std::path::PathBuf;
 use std::process::Command;
+use tempfile::Builder;
 
 #[derive(Debug)]
 struct Dependency<'a> {
@@ -205,7 +208,7 @@ fn install_dependency(
         "pkg" => os == "freebsd",
         "pkg_add" => os == "openbsd",
         "zoi" | "cargo" | "native" | "go" | "npm" | "deno" | "jsr" | "bun" | "pip" | "pipx"
-        | "cargo-binstall" | "gem" | "yarn" | "pnpm" | "composer" | "dotnet" | "nix" | "conda" => {
+        | "cargo-binstall" | "gem" | "yarn" | "pnpm" | "composer" | "dotnet" | "nix" | "conda" | "script" | "volta" => {
             true
         }
         _ => false,
@@ -359,7 +362,7 @@ fn install_dependency(
                 return Err(format!("Go dependency failed for '{}'", dep.package).into());
             }
         }
-        "npm" | "yarn" | "pnpm" | "bun" => {
+        "npm" | "yarn" | "pnpm" | "bun" | "volta" => {
             let package_to_install = if let Some(v) = &dep.version_str {
                 format!("{}@{}", dep.package, v)
             } else {
@@ -371,6 +374,7 @@ fn install_dependency(
                 "yarn" => command.args(["global", "add"]),
                 "pnpm" => command.args(["add", "-g"]),
                 "bun" => command.args(["install", "-g"]),
+                "volta" => command.args(["install"]),
                 _ => unreachable!(),
             };
             let status = command.arg(package_to_install).status()?;
@@ -822,6 +826,72 @@ fn install_dependency(
                 return Err(format!("macports dependency failed for '{}'", dep.package).into());
             }
         }
+        "script" => {
+            let url = if dep.package.starts_with("http") {
+                dep.package.to_string()
+            } else {
+                format!("https://{}", dep.package)
+            };
+
+            let platform = utils::get_platform()?;
+            let os = platform.split('-').next().unwrap_or("");
+            let platform_ext = if os == "windows" { "ps1" } else { "sh" };
+
+            let final_url = format!("{}.{}", url, platform_ext);
+            println!("Executing script from URL: {}", final_url.cyan());
+
+            let temp_dir = Builder::new().prefix("zoi-script-dep").tempdir()?;
+            let script_path = temp_dir.path().join(format!("script.{}", platform_ext));
+
+            println!("Downloading script from: {}", final_url.cyan());
+            let client = crate::utils::build_blocking_http_client(60)?;
+            let mut response = client.get(&final_url).send()?;
+
+            if !response.status().is_success() {
+                return Err(format!("Failed to download script: HTTP {}", response.status()).into());
+            }
+
+            let total_size = response.content_length().unwrap_or(0);
+            let pb = ProgressBar::new(total_size);
+            pb.set_style(ProgressStyle::default_bar()
+                .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})")?
+                .progress_chars("#>- "));
+
+            let mut downloaded_bytes = Vec::new();
+            let mut buffer = [0; 8192];
+            loop {
+                let bytes_read = response.read(&mut buffer)?;
+                if bytes_read == 0 {
+                    break;
+                }
+                downloaded_bytes.extend_from_slice(&buffer[..bytes_read]);
+                pb.inc(bytes_read as u64);
+            }
+            pb.finish_with_message("Download complete.");
+
+            fs::write(&script_path, downloaded_bytes)?;
+
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                fs::set_permissions(&script_path, fs::Permissions::from_mode(0o755))?;
+            }
+
+            let mut command = if cfg!(target_os = "windows") {
+                let mut cmd = Command::new("powershell");
+                cmd.arg("-ExecutionPolicy").arg("Bypass").arg("-File").arg(&script_path);
+                cmd
+            } else {
+                let mut cmd = Command::new("bash");
+                cmd.arg(&script_path);
+                cmd
+            };
+
+            let status = command.status()?;
+            if !status.success() {
+                return Err(format!("Script dependency failed for '{}'", dep.package).into());
+            }
+        }
         _ => return Err(format!("Unknown package manager in dependency: {}", dep.manager).into()),
     }
     Ok(())
@@ -1191,6 +1261,10 @@ pub fn uninstall_dependency(
             .arg("-g")
             .arg(dep.package)
             .status()?,
+        "volta" => {
+            println!("Skipping uninstall for Volta, please remove binary manually.");
+            return Ok(());
+        }
         "pip" | "pipx" => Command::new(manager)
             .arg("uninstall")
             .arg(dep.package)
@@ -1339,6 +1413,10 @@ pub fn uninstall_dependency(
             .arg("uninstall")
             .arg(dep.package)
             .status()?,
+        "script" => {
+            println!("Skipping uninstall for script dependency, as it's a one-time execution.");
+            return Ok(());
+        }
         _ => return Err(format!("Unknown package manager for uninstall: {}", dep.manager).into()),
     };
 
