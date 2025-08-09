@@ -1,6 +1,6 @@
 [package]
 name = "zoi-cli"
-version = "4.0.0-beta-prod"
+version = "4.0.1-beta-prod"
 edition = "2024"
 description = "Universal Package Manager & Environment Setup Tool"
 license = "Apache-2.0"
@@ -51,6 +51,9 @@ winapi = { version = "0.3.9", features = ["securitybaseapi", "winnt"] }
 xz2 = "0.1.7"
 zip = { version = "4.3.0", default-features = false, features = ["deflate"] }
 zstd = "0.13.3"
+
+[build-dependencies]
+dotenvy = "0.15.7"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55.0"
