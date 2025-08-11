@@ -26,12 +26,27 @@ For more information about repositories [visit here](/docs/zds/zoi/repositories/
 
 The heart of every Zoi package is a `pkg.yaml` file. This file contains all the metadata and instructions Zoi needs to install your software.
 
+### Using the JSON Schema for Validation
+
+To help you create valid `pkg.yaml` files and get autocompletion in supported editors (like VS Code), you can add a `$schema` tag pointing to the official Zoi package schema.
+
+```yaml
+# my-cli.pkg.yaml
+# yaml-language-server: $schema=https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/pkg.schema.json
+name: my-cli
+repo: community
+# ... rest of your package definition
+```
+
+This line tells your editor to use the schema for validation, which can catch errors before you even test the package.
+
 ### Basic Structure
 
 At a minimum, your package needs these fields:
 
 ```yaml
 # my-cli.pkg.yaml
+# yaml-language-server: $schema=https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/pkg.schema.json
 name: my-cli
 repo: community
 version: 1.2.3

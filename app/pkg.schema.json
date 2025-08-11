@@ -1,0 +1,300 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Zoi Package Schema",
+  "description": "Schema for the pkg.yaml file used by Zoi.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "description": "The name of the package. Required and should be unique.",
+      "type": "string"
+    },
+    "repo": {
+      "description": "The repository where the package is located (e.g. 'core', 'community', 'core/linux/amd64').",
+      "type": "string"
+    },
+    "version": {
+      "description": "The version of the package. Can be a static version number or a URL to a file containing the version.",
+      "type": "string"
+    },
+    "versions": {
+      "description": "A map of version channels to version numbers or URLs. Zoi will use the 'stable' channel by default if it exists.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "description": {
+      "description": "A brief description of the package.",
+      "type": "string"
+    },
+    "website": {
+      "description": "The official website for the package.",
+      "type": "string",
+      "format": "uri"
+    },
+    "readme": {
+      "description": "A URL to a README file for the package.",
+      "type": "string",
+      "format": "uri"
+    },
+    "git": {
+      "description": "The source code repository URL.",
+      "type": "string",
+      "format": "uri"
+    },
+    "maintainer": {
+      "$ref": "#/definitions/maintainerPerson"
+    },
+    "author": {
+      "$ref": "#/definitions/authorPerson"
+    },
+    "license": {
+      "description": "The license of the package (SPDX identifier).",
+      "type": "string"
+    },
+    "scope": {
+      "description": "The installation scope.",
+      "type": "string",
+      "enum": ["user", "system"],
+      "default": "user"
+    },
+    "type": {
+      "description": "The package type.",
+      "type": "string",
+      "enum": ["package", "collection", "service", "config", "app"],
+      "default": "package"
+    },
+    "alt": {
+      "description": "An alternate source to resolve this package from. Can be another package name, a URL to a raw .pkg.yaml file, or a local file path.",
+      "type": "string"
+    },
+    "updater": {
+      "description": "The installation method to use for `zoi update`.",
+      "type": "string",
+      "enum": ["binary", "com_binary", "script", "source"]
+    },
+    "bins": {
+      "description": "A list of binaries this package provides. Used for conflict detection.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "conflicts": {
+      "description": "A list of package names that this package conflicts with.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "tags": {
+      "description": "A list of tags for discovery and filters.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "installation": {
+      "description": "A list of methods to install the package. Zoi will try them in order.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/installationMethod"
+      }
+    },
+    "dependencies": {
+      "$ref": "#/definitions/dependencies"
+    },
+    "post_install": {
+      "description": "Post-installation commands to run after a successful installation.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/hook"
+      }
+    },
+    "post_uninstall": {
+      "description": "Post-uninstallation commands to run before the package is removed.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/hook"
+      }
+    },
+    "service": {
+      "description": "Service definition for 'service' type packages.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/serviceMethod"
+      }
+    },
+    "config": {
+      "description": "Configuration commands for 'config' type packages.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/configCommands"
+      }
+    },
+    "app": {
+      "description": "App template commands for 'app' type packages.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/appCommands"
+      }
+    }
+  },
+  "required": ["name", "repo", "description", "maintainer"],
+  "definitions": {
+    "maintainerPerson": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "website": { "type": "string", "format": "uri" },
+        "key": {
+          "description": "URL to the public GPG key or the 40-character fingerprint.",
+          "type": "string"
+        }
+      },
+      "required": ["name", "email"]
+    },
+    "authorPerson": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "website": { "type": "string", "format": "uri" },
+        "key": {
+          "description": "URL to the public GPG key or the 40-character fingerprint.",
+          "type": "string"
+        }
+      }
+    },
+    "installationMethod": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["binary", "com_binary", "source", "script"]
+        },
+        "url": { "type": "string" },
+        "platforms": { "type": "array", "items": { "type": "string" } },
+        "commands": { "type": "array", "items": { "type": "string" } },
+        "platformComExt": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "checksums": { "$ref": "#/definitions/checksums" },
+        "sigs": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/signature" }
+        },
+        "binary_path": { "type": "string" },
+        "tag": { "type": "string" },
+        "branch": { "type": "string" }
+      },
+      "required": ["type", "url", "platforms"]
+    },
+    "checksums": {
+      "oneOf": [
+        { "type": "string", "format": "uri" },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["sha256", "sha512"],
+              "default": "sha512"
+            },
+            "list": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/checksumInfo" }
+            }
+          },
+          "required": ["list"]
+        }
+      ]
+    },
+    "checksumInfo": {
+      "type": "object",
+      "properties": {
+        "file": { "type": "string" },
+        "checksum": { "type": "string" }
+      },
+      "required": ["file", "checksum"]
+    },
+    "signature": {
+      "type": "object",
+      "properties": {
+        "file": { "type": "string" },
+        "sig": { "type": "string", "format": "uri" }
+      },
+      "required": ["file", "sig"]
+    },
+    "dependencies": {
+      "type": "object",
+      "properties": {
+        "runtime": { "$ref": "#/definitions/dependencyGroup" },
+        "build": { "$ref": "#/definitions/dependencyGroup" }
+      }
+    },
+    "dependencyGroup": {
+      "oneOf": [
+        { "type": "array", "items": { "type": "string" } },
+        {
+          "type": "object",
+          "properties": {
+            "required": { "type": "array", "items": { "type": "string" } },
+            "options": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/dependencyOptionGroup" }
+            },
+            "optional": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      ]
+    },
+    "dependencyOptionGroup": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "desc": { "type": "string" },
+        "all": { "type": "boolean", "default": false },
+        "depends": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["name", "desc", "depends"]
+    },
+    "hook": {
+      "type": "object",
+      "properties": {
+        "platforms": { "type": "array", "items": { "type": "string" } },
+        "commands": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["platforms", "commands"]
+    },
+    "serviceMethod": {
+      "type": "object",
+      "properties": {
+        "platforms": { "type": "array", "items": { "type": "string" } },
+        "start": { "type": "array", "items": { "type": "string" } },
+        "stop": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["platforms", "start", "stop"]
+    },
+    "configCommands": {
+      "type": "object",
+      "properties": {
+        "platforms": { "type": "array", "items": { "type": "string" } },
+        "install": { "type": "array", "items": { "type": "string" } },
+        "uninstall": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["platforms", "install"]
+    },
+    "appCommands": {
+      "type": "object",
+      "properties": {
+        "platforms": { "type": "array", "items": { "type": "string" } },
+        "appCreate": { "type": "string" },
+        "commands": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["platforms", "appCreate"]
+    }
+  }
+}

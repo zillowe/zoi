@@ -301,9 +301,10 @@ Creating a package for Zoi is done by defining a `pkg.yaml` file. This file cont
 
 ### `pkg.yaml` Structure
 
-Here is a comprehensive overview of the fields available in a `pkg.yaml` file.
+Here is a comprehensive overview of the fields available in a `pkg.yaml` file. For validation and autocompletion in your editor, you can add a `$schema` line pointing to the official JSON Schema.
 
 ```yaml
+# yaml-language-server: $schema=https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/pkg.schema.json
 # The name of the package. This is required and should be unique.
 name: my-awesome-app
 # The repository where the package is located (e.g. 'core', 'community', 'core/linux/amd64').
