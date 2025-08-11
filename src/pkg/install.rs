@@ -57,6 +57,10 @@ pub fn run_installation(
 
     check_for_conflicts(&pkg, yes)?;
 
+    if pkg.package_type == types::PackageType::App {
+        return Err("This package is an 'app' template. Use 'zoi create pkg <source> <appName>' to create an app from it.".into());
+    }
+
     if pkg.scope == types::Scope::System {
         if !utils::is_admin() {
             return Err("System-wide installation requires administrative privileges. Please run with sudo or as an administrator.".into());

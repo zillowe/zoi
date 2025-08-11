@@ -30,6 +30,7 @@ pub fn run(
                 "collection" => Some(PackageType::Collection),
                 "service" => Some(PackageType::Service),
                 "config" => Some(PackageType::Config),
+                "app" => Some(PackageType::App),
                 _ => None,
             });
 

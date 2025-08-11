@@ -10,7 +10,7 @@ mod utils;
 // Production or Development
 const BRANCH: &str = "Production";
 const STATUS: &str = "Beta";
-const NUMBER: &str = "4.1.0";
+const NUMBER: &str = "4.1.1";
 
 /// Zoi - The Universal Package Manager & Environment Setup Tool.
 ///
@@ -283,6 +283,14 @@ enum Commands {
         #[arg(value_enum)]
         action: TelemetryAction,
     },
+
+    /// Create an application using a package template
+    Create {
+        /// Package name, @repo/name, local .pkg.yaml path, or URL
+        source: String,
+        /// The application name to substitute into template commands
+        app_name: String,
+    },
 }
 
 #[derive(clap::ValueEnum, Clone)]
@@ -426,6 +434,10 @@ fn main() {
                     TelemetryAction::Disable => TelemetryCommand::Disable,
                 };
                 run(cmd);
+                Ok(())
+            }
+            Commands::Create { source, app_name } => {
+                cmd::create::run(cmd::create::CreateCommand { source, app_name }, cli.yes);
                 Ok(())
             }
         };

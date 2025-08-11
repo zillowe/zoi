@@ -21,6 +21,7 @@ pub enum PackageType {
     Collection,
     Service,
     Config,
+    App,
 }
 
 impl Default for PackageType {
@@ -43,6 +44,16 @@ pub struct ConfigCommands {
     pub platforms: Vec<String>,
     pub install: Vec<String>,
     pub uninstall: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)]
+pub struct AppCommands {
+    pub platforms: Vec<String>,
+    #[serde(rename = "appCreate")]
+    pub app_create: String,
+    #[serde(default)]
+    pub commands: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -80,6 +91,7 @@ pub struct Package {
     pub scope: Scope,
     pub service: Option<Vec<ServiceMethod>>,
     pub config: Option<Vec<ConfigCommands>>,
+    pub app: Option<Vec<AppCommands>>,
     #[serde(default)]
     pub post_install: Option<Vec<PostInstallHook>>,
     #[serde(default)]

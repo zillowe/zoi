@@ -451,6 +451,10 @@ pub fn run(source: &str, args: Vec<String>) -> Result<(), Box<dyn Error>> {
     let content = fs::read_to_string(&resolved_source.path)?;
     let pkg: types::Package = serde_yaml::from_str(&content)?;
 
+    if pkg.package_type == types::PackageType::App {
+        return Err("This package is an 'app' template. Use 'zoi create <pkg> <appName>' to create an app from it.".into());
+    }
+
     let bin_path = find_executable(&pkg)?;
 
     match crate::pkg::telemetry::posthog_capture_event("exec", &pkg, env!("CARGO_PKG_VERSION")) {
