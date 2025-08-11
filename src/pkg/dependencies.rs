@@ -89,20 +89,19 @@ fn parse_dependency_string(dep_str: &str) -> Result<Dependency<'_>, Box<dyn Erro
         (rest, None)
     };
 
-    let (package, version_str) =
-        if let Some(at_pos) = package_and_version.rfind('@') {
-            if at_pos > 0 || (at_pos == 0 && package_and_version.contains('/')) {
-                let (p, v) = package_and_version.split_at(at_pos);
-                (p, Some(v[1..].to_string()))
-            } else {
-                (package_and_version, None)
-            }
-        } else if let Some(idx) = package_and_version.find(['=', '>', '<', '~', '^']) {
-            let (p, v) = package_and_version.split_at(idx);
-            (p, Some(v.to_string()))
+    let (package, version_str) = if let Some(at_pos) = package_and_version.rfind('@') {
+        if at_pos > 0 || (at_pos == 0 && package_and_version.contains('/')) {
+            let (p, v) = package_and_version.split_at(at_pos);
+            (p, Some(v[1..].to_string()))
         } else {
             (package_and_version, None)
-        };
+        }
+    } else if let Some(idx) = package_and_version.find(['=', '>', '<', '~', '^']) {
+        let (p, v) = package_and_version.split_at(idx);
+        (p, Some(v.to_string()))
+    } else {
+        (package_and_version, None)
+    };
 
     let req = if let Some(v_str) = &version_str {
         let req_parse_str = if v_str.chars().next().unwrap().is_ascii_digit() {
@@ -208,9 +207,8 @@ fn install_dependency(
         "pkg" => os == "freebsd",
         "pkg_add" => os == "openbsd",
         "zoi" | "cargo" | "native" | "go" | "npm" | "deno" | "jsr" | "bun" | "pip" | "pipx"
-        | "cargo-binstall" | "gem" | "yarn" | "pnpm" | "composer" | "dotnet" | "nix" | "conda" | "script" | "volta" => {
-            true
-        }
+        | "cargo-binstall" | "gem" | "yarn" | "pnpm" | "composer" | "dotnet" | "nix" | "conda"
+        | "script" | "volta" => true,
         _ => false,
     };
 
@@ -254,6 +252,65 @@ fn install_dependency(
             }
 
             println!("Not installed. Proceeding with installation...");
+
+            if let Ok(resolved_source) = resolve::resolve_source(&zoi_dep_name) {
+                if let Ok(content) = fs::read_to_string(&resolved_source.path) {
+                    if let Ok(dep_pkg) = serde_yaml::from_str::<types::Package>(&content) {
+                        if dep_pkg.conflicts.is_some() || dep_pkg.bins.is_some() {
+                            let installed_packages = local::get_installed_packages()?;
+                            let mut conflict_messages = Vec::new();
+
+                            if let Some(conflicts_with) = &dep_pkg.conflicts {
+                                for conflict_pkg_name in conflicts_with {
+                                    if installed_packages
+                                        .iter()
+                                        .any(|p| &p.name == conflict_pkg_name)
+                                    {
+                                        conflict_messages.push(format!(
+                                            "Package '{}' conflicts with installed package '{}'.",
+                                            dep_pkg.name.cyan(),
+                                            conflict_pkg_name.cyan()
+                                        ));
+                                    }
+                                }
+                            }
+
+                            if let Some(bins_provided) = &dep_pkg.bins {
+                                for bin in bins_provided {
+                                    for installed_pkg in &installed_packages {
+                                        if let Some(installed_bins) = &installed_pkg.bins {
+                                            if installed_bins.contains(bin) {
+                                                conflict_messages.push(format!(
+                                                    "Binary '{}' provided by '{}' is already provided by installed package '{}'.",
+                                                    bin.cyan(),
+                                                    dep_pkg.name.cyan(),
+                                                    installed_pkg.name.cyan()
+                                                ));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            if !conflict_messages.is_empty() {
+                                println!("{}", "Conflict Detected:".red().bold());
+                                for msg in conflict_messages {
+                                    println!("- {}", msg);
+                                }
+                                if !utils::ask_for_confirmation(
+                                    "Do you want to continue with the installation anyway?",
+                                    yes,
+                                ) {
+                                    return Err(
+                                        "Operation aborted by user due to conflicts.".into()
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             install_zoi_dependency(&zoi_dep_name, yes, processed_deps)?;
         }
         "native" => {
@@ -302,7 +359,10 @@ fn install_dependency(
             };
 
             let package_to_install = if let Some(v) = &dep.version_str {
-                println!("{} Version specifications for native dependencies are not guaranteed to work.", "Warning:".yellow());
+                println!(
+                    "{} Version specifications for native dependencies are not guaranteed to work.",
+                    "Warning:".yellow()
+                );
                 match pm.as_str() {
                     "apt" | "apt-get" | "zypper" => format!("{}={}", dep.package, v),
                     "dnf" | "yum" => format!("{}-{}", dep.package, v),
@@ -470,7 +530,10 @@ fn install_dependency(
         }
         "nix" => {
             if dep.version_str.is_some() {
-                println!("{} Version specifications for nix are not supported. Installing latest.", "Warning:".yellow());
+                println!(
+                    "{} Version specifications for nix are not supported. Installing latest.",
+                    "Warning:".yellow()
+                );
             }
             let status = Command::new("nix-env")
                 .arg("-iA")
@@ -508,7 +571,10 @@ fn install_dependency(
         }
         "pacman" => {
             if dep.version_str.is_some() {
-                println!("{} Version specifications for pacman are not supported. Installing latest.", "Warning:".yellow());
+                println!(
+                    "{} Version specifications for pacman are not supported. Installing latest.",
+                    "Warning:".yellow()
+                );
             }
             let status = Command::new("sudo")
                 .arg("pacman")
@@ -523,7 +589,11 @@ fn install_dependency(
         }
         "yay" | "paru" => {
             if dep.version_str.is_some() {
-                println!("{} Version specifications for {} are not supported. Installing latest.", "Warning:".yellow(), manager);
+                println!(
+                    "{} Version specifications for {} are not supported. Installing latest.",
+                    "Warning:".yellow(),
+                    manager
+                );
             }
             let status = Command::new(manager)
                 .arg("-S")
@@ -654,7 +724,10 @@ fn install_dependency(
         }
         "apk" => {
             if dep.version_str.is_some() {
-                println!("{} Version specifications for apk are not supported. Installing latest.", "Warning:".yellow());
+                println!(
+                    "{} Version specifications for apk are not supported. Installing latest.",
+                    "Warning:".yellow()
+                );
             }
             let status = Command::new("sudo")
                 .arg("apk")
@@ -667,7 +740,10 @@ fn install_dependency(
         }
         "xbps" | "xbps-install" => {
             if dep.version_str.is_some() {
-                println!("{} Version specifications for xbps are not supported. Installing latest.", "Warning:".yellow());
+                println!(
+                    "{} Version specifications for xbps are not supported. Installing latest.",
+                    "Warning:".yellow()
+                );
             }
             let status = Command::new("sudo")
                 .arg("xbps-install")
@@ -680,7 +756,10 @@ fn install_dependency(
         }
         "eopkg" => {
             if dep.version_str.is_some() {
-                println!("{} Version specifications for eopkg are not supported. Installing latest.", "Warning:".yellow());
+                println!(
+                    "{} Version specifications for eopkg are not supported. Installing latest.",
+                    "Warning:".yellow()
+                );
             }
             let status = Command::new("sudo")
                 .arg("eopkg")
@@ -694,7 +773,10 @@ fn install_dependency(
         }
         "guix" => {
             if dep.version_str.is_some() {
-                println!("{} Version specifications for guix are not supported. Installing latest.", "Warning:".yellow());
+                println!(
+                    "{} Version specifications for guix are not supported. Installing latest.",
+                    "Warning:".yellow()
+                );
             }
             let status = Command::new("guix")
                 .arg("install")
@@ -706,7 +788,10 @@ fn install_dependency(
         }
         "pkg" => {
             if dep.version_str.is_some() {
-                println!("{} Version specifications for pkg are not supported. Installing latest.", "Warning:".yellow());
+                println!(
+                    "{} Version specifications for pkg are not supported. Installing latest.",
+                    "Warning:".yellow()
+                );
             }
             let status = Command::new("sudo")
                 .arg("pkg")
@@ -720,7 +805,10 @@ fn install_dependency(
         }
         "pkg_add" => {
             if dep.version_str.is_some() {
-                println!("{} Version specifications for pkg_add are not supported. Installing latest.", "Warning:".yellow());
+                println!(
+                    "{} Version specifications for pkg_add are not supported. Installing latest.",
+                    "Warning:".yellow()
+                );
             }
             let status = Command::new("sudo")
                 .arg("pkg_add")
@@ -749,7 +837,10 @@ fn install_dependency(
         }
         "portage" => {
             if dep.version_str.is_some() {
-                println!("{} Version specifications for portage are not supported. Installing latest.", "Warning:".yellow());
+                println!(
+                    "{} Version specifications for portage are not supported. Installing latest.",
+                    "Warning:".yellow()
+                );
             }
             let status = Command::new("sudo")
                 .arg("emerge")
@@ -761,7 +852,10 @@ fn install_dependency(
         }
         "snap" => {
             if dep.version_str.is_some() {
-                println!("{} Version specifications for snap are not supported. Installing latest.", "Warning:".yellow());
+                println!(
+                    "{} Version specifications for snap are not supported. Installing latest.",
+                    "Warning:".yellow()
+                );
             }
             let status = Command::new("sudo")
                 .arg("snap")
@@ -774,7 +868,10 @@ fn install_dependency(
         }
         "flatpak" => {
             if dep.version_str.is_some() {
-                println!("{} Version specifications for flatpak are not supported. Installing latest.", "Warning:".yellow());
+                println!(
+                    "{} Version specifications for flatpak are not supported. Installing latest.",
+                    "Warning:".yellow()
+                );
             }
             let status = Command::new("sudo")
                 .arg("flatpak")
@@ -793,7 +890,8 @@ fn install_dependency(
             if let Some(v) = &dep.version_str {
                 command.arg("--version").arg(v);
             }
-            command.arg("--accept-package-agreements")
+            command
+                .arg("--accept-package-agreements")
                 .arg("--accept-source-agreements");
             let status = command.status()?;
             if !status.success() {
@@ -802,7 +900,10 @@ fn install_dependency(
         }
         "conda" => {
             if dep.version_str.is_some() {
-                println!("{} Version specifications for conda are not supported. Installing latest.", "Warning:".yellow());
+                println!(
+                    "{} Version specifications for conda are not supported. Installing latest.",
+                    "Warning:".yellow()
+                );
             }
             let status = Command::new("conda")
                 .arg("install")
@@ -815,7 +916,10 @@ fn install_dependency(
         }
         "macports" => {
             if dep.version_str.is_some() {
-                println!("{} Version specifications for macports are not supported. Installing latest.", "Warning:".yellow());
+                println!(
+                    "{} Version specifications for macports are not supported. Installing latest.",
+                    "Warning:".yellow()
+                );
             }
             let status = Command::new("sudo")
                 .arg("port")
@@ -848,7 +952,9 @@ fn install_dependency(
             let mut response = client.get(&final_url).send()?;
 
             if !response.status().is_success() {
-                return Err(format!("Failed to download script: HTTP {}", response.status()).into());
+                return Err(
+                    format!("Failed to download script: HTTP {}", response.status()).into(),
+                );
             }
 
             let total_size = response.content_length().unwrap_or(0);
@@ -879,7 +985,10 @@ fn install_dependency(
 
             let mut command = if cfg!(target_os = "windows") {
                 let mut cmd = Command::new("powershell");
-                cmd.arg("-ExecutionPolicy").arg("Bypass").arg("-File").arg(&script_path);
+                cmd.arg("-ExecutionPolicy")
+                    .arg("Bypass")
+                    .arg("-File")
+                    .arg(&script_path);
                 cmd
             } else {
                 let mut cmd = Command::new("bash");

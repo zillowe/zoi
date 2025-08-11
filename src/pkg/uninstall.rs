@@ -93,7 +93,8 @@ fn uninstall_collection(
     local::remove_manifest(&pkg.name, scope)?;
     println!("\nRemoved manifest for collection '{}'.", pkg.name);
 
-    match crate::pkg::telemetry::posthog_capture_event("uninstall", pkg, env!("CARGO_PKG_VERSION")) {
+    match crate::pkg::telemetry::posthog_capture_event("uninstall", pkg, env!("CARGO_PKG_VERSION"))
+    {
         Ok(true) => println!("{} telemetry sent", "Info:".green()),
         Ok(false) => (),
         Err(e) => eprintln!("{} telemetry failed: {}", "Warning:".yellow(), e),
@@ -161,7 +162,7 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
                 "\n--- Dependency '{}' is no longer needed, uninstalling... ---",
                 dep_str.bold()
             );
-            if let Err(e) = dependencies::uninstall_dependency(dep_str,  &run) {
+            if let Err(e) = dependencies::uninstall_dependency(dep_str, &run) {
                 eprintln!(
                     "Warning: Could not uninstall dependency '{}': {}",
                     dep_str, e

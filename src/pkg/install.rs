@@ -849,6 +849,7 @@ fn handle_com_binary_install(
     pkg: &types::Package,
 ) -> Result<(), Box<dyn Error>> {
     let platform = utils::get_platform()?;
+    let target_os = platform.split('-').next().unwrap_or("");
     let os = std::env::consts::OS;
 
     let com_ext = method
@@ -963,7 +964,14 @@ fn handle_com_binary_install(
 
     let binary_name = &pkg.name;
     let binary_name_with_ext = format!("{}.exe", pkg.name);
-    let declared_binary_path = method.binary_path.as_deref();
+    let declared_binary_path_normalized: Option<String> = method.binary_path.as_ref().map(|bp| {
+        if target_os == "windows" && !bp.ends_with(".exe") {
+            format!("{bp}.exe")
+        } else {
+            bp.clone()
+        }
+    });
+    let declared_binary_path = declared_binary_path_normalized.as_deref();
     let mut found_binary_path = None;
     let mut files_in_archive = Vec::new();
 
@@ -997,7 +1005,7 @@ fn handle_com_binary_install(
         } else {
             let file_name = path.file_name().unwrap_or_default();
             if file_name == binary_name.as_str()
-                || (cfg!(target_os = "windows") && file_name == binary_name_with_ext.as_str())
+                || (target_os == "windows" && file_name == binary_name_with_ext.as_str())
             {
                 found_binary_path = Some(path.to_path_buf());
             }
