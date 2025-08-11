@@ -6,6 +6,8 @@ First of all, thank you for considering contributing to Zoi! We're excited to ha
 
 We welcome contributions in many forms, including bug reports, feature requests, documentation improvements, and code contributions.
 
+You can use any of our [mirrors](/README.md#-contributing) for contributions.
+
 ### Reporting Bugs or Requesting Features
 
 If you find a bug or have an idea for a new feature, please check our [**issue tracker**](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues) to see if it has already been reported. If not, feel free to open a new issue.

@@ -1,16 +1,17 @@
 [package]
 name = "zoi-cli"
-version = "4.1.1-beta-prod"
+version = "4.1.2-beta-prod"
 edition = "2024"
 description = "Universal Package Manager & Environment Setup Tool"
 license = "Apache-2.0"
-repository = "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi"
-homepage = "https://zillowe.rf.gd/zds/zoi"
-documentation = "https://zillowe.rf.gd/docs/zds/zoi"
+repository = "https://github.com/Zillowe/Zoi"
+homepage = "https://zillowe.rf.gd/zds/zoi/"
+documentation = "https://zillowe.rf.gd/docs/zds/zoi/"
 keywords = ["cli", "package-manager", "dev-tools", "universal", "environment"]
 categories = ["command-line-utilities", "development-tools"]
 readme = "README.md"
 build = "build.rs"
+exclude = ["packages/*", ".github", ".gitlab", "app/*", "docs/*", "build/*", ".gitlab-ci.yml", "CONTRIBUTING.md"]
 
 [[bin]]
 name = "zoi"
@@ -24,6 +25,7 @@ clap = { version = "4.5.41", features = ["derive"] }
 clap_complete = "4.5.55"
 colored = "3.0.0"
 comfy-table = "7.1.4"
+crossterm = "0.29.0"
 dialoguer = "0.11.0"
 dirs = "6.0.0"
 flate2 = "1.1.2"
@@ -33,6 +35,7 @@ home = "0.5.11"
 indicatif = "0.18.0"
 nix = { version = "0.30.1", features = ["user"] }
 openssl = { version = "0.10.73", features = ["vendored"] }
+ratatui = { version = "0.29.0", features = ["crossterm"] }
 regex = "1.11.1"
 reqwest = { version = "0.12.22", features = ["blocking"] }
 self_update = "0.42.0"

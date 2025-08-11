@@ -35,8 +35,11 @@
   <a href="https://zillowe.rf.gd/docs/zds/zoi/"><strong>Docs</strong></a> •
   <a href="https://discord.gg/P4R7yaA3hf"><strong>Discord</strong></a> •
   <a href="./SECURITY.md"><strong>Security</strong></a> •
-  <a href="./CODE_OF_CONDUCT.md"><strong>Code of Conduct</strong></a> •
-  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues"><strong>Report an Issue</strong></a>
+  <a href="./CONTRIBUTING.md"><strong>Contributing</strong></a>
+  <br/>
+  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Bug%20Report"><strong>Report a Bug</strong></a>
+  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Feature%20Request"><strong>Requests a Feature</strong></a>
+  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Enhancement%20Request"><strong>Requests an Enhancement</strong></a>
 </div>
 
 <hr/>
