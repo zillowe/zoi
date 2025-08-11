@@ -73,6 +73,7 @@ Zoi supports different types of packages. You can specify the type using the `ty
 - `collection`: A meta-package that only installs a list of other packages as dependencies.
 - `service`: A package that runs as a background service (e.g. a database).
 - `config`: A package that manages configuration files for another application.
+- `app`: An application template used with `zoi create <source> <appName>` to scaffold projects. Not installable directly.
 
 ### Tags (Recommended)
 

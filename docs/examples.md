@@ -320,6 +320,53 @@ config:
 
 ---
 
+## App Template Package
+
+An `app` package defines a template to scaffold applications via `zoi create <source> <appName>`. It is not installable directly.
+
+```yaml
+# apps/rails-app.pkg.yaml
+name: rails-app
+repo: community
+type: app
+version: "7"
+description: "Rails app template"
+tags: [app, rails, ruby]
+maintainer:
+  name: "Your Name"
+  email: "you@example.com"
+
+dependencies:
+  runtime:
+    required:
+      - zoi:@core/ruby
+      - zoi:@main/gems/rails
+
+# Platform-specific create command and optional follow-up commands
+app:
+  - platforms: ["all"]
+    appCreate: "rails new ${appName}"
+    commands:
+      - "cd ${appName} && bundle install"
+      - "cd ${appName} && git init"
+```
+
+Usage:
+
+```sh
+zoi create rails-app MyBlog
+# or from a specific repo
+zoi create @community/rails-app MyBlog
+```
+
+Notes:
+
+- `${appName}` and `{appName}` placeholders are supported in `appCreate` and `commands`.
+- Dependencies under `dependencies.runtime.required` are installed before running `appCreate`.
+- You may also use `dependencies.build` for tools only needed during scaffolding.
+
+---
+
 ## Package with Optional Dependencies
 
 You can define optional dependencies that the user will be prompted to install. This is useful for adding extra functionality without bloating the default installation.
