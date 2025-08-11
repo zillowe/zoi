@@ -76,4 +76,4 @@ zoi install @community/htop
 zoi install @core/linux/amd64/nvidia-driver
 ```
 
-For creating and publishing packages, see [Creating & Publishing Packages](./creating-packages/).
+For creating and publishing packages, see [Creating & Publishing Packages](/docs/zds/zoi/creating-packages/).

@@ -78,7 +78,7 @@ Legend:
 | `snap`           | Linux (Snap)           | `sudo snap install <pkg>`                   | `sudo snap remove <pkg>`             |
 | `flatpak`        | Linux (Flathub)        | `sudo flatpak install flathub <pkg> -y`     | `flatpak uninstall -y <pkg>`         |
 | `pkg`            | FreeBSD                | `sudo pkg install -y <pkg>`                 | `sudo pkg delete -y <pkg>`           |
-| `pkg_add`        | OpenBSD                | `sudo pkg_add -I `pkg>`                     | `sudo pkg_delete <pkg>`              |
+| `pkg_add`        | OpenBSD                | `sudo pkg_add -I <pkg>`                     | `sudo pkg_delete <pkg>`              |
 | `cargo`          | Rust                   | `cargo install <crate>`                     | `cargo uninstall <crate>`            |
 | `cargo-binstall` | Rust (binary)          | `cargo binstall <crate>`                    | `cargo uninstall <crate>`            |
 | `go`             | Go                     | `go install <module>@latest`                | (no uninstall; manual)               |
@@ -86,6 +86,7 @@ Legend:
 | `yarn`           | Node.js                | `yarn global add <pkg>`                     | `yarn global remove <pkg>`           |
 | `pnpm`           | Node.js                | `pnpm add -g <pkg>`                         | `pnpm remove -g <pkg>`               |
 | `bun`            | Bun                    | `bun install -g <pkg>`                      | `bun remove -g <pkg>`                |
+| `volta`          | JavaScript             | `volta install <pkg>`                       | (no uninstall)                       |
 | `deno`           | Deno                   | `deno install -g <pkg>`                     | `deno uninstall <pkg>`               |
 | `jsr`            | JavaScript Registry    | `npx jsr add <pkg>`                         | (no uninstall)                       |
 | `pip`            | Python                 | `pip install <pkg>`                         | `pip uninstall -y <pkg>`             |
@@ -100,10 +101,19 @@ Legend:
 
 Notes:
 
-- AUR: `aur:<pkg>`builds from source using`makepkg`; uninstall is done with `pacman`.
+- AUR: `aur:<pkg>` builds from source using `makepkg`; uninstall is done with `pacman`.
 - `native:<pkg>` selects the appropriate system manager based on OS/distro; if none can be detected, Zoi errors.
 - Some managers (e.g. `go`, `jsr`, `volta`) do not provide reliable uninstall; Zoi prints a notice and skips.
 - The `script` manager takes a URL as the package name (e.g. `script:https://example.com/install`). It appends `.sh` for Linux/macOS and `.ps1` for Windows, then downloads and executes the script. There is no automatic uninstallation.
+
+## Zoi Dependencies and Conflict Checks
+
+When a dependency uses the `zoi:` manager, Zoi resolves the referenced package definition and applies the same conflict checks as for a top-level install:
+
+- If the dependency package declares `bins`, Zoi checks whether any of those binaries are already provided by installed packages.
+- If the dependency package declares `conflicts`, Zoi checks whether any listed packages are installed.
+
+If conflicts are detected, Zoi displays the conflicts and prompts whether to continue before proceeding with installation.
 
 ## Troubleshooting
 

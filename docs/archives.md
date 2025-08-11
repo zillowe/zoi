@@ -26,7 +26,7 @@ installation:
 Zoi will download, verify, and extract the archive, then locate the executable:
 
 - By default, it matches the package `name` (or `name.exe` on Windows).
-- You can override this by specifying `binary_path` in the `com_binary` installation method. This can be a relative path (e.g. `bin/tool`) or just a filename (e.g. `tool.exe`).
+- You can override this by specifying `binary_path` in the `com_binary` installation method. This can be a relative path (e.g. `bin/tool`) or just a filename (e.g. `tool.exe`). On Windows targets, if your `binary_path` does not end with `.exe`, Zoi will also look for the same path with `.exe` appended.
 - If exactly one file is present after extraction, Zoi assumes it is the intended binary.
 
 When installing, Zoi renames the found executable to the package name. If the located file ends with `.exe`, the installed filename will be `<package>.exe`; otherwise it will be `<package>`.

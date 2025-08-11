@@ -61,6 +61,7 @@ installation:
       macos: tar.gz
       windows: zip
     # The executable lives at this path inside the archive.
+    # On Windows targets, if this path does not end with .exe, Zoi will also try with .exe appended.
     binary_path: "bin/my-cli"
 ```
 
@@ -577,7 +578,7 @@ zoi env web    # set up an environment by alias
 zoi env        # interactive environment chooser
 ```
 
-See full schema and best practices in [Project Configuration (zoi.yaml)](./project-config/).
+See full schema and best practices in [Project Configuration (zoi.yaml)](/docs/zds/zoi/project-config/).
 
 ---
 
