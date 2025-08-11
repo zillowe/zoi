@@ -38,10 +38,52 @@ dependencies:
           - native:gtk4:for GNOME desktops
 ```
 
-Format per entry: `manager:package` with optional version requirement (e.g. `=1.2.3`, `>=2.0.0`) and an optional inline description after the last colon.
+Format per entry: `manager:package` with optional version and an optional inline description after the last colon.
 
-- Version constraints are supported for many managers when Zoi can detect installed versions. If a manager cannot enforce versions directly, Zoi warns when the detected version does not satisfy the constraint.
+- Version can be specified either with `@<semver>` or with a comparator string like `=1.2.3`, `>=2.0.0`, `^1.2`, `~1.2.3`.
+- Do not prefix versions with `v`. Use `@1.2.3`, not `@v1.2.3`.
+- Examples:
+  - `npm:typescript@5.3.2`
+  - `cargo:bat@0.24.0`
+  - `apt:curl=7.68.0-1ubuntu2.18`
+  - `zoi:some-zoi-package@1.2.3`
+  - `zoi:some-zoi-package@stable` (uses that package's `versions` map)
+- Inline description goes after the last colon if present and must not contain version characters. For example: `pipx:black:Python formatter CLI`.
 - For system-native packages, Zoi picks your OS package manager automatically when using `native:<pkg>`.
+
+Notes on versions and managers:
+
+- Zoi parses versions using SemVer requirements. If a manager cannot enforce versions directly, Zoi attempts best-effort checks or warns that pinning may not be honored.
+- Some managers support pinning (e.g. `apt` via `pkg=ver`, `dnf` via `pkg-ver`, `choco` via `--version`, `cargo` via `--version`, `npm/yarn/pnpm/bun` via `pkg@ver`, `brew` when a formula tap provides `pkg@ver`).
+- Many OS managers do not support explicit pinning in a reliable way (e.g. `pacman`, `yay/paru`, `apk`, `xbps`, `eopkg`, `guix`, `portage`, `snap`, `flatpak`, `macports`, `conda`). Zoi will install the latest available and may print a warning.
+- Go modules: Zoi currently installs with `go install <module>@latest`. Declaring a version like `go:module@...` is not supported through Zoi's SemVer parser and may fail.
+
+Templating:
+
+- You can reference the parent package version using `{version}` inside a dependency string. It will be replaced before parsing. Example: `zoi:my-plugin@{version}`.
+
+Mapped versions (versions map):
+
+- If your package defines a `versions:` map (channel → concrete version), Zoi resolves the concrete version first and then substitutes it into dependencies via `{version}`.
+- This lets you keep dependency versions in lockstep with the resolved package version. For example, if `stable` maps to `1.4.3`, then `{version}` becomes `1.4.3` in dependencies.
+- Channel tokens inside dependencies are supported only for `zoi:` dependencies. You can write `zoi:<pkg>@<channel>` (e.g. `zoi:core-tool@stable`) and Zoi will resolve that package's `versions` map.
+- For non-`zoi` managers (e.g. `npm`, `apt`, `cargo`), channel names like `@stable` are not supported; use `{version}` templating instead.
+
+Example:
+
+```yaml
+name: my-app
+versions:
+  stable: 1.4.3
+  beta: 1.5.0-beta.2
+dependencies:
+  runtime:
+    required:
+      - zoi:my-plugin@{version}
+      - npm:my-lib@{version}
+```
+
+In this example, Zoi resolves `my-app` to its concrete version from `versions:` (defaults to `stable` if present) and substitutes that into the dependency strings before installing.
 
 ## Supported managers
 
