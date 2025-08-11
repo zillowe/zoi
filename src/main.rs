@@ -10,7 +10,7 @@ mod utils;
 // Production or Development
 const BRANCH: &str = "Production";
 const STATUS: &str = "Beta";
-const NUMBER: &str = "4.0.4";
+const NUMBER: &str = "4.1.0";
 
 /// Zoi - The Universal Package Manager & Environment Setup Tool.
 ///
