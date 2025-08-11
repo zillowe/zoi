@@ -37,8 +37,8 @@
   <a href="./SECURITY.md"><strong>Security</strong></a> •
   <a href="./CONTRIBUTING.md"><strong>Contributing</strong></a>
   <br/>
-  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Bug%20Report"><strong>Report a Bug</strong></a>
-  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Feature%20Request"><strong>Requests a Feature</strong></a>
+  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Bug%20Report"><strong>Report a Bug</strong></a> •
+  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Feature%20Request"><strong>Requests a Feature</strong></a> •
   <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Enhancement%20Request"><strong>Requests an Enhancement</strong></a>
 </div>
 
