@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/pkg.schema.json
 name: zoi
 repo: core
 versions:
@@ -31,7 +32,7 @@ installation:
     url: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/{version}/downloads/zoi-{platform}.{platformComExt}
     platforms: [linux, macos, windows-amd64]
     checksums: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/{version}/downloads/checksums.txt
-    binary_path: "binariy-bin" # or .exe, user defines it, zoi renames it to the <package-name>, and doesnt change or remove it if it has .exe it the end
+    binary_path: "binariy-bin"
 
   - type: script
     url: "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.{platformExt}"
