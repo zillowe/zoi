@@ -176,6 +176,8 @@ enum Commands {
     Run {
         /// The alias of the command to execute
         cmd_alias: Option<String>,
+        /// Arguments to pass to the command
+        args: Vec<String>,
     },
 
     /// Manage and set up project environments from a local zoi.yaml file
@@ -386,8 +388,8 @@ fn main() {
                 cmd::uninstall::run(&packages);
                 Ok(())
             }
-            Commands::Run { cmd_alias } => {
-                cmd::run::run(cmd_alias);
+            Commands::Run { cmd_alias, args } => {
+                cmd::run::run(cmd_alias, args);
                 Ok(())
             }
             Commands::Env { env_alias } => {

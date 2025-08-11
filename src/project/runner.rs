@@ -3,7 +3,11 @@ use colored::*;
 use dialoguer::{Select, theme::ColorfulTheme};
 use std::error::Error;
 
-pub fn run(cmd_alias: Option<&str>, config: &ProjectConfig) -> Result<(), Box<dyn Error>> {
+pub fn run(
+    cmd_alias: Option<&str>,
+    args: &[String],
+    config: &ProjectConfig,
+) -> Result<(), Box<dyn Error>> {
     if config.commands.is_empty() {
         return Err("No commands defined in zoi.yaml".into());
     }
@@ -13,9 +17,12 @@ pub fn run(cmd_alias: Option<&str>, config: &ProjectConfig) -> Result<(), Box<dy
             .commands
             .iter()
             .find(|c| c.cmd == alias)
-            .ok_or_else(|| format!("Command alias '{alias}' not found in zoi.yaml"))?
+            .ok_or_else(|| format!("Command alias '{}' not found in zoi.yaml", alias))?
             .clone(),
         None => {
+            if !args.is_empty() {
+                return Err("Cannot pass arguments when in interactive mode.".into());
+            }
             let selections: Vec<&str> = config.commands.iter().map(|c| c.cmd.as_str()).collect();
             let selection = Select::with_theme(&ColorfulTheme::default())
                 .with_prompt("Choose a command to run")
@@ -29,5 +36,10 @@ pub fn run(cmd_alias: Option<&str>, config: &ProjectConfig) -> Result<(), Box<dy
     };
 
     println!("\n--- Running command: {} ---", command_to_run.cmd.bold());
-    executor::run_shell_command(&command_to_run.run)
+    let mut full_command = command_to_run.run.clone();
+    if !args.is_empty() {
+        full_command.push(' ');
+        full_command.push_str(&args.join(" "));
+    }
+    executor::run_shell_command(&full_command)
 }
