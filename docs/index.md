@@ -471,10 +471,11 @@ For the full list of supported dependency managers, usage semantics, and command
 
 <Accordions type="single">
   <Accordion title="How do I create my own package for Zoi?">
-    You can create a `.pkg.yaml` file that defines your package. This file
+    You can create a `pkg.yaml` file that defines your package. This file
     includes metadata like the package name, version, description, and
-    installation instructions. The `Package` struct in `src/pkg/types.rs` shows
-    all available fields.
+    installation instructions. The `Package` struct in [`types.rs`](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/src/pkg/types.rs) shows
+    all available fields, and there's a [schema](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/app/pkg.schema.json) you can use in your `pkg.yaml` file.
+    For more info about creating and publishing a package please visit [this guide](/docs/zds/zoi/creating-packages/).
   </Accordion>
 </Accordions>
 <br />
