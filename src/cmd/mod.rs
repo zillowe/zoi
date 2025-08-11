@@ -10,6 +10,7 @@ pub mod exec;
 pub mod info;
 pub mod install;
 pub mod list;
+pub mod make;
 pub mod pin;
 pub mod repo;
 pub mod run;

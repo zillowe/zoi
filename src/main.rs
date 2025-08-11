@@ -291,6 +291,13 @@ enum Commands {
         /// The application name to substitute into template commands
         app_name: String,
     },
+
+    /// Create a new package file interactively
+    #[command(long_about = "Interactively create a new zoi package file (pkg.yaml).")]
+    Make {
+        /// The name of the package to create a file for.
+        package_name: Option<String>,
+    },
 }
 
 #[derive(clap::ValueEnum, Clone)]
@@ -440,6 +447,7 @@ fn main() {
                 cmd::create::run(cmd::create::CreateCommand { source, app_name }, cli.yes);
                 Ok(())
             }
+            Commands::Make { package_name } => cmd::make::run(package_name),
         };
 
         if let Err(e) = result {
