@@ -235,6 +235,7 @@ Zoi provides a wide range of commands to manage your packages and environment. F
 | `clone`     | Clones the source code repository of one or more packages. A target directory can only be specified when cloning a single package.                                                                                         |
 | `exec`      | Downloads a binary to a temporary cache and runs it without installing it.                                                                                                                                                 |
 | `create`    | Creates an application from an app template. Usage: `zoi create <source> <appName>`                                                                                                                                        |
+| `make`      | Interactively creates a new `pkg.yaml` file.                                                                                                                                                                               |
 
 ### Project Environment
 

@@ -26,7 +26,27 @@ For more information about repositories [visit here](/docs/zds/zoi/repositories/
 
 The heart of every Zoi package is a `pkg.yaml` file. This file contains all the metadata and instructions Zoi needs to install your software.
 
-### Using the JSON Schema for Validation
+You can create this file manually, or use Zoi's interactive helper.
+
+### Option A: Using the Interactive `make` Command (Recommended)
+
+The easiest way to create a valid package file is with the `zoi make` command. It launches an interactive terminal UI that guides you through filling out all the necessary fields.
+
+```sh
+# Launch the interactive creator
+zoi make
+
+# You can also pre-fill the package name
+zoi make my-new-app
+```
+
+This will create a `my-new-app.pkg.yaml` file in your current directory with all the correct formatting and even the JSON schema link for editor autocompletion.
+
+### Option B: Creating the File Manually
+
+If you prefer to create the file by hand, here's what you need to know.
+
+#### Using the JSON Schema for Validation
 
 To help you create valid `pkg.yaml` files and get autocompletion in supported editors (like VS Code), you can add a `$schema` tag pointing to the official Zoi package schema.
 

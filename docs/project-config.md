@@ -74,6 +74,16 @@ Field reference:
 zoi run dev
 ```
 
+- To pass arguments to the underlying script, add them after the command alias. Use `--` to separate the arguments from Zoi's own options if needed.
+
+```sh
+# If 'test' is 'npm test', this runs 'npm test -- --watch'
+zoi run test -- --watch
+
+# If 'fmt' is 'cargo fmt', this runs 'cargo fmt -- --all'
+zoi run fmt --all
+```
+
 - Interactively choose a command (no alias provided):
 
 ```sh
