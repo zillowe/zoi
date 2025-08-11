@@ -91,7 +91,7 @@ async function installZoi() {
 async function main() {
   const installed = await isZoiInstalled();
   if (installed) {
-    console.log("zoi is already installed.");
+    console.log("zoi is already installed. To upgrade, run 'zoi upgrade'.");
   } else {
     console.log("zoi not found, starting installation.");
     await installZoi();

@@ -1,7 +1,7 @@
 {
   "name": "@zillowe/zoi",
   "description": "Universal Package Manager & Environment Setup Tool",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "main": "./dist/index.js",
   "bin": {
     "zoi-installer": "./dist/index.js"
