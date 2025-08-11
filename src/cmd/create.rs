@@ -3,6 +3,8 @@ use crate::utils;
 use clap::Parser;
 use colored::*;
 use std::collections::HashSet;
+use std::fs;
+use std::path::Path;
 
 #[derive(Parser)]
 pub struct CreateCommand {
@@ -23,6 +25,27 @@ fn run_pkg_create(
     app_name: &str,
     yes: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let app_dir = Path::new(app_name);
+    if app_dir.exists() {
+        if app_dir.is_dir() {
+            if fs::read_dir(app_dir)?.next().is_some() {
+                println!(
+                    "{}",
+                    format!(
+                        "Warning: Directory '{}' already exists and is not empty.",
+                        app_name
+                    )
+                    .yellow()
+                );
+                if !utils::ask_for_confirmation("Do you want to continue?", yes) {
+                    return Err("Operation aborted by user.".into());
+                }
+            }
+        } else {
+            return Err(format!("A file with the name '{}' already exists.", app_name).into());
+        }
+    }
+
     let (pkg, version) = resolve::resolve_package_and_version(source)?;
 
     if pkg.package_type != types::PackageType::App {
