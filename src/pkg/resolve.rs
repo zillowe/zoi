@@ -429,23 +429,35 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, B
     let request = parse_source_string(source)?;
 
     let resolved_source = if source.starts_with("@git/") {
-        let parts: Vec<&str> = source.trim_start_matches("@git/").split('/').collect();
-        if parts.len() != 2 {
-            return Err("Invalid git source. Use @git/<repo-name>/<pkg-name>".into());
+        let full_path_str = source.trim_start_matches("@git/");
+        let parts: Vec<&str> = full_path_str.split('/').collect();
+
+        if parts.len() < 2 {
+            return Err("Invalid git source. Use @git/<repo-name>/<path/to/pkg>".into());
         }
+
         let repo_name = parts[0];
-        let pkg_name = parts[1];
+        let nested_path_parts = &parts[1..];
+        let pkg_name = nested_path_parts.last().unwrap();
+
         let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
-        let path = home_dir
+        let mut path = home_dir
             .join(".zoi")
             .join("pkgs")
             .join("git")
-            .join(repo_name)
-            .join(format!("{}.pkg.yaml", pkg_name));
+            .join(repo_name);
+
+        for part in nested_path_parts.iter().take(nested_path_parts.len() - 1) {
+            path = path.join(part);
+        }
+
+        path = path.join(format!("{}.pkg.yaml", pkg_name));
+
         if !path.exists() {
+            let nested_path_str = nested_path_parts.join("/");
             return Err(format!(
                 "Package '{}' not found in git repo '{}' (expected: {})",
-                pkg_name,
+                nested_path_str,
                 repo_name,
                 path.display()
             )
