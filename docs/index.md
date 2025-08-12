@@ -23,6 +23,7 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
 - **Package Types:** Supports standard packages, meta-packages (collections), background services, configuration packages, and app templates.
 - **Secure Package Distribution:** Support for checksums and GPG signatures to verify package integrity and authenticity.
 - **Tag-based Discovery:** Search by and filter packages using tags for faster discovery.
+- **Use as a Library:** Integrate Zoi's package management features directly into your Rust applications. See the [Library API documentation](/docs/zds/zoi/lib/) for details.
 
 ## Getting Started
 
@@ -74,10 +75,10 @@ scoop install zoi
 
 #### From Crates.io
 
-You can install `zoi` directly from [crates.io](https://crates.io/crates/zoi-cli) using `cargo`
+You can install `zoi` directly from [crates.io](https://crates.io/crates/zoi-rs) using `cargo`
 
 ```sh
-cargo install zoi
+cargo install zoi-rs
 ```
 
 #### From NPM
@@ -257,10 +258,10 @@ See the full schema and examples in [Project Configuration (zoi.yaml)](/docs/zds
 
 Manages the package database registry URL.
 
-| Subcommand                | Description                                                                              |
-| ------------------------- | ---------------------------------------------------------------------------------------- |
+| Subcommand                  | Description                                                                                  |
+| --------------------------- | -------------------------------------------------------------------------------------------- |
 | `sync set <url or keyword>` | Sets the package database registry URL. Keywords: `default`, `gitlab`, `github`, `codeberg`. |
-| `sync show`                 | Displays the current registry URL.                                                       |
+| `sync show`                 | Displays the current registry URL.                                                           |
 
 ### Repository Management (`repo`)
 

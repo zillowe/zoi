@@ -1,5 +1,5 @@
 use crate::pkg;
-use colored::*; 
+use colored::*;
 
 pub fn run(verbose: bool) {
     println!("{}", "--- Syncing Package Database ---".yellow().bold());
@@ -42,4 +42,3 @@ pub fn show_registry() {
         }
     }
 }
-

@@ -38,8 +38,7 @@ pub fn read_config() -> Result<Config, Box<dyn Error>> {
     let mut config: Config = serde_yaml::from_str(&content)?;
 
     let mut needs_update = if config.registry.is_none() {
-        config.registry =
-            Some("https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi-Pkgs.git".to_string());
+        config.registry = Some("https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi-Pkgs.git".to_string());
         true
     } else {
         false
