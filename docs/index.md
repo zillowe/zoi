@@ -212,7 +212,7 @@ Zoi provides a wide range of commands to manage your packages and environment. F
 | `about`      | Displays the full application name, description, author, license, and homepage.                                                                            |
 | `info`       | Displays key system details like OS, CPU architecture, and available package managers (requires `zoi sync` to be run first for package manager detection). |
 | `check`      | Verifies that all required dependencies (like git) are installed.                                                                                          |
-| `sync`       | Clones or updates the package database, and updates the local system configuration by detecting available package managers.                                |
+| `sync`       | Clones or updates the package database from the configured registry. See subcommands for more options.                                                     |
 | `upgrade`    | Downloads the latest release of Zoi and replaces the current executable.                                                                                   |
 | `clean`      | Clears the cache of downloaded package binaries.                                                                                                           |
 | `autoremove` | Removes packages that were installed as dependencies but are no longer needed.                                                                             |
@@ -252,6 +252,15 @@ See the full schema and examples in [Project Configuration (zoi.yaml)](/docs/zds
 | ------- | ----------------------------------- |
 | `start` | Starts a package that is a service. |
 | `stop`  | Stops a running service package.    |
+
+### Sync Management (`sync`)
+
+Manages the package database registry URL.
+
+| Subcommand                | Description                                                                              |
+| ------------------------- | ---------------------------------------------------------------------------------------- |
+| `sync set <url or keyword>` | Sets the package database registry URL. Keywords: `default`, `gitlab`, `github`, `codeberg`. |
+| `sync show`                 | Displays the current registry URL.                                                       |
 
 ### Repository Management (`repo`)
 
