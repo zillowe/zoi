@@ -259,4 +259,5 @@ pub struct Config {
     pub native_package_manager: Option<String>,
     #[serde(default)]
     pub telemetry_enabled: bool,
+    pub registry: Option<String>,
 }

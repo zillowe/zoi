@@ -79,6 +79,9 @@ enum Commands {
         long_about = "Clones the official package database from GitLab to your local machine (~/.zoi/pkgs/db). If the database already exists, it verifies the remote URL and pulls the latest changes."
     )]
     Sync {
+        #[command(subcommand)]
+        command: Option<SyncCommands>,
+
         /// Show the full git output
         #[arg(short, long)]
         verbose: bool,
@@ -300,6 +303,17 @@ enum Commands {
     },
 }
 
+#[derive(clap::Subcommand, Clone)]
+pub enum SyncCommands {
+    /// Set the registry URL
+    Set {
+        /// URL or keyword (default, github, gitlab, codeberg)
+        url: String,
+    },
+    /// Show the current registry URL
+    Show,
+}
+
 #[derive(clap::ValueEnum, Clone)]
 enum TelemetryAction {
     Status,
@@ -342,8 +356,15 @@ pub fn run() {
                 cmd::check::run();
                 Ok(())
             }
-            Commands::Sync { verbose } => {
-                cmd::sync::run(verbose);
+            Commands::Sync { command, verbose } => {
+                if let Some(cmd) = command {
+                    match cmd {
+                        SyncCommands::Set { url } => cmd::sync::set_registry(&url),
+                        SyncCommands::Show => cmd::sync::show_registry(),
+                    }
+                } else {
+                    cmd::sync::run(verbose);
+                }
                 Ok(())
             }
             Commands::List {

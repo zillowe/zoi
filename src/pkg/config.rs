@@ -28,6 +28,7 @@ pub fn read_config() -> Result<Config, Box<dyn Error>> {
             package_managers: None,
             native_package_manager: None,
             telemetry_enabled: false,
+            registry: Some("https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi-Pkgs.git".to_string()),
         };
         write_config(&default_config)?;
         return Ok(default_config);
@@ -35,6 +36,14 @@ pub fn read_config() -> Result<Config, Box<dyn Error>> {
 
     let content = fs::read_to_string(config_path)?;
     let mut config: Config = serde_yaml::from_str(&content)?;
+
+    let mut needs_update = if config.registry.is_none() {
+        config.registry =
+            Some("https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi-Pkgs.git".to_string());
+        true
+    } else {
+        false
+    };
 
     let original_repos = config.repos.clone();
 
@@ -48,7 +57,9 @@ pub fn read_config() -> Result<Config, Box<dyn Error>> {
     }
     config.repos = new_repos;
 
-    let mut needs_update = config.repos != original_repos;
+    if config.repos != original_repos {
+        needs_update = true;
+    }
 
     if !config.repos.contains(&"core".to_string()) {
         config.repos.insert(0, "core".to_string());
@@ -226,4 +237,10 @@ pub fn remove_git_repo(repo_name: &str) -> Result<(), Box<dyn Error>> {
         target.display()
     );
     Ok(())
+}
+
+pub fn set_registry(url: &str) -> Result<(), Box<dyn Error>> {
+    let mut config = read_config()?;
+    config.registry = Some(url.to_string());
+    write_config(&config)
 }

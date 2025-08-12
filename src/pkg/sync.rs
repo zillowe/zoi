@@ -1,15 +1,22 @@
 use crate::{pkg::config, utils};
 use colored::*;
 use git2::{
-    FetchOptions, RemoteCallbacks, Repository,
     build::{CheckoutBuilder, RepoBuilder},
+    FetchOptions,
+    RemoteCallbacks,
+    Repository,
 };
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use std::fs;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
-const DB_URL: &str = "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi-Pkgs.git";
+fn get_db_url() -> Result<String, Box<dyn std::error::Error>> {
+    let config = config::read_config()?;
+    Ok(config.registry.unwrap_or_else(|| {
+        "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi-Pkgs.git".to_string()
+    }))
+}
 
 fn get_db_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
     let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
@@ -69,6 +76,8 @@ fn sync_git_repos(verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
 
 fn run_verbose() -> Result<(), Box<dyn std::error::Error>> {
     let db_path = get_db_path()?;
+    let db_url = get_db_url()?;
+
     if db_path.exists() {
         let status = Command::new("git")
             .arg("-C")
@@ -84,7 +93,7 @@ fn run_verbose() -> Result<(), Box<dyn std::error::Error>> {
         let status = Command::new("git")
             .arg("clone")
             .arg("--progress")
-            .arg(DB_URL)
+            .arg(&db_url)
             .arg(&db_path)
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
@@ -97,6 +106,26 @@ fn run_verbose() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub fn run(verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
+    let db_path = get_db_path()?;
+    let db_url = get_db_url()?;
+
+    if db_path.exists() {
+        if let Ok(repo) = Repository::open(&db_path) {
+            if let Ok(remote) = repo.find_remote("origin") {
+                if let Some(remote_url) = remote.url() {
+                    if remote_url != db_url {
+                        println!(
+                            "Registry URL has changed from {}. Removing old database and re-cloning from {}.",
+                            remote_url.yellow(),
+                            db_url.cyan()
+                        );
+                        fs::remove_dir_all(&db_path)?;
+                    }
+                }
+            }
+        }
+    }
+
     if verbose {
         run_verbose()?;
     } else {
@@ -196,7 +225,7 @@ pub fn run(verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
             RepoBuilder::new()
                 .fetch_options(fo)
                 .with_checkout(checkout_builder)
-                .clone(DB_URL, &db_path)?;
+                .clone(&db_url, &db_path)?;
 
             fetch_pb.finish_with_message("Fetched.");
             checkout_pb.finish_with_message("Checked out.");
@@ -216,3 +245,4 @@ pub fn run(verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+

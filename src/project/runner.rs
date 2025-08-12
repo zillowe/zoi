@@ -35,7 +35,7 @@ pub fn run(
         }
     };
 
-    println!("\n--- Running command: {} ---", command_to_run.cmd.bold());
+    println!("--- Running command: {} ---", command_to_run.cmd.bold());
     let mut full_command = command_to_run.run.clone();
     if !args.is_empty() {
         full_command.push(' ');
