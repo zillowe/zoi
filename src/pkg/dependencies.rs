@@ -231,23 +231,45 @@ fn install_dependency(
                 dep.package.to_string()
             };
             if let Some(manifest) = local::is_package_installed(dep.package, scope)? {
-                let installed_version = Version::parse(&manifest.version)?;
-                if let Some(req) = &dep.req {
-                    if req.matches(&installed_version) {
-                        println!(
-                            "Already installed (version {installed_version} satisfies {req}). Skipping."
-                        );
-                        return Ok(());
-                    } else {
-                        return Err(format!(
-                            "Version conflict for '{}': need {}, but {} is installed.",
-                            dep.package, req, installed_version
-                        )
-                        .into());
+                match Version::parse(&manifest.version) {
+                    Ok(installed_version) => {
+                        if let Some(req) = &dep.req {
+                            if req.matches(&installed_version) {
+                                println!(
+                                    "Already installed (version {} satisfies {}). Skipping.",
+                                    installed_version, req
+                                );
+                                return Ok(());
+                            } else {
+                                return Err(format!(
+                                    "Version conflict for '{}': need {}, but {} is installed.",
+                                    dep.package, req, installed_version
+                                )
+                                .into());
+                            }
+                        } else {
+                            println!(
+                                "Already installed (version {}). Skipping.",
+                                installed_version
+                            );
+                            return Ok(());
+                        }
                     }
-                } else {
-                    println!("Already installed (version {installed_version}). Skipping.");
-                    return Ok(());
+                    Err(e) => {
+                        println!(
+                            "{} Could not parse version ('{}') for installed package '{}': {}.",
+                            "Warning:".yellow(),
+                            manifest.version,
+                            dep.package,
+                            e
+                        );
+                        if dep.req.is_some() {
+                            println!("Proceeding with installation due to version check failure.");
+                        } else {
+                            println!("Assuming package is installed and skipping.");
+                            return Ok(());
+                        }
+                    }
                 }
             }
 
@@ -301,9 +323,11 @@ fn install_dependency(
                                     "Do you want to continue with the installation anyway?",
                                     yes,
                                 ) {
-                                    return Err(
-                                        "Operation aborted by user due to conflicts.".into()
+                                    println!(
+                                        "Skipping installation of '{}' due to conflicts.",
+                                        dep.package.cyan()
                                     );
+                                    return Ok(());
                                 }
                             }
                         }
