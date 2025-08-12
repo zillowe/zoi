@@ -72,7 +72,6 @@ fn run_pkg_create(
             )
         })?;
 
-    // Install required dependencies (runtime + build) before creating the app
     if let Some(deps) = &pkg.dependencies {
         let mut processed_deps = HashSet::new();
         let mut _installed_deps_list: Vec<String> = Vec::new();

@@ -284,12 +284,18 @@ fn install_dependency(
 
                             if let Some(conflicts_with) = &dep_pkg.conflicts {
                                 for conflict_pkg_name in conflicts_with {
-                                    if installed_packages
+                                    let is_zoi_conflict = installed_packages
                                         .iter()
-                                        .any(|p| &p.name == conflict_pkg_name)
-                                    {
+                                        .any(|p| &p.name == conflict_pkg_name);
+                                    if is_zoi_conflict {
                                         conflict_messages.push(format!(
                                             "Package '{}' conflicts with installed package '{}'.",
+                                            dep_pkg.name.cyan(),
+                                            conflict_pkg_name.cyan()
+                                        ));
+                                    } else if utils::command_exists(conflict_pkg_name) {
+                                        conflict_messages.push(format!(
+                                            "Package '{}' conflicts with existing command '{}' on your system.",
                                             dep_pkg.name.cyan(),
                                             conflict_pkg_name.cyan()
                                         ));
@@ -314,9 +320,11 @@ fn install_dependency(
                                 }
                             }
 
-                            if !conflict_messages.is_empty() {
+                            let unique_messages: HashSet<String> =
+                                conflict_messages.into_iter().collect();
+                            if !unique_messages.is_empty() {
                                 println!("{}", "Conflict Detected:".red().bold());
-                                for msg in conflict_messages {
+                                for msg in unique_messages {
                                     println!("- {}", msg);
                                 }
                                 if !utils::ask_for_confirmation(

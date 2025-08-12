@@ -10,11 +10,9 @@ fn main() {
     if Path::new(env_path_str).exists() {
         println!("cargo:rerun-if-changed={}", env_path_str);
 
-        // Use dotenvy to iterate over the key-value pairs
         if let Ok(iter) = dotenvy::from_filename_iter(env_path_str) {
             for item in iter {
                 if let Ok((key, val)) = item {
-                    // Pass each variable to the compiler so option_env! can find it
                     println!("cargo:rustc-env={}={}", key, val);
                 }
             }
