@@ -3448,8 +3448,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "626bd9fa9734751fc50d6060752170984d7053f5a39061f524cda68023d4db8a"
 
 [[package]]
-name = "zoi-cli"
-version = "4.1.3-beta-prod"
+name = "zoi"
+version = "4.2.0-beta-dev"
 dependencies = [
  "anyhow",
  "bsdiff",
