@@ -7,24 +7,19 @@ packages:
 
 commands:
   - cmd: "build"
-    run: "./build/build.sh"
-  - cmd: "build-r"
     run: "./build/build-release.sh"
-  - cmd: "build-all"
-    run: "./build/build-all.sh"
-  - cmd: "archive"
-    run: "./build/archive.sh"
+  - cmd: "lines"
+    run: "cloc src build.rs"
   - cmd: "install"
-    run: "cargo clean && ./configure && make && sudo make install"
+    run: "cargo clean && ./configure && make && sudo make install && make install-completions"
   - cmd: "deps"
     run: "cargo machete"
-  - cmd: "prepare"
-    run: "cargo clippy --all-targets --fix --allow-dirty --allow-staged && cargo check --verbose"
+  - cmd: "fmt"
+    run: "cargo fmt --all"
+  - cmd: "check"
+    run: "cargo clippy --all-targets --fix --allow-dirty --allow-staged && cargo check"
 
 environments:
-  - name: "Development"
-    cmd: "dev"
-    run: ["./build/build.sh"]
-  - name: "Production"
-    cmd: "prod"
-    run: ["./build/build-all.sh"]
+  - name: "Prepare"
+    cmd: "pre"
+    run: ["zoi run deps", "zoi run fmt", "zoi run check"]

@@ -74,10 +74,10 @@ scoop install zoi
 
 #### From Crates.io
 
-You can install `zoi-cli` directly from [crates.io](https://crates.io/crates/zoi-cli) using `cargo`
+You can install `zoi` directly from [crates.io](https://crates.io/crates/zoi-cli) using `cargo`
 
 ```sh
-cargo install zoi-cli
+cargo install zoi
 ```
 
 #### From NPM

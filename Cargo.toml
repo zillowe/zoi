@@ -11,7 +11,7 @@ keywords = ["cli", "package-manager", "dev-tools", "universal", "environment"]
 categories = ["command-line-utilities", "development-tools"]
 readme = "README.md"
 build = "build.rs"
-exclude = ["packages/*", ".github", ".gitlab", "app/*", "docs/*", "build/*", ".gitlab-ci.yml", "CONTRIBUTING.md", "zoi.yaml"]
+exclude = ["packages/*", ".github", ".gitlab", "app/*", "docs/*", "build/*", ".gitlab-ci.yml", "CONTRIBUTING.md", "zoi.yaml", "GEMINI.md"]
 
 [lib]
 name = "zoi"
