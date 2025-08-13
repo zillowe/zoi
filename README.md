@@ -364,7 +364,7 @@ For details and CLI usage examples, see the docs page: [Repositories](https://zi
 
 ## 📜 License
 
-Zoi is licensed under the [Apache-2.0 License](./LICENSE).
+Zoi is licensed under the [Apache 2.0 License](./LICENSE).
 
 <hr/>
 
