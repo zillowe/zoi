@@ -55,7 +55,7 @@ fn download_file(url: &str, path: &Path) -> Result<(), Box<dyn Error>> {
     let pb = ProgressBar::new(total_size);
     pb.set_style(ProgressStyle::default_bar()
         .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})")?
-        .progress_chars("#>-"));
+        .progress_chars("#>- "));
 
     let mut dest = File::create(path)?;
     let mut buffer = [0; 8192];
@@ -88,8 +88,8 @@ fn download_patch_file(url: &str, path: &Path) -> Result<(), Box<dyn Error>> {
     let total_size = response.content_length().unwrap_or(0);
     let pb = ProgressBar::new(total_size);
     pb.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})")?
-        .progress_chars("#>-"));
+        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})")? 
+        .progress_chars("#>- "));
 
     let mut dest = File::create(path)?;
     let mut buffer = [0; 8192];
@@ -255,7 +255,13 @@ fn fallback_full_upgrade(
     Ok(new_binary_path)
 }
 
-pub fn run(branch: &str, status: &str, number: &str) -> Result<(), Box<dyn Error>> {
+pub fn run(
+    branch: &str,
+    status: &str,
+    number: &str,
+    full: bool,
+    force: bool,
+) -> Result<(), Box<dyn Error>> {
     let current_version = if status.is_empty() || status.eq_ignore_ascii_case("stable") {
         number.to_string()
     } else {
@@ -277,9 +283,11 @@ pub fn run(branch: &str, status: &str, number: &str) -> Result<(), Box<dyn Error
         latest_version_num.to_string()
     };
 
-    if !self_update::version::bump_is_greater(&current_version, &latest_version_str)? {
-        println!("\n{}", "You are already on the latest version!".green());
-        return Err("already_on_latest".into());
+    if !force {
+        if !self_update::version::bump_is_greater(&current_version, &latest_version_str)? {
+            println!("\n{}", "You are already on the latest version!".green());
+            return Err("already_on_latest".into());
+        }
     }
 
     let (os, arch) = get_platform_info()?;
@@ -308,26 +316,31 @@ pub fn run(branch: &str, status: &str, number: &str) -> Result<(), Box<dyn Error
     let archive_ext = if os == "windows" { "zip" } else { "tar.zst" };
     let archive_filename = format!("zoi-{os}-{arch}.{archive_ext}");
 
-    let new_binary_path = match attempt_patch_upgrade(
-        &base_url,
-        &checksums_bin_content,
-        &checksums_txt_content,
-        &archive_filename,
-        &patch_filename,
-        &new_binary_checksum_name,
-    ) {
-        Ok(path) => {
-            println!("{}", "Patch upgrade successful!".green());
-            path
-        }
-        Err(e) => {
-            println!(
-                "{}: {}. {}",
-                "Patch upgrade failed".yellow(),
-                e,
-                "Attempting full download.".yellow()
-            );
-            fallback_full_upgrade(&base_url, &checksums_txt_content, os, arch)?
+    let new_binary_path = if full {
+        println!("\nFull flag specified, forcing full download...");
+        fallback_full_upgrade(&base_url, &checksums_txt_content, os, arch)?
+    } else {
+        match attempt_patch_upgrade(
+            &base_url,
+            &checksums_bin_content,
+            &checksums_txt_content,
+            &archive_filename,
+            &patch_filename,
+            &new_binary_checksum_name,
+        ) {
+            Ok(path) => {
+                println!("{}", "Patch upgrade successful!".green());
+                path
+            }
+            Err(e) => {
+                println!(
+                    "{}: {}. {}",
+                    "Patch upgrade failed".yellow(),
+                    e,
+                    "Attempting full download.".yellow()
+                );
+                fallback_full_upgrade(&base_url, &checksums_txt_content, os, arch)?
+            }
         }
     };
 

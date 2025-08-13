@@ -6,7 +6,7 @@ use clap_complete::generate;
 use std::io;
 
 // Production or Development
-const BRANCH: &str = "Development";
+const BRANCH: &str = "Production";
 const STATUS: &str = "Beta";
 const NUMBER: &str = "4.2.0";
 
@@ -209,7 +209,15 @@ enum Commands {
         alias = "ug",
         long_about = "Downloads the latest release from GitLab, verifies its checksum, and replaces the current executable."
     )]
-    Upgrade,
+    Upgrade {
+        /// Force a full download, skipping the patch-based upgrade
+        #[arg(long)]
+        full: bool,
+
+        /// Force the upgrade even if the version is the same
+        #[arg(long)]
+        force: bool,
+    },
 
     /// Removes packages that were installed as dependencies but are no longer needed
     Autoremove,
@@ -422,8 +430,8 @@ pub fn run() {
                 cmd::clone::run(sources, target_directory, cli.yes);
                 Ok(())
             }
-            Commands::Upgrade => {
-                cmd::upgrade::run(BRANCH, STATUS, NUMBER);
+            Commands::Upgrade { full, force } => {
+                cmd::upgrade::run(BRANCH, STATUS, NUMBER, full, force);
                 Ok(())
             }
             Commands::Autoremove => {
