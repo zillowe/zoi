@@ -90,7 +90,7 @@ fn parse_dependency_string(dep_str: &str) -> Result<Dependency<'_>, Box<dyn Erro
     };
 
     let (package, version_str) = if let Some(at_pos) = package_and_version.rfind('@') {
-        if at_pos > 0 || (at_pos == 0 && package_and_version.contains('/')) {
+        if at_pos > 0 {
             let (p, v) = package_and_version.split_at(at_pos);
             (p, Some(v[1..].to_string()))
         } else {
