@@ -32,16 +32,16 @@ If you'd like to contribute code, please follow these steps:
 
 ## Development Setup
 
-To get started with developing Zoi, you'll need to set up your local environment.
+To get started with developing Zoi, you'll need to set up your local environment. We use `zoi` itself to manage project tasks, defined in the `zoi.yaml` file.
 
 ### Prerequisites
 
 - **Rust:** Make sure you have the latest version of Rust and Cargo installed. You can find instructions at [rust-lang.org](https://www.rust-lang.org/tools/install).
 - **Make:** The `make` command is required for our Makefile-based build process.
 
-### Building from Source
+### Building for the First Time
 
-We recommend using `make` to build the project, as it simplifies the process.
+Since we use Zoi to build Zoi, you'll need to perform an initial build using `make`:
 
 1.  **Configure the build:**
     ```sh
@@ -52,12 +52,41 @@ We recommend using `make` to build the project, as it simplifies the process.
     make
     sudo make install
     ```
-3.  **Install shell completions (optional):**
-    ```sh
-    make install-completions
-    ```
 
-If you don't have `make`, you can use the provided build scripts in the `./build` directory.
+Once you have a working `zoi` command, you can use it for subsequent development tasks.
+
+### Development Workflow with Zoi
+
+All common development tasks are defined as commands in `zoi.yaml` and can be executed with `zoi run`. If you run `zoi run` without arguments, you'll get an interactive list of available commands.
+
+- **Prepare your environment:** Before you start coding, run the `pre` environment setup. This will check dependencies, format your code, and run checks.
+
+  ```sh
+  zoi env pre
+  ```
+
+- **Build the project:** To build a release version of Zoi.
+
+  ```sh
+  zoi run build
+  ```
+
+- **Run checks:** To run `clippy` and other checks.
+
+  ```sh
+  zoi run check
+  ```
+
+- **Format code:** To format the code according to project standards.
+
+  ```sh
+  zoi run fmt
+  ```
+
+- **Install:** To perform a full installation, including shell completions.
+  ```sh
+  zoi run install
+  ```
 
 ## Commit Messages
 
