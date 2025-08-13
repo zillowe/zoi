@@ -1,6 +1,6 @@
 use crate::cmd;
 use crate::utils;
-use clap::{CommandFactory, Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand, ValueHint};
 use clap_complete::Shell;
 use clap_complete::generate;
 use std::io;
@@ -136,7 +136,7 @@ enum Commands {
     #[command(alias = "i")]
     Install {
         /// Package names, local paths, or URLs to .pkg.yaml files
-        #[arg(value_name = "SOURCES", required = true)]
+        #[arg(value_name = "SOURCES", required = true, value_hint = ValueHint::FilePath)]
         sources: Vec<String>,
         /// Force re-installation even if the package is already installed
         #[arg(long)]
@@ -152,7 +152,7 @@ enum Commands {
     )]
     Build {
         /// Package names, local paths, or URLs to .pkg.yaml files
-        #[arg(value_name = "SOURCES", required = true)]
+        #[arg(value_name = "SOURCES", required = true, value_hint = ValueHint::FilePath)]
         sources: Vec<String>,
         /// Force re-installation even if the package is already installed
         #[arg(long)]
@@ -196,7 +196,7 @@ enum Commands {
     )]
     Clone {
         /// Package names, local paths, or URLs to resolve the git repo from
-        #[arg(value_name = "SOURCES", required = true)]
+        #[arg(value_name = "SOURCES", required = true, value_hint = ValueHint::FilePath)]
         sources: Vec<String>,
 
         /// Optional directory to clone into. Defaults to the package name.
