@@ -86,7 +86,7 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
 - **Package Types:** Supports standard packages, meta-packages (collections), background services, configuration packages, and app templates.
 - **Secure Package Distribution:** Support for checksums and GPG signatures to verify package integrity and authenticity.
 - **Tag-based Discovery:** Search by and filter packages using tags for faster discovery.
-- **Use as a Library:** Integrate Zoi's package management features directly into your Rust applications. See the [Library API documentation](https://zillowe.rf.gd/docs/zds/zoi/lib/) for details.
+- **Use as a Library:** Integrate Zoi's package management features directly into your Rust applications. See the [Library documentation](https://zillowe.rf.gd/docs/zds/zoi/lib/) for details.
 
 ## 🚀 Getting Started
 
@@ -255,7 +255,7 @@ What dependency installation we support.
 | `pip`            | Python                          | `pip:requests`                            |
 | `nix`            | NixOS / Nix                     | `nix:nixpkgs.hello`                       |
 
-And many more,
+And many more.
 
 For more dependencies and information please visit the [Dependencies Page](https://zillowe.rf.gd/docs/zds/zoi/dependencies/) on Docs.
 
