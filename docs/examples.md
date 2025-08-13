@@ -786,3 +786,33 @@ installation:
 
 - `bins`: A list of the executable files the package provides. Zoi checks if any of these binaries are already provided by another installed package.
 - `conflicts`: A list of other Zoi package names that are incompatible with this one.
+
+---
+
+## Package with Git Tag Version
+
+You can set the `version` to `"{git}"` to automatically resolve the latest stable release tag from the repository specified in the `git` field. This works for both GitHub and GitLab.
+
+```yaml
+# utils/my-git-tool.pkg.yaml
+name: my-git-tool
+repo: community
+version: "{git}"
+description: A tool that is always at the latest version from git.
+website: https://example.com/my-git-tool
+git: https://github.com/user/my-git-tool
+tags: [cli, tools]
+maintainer:
+  name: "Your Name"
+  email: "your.email@example.com"
+license: MIT
+
+installation:
+  - type: binary
+    url: "https://github.com/user/my-git-tool/releases/download/v{version}/my-git-tool-{platform}"
+    platforms: ["linux-amd64", "macos-amd64", "windows-amd64"]
+```
+
+**Key Fields:**
+
+- `version: "{git}"`: Tells Zoi to query the GitHub/GitLab API for the latest release and use its tag as the version. The `{version}` placeholder in the `url` will then be substituted with the resolved tag.

@@ -102,4 +102,16 @@ zoi install @community/htop
 zoi install @core/linux/amd64/nvidia-driver
 ```
 
+To install a package from your custom git repository, use the `@git/` prefix, followed by the repository name and the package name.
+
+```sh
+zoi install @git/zoi-repo/package
+```
+
+You can install from nested repository also
+
+```sh
+zoi install @git/zoi-repo/path/to/package
+```
+
 For creating and publishing packages, see [Creating & Publishing Packages](/docs/zds/zoi/creating-packages/).

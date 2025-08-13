@@ -89,7 +89,7 @@ license: MIT
 ```
 
 - `name`: The unique identifier for your package.
-- `version`: The current version of the software.
+- `version`: The current version of the software. You can also set this to `"{git}"` to automatically use the latest stable release tag from the GitHub or GitLab repository specified in the `git` field.
 - `description`: A short, one-sentence summary of what the package does.
 - `maintainer`: Your name, website and email.
 - `license`: The software's license (e.g. `MIT`, `GPL-3.0-or-later`).
