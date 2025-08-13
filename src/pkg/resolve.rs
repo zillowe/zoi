@@ -261,6 +261,86 @@ fn resolve_channel(
     }
 }
 
+fn resolve_latest_git_tag(git_repo: &str) -> Result<String, Box<dyn Error>> {
+    if git_repo.is_empty() {
+        return Err("The 'git' field is empty, cannot resolve git tag.".into());
+    }
+
+    let is_gitlab = git_repo.contains("gitlab.com");
+    let api_url = if is_gitlab {
+        let project_path = git_repo
+            .strip_prefix("https://gitlab.com/")
+            .unwrap_or(git_repo)
+            .trim_end_matches(".git");
+        let encoded_path = project_path.replace('/', "%2F");
+        format!(
+            "https://gitlab.com/api/v4/projects/{}/releases",
+            encoded_path
+        )
+    } else {
+        let repo_path = if let Some(path) = git_repo.strip_prefix("https://github.com/") {
+            path.trim_end_matches(".git")
+        } else {
+            git_repo
+        };
+        format!("https://api.github.com/repos/{}/releases/latest", repo_path)
+    };
+
+    println!("Fetching latest tag from: {}", api_url.cyan());
+
+    let client = crate::utils::build_blocking_http_client(15)?;
+    let mut attempt = 0u32;
+    let resp_text = loop {
+        attempt += 1;
+        match client
+            .get(&api_url)
+            .header("User-Agent", "zoi-package-manager")
+            .send()
+        {
+            Ok(r) => {
+                if r.status().is_success() {
+                    break r.text()?;
+                } else {
+                    return Err(format!(
+                        "Failed to fetch from git API (HTTP {}): {}",
+                        r.status(),
+                        r.text()?
+                    )
+                    .into());
+                }
+            }
+            Err(e) => {
+                if attempt < 3 {
+                    eprintln!("{}: fetch failed ({}). Retrying...", "Network".yellow(), e);
+                    crate::utils::retry_backoff_sleep(attempt);
+                    continue;
+                } else {
+                    return Err(format!(
+                        "Failed to fetch from git API after {} attempts: {}",
+                        attempt, e
+                    )
+                    .into());
+                }
+            }
+        }
+    };
+
+    let json: serde_json::Value = serde_json::from_str(&resp_text)?;
+
+    let tag = if is_gitlab {
+        json.as_array()
+            .and_then(|arr| arr.get(0))
+            .and_then(|first| first.get("tag_name"))
+            .and_then(|tag| tag.as_str())
+    } else {
+        // GitHub
+        json.get("tag_name").and_then(|tag| tag.as_str())
+    };
+
+    tag.map(|s| s.trim_start_matches('v').to_string())
+        .ok_or_else(|| "Could not find latest tag from Git API response.".into())
+}
+
 pub fn get_default_version(pkg: &types::Package) -> Result<String, Box<dyn Error>> {
     if let Some(pinned_version) = pin::get_pinned_version(&pkg.name)? {
         println!(
@@ -297,6 +377,9 @@ pub fn get_default_version(pkg: &types::Package) -> Result<String, Box<dyn Error
     }
 
     if let Some(ver) = &pkg.version {
+        if ver == "{git}" {
+            return resolve_latest_git_tag(&pkg.git);
+        }
         if ver.starts_with("http") {
             let client = crate::utils::build_blocking_http_client(15)?;
             let mut attempt = 0u32;
@@ -375,6 +458,9 @@ fn get_version_for_install(
     version_spec: &Option<String>,
 ) -> Result<String, Box<dyn Error>> {
     if let Some(spec) = version_spec {
+        if spec == "{git}" {
+            return resolve_latest_git_tag(&pkg.git);
+        }
         if spec.starts_with('@') {
             let channel = spec.trim_start_matches('@');
             let versions = pkg.versions.as_ref().ok_or_else(|| {
