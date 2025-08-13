@@ -15,6 +15,30 @@ This page explains Zoi's official repositories and mirrors, and how package repo
   - Primary: [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi-Pkgs)
   - Mirrors: [GitHub](https://github.com/Zillowe/Zoi-Pkgs), [Codeberg](https://codeberg.org/Zillowe/Zoi-Pkgs)
 
+## Managing the Package Database Registry
+
+The package database is the core git repository that Zoi clones to `~/.zoi/pkgs/db`. This repository contains all the package definitions organized into tiers. While you can manage which repositories inside the database are active using `zoi repo`, you can also change the URL of the entire database registry itself using `zoi sync`.
+
+This is useful if you want to use a mirror or a completely different package database.
+
+| Command                         | Description                                                                                  |
+| ------------------------------- | -------------------------------------------------------------------------------------------- |
+| `zoi sync set <url-or-keyword>` | Sets the package database registry URL. Keywords: `default`, `gitlab`, `github`, `codeberg`. |
+| `zoi sync show`                 | Displays the current registry URL.                                                           |
+
+### Examples
+
+```sh
+# Show the current registry URL
+zoi sync show
+
+# Set the registry to the official GitHub mirror
+zoi sync set github
+
+# Set the registry to a custom URL
+zoi sync set https://my-custom-registry.com/zoi-pkgs.git
+```
+
 ## Repository tiers
 
 Zoi organizes packages into tiers. Use these to decide where a package belongs and to assess stability.
@@ -30,7 +54,9 @@ Zoi organizes packages into tiers. Use these to decide where a package belongs a
 
 Note: Packages from `community`, `test`, and `archive` may carry higher risk. Zoi prints warnings where appropriate.
 
-## Managing repositories with the CLI
+## Managing Active Repositories
+
+The `zoi repo` command manages which repositories from the package database are active. Active repositories are searched during package operations like `install` and `search`.
 
 | Command                       | Description                                                                                       |
 | ----------------------------- | ------------------------------------------------------------------------------------------------- |

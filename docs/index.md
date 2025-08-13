@@ -207,17 +207,17 @@ Zoi provides a wide range of commands to manage your packages and environment. F
 
 ### General Commands
 
-| Command      | Description                                                                                                                                                |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `version`    | Displays the version number, build status, branch, and commit hash.                                                                                        |
-| `about`      | Displays the full application name, description, author, license, and homepage.                                                                            |
-| `info`       | Displays key system details like OS, CPU architecture, and available package managers (requires `zoi sync` to be run first for package manager detection). |
-| `check`      | Verifies that all required dependencies (like git) are installed.                                                                                          |
-| `sync`       | Clones or updates the package database from the configured registry. See subcommands for more options.                                                     |
-| `upgrade`    | Downloads the latest release of Zoi and replaces the current executable.                                                                                   |
-| `clean`      | Clears the cache of downloaded package binaries.                                                                                                           |
-| `autoremove` | Removes packages that were installed as dependencies but are no longer needed.                                                                             |
-| `telemetry`  | Manages [opt-in telemetry](./telemetry).                                                                                                                   |
+| Command      | Description                                                                                                                                                                                                         |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version`    | Displays the version number, build status, branch, and commit hash.                                                                                                                                                 |
+| `about`      | Displays the full application name, description, author, license, and homepage.                                                                                                                                     |
+| `info`       | Displays key system details like OS, CPU architecture, and available package managers (requires `zoi sync` to be run first for package manager detection).                                                          |
+| `check`      | Verifies that all required dependencies (like git) are installed.                                                                                                                                                   |
+| `sync`       | Clones or updates the package database from the configured registry. See subcommands for more options.                                                                                                              |
+| `upgrade`    | Downloads the latest release of Zoi and replaces the current executable. <br/>`--full`: Force a full download, skipping the patch-based upgrade. <br/>`--force`: Force the upgrade even if the version is the same. |
+| `clean`      | Clears the cache of downloaded package binaries.                                                                                                                                                                    |
+| `autoremove` | Removes packages that were installed as dependencies but are no longer needed.                                                                                                                                      |
+| `telemetry`  | Manages [opt-in telemetry](./telemetry).                                                                                                                                                                            |
 
 ### Package Management
 
@@ -574,7 +574,7 @@ For the full list of supported dependency managers, usage semantics, and command
 <br />
 <Accordions type="single">
   <Accordion title="How do I update Zoi itself?">
-    Run `zoi upgrade`. Zoi attempts a patch (delta) upgrade first and falls back to a full binary download if needed.
+    Run `zoi upgrade`. Zoi attempts a patch (delta) upgrade first and falls back to a full binary download if needed. You can use `zoi upgrade --full` to force a full download, and `zoi upgrade --force` to upgrade even if you are on the latest version.
   </Accordion>
 </Accordions>
 <br />
