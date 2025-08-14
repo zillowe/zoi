@@ -877,6 +877,7 @@ fn handle_com_binary_install(
         .replace("{version}", pkg.version.as_deref().unwrap_or(""));
     url = url.replace("{name}", &pkg.name);
     url = url.replace("{platform}", &platform);
+    url = url.replace("{git}", &pkg.git);
     url = url.replace("{platformComExt}", com_ext);
 
     if url.starts_with("http://") {
@@ -1123,6 +1124,7 @@ fn handle_binary_install(
             .replace("{version}", pkg.version.as_deref().unwrap_or(""));
         url = url.replace("{name}", &pkg.name);
         url = url.replace("{platform}", &platform);
+        url = url.replace("{git}", &pkg.git);
 
         if !url.ends_with(ext) {
             url = format!("{}.{}", url, ext);
@@ -1324,6 +1326,7 @@ fn handle_binary_install(
         .replace("{version}", pkg.version.as_deref().unwrap_or(""));
     url = url.replace("{name}", &pkg.name);
     url = url.replace("{platform}", &platform);
+    url = url.replace("{git}", &pkg.git);
 
     if url.starts_with("http://") {
         println!(
