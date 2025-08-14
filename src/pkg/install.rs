@@ -1452,7 +1452,8 @@ fn handle_script_install(
     let resolved_url = method
         .url
         .replace("{platformExt}", platform_ext)
-        .replace("{website}", pkg.website.as_deref().unwrap_or_default());
+        .replace("{website}", pkg.website.as_deref().unwrap_or_default())
+        .replace("{git}", &pkg.git);
 
     let temp_dir = Builder::new().prefix("zoi-script-install").tempdir()?;
     let script_filename = format!("install.{platform_ext}");
