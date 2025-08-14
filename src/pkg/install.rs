@@ -1625,6 +1625,117 @@ fn handle_source_install(
         }
     }
 
+    let entries: Vec<PathBuf> = fs::read_dir(&bin_path)
+        .map_err(|e| format!("Failed to read store directory at {:?}: {}", bin_path, e))?
+        .filter_map(Result::ok)
+        .map(|e| e.path())
+        .filter(|p| p.is_file())
+        .collect();
+
+    if entries.is_empty() {
+        println!(
+            "{}",
+            "Build completed, no binaries found in the store directory to link.".yellow()
+        );
+        println!("{}", "Source build and installation completed.".green());
+        return Ok(());
+    }
+
+    println!("Build completed, searching for binaries in store directory to link...");
+
+    let mut binaries_to_link: Vec<(String, PathBuf)> = Vec::new();
+
+    if let Some(bin_names) = &pkg.bins {
+        for bin_name in bin_names {
+            let mut found_bin = false;
+            for entry in &entries {
+                let file_name = entry.file_name().unwrap().to_string_lossy();
+                if file_name == *bin_name
+                    || (cfg!(target_os = "windows") && file_name == format!("{}.exe", bin_name))
+                {
+                    binaries_to_link.push((bin_name.clone(), entry.clone()));
+                    found_bin = true;
+                    break;
+                }
+            }
+            if !found_bin {
+                return Err(format!(
+                    "Could not find expected binary '{}' in store directory after build.",
+                    bin_name
+                )
+                .into());
+            }
+        }
+    } else {
+        if entries.len() == 1 {
+            let bin_path = entries[0].clone();
+            let bin_name = bin_path
+                .file_stem()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
+            binaries_to_link.push((bin_name, bin_path));
+        } else {
+            let os_specific_name = if cfg!(target_os = "windows") {
+                format!("{}.exe", pkg.name)
+            } else {
+                pkg.name.clone()
+            };
+
+            for entry in &entries {
+                if entry.file_name().unwrap().to_string_lossy() == os_specific_name {
+                    binaries_to_link.push((pkg.name.clone(), entry.clone()));
+                    break;
+                }
+            }
+            if binaries_to_link.is_empty() && cfg!(target_os = "windows") {
+                for entry in &entries {
+                    if entry.file_name().unwrap().to_string_lossy() == pkg.name {
+                        binaries_to_link.push((pkg.name.clone(), entry.clone()));
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    if binaries_to_link.is_empty() {
+        return Err(format!(
+            "Build produced files in the store directory, but could not determine which binary to link for package '{}'. Specify the binary name in the 'bins' field of the package manifest.",
+            pkg.name
+        ).into());
+    }
+
+    for (bin_name, binary_path_in_store) in binaries_to_link {
+        println!("Found built binary: {}", binary_path_in_store.display());
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&binary_path_in_store, fs::Permissions::from_mode(0o755))?;
+
+            let symlink_dir = home::home_dir().ok_or("No home dir")?.join(".zoi/pkgs/bin");
+            fs::create_dir_all(&symlink_dir)?;
+            let symlink_path = symlink_dir.join(bin_name);
+
+            if symlink_path.exists() {
+                fs::remove_file(&symlink_path)?;
+            }
+            std::os::unix::fs::symlink(&binary_path_in_store, &symlink_path)?;
+        }
+
+        #[cfg(windows)]
+        {
+            let bin_dir = home::home_dir().ok_or("No home dir")?.join(".zoi/pkgs/bin");
+            fs::create_dir_all(&bin_dir)?;
+            let dest_path = bin_dir.join(binary_path_in_store.file_name().unwrap());
+            if dest_path.exists() {
+                fs::remove_file(&dest_path)?;
+            }
+            fs::copy(&binary_path_in_store, &dest_path)?;
+        }
+    }
+
     println!("{}", "Source build and installation completed.".green());
     Ok(())
 }
