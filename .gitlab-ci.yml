@@ -92,30 +92,15 @@ create_release:
   image: gitlab/glab
   variables:
     GIT_DEPTH: 0
+  before_script:
+    - apt-get update -y && apt-get install -y nodejs npm git coreutils
+    - npm i -g @google/gemini-cli
   script:
     - glab auth login --token $GITLAB_TOKEN_RELEASE
-    - |
-      set -e
-      if [ $(git tag -l | wc -l) -gt 1 ]; then
-        PREVIOUS_TAG=$(git describe --tags --abbrev=0 $(git rev-list --tags --skip=1 --max-count=1))
-        COMMIT_RANGE="$PREVIOUS_TAG..$CI_COMMIT_TAG"
-      else
-        COMMIT_RANGE="$CI_COMMIT_TAG"
-      fi
-      CHANGELOG=$(git log --pretty=format:"* %s (%h)" $COMMIT_RANGE)
-      MERGED_MRS=$(git log $COMMIT_RANGE | grep -oE 'See merge request !([0-9]+)' | sed 's/See merge request/!/' | sort -u)
-      CLOSED_ISSUES=$(git log $COMMIT_RANGE | grep -oE '(Closes|closes|Fixes|fixes) #[0-9]+' | sed -E 's/.*#/#/' | sort -u)
-      RELEASE_NOTES="## Changelog\n\n$CHANGELOG"
-      if [ -n "$MERGED_MRS" ]; then
-        MR_LIST=$(echo "$MERGED_MRS" | sed 's/^/* /')
-        RELEASE_NOTES="$RELEASE_NOTES\n\n### Merged Merge Requests\n$MR_LIST"
-      fi
-      if [ -n "$CLOSED_ISSUES" ]; then
-        ISSUE_LIST=$(echo "$CLOSED_ISSUES" | sed 's/^/* /')
-        RELEASE_NOTES="$RELEASE_NOTES\n\n### Closed Issues\n$ISSUE_LIST"
-      fi
-      RELEASE_NAME="${CI_COMMIT_TAG_MESSAGE:-$CI_COMMIT_TAG}"
-      glab release create "$CI_COMMIT_TAG" ./build/archived/* --name "$RELEASE_NAME" --notes-file - <<< "$RELEASE_NOTES"
+    - chmod +x ./build/notes.sh
+    - ./build/notes.sh > release_notes.md
+    - RELEASE_NAME="${CI_COMMIT_TAG_MESSAGE:-$CI_COMMIT_TAG}"
+    - glab release create "$CI_COMMIT_TAG" ./build/archived/* --name "$RELEASE_NAME" --notes-file release_notes.md
   needs:
     - package:archive
   rules:
