@@ -1,12 +1,12 @@
 {
-  "version": "Beta-4.2.2",
+  "version": "Beta-4.2.3",
   "description": "Universal Package Manager & Environment Setup Tool",
   "homepage": "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi",
   "license": "Apache-2.0",
   "architecture": {
     "64bit": {
-      "url": "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/Prod-Beta-4.2.2/downloads/zoi-windows-amd64.zip",
-      "hash": "a9f43a2b9a78d38849e224f78fcee159a747da4027b7c3e765d936c1e20f11a8"
+      "url": "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/Prod-Beta-4.2.3/downloads/zoi-windows-amd64.zip",
+      "hash": "771a3af7f6750133bd7df7873aa5c8fa2512966543d38f547d7ca27db85e5066"
     }
   },
   "bin": "zoi.exe",
