@@ -1266,6 +1266,7 @@ fn handle_binary_install(
                     if symlink_path.exists() {
                         fs::remove_file(&symlink_path)?;
                     }
+                    #[cfg(unix)]
                     std::os::unix::fs::symlink(&app_executable, &symlink_path)?;
                 } else {
                     println!(
@@ -1314,6 +1315,7 @@ fn handle_binary_install(
             if symlink_path.exists() {
                 fs::remove_file(&symlink_path)?;
             }
+            #[cfg(unix)]
             std::os::unix::fs::symlink(&bin_path, symlink_path)?;
         }
 
