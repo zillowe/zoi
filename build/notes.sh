@@ -13,9 +13,10 @@ generate_legacy_notes() {
     else
         COMMIT_RANGE="$CI_COMMIT_TAG"
     fi
-    CHANGELOG=$(git log --pretty=format:"* %s (%h)" $COMMIT_RANGE)
-    MERGED_MRS=$(git log $COMMIT_RANGE | grep -oE 'See merge request !([0-9]+)' | sed 's/See merge request/!/' | sort -u)
-    CLOSED_ISSUES=$(git log $COMMIT_RANGE | grep -oE '(Closes|closes|Fixes|fixes) #[0-9]+' | sed -E 's/.*#/#/' | sort -u)
+    
+    CHANGELOG=$(git log --pretty=format:'* %s ([%h]('"$CI_PROJECT_URL"'/-/commit/%H))' "$COMMIT_RANGE")
+    MERGED_MRS=$(git log "$COMMIT_RANGE" | grep -oE 'See merge request !([0-9]+)' | sed 's/See merge request/!/' | sort -u)
+    CLOSED_ISSUES=$(git log "$COMMIT_RANGE" | grep -oE '(Closes|closes|Fixes|fixes) #[0-9]+' | sed -E 's/.*#/#/' | sort -u)
     
     echo "## Changelog"
     echo ""
@@ -58,11 +59,12 @@ generate_gemini_notes() {
         COMMIT_RANGE="$CI_COMMIT_TAG"
     fi
 
-    COMMIT_LOG=$(git log --pretty=format:"- %s" $COMMIT_RANGE)
+    COMMIT_LOG=$(git log --pretty=format:"### %s%n%n%b" "$COMMIT_RANGE")
     MERGED_MRS=$(git log $COMMIT_RANGE | grep -oE 'See merge request !([0-9]+)' | sed 's/See merge request/!/' | sort -u | paste -sd ' ' -)
     CLOSED_ISSUES=$(git log $COMMIT_RANGE | grep -oE '(Closes|closes|Fixes|fixes) #[0-9]+' | sed -E 's/.*#/#/' | sort -u | paste -sd ' ' -)
 
-    PROMPT="Generate release notes in Markdown for version '$CI_COMMIT_TAG_MESSAGE'. Summarize the following commits, merged MRs, and closed issues. Organize the summary into '### ✨ Features' and '### 🌟 Enhancements' and '### 🐛 Bug Fixes' . Be concise and professional.
+    PROMPT="Generate release notes in Markdown for version '$CI_COMMIT_TAG_MESSAGE'. The full commit message is provided below, use it as the primary source for the release notes. Also, summarize the following commits, merged MRs, and closed issues. Organize the summary into '### ✨ Features' and '### 🌟 Enhancements' and '### 🐛 Bug Fixes' . Be concise and professional.
+
 
 **Commits:**
 $COMMIT_LOG
@@ -73,5 +75,6 @@ $COMMIT_LOG
 "
     timeout 420 gemini --prompt "$PROMPT"
 }
+
 
 generate_gemini_notes || generate_legacy_notes

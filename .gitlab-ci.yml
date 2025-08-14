@@ -93,7 +93,7 @@ create_release:
   variables:
     GIT_DEPTH: 0
   before_script:
-    - apt-get update -y && apt-get install -y nodejs npm git coreutils
+    - apk add --no-cache nodejs npm git coreutils
     - npm i -g @google/gemini-cli
   script:
     - glab auth login --token $GITLAB_TOKEN_RELEASE
