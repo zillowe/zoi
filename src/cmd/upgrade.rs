@@ -11,6 +11,10 @@ pub fn run(branch: &str, status: &str, number: &str, full: bool, force: bool) {
                 "Zoi upgraded successfully! Please restart your shell for changes to take effect."
                     .green()
             );
+            println!(
+                "\n{}: To update shell completions, run 'zoi shell <your-shell>'.",
+                "Hint".cyan().bold()
+            );
         }
         Err(e) if e.to_string() == "already_on_latest" => {}
         Err(e) => {

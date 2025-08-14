@@ -5,10 +5,10 @@ use clap_complete::Shell;
 use clap_complete::generate;
 use std::io;
 
-// Production or Development
+// Production, Development or Public
 const BRANCH: &str = "Production";
 const STATUS: &str = "Beta";
-const NUMBER: &str = "4.2.3";
+const NUMBER: &str = "4.3.0";
 
 /// Zoi - The Universal Package Manager & Environment Setup Tool.
 ///
@@ -18,7 +18,7 @@ const NUMBER: &str = "4.2.3";
 #[command(name = "zoi", author, about, long_about = None, disable_version_flag = true,
     trailing_var_arg = true,
 )]
-struct Cli {
+pub struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
 
@@ -247,6 +247,13 @@ enum Commands {
         tags: Option<Vec<String>>,
     },
 
+    /// Installs completion scripts for a given shell
+    Shell {
+        /// The shell to install completions for
+        #[arg(value_enum)]
+        shell: Shell,
+    },
+
     /// Download and execute a binary package without installing it
     #[command(
         alias = "x",
@@ -446,6 +453,10 @@ pub fn run() {
                 tags,
             } => {
                 cmd::search::run(search_term, repo, package_type, tags);
+                Ok(())
+            }
+            Commands::Shell { shell } => {
+                cmd::shell::run(shell);
                 Ok(())
             }
             Commands::Exec { source, args } => {

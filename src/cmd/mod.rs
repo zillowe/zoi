@@ -15,6 +15,7 @@ pub mod pin;
 pub mod repo;
 pub mod run;
 pub mod search;
+pub mod shell;
 pub mod show;
 pub mod start;
 pub mod stop;

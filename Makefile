@@ -64,29 +64,17 @@ install-completions: all
 	@echo "Installing shell completions..."
 ifeq ($(IS_WINDOWS),1)
 	@echo "  -> PowerShell"
-	@if not exist "$(USERPROFILE)\Documents\PowerShell" mkdir "$(USERPROFILE)\Documents\PowerShell"
-	@target\release\$(NAME).exe generate-completions powershell >> "$(USERPROFILE)\Documents\PowerShell\Microsoft.PowerShell_profile.ps1"
-	@echo ""
-	@echo "Completion script appended to your PowerShell profile."
-	@echo "Please restart your shell or run '. $PROFILE' to activate it."
+	@./target/release/$(NAME).exe shell powershell
 else
 	@echo "  -> Bash"
-	@mkdir -p ~/.local/share/bash-completion/completions
-	@./target/release/$(NAME) generate-completions bash > ~/.local/share/bash-completion/completions/$(NAME)
-
+	@./target/release/$(NAME) shell bash
 	@echo "  -> Zsh"
-	@mkdir -p ~/.zsh/completions
-	@./target/release/$(NAME) generate-completions zsh > ~/.zsh/completions/_$(NAME)
-
+	@./target/release/$(NAME) shell zsh
 	@echo "  -> Fish"
-	@mkdir -p ~/.config/fish/completions
-	@./target/release/$(NAME) generate-completions fish > ~/.config/fish/completions/$(NAME).fish
-
+	@./target/release/$(NAME) shell fish
 	@echo "  -> Elvish"
-	@mkdir -p ~/.config/elvish/completions
-	@./target/release/$(NAME) generate-completions elvish > ~/.config/elvish/completions/$(NAME).elv
-	
+	@./target/release/$(NAME) shell elvish
+endif
 	@echo ""
 	@echo "Completion scripts installed."
 	@echo "Please restart your shell or source your shell's profile to activate them."
-endif
