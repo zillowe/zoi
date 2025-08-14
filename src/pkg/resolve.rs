@@ -267,6 +267,8 @@ fn resolve_latest_git_tag(git_repo: &str) -> Result<String, Box<dyn Error>> {
     }
 
     let is_gitlab = git_repo.contains("gitlab.com");
+    let is_codeberg = git_repo.contains("codeberg.org");
+
     let api_url = if is_gitlab {
         let project_path = git_repo
             .strip_prefix("https://gitlab.com/")
@@ -277,6 +279,12 @@ fn resolve_latest_git_tag(git_repo: &str) -> Result<String, Box<dyn Error>> {
             "https://gitlab.com/api/v4/projects/{}/releases",
             encoded_path
         )
+    } else if is_codeberg {
+        let repo_path = git_repo
+            .strip_prefix("https://codeberg.org/")
+            .unwrap_or(git_repo)
+            .trim_end_matches(".git");
+        format!("https://codeberg.org/api/v1/repos/{}/releases", repo_path)
     } else {
         let repo_path = if let Some(path) = git_repo.strip_prefix("https://github.com/") {
             path.trim_end_matches(".git")
@@ -327,7 +335,7 @@ fn resolve_latest_git_tag(git_repo: &str) -> Result<String, Box<dyn Error>> {
 
     let json: serde_json::Value = serde_json::from_str(&resp_text)?;
 
-    let tag = if is_gitlab {
+    let tag = if is_gitlab || is_codeberg {
         json.as_array()
             .and_then(|arr| arr.get(0))
             .and_then(|first| first.get("tag_name"))
