@@ -90,9 +90,32 @@ package:archive:
 create_release:
   stage: release
   image: gitlab/glab
+  variables:
+    GIT_DEPTH: 0
   script:
     - glab auth login --token $GITLAB_TOKEN_RELEASE
-    - glab release create "$CI_COMMIT_TAG" ./build/archived/* --name "$CI_COMMIT_TAG_MESSAGE" --notes "Zoi release for $CI_COMMIT_TAG_MESSAGE"
+    - |
+      set -e
+      if [ $(git tag -l | wc -l) -gt 1 ]; then
+        PREVIOUS_TAG=$(git describe --tags --abbrev=0 $(git rev-list --tags --skip=1 --max-count=1))
+        COMMIT_RANGE="$PREVIOUS_TAG..$CI_COMMIT_TAG"
+      else
+        COMMIT_RANGE="$CI_COMMIT_TAG"
+      fi
+      CHANGELOG=$(git log --pretty=format:"* %s (%h)" $COMMIT_RANGE)
+      MERGED_MRS=$(git log $COMMIT_RANGE | grep -oE 'See merge request !([0-9]+)' | sed 's/See merge request/!/' | sort -u)
+      CLOSED_ISSUES=$(git log $COMMIT_RANGE | grep -oE '(Closes|closes|Fixes|fixes) #[0-9]+' | sed -E 's/.*#/#/' | sort -u)
+      RELEASE_NOTES="## Changelog\n\n$CHANGELOG"
+      if [ -n "$MERGED_MRS" ]; then
+        MR_LIST=$(echo "$MERGED_MRS" | sed 's/^/* /')
+        RELEASE_NOTES="$RELEASE_NOTES\n\n### Merged Merge Requests\n$MR_LIST"
+      fi
+      if [ -n "$CLOSED_ISSUES" ]; then
+        ISSUE_LIST=$(echo "$CLOSED_ISSUES" | sed 's/^/* /')
+        RELEASE_NOTES="$RELEASE_NOTES\n\n### Closed Issues\n$ISSUE_LIST"
+      fi
+      RELEASE_NAME="${CI_COMMIT_TAG_MESSAGE:-$CI_COMMIT_TAG}"
+      glab release create "$CI_COMMIT_TAG" ./build/archived/* --name "$RELEASE_NAME" --notes-file - <<< "$RELEASE_NOTES"
   needs:
     - package:archive
   rules:
