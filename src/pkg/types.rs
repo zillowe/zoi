@@ -169,6 +169,8 @@ pub struct InstallationMethod {
     pub tag: Option<String>,
     #[serde(default)]
     pub branch: Option<String>,
+    #[serde(default)]
+    pub binary_types: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
