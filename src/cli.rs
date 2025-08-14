@@ -464,10 +464,7 @@ pub fn run() {
                 repo,
                 package_type,
                 tags,
-            } => {
-                cmd::search::run(search_term, repo, package_type, tags);
-                Ok(())
-            }
+            } => cmd::search::run(search_term, repo, package_type, tags),
             Commands::Shell { shell } => {
                 cmd::shell::run(shell);
                 Ok(())

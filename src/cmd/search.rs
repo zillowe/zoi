@@ -1,13 +1,40 @@
 use crate::pkg::{local, types::PackageType};
 use colored::*;
 use comfy_table::{ContentArrangement, Table, presets::UTF8_FULL};
+use std::io::{self, Write};
+use std::process::{Command, Stdio};
+
+fn print_with_pager(content: &str) -> io::Result<()> {
+    let pager = if crate::utils::command_exists("less") {
+        "less"
+    } else if crate::utils::command_exists("more") {
+        "more"
+    } else {
+        print!("{}", content);
+        return Ok(());
+    };
+
+    let mut command = Command::new(pager);
+    if pager == "less" {
+        command.arg("-R");
+    }
+
+    let mut child = command.stdin(Stdio::piped()).spawn()?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(content.as_bytes());
+    }
+
+    child.wait()?;
+    Ok(())
+}
 
 pub fn run(
     search_term: String,
     repo: Option<String>,
     package_type: Option<String>,
     tags: Option<Vec<String>>,
-) {
+) -> Result<(), Box<dyn std::error::Error>> {
     println!(
         "{}{}{}",
         "--- Searching for packages matching '".yellow(),
@@ -79,7 +106,7 @@ pub fn run(
 
             if matches.is_empty() {
                 println!("\n{}", "No packages found matching your query.".yellow());
-                return;
+                return Ok(());
             }
 
             let mut table = Table::new();
@@ -111,10 +138,11 @@ pub fn run(
                 table.add_row(vec![pkg.name, version, pkg.repo, tags_display, desc]);
             }
 
-            println!("{}", table);
+            print_with_pager(&table.to_string())?;
         }
         Err(e) => {
-            eprintln!("\n{}: {}", "Error".red().bold(), e);
+            return Err(e);
         }
     }
+    Ok(())
 }
