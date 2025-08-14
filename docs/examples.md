@@ -116,6 +116,43 @@ installation:
 
 ---
 
+## Package with Installer/Application Bundle
+
+For GUI applications or tools distributed as installers (`.dmg`, `.msi`) or application bundles (`.appimage`), use the `binary` type with the `binary_types` field.
+
+```yaml
+# gui/my-gui-app.pkg.yaml
+name: my-gui-app
+repo: community
+version: 1.0.0
+description: A GUI application distributed as a DMG/MSI/AppImage.
+website: https://example.com/my-gui-app
+git: https://github.com/user/my-gui-app
+tags: [gui, app]
+maintainer:
+  name: "Your Name"
+  email: "your.email@example.com"
+license: MIT
+
+installation:
+  - type: binary
+    url: "https://github.com/user/my-gui-app/releases/download/v{version}/my-gui-app-{version}-{platform}"
+    platforms: ["linux-amd64", "macos-amd64", "windows-amd64"]
+    # This tells Zoi to expect specific installer/bundle types.
+    # Zoi will automatically handle them:
+    # - dmg: Mounts the DMG and copies the .app to /Applications (or ~/Applications).
+    # - msi: Runs the MSI installer silently.
+    # - appimage: Makes the AppImage executable and adds it to the path.
+    binary_types: ["appimage", "dmg", "msi"]
+```
+
+**Key Fields:**
+
+- `type: binary`: The installation type is still `binary`.
+- `binary_types`: A list of special binary formats. Zoi will apply the correct installation procedure for each platform based on this list.
+
+---
+
 ## Build from Source Package
 
 For packages that need to be compiled on the user's machine, you can use the `source` installation type.
@@ -146,7 +183,7 @@ dependencies:
 
 installation:
   - type: source
-    url: "https://github.com/{git}" # URL to the git repository.
+    url: "{git}" # URL to the git repository.
     platforms: ["linux-amd64", "macos-amd64", "windows-amd64"]
     # Commands to execute in the cloned repository to build and install.
     # Optionally pick a tag or branch (only one). {version} will be expanded.
@@ -791,7 +828,7 @@ installation:
 
 ## Package with Git Tag Version
 
-You can set the `version` to `"{git}"` to automatically resolve the latest stable release tag from the repository specified in the `git` field. This works for both GitHub and GitLab.
+You can set the `version` to `"{git}"` to automatically resolve the latest stable release tag from the repository specified in the `git` field. This works for GitHub, GitLab and Codeberg.
 
 ```yaml
 # utils/my-git-tool.pkg.yaml
@@ -809,10 +846,12 @@ license: MIT
 
 installation:
   - type: binary
-    url: "https://github.com/user/my-git-tool/releases/download/v{version}/my-git-tool-{platform}"
+    url: "{git}/releases/download/{version}/my-git-tool-{platform}"
     platforms: ["linux-amd64", "macos-amd64", "windows-amd64"]
 ```
 
 **Key Fields:**
 
-- `version: "{git}"`: Tells Zoi to query the GitHub/GitLab API for the latest release and use its tag as the version. The `{version}` placeholder in the `url` will then be substituted with the resolved tag.
+- `version: "{git}"`: Tells Zoi to query the GitHub/GitLab/Codeberg API for the latest release and use its tag as the version.
+- The `{version}` placeholder in the `url` will then be substituted with the resolved tag.
+- The `{git}` placeholder is also available, substituting the URL from the top-level `git` field.

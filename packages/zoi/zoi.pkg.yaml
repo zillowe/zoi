@@ -29,13 +29,13 @@ tags:
 
 installation:
   - type: com_binary
-    url: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/{version}/downloads/zoi-{platform}.{platformComExt}
+    url: "{git}/-/releases/{version}/downloads/zoi-{platform}.{platformComExt}"
     platforms: [linux, macos, windows-amd64]
     checksums: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/{version}/downloads/checksums.txt
     binary_path: "binariy-bin"
 
   - type: script
-    url: "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.{platformExt}"
+    url: "{git}/-/raw/main/app/install.{platformExt}"
     platforms: [linux, macos, windows-amd64]
     checksums: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/checksums.txt
 
@@ -52,18 +52,17 @@ installation:
 post_install:
   - platforms: [linux, macos]
     commands:
-      - "echo Installing shell completions for {name} {version}"
-      - "{name} generate-completions bash > ~/.local/share/bash-completion/completions/{name} || true"
-      - "{name} generate-completions zsh > ~/.zsh/completions/_{name} || true"
-      - "{name} generate-completions fish > ~/.config/fish/completions/{name}.fish || true"
+      - "echo Install shell completions for {name} {version} using this command"
+      - "echo zoi shell <shell-name>"
   - platforms: [windows-amd64]
     commands:
       - "echo Installing PowerShell profile completions for {name} {version}"
-      - "powershell -NoProfile -Command \"$p=\"$env:USERPROFILE\\Documents\\PowerShell\"; if(!(Test-Path $p)){New-Item -ItemType Directory -Path $p|Out-Null}; {name}.exe generate-completions powershell >> \"$p\\Microsoft.PowerShell_profile.ps1\"\""
+      - "zoi shell powershell"
 
 dependencies:
-  runtime:
+  required:
     - "native:git"
+  optional:
     - "native:less"
   build:
     - "native:rust"

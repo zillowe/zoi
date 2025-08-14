@@ -62,7 +62,7 @@ generate_gemini_notes() {
     MERGED_MRS=$(git log $COMMIT_RANGE | grep -oE 'See merge request !([0-9]+)' | sed 's/See merge request/!/' | sort -u | paste -sd ' ' -)
     CLOSED_ISSUES=$(git log $COMMIT_RANGE | grep -oE '(Closes|closes|Fixes|fixes) #[0-9]+' | sed -E 's/.*#/#/' | sort -u | paste -sd ' ' -)
 
-    PROMPT="Generate release notes in Markdown for version '$CI_COMMIT_TAG_MESSAGE'. Summarize the following commits, merged MRs, and closed issues. Organize the summary into '### ✨ Features' and '### 🐛 Bug Fixes'. Be concise and professional.
+    PROMPT="Generate release notes in Markdown for version '$CI_COMMIT_TAG_MESSAGE'. Summarize the following commits, merged MRs, and closed issues. Organize the summary into '### ✨ Features' and '### 🌟 Enhancements' and '### 🐛 Bug Fixes' . Be concise and professional.
 
 **Commits:**
 $COMMIT_LOG

@@ -226,6 +226,7 @@ Zoi provides a wide range of commands to manage your packages and environment. F
 | `list`      | Lists installed or all available packages. <br/>`--all`: List all packages, not just installed. <br/>`--repo <repo>`: Filter by repository. <br/>`--type <type>`: Filter by package type.                                  |
 | `show`      | Shows detailed information about a package. <br/>`--raw`: Display the raw, unformatted package file.                                                                                                                       |
 | `search`    | Searches packages by name, description, and tags. <br/>`--repo <repo>`: Filter by repository. <br/>`--type <type>`: Filter by package type. <br/>`-t, --tag <tag>`: Filter by one or more tags (repeat or comma-separate). |
+| `shell`     | Installs completion scripts for a given shell (e.g. `zoi shell bash`).                                                                                                                                                     |
 | `install`   | Installs one or more packages. <br/>`--force`: Force re-installation if the package already exists. <br/>`--interactive`: Choose the installation method interactively.                                                    |
 | `build`     | Builds and installs one or more packages from source. <br/>`--force`: Force the package to be rebuilt.                                                                                                                     |
 | `uninstall` | Removes one or more packages. Also removes any of its dependencies that are no longer needed. For collections, it removes all of its dependencies.                                                                         |
@@ -394,6 +395,9 @@ installation:
     sigs:
       - file: "my-awesome-app-{platform}"
         sig: "https://github.com/user/my-awesome-app/releases/download/v{version}/my-awesome-app-{platform}.sig"
+    # (Optional) A list of installer/bundle types like 'dmg', 'msi', or 'appimage'.
+    # Zoi will handle these file types with appropriate platform-specific actions.
+    binary_types: ["dmg", "msi", "appimage"]
 
   - type: com_binary
     url: "https://github.com/user/my-awesome-app/releases/download/v{version}/my-awesome-app-v{version}-{platform}.{platformComExt}"

@@ -35,7 +35,8 @@
   <a href="https://zillowe.rf.gd/docs/zds/zoi/"><strong>Docs</strong></a> •
   <a href="https://discord.gg/P4R7yaA3hf"><strong>Discord</strong></a> •
   <a href="./SECURITY.md"><strong>Security</strong></a> •
-  <a href="./CONTRIBUTING.md"><strong>Contributing</strong></a>
+  <a href="./CONTRIBUTING.md"><strong>Contributing</strong></a> •
+  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases"><strong>Changelog</strong></a>
   <br/>
   <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Bug%20Report"><strong>Report a Bug</strong></a> •
   <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Feature%20Request"><strong>Requests a Feature</strong></a> •
@@ -230,30 +231,30 @@ We're planning to add support for more platforms.
 
 What dependency installation we support.
 
-| Manager          | Ecosystem / OS                  | Example                                   |
-| ---------------- | ------------------------------- | ----------------------------------------- |
-| `zoi`            | Zoi                             | `zoi:my-other-package`                    |
-| `native`         | System's native package manager | `native:openssl`                          |
-| `script`         | Script execution                | `script:website.com/install`              |
-| `apt`, `apt-get` | Debian, Ubuntu, etc.            | `apt:libssl-dev`                          |
-| `pacman`         | Arch Linux                      | `pacman:base-devel`                       |
-| `yay`, `paru`    | Arch Linux (AUR)                | `yay:google-chrome`                       |
-| `aur`            | Arch Linux (AUR)                | `aur:visual-studio-code-bin`              |
-| `brew`           | macOS (Homebrew)                | `brew:node`                               |
-| `scoop`          | Windows                         | `scoop:git`                               |
-| `snap`           | Linux (Snapcraft)               | `snap:node`                               |
-| `flatpak`        | Linux (Flathub)                 | `flatpak:org.gimp.GIMP`                   |
-| `pkg`            | FreeBSD                         | `pkg:git`                                 |
-| `pkg_add`        | OpenBSD                         | `pkg_add:git`                             |
-| `cargo`          | Rust                            | `cargo:ripgrep`                           |
-| `cargo-binstall` | Rust (pre-compiled binaries)    | `cargo-binstall:ripgrep`                  |
-| `go`             | Go                              | `go:golang.org/x/tools/cmd/goimports`     |
-| `npm`            | Node.js                         | `npm:typescript`                          |
-| `bun`            | Bun                             | `bun:elysia`                              |
-| `deno`           | Deno                            | `deno:npm:chalk` or `deno:jsr:@std/bytes` |
-| `jsr`            | JavaScript Registry             | `jsr:@std/http`                           |
-| `pip`            | Python                          | `pip:requests`                            |
-| `nix`            | NixOS / Nix                     | `nix:nixpkgs.hello`                       |
+| Manager          | Ecosystem / OS                  | Example                                                                         |
+| ---------------- | ------------------------------- | ------------------------------------------------------------------------------- |
+| `zoi`            | Zoi                             | `zoi:my-other-package`                                                          |
+| `native`         | System's native package manager | `native:openssl`                                                                |
+| `script`         | Script execution                | `script:website.com/install`                                                    |
+| `apt`, `apt-get` | Debian, Ubuntu, etc.            | `apt:libssl-dev`                                                                |
+| `pacman`         | Arch Linux                      | `pacman:base-devel`                                                             |
+| `yay`, `paru`    | Arch Linux (AUR)                | `yay:google-chrome`                                                             |
+| `aur`            | Arch Linux (AUR)                | `aur:visual-studio-code-bin`                                                    |
+| `brew`           | macOS (Homebrew)                | `brew:node`                                                                     |
+| `scoop`          | Windows                         | `scoop:git`                                                                     |
+| `snap`           | Linux (Snapcraft)               | `snap:node`                                                                     |
+| `flatpak`        | Linux (Flathub)                 | `flatpak:org.gimp.GIMP`                                                         |
+| `pkg`            | FreeBSD                         | `pkg:git`                                                                       |
+| `pkg_add`        | OpenBSD                         | `pkg_add:git`                                                                   |
+| `cargo`          | Rust                            | `cargo:ripgrep`                                                                 |
+| `cargo-binstall` | Rust (pre-compiled binaries)    | `cargo-binstall:ripgrep`                                                        |
+| `go`             | Go                              | `go:golang.org/x/tools/cmd/goimports`                                           |
+| `npm`            | Node.js                         | `npm:typescript`                                                                |
+| `bun`            | Bun                             | `bun:elysia`                                                                    |
+| `deno`           | Deno                            | `deno:npm-chalk` or `deno:jsr-@std/bytes` (the `-` instead of `:` is important) |
+| `jsr`            | JavaScript Registry             | `jsr:@std/http`                                                                 |
+| `pip`            | Python                          | `pip:requests`                                                                  |
+| `nix`            | NixOS / Nix                     | `nix:nixpkgs.hello`                                                             |
 
 And many more.
 

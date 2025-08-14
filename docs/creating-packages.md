@@ -136,6 +136,19 @@ installation:
     platforms: ["linux-amd64", "macos-amd64", "windows-amd64"]
 ```
 
+For more complex installers or application bundles like `.dmg` on macOS, `.msi` on Windows, or `.appimage` on Linux, you can add the `binary_types` field. Zoi will then use platform-specific logic to handle the installation.
+
+```yaml
+installation:
+  - type: binary
+    url: "https://github.com/user/my-gui-app/releases/download/v{version}/my-gui-app-{platform}"
+    platforms: ["macos-amd64", "windows-amd64", "linux-amd64"]
+    # (Optional) Specify installer/bundle types.
+    # Zoi will handle them appropriately (e.g. mount DMG, run MSI).
+    # Supported types: "dmg", "msi", "appimage"
+    binary_types: ["dmg", "msi", "appimage"]
+```
+
 #### `com_binary` (Compressed Binary)
 
 For downloading a `.zip` or `.tar.gz` archive that contains the binary.
