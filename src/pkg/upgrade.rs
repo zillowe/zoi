@@ -23,7 +23,7 @@ struct GitLabRelease {
     tag_name: String,
 }
 
-fn get_latest_tag(is_dev_build: bool) -> Result<String, Box<dyn Error>> {
+fn get_latest_tag(branch_prefix: &str) -> Result<String, Box<dyn Error>> {
     println!("Fetching latest release information from GitLab...");
     let api_url = format!(
         "https://gitlab.com/api/v4/projects/{}/releases",
@@ -34,14 +34,17 @@ fn get_latest_tag(is_dev_build: bool) -> Result<String, Box<dyn Error>> {
         .build()?;
     let releases: Vec<GitLabRelease> = client.get(&api_url).send()?.json()?;
 
-    let tag_prefix = if is_dev_build { "Dev-" } else { "Prod-" };
     let latest_tag = releases
         .into_iter()
-        .find(|r| r.tag_name.starts_with(tag_prefix))
+        .find(|r| r.tag_name.starts_with(branch_prefix))
         .map(|r| r.tag_name)
-        .ok_or_else(|| format!("No release found with prefix '{tag_prefix}'"))?;
+        .ok_or_else(|| format!("No release found with prefix '{}'", branch_prefix))?;
 
-    println!("Found latest tag: {}", latest_tag.green());
+    println!(
+        "Found latest tag for branch prefix '{}': {}",
+        branch_prefix,
+        latest_tag.green()
+    );
     Ok(latest_tag)
 }
 
@@ -261,6 +264,8 @@ pub fn run(
     number: &str,
     full: bool,
     force: bool,
+    tag: Option<String>,
+    custom_branch: Option<String>,
 ) -> Result<(), Box<dyn Error>> {
     let current_version = if status.is_empty() || status.eq_ignore_ascii_case("stable") {
         number.to_string()
@@ -268,8 +273,22 @@ pub fn run(
         format!("{}-{}", number, status.to_lowercase())
     };
 
-    let is_dev_build = branch.eq_ignore_ascii_case("development");
-    let latest_tag = get_latest_tag(is_dev_build)?;
+    let latest_tag = if let Some(tag_name) = tag {
+        println!("Upgrading to specified tag: {}", tag_name.green());
+        tag_name
+    } else {
+        let branch_prefix = if let Some(b) = custom_branch {
+            println!("Upgrading to latest release from branch: {}", b.green());
+            format!("{}-", b)
+        } else {
+            if branch.eq_ignore_ascii_case("public") {
+                "Pub-".to_string()
+            } else {
+                "Prod-".to_string()
+            }
+        };
+        get_latest_tag(&branch_prefix)?
+    };
 
     let parts: Vec<&str> = latest_tag.split('-').collect();
     let latest_version_num = parts

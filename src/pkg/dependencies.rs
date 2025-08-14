@@ -475,10 +475,19 @@ fn install_dependency(
             }
         }
         "deno" => {
+            let package_to_install = if let Some(pkg) = dep.package.strip_prefix("npm-") {
+                format!("npm:{}", pkg.trim_start())
+            } else if let Some(pkg) = dep.package.strip_prefix("jsr-") {
+                format!("jsr:{}", pkg.trim_start())
+            } else {
+                dep.package.to_string()
+            };
+
             let status = Command::new("deno")
                 .arg("install")
                 .arg("-g")
-                .arg(dep.package)
+                .arg("-A")
+                .arg(package_to_install)
                 .status()?;
             if !status.success() {
                 return Err(format!("Deno dependency failed for '{}'", dep.package).into());
@@ -1383,10 +1392,26 @@ pub fn uninstall_dependency(
             .arg("-g")
             .arg(dep.package)
             .status()?,
-        "deno" => Command::new("deno")
-            .arg("uninstall")
-            .arg(dep.package)
-            .status()?,
+        "deno" => {
+            let package_name = if let Some(pkg) = dep.package.strip_prefix("npm-") {
+                pkg.trim_start()
+            } else if let Some(pkg) = dep.package.strip_prefix("jsr-") {
+                pkg.trim_start()
+            } else {
+                dep.package
+            };
+
+            let executable_name = if let Some(idx) = package_name.rfind('/') {
+                &package_name[idx + 1..]
+            } else {
+                package_name
+            };
+
+            Command::new("deno")
+                .arg("uninstall")
+                .arg(executable_name)
+                .status()?
+        }
         "yarn" => Command::new("yarn")
             .arg("global")
             .arg("remove")

@@ -333,7 +333,6 @@ fn resolve_latest_git_tag(git_repo: &str) -> Result<String, Box<dyn Error>> {
             .and_then(|first| first.get("tag_name"))
             .and_then(|tag| tag.as_str())
     } else {
-        // GitHub
         json.get("tag_name").and_then(|tag| tag.as_str())
     };
 

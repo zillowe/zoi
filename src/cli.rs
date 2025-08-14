@@ -217,6 +217,14 @@ enum Commands {
         /// Force the upgrade even if the version is the same
         #[arg(long)]
         force: bool,
+
+        /// Upgrade to a specific git tag
+        #[arg(long)]
+        tag: Option<String>,
+
+        /// Upgrade to the latest release of a specific branch (e.g. Prod, Pub)
+        #[arg(long)]
+        branch: Option<String>,
     },
 
     /// Removes packages that were installed as dependencies but are no longer needed
@@ -437,8 +445,13 @@ pub fn run() {
                 cmd::clone::run(sources, target_directory, cli.yes);
                 Ok(())
             }
-            Commands::Upgrade { full, force } => {
-                cmd::upgrade::run(BRANCH, STATUS, NUMBER, full, force);
+            Commands::Upgrade {
+                full,
+                force,
+                tag,
+                branch,
+            } => {
+                cmd::upgrade::run(BRANCH, STATUS, NUMBER, full, force, tag, branch);
                 Ok(())
             }
             Commands::Autoremove => {

@@ -1,10 +1,18 @@
 use crate::pkg;
 use colored::*;
 
-pub fn run(branch: &str, status: &str, number: &str, full: bool, force: bool) {
+pub fn run(
+    branch: &str,
+    status: &str,
+    number: &str,
+    full: bool,
+    force: bool,
+    tag: Option<String>,
+    custom_branch: Option<String>,
+) {
     println!("{}", "--- Upgrading Zoi ---".yellow());
 
-    match pkg::upgrade::run(branch, status, number, full, force) {
+    match pkg::upgrade::run(branch, status, number, full, force, tag, custom_branch) {
         Ok(()) => {
             println!(
                 "\n{}",
