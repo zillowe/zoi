@@ -99,8 +99,6 @@ create_release:
   script:
     - glab auth login --token $GITLAB_TOKEN_RELEASE
     - chmod +x ./build/notes.sh
-    - bash -c "ls"
-    - bash -c "ls ./build/"
     - bash -c "./build/notes.sh > release_notes.md"
     - RELEASE_NAME="${CI_COMMIT_TAG_MESSAGE:-$CI_COMMIT_TAG}"
     - glab release create "$CI_COMMIT_TAG" ./build/archived/* --name "$RELEASE_NAME" --notes-file release_notes.md
