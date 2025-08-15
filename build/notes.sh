@@ -14,7 +14,7 @@ generate_legacy_notes() {
         COMMIT_RANGE="$CI_COMMIT_TAG"
     fi
     
-    CHANGELOG=$(git log --pretty=format:'* %s ([%h]('"$CI_PROJECT_URL"'/-/commit/%H))' "$COMMIT_RANGE")
+    CHANGELOG=$(git log --pretty=format:'- %s ([%h]('"$CI_PROJECT_URL"'/-/commit/%H))' "$COMMIT_RANGE")
     MERGED_MRS=$(git log "$COMMIT_RANGE" | grep -oE 'See merge request !([0-9]+)' | sed 's/See merge request/!/' | sort -u)
     CLOSED_ISSUES=$(git log "$COMMIT_RANGE" | grep -oE '(Closes|closes|Fixes|fixes) #[0-9]+' | sed -E 's/.*#/#/' | sort -u)
     
