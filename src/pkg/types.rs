@@ -24,6 +24,21 @@ pub enum PackageType {
     Library,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum UpdateType {
+    Change,
+    Vulnerability,
+    Update,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UpdateInfo {
+    #[serde(rename = "type")]
+    pub update_type: UpdateType,
+    pub message: String,
+}
+
 #[derive(Debug, Deserialize, Clone)]
 #[allow(dead_code)]
 pub struct ServiceMethod {
@@ -128,6 +143,8 @@ pub struct Package {
     pub rollback: Option<bool>,
     #[serde(default)]
     pub pkg_config: Option<PkgConfig>,
+    #[serde(default)]
+    pub updates: Option<Vec<UpdateInfo>>,
 }
 
 #[derive(Debug, Deserialize, Clone)]

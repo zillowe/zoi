@@ -48,6 +48,28 @@ fn send_telemetry(event: &str, pkg: &types::Package) {
     }
 }
 
+fn display_updates(pkg: &types::Package, yes: bool) -> Result<bool, Box<dyn Error>> {
+    if let Some(updates) = &pkg.updates {
+        if updates.is_empty() {
+            return Ok(true);
+        }
+        println!("\n{}", "Important Updates:".bold().yellow());
+        for update in updates {
+            let type_str = match update.update_type {
+                types::UpdateType::Change => "Change".blue(),
+                types::UpdateType::Vulnerability => "Vulnerability".red().bold(),
+                types::UpdateType::Update => "Update".green(),
+            };
+            println!("  - [{}] {}", type_str, update.message);
+        }
+
+        if !utils::ask_for_confirmation("\nDo you want to continue?", yes) {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
 pub fn run_installation(
     source: &str,
     mode: InstallMode,
@@ -57,6 +79,11 @@ pub fn run_installation(
     processed_deps: &mut HashSet<String>,
 ) -> Result<(), Box<dyn Error>> {
     let (pkg, version) = resolve::resolve_package_and_version(source)?;
+
+    if !display_updates(&pkg, yes)? {
+        println!("Operation aborted.");
+        return Ok(());
+    }
 
     if let Some(manifest) = local::is_package_installed(&pkg.name, pkg.scope)? {
         if manifest.version != version {
