@@ -11,10 +11,8 @@ fn main() {
         println!("cargo:rerun-if-changed={}", env_path_str);
 
         if let Ok(iter) = dotenvy::from_filename_iter(env_path_str) {
-            for item in iter {
-                if let Ok((key, val)) = item {
-                    println!("cargo:rustc-env={}={}", key, val);
-                }
+            for (key, val) in iter.flatten() {
+                println!("cargo:rustc-env={}={}", key, val);
             }
         } else {
             println!("cargo:warning=failed to load env file: {}", env_path_str);

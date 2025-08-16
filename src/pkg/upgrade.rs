@@ -280,12 +280,10 @@ pub fn run(
         let branch_prefix = if let Some(b) = custom_branch {
             println!("Upgrading to latest release from branch: {}", b.green());
             format!("{}-", b)
+        } else if branch.eq_ignore_ascii_case("public") {
+            "Pub-".to_string()
         } else {
-            if branch.eq_ignore_ascii_case("public") {
-                "Pub-".to_string()
-            } else {
-                "Prod-".to_string()
-            }
+            "Prod-".to_string()
         };
         get_latest_tag(&branch_prefix)?
     };
@@ -302,11 +300,9 @@ pub fn run(
         latest_version_num.to_string()
     };
 
-    if !force {
-        if !self_update::version::bump_is_greater(&current_version, &latest_version_str)? {
-            println!("\n{}", "You are already on the latest version!".green());
-            return Err("already_on_latest".into());
-        }
+    if !force && !self_update::version::bump_is_greater(&current_version, &latest_version_str)? {
+        println!("\n{}", "You are already on the latest version!".green());
+        return Err("already_on_latest".into());
     }
 
     let (os, arch) = get_platform_info()?;

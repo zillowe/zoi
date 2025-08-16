@@ -15,7 +15,7 @@ pub fn run(branch: &str, status: &str, number: &str, commit: &str) {
 
     let platform = utils::get_platform().unwrap_or_else(|e| e.to_string());
     let parts: Vec<&str> = platform.split('-').collect();
-    let os = parts.get(0).cloned().unwrap_or("unknown");
+    let os = parts.first().cloned().unwrap_or("unknown");
     let arch = parts.get(1).cloned().unwrap_or("unknown");
 
     utils::print_aligned_info("OS", os);

@@ -51,12 +51,10 @@ pub fn run(args: RepoCommand) {
                     if let Err(e) = config::clone_git_repo(&val) {
                         eprintln!("{}: {}", "Error".red().bold(), e);
                     }
+                } else if let Err(e) = config::add_repo(&val) {
+                    eprintln!("{}: {}", "Error".red().bold(), e);
                 } else {
-                    if let Err(e) = config::add_repo(&val) {
-                        eprintln!("{}: {}", "Error".red().bold(), e);
-                    } else {
-                        println!("Repository '{}' added successfully.", val.green());
-                    }
+                    println!("Repository '{}' added successfully.", val.green());
                 }
             } else if !yes {
                 if let Err(e) = config::interactive_add_repo() {

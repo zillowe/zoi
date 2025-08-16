@@ -95,7 +95,7 @@ pub fn remove(ext_name: &str, _yes: bool) -> Result<(), Box<dyn Error>> {
                     let repo_name = add
                         .trim_end_matches('/')
                         .split('/')
-                        .last()
+                        .next_back()
                         .unwrap_or("")
                         .trim_end_matches(".git");
                     if !repo_name.is_empty() {

@@ -443,8 +443,8 @@ pub fn check_path() {
                     return false;
                 }
 
-                let p_expanded = if p.starts_with("~/") {
-                    home.join(&p[2..])
+                let p_expanded = if let Some(stripped) = p.strip_prefix("~/") {
+                    home.join(stripped)
                 } else if p == "~" {
                     home.clone()
                 } else {

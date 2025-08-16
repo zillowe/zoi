@@ -337,7 +337,7 @@ fn resolve_latest_git_tag(git_repo: &str) -> Result<String, Box<dyn Error>> {
 
     let tag = if is_gitlab || is_codeberg {
         json.as_array()
-            .and_then(|arr| arr.get(0))
+            .and_then(|arr| arr.first())
             .and_then(|first| first.get("tag_name"))
             .and_then(|tag| tag.as_str())
     } else {

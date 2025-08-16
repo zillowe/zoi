@@ -17,7 +17,7 @@ use zip::ZipArchive;
 use zstd::stream::read::Decoder as ZstdDecoder;
 
 fn get_filename_from_url(url: &str) -> &str {
-    url.split('/').last().unwrap_or("")
+    url.split('/').next_back().unwrap_or("")
 }
 
 fn get_expected_checksum(

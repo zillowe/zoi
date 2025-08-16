@@ -251,10 +251,10 @@ pub fn run_installation(
                 )
                 .yellow()
             );
-            if pkg.package_type == types::PackageType::Service {
-                if utils::ask_for_confirmation("Do you want to start the service?", yes) {
-                    service::start_service(&pkg)?;
-                }
+            if pkg.package_type == types::PackageType::Service
+                && utils::ask_for_confirmation("Do you want to start the service?", yes)
+            {
+                service::start_service(&pkg)?;
             }
             return Ok(());
         }
@@ -354,10 +354,10 @@ pub fn run_installation(
             _ => "install",
         };
         send_telemetry(event_name, &pkg);
-        if pkg.package_type == types::PackageType::Service {
-            if utils::ask_for_confirmation("Do you want to start the service now?", yes) {
-                service::start_service(&pkg)?;
-            }
+        if pkg.package_type == types::PackageType::Service
+            && utils::ask_for_confirmation("Do you want to start the service now?", yes)
+        {
+            service::start_service(&pkg)?;
         }
         if pkg.post_install.is_some()
             && utils::ask_for_confirmation(
@@ -634,7 +634,7 @@ fn write_manifest(
 }
 
 fn get_filename_from_url(url: &str) -> &str {
-    url.split('/').last().unwrap_or("")
+    url.split('/').next_back().unwrap_or("")
 }
 
 fn get_expected_checksum(
@@ -706,7 +706,7 @@ fn verify_checksum(
                     hasher.update(data);
                     format!("{:x}", hasher.finalize())
                 }
-                "sha512" | _ => {
+                _ => {
                     let mut hasher = Sha512::new();
                     hasher.update(data);
                     format!("{:x}", hasher.finalize())
@@ -759,7 +759,7 @@ impl VerificationHelper for Helper {
     }
 
     fn check(&mut self, structure: MessageStructure) -> anyhow::Result<()> {
-        for layer in structure.into_iter() {
+        if let Some(layer) = structure.into_iter().next() {
             match layer {
                 MessageLayer::SignatureGroup { results } => {
                     if results.iter().any(|r| r.is_ok()) {
@@ -1015,12 +1015,10 @@ fn handle_com_binary_install(
             let bp_norm = bp.replace('\\', "/");
             let file_name = path.file_name().and_then(|o| o.to_str()).unwrap_or("");
             let mut matched = rel_str == bp_norm;
-            if !matched {
-                if !bp_norm.contains('/') {
-                    matched = file_name == bp_norm;
-                    if !matched && bp_norm == binary_name.as_str() {
-                        matched = file_name == binary_name_with_ext.as_str();
-                    }
+            if !matched && !bp_norm.contains('/') {
+                matched = file_name == bp_norm;
+                if !matched && bp_norm == binary_name.as_str() {
+                    matched = file_name == binary_name_with_ext.as_str();
                 }
             }
             if matched {
@@ -1238,7 +1236,7 @@ fn handle_binary_install(
 
             let app_path = fs::read_dir(&mount_path)?
                 .filter_map(Result::ok)
-                .find(|entry| entry.path().extension().map_or(false, |ext| ext == "app"))
+                .find(|entry| entry.path().extension().is_some_and(|ext| ext == "app"))
                 .map(|entry| entry.path());
 
             if let Some(app_path) = app_path {
@@ -1678,34 +1676,32 @@ fn handle_source_install(
                 .into());
             }
         }
+    } else if entries.len() == 1 {
+        let bin_path = entries[0].clone();
+        let bin_name = bin_path
+            .file_stem()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+        binaries_to_link.push((bin_name, bin_path));
     } else {
-        if entries.len() == 1 {
-            let bin_path = entries[0].clone();
-            let bin_name = bin_path
-                .file_stem()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .to_string();
-            binaries_to_link.push((bin_name, bin_path));
+        let os_specific_name = if cfg!(target_os = "windows") {
+            format!("{}.exe", pkg.name)
         } else {
-            let os_specific_name = if cfg!(target_os = "windows") {
-                format!("{}.exe", pkg.name)
-            } else {
-                pkg.name.clone()
-            };
+            pkg.name.clone()
+        };
 
+        for entry in &entries {
+            if entry.file_name().unwrap().to_string_lossy() == os_specific_name {
+                binaries_to_link.push((pkg.name.clone(), entry.clone()));
+                break;
+            }
+        }
+        if binaries_to_link.is_empty() && cfg!(target_os = "windows") {
             for entry in &entries {
-                if entry.file_name().unwrap().to_string_lossy() == os_specific_name {
+                if entry.file_name().unwrap().to_string_lossy() == pkg.name {
                     binaries_to_link.push((pkg.name.clone(), entry.clone()));
                     break;
-                }
-            }
-            if binaries_to_link.is_empty() && cfg!(target_os = "windows") {
-                for entry in &entries {
-                    if entry.file_name().unwrap().to_string_lossy() == pkg.name {
-                        binaries_to_link.push((pkg.name.clone(), entry.clone()));
-                        break;
-                    }
                 }
             }
         }

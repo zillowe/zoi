@@ -42,7 +42,7 @@ fn sync_git_repos(verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
         .map(|url| {
             url.trim_end_matches('/')
                 .split('/')
-                .last()
+                .next_back()
                 .unwrap_or("")
                 .trim_end_matches(".git")
                 .to_string()
@@ -264,7 +264,7 @@ pub fn run(verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
     config_data.native_package_manager = utils::get_native_package_manager();
     config_data.package_managers = Some(utils::get_all_available_package_managers());
     config::write_config(&config_data)?;
-    println!("{}", "System configuration updated.");
+    println!("System configuration updated.");
 
     Ok(())
 }

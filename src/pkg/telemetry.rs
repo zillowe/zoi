@@ -47,7 +47,7 @@ fn ensure_client_id() -> Result<String, Box<dyn Error>> {
         let id = {
             use uuid::Timestamp;
             let ts = Timestamp::from_unix(
-                &uuid::NoContext,
+                uuid::NoContext,
                 chrono::Utc::now().timestamp_millis() as u64,
                 0,
             );
@@ -132,7 +132,7 @@ pub fn posthog_capture_event(
         batch: Vec<PosthogEvent<'a>>,
     }
     let payload = Batch {
-        api_key: &ph_key,
+        api_key: ph_key,
         batch: vec![PosthogEvent {
             event: ev.event,
             distinct_id: ev.client_id,

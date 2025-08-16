@@ -179,7 +179,7 @@ pub fn clone_git_repo(url: &str) -> Result<(), Box<dyn Error>> {
     let repo_name = url
         .trim_end_matches('/')
         .split('/')
-        .last()
+        .next_back()
         .unwrap_or("repo")
         .trim_end_matches(".git");
     let target = git_root.join(repo_name);
@@ -245,7 +245,7 @@ pub fn remove_git_repo(repo_name: &str) -> Result<(), Box<dyn Error>> {
         let name_from_url = url
             .trim_end_matches('/')
             .split('/')
-            .last()
+            .next_back()
             .unwrap_or("")
             .trim_end_matches(".git");
         if name_from_url == repo_name {

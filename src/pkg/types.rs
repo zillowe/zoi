@@ -3,32 +3,24 @@ use std::collections::HashMap;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum Scope {
+    #[default]
     User,
     System,
 }
 
-impl Default for Scope {
-    fn default() -> Self {
-        Scope::User
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum PackageType {
+    #[default]
     Package,
     Collection,
     Service,
     Config,
     App,
     Extension,
-}
-
-impl Default for PackageType {
-    fn default() -> Self {
-        PackageType::Package
-    }
 }
 
 #[derive(Debug, Deserialize, Clone)]

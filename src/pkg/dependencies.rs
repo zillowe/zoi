@@ -1142,7 +1142,7 @@ pub fn resolve_and_install_required_options(
                     "--yes provided, installing the first option for '{}'",
                     group.name
                 );
-                if let Some(dep) = parsed_deps.get(0) {
+                if let Some(dep) = parsed_deps.first() {
                     install_dependency(
                         dep,
                         parent_pkg_name,
@@ -1342,9 +1342,11 @@ fn install_zoi_dependency(
     )
 }
 
+type ZoiUninstaller = dyn Fn(&str) -> Result<(), Box<dyn Error>>;
+
 pub fn uninstall_dependency(
     dep_str: &str,
-    zoi_uninstaller: &dyn Fn(&str) -> Result<(), Box<dyn Error>>,
+    zoi_uninstaller: &ZoiUninstaller,
 ) -> Result<(), Box<dyn Error>> {
     let dep = parse_dependency_string(dep_str)?;
     println!(

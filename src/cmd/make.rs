@@ -206,7 +206,7 @@ fn ui(f: &mut Frame, app: &App) {
     let mut input_rects = Vec::new();
     let num_inputs = app.inputs.len();
     let num_columns = 2;
-    let num_rows = (num_inputs + num_columns - 1) / num_columns;
+    let num_rows = num_inputs.div_ceil(num_columns);
 
     let form_chunks = Layout::default()
         .direction(Direction::Horizontal)
@@ -216,11 +216,7 @@ fn ui(f: &mut Frame, app: &App) {
     for i in 0..num_columns {
         let col_chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints(
-                std::iter::repeat(Constraint::Length(3))
-                    .take(num_rows)
-                    .collect::<Vec<_>>(),
-            )
+            .constraints(std::iter::repeat_n(Constraint::Length(3), num_rows).collect::<Vec<_>>())
             .split(form_chunks[i]);
 
         for j in 0..num_rows {
