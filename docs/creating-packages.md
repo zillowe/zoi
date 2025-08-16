@@ -109,6 +109,7 @@ Zoi supports different types of packages. You can specify the type using the `ty
 - `service`: A package that runs as a background service (e.g. a database).
 - `config`: A package that manages configuration files for another application.
 - `app`: An application template used with `zoi create <source> <appName>` to scaffold projects. Not installable directly.
+- `extension`: A package that can modify Zoi's configuration, such as adding new package repositories. It is not installed in the traditional sense but its changes are applied or reverted.
 
 ### Tags (Recommended)
 
@@ -500,7 +501,65 @@ bins:
 
 If a user tries to install `my-utils` while another package that also provides a `mu` binary is already installed, Zoi will detect the conflict. This is different from the package name; for example, the `vim` package might provide the `vi` binary, which could conflict with a separate `vi` package.
 
-## Step 5: Testing Your Package Locally
+## Step 5: Creating an Extension
+
+An `extension` is a special package type that doesn't install software but instead modifies Zoi's own configuration. This is useful for distributing sets of repositories or other configuration changes as a single package.
+
+To create an extension, set the `type` field to `extension` and define an `extension` block.
+
+### The `extension` field
+
+This field contains the configuration changes to be applied.
+
+```yaml
+# my-repo-extension.pkg.yaml
+name: my-repo-extension
+repo: community
+type: extension
+version: "1.0"
+description: "Adds my custom repositories to Zoi."
+# ... other metadata ...
+
+extension:
+  type: zoi # Required. Currently, only 'zoi' is supported.
+  changes:
+    # A list of changes to apply when the extension is added.
+    # These changes are reverted when the extension is removed.
+    - type: repo-git
+      add: https://github.com/user/my-cool-pkgs.git
+    - type: repo-add
+      add: community
+    - type: registry-repo
+      add: https://my-mirror.com/Zoi-Pkgs.git
+```
+
+**Key Fields:**
+
+- `type: extension`: Declares the package as an extension.
+- `extension.type`: The type of extension. Currently, only `zoi` is a valid value.
+- `extension.changes`: A list of changes to make. Each change has a `type` and an `add` value.
+
+**Change Types:**
+
+- `repo-git`: Clones a git repository into Zoi's package sources. The `add` value should be a valid git repository URL. This allows users to install packages from your git repo using `@git/<repo-name>/<pkg-name>`.
+- `repo-add`: Adds an official repository (e.g. `community`, `test`) to the list of active repositories that Zoi searches.
+- `registry-repo`: Changes the URL of the main package database registry that Zoi syncs with.
+
+### Installing and Removing Extensions
+
+Extensions are managed with the `zoi extension` subcommand.
+
+```sh
+# Add the extension and apply its changes
+zoi extension add my-repo-extension
+
+# Remove the extension and revert its changes
+zoi extension remove my-repo-extension
+```
+
+This makes it easy to share and manage complex Zoi configurations.
+
+## Step 6: Testing Your Package Locally
 
 Before you publish your package, you **must** test it locally to ensure it installs correctly.
 
@@ -524,7 +583,7 @@ Before you publish your package, you **must** test it locally to ensure it insta
     zoi uninstall my-package
     ```
 
-## Step 6: Publishing Your Package
+## Step 7: Publishing Your Package
 
 Once your package works locally, it's time to share it with the world! This is done by adding your `pkg.yaml` file to the official Zoi packages database.
 

@@ -376,6 +376,18 @@ tags:
   - cli
   - devtools
 
+# (Optional) Defines this package as an extension.
+extension:
+  type: zoi # The type of extension, currently only 'zoi' is supported.
+  changes:
+    # A list of changes to apply.
+    - type: repo-git # Clones a git repository into the git package source.
+      add: https://github.com/user/my-zoi-pkgs.git
+    - type: registry-repo # Sets the main package database registry URL.
+      add: https://my-mirror.com/Zoi-Pkgs.git
+    - type: repo-add # Adds an official repository to the active list.
+      add: my-custom-repo
+
 # A list of methods to install the package. Zoi will try them in order.
 installation:
   - type: binary

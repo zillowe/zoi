@@ -404,6 +404,47 @@ Notes:
 
 ---
 
+## Extension Package
+
+An `extension` package modifies Zoi's configuration. It is not installed like a normal package, but rather its changes are applied or reverted using `zoi extension add` and `zoi extension remove`.
+
+```yaml
+# extensions/corp-repos.pkg.yaml
+name: corp-repos
+repo: community
+type: extension
+version: "1.0"
+description: "Adds the official corporate package repositories for MyCorp."
+tags: [extension, config]
+maintainer:
+  name: "MyCorp IT"
+  email: "it@mycorp.com"
+
+extension:
+  # The type of extension. Currently only 'zoi' is supported.
+  type: zoi
+  # A list of changes to apply. They are reverted on removal.
+  changes:
+    - type: repo-git # Clones a private git repo of packages
+      add: https://git.mycorp.com/zoi-packages.git
+    - type: repo-add # Activates the 'test' repository
+      add: test
+    - type: registry-repo # Points Zoi to the corporate mirror of the main database
+      add: https://zoi-mirror.mycorp.com/Zoi-Pkgs.git
+```
+
+**Usage:**
+
+```sh
+# Add the extension
+zoi extension add corp-repos
+
+# Remove the extension
+zoi extension remove corp-repos
+```
+
+---
+
 ## Package with Optional Dependencies
 
 You can define optional dependencies that the user will be prompted to install. This is useful for adding extra functionality without bloating the default installation.
