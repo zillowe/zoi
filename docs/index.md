@@ -233,6 +233,7 @@ Zoi provides a wide range of commands to manage your packages and environment. F
 | `update`    | Updates one or more packages to the latest version.                                                                                                                                                                        |
 | `pin`       | Pins a package to a specific version to prevent updates.                                                                                                                                                                   |
 | `unpin`     | Unpins a package, allowing it to be updated again.                                                                                                                                                                         |
+| `rollback`  | Rolls back a package to its previously installed version. See [Package Rollbacks](/docs/zds/zoi/rollbacks/).                                                                                                               |
 | `why`       | Explains why a package is installed (e.g. as a dependency or directly).                                                                                                                                                    |
 | `clone`     | Clones the source code repository of one or more packages. A target directory can only be specified when cloning a single package.                                                                                         |
 | `exec`      | Downloads a binary to a temporary cache and runs it without installing it.                                                                                                                                                 |
@@ -363,6 +364,9 @@ alt: my-app-v2
 # (Optional) The installation method to use for `zoi update`.
 # Can be 'binary', 'com_binary', 'script', or 'source'.
 updater: binary
+# (Optional) Enable or disable rollbacks for this package. Defaults to true.
+# This overrides the global setting in Zoi's config.
+rollback: true
 
 # (Optional) A list of binaries this package provides. Used for conflict detection.
 bins:
@@ -591,6 +595,12 @@ For the full list of supported dependency managers, usage semantics, and command
 <Accordions type="single">
   <Accordion title="How do I update Zoi itself?">
     Run `zoi upgrade`. Zoi attempts a patch (delta) upgrade first and falls back to a full binary download if needed. You can use `zoi upgrade --full` to force a full download, and `zoi upgrade --force` to upgrade even if you are on the latest version.
+  </Accordion>
+</Accordions>
+<br />
+<Accordions type="single">
+  <Accordion title="How do I rollback a package update?">
+    If an update causes issues, you can revert to the previously installed version using `zoi rollback <package-name>`. Zoi automatically creates a backup before upgrading a package. For more details, see the [Package Rollbacks](/docs/zds/zoi/rollbacks/) guide.
   </Accordion>
 </Accordions>
 <br />

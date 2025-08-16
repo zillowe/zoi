@@ -17,7 +17,6 @@ author:
   website: "https://zillowe.rf.gd"
   email: "contact@zillowe.rf.gd"
 license: Apache-2.0
-updater: script
 bins: ["zoi"]
 conflicts: ["zoi"]
 tags:
@@ -32,7 +31,6 @@ installation:
     url: "{git}/-/releases/{version}/downloads/zoi-{platform}.{platformComExt}"
     platforms: [linux, macos, windows-amd64]
     checksums: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/{version}/downloads/checksums.txt
-    binary_path: "binariy-bin"
 
   - type: script
     url: "{git}/-/raw/main/app/install.{platformExt}"
@@ -42,18 +40,31 @@ installation:
   - type: source
     url: "{git}"
     tag: "{version}"
-    platforms: [all]
+    platforms: [linux, macos, freebsd, openbsd]
     commands:
       - ./configure --prefix={prefix}
       - make
       - sudo make install
       - make install-completions
 
+  - type: source
+    url: "{git}"
+    tag: "{version}"
+    platforms: [windows]
+    commands:
+      - ./configure --prefix={prefix}
+      - make
+      - make install
+      - make install-completions
+
 post_install:
   - platforms: [linux, macos]
     commands:
-      - "echo Install shell completions for {name} {version} using this command"
-      - "echo zoi shell <shell-name>"
+      - "echo Installing shell completions for {name} {version}"
+      - "zoi shell bash"
+      - "zoi shell zsh"
+      - "zoi shell fish"
+      - "zoi shell elvish"
   - platforms: [windows-amd64]
     commands:
       - "echo Installing PowerShell profile completions for {name} {version}"

@@ -464,6 +464,21 @@ installation:
 
 In this example, a user can get a pre-compiled binary on their first `zoi install`, but every subsequent `zoi update my-compiler` will trigger a fresh build from the source repository, ensuring they always have the latest version.
 
+### The `rollback` Field: Disabling Backups
+
+By default, Zoi creates a backup of a package before upgrading it, allowing users to revert to the previous version with `zoi rollback`. You can disable this behavior for your package by setting the `rollback` field to `false`.
+
+**Use Case: Volatile or Large Packages**
+
+If your package is very large, or if its state is managed externally and backups are not useful, you can prevent Zoi from creating them.
+
+```yaml
+# my-large-asset-pack.pkg.yaml
+name: my-large-asset-pack
+# ...
+rollback: false # Zoi will not create a backup of this package on upgrade
+```
+
 ### Handling Conflicts: `bins` and `conflicts`
 
 To prevent issues where two different packages provide the same command-line tool or are otherwise incompatible, Zoi offers two fields to manage conflicts. If a conflict is detected, Zoi will warn the user and ask for confirmation before proceeding with the installation.
