@@ -16,6 +16,8 @@ pub fn run(
         Some("service") => Some(types::PackageType::Service),
         Some("config") => Some(types::PackageType::Config),
         Some("app") => Some(types::PackageType::App),
+        Some("extension") => Some(types::PackageType::Extension),
+        Some("library") => Some(types::PackageType::Library),
         Some(other) => return Err(format!("Invalid package type: {}", other).into()),
         None => None,
     };

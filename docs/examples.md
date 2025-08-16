@@ -314,6 +314,41 @@ service:
 
 ---
 
+## Library Package
+
+A `library` package installs shared and/or static libraries and header files to be used by other software. It can also generate a `.pc` file for `pkg-config`.
+
+```yaml
+# libs/my-library.pkg.yaml
+name: my-library
+repo: community
+type: library
+version: 1.2.0
+description: "A library for doing awesome things."
+tags: [library, c++]
+maintainer:
+  name: "Your Name"
+  email: "your.email@example.com"
+
+pkg_config:
+  description: "My Awesome Library"
+  libs: "-L/usr/local/lib -lmy-library"
+  cflags: "-I/usr/local/include/my-library"
+
+installation:
+  - type: com_binary
+    url: "https://example.com/my-library/v{version}/my-library-{platform}.tar.gz"
+    platforms: ["linux-amd64"]
+```
+
+**Key Fields:**
+
+- `type: library`: Defines the package as a library.
+- `pkg_config`: A block that provides metadata for generating a `.pc` file for `pkg-config`.
+- When installed, Zoi places `.so`, `.dll`, `.a`, and header files in the appropriate system directories.
+
+---
+
 ## Configuration Package
 
 A `config` package manages the installation and removal of configuration files. It doesn't install an executable itself but can depend on the application it configures. When installed, Zoi will ask the user if they want to run the setup commands.
@@ -429,7 +464,7 @@ extension:
       add: https://git.mycorp.com/zoi-packages.git
     - type: repo-add # Activates the 'test' repository
       add: test
-    - type: registry-repo # Points Zoi to the corporate mirror of the main database
+    - type: registry-repo # Points Zoi to the corporate mirror of the main database with their own changes
       add: https://zoi-mirror.mycorp.com/Zoi-Pkgs.git
 ```
 

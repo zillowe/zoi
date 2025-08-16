@@ -4,7 +4,7 @@
 
 | Version          | Supported |
 | ---------------- | --------- |
-| Prod. Beta 3.X.X | ✔️        |
+| Prod. Beta 4.X.X | ✔️        |
 
 ## Security Updates
 

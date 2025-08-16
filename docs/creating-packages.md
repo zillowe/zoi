@@ -110,6 +110,7 @@ Zoi supports different types of packages. You can specify the type using the `ty
 - `config`: A package that manages configuration files for another application.
 - `app`: An application template used with `zoi create <source> <appName>` to scaffold projects. Not installable directly.
 - `extension`: A package that can modify Zoi's configuration, such as adding new package repositories. It is not installed in the traditional sense but its changes are applied or reverted.
+- `library`: A software library, which can include headers, shared libraries (.so, .dll), and static libraries (.a). It can also generate `pkg-config` files for easier integration with build systems.
 
 ### Tags (Recommended)
 
@@ -574,7 +575,70 @@ zoi extension remove my-repo-extension
 
 This makes it easy to share and manage complex Zoi configurations.
 
-## Step 6: Testing Your Package Locally
+## Step 6: Creating a Library Package
+
+A `library` is a package that provides shared objects (`.so`), dynamic-link libraries (`.dll`), static archives (`.a`), and header files for other software to use. Zoi can install these files to the correct system locations and generate `pkg-config` files (`.pc`) to make them discoverable by build systems like `make`.
+
+To create a library, set the `type` to `library` and provide a `pkg_config` block.
+
+### The `pkg_config` field
+
+This field contains the information needed to generate a `.pc` file.
+
+```yaml
+# my-library.pkg.yaml
+name: my-library
+repo: community
+type: library
+version: 1.0.0
+description: "A cool library that does things."
+# ... other metadata ...
+
+# This block is used to generate the .pc file
+pkg_config:
+  description: "A cool library"
+  libs: "-lmy-library"
+  cflags: "-I/some/extra/path"
+
+installation:
+  - type: com_binary
+    url: "https://example.com/my-library-v{version}-{platform}.tar.gz"
+    platforms: ["linux-amd64"]
+    # Zoi will look for .so, .a, and .h files in the archive
+    # and install them to the correct locations.
+```
+
+**Key Fields:**
+
+- `type: library`: Declares the package as a library.
+- `pkg_config`: A block containing metadata for the `.pc` file.
+  - `description`: A short description for the `pkg-config` file.
+  - `libs`: The linker flags required to use the library (e.g. `-lmy-library`).
+  - `cflags`: The compiler flags required to use the library (e.g. `-I/path/to/headers`).
+
+### Installation of Library Files
+
+When a `library` package is installed, Zoi handles the files as follows:
+
+- **Shared/Static Libraries (`.so`, `.dll`, `.a`, `.lib`):** These are installed into the system's library directory (`/usr/local/lib` on Linux, `~/.local/lib` for user-scoped installs).
+- **Header Files (`.h`, `.hpp`):** These are installed into the system's include directory (`/usr/local/include` on Linux, `~/.local/include` for user-scoped installs).
+- **`pkg-config` File:** A `.pc` file is generated and installed to the appropriate `pkgconfig` directory, making the library discoverable with `pkg-config --cflags --libs my-library`.
+
+For `source` installations of libraries, you can use the `{prefix}` placeholder in your build commands, which will resolve to the correct installation root (e.g. `/usr/local` or `~/.local`).
+
+```yaml
+installation:
+  - type: source
+    url: "{git}"
+    commands:
+      - "./configure --prefix={prefix}"
+      - "make"
+      - "make install"
+```
+
+This allows standard build systems to install the library files into the correct locations that Zoi manages.
+
+## Step 7: Testing Your Package Locally
 
 Before you publish your package, you **must** test it locally to ensure it installs correctly.
 
@@ -598,7 +662,7 @@ Before you publish your package, you **must** test it locally to ensure it insta
     zoi uninstall my-package
     ```
 
-## Step 7: Publishing Your Package
+## Step 8: Publishing Your Package
 
 Once your package works locally, it's time to share it with the world! This is done by adding your `pkg.yaml` file to the official Zoi packages database.
 
