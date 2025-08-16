@@ -59,7 +59,7 @@ Once you have a working `zoi` command, you can use it for subsequent development
 
 All common development tasks are defined as commands in `zoi.yaml` and can be executed with `zoi run`. If you run `zoi run` without arguments, you'll get an interactive list of available commands.
 
-- **Prepare your environment:** Before you start coding, run the `pre` environment setup. This will check dependencies, format your code, and run checks.
+- **Prepare your environment:** Before you start coding, run the `pre` environment setup. This will check dependencies, format your code and lint it, and run checks.
 
   ```sh
   zoi env pre
@@ -81,6 +81,12 @@ All common development tasks are defined as commands in `zoi.yaml` and can be ex
 
   ```sh
   zoi run fmt
+  ```
+
+- **Lint code:** To lint the code using Clippy.
+
+  ```sh
+  zoi run lint
   ```
 
 - **Install:** To perform a full installation, including shell completions.

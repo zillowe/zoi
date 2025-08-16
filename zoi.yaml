@@ -16,10 +16,12 @@ commands:
     run: "cargo machete"
   - cmd: "fmt"
     run: "cargo fmt --all"
+  - cmd: "lint"
+    run: "cargo clippy --all-targets --fix --allow-dirty --allow-staged"
   - cmd: "check"
-    run: "cargo clippy --all-targets --fix --allow-dirty --allow-staged && cargo check"
+    run: "cargo check"
 
 environments:
   - name: "Prepare"
     cmd: "pre"
-    run: ["zoi run deps", "zoi run fmt", "zoi run check"]
+    run: ["zoi run deps", "zoi run lint", "zoi run fmt", "zoi run check"]
