@@ -96,7 +96,7 @@ enum Commands {
         /// Filter by repository (e.g. 'main', 'extra')
         #[arg(long)]
         repo: Option<String>,
-        /// Filter by package type (package, service, config, collection)
+        /// Filter by package type (package, service, config, collection, extension, library)
         #[arg(short = 't', long = "type")]
         package_type: Option<String>,
     },
@@ -247,7 +247,7 @@ enum Commands {
         /// Filter by repository (e.g. 'main', 'extra')
         #[arg(long)]
         repo: Option<String>,
-        /// Filter by package type (package, service, config, collection)
+        /// Filter by package type (package, service, config, collection, extension, library)
         #[arg(long = "type")]
         package_type: Option<String>,
         /// Filter by tags (any match). Multiple via comma or repeated -t
@@ -334,6 +334,22 @@ enum Commands {
         /// The name of the package to rollback
         #[arg(value_name = "PACKAGE")]
         package: String,
+    },
+
+    /// Provides pkg-config compatible information for installed libraries
+    #[command(name = "pkg-config")]
+    PkgConfig {
+        /// Print library linking information
+        #[arg(long)]
+        libs: bool,
+
+        /// Print C compiler flags
+        #[arg(long)]
+        cflags: bool,
+
+        /// The package to query
+        #[arg(required = true)]
+        packages: Vec<String>,
     },
 }
 
@@ -533,6 +549,11 @@ pub fn run() {
             Commands::Make { package_name } => cmd::make::run(package_name),
             Commands::Extension(args) => cmd::extension::run(args, cli.yes),
             Commands::Rollback { package } => cmd::rollback::run(&package, cli.yes),
+            Commands::PkgConfig {
+                libs,
+                cflags,
+                packages,
+            } => cmd::pkg_config::run(libs, cflags, &packages),
         };
 
         if let Err(e) = result {

@@ -21,6 +21,7 @@ pub enum PackageType {
     Config,
     App,
     Extension,
+    Library,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -72,6 +73,16 @@ pub struct ExtensionInfo {
     pub changes: Vec<ExtensionChange>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct PkgConfig {
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub libs: String,
+    #[serde(default)]
+    pub cflags: String,
+}
+
 #[derive(Debug, Deserialize, Clone)]
 #[allow(dead_code)]
 pub struct Package {
@@ -115,6 +126,8 @@ pub struct Package {
     pub extension: Option<ExtensionInfo>,
     #[serde(default)]
     pub rollback: Option<bool>,
+    #[serde(default)]
+    pub pkg_config: Option<PkgConfig>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -184,6 +197,8 @@ pub struct InstallationMethod {
     pub branch: Option<String>,
     #[serde(default)]
     pub binary_types: Option<Vec<String>>,
+    #[serde(default)]
+    pub lib_types: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, Clone)]

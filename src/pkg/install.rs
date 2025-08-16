@@ -1,4 +1,6 @@
-use crate::pkg::{config, config_handler, dependencies, local, resolve, rollback, service, types};
+use crate::pkg::{
+    config, config_handler, dependencies, library, local, resolve, rollback, service, types,
+};
 use crate::utils;
 use anyhow::Result;
 use chrono::Utc;
@@ -345,6 +347,11 @@ pub fn run_installation(
     };
 
     if result.is_ok() {
+        if pkg.package_type == types::PackageType::Library {
+            if let Err(e) = library::install_pkg_config_file(&pkg) {
+                eprintln!("Warning: failed to install pkg-config file: {}", e);
+            }
+        }
         write_manifest(&pkg, reason, installed_deps_list)?;
         if let Err(e) = utils::setup_path(pkg.scope) {
             eprintln!("{} Failed to configure PATH: {}", "Warning:".yellow(), e);
@@ -986,6 +993,12 @@ fn handle_com_binary_install(
     }
     let mut bin_path = store_dir.join(&dest_filename);
 
+    if pkg.package_type == types::PackageType::Library {
+        library::install_files(temp_dir.path(), pkg)?;
+        println!("{}", "Library files installed successfully.".green());
+        return Ok(());
+    }
+
     let binary_name = &pkg.name;
     let binary_name_with_ext = format!("{}.exe", pkg.name);
     let declared_binary_path_normalized: Option<String> = method.binary_path.as_ref().map(|bp| {
@@ -1127,6 +1140,9 @@ fn handle_binary_install(
     }
 
     if let Some(ext) = binary_type {
+        if pkg.package_type == types::PackageType::Library {
+            return Err("DMG/MSI/AppImage installers are not supported for libraries.".into());
+        }
         let mut url = method
             .url
             .replace("{version}", pkg.version.as_deref().unwrap_or(""));
@@ -1403,6 +1419,30 @@ fn handle_binary_install(
     let file_to_verify = get_filename_from_url(&url);
     verify_checksum(&downloaded_bytes, method, pkg, file_to_verify)?;
     verify_signatures(&downloaded_bytes, method, pkg, file_to_verify)?;
+
+    if pkg.package_type == types::PackageType::Library {
+        let lib_dir = library::get_lib_dir(pkg.scope)?;
+        fs::create_dir_all(&lib_dir)?;
+        let dest_path = lib_dir.join(get_filename_from_url(&url));
+        fs::write(&dest_path, downloaded_bytes)?;
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&dest_path, fs::Permissions::from_mode(0o755))?;
+        }
+
+        if pkg.scope == types::Scope::System && cfg!(target_os = "linux") {
+            println!("Running ldconfig...");
+            let status = Command::new("sudo").arg("ldconfig").status()?;
+            if !status.success() {
+                println!("Warning: ldconfig failed.");
+            }
+        }
+
+        println!("{}", "Library file installed successfully.".green());
+        return Ok(());
+    }
 
     let store_dir = home::home_dir()
         .ok_or("No home dir")?

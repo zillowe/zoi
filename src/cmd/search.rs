@@ -58,6 +58,8 @@ pub fn run(
                 "service" => Some(PackageType::Service),
                 "config" => Some(PackageType::Config),
                 "app" => Some(PackageType::App),
+                "extension" => Some(PackageType::Extension),
+                "library" => Some(PackageType::Library),
                 _ => None,
             });
 

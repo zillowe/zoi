@@ -38,7 +38,7 @@ impl<'a> App<'a> {
                 "Tags (optional, comma-separated)",
                 "Bins (optional, comma-separated)",
                 "Conflicts (optional, comma-separated)",
-                "Package Type (package, collection, service, config, app)",
+                "Package Type (package, collection, service, config, app, extension, library)",
                 "Scope (user, system)",
                 "Maintainer Name",
                 "Maintainer Email",
