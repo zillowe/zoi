@@ -328,6 +328,13 @@ enum Commands {
     /// Manage Zoi extensions
     #[command(alias = "ext")]
     Extension(ExtensionCommand),
+
+    /// Rollback a package to the previously installed version
+    Rollback {
+        /// The name of the package to rollback
+        #[arg(value_name = "PACKAGE")]
+        package: String,
+    },
 }
 
 #[derive(clap::Parser, Debug)]
@@ -525,6 +532,7 @@ pub fn run() {
             }
             Commands::Make { package_name } => cmd::make::run(package_name),
             Commands::Extension(args) => cmd::extension::run(args, cli.yes),
+            Commands::Rollback { package } => cmd::rollback::run(&package, cli.yes),
         };
 
         if let Err(e) = result {

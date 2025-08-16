@@ -14,6 +14,7 @@ pub mod list;
 pub mod make;
 pub mod pin;
 pub mod repo;
+pub mod rollback;
 pub mod run;
 pub mod search;
 pub mod shell;

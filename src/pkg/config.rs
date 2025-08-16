@@ -30,6 +30,7 @@ pub fn read_config() -> Result<Config, Box<dyn Error>> {
             telemetry_enabled: false,
             registry: Some("https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi-Pkgs.git".to_string()),
             git_repos: Vec::new(),
+            rollback_enabled: true,
         };
         write_config(&default_config)?;
         return Ok(default_config);

@@ -1,4 +1,4 @@
-use crate::pkg::{config_handler, dependencies, local, resolve, service, types};
+use crate::pkg::{config, config_handler, dependencies, local, resolve, rollback, service, types};
 use crate::utils;
 use anyhow::Result;
 use chrono::Utc;
@@ -55,6 +55,16 @@ pub fn run_installation(
     processed_deps: &mut HashSet<String>,
 ) -> Result<(), Box<dyn Error>> {
     let (pkg, version) = resolve::resolve_package_and_version(source)?;
+
+    if let Some(manifest) = local::is_package_installed(&pkg.name, pkg.scope)? {
+        if manifest.version != version {
+            let config = config::read_config()?;
+            let rollback_enabled = pkg.rollback.unwrap_or(config.rollback_enabled);
+            if rollback_enabled {
+                rollback::backup_package(&pkg.name, pkg.scope)?;
+            }
+        }
+    }
 
     check_for_conflicts(&pkg, yes)?;
 

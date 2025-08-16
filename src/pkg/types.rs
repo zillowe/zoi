@@ -121,6 +121,8 @@ pub struct Package {
     pub tags: Vec<String>,
     #[serde(default)]
     pub extension: Option<ExtensionInfo>,
+    #[serde(default)]
+    pub rollback: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -283,4 +285,6 @@ pub struct Config {
     pub registry: Option<String>,
     #[serde(default)]
     pub git_repos: Vec<String>,
+    #[serde(default)]
+    pub rollback_enabled: bool,
 }

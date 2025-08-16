@@ -10,6 +10,7 @@ pub mod install;
 pub mod local;
 pub mod pin;
 pub mod resolve;
+pub mod rollback;
 pub mod service;
 pub mod sync;
 pub mod telemetry;
