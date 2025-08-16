@@ -22,6 +22,7 @@ pub enum PackageType {
     Service,
     Config,
     App,
+    Extension,
 }
 
 impl Default for PackageType {
@@ -64,6 +65,22 @@ pub struct PostInstallHook {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[serde(tag = "type")]
+#[serde(rename_all = "kebab-case")]
+pub enum ExtensionChange {
+    RepoGit { add: String },
+    RegistryRepo { add: String },
+    RepoAdd { add: String },
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct ExtensionInfo {
+    #[serde(rename = "type")]
+    pub extension_type: String,
+    pub changes: Vec<ExtensionChange>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
 #[allow(dead_code)]
 pub struct Package {
     pub name: String,
@@ -102,6 +119,8 @@ pub struct Package {
     pub conflicts: Option<Vec<String>>,
     #[serde(default)]
     pub tags: Vec<String>,
+    #[serde(default)]
+    pub extension: Option<ExtensionInfo>,
 }
 
 #[derive(Debug, Deserialize, Clone)]

@@ -324,6 +324,32 @@ enum Commands {
         /// The name of the package to create a file for.
         package_name: Option<String>,
     },
+
+    /// Manage Zoi extensions
+    #[command(alias = "ext")]
+    Extension(ExtensionCommand),
+}
+
+#[derive(clap::Parser, Debug)]
+pub struct ExtensionCommand {
+    #[command(subcommand)]
+    pub command: ExtensionCommands,
+}
+
+#[derive(clap::Subcommand, Debug)]
+pub enum ExtensionCommands {
+    /// Add an extension
+    Add {
+        /// The name of the extension to add
+        #[arg(required = true)]
+        name: String,
+    },
+    /// Remove an extension
+    Remove {
+        /// The name of the extension to remove
+        #[arg(required = true)]
+        name: String,
+    },
 }
 
 #[derive(clap::Subcommand, Clone)]
@@ -498,6 +524,7 @@ pub fn run() {
                 Ok(())
             }
             Commands::Make { package_name } => cmd::make::run(package_name),
+            Commands::Extension(args) => cmd::extension::run(args, cli.yes),
         };
 
         if let Err(e) = result {

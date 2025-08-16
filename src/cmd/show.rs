@@ -74,6 +74,7 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
         crate::pkg::types::PackageType::Service => "Service",
         crate::pkg::types::PackageType::Config => "Config",
         crate::pkg::types::PackageType::App => "App",
+        crate::pkg::types::PackageType::Extension => "Extension",
     };
     println!("{}: {}", "Type".bold(), type_display);
 

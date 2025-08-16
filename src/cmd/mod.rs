@@ -7,6 +7,7 @@ pub mod clone;
 pub mod create;
 pub mod env;
 pub mod exec;
+pub mod extension;
 pub mod info;
 pub mod install;
 pub mod list;

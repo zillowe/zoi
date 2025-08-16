@@ -5,6 +5,7 @@ pub mod config;
 pub mod config_handler;
 pub mod dependencies;
 pub mod exec;
+pub mod extension;
 pub mod install;
 pub mod local;
 pub mod pin;
