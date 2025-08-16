@@ -480,6 +480,32 @@ name: my-large-asset-pack
 rollback: false # Zoi will not create a backup of this package on upgrade
 ```
 
+### The `updates` Field: Important Update Messages
+
+You can add an `updates` section to your `pkg.yaml` to show important messages to the user before they install or update a package. This is useful for communicating breaking changes, security vulnerabilities, or other critical information.
+
+The user will be shown these messages and prompted to continue with the installation.
+
+```yaml
+# my-package.pkg.yaml
+name: my-package
+version: 2.0.0
+# ...
+updates:
+  - type: change
+    message: "This version introduces a new configuration file format. Please see the migration guide."
+  - type: vulnerability
+    message: "A critical vulnerability (CVE-2025-12345) is present in this version. It is recommended to wait for the next release."
+  - type: update
+    message: "This package will no longer be maintained after 2026."
+```
+
+**Update Types:**
+
+- `change`: For breaking changes or important modifications.
+- `vulnerability`: For security-related warnings.
+- `update`: For general updates or announcements.
+
 ### Handling Conflicts: `bins` and `conflicts`
 
 To prevent issues where two different packages provide the same command-line tool or are otherwise incompatible, Zoi offers two fields to manage conflicts. If a conflict is detected, Zoi will warn the user and ask for confirmation before proceeding with the installation.

@@ -371,6 +371,15 @@ updater: binary
 # This overrides the global setting in Zoi's config.
 rollback: true
 
+# (Optional) A list of important messages to show to the user before installation.
+updates:
+  - type: change
+    message: "This version introduces a new configuration file format."
+  - type: vulnerability
+    message: "A critical vulnerability (CVE-2025-12345) is present in this version."
+  - type: update
+    message: "This package will no longer be maintained after 2026."
+
 # (Optional) A list of binaries this package provides. Used for conflict detection.
 bins:
   - my-awesome-app

@@ -657,6 +657,43 @@ post_uninstall:
 
 ---
 
+## Package with Update Messages
+
+You can use the `updates` field to display important messages to the user before installation. This is useful for communicating breaking changes, security vulnerabilities, or other critical information. The user will be prompted to continue after seeing the messages.
+
+```yaml
+# utils/my-legacy-tool.pkg.yaml
+name: my-legacy-tool
+repo: community
+version: 2.5.0
+description: A tool with important update notices.
+maintainer:
+  name: "Your Name"
+  email: "your.email@example.com"
+license: MIT
+
+updates:
+  - type: change
+    message: "This version removes the deprecated '--legacy' flag. Please update your scripts."
+  - type: vulnerability
+    message: "This version is vulnerable to CVE-2025-9999. An update is in progress."
+  - type: update
+    message: "This package is now in maintenance mode and will only receive security fixes."
+
+installation:
+  - type: binary
+    url: "https://example.com/my-legacy-tool/v{version}/my-legacy-tool-{platform}"
+    platforms: ["linux-amd64", "macos-amd64"]
+```
+
+**Key Fields:**
+
+- `updates`: A list of messages to display to the user.
+- `type`: The type of message (`change`, `vulnerability`, or `update`), which affects the color of the message type in the terminal.
+- `message`: The message to display.
+
+---
+
 ## Package with Custom Updater
 
 The `updater` field allows you to specify which installation method `zoi update` should use. This is useful if you want to provide a binary for initial installation but force a build from source during updates to ensure the user has the latest code.
