@@ -5,6 +5,7 @@ use git2::{
     build::{CheckoutBuilder, RepoBuilder},
 };
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -34,11 +35,35 @@ fn sync_git_repos(verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
 
     println!("\n{}", "Syncing external git repositories...".green());
 
+    let config = config::read_config()?;
+    let configured_git_repos_names: HashSet<String> = config
+        .git_repos
+        .iter()
+        .map(|url| {
+            url.trim_end_matches('/')
+                .split('/')
+                .last()
+                .unwrap_or("")
+                .trim_end_matches(".git")
+                .to_string()
+        })
+        .collect();
+
     for entry in fs::read_dir(git_root)? {
         let entry = entry?;
         let path = entry.path();
         if path.is_dir() && path.join(".git").exists() {
             let repo_name = path.file_name().unwrap().to_string_lossy();
+
+            if !configured_git_repos_names.contains(repo_name.as_ref()) {
+                println!(
+                    "Removing untracked git repository '{}'...",
+                    repo_name.yellow()
+                );
+                fs::remove_dir_all(&path)?;
+                continue;
+            }
+
             println!("Pulling changes for '{}'...", repo_name.cyan());
 
             let mut cmd = Command::new("git");

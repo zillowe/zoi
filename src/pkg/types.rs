@@ -262,4 +262,6 @@ pub struct Config {
     #[serde(default)]
     pub telemetry_enabled: bool,
     pub registry: Option<String>,
+    #[serde(default)]
+    pub git_repos: Vec<String>,
 }

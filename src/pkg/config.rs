@@ -29,6 +29,7 @@ pub fn read_config() -> Result<Config, Box<dyn Error>> {
             native_package_manager: None,
             telemetry_enabled: false,
             registry: Some("https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi-Pkgs.git".to_string()),
+            git_repos: Vec::new(),
         };
         write_config(&default_config)?;
         return Ok(default_config);
@@ -198,6 +199,13 @@ pub fn clone_git_repo(url: &str) -> Result<(), Box<dyn Error>> {
     if !status.success() {
         return Err("git clone failed".into());
     }
+
+    let mut config = read_config()?;
+    if !config.git_repos.iter().any(|repo_url| repo_url == url) {
+        config.git_repos.push(url.to_string());
+        write_config(&config)?;
+    }
+
     println!(
         "Cloned git repo as '{}' (use with '@git/{}/<pkg>')",
         repo_name.green(),
@@ -229,6 +237,28 @@ pub fn remove_git_repo(repo_name: &str) -> Result<(), Box<dyn Error>> {
     if !target.exists() {
         return Err(format!("Git repository '{}' not found.", repo_name).into());
     }
+
+    let mut config = read_config()?;
+    let mut removed = false;
+    config.git_repos.retain(|url| {
+        let name_from_url = url
+            .trim_end_matches('/')
+            .split('/')
+            .last()
+            .unwrap_or("")
+            .trim_end_matches(".git");
+        if name_from_url == repo_name {
+            removed = true;
+            false
+        } else {
+            true
+        }
+    });
+
+    if removed {
+        write_config(&config)?;
+    }
+
     fs::remove_dir_all(&target)?;
     println!(
         "Removed git repository '{}' from {}",
