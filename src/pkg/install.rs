@@ -145,6 +145,7 @@ pub fn run_installation(
                     yes,
                     processed_deps,
                     &mut installed_deps_list,
+                    Some("runtime"),
                 )?;
             }
 
@@ -175,6 +176,7 @@ pub fn run_installation(
                     yes,
                     processed_deps,
                     &mut installed_deps_list,
+                    Some("build"),
                 )?;
             }
         } else {
@@ -216,6 +218,7 @@ pub fn run_installation(
                     yes,
                     processed_deps,
                     &mut installed_deps_list,
+                    Some("runtime"),
                 )?;
             }
 
@@ -246,6 +249,7 @@ pub fn run_installation(
                     yes,
                     processed_deps,
                     &mut installed_deps_list,
+                    Some("build"),
                 )?;
             }
         }
@@ -292,8 +296,6 @@ pub fn run_installation(
     println!("Installing '{}' version '{}'", pkg.name, version);
 
     if let Some(deps) = &pkg.dependencies {
-        let mut optional_deps_to_install = Vec::new();
-
         let platform = utils::get_platform()?;
         let should_include_build = match mode {
             InstallMode::ForceSource => true,
@@ -324,7 +326,16 @@ pub fn run_installation(
                     processed_deps,
                     &mut installed_deps_list,
                 )?;
-                optional_deps_to_install.extend(build_deps.get_optional().clone());
+                dependencies::resolve_and_install_optional(
+                    build_deps.get_optional(),
+                    &pkg.name,
+                    &version,
+                    pkg.scope,
+                    yes,
+                    processed_deps,
+                    &mut installed_deps_list,
+                    Some("build"),
+                )?;
             }
         }
 
@@ -347,18 +358,15 @@ pub fn run_installation(
                 processed_deps,
                 &mut installed_deps_list,
             )?;
-            optional_deps_to_install.extend(runtime_deps.get_optional().clone());
-        }
-
-        if !optional_deps_to_install.is_empty() {
             dependencies::resolve_and_install_optional(
-                &optional_deps_to_install,
+                runtime_deps.get_optional(),
                 &pkg.name,
                 &version,
                 pkg.scope,
                 yes,
                 processed_deps,
                 &mut installed_deps_list,
+                Some("runtime"),
             )?;
         }
     }

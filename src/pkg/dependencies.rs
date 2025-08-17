@@ -1234,6 +1234,7 @@ pub fn resolve_and_install_optional(
     yes: bool,
     processed_deps: &mut HashSet<String>,
     installed_deps: &mut Vec<String>,
+    dep_type: Option<&str>,
 ) -> Result<(), Box<dyn Error>> {
     if deps.is_empty() {
         return Ok(());
@@ -1244,8 +1245,13 @@ pub fn resolve_and_install_optional(
         .map(|dep_str_template| dep_str_template.replace("{version}", parent_version))
         .collect();
 
+    let type_str = dep_type.map(|s| format!("{} ", s)).unwrap_or_default();
+
     if yes {
-        println!("{}", "Installing all optional dependencies...".bold());
+        println!(
+            "{}",
+            format!("Installing all optional {} dependencies...", type_str).bold()
+        );
         for dep_str in &dep_strs {
             let dependency = parse_dependency_string(dep_str)?;
             install_dependency(
@@ -1260,7 +1266,10 @@ pub fn resolve_and_install_optional(
         return Ok(());
     }
 
-    println!("{}", "This package has optional dependencies:".bold());
+    println!(
+        "{}",
+        format!("This package has optional {} dependencies:", type_str).bold()
+    );
     let mut parsed_deps = Vec::new();
     for (i, dep_str) in dep_strs.iter().enumerate() {
         let dep = parse_dependency_string(dep_str)?;
