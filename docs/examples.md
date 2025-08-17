@@ -314,6 +314,46 @@ service:
 
 ---
 
+## Docker-based Service Package
+
+For services that are managed with Docker Compose, you can define a `docker` service method. Zoi will download the compose file and use it to manage the service lifecycle.
+
+```yaml
+# services/my-docker-db.pkg.yaml
+name: my-docker-db
+repo: community
+type: service
+version: "latest"
+description: A database server that runs in Docker.
+tags: [service, database, docker]
+maintainer:
+  name: "Your Name"
+  email: "your.email@example.com"
+
+# This service doesn't need an installation method if it only runs in Docker.
+# But it might have dependencies like 'docker' itself.
+dependencies:
+  runtime:
+    required:
+      - native:docker
+      - native:docker-compose
+
+service:
+  - platforms: ["all"]
+    docker:
+      - type: compose
+        file: "https://raw.githubusercontent.com/user/my-docker-db/main/docker-compose.yml"
+```
+
+**Key Fields:**
+
+- `type: service`: Defines this as a service package.
+- `service.docker`: A list of Docker service definitions.
+- `type: compose`: Specifies a Docker Compose service.
+- `file`: A URL to the `docker-compose.yml` file.
+
+---
+
 ## Library Package
 
 A `library` package installs shared and/or static libraries and header files to be used by other software. It can also generate a `.pc` file for `pkg-config`.

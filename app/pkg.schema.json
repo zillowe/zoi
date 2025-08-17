@@ -310,13 +310,50 @@
       "required": ["platforms", "commands"]
     },
     "serviceMethod": {
-      "type": "object",
-      "properties": {
-        "platforms": { "type": "array", "items": { "type": "string" } },
-        "start": { "type": "array", "items": { "type": "string" } },
-        "stop": { "type": "array", "items": { "type": "string" } }
-      },
-      "required": ["platforms", "start", "stop"]
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "start": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "stop": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": ["platforms", "start", "stop"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "platforms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "docker": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/dockerType"
+              }
+            }
+          },
+          "required": ["platforms", "docker"]
+        }
+      ]
     },
     "configCommands": {
       "type": "object",
@@ -400,6 +437,20 @@
           "type": "string"
         }
       }
+    },
+    "dockerType": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["compose"]
+        },
+        "file": {
+          "type": "string",
+          "format": "uri"
+        }
+      },
+      "required": ["type", "file"]
     }
   }
 }

@@ -106,7 +106,7 @@ Zoi supports different types of packages. You can specify the type using the `ty
 
 - `package` (Default): A standard software package.
 - `collection`: A meta-package that only installs a list of other packages as dependencies.
-- `service`: A package that runs as a background service (e.g. a database).
+- `service`: A package that runs as a background service (e.g. a database). Can be managed with native system commands or with Docker Compose.
 - `config`: A package that manages configuration files for another application.
 - `app`: An application template used with `zoi create <source> <appName>` to scaffold projects. Not installable directly.
 - `extension`: A package that can modify Zoi's configuration, such as adding new package repositories. It is not installed in the traditional sense but its changes are applied or reverted.
@@ -543,7 +543,52 @@ bins:
 
 If a user tries to install `my-utils` while another package that also provides a `mu` binary is already installed, Zoi will detect the conflict. This is different from the package name; for example, the `vim` package might provide the `vi` binary, which could conflict with a separate `vi` package.
 
-## Step 5: Creating an Extension
+## Step 5: Creating a Service Package
+
+A `service` is a package type for applications that run in the background, like databases or web servers. Zoi can manage starting and stopping these services.
+
+You can define a service to be run via native system commands or with Docker Compose.
+
+### Command-Based Service
+
+This is for services managed by shell commands.
+
+```yaml
+# my-service.pkg.yaml
+type: service
+# ...
+service:
+  - platforms: ["linux", "macos"]
+    start:
+      - "my-service --daemon"
+    stop:
+      - "pkill my-service"
+```
+
+### Docker-based Service
+
+If your service is defined in a `docker-compose.yml` file, Zoi can manage it for you.
+
+```yaml
+# my-docker-service.pkg.yaml
+type: service
+# ...
+service:
+  - platforms: ["all"] # Or specific platforms
+    docker:
+      - type: compose
+        file: "https://example.com/my-service/docker-compose.yml"
+```
+
+**Key fields:**
+
+- `docker`: A list of docker service definitions.
+- `type: compose`: Specifies that this is a Docker Compose service.
+- `file`: A URL to the `docker-compose.yml` file. Zoi will download this file, store it, and use it to start and stop the service with `docker-compose up -d` and `docker-compose down`.
+
+When a user installs a service package, Zoi will ask if they want to start it. They can also manage it later with `zoi start <pkg>` and `zoi stop <pkg>`.
+
+## Step 6: Creating an Extension
 
 An `extension` is a special package type that doesn't install software but instead modifies Zoi's own configuration. This is useful for distributing sets of repositories or other configuration changes as a single package.
 
@@ -601,7 +646,7 @@ zoi extension remove my-repo-extension
 
 This makes it easy to share and manage complex Zoi configurations.
 
-## Step 6: Creating a Library Package
+## Step 7: Creating a Library Package
 
 A `library` is a package that provides shared objects (`.so`), dynamic-link libraries (`.dll`), static archives (`.a`), and header files for other software to use. Zoi can install these files to the correct system locations and generate `pkg-config` files (`.pc`) to make them discoverable by build systems like `make`.
 
@@ -664,7 +709,7 @@ installation:
 
 This allows standard build systems to install the library files into the correct locations that Zoi manages.
 
-## Step 7: Testing Your Package Locally
+## Step 8: Testing Your Package Locally
 
 Before you publish your package, you **must** test it locally to ensure it installs correctly.
 
@@ -688,7 +733,7 @@ Before you publish your package, you **must** test it locally to ensure it insta
     zoi uninstall my-package
     ```
 
-## Step 8: Publishing Your Package
+## Step 9: Publishing Your Package
 
 Once your package works locally, it's time to share it with the world! This is done by adding your `pkg.yaml` file to the official Zoi packages database.
 

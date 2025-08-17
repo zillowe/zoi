@@ -305,7 +305,7 @@ Zoi supports different types of packages, defined in the `.pkg.yaml` file.
 | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Package`    | A standard software package that can be installed. This is the default type.                                                                                                  |
 | `Collection` | A meta-package that groups other packages together as dependencies.                                                                                                           |
-| `Service`    | A package that runs as a background service. It includes commands for starting and stopping the service.                                                                      |
+| `Service`    | A package that runs as a background service. Can be managed with shell commands or via Docker Compose.                                                                        |
 | `Config`     | A package that manages configuration files. It includes commands for installing and uninstalling the configuration.                                                           |
 | `App`        | An app template. Not installable; used via `zoi create` to scaffold an application (e.g. frameworks like Rails).                                                              |
 | `Extension`  | A package that can modify Zoi's configuration, such as adding new package repositories. It is not installed in the traditional sense but its changes are applied or reverted. |
