@@ -40,11 +40,24 @@ pub struct UpdateInfo {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-#[allow(dead_code)]
-pub struct ServiceMethod {
-    pub platforms: Vec<String>,
-    pub start: Vec<String>,
-    pub stop: Vec<String>,
+#[serde(tag = "type")]
+#[serde(rename_all = "kebab-case")]
+pub enum DockerType {
+    Compose { file: String },
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum ServiceMethod {
+    Command {
+        platforms: Vec<String>,
+        start: Vec<String>,
+        stop: Vec<String>,
+    },
+    Docker {
+        platforms: Vec<String>,
+        docker: Vec<DockerType>,
+    },
 }
 
 #[derive(Debug, Deserialize, Clone)]
