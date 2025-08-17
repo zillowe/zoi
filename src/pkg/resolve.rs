@@ -23,6 +23,7 @@ pub struct ResolvedSource {
     pub path: PathBuf,
     pub source_type: SourceType,
     pub repo_name: Option<String>,
+    pub sharable_manifest: Option<types::SharableInstallManifest>,
 }
 
 #[derive(Debug, Default)]
@@ -38,6 +39,25 @@ fn get_db_root() -> Result<PathBuf, Box<dyn Error>> {
 }
 
 fn parse_source_string(source_str: &str) -> Result<PackageRequest, Box<dyn Error>> {
+    if source_str.contains('/')
+        && (source_str.ends_with(".manifest.yaml") || source_str.ends_with(".pkg.yaml"))
+    {
+        let path = std::path::Path::new(source_str);
+        let file_stem = path.file_stem().unwrap_or_default().to_string_lossy();
+        let name = if let Some(stripped) = file_stem.strip_suffix(".manifest") {
+            stripped.to_string()
+        } else if let Some(stripped) = file_stem.strip_suffix(".pkg") {
+            stripped.to_string()
+        } else {
+            file_stem.to_string()
+        };
+        return Ok(PackageRequest {
+            repo: None,
+            name,
+            version_spec: None,
+        });
+    }
+
     let mut repo = None;
     let name: &str;
     let mut version_spec = None;
@@ -107,6 +127,7 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
                 path,
                 source_type,
                 repo_name: Some(repo_name.clone()),
+                sharable_manifest: None,
             });
         }
     }
@@ -192,6 +213,7 @@ fn download_from_url(url: &str) -> Result<ResolvedSource, Box<dyn Error>> {
         path: temp_path,
         source_type: SourceType::Url,
         repo_name: None,
+        sharable_manifest: None,
     })
 }
 
@@ -498,7 +520,18 @@ pub fn resolve_source(source: &str) -> Result<ResolvedSource, Box<dyn Error>> {
 
 pub fn resolve_package_and_version(
     source_str: &str,
-) -> Result<(types::Package, String), Box<dyn Error>> {
+) -> Result<
+    (
+        types::Package,
+        String,
+        Option<types::SharableInstallManifest>,
+    ),
+    Box<dyn Error>,
+> {
+    if source_str.ends_with(".manifest.yaml") {
+        return resolve_from_manifest(source_str);
+    }
+
     let request = parse_source_string(source_str)?;
     let resolved_source = resolve_source_recursive(source_str, 0)?;
 
@@ -511,12 +544,56 @@ pub fn resolve_package_and_version(
     let version_string = get_version_for_install(&pkg, &request.version_spec)?;
 
     pkg.version = Some(version_string.clone());
-    Ok((pkg, version_string))
+    Ok((pkg, version_string, resolved_source.sharable_manifest))
+}
+
+fn resolve_from_manifest(
+    manifest_path: &str,
+) -> Result<
+    (
+        types::Package,
+        String,
+        Option<types::SharableInstallManifest>,
+    ),
+    Box<dyn Error>,
+> {
+    println!(
+        "Using local sharable manifest file: {}",
+        manifest_path.cyan()
+    );
+    let content = fs::read_to_string(manifest_path)?;
+    let sharable_manifest: types::SharableInstallManifest = serde_yaml::from_str(&content)?;
+
+    let new_source = format!(
+        "@{}/{}@{}",
+        sharable_manifest.repo, sharable_manifest.name, sharable_manifest.version
+    );
+
+    let (pkg, version, _) = resolve_package_and_version(&new_source)?;
+
+    Ok((pkg, version, Some(sharable_manifest)))
 }
 
 fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, Box<dyn Error>> {
     if depth > 5 {
         return Err("Exceeded max resolution depth, possible circular 'alt' reference.".into());
+    }
+
+    if source.ends_with(".manifest.yaml") {
+        let path = PathBuf::from(source);
+        if !path.exists() {
+            return Err(format!("Local file not found at '{source}'").into());
+        }
+        println!("Using local sharable manifest file: {}", path.display());
+        let content = fs::read_to_string(&path)?;
+        let sharable_manifest: types::SharableInstallManifest = serde_yaml::from_str(&content)?;
+        let new_source = format!(
+            "@{}/{}@{}",
+            sharable_manifest.repo, sharable_manifest.name, sharable_manifest.version
+        );
+        let mut resolved_source = resolve_source_recursive(&new_source, depth + 1)?;
+        resolved_source.sharable_manifest = Some(sharable_manifest);
+        return Ok(resolved_source);
     }
 
     let request = parse_source_string(source)?;
@@ -564,6 +641,7 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, B
             path,
             source_type: SourceType::GitRepo(repo_name.to_string()),
             repo_name: Some(format!("git/{}", repo_name)),
+            sharable_manifest: None,
         }
     } else if source.starts_with("http://") || source.starts_with("https://") {
         download_from_url(source)?
@@ -577,6 +655,7 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, B
             path,
             source_type: SourceType::LocalFile,
             repo_name: None,
+            sharable_manifest: None,
         }
     } else {
         find_package_in_db(&request)?

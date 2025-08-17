@@ -78,7 +78,7 @@ pub fn run_installation(
     yes: bool,
     processed_deps: &mut HashSet<String>,
 ) -> Result<(), Box<dyn Error>> {
-    let (pkg, version) = resolve::resolve_package_and_version(source)?;
+    let (pkg, version, sharable_manifest) = resolve::resolve_package_and_version(source)?;
 
     if !display_updates(&pkg, yes)? {
         println!("Operation aborted.");
@@ -114,8 +114,31 @@ pub fn run_installation(
     }
 
     let mut installed_deps_list = Vec::new();
+    let mut chosen_options = Vec::new();
+    let mut chosen_optionals = Vec::new();
 
-    if pkg.package_type == types::PackageType::Collection {
+    if let Some(sm) = &sharable_manifest {
+        dependencies::resolve_and_install_required(
+            &sm.chosen_options,
+            &pkg.name,
+            &version,
+            pkg.scope,
+            true, // yes = true
+            processed_deps,
+            &mut installed_deps_list,
+        )?;
+        dependencies::resolve_and_install_required(
+            &sm.chosen_optionals,
+            &pkg.name,
+            &version,
+            pkg.scope,
+            true, // yes = true
+            processed_deps,
+            &mut installed_deps_list,
+        )?;
+        chosen_options = sm.chosen_options.clone();
+        chosen_optionals = sm.chosen_optionals.clone();
+    } else if pkg.package_type == types::PackageType::Collection {
         println!("Installing package collection '{}'...", pkg.name.bold());
         if let Some(deps) = &pkg.dependencies {
             if let Some(runtime_deps) = &deps.runtime {
@@ -136,6 +159,7 @@ pub fn run_installation(
                     yes,
                     processed_deps,
                     &mut installed_deps_list,
+                    &mut chosen_options,
                 )?;
                 dependencies::resolve_and_install_optional(
                     runtime_deps.get_optional(),
@@ -145,6 +169,7 @@ pub fn run_installation(
                     yes,
                     processed_deps,
                     &mut installed_deps_list,
+                    &mut chosen_optionals,
                     Some("runtime"),
                 )?;
             }
@@ -167,6 +192,7 @@ pub fn run_installation(
                     yes,
                     processed_deps,
                     &mut installed_deps_list,
+                    &mut chosen_options,
                 )?;
                 dependencies::resolve_and_install_optional(
                     build_deps.get_optional(),
@@ -176,6 +202,7 @@ pub fn run_installation(
                     yes,
                     processed_deps,
                     &mut installed_deps_list,
+                    &mut chosen_optionals,
                     Some("build"),
                 )?;
             }
@@ -183,12 +210,11 @@ pub fn run_installation(
             println!("Collection has no dependencies to install.");
         }
         write_manifest(&pkg, reason, installed_deps_list)?;
+        write_sharable_manifest(&pkg, chosen_options, chosen_optionals)?;
         println!("Collection '{}' installed successfully.", pkg.name.green());
         send_telemetry("install", &pkg);
         return Ok(());
-    }
-
-    if pkg.package_type == types::PackageType::Config {
+    } else if pkg.package_type == types::PackageType::Config {
         println!("Installing configuration '{}'...", pkg.name.bold());
         if let Some(deps) = &pkg.dependencies {
             if let Some(runtime_deps) = &deps.runtime {
@@ -209,6 +235,7 @@ pub fn run_installation(
                     yes,
                     processed_deps,
                     &mut installed_deps_list,
+                    &mut chosen_options,
                 )?;
                 dependencies::resolve_and_install_optional(
                     runtime_deps.get_optional(),
@@ -218,6 +245,7 @@ pub fn run_installation(
                     yes,
                     processed_deps,
                     &mut installed_deps_list,
+                    &mut chosen_optionals,
                     Some("runtime"),
                 )?;
             }
@@ -240,6 +268,7 @@ pub fn run_installation(
                     yes,
                     processed_deps,
                     &mut installed_deps_list,
+                    &mut chosen_options,
                 )?;
                 dependencies::resolve_and_install_optional(
                     build_deps.get_optional(),
@@ -249,11 +278,13 @@ pub fn run_installation(
                     yes,
                     processed_deps,
                     &mut installed_deps_list,
+                    &mut chosen_optionals,
                     Some("build"),
                 )?;
             }
         }
         write_manifest(&pkg, reason, installed_deps_list)?;
+        write_sharable_manifest(&pkg, chosen_options, chosen_optionals)?;
         println!("Configuration '{}' registered.", pkg.name.green());
 
         send_telemetry("install", &pkg);
@@ -295,21 +326,56 @@ pub fn run_installation(
 
     println!("Installing '{}' version '{}'", pkg.name, version);
 
-    if let Some(deps) = &pkg.dependencies {
-        let platform = utils::get_platform()?;
-        let should_include_build = match mode {
-            InstallMode::ForceSource => true,
-            InstallMode::PreferBinary | InstallMode::Interactive | InstallMode::Updater(_) => {
-                find_method(&pkg, "source", &platform).is_some()
-                    && find_method(&pkg, "binary", &platform).is_none()
-                    && find_method(&pkg, "com_binary", &platform).is_none()
-            }
-        };
+    if sharable_manifest.is_none() {
+        if let Some(deps) = &pkg.dependencies {
+            let platform = utils::get_platform()?;
+            let should_include_build = match mode {
+                InstallMode::ForceSource => true,
+                InstallMode::PreferBinary | InstallMode::Interactive | InstallMode::Updater(_) => {
+                    find_method(&pkg, "source", &platform).is_some()
+                        && find_method(&pkg, "binary", &platform).is_none()
+                        && find_method(&pkg, "com_binary", &platform).is_none()
+                }
+            };
 
-        if should_include_build {
-            if let Some(build_deps) = &deps.build {
+            if should_include_build {
+                if let Some(build_deps) = &deps.build {
+                    dependencies::resolve_and_install_required(
+                        &build_deps.get_required_simple(),
+                        &pkg.name,
+                        &version,
+                        pkg.scope,
+                        yes,
+                        processed_deps,
+                        &mut installed_deps_list,
+                    )?;
+                    dependencies::resolve_and_install_required_options(
+                        &build_deps.get_required_options(),
+                        &pkg.name,
+                        &version,
+                        pkg.scope,
+                        yes,
+                        processed_deps,
+                        &mut installed_deps_list,
+                        &mut chosen_options,
+                    )?;
+                    dependencies::resolve_and_install_optional(
+                        build_deps.get_optional(),
+                        &pkg.name,
+                        &version,
+                        pkg.scope,
+                        yes,
+                        processed_deps,
+                        &mut installed_deps_list,
+                        &mut chosen_optionals,
+                        Some("build"),
+                    )?;
+                }
+            }
+
+            if let Some(runtime_deps) = &deps.runtime {
                 dependencies::resolve_and_install_required(
-                    &build_deps.get_required_simple(),
+                    &runtime_deps.get_required_simple(),
                     &pkg.name,
                     &version,
                     pkg.scope,
@@ -318,56 +384,27 @@ pub fn run_installation(
                     &mut installed_deps_list,
                 )?;
                 dependencies::resolve_and_install_required_options(
-                    &build_deps.get_required_options(),
+                    &runtime_deps.get_required_options(),
                     &pkg.name,
                     &version,
                     pkg.scope,
                     yes,
                     processed_deps,
                     &mut installed_deps_list,
+                    &mut chosen_options,
                 )?;
                 dependencies::resolve_and_install_optional(
-                    build_deps.get_optional(),
+                    runtime_deps.get_optional(),
                     &pkg.name,
                     &version,
                     pkg.scope,
                     yes,
                     processed_deps,
                     &mut installed_deps_list,
-                    Some("build"),
+                    &mut chosen_optionals,
+                    Some("runtime"),
                 )?;
             }
-        }
-
-        if let Some(runtime_deps) = &deps.runtime {
-            dependencies::resolve_and_install_required(
-                &runtime_deps.get_required_simple(),
-                &pkg.name,
-                &version,
-                pkg.scope,
-                yes,
-                processed_deps,
-                &mut installed_deps_list,
-            )?;
-            dependencies::resolve_and_install_required_options(
-                &runtime_deps.get_required_options(),
-                &pkg.name,
-                &version,
-                pkg.scope,
-                yes,
-                processed_deps,
-                &mut installed_deps_list,
-            )?;
-            dependencies::resolve_and_install_optional(
-                runtime_deps.get_optional(),
-                &pkg.name,
-                &version,
-                pkg.scope,
-                yes,
-                processed_deps,
-                &mut installed_deps_list,
-                Some("runtime"),
-            )?;
         }
     }
 
@@ -388,6 +425,7 @@ pub fn run_installation(
             }
         }
         write_manifest(&pkg, reason, installed_deps_list)?;
+        write_sharable_manifest(&pkg, chosen_options, chosen_optionals)?;
         if let Err(e) = utils::setup_path(pkg.scope) {
             eprintln!("{} Failed to configure PATH: {}", "Warning:".yellow(), e);
         }
@@ -673,6 +711,33 @@ fn write_manifest(
         installed_dependencies,
     };
     local::write_manifest(&manifest)
+}
+
+fn write_sharable_manifest(
+    pkg: &types::Package,
+    chosen_options: Vec<String>,
+    chosen_optionals: Vec<String>,
+) -> Result<(), Box<dyn Error>> {
+    let manifest = types::SharableInstallManifest {
+        name: pkg.name.clone(),
+        version: pkg.version.clone().expect("Version should be resolved"),
+        repo: pkg.repo.clone(),
+        scope: pkg.scope,
+        chosen_options,
+        chosen_optionals,
+    };
+
+    let store_dir = home::home_dir()
+        .ok_or("No home dir")?
+        .join(".zoi/pkgs/store")
+        .join(&pkg.name);
+    fs::create_dir_all(&store_dir)?;
+
+    let manifest_path = store_dir.join(format!("{}.manifest.yaml", pkg.name));
+    let content = serde_yaml::to_string(&manifest)?;
+    fs::write(manifest_path, content)?;
+
+    Ok(())
 }
 
 fn get_filename_from_url(url: &str) -> &str {

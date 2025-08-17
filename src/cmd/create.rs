@@ -46,7 +46,7 @@ fn run_pkg_create(
         }
     }
 
-    let (pkg, version) = resolve::resolve_package_and_version(source)?;
+    let (pkg, version, _) = resolve::resolve_package_and_version(source)?;
 
     if pkg.package_type != types::PackageType::App {
         return Err(format!(
@@ -86,6 +86,7 @@ fn run_pkg_create(
                 &mut processed_deps,
                 &mut _installed_deps_list,
             )?;
+            let mut chosen_options = Vec::new();
             dependencies::resolve_and_install_required_options(
                 &build_deps.get_required_options(),
                 &pkg.name,
@@ -94,6 +95,7 @@ fn run_pkg_create(
                 yes,
                 &mut processed_deps,
                 &mut _installed_deps_list,
+                &mut chosen_options,
             )?;
         }
 
@@ -107,6 +109,7 @@ fn run_pkg_create(
                 &mut processed_deps,
                 &mut _installed_deps_list,
             )?;
+            let mut chosen_options = Vec::new();
             dependencies::resolve_and_install_required_options(
                 &runtime_deps.get_required_options(),
                 &pkg.name,
@@ -115,6 +118,7 @@ fn run_pkg_create(
                 yes,
                 &mut processed_deps,
                 &mut _installed_deps_list,
+                &mut chosen_options,
             )?;
         }
     }

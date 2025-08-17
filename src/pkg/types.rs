@@ -325,3 +325,15 @@ pub struct Config {
     #[serde(default)]
     pub rollback_enabled: bool,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SharableInstallManifest {
+    pub name: String,
+    pub version: String,
+    pub repo: String,
+    pub scope: Scope,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub chosen_options: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub chosen_optionals: Vec<String>,
+}

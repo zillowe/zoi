@@ -4,7 +4,7 @@ use std::error::Error;
 pub fn add(ext_name: &str, _yes: bool) -> Result<(), Box<dyn Error>> {
     println!("Adding extension: {}", ext_name);
 
-    let (pkg, _) = resolve::resolve_package_and_version(ext_name)?;
+    let (pkg, _, _) = resolve::resolve_package_and_version(ext_name)?;
 
     if pkg.package_type != types::PackageType::Extension {
         return Err(format!("'{}' is not an extension package.", ext_name).into());
@@ -73,7 +73,7 @@ pub fn remove(ext_name: &str, _yes: bool) -> Result<(), Box<dyn Error>> {
             return Err(format!("Extension '\'{}\' is not installed.", ext_name).into());
         };
 
-    let (pkg, _) = resolve::resolve_package_and_version(ext_name)?;
+    let (pkg, _, _) = resolve::resolve_package_and_version(ext_name)?;
 
     if pkg.package_type != types::PackageType::Extension {
         return Err(format!("'{}' is not an extension package.", ext_name).into());

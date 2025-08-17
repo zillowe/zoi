@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use std::error::Error;
 
 pub fn run(package_name: &str, yes: bool) -> Result<(), Box<dyn Error>> {
-    let (pkg, _) = resolve::resolve_package_and_version(package_name)?;
+    let (pkg, _, _) = resolve::resolve_package_and_version(package_name)?;
 
     if pkg.package_type != types::PackageType::Service {
         return Err(format!("Package '{}' is not a service.", package_name).into());

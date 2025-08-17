@@ -7,7 +7,7 @@ pub fn run(libs: bool, cflags: bool, packages: &[String]) -> Result<(), Box<dyn 
     }
 
     for package_name in packages {
-        let (pkg, _) = resolve::resolve_package_and_version(package_name)?;
+        let (pkg, _, _) = resolve::resolve_package_and_version(package_name)?;
         if local::is_package_installed(&pkg.name, pkg.scope)?.is_none() {
             return Err(format!("Package '{}' is not installed.", pkg.name).into());
         }

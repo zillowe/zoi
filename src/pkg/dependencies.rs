@@ -1085,6 +1085,7 @@ pub fn resolve_and_install_required_options(
     yes: bool,
     processed_deps: &mut HashSet<String>,
     installed_deps: &mut Vec<String>,
+    chosen_options: &mut Vec<String>,
 ) -> Result<(), Box<dyn Error>> {
     if option_groups.is_empty() {
         return Ok(());
@@ -1127,7 +1128,8 @@ pub fn resolve_and_install_required_options(
                     "--yes provided, installing all options for '{}'",
                     group.name
                 );
-                for dep in &parsed_deps {
+                for (i, dep) in parsed_deps.iter().enumerate() {
+                    chosen_options.push(dep_strs[i].clone());
                     install_dependency(
                         dep,
                         parent_pkg_name,
@@ -1143,6 +1145,7 @@ pub fn resolve_and_install_required_options(
                     group.name
                 );
                 if let Some(dep) = parsed_deps.first() {
+                    chosen_options.push(dep_strs[0].clone());
                     install_dependency(
                         dep,
                         parent_pkg_name,
@@ -1184,6 +1187,7 @@ pub fn resolve_and_install_required_options(
             to_install.dedup();
 
             for index in to_install {
+                chosen_options.push(dep_strs[index].clone());
                 let dep = &parsed_deps[index];
                 install_dependency(
                     dep,
@@ -1212,6 +1216,7 @@ pub fn resolve_and_install_required_options(
                 .default(0)
                 .interact()?;
 
+            chosen_options.push(dep_strs[selection].clone());
             let dep = &parsed_deps[selection];
             install_dependency(
                 dep,
@@ -1234,6 +1239,7 @@ pub fn resolve_and_install_optional(
     yes: bool,
     processed_deps: &mut HashSet<String>,
     installed_deps: &mut Vec<String>,
+    chosen_optionals: &mut Vec<String>,
     dep_type: Option<&str>,
 ) -> Result<(), Box<dyn Error>> {
     if deps.is_empty() {
@@ -1253,6 +1259,7 @@ pub fn resolve_and_install_optional(
             format!("Installing all optional {} dependencies...", type_str).bold()
         );
         for dep_str in &dep_strs {
+            chosen_optionals.push(dep_str.clone());
             let dependency = parse_dependency_string(dep_str)?;
             install_dependency(
                 &dependency,
@@ -1320,6 +1327,7 @@ pub fn resolve_and_install_optional(
     to_install.dedup();
 
     for index in to_install {
+        chosen_optionals.push(dep_strs[index].clone());
         let dep = &parsed_deps[index];
         install_dependency(
             dep,
