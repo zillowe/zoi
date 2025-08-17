@@ -91,7 +91,7 @@ fn download_patch_file(url: &str, path: &Path) -> Result<(), Box<dyn Error>> {
     let total_size = response.content_length().unwrap_or(0);
     let pb = ProgressBar::new(total_size);
     pb.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})")? 
+        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})")?
         .progress_chars("#>- "));
 
     let mut dest = File::create(path)?;
@@ -174,17 +174,14 @@ fn attempt_patch_upgrade(
     base_url: &str,
     bin_checksums: &str,
     patch_checksums: &str,
-    archive_filename: &str,
     patch_filename: &str,
     new_binary_checksum_name: &str,
 ) -> Result<PathBuf, Box<dyn Error>> {
-    println!("\nAttempting patch-based upgrade (bsdiff)...");
+    println!(
+        "
+Attempting patch-based upgrade (bsdiff)..."
+    );
     let temp_dir = Builder::new().prefix("zoi-patch-upgrade").tempdir()?;
-
-    let old_archive_url = format!("{}/{}", base_url, archive_filename);
-    let old_archive_path = temp_dir.path().join(archive_filename);
-    println!("Downloading base archive from: {}", old_archive_url);
-    download_file(&old_archive_url, &old_archive_path)?;
 
     let patch_url = format!("{}/{}", base_url, patch_filename);
     let patch_path = temp_dir.path().join(patch_filename);
@@ -192,24 +189,11 @@ fn attempt_patch_upgrade(
     download_patch_file(&patch_url, &patch_path)?;
     verify_checksum(&patch_path, patch_checksums, patch_filename)?;
 
-    println!("Extracting old archive to obtain base binary...");
-    let old_extract_dir = temp_dir.path().join("old");
-    fs::create_dir_all(&old_extract_dir)?;
-    extract_archive(&old_archive_path, &old_extract_dir)?;
-
-    let old_binary_name = if cfg!(target_os = "windows") {
-        "zoi.exe"
-    } else {
-        "zoi"
-    };
-    let old_binary_path = old_extract_dir.join(old_binary_name);
-    if !old_binary_path.exists() {
-        return Err("Could not find old binary inside the previous archive.".into());
-    }
+    println!("Reading current executable to apply patch...");
+    let old_data = fs::read(env::current_exe()?)?;
+    let patch_data = fs::read(&patch_path)?;
 
     println!("Applying patch to derive new binary...");
-    let old_data = fs::read(&old_binary_path)?;
-    let patch_data = fs::read(&patch_path)?;
     let mut new_binary_data = Vec::new();
     let mut patch_reader = Cursor::new(patch_data);
     bsdiff::patch(&old_data, &mut patch_reader, &mut new_binary_data)?;
@@ -237,7 +221,10 @@ fn fallback_full_upgrade(
     os: &str,
     arch: &str,
 ) -> Result<PathBuf, Box<dyn Error>> {
-    println!("\nFalling back to full binary download...");
+    println!(
+        "
+Falling back to full binary download..."
+    );
     let archive_ext = if os == "windows" { "zip" } else { "tar.zst" };
     let archive_filename = format!("zoi-{os}-{arch}.{archive_ext}");
     let download_url = format!("{base_url}/{archive_filename}");
@@ -301,7 +288,11 @@ pub fn run(
     };
 
     if !force && !self_update::version::bump_is_greater(&current_version, &latest_version_str)? {
-        println!("\n{}", "You are already on the latest version!".green());
+        println!(
+            "
+{}",
+            "You are already on the latest version!".green()
+        );
         return Err("already_on_latest".into());
     }
 
@@ -328,18 +319,17 @@ pub fn run(
 
     let new_binary_checksum_name = format!("zoi-{}-{}-v{}", os, arch, latest_version_str);
 
-    let archive_ext = if os == "windows" { "zip" } else { "tar.zst" };
-    let archive_filename = format!("zoi-{os}-{arch}.{archive_ext}");
-
     let new_binary_path = if full {
-        println!("\nFull flag specified, forcing full download...");
+        println!(
+            "
+Full flag specified, forcing full download..."
+        );
         fallback_full_upgrade(&base_url, &checksums_txt_content, os, arch)?
     } else {
         match attempt_patch_upgrade(
             &base_url,
             &checksums_bin_content,
             &checksums_txt_content,
-            &archive_filename,
             &patch_filename,
             &new_binary_checksum_name,
         ) {
