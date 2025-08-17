@@ -21,6 +21,9 @@ path = "src/lib.rs"
 name = "zoi"
 path = "src/main.rs"
 
+[lints.clippy]
+too_many_arguments = "allow"
+
 [package.metadata.cargo-machete]
 ignored = ["openssl"]
 

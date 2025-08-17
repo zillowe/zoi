@@ -397,6 +397,291 @@ post_uninstall:
 
 The structure is identical to `post_install`.
 
+## Step 5: Creating a Collection Package
+
+A `collection` is a meta-package that doesn't install any files itself but instead groups other packages together as dependencies. This is useful for creating "bundles" of tools, like a complete development environment for a specific language or framework.
+
+To create a collection, set the `type` field to `collection` and list the packages you want to include in the `dependencies` section.
+
+```yaml
+# collections/web-dev-essentials.pkg.yaml
+name: web-dev-essentials
+repo: community
+type: collection # Set the package type to 'collection'.
+version: "1.0"
+description: "A collection of essential tools for web development."
+tags: [collection, web, devtools]
+maintainer:
+  name: "Community"
+  email: "community@example.com"
+
+# The 'runtime' dependencies are the packages that will be installed.
+# This collection demonstrates pulling tools from different package managers.
+dependencies:
+  runtime:
+    required:
+      - zoi:node
+      - zoi:bun
+      - native:git
+    optional:
+      - npm:pnpm
+      - npm:serve
+      - npm:typescript
+```
+
+When a user runs `zoi install web-dev-essentials`, Zoi will install `node`, `bun`, and `git`, and then prompt the user to install the optional packages.
+
+## Step 6: Creating a Config Package
+
+A `config` package is designed to manage configuration files for another application. It doesn't install an executable itself, but it can run scripts to place or remove configuration files. It's a good practice to make the config package depend on the application it configures.
+
+To create a config package, set the `type` to `config` and define a `config` block with `install` and `uninstall` commands.
+
+### The `config` field
+
+This field contains platform-specific commands to manage the configuration files.
+
+```yaml
+# my-app-config.pkg.yaml
+name: my-app-config
+repo: community
+type: config
+version: "1.0"
+description: "Configuration files for my-app."
+# ... other metadata ...
+
+dependencies:
+  runtime:
+    required:
+      - zoi:my-app # This config depends on 'my-app' being installed.
+
+config:
+  - platforms: ["linux", "macos"]
+    # These commands are run to place the config files.
+    # Assume your package repo includes a 'config.toml' file.
+    install:
+      - "mkdir -p ~/.config/my-app"
+      - "cp ./config.toml ~/.config/my-app/config.toml"
+    # These commands are run when the user uninstalls the config.
+    uninstall:
+      - "rm ~/.config/my-app/config.toml"
+```
+
+When a user installs this package, Zoi will first ensure `my-app` is installed, and then ask for confirmation before running the `install` commands. When uninstalled, it will run the `uninstall` commands.
+
+## Step 7: Creating an App Template
+
+An `app` package is a template used to scaffold new applications with the `zoi create <source> <appName>` command. It is not installable directly like other packages. This is useful for creating starter projects for frameworks like Rails, React, or your own custom project structure.
+
+To create an app template, set the `type` to `app` and define an `app` block.
+
+### The `app` field
+
+This field contains the commands needed to create the new application.
+
+```yaml
+# apps/rails-app.pkg.yaml
+name: rails-app
+repo: community
+type: app
+version: "7"
+description: "Rails app template"
+# ... other metadata ...
+
+dependencies:
+  runtime:
+    required:
+      - zoi:@core/ruby
+      - zoi:@main/gems/rails
+
+# Platform-specific create command and optional follow-up commands
+app:
+  - platforms: ["all"]
+    appCreate: "rails new ${appName}"
+    commands:
+      - "cd ${appName} && bundle install"
+      - "cd ${appName} && git init"
+```
+
+**Key fields:**
+
+- `type: app`: Declares the package as an app template.
+- `app.appCreate`: The main command to run to create the project. The `${appName}` placeholder will be replaced with the name the user provides.
+- `app.commands`: An optional list of follow-up commands to run after the project is created.
+- `dependencies`: Any dependencies listed under `runtime` or `build` will be installed before the `appCreate` command is run.
+
+To use this template, a user would run:
+
+```sh
+zoi create rails-app MyNewBlog
+```
+
+## Step 8: Creating a Service Package
+
+A `service` is a package type for applications that run in the background, like databases or web servers. Zoi can manage starting and stopping these services.
+
+You can define a service to be run via native system commands or with Docker Compose.
+
+### Command-Based Service
+
+This is for services managed by shell commands.
+
+```yaml
+# my-service.pkg.yaml
+type: service
+# ...
+service:
+  - platforms: ["linux", "macos"]
+    start:
+      - "my-service --daemon"
+    stop:
+      - "pkill my-service"
+```
+
+### Docker-based Service
+
+If your service is defined in a `docker-compose.yml` file, Zoi can manage it for you.
+
+```yaml
+# my-docker-service.pkg.yaml
+type: service
+# ...
+service:
+  - platforms: ["all"] # Or specific platforms
+    docker:
+      - type: compose
+        file: "https://example.com/my-service/docker-compose.yml"
+```
+
+**Key fields:**
+
+- `docker`: A list of docker service definitions.
+- `type: compose`: Specifies that this is a Docker Compose service.
+- `file`: A URL to the `docker-compose.yml` file. Zoi will download this file, store it, and use it to start and stop the service with `docker-compose up -d` and `docker-compose down`.
+
+When a user installs a service package, Zoi will ask if they want to start it. They can also manage it later with `zoi start <pkg>` and `zoi stop <pkg>`.
+
+## Step 9: Creating an Extension
+
+An `extension` is a special package type that doesn't install software but instead modifies Zoi's own configuration. This is useful for distributing sets of repositories or other configuration changes as a single package.
+
+To create an extension, set the `type` field to `extension` and define an `extension` block.
+
+### The `extension` field
+
+This field contains the configuration changes to be applied.
+
+```yaml
+# my-repo-extension.pkg.yaml
+name: my-repo-extension
+repo: community
+type: extension
+version: "1.0"
+description: "Adds my custom repositories to Zoi."
+# ... other metadata ...
+
+extension:
+  type: zoi # Required. Currently, only 'zoi' is supported.
+  changes:
+    # A list of changes to apply when the extension is added.
+    # These changes are reverted when the extension is removed.
+    - type: repo-git
+      add: https://github.com/user/my-cool-pkgs.git
+    - type: repo-add
+      add: community
+    - type: registry-repo
+      add: https://my-mirror.com/Zoi-Pkgs.git
+```
+
+**Key Fields:**
+
+- `type: extension`: Declares the package as an extension.
+- `extension.type`: The type of extension. Currently, only `zoi` is a valid value.
+- `extension.changes`: A list of changes to make. Each change has a `type` and an `add` value.
+
+**Change Types:**
+
+- `repo-git`: Clones a git repository into Zoi's package sources. The `add` value should be a valid git repository URL. This allows users to install packages from your git repo using `@git/<repo-name>/<pkg-name>`.
+- `repo-add`: Adds an official repository (e.g. `community`, `test`) to the list of active repositories that Zoi searches.
+- `registry-repo`: Changes the URL of the main package database registry that Zoi syncs with.
+
+### Installing and Removing Extensions
+
+Extensions are managed with the `zoi extension` subcommand.
+
+```sh
+# Add the extension and apply its changes
+zoi extension add my-repo-extension
+
+# Remove the extension and revert its changes
+zoi extension remove my-repo-extension
+```
+
+This makes it easy to share and manage complex Zoi configurations.
+
+## Step 10: Creating a Library Package
+
+A `library` is a package that provides shared objects (`.so`), dynamic-link libraries (`.dll`), static archives (`.a`), and header files for other software to use. Zoi can install these files to the correct system locations and generate `pkg-config` files (`.pc`) to make them discoverable by build systems like `make`.
+
+To create a library, set the `type` to `library` and provide a `pkg_config` block.
+
+### The `pkg_config` field
+
+This field contains the information needed to generate a `.pc` file.
+
+```yaml
+# my-library.pkg.yaml
+name: my-library
+repo: community
+type: library
+version: 1.0.0
+description: "A cool library that does things."
+# ... other metadata ...
+
+# This block is used to generate the .pc file
+pkg_config:
+  description: "A cool library"
+  libs: "-lmy-library"
+  cflags: "-I/some/extra/path"
+
+installation:
+  - type: com_binary
+    url: "https://example.com/my-library-v{version}-{platform}.tar.gz"
+    platforms: ["linux-amd64"]
+    # Zoi will look for .so, .a, and .h files in the archive
+    # and install them to the correct locations.
+```
+
+**Key Fields:**
+
+- `type: library`: Declares the package as a library.
+- `pkg_config`: A block containing metadata for the `.pc` file.
+  - `description`: A short description for the `pkg-config` file.
+  - `libs`: The linker flags required to use the library (e.g. `-lmy-library`).
+  - `cflags`: The compiler flags required to use the library (e.g. `-I/path/to/headers`).
+
+### Installation of Library Files
+
+When a `library` package is installed, Zoi handles the files as follows:
+
+- **Shared/Static Libraries (`.so`, `.dll`, `.a`, `.lib`):** These are installed into the system's library directory (`/usr/local/lib` on Linux, `~/.local/lib` for user-scoped installs).
+- **Header Files (`.h`, `.hpp`):** These are installed into the system's include directory (`/usr/local/include` on Linux, `~/.local/include` for user-scoped installs).
+- **`pkg-config` File:** A `.pc` file is generated and installed to the appropriate `pkgconfig` directory, making the library discoverable with `pkg-config --cflags --libs my-library`.
+
+For `source` installations of libraries, you can use the `{prefix}` placeholder in your build commands, which will resolve to the correct installation root (e.g. `/usr/local` or `~/.local`).
+
+```yaml
+installation:
+  - type: source
+    url: "{git}"
+    commands:
+      - "./configure --prefix={prefix}"
+      - "make"
+      - "make install"
+```
+
+This allows standard build systems to install the library files into the correct locations that Zoi manages.
+
 ## Advanced `pkg.yaml` Features
 
 Beyond the basics, `pkg.yaml` offers powerful fields for more complex scenarios like package aliasing and defining specific update behaviors.
@@ -543,173 +828,7 @@ bins:
 
 If a user tries to install `my-utils` while another package that also provides a `mu` binary is already installed, Zoi will detect the conflict. This is different from the package name; for example, the `vim` package might provide the `vi` binary, which could conflict with a separate `vi` package.
 
-## Step 5: Creating a Service Package
-
-A `service` is a package type for applications that run in the background, like databases or web servers. Zoi can manage starting and stopping these services.
-
-You can define a service to be run via native system commands or with Docker Compose.
-
-### Command-Based Service
-
-This is for services managed by shell commands.
-
-```yaml
-# my-service.pkg.yaml
-type: service
-# ...
-service:
-  - platforms: ["linux", "macos"]
-    start:
-      - "my-service --daemon"
-    stop:
-      - "pkill my-service"
-```
-
-### Docker-based Service
-
-If your service is defined in a `docker-compose.yml` file, Zoi can manage it for you.
-
-```yaml
-# my-docker-service.pkg.yaml
-type: service
-# ...
-service:
-  - platforms: ["all"] # Or specific platforms
-    docker:
-      - type: compose
-        file: "https://example.com/my-service/docker-compose.yml"
-```
-
-**Key fields:**
-
-- `docker`: A list of docker service definitions.
-- `type: compose`: Specifies that this is a Docker Compose service.
-- `file`: A URL to the `docker-compose.yml` file. Zoi will download this file, store it, and use it to start and stop the service with `docker-compose up -d` and `docker-compose down`.
-
-When a user installs a service package, Zoi will ask if they want to start it. They can also manage it later with `zoi start <pkg>` and `zoi stop <pkg>`.
-
-## Step 6: Creating an Extension
-
-An `extension` is a special package type that doesn't install software but instead modifies Zoi's own configuration. This is useful for distributing sets of repositories or other configuration changes as a single package.
-
-To create an extension, set the `type` field to `extension` and define an `extension` block.
-
-### The `extension` field
-
-This field contains the configuration changes to be applied.
-
-```yaml
-# my-repo-extension.pkg.yaml
-name: my-repo-extension
-repo: community
-type: extension
-version: "1.0"
-description: "Adds my custom repositories to Zoi."
-# ... other metadata ...
-
-extension:
-  type: zoi # Required. Currently, only 'zoi' is supported.
-  changes:
-    # A list of changes to apply when the extension is added.
-    # These changes are reverted when the extension is removed.
-    - type: repo-git
-      add: https://github.com/user/my-cool-pkgs.git
-    - type: repo-add
-      add: community
-    - type: registry-repo
-      add: https://my-mirror.com/Zoi-Pkgs.git
-```
-
-**Key Fields:**
-
-- `type: extension`: Declares the package as an extension.
-- `extension.type`: The type of extension. Currently, only `zoi` is a valid value.
-- `extension.changes`: A list of changes to make. Each change has a `type` and an `add` value.
-
-**Change Types:**
-
-- `repo-git`: Clones a git repository into Zoi's package sources. The `add` value should be a valid git repository URL. This allows users to install packages from your git repo using `@git/<repo-name>/<pkg-name>`.
-- `repo-add`: Adds an official repository (e.g. `community`, `test`) to the list of active repositories that Zoi searches.
-- `registry-repo`: Changes the URL of the main package database registry that Zoi syncs with.
-
-### Installing and Removing Extensions
-
-Extensions are managed with the `zoi extension` subcommand.
-
-```sh
-# Add the extension and apply its changes
-zoi extension add my-repo-extension
-
-# Remove the extension and revert its changes
-zoi extension remove my-repo-extension
-```
-
-This makes it easy to share and manage complex Zoi configurations.
-
-## Step 7: Creating a Library Package
-
-A `library` is a package that provides shared objects (`.so`), dynamic-link libraries (`.dll`), static archives (`.a`), and header files for other software to use. Zoi can install these files to the correct system locations and generate `pkg-config` files (`.pc`) to make them discoverable by build systems like `make`.
-
-To create a library, set the `type` to `library` and provide a `pkg_config` block.
-
-### The `pkg_config` field
-
-This field contains the information needed to generate a `.pc` file.
-
-```yaml
-# my-library.pkg.yaml
-name: my-library
-repo: community
-type: library
-version: 1.0.0
-description: "A cool library that does things."
-# ... other metadata ...
-
-# This block is used to generate the .pc file
-pkg_config:
-  description: "A cool library"
-  libs: "-lmy-library"
-  cflags: "-I/some/extra/path"
-
-installation:
-  - type: com_binary
-    url: "https://example.com/my-library-v{version}-{platform}.tar.gz"
-    platforms: ["linux-amd64"]
-    # Zoi will look for .so, .a, and .h files in the archive
-    # and install them to the correct locations.
-```
-
-**Key Fields:**
-
-- `type: library`: Declares the package as a library.
-- `pkg_config`: A block containing metadata for the `.pc` file.
-  - `description`: A short description for the `pkg-config` file.
-  - `libs`: The linker flags required to use the library (e.g. `-lmy-library`).
-  - `cflags`: The compiler flags required to use the library (e.g. `-I/path/to/headers`).
-
-### Installation of Library Files
-
-When a `library` package is installed, Zoi handles the files as follows:
-
-- **Shared/Static Libraries (`.so`, `.dll`, `.a`, `.lib`):** These are installed into the system's library directory (`/usr/local/lib` on Linux, `~/.local/lib` for user-scoped installs).
-- **Header Files (`.h`, `.hpp`):** These are installed into the system's include directory (`/usr/local/include` on Linux, `~/.local/include` for user-scoped installs).
-- **`pkg-config` File:** A `.pc` file is generated and installed to the appropriate `pkgconfig` directory, making the library discoverable with `pkg-config --cflags --libs my-library`.
-
-For `source` installations of libraries, you can use the `{prefix}` placeholder in your build commands, which will resolve to the correct installation root (e.g. `/usr/local` or `~/.local`).
-
-```yaml
-installation:
-  - type: source
-    url: "{git}"
-    commands:
-      - "./configure --prefix={prefix}"
-      - "make"
-      - "make install"
-```
-
-This allows standard build systems to install the library files into the correct locations that Zoi manages.
-
-## Step 8: Testing Your Package Locally
+## Step 11: Testing Your Package Locally
 
 Before you publish your package, you **must** test it locally to ensure it installs correctly.
 
@@ -733,7 +852,7 @@ Before you publish your package, you **must** test it locally to ensure it insta
     zoi uninstall my-package
     ```
 
-## Step 9: Publishing Your Package
+## Step 12: Publishing Your Package
 
 Once your package works locally, it's time to share it with the world! This is done by adding your `pkg.yaml` file to the official Zoi packages database.
 
