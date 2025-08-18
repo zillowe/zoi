@@ -43,6 +43,8 @@
   <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Enhancement%20Request"><strong>Request an Enhancement</strong></a>
 </div>
 
+<br/>
+
 <details>
 <summary>Table of Contents</summary>
 
