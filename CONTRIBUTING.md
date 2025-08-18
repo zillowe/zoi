@@ -30,18 +30,18 @@ If you'd like to contribute code, please follow these steps:
 5.  **Push your changes** to your fork.
 6.  **Open a merge request** to the `main` branch of the original repository.
 
-## Development Setup
+## Development
 
-To get started with developing Zoi, you'll need to set up your local environment. We use `zoi` itself to manage project tasks, defined in the `zoi.yaml` file.
+To get started with developing Zoi, you'll need to set up your local environment.
 
 ### Prerequisites
 
 - **Rust:** Make sure you have the latest version of Rust and Cargo installed. You can find instructions at [rust-lang.org](https://www.rust-lang.org/tools/install).
 - **Make:** The `make` command is required for our Makefile-based build process.
 
-### Building for the First Time
+### First-Time Setup
 
-Since we use Zoi to build Zoi, you'll need to perform an initial build using `make`:
+Because Zoi is used to manage its own development, you must first build and install it manually using `make`:
 
 1.  **Configure the build:**
     ```sh
@@ -53,43 +53,68 @@ Since we use Zoi to build Zoi, you'll need to perform an initial build using `ma
     sudo make install
     ```
 
-Once you have a working `zoi` command, you can use it for subsequent development tasks.
+Once you have a working `zoi` command, you can use it for all other development tasks.
 
 ### Development Workflow with Zoi
 
-All common development tasks are defined as commands in `zoi.yaml` and can be executed with `zoi run`. If you run `zoi run` without arguments, you'll get an interactive list of available commands.
+We use `zoi` itself to manage project tasks, which are defined in the `zoi.yaml` file. You can run tasks using `zoi run <command>` or set up environments with `zoi env <environment>`.
 
-- **Prepare your environment:** Before you start coding, run the `pre` environment setup. This will check dependencies, format your code and lint it, and run checks.
+If you run `zoi run` or `zoi env` without arguments, you'll get an interactive list of available commands.
 
-  ```sh
-  zoi env pre
-  ```
+#### Passing Arguments to Commands
 
-- **Build the project:** To build a release version of Zoi.
+To pass arguments to the underlying script, add them after the command alias. Use `--` to separate the arguments from Zoi's own options if needed.
+
+```sh
+# This runs 'cargo check --tests'
+zoi run check -- --tests
+```
+
+#### Environment Preparation
+
+Before you start coding, run the `pre` environment to ensure your changes meet our quality standards. It will check for unused dependencies, format your code, and run lints and other checks.
+
+```sh
+zoi env pre
+```
+
+This single command is equivalent to running `zoi run deps`, `zoi run fmt`, `zoi run lint`, and `zoi run check` in sequence.
+
+#### Development Commands
+
+Here are the most common commands defined in `zoi.yaml`:
+
+- **`build`**: Builds a release version of Zoi.
 
   ```sh
   zoi run build
   ```
 
-- **Run checks:** To run `clippy` and other checks.
+- **`check`**: Checks the project for errors without performing a full build.
 
   ```sh
   zoi run check
   ```
 
-- **Format code:** To format the code according to project standards.
+- **`fmt`**: Formats all code in the project according to our style guidelines.
 
   ```sh
   zoi run fmt
   ```
 
-- **Lint code:** To lint the code using Clippy.
+- **`lint`**: Lints the code using Clippy and applies automatic fixes where possible.
 
   ```sh
   zoi run lint
   ```
 
-- **Install:** To perform a full installation, including shell completions.
+- **`deps`**: Checks for unused dependencies with `cargo-machete`.
+
+  ```sh
+  zoi run deps
+  ```
+
+- **`install`**: Performs a clean build and installs the latest version of Zoi, including shell completions. This is useful for testing your changes in a live environment.
   ```sh
   zoi run install
   ```
