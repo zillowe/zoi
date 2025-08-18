@@ -132,21 +132,18 @@ pub fn run(verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
     let db_path = get_db_path()?;
     let db_url = get_db_url()?;
 
-    if db_path.exists() {
-        if let Ok(repo) = Repository::open(&db_path) {
-            if let Ok(remote) = repo.find_remote("origin") {
-                if let Some(remote_url) = remote.url() {
-                    if remote_url != db_url {
-                        println!(
-                            "Registry URL has changed from {}. Removing old database and re-cloning from {}.",
-                            remote_url.yellow(),
-                            db_url.cyan()
-                        );
-                        fs::remove_dir_all(&db_path)?;
-                    }
-                }
-            }
-        }
+    if db_path.exists()
+        && let Ok(repo) = Repository::open(&db_path)
+        && let Ok(remote) = repo.find_remote("origin")
+        && let Some(remote_url) = remote.url()
+        && remote_url != db_url
+    {
+        println!(
+            "Registry URL has changed from {}. Removing old database and re-cloning from {}.",
+            remote_url.yellow(),
+            db_url.cyan()
+        );
+        fs::remove_dir_all(&db_path)?;
     }
 
     if verbose {

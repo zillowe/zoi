@@ -43,10 +43,10 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
         for entry in fs::read_dir(dependents_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.is_file() {
-                if let Some(pkg_name) = path.file_name().and_then(|n| n.to_str()) {
-                    dependents.push(pkg_name.to_string());
-                }
+            if path.is_file()
+                && let Some(pkg_name) = path.file_name().and_then(|n| n.to_str())
+            {
+                dependents.push(pkg_name.to_string());
             }
         }
     }

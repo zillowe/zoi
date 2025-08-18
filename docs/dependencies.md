@@ -157,6 +157,23 @@ When a dependency uses the `zoi:` manager, Zoi resolves the referenced package d
 
 If conflicts are detected, Zoi displays the conflicts and prompts whether to continue before proceeding with installation.
 
+## Reproducible Installs with Sharable Manifests
+
+When you install a package that has selectable (`options`) or `optional` dependencies, Zoi will prompt you to make choices. To ensure that you can reinstall the same package with the exact same dependency choices later (for example, on another machine or in a CI/CD pipeline), Zoi automatically generates a sharable manifest file.
+
+- **Location:** After a successful installation, a file named `<package_name>.manifest.yaml` is created inside the package's installation directory (`~/.zoi/pkgs/store/<package_name>/`).
+- **Content:** This file records the package's name, version, and repository, along with the specific choices you made for its dependencies (`chosen_options` and `chosen_optionals`).
+
+### Usage
+
+You can copy this `.manifest.yaml` file into your project's repository. To perform a non-interactive, reproducible installation, simply run:
+
+```sh
+zoi install /path/to/your/package.manifest.yaml
+```
+
+Zoi will read the manifest, resolve the base package, and install it along with the exact set of dependencies specified in the file, skipping any interactive prompts.
+
 ## Troubleshooting
 
 - Some managers require being present on PATH. Run `zoi info` to see which managers Zoi detects.

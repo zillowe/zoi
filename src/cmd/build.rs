@@ -10,14 +10,14 @@ pub fn run(sources: &[String], force: bool, yes: bool) {
             source.blue().bold()
         );
 
-        if let Ok(Some(manifest)) = local::is_package_installed(source, types::Scope::User) {
-            if !force {
-                println!(
-                    "Package '{}' is already installed. Use --force to rebuild.",
-                    manifest.name.yellow()
-                );
-                continue;
-            }
+        if let Ok(Some(manifest)) = local::is_package_installed(source, types::Scope::User)
+            && !force
+        {
+            println!(
+                "Package '{}' is already installed. Use --force to rebuild.",
+                manifest.name.yellow()
+            );
+            continue;
         }
 
         match resolve::resolve_source(source) {

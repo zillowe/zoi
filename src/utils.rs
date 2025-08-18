@@ -451,10 +451,10 @@ pub fn check_path() {
                     PathBuf::from(p)
                 };
 
-                if let Ok(p_canon) = fs::canonicalize(&p_expanded) {
-                    if p_canon == zoi_bin_dir_canon {
-                        return true;
-                    }
+                if let Ok(p_canon) = fs::canonicalize(&p_expanded)
+                    && p_canon == zoi_bin_dir_canon
+                {
+                    return true;
                 }
 
                 false

@@ -21,10 +21,10 @@ pub fn run(branch: &str, status: &str, number: &str, commit: &str) {
     utils::print_aligned_info("OS", os);
     utils::print_aligned_info("Architecture", arch);
 
-    if os == "linux" {
-        if let Some(dist) = utils::get_linux_distribution() {
-            utils::print_aligned_info("Distribution", &dist);
-        }
+    if os == "linux"
+        && let Some(dist) = utils::get_linux_distribution()
+    {
+        utils::print_aligned_info("Distribution", &dist);
     }
 
     let config = pkg::config::read_config();

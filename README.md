@@ -44,6 +44,8 @@
 </div>
 
 <br/>
+<hr/>
+<br/>
 
 <details>
 <summary>Table of Contents</summary>
@@ -84,6 +86,7 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
 - **Secure Package Distribution:** Support for checksums and GPG signatures to verify package integrity and authenticity.
 - **Tag-based Discovery:** Search by and filter packages using tags for faster discovery.
 - **Use as a Library:** Integrate Zoi's package management features directly into your Rust applications. See the [Library documentation](https://zillowe.rf.gd/docs/zds/zoi/lib/) for details.
+- **Package Recording & Re-installation:** Automatically keeps a record of all installed packages, which can be used to easily reinstall them on a new machine.
 
 ## 🚀 Getting Started
 

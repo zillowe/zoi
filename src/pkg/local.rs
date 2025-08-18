@@ -101,12 +101,11 @@ pub fn get_installed_packages_with_type() -> Result<Vec<InstalledPackage>, Box<d
             let pkg: Package = serde_yaml::from_str(&content)?;
 
             let mut repo_field = manifest.repo.clone();
-            if repo_field.is_empty() {
-                if let Some(parent_dir) = path.parent() {
-                    if let Ok(repo_subpath) = parent_dir.strip_prefix(&db_root) {
-                        repo_field = repo_subpath.to_string_lossy().to_string();
-                    }
-                }
+            if repo_field.is_empty()
+                && let Some(parent_dir) = path.parent()
+                && let Ok(repo_subpath) = parent_dir.strip_prefix(&db_root)
+            {
+                repo_field = repo_subpath.to_string_lossy().to_string();
             }
 
             packages.push(InstalledPackage {
@@ -155,10 +154,10 @@ pub fn get_all_available_packages() -> Result<Vec<super::types::Package>, Box<dy
                 let content = fs::read_to_string(entry.path())?;
                 let mut pkg: super::types::Package = serde_yaml::from_str(&content)?;
 
-                if let Some(parent_dir) = entry.path().parent() {
-                    if let Ok(repo_subpath) = parent_dir.strip_prefix(&db_root) {
-                        pkg.repo = repo_subpath.to_string_lossy().to_string();
-                    }
+                if let Some(parent_dir) = entry.path().parent()
+                    && let Ok(repo_subpath) = parent_dir.strip_prefix(&db_root)
+                {
+                    pkg.repo = repo_subpath.to_string_lossy().to_string();
                 }
 
                 available.push(pkg);

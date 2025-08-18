@@ -89,16 +89,16 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
         println!("{}: {}", "Tags".bold(), pkg.tags.join(", "));
     }
 
-    if let Some(bins) = &pkg.bins {
-        if !bins.is_empty() {
-            println!("{}: {}", "Provides".bold(), bins.join(", ").green());
-        }
+    if let Some(bins) = &pkg.bins
+        && !bins.is_empty()
+    {
+        println!("{}: {}", "Provides".bold(), bins.join(", ").green());
     }
 
-    if let Some(conflicts) = &pkg.conflicts {
-        if !conflicts.is_empty() {
-            println!("{}: {}", "Conflicts".bold(), conflicts.join(", ").red());
-        }
+    if let Some(conflicts) = &pkg.conflicts
+        && !conflicts.is_empty()
+    {
+        println!("{}: {}", "Conflicts".bold(), conflicts.join(", ").red());
     }
 
     if pkg.package_type == crate::pkg::types::PackageType::Package {
@@ -151,28 +151,27 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
 
                     let mut extra_info = archs.join(", ");
 
-                    if method.install_type == "binary" {
-                        if let Some(binary_types) = &method.binary_types {
-                            let lower_os = os.to_lowercase();
-                            let mut type_to_add = "";
-                            if lower_os == "macos" && binary_types.contains(&"dmg".to_string()) {
-                                type_to_add = "dmg";
-                            } else if lower_os == "linux"
-                                && binary_types.contains(&"appimage".to_string())
-                            {
-                                type_to_add = "appimage";
-                            } else if lower_os == "windows"
-                                && binary_types.contains(&"msi".to_string())
-                            {
-                                type_to_add = "msi";
-                            }
+                    if method.install_type == "binary"
+                        && let Some(binary_types) = &method.binary_types
+                    {
+                        let lower_os = os.to_lowercase();
+                        let mut type_to_add = "";
+                        if lower_os == "macos" && binary_types.contains(&"dmg".to_string()) {
+                            type_to_add = "dmg";
+                        } else if lower_os == "linux"
+                            && binary_types.contains(&"appimage".to_string())
+                        {
+                            type_to_add = "appimage";
+                        } else if lower_os == "windows" && binary_types.contains(&"msi".to_string())
+                        {
+                            type_to_add = "msi";
+                        }
 
-                            if !type_to_add.is_empty() {
-                                if extra_info.is_empty() {
-                                    extra_info = type_to_add.to_string();
-                                } else {
-                                    extra_info = format!("{}, {}", extra_info, type_to_add);
-                                }
+                        if !type_to_add.is_empty() {
+                            if extra_info.is_empty() {
+                                extra_info = type_to_add.to_string();
+                            } else {
+                                extra_info = format!("{}, {}", extra_info, type_to_add);
                             }
                         }
                     }

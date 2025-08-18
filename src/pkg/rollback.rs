@@ -97,22 +97,20 @@ pub fn run(package_name: &str, yes: bool) -> Result<(), Box<dyn Error>> {
         let bin_root = get_bin_root()?;
         for bin in bins {
             let symlink_path = bin_root.join(bin);
-            if symlink_path.exists() {
-                if let Ok(target) = fs::read_link(&symlink_path) {
-                    if target.starts_with(&store_dir) {
-                        fs::remove_file(&symlink_path)?;
-                    }
-                }
+            if symlink_path.exists()
+                && let Ok(target) = fs::read_link(&symlink_path)
+                && target.starts_with(&store_dir)
+            {
+                fs::remove_file(&symlink_path)?;
             }
         }
     } else {
         let symlink_path = get_bin_root()?.join(package_name);
-        if symlink_path.exists() {
-            if let Ok(target) = fs::read_link(&symlink_path) {
-                if target.starts_with(&store_dir) {
-                    fs::remove_file(symlink_path)?;
-                }
-            }
+        if symlink_path.exists()
+            && let Ok(target) = fs::read_link(&symlink_path)
+            && target.starts_with(&store_dir)
+        {
+            fs::remove_file(symlink_path)?;
         }
     }
 

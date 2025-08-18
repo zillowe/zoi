@@ -72,10 +72,10 @@ fn run_list_installed(
 
     let mut found_packages = false;
     for pkg in packages {
-        if let Some(repo) = &repo_filter {
-            if !pkg.repo.starts_with(repo) {
-                continue;
-            }
+        if let Some(repo) = &repo_filter
+            && !pkg.repo.starts_with(repo)
+        {
+            continue;
         }
         if type_filter.is_some() && pkg.package_type != type_filter.unwrap() {
             continue;

@@ -72,10 +72,10 @@ pub fn run(
             let matches: Vec<_> = all_packages
                 .into_iter()
                 .filter(|pkg| {
-                    if let Some(ptype) = type_filter {
-                        if pkg.package_type != ptype {
-                            return false;
-                        }
+                    if let Some(ptype) = type_filter
+                        && pkg.package_type != ptype
+                    {
+                        return false;
                     }
 
                     if !wanted_tags.is_empty() {

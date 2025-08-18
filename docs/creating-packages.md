@@ -319,6 +319,8 @@ dependencies:
 
 When a user installs this package, Zoi will prompt them to choose a GUI provider, ensuring the necessary dependency is met while giving the user control.
 
+These choices, along with any selected `optional` dependencies, are automatically saved to a `<package_name>.manifest.yaml` file in the package's store directory. This file can be shared to allow for fully reproducible, non-interactive installations of the package with the same dependency set.
+
 ### Advanced: Full dependency schema
 
 Both `runtime` and `build` support the same structure: a simple list, or an advanced object with `required`, `options`, and `optional` all at once.

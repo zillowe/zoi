@@ -10,6 +10,7 @@ pub mod install;
 pub mod library;
 pub mod local;
 pub mod pin;
+pub mod recorder;
 pub mod resolve;
 pub mod rollback;
 pub mod service;
