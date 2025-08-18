@@ -434,11 +434,11 @@ pub fn check_path() {
             return;
         }
 
-        if let Ok(path_var) = std::env::var("PATH") {
+        let is_in_path_env = if let Ok(path_var) = std::env::var("PATH") {
             let zoi_bin_dir_canon =
                 fs::canonicalize(&zoi_bin_dir).unwrap_or_else(|_| zoi_bin_dir.clone());
 
-            let _is_in_path = path_var.split(std::path::MAIN_SEPARATOR).any(|p| {
+            path_var.split(std::path::MAIN_SEPARATOR).any(|p| {
                 if p.is_empty() {
                     return false;
                 }
@@ -451,25 +451,55 @@ pub fn check_path() {
                     PathBuf::from(p)
                 };
 
-                if let Ok(p_canon) = fs::canonicalize(&p_expanded)
-                    && p_canon == zoi_bin_dir_canon
-                {
-                    return true;
+                if let Ok(p_canon) = fs::canonicalize(&p_expanded) {
+                    p_canon == zoi_bin_dir_canon
+                } else {
+                    p_expanded == zoi_bin_dir
                 }
+            })
+        } else {
+            false
+        };
 
-                false
-            });
+        if is_in_path_env {
+            return;
+        }
 
-            // if !is_in_path {
-            //     eprintln!(
-            //         "{}: zoi's bin directory `{}` is not in your PATH.",
-            //         "Warning".yellow(),
-            //         zoi_bin_dir.display()
-            //     );
-            //     eprintln!(
-            //         "Please restart your terminal, or add it to your PATH manually for commands to be available."
-            //     );
-            // }
+        let zoi_path_str_fragment = ".zoi/pkgs/bin";
+        let shell_configs = [
+            ".bashrc",
+            ".bash_profile",
+            ".zshrc",
+            ".profile",
+            ".config/fish/config.fish",
+            ".cshrc",
+            ".tcshrc",
+        ];
+
+        let found_in_shell_config = shell_configs.iter().any(|config| {
+            let config_path = home.join(config);
+            if config_path.exists()
+                && let Ok(content) = fs::read_to_string(config_path)
+            {
+                return content.contains(zoi_path_str_fragment);
+            }
+            false
+        });
+
+        eprintln!(
+            "{}: zoi's bin directory '{}' is not in your PATH.",
+            "Warning".yellow(),
+            zoi_bin_dir.display()
+        );
+
+        if found_in_shell_config {
+            eprintln!(
+                "However, it was found in a shell configuration file. Please restart your terminal for the changes to take effect."
+            );
+        } else {
+            eprintln!(
+                "Please run 'zoi setup --scope user' or add it to your PATH manually for commands to be available."
+            );
         }
     }
 }
