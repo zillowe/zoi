@@ -214,6 +214,7 @@ Zoi provides a wide range of commands to manage your packages and environment. F
 | `about`      | Displays the full application name, description, author, license, and homepage.                                                                                                                                                                                                                                                                      |
 | `info`       | Displays key system details like OS, CPU architecture, and available package managers (requires `zoi sync` to be run first for package manager detection).                                                                                                                                                                                           |
 | `check`      | Verifies that all required dependencies (like git) are installed.                                                                                                                                                                                                                                                                                    |
+| `setup`      | Configures the shell environment for Zoi to make package binaries available. <br/>`--scope <user\|system>`: Set the scope (default: user).                                                                                                                                                                                                           |
 | `sync`       | Clones or updates the package database from the configured registry. <br/>`--verbose`: Show the full git output.                                                                                                                                                                                                                                     |
 | `upgrade`    | Downloads the latest release of Zoi and replaces the current executable. <br/>`--full`: Force a full download, skipping the patch-based upgrade. <br/>`--force`: Force the upgrade even if the version is the same. <br/>`--tag <tag>`: Upgrade to a specific git tag. <br/>`--branch <branch>`: Upgrade to the latest release of a specific branch. |
 | `clean`      | Clears the cache of downloaded package binaries.                                                                                                                                                                                                                                                                                                     |
@@ -589,7 +590,7 @@ For the full list of supported dependency managers, usage semantics, and command
   <Accordion title="Where are binaries installed and how do I fix PATH?">
     Binaries are placed in `~/.zoi/pkgs/store/<name>/bin` and linked into
     `~/.zoi/pkgs/bin`. Zoi attempts to add this to your shell PATH on Unix and user PATH on Windows.
-    If commands are not found, add `~/.zoi/pkgs/bin` to your PATH manually.
+    If commands are not found, run `zoi setup` to configure your shell, or add `~/.zoi/pkgs/bin` to your PATH manually.
   </Accordion>
 </Accordions>
 <br />
