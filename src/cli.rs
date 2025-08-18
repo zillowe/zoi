@@ -38,6 +38,12 @@ pub struct Cli {
     yes: bool,
 }
 
+#[derive(clap::ValueEnum, Clone, Debug, Copy)]
+pub enum SetupScope {
+    User,
+    System,
+}
+
 #[derive(Subcommand)]
 enum Commands {
     /// Generates shell completion scripts
@@ -260,6 +266,16 @@ enum Commands {
         /// The shell to install completions for
         #[arg(value_enum)]
         shell: Shell,
+    },
+
+    /// Configures the shell environment for Zoi
+    #[command(
+        long_about = "Adds the Zoi binary directory to your shell's PATH to make Zoi packages' executables available as commands."
+    )]
+    Setup {
+        /// The scope to apply the setup to (user or system-wide)
+        #[arg(long, value_enum, default_value = "user")]
+        scope: SetupScope,
     },
 
     /// Download and execute a binary package without installing it
@@ -516,6 +532,10 @@ pub fn run() {
             } => cmd::search::run(search_term, repo, package_type, tags),
             Commands::Shell { shell } => {
                 cmd::shell::run(shell);
+                Ok(())
+            }
+            Commands::Setup { scope } => {
+                cmd::setup::run(scope);
                 Ok(())
             }
             Commands::Exec { source, args } => {
