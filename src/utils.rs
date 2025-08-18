@@ -354,6 +354,10 @@ pub fn setup_path(scope: Scope) -> Result<(), Box<dyn Error>> {
             let cmd = format!("\n# Added by Zoi\nset -gx PATH \"{}\" $PATH\n", zoi_bin_str);
 
             (path, cmd)
+        } else if shell_name.contains("elvish") {
+            let path = home.join(".config/elvish/rc.elv");
+            let cmd = "\n# Added by Zoi\nset paths = [ ~/.zoi/pkgs/bin $paths... ]\n".to_string();
+            (path, cmd)
         } else if shell_name.contains("csh") || shell_name.contains("tcsh") {
             let path = home.join(".cshrc");
             let cmd = format!("\n# Added by Zoi\nsetenv PATH=\"{}:$PATH\"\n", zoi_bin_str);
@@ -365,6 +369,9 @@ pub fn setup_path(scope: Scope) -> Result<(), Box<dyn Error>> {
         };
 
         if !profile_file_path.exists() {
+            if let Some(parent) = profile_file_path.parent() {
+                fs::create_dir_all(parent)?;
+            }
             File::create(&profile_file_path)?;
         }
 
