@@ -64,12 +64,12 @@ fn parse_source_string(source_str: &str) -> Result<PackageRequest, Box<dyn Error
 
     let mut main_part = source_str;
 
-    if let Some(at_pos) = source_str.rfind('@') {
-        if at_pos > 0 {
-            let (pkg_part, ver_part) = source_str.split_at(at_pos);
-            main_part = pkg_part;
-            version_spec = Some(ver_part[1..].to_string());
-        }
+    if let Some(at_pos) = source_str.rfind('@')
+        && at_pos > 0
+    {
+        let (pkg_part, ver_part) = source_str.split_at(at_pos);
+        main_part = pkg_part;
+        version_spec = Some(ver_part[1..].to_string());
     }
 
     if main_part.starts_with('@') {
@@ -501,11 +501,11 @@ fn get_version_for_install(
             return resolve_channel(versions, channel);
         }
 
-        if let Some(versions) = &pkg.versions {
-            if versions.contains_key(spec) {
-                println!("Found '{}' as a channel, resolving...", spec.cyan());
-                return resolve_channel(versions, spec);
-            }
+        if let Some(versions) = &pkg.versions
+            && versions.contains_key(spec)
+        {
+            println!("Found '{}' as a channel, resolving...", spec.cyan());
+            return resolve_channel(versions, spec);
         }
 
         return Ok(spec.clone());

@@ -2,6 +2,7 @@ use crate::pkg::{install, resolve, types};
 use crate::utils;
 use colored::*;
 use std::collections::HashSet;
+use std::fs;
 
 pub fn run(sources: &[String], force: bool, interactive: bool, yes: bool) {
     let mode = if interactive {
@@ -13,7 +14,49 @@ pub fn run(sources: &[String], force: bool, interactive: bool, yes: bool) {
     let mut failed_packages = Vec::new();
     let mut processed_deps = HashSet::new();
 
+    let mut sources_to_process: Vec<String> = Vec::new();
     for source in sources {
+        if source.ends_with("zoi.pkgs.json") {
+            println!(
+                "=> Installing packages from lockfile: {}",
+                source.cyan().bold()
+            );
+            match fs::read_to_string(source) {
+                Ok(content) => {
+                    match serde_json::from_str::<Vec<types::RecordedPackage>>(&content) {
+                        Ok(packages) => {
+                            for pkg in packages {
+                                sources_to_process
+                                    .push(format!("@{}/{}@{}", pkg.repo, pkg.name, pkg.version));
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!(
+                                "{}: Failed to parse lockfile '{}': {}",
+                                "Error".red().bold(),
+                                source,
+                                e
+                            );
+                            failed_packages.push(source.to_string());
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!(
+                        "{}: Failed to read lockfile '{}': {}",
+                        "Error".red().bold(),
+                        source,
+                        e
+                    );
+                    failed_packages.push(source.to_string());
+                }
+            }
+        } else {
+            sources_to_process.push(source.to_string());
+        }
+    }
+
+    for source in &sources_to_process {
         println!("=> Installing package: {}", source.cyan().bold());
 
         match resolve::resolve_source(source) {

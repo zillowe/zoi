@@ -1,5 +1,6 @@
 use crate::pkg::{
-    config, config_handler, dependencies, library, local, resolve, rollback, service, types,
+    config, config_handler, dependencies, library, local, recorder, resolve, rollback, service,
+    types,
 };
 use crate::utils;
 use anyhow::Result;
@@ -85,13 +86,13 @@ pub fn run_installation(
         return Ok(());
     }
 
-    if let Some(manifest) = local::is_package_installed(&pkg.name, pkg.scope)? {
-        if manifest.version != version {
-            let config = config::read_config()?;
-            let rollback_enabled = pkg.rollback.unwrap_or(config.rollback_enabled);
-            if rollback_enabled {
-                rollback::backup_package(&pkg.name, pkg.scope)?;
-            }
+    if let Some(manifest) = local::is_package_installed(&pkg.name, pkg.scope)?
+        && manifest.version != version
+    {
+        let config = config::read_config()?;
+        let rollback_enabled = pkg.rollback.unwrap_or(config.rollback_enabled);
+        if rollback_enabled {
+            rollback::backup_package(&pkg.name, pkg.scope)?;
         }
     }
 
@@ -211,6 +212,9 @@ pub fn run_installation(
         }
         write_manifest(&pkg, reason, installed_deps_list)?;
         write_sharable_manifest(&pkg, chosen_options, chosen_optionals)?;
+        if let Err(e) = recorder::record_package(&pkg) {
+            eprintln!("Warning: failed to record package installation: {}", e);
+        }
         println!("Collection '{}' installed successfully.", pkg.name.green());
         send_telemetry("install", &pkg);
         return Ok(());
@@ -285,6 +289,9 @@ pub fn run_installation(
         }
         write_manifest(&pkg, reason, installed_deps_list)?;
         write_sharable_manifest(&pkg, chosen_options, chosen_optionals)?;
+        if let Err(e) = recorder::record_package(&pkg) {
+            eprintln!("Warning: failed to record package installation: {}", e);
+        }
         println!("Configuration '{}' registered.", pkg.name.green());
 
         send_telemetry("install", &pkg);
@@ -295,116 +302,111 @@ pub fn run_installation(
         return Ok(());
     }
 
-    if let Some(mut manifest) = local::is_package_installed(&pkg.name, pkg.scope)? {
-        if manifest.reason == types::InstallReason::Dependency
-            && reason == types::InstallReason::Direct
-        {
-            println!("Updating package '{}' to be directly managed.", pkg.name);
-            manifest.reason = types::InstallReason::Direct;
-            local::write_manifest(&manifest)?;
-        }
+    if let Some(mut manifest) = local::is_package_installed(&pkg.name, pkg.scope)?
+        && manifest.reason == types::InstallReason::Dependency
+        && reason == types::InstallReason::Direct
+    {
+        println!("Updating package '{}' to be directly managed.", pkg.name);
+        manifest.reason = types::InstallReason::Direct;
+        local::write_manifest(&manifest)?;
     }
 
-    if !force {
-        if let Some(manifest) = local::is_package_installed(&pkg.name, pkg.scope)? {
-            println!(
-                "{}",
-                format!(
-                    "Package '{}' version {} is already installed.",
-                    pkg.name, manifest.version
-                )
-                .yellow()
-            );
-            if pkg.package_type == types::PackageType::Service
-                && utils::ask_for_confirmation("Do you want to start the service?", yes)
-            {
-                service::start_service(&pkg)?;
-            }
-            return Ok(());
+    if !force && let Some(manifest) = local::is_package_installed(&pkg.name, pkg.scope)? {
+        println!(
+            "{}",
+            format!(
+                "Package '{}' version {} is already installed.",
+                pkg.name, manifest.version
+            )
+            .yellow()
+        );
+        if pkg.package_type == types::PackageType::Service
+            && utils::ask_for_confirmation("Do you want to start the service?", yes)
+        {
+            service::start_service(&pkg)?;
         }
+        return Ok(());
     }
 
     println!("Installing '{}' version '{}'", pkg.name, version);
 
-    if sharable_manifest.is_none() {
-        if let Some(deps) = &pkg.dependencies {
-            let platform = utils::get_platform()?;
-            let should_include_build = match mode {
-                InstallMode::ForceSource => true,
-                InstallMode::PreferBinary | InstallMode::Interactive | InstallMode::Updater(_) => {
-                    find_method(&pkg, "source", &platform).is_some()
-                        && find_method(&pkg, "binary", &platform).is_none()
-                        && find_method(&pkg, "com_binary", &platform).is_none()
-                }
-            };
-
-            if should_include_build {
-                if let Some(build_deps) = &deps.build {
-                    dependencies::resolve_and_install_required(
-                        &build_deps.get_required_simple(),
-                        &pkg.name,
-                        &version,
-                        pkg.scope,
-                        yes,
-                        processed_deps,
-                        &mut installed_deps_list,
-                    )?;
-                    dependencies::resolve_and_install_required_options(
-                        &build_deps.get_required_options(),
-                        &pkg.name,
-                        &version,
-                        pkg.scope,
-                        yes,
-                        processed_deps,
-                        &mut installed_deps_list,
-                        &mut chosen_options,
-                    )?;
-                    dependencies::resolve_and_install_optional(
-                        build_deps.get_optional(),
-                        &pkg.name,
-                        &version,
-                        pkg.scope,
-                        yes,
-                        processed_deps,
-                        &mut installed_deps_list,
-                        &mut chosen_optionals,
-                        Some("build"),
-                    )?;
-                }
+    if sharable_manifest.is_none()
+        && let Some(deps) = &pkg.dependencies
+    {
+        let platform = utils::get_platform()?;
+        let should_include_build = match mode {
+            InstallMode::ForceSource => true,
+            InstallMode::PreferBinary | InstallMode::Interactive | InstallMode::Updater(_) => {
+                find_method(&pkg, "source", &platform).is_some()
+                    && find_method(&pkg, "binary", &platform).is_none()
+                    && find_method(&pkg, "com_binary", &platform).is_none()
             }
+        };
 
-            if let Some(runtime_deps) = &deps.runtime {
-                dependencies::resolve_and_install_required(
-                    &runtime_deps.get_required_simple(),
-                    &pkg.name,
-                    &version,
-                    pkg.scope,
-                    yes,
-                    processed_deps,
-                    &mut installed_deps_list,
-                )?;
-                dependencies::resolve_and_install_required_options(
-                    &runtime_deps.get_required_options(),
-                    &pkg.name,
-                    &version,
-                    pkg.scope,
-                    yes,
-                    processed_deps,
-                    &mut installed_deps_list,
-                    &mut chosen_options,
-                )?;
-                dependencies::resolve_and_install_optional(
-                    runtime_deps.get_optional(),
-                    &pkg.name,
-                    &version,
-                    pkg.scope,
-                    yes,
-                    processed_deps,
-                    &mut installed_deps_list,
-                    &mut chosen_optionals,
-                    Some("runtime"),
-                )?;
-            }
+        if should_include_build && let Some(build_deps) = &deps.build {
+            dependencies::resolve_and_install_required(
+                &build_deps.get_required_simple(),
+                &pkg.name,
+                &version,
+                pkg.scope,
+                yes,
+                processed_deps,
+                &mut installed_deps_list,
+            )?;
+            dependencies::resolve_and_install_required_options(
+                &build_deps.get_required_options(),
+                &pkg.name,
+                &version,
+                pkg.scope,
+                yes,
+                processed_deps,
+                &mut installed_deps_list,
+                &mut chosen_options,
+            )?;
+            dependencies::resolve_and_install_optional(
+                build_deps.get_optional(),
+                &pkg.name,
+                &version,
+                pkg.scope,
+                yes,
+                processed_deps,
+                &mut installed_deps_list,
+                &mut chosen_optionals,
+                Some("build"),
+            )?;
+        }
+
+        if let Some(runtime_deps) = &deps.runtime {
+            dependencies::resolve_and_install_required(
+                &runtime_deps.get_required_simple(),
+                &pkg.name,
+                &version,
+                pkg.scope,
+                yes,
+                processed_deps,
+                &mut installed_deps_list,
+            )?;
+            dependencies::resolve_and_install_required_options(
+                &runtime_deps.get_required_options(),
+                &pkg.name,
+                &version,
+                pkg.scope,
+                yes,
+                processed_deps,
+                &mut installed_deps_list,
+                &mut chosen_options,
+            )?;
+            dependencies::resolve_and_install_optional(
+                runtime_deps.get_optional(),
+                &pkg.name,
+                &version,
+                pkg.scope,
+                yes,
+                processed_deps,
+                &mut installed_deps_list,
+                &mut chosen_optionals,
+                Some("runtime"),
+            )?;
         }
     }
 
@@ -419,13 +421,16 @@ pub fn run_installation(
     };
 
     if result.is_ok() {
-        if pkg.package_type == types::PackageType::Library {
-            if let Err(e) = library::install_pkg_config_file(&pkg) {
-                eprintln!("Warning: failed to install pkg-config file: {}", e);
-            }
+        if pkg.package_type == types::PackageType::Library
+            && let Err(e) = library::install_pkg_config_file(&pkg)
+        {
+            eprintln!("Warning: failed to install pkg-config file: {}", e);
         }
         write_manifest(&pkg, reason, installed_deps_list)?;
         write_sharable_manifest(&pkg, chosen_options, chosen_optionals)?;
+        if let Err(e) = recorder::record_package(&pkg) {
+            eprintln!("Warning: failed to record package installation: {}", e);
+        }
         if let Err(e) = utils::setup_path(pkg.scope) {
             eprintln!("{} Failed to configure PATH: {}", "Warning:".yellow(), e);
         }
@@ -444,14 +449,13 @@ pub fn run_installation(
                 "This package has post-installation commands. Do you want to run them?",
                 yes,
             )
+            && let Err(e) = run_post_install_hooks(&pkg)
         {
-            if let Err(e) = run_post_install_hooks(&pkg) {
-                eprintln!(
-                    "{} Post-installation commands failed: {}",
-                    "Warning:".yellow(),
-                    e
-                );
-            }
+            eprintln!(
+                "{} Post-installation commands failed: {}",
+                "Warning:".yellow(),
+                e
+            );
         }
     }
 
@@ -489,15 +493,15 @@ fn check_for_conflicts(pkg: &types::Package, yes: bool) -> Result<(), Box<dyn Er
         if let Some(bins_provided) = &pkg.bins {
             for bin in bins_provided {
                 for installed_pkg in &installed_packages {
-                    if let Some(installed_bins) = &installed_pkg.bins {
-                        if installed_bins.contains(bin) {
-                            conflict_messages.push(format!(
+                    if let Some(installed_bins) = &installed_pkg.bins
+                        && installed_bins.contains(bin)
+                    {
+                        conflict_messages.push(format!(
                                 "Binary '{}' provided by '{}' is already provided by installed package '{}'.",
                                 bin.cyan(),
                                 pkg.name.cyan(),
                                 installed_pkg.name.cyan()
                             ));
-                        }
                     }
                 }
             }
@@ -659,20 +663,20 @@ fn run_default_flow(pkg: &types::Package, platform: &str, yes: bool) -> Result<(
     }
 
     println!("No compressed binary found, checking for script...");
-    if let Some(method) = find_method(pkg, "script", platform) {
-        if utils::ask_for_confirmation("Found a 'script' method. Do you want to execute it?", yes) {
-            return handle_script_install(method, pkg);
-        }
+    if let Some(method) = find_method(pkg, "script", platform)
+        && utils::ask_for_confirmation("Found a 'script' method. Do you want to execute it?", yes)
+    {
+        return handle_script_install(method, pkg);
     }
 
     println!("No script found, checking for source...");
-    if let Some(method) = find_method(pkg, "source", platform) {
-        if utils::ask_for_confirmation(
+    if let Some(method) = find_method(pkg, "source", platform)
+        && utils::ask_for_confirmation(
             "Found a 'source' method. Do you want to build from source?",
             yes,
-        ) {
-            return handle_source_install(method, pkg);
-        }
+        )
+    {
+        return handle_source_install(method, pkg);
     }
 
     Err("No compatible and accepted installation method found for your platform.".into())
@@ -1086,10 +1090,10 @@ fn handle_com_binary_install(
         .join("bin");
     fs::create_dir_all(&store_dir)?;
     let mut dest_filename = pkg.name.clone();
-    if let Some(bp) = &method.binary_path {
-        if bp.ends_with(".exe") {
-            dest_filename = format!("{}.exe", pkg.name);
-        }
+    if let Some(bp) = &method.binary_path
+        && bp.ends_with(".exe")
+    {
+        dest_filename = format!("{}.exe", pkg.name);
     }
     let mut bin_path = store_dir.join(&dest_filename);
 
