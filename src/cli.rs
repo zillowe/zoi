@@ -8,7 +8,7 @@ use std::io;
 // Production, Development or Public
 const BRANCH: &str = "Production";
 const STATUS: &str = "Beta";
-const NUMBER: &str = "4.3.0";
+const NUMBER: &str = "4.3.6";
 
 /// Zoi - The Universal Package Manager & Environment Setup Tool.
 ///
