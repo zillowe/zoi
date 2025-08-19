@@ -493,16 +493,7 @@ pub fn check_path() {
             false
         });
 
-        eprintln!(
-            "{}: zoi's bin directory '{}' is not in your PATH.",
-            "Warning".yellow(),
-            zoi_bin_dir.display()
-        );
-
         if found_in_shell_config {
-            eprintln!(
-                "However, it was found in a shell configuration file. Please restart your terminal for the changes to take effect."
-            );
         } else {
             eprintln!(
                 "Please run 'zoi setup --scope user' or add it to your PATH manually for commands to be available."
