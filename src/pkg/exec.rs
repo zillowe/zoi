@@ -464,7 +464,23 @@ pub fn run(source: &str, args: Vec<String>) -> Result<(), Box<dyn Error>> {
     }
 
     println!("\n--- Executing '{}' ---\n", pkg.name.bold());
-    let status = Command::new(bin_path).args(args).status()?;
+
+    let mut command_str = format!("\"{}\"", bin_path.display());
+    if !args.is_empty() {
+        command_str.push(' ');
+        command_str.push_str(&args.join(" "));
+    }
+
+    println!("> {}", command_str.cyan());
+
+    let status = if cfg!(target_os = "windows") {
+        Command::new("pwsh")
+            .arg("-Command")
+            .arg(&command_str)
+            .status()?
+    } else {
+        Command::new("bash").arg("-c").arg(&command_str).status()?
+    };
 
     if let Some(code) = status.code() {
         std::process::exit(code);

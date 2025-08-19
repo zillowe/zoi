@@ -281,7 +281,7 @@ enum Commands {
     /// Download and execute a binary package without installing it
     #[command(
         alias = "x",
-        long_about = "Downloads a binary to a temporary cache and runs it. All arguments after the package name are passed directly to the executed command."
+        long_about = "Downloads a binary to a temporary cache and executes it in a shell. All arguments after the package name are passed as arguments to the shell command."
     )]
     Exec {
         /// Package name, local path, or URL to execute
