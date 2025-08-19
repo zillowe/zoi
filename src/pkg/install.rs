@@ -525,19 +525,6 @@ fn check_for_conflicts(pkg: &types::Package, yes: bool) -> Result<(), Box<dyn Er
         return Ok(());
     }
 
-    if utils::command_exists(&pkg.name) {
-        println!(
-            "Warning: Command '{}' exists but was not installed by Zoi.",
-            pkg.name.yellow()
-        );
-        if !utils::ask_for_confirmation(
-            "Do you want to continue and potentially overwrite it?",
-            yes,
-        ) {
-            return Err("Operation aborted by user.".into());
-        }
-    }
-
     Ok(())
 }
 
