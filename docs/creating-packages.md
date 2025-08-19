@@ -92,7 +92,7 @@ license: MIT
 - `version`: The current version of the software. You can also set this to `"{git}"` to automatically use the latest stable release tag from the GitHub or GitLab repository specified in the `git` field.
 - `description`: A short, one-sentence summary of what the package does.
 - `maintainer`: Your name, website and email.
-- `license`: The software's license (e.g. `MIT`, `GPL-3.0-or-later`).
+- `license`: The software's license. This should be a valid [SPDX license expression](https://spdx.github.io/spdx-spec/v2.3/SPDX-license-expressions/) (e.g, `MIT`, `GPL-3.0-or-later`, `MIT OR Apache-2.0`). If the license is proprietary and not covered by an SPDX identifier, use `Proprietary`. Zoi will check if the license is OSI-approved and will show a warning if it's not.
 
 It's also highly recommended to add:
 

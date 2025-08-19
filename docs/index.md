@@ -357,7 +357,10 @@ author:
   website: "https://author.com"
   # (Optional) URL to the author's public GPG key or the 40-character fingerprint.
   key: "https://example.com/author.gpg"
-# (Optional) The license of the package.
+# (Optional) The license of the package. Should be a valid SPDX license expression
+# (e.g. "MIT", "GPL-3.0-or-later", "MIT OR Apache-2.0").
+# Use "Proprietary" for non-SPDX/proprietary licenses.
+# Zoi will check for OSI-approved licenses and warn if the check fails.
 license: MIT
 # (Optional) The installation scope. Can be 'user' (default) or 'system'.
 scope: user
@@ -619,6 +622,12 @@ For the full list of supported dependency managers, usage semantics, and command
 <Accordions type="single">
   <Accordion title="How can I back up and restore my installed packages?">
     Zoi automatically keeps a record of all your installed packages in `~/.zoi/pkgs/zoi.pkgs.json`. You can back up this file. To restore all your packages on a new system, simply run `zoi install /path/to/your/zoi.pkgs.json`.
+  </Accordion>
+</Accordions>
+<br />
+<Accordions type="single">
+  <Accordion title="How do I ensure a reproducible installation?">
+    When you install a package with selectable or optional dependencies, Zoi saves your choices to a `<package_name>.manifest.yaml` file in the package's installation directory. You can commit this file to your project and run `zoi install /path/to/your/package.manifest.yaml` to reinstall the package with the exact same dependencies non-interactively.
   </Accordion>
 </Accordions>
 <br />

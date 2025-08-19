@@ -31,6 +31,8 @@ author:
   name: "Original Author"
   # A URL is also valid.
   key: "https://keys.example.com/author.gpg"
+# The license of the package. Must be a valid SPDX license expression.
+# Use 'Proprietary' for proprietary licenses.
 license: MIT
 
 # The 'installation' section defines how to install the package.
@@ -559,6 +561,58 @@ dependencies:
 - **required**: Always installed dependencies.
 - **optional**: Prompted dependencies; use `manager:package:description` for inline descriptions.
 - **options groups**: Under `required.options`, define selectable providers with `name`, `desc`, `all`, and `depends` where each item may have an inline description.
+
+---
+
+## Package with Selectable Required Dependencies
+
+For packages that can work with different backends or libraries, you can let the user choose which one to install. This is handled by structuring the `required` dependencies with an `options` block.
+
+```yaml
+# gui/my-cross-platform-app.pkg.yaml
+name: my-cross-platform-app
+repo: community
+version: 1.0.0
+description: An application that supports multiple GUI toolkits.
+tags: [gui]
+maintainer:
+  name: "Your Name"
+  email: "your.email@example.com"
+
+dependencies:
+  runtime:
+    required:
+      # A simple, non-optional required dependency.
+      - zoi:core-utils
+      # A group of selectable dependencies.
+      options:
+        - name: "GUI Toolkit"
+          desc: "Choose a GUI provider for the application"
+          all: false # The user must pick only one of these.
+          depends:
+            - native:qt6:Recommended for KDE Plasma
+            - native:gtk4:Recommended for GNOME
+            - native:libadwaita:For a modern GNOME look and feel
+
+  build:
+    required:
+      - zoi:build-utils
+    options:
+      - name: "Build GUI Toolkit"
+        desc: "Choose GUI dev libraries"
+        all: true
+        depends:
+          - native:qt6-dev:KDE toolkit headers and libs
+          - native:gtk4-dev:GNOME toolkit headers and libs
+```
+
+**Key Fields:**
+
+- `dependencies.runtime.required.options`: This defines a list of choices for the user.
+  - `name`: The name of the choice group (e.g. "GUI Toolkit").
+  - `desc`: A description of what the user is choosing.
+  - `all`: If `no`, the user can only select one option. If `yes`, they can select multiple (e.g. for installing multiple plugins).
+  - `depends`: A list of the actual dependencies the user can choose from. The `manager:package:description` format is used here.
 
 ---
 

@@ -71,10 +71,11 @@ post_install:
       - "zoi shell powershell"
 
 dependencies:
-  required:
-    - "native:git"
-  optional:
-    - "native:less"
+  runtime:
+    required:
+      - "native:git"
+    optional:
+      - "native:less"
   build:
     - "native:rust"
     - "native:cargo"
