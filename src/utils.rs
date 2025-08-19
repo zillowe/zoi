@@ -1,6 +1,5 @@
 use crate::pkg::resolve::SourceType;
 use colored::*;
-use spdx;
 use std::error::Error;
 use std::fmt::Display;
 use std::fs;

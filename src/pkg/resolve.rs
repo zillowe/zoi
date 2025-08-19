@@ -1,4 +1,4 @@
-use crate::pkg::{cache, config, pin, types};
+use crate::pkg::{config, pin, types};
 use chrono::Utc;
 use colored::*;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -679,18 +679,48 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, B
 
         let mut alt_resolved_source =
             if alt_source.starts_with("http://") || alt_source.starts_with("https://") {
-                if let Some(cached_path) = cache::get_cached_alt_source_path(&alt_source)? {
-                    println!("Found cached 'alt' source for URL: {}", alt_source.cyan());
-                    resolve_source_recursive(cached_path.to_str().unwrap(), depth + 1)?
-                } else {
-                    println!(
-                        "Downloading and caching 'alt' source from: {}",
-                        alt_source.cyan()
-                    );
-                    let downloaded_content = reqwest::blocking::get(&alt_source)?.text()?;
-                    let cached_path = cache::cache_alt_source(&alt_source, &downloaded_content)?;
-                    resolve_source_recursive(cached_path.to_str().unwrap(), depth + 1)?
+                println!("Downloading 'alt' source from: {}", alt_source.cyan());
+                let client = crate::utils::build_blocking_http_client(20)?;
+                let mut attempt = 0u32;
+                let response = loop {
+                    attempt += 1;
+                    match client.get(&alt_source).send() {
+                        Ok(resp) => break resp,
+                        Err(e) => {
+                            if attempt < 3 {
+                                eprintln!(
+                                    "{}: download failed ({}). Retrying...",
+                                    "Network".yellow(),
+                                    e
+                                );
+                                crate::utils::retry_backoff_sleep(attempt);
+                                continue;
+                            } else {
+                                return Err(format!(
+                                    "Failed to download file after {} attempts: {}",
+                                    attempt, e
+                                )
+                                .into());
+                            }
+                        }
+                    }
+                };
+                if !response.status().is_success() {
+                    return Err(format!(
+                        "Failed to download alt source (HTTP {}): {}",
+                        response.status(),
+                        alt_source
+                    )
+                    .into());
                 }
+
+                let content = response.text()?;
+                let temp_path = env::temp_dir().join(format!(
+                    "zoi-alt-{}.pkg.yaml",
+                    Utc::now().timestamp_nanos_opt().unwrap_or(0)
+                ));
+                fs::write(&temp_path, &content)?;
+                resolve_source_recursive(temp_path.to_str().unwrap(), depth + 1)?
             } else {
                 resolve_source_recursive(&alt_source, depth + 1)?
             };
