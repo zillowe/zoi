@@ -1,4 +1,4 @@
-use crate::pkg::{config_handler, dependencies, local, resolve, types};
+use crate::pkg::{config_handler, dependencies, local, recorder, resolve, types};
 use crate::utils;
 use colored::*;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -178,6 +178,13 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
     }
 
     local::remove_manifest(&pkg.name, scope)?;
+    if let Err(e) = recorder::remove_package_from_record(&pkg.name) {
+        eprintln!(
+            "{} Failed to remove package from SBOM: {}",
+            "Warning:".yellow(),
+            e
+        );
+    }
     println!("Removed manifest for '{}'.", pkg.name);
 
     match crate::pkg::telemetry::posthog_capture_event("uninstall", &pkg, env!("CARGO_PKG_VERSION"))

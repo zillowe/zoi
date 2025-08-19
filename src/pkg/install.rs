@@ -213,10 +213,10 @@ pub fn run_installation(
             println!("Collection has no dependencies to install.");
         }
         write_manifest(&pkg, reason, installed_deps_list)?;
-        write_sharable_manifest(&pkg, chosen_options, chosen_optionals)?;
-        if let Err(e) = recorder::record_package(&pkg) {
+        if let Err(e) = recorder::record_package(&pkg, &chosen_options, &chosen_optionals) {
             eprintln!("Warning: failed to record package installation: {}", e);
         }
+        write_sharable_manifest(&pkg, chosen_options, chosen_optionals)?;
         println!("Collection '{}' installed successfully.", pkg.name.green());
         send_telemetry("install", &pkg);
         return Ok(());
@@ -290,10 +290,10 @@ pub fn run_installation(
             }
         }
         write_manifest(&pkg, reason, installed_deps_list)?;
-        write_sharable_manifest(&pkg, chosen_options, chosen_optionals)?;
-        if let Err(e) = recorder::record_package(&pkg) {
+        if let Err(e) = recorder::record_package(&pkg, &chosen_options, &chosen_optionals) {
             eprintln!("Warning: failed to record package installation: {}", e);
         }
+        write_sharable_manifest(&pkg, chosen_options, chosen_optionals)?;
         println!("Configuration '{}' registered.", pkg.name.green());
 
         send_telemetry("install", &pkg);
@@ -429,10 +429,10 @@ pub fn run_installation(
             eprintln!("Warning: failed to install pkg-config file: {}", e);
         }
         write_manifest(&pkg, reason, installed_deps_list)?;
-        write_sharable_manifest(&pkg, chosen_options, chosen_optionals)?;
-        if let Err(e) = recorder::record_package(&pkg) {
+        if let Err(e) = recorder::record_package(&pkg, &chosen_options, &chosen_optionals) {
             eprintln!("Warning: failed to record package installation: {}", e);
         }
+        write_sharable_manifest(&pkg, chosen_options, chosen_optionals)?;
         if let Err(e) = utils::setup_path(pkg.scope) {
             eprintln!("{} Failed to configure PATH: {}", "Warning:".yellow(), e);
         }

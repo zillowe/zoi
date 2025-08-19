@@ -337,10 +337,3 @@ pub struct SharableInstallManifest {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub chosen_optionals: Vec<String>,
 }
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-pub struct RecordedPackage {
-    pub name: String,
-    pub repo: String,
-    pub version: String,
-}

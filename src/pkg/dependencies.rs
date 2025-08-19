@@ -1124,8 +1124,8 @@ pub fn resolve_and_install_required_options(
                     "--yes provided, installing all options for '{}'",
                     group.name
                 );
-                for (i, dep) in parsed_deps.iter().enumerate() {
-                    chosen_options.push(dep_strs[i].clone());
+                for dep in parsed_deps.iter() {
+                    chosen_options.push(format!("{}:{}", dep.manager, dep.package));
                     install_dependency(
                         dep,
                         parent_pkg_name,
@@ -1141,7 +1141,7 @@ pub fn resolve_and_install_required_options(
                     group.name
                 );
                 if let Some(dep) = parsed_deps.first() {
-                    chosen_options.push(dep_strs[0].clone());
+                    chosen_options.push(format!("{}:{}", dep.manager, dep.package));
                     install_dependency(
                         dep,
                         parent_pkg_name,
@@ -1183,8 +1183,8 @@ pub fn resolve_and_install_required_options(
             to_install.dedup();
 
             for index in to_install {
-                chosen_options.push(dep_strs[index].clone());
                 let dep = &parsed_deps[index];
+                chosen_options.push(format!("{}:{}", dep.manager, dep.package));
                 install_dependency(
                     dep,
                     parent_pkg_name,
@@ -1212,8 +1212,8 @@ pub fn resolve_and_install_required_options(
                 .default(0)
                 .interact()?;
 
-            chosen_options.push(dep_strs[selection].clone());
             let dep = &parsed_deps[selection];
+            chosen_options.push(format!("{}:{}", dep.manager, dep.package));
             install_dependency(
                 dep,
                 parent_pkg_name,
@@ -1323,8 +1323,8 @@ pub fn resolve_and_install_optional(
     to_install.dedup();
 
     for index in to_install {
-        chosen_optionals.push(dep_strs[index].clone());
         let dep = &parsed_deps[index];
+        chosen_optionals.push(format!("{}:{}", dep.manager, dep.package));
         install_dependency(
             dep,
             parent_pkg_name,
