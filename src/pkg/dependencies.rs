@@ -229,7 +229,8 @@ fn install_dependency(
             } else {
                 dep.package.to_string()
             };
-            if let Some(manifest) = local::is_package_installed(dep.package, scope)? {
+            if let Some(manifest) = local::is_package_installed(&dep.package.to_lowercase(), scope)?
+            {
                 match Version::parse(&manifest.version) {
                     Ok(installed_version) => {
                         if let Some(req) = &dep.req {

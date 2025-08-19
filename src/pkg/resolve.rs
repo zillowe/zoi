@@ -77,7 +77,7 @@ fn parse_source_string(source_str: &str) -> Result<PackageRequest, Box<dyn Error
         if let Some(pos) = s.rfind('/') {
             let (repo_str, name_str) = s.split_at(pos);
             if !name_str[1..].is_empty() {
-                repo = Some(repo_str.to_string());
+                repo = Some(repo_str.to_lowercase());
                 name = &name_str[1..];
             } else {
                 return Err("Invalid format: missing package name after repo path.".into());
@@ -634,7 +634,8 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, B
             .into());
         }
         println!(
-            "Warning: using external git repo '@git/{}' not from official Zoi database.",
+            "Warning: using external git repo '{}{}' not from official Zoi database.",
+            "@git/".yellow(),
             repo_name.yellow()
         );
         ResolvedSource {

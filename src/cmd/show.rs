@@ -38,7 +38,9 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
     }
     println!("\n{}\n", pkg.description);
 
-    println!("{}: {}", "License".bold(), pkg.license);
+    if !pkg.license.is_empty() {
+        println!("{}: {}", "License".bold(), pkg.license);
+    }
 
     let mut maintainer_line = format!(
         "{}: {} <{}>",
