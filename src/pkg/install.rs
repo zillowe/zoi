@@ -81,6 +81,8 @@ pub fn run_installation(
 ) -> Result<(), Box<dyn Error>> {
     let (pkg, version, sharable_manifest) = resolve::resolve_package_and_version(source)?;
 
+    utils::check_license(&pkg.license);
+
     if !display_updates(&pkg, yes)? {
         println!("Operation aborted.");
         return Ok(());

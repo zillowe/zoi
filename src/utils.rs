@@ -1,5 +1,6 @@
 use crate::pkg::resolve::SourceType;
 use colored::*;
+use spdx;
 use std::error::Error;
 use std::fmt::Display;
 use std::fs;
@@ -580,4 +581,46 @@ pub fn retry_backoff_sleep(attempt: u32) {
         % 200) as u64;
     let sleep_ms = (base_ms + jitter).min(8000);
     std::thread::sleep(Duration::from_millis(sleep_ms));
+}
+
+pub fn check_license(license: &str) {
+    if license.is_empty() {
+        println!(
+            "{}",
+            "Warning: Package does not have a license specified.".yellow()
+        );
+        return;
+    }
+
+    if license.eq_ignore_ascii_case("Proprietary") {
+        println!(
+            "{}",
+            "Warning: Package is using a proprietary license.".red()
+        );
+        return;
+    }
+
+    match spdx::Expression::parse(license) {
+        Ok(expr) => {
+            if !expr.evaluate(|req| match req.license {
+                spdx::LicenseItem::Spdx { id, .. } => id.is_osi_approved(),
+                spdx::LicenseItem::Other { .. } => false,
+            }) {
+                println!(
+                    "{}{}{}",
+                    "Warning: License '".yellow(),
+                    license.yellow().bold(),
+                    "' is not an OSI approved license.".yellow()
+                );
+            }
+        }
+        Err(_) => {
+            println!(
+                "{}{}{}",
+                "Warning: Could not parse license expression '".yellow(),
+                license.yellow().bold(),
+                "' It may not be a valid SPDX identifier.".yellow()
+            );
+        }
+    }
 }
