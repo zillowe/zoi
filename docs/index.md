@@ -528,10 +528,8 @@ For the full list of supported dependency managers, usage semantics, and command
   <Accordion title="How do optional dependencies work?">
     You can specify `optional` dependencies in your `pkg.yaml` under the `build`
     or `runtime` sections. When a user installs your package, they will be shown
-    the list of optional dependencies and their descriptions, and they can
-
-    choose which ones to install. This is great for plugins or extra features.
-
+    the list of optional dependencies and their descriptions, and they can choose which ones to install.
+    This is great for plugins or extra features.
   </Accordion>
 </Accordions>
 <br />
