@@ -3,7 +3,7 @@ title: Replacing Omarchy/Omakub with Zoi
 description: How to create a personalized development environment using Zoi, similar to Omarchy or Omakub.
 ---
 
-Omarchy and Omakub are tools that provide an opinionated setup for Arch Linux. While powerful, they are tailored to a specific operating system and a specific set of tools. Zoi allows you to achieve a similar result—a fully configured development environment—but with the flexibility to choose your own tools and run your setup on any platform Zoi supports (Linux, macOS, and Windows).
+Omarchy and Omakub are tools that provide an opinionated setup for Arch Linux/Ubuntu. While powerful, they are tailored to a specific operating system and a specific set of tools. Zoi allows you to achieve a similar result—a fully configured development environment—but with the flexibility to choose your own tools and run your setup on any platform Zoi supports (Linux, macOS, and Windows).
 
 This guide will walk you through creating your own personalized "Omarchy-like" setup using Zoi's `collection` and `config` packages.
 
@@ -50,9 +50,7 @@ dependencies:
     required:
       # Core Utilities
       - native:git
-      - zoi:neovim
-      - zoi:starship
-      - zoi:wezterm
+      - native:ghostty
 
       # Web Browsers (choose one)
       options:
@@ -67,11 +65,11 @@ dependencies:
     optional:
       # Programming Languages
       - zoi:node:For JavaScript/TypeScript development
-      - zoi:go:For Go development
-      - zoi:rust:For Rust development
+      - native:go:For Go development
+      - native:rust:For Rust development
 
       # Other Tools
-      - zoi:docker:For containerization
+      - native:docker:For containerization
 ```
 
 ### Key Concepts in this Collection:
@@ -79,7 +77,7 @@ dependencies:
 - **`type: collection`**: This tells Zoi that this package only installs dependencies.
 - **`dependencies.runtime.required`**: These packages will always be installed.
   - We use `native:git` to let Zoi pick the best way to install `git` on any OS.
-  - We pull other tools like `neovim` and `starship` from the Zoi repositories.
+  - We pull other tools like `neovim` and `astronvim` from the Zoi repositories.
 - **`options`**: This block gives you a choice during installation. Here, you can choose which browser to install, and Zoi will use the correct package manager for your OS.
 - **`optional`**: These packages are for tools you don't always need. Zoi will prompt you to ask if you want to install them.
 
@@ -106,8 +104,9 @@ maintainer:
 dependencies:
   runtime:
     required:
-      - zoi:starship
-      - zoi:neovim
+      - native:starship
+      - native:zsh
+      - native:neovim
 
 config:
   - platforms: ["linux", "macos"]
@@ -173,7 +172,7 @@ Zoi will now:
 
 1.  Install `my-dotfiles`, which in turn installs `starship` and `neovim`.
 2.  Run the `install` commands from `my-dotfiles` to clone your dotfiles and create symlinks.
-3.  Install the other `required` dependencies from your collection (`git`, `wezterm`).
+3.  Install the other `required` dependencies from your collection (`git`, `ghostty`).
 4.  Prompt you to choose a web browser.
 5.  Prompt you to select which `optional` tools you want to install.
 
