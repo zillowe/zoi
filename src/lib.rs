@@ -54,3 +54,43 @@ pub fn install(
     let mut processed_deps = HashSet::new();
     pkg::install::run_installation(source, mode, force, reason, yes, &mut processed_deps)
 }
+
+/// Updates a Zoi package if a new version is available.
+///
+/// This function checks the installed version of a package against the latest
+/// available version. If they differ, it performs an update.
+///
+/// # Arguments
+///
+/// * `source` - The package source identifier (e.g. "package-name").
+/// * `yes` - If true, automatically confirms any prompts.
+///
+/// # Returns
+///
+/// A `Result` containing an `UpdateResult` enum on success, or an error if the
+/// update fails.
+///
+/// # Example
+///
+/// ```no_run
+/// use zoi::{update, UpdateResult};
+///
+/// fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let source = "hello";
+///     match zoi::update(source, true)? {
+///         UpdateResult::Updated { from, to } => {
+///             println!("Updated from {} to {}", from, to);
+///         }
+///         UpdateResult::AlreadyUpToDate => {
+///             println!("Already up to date.");
+///         }
+///         UpdateResult::Pinned => {
+///             println!("Package is pinned, skipping update.");
+///         }
+///     }
+///     Ok(())
+/// }
+/// ```
+pub fn update(source: &str, yes: bool) -> Result<pkg::update::UpdateResult, Box<dyn Error>> {
+    pkg::update::run(source, yes)
+}
