@@ -6,7 +6,7 @@ description: How Zoi installs dependencies from external package managers and th
 Zoi can install dependencies via many ecosystem and OS package managers. This page documents:
 
 - How to declare dependencies in `pkg.yaml`
-- All supported managers, platforms, and the commands Zoi runs under the hood
+- All supported managers, their target platforms/ecosystems, and example usage
 - Notes and caveats for specific managers
 
 ## Declaring dependencies in `pkg.yaml`
@@ -94,59 +94,57 @@ dependencies:
 
 ## Supported managers
 
-Legend:
+Below is a comprehensive list of all supported dependency managers, their target platforms or ecosystems, and an example of how to use them in your `pkg.yaml`.
 
-- Platform: `linux/macos/windows/freebsd/openbsd`; or distro family
-- Install/Uninstall: the exact commands Zoi runs
-
-| Manager          | Platform/family        | Install command (approx)                    | Uninstall command (approx)           |
-| ---------------- | ---------------------- | ------------------------------------------- | ------------------------------------ |
-| `zoi`            | all                    | `zoi install`                               | `zoi uninstall`                      |
-| `native`         | auto (OS/distro)       | picks the default package manager           | picks corresponding remove command   |
-| `apt`, `apt-get` | Debian/Ubuntu          | `sudo apt install -y` `<pkg>`               | `sudo apt remove -y <pkg>`           |
-| `pacman`         | Arch                   | `sudo pacman -S --needed --noconfirm <pkg>` | `sudo pacman -Rns --noconfirm <pkg>` |
-| `yay`            | Arch (AUR helper)      | `yay -S --needed --noconfirm <pkg>`         | `yay -Rns --noconfirm <pkg>`         |
-| `paru`           | Arch (AUR helper)      | `paru -S --needed --noconfirm <pkg>`        | `paru -Rns --noconfirm <pkg>`        |
-| `pikaur`         | Arch (AUR helper)      | `pikaur -S --needed --noconfirm <pkg>`      | `pikaur -Rns --noconfirm <pkg>`      |
-| `trizen`         | Arch (AUR helper)      | `trizen -S --needed --noconfirm <pkg>`      | `trizen -Rns --noconfirm <pkg>`      |
-| `aur`            | Arch (AUR via makepkg) | `git clone + makepkg -si`                   | `pacman -Rns --noconfirm <pkg>`      |
-| `dnf`, `yum`     | Fedora/RHEL            | `sudo dnf install -y <pkg>`                 | `sudo dnf remove -y <pkg>`           |
-| `zypper`         | openSUSE               | `sudo zypper install -y <pkg>`              | `sudo zypper remove -y <pkg>`        |
-| `apk`            | Alpine                 | `sudo apk add <pkg>`                        | `sudo apk del <pkg>`                 |
-| `portage`        | Gentoo                 | `sudo emerge <pkg>`                         | `sudo emerge --unmerge <pkg>`        |
-| `xbps-install`   | Void Linux             | `sudo xbps-install -S <pkg>`                | `sudo xbps-remove -R <pkg>`          |
-| `eopkg`          | Solus                  | `sudo eopkg it -y <pkg>`                    | `sudo eopkg rm -y <pkg>`             |
-| `guix`           | GNU Guix               | `guix install <pkg>`                        | `guix remove <pkg>`                  |
-| `brew`           | macOS                  | `brew install <pkg>`                        | `brew uninstall <pkg>`               |
-| `brew-cask`      | macOS (GUI apps)       | `brew install --cask <pkg>`                 | `brew uninstall --cask <pkg>`        |
-| `mas`            | macOS App Store        | `mas install <id-or-name>`                  | `mas remove <id-or-name>`            |
-| `macports`       | macOS                  | `sudo port install <pkg>`                   | `sudo port uninstall <pkg>`          |
-| `scoop`          | Windows                | `scoop install <pkg>`                       | `scoop uninstall <pkg>`              |
-| `choco`          | Windows                | `choco install -y <pkg>`                    | `choco uninstall -y <pkg>`           |
-| `winget`         | Windows                | `winget install <pkg> --silent`             | `winget uninstall <pkg> --silent`    |
-| `snap`           | Linux (Snap)           | `sudo snap install <pkg>`                   | `sudo snap remove <pkg>`             |
-| `flatpak`        | Linux (Flathub)        | `sudo flatpak install flathub <pkg> -y`     | `flatpak uninstall -y <pkg>`         |
-| `pkg`            | FreeBSD                | `sudo pkg install -y <pkg>`                 | `sudo pkg delete -y <pkg>`           |
-| `pkg_add`        | OpenBSD                | `sudo pkg_add -I <pkg>`                     | `sudo pkg_delete <pkg>`              |
-| `cargo`          | Rust                   | `cargo install <crate>`                     | `cargo uninstall <crate>`            |
-| `cargo-binstall` | Rust (binary)          | `cargo binstall <crate>`                    | `cargo uninstall <crate>`            |
-| `go`             | Go                     | `go install <module>@latest`                | (no uninstall; manual)               |
-| `npm`            | Node.js                | `npm install -g <pkg>`                      | `npm uninstall -g <pkg>`             |
-| `yarn`           | Node.js                | `yarn global add <pkg>`                     | `yarn global remove <pkg>`           |
-| `pnpm`           | Node.js                | `pnpm add -g <pkg>`                         | `pnpm remove -g <pkg>`               |
-| `bun`            | Bun                    | `bun install -g <pkg>`                      | `bun remove -g <pkg>`                |
-| `volta`          | JavaScript             | `volta install <pkg>`                       | (no uninstall)                       |
-| `deno`           | Deno                   | `deno install -g <pkg>`                     | `deno uninstall <pkg>`               |
-| `jsr`            | JavaScript Registry    | `npx jsr add <pkg>`                         | (no uninstall)                       |
-| `pip`            | Python                 | `pip install <pkg>`                         | `pip uninstall -y <pkg>`             |
-| `pipx`           | Python CLI tools       | `pipx install <pkg>`                        | `pipx uninstall <pkg>`               |
-| `uv`             | Python CLI tools       | `uv tool install <pkg>`                     | `uv tool uninstall <pkg>`            |
-| `conda`          | Conda                  | `conda install -y <pkg>`                    | `conda uninstall -y <pkg>`           |
-| `gem`            | Ruby                   | `gem install <pkg>`                         | `gem uninstall <pkg>`                |
-| `composer`       | PHP                    | `composer global require <pkg>`             | `composer global remove <pkg>`       |
-| `dotnet`         | .NET                   | `dotnet tool install -g <pkg>`              | `dotnet tool uninstall -g <pkg>`     |
-| `nix`            | Nix                    | `nix-env -iA nixpkgs.<pkg>`                 | `nix-env -e <pkg>`                   |
-| `dart-pub`       | Dart                   | `dart pub global activate <pkg>`            | `dart pub global deactivate <pkg>`   |
+| Manager          | Platform / Ecosystem | Example Usage                         |
+| ---------------- | -------------------- | ------------------------------------- |
+| `zoi`            | Zoi (all)            | `zoi:my-package`                      |
+| `native`         | System (auto)        | `native:openssl`                      |
+| `script`         | URL (all)            | `script:example.com/install`          |
+| `apt`, `apt-get` | Debian/Ubuntu        | `apt:build-essential`                 |
+| `pacman`         | Arch Linux           | `pacman:base-devel`                   |
+| `yay`            | Arch Linux (AUR)     | `yay:google-chrome`                   |
+| `paru`           | Arch Linux (AUR)     | `paru:visual-studio-code-bin`         |
+| `pikaur`         | Arch Linux (AUR)     | `pikaur:spotify`                      |
+| `trizen`         | Arch Linux (AUR)     | `trizen:zoom`                         |
+| `aur`            | Arch Linux (AUR)     | `aur:slack-desktop`                   |
+| `dnf`, `yum`     | Fedora/RHEL          | `dnf:libX11-devel`                    |
+| `zypper`         | openSUSE             | `zypper:libopenssl-devel`             |
+| `apk`            | Alpine Linux         | `apk:build-base`                      |
+| `portage`        | Gentoo               | `portage:dev-libs/openssl`            |
+| `xbps-install`   | Void Linux           | `xbps-install:base-devel`             |
+| `eopkg`          | Solus                | `eopkg:system.devel`                  |
+| `guix`           | GNU Guix             | `guix:gcc-toolchain`                  |
+| `brew`           | macOS (Homebrew)     | `brew:node`                           |
+| `brew-cask`      | macOS (Homebrew)     | `brew-cask:visual-studio-code`        |
+| `mas`            | macOS App Store      | `mas:1295203466`                      |
+| `macports`       | macOS (MacPorts)     | `macports:openssl`                    |
+| `scoop`          | Windows              | `scoop:git`                           |
+| `choco`          | Windows (Chocolatey) | `choco:git`                           |
+| `winget`         | Windows              | `winget:Git.Git`                      |
+| `snap`           | Linux (Snapcraft)    | `snap:node`                           |
+| `flatpak`        | Linux (Flathub)      | `flatpak:org.gimp.GIMP`               |
+| `pkg`            | FreeBSD              | `pkg:git`                             |
+| `pkg_add`        | OpenBSD              | `pkg_add:git`                         |
+| `cargo`          | Rust                 | `cargo:ripgrep`                       |
+| `cargo-binstall` | Rust (binary)        | `cargo-binstall:ripgrep`              |
+| `go`             | Go                   | `go:golang.org/x/tools/cmd/goimports` |
+| `npm`            | Node.js              | `npm:typescript`                      |
+| `yarn`           | Node.js              | `yarn:prettier`                       |
+| `pnpm`           | Node.js              | `pnpm:eslint`                         |
+| `bun`            | Bun                  | `bun:elysia`                          |
+| `volta`          | JavaScript           | `volta:node`                          |
+| `deno`           | Deno                 | `deno:npm-chalk`                      |
+| `jsr`            | JavaScript Registry  | `jsr:@std/http`                       |
+| `pip`            | Python               | `pip:requests`                        |
+| `pipx`           | Python               | `pipx:black`                          |
+| `uv`             | Python               | `uv:ruff`                             |
+| `conda`          | Conda                | `conda:numpy`                         |
+| `gem`            | Ruby                 | `gem:rails`                           |
+| `composer`       | PHP                  | `composer:laravel/installer`          |
+| `dotnet`         | .NET                 | `dotnet:fantomas`                     |
+| `nix`            | Nix                  | `nix:nixpkgs.hello`                   |
+| `dart-pub`       | Dart                 | `dart-pub:shelf`                      |
 
 Notes:
 

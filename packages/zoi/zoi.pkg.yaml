@@ -70,6 +70,10 @@ post_install:
       - "echo Installing PowerShell profile completions for {name} {version}"
       - "zoi shell powershell"
 
+updates:
+  - type: update
+    message: "If you want to upgrade Zoi its recommended to run the 'upgrade' command instead"
+
 dependencies:
   runtime:
     required:
