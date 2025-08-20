@@ -68,3 +68,33 @@ This enum is used to track why a package was installed, which helps with managin
 | `Dependency` | The package was installed automatically as a dependency of another package. |
 
 For complete, runnable examples, please see the [Library Examples page](/docs/zds/zoi/lib/examples/).
+
+## The `update` Function
+
+This function checks if a package has a new version available and updates it.
+
+### Signature
+
+```rust
+pub fn update(
+    source: &str,
+    yes: bool,
+) -> Result<UpdateResult, Box<dyn std::error::Error>>
+```
+
+### Parameters
+
+| Parameter | Type   | Description                                                                                                    |
+| --------- | ------ | -------------------------------------------------------------------------------------------------------------- |
+| `source`  | `&str` | The identifier for the package to update (e.g. `"hello"`).                                                     |
+| `yes`     | `bool` | If `true`, Zoi will automatically answer "yes" to any confirmation prompts, making the update non-interactive. |
+
+### The `UpdateResult` Enum
+
+The `update` function returns an `UpdateResult` enum which indicates the outcome of the operation.
+
+| Variant                | Description                                                       |
+| ---------------------- | ----------------------------------------------------------------- |
+| `Updated { from, to }` | The package was successfully updated from one version to another. |
+| `AlreadyUpToDate`      | The installed package is already the latest version.              |
+| `Pinned`               | The package is pinned and was not updated.                        |

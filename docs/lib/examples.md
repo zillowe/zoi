@@ -74,3 +74,45 @@ fn main() {
 ```
 
 This example will cause Zoi to find the source code for `git`, download it, and run the build commands specified in its `pkg.yaml` file, even if a pre-compiled binary is available.
+
+## Updating a Package
+
+This example shows how to check for and apply updates to an installed package.
+
+### Code
+
+```rust
+use zoi::{update, UpdateResult};
+
+fn main() {
+    let package_source = "hello";
+
+    println!("Checking for updates for '{}'...", package_source);
+
+    // Call the update function.
+    match zoi::update(package_source, true) {
+        Ok(result) => match result {
+            UpdateResult::Updated { from, to } => {
+                println!("Successfully updated '{}' from v{} to v{}", package_source, from, to);
+            }
+            UpdateResult::AlreadyUpToDate => {
+                println!("'{}' is already up to date.", package_source);
+            }
+            UpdateResult::Pinned => {
+                println!("'{}' is pinned and was not updated.", package_source);
+            }
+        },
+        Err(e) => {
+            // This can happen if the package is not installed,
+            // or if the user cancels the update prompt.
+            eprintln!("Error updating '{}': {}", package_source, e);
+        }
+    }
+}
+```
+
+### Explanation
+
+1.  **Import necessary items:** We bring `update` and `UpdateResult` into scope.
+2.  **Call `zoi::update`:** We pass the package name and `true` to automatically confirm the update prompt.
+3.  **Handle the result:** We `match` on both the outer `Result` (for errors) and the inner `UpdateResult` to handle all possible outcomes and print an appropriate message.
