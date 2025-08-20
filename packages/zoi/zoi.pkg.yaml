@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/pkg.schema.json
 name: zoi
-repo: core
+repo: core/zillowe
 versions:
   stable: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/version.json
   public: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/version.json
