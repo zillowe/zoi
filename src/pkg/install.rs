@@ -126,7 +126,7 @@ pub fn run_installation(
             &pkg.name,
             &version,
             pkg.scope,
-            true, // yes = true
+            true,
             processed_deps,
             &mut installed_deps_list,
         )?;
@@ -135,7 +135,7 @@ pub fn run_installation(
             &pkg.name,
             &version,
             pkg.scope,
-            true, // yes = true
+            true,
             processed_deps,
             &mut installed_deps_list,
         )?;
