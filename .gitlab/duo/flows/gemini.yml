@@ -7,13 +7,13 @@ commands:
   - apt-get install --yes glab
   - echo "Installing gemini client"
   - npm install --global @google/gemini-cli
+  - echo $GOOGLE_CREDENTIALS > /root/credentials.json
   - echo "Configuring git"
   - git config --global user.email "gemini@gitlab.com"
   - git config --global user.name "Gemini"
   - echo "Running gemini"
   - |
-    GEMINI_API_KEY=$GOOGLE_API_KEY
-    gemini --yolo --debug --prompt "
+    GEMINI_API_KEY=$GOOGLE_API_KEY GOOGLE_APPLICATION_CREDENTIALS=/root/credentials.json gemini --yolo --debug --prompt "
     You are an AI assistant helping with GitLab operations.
 
     Context: $AI_FLOW_CONTEXT
