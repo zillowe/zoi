@@ -1,0 +1,55 @@
+image: node:22-slim
+commands:
+  - echo "Installing glab"
+  - export GITLAB_TOKEN=$GITLAB_TOKEN_GEMINI
+  - apt-get update --quiet && apt-get install --yes curl wget gpg git unzip && rm --recursive --force /var/lib/apt/lists/*
+  - curl --silent --show-error --location "https://raw.githubusercontent.com/upciti/wakemeops/main/assets/install_repository" | bash
+  - apt-get install --yes glab
+  - echo "Installing gemini client"
+  - npm install --global @google/gemini-cli
+  - echo "Configuring git"
+  - git config --global user.email "gemini@gitlab.com"
+  - git config --global user.name "Gemini"
+  - echo "Running gemini"
+  - |
+    GEMINI_API_KEY=$GOOGLE_API_KEY
+    gemini --yolo --debug --prompt "
+    You are an AI assistant helping with GitLab operations.
+
+    Context: $AI_FLOW_CONTEXT
+    Task: $AI_FLOW_INPUT
+    Event: $AI_FLOW_EVENT
+
+    Please execute the requested task using the available GitLab tools.
+    Be thorough in your analysis and provide clear explanations.
+
+    <important>
+    Please use the glab CLI to access data from GitLab. The glab CLI has already been authenticated. You can run the corresponding commands.
+
+    If you are asked to summarise an MR or issue or asked to provide more information then please post back a note to the MR/Issue so that the user can see it.
+
+    When generating the shell commands, avoid using $(), <(), or >(), so you don't raise: Error executing tool run_shell_command: Command substitution using $(), <(), or >() is not allowed for security reasons
+    </important>
+    "
+  - git checkout --branch $CI_WORKLOAD_REF origin/$CI_WORKLOAD_REF
+  - echo "Checking for git changes and pushing if any exist"
+  - |
+    if ! git diff --quiet || ! git diff --cached --quiet || [ --not --zero "$(git ls-files --others --exclude-standard)" ]; then
+      echo "Git changes detected, adding and pushing..."
+      git add .
+      if git diff --cached --quiet; then
+        echo "No staged changes to commit"
+      else
+        echo "Committing changes to branch: $CI_WORKLOAD_REF"
+        git commit --message "Gemini Code changes"
+        echo "Pushing changes up to $CI_WORKLOAD_REF"
+        git push https://gitlab-ci-token:$GITLAB_TOKEN@$GITLAB_HOST/gl-demo-ultimate-dev-ai-epic-17570/test-java-project.git $CI_WORKLOAD_REF
+        echo "Changes successfully pushed"
+      fi
+    else
+      echo "No git changes detected, skipping push"
+    fi
+variables:
+  - GITLAB_TOKEN_GEMINI
+  - GITLAB_HOST
+  - GOOGLE_API_KEY
