@@ -66,11 +66,13 @@ package:archive:
   stage: package
   image: ubuntu:latest
   before_script:
-    - apt-get update -y && apt-get install -y p7zip-full tar zstd bsdiff curl git jq unzip
+    - apt-get update -y && apt-get install -y p7zip-full tar zstd bsdiff curl git jq unzip gnupg coreutils
   script:
     - echo "Aggregating build artifacts..."
     - echo "Contents of the release directory:"
     - ls -lR ./build/release/
+    - echo "Importing GPG key..."
+    - echo "$GPG_PRIVATE_KEY_B32" | base32 -d | gpg --batch --import
     - echo "Running archive script..."
     - chmod +x ./build/archive.sh
     - ./build/archive.sh
@@ -95,7 +97,7 @@ create_release:
     GIT_DEPTH: 0
   before_script:
     - apk add --no-cache nodejs npm git coreutils bash
-    - npm i -g @google/gemini-cli
+    - npm i -g @google/gemini-cli@0.1.20
   script:
     - glab auth login --token $GITLAB_TOKEN_RELEASE
     - chmod +x ./build/notes.sh

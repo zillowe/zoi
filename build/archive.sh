@@ -13,6 +13,7 @@ ARCHIVE_DIR="./build/archived"
 CHECKSUM_FILE="${ARCHIVE_DIR}/checksums.txt"
 CHECKSUM_SHA256_FILE="${ARCHIVE_DIR}/checksums-256.txt"
 GITLAB_PROJECT_PATH="Zillowe/Zillwen/Zusty/Zoi"
+PUBLIC_KEY_URL="https://zillowe.pages.dev/keys/zillowe-main.asc"
 
 function check_command() {
     if ! command -v "$1" &> /dev/null;
@@ -23,11 +24,18 @@ function check_command() {
     fi
 }
 
+function sign_file() {
+    local file_to_sign=$1
+    echo -e "${CYAN}  -> Signing ${file_to_sign}...${NC}"
+    gpg --armor --detach-sign "$file_to_sign"
+}
+
 check_command "7z"
 check_command "zstd"
 check_command "bsdiff"
 check_command "curl"
 check_command "jq"
+check_command "gpg"
 
 if [ ! -d "$COMPILED_DIR" ]; then
     echo -e "${RED}Error: Compiled directory '${COMPILED_DIR}' not found.${NC}"
@@ -36,6 +44,9 @@ fi
 
 rm -rf "$ARCHIVE_DIR"
 mkdir -p "$ARCHIVE_DIR"
+
+echo -e "${CYAN}Fetching and importing public key...${NC}"
+curl -sL "$PUBLIC_KEY_URL" | gpg --import
 
 echo -e "${CYAN}Fetching the latest release tag from GitLab API...${NC}"
 
@@ -131,10 +142,12 @@ for binary_path in "$COMPILED_DIR"/*; do
     if [[ "$filename" == *"windows"* ]]; then
         (cd "$TMP_ARCHIVE_DIR" && 7z a -tzip -mx=9 "${archive_basename}.zip" "$final_binary_name" >/dev/null)
         mv "${TMP_ARCHIVE_DIR}/${archive_basename}.zip" "${ARCHIVE_DIR}/"
+        sign_file "${ARCHIVE_DIR}/${archive_basename}.zip"
     else
         (cd "$TMP_ARCHIVE_DIR" && tar -cf "${archive_basename}.tar" "$final_binary_name")
         zstd -T0 "${TMP_ARCHIVE_DIR}/${archive_basename}.tar"
         mv "${TMP_ARCHIVE_DIR}/${archive_basename}.tar.zst" "${ARCHIVE_DIR}/"
+        sign_file "${ARCHIVE_DIR}/${archive_basename}.tar.zst"
     fi
 
     rm -rf "$TMP_ARCHIVE_DIR"
@@ -181,6 +194,7 @@ else
                 PATCH_FILE="${ARCHIVE_DIR}/${filename}.patch"
                 echo -e "  -> Creating patch (old binary -> new binary) for ${filename}..."
                 bsdiff "$OLD_BINARY_PATH" "$new_binary_path" "$PATCH_FILE"
+                sign_file "$PATCH_FILE"
             fi
         else
             echo -e "${YELLOW}  -> Could not download old archive for ${filename}. Skipping patch.${NC}"
@@ -192,7 +206,7 @@ fi
 echo -e "${CYAN}🔐 Generating sha512 checksums...${NC}"
 (
   cd "$ARCHIVE_DIR" || exit 1
-  find . -maxdepth 1 -type f -not -name "checksums.txt" -exec sha512sum {} +
+  find . -maxdepth 1 -type f -not -name "checksums.txt" -not -name "*.asc" -exec sha512sum {} +
 ) > "$CHECKSUM_FILE"
 
 if [ -n "${CI_COMMIT_TAG:-}" ]; then
@@ -210,7 +224,7 @@ fi
 echo -e "${CYAN}🔐 Generating sha256 checksums...${NC}"
 (
   cd "$ARCHIVE_DIR" || exit 1
-  find . -maxdepth 1 -type f -not -name "checksums-sha256.txt" -exec sha256sum {} +
+  find . -maxdepth 1 -type f -not -name "checksums-sha256.txt" -not -name "*.asc" -exec sha256sum {} +
 ) > "$CHECKSUM_SHA256_FILE"
 
 if [ -n "${CI_COMMIT_TAG:-}" ]; then
@@ -224,6 +238,9 @@ if [ -n "${CI_COMMIT_TAG:-}" ]; then
     fi
     rm -f "$SOURCE_ARCHIVE_FILE"
 fi
+
+sign_file "$CHECKSUM_FILE"
+sign_file "$CHECKSUM_SHA256_FILE"
 
 echo -e "\n${GREEN}✅ Archiving, diffing, and checksum generation complete!${NC}"
 echo -e "${CYAN}Output files are in the '${ARCHIVE_DIR}' directory.${NC}"
