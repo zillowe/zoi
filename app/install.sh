@@ -29,9 +29,12 @@ require_util "zstd"
 require_util "grep"
 require_util "sed"
 require_util "tr"
+require_util "gpg"
+
+PUBLIC_KEY_URL="https://zillowe.pages.dev/keys/zillowe-main.asc"
 
 info "Fetching the latest release tag from GitLab API..."
-LATEST_TAG=$(curl --silent "https://gitlab.com/api/v4/projects/${GITLAB_PROJECT_PATH//\//%2F}/releases" | tr ',' '\n' | grep '"tag_name"' | sed 's/.*"tag_name":"\([^"]*\)".*/\1/' | head -n 1)
+LATEST_TAG=$(curl --silent "https://gitlab.com/api/v4/projects/${GITLAB_PROJECT_PATH//\/\%2F}/releases" | tr ',' '\n' | grep '"tag_name"' | sed 's/.*"tag_name":"\([^"]*\)".*/\1/' | head -n 1)
 
 if [ -z "$LATEST_TAG" ]; then
     error "Could not fetch the latest release tag. Please check the repository path and network."
@@ -53,7 +56,7 @@ case "$(uname -m)" in
     *)          error "Unsupported Arch: $(uname -m)" ;;
 esac
 
-INSTALL_DIR="${HOME}/.local/bin" 
+INSTALL_DIR="${HOME}/.local/bin"
 SUDO_CMD=""
 if [ "$(id -u)" -eq 0 ] || [ -n "${SUDO_USER-}" ]; then
     INSTALL_DIR="/usr/local/bin"
@@ -63,12 +66,15 @@ fi
 REPO_BASE_URL="https://gitlab.com/${GITLAB_PROJECT_PATH}/-/releases/${LATEST_TAG}/downloads"
 TARGET_ARCHIVE="zoi-${os}-${arch}.tar.zst"
 DOWNLOAD_URL="${REPO_BASE_URL}/${TARGET_ARCHIVE}"
+SIGNATURE_URL="${DOWNLOAD_URL}.asc"
 CHECKSUM_URL="${REPO_BASE_URL}/checksums.txt"
 INSTALL_PATH="${INSTALL_DIR}/${BIN_NAME}"
 
 TEMP_DIR=$(mktemp -d)
 TEMP_ARCHIVE="${TEMP_DIR}/${TARGET_ARCHIVE}"
+TEMP_SIGNATURE="${TEMP_DIR}/${TARGET_ARCHIVE}.asc"
 TEMP_CHECKSUMS="${TEMP_DIR}/checksums.txt"
+TEMP_PUBKEY="${TEMP_DIR}/pubkey.asc"
 
 info "Installing/Updating Zoi for ${os}(${arch})..."
 info "Target: ${INSTALL_PATH}"
@@ -115,6 +121,24 @@ if [ "$actual_hash" != "$expected_hash" ]; then
 else
     info "Checksum verified successfully."
 fi
+
+info "Verifying GPG signature..."
+if ! curl --fail --location --progress-bar --output "$TEMP_SIGNATURE" "$SIGNATURE_URL"; then
+    rm -rf "$TEMP_DIR"
+    error "Failed to download GPG signature file: ${SIGNATURE_URL}"
+fi
+if ! curl --fail --location --progress-bar --output "$TEMP_PUBKEY" "$PUBLIC_KEY_URL"; then
+    rm -rf "$TEMP_DIR"
+    error "Failed to download GPG public key: ${PUBLIC_KEY_URL}"
+fi
+
+if gpg --import "$TEMP_PUBKEY" >/dev/null 2>&1 && gpg --verify "$TEMP_SIGNATURE" "$TEMP_ARCHIVE" >/dev/null 2>&1; then
+    info "GPG signature verified successfully."
+else
+    rm -rf "$TEMP_DIR"
+    error "GPG signature verification failed! The downloaded file may be corrupt or tampered with."
+fi
+
 
 if [ -f "$INSTALL_PATH" ]; then
     info "Removing existing binary at ${INSTALL_PATH}..."

@@ -9,9 +9,11 @@ $ErrorActionPreference = "Stop"
 $GitLabProjectPath = "Zillowe/Zillwen/Zusty/Zoi"
 $InstallDir = Join-Path $env:USERPROFILE ".zoi\bin"
 $BinName = "zoi.exe"
+$PublicKeyUrl = "https://zillowe.pages.dev/keys/zillowe-main.asc"
 
 function Write-Info { param($Message) Write-Host "[INFO] $Message" -ForegroundColor Cyan }
 function Write-Success { param($Message) Write-Host "[SUCCESS] $Message" -ForegroundColor Green }
+function Write-Warning { param($Message) Write-Host "[WARN] $Message" -ForegroundColor Yellow }
 function Write-Error-Exit {
     param($Message, $Exception = $null)
     Write-Host "[ERROR] $Message" -ForegroundColor Red
@@ -57,13 +59,16 @@ try {
 $BaseUrl = "https://gitlab.com/$GitLabProjectPath/-/releases/$LatestTag/downloads"
 $TargetArchive = "zoi-${Os}-${Arch}.zip"
 $DownloadUrl = "$BaseUrl/$TargetArchive"
+$SignatureUrl = "$DownloadUrl.asc"
 $ChecksumUrl = "$BaseUrl/checksums.txt"
 $OutputPath = Join-Path $InstallDir $BinName
 
 $TempDir = Join-Path $env:TEMP ([System.Guid]::NewGuid().ToString())
 New-Item -ItemType Directory -Path $TempDir -Force | Out-Null
 $TempZipPath = Join-Path $TempDir $TargetArchive
+$TempSignaturePath = Join-Path $TempDir "$($TargetArchive).asc"
 $TempChecksumPath = Join-Path $TempDir "checksums.txt"
+$TempPubKeyPath = Join-Path $TempDir "pubkey.asc"
 
 Write-Info "Installing/Updating Zoi for $Os ($Arch)..."
 Write-Info "Target: $InstallDir"
@@ -103,6 +108,30 @@ try {
 catch {
     if (Test-Path $TempDir) { Remove-Item $TempDir -Recurse -Force }
     Write-Error-Exit "Security Verification Failed:" $_.Exception
+}
+
+$GpgPath = Get-Command gpg -ErrorAction SilentlyContinue
+if ($GpgPath) {
+    Write-Info "Verifying GPG signature..."
+    try {
+        Invoke-WebRequest -Uri $SignatureUrl -OutFile $TempSignaturePath -UseBasicParsing
+        Invoke-WebRequest -Uri $PublicKeyUrl -OutFile $TempPubKeyPath -UseBasicParsing
+
+        $GpgResult = & gpg --import $TempPubKeyPath 2>&1
+        $GpgResult = & gpg --verify $TempSignaturePath $TempZipPath 2>&1
+
+        if ($LASTEXITCODE -ne 0) {
+            throw "GPG signature verification failed. The downloaded file may be corrupt or tampered with. Details: $GpgResult"
+        }
+        Write-Success "GPG signature verified successfully."
+    }
+    catch {
+        if (Test-Path $TempDir) { Remove-Item $TempDir -Recurse -Force }
+        Write-Error-Exit "GPG Verification Failed:" $_.Exception
+    }
+} else {
+    Write-Warning "GPG command not found. Skipping signature verification."
+    Write-Warning "For enhanced security, please install GnuPG and ensure 'gpg.exe' is in your PATH."
 }
 
 if (Test-Path $OutputPath) {
