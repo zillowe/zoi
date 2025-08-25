@@ -29,13 +29,13 @@ async function installZoi() {
 
   if (os === "win32") {
     scriptUrl =
-      "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.ps1";
+      "https://zillowe.pages.dev/scripts/zoi/install.ps1";
     scriptName = "install.ps1";
     shell = "powershell.exe";
     shellArgs = ["-ExecutionPolicy", "Bypass", "-File"];
   } else if (os === "linux" || os === "darwin") {
     scriptUrl =
-      "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.sh";
+      "https://zillowe.pages.dev/scripts/zoi/install.sh";
     scriptName = "install.sh";
     shell = "bash";
     shellArgs = [];

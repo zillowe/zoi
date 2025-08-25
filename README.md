@@ -174,13 +174,13 @@ You can also use our installer scripts for a quick setup.
 **Linux / macOS :**
 
 ```sh
-curl -fsSL https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.sh | bash
+curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash
 ```
 
 **Windows:**
 
 ```powershell
-powershell -c "irm gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/install.ps1|iex"
+powershell -c "irm zillowe.pages.dev/scripts/zoi/install.ps1|iex"
 ```
 
 ### 🛠️ Build from Source
