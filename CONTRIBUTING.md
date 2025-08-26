@@ -143,7 +143,7 @@ Here are the most common commands defined in `zoi.yaml`:
 
 Please write clear and descriptive commit messages. A good commit message should explain the "what" and "why" of your changes.
 
-We mostly use [ZFGM Commits](https://zillowe.rf.gd/docs/methods/zfgm/commits/) when creating our commit messages, to use it with [GCT](https://gitlab.com/Zillowe/Zillwen/Zusty/GCT) follow [GCT Docs](https://zillowe.rf.gd/docs/zds/gct/).
+We mostly use [ZFGM Commits](https://zillowe.qzz.io/docs/methods/zfgm/commits) when creating our commit messages, to use it with [GCT](https://gitlab.com/Zillowe/Zillwen/Zusty/GCT) follow [GCT Docs](https://zillowe.qzz.io/docs/zds/gct).
 
 ## Code of Conduct
 

@@ -32,7 +32,7 @@
 <br/>
 
 <div align="center">
-  <a href="https://zillowe.rf.gd/docs/zds/zoi/"><strong>Docs</strong></a> •
+  <a href="https://zillowe.qzz.io/docs/zds/zoi"><strong>Docs</strong></a> •
   <a href="https://discord.gg/P4R7yaA3hf"><strong>Discord</strong></a> •
   <a href="./SECURITY.md"><strong>Security</strong></a> •
   <a href="./CONTRIBUTING.md"><strong>Contributing</strong></a> •
@@ -79,13 +79,13 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
 - **Universal Package Support:** Install packages from various sources: binaries, compressed archives, build from source, or installer scripts.
 - **Extensive Dependency Management:** Integrates with over 30+ package managers (`apt`, `brew`, `cargo`, `npm`, `pip`, `scoop`, etc.) to handle dependencies.
 - **Rich Dependencies:** Packages can define runtime and build dependencies with required, optional, and selectable options groups.
-- **Project Environments:** Easily define and manage project-specific environments and commands using [`zoi.yaml`](https://zillowe.rf.gd/docs/zds/zoi/project-config/).
+- **Project Environments:** Easily define and manage project-specific environments and commands using [`zoi.yaml`](https://zillowe.qzz.io/docs/zds/zoi/project-config).
 - **Repository-Based:** Manage packages from official or community repositories. Easily add your own.
 - **Intuitive CLI:** A simple and powerful command-line interface with helpful aliases for a better developer experience.
 - **Package Types:** Supports standard packages, meta-packages (collections), background services, configuration packages, extensions, libraries, and app templates.
 - **Secure Package Distribution:** Support for checksums and GPG signatures to verify package integrity and authenticity.
 - **Tag-based Discovery:** Search by and filter packages using tags for faster discovery.
-- **Use as a Library:** Integrate Zoi's package management features directly into your Rust applications. See the [Library documentation](https://zillowe.rf.gd/docs/zds/zoi/lib/) for details.
+- **Use as a Library:** Integrate Zoi's package management features directly into your Rust applications. See the [Library documentation](https://zillowe.qzz.io/docs/zds/zoi/lib) for details.
 - **Package Recording & Re-installation:** Automatically keeps a record of all installed packages, which can be used to easily reinstall them on a new machine.
 
 ## 🚀 Getting Started
@@ -257,7 +257,7 @@ What dependency installation we support.
 
 And many more.
 
-For more dependencies and information please visit the [Dependencies Page](https://zillowe.rf.gd/docs/zds/zoi/dependencies/) on Docs.
+For more dependencies and information please visit the [Dependencies Page](https://zillowe.qzz.io/docs/zds/zoi/dependencies) on Docs.
 
 Some of the package manager are OS specific, so when a dependency is in that package manager it only installs it for that OS.
 
@@ -327,7 +327,7 @@ Here are some common commands to get you started.
   zoi upgrade
   ```
 
-For more detailed information, please refer to the [Docs](https://zillowe.rf.gd/docs/zds/zoi/).
+For more detailed information, please refer to the [Docs](https://zillowe.qzz.io/docs/zds/zoi).
 
 ## 📦 Packaging Status
 
@@ -360,7 +360,7 @@ Zoi is hosted on multiple forges. The primary locations and mirrors are:
 - Test: Testing repo for new Zoi features and for new packages before release.
 - Archive: Archived packages that are no longer maintained.
 
-For details and CLI usage examples, see the docs page: [Repositories](https://zillowe.rf.gd/docs/zds/zoi/repositories/).
+For details and CLI usage examples, see the docs page: [Repositories](https://zillowe.qzz.io/docs/zds/zoi/repositories).
 
 ## 📜 License
 

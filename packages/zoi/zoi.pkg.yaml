@@ -5,7 +5,7 @@ versions:
   stable: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/version.json
   public: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/version.json
 description: Universal Package Manager & Environment Setup Tool
-website: https://zillowe.rf.gd/docs/zds/zoi/
+website: https://zillowe.qzz.io/docs/zds/zoi
 git: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi.git
 maintainer:
   name: "ZilloweZ"
@@ -14,8 +14,8 @@ maintainer:
   key: "E64EAD446DEE0781E4E294E25EE37FA1FC3B442D"
 author:
   name: "Zillowe Foundation"
-  website: "https://zillowe.rf.gd"
-  email: "contact@zillowe.rf.gd"
+  website: "https://zillowe.qzz.io"
+  email: "contact@zillowe.qzz.io"
 license: Apache-2.0
 bins: ["zoi"]
 conflicts: ["zoi"]

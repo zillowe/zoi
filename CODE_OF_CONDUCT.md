@@ -9,4 +9,4 @@ We value all members of our community and so in order to ensure a harassment-fre
 - Be mindful of what you say, be diligent in how you say it.
 - Show respect and, as always, be excellent to each other.
 
-Violations of these rules or any other form of abuse can be reported confidentially to [contact@zillowe.rf.gd](mailto:contact@zillowe.rf.gd). Members who do not adhere to our code of conduct will be banned either permanently or until they change their ways so as to be compatible with a friendly, open, and inclusive community.
+Violations of these rules or any other form of abuse can be reported confidentially to [contact@zillowe.qzz.io](mailto:contact@zillowe.qzz.io). Members who do not adhere to our code of conduct will be banned either permanently or until they change their ways so as to be compatible with a friendly, open, and inclusive community.

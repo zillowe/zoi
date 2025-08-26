@@ -5,13 +5,24 @@ edition = "2024"
 description = "Universal Package Manager & Environment Setup Tool"
 license = "Apache-2.0"
 repository = "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi"
-homepage = "https://zillowe.rf.gd/zds/zoi/"
-documentation = "https://zillowe.rf.gd/docs/zds/zoi/"
+homepage = "https://zillowe.qzz.io/zds/zoi"
+documentation = "https://zillowe.qzz.io/docs/zds/zoi"
 keywords = ["cli", "package-manager", "dev-tools", "universal", "environment"]
 categories = ["command-line-utilities", "development-tools"]
 readme = "README.md"
 build = "build.rs"
-exclude = ["packages/*", ".github", ".gitlab", "app/*", "docs/*", "build/*", ".gitlab-ci.yml", "CONTRIBUTING.md", "zoi.yaml", "GEMINI.md"]
+exclude = [
+  "packages/*",
+  ".github",
+  ".gitlab",
+  "app/*",
+  "docs/*",
+  "build/*",
+  ".gitlab-ci.yml",
+  "CONTRIBUTING.md",
+  "zoi.yaml",
+  "GEMINI.md",
+]
 
 [lib]
 name = "zoi"
@@ -52,7 +63,9 @@ regex = "1.11.1"
 reqwest = { version = "0.12.22", features = ["blocking"] }
 self_update = "0.42.0"
 semver = "1.0.26"
-sequoia-openpgp = { version = "2.0.0", default-features = false, features = ["crypto-openssl"] }
+sequoia-openpgp = { version = "2.0.0", default-features = false, features = [
+  "crypto-openssl",
+] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.141"
 serde_yaml = "0.9.34"
