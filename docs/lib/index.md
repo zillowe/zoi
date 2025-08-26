@@ -67,7 +67,7 @@ This enum is used to track why a package was installed, which helps with managin
 | `Direct`     | The package was installed directly by a user's request.                     |
 | `Dependency` | The package was installed automatically as a dependency of another package. |
 
-For complete, runnable examples, please see the [Library Examples page](/docs/zds/zoi/lib/examples/).
+For complete, runnable examples, please see the [Library Examples page](/docs/zds/zoi/lib/examples).
 
 ## The `update` Function
 

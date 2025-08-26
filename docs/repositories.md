@@ -114,4 +114,4 @@ You can install from nested repository also
 zoi install @git/zoi-repo/path/to/package
 ```
 
-For creating and publishing packages, see [Creating & Publishing Packages](/docs/zds/zoi/creating-packages/).
+For creating and publishing packages, see [Creating & Publishing Packages](/docs/zds/zoi/creating-packages).

@@ -869,7 +869,7 @@ zoi env web    # set up an environment by alias
 zoi env        # interactive environment chooser
 ```
 
-See full schema and best practices in [Project Configuration (zoi.yaml)](/docs/zds/zoi/project-config/).
+See full schema and best practices in [Project Configuration (zoi.yaml)](/docs/zds/zoi/project-config).
 
 ---
 

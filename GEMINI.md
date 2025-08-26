@@ -33,6 +33,6 @@ Maintaining up-to-date and consistent documentation is crucial for the Zoi proje
 ### Formatting and Style
 
 - **Framework:** The documentation uses [FumaDocs](https://fumadocs.dev). Please follow its conventions.
-- **Internal Linking:** When linking to other pages within the Zoi documentation, use the following absolute path format: `/docs/zds/zoi/{path-to-page-without-md-extension}/`.
-  - Example: A link to `docs/repositories.md` should be written as `[Repositories](/docs/zds/zoi/repositories/)`.
-  - Example: A link to `docs/lib/index.md` should be written as `[Library API](/docs/zds/zoi/lib/)`.
+- **Internal Linking:** When linking to other pages within the Zoi documentation, use the following absolute path format: `/docs/zds/zoi/{path-to-page-without-md-extension}`.
+  - Example: A link to `docs/repositories.md` should be written as `[Repositories](/docs/zds/zoi/repositories)`.
+  - Example: A link to `docs/lib/index.md` should be written as `[Library API](/docs/zds/zoi/lib)`.

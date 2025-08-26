@@ -9,7 +9,7 @@ This guide will provide you with everything you need to know to get started, fro
 
 ## Introduction
 
-Zoi is a universal package manager and environment setup tool, designed to simplify package management and environment configuration across multiple operating systems. It's part of the [Zillowe Development Suite (ZDS)](/docs/zds/) and aims to streamline your development workflow by managing tools and project environments with ease.
+Zoi is a universal package manager and environment setup tool, designed to simplify package management and environment configuration across multiple operating systems. It's part of the [Zillowe Development Suite (ZDS)](/docs/zds) and aims to streamline your development workflow by managing tools and project environments with ease.
 
 ## Features
 
@@ -17,13 +17,13 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
 - **Universal Package Support:** Install packages from various sources: binaries, compressed archives, build from source, or installer scripts.
 - **Extensive Dependency Management:** Integrates with over 30+ package managers (`apt`, `brew`, `cargo`, `npm`, `pip`, `scoop`, etc.) to handle dependencies.
 - **Rich Dependencies:** Packages can define runtime and build dependencies with required, optional, and selectable options groups.
-- **Project Environments:** Easily define and manage project-specific environments and commands using [`zoi.yaml`](/docs/zds/zoi/project-config/).
+- **Project Environments:** Easily define and manage project-specific environments and commands using [`zoi.yaml`](/docs/zds/zoi/project-config).
 - **Repository-Based:** Manage packages from official or community repositories. Easily add your own.
 - **Intuitive CLI:** A simple and powerful command-line interface with helpful aliases for a better developer experience.
 - **Package Types:** Supports standard packages, meta-packages (collections), background services, configuration packages, extensions, libraries, and app templates.
 - **Secure Package Distribution:** Support for checksums and GPG signatures to verify package integrity and authenticity.
 - **Tag-based Discovery:** Search by and filter packages using tags for faster discovery.
-- **Use as a Library:** Integrate Zoi's package management features directly into your Rust applications. See the [Library documentation](/docs/zds/zoi/lib/) for details.
+- **Use as a Library:** Integrate Zoi's package management features directly into your Rust applications. See the [Library documentation](/docs/zds/zoi/lib) for details.
 - **Package Recording & Re-installation:** Automatically keeps a record of all installed packages, which can be used to easily reinstall them on a new machine.
 
 ## Getting Started
@@ -55,7 +55,7 @@ You can install Zoi using a package manager, an installer script, or by building
 
 #### Arch Linux (AUR)
 
-Install `zoi-bin` (Pre-compiled binary) or `zoi` (built from source) from the AUR:
+Install [`zoi-bin`](https://aur.archlinux.org/packages/zoi-bin) (Pre-compiled binary) or [`zoi`](https://aur.archlinux.org/packages/zoi) (built from source) from the AUR:
 
 ```sh
 yay -S zoi-bin
@@ -235,7 +235,7 @@ Zoi provides a wide range of commands to manage your packages and environment. F
 | `update`     | Updates one or more packages to the latest version.                                                                                                                                                                                                                                                                   |
 | `pin`        | Pins a package to a specific version to prevent updates.                                                                                                                                                                                                                                                              |
 | `unpin`      | Unpins a package, allowing it to be updated again.                                                                                                                                                                                                                                                                    |
-| `rollback`   | Rolls back a package to its previously installed version. See [Package Rollbacks](/docs/zds/zoi/rollbacks/).                                                                                                                                                                                                          |
+| `rollback`   | Rolls back a package to its previously installed version. See [Package Rollbacks](/docs/zds/zoi/rollbacks).                                                                                                                                                                                                           |
 | `why`        | Explains why a package is installed (e.g. as a dependency or directly).                                                                                                                                                                                                                                               |
 | `clone`      | Clones the source code repository of one or more packages. A target directory can only be specified when cloning a single package.                                                                                                                                                                                    |
 | `exec`       | Downloads a binary to a temporary cache and runs it without installing it.                                                                                                                                                                                                                                            |
@@ -250,7 +250,7 @@ Zoi provides a wide range of commands to manage your packages and environment. F
 | `run`   | Executes a command from a local `zoi.yaml` file. Can be run interactively.     |
 | `env`   | Sets up project environments from a `zoi.yaml` file. Can be run interactively. |
 
-See the full schema and examples in [Project Configuration (zoi.yaml)](/docs/zds/zoi/project-config/).
+See the full schema and examples in [Project Configuration (zoi.yaml)](/docs/zds/zoi/project-config).
 
 ### Service Management
 
@@ -299,7 +299,7 @@ zoi repo rm community
 zoi repo ls
 ```
 
-For an overview of official repositories, mirrors, and repository tiers, see [Repositories](/docs/zds/zoi/repositories/).
+For an overview of official repositories, mirrors, and repository tiers, see [Repositories](/docs/zds/zoi/repositories).
 
 Zoi supports different types of packages, defined in the `.pkg.yaml` file.
 
@@ -315,7 +315,7 @@ Zoi supports different types of packages, defined in the `.pkg.yaml` file.
 
 ## Creating Packages (`pkg.yaml`)
 
-Creating a package for Zoi is done by defining a `pkg.yaml` file. This file contains all the metadata and instructions Zoi needs to install your software. For more examples, see the [Package Examples](/docs/zds/zoi/examples/) page.
+Creating a package for Zoi is done by defining a `pkg.yaml` file. This file contains all the metadata and instructions Zoi needs to install your software. For more examples, see the [Package Examples](/docs/zds/zoi/examples) page.
 
 ### `pkg.yaml` Structure
 
@@ -509,11 +509,11 @@ Zoi supports four types of installation methods within the `installation` list:
 3.  **`source`**: Clones a git repository and runs a series of build commands you define. Supports optional `tag` or `branch` (use only one). If none is provided, the default branch HEAD is used. `tag` can include placeholders like `v{version}`.
 4.  **`script`**: Downloads and executes an installation script (e.g. `install.sh`).
 
-For the list of supported archive formats for `com_binary`, see [Supported Archives for Compressed Binaries](/docs/zds/zoi/archives/).
+For the list of supported archive formats for `com_binary`, see [Supported Archives for Compressed Binaries](/docs/zds/zoi/archives).
 
 ### Dependencies
 
-For the full list of supported dependency managers, usage semantics, and commands Zoi runs, see [Dependencies & Supported Package Managers](/docs/zds/zoi/dependencies/).
+For the full list of supported dependency managers, usage semantics, and commands Zoi runs, see [Dependencies & Supported Package Managers](/docs/zds/zoi/dependencies).
 
 ## FAQ
 
@@ -523,7 +523,7 @@ For the full list of supported dependency managers, usage semantics, and command
     includes metadata like the package name, version, description, and
     installation instructions. The `Package` struct in [`types.rs`](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/src/pkg/types.rs) shows
     all available fields, and there's a [schema](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/app/pkg.schema.json) you can use in your `pkg.yaml` file.
-    For more info about creating and publishing a package please visit [this guide](/docs/zds/zoi/creating-packages/).
+    For more info about creating and publishing a package please visit [this guide](/docs/zds/zoi/creating-packages).
   </Accordion>
 </Accordions>
 <br />
@@ -615,7 +615,7 @@ For the full list of supported dependency managers, usage semantics, and command
 <br />
 <Accordions type="single">
   <Accordion title="How do I rollback a package update?">
-    If an update causes issues, you can revert to the previously installed version using `zoi rollback <package-name>`. Zoi automatically creates a backup before upgrading a package. For more details, see the [Package Rollbacks](/docs/zds/zoi/rollbacks/) guide.
+    If an update causes issues, you can revert to the previously installed version using `zoi rollback <package-name>`. Zoi automatically creates a backup before upgrading a package. For more details, see the [Package Rollbacks](/docs/zds/zoi/rollbacks) guide.
   </Accordion>
 </Accordions>
 <br />
@@ -633,7 +633,7 @@ For the full list of supported dependency managers, usage semantics, and command
 <br />
 <Accordions type="single">
   <Accordion title="Does Zoi collect your data?">
-    We believe in privacy by design. Zoi does **not** collect any data by default. You can choose to opt-in to our anonymous telemetry to help us improve the application. To learn more about what we collect and why, please see our [Telemetry & Analytics](/docs/zds/zoi/telemetry/) page.
+    We believe in privacy by design. Zoi does **not** collect any data by default. You can choose to opt-in to our anonymous telemetry to help us improve the application. To learn more about what we collect and why, please see our [Telemetry & Analytics](/docs/zds/zoi/telemetry) page.
   </Accordion>
 </Accordions>
 

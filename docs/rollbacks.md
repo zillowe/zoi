@@ -67,4 +67,4 @@ This setting will override the global configuration.
 The rollback feature is designed for quick recovery, not for managing multiple versions of a package.
 
 - It only stores **one** previous version.
-- To lock a package to a specific version and prevent it from being updated, use the [`zoi pin`](/docs/zds/zoi/) command instead.
+- To lock a package to a specific version and prevent it from being updated, use the [`zoi pin`](/docs/zds/zoi) command instead.
