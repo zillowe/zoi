@@ -268,7 +268,7 @@ fn try_sync(db_url: &str, verbose: bool) -> Result<(), Box<dyn std::error::Error
     }
 }
 
-pub fn run(verbose: bool, fallback: bool) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run(verbose: bool, fallback: bool, no_pm: bool) -> Result<(), Box<dyn std::error::Error>> {
     let db_url = get_db_url()?;
 
     if !fallback {
@@ -308,16 +308,18 @@ pub fn run(verbose: bool, fallback: bool) -> Result<(), Box<dyn std::error::Erro
 
     sync_git_repos(verbose)?;
 
-    println!(
-        "
+    if !no_pm {
+        println!(
+            "
 {}",
-        "Updating system configuration...".green()
-    );
-    let mut config_data = config::read_config()?;
-    config_data.native_package_manager = utils::get_native_package_manager();
-    config_data.package_managers = Some(utils::get_all_available_package_managers());
-    config::write_config(&config_data)?;
-    println!("System configuration updated.");
+            "Updating system configuration...".green()
+        );
+        let mut config_data = config::read_config()?;
+        config_data.native_package_manager = utils::get_native_package_manager();
+        config_data.package_managers = Some(utils::get_all_available_package_managers());
+        config::write_config(&config_data)?;
+        println!("System configuration updated.");
+    }
 
     Ok(())
 }

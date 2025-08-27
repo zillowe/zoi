@@ -95,6 +95,10 @@ enum Commands {
         /// Fallback to other mirrors if the default one fails
         #[arg(long)]
         fallback: bool,
+
+        /// Do not check for installed package managers
+        #[arg(long = "no-pm")]
+        no_package_managers: bool,
     },
 
     /// Lists installed or all available packages
@@ -452,6 +456,7 @@ pub fn run() {
                 command,
                 verbose,
                 fallback,
+                no_package_managers,
             } => {
                 if let Some(cmd) = command {
                     match cmd {
@@ -459,7 +464,7 @@ pub fn run() {
                         SyncCommands::Show => cmd::sync::show_registry(),
                     }
                 } else {
-                    cmd::sync::run(verbose, fallback);
+                    cmd::sync::run(verbose, fallback, no_package_managers);
                 }
                 Ok(())
             }

@@ -1,10 +1,10 @@
 use crate::pkg;
 use colored::*;
 
-pub fn run(verbose: bool, fallback: bool) {
+pub fn run(verbose: bool, fallback: bool, no_pm: bool) {
     println!("{}", "--- Syncing Package Database ---".yellow().bold());
 
-    if let Err(e) = pkg::sync::run(verbose, fallback) {
+    if let Err(e) = pkg::sync::run(verbose, fallback, no_pm) {
         eprintln!("\n{}: {}", "Error".red().bold(), e);
         std::process::exit(1);
     }
