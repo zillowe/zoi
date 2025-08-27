@@ -13,7 +13,7 @@ pub fn run(package_names: &[String], yes: bool) {
     }
 
     println!("{}", "--- Syncing Package Database ---".yellow().bold());
-    if let Err(e) = sync::run(false) {
+    if let Err(e) = sync::run(false, true) {
         eprintln!("{}: {}", "Sync failed".red().bold(), e);
         std::process::exit(1);
     }
@@ -116,7 +116,7 @@ fn run_update_single_logic(
 
 fn run_update_all_logic(yes: bool) -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", "--- Syncing Package Database ---".yellow().bold());
-    sync::run(false)?;
+    sync::run(false, true)?;
 
     let installed_packages = local::get_installed_packages()?;
     let pinned_packages = pin::get_pinned_packages()?;

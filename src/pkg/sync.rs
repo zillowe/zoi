@@ -10,6 +10,12 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
+const MIRRORS: &[&str] = &[
+    "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi-Pkgs.git",
+    "https://github.com/Zillowe/Zoi-Pkgs.git",
+    "https://codeberg.org/Zillowe/Zoi-Pkgs.git",
+];
+
 fn get_db_url() -> Result<String, Box<dyn std::error::Error>> {
     let config = config::read_config()?;
     Ok(config
@@ -33,7 +39,11 @@ fn sync_git_repos(verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    println!("\n{}", "Syncing external git repositories...".green());
+    println!(
+        "
+{}",
+        "Syncing external git repositories...".green()
+    );
 
     let config = config::read_config()?;
     let configured_git_repos_names: HashSet<String> = config
@@ -97,9 +107,8 @@ fn sync_git_repos(verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn run_verbose() -> Result<(), Box<dyn std::error::Error>> {
+fn run_verbose(db_url: &str) -> Result<(), Box<dyn std::error::Error>> {
     let db_path = get_db_path()?;
-    let db_url = get_db_url()?;
 
     if db_path.exists() {
         let status = Command::new("git")
@@ -116,7 +125,7 @@ fn run_verbose() -> Result<(), Box<dyn std::error::Error>> {
         let status = Command::new("git")
             .arg("clone")
             .arg("--progress")
-            .arg(&db_url)
+            .arg(db_url)
             .arg(&db_path)
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
@@ -128,9 +137,115 @@ fn run_verbose() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-pub fn run(verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
+fn run_non_verbose(db_url: &str) -> Result<(), Box<dyn std::error::Error>> {
     let db_path = get_db_path()?;
-    let db_url = get_db_url()?;
+    println!("Database path: {}", db_path.display());
+
+    let m = MultiProgress::new();
+    let fetch_pb = m.add(ProgressBar::new(0).with_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] Fetching: [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)")? 
+            .progress_chars("#>-"),
+    ));
+    let checkout_pb = m.add(ProgressBar::new(0).with_style(
+    ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] Checkout: [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)")? 
+            .progress_chars("#>-"),
+    ));
+
+    if db_path.exists() {
+        println!("Database found. Pulling changes...");
+        let repo = Repository::open(&db_path)?;
+        let mut remote = repo.find_remote("origin")?;
+
+        let mut cb = RemoteCallbacks::new();
+        let fetch_pb_clone = fetch_pb.clone();
+        cb.transfer_progress(move |stats| {
+            if stats.total_deltas() > 0 {
+                fetch_pb_clone.set_length(stats.total_deltas() as u64);
+                fetch_pb_clone.set_position(stats.indexed_deltas() as u64);
+            }
+            true
+        });
+
+        let mut fo = FetchOptions::new();
+        fo.remote_callbacks(cb);
+        remote.fetch(&["main"], Some(&mut fo), None)?;
+        fetch_pb.finish_with_message("Fetched.");
+
+        let fetch_head = repo.find_reference("FETCH_HEAD")?;
+        let fetch_commit = repo.reference_to_annotated_commit(&fetch_head)?;
+        let analysis = repo.merge_analysis(&[&fetch_commit])?;
+
+        if analysis.0.is_up_to_date() {
+            checkout_pb.finish_with_message("Already up to date.");
+        } else if analysis.0.is_fast_forward() {
+            let refname = "refs/heads/main";
+            let mut reference = repo.find_reference(refname)?;
+            reference.set_target(fetch_commit.id(), "Fast-forwarding")?;
+            repo.set_head(refname)?;
+
+            let mut checkout_builder = CheckoutBuilder::new();
+            let checkout_pb_clone = checkout_pb.clone();
+            checkout_builder.force().progress(move |_path, cur, total| {
+                if total > 0 {
+                    checkout_pb_clone.set_length(total as u64);
+                    checkout_pb_clone.set_position(cur as u64);
+                }
+            });
+
+            repo.checkout_head(Some(&mut checkout_builder))?;
+            checkout_pb.finish_with_message("Checked out.");
+        } else {
+            checkout_pb.finish_with_message("Cannot fast-forward.");
+            println!(
+                "{}",
+                "Cannot fast-forward. Please run `git pull` manually.".yellow()
+            );
+        }
+    } else {
+        println!("No local database found. Cloning from remote...");
+        if let Some(parent) = db_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        let mut cb = RemoteCallbacks::new();
+        let fetch_pb_clone = fetch_pb.clone();
+        cb.transfer_progress(move |stats| {
+            if stats.total_deltas() > 0 {
+                fetch_pb_clone.set_length(stats.total_deltas() as u64);
+            }
+            fetch_pb_clone.set_position(stats.indexed_deltas() as u64);
+            true
+        });
+
+        let mut fo = FetchOptions::new();
+        fo.remote_callbacks(cb);
+
+        let mut checkout_builder = CheckoutBuilder::new();
+        let checkout_pb_clone = checkout_pb.clone();
+        checkout_builder.progress(move |_path, cur, total| {
+            if total > 0 {
+                checkout_pb_clone.set_length(total as u64);
+            }
+            checkout_pb_clone.set_position(cur as u64);
+        });
+
+        RepoBuilder::new()
+            .fetch_options(fo)
+            .with_checkout(checkout_builder)
+            .clone(db_url, &db_path)?;
+
+        fetch_pb.finish_with_message("Fetched.");
+        checkout_pb.finish_with_message("Checked out.");
+    }
+
+    m.clear().ok();
+    Ok(())
+}
+
+fn try_sync(db_url: &str, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
+    let db_path = get_db_path()?;
 
     if db_path.exists()
         && let Ok(repo) = Repository::open(&db_path)
@@ -147,116 +262,57 @@ pub fn run(verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     if verbose {
-        run_verbose()?;
+        run_verbose(db_url)
     } else {
-        let db_path = get_db_path()?;
-        println!("Database path: {}", db_path.display());
+        run_non_verbose(db_url)
+    }
+}
 
-        let m = MultiProgress::new();
-        let fetch_pb = m.add(ProgressBar::new(0).with_style(
-        ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] Fetching: [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)")? 
-            .progress_chars("#>-"),
-        ));
-        let checkout_pb = m.add(ProgressBar::new(0).with_style(
-        ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] Checkout: [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)")? 
-            .progress_chars("#>-"),
-        ));
+pub fn run(verbose: bool, fallback: bool) -> Result<(), Box<dyn std::error::Error>> {
+    let db_url = get_db_url()?;
 
-        if db_path.exists() {
-            println!("Database found. Pulling changes...");
-            let repo = Repository::open(&db_path)?;
-            let mut remote = repo.find_remote("origin")?;
-
-            let mut cb = RemoteCallbacks::new();
-            let fetch_pb_clone = fetch_pb.clone();
-            cb.transfer_progress(move |stats| {
-                if stats.total_deltas() > 0 {
-                    fetch_pb_clone.set_length(stats.total_deltas() as u64);
-                    fetch_pb_clone.set_position(stats.indexed_deltas() as u64);
-                }
-                true
-            });
-
-            let mut fo = FetchOptions::new();
-            fo.remote_callbacks(cb);
-            remote.fetch(&["main"], Some(&mut fo), None)?;
-            fetch_pb.finish_with_message("Fetched.");
-
-            let fetch_head = repo.find_reference("FETCH_HEAD")?;
-            let fetch_commit = repo.reference_to_annotated_commit(&fetch_head)?;
-            let analysis = repo.merge_analysis(&[&fetch_commit])?;
-
-            if analysis.0.is_up_to_date() {
-                checkout_pb.finish_with_message("Already up to date.");
-            } else if analysis.0.is_fast_forward() {
-                let refname = "refs/heads/main";
-                let mut reference = repo.find_reference(refname)?;
-                reference.set_target(fetch_commit.id(), "Fast-forwarding")?;
-                repo.set_head(refname)?;
-
-                let mut checkout_builder = CheckoutBuilder::new();
-                let checkout_pb_clone = checkout_pb.clone();
-                checkout_builder.force().progress(move |_path, cur, total| {
-                    if total > 0 {
-                        checkout_pb_clone.set_length(total as u64);
-                        checkout_pb_clone.set_position(cur as u64);
-                    }
-                });
-
-                repo.checkout_head(Some(&mut checkout_builder))?;
-                checkout_pb.finish_with_message("Checked out.");
-            } else {
-                checkout_pb.finish_with_message("Cannot fast-forward.");
-                println!(
-                    "{}",
-                    "Cannot fast-forward. Please run `git pull` manually.".yellow()
-                );
+    if !fallback {
+        try_sync(&db_url, verbose)?;
+    } else {
+        let mut urls_to_try = vec![db_url.clone()];
+        for &mirror in MIRRORS {
+            if !urls_to_try.contains(&mirror.to_string()) {
+                urls_to_try.push(mirror.to_string());
             }
-        } else {
-            println!("No local database found. Cloning from remote...");
-            if let Some(parent) = db_path.parent() {
-                fs::create_dir_all(parent)?;
-            }
-
-            let mut cb = RemoteCallbacks::new();
-            let fetch_pb_clone = fetch_pb.clone();
-            cb.transfer_progress(move |stats| {
-                if stats.total_deltas() > 0 {
-                    fetch_pb_clone.set_length(stats.total_deltas() as u64);
-                }
-                fetch_pb_clone.set_position(stats.indexed_deltas() as u64);
-                true
-            });
-
-            let mut fo = FetchOptions::new();
-            fo.remote_callbacks(cb);
-
-            let mut checkout_builder = CheckoutBuilder::new();
-            let checkout_pb_clone = checkout_pb.clone();
-            checkout_builder.progress(move |_path, cur, total| {
-                if total > 0 {
-                    checkout_pb_clone.set_length(total as u64);
-                }
-                checkout_pb_clone.set_position(cur as u64);
-            });
-
-            RepoBuilder::new()
-                .fetch_options(fo)
-                .with_checkout(checkout_builder)
-                .clone(&db_url, &db_path)?;
-
-            fetch_pb.finish_with_message("Fetched.");
-            checkout_pb.finish_with_message("Checked out.");
         }
 
-        m.clear().ok();
+        let mut success = false;
+        for (i, url) in urls_to_try.iter().enumerate() {
+            if i == 0 {
+                println!("Attempting to sync with primary mirror: {}", url.cyan());
+            } else {
+                println!("Trying fallback: {}", url.cyan());
+            }
+
+            if let Err(e) = try_sync(url, verbose) {
+                println!("Sync with {} failed: {}", url.yellow(), e);
+            } else {
+                println!("{} with {}", "Sync successful".green(), url.cyan());
+                success = true;
+                break;
+            }
+        }
+
+        if !success {
+            return Err(
+                "All mirrors failed. Please check your connection and the repository status."
+                    .into(),
+            );
+        }
     }
 
     sync_git_repos(verbose)?;
 
-    println!("\n{}", "Updating system configuration...".green());
+    println!(
+        "
+{}",
+        "Updating system configuration...".green()
+    );
     let mut config_data = config::read_config()?;
     config_data.native_package_manager = utils::get_native_package_manager();
     config_data.package_managers = Some(utils::get_all_available_package_managers());

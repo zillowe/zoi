@@ -91,6 +91,10 @@ enum Commands {
         /// Show the full git output
         #[arg(short, long)]
         verbose: bool,
+
+        /// Fallback to other mirrors if the default one fails
+        #[arg(long)]
+        fallback: bool,
     },
 
     /// Lists installed or all available packages
@@ -444,14 +448,18 @@ pub fn run() {
                 cmd::check::run();
                 Ok(())
             }
-            Commands::Sync { command, verbose } => {
+            Commands::Sync {
+                command,
+                verbose,
+                fallback,
+            } => {
                 if let Some(cmd) = command {
                     match cmd {
                         SyncCommands::Set { url } => cmd::sync::set_registry(&url),
                         SyncCommands::Show => cmd::sync::show_registry(),
                     }
                 } else {
-                    cmd::sync::run(verbose);
+                    cmd::sync::run(verbose, fallback);
                 }
                 Ok(())
             }
