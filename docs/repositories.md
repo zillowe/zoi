@@ -39,6 +39,13 @@ zoi sync set github
 zoi sync set https://my-custom-registry.com/zoi-pkgs.git
 ```
 
+### Automatic Fallback
+
+To improve reliability, Zoi can automatically try syncing from official mirrors if your configured primary registry is unavailable.
+
+- **`zoi sync --fallback`**: If the sync fails, Zoi will attempt to use the other official mirrors (GitLab, GitHub, Codeberg) one by one until it succeeds.
+- **`zoi update`**: The `update` command uses this fallback mechanism by default to ensure that package updates are as reliable as possible.
+
 ## Repository tiers
 
 Zoi organizes packages into tiers. Use these to decide where a package belongs and to assess stability.
