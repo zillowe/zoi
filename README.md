@@ -36,6 +36,7 @@
   <a href="https://discord.gg/P4R7yaA3hf"><strong>Discord</strong></a> •
   <a href="./SECURITY.md"><strong>Security</strong></a> •
   <a href="./CONTRIBUTING.md"><strong>Contributing</strong></a> •
+  <a href="./ROADMAP.md"><strong>Roadmap</strong></a> •
   <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases"><strong>Changelog</strong></a>
   <br/>
   <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Bug%20Report"><strong>Report a Bug</strong></a> •
@@ -150,7 +151,7 @@ scoop install zoi
 
 #### Crates.io
 
-You can install `zoi` directly from [crates.io](https://crates.io/crates/zoi) using `cargo`:
+You can install `zoi` directly from [crates.io](https://crates.io/crates/zoi-rs) using `cargo`:
 
 ```sh
 cargo install zoi-rs

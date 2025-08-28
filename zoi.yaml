@@ -1,7 +1,5 @@
 name: "Zoi"
 packages:
-  - name: "rustc"
-    check: "rustc --version"
   - name: "cargo"
     check: "cargo --version"
 
