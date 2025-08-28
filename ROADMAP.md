@@ -70,6 +70,7 @@ platforms:
 ```
 
 - [ ] Better `make` command.
+- [ ] Better UI/UX experience
 - [ ] Add to `list` command `--all-nested` to show all the packages from nested repos.
 - [ ] Improve `run` and `env` commands with platform specific commands and envs.
 - [ ] Improve the library side of Zoi with better docs.
