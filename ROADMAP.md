@@ -6,6 +6,27 @@ Upcoming release: Beta 5.0.0
 
 ## New Features
 
+- [ ] Package command that package packages before installing them.
+      When installing or building a package from a pkg.yaml it will do like pacman PKGBUILD by getting all the files and info and packaging it into a name.pkg.tar.zst archive then installing it.
+      It will work like pacman, aur/yay
+      So when we have mirrors, it will package them and Zoi will install the pkg.tar.zst file and install it.
+      You can build a package archive using this command:
+      `$ zoi package file.pkg.yaml`
+      This will produce a file.pkg.tar.zst
+      This command will run on every new package (or update) on the mirrors.
+
+```sh
+$ zoi install fastfetch
+# Here we ask for confirmation if there's conflicts and checking if it's work on the user platform
+$ ... installing dependencies
+# Here we ask for confirmation about options and optional dependencies
+$ ... downloading the package
+$ ... preparing the package
+# Here's the fastfetch.pkg.tar.zst package archive begins installing, we need just that file for installing packages
+$ ... installing the package
+$ fastfetch from main installed!
+```
+
 - [ ] Project specific installation for packages
       Install packages to a specific project by adding `--local` flag, to run said package we do `zoi exec` command.
       `zoi exec` first check for installed packages locally, then installed package globally, then for cached packages.
