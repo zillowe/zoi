@@ -48,7 +48,8 @@ platforms:
     gpu: [nvidia@^340, amd] # optional, @ for driver version, semver
 ```
 
-- [ ] Better `make` command
+- [ ] Better `make` command.
+- [ ] Add to `list` command `--all-nested` to show all the packages from nested repos.
 - [ ] Improve `run` and `env` commands with platform specific commands and envs.
 - [ ] Improve the library side of Zoi with better docs.
 - [ ] More platforms support
