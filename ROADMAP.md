@@ -49,9 +49,13 @@ $ fastfetch from main installed!
       `man <package>` command for viewing a text or markdown manual.
       Add this to the pkg.yaml: `man: url-to-plain-text-or-markdown`
 - [ ] Tab completion for packages in active repos
+- [ ] PGP command
+      `pgp` command for managing public pgp keys to verify installed packages (`sig` field)
+      We have a collection of trusted pgp keys, you can import pgp keys to be trusted, also work with zoi type extension to import pgp keys from urls or custom/default registries.
 
 ## Enhancements & Improvements
 
+- [ ] Ability to add a pgp key from a custom registry in maintainer and author fields
 - [ ] Better platform choices
       something like this, you can add bulk if the others match:
 
