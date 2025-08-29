@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
 use std::path::Path;
@@ -22,16 +23,47 @@ pub struct PackageCheck {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum PlatformOrString {
+    String(String),
+    Platform(HashMap<String, String>),
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum PlatformOrStringVec {
+    StringVec(Vec<String>),
+    Platform(HashMap<String, Vec<String>>),
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum PlatformOrEnvMap {
+    EnvMap(HashMap<String, String>),
+    Platform(HashMap<String, HashMap<String, String>>),
+}
+
+impl Default for PlatformOrEnvMap {
+    fn default() -> Self {
+        PlatformOrEnvMap::EnvMap(HashMap::new())
+    }
+}
+
+#[derive(Debug, Deserialize, Clone)]
 pub struct CommandSpec {
     pub cmd: String,
-    pub run: String,
+    pub run: PlatformOrString,
+    #[serde(default)]
+    pub env: PlatformOrEnvMap,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct EnvironmentSpec {
     pub name: String,
     pub cmd: String,
-    pub run: Vec<String>,
+    pub run: PlatformOrStringVec,
+    #[serde(default)]
+    pub env: PlatformOrEnvMap,
 }
 
 pub fn load() -> Result<ProjectConfig, Box<dyn Error>> {

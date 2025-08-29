@@ -1,10 +1,14 @@
-use super::{config::ProjectConfig, executor};
+use super::{config, executor};
+use crate::utils;
 use colored::*;
 use dialoguer::{Select, theme::ColorfulTheme};
 use std::error::Error;
 use std::process::Command;
 
-pub fn setup(env_alias: Option<&str>, config: &ProjectConfig) -> Result<(), Box<dyn Error>> {
+pub fn setup(
+    env_alias: Option<&str>,
+    config: &config::ProjectConfig,
+) -> Result<(), Box<dyn Error>> {
     if config.environments.is_empty() {
         return Err("No environments defined in zoi.yaml".into());
     }
@@ -40,14 +44,39 @@ pub fn setup(env_alias: Option<&str>, config: &ProjectConfig) -> Result<(), Box<
 
     check_packages(config)?;
 
-    for cmd_str in &env_to_setup.run {
-        executor::run_shell_command(cmd_str)?;
+    let platform = utils::get_platform()?;
+
+    let run_cmds = match &env_to_setup.run {
+        config::PlatformOrStringVec::StringVec(v) => v.clone(),
+        config::PlatformOrStringVec::Platform(p) => p
+            .get(&platform)
+            .or_else(|| p.get("default"))
+            .cloned()
+            .ok_or_else(|| {
+                format!(
+                    "No commands found for platform '{}' and no default specified",
+                    platform
+                )
+            })?,
+    };
+
+    let env_vars = match &env_to_setup.env {
+        config::PlatformOrEnvMap::EnvMap(m) => m.clone(),
+        config::PlatformOrEnvMap::Platform(p) => p
+            .get(&platform)
+            .or_else(|| p.get("default"))
+            .cloned()
+            .unwrap_or_default(),
+    };
+
+    for cmd_str in &run_cmds {
+        executor::run_shell_command(cmd_str, &env_vars)?;
     }
 
     Ok(())
 }
 
-fn check_packages(config: &ProjectConfig) -> Result<(), Box<dyn Error>> {
+fn check_packages(config: &config::ProjectConfig) -> Result<(), Box<dyn Error>> {
     if config.packages.is_empty() {
         return Ok(());
     }
