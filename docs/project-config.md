@@ -12,6 +12,8 @@ Zoi can manage per-project commands and environments using a `zoi.yaml` file pla
 
 ## Schema
 
+The `zoi.yaml` file allows for simple and complex configurations, including platform-specific commands and environment variables.
+
 ```yaml
 # Required project name (used in output)
 name: my-project
@@ -25,26 +27,49 @@ packages:
     check: node --version
 
 # Optional: Short, named commands runnable via `zoi run <cmd>`
-# Each command has:
-# - cmd: alias name you type
-# - run: the shell command to execute
 commands:
-  - cmd: dev
-    run: npm run dev
+  # Simple command
   - cmd: test
     run: npm test
 
+  # Platform-specific command with environment variables
+  - cmd: dev
+    run:
+      # Platform is in format <os>-<arch>, e.g. linux-amd64, macos-arm64, windows-amd64
+      linux-amd64: npm run dev:linux
+      macos-amd64: npm run dev:mac
+      windows-amd64: npm run dev:win
+      default: npm run dev # Fallback for other platforms
+    env:
+      # Simple env vars for all platforms
+      API_KEY: "12345"
+      # Platform-specific env vars
+      platform:
+        linux-amd64:
+          ENDPOINT: "https://api.linux.dev"
+        macos-amd64:
+          ENDPOINT: "https://api.mac.dev"
+        default:
+          ENDPOINT: "https://api.dev"
+
 # Optional: Environment setups runnable via `zoi env <alias>`
-# Each environment has:
-# - name: human-friendly label (for interactive selection)
-# - cmd: alias name you type
-# - run: ordered list of shell commands executed sequentially
 environments:
   - name: Web development environment
     cmd: web
     run:
-      - npm ci
-      - npm run build
+      default:
+        - npm ci
+        - npm run build
+      windows-amd64:
+        - npm ci
+        - echo "Building for Windows..."
+        - npm run build:win
+    env:
+      default:
+        NODE_ENV: "production"
+      windows-amd64:
+        NODE_ENV: "production_win"
+
   - name: Rust toolchain setup
     cmd: rust
     run:
@@ -52,19 +77,29 @@ environments:
       - rustup component add clippy rustfmt
 ```
 
-Field reference:
+### Field Reference
 
-- name: string (required)
-- packages: list of objects (optional)
-  - name: string (label only)
-  - check: string (command to validate presence/version)
-- commands: list of objects (optional)
-  - cmd: string (alias)
-  - run: string (command)
-- environments: list of objects (optional)
-  - name: string (label)
-  - cmd: string (alias)
-  - run: list of strings (commands)
+- `name`: `string` (required)
+- `packages`: `list` of objects (optional)
+  - `name`: `string` (label only)
+  - `check`: `string` (command to validate presence/version)
+- `commands`: `list` of objects (optional)
+  - `cmd`: `string` (alias)
+  - `run`: `string` or `map` (command)
+    - If a `string`, it's the command for all platforms.
+    - If a `map`, keys are platforms (`<os>-<arch>`) and values are command strings. A `default` key can be used as a fallback.
+  - `env`: `map` (optional)
+    - Can be a simple `map` of `string: string` for environment variables.
+    - Can be a `map` where the key `platform` contains platform-specific environment variables, and other keys are global.
+- `environments`: `list` of objects (optional)
+  - `name`: `string` (label)
+  - `cmd`: `string` (alias)
+  - `run`: `list of strings` or `map` (commands)
+    - If a `list of strings`, it's the command list for all platforms.
+    - If a `map`, keys are platforms (`<os>-<arch>`) and values are lists of command strings. A `default` key can be used as a fallback.
+  - `env`: `map` (optional) - Same structure as in `commands`.
+
+Zoi determines the platform from the OS and architecture (e.g. `linux-amd64`, `macos-arm64`, `windows-amd64`).
 
 ## CLI usage
 
@@ -110,3 +145,4 @@ If `zoi.yaml` is missing, Zoi prints an error. If no commands or environments ar
 - Prefer explicit toolchain versions in environment steps to ensure reproducibility.
 - Use short, memorable `cmd` aliases.
 - Split long setups into multiple environments (e.g. `deps`, `build`, `lint`).
+- Use the `default` key in platform-specific maps to provide a good fallback experience.

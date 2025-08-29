@@ -842,17 +842,34 @@ packages:
     check: node --version
 
 commands:
-  - cmd: dev
-    run: npm run dev
+  # Simple command for all platforms
   - cmd: test
     run: npm test
+
+  # Platform-specific command
+  - cmd: dev
+    run:
+      linux-amd64: npm run dev:linux
+      macos-amd64: npm run dev:mac
+      windows-amd64: npm run dev:win
+      default: npm run dev
+    env:
+      API_KEY: "12345"
+      platform:
+        default:
+          ENDPOINT: "https://api.dev"
 
 environments:
   - name: Web build
     cmd: web
     run:
-      - npm ci
-      - npm run build
+      default:
+        - npm ci
+        - npm run build
+      windows-amd64:
+        - npm ci
+        - echo "Building for Windows..."
+        - npm run build:win
   - name: Rust toolchain
     cmd: rust
     run:
