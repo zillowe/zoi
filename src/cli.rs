@@ -1,6 +1,8 @@
 use crate::cmd;
 use crate::utils;
-use clap::{CommandFactory, Parser, Subcommand, ValueHint};
+use clap::{
+    ColorChoice, CommandFactory, FromArgMatches, Parser, Subcommand, ValueHint, builder::styling,
+};
 use clap_complete::Shell;
 use clap_complete::generate;
 use std::io;
@@ -17,6 +19,7 @@ const NUMBER: &str = "5.0.0";
 #[derive(Parser)]
 #[command(name = "zoi", author, about, long_about = None, disable_version_flag = true,
     trailing_var_arg = true,
+    color = ColorChoice::Always,
 )]
 pub struct Cli {
     #[command(subcommand)]
@@ -418,8 +421,22 @@ enum TelemetryAction {
 }
 
 pub fn run() {
+    let styles = styling::Styles::styled()
+        .header(styling::AnsiColor::Yellow.on_default() | styling::Effects::BOLD)
+        .usage(styling::AnsiColor::Green.on_default() | styling::Effects::BOLD)
+        .literal(styling::AnsiColor::Green.on_default())
+        .placeholder(styling::AnsiColor::Cyan.on_default());
+
     let commit: &str = option_env!("ZOI_COMMIT_HASH").unwrap_or("dev");
-    let cli = Cli::parse();
+    let mut cmd = Cli::command().styles(styles);
+    let matches = cmd.clone().get_matches();
+    let cli = match Cli::from_arg_matches(&matches) {
+        Ok(cli) => cli,
+        Err(err) => {
+            err.print().unwrap();
+            std::process::exit(1);
+        }
+    };
 
     utils::check_path();
 
@@ -594,6 +611,6 @@ pub fn run() {
             std::process::exit(1);
         }
     } else {
-        Cli::command().print_help().unwrap();
+        cmd.print_help().unwrap();
     }
 }

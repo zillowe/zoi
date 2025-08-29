@@ -42,7 +42,7 @@ ignored = ["openssl"]
 anyhow = "1.0.98"
 bsdiff = "0.2.1"
 chrono = { version = "0.4.41", features = ["serde"] }
-clap = { version = "4.5.41", features = ["derive"] }
+clap = { version = "4.5.41", features = ["derive", "color"] }
 clap_complete = "4.5.55"
 colored = "3.0.0"
 comfy-table = "7.1.4"
