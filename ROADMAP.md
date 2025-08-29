@@ -52,6 +52,7 @@ $ fastfetch from main installed!
 - [ ] PGP command
       `pgp` command for managing public pgp keys to verify installed packages (`sig` field)
       We have a collection of trusted pgp keys, you can import pgp keys to be trusted, also work with zoi type extension to import pgp keys from urls or custom/default registries.
+      PGP keys are stored at ~/.zoi/pgp/
 
 ## Enhancements & Improvements
 
