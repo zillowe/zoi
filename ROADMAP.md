@@ -53,9 +53,11 @@ $ fastfetch from main installed!
       `pgp` command for managing public pgp keys to verify installed packages (`sig` field)
       We have a collection of trusted pgp keys, you can import pgp keys to be trusted, also work with zoi type extension to import pgp keys from urls or custom/default registries.
       PGP keys are stored at ~/.zoi/pgp/
+- [ ] Dockerize the whole app
 
 ## Enhancements & Improvements
 
+- [ ] Better GitLab CI per-commit checks
 - [ ] Ability to add a pgp key from a custom registry in maintainer and author fields
 - [ ] Better platform choices
       something like this, you can add bulk if the others match:
@@ -75,6 +77,7 @@ platforms:
 ```
 
 - [ ] Better `make` command.
+- [ ] Add `--all-optional` to install command to accept all the optional dependencies
 - [ ] Better UI/UX experience
 - [x] Improve `run` and `env` commands with platform specific commands and envs.
 - [ ] Improve the library side of Zoi with better docs.

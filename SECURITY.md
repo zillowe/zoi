@@ -17,7 +17,7 @@
 | [Crates.io `zoi-rs`](https://crates.io/crates/zoi-rs)       | ❔        |
 | NPM\* `@zillowe/zoi`                                        | ❌        |
 
-Crates.io package could be out-of-date sometimes.
+Crates.io package can be out-of-date sometimes.
 
 The NPM package just runs the installer script.
 
@@ -42,7 +42,7 @@ zoi upgrade
 If you discover a security vulnerability, please follow these steps:
 
 1. **DO NOT** disclose the vulnerability publicly.
-2. Send a detailed report to: [GitLab Issues\*](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new), [GitLab Vulnerability](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/security/vulnerabilities/new), email: [contact@zillowe.qzz.io](mailto:zillowe.qzz.io) or [@ZilloweZ:matrix.org](https://matrix.to/#/@ZilloweZ:matrix.org).
+2. Send a detailed report to: [GitLab Issues\*](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new), [GitLab Vulnerability](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/security/vulnerabilities/new), email: [contact@zillowe.qzz.io](mailto:contact@zillowe.qzz.io) or [@ZilloweZ:matrix.org](https://matrix.to/#/@ZilloweZ:matrix.org).
 3. Include in your report:
    - A description of the vulnerability
    - Steps to reproduce the issue
