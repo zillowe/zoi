@@ -15,7 +15,7 @@
 | [Homebrew](https://github.com/Zillowe/homebrew-tap)         | ✔️        |
 | [Scoop](https://github.com/Zillowe/scoop)                   | ✔️        |
 | [Crates.io `zoi-rs`](https://crates.io/crates/zoi-rs)       | ❔        |
-| NPM\* `@zillowe/zoi`                                        | ❌        |
+| NPM `@zillowe/zoi`                                          | ❌        |
 
 Crates.io package can be out-of-date sometimes.
 
