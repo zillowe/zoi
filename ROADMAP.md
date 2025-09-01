@@ -49,12 +49,19 @@ $ fastfetch from main installed!
 - [ ] Man command for viewing manual
       `man <package>` command for viewing a text or markdown manual.
       Add this to the pkg.yaml: `man: url-to-plain-text-or-markdown`
-- [-] Tab completion for packages in active repos
+- [x] Tab completion for packages in active repos
 - [ ] PGP command
       `pgp` command for managing public pgp keys to verify installed packages (`sig` field)
       We have a collection of trusted pgp keys, you can import pgp keys to be trusted, also work with zoi type extension to import pgp keys from urls or custom/default registries.
       PGP keys are stored at ~/.zoi/pgp/
 - [ ] Dockerize the whole app
+- [ ] Add support for not just git registry but for also Cloudflare R2 and AWS S3 (and S3 compatible) storages to host packages and sync them, (in global config these are specified, and in `zoi` type extension).
+
+```sh
+$ zoi sync set this-is-a-url --s3 # or --r2
+$ Choose if its S3 AWS or S3 compatible # s3 only
+$ Enter credentials # saved at the global config
+```
 
 ## Enhancements & Improvements
 
