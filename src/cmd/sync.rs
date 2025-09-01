@@ -1,7 +1,8 @@
 use crate::pkg;
+use crate::utils;
 use colored::*;
 
-pub fn run(verbose: bool, fallback: bool, no_pm: bool) {
+pub fn run(verbose: bool, fallback: bool, no_pm: bool, no_shell_setup: bool) {
     println!("{}", "--- Syncing Package Database ---".yellow().bold());
 
     if let Err(e) = pkg::sync::run(verbose, fallback, no_pm) {
@@ -10,6 +11,24 @@ pub fn run(verbose: bool, fallback: bool, no_pm: bool) {
     }
 
     println!("{}", "Sync complete.".green());
+
+    if no_shell_setup {
+        return;
+    }
+
+    println!(
+        "\n{}",
+        "--- Setting up shell completions ---".yellow().bold()
+    );
+    if let Some(shell) = utils::get_current_shell() {
+        println!("Detected shell: {}", shell.to_string().cyan());
+        crate::cmd::shell::run(shell);
+    } else {
+        println!(
+            "{}",
+            "Could not detect shell. Skipping auto-completion setup.".yellow()
+        );
+    }
 }
 
 pub fn set_registry(url_or_keyword: &str) {

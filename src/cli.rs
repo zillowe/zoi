@@ -58,9 +58,19 @@ impl TypedValueParser for PackageValueParser {
     }
 
     fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {
-        Some(Box::new(utils::get_all_package_names().into_iter().map(
-            |s| PossibleValue::new(Box::leak(s.into_boxed_str()) as &str),
-        )))
+        Some(Box::new(
+            utils::get_all_packages_for_completion()
+                .into_iter()
+                .map(|pkg| {
+                    let help = if pkg.description.is_empty() {
+                        pkg.repo
+                    } else {
+                        format!("[{}] {}", pkg.repo, pkg.description)
+                    };
+                    PossibleValue::new(Box::leak(pkg.display.into_boxed_str()) as &'static str)
+                        .help(Box::leak(help.into_boxed_str()) as &'static str)
+                }),
+        ))
     }
 }
 
@@ -80,11 +90,22 @@ impl TypedValueParser for PackageValueParserForUpdate {
     }
 
     fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {
-        let mut packages = utils::get_all_package_names();
-        packages.push("all".to_string());
-        Some(Box::new(packages.into_iter().map(|s| {
-            PossibleValue::new(Box::leak(s.into_boxed_str()) as &str)
-        })))
+        let packages = utils::get_all_packages_for_completion()
+            .into_iter()
+            .map(|pkg| {
+                let help = if pkg.description.is_empty() {
+                    pkg.repo.clone()
+                } else {
+                    format!("[{}] {}", pkg.repo, pkg.description)
+                };
+                PossibleValue::new(Box::leak(pkg.display.into_boxed_str()) as &'static str)
+                    .help(Box::leak(help.into_boxed_str()) as &'static str)
+            });
+
+        let all_val = PossibleValue::new("all").help("Update all installed packages");
+        let all = std::iter::once(all_val);
+
+        Some(Box::new(all.chain(packages)))
     }
 }
 
@@ -104,9 +125,19 @@ impl TypedValueParser for PkgOrPathParser {
     }
 
     fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {
-        Some(Box::new(utils::get_all_package_names().into_iter().map(
-            |s| PossibleValue::new(Box::leak(s.into_boxed_str()) as &str),
-        )))
+        Some(Box::new(
+            utils::get_all_packages_for_completion()
+                .into_iter()
+                .map(|pkg| {
+                    let help = if pkg.description.is_empty() {
+                        pkg.repo
+                    } else {
+                        format!("[{}] {}", pkg.repo, pkg.description)
+                    };
+                    PossibleValue::new(Box::leak(pkg.display.into_boxed_str()) as &'static str)
+                        .help(Box::leak(help.into_boxed_str()) as &'static str)
+                }),
+        ))
     }
 }
 
@@ -171,6 +202,10 @@ enum Commands {
         /// Do not check for installed package managers
         #[arg(long = "no-pm")]
         no_package_managers: bool,
+
+        /// Do not attempt to set up shell completions after syncing
+        #[arg(long)]
+        no_shell_setup: bool,
     },
 
     /// Lists installed or all available packages
@@ -556,6 +591,7 @@ pub fn run() {
                 verbose,
                 fallback,
                 no_package_managers,
+                no_shell_setup,
             } => {
                 if let Some(cmd) = command {
                     match cmd {
@@ -563,7 +599,7 @@ pub fn run() {
                         SyncCommands::Show => cmd::sync::show_registry(),
                     }
                 } else {
-                    cmd::sync::run(verbose, fallback, no_package_managers);
+                    cmd::sync::run(verbose, fallback, no_package_managers, no_shell_setup);
                 }
                 Ok(())
             }

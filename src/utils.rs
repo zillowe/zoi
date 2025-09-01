@@ -8,6 +8,9 @@ use std::process::Command;
 use std::time::Duration;
 use walkdir::WalkDir;
 
+use clap_complete::Shell;
+use std::path::Path;
+
 pub fn is_admin() -> bool {
     #[cfg(windows)]
     {
@@ -250,12 +253,7 @@ pub fn print_repo_warning(repo_name: &Option<String>) {
         };
 
         if let Some(message) = warning_message {
-            println!(
-                "
-{}: {}",
-                "NOTE".yellow().bold(),
-                message.yellow()
-            );
+            println!("\n{}: {}", "NOTE".yellow().bold(), message.yellow());
         }
     }
 }
@@ -278,8 +276,7 @@ pub fn confirm_untrusted_source(source_type: &SourceType, yes: bool) -> Result<(
     };
 
     println!(
-        "
-{}: {}",
+        "\n{}: {}",
         "SECURITY WARNING".yellow().bold(),
         warning_message
     );
@@ -351,30 +348,20 @@ pub fn setup_path(scope: Scope) -> Result<(), Box<dyn Error>> {
                 home.join(".bashrc")
             };
             let cmd = format!(
-                "
-# Added by Zoi
-export PATH=\"{}:{}\n",
+                "\n# Added by Zoi\nexport PATH=\"{}:{}\"\n",
                 zoi_bin_str, "$PATH"
             );
             (path, cmd)
         } else if shell_name.contains("zsh") {
             let path = home.join(".zshrc");
             let cmd = format!(
-                "
-# Added by Zoi
-export PATH=\"{}:{}\n",
+                "\n# Added by Zoi\nexport PATH=\"{}:{}\"\n",
                 zoi_bin_str, "$PATH"
             );
             (path, cmd)
         } else if shell_name.contains("fish") {
             let path = home.join(".config/fish/config.fish");
-            let cmd = format!(
-                "
-# Added by Zoi
-set -gx PATH \"{}\" $PATH
-",
-                zoi_bin_str
-            );
+            let cmd = format!("\n# Added by Zoi\nset -gx PATH \"{}\" $PATH\n", zoi_bin_str);
 
             (path, cmd)
         } else if shell_name.contains("elvish") {
@@ -388,18 +375,14 @@ set paths = [ ~/.zoi/pkgs/bin $paths... ]
         } else if shell_name.contains("csh") || shell_name.contains("tcsh") {
             let path = home.join(".cshrc");
             let cmd = format!(
-                "
-# Added by Zoi
-setenv PATH=\"{}:{}\n",
+                "\n# Added by Zoi\nsetenv PATH=\"{}:{}\"\n",
                 zoi_bin_str, "$PATH"
             );
             (path, cmd)
         } else {
             let path = home.join(".profile");
             let cmd = format!(
-                "
-# Added by Zoi
-export PATH=\"{}:{}\n",
+                "\n# Added by Zoi\nexport PATH=\"{}:{}\"\n",
                 zoi_bin_str, "$PATH"
             );
             (path, cmd)
@@ -661,9 +644,18 @@ pub fn check_license(license: &str) {
     }
 }
 
-pub fn get_all_package_names() -> Vec<String> {
-    // Note: get_db_root is fallible, but we can't return a Result here
-    // for clap's value_parser. Return an empty vec on error.
+#[derive(serde::Deserialize)]
+struct PackageForCompletion {
+    description: Option<String>,
+}
+
+pub struct PackageCompletion {
+    pub display: String,
+    pub repo: String,
+    pub description: String,
+}
+
+pub fn get_all_packages_for_completion() -> Vec<PackageCompletion> {
     let db_root = if let Ok(path) = crate::pkg::resolve::get_db_root() {
         path
     } else {
@@ -680,13 +672,13 @@ pub fn get_all_package_names() -> Vec<String> {
         return Vec::new();
     }
 
-    let mut packages = std::collections::HashSet::new();
+    let mut packages = Vec::new();
     for repo_name in &active_repos {
         let repo_path = db_root.join(repo_name);
         if !repo_path.is_dir() {
             continue;
         }
-        for entry in WalkDir::new(repo_path)
+        for entry in WalkDir::new(&repo_path)
             .into_iter()
             .filter_map(|e| e.ok())
             .filter(|e| e.path().is_file() && e.path().extension().is_some_and(|ext| ext == "yaml"))
@@ -694,11 +686,50 @@ pub fn get_all_package_names() -> Vec<String> {
             if let Some(stem) = entry.path().file_stem()
                 && let Some(name) = stem.to_str().and_then(|s| s.strip_suffix(".pkg"))
             {
-                packages.insert(name.to_string());
+                let content = fs::read_to_string(entry.path()).unwrap_or_default();
+                let pkg_info: Result<PackageForCompletion, _> = serde_yaml::from_str(&content);
+
+                let description = match pkg_info {
+                    Ok(pi) => pi.description.unwrap_or_default(),
+                    Err(_) => String::new(),
+                };
+
+                let relative_path = entry.path().strip_prefix(&repo_path).unwrap();
+                let path_to_pkg = relative_path.with_file_name(name);
+                let full_pkg_id = format!(
+                    "@{}/{}",
+                    repo_name,
+                    path_to_pkg.to_string_lossy().replace('\\', "/")
+                );
+
+                packages.push(PackageCompletion {
+                    display: full_pkg_id,
+                    repo: repo_name.clone(),
+                    description,
+                });
             }
         }
     }
-    let mut package_list: Vec<String> = packages.into_iter().collect();
-    package_list.sort();
-    package_list
+    packages.sort_by(|a, b| a.display.cmp(&b.display));
+    packages
+}
+
+pub fn get_current_shell() -> Option<Shell> {
+    if cfg!(windows) {
+        return Some(Shell::PowerShell);
+    }
+
+    if let Ok(shell_path) = std::env::var("SHELL") {
+        let shell_name = Path::new(&shell_path).file_name()?.to_str()?;
+        match shell_name {
+            "bash" => Some(Shell::Bash),
+            "zsh" => Some(Shell::Zsh),
+            "fish" => Some(Shell::Fish),
+            "elvish" => Some(Shell::Elvish),
+            "pwsh" => Some(Shell::PowerShell),
+            _ => None,
+        }
+    } else {
+        None
+    }
 }
