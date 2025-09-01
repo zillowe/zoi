@@ -4,8 +4,8 @@ use colored::*;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::collections::HashSet;
 
-pub fn run(package_names: &[String], yes: bool) {
-    if package_names.len() == 1 && package_names[0] == "all" {
+pub fn run(all: bool, package_names: &[String], yes: bool) {
+    if all {
         if let Err(e) = run_update_all_logic(yes) {
             eprintln!("{}: {}", "Update failed".red().bold(), e);
         }

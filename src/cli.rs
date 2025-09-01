@@ -75,41 +75,6 @@ impl TypedValueParser for PackageValueParser {
 }
 
 #[derive(Clone, Debug)]
-struct PackageValueParserForUpdate;
-
-impl TypedValueParser for PackageValueParserForUpdate {
-    type Value = String;
-
-    fn parse_ref(
-        &self,
-        _cmd: &clap::Command,
-        _arg: Option<&clap::Arg>,
-        value: &std::ffi::OsStr,
-    ) -> Result<Self::Value, clap::Error> {
-        Ok(value.to_string_lossy().into_owned())
-    }
-
-    fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {
-        let packages = utils::get_all_packages_for_completion()
-            .into_iter()
-            .map(|pkg| {
-                let help = if pkg.description.is_empty() {
-                    pkg.repo.clone()
-                } else {
-                    format!("[{}] {}", pkg.repo, pkg.description)
-                };
-                PossibleValue::new(Box::leak(pkg.display.into_boxed_str()) as &'static str)
-                    .help(Box::leak(help.into_boxed_str()) as &'static str)
-            });
-
-        let all_val = PossibleValue::new("all").help("Update all installed packages");
-        let all = std::iter::once(all_val);
-
-        Some(Box::new(all.chain(packages)))
-    }
-}
-
-#[derive(Clone, Debug)]
 struct PkgOrPathParser;
 
 impl TypedValueParser for PkgOrPathParser {
@@ -225,7 +190,7 @@ enum Commands {
     /// Shows detailed information about a package
     Show {
         /// The name of the package to show
-        #[arg(value_parser = PackageValueParser)]
+        #[arg(value_parser = PackageValueParser, hide_possible_values = true)]
         package_name: String,
         /// Display the raw, unformatted package file
         #[arg(long)]
@@ -235,7 +200,7 @@ enum Commands {
     /// Pin a package to a specific version
     Pin {
         /// The name of the package to pin
-        #[arg(value_parser = PackageValueParser)]
+        #[arg(value_parser = PackageValueParser, hide_possible_values = true)]
         package: String,
         /// The version to pin the package to
         version: String,
@@ -244,23 +209,27 @@ enum Commands {
     /// Unpin a package, allowing it to be updated
     Unpin {
         /// The name of the package to unpin
-        #[arg(value_parser = PackageValueParser)]
+        #[arg(value_parser = PackageValueParser, hide_possible_values = true)]
         package: String,
     },
 
     /// Updates one or more packages to their latest versions
     #[command(alias = "up")]
     Update {
-        /// The name(s) of the package(s) to update. Use 'all' to update all installed packages.
-        #[arg(value_name = "PACKAGES", required = true, value_parser = PackageValueParserForUpdate)]
+        /// The name(s) of the package(s) to update
+        #[arg(value_name = "PACKAGES", value_parser = PackageValueParser, hide_possible_values = true)]
         package_names: Vec<String>,
+
+        /// Update all installed packages
+        #[arg(long, conflicts_with = "package_names")]
+        all: bool,
     },
 
     /// Installs one or more packages from a name, local file, or URL
     #[command(alias = "i")]
     Install {
         /// Package names, local paths, or URLs to .pkg.yaml files
-        #[arg(value_name = "SOURCES", required = true, value_hint = ValueHint::FilePath, value_parser = PkgOrPathParser)]
+        #[arg(value_name = "SOURCES", required = true, value_hint = ValueHint::FilePath, value_parser = PkgOrPathParser, hide_possible_values = true)]
         sources: Vec<String>,
         /// Force re-installation even if the package is already installed
         #[arg(long)]
@@ -279,7 +248,7 @@ enum Commands {
     )]
     Build {
         /// Package names, local paths, or URLs to .pkg.yaml files
-        #[arg(value_name = "SOURCES", required = true, value_hint = ValueHint::FilePath, value_parser = PkgOrPathParser)]
+        #[arg(value_name = "SOURCES", required = true, value_hint = ValueHint::FilePath, value_parser = PkgOrPathParser, hide_possible_values = true)]
         sources: Vec<String>,
         /// Force re-installation even if the package is already installed
         #[arg(long)]
@@ -293,7 +262,7 @@ enum Commands {
     )]
     Uninstall {
         /// One or more packages to uninstall
-        #[arg(value_name = "PACKAGES", required = true, value_parser = PackageValueParser)]
+        #[arg(value_name = "PACKAGES", required = true, value_parser = PackageValueParser, hide_possible_values = true)]
         packages: Vec<String>,
     },
 
@@ -323,7 +292,7 @@ enum Commands {
     )]
     Clone {
         /// Package names, local paths, or URLs to resolve the git repo from
-        #[arg(value_name = "SOURCES", required = true, value_hint = ValueHint::FilePath)]
+        #[arg(value_name = "SOURCES", required = true, value_hint = ValueHint::FilePath, hide_possible_values = true)]
         sources: Vec<String>,
 
         /// Optional directory to clone into. Defaults to the package name.
@@ -360,7 +329,7 @@ enum Commands {
     /// Explains why a package is installed
     Why {
         /// The name of the package to inspect
-        #[arg(value_parser = PackageValueParser)]
+        #[arg(value_parser = PackageValueParser, hide_possible_values = true)]
         package_name: String,
     },
 
@@ -407,7 +376,7 @@ enum Commands {
     )]
     Exec {
         /// Package name, local path, or URL to execute
-        #[arg(value_name = "SOURCE", value_parser = PkgOrPathParser, value_hint = ValueHint::FilePath)]
+        #[arg(value_name = "SOURCE", value_parser = PkgOrPathParser, value_hint = ValueHint::FilePath, hide_possible_values = true)]
         source: String,
 
         /// Arguments to pass to the executed command
@@ -476,7 +445,7 @@ Commands:
     /// Rollback a package to the previously installed version
     Rollback {
         /// The name of the package to rollback
-        #[arg(value_name = "PACKAGE", value_parser = PackageValueParser)]
+        #[arg(value_name = "PACKAGE", value_parser = PackageValueParser, hide_possible_values = true)]
         package: String,
     },
 
@@ -623,8 +592,15 @@ pub fn run() {
                 cmd::unpin::run(&package);
                 Ok(())
             }
-            Commands::Update { package_names } => {
-                cmd::update::run(&package_names, cli.yes);
+            Commands::Update { package_names, all } => {
+                if !all && package_names.is_empty() {
+                    let mut cmd = Cli::command();
+                    if let Some(subcmd) = cmd.find_subcommand_mut("update") {
+                        subcmd.print_help().unwrap();
+                    }
+                } else {
+                    cmd::update::run(all, &package_names, cli.yes);
+                }
                 Ok(())
             }
             Commands::Install {
