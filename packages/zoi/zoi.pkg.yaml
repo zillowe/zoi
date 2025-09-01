@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/pkg.schema.json
 name: zoi
-repo: core/zillowe
+repo: zillowe
 versions:
   stable: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/version.json
   public: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/version.json
@@ -11,7 +11,6 @@ maintainer:
   name: "ZilloweZ"
   website: "https://zillowez.rf.gd"
   email: "zillowez@gmail.com"
-  key: "E64EAD446DEE0781E4E294E25EE37FA1FC3B442D"
 author:
   name: "Zillowe Foundation"
   website: "https://zillowe.qzz.io"
@@ -68,6 +67,9 @@ post_install:
     commands:
       - "echo Installing PowerShell profile completions for {name} {version}"
       - "zoi shell powershell"
+  - platforms: [all]
+    commands:
+      - "zoi setup"
 
 updates:
   - type: update
