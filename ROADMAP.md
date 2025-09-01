@@ -65,11 +65,10 @@ $ Enter credentials # saved at the global config
 
 ## Enhancements & Improvements
 
-- [ ] Make update command `--all` instead of `all` because the user could have a package named `all` for some reason
+- [x] Make update command `--all` instead of `all` because the user could have a package named `all` for some reason
 - [ ] Make when packages in active repos 2 or more have the same name to bring an interactive prompt to choose which one (name, repo and description)
 - [ ] Better GitLab CI per-commit checks
-- [ ] Show license spdx check in `show` command
-- [ ] Ability to add a pgp key from a custom registry in maintainer and author fields
+- [x] Show license spdx check in `show` command
 - [ ] Better platform choices
       something like this, you can add bulk if the others match:
 
@@ -88,8 +87,7 @@ platforms:
 ```
 
 - [ ] Better `make` command.
-- [ ] Add `--all-optional` to install command to accept all the optional dependencies
-- [ ] Better UI/UX experience
+- [-] Add `--all-optional` to install command to accept all the optional dependencies
 - [x] Improve `run` and `env` commands with platform specific commands and envs.
 - [ ] Improve the library side of Zoi with better docs.
 - [ ] More platforms support
