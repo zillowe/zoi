@@ -39,7 +39,7 @@ $ fastfetch from main installed!
       To add or remove mcp servers we use these commands `add/rm mcp <package> <tool>`.
       `<tool>` is like Codex/Claude Code/Gemini/Cursor, etc.
       If the mcp is a binary it will not be added to path, it will be only executable via this command `mpc exec <package>`.
-      First party support for tools are: OpenCode (SST), Gemini CLI, Codex CLI, Claude Code, VSCode, Cursor and Windsurf.
+      First party support for tools are: OpenCode (SST), Gemini CLI, Codex CLI, Claude Code, VSCode, Cursor (and Cursor CLI) and Windsurf.
 - [ ] Publish command that creates an issue for adding new packages
       `publish ./path/to/name.pkg.yaml` this command will create an issue or GitHub, GitLab or Codeberg requesting to add a new package from a local pkg.yaml file.
       When publishing a new package you can choose a mirror `publish ... mirror-name`, if not specified it will choose the default mirror from your config file.

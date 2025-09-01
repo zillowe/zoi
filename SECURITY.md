@@ -24,7 +24,7 @@ The NPM package just runs the installer script.
 Meanings:
 
 - ✔️ Fully supported
-- ❔ Could be out-of-date sometimes
+- ❔ Could be out-of-date
 - ❌ Not supported
 
 ## Security Updates
