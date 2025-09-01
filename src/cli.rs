@@ -1,7 +1,8 @@
 use crate::cmd;
 use crate::utils;
 use clap::{
-    ColorChoice, CommandFactory, FromArgMatches, Parser, Subcommand, ValueHint, builder::styling,
+    ColorChoice, CommandFactory, FromArgMatches, Parser, Subcommand, ValueHint,
+    builder::PossibleValue, builder::TypedValueParser, builder::styling,
 };
 use clap_complete::Shell;
 use clap_complete::generate;
@@ -39,6 +40,74 @@ pub struct Cli {
         global = true
     )]
     yes: bool,
+}
+
+#[derive(Clone, Debug)]
+struct PackageValueParser;
+
+impl TypedValueParser for PackageValueParser {
+    type Value = String;
+
+    fn parse_ref(
+        &self,
+        _cmd: &clap::Command,
+        _arg: Option<&clap::Arg>,
+        value: &std::ffi::OsStr,
+    ) -> Result<Self::Value, clap::Error> {
+        Ok(value.to_string_lossy().into_owned())
+    }
+
+    fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {
+        Some(Box::new(utils::get_all_package_names().into_iter().map(
+            |s| PossibleValue::new(Box::leak(s.into_boxed_str()) as &str),
+        )))
+    }
+}
+
+#[derive(Clone, Debug)]
+struct PackageValueParserForUpdate;
+
+impl TypedValueParser for PackageValueParserForUpdate {
+    type Value = String;
+
+    fn parse_ref(
+        &self,
+        _cmd: &clap::Command,
+        _arg: Option<&clap::Arg>,
+        value: &std::ffi::OsStr,
+    ) -> Result<Self::Value, clap::Error> {
+        Ok(value.to_string_lossy().into_owned())
+    }
+
+    fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {
+        let mut packages = utils::get_all_package_names();
+        packages.push("all".to_string());
+        Some(Box::new(packages.into_iter().map(|s| {
+            PossibleValue::new(Box::leak(s.into_boxed_str()) as &str)
+        })))
+    }
+}
+
+#[derive(Clone, Debug)]
+struct PkgOrPathParser;
+
+impl TypedValueParser for PkgOrPathParser {
+    type Value = String;
+
+    fn parse_ref(
+        &self,
+        _cmd: &clap::Command,
+        _arg: Option<&clap::Arg>,
+        value: &std::ffi::OsStr,
+    ) -> Result<Self::Value, clap::Error> {
+        Ok(value.to_string_lossy().into_owned())
+    }
+
+    fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {
+        Some(Box::new(utils::get_all_package_names().into_iter().map(
+            |s| PossibleValue::new(Box::leak(s.into_boxed_str()) as &str),
+        )))
+    }
 }
 
 #[derive(clap::ValueEnum, Clone, Debug, Copy)]
@@ -121,6 +190,7 @@ enum Commands {
     /// Shows detailed information about a package
     Show {
         /// The name of the package to show
+        #[arg(value_parser = PackageValueParser)]
         package_name: String,
         /// Display the raw, unformatted package file
         #[arg(long)]
@@ -130,6 +200,7 @@ enum Commands {
     /// Pin a package to a specific version
     Pin {
         /// The name of the package to pin
+        #[arg(value_parser = PackageValueParser)]
         package: String,
         /// The version to pin the package to
         version: String,
@@ -138,6 +209,7 @@ enum Commands {
     /// Unpin a package, allowing it to be updated
     Unpin {
         /// The name of the package to unpin
+        #[arg(value_parser = PackageValueParser)]
         package: String,
     },
 
@@ -145,7 +217,7 @@ enum Commands {
     #[command(alias = "up")]
     Update {
         /// The name(s) of the package(s) to update. Use 'all' to update all installed packages.
-        #[arg(value_name = "PACKAGES", required = true)]
+        #[arg(value_name = "PACKAGES", required = true, value_parser = PackageValueParserForUpdate)]
         package_names: Vec<String>,
     },
 
@@ -153,7 +225,7 @@ enum Commands {
     #[command(alias = "i")]
     Install {
         /// Package names, local paths, or URLs to .pkg.yaml files
-        #[arg(value_name = "SOURCES", required = true, value_hint = ValueHint::FilePath)]
+        #[arg(value_name = "SOURCES", required = true, value_hint = ValueHint::FilePath, value_parser = PkgOrPathParser)]
         sources: Vec<String>,
         /// Force re-installation even if the package is already installed
         #[arg(long)]
@@ -165,11 +237,14 @@ enum Commands {
 
     /// Builds and installs one or more packages from a name, local file, or URL
     #[command(
-        long_about = "Builds one or more packages from various sources using the 'source' installation method:\n- A package name from the database (e.g. 'vim')\n- A local .pkg.yaml file (e.g. './my-package.pkg.yaml')\n- A URL pointing to a raw .pkg.yaml file"
+        long_about = "Builds one or more packages from various sources using the 'source' installation method:
+- A package name from the database (e.g. 'vim')
+- A local .pkg.yaml file (e.g. './my-package.pkg.yaml')
+- A URL pointing to a raw .pkg.yaml file"
     )]
     Build {
         /// Package names, local paths, or URLs to .pkg.yaml files
-        #[arg(value_name = "SOURCES", required = true, value_hint = ValueHint::FilePath)]
+        #[arg(value_name = "SOURCES", required = true, value_hint = ValueHint::FilePath, value_parser = PkgOrPathParser)]
         sources: Vec<String>,
         /// Force re-installation even if the package is already installed
         #[arg(long)]
@@ -183,7 +258,7 @@ enum Commands {
     )]
     Uninstall {
         /// One or more packages to uninstall
-        #[arg(value_name = "PACKAGES", required = true)]
+        #[arg(value_name = "PACKAGES", required = true, value_parser = PackageValueParser)]
         packages: Vec<String>,
     },
 
@@ -250,6 +325,7 @@ enum Commands {
     /// Explains why a package is installed
     Why {
         /// The name of the package to inspect
+        #[arg(value_parser = PackageValueParser)]
         package_name: String,
     },
 
@@ -296,7 +372,7 @@ enum Commands {
     )]
     Exec {
         /// Package name, local path, or URL to execute
-        #[arg(value_name = "SOURCE")]
+        #[arg(value_name = "SOURCE", value_parser = PkgOrPathParser, value_hint = ValueHint::FilePath)]
         source: String,
 
         /// Arguments to pass to the executed command
@@ -310,7 +386,13 @@ enum Commands {
     /// Manage package repositories
     #[command(
         aliases = ["repositories"],
-        long_about = "Manages the list of package repositories used by Zoi.\n\nCommands:\n- add (alias: a): Add an official repo by name or clone from a git URL.\n- remove|rm: Remove a repo from active list (repo rm <name>).\n- list|ls: Show active repositories by default; use 'list all' to show all available repositories.\n- git: Manage cloned git repositories (git ls, git rm <repo-name>)."
+        long_about = "Manages the list of package repositories used by Zoi.
+
+Commands:
+- add (alias: a): Add an official repo by name or clone from a git URL.
+- remove|rm: Remove a repo from active list (repo rm <name>).
+- list|ls: Show active repositories by default; use 'list all' to show all available repositories.
+- git: Manage cloned git repositories (git ls, git rm <repo-name>)."
     )]
     Repo(cmd::repo::RepoCommand),
 
@@ -359,7 +441,7 @@ enum Commands {
     /// Rollback a package to the previously installed version
     Rollback {
         /// The name of the package to rollback
-        #[arg(value_name = "PACKAGE")]
+        #[arg(value_name = "PACKAGE", value_parser = PackageValueParser)]
         package: String,
     },
 

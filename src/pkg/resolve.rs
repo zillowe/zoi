@@ -33,7 +33,7 @@ struct PackageRequest {
     version_spec: Option<String>,
 }
 
-fn get_db_root() -> Result<PathBuf, Box<dyn Error>> {
+pub(crate) fn get_db_root() -> Result<PathBuf, Box<dyn Error>> {
     let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
     Ok(home_dir.join(".zoi").join("pkgs").join("db"))
 }

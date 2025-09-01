@@ -6,6 +6,7 @@ use std::fs;
 use std::io::{Write, stdin, stdout};
 use std::process::Command;
 use std::time::Duration;
+use walkdir::WalkDir;
 
 pub fn is_admin() -> bool {
     #[cfg(windows)]
@@ -249,7 +250,12 @@ pub fn print_repo_warning(repo_name: &Option<String>) {
         };
 
         if let Some(message) = warning_message {
-            println!("\n{}: {}", "NOTE".yellow().bold(), message.yellow());
+            println!(
+                "
+{}: {}",
+                "NOTE".yellow().bold(),
+                message.yellow()
+            );
         }
     }
 }
@@ -272,7 +278,8 @@ pub fn confirm_untrusted_source(source_type: &SourceType, yes: bool) -> Result<(
     };
 
     println!(
-        "\n{}: {}",
+        "
+{}: {}",
         "SECURITY WARNING".yellow().bold(),
         warning_message
     );
@@ -343,28 +350,58 @@ pub fn setup_path(scope: Scope) -> Result<(), Box<dyn Error>> {
             } else {
                 home.join(".bashrc")
             };
-            let cmd = format!("\n# Added by Zoi\nexport PATH=\"{}:$PATH\"\n", zoi_bin_str);
+            let cmd = format!(
+                "
+# Added by Zoi
+export PATH=\"{}:{}\n",
+                zoi_bin_str, "$PATH"
+            );
             (path, cmd)
         } else if shell_name.contains("zsh") {
             let path = home.join(".zshrc");
-            let cmd = format!("\n# Added by Zoi\nexport PATH=\"{}:$PATH\"\n", zoi_bin_str);
+            let cmd = format!(
+                "
+# Added by Zoi
+export PATH=\"{}:{}\n",
+                zoi_bin_str, "$PATH"
+            );
             (path, cmd)
         } else if shell_name.contains("fish") {
             let path = home.join(".config/fish/config.fish");
-            let cmd = format!("\n# Added by Zoi\nset -gx PATH \"{}\" $PATH\n", zoi_bin_str);
+            let cmd = format!(
+                "
+# Added by Zoi
+set -gx PATH \"{}\" $PATH
+",
+                zoi_bin_str
+            );
 
             (path, cmd)
         } else if shell_name.contains("elvish") {
             let path = home.join(".config/elvish/rc.elv");
-            let cmd = "\n# Added by Zoi\nset paths = [ ~/.zoi/pkgs/bin $paths... ]\n".to_string();
+            let cmd = "
+# Added by Zoi
+set paths = [ ~/.zoi/pkgs/bin $paths... ]
+"
+            .to_string();
             (path, cmd)
         } else if shell_name.contains("csh") || shell_name.contains("tcsh") {
             let path = home.join(".cshrc");
-            let cmd = format!("\n# Added by Zoi\nsetenv PATH=\"{}:$PATH\"\n", zoi_bin_str);
+            let cmd = format!(
+                "
+# Added by Zoi
+setenv PATH=\"{}:{}\n",
+                zoi_bin_str, "$PATH"
+            );
             (path, cmd)
         } else {
             let path = home.join(".profile");
-            let cmd = format!("\n# Added by Zoi\nexport PATH=\"{}:$PATH\"\n", zoi_bin_str);
+            let cmd = format!(
+                "
+# Added by Zoi
+export PATH=\"{}:{}\n",
+                zoi_bin_str, "$PATH"
+            );
             (path, cmd)
         };
 
@@ -622,4 +659,46 @@ pub fn check_license(license: &str) {
             );
         }
     }
+}
+
+pub fn get_all_package_names() -> Vec<String> {
+    // Note: get_db_root is fallible, but we can't return a Result here
+    // for clap's value_parser. Return an empty vec on error.
+    let db_root = if let Ok(path) = crate::pkg::resolve::get_db_root() {
+        path
+    } else {
+        return Vec::new();
+    };
+
+    let active_repos = if let Ok(config) = crate::pkg::config::read_config() {
+        config.repos
+    } else {
+        return Vec::new();
+    };
+
+    if !db_root.exists() {
+        return Vec::new();
+    }
+
+    let mut packages = std::collections::HashSet::new();
+    for repo_name in &active_repos {
+        let repo_path = db_root.join(repo_name);
+        if !repo_path.is_dir() {
+            continue;
+        }
+        for entry in WalkDir::new(repo_path)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().is_file() && e.path().extension().is_some_and(|ext| ext == "yaml"))
+        {
+            if let Some(stem) = entry.path().file_stem()
+                && let Some(name) = stem.to_str().and_then(|s| s.strip_suffix(".pkg"))
+            {
+                packages.insert(name.to_string());
+            }
+        }
+    }
+    let mut package_list: Vec<String> = packages.into_iter().collect();
+    package_list.sort();
+    package_list
 }
