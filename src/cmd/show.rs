@@ -1,4 +1,5 @@
 use crate::pkg::{resolve, types::Package};
+use crate::utils;
 use colored::*;
 use std::fs;
 
@@ -40,6 +41,7 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
 
     if !pkg.license.is_empty() {
         println!("{}: {}", "License".bold(), pkg.license);
+        utils::check_license(&pkg.license);
     }
 
     let mut maintainer_line = format!(
