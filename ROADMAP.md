@@ -33,6 +33,7 @@ $ fastfetch from main installed!
       `zoi pkg-config` same as above but for libraries.
       The installed packages with the SBOM are in the local `.zoi/` directory.
       To uninstall a local package we also add `--local` flag to it.
+      You can have a scope in the local pkg.yaml file for `global` or `local` so when installing packages you dont need to specify `--local`, also if its local in the config and you want to install a package globally you can use `--global` flag to override the config.
 - [ ] MCP package type and `mcp` command
       You can add and remove mcps, an mcp package is just a normal package with some extra fields such as `mcp type`, so it could be http server, a binary or something else.
       To add or remove mcp servers we use these commands `add/rm mcp <package> <tool>`.
@@ -57,6 +58,8 @@ $ fastfetch from main installed!
 
 ## Enhancements & Improvements
 
+- [ ] Make update command `--all` instead of `all` because the user could have a package named `all` for some reason
+- [ ] Make when packages in active repos 2 or more have the same name to bring an interactive prompt to choose which one (name, repo and description)
 - [ ] Better GitLab CI per-commit checks
 - [ ] Show license spdx check in `show` command
 - [ ] Ability to add a pgp key from a custom registry in maintainer and author fields

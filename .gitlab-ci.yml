@@ -97,7 +97,7 @@ create_release:
     GIT_DEPTH: 0
   before_script:
     - apk add --no-cache nodejs npm git coreutils bash
-    - npm i -g @google/gemini-cli@0.1.20
+    - npm i -g @google/gemini-cli@latest
   script:
     - glab auth login --token $GITLAB_TOKEN_RELEASE
     - chmod +x ./build/notes.sh
