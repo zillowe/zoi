@@ -87,7 +87,7 @@ platforms:
 ```
 
 - [ ] Better `make` command.
-- [-] Add `--all-optional` to install command to accept all the optional dependencies
+- [x] Add `--all-optional` to install command to accept all the optional dependencies
 - [x] Improve `run` and `env` commands with platform specific commands and envs.
 - [ ] Improve the library side of Zoi with better docs.
 - [ ] More platforms support
