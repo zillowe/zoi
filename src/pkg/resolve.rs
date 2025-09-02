@@ -1,6 +1,7 @@
 use crate::pkg::{config, pin, types};
 use chrono::Utc;
 use colored::*;
+use dialoguer::{Select, theme::ColorfulTheme};
 use indicatif::{ProgressBar, ProgressStyle};
 use std::collections::HashMap;
 use std::env;
@@ -9,7 +10,7 @@ use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum SourceType {
     OfficialRepo,
     UntrustedRepo(String),
@@ -111,11 +112,22 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
         config::read_config()?.repos
     };
 
+    struct FoundPackage {
+        path: PathBuf,
+        source_type: SourceType,
+        repo_name: String,
+        description: String,
+    }
+
+    let mut found_packages = Vec::new();
+
     for repo_name in &search_repos {
         let pkg_file_name = format!("{}.pkg.yaml", request.name);
         let path = db_root.join(repo_name.to_lowercase()).join(&pkg_file_name);
         if path.exists() {
-            println!("Found package '{}' in repo '{}'", request.name, repo_name);
+            let content = fs::read_to_string(&path)?;
+            let pkg: types::Package = serde_yaml::from_str(&content)?;
+
             let major_repo = repo_name.split('/').next().unwrap_or("").to_lowercase();
             let source_type =
                 if major_repo == "core" || major_repo == "main" || major_repo == "extra" {
@@ -123,27 +135,71 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
                 } else {
                     SourceType::UntrustedRepo(repo_name.clone())
                 };
-            return Ok(ResolvedSource {
+
+            found_packages.push(FoundPackage {
                 path,
                 source_type,
-                repo_name: Some(repo_name.clone()),
-                sharable_manifest: None,
+                repo_name: repo_name.clone(),
+                description: pkg.description,
             });
         }
     }
 
-    if let Some(repo) = &request.repo {
-        Err(format!(
-            "Package '{}' not found in repository '@{}'.",
-            request.name, repo
-        )
-        .into())
+    if found_packages.is_empty() {
+        if let Some(repo) = &request.repo {
+            Err(format!(
+                "Package '{}' not found in repository '@{}'.",
+                request.name, repo
+            )
+            .into())
+        } else {
+            Err(format!(
+                "Package '{}' not found in any active repositories.",
+                request.name
+            )
+            .into())
+        }
+    } else if found_packages.len() == 1 {
+        let chosen = &found_packages[0];
+        println!(
+            "Found package '{}' in repo '{}'",
+            request.name, chosen.repo_name
+        );
+        Ok(ResolvedSource {
+            path: chosen.path.clone(),
+            source_type: chosen.source_type.clone(),
+            repo_name: Some(chosen.repo_name.clone()),
+            sharable_manifest: None,
+        })
     } else {
-        Err(format!(
-            "Package '{}' not found in any active repositories.",
-            request.name
-        )
-        .into())
+        println!(
+            "Found multiple packages named '{}'. Please choose one:",
+            request.name.cyan()
+        );
+
+        let items: Vec<String> = found_packages
+            .iter()
+            .map(|p| format!("@{} - {}", p.repo_name.bold(), p.description))
+            .collect();
+
+        let selection = Select::with_theme(&ColorfulTheme::default())
+            .with_prompt("Select a package")
+            .items(&items)
+            .default(0)
+            .interact()?;
+
+        let chosen = &found_packages[selection];
+        println!(
+            "Selected package '{}' from repo '{}'",
+            request.name, chosen.repo_name
+        );
+
+        Ok(ResolvedSource {
+            path: chosen.path.clone(),
+            source_type: chosen.source_type.clone(),
+            repo_name: Some(chosen.repo_name.clone()),
+            sharable_manifest: None,
+        })
     }
 }
 
