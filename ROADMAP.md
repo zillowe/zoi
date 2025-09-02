@@ -66,7 +66,7 @@ $ Enter credentials # saved at the global config
 ## Enhancements & Improvements
 
 - [x] Make update command `--all` instead of `all` because the user could have a package named `all` for some reason
-- [ ] Make when packages in active repos 2 or more have the same name to bring an interactive prompt to choose which one (name, repo and description)
+- [x] Make when packages in active repos 2 or more have the same name to bring an interactive prompt to choose which one (name, repo and description)
 - [ ] Better GitLab CI per-commit checks
 - [x] Show license spdx check in `show` command
 - [ ] Better platform choices
