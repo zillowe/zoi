@@ -83,6 +83,7 @@ fn run_pkg_create(
                 &version,
                 pkg.scope,
                 yes,
+                false,
                 &mut processed_deps,
                 &mut _installed_deps_list,
             )?;
@@ -93,6 +94,7 @@ fn run_pkg_create(
                 &version,
                 pkg.scope,
                 yes,
+                false,
                 &mut processed_deps,
                 &mut _installed_deps_list,
                 &mut chosen_options,
@@ -106,6 +108,7 @@ fn run_pkg_create(
                 &version,
                 pkg.scope,
                 yes,
+                false,
                 &mut processed_deps,
                 &mut _installed_deps_list,
             )?;
@@ -116,6 +119,7 @@ fn run_pkg_create(
                 &version,
                 pkg.scope,
                 yes,
+                false,
                 &mut processed_deps,
                 &mut _installed_deps_list,
                 &mut chosen_options,

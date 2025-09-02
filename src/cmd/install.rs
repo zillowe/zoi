@@ -12,7 +12,7 @@ const ZOI_SCOPE_PROPERTY: &str = "zoi:scope";
 const ZOI_CHOSEN_OPTIONS_PROPERTY: &str = "zoi:chosen_options";
 const ZOI_CHOSEN_OPTIONALS_PROPERTY: &str = "zoi:chosen_optionals";
 
-pub fn run(sources: &[String], force: bool, interactive: bool, yes: bool) {
+pub fn run(sources: &[String], force: bool, interactive: bool, all_optional: bool, yes: bool) {
     let mode = if interactive {
         install::InstallMode::Interactive
     } else {
@@ -116,6 +116,7 @@ pub fn run(sources: &[String], force: bool, interactive: bool, yes: bool) {
                     force,
                     types::InstallReason::Direct,
                     yes,
+                    all_optional,
                     &mut processed_deps,
                 ) {
                     if e.to_string().contains("aborted by user") {

@@ -237,6 +237,9 @@ enum Commands {
         /// Run in interactive mode
         #[arg(short, long)]
         interactive: bool,
+        /// Accept all optional dependencies
+        #[arg(long)]
+        all_optional: bool,
     },
 
     /// Builds and installs one or more packages from a name, local file, or URL
@@ -607,8 +610,9 @@ pub fn run() {
                 sources,
                 force,
                 interactive,
+                all_optional,
             } => {
-                cmd::install::run(&sources, force, interactive, cli.yes);
+                cmd::install::run(&sources, force, interactive, all_optional, cli.yes);
                 Ok(())
             }
             Commands::Build { sources, force } => {

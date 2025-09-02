@@ -107,6 +107,7 @@ fn run_update_single_logic(
         true,
         types::InstallReason::Direct,
         yes,
+        false,
         &mut processed_deps,
     )?;
 
@@ -207,6 +208,7 @@ fn run_update_all_logic(yes: bool) -> Result<(), Box<dyn std::error::Error>> {
             true,
             types::InstallReason::Direct,
             yes,
+            false,
             &mut processed_deps,
         )?;
     }

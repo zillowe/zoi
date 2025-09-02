@@ -52,7 +52,7 @@ pub fn install(
     // Internally, run_installation uses this to track dependencies and avoid cycles.
     // For a top-level install call, we start with an empty set.
     let mut processed_deps = HashSet::new();
-    pkg::install::run_installation(source, mode, force, reason, yes, &mut processed_deps)
+    pkg::install::run_installation(source, mode, force, reason, yes, false, &mut processed_deps)
 }
 
 /// Updates a Zoi package if a new version is available.

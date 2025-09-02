@@ -36,6 +36,7 @@ pub fn run(sources: &[String], force: bool, yes: bool) {
                     true,
                     InstallReason::Direct,
                     yes,
+                    false,
                     &mut processed_deps,
                 ) {
                     eprintln!("\n{}: {}", "Build failed".red().bold(), e);

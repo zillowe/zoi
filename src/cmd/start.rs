@@ -25,6 +25,7 @@ pub fn run(package_name: &str, yes: bool) -> Result<(), Box<dyn Error>> {
                 false,
                 types::InstallReason::Direct,
                 yes,
+                false,
                 &mut processed_deps,
             )?;
         } else {

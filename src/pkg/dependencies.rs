@@ -166,6 +166,7 @@ fn install_dependency(
     parent_pkg_name: &str,
     scope: types::Scope,
     yes: bool,
+    all_optional: bool,
     processed_deps: &mut HashSet<String>,
     installed_deps: &mut Vec<String>,
 ) -> Result<(), Box<dyn Error>> {
@@ -275,7 +276,7 @@ fn install_dependency(
 
             println!("Not installed. Proceeding with installation...");
 
-            install_zoi_dependency(&zoi_dep_name, yes, processed_deps)?;
+            install_zoi_dependency(&zoi_dep_name, yes, all_optional, processed_deps)?;
         }
         "native" => {
             if let Some(installed_version) = get_native_command_version(dep.package)? {
@@ -985,6 +986,7 @@ pub fn resolve_and_install_required(
     parent_version: &str,
     scope: types::Scope,
     yes: bool,
+    all_optional: bool,
     processed_deps: &mut HashSet<String>,
     installed_deps: &mut Vec<String>,
 ) -> Result<(), Box<dyn Error>> {
@@ -1001,6 +1003,7 @@ pub fn resolve_and_install_required(
             parent_pkg_name,
             scope,
             yes,
+            all_optional,
             processed_deps,
             installed_deps,
         )?;
@@ -1015,6 +1018,7 @@ pub fn resolve_and_install_required_options(
     parent_version: &str,
     scope: types::Scope,
     yes: bool,
+    all_optional: bool,
     processed_deps: &mut HashSet<String>,
     installed_deps: &mut Vec<String>,
     chosen_options: &mut Vec<String>,
@@ -1067,6 +1071,7 @@ pub fn resolve_and_install_required_options(
                         parent_pkg_name,
                         scope,
                         yes,
+                        all_optional,
                         processed_deps,
                         installed_deps,
                     )?;
@@ -1083,6 +1088,7 @@ pub fn resolve_and_install_required_options(
                         parent_pkg_name,
                         scope,
                         yes,
+                        all_optional,
                         processed_deps,
                         installed_deps,
                     )?;
@@ -1126,6 +1132,7 @@ pub fn resolve_and_install_required_options(
                     parent_pkg_name,
                     scope,
                     yes,
+                    all_optional,
                     processed_deps,
                     installed_deps,
                 )?;
@@ -1155,6 +1162,7 @@ pub fn resolve_and_install_required_options(
                 parent_pkg_name,
                 scope,
                 yes,
+                all_optional,
                 processed_deps,
                 installed_deps,
             )?;
@@ -1169,6 +1177,7 @@ pub fn resolve_and_install_optional(
     parent_version: &str,
     scope: types::Scope,
     yes: bool,
+    all_optional: bool,
     processed_deps: &mut HashSet<String>,
     installed_deps: &mut Vec<String>,
     chosen_optionals: &mut Vec<String>,
@@ -1185,7 +1194,7 @@ pub fn resolve_and_install_optional(
 
     let type_str = dep_type.map(|s| format!("{} ", s)).unwrap_or_default();
 
-    if yes {
+    if yes || all_optional {
         println!(
             "{}",
             format!("Installing all optional {} dependencies...", type_str).bold()
@@ -1198,6 +1207,7 @@ pub fn resolve_and_install_optional(
                 parent_pkg_name,
                 scope,
                 true,
+                all_optional,
                 processed_deps,
                 installed_deps,
             )?;
@@ -1266,6 +1276,7 @@ pub fn resolve_and_install_optional(
             parent_pkg_name,
             scope,
             yes,
+            all_optional,
             processed_deps,
             installed_deps,
         )?;
@@ -1277,6 +1288,7 @@ pub fn resolve_and_install_optional(
 fn install_zoi_dependency(
     package_name: &str,
     yes: bool,
+    all_optional: bool,
     processed_deps: &mut HashSet<String>,
 ) -> Result<(), Box<dyn Error>> {
     let resolved_source = resolve::resolve_source(package_name)?;
@@ -1287,6 +1299,7 @@ fn install_zoi_dependency(
         false,
         crate::pkg::types::InstallReason::Dependency,
         yes,
+        all_optional,
         processed_deps,
     )
 }

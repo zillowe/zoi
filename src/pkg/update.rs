@@ -53,6 +53,7 @@ pub fn run(package_name: &str, yes: bool) -> Result<UpdateResult, Box<dyn Error>
         true,
         types::InstallReason::Direct,
         yes,
+        false,
         &mut processed_deps,
     )?;
 
