@@ -42,6 +42,9 @@
   <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Bug%20Report"><strong>Report a Bug</strong></a> •
   <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Feature%20Request"><strong>Request a Feature</strong></a> •
   <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Enhancement%20Request"><strong>Request an Enhancement</strong></a>
+  <br/>
+  <a href="./CODE_OF_CONDUCT.md"><strong>Code of Conduct</strong></a> •
+  <a href="./RELEASE.md"><strong>Release Guidelines</strong></a>
 </div>
 
 <br/>

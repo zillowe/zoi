@@ -65,6 +65,10 @@ pub fn format_version_summary(branch: &str, status: &str, number: &str) -> Strin
         "Prod."
     } else if branch == "Development" {
         "Dev."
+    } else if branch == "Public" {
+        "Pub."
+    } else if branch == "Special" {
+        "Spec."
     } else {
         branch
     };

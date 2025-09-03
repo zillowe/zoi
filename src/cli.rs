@@ -8,7 +8,7 @@ use clap_complete::Shell;
 use clap_complete::generate;
 use std::io;
 
-// Production, Development or Public
+// Development, Special, Public or Production
 const BRANCH: &str = "Development";
 const STATUS: &str = "Beta";
 const NUMBER: &str = "5.0.0";
