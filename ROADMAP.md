@@ -69,6 +69,7 @@ $ Enter credentials # saved at the global config
 - [x] Make when packages in active repos 2 or more have the same name to bring an interactive prompt to choose which one (name, repo and description)
 - [ ] Better GitLab CI per-commit checks
 - [x] Show license spdx check in `show` command
+- [ ] Show if a package is installed in `show` command
 - [ ] Better platform choices
       something like this, you can add bulk if the others match:
 
