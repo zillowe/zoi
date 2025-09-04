@@ -14,6 +14,22 @@ This release focuses on improving project-local workflows, enhancing security, a
 
 - [ ] **Project-Local Packages:** Install packages to a project-specific `.zoi/` directory using a `--local` flag, runnable with `zoi exec`.
 
+- [ ] **MCP (AI Completion Proxy) Server (`mcp` command):** Introduce a new `mcp` package type and `zoi mcp` command to manage local AI completion tool servers.
+      This feature allows Zoi to manage different AI coding assistants (like Codex, Gemini, Claude) as local servers or binaries. An `mcp` package can be an HTTP server or a binary that is not added to the user's PATH.
+      **Commands:**
+
+```sh
+# Add or remove an MCP server for a specific tool
+zoi mcp add <package> <tool>
+zoi mcp rm <package> <tool>
+
+# Execute an MCP binary directly
+zoi mcp exec <package>
+```
+
+      **Supported Tools:**
+      First-party support is planned for tools like `OpenCode (SST)`, `Gemini CLI`, `Codex CLI`, `Claude Code`, `VSCode`, `Cursor`, and `Windsurf`.
+
 ### Security & Integrity
 
 - [ ] **PGP Key Management (`zoi pgp`):** Introduce a `pgp` command to manage public keys for verifying package signatures.
@@ -84,8 +100,8 @@ $ fastfetch from main installed!
 These are features and ideas we are considering for future releases. They are not yet scheduled but represent the direction we want to take Zoi.
 
 - [ ] **Enhanced Library & API Experience:** Improve the public API and documentation to make Zoi a powerful library for other Rust applications.
-- [ ] **MCP (Managed Component Packages):** Introduce a new package type for managed, isolated tools and services (e.g. language servers) that are not added to the user's PATH.
-- [ ] **Full Platform Parity:** Achieve full build and package support for all targeted platforms, including OpenBSD and Android (Termux).
+- [ ] **Full Platform Parity:** Achieve full build and package support for all targeted platforms, including FreeBSD/OpenBSD and Android (Termux).
+- [ ] **Managed Components (`zoi component`):** Introduce a new package type for managed, isolated developer tools (e.g. language servers, linters) that are not added to the user's PATH, but are managed by Zoi and can be executed via `zoi component exec` or integrated with other developer tools.
 
 ---
 
