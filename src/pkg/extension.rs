@@ -1,5 +1,6 @@
 use crate::pkg::{config, local, resolve, types};
 use std::error::Error;
+use std::fs;
 
 pub fn add(ext_name: &str, _yes: bool) -> Result<(), Box<dyn Error>> {
     println!("Adding extension: {}", ext_name);
@@ -33,6 +34,14 @@ pub fn add(ext_name: &str, _yes: bool) -> Result<(), Box<dyn Error>> {
                 types::ExtensionChange::RepoAdd { add } => {
                     println!("Adding repository: {}", add);
                     config::add_repo(&add)?;
+                }
+                types::ExtensionChange::Project { add } => {
+                    println!("Creating zoi.yaml...");
+                    if std::path::Path::new("zoi.yaml").exists() {
+                        return Err("A 'zoi.yaml' file already exists in the current directory. Please remove it first."
+                            .into());
+                    }
+                    fs::write("zoi.yaml", add)?;
                 }
             }
         }
@@ -119,6 +128,12 @@ pub fn remove(ext_name: &str, _yes: bool) -> Result<(), Box<dyn Error>> {
                     println!("Removing repository: {}", add);
                     if let Err(e) = config::remove_repo(add) {
                         eprintln!("Warning: failed to remove repo '\'{}\'': {}", add, e);
+                    }
+                }
+                types::ExtensionChange::Project { add: _ } => {
+                    println!("Removing zoi.yaml...");
+                    if let Err(e) = fs::remove_file("zoi.yaml") {
+                        eprintln!("Warning: failed to remove 'zoi.yaml': {}", e);
                     }
                 }
             }

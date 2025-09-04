@@ -93,6 +93,7 @@ pub enum ExtensionChange {
     RepoGit { add: String },
     RegistryRepo { add: String },
     RepoAdd { add: String },
+    Project { add: String },
 }
 
 #[derive(Debug, Deserialize, Clone)]
