@@ -1,0 +1,206 @@
+---
+title: Extensions
+description: A guide to creating and using Zoi extensions to manage Zoi's configuration.
+---
+
+Zoi extensions are a special type of package that, instead of installing software, modify Zoi's own configuration or project setup. They provide a powerful way to distribute and manage collections of settings, such as custom package repositories, or even entire project starter templates (`zoi.yaml`) as a single, versionable package.
+
+Extensions are not "installed" in the traditional sense; they are "added" and "removed" using the `zoi extension` subcommand. When an extension is added, its defined changes are applied. When it's removed, those changes are automatically reverted.
+
+## Use Cases
+
+Extensions are ideal for:
+
+- **Distributing Repository Sets:** Package a list of official and git-based repositories for a team or project, so everyone can get access with a single command.
+- **Corporate Mirrors:** Point Zoi to a company's internal mirror of the official package database.
+- **Project Starters:** Distribute a standard `zoi.yaml` file for a specific type of project (e.g., Rust library, web service) to bootstrap development environments quickly.
+- **Easy Configuration Sharing:** Simplify the process of setting up a new machine with a standard Zoi configuration.
+
+## Creating an Extension
+
+An extension is defined in a `pkg.yaml` file, just like any other package. The key differences are setting the `type` to `extension` and defining an `extension` block.
+
+```yaml
+# my-repo-extension.pkg.yaml
+name: my-repo-extension
+repo: community
+type: extension
+version: "1.0"
+description: "Adds my custom repositories to Zoi."
+maintainer:
+  name: "Your Name"
+  email: "your.email@example.com"
+
+# The 'extension' block contains the configuration changes.
+extension:
+  type: zoi
+  changes:
+    - type: repo-git
+      add: https://github.com/user/my-cool-pkgs.git
+    - type: repo-add
+      add: test
+```
+
+### The `extension` Field
+
+This is the core of an extension package.
+
+- `type`: The type of extension. Currently, `zoi` is the only supported value.
+- `changes`: A list of configuration changes to apply when the extension is added.
+
+### Change Types
+
+Zoi supports four types of changes that can be made by an extension.
+
+#### `repo-git`
+
+Clones a Git repository containing `pkg.yaml` files into Zoi's local package sources.
+
+- **Purpose:** To add a custom, third-party package repository.
+- **`add` Value:** A valid Git repository URL (e.g., `https://github.com/user/my-zoi-repo.git`).
+- **Effect:** Zoi clones the repository into `~/.zoi/pkgs/git/`. Users can then install packages from it using the `@git/<repo-name>/<pkg-name>` syntax.
+- **On Removal:** The cloned repository directory is deleted.
+
+#### `repo-add`
+
+Adds an official Zoi repository tier to the list of active repositories that Zoi searches.
+
+- **Purpose:** To enable official repositories that are not active by default, such as `test`.
+- **`add` Value:** The name of an official repository tier (e.g., `core`, `main`, `community`, `test`, `archive`).
+- **Effect:** The repository name is added to the `repos` list in Zoi's configuration file.
+- **On Removal:** The repository is removed from the active list.
+
+#### `registry-repo`
+
+Changes the URL of the main package database that Zoi clones and syncs with.
+
+- **Purpose:** To point Zoi to a different central package database, such as a corporate mirror or a personal fork.
+- **`add` Value:** A valid Git repository URL.
+- **Effect:** The registry URL in Zoi's configuration is updated to the new URL.
+- **On Removal:** The registry URL is reverted to the default Zoi package database on GitLab.
+
+#### `project`
+
+Creates a `zoi.yaml` file in the current directory, allowing for sharable project configurations.
+
+- **Purpose:** To distribute a standard `zoi.yaml` project file that can be used to set up a development environment.
+- **`add` Value:** The raw, multi-line string content of the `zoi.yaml` file.
+- **Effect:** A new `zoi.yaml` file is created in the current directory with the content from the `add` field. The command will fail if a `zoi.yaml` file already exists.
+- **On Removal:** The `zoi.yaml` file is deleted.
+
+## Examples
+
+Here are a couple of examples demonstrating different use cases for extensions.
+
+### Corporate Configuration Bundle
+
+This example combines multiple changes to configure Zoi for a corporate environment.
+
+```yaml
+# extensions/corp-bundle.pkg.yaml
+# yaml-language-server: $schema=https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/pkg.schema.json
+name: corp-bundle
+repo: community
+type: extension
+version: "1.1"
+description: "Configures Zoi for the corporate environment at MyCorp."
+tags: [extension, config, mycorp]
+maintainer:
+  name: "MyCorp IT"
+  email: "it@mycorp.com"
+
+extension:
+  type: zoi
+  changes:
+    # 1. Point Zoi to the official corporate mirror of the package database.
+    - type: registry-repo
+      add: https://git.mycorp.com/zoi/Zoi-Pkgs.git
+
+    # 2. Add the 'test' repository to the active list for developers.
+    - type: repo-add
+      add: test
+
+    # 3. Add the private git repository for MyCorp's internal tools.
+    - type: repo-git
+      add: https://git.mycorp.com/zoi/internal-tools.git
+```
+
+### Project Starter Extension
+
+This example shows how to create a "project starter" that provides a ready-to-use `zoi.yaml` for a new Rust project.
+
+```yaml
+# my-rust-starter.pkg.yaml
+name: my-rust-starter
+repo: community
+type: extension
+version: "1.0"
+description: "A starter zoi.yaml for a Rust project."
+maintainer:
+  name: "Your Name"
+  email: "your.email@example.com"
+
+extension:
+  type: zoi
+  changes:
+    - type: project
+      add: |
+        name: my-rust-project
+        packages:
+          - name: rust
+            check: "rustc --version"
+          - name: cargo-watch
+            check: "cargo watch --version"
+        commands:
+          - cmd: run
+            run: cargo run
+          - cmd: test
+            run: cargo test
+          - cmd: watch
+            run: cargo watch -x run
+```
+
+A user can now navigate to an empty project directory, run `zoi extension add my-rust-starter`, and immediately have a working `zoi.yaml` to start developing.
+
+## Managing Extensions
+
+Extensions are managed with the `zoi extension` subcommand.
+
+### Adding an Extension
+
+To add an extension and apply its changes, use `zoi extension add`:
+
+```sh
+# Add an extension from an official repository
+zoi extension add corp-bundle
+
+# Add an extension from a local file for testing
+zoi extension add ./corp-bundle.pkg.yaml
+```
+
+When you add an extension, Zoi:
+
+1.  Resolves the package definition.
+2.  Verifies it is a valid `extension` package.
+3.  Applies each of the configuration changes listed in the `changes` block.
+4.  Records a manifest to remember that the extension has been added.
+
+### Removing an Extension
+
+To remove an extension and revert its changes, use `zoi extension remove`:
+
+```sh
+zoi extension remove corp-bundle
+```
+
+When you remove an extension, Zoi:
+
+1.  Reads the package definition to find the original changes.
+2.  Reverts each change in the **reverse order** they were applied.
+3.  Removes the extension's manifest.
+
+This ensures that the configuration is returned to the state it was in before the extension was added.
+
+## Publishing Extensions
+
+Extensions are published and shared just like any other Zoi package: by adding their `pkg.yaml` file to a package repository. Learn more in the [Publishing Packages guide](/docs/zds/zoi/publishing-packages).

@@ -1,0 +1,19 @@
+{
+  "pages": [
+    "creating-packages",
+    "examples",
+    "project-config",
+    "guides",
+    "---Maintainers Guides---",
+    "creating-packages",
+    "publishing-packages",
+    "---Advance Usage---",
+    "dependencies",
+    "repositories",
+    "rollbacks",
+    "archives",
+    "telemetry",
+    "---Zoi Library---",
+    "..."
+  ]
+}

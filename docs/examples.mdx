@@ -391,6 +391,56 @@ installation:
 
 ---
 
+## Script Package
+
+A `script` package is a special package type that doesn't install a binary but instead runs a series of inline shell commands. This is useful for performing custom setup actions, orchestrating other tools, or for installers that consist of a series of commands rather than a single remote script.
+
+This is distinct from the `script` **installation method**, which is used for packages that download and run a single remote script file (like `install.sh`).
+
+```yaml
+# my-setup-script.pkg.yaml
+name: my-setup-script
+repo: community
+type: script
+version: "1.0"
+description: "A package that runs a series of setup commands."
+tags: [script, setup]
+maintainer:
+  name: "Your Name"
+  email: "your.email@example.com"
+
+# The 'script' field contains the commands to run.
+script:
+  - platforms: ["linux", "macos"]
+    # These commands run when the user installs the package.
+    install:
+      - "echo 'Creating configuration directory...'"
+      - "mkdir -p ~/.config/my-app"
+      - "echo 'hello: world' > ~/.config/my-app/config.yml"
+    # These commands run when the user uninstalls the package.
+    uninstall:
+      - "echo 'Removing configuration...'"
+      - "rm -rf ~/.config/my-app"
+
+  - platforms: ["windows"]
+    install:
+      - "echo 'Creating configuration directory...'"
+      - "mkdir -p $env:APPDATA/my-app"
+      - "echo 'hello: world' | Out-File -FilePath $env:APPDATA/my-app/config.yml"
+    uninstall:
+      - "echo 'Removing configuration...'"
+      - "rm -r $env:APPDATA/my-app"
+```
+
+**Key Fields:**
+
+- `type: script`: Declares the package as a script package.
+- `script`: A block containing platform-specific `install` and optional `uninstall` commands.
+
+When a user runs `zoi install my-setup-script`, Zoi will ask for confirmation and then execute the commands listed under `install` for the user's platform. The `uninstall` commands are run with `zoi uninstall`.
+
+---
+
 ## Configuration Package
 
 A `config` package manages the installation and removal of configuration files. It doesn't install an executable itself but can depend on the application it configures. When installed, Zoi will ask the user if they want to run the setup commands.

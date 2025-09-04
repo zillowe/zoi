@@ -42,6 +42,11 @@
       "type": "string",
       "format": "uri"
     },
+    "man": {
+      "description": "A URL to a markdown or text manual file for the `zoi man` command.",
+      "type": "string",
+      "format": "uri"
+    },
     "maintainer": {
       "$ref": "#/definitions/maintainerPerson"
     },
@@ -68,7 +73,8 @@
         "config",
         "app",
         "extension",
-        "library"
+        "library",
+        "script"
       ],
       "default": "package"
     },
@@ -131,6 +137,13 @@
       "type": "array",
       "items": {
         "$ref": "#/definitions/serviceMethod"
+      }
+    },
+    "script": {
+      "description": "Commands for 'script' type packages.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/configCommands"
       }
     },
     "config": {

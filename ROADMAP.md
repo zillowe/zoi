@@ -49,7 +49,6 @@ $ fastfetch from main installed!
       `pgp` command for managing public pgp keys to verify installed packages (`sig` field)
       We have a collection of trusted pgp keys, you can import pgp keys to be trusted, also work with zoi type extension to import pgp keys from urls or custom/default registries.
       PGP keys are stored at ~/.zoi/pgp/
-- [ ] Dockerize the whole app
 - [ ] Add support for not just git registry but for also Cloudflare R2 and AWS S3 (and S3 compatible) storages to host packages and sync them, (in global config these are specified, and in `zoi` type extension).
 
 ```sh

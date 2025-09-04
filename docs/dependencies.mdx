@@ -87,10 +87,18 @@ dependencies:
 
 ### Version Pinning Notes
 
-- Zoi parses versions using SemVer requirements. If a manager cannot enforce versions directly, Zoi attempts best-effort checks or warns that pinning may not be honored.
-- Some managers support pinning (e.g. `apt` via `pkg=ver`, `dnf` via `pkg-ver`, `choco` via `--version`, `cargo` via `--version`, `npm/yarn/pnpm/bun` via `pkg@ver`, `brew` when a formula tap provides `pkg@ver`).
-- Many OS managers do not support explicit pinning in a reliable way (e.g. `pacman`, `yay/paru`, `apk`, `xbps`, `eopkg`, `guix`, `portage`, `snap`, `flatpak`, `macports`, `conda`). Zoi will install the latest available and may print a warning.
-- Go modules: Zoi currently installs with `go install <module>@latest`. Declaring a version like `go:module@...` is not supported through Zoi's SemVer parser and may fail.
+Zoi parses version specifiers using standard SemVer requirements (e.g. `>1.2.3`, `~2.4`, `^3`). However, the ability to enforce these versions depends on the underlying package manager.
+
+| Manager Family        | Pinning Support | Notes                                                                                                                                                           |
+| --------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apt`, `dnf`, `yum`   | ✔️ Yes          | Supports exact versions via `pkg=version` or `pkg-version` syntax.                                                                                              |
+| `choco`, `cargo`      | ✔️ Yes          | Supports version constraints via a `--version` flag.                                                                                                            |
+| `npm`, `yarn`, `pnpm` | ✔️ Yes          | Supports SemVer ranges, tags, and exact versions via `pkg@version` syntax.                                                                                      |
+| `brew`                | ❔ Partial      | Pinning is only possible if a formula for the specific version exists (e.g. `node@18`). It does not support arbitrary SemVer ranges for most packages.          |
+| `go`                  | ❌ No           | Zoi currently installs Go modules using `go install <module>@latest`. Version specifiers are not supported.                                                     |
+| Most OS Managers      | ❌ No           | `pacman`, `yay`, `paru`, `apk`, `xbps`, `eopkg`, `guix`, `portage`, `snap`, `flatpak`, `macports`, and `conda` do not support reliable version pinning via Zoi. |
+
+When pinning is not supported, Zoi will install the latest version available from the package manager and may print a warning.
 
 ## Supported managers
 
@@ -150,7 +158,7 @@ Notes:
 
 - AUR: `aur:<pkg>` builds from source using `makepkg`; uninstall is done with `pacman`.
 - `native:<pkg>` selects the appropriate system manager based on OS/distro; if none can be detected, Zoi errors.
-- Some managers (e.g. `go`, `jsr`, `volta`) do not provide reliable uninstall; Zoi prints a notice and skips.
+- Some managers (e.g. `go`, `jsr`, `volta`, `uv`) do not provide reliable uninstall; Zoi prints a notice and skips.
 - The `script` manager takes a URL as the package name (e.g. `script:example.com/install`). It appends `.sh` for Linux/macOS and `.ps1` for Windows, then downloads and executes the script. There is no automatic uninstallation.
 
 ## Zoi Dependencies and Conflict Checks
