@@ -79,6 +79,7 @@ platforms:
 
 - [ ] Better `make` command.
 - [ ] Improve the library side of Zoi with better docs.
+- [ ] Make bsdiff upgrade work
 - [ ] More platforms support
       Adding more platforms support in the release CI and build scripts and in upgrade command and maybe packages.
       Isn't a high priority so it may not be shipped in the next release.
