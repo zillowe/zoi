@@ -1,6 +1,6 @@
-# Gemini Assistant Guidelines for Zoi Project
+# AI Assistant Guidelines for Zoi Project
 
-This document provides guidelines for the Gemini assistant when working on the Zoi project. Please adhere to these instructions to ensure consistency and quality.
+This document provides guidelines for the AI assistant when working on the Zoi project. Please adhere to these instructions to ensure consistency and quality.
 
 ## General Principles
 

@@ -21,7 +21,7 @@ exclude = [
   ".gitlab-ci.yml",
   "CONTRIBUTING.md",
   "zoi.yaml",
-  "GEMINI.md",
+  "AGENTS.md",
 ]
 
 [lib]

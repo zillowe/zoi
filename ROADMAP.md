@@ -36,7 +36,17 @@ zoi mcp exec <package>
 ### Ecosystem & Contribution
 
 - [ ] **Package Publishing Workflow (`zoi publish`):** Streamline submitting new packages via the `publish` command, which will auto-generate an issue/PR to the `Zoi-Pkgs` repo.
+- [ ] **Install Packages From Git Repos:** Adding the ability to install a package from a git repo (like how we install it from a URL), support are for these git providers: GitHub, GitLab and Codeberg.
+      This new `--repo` command will look into the repo for a field in `zoi.yaml` that defines the package location, either a URL, local package in the repo or a package in the registry that Zoi installs, e.g. `@community/editors/my-app`, all that without cloning the repo.
+      **Commands:**
+
+```sh
+$ zoi install --repo Zillowe/Hello # default is GitHub
+$ zoi install --repo gl:Zillowe/Hello # gh: GitHub, gl: GitLab, cb: Codeberg, you can use full names instead, e.g. codeberg:Zillowe/Hello
+```
+
 - [ ] **Cloud-Native Registries (S3/R2 Support):** Add support for S3-compatible object storage as a package registry backend.
+      **Commands:**
 
 ```sh
 $ zoi sync set this-is-a-url --s3 # or --r2
@@ -47,6 +57,7 @@ $ Enter credentials # saved at the global config
 ### Enhancements & Improvements
 
 - [ ] **Advanced Platform Selectors:** Enhance the `platforms` field in `pkg.yaml` to allow for more granular targeting (OS version, kernel, DE, CPU/GPU, etc.).
+      **Code:**
 
 ```yaml
 platforms:
