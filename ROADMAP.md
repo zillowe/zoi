@@ -1,55 +1,27 @@
 # Roadmap
 
-This document outlines the planned features and improvements for the upcoming release of Zoi.
+This document outlines the future direction of Zoi, including planned features, enhancements, and long-term goals. Our roadmap is shaped by community feedback and our vision to create a truly universal and developer-friendly package manager.
 
-Upcoming release: Beta 5.0.0
+> **Note:** This roadmap is a living document. Priorities may change, and features may be added or removed based on development progress and community input.
 
-## New Features
+---
 
-- [ ] Package command that package packages before installing them.
-      When installing or building a package from a pkg.yaml it will do like pacman PKGBUILD by getting all the files and info and packaging it into a name.pkg.tar.zst archive then installing it.
-      It will work like pacman, aur/yay
-      So when we have mirrors, it will package them and Zoi will install the pkg.tar.zst file and install it.
-      You can build a package archive using this command:
-      `$ zoi package file.pkg.yaml`
-      This will produce a file.pkg.tar.zst
-      This command will run on every new package (or update) on the mirrors.
+## Beta 5.0.0
 
-```sh
-$ zoi install fastfetch
-# Here we ask for confirmation if there's conflicts and checking if it's work on the user platform
-$ ... installing dependencies
-# Here we ask for confirmation about options and optional dependencies
-$ ... downloading the package
-$ ... preparing the package
-# Here's the fastfetch.pkg.tar.zst package archive begins installing, we need just that file for installing packages
-$ ... installing the package
-$ fastfetch from main installed!
-```
+This release focuses on improving project-local workflows, enhancing security, and adding quality-of-life enhancements.
 
-- [ ] Project specific installation for packages
-      Install packages to a specific project by adding `--local` flag, to run said package we do `zoi exec` command.
-      `zoi exec` first check for installed packages locally, then installed package globally, then for cached packages.
-      `zoi pkg-config` same as above but for libraries.
-      The installed packages with the SBOM are in the local `.zoi/` directory.
-      To uninstall a local package we also add `--local` flag to it.
-      You can have a scope in the local pkg.yaml file for `global` or `local` so when installing packages you dont need to specify `--local`, also if its local in the config and you want to install a package globally you can use `--global` flag to override the config.
-- [ ] MCP package type and `mcp` command
-      You can add and remove mcps, an mcp package is just a normal package with some extra fields such as `mcp type`, so it could be http server, a binary or something else.
-      To add or remove mcp servers we use these commands `add/rm mcp <package> <tool>`.
-      `<tool>` is like Codex/Claude Code/Gemini/Cursor, etc.
-      If the mcp is a binary it will not be added to path, it will be only executable via this command `mpc exec <package>`.
-      First party support for tools are: OpenCode (SST), Gemini CLI, Codex CLI, Claude Code, VSCode, Cursor (and Cursor CLI) and Windsurf.
-- [ ] Publish command that creates an issue for adding new packages
-      `publish ./path/to/name.pkg.yaml` this command will create an issue or GitHub, GitLab or Codeberg requesting to add a new package from a local pkg.yaml file.
-      When publishing a new package you can choose a mirror `publish ... mirror-name`, if not specified it will choose the default mirror from your config file.
-      The publish command will check for the package name and repo/nested repo for existing packages.
-      If you want to update an existing package it will check the version to see if there's an update or no, if there's an update it will create a different type of issue.
-- [ ] PGP command
-      `pgp` command for managing public pgp keys to verify installed packages (`sig` field)
-      We have a collection of trusted pgp keys, you can import pgp keys to be trusted, also work with zoi type extension to import pgp keys from urls or custom/default registries.
-      PGP keys are stored at ~/.zoi/pgp/
-- [ ] Add support for not just git registry but for also Cloudflare R2 and AWS S3 (and S3 compatible) storages to host packages and sync them, (in global config these are specified, and in `zoi` type extension).
+### Core Package Management
+
+- [ ] **Project-Local Packages:** Install packages to a project-specific `.zoi/` directory using a `--local` flag, runnable with `zoi exec`.
+
+### Security & Integrity
+
+- [ ] **PGP Key Management (`zoi pgp`):** Introduce a `pgp` command to manage public keys for verifying package signatures.
+
+### Ecosystem & Contribution
+
+- [ ] **Package Publishing Workflow (`zoi publish`):** Streamline submitting new packages via the `publish` command, which will auto-generate an issue/PR to the `Zoi-Pkgs` repo.
+- [ ] **Cloud-Native Registries (S3/R2 Support):** Add support for S3-compatible object storage as a package registry backend.
 
 ```sh
 $ zoi sync set this-is-a-url --s3 # or --r2
@@ -57,10 +29,9 @@ $ Choose if its S3 AWS or S3 compatible # s3 only
 $ Enter credentials # saved at the global config
 ```
 
-## Enhancements & Improvements
+### Enhancements & Improvements
 
-- [ ] Better platform choices
-      something like this, you can add bulk if the others match:
+- [ ] **Advanced Platform Selectors:** Enhance the `platforms` field in `pkg.yaml` to allow for more granular targeting (OS version, kernel, DE, CPU/GPU, etc.).
 
 ```yaml
 platforms:
@@ -76,17 +47,87 @@ platforms:
     gpu: [nvidia@^340, amd] # optional, @ for driver version, semver
 ```
 
-- [ ] Better `make` command.
-- [ ] Improve the library side of Zoi with better docs.
-- [ ] Make bsdiff upgrade work
-- [ ] More platforms support
-      Adding more platforms support in the release CI and build scripts and in upgrade command and maybe packages.
-      Isn't a high priority so it may not be shipped in the next release.
-  - [ ] Windows arm64
-  - [ ] FreeBSD amd64, arm64
-  - [ ] OpenBSD amd64, arm64
-  - [ ] Android Termux?
+- [ ] **Improved `zoi make` Command:** Improve the TUI and validation for the interactive package creation tool.
+- [ ] **Bsdiff Self-Update Improvements:** Fix and stabilize the patch-based self-update mechanism for `zoi upgrade`.
+- [ ] **Expanded Platform Support:** Add binary and package support for more platforms, starting with Windows (ARM64) and FreeBSD.
 
 ---
 
-> **Note:** This roadmap is subject to change based on community feedback and development progress. Features/Enhancements may be added, removed, or re-prioritized as needed.
+## Beta 6.0.0
+
+This release will focus on a foundational rebuild of the packaging system and a major refactor to improve performance and maintainability.
+
+### Core Package Management
+
+- [ ] **Archival Packaging System (`zoi package`):** Re-architect the installation flow to use a robust, self-contained package format (`.pkg.tar.zst`), similar to `pacman`. This will make installations faster and more reliable.
+
+```sh
+$ zoi install fastfetch
+# Here we ask for confirmation if there's conflicts and checking if it's work on the user platform
+$ ... installing dependencies
+# Here we ask for confirmation about options and optional dependencies
+$ ... downloading the package
+$ ... preparing the package
+# Here's the fastfetch.pkg.tar.zst package archive begins installing, we need just that file for installing packages
+$ ... installing the package
+$ fastfetch from main installed!
+```
+
+### Codebase & Performance
+
+- [ ] **Major Refactor:** Undertake a significant refactoring of the codebase to improve modularity, performance, and prepare for a stable 1.0 release.
+
+---
+
+## Future & Long-Term Vision
+
+These are features and ideas we are considering for future releases. They are not yet scheduled but represent the direction we want to take Zoi.
+
+- [ ] **Enhanced Library & API Experience:** Improve the public API and documentation to make Zoi a powerful library for other Rust applications.
+- [ ] **MCP (Managed Component Packages):** Introduce a new package type for managed, isolated tools and services (e.g. language servers) that are not added to the user's PATH.
+- [ ] **Full Platform Parity:** Achieve full build and package support for all targeted platforms, including OpenBSD and Android (Termux).
+
+---
+
+## Contributing to the Roadmap
+
+To add or suggest an item for the roadmap, please open an issue or a pull request. Follow the style guide below to ensure consistency.
+
+### Roadmap Item Style
+
+Each item in the roadmap should be a checklist item (`- [ ]`) and follow this structure:
+
+1.  **Title:** A short, descriptive title in bold. If the feature introduces a new command, include it in backticks.
+    - `- [ ] **Project-Local Packages:**`
+    - `- [ ] **PGP Key Management (`zoi pgp`):**`
+
+2.  **Description:** A concise, one-sentence description of the feature's purpose and benefit.
+    - `- [ ] **Project-Local Packages:** Install packages to a project-specific ".zoi/" directory using a `--local`flag, runnable with`zoi exec`.
+
+3.  **More Info (Optional):** For complex features, you can add more details, user stories, or examples in a block below the main item. Use indentation to keep it visually associated with the checklist item.
+    - **Code Examples:** For features that change `pkg.yaml` or introduce new commands, provide a clear example in a YAML or shell code block.
+
+#### Example:
+
+````markdown
+- [ ] **Advanced Platform Selectors:** Enhance the `platforms` field in `pkg.yaml` to allow for more granular targeting (OS version, kernel, DE, CPU/GPU, etc.).
+
+      ```yaml
+      platforms:
+        - os: [linux]
+          arch: [amd64]
+          distro: [ubuntu]
+          version: "^24.04"
+          gpu: [nvidia@^550]
+      ```
+````
+
+### Roadmap Sections
+
+When adding a new item, please place it under one of the following pre-defined sections. If a suitable section doesn't exist, you can propose a new one.
+
+- **Core Package Management:** Features related to the fundamental processes of installing, updating, and managing packages.
+- **Enhancements & Improvements:** General improvements to existing features, user experience, and quality-of-life changes.
+- **Codebase & Performance:** Changes related to code health, refactoring, performance optimization, and internal architecture.
+- **Security & Integrity:** Features focused on package verification, trust, and protecting users.
+- **Ecosystem & Contribution:** Features that make it easier for the community to contribute packages and interact with the Zoi project.

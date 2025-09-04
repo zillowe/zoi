@@ -13,7 +13,7 @@ Extensions are ideal for:
 
 - **Distributing Repository Sets:** Package a list of official and git-based repositories for a team or project, so everyone can get access with a single command.
 - **Corporate Mirrors:** Point Zoi to a company's internal mirror of the official package database.
-- **Project Starters:** Distribute a standard `zoi.yaml` file for a specific type of project (e.g., Rust library, web service) to bootstrap development environments quickly.
+- **Project Starters:** Distribute a standard `zoi.yaml` file for a specific type of project (e.g. Rust library, web service) to bootstrap development environments quickly.
 - **Easy Configuration Sharing:** Simplify the process of setting up a new machine with a standard Zoi configuration.
 
 ## Creating an Extension
@@ -57,7 +57,7 @@ Zoi supports four types of changes that can be made by an extension.
 Clones a Git repository containing `pkg.yaml` files into Zoi's local package sources.
 
 - **Purpose:** To add a custom, third-party package repository.
-- **`add` Value:** A valid Git repository URL (e.g., `https://github.com/user/my-zoi-repo.git`).
+- **`add` Value:** A valid Git repository URL (e.g. `https://github.com/user/my-zoi-repo.git`).
 - **Effect:** Zoi clones the repository into `~/.zoi/pkgs/git/`. Users can then install packages from it using the `@git/<repo-name>/<pkg-name>` syntax.
 - **On Removal:** The cloned repository directory is deleted.
 
@@ -66,7 +66,7 @@ Clones a Git repository containing `pkg.yaml` files into Zoi's local package sou
 Adds an official Zoi repository tier to the list of active repositories that Zoi searches.
 
 - **Purpose:** To enable official repositories that are not active by default, such as `test`.
-- **`add` Value:** The name of an official repository tier (e.g., `core`, `main`, `community`, `test`, `archive`).
+- **`add` Value:** The name of an official repository tier (e.g. `core`, `main`, `community`, `test`, `archive`).
 - **Effect:** The repository name is added to the `repos` list in Zoi's configuration file.
 - **On Removal:** The repository is removed from the active list.
 
