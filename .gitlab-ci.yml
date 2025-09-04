@@ -5,9 +5,51 @@ stages:
   - release
   - release-package
 
-check_build:
+.cargo_cache:
+  variables:
+    CARGO_HOME: $CI_PROJECT_DIR/.cargo
+  cache:
+    key:
+      files:
+        - Cargo.lock
+    paths:
+      - .cargo/
+      - target/
+
+format:
   stage: test
   image: rust:latest
+  script:
+    - cargo fmt -- --check
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    - if: $CI_COMMIT_BRANCH
+
+lint:
+  stage: test
+  image: rust:latest
+  extends: .cargo_cache
+  tags:
+    - saas-linux-large-amd64
+  variables:
+    RUSTFLAGS: "-Dwarnings"
+  before_script:
+    - apt-get update -y && apt-get install -y build-essential gcc
+    - rustup component add clippy
+  script:
+    - cargo clippy --all-targets --all-features
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    - if: $CI_COMMIT_BRANCH
+
+test:
+  stage: test
+  image: rust:latest
+  extends: .cargo_cache
   tags:
     - saas-linux-large-amd64
   variables:
@@ -15,8 +57,7 @@ check_build:
   before_script:
     - apt-get update -y && apt-get install -y build-essential gcc
   script:
-    - echo "--- Checking build ---"
-    - cargo check --verbose
+    - cargo test --all-features
   rules:
     - if: $CI_COMMIT_TAG
       when: never
@@ -78,8 +119,6 @@ package:archive:
     - ./build/archive.sh
     - echo "Archiving complete."
   needs:
-    - job: check_build
-      optional: true
     - build:linux
     - build:macos
   artifacts:
