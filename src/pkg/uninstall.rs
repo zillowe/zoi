@@ -1,4 +1,4 @@
-use crate::pkg::{config_handler, dependencies, local, recorder, resolve, types};
+use crate::pkg::{config_handler, dependencies, local, recorder, resolve, script_handler, types};
 use crate::utils;
 use colored::*;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -134,6 +134,8 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
     );
     if pkg.package_type == types::PackageType::Config {
         config_handler::run_uninstall_commands(&pkg)?;
+    } else if pkg.package_type == types::PackageType::Script {
+        script_handler::run_uninstall_commands(&pkg)?;
     }
     let store_dir = local::get_store_root(scope)?.join(&pkg.name);
     if store_dir.exists() {

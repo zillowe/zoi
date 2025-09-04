@@ -13,6 +13,7 @@ pub mod pin;
 pub mod recorder;
 pub mod resolve;
 pub mod rollback;
+pub mod script_handler;
 pub mod service;
 pub mod sync;
 pub mod telemetry;
