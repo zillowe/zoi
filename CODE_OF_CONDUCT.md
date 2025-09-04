@@ -10,3 +10,7 @@ We value all members of our community and so in order to ensure a harassment-fre
 - Show respect and, as always, be excellent to each other.
 
 Violations of these rules or any other form of abuse can be reported confidentially to [contact@zillowe.qzz.io](mailto:contact@zillowe.qzz.io). Members who do not adhere to our code of conduct will be banned either permanently or until they change their ways so as to be compatible with a friendly, open, and inclusive community.
+
+This Code of Conduct is a copy of [Zillowe Code of Conduct](https://zillowe.qzz.io/docs/book/guidelines/code-of-conduct)
+
+> This Code of Conduct has been adopted from [KeePassXC](https://github.com/keepassxreboot/keepassxc)'s Code of Conduct.
