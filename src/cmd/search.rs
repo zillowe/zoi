@@ -60,6 +60,7 @@ pub fn run(
                 "app" => Some(PackageType::App),
                 "extension" => Some(PackageType::Extension),
                 "library" => Some(PackageType::Library),
+                "script" => Some(PackageType::Script),
                 _ => None,
             });
 

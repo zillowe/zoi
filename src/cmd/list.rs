@@ -18,6 +18,7 @@ pub fn run(
         Some("app") => Some(types::PackageType::App),
         Some("extension") => Some(types::PackageType::Extension),
         Some("library") => Some(types::PackageType::Library),
+        Some("script") => Some(types::PackageType::Script),
         Some(other) => return Err(format!("Invalid package type: {}", other).into()),
         None => None,
     };

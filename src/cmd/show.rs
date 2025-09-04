@@ -108,6 +108,7 @@ fn print_beautiful(pkg: &crate::pkg::types::Package, installed_manifest: Option<
         crate::pkg::types::PackageType::App => "App",
         crate::pkg::types::PackageType::Extension => "Extension",
         crate::pkg::types::PackageType::Library => "Library",
+        crate::pkg::types::PackageType::Script => "Script",
     };
     println!("{}: {}", "Type".bold(), type_display);
 

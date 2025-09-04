@@ -317,6 +317,94 @@ pub fn run_installation(
             config_handler::run_install_commands(&pkg)?;
         }
         return Ok(());
+    } else if pkg.package_type == types::PackageType::Script {
+        println!("Running script '{}'...", pkg.name.bold());
+        if let Some(deps) = &pkg.dependencies {
+            if let Some(runtime_deps) = &deps.runtime {
+                dependencies::resolve_and_install_required(
+                    &runtime_deps.get_required_simple(),
+                    &pkg.name,
+                    &version,
+                    pkg.scope,
+                    yes,
+                    all_optional,
+                    processed_deps,
+                    &mut installed_deps_list,
+                )?;
+                dependencies::resolve_and_install_required_options(
+                    &runtime_deps.get_required_options(),
+                    &pkg.name,
+                    &version,
+                    pkg.scope,
+                    yes,
+                    all_optional,
+                    processed_deps,
+                    &mut installed_deps_list,
+                    &mut chosen_options,
+                )?;
+                dependencies::resolve_and_install_optional(
+                    runtime_deps.get_optional(),
+                    &pkg.name,
+                    &version,
+                    pkg.scope,
+                    yes,
+                    all_optional,
+                    processed_deps,
+                    &mut installed_deps_list,
+                    &mut chosen_optionals,
+                    Some("runtime"),
+                )?;
+            }
+
+            if let Some(build_deps) = &deps.build {
+                dependencies::resolve_and_install_required(
+                    &build_deps.get_required_simple(),
+                    &pkg.name,
+                    &version,
+                    pkg.scope,
+                    yes,
+                    all_optional,
+                    processed_deps,
+                    &mut installed_deps_list,
+                )?;
+                dependencies::resolve_and_install_required_options(
+                    &build_deps.get_required_options(),
+                    &pkg.name,
+                    &version,
+                    pkg.scope,
+                    yes,
+                    all_optional,
+                    processed_deps,
+                    &mut installed_deps_list,
+                    &mut chosen_options,
+                )?;
+                dependencies::resolve_and_install_optional(
+                    build_deps.get_optional(),
+                    &pkg.name,
+                    &version,
+                    pkg.scope,
+                    yes,
+                    all_optional,
+                    processed_deps,
+                    &mut installed_deps_list,
+                    &mut chosen_optionals,
+                    Some("build"),
+                )?;
+            }
+        }
+        write_manifest(&pkg, reason, installed_deps_list)?;
+        if let Err(e) = recorder::record_package(&pkg, &chosen_options, &chosen_optionals) {
+            eprintln!("Warning: failed to record package installation: {}", e);
+        }
+        write_sharable_manifest(&pkg, chosen_options, chosen_optionals)?;
+        println!("Script '{}' registered.", pkg.name.green());
+
+        send_telemetry("install", &pkg);
+
+        if utils::ask_for_confirmation("Do you want to run the script now?", yes) {
+            run_script_install_commands(&pkg)?;
+        }
+        return Ok(());
     }
 
     if let Some(mut manifest) = local::is_package_installed(&pkg.name, pkg.scope)?
@@ -483,6 +571,61 @@ pub fn run_installation(
     }
 
     result
+}
+
+fn run_script_install_commands(pkg: &types::Package) -> Result<(), Box<dyn Error>> {
+    if let Some(hooks) = &pkg.script {
+        println!(
+            "
+{}",
+            "Running script...".bold()
+        );
+        let platform = utils::get_platform()?;
+        let version = pkg.version.as_deref().unwrap_or("");
+
+        for hook in hooks {
+            if utils::is_platform_compatible(&platform, &hook.platforms) {
+                for cmd_str in &hook.install {
+                    let final_cmd = cmd_str
+                        .replace("{version}", version)
+                        .replace("{name}", &pkg.name);
+
+                    println!("Executing: {}", final_cmd.cyan());
+
+                    let pb = ProgressBar::new_spinner();
+                    pb.set_style(
+                        ProgressStyle::default_spinner()
+                            .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
+                            .template("{spinner:.green} {msg}")?,
+                    );
+                    pb.set_message(format!("Running: {}", final_cmd));
+
+                    let output = if cfg!(target_os = "windows") {
+                        Command::new("pwsh")
+                            .arg("-Command")
+                            .arg(&final_cmd)
+                            .output()?
+                    } else {
+                        Command::new("bash").arg("-c").arg(&final_cmd).output()?
+                    };
+
+                    pb.finish_and_clear();
+
+                    if !output.status.success() {
+                        io::stdout().write_all(&output.stdout)?;
+                        io::stderr().write_all(&output.stderr)?;
+                        return Err(format!("Script command failed: '{}'", final_cmd).into());
+                    } else {
+                        let stdout = String::from_utf8_lossy(&output.stdout);
+                        if !stdout.trim().is_empty() {
+                            println!("{}", stdout.trim());
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 fn check_for_conflicts(pkg: &types::Package, yes: bool) -> Result<(), Box<dyn Error>> {

@@ -83,6 +83,7 @@ pub fn posthog_capture_event(
         crate::pkg::types::PackageType::App => "app",
         crate::pkg::types::PackageType::Extension => "extension",
         crate::pkg::types::PackageType::Library => "library",
+        crate::pkg::types::PackageType::Script => "script",
     };
 
     let ev = PackageEvent {

@@ -22,6 +22,7 @@ pub enum PackageType {
     App,
     Extension,
     Library,
+    Script,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -140,6 +141,7 @@ pub struct Package {
     pub service: Option<Vec<ServiceMethod>>,
     pub config: Option<Vec<ConfigCommands>>,
     pub app: Option<Vec<AppCommands>>,
+    pub script: Option<Vec<ConfigCommands>>,
     #[serde(default)]
     pub post_install: Option<Vec<PostInstallHook>>,
     #[serde(default)]
