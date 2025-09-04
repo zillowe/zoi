@@ -19,6 +19,8 @@ stages:
 format:
   stage: test
   image: rust:latest
+  before_script:
+    - rustup component add rustfmt
   script:
     - cargo fmt -- --check
   rules:

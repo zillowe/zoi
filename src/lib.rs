@@ -6,6 +6,7 @@ mod utils;
 
 pub use pkg::install::InstallMode;
 pub use pkg::types::InstallReason;
+pub use pkg::update::UpdateResult;
 use std::collections::HashSet;
 use std::error::Error;
 

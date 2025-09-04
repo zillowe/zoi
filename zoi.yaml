@@ -18,8 +18,17 @@ commands:
     run: "cargo clippy --all-targets --fix --allow-dirty --allow-staged"
   - cmd: "check"
     run: "cargo check"
+  - cmd: "test"
+    run: "cargo test --all-features"
 
 environments:
   - name: "Prepare"
     cmd: "pre"
-    run: ["zoi run deps", "zoi run lint", "zoi run fmt", "zoi run check"]
+    run:
+      [
+        "zoi run deps",
+        "zoi run lint",
+        "zoi run fmt",
+        "zoi run check",
+        "zoi run test",
+      ]
