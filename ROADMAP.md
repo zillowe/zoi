@@ -16,6 +16,8 @@ This release focuses on improving project-local workflows, enhancing security, a
 
 - [ ] **MCP (AI Completion Proxy) Server (`mcp` command):** Introduce a new `mcp` package type and `zoi mcp` command to manage local AI completion tool servers.
       This feature allows Zoi to manage different AI coding assistants (like Codex, Gemini, Claude) as local servers or binaries. An `mcp` package can be an HTTP server or a binary that is not added to the user's PATH.
+      **Supported Tools:**
+      First-party support is planned for tools like `OpenCode (SST)`, `Gemini CLI`, `Codex CLI`, `Claude Code`, `VSCode`, `Cursor`, and `Windsurf`.
       **Commands:**
 
 ```sh
@@ -26,9 +28,6 @@ zoi mcp rm <package> <tool>
 # Execute an MCP binary directly
 zoi mcp exec <package>
 ```
-
-      **Supported Tools:**
-      First-party support is planned for tools like `OpenCode (SST)`, `Gemini CLI`, `Codex CLI`, `Claude Code`, `VSCode`, `Cursor`, and `Windsurf`.
 
 ### Security & Integrity
 
@@ -65,13 +64,15 @@ platforms:
 
 - [ ] **Improved `zoi make` Command:** Improve the TUI and validation for the interactive package creation tool.
 - [ ] **Bsdiff Self-Update Improvements:** Fix and stabilize the patch-based self-update mechanism for `zoi upgrade`.
-- [ ] **Expanded Platform Support:** Add binary and package support for more platforms, starting with Windows (ARM64) and FreeBSD.
+- [ ] **Expanded Platform Support:** Add binary and package support for more platforms, starting with Windows (ARM64) and FreeBSD/OpenBSD.
 
 ---
 
 ## Beta 6.0.0
 
 This release will focus on a foundational rebuild of the packaging system and a major refactor to improve performance and maintainability.
+
+This should be the last release before `Release 1.0.0`
 
 ### Core Package Management
 
@@ -93,14 +94,17 @@ $ fastfetch from main installed!
 
 - [ ] **Major Refactor:** Undertake a significant refactoring of the codebase to improve modularity, performance, and prepare for a stable 1.0 release.
 
+### Ecosystem & Contribution
+
+- [ ] **Enhanced Library & API Experience:** Improve the public API and documentation to make Zoi a powerful library for other Rust applications.
+
 ---
 
 ## Future & Long-Term Vision
 
 These are features and ideas we are considering for future releases. They are not yet scheduled but represent the direction we want to take Zoi.
 
-- [ ] **Enhanced Library & API Experience:** Improve the public API and documentation to make Zoi a powerful library for other Rust applications.
-- [ ] **Full Platform Parity:** Achieve full build and package support for all targeted platforms, including FreeBSD/OpenBSD and Android (Termux).
+- [ ] **Full Platform Parity:** Achieve full build and package support for all targeted platforms, including Android (Termux).
 - [ ] **Managed Components (`zoi component`):** Introduce a new package type for managed, isolated developer tools (e.g. language servers, linters) that are not added to the user's PATH, but are managed by Zoi and can be executed via `zoi component exec` or integrated with other developer tools.
 
 ---
