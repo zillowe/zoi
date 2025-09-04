@@ -467,6 +467,13 @@ Commands:
         #[arg(required = true)]
         packages: Vec<String>,
     },
+
+    /// Shows a package's manual
+    Man {
+        /// The name of the package to show the manual for
+        #[arg(value_parser = PackageValueParser, hide_possible_values = true)]
+        package_name: String,
+    },
 }
 
 #[derive(clap::Parser, Debug)]
@@ -702,6 +709,7 @@ pub fn run() {
                 cflags,
                 packages,
             } => cmd::pkg_config::run(libs, cflags, &packages),
+            Commands::Man { package_name } => cmd::man::run(&package_name),
         };
 
         if let Err(e) = result {

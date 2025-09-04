@@ -124,6 +124,8 @@ pub struct Package {
     #[serde(default)]
     pub readme: Option<String>,
     #[serde(default)]
+    pub man: Option<String>,
+    #[serde(default)]
     pub git: String,
     pub maintainer: Maintainer,
     pub author: Option<Author>,
