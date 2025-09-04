@@ -119,10 +119,10 @@ Each item in the roadmap should be a checklist item (`- [ ]`) and follow this st
 
 1.  **Title:** A short, descriptive title in bold. If the feature introduces a new command, include it in backticks.
     - `- [ ] **Project-Local Packages:**`
-    - `- [ ] **PGP Key Management (`zoi pgp`):**`
+    - `- [ ] **PGP Key Management ('zoi pgp'):**`
 
 2.  **Description:** A concise, one-sentence description of the feature's purpose and benefit.
-    - `- [ ] **Project-Local Packages:** Install packages to a project-specific ".zoi/" directory using a `--local`flag, runnable with`zoi exec`.
+    - `- [ ] **Project-Local Packages:** Install packages to a project-specific ".zoi/" directory using a '--local' flag, runnable with 'zoi exec'`.
 
 3.  **More Info (Optional):** For complex features, you can add more details, user stories, or examples in a block below the main item. Use indentation to keep it visually associated with the checklist item.
     - **Code Examples:** For features that change `pkg.yaml` or introduce new commands, provide a clear example in a YAML or shell code block.
