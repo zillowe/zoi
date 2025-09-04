@@ -309,16 +309,16 @@ For an overview of official repositories, mirrors, and repository tiers, see [Re
 
 Zoi supports different types of packages, defined in the `.pkg.yaml` file.
 
-| Type         | Description                                                                                                                                                                    |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `Package`    | A standard software package that can be installed. This is the default type.                                                                                                   |
-| `Collection` | A meta-package that groups other packages together as dependencies.                                                                                                            |
-| `Service`    | A package that runs as a background service. Can be managed with shell commands or via Docker Compose.                                                                         |
-| `Config`     | A package that manages configuration files. It includes commands for installing and uninstalling the configuration.                                                            |
-| `App`        | An app template. Not installable; used via `zoi create` to scaffold an application (e.g. frameworks like Rails).                                                               |
+| Type         | Description                                                                                                                                                                                                                         |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Package`    | A standard software package that can be installed. This is the default type.                                                                                                                                                        |
+| `Collection` | A meta-package that groups other packages together as dependencies.                                                                                                                                                                 |
+| `Service`    | A package that runs as a background service. Can be managed with shell commands or via Docker Compose.                                                                                                                              |
+| `Config`     | A package that manages configuration files. It includes commands for installing and uninstalling the configuration.                                                                                                                 |
+| `App`        | An app template. Not installable; used via `zoi create` to scaffold an application (e.g. frameworks like Rails).                                                                                                                    |
 | `Extension`  | A package that can modify Zoi's configuration, such as adding new package repositories. It is not installed in the traditional sense but its changes are applied or reverted. See the [Extensions Guide](/docs/zds/zoi/extensions). |
-| `Library`    | A software library with headers and/or binaries (.so, .dll, .a). Can provide pkg-config files.                                                                                 |
-| `Script`     | A package that runs a series of inline shell commands instead of installing a binary.                                                                                          |
+| `Library`    | A software library with headers and/or binaries (.so, .dll, .a). Can provide pkg-config files.                                                                                                                                      |
+| `Script`     | A package that runs a series of inline shell commands instead of installing a binary.                                                                                                                                               |
 
 ## Creating Packages (`pkg.yaml`)
 
@@ -534,12 +534,18 @@ For the full list of supported dependency managers, usage semantics, and command
 
 <Accordions type="single">
   <Accordion title="How do I create my own package for Zoi?">
-    You can create a `pkg.yaml` file that defines your package. The easiest way is to run `zoi make` for an interactive setup. This file includes metadata like the package name, version, description, and installation instructions. The `Package` struct in [`types.rs`](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/src/pkg/types.rs) shows all available fields, and there\'s a [schema](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/app/pkg.schema.json) you can use in your `pkg.yaml` file. For more info about creating and publishing a package please visit [this guide](/docs/zds/zoi/creating-packages).
+    You can create a `pkg.yaml` file that defines your package. The easiest way is to run `zoi make` for an interactive setup. This file includes metadata like the package name, version, description, and installation instructions. The `Package` struct in [`types.rs`](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/src/pkg/types.rs) shows all available fields, and there's a [schema](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/app/pkg.schema.json) you can use in your `pkg.yaml` file. For more info about creating and publishing a package please visit [this guide](/docs/zds/zoi/creating-packages).
   </Accordion>
 </Accordions>
 <br />
 <Accordions type="single">
-  <Accordion title="How do I view a package\'s manual?">
+  <Accordion title="How do I publish a package?">
+    If the package maintainer has provided a `man` URL in the package definition, you can run `zoi man <package-name>` to view it in your terminal.
+  </Accordion>
+</Accordions>
+<br />
+<Accordions type="single">
+  <Accordion title="How do I view a package's manual?">
     If the package maintainer has provided a `man` URL in the package definition, you can run `zoi man <package-name>` to view it in your terminal.
   </Accordion>
 </Accordions>
@@ -573,7 +579,7 @@ For the full list of supported dependency managers, usage semantics, and command
   <Accordion title="Can I install packages from other package managers?">
     Yes, Zoi supports installing dependencies from a wide range of other package
     managers like `brew`, `winget`, `scoop`, `npm`, `cargo`, `pip`, and many
-    more. These are defined in the `dependencies` section of a package\'s
+    more. These are defined in the `dependencies` section of a packags's
     `.pkg.yaml` file.
   </Accordion>
 </Accordions>
@@ -644,7 +650,7 @@ For the full list of supported dependency managers, usage semantics, and command
 <br />
 <Accordions type="single">
   <Accordion title="How do I ensure a reproducible installation?">
-    When you install a package with selectable or optional dependencies, Zoi saves your choices to a `<package_name>.manifest.yaml` file in the package\'s installation directory. You can commit this file to your project and run `zoi install /path/to/your/package.manifest.yaml` to reinstall the package with the exact same dependencies non-interactively.
+    When you install a package with selectable or optional dependencies, Zoi saves your choices to a `<package_name>.manifest.yaml` file in the package's installation directory. You can commit this file to your project and run `zoi install /path/to/your/package.manifest.yaml` to reinstall the package with the exact same dependencies non-interactively.
   </Accordion>
 </Accordions>
 <br />
