@@ -45,11 +45,6 @@ $ fastfetch from main installed!
       When publishing a new package you can choose a mirror `publish ... mirror-name`, if not specified it will choose the default mirror from your config file.
       The publish command will check for the package name and repo/nested repo for existing packages.
       If you want to update an existing package it will check the version to see if there's an update or no, if there's an update it will create a different type of issue.
-- [ ] Add package type script that runs platform specific commands with dependencies.
-- [ ] Man command for viewing manual
-      `man <package>` command for viewing a text or markdown manual.
-      Add this to the pkg.yaml: `man: url-to-plain-text-or-markdown`
-- [x] Tab completion for packages in active repos
 - [ ] PGP command
       `pgp` command for managing public pgp keys to verify installed packages (`sig` field)
       We have a collection of trusted pgp keys, you can import pgp keys to be trusted, also work with zoi type extension to import pgp keys from urls or custom/default registries.
@@ -65,11 +60,6 @@ $ Enter credentials # saved at the global config
 
 ## Enhancements & Improvements
 
-- [x] Make update command `--all` instead of `all` because the user could have a package named `all` for some reason
-- [x] Make when packages in active repos 2 or more have the same name to bring an interactive prompt to choose which one (name, repo and description)
-- [ ] Better GitLab CI per-commit checks
-- [x] Show license spdx check in `show` command
-- [ ] Show if a package is installed in `show` command
 - [ ] Better platform choices
       something like this, you can add bulk if the others match:
 
@@ -88,8 +78,6 @@ platforms:
 ```
 
 - [ ] Better `make` command.
-- [x] Add `--all-optional` to install command to accept all the optional dependencies
-- [x] Improve `run` and `env` commands with platform specific commands and envs.
 - [ ] Improve the library side of Zoi with better docs.
 - [ ] More platforms support
       Adding more platforms support in the release CI and build scripts and in upgrade command and maybe packages.
