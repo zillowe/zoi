@@ -13,6 +13,7 @@ use ratatui::{
     prelude::*,
     widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap},
 };
+use std::fs;
 use std::io;
 use syntect::{
     easy::HighlightLines,
@@ -39,45 +40,83 @@ impl<'a> App<'a> {
     }
 }
 
-pub fn run(package_name: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run(
+    package_name: &str,
+    upstream: bool,
+    raw: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
     let (pkg, version, _) = resolve::resolve_package_and_version(package_name)?;
 
-    if let Some(man_url) = pkg.man {
-        let mut url = man_url.replace("{version}", &version);
-        url = url.replace("{name}", &pkg.name);
-        if let Ok(platform) = utils::get_platform() {
-            url = url.replace("{platform}", &platform);
+    let fetch_from_upstream = || -> Result<String, Box<dyn std::error::Error>> {
+        if let Some(man_url) = pkg.man.as_ref() {
+            let mut url = man_url.replace("{version}", &version);
+            url = url.replace("{name}", &pkg.name);
+            if let Ok(platform) = utils::get_platform() {
+                url = url.replace("{platform}", &platform);
+            }
+            url = url.replace("{git}", &pkg.git);
+
+            if !raw {
+                println!("Fetching manual from {}...", url);
+            }
+            Ok(reqwest::blocking::get(url)?.text()?)
+        } else {
+            Err(anyhow!("Package '{}' does not have a manual URL.", package_name).into())
         }
-        url = url.replace("{git}", &pkg.git);
+    };
 
-        println!("Fetching manual from {}...", url);
-        let content = reqwest::blocking::get(url)?.text()?;
-
-        enable_raw_mode()?;
-        let mut stdout = io::stdout();
-        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-        let backend = CrosstermBackend::new(stdout);
-        let mut terminal = Terminal::new(backend)?;
-
-        let app = App::new(&content);
-        let res = run_app(&mut terminal, app);
-
-        disable_raw_mode()?;
-        execute!(
-            terminal.backend_mut(),
-            LeaveAlternateScreen,
-            DisableMouseCapture
-        )?;
-        terminal.show_cursor()?;
-
-        if let Err(err) = res {
-            eprintln!("{:?}", err)
-        }
-
-        Ok(())
+    let content = if upstream {
+        fetch_from_upstream()?
     } else {
-        Err(anyhow!("Package '{}' does not have a manual.", package_name).into())
+        let store_dir = home::home_dir()
+            .ok_or("No home dir")?
+            .join(".zoi/pkgs/store")
+            .join(&pkg.name);
+        let man_md_path = store_dir.join("man.md");
+        let man_txt_path = store_dir.join("man.txt");
+
+        if man_md_path.exists() {
+            if !raw {
+                println!("Displaying locally installed manual (Markdown)...");
+            }
+            fs::read_to_string(man_md_path)?
+        } else if man_txt_path.exists() {
+            if !raw {
+                println!("Displaying locally installed manual (text)...");
+            }
+            fs::read_to_string(man_txt_path)?
+        } else {
+            fetch_from_upstream()?
+        }
+    };
+
+    if raw {
+        print!("{}", content);
+        return Ok(());
     }
+
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+
+    let app = App::new(&content);
+    let res = run_app(&mut terminal, app);
+
+    disable_raw_mode()?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
+    terminal.show_cursor()?;
+
+    if let Err(err) = res {
+        eprintln!("{:?}", err)
+    }
+
+    Ok(())
 }
 
 fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) -> io::Result<()> {

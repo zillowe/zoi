@@ -473,6 +473,12 @@ Commands:
         /// The name of the package to show the manual for
         #[arg(value_parser = PackageValueParser, hide_possible_values = true)]
         package_name: String,
+        /// Always look at the upstream manual even if it's downloaded
+        #[arg(long)]
+        upstream: bool,
+        /// Print the manual to the terminal raw
+        #[arg(long)]
+        raw: bool,
     },
 }
 
@@ -709,7 +715,11 @@ pub fn run() {
                 cflags,
                 packages,
             } => cmd::pkg_config::run(libs, cflags, &packages),
-            Commands::Man { package_name } => cmd::man::run(&package_name),
+            Commands::Man {
+                package_name,
+                upstream,
+                raw,
+            } => cmd::man::run(&package_name, upstream, raw),
         };
 
         if let Err(e) = result {

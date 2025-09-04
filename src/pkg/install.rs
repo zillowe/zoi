@@ -532,6 +532,9 @@ pub fn run_installation(
     };
 
     if result.is_ok() {
+        if let Err(e) = install_manual_if_available(&pkg) {
+            eprintln!("Warning: failed to install manual: {}", e);
+        }
         if pkg.package_type == types::PackageType::Library
             && let Err(e) = library::install_pkg_config_file(&pkg)
         {
@@ -850,6 +853,34 @@ fn find_method<'a>(
     pkg.installation.iter().find(|m| {
         m.install_type == type_name && crate::utils::is_platform_compatible(platform, &m.platforms)
     })
+}
+
+fn install_manual_if_available(pkg: &types::Package) -> Result<(), Box<dyn Error>> {
+    if let Some(man_url_template) = &pkg.man {
+        let version = pkg.version.as_deref().ok_or("Version not resolved")?;
+        let mut url = man_url_template.replace("{version}", version);
+        url = url.replace("{name}", &pkg.name);
+        if let Ok(platform) = utils::get_platform() {
+            url = url.replace("{platform}", &platform);
+        }
+        url = url.replace("{git}", &pkg.git);
+
+        println!("Downloading manual from {}...", url);
+        let content = reqwest::blocking::get(&url)?.bytes()?;
+
+        let store_dir = home::home_dir()
+            .ok_or("No home dir")?
+            .join(".zoi/pkgs/store")
+            .join(&pkg.name);
+        fs::create_dir_all(&store_dir)?;
+
+        let extension = if url.ends_with(".md") { "md" } else { "txt" };
+        let man_path = store_dir.join(format!("man.{}", extension));
+
+        fs::write(man_path, &content)?;
+        println!("Manual for '{}' installed.", pkg.name);
+    }
+    Ok(())
 }
 
 fn write_manifest(
