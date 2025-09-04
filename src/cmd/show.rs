@@ -1,4 +1,7 @@
-use crate::pkg::{resolve, types::Package};
+use crate::pkg::{
+    local, resolve,
+    types::{InstallManifest, Package},
+};
 use crate::utils;
 use colored::*;
 use std::fs;
@@ -18,13 +21,22 @@ pub fn run(source: &str, raw: bool) {
             }
             pkg.version =
                 Some(resolve::get_default_version(&pkg).unwrap_or_else(|_| "N/A".to_string()));
-            print_beautiful(&pkg);
+
+            let installed_manifest = match local::is_package_installed(&pkg.name, pkg.scope) {
+                Ok(manifest) => manifest,
+                Err(e) => {
+                    eprintln!("Warning: could not check installation status: {}", e);
+                    None
+                }
+            };
+
+            print_beautiful(&pkg, installed_manifest.as_ref());
         }
         Err(e) => eprintln!("{}: {}", "Error".red(), e),
     }
 }
 
-fn print_beautiful(pkg: &crate::pkg::types::Package) {
+fn print_beautiful(pkg: &crate::pkg::types::Package, installed_manifest: Option<&InstallManifest>) {
     println!(
         "{} {} - {}",
         pkg.name.bold().green(),
@@ -37,7 +49,23 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
     if !pkg.git.is_empty() {
         println!("Git Repo: {}", pkg.git.cyan().underline());
     }
-    println!("\n{}\n", pkg.description);
+    println!(
+        "
+{}
+",
+        pkg.description
+    );
+
+    if let Some(manifest) = installed_manifest {
+        println!(
+            "{}: {} ({})",
+            "Status".bold(),
+            "Installed".green(),
+            manifest.version
+        );
+    } else {
+        println!("{}: {}", "Status".bold(), "Not Installed".red());
+    }
 
     if !pkg.license.is_empty() {
         println!("{}: {}", "License".bold(), pkg.license);
@@ -106,7 +134,11 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
     }
 
     if pkg.package_type == crate::pkg::types::PackageType::Package {
-        println!("\n{}:", "Available installation methods".bold());
+        println!(
+            "
+{}:",
+            "Available installation methods".bold()
+        );
         for method in &pkg.installation {
             let type_str = &method.install_type;
             let display_type = match type_str.as_str() {
@@ -194,7 +226,11 @@ fn print_beautiful(pkg: &crate::pkg::types::Package) {
     }
 
     if let Some(deps) = &pkg.dependencies {
-        println!("\n{}:", "Dependencies".bold());
+        println!(
+            "
+{}:",
+            "Dependencies".bold()
+        );
 
         if let Some(build) = &deps.build {
             println!("  {}:", "Build".bold());
