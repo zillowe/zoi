@@ -6,108 +6,48 @@ This document outlines the future direction of Zoi, including planned features, 
 
 ---
 
-## Beta 5.0.0
+## v5 Beta: The Lua Overhaul
 
-This release focuses on improving project-local workflows, enhancing security, and adding quality-of-life enhancements.
+This release represents a foundational rebuild of the packaging system and a major refactor to improve performance, expressiveness, and maintainability. This is the last major beta release planned before a stable 1.0.0.
 
-### Core Package Management
+### Foundational Changes: Lua & The New Build System
+
+- [ ] **Transition to Lua-based Packages:** Replace the `pkg.yaml` format with `pkg.lua`. This allows for more dynamic, expressive, and maintainable package definitions, moving from a static data format to a sandboxed scripting language.
+
+- [ ] **Major Codebase Refactor:** Undertake a significant refactoring of the entire codebase to improve modularity, performance, and prepare for a stable 1.0 release.
+
+- [ ] **Archival Packaging System (`zoi package`):** Re-architect the installation flow to use a robust, self-contained package format (`.pkg.tar.zst`), similar to `pacman`. This makes installations faster, more reliable, and enables offline installs from pre-built packages.
+      This new system introduces several commands: - `zoi package meta ./path/to/name.pkg.lua`: Executes the package's Lua script in a secure sandbox to generate a static `name.metadata.json` file. This file is crucial for package indexers and frontends. - `zoi package build`: Using the generated `name.metadata.json`, this command fetches sources or binaries, verifies their integrity, and builds a standard `.pkg.tar.zst` archive for a specific platform. - `zoi package install ./path/to/name-os-arch.pkg.tar.zst`: Installs a package directly from a pre-built archive, allowing for fast, offline installations.
+
+- [ ] **Installation Scopes:** Introduce `--scope user` (default, installs to `~/.zoi`) and `--scope system` flags to control package installation locations, enabling better integration for system-level package management.
+
+- [ ] **Enhanced Library & API Experience:** Improve the public API and documentation to make Zoi a powerful and ergonomic library for other Rust applications to leverage.
+
+### Core Features & Enhancements
 
 - [ ] **Project-Local Packages:** Install packages to a project-specific `.zoi/` directory using a `--local` flag, runnable with `zoi exec`.
 
-- [ ] **MCP (AI Completion Proxy) Server (`mcp` command):** Introduce a new `mcp` package type and `zoi mcp` command to manage local AI completion tool servers.
-      This feature allows Zoi to manage different AI coding assistants (like Codex, Gemini, Claude) as local servers or binaries. An `mcp` package can be an HTTP server or a binary that is not added to the user's PATH.
-      **Supported Tools:**
-      First-party support is planned for tools like `OpenCode (SST)`, `Gemini CLI`, `Codex CLI`, `Claude Code`, `VSCode`, `Cursor`, and `Windsurf`.
-      **Commands:**
-
-```sh
-# Add or remove an MCP server for a specific tool
-zoi mcp add <package> <tool>
-zoi mcp rm <package> <tool>
-
-# Execute an MCP binary directly
-zoi mcp exec <package>
-```
-
-### Security & Integrity
-
 - [ ] **PGP Key Management (`zoi pgp`):** Introduce a `pgp` command to manage public keys for verifying package signatures.
 
-### Ecosystem & Contribution
-
 - [ ] **Package Publishing Workflow (`zoi publish`):** Streamline submitting new packages via the `publish` command, which will auto-generate an issue/PR to the `Zoi-Pkgs` repo.
-- [ ] **Install Packages From Git Repos:** Adding the ability to install a package from a git repo (like how we install it from a URL), support are for these git providers: GitHub, GitLab and Codeberg.
-      This new `--repo` command will look into the repo for a field in `zoi.yaml` that defines the package location, either a URL, local package in the repo or a package in the registry that Zoi installs, e.g. `@community/editors/my-app`, all that without cloning the repo.
+
+- [ ] **Install Packages From Git Repos:** Add the ability to install a package directly from a git repository (GitHub, GitLab, Codeberg) without a full clone, using a field in a `zoi.yaml` file to locate the package definition.
       **Commands:**
 
 ```sh
 $ zoi install --repo Zillowe/Hello # default is GitHub
-$ zoi install --repo gl:Zillowe/Hello # gh: GitHub, gl: GitLab, cb: Codeberg, you can use full names instead, e.g. codeberg:Zillowe/Hello
+$ zoi install --repo gl:Zillowe/Hello # gh: GitHub, gl: GitLab, cb: Codeberg
 ```
 
 - [ ] **Cloud-Native Registries (S3/R2 Support):** Add support for S3-compatible object storage as a package registry backend.
-      **Commands:**
 
-```sh
-$ zoi sync set this-is-a-url --s3 # or --r2
-$ Choose if its S3 AWS or S3 compatible # s3 only
-$ Enter credentials # saved at the global config
-```
+- [ ] **Advanced Platform Selectors:** Enhance the `platforms` field in package definitions to allow for more granular targeting (OS version, kernel, DE, CPU/GPU, etc.).
 
-### Enhancements & Improvements
+- [ ] **Improved `zoi make` Command:** Improve the TUI and validation for the interactive package creation tool to support the new Lua format.
 
-- [ ] **Advanced Platform Selectors:** Enhance the `platforms` field in `pkg.yaml` to allow for more granular targeting (OS version, kernel, DE, CPU/GPU, etc.).
-      **Code:**
-
-```yaml
-platforms:
-  - os: [linux]
-    arch: [amd64, arm64]
-    distro: [ubuntu, debian] # optional
-    server: [wayland, xorg] # optional
-    version: ^24.04 # optional, os/distro version, semver
-    kernel: ^6.16.2 # optional, linux kernel version, semver
-    de: [gnome, plasma] # optional
-    wm: [kwinn, hyprland] # optional
-    cpu: [intel, amd] # optional
-    gpu: [nvidia@^340, amd] # optional, @ for driver version, semver
-```
-
-- [ ] **Improved `zoi make` Command:** Improve the TUI and validation for the interactive package creation tool.
 - [ ] **Bsdiff Self-Update Improvements:** Fix and stabilize the patch-based self-update mechanism for `zoi upgrade`.
+
 - [ ] **Expanded Platform Support:** Add binary and package support for more platforms, starting with Windows (ARM64) and FreeBSD/OpenBSD.
-
----
-
-## Beta 6.0.0
-
-This release will focus on a foundational rebuild of the packaging system and a major refactor to improve performance and maintainability.
-
-This should be the last release before `Release 1.0.0`
-
-### Core Package Management
-
-- [ ] **Archival Packaging System (`zoi package`):** Re-architect the installation flow to use a robust, self-contained package format (`.pkg.tar.zst`), similar to `pacman`. This will make installations faster and more reliable.
-
-```sh
-$ zoi install fastfetch
-# Here we ask for confirmation if there's conflicts and checking if it's work on the user platform
-$ ... installing dependencies
-# Here we ask for confirmation about options and optional dependencies
-$ ... downloading the package
-$ ... preparing the package
-# Here's the fastfetch.pkg.tar.zst package archive begins installing, we need just that file for installing packages
-$ ... installing the package
-$ fastfetch from main installed!
-```
-
-### Codebase & Performance
-
-- [ ] **Major Refactor:** Undertake a significant refactoring of the codebase to improve modularity, performance, and prepare for a stable 1.0 release.
-
-### Ecosystem & Contribution
-
-- [ ] **Enhanced Library & API Experience:** Improve the public API and documentation to make Zoi a powerful library for other Rust applications.
 
 ---
 
@@ -136,29 +76,27 @@ Each item in the roadmap should be a checklist item (`- [ ]`) and follow this st
     - `- [ ] **Project-Local Packages:** Install packages to a project-specific ".zoi/" directory using a '--local' flag, runnable with 'zoi exec'`.
 
 3.  **More Info (Optional):** For complex features, you can add more details, user stories, or examples in a block below the main item. Use indentation to keep it visually associated with the checklist item.
-    - **Code Examples:** For features that change `pkg.yaml` or introduce new commands, provide a clear example in a YAML or shell code block.
+    - **Code Examples:** For features that change package definitions or introduce new commands, provide a clear example in a code block.
 
 #### Example:
 
 ````markdown
-- [ ] **Advanced Platform Selectors:** Enhance the `platforms` field in `pkg.yaml` to allow for more granular targeting (OS version, kernel, DE, CPU/GPU, etc.).
+- [ ] **Advanced Platform Selectors:** Enhance the `platforms` field to allow for more granular targeting.
 
-      ```yaml
-      platforms:
-        - os: [linux]
-          arch: [amd64]
-          distro: [ubuntu]
-          version: "^24.04"
-          gpu: [nvidia@^550]
+      ```lua
+      -- Example in name.pkg.lua
+      platforms = {
+        { os = "linux", arch = "amd64", distro = "ubuntu", version = "^24.04" }
+      }
       ```
 ````
 
 ### Roadmap Sections
 
-When adding a new item, please place it under one of the following pre-defined sections. If a suitable section doesn't exist, you can propose a new one.
+When adding a new item, please place it under one of the following pre-defined sections. If a suitable section doesn\'t exist, you can propose a new one.
 
-- **Core Package Management:** Features related to the fundamental processes of installing, updating, and managing packages.
-- **Enhancements & Improvements:** General improvements to existing features, user experience, and quality-of-life changes.
-- **Codebase & Performance:** Changes related to code health, refactoring, performance optimization, and internal architecture.
+- **Foundational Changes:** Major architectural changes, language transitions, or core system rebuilds.
+- **Core Features & Enhancements:** New commands, improvements to existing features, and quality-of-life changes.
 - **Security & Integrity:** Features focused on package verification, trust, and protecting users.
 - **Ecosystem & Contribution:** Features that make it easier for the community to contribute packages and interact with the Zoi project.
+- **Codebase & Performance:** Changes related to code health, refactoring, performance optimization, and internal architecture.
