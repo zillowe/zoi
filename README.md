@@ -33,6 +33,7 @@
 
 <div align="center">
   <a href="https://zillowe.qzz.io/docs/zds/zoi"><strong>Docs</strong></a> •
+  <a href="https://nel.zillowe.qzz.io"><strong>Package Registry</strong></a> •
   <a href="https://discord.gg/P4R7yaA3hf"><strong>Discord</strong></a> •
   <a href="./SECURITY.md"><strong>Security</strong></a> •
   <a href="./CONTRIBUTING.md"><strong>Contributing</strong></a> •
@@ -369,6 +370,10 @@ Zoi is hosted on multiple forges. The primary locations and mirrors are:
 - Archive: Archived packages that are no longer maintained.
 
 For details and CLI usage examples, see the docs page: [Repositories](https://zillowe.qzz.io/docs/zds/zoi/repositories).
+
+### Nel Package Registry
+
+Zoi has an online package registry, the [Nel Registry](https://nel.zillowe.qzz.io), where you can browse, search, and view packages available in the official Zoi repositories.
 
 ## 📜 License
 
