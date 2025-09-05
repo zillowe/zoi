@@ -163,6 +163,8 @@ pub struct Package {
     pub pkg_config: Option<PkgConfig>,
     #[serde(default)]
     pub updates: Option<Vec<UpdateInfo>>,
+    #[serde(default)]
+    pub selectable: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -215,6 +217,8 @@ pub struct ChecksumInfo {
 #[derive(Debug, Deserialize, Clone)]
 #[allow(dead_code)]
 pub struct InstallationMethod {
+    #[serde(default)]
+    pub name: Option<String>,
     #[serde(rename = "type")]
     pub install_type: String,
     pub url: String,

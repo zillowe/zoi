@@ -81,7 +81,7 @@ pub fn get_installed_packages_with_type() -> Result<Vec<InstalledPackage>, Box<d
         if !manifest.repo.is_empty() {
             let path = db_root
                 .join(&manifest.repo)
-                .join(format!("{}.pkg.yaml", manifest.name));
+                .join(format!("{}.pkg.lua", manifest.name));
             if path.exists() {
                 pkg_file = Some(path);
             }
@@ -89,7 +89,7 @@ pub fn get_installed_packages_with_type() -> Result<Vec<InstalledPackage>, Box<d
 
         if pkg_file.is_none() {
             for entry in WalkDir::new(&db_root).into_iter().filter_map(Result::ok) {
-                if entry.file_name().to_string_lossy() == format!("{}.pkg.yaml", manifest.name) {
+                if entry.file_name().to_string_lossy() == format!("{}.pkg.lua", manifest.name) {
                     pkg_file = Some(entry.path().to_path_buf());
                     break;
                 }
@@ -97,8 +97,7 @@ pub fn get_installed_packages_with_type() -> Result<Vec<InstalledPackage>, Box<d
         }
 
         if let Some(path) = pkg_file {
-            let content = fs::read_to_string(&path)?;
-            let pkg: Package = serde_yaml::from_str(&content)?;
+            let pkg: Package = crate::pkg::lua_parser::parse_lua_package(path.to_str().unwrap())?;
 
             let mut repo_field = manifest.repo.clone();
             if repo_field.is_empty()
@@ -150,9 +149,9 @@ pub fn get_all_available_packages() -> Result<Vec<super::types::Package>, Box<dy
             continue;
         }
         for entry in WalkDir::new(repo_path).into_iter().filter_map(Result::ok) {
-            if entry.file_name().to_string_lossy().ends_with(".pkg.yaml") {
-                let content = fs::read_to_string(entry.path())?;
-                let mut pkg: super::types::Package = serde_yaml::from_str(&content)?;
+            if entry.file_name().to_string_lossy().ends_with(".pkg.lua") {
+                let mut pkg: super::types::Package =
+                    crate::pkg::lua_parser::parse_lua_package(entry.path().to_str().unwrap())?;
 
                 if let Some(parent_dir) = entry.path().parent()
                     && let Ok(repo_subpath) = parent_dir.strip_prefix(&db_root)

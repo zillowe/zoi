@@ -10,12 +10,14 @@ pub fn run(source: &str, raw: bool) {
     let source = source.trim();
     match resolve::resolve_source(source) {
         Ok(resolved_source) => {
-            let content = fs::read_to_string(&resolved_source.path).unwrap();
             if raw {
+                let content = fs::read_to_string(&resolved_source.path).unwrap();
                 println!("{content}");
                 return;
             }
-            let mut pkg: Package = serde_yaml::from_str(&content).unwrap();
+            let mut pkg: Package =
+                crate::pkg::lua_parser::parse_lua_package(resolved_source.path.to_str().unwrap())
+                    .unwrap();
             if let Some(repo_name) = resolved_source.repo_name {
                 pkg.repo = repo_name;
             }

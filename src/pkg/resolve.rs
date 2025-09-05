@@ -41,7 +41,7 @@ pub(crate) fn get_db_root() -> Result<PathBuf, Box<dyn Error>> {
 
 fn parse_source_string(source_str: &str) -> Result<PackageRequest, Box<dyn Error>> {
     if source_str.contains('/')
-        && (source_str.ends_with(".manifest.yaml") || source_str.ends_with(".pkg.yaml"))
+        && (source_str.ends_with(".manifest.yaml") || source_str.ends_with(".pkg.lua"))
     {
         let path = std::path::Path::new(source_str);
         let file_stem = path.file_stem().unwrap_or_default().to_string_lossy();
@@ -122,11 +122,11 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
     let mut found_packages = Vec::new();
 
     for repo_name in &search_repos {
-        let pkg_file_name = format!("{}.pkg.yaml", request.name);
+        let pkg_file_name = format!("{}.pkg.lua", request.name);
         let path = db_root.join(repo_name.to_lowercase()).join(&pkg_file_name);
         if path.exists() {
-            let content = fs::read_to_string(&path)?;
-            let pkg: types::Package = serde_yaml::from_str(&content)?;
+            let pkg: types::Package =
+                crate::pkg::lua_parser::parse_lua_package(path.to_str().unwrap())?;
 
             let major_repo = repo_name.split('/').next().unwrap_or("").to_lowercase();
             let source_type =
@@ -260,7 +260,7 @@ fn download_from_url(url: &str) -> Result<ResolvedSource, Box<dyn Error>> {
     let content = String::from_utf8(downloaded_bytes)?;
 
     let temp_path = env::temp_dir().join(format!(
-        "zoi-temp-{}.yaml",
+        "zoi-temp-{}.pkg.lua",
         Utc::now().timestamp_nanos_opt().unwrap_or(0)
     ));
     fs::write(&temp_path, content)?;
@@ -335,7 +335,7 @@ fn resolve_channel(
             Ok(url_or_version.clone())
         }
     } else {
-        Err(format!("Channel '@{channel}' not found in versions map.").into())
+        Err(format!("Channel '@{}' not found in versions map.", channel).into())
     }
 }
 
@@ -584,15 +584,11 @@ pub fn resolve_package_and_version(
     ),
     Box<dyn Error>,
 > {
-    if source_str.ends_with(".manifest.yaml") {
-        return resolve_from_manifest(source_str);
-    }
-
     let request = parse_source_string(source_str)?;
     let resolved_source = resolve_source_recursive(source_str, 0)?;
 
-    let content = fs::read_to_string(&resolved_source.path)?;
-    let mut pkg: types::Package = serde_yaml::from_str(&content)?;
+    let mut pkg =
+        crate::pkg::lua_parser::parse_lua_package(resolved_source.path.to_str().unwrap())?;
     if let Some(repo_name) = resolved_source.repo_name.clone() {
         pkg.repo = repo_name;
     }
@@ -601,33 +597,6 @@ pub fn resolve_package_and_version(
 
     pkg.version = Some(version_string.clone());
     Ok((pkg, version_string, resolved_source.sharable_manifest))
-}
-
-fn resolve_from_manifest(
-    manifest_path: &str,
-) -> Result<
-    (
-        types::Package,
-        String,
-        Option<types::SharableInstallManifest>,
-    ),
-    Box<dyn Error>,
-> {
-    println!(
-        "Using local sharable manifest file: {}",
-        manifest_path.cyan()
-    );
-    let content = fs::read_to_string(manifest_path)?;
-    let sharable_manifest: types::SharableInstallManifest = serde_yaml::from_str(&content)?;
-
-    let new_source = format!(
-        "@{}/{}@{}",
-        sharable_manifest.repo, sharable_manifest.name, sharable_manifest.version
-    );
-
-    let (pkg, version, _) = resolve_package_and_version(&new_source)?;
-
-    Ok((pkg, version, Some(sharable_manifest)))
 }
 
 fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, Box<dyn Error>> {
@@ -677,7 +646,7 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, B
             path = path.join(part);
         }
 
-        path = path.join(format!("{}.pkg.yaml", pkg_name));
+        path = path.join(format!("{}.pkg.lua", pkg_name));
 
         if !path.exists() {
             let nested_path_str = nested_path_parts.join("/");
@@ -702,7 +671,7 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, B
         }
     } else if source.starts_with("http://") || source.starts_with("https://") {
         download_from_url(source)?
-    } else if source.ends_with(".pkg.yaml") {
+    } else if source.ends_with(".pkg.lua") {
         let path = PathBuf::from(source);
         if !path.exists() {
             return Err(format!("Local file not found at '{source}'").into());
@@ -718,20 +687,10 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, B
         find_package_in_db(&request)?
     };
 
-    let content = fs::read_to_string(&resolved_source.path)?;
+    let pkg_for_alt_check =
+        crate::pkg::lua_parser::parse_lua_package(resolved_source.path.to_str().unwrap())?;
 
-    #[derive(serde::Deserialize)]
-    struct AltCheck {
-        alt: Option<String>,
-    }
-    let alt_check: AltCheck = match serde_yaml::from_str(&content) {
-        Ok(ac) => ac,
-        Err(e) => {
-            return Err(format!("Failed to parse package file for 'alt' check: {}", e).into());
-        }
-    };
-
-    if let Some(alt_source) = alt_check.alt {
+    if let Some(alt_source) = pkg_for_alt_check.alt {
         println!("Found 'alt' source. Resolving from: {}", alt_source.cyan());
 
         let mut alt_resolved_source =
@@ -773,7 +732,7 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, B
 
                 let content = response.text()?;
                 let temp_path = env::temp_dir().join(format!(
-                    "zoi-alt-{}.pkg.yaml",
+                    "zoi-alt-{}.pkg.lua",
                     Utc::now().timestamp_nanos_opt().unwrap_or(0)
                 ));
                 fs::write(&temp_path, &content)?;

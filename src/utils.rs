@@ -442,7 +442,7 @@ set paths = [ ~/.zoi/pkgs/bin $paths... ]
         let new_path = if current_path.is_empty() {
             zoi_bin_path_str.to_string()
         } else {
-            format!("{};{}", current_path, zoi_bin_path_str)
+            format!("{};{{}}", current_path, zoi_bin_path_str)
         };
         env.set_value("Path", &new_path)?;
 
@@ -685,13 +685,20 @@ pub fn get_all_packages_for_completion() -> Vec<PackageCompletion> {
         for entry in WalkDir::new(&repo_path)
             .into_iter()
             .filter_map(|e| e.ok())
-            .filter(|e| e.path().is_file() && e.path().extension().is_some_and(|ext| ext == "yaml"))
+            .filter(|e| e.path().is_file() && e.path().extension().is_some_and(|ext| ext == "lua"))
         {
             if let Some(stem) = entry.path().file_stem()
                 && let Some(name) = stem.to_str().and_then(|s| s.strip_suffix(".pkg"))
             {
-                let content = fs::read_to_string(entry.path()).unwrap_or_default();
-                let pkg_info: Result<PackageForCompletion, _> = serde_yaml::from_str(&content);
+                let pkg_info: Result<PackageForCompletion, _> =
+                    (|| -> Result<_, Box<dyn Error>> {
+                        let pkg = crate::pkg::lua_parser::parse_lua_package(
+                            entry.path().to_str().unwrap(),
+                        )?;
+                        Ok(PackageForCompletion {
+                            description: Some(pkg.description),
+                        })
+                    })();
 
                 let description = match pkg_info {
                     Ok(pi) => pi.description.unwrap_or_default(),

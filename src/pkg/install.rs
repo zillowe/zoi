@@ -225,7 +225,6 @@ pub fn run_installation(
         if let Err(e) = recorder::record_package(&pkg, &chosen_options, &chosen_optionals) {
             eprintln!("Warning: failed to record package installation: {}", e);
         }
-        write_sharable_manifest(&pkg, chosen_options, chosen_optionals)?;
         println!("Collection '{}' installed successfully.", pkg.name.green());
         send_telemetry("install", &pkg);
         return Ok(());
@@ -308,7 +307,6 @@ pub fn run_installation(
         if let Err(e) = recorder::record_package(&pkg, &chosen_options, &chosen_optionals) {
             eprintln!("Warning: failed to record package installation: {}", e);
         }
-        write_sharable_manifest(&pkg, chosen_options, chosen_optionals)?;
         println!("Configuration '{}' registered.", pkg.name.green());
 
         send_telemetry("install", &pkg);
@@ -396,7 +394,6 @@ pub fn run_installation(
         if let Err(e) = recorder::record_package(&pkg, &chosen_options, &chosen_optionals) {
             eprintln!("Warning: failed to record package installation: {}", e);
         }
-        write_sharable_manifest(&pkg, chosen_options, chosen_optionals)?;
         println!("Script '{}' registered.", pkg.name.green());
 
         send_telemetry("install", &pkg);
@@ -544,7 +541,6 @@ pub fn run_installation(
         if let Err(e) = recorder::record_package(&pkg, &chosen_options, &chosen_optionals) {
             eprintln!("Warning: failed to record package installation: {}", e);
         }
-        write_sharable_manifest(&pkg, chosen_options, chosen_optionals)?;
         if let Err(e) = utils::setup_path(pkg.scope) {
             eprintln!("{} Failed to configure PATH: {}", "Warning:".yellow(), e);
         }
@@ -784,9 +780,15 @@ fn run_interactive_flow(pkg: &types::Package, platform: &str) -> Result<(), Box<
         return Err("No compatible installation methods found for your platform.".into());
     }
 
-    let method_names: Vec<&str> = available_methods
+    let method_names: Vec<String> = available_methods
         .iter()
-        .map(|m| m.install_type.as_str())
+        .map(|m| {
+            if let Some(name) = &m.name {
+                format!("{} ({})", name, m.install_type)
+            } else {
+                m.install_type.clone()
+            }
+        })
         .collect();
 
     let selection = Select::with_theme(&ColorfulTheme::default())
@@ -899,33 +901,6 @@ fn write_manifest(
         installed_dependencies,
     };
     local::write_manifest(&manifest)
-}
-
-fn write_sharable_manifest(
-    pkg: &types::Package,
-    chosen_options: Vec<String>,
-    chosen_optionals: Vec<String>,
-) -> Result<(), Box<dyn Error>> {
-    let manifest = types::SharableInstallManifest {
-        name: pkg.name.clone(),
-        version: pkg.version.clone().expect("Version should be resolved"),
-        repo: pkg.repo.clone(),
-        scope: pkg.scope,
-        chosen_options,
-        chosen_optionals,
-    };
-
-    let store_dir = home::home_dir()
-        .ok_or("No home dir")?
-        .join(".zoi/pkgs/store")
-        .join(&pkg.name);
-    fs::create_dir_all(&store_dir)?;
-
-    let manifest_path = store_dir.join(format!("{}.manifest.yaml", pkg.name));
-    let content = serde_yaml::to_string(&manifest)?;
-    fs::write(manifest_path, content)?;
-
-    Ok(())
 }
 
 fn get_filename_from_url(url: &str) -> &str {
