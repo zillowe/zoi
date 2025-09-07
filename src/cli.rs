@@ -475,6 +475,9 @@ enum Commands {
     /// Build, create, and manage Zoi packages
     #[command(alias = "pkg")]
     Package(cmd::package::PackageCommand),
+
+    /// Manage PGP keys for package signature verification
+    Pgp(cmd::pgp::PgpCommand),
 }
 
 #[derive(clap::Parser, Debug)]
@@ -719,6 +722,7 @@ pub fn run() {
                 cmd::package::run(args);
                 Ok(())
             }
+            Commands::Pgp(args) => cmd::pgp::run(args),
         };
 
         if let Err(e) = result {

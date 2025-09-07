@@ -1,5 +1,5 @@
 use super::structs::FinalMetadata;
-use crate::utils;
+use crate::{pkg, utils};
 use colored::*;
 use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -113,15 +113,17 @@ fn verify_signature(
 ) -> Result<(), Box<dyn Error>> {
     println!("Verifying signature for downloaded asset...");
 
-    let keys = [
-        metadata.maintainer.key.as_deref(),
-        metadata.author.as_ref().and_then(|a| a.key.as_deref()),
-    ]
-    .iter()
-    .filter_map(|&k| k)
-    .collect::<Vec<_>>();
+    let mut keys_to_check: Vec<(&str, Option<&str>)> = Vec::new();
+    if let Some(key) = metadata.maintainer.key.as_deref() {
+        keys_to_check.push((key, metadata.maintainer.key_name.as_deref()));
+    }
+    if let Some(author) = &metadata.author
+        && let Some(key) = author.key.as_deref()
+    {
+        keys_to_check.push((key, author.key_name.as_deref()));
+    }
 
-    if keys.is_empty() {
+    if keys_to_check.is_empty() {
         println!(
             "{} Signature URL found, but no maintainer or author key is defined. Skipping verification.",
             "Warning:".yellow(),
@@ -131,8 +133,37 @@ fn verify_signature(
 
     let rt = Runtime::new()?;
     rt.block_on(async {
-        let mut certs = Vec::new();
-        for key_source in &keys {
+        let mut certs: Vec<Cert> = pkg::pgp::get_all_local_certs().unwrap_or_default();
+        let local_fingerprints: Vec<String> = certs
+            .iter()
+            .map(|c| c.fingerprint().to_string().to_uppercase())
+            .collect();
+
+        for (key_source, key_name) in &keys_to_check {
+            let mut key_found_locally = false;
+
+            if key_source.len() == 40
+                && key_source.chars().all(|c| c.is_ascii_hexdigit())
+                && local_fingerprints
+                    .iter()
+                    .any(|fp| fp == &key_source.to_uppercase())
+            {
+                key_found_locally = true;
+            }
+
+            if key_found_locally {
+                println!(
+                    "Found key for '{}' locally.",
+                    key_name.unwrap_or(key_source)
+                );
+                continue;
+            }
+
+            println!(
+                "Key for '{}' not found locally, attempting to import...",
+                key_name.unwrap_or(key_source)
+            );
+
             let key_bytes_result = if key_source.starts_with("http") {
                 println!("Importing key from URL: {}", key_source.cyan());
                 reqwest::get(*key_source).await?.bytes().await
@@ -159,6 +190,16 @@ fn verify_signature(
             match key_bytes_result {
                 Ok(key_bytes) => {
                     if let Ok(cert) = Cert::from_bytes(&key_bytes) {
+                        if let Some(name) = key_name
+                            && let Err(e) = pkg::pgp::add_key_from_bytes(&key_bytes, name)
+                        {
+                            println!(
+                                "{} Failed to save imported key '{}': {}",
+                                "Warning:".yellow(),
+                                name,
+                                e
+                            );
+                        }
                         certs.push(cert);
                     } else {
                         println!(

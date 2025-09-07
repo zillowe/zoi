@@ -14,6 +14,7 @@ pub mod list;
 pub mod make;
 pub mod man;
 pub mod package;
+pub mod pgp;
 pub mod pin;
 pub mod pkg_config;
 pub mod repo;

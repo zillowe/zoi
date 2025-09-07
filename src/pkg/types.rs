@@ -174,6 +174,7 @@ pub struct Maintainer {
     pub email: String,
     pub website: Option<String>,
     pub key: Option<String>,
+    pub key_name: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -183,6 +184,7 @@ pub struct Author {
     pub email: Option<String>,
     pub website: Option<String>,
     pub key: Option<String>,
+    pub key_name: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

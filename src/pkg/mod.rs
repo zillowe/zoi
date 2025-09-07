@@ -11,6 +11,7 @@ pub mod library;
 pub mod local;
 pub mod lua_parser;
 pub mod package;
+pub mod pgp;
 pub mod pin;
 pub mod recorder;
 pub mod resolve;
