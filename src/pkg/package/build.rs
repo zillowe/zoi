@@ -50,7 +50,7 @@ fn verify_checksum(data: &[u8], expected_checksum: &str) -> Result<(), Box<dyn E
         Ok(())
     } else {
         Err(format!(
-            "Checksum mismatch!\n  Expected: {}\\n  Actual: {}",
+            "Checksum mismatch!\n  Expected: {}\n  Actual: {}",
             expected_checksum, actual_hash
         )
         .into())
