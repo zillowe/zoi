@@ -15,11 +15,11 @@ This release represents a foundational rebuild of the packaging system and a maj
 - [x] **Transition to Lua-based Packages:** Replace the `pkg.yaml` format with `pkg.lua`. This allows for more dynamic, expressive, and maintainable package definitions, moving from a static data format to a sandboxed scripting language.
 
 - [x] **Archival Packaging System (`zoi package`):** Re-architect the installation flow to use a robust, self-contained package format (`.pkg.tar.zst`), similar to `pacman`. This makes installations faster, more reliable, and enables offline installs from pre-built packages.
-      This new system introduces several commands: - `zoi package meta ./path/to/name.pkg.lua`: Executes the package's Lua script in a secure sandbox to generate a static `name.metadata.json` file. This file is crucial for package indexers and frontends. - `zoi package build`: Using the generated `name.metadata.json`, this command fetches sources or binaries, verifies their integrity, and builds a standard `.pkg.tar.zst` archive for a specific platform. - `zoi package install ./path/to/name-os-arch.pkg.tar.zst`: Installs a package directly from a pre-built archive, allowing for fast, offline installations.
+      This new system introduces several commands: - `zoi package meta ./path/to/name.pkg.lua`: Executes the package's Lua script in a secure sandbox to generate a static `name.meta.json` file. This file is crucial for package indexers and frontends. - `zoi package build`: Using the generated `name.meta.json`, this command fetches sources or binaries, verifies their integrity, and builds a standard `.pkg.tar.zst` archive for a specific platform. - `zoi package install ./path/to/name-os-arch.pkg.tar.zst`: Installs a package directly from a pre-built archive, allowing for fast, offline installations.
 
 - [x] **Installation Scopes:** Introduce `--scope user` (default, installs to `~/.zoi`) and `--scope system` flags to control package installation locations, enabling better integration for system-level package management.
 
-- [ ] **Enhanced Library & API Experience:** Improve the public API and documentation to make Zoi a powerful and ergonomic library for other Rust applications to leverage.
+- [x] **Enhanced Library & API Experience:** Improve the public API and documentation to make Zoi a powerful and ergonomic library for other Rust applications to leverage.
 
 ### Core Features & Enhancements
 

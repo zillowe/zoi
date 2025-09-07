@@ -137,12 +137,15 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
                 let pkg: types::Package =
                     crate::pkg::lua_parser::parse_lua_package(path.to_str().unwrap())?;
                 let major_repo = repo_name.split('/').next().unwrap_or("").to_lowercase();
-                let source_type =
-                    if major_repo == "core" || major_repo == "main" || major_repo == "extra" {
-                        SourceType::OfficialRepo
-                    } else {
-                        SourceType::UntrustedRepo(repo_name.clone())
-                    };
+                let source_type = if major_repo == "core"
+                    || major_repo == "main"
+                    || major_repo == "extra"
+                    || major_repo == "zillowe"
+                {
+                    SourceType::OfficialRepo
+                } else {
+                    SourceType::UntrustedRepo(repo_name.clone())
+                };
                 found_packages.push(FoundPackage {
                     path,
                     source_type,
@@ -169,12 +172,15 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
                     let pkg: types::Package =
                         crate::pkg::lua_parser::parse_lua_package(pkg_file_path.to_str().unwrap())?;
                     let major_repo = repo_name.split('/').next().unwrap_or("").to_lowercase();
-                    let source_type =
-                        if major_repo == "core" || major_repo == "main" || major_repo == "extra" {
-                            SourceType::OfficialRepo
-                        } else {
-                            SourceType::UntrustedRepo(repo_name.clone())
-                        };
+                    let source_type = if major_repo == "core"
+                        || major_repo == "main"
+                        || major_repo == "extra"
+                        || major_repo == "zillowe"
+                    {
+                        SourceType::OfficialRepo
+                    } else {
+                        SourceType::UntrustedRepo(repo_name.clone())
+                    };
 
                     let full_repo_path = pkg_dir_path
                         .strip_prefix(&db_root)

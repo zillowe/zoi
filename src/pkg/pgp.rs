@@ -152,7 +152,6 @@ pub fn list_keys() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
-    println!();
     println!("{}", "--- Stored PGP Keys ---".yellow().bold());
 
     for key_info in keys {
