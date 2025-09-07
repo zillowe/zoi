@@ -12,14 +12,12 @@ This release represents a foundational rebuild of the packaging system and a maj
 
 ### Foundational Changes: Lua & The New Build System
 
-- [ ] **Transition to Lua-based Packages:** Replace the `pkg.yaml` format with `pkg.lua`. This allows for more dynamic, expressive, and maintainable package definitions, moving from a static data format to a sandboxed scripting language.
+- [x] **Transition to Lua-based Packages:** Replace the `pkg.yaml` format with `pkg.lua`. This allows for more dynamic, expressive, and maintainable package definitions, moving from a static data format to a sandboxed scripting language.
 
-- [ ] **Major Codebase Refactor:** Undertake a significant refactoring of the entire codebase to improve modularity, performance, and prepare for a stable 1.0 release.
-
-- [ ] **Archival Packaging System (`zoi package`):** Re-architect the installation flow to use a robust, self-contained package format (`.pkg.tar.zst`), similar to `pacman`. This makes installations faster, more reliable, and enables offline installs from pre-built packages.
+- [x] **Archival Packaging System (`zoi package`):** Re-architect the installation flow to use a robust, self-contained package format (`.pkg.tar.zst`), similar to `pacman`. This makes installations faster, more reliable, and enables offline installs from pre-built packages.
       This new system introduces several commands: - `zoi package meta ./path/to/name.pkg.lua`: Executes the package's Lua script in a secure sandbox to generate a static `name.metadata.json` file. This file is crucial for package indexers and frontends. - `zoi package build`: Using the generated `name.metadata.json`, this command fetches sources or binaries, verifies their integrity, and builds a standard `.pkg.tar.zst` archive for a specific platform. - `zoi package install ./path/to/name-os-arch.pkg.tar.zst`: Installs a package directly from a pre-built archive, allowing for fast, offline installations.
 
-- [ ] **Installation Scopes:** Introduce `--scope user` (default, installs to `~/.zoi`) and `--scope system` flags to control package installation locations, enabling better integration for system-level package management.
+- [x] **Installation Scopes:** Introduce `--scope user` (default, installs to `~/.zoi`) and `--scope system` flags to control package installation locations, enabling better integration for system-level package management.
 
 - [ ] **Enhanced Library & API Experience:** Improve the public API and documentation to make Zoi a powerful and ergonomic library for other Rust applications to leverage.
 
@@ -27,7 +25,7 @@ This release represents a foundational rebuild of the packaging system and a maj
 
 - [ ] **Project-Local Packages:** Install packages to a project-specific `.zoi/` directory using a `--local` flag, runnable with `zoi exec`.
 
-- [ ] **PGP Key Management (`zoi pgp`):** Introduce a `pgp` command to manage public keys for verifying package signatures.
+- [x] **PGP Key Management (`zoi pgp`):** Introduce a `pgp` command to manage public keys for verifying package signatures.
 
 - [ ] **Package Publishing Workflow (`zoi publish`):** Streamline submitting new packages via the `publish` command, which will auto-generate an issue/PR to the `Zoi-Pkgs` repo.
 
@@ -47,8 +45,6 @@ $ zoi install --repo gl:Zillowe/Hello # gh: GitHub, gl: GitLab, cb: Codeberg
 
 - [ ] **Bsdiff Self-Update Improvements:** Fix and stabilize the patch-based self-update mechanism for `zoi upgrade`.
 
-- [ ] **Expanded Platform Support:** Add binary and package support for more platforms, starting with Windows (ARM64) and FreeBSD/OpenBSD.
-
 ---
 
 ## Future & Long-Term Vision
@@ -56,6 +52,7 @@ $ zoi install --repo gl:Zillowe/Hello # gh: GitHub, gl: GitLab, cb: Codeberg
 These are features and ideas we are considering for future releases. They are not yet scheduled but represent the direction we want to take Zoi.
 
 - [ ] **Full Platform Parity:** Achieve full build and package support for all targeted platforms, including Android (Termux).
+- [ ] **Expanded Platform Support:** Add binary and package support for more platforms, starting with Windows (ARM64) and FreeBSD/OpenBSD.
 - [ ] **Managed Components (`zoi component`):** Introduce a new package type for managed, isolated developer tools (e.g. language servers, linters) that are not added to the user's PATH, but are managed by Zoi and can be executed via `zoi component exec` or integrated with other developer tools.
 
 ---

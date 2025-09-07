@@ -11,7 +11,7 @@ This document provides guidelines for the AI assistant when working on the Zoi p
 
 1.  **Analyze and Plan:** Before making any changes, thoroughly analyze the user's request and the relevant codebase. Formulate a clear plan of action.
 2.  **Implement:** Write or modify the code according to the plan.
-3.  **Verify with Build:** After every single code change, run `cargo build` to check for compilation errors and ensure the project remains in a buildable state. Do not proceed if the build is broken.
+3.  **Verify with Build:** After every single code change, run `cargo check` to check for compilation errors and ensure the project remains in a buildable state. Do not proceed if the build is broken.
 4.  **Update Documentation:** After implementing and verifying a feature or change, update the relevant documentation to reflect the new state of the codebase.
 
 ## Documentation Guidelines

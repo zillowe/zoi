@@ -34,6 +34,7 @@ path = "src/main.rs"
 
 [lints.clippy]
 too_many_arguments = "allow"
+type_complexity = "allow"
 
 [package.metadata.cargo-machete]
 ignored = ["openssl"]
