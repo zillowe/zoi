@@ -3,6 +3,15 @@ use crate::utils;
 use colored::*;
 use flate2::read::GzDecoder;
 use indicatif::{ProgressBar, ProgressStyle};
+use sequoia_openpgp::{
+    KeyHandle,
+    cert::Cert,
+    parse::{
+        Parse,
+        stream::{DetachedVerifierBuilder, MessageLayer, MessageStructure, VerificationHelper},
+    },
+    policy::StandardPolicy,
+};
 use sha2::{Digest, Sha512};
 use std::error::Error;
 use std::fs::{self, File};
@@ -10,6 +19,7 @@ use std::io::{Cursor, Read};
 use std::path::Path;
 use tar::Archive;
 use tempfile::Builder;
+use tokio::runtime::Runtime;
 use xz2::read::XzDecoder;
 use zip::ZipArchive;
 use zstd::stream::read::Decoder as ZstdDecoder;
@@ -57,6 +67,142 @@ fn verify_checksum(data: &[u8], expected_checksum: &str) -> Result<(), Box<dyn E
     }
 }
 
+struct Helper {
+    certs: Vec<Cert>,
+}
+
+impl VerificationHelper for Helper {
+    fn get_certs(&mut self, ids: &[KeyHandle]) -> anyhow::Result<Vec<Cert>> {
+        let matching_certs: Vec<Cert> = self
+            .certs
+            .iter()
+            .filter(|cert| {
+                ids.iter().any(|id| {
+                    cert.keys().any(|key| match *id {
+                        KeyHandle::KeyID(ref keyid) => key.key().keyid() == *keyid,
+                        KeyHandle::Fingerprint(ref fp) => key.key().fingerprint() == *fp,
+                    })
+                })
+            })
+            .cloned()
+            .collect();
+        Ok(matching_certs)
+    }
+
+    fn check(&mut self, structure: MessageStructure) -> anyhow::Result<()> {
+        if let Some(layer) = structure.into_iter().next() {
+            match layer {
+                MessageLayer::SignatureGroup { results } => {
+                    if results.iter().any(|r| r.is_ok()) {
+                        return Ok(());
+                    } else {
+                        return Err(anyhow::anyhow!("No valid signature found"));
+                    }
+                }
+                _ => return Err(anyhow::anyhow!("Unexpected message structure")),
+            }
+        }
+        Err(anyhow::anyhow!("No signature layer found"))
+    }
+}
+
+fn verify_signature(
+    data: &[u8],
+    signature_url: &str,
+    metadata: &FinalMetadata,
+) -> Result<(), Box<dyn Error>> {
+    println!("Verifying signature for downloaded asset...");
+
+    let keys = [
+        metadata.maintainer.key.as_deref(),
+        metadata.author.as_ref().and_then(|a| a.key.as_deref()),
+    ]
+    .iter()
+    .filter_map(|&k| k)
+    .collect::<Vec<_>>();
+
+    if keys.is_empty() {
+        println!(
+            "{} Signature URL found, but no maintainer or author key is defined. Skipping verification.",
+            "Warning:".yellow(),
+        );
+        return Ok(());
+    }
+
+    let rt = Runtime::new()?;
+    rt.block_on(async {
+        let mut certs = Vec::new();
+        for key_source in &keys {
+            let key_bytes_result = if key_source.starts_with("http") {
+                println!("Importing key from URL: {}", key_source.cyan());
+                reqwest::get(*key_source).await?.bytes().await
+            } else if key_source.len() == 40 && key_source.chars().all(|c| c.is_ascii_hexdigit()) {
+                let fingerprint = key_source.to_uppercase();
+                let key_server_url = format!(
+                    "https://keys.openpgp.org/vks/v1/by-fingerprint/{}",
+                    fingerprint
+                );
+                println!(
+                    "Importing key for fingerprint {} from keyserver...",
+                    fingerprint.cyan()
+                );
+                reqwest::get(&key_server_url).await?.bytes().await
+            } else {
+                println!(
+                    "{} Invalid key source: '{}'. Must be a URL or a 40-character GPG fingerprint.",
+                    "Warning:".yellow(),
+                    key_source
+                );
+                continue;
+            };
+
+            match key_bytes_result {
+                Ok(key_bytes) => {
+                    if let Ok(cert) = Cert::from_bytes(&key_bytes) {
+                        certs.push(cert);
+                    } else {
+                        println!(
+                            "{} Failed to parse certificate from source: {}",
+                            "Warning:".yellow(),
+                            key_source
+                        );
+                    }
+                }
+                Err(e) => {
+                    println!(
+                        "{} Failed to download key from source {}: {}",
+                        "Warning:".yellow(),
+                        key_source,
+                        e
+                    );
+                }
+            }
+        }
+
+        if certs.is_empty() {
+            return Err(anyhow::anyhow!(
+                "No valid public keys found to verify signature."
+            ));
+        }
+
+        println!("Downloading signature from: {}", signature_url);
+        let sig_bytes = reqwest::get(signature_url).await?.bytes().await?;
+
+        let policy = &StandardPolicy::new();
+        let helper = Helper { certs };
+
+        let mut verifier =
+            DetachedVerifierBuilder::from_bytes(&sig_bytes)?.with_policy(policy, None, helper)?;
+
+        verifier.verify_bytes(data)?;
+
+        println!("{}", "Signature verified successfully.".green());
+        Ok(())
+    })?;
+
+    Ok(())
+}
+
 pub fn run(meta_file: &Path) -> Result<(), Box<dyn Error>> {
     println!("Building package from: {}", meta_file.display());
 
@@ -94,6 +240,15 @@ pub fn run(meta_file: &Path) -> Result<(), Box<dyn Error>> {
         println!(
             "{}",
             "No checksum provided, skipping verification.".yellow()
+        );
+    }
+
+    if let Some(signature_url) = &asset.signature_url {
+        verify_signature(&downloaded_data, signature_url, &metadata)?;
+    } else {
+        println!(
+            "{}",
+            "No signature provided, skipping verification.".yellow()
         );
     }
 

@@ -84,7 +84,7 @@ pub fn run(package_file: &Path) -> Result<(), Box<dyn Error>> {
         for bin_name in bins {
             let mut found_bin = false;
             for entry in WalkDir::new(&store_dir).into_iter().filter_map(|e| e.ok()) {
-                if entry.file_name().to_string_lossy() == *bin_name {
+                if entry.file_type().is_file() && entry.file_name().to_string_lossy() == *bin_name {
                     let target_path = entry.path();
                     let link_path = bin_root.join(bin_name);
 
