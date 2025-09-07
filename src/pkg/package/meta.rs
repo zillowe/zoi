@@ -8,7 +8,7 @@ use std::path::Path;
 pub fn run(package_file: &Path) -> Result<(), Box<dyn Error>> {
     println!("Generating metadata for: {}", package_file.display());
 
-    let (package_template, version, _) =
+    let (package_template, version, _, _) =
         resolve::resolve_package_and_version(package_file.to_str().unwrap())?;
 
     let method_priority = ["com_binary", "binary", "source"];

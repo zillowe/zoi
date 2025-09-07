@@ -537,11 +537,13 @@ pub fn resolve_package_and_version(
         types::Package,
         String,
         Option<types::SharableInstallManifest>,
+        PathBuf,
     ),
     Box<dyn Error>,
 > {
     let request = parse_source_string(source_str)?;
     let resolved_source = resolve_source_recursive(source_str, 0)?;
+    let pkg_lua_path = resolved_source.path.clone();
 
     let mut pkg =
         crate::pkg::lua_parser::parse_lua_package(resolved_source.path.to_str().unwrap())?;
@@ -552,7 +554,12 @@ pub fn resolve_package_and_version(
     let version_string = get_version_for_install(&pkg, &request.version_spec)?;
 
     pkg.version = Some(version_string.clone());
-    Ok((pkg, version_string, resolved_source.sharable_manifest))
+    Ok((
+        pkg,
+        version_string,
+        resolved_source.sharable_manifest,
+        pkg_lua_path,
+    ))
 }
 
 fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, Box<dyn Error>> {

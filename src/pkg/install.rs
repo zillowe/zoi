@@ -80,7 +80,8 @@ pub fn run_installation(
     all_optional: bool,
     processed_deps: &mut HashSet<String>,
 ) -> Result<(), Box<dyn Error>> {
-    let (pkg, version, sharable_manifest) = resolve::resolve_package_and_version(source)?;
+    let (pkg, version, sharable_manifest, pkg_lua_path) =
+        resolve::resolve_package_and_version(source)?;
 
     utils::check_license(&pkg.license);
 
@@ -523,8 +524,8 @@ pub fn run_installation(
 
     let result = match mode {
         InstallMode::ForceSource => run_source_flow(&pkg, &platform),
-        InstallMode::PreferBinary => run_default_flow(&pkg, &platform, yes),
-        InstallMode::Interactive => run_interactive_flow(&pkg, &platform),
+        InstallMode::PreferBinary => run_default_flow(&pkg, &pkg_lua_path, &platform, yes),
+        InstallMode::Interactive => run_interactive_flow(&pkg, &pkg_lua_path, &platform),
         InstallMode::Updater(ref method_name) => run_updater_flow(&pkg, &platform, method_name),
     };
 
@@ -753,7 +754,11 @@ fn run_updater_flow(
     .into())
 }
 
-fn run_interactive_flow(pkg: &types::Package, platform: &str) -> Result<(), Box<dyn Error>> {
+fn run_interactive_flow(
+    pkg: &types::Package,
+    _pkg_lua_path: &std::path::Path,
+    platform: &str,
+) -> Result<(), Box<dyn Error>> {
     let mut available_methods = Vec::new();
     for method in &pkg.installation {
         if crate::utils::is_platform_compatible(platform, &method.platforms) {
@@ -853,7 +858,62 @@ fn download_file_with_progress(url: &str) -> Result<Vec<u8>, Box<dyn Error>> {
     Ok(downloaded_bytes)
 }
 
-fn run_default_flow(pkg: &types::Package, platform: &str, yes: bool) -> Result<(), Box<dyn Error>> {
+fn try_meta_build_install(
+    pkg_lua_path: &std::path::Path,
+    pkg: &types::Package,
+) -> Result<(), Box<dyn Error>> {
+    println!(
+        "{}",
+        "Attempting to build and install from meta files...".yellow()
+    );
+
+    // 1. Meta
+    if let Err(e) = crate::pkg::package::meta::run(pkg_lua_path) {
+        return Err(format!("'meta' step failed: {}", e).into());
+    }
+    let meta_filename = format!("{}.meta.json", pkg.name);
+    let meta_path = pkg_lua_path.with_file_name(meta_filename);
+    if !meta_path.exists() {
+        return Err("meta.json file not created".into());
+    }
+    println!("'meta' step successful.");
+
+    // 2. Build
+    if let Err(e) = crate::pkg::package::build::run(&meta_path) {
+        return Err(format!("'build' step failed: {}", e).into());
+    }
+    let platform = utils::get_platform()?;
+    let archive_filename = format!(
+        "{}-{}-{}.pkg.tar.zst",
+        pkg.name,
+        pkg.version.as_deref().unwrap_or(""),
+        platform
+    );
+    let archive_path = meta_path.with_file_name(archive_filename);
+    if !archive_path.exists() {
+        return Err("package archive not created".into());
+    }
+    println!("'build' step successful.");
+
+    // 3. Install
+    if let Err(e) = crate::pkg::package::install::run(&archive_path) {
+        return Err(format!("'install' step failed: {}", e).into());
+    }
+    println!("'install' step successful.");
+
+    // Cleanup temporary files
+    let _ = fs::remove_file(&meta_path);
+    let _ = fs::remove_file(&archive_path);
+
+    Ok(())
+}
+
+fn run_default_flow(
+    pkg: &types::Package,
+    pkg_lua_path: &std::path::Path,
+    platform: &str,
+    yes: bool,
+) -> Result<(), Box<dyn Error>> {
     let db_path = resolve::get_db_root()?;
     if let Ok(repo_config) = config::read_repo_config(&db_path)
         && let Some(repo_pkg_url_template) = repo_config.repo_pkg
@@ -904,6 +964,20 @@ fn run_default_flow(pkg: &types::Package, platform: &str, yes: bool) -> Result<(
                 );
             }
         }
+    }
+
+    println!(
+        "{}",
+        "Could not install pre-built package. Trying meta-build-install flow...".yellow()
+    );
+    if let Err(e) = try_meta_build_install(pkg_lua_path, pkg) {
+        println!(
+            "meta-build-install flow failed: {}. Falling back to other methods.",
+            e.to_string().yellow()
+        );
+    } else {
+        println!("{}", "meta-build-install flow successful.".green());
+        return Ok(());
     }
 
     if let Some(method) = find_method(pkg, "binary", platform) {

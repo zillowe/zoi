@@ -104,7 +104,7 @@ fn uninstall_collection(
 }
 
 pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
-    let (pkg, _, _) = resolve::resolve_package_and_version(package_name)?;
+    let (pkg, _, _, _) = resolve::resolve_package_and_version(package_name)?;
     let (manifest, scope) =
         if let Some(m) = local::is_package_installed(&pkg.name, types::Scope::User)? {
             (m, types::Scope::User)

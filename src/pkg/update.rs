@@ -27,7 +27,7 @@ pub fn run(package_name: &str, yes: bool) -> Result<UpdateResult, Box<dyn Error>
             package_name
         ))?;
 
-    let (new_pkg, new_version, _) = resolve::resolve_package_and_version(&lower_package_name)?;
+    let (new_pkg, new_version, _, _) = resolve::resolve_package_and_version(&lower_package_name)?;
 
     if manifest.version == new_version {
         return Ok(UpdateResult::AlreadyUpToDate);
