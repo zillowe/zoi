@@ -149,13 +149,18 @@ pub fn get_all_available_packages() -> Result<Vec<super::types::Package>, Box<dy
             continue;
         }
         for entry in WalkDir::new(repo_path).into_iter().filter_map(Result::ok) {
-            if entry.file_name().to_string_lossy().ends_with(".pkg.lua") {
-                let mut pkg: super::types::Package =
-                    crate::pkg::lua_parser::parse_lua_package(entry.path().to_str().unwrap())?;
+            if !entry.file_type().is_dir() {
+                continue;
+            }
 
-                if let Some(parent_dir) = entry.path().parent()
-                    && let Ok(repo_subpath) = parent_dir.strip_prefix(&db_root)
-                {
+            let pkg_name = entry.file_name().to_string_lossy();
+            let pkg_file_path = entry.path().join(format!("{}.pkg.lua", pkg_name));
+
+            if pkg_file_path.is_file() {
+                let mut pkg: super::types::Package =
+                    crate::pkg::lua_parser::parse_lua_package(pkg_file_path.to_str().unwrap())?;
+
+                if let Ok(repo_subpath) = entry.path().strip_prefix(&db_root) {
                     pkg.repo = repo_subpath.to_string_lossy().to_string();
                 }
 

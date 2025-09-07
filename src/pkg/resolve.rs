@@ -8,7 +8,8 @@ use std::env;
 use std::error::Error;
 use std::fs;
 use std::io::Read;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use walkdir::WalkDir;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum SourceType {
@@ -75,11 +76,10 @@ fn parse_source_string(source_str: &str) -> Result<PackageRequest, Box<dyn Error
 
     if main_part.starts_with('@') {
         let s = main_part.trim_start_matches('@');
-        if let Some(pos) = s.rfind('/') {
-            let (repo_str, name_str) = s.split_at(pos);
-            if !name_str[1..].is_empty() {
+        if let Some((repo_str, name_str)) = s.split_once('/') {
+            if !name_str.is_empty() {
                 repo = Some(repo_str.to_lowercase());
-                name = &name_str[1..];
+                name = name_str;
             } else {
                 return Err("Invalid format: missing package name after repo path.".into());
             }
@@ -121,27 +121,76 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
 
     let mut found_packages = Vec::new();
 
-    for repo_name in &search_repos {
-        let pkg_file_name = format!("{}.pkg.lua", request.name);
-        let path = db_root.join(repo_name.to_lowercase()).join(&pkg_file_name);
-        if path.exists() {
-            let pkg: types::Package =
-                crate::pkg::lua_parser::parse_lua_package(path.to_str().unwrap())?;
+    if request.name.contains('/') {
+        let pkg_name = Path::new(&request.name)
+            .file_name()
+            .and_then(|s| s.to_str())
+            .ok_or_else(|| format!("Invalid package path: {}", request.name))?;
 
-            let major_repo = repo_name.split('/').next().unwrap_or("").to_lowercase();
-            let source_type =
-                if major_repo == "core" || major_repo == "main" || major_repo == "extra" {
-                    SourceType::OfficialRepo
-                } else {
-                    SourceType::UntrustedRepo(repo_name.clone())
-                };
+        for repo_name in &search_repos {
+            let path = db_root
+                .join(repo_name)
+                .join(&request.name)
+                .join(format!("{}.pkg.lua", pkg_name));
 
-            found_packages.push(FoundPackage {
-                path,
-                source_type,
-                repo_name: repo_name.clone(),
-                description: pkg.description,
-            });
+            if path.exists() {
+                let pkg: types::Package =
+                    crate::pkg::lua_parser::parse_lua_package(path.to_str().unwrap())?;
+                let major_repo = repo_name.split('/').next().unwrap_or("").to_lowercase();
+                let source_type =
+                    if major_repo == "core" || major_repo == "main" || major_repo == "extra" {
+                        SourceType::OfficialRepo
+                    } else {
+                        SourceType::UntrustedRepo(repo_name.clone())
+                    };
+                found_packages.push(FoundPackage {
+                    path,
+                    source_type,
+                    repo_name: repo_name.clone(),
+                    description: pkg.description,
+                });
+            }
+        }
+    } else {
+        // This is just a package name, search for it
+        for repo_name in &search_repos {
+            let repo_path = db_root.join(repo_name);
+            if !repo_path.is_dir() {
+                continue;
+            }
+            for entry in WalkDir::new(&repo_path)
+                .into_iter()
+                .filter_map(|e| e.ok())
+                .filter(|e| e.file_type().is_dir() && e.file_name() == request.name.as_str())
+            {
+                let pkg_dir_path = entry.path();
+                let pkg_file_path = pkg_dir_path.join(format!("{}.pkg.lua", request.name));
+
+                if pkg_file_path.exists() {
+                    let pkg: types::Package =
+                        crate::pkg::lua_parser::parse_lua_package(pkg_file_path.to_str().unwrap())?;
+                    let major_repo = repo_name.split('/').next().unwrap_or("").to_lowercase();
+                    let source_type =
+                        if major_repo == "core" || major_repo == "main" || major_repo == "extra" {
+                            SourceType::OfficialRepo
+                        } else {
+                            SourceType::UntrustedRepo(repo_name.clone())
+                        };
+
+                    let full_repo_path = pkg_dir_path
+                        .strip_prefix(&db_root)
+                        .unwrap_or(pkg_dir_path)
+                        .to_string_lossy()
+                        .to_string();
+
+                    found_packages.push(FoundPackage {
+                        path: pkg_file_path,
+                        source_type,
+                        repo_name: full_repo_path,
+                        description: pkg.description,
+                    });
+                }
+            }
         }
     }
 

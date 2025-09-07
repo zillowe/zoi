@@ -1,9 +1,9 @@
-use crate::pkg::types::Config;
+use crate::pkg::types::{Config, RepoConfig};
 use colored::*;
 use std::error::Error;
 use std::fs;
 use std::io::{self, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 fn get_config_path() -> Result<PathBuf, Box<dyn Error>> {
     let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
@@ -273,4 +273,14 @@ pub fn set_registry(url: &str) -> Result<(), Box<dyn Error>> {
     let mut config = read_config()?;
     config.registry = Some(url.to_string());
     write_config(&config)
+}
+
+pub fn read_repo_config(db_path: &Path) -> Result<RepoConfig, Box<dyn Error>> {
+    let config_path = db_path.join("repo.yaml");
+    if !config_path.exists() {
+        return Err("repo.yaml not found in the root of the package database.".into());
+    }
+    let content = fs::read_to_string(config_path)?;
+    let config: RepoConfig = serde_yaml::from_str(&content)?;
+    Ok(config)
 }

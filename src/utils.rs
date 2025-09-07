@@ -685,15 +685,16 @@ pub fn get_all_packages_for_completion() -> Vec<PackageCompletion> {
         for entry in WalkDir::new(&repo_path)
             .into_iter()
             .filter_map(|e| e.ok())
-            .filter(|e| e.path().is_file() && e.path().extension().is_some_and(|ext| ext == "lua"))
+            .filter(|e| e.file_type().is_dir())
         {
-            if let Some(stem) = entry.path().file_stem()
-                && let Some(name) = stem.to_str().and_then(|s| s.strip_suffix(".pkg"))
-            {
+            let pkg_name = entry.file_name().to_string_lossy();
+            let pkg_file_path = entry.path().join(format!("{}.pkg.lua", pkg_name));
+
+            if pkg_file_path.is_file() {
                 let pkg_info: Result<PackageForCompletion, _> =
                     (|| -> Result<_, Box<dyn Error>> {
                         let pkg = crate::pkg::lua_parser::parse_lua_package(
-                            entry.path().to_str().unwrap(),
+                            pkg_file_path.to_str().unwrap(),
                         )?;
                         Ok(PackageForCompletion {
                             description: Some(pkg.description),
@@ -705,13 +706,9 @@ pub fn get_all_packages_for_completion() -> Vec<PackageCompletion> {
                     Err(_) => String::new(),
                 };
 
-                let relative_path = entry.path().strip_prefix(&repo_path).unwrap();
-                let path_to_pkg = relative_path.with_file_name(name);
-                let full_pkg_id = format!(
-                    "@{}/{}",
-                    repo_name,
-                    path_to_pkg.to_string_lossy().replace('\\', "/")
-                );
+                let relative_path = entry.path().strip_prefix(&db_root).unwrap();
+                let full_pkg_id =
+                    format!("@{}", relative_path.to_string_lossy().replace('\\', "/"));
 
                 packages.push(PackageCompletion {
                     display: full_pkg_id,

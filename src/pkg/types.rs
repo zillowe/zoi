@@ -346,3 +346,17 @@ pub struct SharableInstallManifest {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub chosen_optionals: Vec<String>,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RepoConfig {
+    pub name: String,
+    pub description: String,
+    #[serde(rename = "repo-git")]
+    pub repo_git: String,
+    #[serde(rename = "mirrors-git", default)]
+    pub mirrors_git: Vec<String>,
+    #[serde(rename = "repo-pkg")]
+    pub repo_pkg: Option<String>,
+    #[serde(rename = "mirrors-pkg", default)]
+    pub mirrors_pkg: Vec<String>,
+}
