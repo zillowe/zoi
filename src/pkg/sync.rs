@@ -10,12 +10,6 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
-const MIRRORS: &[&str] = &[
-    "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi-Pkgs.git",
-    "https://github.com/Zillowe/Zoi-Pkgs.git",
-    "https://codeberg.org/Zillowe/Zoi-Pkgs.git",
-];
-
 fn get_db_url() -> Result<String, Box<dyn std::error::Error>> {
     let config = config::read_config()?;
     Ok(config
@@ -271,39 +265,51 @@ fn try_sync(db_url: &str, verbose: bool) -> Result<(), Box<dyn std::error::Error
 pub fn run(verbose: bool, fallback: bool, no_pm: bool) -> Result<(), Box<dyn std::error::Error>> {
     let db_url = get_db_url()?;
 
-    if !fallback {
-        try_sync(&db_url, verbose)?;
-    } else {
-        let mut urls_to_try = vec![db_url.clone()];
-        for &mirror in MIRRORS {
-            if !urls_to_try.contains(&mirror.to_string()) {
-                urls_to_try.push(mirror.to_string());
+    let mut urls_to_try = vec![db_url.clone()];
+
+    if fallback {
+        let db_path = get_db_path()?;
+        let repo_config_path = db_path.join("repo.yaml");
+        if repo_config_path.exists() {
+            println!("Found repo.yaml, using it for sync fallbacks.");
+            let repo_config = config::read_repo_config(&db_path)?;
+            if repo_config.repo_git != db_url {
+                println!(
+                    "{}",
+                    "Warning: Registry URL in config differs from repo.yaml. Using config URL as primary.".yellow()
+                );
             }
+            urls_to_try.extend(repo_config.mirrors_git);
+        } else {
+            println!("repo.yaml not found in database, no fallbacks available.");
+        }
+    }
+
+    if urls_to_try.is_empty() {
+        return Err("No repository URL found to sync from.".into());
+    }
+
+    let mut success = false;
+    for (i, url) in urls_to_try.iter().enumerate() {
+        if i == 0 {
+            println!("Attempting to sync with primary URL: {}", url.cyan());
+        } else {
+            println!("Trying fallback: {}", url.cyan());
         }
 
-        let mut success = false;
-        for (i, url) in urls_to_try.iter().enumerate() {
-            if i == 0 {
-                println!("Attempting to sync with primary mirror: {}", url.cyan());
-            } else {
-                println!("Trying fallback: {}", url.cyan());
-            }
-
-            if let Err(e) = try_sync(url, verbose) {
-                println!("Sync with {} failed: {}", url.yellow(), e);
-            } else {
-                println!("{} with {}", "Sync successful".green(), url.cyan());
-                success = true;
-                break;
-            }
+        if let Err(e) = try_sync(url, verbose) {
+            println!("Sync with {} failed: {}", url.yellow(), e);
+        } else {
+            println!("{} with {}", "Sync successful".green(), url.cyan());
+            success = true;
+            break;
         }
+    }
 
-        if !success {
-            return Err(
-                "All mirrors failed. Please check your connection and the repository status."
-                    .into(),
-            );
-        }
+    if !success {
+        return Err(
+            "All mirrors failed. Please check your connection and the repository status.".into(),
+        );
     }
 
     sync_git_repos(verbose)?;
