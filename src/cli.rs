@@ -240,6 +240,9 @@ enum Commands {
         /// Accept all optional dependencies
         #[arg(long)]
         all_optional: bool,
+        /// The scope to install the package to (user or system-wide)
+        #[arg(long, value_enum)]
+        scope: Option<SetupScope>,
     },
 
     /// Builds and installs one or more packages from a name, local file, or URL
@@ -622,8 +625,9 @@ pub fn run() {
                 force,
                 interactive,
                 all_optional,
+                scope,
             } => {
-                cmd::install::run(&sources, force, interactive, all_optional, cli.yes);
+                cmd::install::run(&sources, force, interactive, all_optional, cli.yes, scope);
                 Ok(())
             }
             Commands::Build { sources, force } => {

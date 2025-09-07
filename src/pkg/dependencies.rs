@@ -276,7 +276,7 @@ fn install_dependency(
 
             println!("Not installed. Proceeding with installation...");
 
-            install_zoi_dependency(&zoi_dep_name, yes, all_optional, processed_deps)?;
+            install_zoi_dependency(&zoi_dep_name, yes, all_optional, processed_deps, scope)?;
         }
         "native" => {
             if let Some(installed_version) = get_native_command_version(dep.package)? {
@@ -1278,6 +1278,7 @@ fn install_zoi_dependency(
     yes: bool,
     all_optional: bool,
     processed_deps: &mut HashSet<String>,
+    scope: types::Scope,
 ) -> Result<(), Box<dyn Error>> {
     let resolved_source = resolve::resolve_source(package_name)?;
 
@@ -1289,6 +1290,7 @@ fn install_zoi_dependency(
         yes,
         all_optional,
         processed_deps,
+        Some(scope),
     )
 }
 

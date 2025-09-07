@@ -55,6 +55,7 @@ pub fn run(package_name: &str, yes: bool) -> Result<UpdateResult, Box<dyn Error>
         yes,
         false,
         &mut processed_deps,
+        None,
     )?;
 
     Ok(UpdateResult::Updated {

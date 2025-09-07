@@ -48,8 +48,6 @@ pub fn run(package_file: &Path) -> Result<(), Box<dyn Error>> {
 
     let mut assets = Vec::new();
     let platforms_to_process = if best_method_template.platforms.contains(&"all".to_string()) {
-        // A list of common platforms to target when "all" is specified.
-        // This could be expanded in the future.
         vec![
             "linux-amd64",
             "linux-arm64",

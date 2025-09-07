@@ -1,4 +1,5 @@
 use super::structs::FinalMetadata;
+use crate::pkg::{local, types};
 use colored::*;
 use std::error::Error;
 use std::fs::{self, File};
@@ -8,17 +9,28 @@ use tempfile::Builder;
 use walkdir::WalkDir;
 use zstd::stream::read::Decoder as ZstdDecoder;
 
-fn get_store_root() -> Result<PathBuf, Box<dyn Error>> {
-    let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
-    Ok(home_dir.join(".zoi/pkgs/store"))
+fn get_bin_root(scope: types::Scope) -> Result<PathBuf, Box<dyn Error>> {
+    match scope {
+        types::Scope::User => {
+            let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
+            Ok(home_dir.join(".zoi/pkgs/bin"))
+        }
+        types::Scope::System => {
+            if cfg!(target_os = "windows") {
+                Ok(PathBuf::from("C:\\ProgramData\\zoi\\pkgs\\bin"))
+            } else {
+                Ok(PathBuf::from("/usr/local/bin"))
+            }
+        }
+    }
 }
 
-fn get_bin_root() -> Result<PathBuf, Box<dyn Error>> {
-    let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
-    Ok(home_dir.join(".zoi/pkgs/bin"))
-}
+pub fn run(
+    package_file: &Path,
+    scope_override: Option<types::Scope>,
+) -> Result<(), Box<dyn Error>> {
+    let scope = scope_override.unwrap_or(types::Scope::User);
 
-pub fn run(package_file: &Path) -> Result<(), Box<dyn Error>> {
     println!(
         "Installing from package archive: {}",
         package_file.display()
@@ -41,7 +53,7 @@ pub fn run(package_file: &Path) -> Result<(), Box<dyn Error>> {
         metadata.version.yellow()
     );
 
-    let store_dir = get_store_root()?.join(&metadata.name);
+    let store_dir = local::get_store_root(scope)?.join(&metadata.name);
     if store_dir.exists() {
         println!("Removing existing installation...");
         fs::remove_dir_all(&store_dir)?;
@@ -78,7 +90,7 @@ pub fn run(package_file: &Path) -> Result<(), Box<dyn Error>> {
     }
 
     if let Some(bins) = &metadata.bins {
-        let bin_root = get_bin_root()?;
+        let bin_root = get_bin_root(scope)?;
         fs::create_dir_all(&bin_root)?;
 
         for bin_name in bins {

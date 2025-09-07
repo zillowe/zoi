@@ -27,6 +27,7 @@ pub fn run(package_name: &str, yes: bool) -> Result<(), Box<dyn Error>> {
                 yes,
                 false,
                 &mut processed_deps,
+                None,
             )?;
         } else {
             return Err("Service not installed, aborting.".into());

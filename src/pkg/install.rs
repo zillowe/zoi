@@ -79,9 +79,14 @@ pub fn run_installation(
     yes: bool,
     all_optional: bool,
     processed_deps: &mut HashSet<String>,
+    scope_override: Option<types::Scope>,
 ) -> Result<(), Box<dyn Error>> {
-    let (pkg, version, sharable_manifest, pkg_lua_path) =
+    let (mut pkg, version, sharable_manifest, pkg_lua_path) =
         resolve::resolve_package_and_version(source)?;
+
+    if let Some(scope) = scope_override {
+        pkg.scope = scope;
+    }
 
     utils::check_license(&pkg.license);
 
@@ -867,7 +872,6 @@ fn try_meta_build_install(
         "Attempting to build and install from meta files...".yellow()
     );
 
-    // 1. Meta
     if let Err(e) = crate::pkg::package::meta::run(pkg_lua_path) {
         return Err(format!("'meta' step failed: {}", e).into());
     }
@@ -878,7 +882,6 @@ fn try_meta_build_install(
     }
     println!("'meta' step successful.");
 
-    // 2. Build
     if let Err(e) = crate::pkg::package::build::run(&meta_path) {
         return Err(format!("'build' step failed: {}", e).into());
     }
@@ -895,13 +898,11 @@ fn try_meta_build_install(
     }
     println!("'build' step successful.");
 
-    // 3. Install
-    if let Err(e) = crate::pkg::package::install::run(&archive_path) {
+    if let Err(e) = crate::pkg::package::install::run(&archive_path, Some(pkg.scope)) {
         return Err(format!("'install' step failed: {}", e).into());
     }
     println!("'install' step successful.");
 
-    // Cleanup temporary files
     let _ = fs::remove_file(&meta_path);
     let _ = fs::remove_file(&archive_path);
 
@@ -951,7 +952,7 @@ fn run_default_flow(
                 fs::write(&temp_archive_path, downloaded_data)?;
 
                 println!("Successfully downloaded pre-built package.");
-                if crate::pkg::package::install::run(&temp_archive_path).is_ok() {
+                if crate::pkg::package::install::run(&temp_archive_path, Some(pkg.scope)).is_ok() {
                     println!("Successfully installed pre-built package.");
                     return Ok(());
                 } else {

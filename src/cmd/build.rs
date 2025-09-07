@@ -38,6 +38,7 @@ pub fn run(sources: &[String], force: bool, yes: bool) {
                     yes,
                     false,
                     &mut processed_deps,
+                    None,
                 ) {
                     eprintln!("\n{}: {}", "Build failed".red().bold(), e);
                     std::process::exit(1);

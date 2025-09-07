@@ -152,7 +152,6 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
             }
         }
     } else {
-        // This is just a package name, search for it
         for repo_name in &search_repos {
             let repo_path = db_root.join(repo_name);
             if !repo_path.is_dir() {

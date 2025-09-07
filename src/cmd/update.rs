@@ -109,6 +109,7 @@ fn run_update_single_logic(
         yes,
         false,
         &mut processed_deps,
+        None,
     )?;
 
     println!("\n{}", "Update complete.".green());
@@ -210,6 +211,7 @@ fn run_update_all_logic(yes: bool) -> Result<(), Box<dyn std::error::Error>> {
             yes,
             false,
             &mut processed_deps,
+            None,
         )?;
     }
 

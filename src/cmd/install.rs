@@ -12,12 +12,24 @@ const ZOI_SCOPE_PROPERTY: &str = "zoi:scope";
 const ZOI_CHOSEN_OPTIONS_PROPERTY: &str = "zoi:chosen_options";
 const ZOI_CHOSEN_OPTIONALS_PROPERTY: &str = "zoi:chosen_optionals";
 
-pub fn run(sources: &[String], force: bool, interactive: bool, all_optional: bool, yes: bool) {
+pub fn run(
+    sources: &[String],
+    force: bool,
+    interactive: bool,
+    all_optional: bool,
+    yes: bool,
+    scope: Option<crate::cli::SetupScope>,
+) {
     let mode = if interactive {
         install::InstallMode::Interactive
     } else {
         install::InstallMode::PreferBinary
     };
+
+    let scope_override = scope.map(|s| match s {
+        crate::cli::SetupScope::User => types::Scope::User,
+        crate::cli::SetupScope::System => types::Scope::System,
+    });
 
     let mut failed_packages = Vec::new();
     let mut processed_deps = HashSet::new();
@@ -118,6 +130,7 @@ pub fn run(sources: &[String], force: bool, interactive: bool, all_optional: boo
                     yes,
                     all_optional,
                     &mut processed_deps,
+                    scope_override,
                 ) {
                     if e.to_string().contains("aborted by user") {
                         eprintln!("\n{}", e.to_string().yellow());
