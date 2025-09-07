@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
 pub struct MetaCommand {
-    /// Path to the package file (e.g., path/to/name.pkg.lua)
+    /// Path to the package file (e.g. path/to/name.pkg.lua)
     #[arg(required = true)]
     pub package_file: PathBuf,
 }

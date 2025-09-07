@@ -113,6 +113,7 @@ pub fn run(package_file: &Path) -> Result<(), Box<dyn Error>> {
             binary_path: best_method_template.binary_path.clone(),
             assets,
         },
+        bins: package_template.bins,
     };
 
     let json_output = serde_json::to_string_pretty(&final_metadata)?;

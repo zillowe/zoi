@@ -14,6 +14,8 @@ pub struct FinalMetadata {
     pub maintainer: types::Maintainer,
     pub author: Option<types::Author>,
     pub installation: ResolvedInstallation,
+    #[serde(default)]
+    pub bins: Option<Vec<String>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
