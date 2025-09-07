@@ -1,6 +1,7 @@
 use crate::pkg;
 use clap::{ArgGroup, Parser, Subcommand};
 use std::error::Error;
+use std::path::Path;
 
 #[derive(Parser, Debug)]
 #[command(long_about = "Manages PGP keys for package signature verification.")]
@@ -11,27 +12,34 @@ pub struct PgpCommand {
 
 #[derive(Subcommand, Debug)]
 pub enum PgpCommands {
-    /// Add a PGP key from a file or a keyserver
+    /// Add a PGP key from a file, URL, or a keyserver
     Add(AddKey),
     /// Remove a PGP key
     Remove(RemoveKey),
+    /// List all imported PGP keys
+    List,
 }
 
 #[derive(Parser, Debug)]
 #[command(group(
     ArgGroup::new("source")
         .required(true)
-        .args(["path", "fingerprint"]),
+        .args(["path", "fingerprint", "url"]),
 ))]
 pub struct AddKey {
     /// Path to the PGP key file (.asc)
+    #[arg(long)]
     pub path: Option<String>,
 
     /// Fingerprint of the PGP key to fetch from keys.openpgp.org
     #[arg(long)]
     pub fingerprint: Option<String>,
 
-    /// Name to associate with the key (defaults to filename if adding from path)
+    /// URL of the PGP key to import
+    #[arg(long)]
+    pub url: Option<String>,
+
+    /// Name to associate with the key (defaults to filename if adding from path/url)
     #[arg(long)]
     pub name: Option<String>,
 }
@@ -62,6 +70,17 @@ pub fn run(args: PgpCommand) -> Result<(), Box<dyn Error>> {
                 } else {
                     return Err("A name must be provided when adding a key by fingerprint.".into());
                 }
+            } else if let Some(url) = add_args.url {
+                let name = if let Some(n) = add_args.name {
+                    n
+                } else {
+                    Path::new(&url)
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .ok_or("Could not derive name from URL")?
+                        .to_string()
+                };
+                pkg::pgp::add_key_from_url(&url, &name)?;
             }
         }
         PgpCommands::Remove(remove_args) => {
@@ -70,6 +89,9 @@ pub fn run(args: PgpCommand) -> Result<(), Box<dyn Error>> {
             } else if let Some(fingerprint) = remove_args.fingerprint {
                 pkg::pgp::remove_key_by_fingerprint(&fingerprint)?;
             }
+        }
+        PgpCommands::List => {
+            pkg::pgp::list_keys()?;
         }
     }
     Ok(())

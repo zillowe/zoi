@@ -133,7 +133,9 @@ fn verify_signature(
 
     let rt = Runtime::new()?;
     rt.block_on(async {
-        let mut certs: Vec<Cert> = pkg::pgp::get_all_local_certs().unwrap_or_default();
+        let local_keys = pkg::pgp::get_all_local_keys_info().unwrap_or_default();
+        let mut certs: Vec<Cert> = local_keys.iter().map(|ki| ki.cert.clone()).collect();
+        let local_key_names: Vec<String> = local_keys.iter().map(|ki| ki.name.clone()).collect();
         let local_fingerprints: Vec<String> = certs
             .iter()
             .map(|c| c.fingerprint().to_string().to_uppercase())
@@ -142,7 +144,14 @@ fn verify_signature(
         for (key_source, key_name) in &keys_to_check {
             let mut key_found_locally = false;
 
-            if key_source.len() == 40
+            if let Some(name) = key_name
+                && local_key_names.iter().any(|n| n == name)
+            {
+                key_found_locally = true;
+            }
+
+            if !key_found_locally
+                && key_source.len() == 40
                 && key_source.chars().all(|c| c.is_ascii_hexdigit())
                 && local_fingerprints
                     .iter()
