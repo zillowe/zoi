@@ -428,13 +428,6 @@ enum Commands {
         app_name: String,
     },
 
-    /// Create a new package file interactively
-    #[command(long_about = "Interactively create a new zoi package file (pkg.yaml).")]
-    Make {
-        /// The name of the package to create a file for.
-        package_name: Option<String>,
-    },
-
     /// Manage Zoi extensions
     #[command(alias = "ext")]
     Extension(ExtensionCommand),
@@ -709,7 +702,6 @@ pub fn run() {
                 cmd::create::run(cmd::create::CreateCommand { source, app_name }, cli.yes);
                 Ok(())
             }
-            Commands::Make { package_name } => cmd::make::run(package_name),
             Commands::Extension(args) => cmd::extension::run(args, cli.yes),
             Commands::Rollback { package } => cmd::rollback::run(&package, cli.yes),
             Commands::PkgConfig {
