@@ -20,7 +20,7 @@ const NUMBER: &str = "5.0.0";
 #[derive(Parser)]
 #[command(name = "zoi", author, about, long_about = None, disable_version_flag = true,
     trailing_var_arg = true,
-    color = ColorChoice::Always,
+    color = ColorChoice::Auto,
 )]
 pub struct Cli {
     #[command(subcommand)]

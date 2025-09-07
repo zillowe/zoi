@@ -44,7 +44,7 @@ pub fn run(
     upstream: bool,
     raw: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let (pkg, _version, _) = resolve::resolve_package_and_version(package_name)?;
+    let (pkg, _version, _, _) = resolve::resolve_package_and_version(package_name)?;
 
     let fetch_from_upstream = || -> Result<String, Box<dyn std::error::Error>> {
         if let Some(url) = pkg.man.as_ref() {

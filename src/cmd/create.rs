@@ -46,7 +46,7 @@ fn run_pkg_create(
         }
     }
 
-    let (pkg, version, _) = resolve::resolve_package_and_version(source)?;
+    let (pkg, version, _, _) = resolve::resolve_package_and_version(source)?;
 
     if pkg.package_type != types::PackageType::App {
         return Err(format!(

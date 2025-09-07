@@ -78,7 +78,7 @@ fn run_update_single_logic(
 
     println!("Currently installed version: {}", manifest.version.yellow());
 
-    let (new_pkg, new_version, _) = resolve::resolve_package_and_version(&lower_package_name)?;
+    let (new_pkg, new_version, _, _) = resolve::resolve_package_and_version(&lower_package_name)?;
 
     println!("Available version: {}", new_version.green());
 
