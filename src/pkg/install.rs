@@ -793,7 +793,119 @@ fn run_interactive_flow(pkg: &types::Package, platform: &str) -> Result<(), Box<
     }
 }
 
+fn download_file_with_progress(url: &str) -> Result<Vec<u8>, Box<dyn Error>> {
+    if url.starts_with("http://") {
+        println!(
+            "{} downloading over insecure HTTP: {}",
+            "Warning:".yellow(),
+            url
+        );
+    }
+    println!("Downloading from: {url}");
+
+    let client = crate::utils::build_blocking_http_client(60)?;
+    let mut attempt = 0u32;
+    let response = loop {
+        attempt += 1;
+        match client.get(url).send() {
+            Ok(resp) => break resp,
+            Err(e) => {
+                if attempt < 3 {
+                    eprintln!(
+                        "{}: download failed ({}). Retrying...",
+                        "Network".yellow(),
+                        e
+                    );
+                    crate::utils::retry_backoff_sleep(attempt);
+                    continue;
+                } else {
+                    return Err(format!(
+                        "Failed to download '{}' after {} attempts: {}",
+                        url, attempt, e
+                    )
+                    .into());
+                }
+            }
+        }
+    };
+    if !response.status().is_success() {
+        return Err(format!("Failed to download (HTTP {}): {}", response.status(), url).into());
+    }
+
+    let total_size = response.content_length().unwrap_or(0);
+    let pb = ProgressBar::new(total_size);
+    pb.set_style(ProgressStyle::default_bar()
+        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})")? 
+        .progress_chars("#>-"));
+
+    let mut downloaded_bytes = Vec::new();
+    let mut stream = response;
+    let mut buffer = [0; 8192];
+    loop {
+        let bytes_read = stream.read(&mut buffer)?;
+        if bytes_read == 0 {
+            break;
+        }
+        downloaded_bytes.extend_from_slice(&buffer[..bytes_read]);
+        pb.inc(bytes_read as u64);
+    }
+    pb.finish_with_message("Download complete.");
+    Ok(downloaded_bytes)
+}
+
 fn run_default_flow(pkg: &types::Package, platform: &str, yes: bool) -> Result<(), Box<dyn Error>> {
+    let db_path = resolve::get_db_root()?;
+    if let Ok(repo_config) = config::read_repo_config(&db_path)
+        && let Some(repo_pkg_url_template) = repo_config.repo_pkg
+    {
+        let mut urls_to_try = vec![repo_pkg_url_template];
+        urls_to_try.extend(repo_config.mirrors_pkg);
+
+        for url_template in urls_to_try {
+            let (os, arch) = (
+                platform.split('-').next().unwrap_or(""),
+                platform.split('-').nth(1).unwrap_or(""),
+            );
+            let url_dir = url_template
+                .replace("{os}", os)
+                .replace("{arch}", arch)
+                .replace("{version}", pkg.version.as_deref().unwrap_or(""))
+                .replace("{package}", &pkg.repo);
+
+            let archive_filename = format!(
+                "{}-{}-{}.pkg.tar.zst",
+                pkg.name,
+                pkg.version.as_deref().unwrap_or(""),
+                platform
+            );
+            let final_url = format!("{}/{}", url_dir.trim_end_matches('/'), archive_filename);
+
+            println!(
+                "Attempting to download pre-built package from: {}",
+                final_url.cyan()
+            );
+
+            if let Ok(downloaded_data) = download_file_with_progress(&final_url) {
+                let temp_dir = Builder::new().prefix("zoi-prebuilt").tempdir()?;
+                let temp_archive_path = temp_dir.path().join(&archive_filename);
+                fs::write(&temp_archive_path, downloaded_data)?;
+
+                println!("Successfully downloaded pre-built package.");
+                if crate::pkg::package::install::run(&temp_archive_path).is_ok() {
+                    println!("Successfully installed pre-built package.");
+                    return Ok(());
+                } else {
+                    println!("Failed to install downloaded package. Trying next source.");
+                }
+            } else {
+                println!(
+                    "Failed to download from {}. Trying next mirror if available.",
+                    final_url
+                );
+            }
+        }
+    }
+
     if let Some(method) = find_method(pkg, "binary", platform) {
         println!("Found 'binary' method. Installing...");
         return handle_binary_install(method, pkg);
