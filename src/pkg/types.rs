@@ -40,14 +40,14 @@ pub struct UpdateInfo {
     pub message: String,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
 #[serde(rename_all = "kebab-case")]
 pub enum DockerType {
     Compose { file: String },
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum ServiceMethod {
     Command {
@@ -61,7 +61,7 @@ pub enum ServiceMethod {
     },
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[allow(dead_code)]
 pub struct ConfigCommands {
     pub platforms: Vec<String>,
@@ -69,7 +69,7 @@ pub struct ConfigCommands {
     pub uninstall: Option<Vec<String>>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[allow(dead_code)]
 pub struct AppCommands {
     pub platforms: Vec<String>,
@@ -79,14 +79,14 @@ pub struct AppCommands {
     pub commands: Option<Vec<String>>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[allow(dead_code)]
 pub struct PostInstallHook {
     pub platforms: Vec<String>,
     pub commands: Vec<String>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
 #[serde(rename_all = "kebab-case")]
 pub enum ExtensionChange {
@@ -96,7 +96,7 @@ pub enum ExtensionChange {
     Project { add: String },
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ExtensionInfo {
     #[serde(rename = "type")]
     pub extension_type: String,
@@ -113,7 +113,7 @@ pub struct PkgConfig {
     pub cflags: String,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[allow(dead_code)]
 pub struct Package {
     pub name: String,
@@ -167,7 +167,7 @@ pub struct Package {
     pub selectable: Option<bool>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[allow(dead_code)]
 pub struct Maintainer {
     pub name: String,
@@ -176,7 +176,7 @@ pub struct Maintainer {
     pub key: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[allow(dead_code)]
 pub struct Author {
     pub name: String,
@@ -214,7 +214,7 @@ pub struct ChecksumInfo {
     pub checksum: String,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[allow(dead_code)]
 pub struct InstallationMethod {
     #[serde(default)]
@@ -227,6 +227,8 @@ pub struct InstallationMethod {
     #[serde(rename = "platformComExt")]
     pub platform_com_ext: Option<HashMap<String, String>>,
     pub checksums: Option<Checksums>,
+    #[serde(default)]
+    pub checksum_type: Option<String>,
     pub sigs: Option<Vec<Signature>>,
     #[serde(default)]
     pub binary_path: Option<String>,
@@ -240,7 +242,7 @@ pub struct InstallationMethod {
     pub lib_types: Option<Vec<String>>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[allow(dead_code)]
 pub struct DependencyOptionGroup {
     pub name: String,
@@ -250,7 +252,7 @@ pub struct DependencyOptionGroup {
     pub depends: Vec<String>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum DependencyGroup {
     Simple(Vec<String>),
@@ -283,7 +285,7 @@ impl DependencyGroup {
     }
 }
 
-#[derive(Debug, Deserialize, Clone, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct ComplexDependencyGroup {
     #[serde(default)]
     pub required: Vec<String>,
@@ -293,7 +295,7 @@ pub struct ComplexDependencyGroup {
     pub optional: Vec<String>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Dependencies {
     #[serde(default)]
     pub runtime: Option<DependencyGroup>,

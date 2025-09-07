@@ -244,10 +244,7 @@ enum Commands {
 
     /// Builds and installs one or more packages from a name, local file, or URL
     #[command(
-        long_about = "Builds one or more packages from various sources using the 'source' installation method:
-- A package name from the database (e.g. 'vim')
-- A local .pkg.yaml file (e.g. './my-package.pkg.yaml')
-- A URL pointing to a raw .pkg.yaml file"
+        long_about = "Builds one or more packages from various sources using the 'source' installation method:\n- A package name from the database (e.g. 'vim')\n- A local .pkg.yaml file (e.g. './my-package.pkg.yaml')\n- A URL pointing to a raw .pkg.yaml file"
     )]
     Build {
         /// Package names, local paths, or URLs to .pkg.yaml files
@@ -393,13 +390,7 @@ enum Commands {
     /// Manage package repositories
     #[command(
         aliases = ["repositories"],
-        long_about = "Manages the list of package repositories used by Zoi.
-
-Commands:
-- add (alias: a): Add an official repo by name or clone from a git URL.
-- remove|rm: Remove a repo from active list (repo rm <name>).
-- list|ls: Show active repositories by default; use 'list all' to show all available repositories.
-- git: Manage cloned git repositories (git ls, git rm <repo-name>)."
+        long_about = "Manages the list of package repositories used by Zoi.\n\nCommands:\n- add (alias: a): Add an official repo by name or clone from a git URL.\n- remove|rm: Remove a repo from active list (repo rm <name>).\n- list|ls: Show active repositories by default; use 'list all' to show all available repositories.\n- git: Manage cloned git repositories (git ls, git rm <repo-name>)."
     )]
     Repo(cmd::repo::RepoCommand),
 
@@ -480,6 +471,10 @@ Commands:
         #[arg(long)]
         raw: bool,
     },
+
+    /// Build, create, and manage Zoi packages
+    #[command(alias = "pkg")]
+    Package(cmd::package::PackageCommand),
 }
 
 #[derive(clap::Parser, Debug)]
@@ -720,6 +715,10 @@ pub fn run() {
                 upstream,
                 raw,
             } => cmd::man::run(&package_name, upstream, raw),
+            Commands::Package(args) => {
+                cmd::package::run(args);
+                Ok(())
+            }
         };
 
         if let Err(e) = result {

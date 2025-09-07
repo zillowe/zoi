@@ -3,7 +3,10 @@ use mlua::{self, Lua, LuaSerdeExt, Table, Value};
 use std::error::Error;
 use std::fs;
 
-pub fn parse_lua_package(file_path: &str) -> std::result::Result<types::Package, Box<dyn Error>> {
+pub fn parse_lua_package_for_platform(
+    file_path: &str,
+    platform: &str,
+) -> std::result::Result<types::Package, Box<dyn Error>> {
     let lua_code = fs::read_to_string(file_path)?;
     let lua = Lua::new();
 
@@ -17,11 +20,12 @@ pub fn parse_lua_package(file_path: &str) -> std::result::Result<types::Package,
     lua.globals().set("__ZoiPackageSelectable", false)?;
 
     let system_table = lua.create_table()?;
-    let platform = utils::get_platform()?;
     let parts: Vec<&str> = platform.split('-').collect();
     system_table.set("OS", *parts.first().unwrap_or(&""))?;
     system_table.set("ARCH", *parts.get(1).unwrap_or(&""))?;
-    if let Some(distro) = utils::get_linux_distribution() {
+    if let Some(distro) = utils::get_linux_distribution()
+        && platform.starts_with("linux")
+    {
         system_table.set("DISTRO", distro)?;
     }
     lua.globals().set("SYSTEM", system_table)?;
@@ -87,4 +91,9 @@ pub fn parse_lua_package(file_path: &str) -> std::result::Result<types::Package,
     };
 
     Ok(package)
+}
+
+pub fn parse_lua_package(file_path: &str) -> std::result::Result<types::Package, Box<dyn Error>> {
+    let platform = utils::get_platform()?;
+    parse_lua_package_for_platform(file_path, &platform)
 }

@@ -13,6 +13,7 @@ pub mod install;
 pub mod list;
 pub mod make;
 pub mod man;
+pub mod package;
 pub mod pin;
 pub mod pkg_config;
 pub mod repo;
