@@ -7,7 +7,7 @@ This guide covers how to publish your package to the official Zoi repositories, 
 
 ## Publishing to Official Repositories
 
-Once your package works locally, it's time to share it with the world! This is done by adding your `pkg.yaml` file to the official Zoi packages database.
+Once your `.pkg.lua` file works locally, it's time to share it with the world! This is done by adding your package file to the official Zoi packages database.
 
 The Zoi package database is hosted on GitLab and mirrored on GitHub and Codeberg.
 
@@ -32,27 +32,27 @@ You can contribute by opening a **Merge/Pull Request** to either repository, or 
 3.  **Choose the Right Directory:**
     As discussed in the [creating packages guide](/docs/zds/zoi/creating-packages), you should almost always add new packages to the `community` directory.
 
-    You can also create nested directories to better organize packages. For example, you could place a Linux-specific editor in `community/editors/linux/my-editor.pkg.yaml`. The `repo` field in your package file should then be `community/editors/linux`.
+    You can also create nested directories to better organize packages. For example, you could place a Linux-specific editor in `community/editors/linux/my-editor.pkg.lua`. The `repo` field in your package file should then be `community/editors/linux`.
 
 4.  **Add Your Package File:**
-    Copy your `my-package.pkg.yaml` file into the `community/` directory.
+    Copy your `my-package.pkg.lua` file into the `community/` directory.
 
     ```sh
-    cp /path/to/my-package.pkg.yaml community/
+    cp /path/to/my-package.pkg.lua community/
     ```
 
     For a nested repository, create the directory structure and place your file inside:
 
     ```sh
     mkdir -p community/editors/linux
-    cp /path/to/my-editor.pkg.yaml community/editors/linux/
+    cp /path/to/my-editor.pkg.lua community/editors/linux/
     ```
 
 5.  **Commit and Push:**
     Commit your new package file to your forked repository.
 
     ```sh
-    git add community/my-package.pkg.yaml
+    git add community/my-package.pkg.lua
     git commit -m "feat(community): add my-package v1.2.3"
     git push origin main
     ```
@@ -60,7 +60,7 @@ You can contribute by opening a **Merge/Pull Request** to either repository, or 
     For a nested package, your commit might look like this:
 
     ```sh
-    git add community/editors/linux/my-editor.pkg.yaml
+    git add community/editors/linux/my-editor.pkg.lua
     git commit -m "feat(community): add my-editor v1.0.0"
     git push origin main
     ```
@@ -75,6 +75,29 @@ A Zoi maintainer will review your submission. They may suggest some changes. Onc
 
 Once your package is merged, it will also be visible on the [Nel Registry](https://nel.zillowe.qzz.io).
 
+## Advanced: Publishing Pre-Built Packages
+
+While the above method works for publishing package definitions (`.pkg.lua`), the official Zoi repositories store pre-built package archives (`.pkg.tar.zst`) for faster and more reliable installations. This avoids having every user download assets from upstream URLs.
+
+You can create these archives yourself using the `zoi package` command set. This is the same workflow used by Zoi's CI/CD.
+
+1.  **Generate Metadata:**
+    Run `zoi package meta` on your `.pkg.lua` file. This creates a `.meta.json` file, resolving all dynamic Lua code into a static list of assets for all platforms.
+
+    ```sh
+    zoi package meta ./my-package.pkg.lua
+    ```
+
+2.  **Build the Archive:**
+    Run `zoi package build` on the generated metadata file. This command downloads the assets for your **current platform**, verifies them, and creates a distributable `.pkg.tar.zst` archive.
+
+    ```sh
+    zoi package build ./my-package.meta.json
+    ```
+
+3.  **Publish the Archive:**
+    You can then upload this `.pkg.tar.zst` archive to a web server or a release page. The official Zoi repositories are hosted on a dedicated server. For community contributions, you would typically provide the `.pkg.lua` file in your pull request, and the Zoi maintainers would handle the build and hosting of the archive.
+
 ## Creating Your Own Git-Based Package Repository
 
 While contributing to the official repositories is great for public packages, you might want to manage your own set of packages for private projects, company-internal tools, or personal use. Zoi makes this easy by allowing you to add any git repository as a package source.
@@ -82,12 +105,12 @@ While contributing to the official repositories is great for public packages, yo
 ### Step 1: Create Your Git Repository
 
 1.  Create a new, empty repository on a service like GitLab or GitHub.
-2.  Add your `*.pkg.yaml` files to the root of the repository. The structure is simple: just a flat collection of package files. You can also create nested directories.
+2.  Add your `*.pkg.lua` files to the root of the repository. The structure is simple: just a flat collection of package files. You can also create nested directories.
 
     ```
     my-zoi-repo/
-    ├── my-first-package.pkg.yaml
-    └── my-second-package.pkg.yaml
+    ├── my-first-package.pkg.lua
+    └── my-second-package.pkg.lua
     ```
 
 3.  Commit and push your files to the remote repository.
@@ -120,16 +143,23 @@ For advanced use cases, such as creating a corporate mirror or a completely sepa
 ### Step 1: Set Up the Registry Repository
 
 1.  Create a new git repository.
-2.  Structure it like the official `Zoi-Pkgs` repository, with directories for tiers like `core`, `main`, `community`, etc.
+2.  Create a `repo.yaml` file in the root of your repository to define its properties. See the [Repositories guide](/docs/zds/zoi/repositories#the-repoyaml-file) for details on the available fields. A minimal example would be:
+    ```yaml
+    name: My Custom Registry
+    description: A collection of my personal packages.
+    repo-git: https://github.com/YourOrg/my-zoi-registry.git
+    ```
+3.  Structure the rest of your repository like the official `Zoi-Pkgs` database, with directories for tiers like `core`, `main`, `community`, etc.
 
     ```
     my-zoi-registry/
+    ├── repo.yaml
     ├── core/
     │   └── ...
     ├── main/
     │   └── ...
     └── community/
-        └── my-package.pkg.yaml
+        └── my-package.pkg.lua
     ```
 
 ### Step 2: Point Zoi to Your Registry
@@ -150,21 +180,23 @@ This command updates the registry URL in Zoi's configuration. The next time `zoi
 
 For a more user-friendly approach, you can distribute an `extension` package that configures the registry automatically.
 
-Create a `pkg.yaml` file for your extension:
+Create a `.pkg.lua` file for your extension:
 
-```yaml
-# my-registry-ext.pkg.yaml
-name: my-registry-ext
-repo: community
-type: extension
-version: "1.0"
-description: "Configures Zoi to use MyOrg's internal package registry."
-
-extension:
-  type: zoi
-  changes:
-    - type: registry-repo
-      add: https://github.com/YourOrg/my-zoi-registry.git
+```lua
+-- my-registry-ext.pkg.lua
+package({
+  name = "my-registry-ext",
+  repo = "community",
+  type = "extension",
+  version = "1.0",
+  description = "Configures Zoi to use MyOrg's internal package registry.",
+  extension = {
+    type = "zoi",
+    changes = {
+      { type = "registry-repo", add = "https://github.com/YourOrg/my-zoi-registry.git" }
+    }
+  }
+})
 ```
 
 Publish this extension (e.g. in a separate git repository that users can add). Users can then run `zoi extension add my-registry-ext` to switch to your registry. This is a clean way to manage the configuration change. For more details, see the [Extensions guide](/docs/zds/zoi/extensions).

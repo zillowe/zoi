@@ -50,14 +50,16 @@ If the file or key doesn't exist, you can add it.
 
 ### Per-Package Configuration
 
-A package author can disable rollbacks for their specific package by adding the `rollback` field to the `pkg.yaml` file and setting it to `false`.
+A package author can disable rollbacks for their specific package by adding the `rollback` field to the `.pkg.lua` file and setting it to `false`.
 
-```yaml
-# my-package.pkg.yaml
-name: my-package
-version: 1.2.0
-# ... other fields
-rollback: false # Disables rollback backups for this package
+```lua
+-- my-package.pkg.lua
+package({
+  name = "my-package",
+  version = "1.2.0",
+  -- ... other fields
+  rollback = false -- Disables rollback backups for this package
+})
 ```
 
 This setting will override the global configuration.

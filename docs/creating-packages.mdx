@@ -22,898 +22,191 @@ For your first contribution, you will almost always be adding your package to th
 
 For more information about repositories [visit here](/docs/zds/zoi/repositories)
 
-## Step 1: Creating Your `pkg.yaml` File
+## Step 1: Creating Your Package File
 
-The heart of every Zoi package is a `pkg.yaml` file. This file contains all the metadata and instructions Zoi needs to install your software.
+The heart of every Zoi package is its `.pkg.lua` definition file. This is a Lua script that allows for dynamic logic, making it powerful for complex packages with variable URLs or platform-specific needs.
 
-You can create this file manually, or use Zoi's interactive helper.
+A `.pkg.lua` file defines a package by calling global functions like `package{}`, `install{}`, and `dependencies{}`. You have access to global variables like `PKG` (the package being defined) and `SYSTEM` (with `OS`, `ARCH`, `DISTRO`) to make your package definition dynamic.
 
-### Option A: Using the Interactive `make` Command (Recommended)
+Here is a basic example:
 
-The easiest way to create a valid package file is with the `zoi make` command. It launches an interactive terminal UI that guides you through filling out all the necessary fields.
+```lua
+-- my-cli.pkg.lua
 
-```sh
-# Launch the interactive creator
-zoi make
+-- Use local variables for repeated values
+local repo_owner = "user"
+local repo_name = "my-cli"
+local version = "1.2.3"
 
-# You can also pre-fill the package name
-zoi make my-new-app
-```
+-- The main package definition table
+package({
+  name = repo_name,
+  repo = "community",
+  version = version,
+  description = "A simple command-line utility.",
+  website = "https://example.com/" .. repo_name,
+  git = "https://github.com/" .. repo_owner .. "/" .. repo_name,
+  maintainer = {
+    name = "Your Name",
+    email = "your.email@example.com",
+    key = "DEADC0DEDEADBEEFDEADC0DEDEADBEEFDEADC0DE" -- GPG Key Fingerprint or URL
+  },
+  license = "MIT",
+  tags = { "cli", "devtools" },
+  bins = { "my-cli" }, -- Binaries this package provides
+  conflicts = { "old-cli" } -- Packages this conflicts with
+})
 
-This will create a `my-new-app.pkg.yaml` file in your current directory with all the correct formatting and even the JSON schema link for editor autocompletion.
+-- The installation methods
+install({
+  {
+    name = "Binary",
+    type = "binary",
+    -- Use Lua to construct the URL dynamically
+    url = "https://github.com/" .. repo_owner .. "/" .. repo_name .. "/releases/download/v" .. PKG.version .. "/" .. repo_name .. "-" .. SYSTEM.OS .. "-" .. SYSTEM.ARCH,
+    platforms = { "all" }
+  }
+})
 
-### Option B: Creating the File Manually
-
-If you prefer to create the file by hand, here's what you need to know.
-
-#### Using the JSON Schema for Validation
-
-To help you create valid `pkg.yaml` files and get autocompletion in supported editors (like VS Code), you can add a `$schema` tag pointing to the official Zoi package schema.
-
-```yaml
-# my-cli.pkg.yaml
-# yaml-language-server: $schema=https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/pkg.schema.json
-name: my-cli
-repo: community
-# ... rest of your package definition
-```
-
-This line tells your editor to use the schema for validation, which can catch errors before you even test the package.
-
-### Basic Structure
-
-At a minimum, your package needs these fields:
-
-```yaml
-# my-cli.pkg.yaml
-# yaml-language-server: $schema=https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/pkg.schema.json
-name: my-cli
-repo: community
-version: 1.2.3
-description: A simple command-line utility.
-website: https://example.com/my-cli
-readme: https://example.com/my-cli/README.md
-# (Optional) A URL to a markdown manual for `zoi man`.
-man: https://example.com/my-cli/MAN.md
-git: https://github.com/user/my-cli
-maintainer:
-  name: "Your Name"
-  email: "your.email@example.com"
-  # Optional: URL to your public GPG key
-  key: "https://keys.example.com/your-key.gpg"
-  # (Optional) Website of the maintainer
-  website: "https://maintainer.com"
-# Optional: if the package author is different
-author:
-  name: "Original Author"
-  email: "author@email.com"
-  website: "https://author.com"
-  key: "https://keys.example.com/author-key.gpg"
-license: MIT
-```
-
-- `name`: The unique identifier for your package.
-- `version`: The current version of the software. You can also set this to `"{git}"` to automatically use the latest stable release tag from the GitHub or GitLab repository specified in the `git` field.
-- `description`: A short, one-sentence summary of what the package does.
-- `maintainer`: Your name, website and email.
-- `license`: The software's license. This should be a valid [SPDX license expression](https://spdx.github.io/spdx-spec/v2.3/SPDX-license-expressions/) (e.g, `MIT`, `GPL-3.0-or-later`, `MIT OR Apache-2.0`). If the license is proprietary and not covered by an SPDX identifier, use `Proprietary`. Zoi will check if the license is OSI-approved and will show a warning if it's not.
-
-It's also highly recommended to add:
-
-- `website`: The official project website.
-- `git`: The URL of the source code repository.
-- `readme`: A URL to a README file (markdown or plain text).
-- `man`: A URL to a markdown manual file that can be viewed with `zoi man`.
-
-### Package Types
-
-Zoi supports different types of packages. You can specify the type using the `type` field. This guide will cover how to create these different types in a later step.
-
-- `package` (Default): A standard software package.
-- `collection`: A meta-package that only installs a list of other packages as dependencies.
-- `service`: A package that runs as a background service (e.g. a database).
-- `config`: A package that manages configuration files for another application.
-- `app`: An application template used with `zoi create`.
-- `extension`: A package that can modify Zoi's configuration.
-- `library`: A software library.
-- `script`: A package that runs a set of inline shell commands.
-
-### Tags (Recommended)
-
-Add a `tags` list to improve discoverability in `zoi search` and to let users filter by tags.
-
-```yaml
-tags:
-  - cli
-  - devtools
-  - editor
+-- Dependencies
+dependencies({
+  build = {
+    required = { "native:go" }
+  }
+})
 ```
 
 ## Step 2: Defining an Installation Method
 
-The `installation` section tells Zoi how to get the software onto a user's machine. You can provide multiple methods, and Zoi will pick the best one for the user's platform.
+The `install{}` block tells Zoi how to get the software. You can provide multiple methods, and Zoi will pick the best one. If you set `selectable = true`, the user will be prompted to choose.
 
-#### `binary`
-
-For downloading a single, pre-compiled executable.
-
-```yaml
-installation:
-  - type: binary
-    url: "https://github.com/user/my-cli/releases/download/v{version}/my-cli-{platform}"
-    platforms: ["linux-amd64", "macos-amd64", "windows-amd64"]
+```lua
+install({
+  selectable = true, -- Allows the user to choose between these methods
+  {
+    name = "Binary", -- A descriptive name for the method
+    type = "binary",
+    url = "...",
+    platforms = { "linux-amd64", "macos-amd64", "windows-amd64" }
+  },
+  {
+    name = "Build from Source",
+    type = "source",
+    url = PKG.git, -- Use the git URL from the package definition
+    platforms = { "all" },
+    build_commands = { "make" },
+    install_commands = { 'make install DESTDIR="${Zoi_DESTDIR}"' }
+  }
+})
 ```
 
-For more complex installers or application bundles like `.dmg` on macOS, `.msi` on Windows, or `.appimage` on Linux, you can add the `binary_types` field. Zoi will then use platform-specific logic to handle the installation.
+For a full list of installation types (`binary`, `com_binary`, `source`, `script`) and their options, see the [Package Examples](/docs/zds/zoi/examples).
 
-```yaml
-installation:
-  - type: binary
-    url: "https://github.com/user/my-gui-app/releases/download/v{version}/my-gui-app-{platform}"
-    platforms: ["macos-amd64", "windows-amd64", "linux-amd64"]
-    # (Optional) Specify installer/bundle types.
-    # Zoi will handle them appropriately (e.g. mount DMG, run MSI).
-    # Supported types: "dmg", "msi", "appimage"
-    binary_types: ["dmg", "msi", "appimage"]
+### Security: Checksums and Signatures
+
+It is **highly recommended** to include checksums and GPG signatures to verify downloads.
+
+```lua
+install({
+  {
+    type = "binary",
+    url = "...",
+    platforms = { "all" },
+    -- URL to a checksums file (e.g. checksums.txt)
+    checksums = release_base_url .. "/checksums.txt",
+    -- GPG signature for the file
+    sigs = {
+      {
+        file = "my-cli-" .. SYSTEM.OS .. "-" .. SYSTEM.ARCH,
+        sig = release_base_url .. "/my-cli.sig"
+      }
+    }
+  }
+})
 ```
 
-#### `com_binary` (Compressed Binary)
-
-For downloading a `.zip` or `.tar.gz` archive that contains the binary.
-
-```yaml
-installation:
-  - type: com_binary
-    url: "https://github.com/user/tool/releases/download/v{version}/tool-v{version}-{platform}.{platformComExt}"
-    platforms: ["linux-amd64", "macos-amd64", "windows-amd64"]
-    platformComExt:
-      linux: "tar.gz"
-      macos: "tar.gz"
-      windows: "zip"
-    # (Optional) Path or filename of the executable inside the archive.
-    # If this ends with .exe, Zoi installs it as <package>.exe; otherwise <package>.
-    # Can be a relative path (bin/tool) or just a filename (tool.exe).
-    # On Windows targets, if this does not end with .exe, Zoi will also try with .exe appended.
-    binary_path: "bin/tool"
-```
-
-Supported archive formats for `com_binary` are documented in [Supported Archives for Compressed Binaries](/docs/zds/zoi/archives).
-
-#### `source`
-
-For packages that need to be compiled from source code.
-
-```yaml
-installation:
-  - type: source
-    url: "https://github.com/{git}" # {git} is a placeholder for the top-level git field
-    platforms: ["linux-amd64", "macos-amd64", "windows-amd64"]
-    # (Optional) One of these may be specified to pick a ref.
-    # tag can include placeholders like v{version}.
-    # tag: "v{version}"
-    # branch: "release/{version}"
-    commands:
-      - "make build"
-      - "mv ./bin/compiler {store}/{name}" # {store} is the path to Zoi's install directory
-```
-
-#### `script`
-
-For tools that use an installation script (e.g. `install.sh`).
-
-```yaml
-installation:
-  - type: script
-    url: "https://example.com/install.{platformExt}" # {platformExt} becomes 'sh' or 'ps1'
-    platforms: ["linux-amd64", "macos-amd64", "windows-amd64"]
-```
-
-### Placeholders
-
-Zoi uses placeholders to make your URLs dynamic:
-
-- `{version}`: The package version.
-- `{platform}`: The user's platform (e.g. `linux-amd64`).
-- `{platformComExt}`: The correct compressed archive extension for the OS.
-- `{platformExt}`: The correct script extension for the OS.
-- `{git}`: The value of the top-level `git` field.
-- `{store}`: The path where the final binary should be placed (for `source` builds).
-
-For resolving a package version from a remote URL (plain text or JSON), see the example in [Package with Remote Version URL](/docs/zds/zoi/examples#package-with-remote-version-url-json-or-plain-text).
-
-### Security: Checksums
-
-It is **highly recommended** to include checksums to verify the integrity of downloaded files.
-
-```yaml
-installation:
-  - type: binary
-    url: "..."
-    platforms: ["..."]
-     checksums:
-       # Option 1: URL to a checksums file (e.g. checksums.txt)
-       # Defaults to sha512 algorithm
-       url: "https://github.com/user/my-cli/releases/download/v{version}/checksums.txt"
-       # Option 2: Explicit list with algorithm type
-       # type: sha256 # or sha512 (default)
-       # list:
-       #   - file: "my-cli-zip"
-       #     # Hex digest or URL to a file containing the digest
-       #     checksum: "<hex-digest-or-url>"
-```
-
-### Security: Signatures
-
-For an even higher level of security, you can add GPG signature verification. This ensures that the package was published by a trusted developer.
-
-This requires two parts:
-
-1.  **Provide a GPG Key:** Add a `key` field to the `maintainer` or `author` sections. The value can be a URL pointing to the public GPG key, or the key's 40-character fingerprint. Zoi will fetch fingerprints from `keys.openpgp.org`.
-
-    ```yaml
-    maintainer:
-      name: "Your Name"
-      email: "your.email@example.com"
-      # Can be a URL to the key, or the key's fingerprint
-      key: "DEADC0DEDEADBEEFDEADC0DEDEADBEEFDEADC0DE"
-
-    author:
-      name: "Original Author"
-      # A URL is also valid
-      key: "https://keys.example.com/author-key.gpg"
-    ```
-
-2.  **Add Signature Information:** In the `installation` method, add a `sigs` list. Each item specifies a file and a URL to its corresponding `.sig` file.
-
-    ```yaml
-    installation:
-      - type: binary
-        url: "..."
-        platforms: ["..."]
-        # ... checksums ...
-        sigs:
-          - file: "my-cli-{platform}" # The file to verify
-            sig: "https://github.com/user/my-cli/releases/download/v{version}/my-cli-{platform}.sig" # URL to the signature
-    ```
-
-Zoi will download the key from the URL, import it, and use it to verify the signature of the downloaded file.
+Zoi will use the `key` from the `maintainer` or `author` block to verify the signature. You can manage keys with the `zoi pgp` command.
 
 ## Step 3: Adding Dependencies
 
-If your package requires other tools to be installed, define them in the `dependencies` section. Dependencies are split between `build` (needed to compile from source) and `runtime` (needed to run the application).
+Define dependencies in the `dependencies{}` block.
 
-Both `build` and `runtime` dependency groups can be defined as a simple list of required dependencies, or as a more advanced object with `required`, `optional`, and selectable `options`.
-
-```yaml
-dependencies:
-  build:
-    required:
-      - native:make
-      - native:gcc
-  runtime:
-    required:
-      - zoi:some-base-library
-    optional:
-      - zoi:plugin-A:adds feature X
-      - zoi:plugin-B:adds feature Y
+```lua
+dependencies({
+  -- Build-time dependencies
+  build = {
+    required = { "native:make", "native:gcc" },
+    optional = { "native:rust:for rust language support" }
+  },
+  -- Runtime dependencies
+  runtime = {
+    required = { "zoi:some-base-library" },
+    -- Let the user choose a GUI provider
+    options = {
+      {
+        name = "GUI",
+        desc = "GUI Providers",
+        all = false, -- 'false' means choose one, 'true' allows multiple
+        depends = {
+          "native:qt6:for KDE desktop environments",
+          "native:gtk4:for GNOME-based desktop environments"
+        }
+      }
+    }
+  }
+})
 ```
 
-- `required`: Dependencies that are always installed.
-- `optional`: Dependencies that the user is prompted to install. The format is `manager:package-name:description`, where the description explains what the dependency provides.
+For more details, see the [Dependencies guide](/docs/zds/zoi/dependencies).
 
-### Selectable Required Dependencies
+## Step 4: Advanced Features
 
-For more complex scenarios, you can offer the user a choice between different providers for a required dependency. This is useful when your application supports multiple backends (e.g. different GUI toolkits or database drivers).
+Zoi supports many advanced features in the `package{}` block:
 
-You can structure the `required` section with an `options` block:
+- `alt`: Redirect to another package, URL, or file.
+- `updater`: Force `zoi update` to use a specific install method (e.g. `source`).
+- `rollback = false`: Disable rollback backups for this package.
+- `updates`: A list of messages (breaking changes, vulnerabilities) to show the user before installation.
 
-```yaml
-dependencies:
-  runtime:
-    required:
-      # You can mix simple required dependencies...
-      - zoi:core-library
-      # ...with selectable options.
-      options:
-        - name: "GUI"
-          desc: "GUI Providers"
-          all: no # 'no' means the user must choose only one. 'yes' allows multiple selections.
-          depends:
-            - native:qt6:for KDE desktop environments
-            - native:gtk4:for GNOME-based desktop environments
-```
+See the [Package Examples](/docs/zds/zoi/examples) for how to use these.
 
-When a user installs this package, Zoi will prompt them to choose a GUI provider, ensuring the necessary dependency is met while giving the user control.
+## Step 5: Testing Your Package Locally
 
-These choices, along with any selected `optional` dependencies, are automatically saved to a `<package_name>.manifest.yaml` file in the package's store directory. This file can be shared to allow for fully reproducible, non-interactive installations of the package with the same dependency set.
-
-### Advanced: Full dependency schema
-
-Both `runtime` and `build` support the same structure: a simple list, or an advanced object with `required`, `options`, and `optional` all at once.
-
-```yaml
-dependencies:
-  runtime:
-    required:
-      - zoi:core-utils
-    options:
-      - name: "GUI Toolkit"
-        desc: "Choose a GUI provider for the application"
-        all: false
-        depends:
-          - native:qt6:Recommended for KDE Plasma
-          - native:gtk4:Recommended for GNOME
-          - native:libadwaita:For a modern GNOME look and feel
-    optional:
-      - zoi:extra-utils:handy extras
-  build:
-    required:
-      - zoi:build-utils
-    options:
-      - name: "Build GUI Toolkit"
-        desc: "Choose GUI dev libraries"
-        all: true
-        depends:
-          - native:qt6-dev:KDE toolkit headers and libs
-          - native:gtk4-dev:GNOME toolkit headers and libs
-    optional:
-      - zoi:extra-build-utils:extra helpers
-```
-
-- Required entries cannot have inline descriptions. If you need description and choice, use an `options` group.
-- Optional entries can have inline descriptions using `manager:package:description`.
-- In an `options` group, each `depends` item can include an inline description after the second `:`.
-- During installation:
-  - For normal packages, `build` dependencies are installed when a source build is selected/required (no compatible `binary`/`com_binary`), or when forcing source.
-  - For `collection` and `config` packages, both `runtime` and `build` dependencies are honored directly.
-
-## Step 4: Adding Post-Installation & Uninstallation Hooks
-
-Some packages may require additional setup steps after installation is complete, or cleanup steps during uninstallation. The `post_install` and `post_uninstall` fields allow you to define platform-specific commands.
-
-Zoi will ask for user confirmation before running these commands for security.
-
-### `post_install`
-
-These commands run after a successful installation. This is useful for setting up shell completions or running a configuration wizard.
-
-```yaml
-post_install:
-  - platforms: ["linux", "macos"]
-    commands:
-      - "echo 'Heads up! {name} needs to do some post-install setup.'"
-      - "{name} --setup-completions"
-  - platforms: ["windows"]
-    commands:
-      - "echo 'Successfully installed {name} v{version}!'"
-```
-
-- `platforms`: A list of platforms where these commands should run (e.g. `linux`, `macos`, `windows`, `linux-amd64`).
-- `commands`: A list of shell commands to execute. You can use the `{name}` and `{version}` placeholders.
-
-### `post_uninstall`
-
-These commands run before a package is uninstalled. This is useful for cleaning up configuration files, removing system services, or deregistering components.
-
-```yaml
-post_uninstall:
-  - platforms: ["linux", "macos"]
-    commands:
-      - "echo 'Running cleanup tasks for {name}...'"
-      - "{name} --remove-completions"
-```
-
-The structure is identical to `post_install`.
-
-## Step 5: Creating Specific Package Types
-
-Beyond a standard `package`, Zoi supports several special package types for different use cases. You define the type of your package using the `type` field in your `pkg.yaml`.
-
-### Collection Packages
-
-A `collection` is a meta-package that doesn't install any files itself but instead groups other packages together as dependencies. This is useful for creating "bundles" of tools, like a complete development environment for a specific language or framework.
-
-To create a collection, set the `type` field to `collection` and list the packages you want to include in the `dependencies` section.
-
-```yaml
-# collections/web-dev-essentials.pkg.yaml
-name: web-dev-essentials
-repo: community
-type: collection # Set the package type to 'collection'.
-version: "1.0"
-description: "A collection of essential tools for web development."
-tags: [collection, web, devtools]
-maintainer:
-  name: "Community"
-  email: "community@example.com"
-
-# The 'runtime' dependencies are the packages that will be installed.
-# This collection demonstrates pulling tools from different package managers.
-dependencies:
-  runtime:
-    required:
-      - zoi:node
-      - zoi:bun
-      - native:git
-    optional:
-      - npm:pnpm
-      - npm:serve
-      - npm:typescript
-```
-
-When a user runs `zoi install web-dev-essentials`, Zoi will install `node`, `bun`, and `git`, and then prompt the user to install the optional packages.
-
-### Config Packages
-
-A `config` package is designed to manage configuration files for another application. It doesn't install an executable itself, but it can run scripts to place or remove configuration files. It's a good practice to make the config package depend on the application it configures.
-
-To create a config package, set the `type` to `config` and define a `config` block with `install` and `uninstall` commands.
-
-#### The `config` field
-
-This field contains platform-specific commands to manage the configuration files.
-
-```yaml
-# my-app-config.pkg.yaml
-name: my-app-config
-repo: community
-type: config
-version: "1.0"
-description: "Configuration files for my-app."
-# ... other metadata ...
-
-dependencies:
-  runtime:
-    required:
-      - zoi:my-app # This config depends on 'my-app' being installed.
-
-config:
-  - platforms: ["linux", "macos"]
-    # These commands are run to place the config files.
-    # Assume your package repo includes a 'config.toml' file.
-    install:
-      - "mkdir -p ~/.config/my-app"
-      - "cp ./config.toml ~/.config/my-app/config.toml"
-    # These commands are run when the user uninstalls the config.
-    uninstall:
-      - "rm ~/.config/my-app/config.toml"
-```
-
-When a user installs this package, Zoi will first ensure `my-app` is installed, and then ask for confirmation before running the `install` commands. When uninstalled, it will run the `uninstall` commands.
-
-### App Templates
-
-An `app` package is a template used to scaffold new applications with the `zoi create <source> <appName>` command. It is not installable directly like other packages. This is useful for creating starter projects for frameworks like Rails, React, or your own custom project structure.
-
-To create an app template, set the `type` to `app` and define an `app` block.
-
-#### The `app` field
-
-This field contains the commands needed to create the new application.
-
-```yaml
-# apps/rails-app.pkg.yaml
-name: rails-app
-repo: community
-type: app
-version: "7"
-description: "Rails app template"
-# ... other metadata ...
-
-dependencies:
-  runtime:
-    required:
-      - zoi:@core/ruby
-      - zoi:@main/gems/rails
-
-# Platform-specific create command and optional follow-up commands
-app:
-  - platforms: ["all"]
-    appCreate: "rails new ${appName}"
-    commands:
-      - "cd ${appName} && bundle install"
-      - "cd ${appName} && git init"
-```
-
-**Key fields:**
-
-- `type: app`: Declares the package as an app template.
-- `app.appCreate`: The main command to run to create the project. The `${appName}` placeholder will be replaced with the name the user provides.
-- `app.commands`: An optional list of follow-up commands to run after the project is created.
-- `dependencies`: Any dependencies listed under `runtime` or `build` will be installed before the `appCreate` command is run.
-
-To use this template, a user would run:
+Before publishing, you **must** test your package locally.
 
 ```sh
-zoi create rails-app MyNewBlog
+# Install from your local .pkg.lua file
+zoi install ./my-package.pkg.lua
+
+# If testing a source build specifically
+zoi build ./my-package.pkg.lua
 ```
 
-### Service Packages
-
-A `service` is a package type for applications that run in the background, like databases or web servers. Zoi can manage starting and stopping these services.
-
-You can define a service to be run via native system commands or with Docker Compose.
-
-#### Command-Based Service
-
-This is for services managed by shell commands.
-
-```yaml
-# my-service.pkg.yaml
-type: service
-# ...
-service:
-  - platforms: ["linux", "macos"]
-    start:
-      - "my-service --daemon"
-    stop:
-      - "pkill my-service"
-```
-
-#### Docker-based Service
-
-If your service is defined in a `docker-compose.yml` file, Zoi can manage it for you.
-
-```yaml
-# my-docker-service.pkg.yaml
-type: service
-# ...
-service:
-  - platforms: ["all"] # Or specific platforms
-    docker:
-      - type: compose
-        file: "https://example.com/my-service/docker-compose.yml"
-```
-
-**Key fields:**
-
-- `docker`: A list of docker service definitions.
-- `type: compose`: Specifies that this is a Docker Compose service.
-- `file`: A URL to the `docker-compose.yml` file. Zoi will download this file, store it, and use it to start and stop the service with `docker-compose up -d` and `docker-compose down`.
-
-When a user installs a service package, Zoi will ask if they want to start it. They can also manage it later with `zoi start <pkg>` and `zoi stop <pkg>`.
-
-### Extension Packages
-
-An `extension` is a special package type that doesn't install software but instead modifies Zoi's own configuration. This is useful for distributing sets of repositories or other configuration changes as a single package.
-
-To create an extension, set the `type` field to `extension` and define an `extension` block.
-
-#### The `extension` field
-
-This field contains the configuration changes to be applied.
-
-```yaml
-# my-repo-extension.pkg.yaml
-name: my-repo-extension
-repo: community
-type: extension
-version: "1.0"
-description: "Adds my custom repositories to Zoi."
-# ... other metadata ...
-
-extension:
-  type: zoi # Required. Currently, only 'zoi' is supported.
-  changes:
-    # A list of changes to apply when the extension is added.
-    # These changes are reverted when the extension is removed.
-    - type: repo-git
-      add: https://github.com/user/my-cool-pkgs.git
-    - type: repo-add
-      add: community
-    - type: registry-repo
-      add: https://my-mirror.com/Zoi-Pkgs.git
-```
-
-**Key Fields:**
-
-- `type: extension`: Declares the package as an extension.
-- `extension.type`: The type of extension. Currently, only `zoi` is a valid value.
-- `extension.changes`: A list of changes to make. Each change has a `type` and an `add` value.
-
-**Change Types:**
-
-- `repo-git`: Clones a git repository into Zoi's package sources. The `add` value should be a valid git repository URL. This allows users to install packages from your git repo using `@git/<repo-name>/<pkg-name>`.
-- `repo-add`: Adds an official repository (e.g. `community`, `test`) to the list of active repositories that Zoi searches.
-- `registry-repo`: Changes the URL of the main package database registry that Zoi syncs with.
-
-#### Installing and Removing Extensions
-
-Extensions are managed with the `zoi extension` subcommand.
+After installation, run the package's command to ensure it works, then uninstall it to test cleanup.
 
 ```sh
-# Add the extension and apply its changes
-zoi extension add my-repo-extension
-
-# Remove the extension and revert its changes
-zoi extension remove my-repo-extension
+zoi uninstall my-package
 ```
 
-This makes it easy to share and manage complex Zoi configurations.
+## Step 6: The `zoi package` Workflow (Advanced)
 
-For a more in-depth guide on extensions, see the [Extensions documentation](/docs/zds/zoi/extensions).
+For more complex packages, Zoi provides a dedicated `package` command set for a structured build process.
 
-### Library Packages
+1.  **`zoi package meta <path/to/file.pkg.lua>`**:
+    Generates a `*.meta.json` file. This file resolves all the dynamic Lua script logic for each platform into a static description of all assets, checksums, and signatures.
 
-A `library` is a package that provides shared objects (`.so`), dynamic-link libraries (`.dll`), static archives (`.a`), and header files for other software to use. Zoi can install these files to the correct system locations and generate `pkg-config` files (`.pc`) to make them discoverable by build systems like `make`.
+2.  **`zoi package build <path/to/file.meta.json>`**:
+    Takes the `meta.json` file, downloads all the assets for the **current platform**, verifies them, and bundles them into a single Zoi package archive (`.pkg.tar.zst`).
 
-To create a library, set the `type` to `library` and provide a `pkg_config` block.
+3.  **`zoi package install <path/to/file.pkg.tar.zst>`**:
+    Installs a package from a local Zoi package archive. This is how Zoi installs pre-built packages from a repository.
 
-#### The `pkg_config` field
+This workflow is used internally by Zoi's CI/CD to build and publish official packages, but you can also use it for your own complex build pipelines.
 
-This field contains the information needed to generate a `.pc` file.
+## Step 7: Publishing Your Package
 
-```yaml
-# my-library.pkg.yaml
-name: my-library
-repo: community
-type: library
-version: 1.0.0
-description: "A cool library that does things."
-# ... other metadata ...
-
-# This block is used to generate the .pc file
-pkg_config:
-  description: "A cool library"
-  libs: "-lmy-library"
-  cflags: "-I/some/extra/path"
-
-installation:
-  - type: com_binary
-    url: "https://example.com/my-library-v{version}-{platform}.tar.gz"
-    platforms: ["linux-amd64"]
-    # Zoi will look for .so, .a, and .h files in the archive
-    # and install them to the correct locations.
-```
-
-**Key Fields:**
-
-- `type: library`: Declares the package as a library.
-- `pkg_config`: A block containing metadata for the `.pc` file.
-  - `description`: A short description for the `pkg-config` file.
-  - `libs`: The linker flags required to use the library (e.g. `-lmy-library`).
-  - `cflags`: The compiler flags required to use the library (e.g. `-I/path/to/headers`).
-
-#### Installation of Library Files
-
-When a `library` package is installed, Zoi handles the files as follows:
-
-- **Shared/Static Libraries (`.so`, `.dll`, `.a`, `.lib`):** These are installed into the system's library directory (`/usr/local/lib` on Linux, `~/.local/lib` for user-scoped installs).
-- **Header Files (`.h`, `.hpp`):** These are installed into the system's include directory (`/usr/local/include` on Linux, `~/.local/include` for user-scoped installs).
-- **`pkg-config` File:** A `.pc` file is generated and installed to the appropriate `pkgconfig` directory, making the library discoverable with `pkg-config --cflags --libs my-library`.
-
-For `source` installations of libraries, you can use the `{prefix}` placeholder in your build commands, which will resolve to the correct installation root (e.g. `/usr/local` or `~/.local`).
-
-```yaml
-installation:
-  - type: source
-    url: "{git}"
-    commands:
-      - "./configure --prefix={prefix}"
-      - "make"
-      - "make install"
-```
-
-This allows standard build systems to install the library files into the correct locations that Zoi manages.
-
-### Script Packages
-
-A `script` package is a special package type that doesn't install a binary but instead runs a series of inline shell commands. This is useful for performing custom setup actions, orchestrating other tools, or for installers that consist of a series of commands rather than a single remote script.
-
-This is distinct from the `script` **installation method**, which is used for packages that download and run a single remote script file (like `install.sh`).
-
-To create a `script` package, set the `type` to `script` and define a top-level `script` block with `install` and optional `uninstall` commands.
-
-```yaml
-# my-setup-script.pkg.yaml
-name: my-setup-script
-repo: community
-type: script
-version: "1.0"
-description: "A package that runs a series of setup commands."
-# ... other metadata ...
-
-# The 'script' field contains the commands to run.
-script:
-  - platforms: ["linux", "macos"]
-    # These commands run when the user installs the package.
-    install:
-      - "echo 'Creating configuration directory...'"
-      - "mkdir -p ~/.config/my-app"
-      - "echo 'hello: world' > ~/.config/my-app/config.yml"
-    # These commands run when the user uninstalls the package.
-    uninstall:
-      - "echo 'Removing configuration...'"
-      - "rm -rf ~/.config/my-app"
-
-  - platforms: ["windows"]
-    install:
-      - "echo 'Creating configuration directory...'"
-      - "mkdir -p $env:APPDATA/my-app"
-      - "echo 'hello: world' | Out-File -FilePath $env:APPDATA/my-app/config.yml"
-    uninstall:
-      - "echo 'Removing configuration...'"
-      - "rm -r $env:APPDATA/my-app"
-```
-
-When a user runs `zoi install my-setup-script`, Zoi will ask for confirmation and then execute the commands listed under `install` for the user's platform. The `uninstall` commands are run with `zoi uninstall`.
-
-## Step 6: Advanced `pkg.yaml` Features
-
-Beyond the basics, `pkg.yaml` offers powerful fields for more complex scenarios like package aliasing and defining specific update behaviors.
-
-### The `alt` Field: Aliasing and Redirection
-
-The `alt` field allows you to redirect Zoi to resolve a different package source. This is incredibly useful for creating aliases or maintaining multiple versions of a package. When a user tries to install the current package, Zoi will instead fetch and install the one specified in the `alt` field.
-
-The value of `alt` can be:
-
-- Another package name (e.g. `my-app-git`).
-- A URL to a raw `.pkg.yaml` file.
-- A local file path to a `.pkg.yaml` file.
-
-**Use Case: Creating a "latest" alias**
-
-Imagine you have a package `my-app` that is built from source, but you also want to provide a pre-compiled version for users who don't want to build it. You can create two package files:
-
-1.  `my-app-bin.pkg.yaml`: Installs the pre-compiled binary.
-2.  `my-app.pkg.yaml`: An alias that points to the binary version.
-
-```yaml
-# my-app.pkg.yaml
-name: my-app
-repo: community
-version: 1.0.0
-description: A simple command-line utility (alias for binary).
-# ... other metadata ...
-alt: my-app-bin # Redirects to the 'my-app-bin' package
-```
-
-Now, when a user runs `zoi install my-app`, Zoi will automatically resolve and install `my-app-bin` instead.
-
-### The `updater` Field: Custom Update Logic
-
-The `updater` field gives you control over how `zoi update` behaves for your package. By default, Zoi will try to find a `binary` or `com_binary` to perform an update. However, you can force it to use a different method.
-
-The value of `updater` can be one of the installation types: `binary`, `com_binary`, `script`, or `source`.
-
-**Use Case: Forcing a source build on update**
-
-If your package must always be compiled from the latest source code to function correctly, you can ensure that `zoi update` always pulls and rebuilds it.
-
-```yaml
-# my-compiler.pkg.yaml
-name: my-compiler
-repo: community
-version: 0.2.0
-description: A compiler that needs to be built from the latest source.
-# ...
-updater: source # Force 'zoi update' to use the 'source' method
-
-installation:
-  - type: source
-    url: "https://github.com/{git}"
-    commands:
-      - "make clean"
-      - "make build"
-      - "mv ./bin/compiler {store}/compiler"
-  - type: binary
-    # This binary is provided as an initial install option,
-    # but updates will always use the source method above.
-    url: "https://github.com/user/compiler/releases/download/v{version}/compiler-{platform}"
-    platforms: ["linux-amd64", "macos-amd64"]
-```
-
-In this example, a user can get a pre-compiled binary on their first `zoi install`, but every subsequent `zoi update my-compiler` will trigger a fresh build from the source repository, ensuring they always have the latest version.
-
-### The `rollback` Field: Disabling Backups
-
-By default, Zoi creates a backup of a package before upgrading it, allowing users to revert to the previous version with `zoi rollback`. You can disable this behavior for your package by setting the `rollback` field to `false`.
-
-**Use Case: Volatile or Large Packages**
-
-If your package is very large, or if its state is managed externally and backups are not useful, you can prevent Zoi from creating them.
-
-```yaml
-# my-large-asset-pack.pkg.yaml
-name: my-large-asset-pack
-# ...
-rollback: false # Zoi will not create a backup of this package on upgrade
-```
-
-### The `updates` Field: Important Update Messages
-
-You can add an `updates` section to your `pkg.yaml` to show important messages to the user before they install or update a package. This is useful for communicating breaking changes, security vulnerabilities, or other critical information.
-
-The user will be shown these messages and prompted to continue with the installation.
-
-```yaml
-# my-package.pkg.yaml
-name: my-package
-version: 2.0.0
-# ...
-updates:
-  - type: change
-    message: "This version introduces a new configuration file format. Please see the migration guide."
-  - type: vulnerability
-    message: "A critical vulnerability (CVE-2025-12345) is present in this version. It is recommended to wait for the next release."
-  - type: update
-    message: "This package will no longer be maintained after 2026."
-```
-
-**Update Types:**
-
-- `change`: For breaking changes or important modifications.
-- `vulnerability`: For security-related warnings.
-- `update`: For general updates or announcements.
-
-### Handling Conflicts: `bins` and `conflicts`
-
-To prevent issues where two different packages provide the same command-line tool or are otherwise incompatible, Zoi offers two fields to manage conflicts. If a conflict is detected, Zoi will warn the user and ask for confirmation before proceeding with the installation.
-
-If these fields are not present, Zoi falls back to its default behavior of checking if a command with the same name as the package already exists on the system.
-
-#### The `conflicts` Field
-
-This field lets you declare that your package is incompatible with a list of other Zoi packages.
-
-```yaml
-# my-new-editor.pkg.yaml
-name: my-new-editor
-version: 1.0.0
-# ...
-conflicts:
-  - old-editor # This package cannot be installed if 'old-editor' is present
-  - another-editor
-```
-
-#### The `bins` Field
-
-This field lists the executable files (binaries) that your package installs. Zoi uses this to detect if another installed package provides a binary with the same name.
-
-```yaml
-# my-utils.pkg.yaml
-name: my-utils
-version: 1.0.0
-# ...
-# This package installs two commands: 'mu' and 'mu-helper'
-bins:
-  - mu
-  - mu-helper
-```
-
-If a user tries to install `my-utils` while another package that also provides a `mu` binary is already installed, Zoi will detect the conflict. This is different from the package name; for example, the `vim` package might provide the `vi` binary, which could conflict with a separate `vi` package.
-
-## Step 7: Testing Your Package Locally
-
-Before you publish your package, you **must** test it locally to ensure it installs correctly.
-
-1.  Save your `my-package.pkg.yaml` file somewhere on your machine.
-2.  Run the install command, pointing to your local file:
-
-    ```sh
-    zoi install ./path/to/my-package.pkg.yaml
-    ```
-
-    If you are testing a `source` build, use the `build` command:
-
-    ```sh
-    zoi build ./path/to/my-package.pkg.yaml
-    ```
-
-3.  Zoi will attempt to install it just like a user would. Watch for any errors in the output.
-4.  After a successful installation, try running the command to make sure it works.
-5.  Finally, uninstall it to ensure a clean removal:
-    ```sh
-    zoi uninstall my-package
-    ```
-
-## Step 8: Publishing Your Package
-
-Once your package is tested and ready, the final step is to publish it. This can involve submitting it to the official Zoi repositories or hosting it in your own private or public repository.
+Once your package is tested and ready, you can publish it to the official repositories or host your own.
 
 For a complete guide on publishing, please see:
 
 - **[Publishing Packages](/docs/zds/zoi/publishing-packages)**
-
-Once published to the official repositories, your package will be discoverable on the [Nel Registry](https://nel.zillowe.qzz.io).

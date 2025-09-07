@@ -18,21 +18,25 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
 ## Features
 
 - **Cross-Platform:** Works seamlessly on Linux, macOS, and Windows.
-- **Universal Package Support:** Install packages from various sources: binaries, compressed archives, build from source, or installer scripts.
-- **Extensive Dependency Management:** Integrates with over 40+ package managers (`apt`, `brew`, `cargo`, `npm`, `pip`, `scoop`, etc.) to handle dependencies.
-- **Rich Dependencies:** Packages can define runtime and build dependencies with required, optional, and selectable options groups.
-- **Project Environments:** Easily define and manage project-specific environments and commands using [`zoi.yaml`](/docs/zds/zoi/project-config).
-- **Repository-Based:** Manage packages from official or community repositories. Easily add your own.
-- **Intuitive CLI:** A simple and powerful command-line interface with helpful aliases for a better developer experience.
-- **Versatile Package Types:** Supports standard packages, meta-packages (collections), background services, configuration packages, extensions, libraries, app templates, and script-based installers.
-- **Secure & Verifiable:** Support for checksums and GPG signatures to verify package integrity and authenticity.
-- **Efficient Self-Updates:** Uses patch-based updates (`bsdiff`) for smaller and faster upgrades of Zoi itself.
-- **Tag-based Discovery:** Search by and filter packages using tags for faster discovery.
-- **View Manuals:** Read package manuals directly in your terminal with `zoi man`.
+- **Dynamic Package Definitions:** Define packages with dynamic Lua scripts (`.pkg.lua`) for maximum flexibility.
+- **Universal Package Support:** Install from binaries, compressed archives, source, or installer scripts.
+- **Extensive Dependency Management:** Integrates with over 40 package managers (`apt`, `brew`, `cargo`, `npm`, `pip`, etc.).
+- **Rich Dependencies:** Define runtime and build dependencies with required, optional, and selectable options.
+- **Project Environments:** Manage project-specific commands and environments with `zoi.yaml`.
+- **Repository-Based:** Use official, community, or your own private/public Git-based repositories.
+- **Secure & Verifiable:** Verifies package integrity and authenticity with checksums and GPG signatures. Manage keys with `zoi pgp`.
+- **Versatile Package Types:** Supports standard packages, collections, services, configs, app templates, extensions, libraries, and inline scripts.
 - **Interactive Package Creation:** Use `zoi make` to interactively create new package definitions.
-- **Library Support:** Use `zoi pkg-config` to get compiler/linker flags for installed libraries.
-- **Use as a Library:** Integrate Zoi's package management features directly into your Rust applications. See the [Library documentation](/docs/zds/zoi/lib) for details.
-- **SBOM & Reproducible Installs:** Automatically records installed packages to an SBOM (`zoi.pkgs.json`) for backup/restore and generates sharable manifest files for reproducible dependency choices.
+- **Local Package Development:** A dedicated `zoi package` command set (`meta`, `build`, `install`) to streamline creating and testing packages locally.
+- **Efficient Self-Updates:** Uses patch-based updates (`bsdiff`) for smaller and faster upgrades.
+- **Advanced CLI Tools:**
+  - `zoi man`: Read package manuals in the terminal.
+  - `zoi why`: Understand why a package is installed.
+  - `zoi rollback`: Revert a package to its previous version.
+  - `zoi pin`: Pin a package to a specific version.
+  - `zoi exec`: Run a package without installing it.
+- **Library Support:** Use as a Rust library and get compiler/linker flags via `zoi pkg-config`.
+- **SBOM & Reproducible Installs:** Automatically records installed packages to an SBOM (`zoi.pkgs.json`) and generates sharable manifest files for reproducible dependency choices.
 
 ## Getting Started
 
@@ -249,7 +253,6 @@ Zoi provides a wide range of commands to manage your packages and environment. F
 | `exec`       | Downloads a binary to a temporary cache and runs it without installing it.                                                                                                                                                                                                                                                                                                      |
 | `extension`  | Manages Zoi extensions (`add`, `remove`).                                                                                                                                                                                                                                                                                                                                       |
 | `create`     | Creates an application from an app template. Usage: `zoi create <source> <appName>`                                                                                                                                                                                                                                                                                             |
-| `make`       | Interactively creates a new `pkg.yaml` file.                                                                                                                                                                                                                                                                                                                                    |
 | `man`        | Renders a package's manual in the terminal. <br/>`--upstream`: Fetch the manual from its remote URL, ignoring any local copy. <br/>`--raw`: Print the raw manual content without rendering.                                                                                                                                                                                     |
 | `pkg-config` | Provides compiler and linker flags for installed libraries.                                                                                                                                                                                                                                                                                                                     |
 
@@ -268,6 +271,13 @@ See the full schema and examples in [Project Configuration (zoi.yaml)](/docs/zds
 | ------- | ----------------------------------- |
 | `start` | Starts a package that is a service. |
 | `stop`  | Stops a running service package.    |
+
+### Package Development
+
+| Command   | Description                                                                   |
+| --------- | ----------------------------------------------------------------------------- |
+| `package` | Build, create, and manage Zoi packages (`meta`, `build`, `install`).          |
+| `pgp`     | Manage PGP keys for package signature verification (`add`, `remove`, `list`). |
 
 ### Sync Management (`sync`)
 
@@ -311,7 +321,7 @@ zoi repo ls
 
 For an overview of official repositories, mirrors, and repository tiers, see [Repositories](/docs/zds/zoi/repositories).
 
-Zoi supports different types of packages, defined in the `.pkg.yaml` file.
+Zoi supports different types of packages, defined in the `.pkg.lua` file.
 
 | Type         | Description                                                                                                                                                                                                                         |
 | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -324,200 +334,38 @@ Zoi supports different types of packages, defined in the `.pkg.yaml` file.
 | `Library`    | A software library with headers and/or binaries (.so, .dll, .a). Can provide pkg-config files.                                                                                                                                      |
 | `Script`     | A package that runs a series of inline shell commands instead of installing a binary.                                                                                                                                               |
 
-## Creating Packages (`pkg.yaml`)
+## Creating Packages (`.pkg.lua`)
 
-Creating a package for Zoi is done by defining a `pkg.yaml` file. This file contains all the metadata and instructions Zoi needs to install your software. For more examples, see the [Package Examples](/docs/zds/zoi/examples) page.
+Packages for Zoi are defined using `.pkg.lua` files. These are Lua scripts that define package metadata and installation logic, allowing for highly dynamic and flexible package definitions.
 
-### `pkg.yaml` Structure
+- **Dynamic & Flexible:** Use Lua scripting to define dynamic URLs, platform-specific logic, and complex installation steps.
+- **Interactive Creation:** Use `zoi make` to interactively create a package definition file.
+- **Comprehensive Examples:** For a deep dive into creating packages, see the [Creating Packages guide](/docs/zds/zoi/creating-packages) and the [Package Examples](/docs/zds/zoi/examples).
 
-Here is a comprehensive overview of the fields available in a `pkg.yaml` file. For validation and autocompletion in your editor, you can add a `$schema` line pointing to the official JSON Schema.
+### `.pkg.lua` Structure
 
-```yaml
-# yaml-language-server: $schema=https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/pkg.schema.json
-# The name of the package. This is required and should be unique.
-name: my-awesome-app
-# The repository where the package is located (e.g. 'core', 'community', 'core/linux/amd64').
-repo: community
-# The version of the package. Can be a static version number or a URL to a file containing the version.
-version: 1.0.0
-# (Optional) A map of version channels to version numbers or URLs.
-# Zoi will use the 'stable' channel by default if it exists.
-versions:
-  stable: 1.0.0
-  latest: 1.1.0-beta
-# A brief description of the package.
-description: My awesome application does awesome things.
-# (Optional) The official website for the package.
-website: https://my-awesome-app.com
-# (Optional) A URL to a README file for the package.
-readme: https://my-awesome-app.com/README.md
-# (Optional) A URL to a markdown or text manual file for the `zoi man` command.
-man: https://my-awesome-app.com/MAN.md
-# (Optional) The source code repository URL.
-git: https://github.com/user/my-awesome-app
-# Information about the package maintainer.
-maintainer:
-  name: "Your Name"
-  email: "your@email.com"
-  # (Optional) URL to the maintainer's public GPG key or the 40-character fingerprint.
-  key: "DEADC0DEDEADBEEFDEADC0DEDEADBEEFDEADC0DE"
-  # (Optional) Website of the maintainer
-  website: "https://maintainer.com"
-# (Optional) Information about the original author, if different from the maintainer.
-author:
-  name: "Author Name"
-  email: "author@email.com"
-  website: "https://author.com"
-  # (Optional) URL to the author's public GPG key or the 40-character fingerprint.
-  key: "https://example.com/author.gpg"
-# (Optional) The license of the package. Should be a valid SPDX license expression
-# (e.g. "MIT", "GPL-3.0-or-later", "MIT OR Apache-2.0").
-# Use "Proprietary" for non-SPDX/proprietary licenses.
-# Zoi will check for OSI-approved licenses and warn if the check fails.
-license: MIT
-# (Optional) The installation scope. Can be 'user' (default) or 'system'.
-scope: user
-# (Optional) The package type. Can be 'package' (default), 'collection', 'service', 'config', 'app', 'extension', 'library', or 'script'.
-type: package
-# (Optional) An alternate source to resolve this package from. Can be another
-# package name (e.g. 'my-app-git'), a URL to a raw .pkg.yaml file, or a local file path.
-alt: my-app-v2
-# (Optional) The installation method to use for `zoi update`.
-# Can be 'binary', 'com_binary', 'script', or 'source'.
-updater: binary
-# (Optional) Enable or disable rollbacks for this package. Defaults to true.
-# This overrides the global setting in Zoi's config.
-rollback: true
+A `.pkg.lua` file is a Lua script that calls global functions like `package{}`, `install{}`, and `dependencies{}` to define the package.
 
-# (Optional) A list of important messages to show to the user before installation.
-updates:
-  - type: change
-    message: "This version introduces a new configuration file format."
-  - type: vulnerability
-    message: "A critical vulnerability (CVE-2025-12345) is present in this version."
-  - type: update
-    message: "This package will no longer be maintained after 2026."
+```lua
+-- my-cli.pkg.lua
+package({
+  name = "my-cli",
+  repo = "community",
+  version = "1.2.3",
+  description = "A simple command-line utility.",
+  -- ... more metadata
+})
 
-# (Optional) A list of binaries this package provides. Used for conflict detection.
-bins:
-  - my-awesome-app
-# (Optional) A list of package names that this package conflicts with.
-conflicts:
-  - my-awesome-app-legacy
-
-# (Optional) A list of tags for discovery and filters.
-tags:
-  - cli
-  - devtools
-
-# (Optional) Defines this package as an extension.
-extension:
-  type: zoi # The type of extension, currently only 'zoi' is supported.
-  changes:
-    # A list of changes to apply.
-    - type: repo-git # Clones a git repository into the git package source.
-      add: https://github.com/user/my-zoi-pkgs.git
-    - type: registry-repo # Sets the main package database registry URL.
-      add: https://my-mirror.com/Zoi-Pkgs.git
-    - type: repo-add # Adds an official repository to the active list.
-      add: my-custom-repo
-
-# (Optional) For 'library' type packages, provides pkg-config information.
-pkg_config:
-  description: "My Awesome Library"
-  libs: "-L/usr/local/lib -lmy-awesome-app"
-  cflags: "-I/usr/local/include/my-awesome-app"
-
-# A list of methods to install the package. Zoi will try them in order.
-installation:
-  - type: binary
-    url: "https://github.com/user/my-awesome-app/releases/download/v{version}/my-awesome-app-{platform}"
-    platforms: ["linux-amd64", "macos-amd64", "windows-amd64"]
-    # (Optional) Checksum verification for the downloaded file.
-    checksums:
-      # Option A: simple URL to a checksums file (defaults to sha512)
-      url: "https://github.com/user/my-awesome-app/releases/download/v{version}/checksums.txt"
-      # Option B: explicit list with type (supports sha512 or sha256)
-      # type: sha256
-      # list:
-      #   - file: "my-awesome-app-zip"
-      #     checksum: "<hex-digest-or-url>"
-    # (Optional) GPG signature verification for the downloaded file.
-    # Zoi will use the 'key' from the 'maintainer' or 'author' fields.
-    sigs:
-      - file: "my-awesome-app-{platform}"
-        sig: "https://github.com/user/my-awesome-app/releases/download/v{version}/my-awesome-app-{platform}.sig"
-    # (Optional) A list of installer/bundle types like 'dmg', 'msi', or 'appimage'.
-    # Zoi will handle these file types with appropriate platform-specific actions.
-    binary_types: ["dmg", "msi", "appimage"]
-
-  - type: com_binary
-    url: "https://github.com/user/my-awesome-app/releases/download/v{version}/my-awesome-app-v{version}-{platform}.{platformComExt}"
-    platforms: ["linux-amd64", "macos-amd64", "windows-amd64"]
-    platformComExt:
-      linux: tar.zst
-      macos: tar.zst
-      windows: zip
-    # (Optional) The path or filename of the binary inside the archive.
-    # If it ends with .exe, Zoi will name the installed file <package>.exe; otherwise <package>.
-    # On Windows targets, if binary_path does not end with .exe, Zoi will also try with .exe appended.
-    # Examples:
-    # binary_path: "bin/my-awesome-app"
-    # binary_path: "my-awesome-app.exe"
-    binary_path: "bin/my-awesome-app"
-
-  - type: source
-    url: "https://github.com/{git}"
-    platforms: ["linux-amd64", "macos-amd64", "windows-amd64"]
-    # (Optional) Use only one of these. {version} will be expanded.
-    # tag: "v{version}"
-    # branch: "release/{version}"
-    commands:
-      - "make build"
-      - "mv ./bin/my-awesome-app {store}/my-awesome-app"
-
-# (Optional) Dependencies required by the package.
-dependencies:
-  # Dependencies are split into 'build' and 'runtime'.
-  build:
-    required:
-      - native:cmake
-    optional:
-      - native:doxygen:for generating documentation
-  runtime:
-    required:
-      # Simple required dependency
-      - zoi:another-zoi-package
-      # A group of selectable required dependencies
-      options:
-        - name: "GUI Toolkit"
-          desc: "Choose a GUI provider"
-          all: no # User must choose one
-          depends:
-            - native:qt6:for KDE desktops
-            - native:gtk4:for GNOME desktops
-    optional:
-      - zoi:awesome-plugin:to enable the awesome feature
-
-# (Optional) Post-installation commands to run after a successful installation.
-post_install:
-  - platforms: ["linux", "macos"]
-    commands:
-      - "{name} generate-completions bash > ~/.local/share/bash-completion/completions/{name} || true"
-      - "{name} generate-completions zsh > ~/.zsh/completions/_{name} || true"
-      - "{name} generate-completions fish > ~/.config/fish/completions/{name}.fish || true"
-  - platforms: ["windows-amd64"]
-    commands:
-      - "powershell -NoProfile -Command \"$p=\"$env:USERPROFILE\Documents\PowerShell\"; if(!(Test-Path $p)){New-Item -ItemType Directory -Path $p|Out-Null}; {name}.exe generate-completions powershell >> \"$p\Microsoft.PowerShell_profile.ps1\""
-
-# (Optional) Post-uninstallation commands to run before the package is removed.
-post_uninstall:
-  - platforms: ["linux", "macos"]
-    commands:
-      - "rm -f ~/.local/share/bash-completion/completions/{name}"
-      - "rm -f ~/.zsh/completions/_{name}"
-      - "rm -f ~/.config/fish/completions/{name}.fish"
+install({
+  {
+    type = "binary",
+    url = "https://example.com/my-cli-v" .. PKG.version .. "-" .. SYSTEM.OS .. "-" .. SYSTEM.ARCH,
+    platforms = { "all" },
+  }
+})
 ```
+
+This approach allows you to use Lua's full power to construct your package definition. You have access to global variables like `PKG` (the package table) and `SYSTEM` (with `OS`, `ARCH`, `DISTRO`).
 
 ### Installation Methods
 
@@ -538,7 +386,7 @@ For the full list of supported dependency managers, usage semantics, and command
 
 <Accordions type="single">
   <Accordion title="How do I create my own package for Zoi?">
-    You can create a `pkg.yaml` file that defines your package. The easiest way is to run `zoi make` for an interactive setup. This file includes metadata like the package name, version, description, and installation instructions. The `Package` struct in [`types.rs`](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/src/pkg/types.rs) shows all available fields, and there's a [schema](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/app/pkg.schema.json) you can use in your `pkg.yaml` file. For more info about creating and publishing a package please visit [this guide](/docs/zds/zoi/creating-packages).
+    You can create a `.pkg.lua` file that defines your package. This file includes metadata like the package name, version, description, and installation instructions. The `Package` struct in [`types.rs`](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/src/pkg/types.rs) shows all available fields. For more info about creating and publishing a package please visit [this guide](/docs/zds/zoi/creating-packages).
   </Accordion>
 </Accordions>
 <br />
@@ -556,7 +404,7 @@ For the full list of supported dependency managers, usage semantics, and command
 <br />
 <Accordions type="single">
   <Accordion title="How do optional dependencies work?">
-    You can specify `optional` dependencies in your `pkg.yaml` under the `build`
+    You can specify `optional` dependencies in your `.pkg.lua` file under the `build`
     or `runtime` sections. When a user installs your package, they will be shown
     the list of optional dependencies and their descriptions, and they can choose which ones to install.
     This is great for plugins or extra features.
@@ -584,7 +432,7 @@ For the full list of supported dependency managers, usage semantics, and command
     Yes, Zoi supports installing dependencies from a wide range of other package
     managers like `brew`, `winget`, `scoop`, `npm`, `cargo`, `pip`, and many
     more. These are defined in the `dependencies` section of a packags's
-    `.pkg.yaml` file.
+    `.pkg.lua` file.
   </Accordion>
 </Accordions>
 <br />
@@ -651,16 +499,14 @@ For the full list of supported dependency managers, usage semantics, and command
     Zoi automatically keeps a record of all your installed packages in an SBOM file at `~/.zoi/pkgs/zoi.pkgs.json`. You can back up this file. To restore all your packages on a new system, simply run `zoi install /path/to/your/zoi.pkgs.json`.
   </Accordion>
 </Accordions>
-<br />
-<Accordions type="single">
-  <Accordion title="How do I ensure a reproducible installation?">
-    When you install a package with selectable or optional dependencies, Zoi saves your choices to a `<package_name>.manifest.yaml` file in the package's installation directory. You can commit this file to your project and run `zoi install /path/to/your/package.manifest.yaml` to reinstall the package with the exact same dependencies non-interactively.
-  </Accordion>
-</Accordions>
+
 <br />
 <Accordions type="single">
   <Accordion title="Does Zoi collect your data?">
-    We believe in privacy by design. Zoi does **not** collect any data by default. You can choose to opt-in to our anonymous telemetry to help us improve the application. To learn more about what we collect and why, please see our [Telemetry & Analytics](/docs/zds/zoi/telemetry) page.
+    We believe in privacy by design. Zoi does **not** collect any data by
+    default. You can choose to opt-in to our anonymous telemetry to help us
+    improve the application. To learn more about what we collect and why, please
+    see our [Telemetry & Analytics](/docs/zds/zoi/telemetry) page.
   </Accordion>
 </Accordions>
 
@@ -731,6 +577,30 @@ For the full list of supported dependency managers, usage semantics, and command
   ```
 
 - **Search by tag directly:**
+
+  ```sh
+  # The term matches tags too
+  zoi search editor
+
+  # Require specific tag(s)
+  zoi search editor -t cli,devtools
+  zoi search editor -t cli -t devtools
+  ```
+
+- **Check why a package is installed:**
+
+  ```sh
+  zoi why <package_name>
+  ```
+
+- **Create an app from a template:**
+
+  ```sh
+  zoi create <source> <appName>
+  # e.g.
+  zoi create rails-app MyBlog
+  zoi create @community/rails-app MyBlog
+  ```
 
   ```sh
   # The term matches tags too

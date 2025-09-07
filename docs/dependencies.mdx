@@ -5,11 +5,11 @@ description: How Zoi installs dependencies from external package managers and th
 
 Zoi can install dependencies via many ecosystem and OS package managers. This page documents:
 
-- How to declare dependencies in `pkg.yaml`
+- How to declare dependencies in `.pkg.lua`
 - All supported managers, their target platforms/ecosystems, and example usage
 - Notes and caveats for specific managers
 
-## Declaring dependencies in `pkg.yaml`
+## Declaring dependencies in `.pkg.lua`
 
 Dependencies are specified in the `dependencies` section. Both `runtime` and `build` dependency groups can be defined as a simple list of required dependencies, or as a more advanced object with `required`, `optional`, and selectable `options`.
 
@@ -27,62 +27,71 @@ Each entry follows the format: `manager:package` with an optional version and an
 
 ### Simple Dependency List
 
-For packages with only required dependencies, you can use a simple list.
+For packages with only required dependencies, you can use a simple list of strings.
 
-```yaml
-dependencies:
-  runtime:
-    - native:openssl
-    - npm:typescript
-    - zoi:some-zoi-package
-  build:
-    - native:make
+```lua
+dependencies({
+  runtime = { "native:openssl", "npm:typescript", "zoi:some-zoi-package" },
+  build = { "native:make" }
+})
 ```
 
 ### Advanced Dependency Object
 
-For more complex scenarios involving optional or selectable dependencies, use the object format.
+For more complex scenarios involving optional or selectable dependencies, use nested tables.
 
-```yaml
-dependencies:
-  runtime:
-    required:
-      - zoi:core-utils
-    options:
-      - name: "GUI Toolkit"
-        desc: "Choose a GUI provider for the application"
-        all: false # 'false' means the user must choose one. 'true' allows multiple selections.
-        depends:
-          - native:qt6:Recommended for KDE Plasma
-          - native:gtk4:Recommended for GNOME
-    optional:
-      - zoi:extra-utils:handy extras
-  build:
-    required:
-      - zoi:build-utils
+```lua
+dependencies({
+  runtime = {
+    required = { "zoi:core-utils" },
+    options = {
+      {
+        name = "GUI Toolkit",
+        desc = "Choose a GUI provider for the application",
+        all = false, -- false means the user must choose one. true allows multiple selections.
+        depends = {
+          "native:qt6:Recommended for KDE Plasma",
+          "native:gtk4:Recommended for GNOME"
+        }
+      }
+    },
+    optional = { "zoi:extra-utils:handy extras" }
+  },
+  build = {
+    required = { "zoi:build-utils" }
+  }
+})
 ```
 
 - `required`: A list of dependencies that are always installed.
 - `options`: A list of groups where the user is prompted to choose one or more dependencies.
 - `optional`: A list of dependencies that the user is prompted to install.
 
-### Templating and Versioning
+### Dynamic Versions with Lua
 
-- **`{version}` Placeholder:** You can reference the parent package's version using `{version}` in a dependency string. It will be replaced before parsing. Example: `zoi:my-plugin@{version}`.
-- **`versions` Map:** If your package defines a `versions` map (e.g. `stable: 1.4.3`), Zoi resolves the concrete version and substitutes it for `{version}` in all dependency strings. This is useful for keeping dependency versions in lockstep.
+In `.pkg.lua` files, you can use Lua's string concatenation and the global `PKG` table to create dynamic version dependencies. The `PKG` table contains the fields defined in your `package{}` block.
 
-Example with templating:
+Example with dynamic versions:
 
-```yaml
-name: my-app
-versions:
-  stable: 1.4.3
-  beta: 1.5.0-beta.2
-dependencies:
-  runtime:
-    required:
-      - zoi:my-plugin@{version}
-      - npm:my-lib@{version}
+```lua
+package({
+  name = "my-app",
+  versions = {
+    stable = "1.4.3",
+    beta = "1.5.0-beta.2"
+  }
+  -- Zoi will resolve the default version (e.g. from the 'stable' channel)
+  -- and place it in PKG.version before processing dependencies.
+})
+
+dependencies({
+  runtime = {
+    required = {
+      "zoi:my-plugin@" .. PKG.version,
+      "npm:my-lib@" .. PKG.version
+    }
+  }
+})
 ```
 
 ### Version Pinning Notes
@@ -102,7 +111,7 @@ When pinning is not supported, Zoi will install the latest version available fro
 
 ## Supported managers
 
-Below is a comprehensive list of all supported dependency managers, their target platforms or ecosystems, and an example of how to use them in your `pkg.yaml`.
+Below is a comprehensive list of all supported dependency managers, their target platforms or ecosystems, and an example of how to use them in your `.pkg.lua`.
 
 | Manager          | Platform / Ecosystem | Example Usage                         |
 | ---------------- | -------------------- | ------------------------------------- |
@@ -169,23 +178,6 @@ When a dependency uses the `zoi:` manager, Zoi resolves the referenced package d
 - If the dependency package declares `conflicts`, Zoi checks whether any listed packages are installed.
 
 If conflicts are detected, Zoi displays the conflicts and prompts whether to continue before proceeding with installation.
-
-## Reproducible Installs with Sharable Manifests
-
-When you install a package that has selectable (`options`) or `optional` dependencies, Zoi will prompt you to make choices. To ensure that you can reinstall the same package with the exact same dependency choices later (for example, on another machine or in a CI/CD pipeline), Zoi automatically generates a sharable manifest file.
-
-- **Location:** After a successful installation, a file named `<package_name>.manifest.yaml` is created inside the package's installation directory (`~/.zoi/pkgs/store/<package_name>/`).
-- **Content:** This file records the package's name, version, and repository, along with the specific choices you made for its dependencies (`chosen_options` and `chosen_optionals`).
-
-### Usage
-
-You can copy this `.manifest.yaml` file into your project's repository. To perform a non-interactive, reproducible installation, simply run:
-
-```sh
-zoi install /path/to/your/package.manifest.yaml
-```
-
-Zoi will read the manifest, resolve the base package, and install it along with the exact set of dependencies specified in the file, skipping any interactive prompts.
 
 ## Troubleshooting
 

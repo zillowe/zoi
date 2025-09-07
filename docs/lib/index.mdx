@@ -40,13 +40,13 @@ pub fn install(
 
 ### Parameters
 
-| Parameter | Type            | Description                                                                                                                                                   |
-| --------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `source`  | `&str`          | The identifier for the package to install. This can be a package name (e.g. `"hello"`), a path to a local `.pkg.yaml` file, or a URL to a package definition. |
-| `mode`    | `InstallMode`   | An enum that specifies the preferred installation method.                                                                                                     |
-| `force`   | `bool`          | If `true`, Zoi will reinstall the package even if it is already present.                                                                                      |
-| `reason`  | `InstallReason` | An enum indicating why the package is being installed. This is typically `Direct` for user-initiated installs.                                                |
-| `yes`     | `bool`          | If `true`, Zoi will automatically answer "yes" to any confirmation prompts, making the installation non-interactive.                                          |
+| Parameter | Type            | Description                                                                                                                                                  |
+| --------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `source`  | `&str`          | The identifier for the package to install. This can be a package name (e.g. `"hello"`), a path to a local `.pkg.lua` file, or a URL to a package definition. |
+| `mode`    | `InstallMode`   | An enum that specifies the preferred installation method.                                                                                                    |
+| `force`   | `bool`          | If `true`, Zoi will reinstall the package even if it is already present.                                                                                     |
+| `reason`  | `InstallReason` | An enum indicating why the package is being installed. This is typically `Direct` for user-initiated installs.                                               |
+| `yes`     | `bool`          | If `true`, Zoi will automatically answer "yes" to any confirmation prompts, making the installation non-interactive.                                         |
 
 ### The `InstallMode` Enum
 

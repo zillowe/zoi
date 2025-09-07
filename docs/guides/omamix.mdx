@@ -24,52 +24,59 @@ It's best practice to store your custom Zoi packages in your own Git repository.
 1.  Create a new repository on GitHub, GitLab, or another provider.
 2.  Clone it to your local machine.
 
-You will add your custom `pkg.yaml` files to this repository.
+You will add your custom `.pkg.lua` files to this repository.
 
 ## Step 2: Define Your Core Tools with a Collection
 
 First, let's define the list of software you want to install.
 
-Create a file in your new repository named `dev-environment.pkg.yaml`:
+Create a file in your new repository named `dev-environment.pkg.lua`:
 
-```yaml
-# dev-environment.pkg.yaml
-# yaml-language-server: $schema=https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/pkg.schema.json
-name: dev-environment
-repo: user/personal
-type: collection
-version: "1.0"
-description: "My personal development environment, including all my essential tools."
-tags: [collection, dev-environment]
-maintainer:
-  name: "Your Name"
-  email: "your.email@example.com"
+```lua
+-- dev-environment.pkg.lua
+package({
+  name = "dev-environment",
+  repo = "user/personal",
+  type = "collection",
+  version = "1.0",
+  description = "My personal development environment, including all my essential tools.",
+  tags = { "collection", "dev-environment" },
+  maintainer = {
+    name = "Your Name",
+    email = "your.email@example.com"
+  }
+})
 
-dependencies:
-  runtime:
-    required:
-      # Core Utilities
-      - native:git
-      - native:ghostty
-
-      # Web Browsers (choose one)
-      options:
-        - name: "Web Browser"
-          desc: "Select a web browser to install."
-          all: false
-          depends:
-            - brew-cask:google-chrome:Google Chrome for macOS
-            - scoop:googlechrome:Google Chrome for Windows
-            - yay:google-chrome:Google Chrome for Arch Linux
-
-    optional:
-      # Programming Languages
-      - zoi:node:For JavaScript/TypeScript development
-      - native:go:For Go development
-      - native:rust:For Rust development
-
-      # Other Tools
-      - native:docker:For containerization
+dependencies({
+  runtime = {
+    required = {
+      -- Core Utilities
+      "native:git",
+      "native:ghostty"
+    },
+    -- Web Browsers (choose one)
+    options = {
+      {
+        name = "Web Browser",
+        desc = "Select a web browser to install.",
+        all = false,
+        depends = {
+          "brew-cask:google-chrome:Google Chrome for macOS",
+          "scoop:googlechrome:Google Chrome for Windows",
+          "yay:google-chrome:Google Chrome for Arch Linux"
+        }
+      }
+    },
+    optional = {
+      -- Programming Languages
+      "zoi:node:For JavaScript/TypeScript development",
+      "native:go:For Go development",
+      "native:rust:For Rust development",
+      -- Other Tools
+      "native:docker:For containerization"
+    }
+  }
+})
 ```
 
 ### Key Concepts in this Collection:
@@ -85,39 +92,43 @@ dependencies:
 
 Next, let's create a package to manage your configuration files (dotfiles). This example assumes you store your dotfiles in a separate Git repository.
 
-Create a file named `my-dotfiles.pkg.yaml` in your setup repository:
+Create a file named `my-dotfiles.pkg.lua` in your setup repository:
 
-```yaml
-# my-dotfiles.pkg.yaml
-# yaml-language-server: $schema=https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/pkg.schema.json
-name: my-dotfiles
-repo: user/personal
-type: config
-version: "1.0"
-description: "My personal dotfiles and shell configuration."
-tags: [config, dotfiles]
-maintainer:
-  name: "Your Name"
-  email: "your.email@example.com"
-
-# This config package depends on the tools it configures.
-dependencies:
-  runtime:
-    required:
-      - native:starship
-      - native:zsh
-      - native:neovim
-
-config:
-  - platforms: ["linux", "macos"]
-    install:
-      - "git clone https://github.com/YourUsername/dotfiles.git ~/.dotfiles"
-      - "ln -s ~/.dotfiles/.config/starship.toml ~/.config/starship.toml"
-      - "ln -s ~/.dotfiles/.config/nvim ~/.config/nvim"
-    uninstall:
-      - "rm ~/.config/starship.toml"
-      - "rm -rf ~/.config/nvim"
-      - "rm -rf ~/.dotfiles"
+```lua
+-- my-dotfiles.pkg.lua
+package({
+  name = "my-dotfiles",
+  repo = "user/personal",
+  type = "config",
+  version = "1.0",
+  description = "My personal dotfiles and shell configuration.",
+  tags = { "config", "dotfiles" },
+  maintainer = {
+    name = "Your Name",
+    email = "your.email@example.com"
+  },
+  -- This config package depends on the tools it configures.
+  dependencies = {
+    runtime = {
+      required = { "native:starship", "native:zsh", "native:neovim" }
+    }
+  },
+  config = {
+    {
+      platforms = { "linux", "macos" },
+      install = {
+        "git clone https://github.com/YourUsername/dotfiles.git ~/.dotfiles",
+        "ln -s ~/.dotfiles/.config/starship.toml ~/.config/starship.toml",
+        "ln -s ~/.dotfiles/.config/nvim ~/.config/nvim"
+      },
+      uninstall = {
+        "rm ~/.config/starship.toml",
+        "rm -rf ~/.config/nvim",
+        "rm -rf ~/.dotfiles"
+      }
+    }
+  }
+})
 ```
 
 ### Key Concepts in this Config:
@@ -129,21 +140,24 @@ config:
 
 ## Step 4: Link Your Config to Your Collection
 
-Now, update your `dev-environment.pkg.yaml` to include your new dotfiles config as a dependency:
+Now, update your `dev-environment.pkg.lua` to include your new dotfiles config as a dependency:
 
-```yaml
-# dev-environment.pkg.yaml
-# ... (keep the rest of the file the same)
+```lua
+-- dev-environment.pkg.lua
+-- ... (keep the rest of the file the same)
 
-dependencies:
-  runtime:
-    required:
-      # Your dotfiles config
-      - zoi:@user/personal/my-dotfiles
+dependencies({
+  runtime = {
+    required = {
+      -- Your dotfiles config
+      "zoi:@user/personal/my-dotfiles",
 
-      # Core Utilities
-      - native:git
-      # ... (rest of your dependencies)
+      -- Core Utilities
+      "native:git",
+      -- ... (rest of your dependencies)
+    }
+  }
+})
 ```
 
 By adding `zoi:@user/personal/my-dotfiles` (adjust the repo path as needed), you ensure that your dotfiles are installed automatically whenever you install your `dev-environment` collection.

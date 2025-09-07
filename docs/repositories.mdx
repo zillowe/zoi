@@ -41,9 +41,9 @@ zoi sync set https://my-custom-registry.com/zoi-pkgs.git
 
 ### Automatic Fallback
 
-To improve reliability, Zoi can automatically try syncing from official mirrors if your configured primary registry is unavailable.
+To improve reliability, Zoi can automatically try syncing from the mirrors defined in the `mirrors-git` list of the `repo.yaml` file if your configured primary registry is unavailable.
 
-- **`zoi sync --fallback`**: If the sync fails, Zoi will attempt to use the other official mirrors (GitLab, GitHub, Codeberg) one by one until it succeeds.
+- **`zoi sync --fallback`**: If the sync fails, Zoi will attempt to use the mirrors one by one until it succeeds.
 - **`zoi update`**: The `update` command uses this fallback mechanism by default to ensure that package updates are as reliable as possible.
 
 ## Repository tiers
@@ -112,13 +112,68 @@ zoi install @core/linux/amd64/nvidia-driver
 To install a package from your custom git repository, use the `@git/` prefix, followed by the repository name and the package name.
 
 ```sh
-zoi install @git/zoi-repo/package
+# Install from the root of 'my-zoi-repo'
+zoi install @git/my-zoi-repo/package
+
+# Install from a nested directory within the git repo
+zoi install @git/my-zoi-repo/path/to/package
 ```
 
-You can install from nested repository also
+For creating packages, see [Creating Packages](/docs/zds/zoi/creating-packages).
+
+For publishing packages, see [Publishing Packages](/docs/zds/zoi/publishing-packages).
+
+## Nel Package Registry
+
+All packages from the official `core`, `main`, `extra`, and `community` repositories are browsable and searchable on the [Nel Registry](https://nel.zillowe.qzz.io). This provides a convenient way to discover new packages and view their details online.
+way to discover new packages and view their details online.
+|
+| `zoi repo git rm <repo>` | Remove a cloned git repository directory. |
+
+### Examples
 
 ```sh
-zoi install @git/zoi-repo/path/to/package
+# Add a repository interactively
+zoi repo add
+
+# Add official repositories by name
+zoi repo add core
+zoi repo add main
+zoi repo add community
+
+# Add by git URL (cloned under ~/.zoi/pkgs/git/ and used via @git/<repo>/<pkg>)
+zoi repo add https://github.com/YourOrg/my-zoi-repo.git
+
+# Remove and list
+zoi repo rm community
+zoi repo list
+zoi repo list all
+zoi repo git ls
+zoi repo git rm my-zoi-repo
+```
+
+## Installing from a specific repository
+
+- Top-level repository:
+
+```sh
+zoi install @community/htop
+```
+
+- Nested repository path (e.g. platform-specific):
+
+```sh
+zoi install @core/linux/amd64/nvidia-driver
+```
+
+To install a package from your custom git repository, use the `@git/` prefix, followed by the repository name and the package name.
+
+```sh
+# Install from the root of 'my-zoi-repo'
+zoi install @git/my-zoi-repo/package
+
+# Install from a nested directory within the git repo
+zoi install @git/my-zoi-repo/path/to/package
 ```
 
 For creating packages, see [Creating Packages](/docs/zds/zoi/creating-packages).

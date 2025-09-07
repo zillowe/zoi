@@ -18,10 +18,10 @@ Extensions are ideal for:
 
 ## Creating an Extension
 
-An extension is defined in a `pkg.yaml` file, just like any other package. The key differences are setting the `type` to `extension` and defining an `extension` block.
+An extension is defined in a `.pkg.lua` file, just like any other package. The key differences are setting the `type` to `extension` and defining an `extension` block.
 
 ```yaml
-# my-repo-extension.pkg.yaml
+# my-repo-extension.pkg.lua
 name: my-repo-extension
 repo: community
 type: extension
@@ -54,7 +54,7 @@ Zoi supports four types of changes that can be made by an extension.
 
 #### `repo-git`
 
-Clones a Git repository containing `pkg.yaml` files into Zoi's local package sources.
+Clones a Git repository containing `.pkg.lua` files into Zoi's local package sources.
 
 - **Purpose:** To add a custom, third-party package repository.
 - **`add` Value:** A valid Git repository URL (e.g. `https://github.com/user/my-zoi-repo.git`).
@@ -97,8 +97,7 @@ Here are a couple of examples demonstrating different use cases for extensions.
 This example combines multiple changes to configure Zoi for a corporate environment.
 
 ```yaml
-# extensions/corp-bundle.pkg.yaml
-# yaml-language-server: $schema=https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/pkg.schema.json
+# extensions/corp-bundle.pkg.lua
 name: corp-bundle
 repo: community
 type: extension
@@ -129,35 +128,42 @@ extension:
 
 This example shows how to create a "project starter" that provides a ready-to-use `zoi.yaml` for a new Rust project.
 
-```yaml
-# my-rust-starter.pkg.yaml
-name: my-rust-starter
-repo: community
-type: extension
-version: "1.0"
-description: "A starter zoi.yaml for a Rust project."
-maintainer:
-  name: "Your Name"
-  email: "your.email@example.com"
-
-extension:
-  type: zoi
-  changes:
-    - type: project
-      add: |
-        name: my-rust-project
-        packages:
-          - name: rust
-            check: "rustc --version"
-          - name: cargo-watch
-            check: "cargo watch --version"
-        commands:
-          - cmd: run
-            run: cargo run
-          - cmd: test
-            run: cargo test
-          - cmd: watch
-            run: cargo watch -x run
+```lua
+-- my-rust-starter.pkg.lua
+package({
+  name = "my-rust-starter",
+  repo = "community",
+  type = "extension",
+  version = "1.0",
+  description = "A starter zoi.yaml for a Rust project.",
+  maintainer = {
+    name = "Your Name",
+    email = "your.email@example.com"
+  },
+  extension = {
+    type = "zoi",
+    changes = {
+      {
+        type = "project",
+        add = [[
+name: my-rust-project
+packages:
+  - name: rust
+    check: "rustc --version"
+  - name: cargo-watch
+    check: "cargo watch --version"
+commands:
+  - cmd: run
+    run: cargo run
+  - cmd: test
+    run: cargo test
+  - cmd: watch
+    run: cargo watch -x run
+]]
+      }
+    }
+  }
+})
 ```
 
 A user can now navigate to an empty project directory, run `zoi extension add my-rust-starter`, and immediately have a working `zoi.yaml` to start developing.
@@ -175,7 +181,7 @@ To add an extension and apply its changes, use `zoi extension add`:
 zoi extension add corp-bundle
 
 # Add an extension from a local file for testing
-zoi extension add ./corp-bundle.pkg.yaml
+zoi extension add ./corp-bundle.pkg.lua
 ```
 
 When you add an extension, Zoi:
@@ -203,4 +209,5 @@ This ensures that the configuration is returned to the state it was in before th
 
 ## Publishing Extensions
 
-Extensions are published and shared just like any other Zoi package: by adding their `pkg.yaml` file to a package repository. Learn more in the [Publishing Packages guide](/docs/zds/zoi/publishing-packages).
+Extensions are published and shared just like any other Zoi package: by adding their `.pkg.lua` file to a package repository. Learn more in the [Publishing Packages guide](/docs/zds/zoi/publishing-packages).
+ile to a package repository. Learn more in the [Publishing Packages guide](/docs/zds/zoi/publishing-packages).

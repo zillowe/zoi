@@ -3,24 +3,28 @@ title: Supported Archives for Compressed Binaries
 description: Archive formats supported by Zoi's `com_binary` installation method.
 ---
 
-Zoi supports installing compressed binary releases via the `com_binary` method in `pkg.yaml`. The following archive formats are supported across install, exec, and upgrade paths:
+Zoi supports installing compressed binary releases via the `com_binary` method in `.pkg.lua`. The following archive formats are supported across install, exec, and upgrade paths:
 
 - zip
 - tar.gz (gz)
 - tar.xz (xz)
 - tar.zst (zstd)
 
-## Usage in `pkg.yaml`
+## Usage in `.pkg.lua`
 
-```yaml
-installation:
-  - type: com_binary
-    url: "https://example.com/app-v{version}-{platform}.{platformComExt}"
-    platforms: ["linux-amd64", "macos-amd64", "windows-amd64"]
-    platformComExt:
-      linux: "tar.zst" # or tar.gz / tar.xz
-      macos: "tar.zst" # or tar.gz / tar.xz
-      windows: "zip"
+```lua
+install({
+  {
+    type = "com_binary",
+    url = "https://example.com/app-v{version}-{platform}.{platformComExt}",
+    platforms = {"linux-amd64", "macos-amd64", "windows-amd64"},
+    platformComExt = {
+      linux = "tar.zst", -- or tar.gz / tar.xz
+      macos = "tar.zst", -- or tar.gz / tar.xz
+      windows = "zip"
+    }
+  }
+})
 ```
 
 Zoi will download, verify, and extract the archive, then locate the executable:
