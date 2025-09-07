@@ -580,16 +580,12 @@ fn run_script_install_commands(pkg: &types::Package) -> Result<(), Box<dyn Error
             "Running script...".bold()
         );
         let platform = utils::get_platform()?;
-        let version = pkg.version.as_deref().unwrap_or("");
+        let _version = pkg.version.as_deref().unwrap_or("");
 
         for hook in hooks {
             if utils::is_platform_compatible(&platform, &hook.platforms) {
                 for cmd_str in &hook.install {
-                    let final_cmd = cmd_str
-                        .replace("{version}", version)
-                        .replace("{name}", &pkg.name);
-
-                    println!("Executing: {}", final_cmd.cyan());
+                    println!("Executing: {}", cmd_str.cyan());
 
                     let pb = ProgressBar::new_spinner();
                     pb.set_style(
@@ -597,15 +593,12 @@ fn run_script_install_commands(pkg: &types::Package) -> Result<(), Box<dyn Error
                             .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
                             .template("{spinner:.green} {msg}")?,
                     );
-                    pb.set_message(format!("Running: {}", final_cmd));
+                    pb.set_message(format!("Running: {}", cmd_str));
 
                     let output = if cfg!(target_os = "windows") {
-                        Command::new("pwsh")
-                            .arg("-Command")
-                            .arg(&final_cmd)
-                            .output()?
+                        Command::new("pwsh").arg("-Command").arg(cmd_str).output()?
                     } else {
-                        Command::new("bash").arg("-c").arg(&final_cmd).output()?
+                        Command::new("bash").arg("-c").arg(cmd_str).output()?
                     };
 
                     pb.finish_and_clear();
@@ -613,7 +606,7 @@ fn run_script_install_commands(pkg: &types::Package) -> Result<(), Box<dyn Error
                     if !output.status.success() {
                         io::stdout().write_all(&output.stdout)?;
                         io::stderr().write_all(&output.stderr)?;
-                        return Err(format!("Script command failed: '{}'", final_cmd).into());
+                        return Err(format!("Script command failed: '{}'", cmd_str).into());
                     } else {
                         let stdout = String::from_utf8_lossy(&output.stdout);
                         if !stdout.trim().is_empty() {
@@ -695,16 +688,11 @@ fn run_post_install_hooks(pkg: &types::Package) -> Result<(), Box<dyn Error>> {
     if let Some(hooks) = &pkg.post_install {
         println!("\n{}", "Running post-installation commands...".bold());
         let platform = utils::get_platform()?;
-        let version = pkg.version.as_deref().unwrap_or("");
 
         for hook in hooks {
             if utils::is_platform_compatible(&platform, &hook.platforms) {
                 for cmd_str in &hook.commands {
-                    let final_cmd = cmd_str
-                        .replace("{version}", version)
-                        .replace("{name}", &pkg.name);
-
-                    println!("Executing: {}", final_cmd.cyan());
+                    println!("Executing: {}", cmd_str.cyan());
 
                     let pb = ProgressBar::new_spinner();
                     pb.set_style(
@@ -712,15 +700,12 @@ fn run_post_install_hooks(pkg: &types::Package) -> Result<(), Box<dyn Error>> {
                             .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"])
                             .template("{spinner:.green} {msg}")?,
                     );
-                    pb.set_message(format!("Running: {}", final_cmd));
+                    pb.set_message(format!("Running: {}", cmd_str));
 
                     let output = if cfg!(target_os = "windows") {
-                        Command::new("pwsh")
-                            .arg("-Command")
-                            .arg(&final_cmd)
-                            .output()?
+                        Command::new("pwsh").arg("-Command").arg(cmd_str).output()?
                     } else {
-                        Command::new("bash").arg("-c").arg(&final_cmd).output()?
+                        Command::new("bash").arg("-c").arg(cmd_str).output()?
                     };
 
                     pb.finish_and_clear();
@@ -728,7 +713,7 @@ fn run_post_install_hooks(pkg: &types::Package) -> Result<(), Box<dyn Error>> {
                     if !output.status.success() {
                         io::stdout().write_all(&output.stdout)?;
                         io::stderr().write_all(&output.stderr)?;
-                        return Err(format!("Post-install command failed: '{}'", final_cmd).into());
+                        return Err(format!("Post-install command failed: '{}'", cmd_str).into());
                     } else {
                         let stdout = String::from_utf8_lossy(&output.stdout);
                         if !stdout.trim().is_empty() {
@@ -858,17 +843,9 @@ fn find_method<'a>(
 }
 
 fn install_manual_if_available(pkg: &types::Package) -> Result<(), Box<dyn Error>> {
-    if let Some(man_url_template) = &pkg.man {
-        let version = pkg.version.as_deref().ok_or("Version not resolved")?;
-        let mut url = man_url_template.replace("{version}", version);
-        url = url.replace("{name}", &pkg.name);
-        if let Ok(platform) = utils::get_platform() {
-            url = url.replace("{platform}", &platform);
-        }
-        url = url.replace("{git}", &pkg.git);
-
+    if let Some(url) = &pkg.man {
         println!("Downloading manual from {}...", url);
-        let content = reqwest::blocking::get(&url)?.bytes()?;
+        let content = reqwest::blocking::get(url)?.bytes()?;
 
         let store_dir = home::home_dir()
             .ok_or("No home dir")?
@@ -910,17 +887,13 @@ fn get_filename_from_url(url: &str) -> &str {
 fn get_expected_checksum(
     checksums: &types::Checksums,
     file_to_verify: &str,
-    pkg: &types::Package,
-    platform: &str,
+    _pkg: &types::Package,
+    _platform: &str,
 ) -> Result<Option<(String, String)>, Box<dyn Error>> {
     match checksums {
         types::Checksums::Url(url) => {
-            let mut url = url.replace("{version}", pkg.version.as_deref().unwrap_or(""));
-            url = url.replace("{name}", &pkg.name);
-            url = url.replace("{platform}", platform);
-
             println!("Downloading checksums from: {}", url.cyan());
-            let response = reqwest::blocking::get(&url)?.text()?;
+            let response = reqwest::blocking::get(url)?.text()?;
             for line in response.lines() {
                 let parts: Vec<&str> = line.split_whitespace().collect();
                 if parts.len() == 2 && parts[1] == file_to_verify {
@@ -937,13 +910,7 @@ fn get_expected_checksum(
             items,
         } => {
             for item in items {
-                let mut file_pattern = item
-                    .file
-                    .replace("{version}", pkg.version.as_deref().unwrap_or(""));
-                file_pattern = file_pattern.replace("{name}", &pkg.name);
-                file_pattern = file_pattern.replace("{platform}", platform);
-
-                if file_pattern == file_to_verify {
+                if item.file == file_to_verify {
                     if item.checksum.starts_with("http") {
                         println!("Downloading checksum from: {}", item.checksum.cyan());
                         let response = reqwest::blocking::get(&item.checksum)?.text()?;
@@ -1052,16 +1019,7 @@ fn verify_signatures(
     file_to_verify: &str,
 ) -> Result<(), Box<dyn Error>> {
     if let Some(sigs) = &method.sigs {
-        let sig_info = sigs.iter().find(|s| {
-            let platform = utils::get_platform().unwrap_or_default();
-            let version = pkg.version.as_deref().unwrap_or("");
-            let file_pattern = s
-                .file
-                .replace("{version}", version)
-                .replace("{name}", &pkg.name)
-                .replace("{platform}", &platform);
-            file_pattern == file_to_verify
-        });
+        let sig_info = sigs.iter().find(|s| s.file == file_to_verify);
 
         if let Some(sig_info) = sig_info {
             println!("Verifying signature for {}...", file_to_verify);
@@ -1152,13 +1110,7 @@ fn handle_com_binary_install(
         .map(|s| s.as_str())
         .unwrap_or(if os == "windows" { "zip" } else { "tar.zst" });
 
-    let mut url = method
-        .url
-        .replace("{version}", pkg.version.as_deref().unwrap_or(""));
-    url = url.replace("{name}", &pkg.name);
-    url = url.replace("{platform}", &platform);
-    url = url.replace("{git}", &pkg.git);
-    url = url.replace("{platformComExt}", com_ext);
+    let url = &method.url;
 
     if url.starts_with("http://") {
         println!(
@@ -1173,7 +1125,7 @@ fn handle_com_binary_install(
     let mut attempt = 0u32;
     let response = loop {
         attempt += 1;
-        match client.get(&url).send() {
+        match client.get(url).send() {
             Ok(resp) => break resp,
             Err(e) => {
                 if attempt < 3 {
@@ -1217,7 +1169,7 @@ fn handle_com_binary_install(
     }
     pb.finish_with_message("Download complete.");
 
-    let file_to_verify = get_filename_from_url(&url);
+    let file_to_verify = get_filename_from_url(url);
     verify_checksum(&downloaded_bytes, method, pkg, file_to_verify)?;
     verify_signatures(&downloaded_bytes, method, pkg, file_to_verify)?;
 
@@ -1388,7 +1340,6 @@ fn handle_binary_install(
     method: &types::InstallationMethod,
     pkg: &types::Package,
 ) -> Result<(), Box<dyn Error>> {
-    let platform = utils::get_platform()?;
     let os = std::env::consts::OS;
 
     let mut binary_type = None;
@@ -1406,16 +1357,13 @@ fn handle_binary_install(
         if pkg.package_type == types::PackageType::Library {
             return Err("DMG/MSI/AppImage installers are not supported for libraries.".into());
         }
-        let mut url = method
-            .url
-            .replace("{version}", pkg.version.as_deref().unwrap_or(""));
-        url = url.replace("{name}", &pkg.name);
-        url = url.replace("{platform}", &platform);
-        url = url.replace("{git}", &pkg.git);
-
-        if !url.ends_with(ext) {
-            url = format!("{}.{}", url, ext);
-        }
+        let url_string;
+        let url: &str = if !method.url.ends_with(ext) {
+            url_string = format!("{}.{}", &method.url, ext);
+            &url_string
+        } else {
+            &method.url
+        };
 
         if url.starts_with("http://") {
             println!(
@@ -1430,7 +1378,7 @@ fn handle_binary_install(
         let mut attempt = 0u32;
         let response = loop {
             attempt += 1;
-            match client.get(&url).send() {
+            match client.get(url).send() {
                 Ok(resp) => break resp,
                 Err(e) => {
                     if attempt < 3 {
@@ -1479,14 +1427,14 @@ fn handle_binary_install(
         }
         pb.finish_with_message("Download complete.");
 
-        let file_to_verify = get_filename_from_url(&url);
+        let file_to_verify = get_filename_from_url(url);
         verify_checksum(&downloaded_bytes, method, pkg, file_to_verify)?;
         verify_signatures(&downloaded_bytes, method, pkg, file_to_verify)?;
 
         let temp_dir = Builder::new()
             .prefix(&format!("zoi-install-{}", pkg.name))
             .tempdir()?;
-        let file_name = get_filename_from_url(&url);
+        let file_name = get_filename_from_url(url);
         let temp_file_path = temp_dir.path().join(file_name);
         fs::write(&temp_file_path, downloaded_bytes)?;
 
@@ -1610,12 +1558,7 @@ fn handle_binary_install(
         return Ok(());
     }
 
-    let mut url = method
-        .url
-        .replace("{version}", pkg.version.as_deref().unwrap_or(""));
-    url = url.replace("{name}", &pkg.name);
-    url = url.replace("{platform}", &platform);
-    url = url.replace("{git}", &pkg.git);
+    let url = &method.url;
 
     if url.starts_with("http://") {
         println!(
@@ -1630,7 +1573,7 @@ fn handle_binary_install(
     let mut attempt = 0u32;
     let response = loop {
         attempt += 1;
-        match client.get(&url).send() {
+        match client.get(url).send() {
             Ok(resp) => break resp,
             Err(e) => {
                 if attempt < 3 {
@@ -1679,14 +1622,14 @@ fn handle_binary_install(
     }
     pb.finish_with_message("Download complete.");
 
-    let file_to_verify = get_filename_from_url(&url);
+    let file_to_verify = get_filename_from_url(url);
     verify_checksum(&downloaded_bytes, method, pkg, file_to_verify)?;
     verify_signatures(&downloaded_bytes, method, pkg, file_to_verify)?;
 
     if pkg.package_type == types::PackageType::Library {
         let lib_dir = library::get_lib_dir(pkg.scope)?;
         fs::create_dir_all(&lib_dir)?;
-        let dest_path = lib_dir.join(get_filename_from_url(&url));
+        let dest_path = lib_dir.join(get_filename_from_url(url));
         fs::write(&dest_path, downloaded_bytes)?;
 
         #[cfg(unix)]
@@ -1765,11 +1708,7 @@ fn handle_script_install(
         "sh"
     };
 
-    let resolved_url = method
-        .url
-        .replace("{platformExt}", platform_ext)
-        .replace("{website}", pkg.website.as_deref().unwrap_or_default())
-        .replace("{git}", &pkg.git);
+    let resolved_url = &method.url;
 
     let temp_dir = Builder::new().prefix("zoi-script-install").tempdir()?;
     let script_filename = format!("install.{platform_ext}");
@@ -1783,13 +1722,13 @@ fn handle_script_install(
         );
     }
     println!("Downloading script from: {}", resolved_url.cyan());
-    let response = reqwest::blocking::get(&resolved_url)?;
+    let response = reqwest::blocking::get(resolved_url)?;
     if !response.status().is_success() {
         return Err(format!("Failed to download script: HTTP {}", response.status()).into());
     }
     let script_bytes = response.bytes()?.to_vec();
 
-    let file_to_verify = get_filename_from_url(&resolved_url);
+    let file_to_verify = get_filename_from_url(resolved_url);
     verify_checksum(&script_bytes, method, pkg, file_to_verify)?;
     verify_signatures(&script_bytes, method, pkg, file_to_verify)?;
 
@@ -1851,8 +1790,8 @@ fn handle_source_install(
     let bin_path = store_path.join("bin");
     fs::create_dir_all(&bin_path)?;
 
-    let repo_url = method.url.replace("{git}", &pkg.git);
-    println!("Cloning from {repo_url}...");
+    let repo_url = &method.url;
+    println!("Cloning from {}...", repo_url);
 
     let pb = ProgressBar::new_spinner();
     pb.set_style(
@@ -1864,7 +1803,7 @@ fn handle_source_install(
 
     let output = std::process::Command::new("git")
         .arg("clone")
-        .arg(&repo_url)
+        .arg(repo_url)
         .arg(&git_path)
         .output()?;
     pb.finish_and_clear();
@@ -1880,9 +1819,7 @@ fn handle_source_install(
             "Invalid source method: both 'tag' and 'branch' specified. Use only one.".into(),
         );
     }
-    if let Some(tag_tmpl) = &method.tag {
-        let version = pkg.version.as_deref().unwrap_or("");
-        let tag = tag_tmpl.replace("{version}", version);
+    if let Some(tag) = &method.tag {
         println!("Checking out tag {}...", tag.cyan());
         let out = std::process::Command::new("git")
             .current_dir(&git_path)
@@ -1894,14 +1831,12 @@ fn handle_source_install(
             io::stderr().write_all(&out.stderr)?;
             return Err(format!("Failed to checkout tag '{}'", tag).into());
         }
-    } else if let Some(branch_tmpl) = &method.branch {
-        let version = pkg.version.as_deref().unwrap_or("");
-        let branch = branch_tmpl.replace("{version}", version);
+    } else if let Some(branch) = &method.branch {
         println!("Checking out branch {}...", branch.cyan());
         let out = std::process::Command::new("git")
             .current_dir(&git_path)
             .arg("checkout")
-            .arg(&branch)
+            .arg(branch)
             .output()?;
         if !out.status.success() {
             io::stdout().write_all(&out.stdout)?;
@@ -1912,7 +1847,7 @@ fn handle_source_install(
 
     if let Some(commands) = &method.commands {
         for cmd_str in commands {
-            let final_cmd = cmd_str.replace("{store}", bin_path.to_str().unwrap());
+            let final_cmd = cmd_str.replace("{prefix}", store_path.to_str().unwrap());
             println!("Executing: {}", final_cmd.cyan());
 
             let pb_cmd = ProgressBar::new_spinner();

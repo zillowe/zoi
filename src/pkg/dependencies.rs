@@ -983,7 +983,7 @@ fn install_dependency(
 pub fn resolve_and_install_required(
     deps: &[String],
     parent_pkg_name: &str,
-    parent_version: &str,
+    _parent_version: &str,
     scope: types::Scope,
     yes: bool,
     all_optional: bool,
@@ -995,9 +995,8 @@ pub fn resolve_and_install_required(
     }
 
     println!("{}", "Resolving required dependencies...".bold());
-    for dep_str_template in deps {
-        let dep_str = dep_str_template.replace("{version}", parent_version);
-        let dependency = parse_dependency_string(&dep_str)?;
+    for dep_str in deps {
+        let dependency = parse_dependency_string(dep_str)?;
         install_dependency(
             &dependency,
             parent_pkg_name,
@@ -1015,7 +1014,7 @@ pub fn resolve_and_install_required(
 pub fn resolve_and_install_required_options(
     option_groups: &[types::DependencyOptionGroup],
     parent_pkg_name: &str,
-    parent_version: &str,
+    _parent_version: &str,
     scope: types::Scope,
     yes: bool,
     all_optional: bool,
@@ -1035,14 +1034,8 @@ pub fn resolve_and_install_required_options(
             group.desc.italic()
         );
 
-        let dep_strs: Vec<String> = group
-            .depends
-            .iter()
-            .map(|dep_str_template| dep_str_template.replace("{version}", parent_version))
-            .collect();
-
         let mut parsed_deps = Vec::new();
-        for (i, dep_str) in dep_strs.iter().enumerate() {
+        for (i, dep_str) in group.depends.iter().enumerate() {
             let dep = parse_dependency_string(dep_str)?;
             let desc = dep.description.unwrap_or("No description");
             let mut dep_display = format!("{}:{}", dep.manager, dep.package);
@@ -1174,7 +1167,7 @@ pub fn resolve_and_install_required_options(
 pub fn resolve_and_install_optional(
     deps: &[String],
     parent_pkg_name: &str,
-    parent_version: &str,
+    _parent_version: &str,
     scope: types::Scope,
     yes: bool,
     all_optional: bool,
@@ -1187,11 +1180,6 @@ pub fn resolve_and_install_optional(
         return Ok(());
     }
 
-    let dep_strs: Vec<String> = deps
-        .iter()
-        .map(|dep_str_template| dep_str_template.replace("{version}", parent_version))
-        .collect();
-
     let type_str = dep_type.map(|s| format!("{} ", s)).unwrap_or_default();
 
     if yes || all_optional {
@@ -1199,7 +1187,7 @@ pub fn resolve_and_install_optional(
             "{}",
             format!("Installing all optional {} dependencies...", type_str).bold()
         );
-        for dep_str in &dep_strs {
+        for dep_str in deps {
             chosen_optionals.push(dep_str.clone());
             let dependency = parse_dependency_string(dep_str)?;
             install_dependency(
@@ -1220,7 +1208,7 @@ pub fn resolve_and_install_optional(
         format!("This package has optional {} dependencies:", type_str).bold()
     );
     let mut parsed_deps = Vec::new();
-    for (i, dep_str) in dep_strs.iter().enumerate() {
+    for (i, dep_str) in deps.iter().enumerate() {
         let dep = parse_dependency_string(dep_str)?;
         let desc = dep.description.unwrap_or("No description");
         let mut dep_display = format!("{}:{}", dep.manager, dep.package);

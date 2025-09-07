@@ -1,5 +1,4 @@
 use crate::pkg::resolve;
-use crate::utils;
 use anyhow::anyhow;
 use crossterm::{
     event::{
@@ -45,17 +44,10 @@ pub fn run(
     upstream: bool,
     raw: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let (pkg, version, _) = resolve::resolve_package_and_version(package_name)?;
+    let (pkg, _version, _) = resolve::resolve_package_and_version(package_name)?;
 
     let fetch_from_upstream = || -> Result<String, Box<dyn std::error::Error>> {
-        if let Some(man_url) = pkg.man.as_ref() {
-            let mut url = man_url.replace("{version}", &version);
-            url = url.replace("{name}", &pkg.name);
-            if let Ok(platform) = utils::get_platform() {
-                url = url.replace("{platform}", &platform);
-            }
-            url = url.replace("{git}", &pkg.git);
-
+        if let Some(url) = pkg.man.as_ref() {
             if !raw {
                 println!("Fetching manual from {}...", url);
             }

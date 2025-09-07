@@ -135,8 +135,6 @@ fn run_pkg_create(
 
     let create_cmd = method
         .app_create
-        .replace("{version}", pkg.version.as_deref().unwrap_or(""))
-        .replace("{name}", &pkg.name)
         .replace("${appName}", app_name)
         .replace("{appName}", app_name);
 
@@ -163,8 +161,6 @@ fn run_pkg_create(
     if let Some(extra_cmds) = &method.commands {
         for cmd in extra_cmds {
             let final_cmd = cmd
-                .replace("{version}", pkg.version.as_deref().unwrap_or(""))
-                .replace("{name}", &pkg.name)
                 .replace("${appName}", app_name)
                 .replace("{appName}", app_name);
 

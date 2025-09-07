@@ -23,17 +23,13 @@ fn get_filename_from_url(url: &str) -> &str {
 fn get_expected_checksum(
     checksums: &types::Checksums,
     file_to_verify: &str,
-    pkg: &types::Package,
-    platform: &str,
+    _pkg: &types::Package,
+    _platform: &str,
 ) -> Result<Option<String>, Box<dyn Error>> {
     match checksums {
         types::Checksums::Url(url) => {
-            let mut url = url.replace("{version}", pkg.version.as_deref().unwrap_or(""));
-            url = url.replace("{name}", &pkg.name);
-            url = url.replace("{platform}", platform);
-
             println!("Downloading checksums from: {}", url.cyan());
-            let response = reqwest::blocking::get(&url)?.text()?;
+            let response = reqwest::blocking::get(url)?.text()?;
             for line in response.lines() {
                 let parts: Vec<&str> = line.split_whitespace().collect();
                 if parts.len() == 2 && parts[1] == file_to_verify {
@@ -50,13 +46,7 @@ fn get_expected_checksum(
             items,
         } => {
             for item in items {
-                let mut file_pattern = item
-                    .file
-                    .replace("{version}", pkg.version.as_deref().unwrap_or(""));
-                file_pattern = file_pattern.replace("{name}", &pkg.name);
-                file_pattern = file_pattern.replace("{platform}", platform);
-
-                if file_pattern == file_to_verify {
+                if item.file == file_to_verify {
                     if item.checksum.starts_with("http") {
                         println!("Downloading checksum from: {}", item.checksum.cyan());
                         let response = reqwest::blocking::get(&item.checksum)?.text()?;
@@ -149,11 +139,7 @@ fn ensure_binary_is_cached(pkg: &types::Package) -> Result<PathBuf, Box<dyn Erro
     if let Some(method) = pkg.installation.iter().find(|m| {
         m.install_type == "binary" && utils::is_platform_compatible(&platform, &m.platforms)
     }) {
-        let mut url = method
-            .url
-            .replace("{version}", pkg.version.as_deref().unwrap_or(""));
-        url = url.replace("{name}", &pkg.name);
-        url = url.replace("{platform}", &platform);
+        let url = &method.url;
 
         if url.starts_with("http://") {
             println!(
@@ -164,7 +150,7 @@ fn ensure_binary_is_cached(pkg: &types::Package) -> Result<PathBuf, Box<dyn Erro
         }
         println!("Downloading from: {url}");
 
-        let response = reqwest::blocking::get(&url)?;
+        let response = reqwest::blocking::get(url)?;
         if !response.status().is_success() {
             return Err(format!("Failed to download binary: HTTP {}", response.status()).into());
         }
@@ -188,7 +174,7 @@ fn ensure_binary_is_cached(pkg: &types::Package) -> Result<PathBuf, Box<dyn Erro
         }
         pb.finish_with_message("Download complete.");
 
-        let file_to_verify = get_filename_from_url(&url);
+        let file_to_verify = get_filename_from_url(url);
         verify_checksum(&downloaded_bytes, method, pkg, file_to_verify)?;
 
         let mut dest = File::create(&bin_path)?;
@@ -214,12 +200,7 @@ fn ensure_binary_is_cached(pkg: &types::Package) -> Result<PathBuf, Box<dyn Erro
             .map(|s| s.as_str())
             .unwrap_or(if os == "windows" { "zip" } else { "tar.zst" });
 
-        let mut url = method
-            .url
-            .replace("{version}", pkg.version.as_deref().unwrap_or(""));
-        url = url.replace("{name}", &pkg.name);
-        url = url.replace("{platform}", &platform);
-        url = url.replace("{platformComExt}", com_ext);
+        let url = &method.url;
 
         if url.starts_with("http://") {
             println!(
@@ -234,7 +215,7 @@ fn ensure_binary_is_cached(pkg: &types::Package) -> Result<PathBuf, Box<dyn Erro
         let mut attempt = 0u32;
         let response = loop {
             attempt += 1;
-            match client.get(&url).send() {
+            match client.get(url).send() {
                 Ok(resp) => break resp,
                 Err(e) => {
                     if attempt < 3 {
@@ -278,7 +259,7 @@ fn ensure_binary_is_cached(pkg: &types::Package) -> Result<PathBuf, Box<dyn Erro
         }
         pb.finish_with_message("Download complete.");
 
-        let file_to_verify = get_filename_from_url(&url);
+        let file_to_verify = get_filename_from_url(url);
         verify_checksum(&downloaded_bytes, method, pkg, file_to_verify)?;
 
         let temp_dir = Builder::new().prefix("zoi-exec-ext").tempdir()?;
