@@ -93,7 +93,7 @@ pub fn add_key_from_url(url: &str, name: &str) -> Result<(), Box<dyn Error>> {
 
     let response = reqwest::blocking::get(url)?;
     if !response.status().is_success() {
-        return Err(format!("Failed to fetch key from url (HTTP {}).", response.status()).into());
+        return Err(format!("Failed to fetch key from url (HTTP {})", response.status()).into());
     }
 
     let key_bytes = response.bytes()?.to_vec();
@@ -155,6 +155,84 @@ pub fn list_keys() -> Result<(), Box<dyn Error>> {
     println!("{}", "--- Stored PGP Keys ---".yellow().bold());
 
     for key_info in keys {
+        println!();
+        println!("{}: {}", "Name".cyan(), key_info.name.bold());
+        println!(
+            "  {}: {}",
+            "Fingerprint".cyan(),
+            key_info.cert.fingerprint()
+        );
+        for userid_amalgamation in key_info.cert.userids() {
+            let userid_packet = userid_amalgamation.userid();
+            let name = userid_packet
+                .name()
+                .ok()
+                .flatten()
+                .unwrap_or("[invalid name]");
+            let email = userid_packet.email().ok().flatten().unwrap_or("");
+
+            if !email.is_empty() {
+                println!("  {}: {} <{}>", "UserID".cyan(), name, email);
+            } else {
+                println!("  {}: {}", "UserID".cyan(), name);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+pub fn search_keys(term: &str) -> Result<(), Box<dyn Error>> {
+    let keys = get_all_local_keys_info()?;
+    let term_lower = term.to_lowercase();
+    let mut found_keys = Vec::new();
+
+    for key_info in keys {
+        let fingerprint = key_info.cert.fingerprint().to_string().to_lowercase();
+        let name = key_info.name.to_lowercase();
+
+        let mut is_match = name.contains(&term_lower) || fingerprint.contains(&term_lower);
+
+        if !is_match {
+            for userid_amalgamation in key_info.cert.userids() {
+                let userid_packet = userid_amalgamation.userid();
+                let uid_name = userid_packet
+                    .name()
+                    .ok()
+                    .flatten()
+                    .unwrap_or("")
+                    .to_lowercase();
+                let uid_email = userid_packet
+                    .email()
+                    .ok()
+                    .flatten()
+                    .unwrap_or("")
+                    .to_lowercase();
+
+                if uid_name.contains(&term_lower) || uid_email.contains(&term_lower) {
+                    is_match = true;
+                    break;
+                }
+            }
+        }
+
+        if is_match {
+            found_keys.push(key_info);
+        }
+    }
+
+    if found_keys.is_empty() {
+        println!("\n{}", "No keys found matching your query.".yellow());
+        return Ok(());
+    }
+
+    println!(
+        "--- Found {} key(s) matching '{}' ---",
+        found_keys.len(),
+        term.blue().bold()
+    );
+
+    for key_info in found_keys {
         println!();
         println!("{}: {}", "Name".cyan(), key_info.name.bold());
         println!(

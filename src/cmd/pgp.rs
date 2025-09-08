@@ -18,6 +18,8 @@ pub enum PgpCommands {
     Remove(RemoveKey),
     /// List all imported PGP keys
     List,
+    /// Search for a PGP key by user ID or fingerprint
+    Search(SearchKey),
 }
 
 #[derive(Parser, Debug)]
@@ -59,6 +61,13 @@ pub struct RemoveKey {
     pub fingerprint: Option<String>,
 }
 
+#[derive(Parser, Debug)]
+pub struct SearchKey {
+    /// The user ID (name, email) or fingerprint to search for
+    #[arg(required = true)]
+    pub term: String,
+}
+
 pub fn run(args: PgpCommand) -> Result<(), Box<dyn Error>> {
     match args.command {
         PgpCommands::Add(add_args) => {
@@ -92,6 +101,9 @@ pub fn run(args: PgpCommand) -> Result<(), Box<dyn Error>> {
         }
         PgpCommands::List => {
             pkg::pgp::list_keys()?;
+        }
+        PgpCommands::Search(search_args) => {
+            pkg::pgp::search_keys(&search_args.term)?;
         }
     }
     Ok(())
