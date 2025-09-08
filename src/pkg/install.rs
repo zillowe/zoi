@@ -932,14 +932,9 @@ fn run_default_flow(
                 .replace("{os}", os)
                 .replace("{arch}", arch)
                 .replace("{version}", pkg.version.as_deref().unwrap_or(""))
-                .replace("{package}", &pkg.repo);
+                .replace("{repo}", &pkg.repo);
 
-            let archive_filename = format!(
-                "{}-{}-{}.pkg.tar.zst",
-                pkg.name,
-                pkg.version.as_deref().unwrap_or(""),
-                platform
-            );
+            let archive_filename = format!("{}.pkg.tar.zst", pkg.name);
             let final_url = format!("{}/{}", url_dir.trim_end_matches('/'), archive_filename);
 
             println!(
