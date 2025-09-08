@@ -1,4 +1,4 @@
-use super::structs::FinalMetadata;
+use super::structs::{FinalMetadata, PlatformAsset};
 use crate::{pkg, utils};
 use colored::*;
 use flate2::read::GzDecoder;
@@ -253,31 +253,22 @@ fn verify_signature(
     Ok(())
 }
 
-pub fn run(meta_file: &Path) -> Result<(), Box<dyn Error>> {
-    println!("Building package from: {}", meta_file.display());
+fn build_for_platform(
+    meta_file: &Path,
+    metadata: &FinalMetadata,
+    asset: &PlatformAsset,
+) -> Result<(), Box<dyn Error>> {
+    println!("--- Building for platform: {} ---", asset.platform.cyan());
 
-    let content = fs::read_to_string(meta_file)?;
-    let metadata: FinalMetadata = serde_json::from_str(&content)?;
-
-    let current_platform = utils::get_platform()?;
-    println!("Building for current platform: {}", current_platform);
-
-    let asset = metadata
-        .installation
-        .assets
-        .iter()
-        .find(|a| a.platform == current_platform)
-        .ok_or_else(|| format!("No asset found for platform '{}'", current_platform))?;
-
-    println!("Found asset for platform: {}", asset.url);
-
-    let build_dir = Builder::new().prefix("zoi-build-").tempdir()?;
+    let build_dir = Builder::new()
+        .prefix(&format!("zoi-build-{}-", asset.platform))
+        .tempdir()?;
     println!("Using build directory: {}", build_dir.path().display());
 
     let pb = ProgressBar::new(0).with_style(
         ProgressStyle::default_bar()
             .template(
-                "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})",
+                "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})"
             )?
             .progress_chars("#>-"),
     );
@@ -294,7 +285,7 @@ pub fn run(meta_file: &Path) -> Result<(), Box<dyn Error>> {
     }
 
     if let Some(signature_url) = &asset.signature_url {
-        verify_signature(&downloaded_data, signature_url, &metadata)?;
+        verify_signature(&downloaded_data, signature_url, metadata)?;
     } else {
         println!(
             "{}",
@@ -373,6 +364,86 @@ pub fn run(meta_file: &Path) -> Result<(), Box<dyn Error>> {
         "{}",
         format!("Successfully built package: {}", output_path.display()).green()
     );
+
+    Ok(())
+}
+
+pub fn run(meta_file: &Path, platforms: &[String]) -> Result<(), Box<dyn Error>> {
+    println!("Building package from: {}", meta_file.display());
+
+    let content = fs::read_to_string(meta_file)?;
+    let metadata: FinalMetadata = serde_json::from_str(&content)?;
+
+    let available_platforms: Vec<String> = metadata
+        .installation
+        .assets
+        .iter()
+        .map(|a| a.platform.clone())
+        .collect();
+
+    let mut target_platforms = std::collections::HashSet::new();
+
+    if platforms.contains(&"all".to_string()) {
+        for p in available_platforms {
+            target_platforms.insert(p);
+        }
+    } else {
+        for p_req in platforms {
+            if p_req == "current" {
+                target_platforms.insert(utils::get_platform()?);
+                continue;
+            }
+            let mut found = false;
+            for ap in &available_platforms {
+                if ap.contains(p_req) {
+                    target_platforms.insert(ap.clone());
+                    found = true;
+                }
+            }
+            if !found {
+                println!(
+                    "{}",
+                    format!(
+                        "Warning: platform request '{}' did not match any available platforms.",
+                        p_req
+                    )
+                    .yellow()
+                );
+            }
+        }
+    }
+
+    if target_platforms.is_empty() {
+        return Err("No platforms selected or available to build.".into());
+    }
+
+    println!(
+        "Will build for the following platforms: {}",
+        target_platforms
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(", ")
+            .cyan()
+    );
+
+    for platform in target_platforms {
+        let asset = metadata
+            .installation
+            .assets
+            .iter()
+            .find(|a| a.platform == platform)
+            .ok_or_else(|| format!("No asset found for platform '{}'", platform))?;
+
+        if let Err(e) = build_for_platform(meta_file, &metadata, asset) {
+            eprintln!(
+                "{}: Failed to build for platform {}: {}",
+                "Error".red().bold(),
+                platform.red(),
+                e
+            );
+        }
+    }
 
     Ok(())
 }

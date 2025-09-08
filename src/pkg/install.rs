@@ -882,7 +882,8 @@ fn try_meta_build_install(
     }
     println!("'meta' step successful.");
 
-    if let Err(e) = crate::pkg::package::build::run(&meta_path) {
+    let current_platform = utils::get_platform()?;
+    if let Err(e) = crate::pkg::package::build::run(&meta_path, &[current_platform]) {
         return Err(format!("'build' step failed: {}", e).into());
     }
     let platform = utils::get_platform()?;
