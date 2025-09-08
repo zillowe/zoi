@@ -82,10 +82,13 @@ fn run_list_installed(
             continue;
         }
 
+        let mut parts = pkg.repo.splitn(2, '/');
+        let repo_display = parts.next().unwrap_or(&pkg.repo);
+
         table.add_row(vec![
             pkg.name,
             pkg.version,
-            pkg.repo,
+            repo_display.to_string(),
             format!("{:?}", pkg.package_type),
         ]);
         found_packages = true;
@@ -141,11 +144,15 @@ fn run_list_all(
         };
         let version =
             crate::pkg::resolve::get_default_version(&pkg).unwrap_or_else(|_| "N/A".to_string());
+
+        let mut parts = pkg.repo.splitn(2, '/');
+        let repo_display = parts.next().unwrap_or(&pkg.repo);
+
         table.add_row(vec![
             status.to_string(),
             pkg.name,
             version,
-            pkg.repo,
+            repo_display.to_string(),
             format!("{:?}", pkg.package_type),
         ]);
     }

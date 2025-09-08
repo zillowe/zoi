@@ -51,12 +51,7 @@ fn print_beautiful(pkg: &crate::pkg::types::Package, installed_manifest: Option<
     if !pkg.git.is_empty() {
         println!("Git Repo: {}", pkg.git.cyan().underline());
     }
-    println!(
-        "
-{}
-",
-        pkg.description
-    );
+    println!("{}", pkg.description);
 
     if let Some(manifest) = installed_manifest {
         println!(
@@ -137,11 +132,7 @@ fn print_beautiful(pkg: &crate::pkg::types::Package, installed_manifest: Option<
     }
 
     if pkg.package_type == crate::pkg::types::PackageType::Package {
-        println!(
-            "
-{}:",
-            "Available installation methods".bold()
-        );
+        println!("{}:", "Available installation methods".bold());
         for method in &pkg.installation {
             let type_str = &method.install_type;
             let display_type = match type_str.as_str() {
@@ -229,11 +220,7 @@ fn print_beautiful(pkg: &crate::pkg::types::Package, installed_manifest: Option<
     }
 
     if let Some(deps) = &pkg.dependencies {
-        println!(
-            "
-{}:",
-            "Dependencies".bold()
-        );
+        println!("{}:", "Dependencies".bold());
 
         if let Some(build) = &deps.build {
             println!("  {}:", "Build".bold());

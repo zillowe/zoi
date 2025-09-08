@@ -127,6 +127,10 @@ pub fn run(
 
                 let version = crate::pkg::resolve::get_default_version(&pkg)
                     .unwrap_or_else(|_| "N/A".to_string());
+
+                let mut parts = pkg.repo.splitn(2, '/');
+                let repo_display = parts.next().unwrap_or(&pkg.repo);
+
                 let tags_display = if pkg.tags.is_empty() {
                     String::from("")
                 } else {
@@ -138,7 +142,13 @@ pub fn run(
                         tags.join(", ")
                     }
                 };
-                table.add_row(vec![pkg.name, version, pkg.repo, tags_display, desc]);
+                table.add_row(vec![
+                    pkg.name,
+                    version,
+                    repo_display.to_string(),
+                    tags_display,
+                    desc,
+                ]);
             }
 
             print_with_pager(&table.to_string())?;
