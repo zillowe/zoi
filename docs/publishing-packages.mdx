@@ -32,27 +32,27 @@ You can contribute by opening a **Merge/Pull Request** to either repository, or 
 3.  **Choose the Right Directory:**
     As discussed in the [creating packages guide](/docs/zds/zoi/creating-packages), you should almost always add new packages to the `community` directory.
 
-    You can also create nested directories to better organize packages. For example, you could place a Linux-specific editor in `community/editors/linux/my-editor.pkg.lua`. The `repo` field in your package file should then be `community/editors/linux`.
+    You can also create nested directories to better organize packages. For example, you could place a Linux-specific editor in `community/editors/linux/my-editor/my-editor.pkg.lua`. The `repo` field in your package file should then be `community/editors/linux`.
 
 4.  **Add Your Package File:**
-    Copy your `my-package.pkg.lua` file into the `community/` directory.
+    Copy your `my-package.pkg.lua` file into the `community/my-package/` directory.
 
     ```sh
-    cp /path/to/my-package.pkg.lua community/
+    cp /path/to/my-package.pkg.lua community/my-package/
     ```
 
     For a nested repository, create the directory structure and place your file inside:
 
     ```sh
-    mkdir -p community/editors/linux
-    cp /path/to/my-editor.pkg.lua community/editors/linux/
+    mkdir -p community/editors/linux/my-editor
+    cp /path/to/my-editor.pkg.lua community/editors/linux/my-editor/
     ```
 
 5.  **Commit and Push:**
     Commit your new package file to your forked repository.
 
     ```sh
-    git add community/my-package.pkg.lua
+    git add community/my-package/my-package.pkg.lua
     git commit -m "feat(community): add my-package v1.2.3"
     git push origin main
     ```
@@ -60,7 +60,7 @@ You can contribute by opening a **Merge/Pull Request** to either repository, or 
     For a nested package, your commit might look like this:
 
     ```sh
-    git add community/editors/linux/my-editor.pkg.lua
+    git add community/editors/linux/my-editor/my-editor.pkg.lua
     git commit -m "feat(community): add my-editor v1.0.0"
     git push origin main
     ```
@@ -159,7 +159,7 @@ For advanced use cases, such as creating a corporate mirror or a completely sepa
     ├── main/
     │   └── ...
     └── community/
-        └── my-package.pkg.lua
+        └── my-package/my-package.pkg.lua
     ```
 
 ### Step 2: Point Zoi to Your Registry

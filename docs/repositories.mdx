@@ -126,60 +126,39 @@ For publishing packages, see [Publishing Packages](/docs/zds/zoi/publishing-pack
 ## Nel Package Registry
 
 All packages from the official `core`, `main`, `extra`, and `community` repositories are browsable and searchable on the [Nel Registry](https://nel.zillowe.qzz.io). This provides a convenient way to discover new packages and view their details online.
-way to discover new packages and view their details online.
-|
-| `zoi repo git rm <repo>` | Remove a cloned git repository directory. |
 
-### Examples
+## The `repo.yaml` file
 
-```sh
-# Add a repository interactively
-zoi repo add
+A Zoi package registry is defined by a `repo.yaml` file at its root. This file contains metadata about the repository, such as its name, description, and the URLs for its git repository and pre-built packages.
 
-# Add official repositories by name
-zoi repo add core
-zoi repo add main
-zoi repo add community
+Here are the fields available in `repo.yaml`:
 
-# Add by git URL (cloned under ~/.zoi/pkgs/git/ and used via @git/<repo>/<pkg>)
-zoi repo add https://github.com/YourOrg/my-zoi-repo.git
+| Field         | Type     | Description                                                                                                                                      |
+| ------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `name`        | `string` | The name of the repository.                                                                                                                      |
+| `description` | `string` | A short description of the repository.                                                                                                           |
+| `repo-git`    | `string` | The primary git URL for the package database. This is where Zoi will clone the repository from.                                                  |
+| `mirrors-git` | `list`   | (Optional) A list of fallback git URLs to use if the primary `repo-git` fails. Zoi will try them in order.                                       |
+| `repo-pkg`    | `string` | (Optional) The URL template for a pre-built package registry. Zoi will try to download pre-built packages from here before building from source. |
+| `mirrors-pkg` | `list`   | (Optional) A list of fallback URLs for the pre-built package registry.                                                                           |
 
-# Remove and list
-zoi repo rm community
-zoi repo list
-zoi repo list all
-zoi repo git ls
-zoi repo git rm my-zoi-repo
+The `repo-pkg` and `mirrors-pkg` URLs can contain the following placeholders, which Zoi will replace at runtime:
+
+- `{os}`: The operating system (e.g. `linux`, `macos`, `windows`).
+- `{arch}`: The CPU architecture (e.g. `amd64`, `arm64`).
+- `{version}`: The version of the package.
+- `{package}`: The name of the package.
+
+### Example
+
+```yaml
+name: Zoi repo
+description: The official Zoi package repository.
+repo-git: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi-Pkgs.git
+mirrors-git:
+  - https://github.com/Zillowe/Zoi-Pkgs.git
+  - https://codeberg.org/Zillowe/Zoi-Pkgs.git
+repo-pkg: https://zoi.zillowe.qzz.io/pkgs/{os}/{arch}/{version}/{package}
+mirrors-pkg:
+  - https://zoi.zilo.qzz.io/pkgs/{os}/{arch}/{version}/{package}
 ```
-
-## Installing from a specific repository
-
-- Top-level repository:
-
-```sh
-zoi install @community/htop
-```
-
-- Nested repository path (e.g. platform-specific):
-
-```sh
-zoi install @core/linux/amd64/nvidia-driver
-```
-
-To install a package from your custom git repository, use the `@git/` prefix, followed by the repository name and the package name.
-
-```sh
-# Install from the root of 'my-zoi-repo'
-zoi install @git/my-zoi-repo/package
-
-# Install from a nested directory within the git repo
-zoi install @git/my-zoi-repo/path/to/package
-```
-
-For creating packages, see [Creating Packages](/docs/zds/zoi/creating-packages).
-
-For publishing packages, see [Publishing Packages](/docs/zds/zoi/publishing-packages).
-
-## Nel Package Registry
-
-All packages from the official `core`, `main`, `extra`, and `community` repositories are browsable and searchable on the [Nel Registry](https://nel.zillowe.qzz.io). This provides a convenient way to discover new packages and view their details online.

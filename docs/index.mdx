@@ -26,7 +26,6 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
 - **Repository-Based:** Use official, community, or your own private/public Git-based repositories.
 - **Secure & Verifiable:** Verifies package integrity and authenticity with checksums and GPG signatures. Manage keys with `zoi pgp`.
 - **Versatile Package Types:** Supports standard packages, collections, services, configs, app templates, extensions, libraries, and inline scripts.
-- **Interactive Package Creation:** Use `zoi make` to interactively create new package definitions.
 - **Local Package Development:** A dedicated `zoi package` command set (`meta`, `build`, `install`) to streamline creating and testing packages locally.
 - **Efficient Self-Updates:** Uses patch-based updates (`bsdiff`) for smaller and faster upgrades.
 - **Advanced CLI Tools:**
@@ -339,7 +338,6 @@ Zoi supports different types of packages, defined in the `.pkg.lua` file.
 Packages for Zoi are defined using `.pkg.lua` files. These are Lua scripts that define package metadata and installation logic, allowing for highly dynamic and flexible package definitions.
 
 - **Dynamic & Flexible:** Use Lua scripting to define dynamic URLs, platform-specific logic, and complex installation steps.
-- **Interactive Creation:** Use `zoi make` to interactively create a package definition file.
 - **Comprehensive Examples:** For a deep dive into creating packages, see the [Creating Packages guide](/docs/zds/zoi/creating-packages) and the [Package Examples](/docs/zds/zoi/examples).
 
 ### `.pkg.lua` Structure
