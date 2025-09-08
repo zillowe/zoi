@@ -51,30 +51,6 @@ pub fn run(
 
     let package_source = &repo_file.package;
 
-    let temp_pkg_path = if package_source.starts_with("http") {
-        println!("Package source is a URL: {}", package_source.cyan());
-        let pkg_content = reqwest::blocking::get(package_source)?.text()?;
-        let temp_path = env::temp_dir().join(format!(
-            "zoi-repo-install-{}.pkg.lua",
-            chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
-        ));
-        fs::write(&temp_path, pkg_content)?;
-        temp_path
-    } else {
-        println!(
-            "Package source is a path in the repo: {}",
-            package_source.cyan()
-        );
-        let pkg_url = get_repo_file_url(&provider, &repo_path, package_source)?;
-        let pkg_content = reqwest::blocking::get(&pkg_url)?.text()?;
-        let temp_path = env::temp_dir().join(format!(
-            "zoi-repo-install-{}.pkg.lua",
-            chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
-        ));
-        fs::write(&temp_path, pkg_content)?;
-        temp_path
-    };
-
     let mode = if interactive {
         install::InstallMode::Interactive
     } else {
@@ -89,16 +65,69 @@ pub fn run(
     let mut processed_deps = HashSet::new();
 
     println!("Starting installation of package from git repo...");
-    install::run_installation(
-        temp_pkg_path.to_str().unwrap(),
-        mode,
-        force,
-        types::InstallReason::Direct,
-        yes,
-        all_optional,
-        &mut processed_deps,
-        scope_override,
-    )
+
+    if package_source.starts_with("http") {
+        println!("Package source is a URL: {}", package_source.cyan());
+        let pkg_content = reqwest::blocking::get(package_source)?.text()?;
+        let temp_path = env::temp_dir().join(format!(
+            "zoi-repo-install-{}.pkg.lua",
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
+        ));
+        fs::write(&temp_path, pkg_content)?;
+        let result = install::run_installation(
+            temp_path.to_str().unwrap(),
+            mode,
+            force,
+            types::InstallReason::Direct,
+            yes,
+            all_optional,
+            &mut processed_deps,
+            scope_override,
+        );
+        fs::remove_file(temp_path)?;
+        result
+    } else if package_source.ends_with(".pkg.lua")
+        || (package_source.contains('/') && !package_source.starts_with('@'))
+    {
+        println!(
+            "Package source is a path in the repo: {}",
+            package_source.cyan()
+        );
+        let pkg_url = get_repo_file_url(&provider, &repo_path, package_source)?;
+        let pkg_content = reqwest::blocking::get(&pkg_url)?.text()?;
+        let temp_path = env::temp_dir().join(format!(
+            "zoi-repo-install-{}.pkg.lua",
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
+        ));
+        fs::write(&temp_path, pkg_content)?;
+        let result = install::run_installation(
+            temp_path.to_str().unwrap(),
+            mode,
+            force,
+            types::InstallReason::Direct,
+            yes,
+            all_optional,
+            &mut processed_deps,
+            scope_override,
+        );
+        fs::remove_file(temp_path)?;
+        result
+    } else {
+        println!(
+            "Package source is a package name: {}",
+            package_source.cyan()
+        );
+        install::run_installation(
+            package_source,
+            mode,
+            force,
+            types::InstallReason::Direct,
+            yes,
+            all_optional,
+            &mut processed_deps,
+            scope_override,
+        )
+    }
 }
 
 fn parse_repo_spec(spec: &str) -> Result<(String, String), Box<dyn Error>> {
@@ -124,7 +153,7 @@ fn get_repo_file_url(
     for branch in &branches {
         let url = match provider {
             "github" => format!(
-                "https://raw.githubusercontent.com/{}/{}/{}",
+                "https://raw.githubusercontent.com/{}/refs/heads/{}/{}",
                 repo_path, branch, file_path
             ),
             "gitlab" => format!(
