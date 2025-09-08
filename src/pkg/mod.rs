@@ -14,6 +14,7 @@ pub mod package;
 pub mod pgp;
 pub mod pin;
 pub mod recorder;
+pub mod repo_install;
 pub mod resolve;
 pub mod rollback;
 pub mod script_handler;

@@ -14,12 +14,27 @@ const ZOI_CHOSEN_OPTIONALS_PROPERTY: &str = "zoi:chosen_optionals";
 
 pub fn run(
     sources: &[String],
+    repo: Option<String>,
     force: bool,
     interactive: bool,
     all_optional: bool,
     yes: bool,
     scope: Option<crate::cli::SetupScope>,
 ) {
+    if let Some(repo_spec) = repo {
+        if let Err(e) =
+            crate::pkg::repo_install::run(&repo_spec, force, interactive, all_optional, yes, scope)
+        {
+            eprintln!(
+                "{}: Failed to install from repo '{}': {}",
+                "Error".red().bold(),
+                repo_spec,
+                e
+            );
+            std::process::exit(1);
+        }
+        return;
+    }
     let mode = if interactive {
         install::InstallMode::Interactive
     } else {

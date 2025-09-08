@@ -225,12 +225,15 @@ enum Commands {
         all: bool,
     },
 
-    /// Installs one or more packages from a name, local file, or URL
+    /// Installs one or more packages from a name, local file, URL, or git repository
     #[command(alias = "i")]
     Install {
         /// Package names, local paths, or URLs to .pkg.yaml files
-        #[arg(value_name = "SOURCES", required = true, value_hint = ValueHint::FilePath, value_parser = PkgOrPathParser, hide_possible_values = true)]
+        #[arg(value_name = "SOURCES", value_hint = ValueHint::FilePath, value_parser = PkgOrPathParser, hide_possible_values = true, required_unless_present = "repo")]
         sources: Vec<String>,
+        /// Install from a git repository (e.g. 'Zillowe/Hello', 'gl:Zillowe/Hello')
+        #[arg(long, value_name = "REPO", conflicts_with = "sources")]
+        repo: Option<String>,
         /// Force re-installation even if the package is already installed
         #[arg(long)]
         force: bool,
@@ -615,12 +618,21 @@ pub fn run() {
             }
             Commands::Install {
                 sources,
+                repo,
                 force,
                 interactive,
                 all_optional,
                 scope,
             } => {
-                cmd::install::run(&sources, force, interactive, all_optional, cli.yes, scope);
+                cmd::install::run(
+                    &sources,
+                    repo,
+                    force,
+                    interactive,
+                    all_optional,
+                    cli.yes,
+                    scope,
+                );
                 Ok(())
             }
             Commands::Build { sources, force } => {
