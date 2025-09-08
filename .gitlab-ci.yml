@@ -111,15 +111,17 @@ package:archive:
   before_script:
     - apt-get update -y && apt-get install -y p7zip-full tar zstd bsdiff curl git jq unzip gnupg coreutils
   script:
-    - echo "Aggregating build artifacts..."
-    - echo "Contents of the release directory:"
-    - ls -lR ./build/release/
-    - echo "Importing GPG key..."
-    - echo "$GPG_PRIVATE_KEY_B32" | base32 -d | gpg --batch --import
-    - echo "Running archive script..."
-    - chmod +x ./build/archive.sh
-    - ./build/archive.sh
-    - echo "Archiving complete."
+    - |
+      set -euo pipefail
+      echo "Aggregating build artifacts..."
+      echo "Contents of the release directory:"
+      ls -lR ./build/release/
+      echo "Importing GPG key..."
+      echo "$GPG_PRIVATE_KEY_B32" | base32 -d | gpg --batch --import
+      echo "Running archive script..."
+      chmod +x ./build/archive.sh
+      ./build/archive.sh
+      echo "Archiving complete."
   needs:
     - build:linux
     - build:macos

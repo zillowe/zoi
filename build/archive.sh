@@ -27,7 +27,7 @@ function check_command() {
 function sign_file() {
     local file_to_sign=$1
     echo -e "${CYAN}  -> Signing ${file_to_sign}...${NC}"
-    gpg --armor --detach-sign "$file_to_sign"
+    echo "${GPG_PASSPHRASE_B32}" | base32 -d | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --armor --detach-sign "$file_to_sign"
 }
 
 check_command "7z"
