@@ -95,6 +95,29 @@ zoi repo git ls
 zoi repo git rm my-zoi-repo
 ```
 
+### Direct Git Repository Installation
+
+In addition to adding a git repository to your local configuration with `zoi repo add`, you can install a package directly from a remote git repository using the `--repo` flag with `zoi install`.
+
+```sh
+# Install from a GitHub repository
+zoi install --repo Zillowe/Hello
+
+# Install from a GitLab repository
+zoi install --repo gl:Zillowe/Hello
+
+# Install from a Codeberg repository
+zoi install --repo cb:Zillowe/Hello
+```
+
+This works if the target repository has a `zoi.yaml` file in its root. The `package` field in this file can specify a package name (e.g. `hello`), a path to a `.pkg.lua` file within the repository, or a URL to a `.pkg.lua` file. This provides a quick way to install packages from git repositories without permanently adding them to your configuration.
+
+**Provider Prefixes:**
+
+- `gh:` or `github:` for GitHub (this is the default if no prefix is given).
+- `gl:` or `gitlab:` for GitLab.
+- `cb:` or `codeberg:` for Codeberg.
+
 ## Installing from a specific repository
 
 - Top-level repository:

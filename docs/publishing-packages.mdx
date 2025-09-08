@@ -200,3 +200,30 @@ package({
 ```
 
 Publish this extension (e.g. in a separate git repository that users can add). Users can then run `zoi extension add my-registry-ext` to switch to your registry. This is a clean way to manage the configuration change. For more details, see the [Extensions guide](/docs/zds/zoi/extensions).
+
+## Making a Git Repository Directly Installable
+
+You can make a Git repository directly installable via `zoi install --repo <repo-spec>` by placing a `zoi.yaml` file in its root. This file tells Zoi what package to install from your repository.
+
+**Example `zoi.yaml`:**
+
+```yaml
+# zoi.yaml in the root of your repository
+package: "my-awesome-package"
+```
+
+The `package` field can be:
+
+- A package name (e.g. `my-package` or `@my-repo/my-package`). Zoi will resolve this from the official repositories.
+- A relative path to a `.pkg.lua` file in the repository.
+- A full URL to a raw `.pkg.lua` file.
+
+With this file in place, users can install the package from your repository without adding it first:
+
+```sh
+# Install from GitHub (default)
+zoi install --repo YourUsername/my-zoi-repo
+
+# Install from GitLab
+zoi install --repo gl:YourUsername/my-zoi-repo
+```

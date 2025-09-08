@@ -19,29 +19,19 @@ This release represents a foundational rebuild of the packaging system and a maj
 
 - [x] **Installation Scopes:** Introduce `--scope user` (default, installs to `~/.zoi`) and `--scope system` flags to control package installation locations, enabling better integration for system-level package management.
 
-- [x] **Enhanced Library & API Experience:** Improve the public API and documentation to make Zoi a powerful and ergonomic library for other Rust applications to leverage.
+- [ ] **Enhanced Library & API Experience:** Improve the public API and documentation to make Zoi a powerful and ergonomic library for other Rust applications to leverage.
 
 ### Core Features & Enhancements
 
-- [ ] **Project-Local Packages:** Install packages to a project-specific `.zoi/` directory using a `--local` flag, runnable with `zoi exec`.
-
 - [x] **PGP Key Management (`zoi pgp`):** Introduce a `pgp` command to manage public keys for verifying package signatures.
 
-- [ ] **Package Publishing Workflow (`zoi publish`):** Streamline submitting new packages via the `publish` command, which will auto-generate an issue/PR to the `Zoi-Pkgs` repo.
-
-- [ ] **Install Packages From Git Repos:** Add the ability to install a package directly from a git repository (GitHub, GitLab, Codeberg) without a full clone, using a field in a `zoi.yaml` file to locate the package definition.
+- [x] **Install Packages From Git Repos:** Add the ability to install a package directly from a git repository (GitHub, GitLab, Codeberg) without a full clone, using a field in a `zoi.yaml` file to locate the package definition.
       **Commands:**
 
 ```sh
 $ zoi install --repo Zillowe/Hello # default is GitHub
 $ zoi install --repo gl:Zillowe/Hello # gh: GitHub, gl: GitLab, cb: Codeberg
 ```
-
-- [ ] **Cloud-Native Registries (S3/R2 Support):** Add support for S3-compatible object storage as a package registry backend.
-
-- [ ] **Advanced Platform Selectors:** Enhance the `platforms` field in package definitions to allow for more granular targeting (OS version, kernel, DE, CPU/GPU, etc.).
-
-- [ ] **Improved `zoi make` Command:** Improve the TUI and validation for the interactive package creation tool to support the new Lua format.
 
 - [ ] **Bsdiff Self-Update Improvements:** Fix and stabilize the patch-based self-update mechanism for `zoi upgrade`.
 
@@ -54,6 +44,8 @@ These are features and ideas we are considering for future releases. They are no
 - [ ] **Full Platform Parity:** Achieve full build and package support for all targeted platforms, including Android (Termux).
 - [ ] **Expanded Platform Support:** Add binary and package support for more platforms, starting with Windows (ARM64) and FreeBSD/OpenBSD.
 - [ ] **Managed Components (`zoi component`):** Introduce a new package type for managed, isolated developer tools (e.g. language servers, linters) that are not added to the user's PATH, but are managed by Zoi and can be executed via `zoi component exec` or integrated with other developer tools.
+- [ ] **Advanced Platform Selectors:** Enhance the `platforms` field in package definitions to allow for more granular targeting (OS version, kernel, DE, CPU/GPU, etc.).
+- [ ] **Project-Local Packages:** Install packages to a project-specific `.zoi/` directory using a `--local` flag, runnable with `zoi exec`.
 
 ---
 

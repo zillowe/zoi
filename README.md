@@ -81,21 +81,22 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
 ## ✨ Features
 
 - **Cross-Platform:** Works seamlessly on Linux, macOS, and Windows.
-- **Universal Package Support:** Install packages from various sources: binaries, compressed archives, build from source, or installer scripts.
-- **Extensive Dependency Management:** Integrates with over 40+ package managers (`apt`, `brew`, `cargo`, `npm`, `pip`, `scoop`, etc.) to handle dependencies.
-- **Rich Dependencies:** Packages can define runtime and build dependencies with required, optional, and selectable options groups.
-- **Project Environments:** Easily define and manage project-specific environments and commands using [`zoi.yaml`](https://zillowe.qzz.io/docs/zds/zoi/project-config).
-- **Repository-Based:** Manage packages from official or community repositories. Easily add your own.
-- **Intuitive CLI:** A simple and powerful command-line interface with helpful aliases for a better developer experience.
-- **Versatile Package Types:** Supports standard packages, meta-packages (collections), background services, configuration packages, extensions, libraries, app templates, and script-based installers.
-- **Secure & Verifiable:** Support for checksums and GPG signatures to verify package integrity and authenticity.
-- **Efficient Self-Updates:** Uses patch-based updates (`bsdiff`) for smaller and faster upgrades of Zoi itself.
-- **Tag-based Discovery:** Search by and filter packages using tags for faster discovery.
-- **View Manuals:** Read package manuals directly in your terminal with `zoi man`.
-- **Interactive Package Creation:** Use `zoi make` to interactively create new package definitions.
-- **Library Support:** Use `zoi pkg-config` to get compiler/linker flags for installed libraries.
-- **Use as a Library:** Integrate Zoi's package management features directly into your Rust applications. See the [Library documentation](https://zillowe.qzz.io/docs/zds/zoi/lib) for details.
-- **SBOM & Reproducible Installs:** Automatically records installed packages to an SBOM (`zoi.pkgs.json`) for backup/restore and generates sharable manifest files for reproducible dependency choices.
+- **Dynamic Package Definitions:** Define packages with dynamic Lua scripts (`.pkg.lua`) for maximum flexibility.
+- **Universal Package Support:** Install from binaries, compressed archives, source, or installer scripts.
+- **Extensive Dependency Management:** Integrates with over 40 package managers (`apt`, `brew`, `cargo`, `npm`, `pip`, etc.).
+- **Rich Dependencies:** Define runtime and build dependencies with required, optional, and selectable options.
+- **Project Environments:** Manage project-specific commands and environments with `zoi.yaml`.
+- **Repository-Based:** Use official, community, or your own private/public Git-based repositories.
+- **Secure & Verifiable:** Verifies package integrity and authenticity with checksums and GPG signatures. Manage keys with `zoi pgp`.
+- **Versatile Package Types:** Supports standard packages, collections, services, configs, app templates, extensions, libraries, and inline scripts.
+- **Local Package Development:** A dedicated `zoi package` command set (`meta`, `build`, `install`) to streamline creating and testing packages locally.
+- **Advanced CLI Tools:**
+  - `zoi man`: Read package manuals in the terminal.
+  - `zoi why`: Understand why a package is installed.
+  - `zoi rollback`: Revert a package to its previous version.
+  - `zoi pin`: Pin a package to a specific version.
+  - `zoi exec`: Run a package without installing it.
+- **Library Support:** Use as a Rust library and get compiler/linker flags via `zoi pkg-config`.
 
 ## 🚀 Getting Started
 
