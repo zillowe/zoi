@@ -158,6 +158,26 @@ install({
 			end
 			return bin
 		end)(),
+		files = {
+			{
+				platforms = { "linux", "macos" },
+				files = {
+					{
+						source = "README.md",
+						destination = "/usr/local/share/doc/hello/README.md",
+					},
+				},
+			},
+			{
+				platforms = { "windows" },
+				files = {
+					{
+						source = "README.md",
+						destination = "C:\\ProgramData\\hello\\README.md",
+					},
+				},
+			},
+		},
 	},
 })
 

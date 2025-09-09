@@ -108,6 +108,44 @@ install({
 
 For a full list of installation types (`binary`, `com_binary`, `source`, `script`) and their options, see the [Package Examples](/docs/zds/zoi/examples).
 
+### Copying Additional Files
+
+For `source` and `com_binary` installation types, you can specify additional files or directories to be copied from the build environment (or extracted archive) to the user's system. This is useful for installing things like documentation, shell completions, or other assets that are not part of the main binary.
+
+This is done using the `files` field within an installation method:
+
+```lua
+install({
+  {
+    name = "Build from Source",
+    type = "source",
+    url = "...",
+    build_commands = { "make" },
+    bin_path = "build/my-cli",
+    files = {
+      {
+        platforms = { "linux", "macos" },
+        files = {
+          { source = "man/my-cli.1", destination = "/usr/local/share/man/man1/my-cli.1" },
+          { source = "completions/my-cli.bash", destination = "/usr/share/bash-completion/completions/my-cli" }
+        }
+      },
+      {
+        platforms = { "windows" },
+        files = {
+          { source = "docs/LICENSE", destination = "C:\ProgramData\my-cli\LICENSE" }
+        }
+      }
+    }
+  }
+})
+```
+
+- The `files` field is a list of `FileGroup` tables.
+- Each `FileGroup` has a `platforms` list to specify which OS it applies to.
+- The `files` field inside the group is a list of `FileCopy` tables.
+- Each `FileCopy` has a `source` (relative to the build/archive root) and a `destination` (an absolute path on the user's system). You can use `~/` in the destination to refer to the user's home directory.
+
 ### Security: Checksums and Signatures
 
 It is **highly recommended** to include checksums and GPG signatures to verify downloads.
