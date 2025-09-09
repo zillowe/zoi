@@ -1,30 +1,114 @@
 ---
-title: Library
+title: Library API
 description: How to integrate Zoi's package management features into your own Rust applications.
 ---
+
+import { Card, Cards } from "fumadocs-ui/components/card";
 
 Zoi is not just a command-line tool; it's also a Rust library that you can use to programmatically install and manage packages. This allows you to embed Zoi's powerful package management capabilities directly into your own applications, such as custom development tools, game launchers, or server deployment scripts.
 
 ## Getting Started
 
-To use Zoi as a library, add it as a dependency in your project
+To use Zoi as a library, add it as a dependency in your project:
 
 ```sh
-cargo add zoi-rs
+cargo add zoi
 ```
 
 Or in your `Cargo.toml` file:
 
 ```toml
 [dependencies]
-zoi-rs = { version = "4.2.0-beta-prod" } # subject to change
+zoi = "5.0.0-beta" # subject to change
 ```
 
-The main entry point for all installation logic is the `zoi::install` function.
+## Core Functions
 
-## The `install` Function
+These are the primary functions for managing packages.
 
-This function handles the entire installation process for a given package, including resolving the package source, handling dependencies, and running any necessary installation steps.
+<Cards>
+  <Card
+    title="install"
+    href="#install-function"
+    description="Install a new package."
+  />
+  <Card
+    title="uninstall"
+    href="#uninstall-function"
+    description="Remove an installed package."
+  />
+  <Card
+    title="update"
+    href="#update-function"
+    description="Update an existing package."
+  />
+  <Card
+    title="upgrade"
+    href="#upgrade-function"
+    description="Upgrade the Zoi binary itself."
+  />
+  <Card
+    title="sync"
+    href="#sync-function"
+    description="Synchronize the local package database."
+  />
+  <Card
+    title="autoremove"
+    href="#autoremove-function"
+    description="Remove unused dependencies."
+  />
+</Cards>
+
+## Information & Querying
+
+These functions help you query the state of packages.
+
+<Cards>
+  <Card
+    title="resolve_package"
+    href="#resolve_package-function"
+    description="Get package metadata without installing."
+  />
+  <Card
+    title="is_package_installed"
+    href="#is_package_installed-function"
+    description="Check if a package is installed."
+  />
+  <Card
+    title="get_installed_packages"
+    href="#get_installed_packages-function"
+    description="List all installed packages."
+  />
+  <Card
+    title="get_all_available_packages"
+    href="#get_all_available_packages-function"
+    description="List all packages in the database."
+  />
+</Cards>
+
+## Pinning
+
+These functions allow you to manage package version pinning.
+
+<Cards>
+  <Card
+    title="pin"
+    href="#pin-function"
+    description="Pin a package to a specific version."
+  />
+  <Card title="unpin" href="#unpin-function" description="Unpin a package." />
+  <Card
+    title="get_pinned_packages"
+    href="#get_pinned_packages-function"
+    description="List all pinned packages."
+  />
+</Cards>
+
+---
+
+## `install` function
+
+This function handles the entire installation process for a given package.
 
 ### Signature
 
@@ -34,42 +118,35 @@ pub fn install(
     mode: InstallMode,
     force: bool,
     reason: InstallReason,
-    yes: bool,
+    non_interactive: bool,
 ) -> Result<(), Box<dyn std::error::Error>>
 ```
 
 ### Parameters
 
-| Parameter | Type            | Description                                                                                                                                                  |
-| --------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `source`  | `&str`          | The identifier for the package to install. This can be a package name (e.g. `"hello"`), a path to a local `.pkg.lua` file, or a URL to a package definition. |
-| `mode`    | `InstallMode`   | An enum that specifies the preferred installation method.                                                                                                    |
-| `force`   | `bool`          | If `true`, Zoi will reinstall the package even if it is already present.                                                                                     |
-| `reason`  | `InstallReason` | An enum indicating why the package is being installed. This is typically `Direct` for user-initiated installs.                                               |
-| `yes`     | `bool`          | If `true`, Zoi will automatically answer "yes" to any confirmation prompts, making the installation non-interactive.                                         |
+| Parameter         | Type            | Description                                                                                                                                                  |
+| ----------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `source`          | `&str`          | The identifier for the package to install. This can be a package name (e.g. `"hello"`), a path to a local `.pkg.lua` file, or a URL to a package definition. |
+| `mode`            | `InstallMode`   | An enum that specifies the preferred installation method.                                                                                                    |
+| `force`           | `bool`          | If `true`, Zoi will reinstall the package even if it is already present.                                                                                     |
+| `reason`          | `InstallReason` | An enum indicating why the package is being installed. This is typically `Direct` for user-initiated installs.                                               |
+| `non_interactive` | `bool`          | If `true`, Zoi will automatically answer "yes" to any confirmation prompts, making the installation non-interactive.                                         |
 
-### The `InstallMode` Enum
+---
 
-This enum controls which installation method Zoi will attempt to use.
+## `uninstall` function
 
-| Variant        | Description                                                                                                                                                         |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PreferBinary` | **(Default)** Zoi will first attempt to download a pre-compiled binary. If one is not available for the target platform, it will fall back to building from source. |
-| `ForceSource`  | Zoi will always build the package from source, even if a pre-compiled binary is available.                                                                          |
-| `Interactive`  | If multiple installation methods are available, Zoi will prompt the user to choose which one to use.                                                                |
+Removes a package that was previously installed by Zoi.
 
-### The `InstallReason` Enum
+### Signature
 
-This enum is used to track why a package was installed, which helps with managing dependencies.
+```rust
+pub fn uninstall(package_name: &str) -> Result<(), Box<dyn std::error::Error>>
+```
 
-| Variant      | Description                                                                 |
-| ------------ | --------------------------------------------------------------------------- |
-| `Direct`     | The package was installed directly by a user's request.                     |
-| `Dependency` | The package was installed automatically as a dependency of another package. |
+---
 
-For complete, runnable examples, please see the [Library Examples page](/docs/zds/zoi/lib/examples).
-
-## The `update` Function
+## `update` function
 
 This function checks if a package has a new version available and updates it.
 
@@ -78,23 +155,133 @@ This function checks if a package has a new version available and updates it.
 ```rust
 pub fn update(
     source: &str,
-    yes: bool,
+    non_interactive: bool,
 ) -> Result<UpdateResult, Box<dyn std::error::Error>>
 ```
 
-### Parameters
+---
 
-| Parameter | Type   | Description                                                                                                    |
-| --------- | ------ | -------------------------------------------------------------------------------------------------------------- |
-| `source`  | `&str` | The identifier for the package to update (e.g. `"hello"`).                                                     |
-| `yes`     | `bool` | If `true`, Zoi will automatically answer "yes" to any confirmation prompts, making the update non-interactive. |
+## `upgrade` function
 
-### The `UpdateResult` Enum
+Upgrades the Zoi binary itself to the latest version available on GitLab.
 
-The `update` function returns an `UpdateResult` enum which indicates the outcome of the operation.
+### Signature
 
-| Variant                | Description                                                       |
-| ---------------------- | ----------------------------------------------------------------- |
-| `Updated { from, to }` | The package was successfully updated from one version to another. |
-| `AlreadyUpToDate`      | The installed package is already the latest version.              |
-| `Pinned`               | The package is pinned and was not updated.                        |
+```rust
+pub fn upgrade(force: bool) -> Result<(), Box<dyn std::error::Error>>
+```
+
+---
+
+## `sync` function
+
+Downloads or updates the package database from the remote repository.
+
+### Signature
+
+```rust
+pub fn sync(verbose: bool) -> Result<(), Box<dyn std::error::Error>>
+```
+
+---
+
+## `autoremove` function
+
+Removes packages that were installed as dependencies but are no longer needed.
+
+### Signature
+
+```rust
+pub fn autoremove(non_interactive: bool) -> Result<(), Box<dyn Error>>
+```
+
+---
+
+## `resolve_package` function
+
+Finds a package and returns its metadata without installing it.
+
+### Signature
+
+```rust
+pub fn resolve_package(source: &str) -> Result<Package, Box<dyn Error>>
+```
+
+---
+
+## `is_package_installed` function
+
+Checks if a package is installed in a given scope.
+
+### Signature
+
+```rust
+pub fn is_package_installed(
+    package_name: &str,
+    scope: Scope,
+) -> Result<Option<InstallManifest>, Box<dyn Error>>
+```
+
+---
+
+## `get_installed_packages` function
+
+Returns a list of all packages installed by Zoi.
+
+### Signature
+
+```rust
+pub fn get_installed_packages() -> Result<Vec<InstallManifest>, Box<dyn Error>>
+```
+
+---
+
+## `get_all_available_packages` function
+
+Returns a list of all packages available in the active repositories.
+
+### Signature
+
+```rust
+pub fn get_all_available_packages() -> Result<Vec<Package>, Box<dyn Error>>
+```
+
+---
+
+## `pin` function
+
+Pins a package to a specific version, preventing it from being updated.
+
+### Signature
+
+```rust
+pub fn pin(package_name: &str, version: &str) -> Result<(), Box<dyn Error>>
+```
+
+---
+
+## `unpin` function
+
+Unpins a package, allowing it to be updated again.
+
+### Signature
+
+```rust
+pub fn unpin(package_name: &str) -> Result<(), Box<dyn Error>>
+```
+
+---
+
+## `get_pinned_packages` function
+
+Returns a list of all currently pinned packages.
+
+### Signature
+
+```rust
+pub fn get_pinned_packages() -> Result<Vec<PinnedPackage>, Box<dyn Error>>
+```
+
+---
+
+For complete, runnable examples, please see the [Library Examples page](/docs/zds/zoi/lib/examples).

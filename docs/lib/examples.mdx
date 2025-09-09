@@ -12,7 +12,7 @@ This example demonstrates the most common use case: installing a package using t
 ### Code
 
 ```rust
-use zoi::{install, InstallMode, InstallReason};
+use zoi::{install, InstallMode, types::InstallReason};
 
 fn main() {
     let package_source = "hello";
@@ -25,7 +25,7 @@ fn main() {
         InstallMode::PreferBinary, // Try to get a binary, fall back to source.
         false,                     // Don't force re-installation.
         InstallReason::Direct,     // This is a direct request from the user.
-        true,                      // Automatically say "yes" to any prompts.
+        true,                      // `non_interactive`: Automatically say "yes" to any prompts.
     );
 
     // Check the result and print a message.
@@ -36,44 +36,63 @@ fn main() {
 }
 ```
 
-### Explanation
+## Listing Installed Packages
 
-1.  **Import necessary items:** We bring `install`, `InstallMode`, and `InstallReason` into scope from the `zoi` crate.
-2.  **Define parameters:** We set the `package_source` to `"hello"` and configure the installation mode. `InstallMode::PreferBinary` is a safe default. Setting `yes: true` ensures the function runs non-interactively.
-3.  **Call `zoi::install`:** We pass our parameters to the function.
-4.  **Handle the result:** The `install` function returns a `Result`. We use a `match` statement to check if the installation was successful or if an error occurred, and we print an appropriate message.
-
-## Forcing an Install from Source
-
-Sometimes you may want to ensure a package is built from its source code, for example, to apply a patch or enable a specific feature. You can do this by using `InstallMode::ForceSource`.
+You can easily get a list of all packages currently installed by Zoi.
 
 ### Code
 
 ```rust
-use zoi::{install, InstallMode, InstallReason};
+use zoi::get_installed_packages;
 
-fn main() {
-    // 'git' is a good example of a package that can be built from source.
-    let package_source = "git";
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    println!("Fetching installed packages...");
+    let installed_packages = get_installed_packages()?;
 
-    println!("Attempting to build and install '{}' from source...", package_source);
-
-    let result = zoi::install(
-        package_source,
-        InstallMode::ForceSource, // Force a source build.
-        true,                     // Force re-installation even if it exists.
-        InstallReason::Direct,
-        true,
-    );
-
-    match result {
-        Ok(()) => println!("'{}' was built and installed successfully!", package_source),
-        Err(e) => eprintln!("Error building '{}': {}", package_source, e),
+    if installed_packages.is_empty() {
+        println!("No packages are installed.");
+    } else {
+        println!("Installed packages:");
+        for pkg in installed_packages {
+            println!(
+                "- {} (Version: {}, Repo: {}, Scope: {:?})",
+                pkg.name,
+                pkg.version,
+                pkg.repo,
+                pkg.scope
+            );
+        }
     }
+    Ok(())
 }
 ```
 
-This example will cause Zoi to find the source code for `git`, download it, and run the build commands specified in its `.pkg.lua` file, even if a pre-compiled binary is available.
+## Resolving Package Information
+
+Before installing, you might want to inspect a package's metadata.
+
+### Code
+
+```rust
+use zoi::resolve_package;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let package_source = "git";
+    println!("Resolving package info for '{}'...", package_source);
+
+    match resolve_package(package_source) {
+        Ok(pkg) => {
+            println!("Successfully resolved package: {}", pkg.name);
+            println!("  Description: {}", pkg.description);
+            println!("  License: {}", pkg.license);
+            println!("  Maintainer: {} <{}>", pkg.maintainer.name, pkg.maintainer.email);
+        }
+        Err(e) => eprintln!("Error resolving package: {}", e),
+    }
+
+    Ok(())
+}
+```
 
 ## Updating a Package
 
@@ -111,8 +130,32 @@ fn main() {
 }
 ```
 
-### Explanation
+## Pinning a Package
 
-1.  **Import necessary items:** We bring `update` and `UpdateResult` into scope.
-2.  **Call `zoi::update`:** We pass the package name and `true` to automatically confirm the update prompt.
-3.  **Handle the result:** We `match` on both the outer `Result` (for errors) and the inner `UpdateResult` to handle all possible outcomes and print an appropriate message.
+Pinning a package prevents it from being accidentally updated.
+
+### Code
+
+```rust
+use zoi::{pin, unpin, get_pinned_packages};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let package_to_pin = "hello";
+    let version_to_pin = "1.0.0";
+
+    println!("Pinning {} to version {}", package_to_pin, version_to_pin);
+    pin(package_to_pin, version_to_pin)?;
+
+    println!("\nCurrently pinned packages:");
+    let pinned = get_pinned_packages()?;
+    for p in &pinned {
+        println!("- {}@{}", p.name, p.version);
+    }
+
+    println!("\nUnpinning {}...", package_to_pin);
+    unpin(package_to_pin)?;
+    println!("'{}' has been unpinned.", package_to_pin);
+
+    Ok(())
+}
+```

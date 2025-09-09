@@ -19,7 +19,7 @@ This release represents a foundational rebuild of the packaging system and a maj
 
 - [x] **Installation Scopes:** Introduce `--scope user` (default, installs to `~/.zoi`) and `--scope system` flags to control package installation locations, enabling better integration for system-level package management.
 
-- [ ] **Enhanced Library & API Experience:** Improve the public API and documentation to make Zoi a powerful and ergonomic library for other Rust applications to leverage.
+- [x] **Enhanced Library & API Experience:** Improve the public API and documentation to make Zoi a powerful and ergonomic library for other Rust applications to leverage.
 
 ### Core Features & Enhancements
 
