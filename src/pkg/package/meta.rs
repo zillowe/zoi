@@ -5,22 +5,30 @@ use std::error::Error;
 use std::fs;
 use std::path::Path;
 
-pub fn run(package_file: &Path) -> Result<(), Box<dyn Error>> {
+pub fn run(package_file: &Path, install_type: Option<String>) -> Result<(), Box<dyn Error>> {
     println!("Generating metadata for: {}", package_file.display());
 
     let (package_template, version, _, _) =
         resolve::resolve_package_and_version(package_file.to_str().unwrap())?;
 
-    let method_priority = ["com_binary", "binary", "source"];
-    let best_method_template = method_priority
-        .iter()
-        .find_map(|t| {
-            package_template
-                .installation
-                .iter()
-                .find(|m| m.install_type == *t)
-        })
-        .ok_or("No suitable installation method found")?;
+    let best_method_template = if let Some(t) = &install_type {
+        package_template
+            .installation
+            .iter()
+            .find(|m| &m.install_type == t)
+            .ok_or_else(|| format!("Installation method '{}' not found", t))?
+    } else {
+        let method_priority = ["com_binary", "binary", "source"];
+        method_priority
+            .iter()
+            .find_map(|t| {
+                package_template
+                    .installation
+                    .iter()
+                    .find(|m| m.install_type == *t)
+            })
+            .ok_or("No suitable installation method found")?
+    };
 
     let mut installation = ResolvedInstallation {
         install_type: best_method_template.install_type.clone(),
