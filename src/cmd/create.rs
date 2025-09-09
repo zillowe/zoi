@@ -8,7 +8,7 @@ use std::path::Path;
 
 #[derive(Parser)]
 pub struct CreateCommand {
-    /// The source of the package (name, @repo/name, path to .pkg.yaml, or URL)
+    /// The source of the package (name, @repo/name, path to .pkg.lua, or URL)
     pub source: String,
     /// The application name to substitute into template commands
     pub app_name: String,

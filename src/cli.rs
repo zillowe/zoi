@@ -228,7 +228,7 @@ enum Commands {
     /// Installs one or more packages from a name, local file, URL, or git repository
     #[command(alias = "i")]
     Install {
-        /// Package names, local paths, or URLs to .pkg.yaml files
+        /// Package names, local paths, or URLs to .pkg.lua files
         #[arg(value_name = "SOURCES", value_hint = ValueHint::FilePath, value_parser = PkgOrPathParser, hide_possible_values = true, required_unless_present = "repo")]
         sources: Vec<String>,
         /// Install from a git repository (e.g. 'Zillowe/Hello', 'gl:Zillowe/Hello')
@@ -250,10 +250,10 @@ enum Commands {
 
     /// Builds and installs one or more packages from a name, local file, or URL
     #[command(
-        long_about = "Builds one or more packages from various sources using the 'source' installation method:\n- A package name from the database (e.g. 'vim')\n- A local .pkg.yaml file (e.g. './my-package.pkg.yaml')\n- A URL pointing to a raw .pkg.yaml file"
+        long_about = "Builds one or more packages from various sources using the 'source' installation method:\n- A package name from the database (e.g. 'vim')\n- A local .pkg.lua file (e.g. './my-package.pkg.lua')\n- A URL pointing to a raw .pkg.lua file"
     )]
     Build {
-        /// Package names, local paths, or URLs to .pkg.yaml files
+        /// Package names, local paths, or URLs to .pkg.lua files
         #[arg(value_name = "SOURCES", required = true, value_hint = ValueHint::FilePath, value_parser = PkgOrPathParser, hide_possible_values = true)]
         sources: Vec<String>,
         /// Force re-installation even if the package is already installed
@@ -425,7 +425,7 @@ enum Commands {
 
     /// Create an application using a package template
     Create {
-        /// Package name, @repo/name, local .pkg.yaml path, or URL
+        /// Package name, @repo/name, local .pkg.lua path, or URL
         source: String,
         /// The application name to substitute into template commands
         app_name: String,
