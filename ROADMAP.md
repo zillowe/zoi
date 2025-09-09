@@ -10,6 +10,7 @@ This document outlines the future direction of Zoi, including planned features, 
 
 This release is the first major stable release.
 
+- [ ] **Repo renaming:** Rename the official Zoi repo to Zoidberg or rename the Zoi Repo term to Zoidberg.
 - [ ] **Managed Components (`zoi component`):** Introduce a new package type for managed, isolated developer tools (e.g. language servers, linters) that are not added to the user's PATH, but are managed by Zoi and can be executed via `zoi component exec` or integrated with other developer tools.
 - [ ] **Project-Local Packages:** Install packages to a project-specific `.zoi/` directory using a `--local` flag, runnable with `zoi exec`.
 - [ ] **Bsdiff Self-Update Improvements:** Fix and stabilize the patch-based self-update mechanism for `zoi upgrade`.
