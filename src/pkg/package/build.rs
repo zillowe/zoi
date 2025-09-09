@@ -24,6 +24,24 @@ use xz2::read::XzDecoder;
 use zip::ZipArchive;
 use zstd::stream::read::Decoder as ZstdDecoder;
 
+struct Defer<F: FnOnce()> {
+    f: Option<F>,
+}
+
+impl<F: FnOnce()> Defer<F> {
+    fn new(f: F) -> Defer<F> {
+        Defer { f: Some(f) }
+    }
+}
+
+impl<F: FnOnce()> Drop for Defer<F> {
+    fn drop(&mut self) {
+        if let Some(f) = self.f.take() {
+            f();
+        }
+    }
+}
+
 fn download_file(url: &str, pb: &ProgressBar) -> Result<Vec<u8>, Box<dyn Error>> {
     let mut response = reqwest::blocking::get(url)?;
     if !response.status().is_success() {
@@ -272,83 +290,261 @@ fn build_for_platform(
 
     if metadata.installation.install_type == "source" {
         let inst = &metadata.installation;
-        let git_url = inst
-            .git
-            .as_ref()
-            .ok_or("Missing git url for source build")?;
 
-        let git_path = build_dir.path().join("git");
-        println!("Cloning from {}...", git_url);
-        let mut git_cmd = std::process::Command::new("git");
-        git_cmd.arg("clone");
-        if let Some(branch) = &inst.branch {
-            git_cmd.arg("-b").arg(branch);
-        }
-        git_cmd.arg(git_url).arg(&git_path);
-        let output = git_cmd.output()?;
+        if let Some(docker_image_str) = &inst.docker_image {
+            let image_to_pull = if let Some(image) = docker_image_str.strip_prefix("ghcr:") {
+                format!("ghcr.io/{}", image)
+            } else if let Some(image) = docker_image_str.strip_prefix("hub:") {
+                image.to_string()
+            } else {
+                docker_image_str.clone()
+            };
 
-        if !output.status.success() {
-            return Err("Failed to clone source repository.".into());
-        }
+            println!("Building using Docker image: {}", image_to_pull.cyan());
+            if !utils::command_exists("docker") {
+                return Err("Docker command not found. Please install Docker.".into());
+            }
 
-        if let Some(tag) = &inst.tag {
-            let output = std::process::Command::new("git")
-                .current_dir(&git_path)
-                .arg("checkout")
-                .arg(tag)
+            println!("Pulling Docker image...");
+            let output = std::process::Command::new("docker")
+                .arg("pull")
+                .arg(&image_to_pull)
                 .output()?;
             if !output.status.success() {
-                return Err(format!("Failed to checkout tag '{}'", tag).into());
+                eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+                return Err(format!("Failed to pull Docker image '{}'", image_to_pull).into());
             }
-        }
 
-        let os_part = platform.split('-').next().unwrap_or(platform);
+            let container_name = format!("zoi-build-{}-{}", metadata.name, platform);
+            let _ = std::process::Command::new("docker")
+                .arg("rm")
+                .arg("-f")
+                .arg(&container_name)
+                .output()?;
 
-        let commands = inst
-            .build_commands
-            .as_ref()
-            .and_then(|m| m.get(os_part))
-            .ok_or(format!("No build commands found for platform {}", platform))?;
+            println!("Starting Docker container...");
+            let output = std::process::Command::new("docker")
+                .arg("run")
+                .arg("-d")
+                .arg("--name")
+                .arg(&container_name)
+                .arg(&image_to_pull)
+                .arg("tail")
+                .arg("-f")
+                .arg("/dev/null")
+                .output()?;
+            if !output.status.success() {
+                eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+                return Err("Failed to start Docker container.".into());
+            }
 
-        println!("{}", "Running build commands...".bold());
-        for cmd_str in commands {
-            println!("Executing: {}", cmd_str.cyan());
-            let output = if platform.starts_with("windows") {
-                std::process::Command::new("pwsh")
-                    .arg("-Command")
-                    .arg(cmd_str)
-                    .current_dir(&git_path)
-                    .output()?
-            } else {
-                std::process::Command::new("bash")
+            // Defer container cleanup
+            let _cleanup = Defer::new(|| {
+                println!("Stopping and removing container...");
+                let _ = std::process::Command::new("docker")
+                    .arg("stop")
+                    .arg(&container_name)
+                    .output();
+                let _ = std::process::Command::new("docker")
+                    .arg("rm")
+                    .arg(&container_name)
+                    .output();
+            });
+
+            let git_url = inst
+                .git
+                .as_ref()
+                .ok_or("Missing git url for source build")?;
+            let repo_path_in_container = "/build";
+
+            println!("Cloning from {} into container...", git_url);
+            let mut git_cmd_args = vec![
+                "exec".to_string(),
+                container_name.clone(),
+                "git".to_string(),
+                "clone".to_string(),
+            ];
+            if let Some(branch) = &inst.branch {
+                git_cmd_args.push("-b".to_string());
+                git_cmd_args.push(branch.clone());
+            }
+            git_cmd_args.push(git_url.clone());
+            git_cmd_args.push(repo_path_in_container.to_string());
+
+            let output = std::process::Command::new("docker")
+                .args(git_cmd_args)
+                .output()?;
+            if !output.status.success() {
+                eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+                return Err("Failed to clone source repository inside container.".into());
+            }
+
+            let cloned_repo_name = git_url
+                .split('/')
+                .next_back()
+                .unwrap()
+                .strip_suffix(".git")
+                .unwrap_or_else(|| git_url.split('/').next_back().unwrap());
+            let workdir_in_container = format!("{}/{}", repo_path_in_container, cloned_repo_name);
+
+            if let Some(tag) = &inst.tag {
+                let output = std::process::Command::new("docker")
+                    .arg("exec")
+                    .arg(&container_name)
+                    .arg("git")
+                    .arg("-C")
+                    .arg(&workdir_in_container)
+                    .arg("checkout")
+                    .arg(tag)
+                    .output()?;
+                if !output.status.success() {
+                    eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+                    return Err(format!("Failed to checkout tag '{}' in container", tag).into());
+                }
+            }
+
+            let os_part = platform.split('-').next().unwrap_or(platform);
+            let commands = inst
+                .build_commands
+                .as_ref()
+                .and_then(|m| m.get(os_part))
+                .ok_or(format!("No build commands found for platform {}", platform))?;
+
+            println!("{}", "Running build commands in container...".bold());
+            for cmd_str in commands {
+                println!("Executing in container: {}", cmd_str.cyan());
+                let output = std::process::Command::new("docker")
+                    .arg("exec")
+                    .arg("-w")
+                    .arg(&workdir_in_container)
+                    .arg(&container_name)
+                    .arg("bash")
                     .arg("-c")
                     .arg(cmd_str)
-                    .current_dir(&git_path)
-                    .output()?
-            };
-            if !output.status.success() {
-                return Err(format!("Build command failed: '{}'", cmd_str).into());
+                    .output()?;
+                if !output.status.success() {
+                    eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+                    return Err(format!("Build command failed in container: '{}'", cmd_str).into());
+                }
             }
-        }
 
-        let bin_path_str = inst
-            .binary_path
-            .as_ref()
-            .and_then(|m| m.get(os_part))
-            .ok_or(format!("No binary_path found for platform {}", platform))?;
+            let bin_path_str = inst
+                .binary_path
+                .as_ref()
+                .and_then(|m| m.get(os_part))
+                .ok_or(format!("No binary_path found for platform {}", platform))?;
 
-        let built_binary_path = git_path.join(bin_path_str);
-        if !built_binary_path.exists() {
-            return Err(format!(
-                "Could not find built binary at specified path: {}",
-                built_binary_path.display()
-            )
-            .into());
+            let built_binary_path_in_container =
+                Path::new(&workdir_in_container).join(bin_path_str);
+
+            let temp_bin_dir = build_dir.path().join("bin");
+            fs::create_dir_all(&temp_bin_dir)?;
+            let local_bin_path =
+                temp_bin_dir.join(built_binary_path_in_container.file_name().unwrap());
+
+            println!("Copying built binary from container...");
+            let cp_arg = format!(
+                "{}:{}",
+                &container_name,
+                built_binary_path_in_container.to_str().unwrap()
+            );
+            let output = std::process::Command::new("docker")
+                .arg("cp")
+                .arg(&cp_arg)
+                .arg(&local_bin_path)
+                .output()?;
+            if !output.status.success() {
+                return Err(format!(
+                    "Failed to copy binary from container: {}",
+                    String::from_utf8_lossy(&output.stderr)
+                )
+                .into());
+            }
+
+            let bin_dir = data_dir.join("usr/bin");
+            fs::create_dir_all(&bin_dir)?;
+            let dest_bin_path = bin_dir.join(local_bin_path.file_name().unwrap());
+            fs::copy(local_bin_path, dest_bin_path)?;
+        } else {
+            let inst = &metadata.installation;
+            let git_url = inst
+                .git
+                .as_ref()
+                .ok_or("Missing git url for source build")?;
+
+            let git_path = build_dir.path().join("git");
+            println!("Cloning from {}...", git_url);
+            let mut git_cmd = std::process::Command::new("git");
+            git_cmd.arg("clone");
+            if let Some(branch) = &inst.branch {
+                git_cmd.arg("-b").arg(branch);
+            }
+            git_cmd.arg(git_url).arg(&git_path);
+            let output = git_cmd.output()?;
+
+            if !output.status.success() {
+                return Err("Failed to clone source repository.".into());
+            }
+
+            if let Some(tag) = &inst.tag {
+                let output = std::process::Command::new("git")
+                    .current_dir(&git_path)
+                    .arg("checkout")
+                    .arg(tag)
+                    .output()?;
+                if !output.status.success() {
+                    return Err(format!("Failed to checkout tag '{}'", tag).into());
+                }
+            }
+
+            let os_part = platform.split('-').next().unwrap_or(platform);
+
+            let commands = inst
+                .build_commands
+                .as_ref()
+                .and_then(|m| m.get(os_part))
+                .ok_or(format!("No build commands found for platform {}", platform))?;
+
+            println!("{}", "Running build commands...".bold());
+            for cmd_str in commands {
+                println!("Executing: {}", cmd_str.cyan());
+                let output = if platform.starts_with("windows") {
+                    std::process::Command::new("pwsh")
+                        .arg("-Command")
+                        .arg(cmd_str)
+                        .current_dir(&git_path)
+                        .output()?
+                } else {
+                    std::process::Command::new("bash")
+                        .arg("-c")
+                        .arg(cmd_str)
+                        .current_dir(&git_path)
+                        .output()?
+                };
+                if !output.status.success() {
+                    return Err(format!("Build command failed: '{}'", cmd_str).into());
+                }
+            }
+
+            let bin_path_str = inst
+                .binary_path
+                .as_ref()
+                .and_then(|m| m.get(os_part))
+                .ok_or(format!("No binary_path found for platform {}", platform))?;
+
+            let built_binary_path = git_path.join(bin_path_str);
+            if !built_binary_path.exists() {
+                return Err(format!(
+                    "Could not find built binary at specified path: {}",
+                    built_binary_path.display()
+                )
+                .into());
+            }
+            let bin_dir = data_dir.join("usr/bin");
+            fs::create_dir_all(&bin_dir)?;
+            let dest_bin_path = bin_dir.join(built_binary_path.file_name().unwrap());
+            fs::copy(built_binary_path, dest_bin_path)?;
         }
-        let bin_dir = data_dir.join("usr/bin");
-        fs::create_dir_all(&bin_dir)?;
-        let dest_bin_path = bin_dir.join(built_binary_path.file_name().unwrap());
-        fs::copy(built_binary_path, dest_bin_path)?;
     } else {
         let asset = metadata
             .installation

@@ -28,6 +28,8 @@ pub struct ResolvedInstallation {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub branch: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub docker_image: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub build_commands: Option<std::collections::HashMap<String, Vec<String>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub binary_path: Option<std::collections::HashMap<String, String>>,

@@ -240,6 +240,8 @@ pub struct InstallationMethod {
     #[serde(default)]
     pub branch: Option<String>,
     #[serde(default)]
+    pub docker_image: Option<String>,
+    #[serde(default)]
     pub binary_types: Option<Vec<String>>,
     #[serde(default)]
     pub lib_types: Option<Vec<String>>,

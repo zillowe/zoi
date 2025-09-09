@@ -39,6 +39,7 @@ pub fn run(package_file: &Path, install_type: Option<String>) -> Result<(), Box<
         installation.git = Some(best_method_template.url.clone());
         installation.tag = best_method_template.tag.clone();
         installation.branch = best_method_template.branch.clone();
+        installation.docker_image = best_method_template.docker_image.clone();
 
         let mut build_commands_map = HashMap::new();
         let mut binary_path_map = HashMap::new();
