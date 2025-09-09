@@ -11,7 +11,9 @@ First of all, thank you for considering contributing to Zoi! We're excited to ha
 - [Development](#development)
   - [Prerequisites](#prerequisites)
   - [First-Time Setup](#first-time-setup)
+  - [Development with Docker](#development-with-docker)
   - [Development Workflow with Zoi](#development-workflow-with-zoi)
+    - [The `zoi.yaml` file](#the-zoiyaml-file)
     - [Passing Arguments to Commands](#passing-arguments-to-commands)
     - [Environment Preparation](#environment-preparation)
     - [Development Commands](#development-commands)
@@ -75,11 +77,41 @@ Because Zoi is used to manage its own development, you must first build and inst
 
 Once you have a working `zoi` command, you can use it for all other development tasks.
 
+### Development with Docker
+
+While a local Rust installation is recommended for active development, you can use Docker to build Zoi, which is useful for creating builds without polluting your local machine.
+
+1.  **Build the image:**
+    The following command builds the final, lightweight Docker image containing the `zoi` binary.
+
+    ```sh
+    docker build -t zoi .
+    ```
+
+2.  **Extract the binary:**
+    If you want to get the compiled `zoi` binary from the image to use on your host system, run these commands:
+    ```sh
+    docker create --name zoi-container zoi
+    docker cp zoi-container:/usr/local/bin/zoi ./zoi
+    docker rm zoi-container
+    ```
+    You will now have a `zoi` executable in your current directory.
+
 ### Development Workflow with Zoi
 
 We use `zoi` itself to manage project tasks, which are defined in the `zoi.yaml` file. You can run tasks using `zoi run <command>` or set up environments with `zoi env <environment>`.
 
 If you run `zoi run` or `zoi env` without arguments, you'll get an interactive list of available commands.
+
+#### The `zoi.yaml` file
+
+The `zoi.yaml` file is the heart of our project-specific workflow. It defines:
+
+- `packages`: Required tools for the project, with commands to check if they are installed.
+- `commands`: Aliases for longer shell commands, e.g. `zoi run lint`. These can be platform-specific.
+- `environments`: Groups of commands to set up a development environment, e.g. `zoi env pre`.
+
+When adding a new build step or a useful script, you should add it to the `commands` section in `zoi.yaml`.
 
 #### Passing Arguments to Commands
 
@@ -98,28 +130,16 @@ Before you commit changes, run the `pre` environment to ensure your changes meet
 zoi env pre
 ```
 
-This single command is equivalent to running `zoi run deps`, `zoi run fmt`, `zoi run lint`, and `zoi run check` in sequence.
+This single command is equivalent to running `zoi run deps`, `zoi run lint`, `zoi run fmt`, `zoi run check`, and `zoi run test` in sequence.
 
 #### Development Commands
 
 Here are the most common commands defined in `zoi.yaml`:
 
-- **`build`**: Builds a release version of Zoi.
-
-  ```sh
-  zoi run build
-  ```
-
 - **`check`**: Checks the project for errors without performing a full build.
 
   ```sh
   zoi run check
-  ```
-
-- **`fmt`**: Formats all code in the project according to our style guidelines.
-
-  ```sh
-  zoi run fmt
   ```
 
 - **`lint`**: Lints the code using Clippy and applies automatic fixes where possible.
@@ -128,15 +148,39 @@ Here are the most common commands defined in `zoi.yaml`:
   zoi run lint
   ```
 
+- **`fmt`**: Formats all code in the project according to our style guidelines.
+
+  ```sh
+  zoi run fmt
+  ```
+
 - **`deps`**: Checks for unused dependencies with `cargo-machete`.
 
   ```sh
   zoi run deps
   ```
 
+- **`test`**: Runs the entire test suite.
+
+  ```sh
+  zoi run test
+  ```
+
+- **`build`**: Builds a release version of Zoi.
+
+  ```sh
+  zoi run build
+  ```
+
 - **`install`**: Performs a clean build and installs the latest version of Zoi, including shell completions. This is useful for testing your changes in a live environment.
+
   ```sh
   zoi run install
+  ```
+
+- **`lines`**: Counts the lines of code in the project using `cloc`.
+  ```sh
+  zoi run lines
   ```
 
 ## Commit Messages

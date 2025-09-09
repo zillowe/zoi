@@ -4,7 +4,7 @@
 
 | Version          | Supported |
 | ---------------- | --------- |
-| Prod. Beta 4.X.X | ✔️        |
+| Prod. Beta 5.X.X | ✔️        |
 
 ## Supported Packages
 
