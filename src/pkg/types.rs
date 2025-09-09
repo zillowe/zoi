@@ -225,14 +225,15 @@ pub struct InstallationMethod {
     pub install_type: String,
     pub url: String,
     pub platforms: Vec<String>,
-    pub commands: Option<Vec<String>>,
+    #[serde(alias = "commands")]
+    pub build_commands: Option<Vec<String>>,
     #[serde(rename = "platformComExt")]
     pub platform_com_ext: Option<HashMap<String, String>>,
     pub checksums: Option<Checksums>,
     #[serde(default)]
     pub checksum_type: Option<String>,
     pub sigs: Option<Vec<Signature>>,
-    #[serde(default)]
+    #[serde(default, alias = "bin_path")]
     pub binary_path: Option<String>,
     #[serde(default)]
     pub tag: Option<String>,

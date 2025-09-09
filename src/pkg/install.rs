@@ -2028,7 +2028,7 @@ fn handle_source_install(
         }
     }
 
-    if let Some(commands) = &method.commands {
+    if let Some(commands) = &method.build_commands {
         for cmd_str in commands {
             let final_cmd = cmd_str.replace("{prefix}", store_path.to_str().unwrap());
             println!("Executing: {}", final_cmd.cyan());

@@ -18,14 +18,24 @@ pub struct FinalMetadata {
     pub bins: Option<Vec<String>>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct ResolvedInstallation {
     pub install_type: String,
-    pub binary_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub git: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tag: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub branch: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub build_commands: Option<std::collections::HashMap<String, Vec<String>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub binary_path: Option<std::collections::HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub assets: Vec<PlatformAsset>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PlatformAsset {
     pub platform: String,
     pub url: String,

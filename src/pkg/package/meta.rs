@@ -22,77 +22,130 @@ pub fn run(package_file: &Path) -> Result<(), Box<dyn Error>> {
         })
         .ok_or("No suitable installation method found")?;
 
-    let checksum_map: HashMap<String, String> =
-        if let Some(checksums) = &best_method_template.checksums {
-            match checksums {
-                types::Checksums::Url(url) => {
-                    println!("Fetching checksums from {}", url);
-                    let resp = reqwest::blocking::get(url)?.text()?;
-                    let mut map = HashMap::new();
-                    for line in resp.lines() {
-                        let parts: Vec<&str> = line.split_whitespace().collect();
-                        if parts.len() == 2 {
-                            map.insert(parts[1].to_string(), parts[0].to_string());
-                        }
-                    }
-                    map
-                }
-                types::Checksums::List { items, .. } => items
-                    .iter()
-                    .map(|item| (item.file.clone(), item.checksum.clone()))
-                    .collect(),
-            }
-        } else {
-            HashMap::new()
-        };
-
-    let mut assets = Vec::new();
-    let platforms_to_process = if best_method_template.platforms.contains(&"all".to_string()) {
-        vec![
-            "linux-amd64",
-            "linux-arm64",
-            "windows-amd64",
-            "windows-arm64",
-            "macos-amd64",
-            "macos-arm64",
-        ]
-        .into_iter()
-        .map(String::from)
-        .collect()
-    } else {
-        best_method_template.platforms.clone()
+    let mut installation = ResolvedInstallation {
+        install_type: best_method_template.install_type.clone(),
+        ..Default::default()
     };
 
-    for platform_str in &platforms_to_process {
-        let parsed_for_platform = lua_parser::parse_lua_package_for_platform(
-            package_file.to_str().unwrap(),
-            platform_str,
-        )?;
+    if best_method_template.install_type == "source" {
+        installation.git = Some(best_method_template.url.clone());
+        installation.tag = best_method_template.tag.clone();
+        installation.branch = best_method_template.branch.clone();
 
-        let method_for_platform = parsed_for_platform
-            .installation
-            .iter()
-            .find(|m| m.install_type == best_method_template.install_type)
-            .ok_or("Could not find chosen install method in platform-specific parse")?;
+        let mut build_commands_map = HashMap::new();
+        let mut binary_path_map = HashMap::new();
 
-        let url = method_for_platform.url.clone();
-        let filename = url.split('/').next_back().unwrap_or("").to_string();
-        let checksum = checksum_map.get(&filename).cloned();
-
-        let signature_url = if let Some(sigs) = &method_for_platform.sigs {
-            sigs.iter()
-                .find(|s| s.file == filename)
-                .map(|s| s.sig.clone())
+        let platforms_to_process = if best_method_template.platforms.contains(&"all".to_string()) {
+            vec![
+                "linux-amd64",
+                "linux-arm64",
+                "windows-amd64",
+                "windows-arm64",
+                "macos-amd64",
+                "macos-arm64",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect()
         } else {
-            None
+            best_method_template.platforms.clone()
         };
 
-        assets.push(PlatformAsset {
-            platform: platform_str.to_string(),
-            url,
-            checksum,
-            signature_url,
-        });
+        for platform_str in &platforms_to_process {
+            let parsed_for_platform = lua_parser::parse_lua_package_for_platform(
+                package_file.to_str().unwrap(),
+                platform_str,
+            )?;
+
+            let method_for_platform = parsed_for_platform
+                .installation
+                .iter()
+                .find(|m| m.install_type == "source")
+                .ok_or("Could not find source install method in platform-specific parse")?;
+
+            if let Some(cmds) = &method_for_platform.build_commands {
+                build_commands_map.insert(platform_str.clone(), cmds.clone());
+            }
+            if let Some(path) = &method_for_platform.binary_path {
+                binary_path_map.insert(platform_str.clone(), path.clone());
+            }
+        }
+        installation.build_commands = Some(build_commands_map);
+        installation.binary_path = Some(binary_path_map);
+    } else {
+        let checksum_map: HashMap<String, String> =
+            if let Some(checksums) = &best_method_template.checksums {
+                match checksums {
+                    types::Checksums::Url(url) => {
+                        println!("Fetching checksums from {}", url);
+                        let resp = reqwest::blocking::get(url)?.text()?;
+                        let mut map = HashMap::new();
+                        for line in resp.lines() {
+                            let parts: Vec<&str> = line.split_whitespace().collect();
+                            if parts.len() == 2 {
+                                map.insert(parts[1].to_string(), parts[0].to_string());
+                            }
+                        }
+                        map
+                    }
+                    types::Checksums::List { items, .. } => items
+                        .iter()
+                        .map(|item| (item.file.clone(), item.checksum.clone()))
+                        .collect(),
+                }
+            } else {
+                HashMap::new()
+            };
+
+        let mut assets = Vec::new();
+        let platforms_to_process = if best_method_template.platforms.contains(&"all".to_string()) {
+            vec![
+                "linux-amd64",
+                "linux-arm64",
+                "windows-amd64",
+                "windows-arm64",
+                "macos-amd64",
+                "macos-arm64",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect()
+        } else {
+            best_method_template.platforms.clone()
+        };
+
+        for platform_str in &platforms_to_process {
+            let parsed_for_platform = lua_parser::parse_lua_package_for_platform(
+                package_file.to_str().unwrap(),
+                platform_str,
+            )?;
+
+            let method_for_platform = parsed_for_platform
+                .installation
+                .iter()
+                .find(|m| m.install_type == best_method_template.install_type)
+                .ok_or("Could not find chosen install method in platform-specific parse")?;
+
+            let url = method_for_platform.url.clone();
+            let filename = url.split('/').next_back().unwrap_or("").to_string();
+            let checksum = checksum_map.get(&filename).cloned();
+
+            let signature_url = if let Some(sigs) = &method_for_platform.sigs {
+                sigs.iter()
+                    .find(|s| s.file == filename)
+                    .map(|s| s.sig.clone())
+            } else {
+                None
+            };
+
+            assets.push(PlatformAsset {
+                platform: platform_str.to_string(),
+                url,
+                checksum,
+                signature_url,
+            });
+        }
+        installation.assets = assets;
     }
 
     let final_metadata = FinalMetadata {
@@ -106,11 +159,7 @@ pub fn run(package_file: &Path) -> Result<(), Box<dyn Error>> {
         man_url: package_template.man,
         maintainer: package_template.maintainer,
         author: package_template.author,
-        installation: ResolvedInstallation {
-            install_type: best_method_template.install_type.clone(),
-            binary_path: best_method_template.binary_path.clone(),
-            assets,
-        },
+        installation,
         bins: package_template.bins,
     };
 
