@@ -195,7 +195,7 @@ zoi uninstall my-package
 For more complex packages, Zoi provides a dedicated `package` command set for a structured build process.
 
 1.  **`zoi package meta <path/to/file.pkg.lua>`**:
-    Generates a `*.meta.json` file. This file resolves all the dynamic Lua script logic for each platform into a static description of all assets, checksums, and signatures.
+    Generates a `*.meta.json` file. This file resolves all the dynamic Lua script logic for each platform into a static description of all assets, checksums, and signatures. You can also specify `--type <type>` to force generation from a specific installation method (`binary`, `com_binary`, or `source`).
 
 2.  **`zoi package build <path/to/file.meta.json>`**:
     Takes the `meta.json` file, downloads all the assets for the **current platform**, verifies them, and bundles them into a single Zoi package archive (`.pkg.tar.zst`).

@@ -82,7 +82,7 @@ While the above method works for publishing package definitions (`.pkg.lua`), th
 You can create these archives yourself using the `zoi package` command set. This is the same workflow used by Zoi's CI/CD.
 
 1.  **Generate Metadata:**
-    Run `zoi package meta` on your `.pkg.lua` file. This creates a `.meta.json` file, resolving all dynamic Lua code into a static list of assets for all platforms.
+    Run `zoi package meta` on your `.pkg.lua` file. This creates a `.meta.json` file, resolving all dynamic Lua code into a static list of assets for all platforms. You can use the `--type` flag to target a specific installation method (e.g. `zoi package meta ./my-package.pkg.lua --type source`).
 
     ```sh
     zoi package meta ./my-package.pkg.lua
