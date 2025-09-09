@@ -89,7 +89,7 @@ You can create these archives yourself using the `zoi package` command set. This
     ```
 
 2.  **Build the Archive:**
-    Run `zoi package build` on the generated metadata file. This command downloads the assets for your **current platform**, verifies them, and creates a distributable `.pkg.tar.zst` archive.
+    Run `zoi package build` on the generated metadata file. This command downloads the assets for your **current platform** (or builds them from source, potentially inside a Docker container if specified), verifies them, and creates a distributable `.pkg.tar.zst` archive.
 
     ```sh
     zoi package build ./my-package.meta.json

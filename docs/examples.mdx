@@ -192,12 +192,15 @@ install({
     type = "source",
     url = PKG.git, -- URL to the git repository.
     platforms = { "linux-amd64", "macos-amd64", "windows-amd64" },
+    -- Optional: build inside a Docker container for reproducibility.
+    docker_image = "hub:golang:1.21-alpine",
     -- Commands to execute in the cloned repository to build.
     build_commands = {
-      "make build"
+      "go build -o compiler"
     },
     -- Path to the built binary, relative to the repo root.
-    bin_path = "./bin/compiler"
+    -- When using docker_image, this is the path inside the container.
+    bin_path = "./compiler"
   }
 })
 

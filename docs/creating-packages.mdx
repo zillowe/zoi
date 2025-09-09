@@ -94,9 +94,13 @@ install({
     type = "source",
     url = PKG.git, -- Use the git URL from the package definition
     platforms = { "all" },
+    -- Optional: build inside a Docker container for reproducibility.
+    -- Use "hub:" for Docker Hub and "ghcr:" for GitHub Container Registry.
+    docker_image = "hub:golang:1.21",
     build_commands = { "make" },
     -- After building, Zoi will look for an executable with the same name as the package.
     -- If the binary has a different name or is in a subdirectory, specify its path.
+    -- When using docker_image, this path is inside the container.
     bin_path = "build/my-cli"
   }
 })

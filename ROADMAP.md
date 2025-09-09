@@ -6,32 +6,13 @@ This document outlines the future direction of Zoi, including planned features, 
 
 ---
 
-## v5 Beta: The Lua Overhaul
+## v1 Stable
 
-This release represents a foundational rebuild of the packaging system and a major refactor to improve performance, expressiveness, and maintainability. This is the last major beta release planned before a stable 1.0.0.
+This release is the first major stable release.
 
-### Foundational Changes: Lua & The New Build System
-
-- [x] **Transition to Lua-based Packages:** Replace the `pkg.yaml` format with `pkg.lua`. This allows for more dynamic, expressive, and maintainable package definitions, moving from a static data format to a sandboxed scripting language.
-
-- [x] **Archival Packaging System (`zoi package`):** Re-architect the installation flow to use a robust, self-contained package format (`.pkg.tar.zst`), similar to `pacman`. This makes installations faster, more reliable, and enables offline installs from pre-built packages.
-      This new system introduces several commands: - `zoi package meta ./path/to/name.pkg.lua`: Executes the package's Lua script in a secure sandbox to generate a static `name.meta.json` file. This file is crucial for package indexers and frontends. - `zoi package build`: Using the generated `name.meta.json`, this command fetches sources or binaries, verifies their integrity, and builds a standard `.pkg.tar.zst` archive for a specific platform. - `zoi package install ./path/to/name-os-arch.pkg.tar.zst`: Installs a package directly from a pre-built archive, allowing for fast, offline installations.
-
-- [x] **Installation Scopes:** Introduce `--scope user` (default, installs to `~/.zoi`) and `--scope system` flags to control package installation locations, enabling better integration for system-level package management.
-
-- [x] **Enhanced Library & API Experience:** Improve the public API and documentation to make Zoi a powerful and ergonomic library for other Rust applications to leverage.
-
-### Core Features & Enhancements
-
-- [x] **PGP Key Management (`zoi pgp`):** Introduce a `pgp` command to manage public keys for verifying package signatures.
-
-- [x] **Install Packages From Git Repos:** Add the ability to install a package directly from a git repository (GitHub, GitLab, Codeberg) without a full clone, using a field in a `zoi.yaml` file to locate the package definition.
-      **Commands:**
-
-```sh
-$ zoi install --repo Zillowe/Hello # default is GitHub
-$ zoi install --repo gl:Zillowe/Hello # gh: GitHub, gl: GitLab, cb: Codeberg
-```
+- [ ] **Managed Components (`zoi component`):** Introduce a new package type for managed, isolated developer tools (e.g. language servers, linters) that are not added to the user's PATH, but are managed by Zoi and can be executed via `zoi component exec` or integrated with other developer tools.
+- [ ] **Project-Local Packages:** Install packages to a project-specific `.zoi/` directory using a `--local` flag, runnable with `zoi exec`.
+- [ ] **Bsdiff Self-Update Improvements:** Fix and stabilize the patch-based self-update mechanism for `zoi upgrade`.
 
 ---
 
@@ -41,10 +22,7 @@ These are features and ideas we are considering for future releases. They are no
 
 - [ ] **Full Platform Parity:** Achieve full build and package support for all targeted platforms, including Android (Termux).
 - [ ] **Expanded Platform Support:** Add binary and package support for more platforms, starting with Windows (ARM64) and FreeBSD/OpenBSD.
-- [ ] **Managed Components (`zoi component`):** Introduce a new package type for managed, isolated developer tools (e.g. language servers, linters) that are not added to the user's PATH, but are managed by Zoi and can be executed via `zoi component exec` or integrated with other developer tools.
 - [ ] **Advanced Platform Selectors:** Enhance the `platforms` field in package definitions to allow for more granular targeting (OS version, kernel, DE, CPU/GPU, etc.).
-- [ ] **Project-Local Packages:** Install packages to a project-specific `.zoi/` directory using a `--local` flag, runnable with `zoi exec`.
-- [ ] **Bsdiff Self-Update Improvements:** Fix and stabilize the patch-based self-update mechanism for `zoi upgrade`.
 
 ---
 

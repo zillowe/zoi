@@ -369,7 +369,7 @@ Zoi supports four types of installation methods within the `installation` list:
 
 1.  **`binary`**: Downloads a pre-compiled binary directly from a URL.
 2.  **`com_binary`**: Downloads a compressed archive (`.zip`, `.tar.gz`, etc.), extracts it, and finds the binary within. Supports `bin_path` to point to the executable inside the archive. On Windows targets, if `bin_path` lacks `.exe`, Zoi will also try with `.exe` appended.
-3.  **`source`**: Clones a git repository and runs your defined `build_commands`. Zoi then moves the final executable to the installation directory. By default, Zoi looks for an executable with the same name as the package. If the executable has a different name or is in a subdirectory, you must specify its location with the `bin_path` field. Supports optional `tag` or `branch` (use only one). If none is provided, the default branch HEAD is used. `tag` can include placeholders like `v{version}`.
+3.  **`source`**: Clones a git repository and runs your defined `build_commands`. Zoi then moves the final executable to the installation directory. By default, Zoi looks for an executable with the same name as the package. If the executable has a different name or is in a subdirectory, you must specify its location with the `bin_path` field. Supports optional `tag` or `branch` (use only one). If none is provided, the default branch HEAD is used. For reproducible builds, you can specify a `docker_image` to run the build inside a container.
 4.  **`script`**: Downloads and executes an installation script (e.g. `install.sh`).
 
 For the list of supported archive formats for `com_binary`, see [Supported Archives for Compressed Binaries](/docs/zds/zoi/archives).
