@@ -95,7 +95,9 @@ install({
     url = PKG.git, -- Use the git URL from the package definition
     platforms = { "all" },
     build_commands = { "make" },
-    install_commands = { 'make install DESTDIR="${Zoi_DESTDIR}"' }
+    -- After building, Zoi will look for an executable with the same name as the package.
+    -- If the binary has a different name or is in a subdirectory, specify its path.
+    bin_path = "build/my-cli"
   }
 })
 ```
