@@ -442,7 +442,7 @@ set paths = [ ~/.zoi/pkgs/bin $paths... ]
         let new_path = if current_path.is_empty() {
             zoi_bin_path_str.to_string()
         } else {
-            format!("{};{{}}", current_path, zoi_bin_path_str)
+            format!("{};{}", current_path, zoi_bin_path_str)
         };
         env.set_value("Path", &new_path)?;
 
