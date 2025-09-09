@@ -195,6 +195,18 @@ pub struct Signature {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FileCopy {
+    pub source: String,
+    pub destination: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FileGroup {
+    pub platforms: Vec<String>,
+    pub files: Vec<FileCopy>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum Checksums {
     Url(String),
@@ -245,6 +257,8 @@ pub struct InstallationMethod {
     pub binary_types: Option<Vec<String>>,
     #[serde(default)]
     pub lib_types: Option<Vec<String>>,
+    #[serde(default)]
+    pub files: Option<Vec<FileGroup>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

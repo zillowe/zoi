@@ -1,5 +1,6 @@
 use super::structs::FinalMetadata;
 use crate::pkg::{local, types};
+use crate::utils;
 use colored::*;
 use std::error::Error;
 use std::fs::{self, File};
@@ -123,6 +124,93 @@ pub fn run(
                     "Warning: could not find binary '{}' to link.",
                     bin_name.yellow()
                 );
+            }
+        }
+    }
+
+    let files_dir = temp_dir.path().join("files");
+    if files_dir.exists()
+        && let Some(file_groups) = &metadata.installation.files
+    {
+        println!("Copying additional files...");
+        let platform = crate::utils::get_platform()?;
+
+        for group in file_groups {
+            if crate::utils::is_platform_compatible(&platform, &group.platforms) {
+                for file_copy in &group.files {
+                    let source_in_archive = files_dir.join(&file_copy.source);
+
+                    if !source_in_archive.exists() {
+                        eprintln!(
+                            "{} File specified in metadata not found in archive: {}",
+                            "Warning:".yellow(),
+                            source_in_archive.display()
+                        );
+                        continue;
+                    }
+
+                    let mut dest_path_str = file_copy.destination.clone();
+                    if dest_path_str.starts_with("~/") {
+                        if scope == types::Scope::System {
+                            eprintln!(
+                                "{} Cannot use home directory ('~') destination for a system-wide package install. Skipping '{}'",
+                                "Warning:".yellow(),
+                                file_copy.destination
+                            );
+                            continue;
+                        }
+                        if let Some(home) = home::home_dir() {
+                            dest_path_str = dest_path_str.replacen("~/", home.to_str().unwrap(), 1);
+                        } else {
+                            eprintln!(
+                                "{} Could not determine home directory. Skipping '{}'",
+                                "Warning:".yellow(),
+                                file_copy.destination
+                            );
+                            continue;
+                        }
+                    }
+
+                    let dest_path = PathBuf::from(&dest_path_str);
+
+                    let home = home::home_dir();
+                    let is_system_path = if let Some(ref h) = home {
+                        !dest_path.starts_with(h)
+                    } else {
+                        true
+                    };
+
+                    if is_system_path && !utils::is_admin() {
+                        return Err(format!("Administrator privileges required to write to {}. Please run with sudo or as an administrator.", dest_path.display()).into());
+                    }
+
+                    if let Some(parent) = dest_path.parent() {
+                        fs::create_dir_all(parent)?;
+                    }
+
+                    if source_in_archive.is_dir() {
+                        fs::create_dir_all(&dest_path)?;
+                        for entry in WalkDir::new(&source_in_archive)
+                            .into_iter()
+                            .filter_map(|e| e.ok())
+                        {
+                            let target_path =
+                                dest_path.join(entry.path().strip_prefix(&source_in_archive)?);
+                            if entry.file_type().is_dir() {
+                                fs::create_dir_all(&target_path)?;
+                            } else {
+                                fs::copy(entry.path(), &target_path)?;
+                            }
+                        }
+                    } else {
+                        fs::copy(&source_in_archive, &dest_path)?;
+                    }
+                    println!(
+                        "Copied {} to {}",
+                        file_copy.source.cyan(),
+                        dest_path.display()
+                    );
+                }
             }
         }
     }

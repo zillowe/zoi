@@ -20,6 +20,7 @@ use std::path::Path;
 use tar::Archive;
 use tempfile::Builder;
 use tokio::runtime::Runtime;
+use walkdir::WalkDir;
 use xz2::read::XzDecoder;
 use zip::ZipArchive;
 use zstd::stream::read::Decoder as ZstdDecoder;
@@ -606,6 +607,61 @@ fn build_for_platform(
                 metadata.installation.install_type
             )
             .into());
+        }
+    }
+
+    let source_base_path = if metadata.installation.install_type == "source" {
+        build_dir.path().join("git")
+    } else {
+        data_dir.clone()
+    };
+
+    if let Some(file_groups) = &metadata.installation.files {
+        println!("Staging additional files for packaging...");
+        let files_staging_dir = staging_dir.join("files");
+        fs::create_dir_all(&files_staging_dir)?;
+
+        for group in file_groups {
+            if utils::is_platform_compatible(platform, &group.platforms) {
+                for file_copy in &group.files {
+                    let source_path = source_base_path.join(&file_copy.source);
+                    let dest_in_archive = files_staging_dir.join(&file_copy.source);
+
+                    if !source_path.exists() {
+                        eprintln!(
+                            "{} Source path for file copy does not exist, skipping: {}",
+                            "Warning:".yellow(),
+                            source_path.display()
+                        );
+                        continue;
+                    }
+
+                    if let Some(parent) = dest_in_archive.parent() {
+                        fs::create_dir_all(parent)?;
+                    }
+
+                    if source_path.is_dir() {
+                        for entry in WalkDir::new(&source_path)
+                            .into_iter()
+                            .filter_map(|e| e.ok())
+                        {
+                            let target_path =
+                                dest_in_archive.join(entry.path().strip_prefix(&source_path)?);
+                            if entry.file_type().is_dir() {
+                                fs::create_dir_all(&target_path)?;
+                            } else {
+                                if let Some(p) = target_path.parent() {
+                                    fs::create_dir_all(p)?;
+                                }
+                                fs::copy(entry.path(), &target_path)?;
+                            }
+                        }
+                    } else {
+                        fs::copy(&source_path, &dest_in_archive)?;
+                    }
+                    println!("Staged '{}' for packaging.", file_copy.source.cyan());
+                }
+            }
         }
     }
 

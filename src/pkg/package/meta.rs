@@ -157,6 +157,23 @@ pub fn run(package_file: &Path, install_type: Option<String>) -> Result<(), Box<
         installation.assets = assets;
     }
 
+    installation.files = best_method_template.files.as_ref().map(|groups| {
+        groups
+            .iter()
+            .map(|g| super::structs::FileGroup {
+                platforms: g.platforms.clone(),
+                files: g
+                    .files
+                    .iter()
+                    .map(|f| super::structs::FileCopy {
+                        source: f.source.clone(),
+                        destination: f.destination.clone(),
+                    })
+                    .collect(),
+            })
+            .collect()
+    });
+
     let final_metadata = FinalMetadata {
         name: package_template.name,
         version,
