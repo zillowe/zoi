@@ -74,7 +74,7 @@ build:linux:
   before_script:
     - dpkg --add-architecture arm64
     - dpkg --add-architecture armhf
-    - apt-get update -y && apt-get install -y build-essential gcc gcc-aarch64-linux-gnu libssl-dev pkg-config libssl-dev:arm64 openssl libssl-dev:armhf gcc-mingw-w64-x86-64 liblzma-dev:arm64
+    - apt-get update -y && apt-get install -y build-essential gcc g++ gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libssl-dev pkg-config libssl-dev:arm64 openssl libssl-dev:armhf gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 liblzma-dev:arm64
   script:
     - echo "Building Linux (amd64, arm64) and Windows (amd64) targets..."
     - chmod +x ./build/build-linux.sh
