@@ -429,8 +429,8 @@ pub fn run(source: &str, args: Vec<String>) -> Result<(), Box<dyn Error>> {
 
     utils::print_repo_warning(&resolved_source.repo_name);
 
-    let content = fs::read_to_string(&resolved_source.path)?;
-    let pkg: types::Package = serde_yaml::from_str(&content)?;
+    let pkg: types::Package =
+        crate::pkg::lua_parser::parse_lua_package(resolved_source.path.to_str().unwrap())?;
 
     if pkg.package_type == types::PackageType::App {
         return Err("This package is an 'app' template. Use 'zoi create <pkg> <appName>' to create an app from it.".into());
