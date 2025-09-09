@@ -33,8 +33,6 @@ $ zoi install --repo Zillowe/Hello # default is GitHub
 $ zoi install --repo gl:Zillowe/Hello # gh: GitHub, gl: GitLab, cb: Codeberg
 ```
 
-- [ ] **Bsdiff Self-Update Improvements:** Fix and stabilize the patch-based self-update mechanism for `zoi upgrade`.
-
 ---
 
 ## Future & Long-Term Vision
@@ -46,6 +44,7 @@ These are features and ideas we are considering for future releases. They are no
 - [ ] **Managed Components (`zoi component`):** Introduce a new package type for managed, isolated developer tools (e.g. language servers, linters) that are not added to the user's PATH, but are managed by Zoi and can be executed via `zoi component exec` or integrated with other developer tools.
 - [ ] **Advanced Platform Selectors:** Enhance the `platforms` field in package definitions to allow for more granular targeting (OS version, kernel, DE, CPU/GPU, etc.).
 - [ ] **Project-Local Packages:** Install packages to a project-specific `.zoi/` directory using a `--local` flag, runnable with `zoi exec`.
+- [ ] **Bsdiff Self-Update Improvements:** Fix and stabilize the patch-based self-update mechanism for `zoi upgrade`.
 
 ---
 
