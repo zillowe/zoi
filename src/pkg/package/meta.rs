@@ -30,6 +30,30 @@ pub fn run(package_file: &Path, install_type: Option<String>) -> Result<(), Box<
             .ok_or("No suitable installation method found")?
     };
 
+    let platforms_to_process = {
+        let mut platforms = Vec::new();
+        if best_method_template.platforms.contains(&"all".to_string()) {
+            platforms.extend(vec![
+                "linux-amd64".to_string(),
+                "linux-arm64".to_string(),
+                "windows-amd64".to_string(),
+                "windows-arm64".to_string(),
+                "macos-amd64".to_string(),
+                "macos-arm64".to_string(),
+            ]);
+        } else {
+            for p in &best_method_template.platforms {
+                if p.contains('-') {
+                    platforms.push(p.clone());
+                } else {
+                    platforms.push(format!("{}-amd64", p));
+                    platforms.push(format!("{}-arm64", p));
+                }
+            }
+        }
+        platforms
+    };
+
     let mut installation = ResolvedInstallation {
         install_type: best_method_template.install_type.clone(),
         ..Default::default()
@@ -43,22 +67,6 @@ pub fn run(package_file: &Path, install_type: Option<String>) -> Result<(), Box<
 
         let mut build_commands_map = HashMap::new();
         let mut binary_path_map = HashMap::new();
-
-        let platforms_to_process = if best_method_template.platforms.contains(&"all".to_string()) {
-            vec![
-                "linux-amd64",
-                "linux-arm64",
-                "windows-amd64",
-                "windows-arm64",
-                "macos-amd64",
-                "macos-arm64",
-            ]
-            .into_iter()
-            .map(String::from)
-            .collect()
-        } else {
-            best_method_template.platforms.clone()
-        };
 
         for platform_str in &platforms_to_process {
             let parsed_for_platform = lua_parser::parse_lua_package_for_platform(
@@ -107,21 +115,6 @@ pub fn run(package_file: &Path, install_type: Option<String>) -> Result<(), Box<
             };
 
         let mut assets = Vec::new();
-        let platforms_to_process = if best_method_template.platforms.contains(&"all".to_string()) {
-            vec![
-                "linux-amd64",
-                "linux-arm64",
-                "windows-amd64",
-                "windows-arm64",
-                "macos-amd64",
-                "macos-arm64",
-            ]
-            .into_iter()
-            .map(String::from)
-            .collect()
-        } else {
-            best_method_template.platforms.clone()
-        };
 
         for platform_str in &platforms_to_process {
             let parsed_for_platform = lua_parser::parse_lua_package_for_platform(
