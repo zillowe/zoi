@@ -97,7 +97,8 @@ pub fn get_installed_packages_with_type() -> Result<Vec<InstalledPackage>, Box<d
         }
 
         if let Some(path) = pkg_file {
-            let pkg: Package = crate::pkg::lua_parser::parse_lua_package(path.to_str().unwrap())?;
+            let pkg: Package =
+                crate::pkg::lua_parser::parse_lua_package(path.to_str().unwrap(), None)?;
 
             let mut repo_field = manifest.repo.clone();
             if repo_field.is_empty()
@@ -157,8 +158,10 @@ pub fn get_all_available_packages() -> Result<Vec<super::types::Package>, Box<dy
             let pkg_file_path = entry.path().join(format!("{}.pkg.lua", pkg_name));
 
             if pkg_file_path.is_file() {
-                let mut pkg: super::types::Package =
-                    crate::pkg::lua_parser::parse_lua_package(pkg_file_path.to_str().unwrap())?;
+                let mut pkg: super::types::Package = crate::pkg::lua_parser::parse_lua_package(
+                    pkg_file_path.to_str().unwrap(),
+                    None,
+                )?;
 
                 if let Ok(repo_subpath) = entry.path().strip_prefix(&db_root) {
                     pkg.repo = repo_subpath.to_string_lossy().to_string();

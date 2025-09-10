@@ -339,7 +339,6 @@ fn build_for_platform(
                 return Err("Failed to start Docker container.".into());
             }
 
-            // Defer container cleanup
             let _cleanup = Defer::new(|| {
                 println!("Stopping and removing container...");
                 let _ = std::process::Command::new("docker")

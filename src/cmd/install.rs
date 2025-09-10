@@ -138,7 +138,7 @@ pub fn run(
                 utils::print_repo_warning(&resolved_source.repo_name);
 
                 if let Err(e) = install::run_installation(
-                    resolved_source.path.to_str().unwrap(),
+                    source,
                     mode.clone(),
                     force,
                     types::InstallReason::Direct,

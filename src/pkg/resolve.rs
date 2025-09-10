@@ -135,7 +135,7 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
 
             if path.exists() {
                 let pkg: types::Package =
-                    crate::pkg::lua_parser::parse_lua_package(path.to_str().unwrap())?;
+                    crate::pkg::lua_parser::parse_lua_package(path.to_str().unwrap(), None)?;
                 let major_repo = repo_name.split('/').next().unwrap_or("").to_lowercase();
                 let source_type = if major_repo == "core"
                     || major_repo == "main"
@@ -169,8 +169,10 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
                 let pkg_file_path = pkg_dir_path.join(format!("{}.pkg.lua", request.name));
 
                 if pkg_file_path.exists() {
-                    let pkg: types::Package =
-                        crate::pkg::lua_parser::parse_lua_package(pkg_file_path.to_str().unwrap())?;
+                    let pkg: types::Package = crate::pkg::lua_parser::parse_lua_package(
+                        pkg_file_path.to_str().unwrap(),
+                        None,
+                    )?;
                     let major_repo = repo_name.split('/').next().unwrap_or("").to_lowercase();
                     let source_type = if major_repo == "core"
                         || major_repo == "main"
@@ -215,10 +217,7 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
         }
     } else if found_packages.len() == 1 {
         let chosen = &found_packages[0];
-        println!(
-            "Found package '{}' in repo '{}'",
-            request.name, chosen.repo_name
-        );
+
         Ok(ResolvedSource {
             path: chosen.path.clone(),
             source_type: chosen.source_type.clone(),
@@ -532,7 +531,19 @@ fn get_version_for_install(
 }
 
 pub fn resolve_source(source: &str) -> Result<ResolvedSource, Box<dyn Error>> {
-    resolve_source_recursive(source, 0)
+    let resolved = resolve_source_recursive(source, 0)?;
+
+    if let Ok(request) = parse_source_string(source)
+        && !matches!(
+            &resolved.source_type,
+            SourceType::LocalFile | SourceType::Url
+        )
+        && let Some(repo_name) = &resolved.repo_name
+    {
+        println!("Found package '{}' in repo '{}'", request.name, repo_name);
+    }
+
+    Ok(resolved)
 }
 
 pub fn resolve_package_and_version(
@@ -550,15 +561,25 @@ pub fn resolve_package_and_version(
     let resolved_source = resolve_source_recursive(source_str, 0)?;
     let pkg_lua_path = resolved_source.path.clone();
 
-    let mut pkg =
-        crate::pkg::lua_parser::parse_lua_package(resolved_source.path.to_str().unwrap())?;
+    let pkg_template =
+        crate::pkg::lua_parser::parse_lua_package(resolved_source.path.to_str().unwrap(), None)?;
+
+    let mut pkg_with_repo = pkg_template;
+    if let Some(repo_name) = resolved_source.repo_name.clone() {
+        pkg_with_repo.repo = repo_name;
+    }
+
+    let version_string = get_version_for_install(&pkg_with_repo, &request.version_spec)?;
+
+    let mut pkg = crate::pkg::lua_parser::parse_lua_package(
+        resolved_source.path.to_str().unwrap(),
+        Some(&version_string),
+    )?;
     if let Some(repo_name) = resolved_source.repo_name.clone() {
         pkg.repo = repo_name;
     }
-
-    let version_string = get_version_for_install(&pkg, &request.version_spec)?;
-
     pkg.version = Some(version_string.clone());
+
     Ok((
         pkg,
         version_string,
@@ -656,7 +677,7 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, B
     };
 
     let pkg_for_alt_check =
-        crate::pkg::lua_parser::parse_lua_package(resolved_source.path.to_str().unwrap())?;
+        crate::pkg::lua_parser::parse_lua_package(resolved_source.path.to_str().unwrap(), None)?;
 
     if let Some(alt_source) = pkg_for_alt_check.alt {
         println!("Found 'alt' source. Resolving from: {}", alt_source.cyan());

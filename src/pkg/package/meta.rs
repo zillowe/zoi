@@ -72,6 +72,7 @@ pub fn run(package_file: &Path, install_type: Option<String>) -> Result<(), Box<
             let parsed_for_platform = lua_parser::parse_lua_package_for_platform(
                 package_file.to_str().unwrap(),
                 platform_str,
+                None,
             )?;
 
             let method_for_platform = parsed_for_platform
@@ -120,6 +121,7 @@ pub fn run(package_file: &Path, install_type: Option<String>) -> Result<(), Box<
             let parsed_for_platform = lua_parser::parse_lua_package_for_platform(
                 package_file.to_str().unwrap(),
                 platform_str,
+                None,
             )?;
 
             let method_for_platform = parsed_for_platform

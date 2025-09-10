@@ -6,6 +6,7 @@ use std::fs;
 pub fn parse_lua_package_for_platform(
     file_path: &str,
     platform: &str,
+    version_override: Option<&str>,
 ) -> std::result::Result<types::Package, Box<dyn Error>> {
     let lua_code = fs::read_to_string(file_path)?;
     let lua = Lua::new();
@@ -27,6 +28,9 @@ pub fn parse_lua_package_for_platform(
         && platform.starts_with("linux")
     {
         system_table.set("DISTRO", distro)?;
+    }
+    if let Some(ver) = version_override {
+        system_table.set("VERSION", ver)?;
     }
     lua.globals().set("SYSTEM", system_table)?;
 
@@ -93,7 +97,10 @@ pub fn parse_lua_package_for_platform(
     Ok(package)
 }
 
-pub fn parse_lua_package(file_path: &str) -> std::result::Result<types::Package, Box<dyn Error>> {
+pub fn parse_lua_package(
+    file_path: &str,
+    version_override: Option<&str>,
+) -> std::result::Result<types::Package, Box<dyn Error>> {
     let platform = utils::get_platform()?;
-    parse_lua_package_for_platform(file_path, &platform)
+    parse_lua_package_for_platform(file_path, &platform, version_override)
 }

@@ -15,9 +15,11 @@ pub fn run(source: &str, raw: bool) {
                 println!("{content}");
                 return;
             }
-            let mut pkg: Package =
-                crate::pkg::lua_parser::parse_lua_package(resolved_source.path.to_str().unwrap())
-                    .unwrap();
+            let mut pkg: Package = crate::pkg::lua_parser::parse_lua_package(
+                resolved_source.path.to_str().unwrap(),
+                None,
+            )
+            .unwrap();
             if let Some(repo_name) = resolved_source.repo_name {
                 pkg.repo = repo_name;
             }

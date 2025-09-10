@@ -695,6 +695,7 @@ pub fn get_all_packages_for_completion() -> Vec<PackageCompletion> {
                     (|| -> Result<_, Box<dyn Error>> {
                         let pkg = crate::pkg::lua_parser::parse_lua_package(
                             pkg_file_path.to_str().unwrap(),
+                            None,
                         )?;
                         Ok(PackageForCompletion {
                             description: Some(pkg.description),
