@@ -28,11 +28,20 @@ jobs:
           GITHUB_ISSUE_STATE: ${{ github.event.issue.state }}
           GITHUB_ACTION: ${{ github.event.action }}
         run: |
+          set -x
           if [ "$GITHUB_ACTION" == "opened" ]; then
-            glab issue create -R $GITLAB_PROJECT \
-              -t "GitHub Issue #${GITHUB_ISSUE_NUMBER}: $GITHUB_ISSUE_TITLE" \
-              -d "$GITHUB_ISSUE_BODY"
-          fi
+              echo "--- Creating new GitLab issue ---"
+              glab issue create -R $GITLAB_PROJECT \
+                -t "GitHub Issue #${GITHUB_ISSUE_NUMBER}: $GITHUB_ISSUE_TITLE" \
+                -d "$GITHUB_ISSUE_BODY"
+
+              if [ $? -ne 0 ]; then
+                echo "Error: 'glab issue create' failed."
+                exit 1
+              else
+                echo "Successfully ran 'glab issue create'."
+              fi
+            fi
           if [ "$GITHUB_ACTION" == "edited" ]; then
             glab issue update $GITLAB_ISSUE_IID -R $GITLAB_PROJECT \
               -t "GitHub Issue #${GITHUB_ISSUE_NUMBER}: $GITHUB_ISSUE_TITLE" \
