@@ -28,24 +28,19 @@ jobs:
           GITHUB_ISSUE_STATE: ${{ github.event.issue.state }}
           GITHUB_ACTION: ${{ github.event.action }}
         run: |
-          GITLAB_ISSUE_IID=$(glab issue list -R $GITLAB_PROJECT --search "GitHub Issue #${GITHUB_ISSUE_NUMBER}:" -F ids)
-
-          if [ -z "$GITLAB_ISSUE_IID" ]; then
-            if [ "$GITHUB_ACTION" == "opened" ]; then
-              glab issue create -R $GITLAB_PROJECT \
-                -t "GitHub Issue #${GITHUB_ISSUE_NUMBER}: $GITHUB_ISSUE_TITLE" \
-                -d "$GITHUB_ISSUE_BODY"
-            fi
-          else
-            if [ "$GITHUB_ACTION" == "edited" ]; then
-              glab issue update $GITLAB_ISSUE_IID -R $GITLAB_PROJECT \
-                -t "GitHub Issue #${GITHUB_ISSUE_NUMBER}: $GITHUB_ISSUE_TITLE" \
-                -d "$GITHUB_ISSUE_BODY"
-            elif [ "$GITHUB_ACTION" == "closed" ]; then
-              glab issue close $GITLAB_ISSUE_IID -R $GITLAB_PROJECT
-            elif [ "$GITHUB_ACTION" == "reopened" ]; then
-              glab issue reopen $GITLAB_ISSUE_IID -R $GITLAB_PROJECT
-            fi
+          if [ "$GITHUB_ACTION" == "opened" ]; then
+            glab issue create -R $GITLAB_PROJECT \
+              -t "GitHub Issue #${GITHUB_ISSUE_NUMBER}: $GITHUB_ISSUE_TITLE" \
+              -d "$GITHUB_ISSUE_BODY"
+          fi
+          if [ "$GITHUB_ACTION" == "edited" ]; then
+            glab issue update $GITLAB_ISSUE_IID -R $GITLAB_PROJECT \
+              -t "GitHub Issue #${GITHUB_ISSUE_NUMBER}: $GITHUB_ISSUE_TITLE" \
+              -d "$GITHUB_ISSUE_BODY"
+          elif [ "$GITHUB_ACTION" == "closed" ]; then
+            glab issue close $GITLAB_ISSUE_IID -R $GITLAB_PROJECT
+          elif [ "$GITHUB_ACTION" == "reopened" ]; then
+            glab issue reopen $GITLAB_ISSUE_IID -R $GITLAB_PROJECT
           fi
 
       - name: Mirror Pull Request
@@ -62,28 +57,23 @@ jobs:
           GITHUB_PR_SOURCE_BRANCH: ${{ github.event.pull_request.head.ref }}
           GITHUB_PR_TARGET_BRANCH: ${{ github.event.pull_request.base.ref }}
         run: |
-          GITLAB_MR_IID=$(glab mr list -R $GITLAB_PROJECT --search "GitHub PR #${GITHUB_PR_NUMBER}:" -F ids)
-
-          if [ -z "$GITLAB_MR_IID" ]; then
-            if [ "$GITHUB_ACTION" == "opened" ]; then
-              glab mr create -R $GITLAB_PROJECT \
-                -t "GitHub PR #${GITHUB_PR_NUMBER}: $GITHUB_PR_TITLE" \
-                -d "$GITHUB_PR_BODY" \
-                --source-branch "$GITHUB_PR_SOURCE_BRANCH" \
-                --target-branch "$GITHUB_PR_TARGET_BRANCH"
+          if [ "$GITHUB_ACTION" == "opened" ]; then
+            glab mr create -R $GITLAB_PROJECT \
+              -t "GitHub PR #${GITHUB_PR_NUMBER}: $GITHUB_PR_TITLE" \
+              -d "$GITHUB_PR_BODY" \
+              --source-branch "$GITHUB_PR_SOURCE_BRANCH" \
+              --target-branch "$GITHUB_PR_TARGET_BRANCH"
+          fi
+          if [ "$GITHUB_ACTION" == "edited" ]; then
+            glab mr update $GITLAB_MR_IID -R $GITLAB_PROJECT \
+              -t "GitHub PR #${GITHUB_PR_NUMBER}: $GITHUB_PR_TITLE" \
+              -d "$GITHUB_PR_BODY"
+          elif [ "$GITHUB_ACTION" == "closed" ]; then
+            if [ "$GITHUB_PR_MERGED" == "true" ]; then
+              glab mr merge $GITLAB_MR_IID -R $GITLAB_PROJECT
+            else
+              glab mr close $GITLAB_MR_IID -R $GITLAB_PROJECT
             fi
-          else
-            if [ "$GITHUB_ACTION" == "edited" ]; then
-              glab mr update $GITLAB_MR_IID -R $GITLAB_PROJECT \
-                -t "GitHub PR #${GITHUB_PR_NUMBER}: $GITHUB_PR_TITLE" \
-                -d "$GITHUB_PR_BODY"
-            elif [ "$GITHUB_ACTION" == "closed" ]; then
-              if [ "$GITHUB_PR_MERGED" == "true" ]; then
-                glab mr merge $GITLAB_MR_IID -R $GITLAB_PROJECT
-              else
-                glab mr close $GITLAB_MR_IID -R $GITLAB_PROJECT
-              fi
-            elif [ "$GITHUB_ACTION" == "reopened" ]; then
-              glab mr reopen $GITLAB_MR_IID -R $GITLAB_PROJECT
-            fi
+          elif [ "$GITHUB_ACTION" == "reopened" ]; then
+            glab mr reopen $GITLAB_MR_IID -R $GITLAB_PROJECT
           fi
