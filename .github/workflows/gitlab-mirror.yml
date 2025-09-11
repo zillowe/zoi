@@ -3,7 +3,7 @@ name: GitLab Mirror
 on:
   issues:
     types: [opened, edited, closed, reopened]
-  pull_request:
+  pull_request_target:
     types: [opened, edited, closed, reopened, synchronize]
 
 jobs:
@@ -48,7 +48,7 @@ jobs:
           fi
 
       - name: Push PR Branch to GitLab Fork
-        if: github.event_name == 'pull_request' && github.event.action != 'closed'
+        if: github.event_name == 'pull_request_target' && github.event.action != 'closed'
         env:
           GITLAB_FORK_PROJECT_PATH: "Zillowe/Zillwen/Zusty/test"
           GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
