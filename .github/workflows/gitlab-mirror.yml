@@ -41,15 +41,14 @@ jobs:
                 -d "$GITHUB_ISSUE_BODY"
             fi
           else
-            if [ "$GITHUB_ACTION" == "edited" ]; {
+            if [ "$GITHUB_ACTION" == "edited" ]; then
               glab issue update $GITLAB_ISSUE_IID -R $GITLAB_PROJECT \
                 -t "GitHub Issue #${GITHUB_ISSUE_NUMBER}: $GITHUB_ISSUE_TITLE" \
                 -d "$GITHUB_ISSUE_BODY"
-            } elif [ "$GITHUB_ACTION" == "closed" ]; {
+            elif [ "$GITHUB_ACTION" == "closed" ]; then
               glab issue close $GITLAB_ISSUE_IID -R $GITLAB_PROJECT
-            } elif [ "$GITHUB_ACTION" == "reopened" ]; {
+            elif [ "$GITHUB_ACTION" == "reopened" ]; then
               glab issue reopen $GITLAB_ISSUE_IID -R $GITLAB_PROJECT
-            }
             fi
           fi
 
@@ -77,18 +76,17 @@ jobs:
                 --target-branch "$GITHUB_PR_TARGET_BRANCH"
             fi
           else
-            if [ "$GITHUB_ACTION" == "edited" ]; {
+            if [ "$GITHUB_ACTION" == "edited" ]; then
               glab mr update $GITLAB_MR_IID -R $GITLAB_PROJECT \
                 -t "GitHub PR #${GITHUB_PR_NUMBER}: $GITHUB_PR_TITLE" \
                 -d "$GITHUB_PR_BODY"
-            } elif [ "$GITHUB_ACTION" == "closed" ]; {
+            elif [ "$GITHUB_ACTION" == "closed" ]; then
               if [ "$GITHUB_PR_MERGED" == "true" ]; then
                 glab mr merge $GITLAB_MR_IID -R $GITLAB_PROJECT
               else
                 glab mr close $GITLAB_MR_IID -R $GITLAB_PROJECT
               fi
-            } elif [ "$GITHUB_ACTION" == "reopened" ]; {
+            elif [ "$GITHUB_ACTION" == "reopened" ]; then
               glab mr reopen $GITLAB_MR_IID -R $GITLAB_PROJECT
-            }
             fi
           fi
