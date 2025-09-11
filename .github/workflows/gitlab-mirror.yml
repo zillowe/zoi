@@ -72,7 +72,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         env:
           GITLAB_FORK_PROJECT_PATH: "Zillowe/Zillwen/Zusty/Zoi-2"
-          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          GL_TOKEN: ${{ secrets.GL_TOKEN }}
           GITHUB_PR_NUMBER: ${{ steps.pr_data.outputs.pr_number }}
           GITHUB_PR_USER: ${{ steps.pr_data.outputs.pr_user }}
           GITHUB_PR_SOURCE_BRANCH: ${{ steps.pr_data.outputs.pr_source_branch }}
@@ -80,7 +80,7 @@ jobs:
           GITLAB_BRANCH_NAME="${GITHUB_PR_USER}/${GITHUB_PR_SOURCE_BRANCH}"
           git config --global user.name "GitHub Actions Mirror"
           git config --global user.email "actions-mirror@github.com"
-          git remote add gitlab "https://oauth2:${GITLAB_TOKEN}@gitlab.com/${GITLAB_FORK_PROJECT_PATH}.git"
+          git remote add gitlab "https://oauth2:${GL_TOKEN}@gitlab.com/${GITLAB_FORK_PROJECT_PATH}.git"
 
           echo "Fetching PR #${GITHUB_PR_NUMBER} from GitHub..."
           git fetch origin "refs/pull/${GITHUB_PR_NUMBER}/head"
