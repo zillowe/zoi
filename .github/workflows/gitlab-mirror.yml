@@ -57,50 +57,50 @@ jobs:
           GITLAB_BRANCH_NAME="${GITHUB_PR_USER}/${GITHUB_PR_SOURCE_BRANCH}"
           git config --global user.name "GitHub Actions Mirror"
           git config --global user.email "actions-mirror@github.com"
-          git remote add gitlab "https://oauth2:${{ secrets.GITLAB_TOKEN }}@gitlab.com/Zillowe/Zillwen/Zusty/Zoi-2.git"
+          git remote add gitlab "https://oauth2:${{ secrets.GITLAB_TOKEN }}@gitlab.com/Zillowe/Zillwen/Zusty/test.git"
           echo "Fetching PR #${GITHUB_PR_NUMBER} from GitHub..."
           git fetch origin "refs/pull/${GITHUB_PR_NUMBER}/head"
           echo "Pushing to GitLab fork branch '${GITLAB_BRANCH_NAME}'..."
           git push -u gitlab FETCH_HEAD:"refs/heads/${GITLAB_BRANCH_NAME}" --force
 
-      - name: Create Cross-Project Merge Request
-        if: github.event_name == 'pull_request'
-        env:
-          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
-          GITLAB_MAIN_PROJECT: "Zillowe/Zillwen/Zusty/Zoi"
-          GITHUB_PR_TITLE: ${{ github.event.pull_request.title }}
-          GITHUB_PR_BODY: ${{ github.event.pull_request.body }}
-          GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
-          GITHUB_ACTION: ${{ github.event.action }}
-          GITHUB_PR_MERGED: ${{ github.event.pull_request.merged }}
-          GITHUB_PR_USER: ${{ github.event.pull_request.user.login }}
-          GITHUB_PR_SOURCE_BRANCH: ${{ github.event.pull_request.head.ref }}
-          GITHUB_PR_TARGET_BRANCH: ${{ github.event.pull_request.base.ref }}
-        run: |
-          GITLAB_BRANCH_NAME="${GITHUB_PR_USER}/${GITHUB_PR_SOURCE_BRANCH}"
-
-          GITLAB_MR_IID=$(glab mr list -R "$GITLAB_MAIN_PROJECT" --search "GitHub PR #${GITHUB_PR_NUMBER}:" -F ids)
-          if [ -z "$GITLAB_MR_IID" ]; then
-            if [ "${{ env.GITHUB_ACTION }}" == "opened" ]; then
-              echo "Creating new cross-project MR in '${GITLAB_MAIN_PROJECT}' from source branch '${GITLAB_BRANCH_NAME}'..."
-              glab mr create -R "$GITLAB_MAIN_PROJECT" \
-                --title "GitHub PR #${GITHUB_PR_NUMBER}: $GITHUB_PR_TITLE" \
-                --description "$GITHUB_PR_BODY" \
-                --source-branch "$GITLAB_BRANCH_NAME" \
-                --target-branch "$GITHUB_PR_TARGET_BRANCH" \
-                --remove-source-branch \
-                --yes
-            fi
-          else
-            if [ "${{ env.GITHUB_ACTION }}" == "edited" ]; then
-              glab mr update "$GITLAB_MR_IID" -R "$GITLAB_MAIN_PROJECT" --title "GitHub PR #${GITHUB_PR_NUMBER}: $GITHUB_PR_TITLE" --description "$GITHUB_PR_BODY"
-            elif [ "${{ env.GITHUB_ACTION }}" == "closed" ]; then
-              if [ "${{ env.GITHUB_PR_MERGED }}" == "true" ]; then
-                glab mr merge "$GITLAB_MR_IID" -R "$GITLAB_MAIN_PROJECT" --yes
-              else
-                glab mr close "$GITLAB_MR_IID" -R "$GITLAB_MAIN_PROJECT"
-              fi
-            elif [ "${{ env.GITHUB_ACTION }}" == "reopened" ]; then
-              glab mr reopen "$GITLAB_MR_IID" -R "$GITLAB_MAIN_PROJECT"
-            fi
-          fi
+      # - name: Create Cross-Project Merge Request
+      #   if: github.event_name == 'pull_request'
+      #   env:
+      #     GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+      #     GITLAB_MAIN_PROJECT: "Zillowe/Zillwen/Zusty/Zoi"
+      #     GITHUB_PR_TITLE: ${{ github.event.pull_request.title }}
+      #     GITHUB_PR_BODY: ${{ github.event.pull_request.body }}
+      #     GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
+      #     GITHUB_ACTION: ${{ github.event.action }}
+      #     GITHUB_PR_MERGED: ${{ github.event.pull_request.merged }}
+      #     GITHUB_PR_USER: ${{ github.event.pull_request.user.login }}
+      #     GITHUB_PR_SOURCE_BRANCH: ${{ github.event.pull_request.head.ref }}
+      #     GITHUB_PR_TARGET_BRANCH: ${{ github.event.pull_request.base.ref }}
+      #   run: |
+      #     GITLAB_BRANCH_NAME="${GITHUB_PR_USER}/${GITHUB_PR_SOURCE_BRANCH}"
+      #
+      #     GITLAB_MR_IID=$(glab mr list -R "$GITLAB_MAIN_PROJECT" --search "GitHub PR #${GITHUB_PR_NUMBER}:" -F ids)
+      #     if [ -z "$GITLAB_MR_IID" ]; then
+      #       if [ "${{ env.GITHUB_ACTION }}" == "opened" ]; then
+      #         echo "Creating new cross-project MR in '${GITLAB_MAIN_PROJECT}' from source branch '${GITLAB_BRANCH_NAME}'..."
+      #         glab mr create -R "$GITLAB_MAIN_PROJECT" \
+      #           --title "GitHub PR #${GITHUB_PR_NUMBER}: $GITHUB_PR_TITLE" \
+      #           --description "$GITHUB_PR_BODY" \
+      #           --source-branch "$GITLAB_BRANCH_NAME" \
+      #           --target-branch "$GITHUB_PR_TARGET_BRANCH" \
+      #           --remove-source-branch \
+      #           --yes
+      #       fi
+      #     else
+      #       if [ "${{ env.GITHUB_ACTION }}" == "edited" ]; then
+      #         glab mr update "$GITLAB_MR_IID" -R "$GITLAB_MAIN_PROJECT" --title "GitHub PR #${GITHUB_PR_NUMBER}: $GITHUB_PR_TITLE" --description "$GITHUB_PR_BODY"
+      #       elif [ "${{ env.GITHUB_ACTION }}" == "closed" ]; then
+      #         if [ "${{ env.GITHUB_PR_MERGED }}" == "true" ]; then
+      #           glab mr merge "$GITLAB_MR_IID" -R "$GITLAB_MAIN_PROJECT" --yes
+      #         else
+      #           glab mr close "$GITLAB_MR_IID" -R "$GITLAB_MAIN_PROJECT"
+      #         fi
+      #       elif [ "${{ env.GITHUB_ACTION }}" == "reopened" ]; then
+      #         glab mr reopen "$GITLAB_MR_IID" -R "$GITLAB_MAIN_PROJECT"
+      #       fi
+      #     fi
