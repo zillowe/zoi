@@ -66,7 +66,6 @@ jobs:
           GITHUB_PR_TARGET_BRANCH: ${{ github.event.pull_request.base.ref }}
         run: |
           GITLAB_MR_IID=$(glab mr list -R $GITLAB_PROJECT --search "GitHub PR #${GITHUB_PR_NUMBER}:" -F ids)
-
           if [ -z "$GITLAB_MR_IID" ]; then
             if [ "$GITHUB_ACTION" == "opened" ]; then
               glab mr create -R $GITLAB_PROJECT \
