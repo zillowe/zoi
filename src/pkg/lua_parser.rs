@@ -3,6 +3,29 @@ use mlua::{self, Lua, LuaSerdeExt, Table, Value};
 use std::error::Error;
 use std::fs;
 
+fn add_fetch_util(lua: &Lua) -> Result<(), mlua::Error> {
+    let fetch_fn = lua.create_function(|lua, url: String| -> Result<Table, mlua::Error> {
+        let response =
+            reqwest::blocking::get(url).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+
+        let fetch_response = lua.create_table()?;
+
+        fetch_response.set("status", response.status().as_u16())?;
+
+        let response_text = response
+            .text()
+            .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+
+        fetch_response.set("text", response_text)?;
+
+        Ok(fetch_response)
+    })?;
+
+    lua.globals().set("fetch", fetch_fn)?;
+
+    Ok(())
+}
+
 pub fn parse_lua_package_for_platform(
     file_path: &str,
     platform: &str,
@@ -76,6 +99,8 @@ pub fn parse_lua_package_for_platform(
         Ok(())
     })?;
     lua.globals().set("dependencies", dependencies_fn)?;
+
+    add_fetch_util(&lua)?;
 
     lua.load(&lua_code).exec()?;
 
