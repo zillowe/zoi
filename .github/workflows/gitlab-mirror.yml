@@ -50,7 +50,6 @@ jobs:
       - name: Push PR Branch to GitLab Fork
         if: github.event_name == 'pull_request' && github.event.action != 'closed'
         env:
-          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
           GITLAB_FORK_PROJECT_PATH: "Zillowe/Zillwen/Zusty/Zoi-2"
           GITHUB_PR_USER: ${{ github.event.pull_request.user.login }}
           GITHUB_PR_SOURCE_BRANCH: ${{ github.event.pull_request.head.ref }}
@@ -59,7 +58,7 @@ jobs:
           GITLAB_BRANCH_NAME="${GITHUB_PR_USER}/${GITHUB_PR_SOURCE_BRANCH}"
           git config --global user.name "GitHub Actions Mirror"
           git config --global user.email "actions-mirror@github.com"
-          git remote add gitlab "https://oauth2:${GITLAB_TOKEN}@gitlab.com/${GITLAB_FORK_PROJECT_PATH}.git"
+          git remote add gitlab "https://oauth2:${{ secrets.GITLAB_TOKEN }}@gitlab.com/${GITLAB_FORK_PROJECT_PATH}.git"
           echo "Fetching PR #${GITHUB_PR_NUMBER} from GitHub..."
           git fetch origin "refs/pull/${GITHUB_PR_NUMBER}/head"
           echo "Pushing to GitLab fork branch '${GITLAB_BRANCH_NAME}'..."
