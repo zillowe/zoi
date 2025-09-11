@@ -17,14 +17,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y glab
 
-      - name: Authenticate with GitLab
-        env:
-          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
-        run: glab auth login --hostname gitlab.com --stdin <<< "$GITLAB_TOKEN"
-
       - name: Mirror Issue
         if: github.event_name == 'issues'
         env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
           GITLAB_PROJECT: "Zillowe/Zillwen/Zusty/Zoi"
           GITHUB_ISSUE_TITLE: ${{ github.event.issue.title }}
           GITHUB_ISSUE_BODY: ${{ github.event.issue.body }}
@@ -55,6 +51,7 @@ jobs:
       - name: Mirror Pull Request
         if: github.event_name == 'pull_request'
         env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
           GITLAB_PROJECT: "Zillowe/Zillwen/Zusty/Zoi"
           GITHUB_PR_TITLE: ${{ github.event.pull_request.title }}
           GITHUB_PR_BODY: ${{ github.event.pull_request.body }}
