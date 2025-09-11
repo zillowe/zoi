@@ -3,12 +3,14 @@ name: GitLab Mirror
 on:
   issues:
     types: [opened, edited, closed, reopened]
-  pull_request_target:
+  pull_request:
     types: [opened, edited, closed, reopened, synchronize]
+  workflow_dispatch:
 
 jobs:
   mirror-to-gitlab:
     runs-on: blacksmith-4vcpu-ubuntu-2204
+    environment: gated-env
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -48,7 +50,7 @@ jobs:
           fi
 
       - name: Push PR Branch to GitLab Fork
-        if: github.event_name == 'pull_request_target' && github.event.action != 'closed'
+        if: github.event_name == 'pull_request' && github.event.action != 'closed'
         env:
           GITLAB_FORK_PROJECT_PATH: "Zillowe/Zillwen/Zusty/test"
           GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
