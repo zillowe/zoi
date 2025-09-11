@@ -1,0 +1,94 @@
+name: GitLab Mirror
+
+on:
+  issues:
+    types: [opened, edited, closed, reopened]
+  pull_request:
+    types: [opened, edited, closed, reopened]
+
+jobs:
+  mirror-to-gitlab:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install glab
+        run: |
+          sudo apt-get update
+          curl -sSL "https://raw.githubusercontent.com/upciti/wakemeops/main/assets/install_repository" | sudo bash
+          sudo apt-get update
+          sudo apt-get install -y glab
+
+      - name: Authenticate with GitLab
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+        run: glab auth login --hostname gitlab.com --stdin <<< "$GITLAB_TOKEN"
+
+      - name: Mirror Issue
+        if: github.event_name == 'issues'
+        env:
+          GITLAB_PROJECT: "Zillowe/Zillwen/Zusty/Zoi"
+          GITHUB_ISSUE_TITLE: ${{ github.event.issue.title }}
+          GITHUB_ISSUE_BODY: ${{ github.event.issue.body }}
+          GITHUB_ISSUE_NUMBER: ${{ github.event.issue.number }}
+          GITHUB_ISSUE_STATE: ${{ github.event.issue.state }}
+          GITHUB_ACTION: ${{ github.event.action }}
+        run: |
+          GITLAB_ISSUE_IID=$(glab issue list -R $GITLAB_PROJECT --search "GitHub Issue #${GITHUB_ISSUE_NUMBER}:" -F ids)
+
+          if [ -z "$GITLAB_ISSUE_IID" ]; then
+            if [ "$GITHUB_ACTION" == "opened" ]; then
+              glab issue create -R $GITLAB_PROJECT \
+                -t "GitHub Issue #${GITHUB_ISSUE_NUMBER}: $GITHUB_ISSUE_TITLE" \
+                -d "$GITHUB_ISSUE_BODY"
+            fi
+          else
+            if [ "$GITHUB_ACTION" == "edited" ]; {
+              glab issue update $GITLAB_ISSUE_IID -R $GITLAB_PROJECT \
+                -t "GitHub Issue #${GITHUB_ISSUE_NUMBER}: $GITHUB_ISSUE_TITLE" \
+                -d "$GITHUB_ISSUE_BODY"
+            } elif [ "$GITHUB_ACTION" == "closed" ]; {
+              glab issue close $GITLAB_ISSUE_IID -R $GITLAB_PROJECT
+            } elif [ "$GITHUB_ACTION" == "reopened" ]; {
+              glab issue reopen $GITLAB_ISSUE_IID -R $GITLAB_PROJECT
+            }
+            fi
+          fi
+
+      - name: Mirror Pull Request
+        if: github.event_name == 'pull_request'
+        env:
+          GITLAB_PROJECT: "Zillowe/Zillwen/Zusty/Zoi"
+          GITHUB_PR_TITLE: ${{ github.event.pull_request.title }}
+          GITHUB_PR_BODY: ${{ github.event.pull_request.body }}
+          GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_PR_STATE: ${{ github.event.pull_request.state }}
+          GITHUB_ACTION: ${{ github.event.action }}
+          GITHUB_PR_MERGED: ${{ github.event.pull_request.merged }}
+          GITHUB_PR_SOURCE_BRANCH: ${{ github.event.pull_request.head.ref }}
+          GITHUB_PR_TARGET_BRANCH: ${{ github.event.pull_request.base.ref }}
+        run: |
+          GITLAB_MR_IID=$(glab mr list -R $GITLAB_PROJECT --search "GitHub PR #${GITHUB_PR_NUMBER}:" -F ids)
+
+          if [ -z "$GITLAB_MR_IID" ]; then
+            if [ "$GITHUB_ACTION" == "opened" ]; then
+              glab mr create -R $GITLAB_PROJECT \
+                -t "GitHub PR #${GITHUB_PR_NUMBER}: $GITHUB_PR_TITLE" \
+                -d "$GITHUB_PR_BODY" \
+                --source-branch "$GITHUB_PR_SOURCE_BRANCH" \
+                --target-branch "$GITHUB_PR_TARGET_BRANCH"
+            fi
+          else
+            if [ "$GITHUB_ACTION" == "edited" ]; {
+              glab mr update $GITLAB_MR_IID -R $GITLAB_PROJECT \
+                -t "GitHub PR #${GITHUB_PR_NUMBER}: $GITHUB_PR_TITLE" \
+                -d "$GITHUB_PR_BODY"
+            } elif [ "$GITHUB_ACTION" == "closed" ]; {
+              if [ "$GITHUB_PR_MERGED" == "true" ]; then
+                glab mr merge $GITLAB_MR_IID -R $GITLAB_PROJECT
+              else
+                glab mr close $GITLAB_MR_IID -R $GITLAB_PROJECT
+              fi
+            } elif [ "$GITHUB_ACTION" == "reopened" ]; {
+              glab mr reopen $GITLAB_MR_IID -R $GITLAB_PROJECT
+            }
+            fi
+          fi
