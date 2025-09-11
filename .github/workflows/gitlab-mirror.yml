@@ -50,8 +50,8 @@ jobs:
       - name: Push PR Branch to GitLab Fork
         if: github.event_name == 'pull_request' && github.event.action != 'closed'
         env:
-          GITLAB_FORK_PROJECT_PATH: "Zillowe/Zillwen/Zusty/Zoi-2"
           GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          GITLAB_FORK_PROJECT_PATH: "Zillowe/Zillwen/Zusty/Zoi-2"
           GITHUB_PR_USER: ${{ github.event.pull_request.user.login }}
           GITHUB_PR_SOURCE_BRANCH: ${{ github.event.pull_request.head.ref }}
           GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -68,8 +68,8 @@ jobs:
       - name: Create Cross-Project Merge Request
         if: github.event_name == 'pull_request'
         env:
-          GITLAB_MAIN_PROJECT: "Zillowe/Zillwen/Zusty/Zoi"
           GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          GITLAB_MAIN_PROJECT: "Zillowe/Zillwen/Zusty/Zoi"
           GITHUB_PR_TITLE: ${{ github.event.pull_request.title }}
           GITHUB_PR_BODY: ${{ github.event.pull_request.body }}
           GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
