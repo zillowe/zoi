@@ -3,8 +3,6 @@ name: GitLab Mirror
 on:
   issues:
     types: [opened, edited, closed, reopened]
-  pull_request:
-    types: [opened, edited, closed, reopened, synchronize]
   workflow_dispatch:
 
 jobs:
