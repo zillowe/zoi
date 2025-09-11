@@ -88,42 +88,46 @@ jobs:
           echo "Pushing to GitLab fork branch '${GITLAB_BRANCH_NAME}'..."
           git push -u gitlab FETCH_HEAD:"refs/heads/${GITLAB_BRANCH_NAME}" --force
 
-      # - name: Create or Update Cross-Project Merge Request
-      #   if: github.event_name == 'workflow_dispatch'
-      #   env:
-      #     GITLAB_MAIN_PROJECT: "Zillowe/Zillwen/Zusty/Zoi"
-      #     GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
-      #     GITHUB_PR_NUMBER: ${{ steps.pr_data.outputs.pr_number }}
-      #     GITHUB_PR_TITLE: ${{ steps.pr_data.outputs.pr_title }}
-      #     GITHUB_PR_BODY: ${{ steps.pr_data.outputs.pr_body }}
-      #     GITHUB_PR_STATE: ${{ steps.pr_data.outputs.pr_state }}
-      #     GITHUB_PR_USER: ${{ steps.pr_data.outputs.pr_user }}
-      #     GITHUB_PR_SOURCE_BRANCH: ${{ steps.pr_data.outputs.pr_source_branch }}
-      #     GITHUB_PR_TARGET_BRANCH: ${{ steps.pr_data.outputs.pr_target_branch }}
-      #   run: |
-      #     GITLAB_BRANCH_NAME="${GITHUB_PR_USER}/${GITHUB_PR_SOURCE_BRANCH}"
-      #     GITLAB_MR_IID=$(glab mr list -R "$GITLAB_MAIN_PROJECT" --search "GitHub PR #${GITHUB_PR_NUMBER}:" -F ids)
-      #
-      #     if [ -z "$GITLAB_MR_IID" ]; then
-      #       if [ "${{ env.GITHUB_PR_STATE }}" == "OPEN" ]; then
-      #         echo "Creating new cross-project MR..."
-      #         glab mr create -R "$GITLAB_MAIN_PROJECT" \
-      #           --title "GitHub PR #${GITHUB_PR_NUMBER}: $GITHUB_PR_TITLE" \
-      #           --description "$GITHUB_PR_BODY" \
-      #           --source-branch "$GITLAB_BRANCH_NAME" \
-      #           --target-branch "$GITHUB_PR_TARGET_BRANCH" \
-      #           --remove-source-branch \
-      #           --yes
-      #       fi
-      #     else
-      #       echo "Updating existing MR #${GITLAB_MR_IID}"
-      #       glab mr update "$GITLAB_MR_IID" -R "$GITLAB_MAIN_PROJECT" --title "GitHub PR #${GITHUB_PR_NUMBER}: $GITHUB_PR_TITLE" --description "$GITHUB_PR_BODY"
-      #
-      #       if [ "${{ env.GITHUB_PR_STATE }}" == "MERGED" ]; then
-      #         glab mr merge "$GITLAB_MR_IID" -R "$GITLAB_MAIN_PROJECT" --yes
-      #       elif [ "${{ env.GITHUB_PR_STATE }}" == "CLOSED" ]; then
-      #         glab mr close "$GITLAB_MR_IID" -R "$GITLAB_MAIN_PROJECT"
-      #       elif [ "${{ env.GITHUB_PR_STATE }}" == "OPEN" ]; then
-      #         glab mr reopen "$GITLAB_MR_IID" -R "$GITLAB_MAIN_PROJECT"
-      #       fi
-      #     fi
+      - name: Create or Update Cross-Project Merge Request
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GITLAB_MAIN_PROJECT: "Zillowe/Zillwen/Zusty/Zoi"
+          GITLAB_FORK_PROJECT: "Zillowe/Zillwen/Zusty/Zoi-2"
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          GITHUB_PR_NUMBER: ${{ steps.pr_data.outputs.pr_number }}
+          GITHUB_PR_TITLE: ${{ steps.pr_data.outputs.pr_title }}
+          GITHUB_PR_BODY: ${{ steps.pr_data.outputs.pr_body }}
+          GITHUB_PR_STATE: ${{ steps.pr_data.outputs.pr_state }}
+          GITHUB_PR_USER: ${{ steps.pr_data.outputs.pr_user }}
+          GITHUB_PR_SOURCE_BRANCH: ${{ steps.pr_data.outputs.pr_source_branch }}
+          GITHUB_PR_TARGET_BRANCH: ${{ steps.pr_data.outputs.pr_target_branch }}
+        run: |
+          GITLAB_BRANCH_NAME="${GITHUB_PR_USER}/${GITHUB_PR_SOURCE_BRANCH}"
+          export GITLAB_REPO="$GITLAB_MAIN_PROJECT"
+
+          GITLAB_MR_IID=$(glab mr list --search "GitHub PR #${GITHUB_PR_NUMBER}:" -F ids)
+
+          if [ -z "$GITLAB_MR_IID" ]; then
+            if [ "${{ env.GITHUB_PR_STATE }}" == "OPEN" ]; then
+              echo "Creating new cross-project MR from source repo '${GITLAB_FORK_PROJECT}'..."
+              glab mr create \
+                --title "GitHub PR #${GITHUB_PR_NUMBER}: $GITHUB_PR_TITLE" \
+                --description "$GITHUB_PR_BODY" \
+                --source-branch "$GITLAB_BRANCH_NAME" \
+                --target-branch "$GITHUB_PR_TARGET_BRANCH" \
+                --head "$GITLAB_FORK_PROJECT" \
+                --remove-source-branch \
+                --yes
+            fi
+          else
+            echo "Updating existing MR #${GITLAB_MR_IID}"
+            glab mr update "$GITLAB_MR_IID" --title "GitHub PR #${GITHUB_PR_NUMBER}: $GITHUB_PR_TITLE" --description "$GITHUB_PR_BODY"
+            
+            if [ "${{ env.GITHUB_PR_STATE }}" == "MERGED" ]; then
+              glab mr merge "$GITLAB_MR_IID" --yes
+            elif [ "${{ env.GITHUB_PR_STATE }}" == "CLOSED" ]; then
+              glab mr close "$GITLAB_MR_IID"
+            elif [ "${{ env.GITHUB_PR_STATE }}" == "OPEN" ]; then
+              glab mr reopen "$GITLAB_MR_IID"
+            fi
+          fi
