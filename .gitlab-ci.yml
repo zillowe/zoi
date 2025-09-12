@@ -19,8 +19,6 @@ stages:
 
 .rust_setup:
   image: rust:latest
-  tags:
-    - saas-linux-large-amd64
   before_script:
     - apt-get update -yq && apt-get install -y build-essential gcc
 
