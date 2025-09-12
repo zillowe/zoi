@@ -12,17 +12,29 @@ stages:
     key:
       files:
         - Cargo.lock
+      prefix: $CI_COMMIT_REF_SLUG
     paths:
       - .cargo/
       - target/
 
+.rust_setup:
+  image: rust:latest
+  tags:
+    - saas-linux-large-amd64
+  before_script:
+    - apt-get update -yq && apt-get install -y build-essential gcc
+
 format:
   stage: test
-  image: rust:latest
+  extends:
+    - .cargo_cache
+    - .rust_setup
   before_script:
     - rustup component add rustfmt
   script:
     - cargo fmt -- --check
+  cache:
+    policy: pull
   rules:
     - if: $CI_COMMIT_TAG
       when: never
@@ -31,14 +43,12 @@ format:
 
 lint:
   stage: test
-  image: rust:latest
-  extends: .cargo_cache
-  tags:
-    - saas-linux-large-amd64
+  extends:
+    - .cargo_cache
+    - .rust_setup
   variables:
     RUSTFLAGS: "-Dwarnings"
   before_script:
-    - apt-get update -y && apt-get install -y build-essential gcc
     - rustup component add clippy
   script:
     - cargo clippy --all-targets --all-features
@@ -50,14 +60,11 @@ lint:
 
 test:
   stage: test
-  image: rust:latest
-  extends: .cargo_cache
-  tags:
-    - saas-linux-large-amd64
+  extends:
+    - .cargo_cache
+    - .rust_setup
   variables:
     RUSTFLAGS: "-Dwarnings"
-  before_script:
-    - apt-get update -y && apt-get install -y build-essential gcc
   script:
     - cargo test --all-features
   rules:
