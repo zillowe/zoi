@@ -120,11 +120,5 @@ jobs:
                 --yes
             fi
           else
-            echo "Updating existing MR #${GITLAB_MR_IID}"
-            glab mr update "$GITLAB_MR_IID" --title "GitHub PR #${GITHUB_PR_NUMBER}: $GITHUB_PR_TITLE" --description "$GITHUB_PR_BODY"
-            if [ "${{ env.GITHUB_PR_STATE }}" == "CLOSED" ]; then
-              glab mr close "$GITLAB_MR_IID"
-            elif [ "${{ env.GITHUB_PR_STATE }}" == "OPEN" ]; then
-              glab mr reopen "$GITLAB_MR_IID"
-            fi
+            echo "MR Already exists"
           fi
