@@ -4,7 +4,7 @@ $outputDir = ".\build\compiled"
 $binaryName = "zoi.exe"
 $finalBinaryName = "zoi.exe"
 $finalBinaryPath = Join-Path -Path $outputDir -ChildPath $finalBinaryName
-$srcBinaryPath = ".\target\release\$binaryName"
+$srcBinaryPath = ".\target\debug\$binaryName"
 
 New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 
@@ -18,7 +18,7 @@ catch {
     $commit = "dev"
 }
 
-Write-Host "Building Zoi in release mode for Windows..." -ForegroundColor Cyan
+Write-Host "Building Zoi for Windows..." -ForegroundColor Cyan
 Write-Host "Commit: $commit" -ForegroundColor Cyan
 
 $env:ZOI_COMMIT_HASH = $commit
