@@ -82,42 +82,42 @@ jobs:
           git config --global user.email "actions-mirror@github.com"
           git remote add gitlab "https://oauth2:${GL_TOKEN}@gitlab.com/${GITLAB_FORK_PROJECT_PATH}.git"
 
-      #     echo "Fetching PR #${GITHUB_PR_NUMBER} from GitHub..."
-      #     git fetch origin "refs/pull/${GITHUB_PR_NUMBER}/head"
-      #
-      #     echo "Pushing to GitLab fork branch '${GITLAB_BRANCH_NAME}'..."
-      #     git push -u gitlab FETCH_HEAD:"refs/heads/${GITLAB_BRANCH_NAME}" --force
-      #
-      # - name: Create or Update Cross-Project Merge Request
-      #   if: github.event_name == 'workflow_dispatch'
-      #   env:
-      #     GITLAB_MAIN_PROJECT: "Zillowe/Zillwen/Zusty/Zoi"
-      #     GITLAB_FORK_PROJECT: "Zillowe/Zillwen/Zusty/Zoi-2"
-      #     GITLAB_TOKEN: ${{ secrets.GL_TOKEN }}
-      #     GITHUB_PR_NUMBER: ${{ steps.pr_data.outputs.pr_number }}
-      #     GITHUB_PR_TITLE: ${{ steps.pr_data.outputs.pr_title }}
-      #     GITHUB_PR_BODY: ${{ steps.pr_data.outputs.pr_body }}
-      #     GITHUB_PR_STATE: ${{ steps.pr_data.outputs.pr_state }}
-      #     GITHUB_PR_USER: ${{ steps.pr_data.outputs.pr_user }}
-      #     GITHUB_PR_SOURCE_BRANCH: ${{ steps.pr_data.outputs.pr_source_branch }}
-      #     GITHUB_PR_TARGET_BRANCH: ${{ steps.pr_data.outputs.pr_target_branch }}
-      #   run: |
-      #     GITLAB_BRANCH_NAME="${GITHUB_PR_USER}/${GITHUB_PR_SOURCE_BRANCH}"
-      #
-      #     export GITLAB_MR_IID=$(glab mr list --repo $GITLAB_MAIN_PROJECT --search "GitHub PR #${GITHUB_PR_NUMBER}:" -F ids 2>/dev/null)
-      #
-      #     if [ -z "$GITLAB_MR_IID" ]; then
-      #       if [ "${{ env.GITHUB_PR_STATE }}" == "OPEN" ]; then
-      #         echo "Creating new cross-project MR from source repo '${GITLAB_FORK_PROJECT}'..."
-      #         glab mr create \
-      #           --title "GitHub PR #${GITHUB_PR_NUMBER}: $GITHUB_PR_TITLE" \
-      #           --description "$GITHUB_PR_BODY" \
-      #           --source-branch "$GITLAB_BRANCH_NAME" \
-      #           --target-branch "$GITHUB_PR_TARGET_BRANCH" \
-      #           --head "$GITLAB_FORK_PROJECT" \
-      #           --remove-source-branch \
-      #           --yes
-      #       fi
-      #     else
-      #       echo "MR Already exists"
-      #     fi
+          echo "Fetching PR #${GITHUB_PR_NUMBER} from GitHub..."
+          git fetch origin "refs/pull/${GITHUB_PR_NUMBER}/head"
+
+          echo "Pushing to GitLab fork branch '${GITLAB_BRANCH_NAME}'..."
+          git push -u gitlab FETCH_HEAD:"refs/heads/${GITLAB_BRANCH_NAME}" --force
+
+      - name: Create or Update Cross-Project Merge Request
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GITLAB_MAIN_PROJECT: "Zillowe/Zillwen/Zusty/Zoi"
+          GITLAB_FORK_PROJECT: "Zillowe/Zillwen/Zusty/Zoi-2"
+          GITLAB_TOKEN: ${{ secrets.GL_TOKEN }}
+          GITHUB_PR_NUMBER: ${{ steps.pr_data.outputs.pr_number }}
+          GITHUB_PR_TITLE: ${{ steps.pr_data.outputs.pr_title }}
+          GITHUB_PR_BODY: ${{ steps.pr_data.outputs.pr_body }}
+          GITHUB_PR_STATE: ${{ steps.pr_data.outputs.pr_state }}
+          GITHUB_PR_USER: ${{ steps.pr_data.outputs.pr_user }}
+          GITHUB_PR_SOURCE_BRANCH: ${{ steps.pr_data.outputs.pr_source_branch }}
+          GITHUB_PR_TARGET_BRANCH: ${{ steps.pr_data.outputs.pr_target_branch }}
+        run: |
+          GITLAB_BRANCH_NAME="${GITHUB_PR_USER}/${GITHUB_PR_SOURCE_BRANCH}"
+
+          export GITLAB_MR_IID=$(glab mr list --repo $GITLAB_MAIN_PROJECT --search "GitHub PR #${GITHUB_PR_NUMBER}:" -F ids 2>/dev/null | grep '^[0-9]\+$' || true)
+
+          if [ -z "$GITLAB_MR_IID" ]; then
+            if [ "${{ env.GITHUB_PR_STATE }}" == "OPEN" ]; then
+              echo "Creating new cross-project MR from source repo '${GITLAB_FORK_PROJECT}'..."
+              glab mr create \
+                --title "GitHub PR #${GITHUB_PR_NUMBER}: $GITHUB_PR_TITLE" \
+                --description "$GITHUB_PR_BODY" \
+                --source-branch "$GITLAB_BRANCH_NAME" \
+                --target-branch "$GITHUB_PR_TARGET_BRANCH" \
+                --head "$GITLAB_FORK_PROJECT" \
+                --remove-source-branch \
+                --yes
+            fi
+          else
+            echo "MR Already exists"
+          fi
