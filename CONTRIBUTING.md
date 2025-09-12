@@ -26,7 +26,10 @@ First of all, thank you for considering contributing to Zoi! We're excited to ha
 
 We welcome contributions in many forms, including bug reports, feature requests, documentation improvements, and code contributions.
 
-You can use any of our [mirrors](/README.md#-repositories-mirrors) for contributions.
+You can use two of our [mirrors](/README.md#-repositories-mirrors) for contributions.
+
+- [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi) (Main & Preferred)
+- [GitHub](https://github.com/Zillowe/Zoi) (Issues and PRs are mirrored to GitLab)
 
 ### Reporting Bugs or Requesting Features
 
@@ -36,11 +39,13 @@ If you find a bug or have an idea for a new feature, please check our [**issue t
 - [Request a Feature](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Feature%20Request)
 - [Request an Enhancement](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Enhancement%20Request)
 
+(Same on GitHub)
+
 ### Contributing Code
 
 If you'd like to contribute code, please follow these steps:
 
-1.  **Fork the repository** on [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi) (Or any other [mirror](/README.md#-repositories-mirrors) you like).
+1.  **Fork the repository** on [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi).
 2.  **Clone your fork** to your local machine.
 3.  **Create a new branch** for your changes.
     ```sh
@@ -166,7 +171,7 @@ Here are the most common commands defined in `zoi.yaml`:
   zoi run test
   ```
 
-- **`build`**: Builds a release version of Zoi.
+- **`build`**: Builds a dev version of Zoi.
 
   ```sh
   zoi run build
