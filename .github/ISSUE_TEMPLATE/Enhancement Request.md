@@ -1,7 +1,7 @@
 ---
 name: Enhancement Request
 about: Suggest an idea for this project
-title: "[ENCH] "
+title: "[FEAT] "
 labels: "Kind/Enhancement"
 ---
 

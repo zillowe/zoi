@@ -1,6 +1,6 @@
 <!-- Please prefix your title with "[BUG]" -->
 
-**NOTE: If your issue is a security concern, open a security report on [GitHub Security Advisory](https://github.com/Zillowe/Zoi/security/advisories/new) or email: [contact@zillowe.qzz.io](mailto:contact@zillowe.qzz.io) instead of opening a public issue.**
+**NOTE: If your issue is a security concern, open a security report on [GitHub Security Advisory](https://github.com/Zillowe/Zoi/security/advisories/new) or email: [contact@zillowe.qzz.io](mailto:contact@zillowe.qzz.io) instead of opening a public issue, visit the [Security Policy](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/SECURITY.md) for more information.**
 
 ---
 
