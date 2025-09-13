@@ -1,6 +1,6 @@
 <!-- Please prefix your title with "[BUG]" -->
 
-**NOTE: If your issue is a security concern, please contact me on [Matrix](https://matrix.to/#/@ZilloweZ:matrix.org>) or open a [Vulnerability Report](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/security/vulnerabilities/new) or visit [SECURITY](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/SECURITY.md) instead of opening a public issue.**
+**NOTE: If your issue is a security concern, open a security report on [GitHub Security Advisory](https://github.com/Zillowe/Zoi/security/advisories/new) or email: [contact@zillowe.qzz.io](mailto:contact@zillowe.qzz.io) instead of opening a public issue.**
 
 ---
 
@@ -40,11 +40,11 @@ Please provide a clear, step-by-step list of actions.
 
 1.
 
-### What is the current *bug* behavior?
+### What is the current _bug_ behavior?
 
 <!-- What actually happens when you follow the steps above? -->
 
-### What is the expected *correct* behavior?
+### What is the expected _correct_ behavior?
 
 <!-- What should have happened instead? -->
 
