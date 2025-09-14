@@ -21,8 +21,8 @@ ARCH_NAME=$(uname -m)
 case $OS_NAME in
   Linux) OS_NAME="linux" ;;
   Darwin) OS_NAME="macos" ;;
-  FreeBSD) OS_NAME="freebsd" ;;
-  OpenBSD) OS_NAME="openbsd" ;;
+  # FreeBSD) OS_NAME="freebsd" ;;
+  # OpenBSD) OS_NAME="openbsd" ;;
   *NT*) OS_NAME="windows" ;;
   *)
     echo "Warning: Unsupported OS '$OS_NAME' detected. The build may fail."
