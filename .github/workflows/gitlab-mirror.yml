@@ -36,10 +36,11 @@ jobs:
           GITHUB_ISSUE_NUMBER: ${{ github.event.issue.number }}
           GITHUB_ACTION: ${{ github.event.action }}
         run: |
-          GITLAB_ISSUE_IID=$(glab issue list -R "$GITLAB_PROJECT" --search "GitHub Issue #${GITHUB_ISSUE_NUMBER}:" -F ids)
+          GITLAB_ISSUE_IID=$(glab issue list --repo $GITLAB_MAIN_PROJECT --in "GitHub Issue #${GITHUB_PR_NUMBER}:" -F ids 2>/dev/null | grep '^[0-9]\+$' || true)
+
           if [ -z "$GITLAB_ISSUE_IID" ]; then
             if [ "${{ env.GITHUB_ACTION }}" == "opened" ]; then
-              glab issue create -R "$GITLAB_PROJECT" -t "GitHub Issue #${GITHUB_ISSUE_NUMBER}: $GITHUB_ISSUE_TITLE" -d "$GITHUB_ISSUE_BODY"
+              glab issue create --repo "$GITLAB_PROJECT" -t "GitHub Issue #${GITHUB_ISSUE_NUMBER}: $GITHUB_ISSUE_TITLE" -d "$GITHUB_ISSUE_BODY"
             fi
           else
             if [ "${{ env.GITHUB_ACTION }}" == "edited" ]; then
