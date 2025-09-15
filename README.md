@@ -201,10 +201,10 @@ If you prefer, you can build Zoi from source. You'll need [Rust](https://www.rus
 
 ```sh
 # For Linux/macOS
-./build/build-release.sh
+./scripts/build-release.sh
 
 # For Windows
-./build/build-release.ps1
+./scripts/build-release.ps1
 ```
 
 **Install it locally:**

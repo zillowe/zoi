@@ -90,11 +90,11 @@ build:linux:
     - apt-get update -y && apt-get install -y build-essential gcc g++ gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libssl-dev pkg-config libssl-dev:arm64 openssl libssl-dev:armhf gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 liblzma-dev:arm64
   script:
     - echo "Building Linux (amd64, arm64) and Windows (amd64) targets..."
-    - chmod +x ./build/build-linux.sh
-    - ./build/build-linux.sh
+    - chmod +x ./scripts/build-linux.sh
+    - ./scripts/build-linux.sh
   artifacts:
     paths:
-      - ./build/release/
+      - ./scripts/release/
     expire_in: 3 days
   rules:
     - if: $CI_COMMIT_TAG
@@ -109,11 +109,11 @@ build:macos:
     - source ~/.cargo/env
   script:
     - echo "Building macOS targets (amd64, arm64)..."
-    - chmod +x ./build/build-macos.sh
-    - ./build/build-macos.sh
+    - chmod +x ./scripts/build-macos.sh
+    - ./scripts/build-macos.sh
   artifacts:
     paths:
-      - ./build/release/
+      - ./scripts/release/
     expire_in: 3 days
   rules:
     - if: $CI_COMMIT_TAG
@@ -128,20 +128,20 @@ package:archive:
       set -euo pipefail
       echo "Aggregating build artifacts..."
       echo "Contents of the release directory:"
-      ls -lR ./build/release/
+      ls -lR ./scripts/release/
       echo "Importing GPG key..."
       echo "$GPG_PRIVATE_KEY_B32" | base32 -d | gpg --batch --import
       echo "Running archive script..."
-      chmod +x ./build/archive.sh
-      ./build/archive.sh
+      chmod +x ./scripts/archive.sh
+      ./scripts/archive.sh
       echo "Archiving complete."
   needs:
     - build:linux
     - build:macos
   artifacts:
     paths:
-      - ./build/archived/
-      - ./build/notes.sh
+      - ./scripts/archived/
+      - ./scripts/notes.sh
     expire_in: 3 days
   rules:
     - if: $CI_COMMIT_TAG
@@ -156,10 +156,10 @@ create_release:
     - npm i -g @google/gemini-cli@latest
   script:
     - glab auth login --token $GITLAB_TOKEN_RELEASE
-    - chmod +x ./build/notes.sh
-    - bash -c "./build/notes.sh > release_notes.md"
+    - chmod +x ./scripts/notes.sh
+    - bash -c "./scripts/notes.sh > release_notes.md"
     - RELEASE_NAME="${CI_COMMIT_TAG_MESSAGE:-$CI_COMMIT_TAG}"
-    - glab release create "$CI_COMMIT_TAG" ./build/archived/* --name "$RELEASE_NAME" --notes-file release_notes.md
+    - glab release create "$CI_COMMIT_TAG" ./scripts/archived/* --name "$RELEASE_NAME" --notes-file release_notes.md
   needs:
     - package:archive
   rules:

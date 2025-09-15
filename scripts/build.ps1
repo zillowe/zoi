@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$outputDir = ".\build\compiled"
+$outputDir = ".\scripts\compiled"
 $binaryName = "zoi.exe"
 $finalBinaryName = "zoi.exe"
 $finalBinaryPath = Join-Path -Path $outputDir -ChildPath $finalBinaryName

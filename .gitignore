@@ -1,9 +1,9 @@
 etc
 test
-build/compiled
-build/archived
-build/release
-build/release-all
+scripts/compiled
+scripts/archived
+scripts/release
+scripts/release-all
 config.mk
 .env
 packages/js/node_modules

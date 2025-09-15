@@ -9,7 +9,7 @@ packages/*
 .gitlab
 app/*
 docs/*
-build/*
+scripts/*
 .gitlab-ci.yml
 CONTRIBUTING.md
 zoi.yaml

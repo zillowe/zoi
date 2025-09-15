@@ -7,7 +7,7 @@ GREEN='\033[0;32m'
 CYAN='\033[0;36m'
 NC='\033[0m' 
 
-OUTPUT_DIR="./build/release"
+OUTPUT_DIR="./script/release"
 COMMIT=$(git rev-parse --short=10 HEAD 2>/dev/null || echo "dev")
 
 TARGETS=(
@@ -62,5 +62,5 @@ for target in "${TARGETS[@]}"; do
 done
 
 echo -e "\n${GREEN}🎉 All Linux and Windows builds completed successfully!${NC}"
-echo -e "${CYAN}Output files in ./build/release directory:${NC}"
+echo -e "${CYAN}Output files in ./scripts/release directory:${NC}"
 ls -lh "$OUTPUT_DIR"

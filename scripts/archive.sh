@@ -8,8 +8,8 @@ CYAN='\033[0;36m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-COMPILED_DIR="./build/release"
-ARCHIVE_DIR="./build/archived"
+COMPILED_DIR="./scripts/release"
+ARCHIVE_DIR="./scripts/archived"
 CHECKSUM_FILE="${ARCHIVE_DIR}/checksums.txt"
 CHECKSUM_SHA256_FILE="${ARCHIVE_DIR}/checksums-256.txt"
 GITLAB_PROJECT_PATH="Zillowe/Zillwen/Zusty/Zoi"
