@@ -74,7 +74,7 @@ Because Zoi is used to manage its own development, you must first build and inst
     ```
 2.  **Build and install:**
     ```sh
-    make
+    make build
     sudo make install
     # (optional) Install CLI completions and setup Zoi's PATH
     make setup
