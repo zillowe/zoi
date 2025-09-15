@@ -1,0 +1,80 @@
+# git-cliff ~ configuration file
+# https://git-cliff.org/docs/configuration
+
+[remote.gitlab]
+owner = "Zillowe/Zillwen/Zusty"
+repo = "Zoi"
+
+[changelog]
+body = """
+{% if version %}\
+    ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+    ## [unreleased]
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+    ### {{ group | striptags | trim | upper_first }}
+    {% for commit in commits %}
+        - {% if commit.scope %}*({{ commit.scope }})* {% endif %}\
+            {% if commit.breaking %}[**breaking**] {% endif %}\
+            {{ commit.message | upper_first }}\
+        * {{ commit.message | split(pat="\n") | first | trim }}\
+            {% if commit.remote.username %} by @{{ commit.remote.username }}{%- endif %}\
+            {% if commit.remote.pr_number %} in #{{ commit.remote.pr_number }}{%- endif %}
+    {% endfor %}
+    {% for contributor in gitlab.contributors | filter(attribute="is_first_time", value=true) %}
+        * @{{ contributor.username }} made their first contribution in #{{ contributor.pr_number }}
+    {%- endfor -%}
+{% endfor %}
+"""
+trim = true
+render_always = true
+postprocessors = [
+    # Replace the placeholder <REPO> with a URL.
+    #{ pattern = '<REPO>', replace = "https://github.com/orhun/git-cliff" },
+]
+output = "CHANGELOG.md"
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+commit_parsers = [
+    { message = "(?i)^Docs", skip = true },
+    { message = "(?i)^CI", skip = true },
+    { message = "(?i)^Release", skip = true },
+
+    { message = "^Build", group = "🛠️ Build" },
+    { message = "^Feat", group = "✨ Features" },
+    { message = "^Fix", group = "🩹 Bug Fixes" },
+    { message = "^Perf", group = "⚡ Performance" },
+    { message = "^Refactor", group = "♻️ Refactor" },
+    { message = "^Style", group = "🎨 Styling" },
+    { message = "^Test", group = "🧪 Testing" },
+    { message = "^Revert", group = "⏪ Revert" },
+    { message = "^Deps", group = "🛡️ Dependencies" },
+    { message = "^Cleanup", group = "🧹 Cleanup" },
+    { message = "^Security", group = "🔒 Security" },
+    { message = "^I18n", group = "🌐 Internationalization" },
+    { message = "^Migrate", group = "➡️ Migrations" },
+    { message = "^SEO", group = "🔍 SEO" },
+    { message = "^AI", group = "🧠 AI" },
+    { message = "^Data", group = "📊 Data" },
+    { message = "^Config", group = "🔧 Configuration" },
+    { message = "^UX", group = "🎯 UX" },
+    { message = "^Struct", group = "🏗️ Structure" },
+    { message = "^Auth", group = "🔐 Authentication" },
+    { message = "^Track", group = "📈 Tracking" },
+    { message = "^API", group = "📋 API" },
+    { message = "^Git", group = "🔀 Git" },
+
+    { message = "^chore", group = "⚙️ Miscellaneous Tasks" },
+    { body = ".*security", group = "🛡️ Security" },
+    { message = ".*", group = "💼 Other" },
+]
+link_parsers = [
+    { pattern = "#([0-9]+)", href = "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/$1", text = "#$1" },
+    { pattern = "!([0-9]+)", href = "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/merge_requests/$1", text = "!$1" },
+]
+filter_commits = false
+sort_commits = "oldest"
+recurse_submodules = false
