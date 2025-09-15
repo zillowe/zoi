@@ -16,14 +16,17 @@ ifeq ($(OS_NAME),windows)
     SRC_BIN = target/release/$(NAME).exe
 endif
 
-.PHONY: all install uninstall clean setup help
+.PHONY: all build install uninstall clean setup help
 
-all: $(SRC_BIN)
+all: build install setup
+	@echo "Done"
+
+build: $(SRC_BIN)
 	@echo "Building Zoi in release mode (commit: $(COMMIT_HASH))..."
 	@ZOI_COMMIT_HASH=$(COMMIT_HASH) cargo build --release
 	@echo "Build complete for $(OS_NAME) ($(ARCH_NAME))."
 
-install: all
+install:
 ifeq ($(IS_WINDOWS),1)
 	@echo "Installing $(NAME) to $(BINDIR)..."
 	@if not exist "$(BINDIR)" mkdir "$(BINDIR)"
@@ -58,7 +61,7 @@ else
 	@rm -f config.mk
 endif
 
-setup: all
+setup:
 	@echo "Running setup for the '$(SHELL_NAME)' shell..."
 	@$(SRC_BIN) shell $(SHELL_NAME)
 	@$(SRC_BIN) setup
@@ -67,7 +70,8 @@ setup: all
 	@echo "Please restart your shell or source your shell's profile to apply changes."
 
 help:
-	@echo "make 		build zoi in release mode"
+	@echo "make 		alias to 'make all'"
+	@echo "make build 	build zoi in release mode"
 	@echo "make install 	install Zoi binary to PREFIX or default user's bin location"
 	@echo "make setup 	install shell completion and setup Zoi's package PATH"
 	@echo "make uninstall 	uninstall Zoi binary"
