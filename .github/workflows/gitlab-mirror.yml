@@ -44,11 +44,11 @@ jobs:
             fi
           else
             if [ "${{ env.GITHUB_ACTION }}" == "edited" ]; then
-              glab issue update "$GITLAB_ISSUE_IID" -R "$GITLAB_PROJECT" -t "GitHub Issue #${GITHUB_ISSUE_NUMBER}: $GITHUB_ISSUE_TITLE" -d "$GITHUB_ISSUE_BODY"
+              glab issue update "$GITLAB_ISSUE_IID" --repo "$GITLAB_PROJECT" -t "GitHub Issue #${GITHUB_ISSUE_NUMBER}: $GITHUB_ISSUE_TITLE" -d "$GITHUB_ISSUE_BODY"
             elif [ "${{ env.GITHUB_ACTION }}" == "closed" ]; then
-              glab issue close "$GITLAB_ISSUE_IID" -R "$GITLAB_PROJECT"
+              glab issue close "$GITLAB_ISSUE_IID" --repo "$GITLAB_PROJECT"
             elif [ "${{ env.GITHUB_ACTION }}" == "reopened" ]; then
-              glab issue reopen "$GITLAB_ISSUE_IID" -R "$GITLAB_PROJECT"
+              glab issue reopen "$GITLAB_ISSUE_IID" --repo "$GITLAB_PROJECT"
             fi
           fi
 

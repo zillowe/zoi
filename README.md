@@ -213,8 +213,8 @@ If you prefer, you can build Zoi from source. You'll need [Rust](https://www.rus
 ./configure
 make
 sudo make install
-# Install CLI completions (bash, zsh, fish, elvish, powershell)
-make install-completion
+# (optional) Install CLI completions and setup Zoi's PATH
+make setup
 ```
 
 ## 💻 Platforms

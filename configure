@@ -1,6 +1,7 @@
 #!/bin/sh
 
 PREFIX="/usr/local"
+SHELL_NAME=""
 
 for arg in "$@"; do
   case $arg in
@@ -23,11 +24,18 @@ case $OS_NAME in
   Darwin) OS_NAME="macos" ;;
   # FreeBSD) OS_NAME="freebsd" ;;
   # OpenBSD) OS_NAME="openbsd" ;;
-  *NT*) OS_NAME="windows" ;;
+  *NT*)
+    OS_NAME="windows"
+    SHELL_NAME="powershell"
+    ;;
   *)
     echo "Warning: Unsupported OS '$OS_NAME' detected. The build may fail."
     ;;
 esac
+
+if [ -z "$SHELL_NAME" ]; then
+  SHELL_NAME=$(basename "$SHELL")
+fi
 
 case $ARCH_NAME in
   x86_64 | amd64) ARCH_NAME="amd64" ;;
@@ -46,9 +54,10 @@ PREFIX = $PREFIX
 # Directory for executables (derived from PREFIX)
 BINDIR = \$(PREFIX)/bin
 
-# Detected OS and Architecture
+# Detected OS, Architecture, and Shell
 OS_NAME = $OS_NAME
 ARCH_NAME = $ARCH_NAME
+SHELL_NAME = $SHELL_NAME
 EOF
 
 echo "Zoi configured successfully:"
@@ -56,5 +65,7 @@ echo "  Installation prefix:  $PREFIX"
 echo "  Binary directory:     \$PREFIX/bin"
 echo "  Operating System:     $OS_NAME"
 echo "  Architecture:         $ARCH_NAME"
+echo "  Detected Shell:       $SHELL_NAME"
 echo ""
-echo "Now run 'make' to build, and 'make install' to install."
+echo "Now run 'make' to build, 'make setup' to configure your shell,"
+echo "and 'make install' to install."

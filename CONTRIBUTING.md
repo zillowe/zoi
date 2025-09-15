@@ -76,8 +76,8 @@ Because Zoi is used to manage its own development, you must first build and inst
     ```sh
     make
     sudo make install
-    # Install CLI completions (bash, zsh, fish, elvish, powershell)
-    make install-completion # or 'zoi shell <shell>'
+    # (optional) Install CLI completions and setup Zoi's PATH
+    make setup
     ```
 
 Once you have a working `zoi` command, you can use it for all other development tasks.

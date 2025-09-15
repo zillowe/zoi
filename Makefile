@@ -5,18 +5,18 @@ COMMIT_HASH := $(shell git rev-parse --short=10 HEAD)
 IS_WINDOWS := 0
 SRC_BIN = target/release/$(NAME)
 
-ifeq ($(OS_NAME),windows)
-    IS_WINDOWS := 1
-    SRC_BIN = target/release/$(NAME).exe
-endif
-
 ifneq (,$(wildcard config.mk))
     include config.mk
 else
     $(error config.mk not found. Please run ./configure first.)
 endif
 
-.PHONY: all install uninstall clean install-completions
+ifeq ($(OS_NAME),windows)
+    IS_WINDOWS := 1
+    SRC_BIN = target/release/$(NAME).exe
+endif
+
+.PHONY: all install uninstall clean setup
 
 all: $(SRC_BIN)
 	@echo "Build complete for $(OS_NAME) ($(ARCH_NAME))."
@@ -60,21 +60,10 @@ else
 	@rm -f config.mk
 endif
 
-install-completions: all
-	@echo "Installing shell completions..."
-ifeq ($(IS_WINDOWS),1)
-	@echo "  -> PowerShell"
-	@./target/release/$(NAME).exe shell powershell
-else
-	@echo "  -> Bash"
-	@./target/release/$(NAME) shell bash
-	@echo "  -> Zsh"
-	@./target/release/$(NAME) shell zsh
-	@echo "  -> Fish"
-	@./target/release/$(NAME) shell fish
-	@echo "  -> Elvish"
-	@./target/release/$(NAME) shell elvish
-endif
+setup: all
+	@echo "Running setup for the '$(SHELL_NAME)' shell..."
+	@$(SRC_BIN) shell $(SHELL_NAME)
+	@$(SRC_BIN) setup
 	@echo ""
-	@echo "Completion scripts installed."
-	@echo "Please restart your shell or source your shell's profile to activate them."
+	@echo "Setup complete."
+	@echo "Please restart your shell or source your shell's profile to apply changes."
