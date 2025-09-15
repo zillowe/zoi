@@ -166,7 +166,7 @@ package:changelog:
   artifacts:
     paths:
       - release_notes.md
-  expire_in: 3 days
+    expire_in: 3 days
 
 create_release:
   stage: release
