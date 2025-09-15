@@ -28,13 +28,11 @@ These are features and ideas we are considering for future releases. They are no
 ### Core Features & Enhancements
 
 - [ ] **Delta Updates for All Packages:** Implement a patch-based update mechanism (e.g. `bsdiff`) for all packages to significantly reduce update download sizes and improve speed.
-
-  This would extend the efficient self-update mechanism used by `zoi upgrade` to the entire package ecosystem. Instead of downloading a full package archive for every version change, `zoi update` would be able to fetch a much smaller binary patch file and apply it to the currently installed version.
-
-  This would involve:
-  1.  Generating patch files during the package publishing process in CI.
-  2.  Including patch metadata in the repository database.
-  3.  Adding logic to `zoi update` to prefer patches, apply them, and verify the resulting file's integrity.
+      This would extend the efficient self-update mechanism used by `zoi upgrade` to the entire package ecosystem. Instead of downloading a full package archive for every version change, `zoi update` would be able to fetch a much smaller binary patch file and apply it to the currently installed version.
+      This would involve:
+      1. Generating patch files during the package publishing process in CI.
+      2. Including patch metadata in the repository database.
+      3. Adding logic to `zoi update` to prefer patches, apply them, and verify the resulting file's integrity.
 
 ---
 
