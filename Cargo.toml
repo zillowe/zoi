@@ -17,7 +17,7 @@ exclude = [
   ".gitlab",
   "app/*",
   "docs/*",
-  "build/*",
+  "scripts/*",
   ".gitlab-ci.yml",
   "CONTRIBUTING.md",
   "zoi.yaml",
@@ -32,6 +32,14 @@ path = "src/lib.rs"
 name = "zoi"
 path = "src/main.rs"
 
+[[bin]]
+name = "zoi-completions"
+path = "src/bin/completions.rs"
+
+[[bin]]
+name = "zoi-mangen"
+path = "src/bin/mangen.rs"
+
 [lints.clippy]
 too_many_arguments = "allow"
 type_complexity = "allow"
@@ -45,6 +53,7 @@ bsdiff = "0.2.1"
 chrono = { version = "0.4.41", features = ["serde"] }
 clap = { version = "4.5.41", features = ["derive", "color"] }
 clap_complete = "4.5.55"
+clap_mangen = "0.2.29"
 colored = "3.0.0"
 comfy-table = "7.1.4"
 crossterm = "0.29.0"

@@ -61,14 +61,12 @@
 //! }
 //! ```
 
-// Make all modules public for library usage
 pub mod cli;
 pub mod cmd;
 pub mod pkg;
 pub mod project;
 pub mod utils;
 
-// Re-export key types and functions for easier use.
 pub use pkg::install::InstallMode;
 pub use pkg::pin::PinnedPackage;
 pub use pkg::types::{
