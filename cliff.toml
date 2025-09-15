@@ -18,7 +18,6 @@ body = """
         - {% if commit.scope %}*({{ commit.scope }})* {% endif %}\
             {% if commit.breaking %}[**breaking**] {% endif %}\
             {{ commit.message | upper_first }}\
-        * {{ commit.message | split(pat="\n") | first | trim }}\
             {% if commit.remote.username %} by @{{ commit.remote.username }}{%- endif %}\
             {% if commit.remote.pr_number %} in #{{ commit.remote.pr_number }}{%- endif %}
     {% endfor %}
@@ -76,5 +75,5 @@ link_parsers = [
     { pattern = "!([0-9]+)", href = "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/merge_requests/$1", text = "!$1" },
 ]
 filter_commits = false
-sort_commits = "oldest"
+sort_commits = "newest"
 recurse_submodules = false
