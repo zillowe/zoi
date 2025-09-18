@@ -47,4 +47,8 @@ package() {
   local _fish_completion_dir="$pkgdir/usr/share/fish/vendor_completions.d"
   install -d "$_fish_completion_dir"
   "$pkgdir/usr/bin/$pkgname" generate-completions fish > "$_fish_completion_dir/$pkgname.fish"
+
+  local _man_dir="$pkgdir/usr/share/man/man1"
+  install -d "$_man_dir"
+  "$pkgdir/usr/bin/$pkgname" generate-manual > "$_man_dir/$pkgname.1"
 }
