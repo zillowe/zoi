@@ -5,11 +5,22 @@ use std::error::Error;
 use std::fs;
 use std::path::Path;
 
-pub fn run(package_file: &Path, install_type: Option<String>) -> Result<(), Box<dyn Error>> {
+pub fn run(
+    package_file: &Path,
+    install_type: Option<String>,
+    version_override: Option<&str>,
+) -> Result<(), Box<dyn Error>> {
     println!("Generating metadata for: {}", package_file.display());
 
-    let (package_template, version, _, _) =
-        resolve::resolve_package_and_version(package_file.to_str().unwrap())?;
+    let temp_pkg = lua_parser::parse_lua_package(package_file.to_str().unwrap(), None)?;
+    let default_version = resolve::get_default_version(&temp_pkg)?;
+
+    let version = version_override
+        .map(|s| s.to_string())
+        .unwrap_or(default_version);
+
+    let package_template =
+        lua_parser::parse_lua_package(package_file.to_str().unwrap(), Some(&version))?;
 
     let best_method_template = if let Some(t) = &install_type {
         package_template
@@ -72,7 +83,7 @@ pub fn run(package_file: &Path, install_type: Option<String>) -> Result<(), Box<
             let parsed_for_platform = lua_parser::parse_lua_package_for_platform(
                 package_file.to_str().unwrap(),
                 platform_str,
-                None,
+                Some(&version),
             )?;
 
             let method_for_platform = parsed_for_platform
@@ -121,7 +132,7 @@ pub fn run(package_file: &Path, install_type: Option<String>) -> Result<(), Box<
             let parsed_for_platform = lua_parser::parse_lua_package_for_platform(
                 package_file.to_str().unwrap(),
                 platform_str,
-                None,
+                Some(&version),
             )?;
 
             let method_for_platform = parsed_for_platform

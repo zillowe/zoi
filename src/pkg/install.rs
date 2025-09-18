@@ -872,7 +872,7 @@ fn try_meta_build_install(
         "Attempting to build and install from meta files...".yellow()
     );
 
-    if let Err(e) = crate::pkg::package::meta::run(pkg_lua_path, None) {
+    if let Err(e) = crate::pkg::package::meta::run(pkg_lua_path, None, pkg.version.as_deref()) {
         return Err(format!("'meta' step failed: {}", e).into());
     }
     let meta_filename = format!("{}.meta.json", pkg.name);
