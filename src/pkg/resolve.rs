@@ -166,6 +166,15 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
                 .filter(|e| e.file_type().is_dir() && e.file_name() == request.name.as_str())
             {
                 let pkg_dir_path = entry.path();
+
+                if let Ok(relative_path) = pkg_dir_path.strip_prefix(&repo_path) {
+                    if relative_path.components().count() > 1 {
+                        continue;
+                    }
+                } else {
+                    continue;
+                }
+
                 let pkg_file_path = pkg_dir_path.join(format!("{}.pkg.lua", request.name));
 
                 if pkg_file_path.exists() {
