@@ -22,7 +22,7 @@ COPY build.rs ./
 
 COPY src ./src
 
-RUN cargo build --release
+RUN cargo build --bin zoi --release
 
 FROM debian:bookworm-slim
 

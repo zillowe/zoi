@@ -23,7 +23,7 @@ all: build install setup
 
 build: $(SRC_BIN)
 	@echo "Building Zoi in release mode (commit: $(COMMIT_HASH))..."
-	@ZOI_COMMIT_HASH=$(COMMIT_HASH) cargo build --release
+	@ZOI_COMMIT_HASH=$(COMMIT_HASH) cargo build --bin zoi --release
 	@echo "Build complete for $(OS_NAME) ($(ARCH_NAME))."
 
 install:

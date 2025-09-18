@@ -36,7 +36,7 @@ for target in "${TARGETS[@]}"; do
 
   rustup target add "$target"
 
-  if ! ZOI_COMMIT_HASH="$COMMIT" cargo build --target "$target" --release; then
+  if ! ZOI_COMMIT_HASH="$COMMIT" cargo build --bin zoi --target "$target" --release; then
     echo -e "${RED}❌ Build failed for ${target}${NC}"
     exit 1
   fi

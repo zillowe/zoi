@@ -46,7 +46,7 @@ for target in "${TARGETS[@]}"; do
       LINKER_ENV="CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc"
     fi
 
-    if ! env $LINKER_ENV $OPENSSL_ENV ZOI_COMMIT_HASH="$COMMIT" cargo build --target "$target" --release; then
+    if ! env $LINKER_ENV $OPENSSL_ENV ZOI_COMMIT_HASH="$COMMIT" cargo build --bin zoi --target "$target" --release; then
       echo -e "${RED}❌ Build failed for ${target}${NC}"
       exit 1
     fi

@@ -22,7 +22,7 @@ Write-Host "Building Zoi for Windows..." -ForegroundColor Cyan
 Write-Host "Commit: $commit" -ForegroundColor Cyan
 
 $env:ZOI_COMMIT_HASH = $commit
-cargo build --release
+cargo build --bin zoi --release
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "Cargo build successful." -ForegroundColor Green

@@ -20,7 +20,7 @@ COMMIT=$(git rev-parse --short=10 HEAD 2>/dev/null || echo "dev")
 echo -e "${CYAN}Building Zoi release binary for $(uname -s)...${NC}"
 echo -e "${CYAN}Commit: $COMMIT${NC}"
 
-if ZOI_COMMIT_HASH="$COMMIT" cargo build --release; then
+if ZOI_COMMIT_HASH="$COMMIT" cargo build --bin zoi --release; then
     echo -e "${GREEN}Cargo build successful.${NC}"
 else
     echo -e "${RED}Cargo build failed.${NC}"
