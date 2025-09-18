@@ -54,6 +54,4 @@ If you can, provide screenshots, mockups, or links to other tools that have a si
 This is extremely helpful for visualizing the final result.
 -->
 
----
-
 /label ~"Kind/Enhancement"

@@ -41,6 +41,4 @@ Add any other context, mockups, or screenshots about the feature request here.
 For example, linking to another tool that has a similar feature is very helpful.
 -->
 
----
-
 /label ~"Kind/Feature"
