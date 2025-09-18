@@ -464,39 +464,35 @@ pub fn check_path() {
         if !zoi_bin_dir.exists() {
             return;
         }
+    } else {
+        return;
+    }
 
-        let is_in_path_env = if let Ok(path_var) = std::env::var("PATH") {
-            let zoi_bin_dir_canon =
-                fs::canonicalize(&zoi_bin_dir).unwrap_or_else(|_| zoi_bin_dir.clone());
+    let command_output = if cfg!(target_os = "windows") {
+        Command::new("pwsh")
+            .arg("-Command")
+            .arg("echo $env:Path")
+            .output()
+    } else {
+        Command::new("bash").arg("-c").arg("echo $PATH").output()
+    };
 
-            path_var.split(std::path::MAIN_SEPARATOR).any(|p| {
-                if p.is_empty() {
-                    return false;
-                }
-
-                let p_expanded = if let Some(stripped) = p.strip_prefix("~/") {
-                    home.join(stripped)
-                } else if p == "~" {
-                    home.clone()
-                } else {
-                    PathBuf::from(p)
-                };
-
-                if let Ok(p_canon) = fs::canonicalize(&p_expanded) {
-                    p_canon == zoi_bin_dir_canon
-                } else {
-                    p_expanded == zoi_bin_dir
-                }
-            })
-        } else {
-            false
-        };
-
-        if !is_in_path_env {
-            eprintln!(
-                "Please run 'zoi setup --scope user' or add it to your PATH manually for commands to be available."
-            );
+    let is_in_path = match command_output {
+        Ok(output) => {
+            if output.status.success() {
+                let path_var = String::from_utf8_lossy(&output.stdout);
+                path_var.contains(".zoi/pkgs/bin")
+            } else {
+                false
+            }
         }
+        Err(_) => false,
+    };
+
+    if !is_in_path {
+        eprintln!(
+            "Please run 'zoi setup --scope user' or add it to your PATH manually for commands to be available."
+        );
     }
 }
 
