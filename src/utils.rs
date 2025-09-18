@@ -492,33 +492,7 @@ pub fn check_path() {
             false
         };
 
-        if is_in_path_env {
-            return;
-        }
-
-        let zoi_path_str_fragment = ".zoi/pkgs/bin";
-        let shell_configs = [
-            ".bashrc",
-            ".bash_profile",
-            ".zshrc",
-            ".profile",
-            ".config/fish/config.fish",
-            ".cshrc",
-            ".tcshrc",
-        ];
-
-        let found_in_shell_config = shell_configs.iter().any(|config| {
-            let config_path = home.join(config);
-            if config_path.exists()
-                && let Ok(content) = fs::read_to_string(config_path)
-            {
-                return content.contains(zoi_path_str_fragment);
-            }
-            false
-        });
-
-        if found_in_shell_config {
-        } else {
+        if !is_in_path_env {
             eprintln!(
                 "Please run 'zoi setup --scope user' or add it to your PATH manually for commands to be available."
             );
