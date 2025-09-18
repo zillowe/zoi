@@ -10,7 +10,7 @@ Zoi has several dependencies that need to be installed for building from source 
 
 These are required to compile Zoi from source.
 
-- **Rust Toolchain**: See `rust-toolchain.toml` for the specific version.
+- **Rust**: Current minimum version is `1.89.0` from the stable channel.
 - **C Compiler**: A C compiler like `gcc` is required. Packages like `build-essential` (Debian/Ubuntu) or `base-devel` (Arch Linux) usually provide this.
 - **OpenSSL**: The development libraries for OpenSSL are required. This is usually `libssl-dev` (Debian/Ubuntu) or `openssl-devel` (Fedora/CentOS).
 - **pkg-config**: The `pkg-config` utility is needed to locate libraries.
@@ -31,9 +31,8 @@ Zoi can be built from source using Cargo.
 
 ### Dependencies
 
-- Rust toolchain (see `rust-toolchain.toml`)
-- `make`
-- `gcc`
+- Rust (`cargo`) + [Build-time Dependencies](#build-time-dependencies)
+- `make` for building with Makefile
 
 ### Building from source
 
@@ -46,8 +45,7 @@ The project can be built in two ways:
     cargo build --release
     ```
 
-    This will produce the main `zoi` binary in `target/release/zoi`.
-    The build can be configured for release builds in `.cargo/config.toml`.
+    This will produce the main `zoi` binary and other helper binaries `zoi-completion` and `zoi-mangen` in `target/release/`, use `--bin zoi` to only build the main `zoi` binary.
 
 2.  **Using Makefile:**
     The project also provides a `Makefile` for convenience.
@@ -55,7 +53,7 @@ The project can be built in two ways:
     ./configure
     make build
     ```
-    This will also build the project in release mode. The `Makefile` can also be used to install Zoi locally.
+    This will also build the project in release mode for only `zoi` binary. The `Makefile` can also be used to install Zoi locally.
 
 ### Binaries
 
@@ -87,8 +85,8 @@ Zoi provides commands to generate shell completions and man pages. These should 
 Alternatively, the `zoi-completions` and `zoi-mangen` binaries can be used directly:
 
 ```sh
-OUT_DIR=completions/ ./target/release/zoi-completions
-OUT_DIR=man/ ./target/release/zoi-mangen
+OUT_DIR=dist/completions/ ./target/release/zoi-completions
+OUT_DIR=dis/man/ ./target/release/zoi-mangen
 ```
 
 ## Existing Packaging Files
