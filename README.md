@@ -62,6 +62,7 @@
     - [Arch Linux (AUR)](#arch-linux-aur)
     - [macOS (Homebrew)](#macos-homebrew)
     - [Windows (Scoop)](#windows-scoop)
+    - [Fedora](#fedora)
     - [Crates.io](#cratesio)
     - [NPM](#npm)
   - [Scripts](#-scripts)
@@ -157,6 +158,19 @@ Install Zoi using Scoop:
 scoop bucket add zillowe https://github.com/Zillowe/scoop.git
 scoop install zoi
 ```
+
+#### Fedora
+
+Install `zoi-rs` on Fedora from [Terra](https://terra.fyralabs.com) repo (not maintained by us, uses [Crates.io](#cratesio) so may not be up-to-date):
+
+```sh
+# add terra repo
+dnf install --nogpgcheck --repofrompath 'terra,https://repos.fyralabs.com/terra$releasever' terra-release
+# install Zoi
+sudo dnf install zoi-rs
+```
+
+More information and instructions for using Terra are available [here](https://developer.fyralabs.com/terra/installing).
 
 #### Crates.io
 

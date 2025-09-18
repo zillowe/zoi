@@ -15,11 +15,14 @@
 | [Homebrew](https://github.com/Zillowe/homebrew-tap)         | ✔️        |
 | [Scoop](https://github.com/Zillowe/scoop)                   | ✔️        |
 | [Crates.io `zoi-rs`](https://crates.io/crates/zoi-rs)       | ❔        |
+| [Fedora `zoi-rs`]()                                         | ❌        |
 | NPM `@zillowe/zoi`                                          | ❌        |
 
 Crates.io package can be out-of-date sometimes.
 
 The NPM package just runs the installer script.
+
+Fedora package is from an external [Terra](https://terra.fyralabs.com/) repo and is not maintained by us, it uses the [Crates.io](./README.md#cratesio) version so it may not be up-to-date.
 
 Meanings:
 
