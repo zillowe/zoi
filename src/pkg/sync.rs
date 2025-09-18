@@ -14,7 +14,7 @@ fn get_db_url() -> Result<String, Box<dyn std::error::Error>> {
     let config = config::read_config()?;
     Ok(config
         .registry
-        .unwrap_or_else(|| "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi-Pkgs.git".to_string()))
+        .unwrap_or_else(|| "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg.git".to_string()))
 }
 
 fn get_db_path() -> Result<PathBuf, Box<dyn std::error::Error>> {

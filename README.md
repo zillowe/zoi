@@ -357,9 +357,9 @@ Zoi is hosted on multiple forges. The primary locations and mirrors are:
   - Primary: [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi)
   - Mirrors: [GitHub](https://github.com/Zillowe/Zoi), [Codeberg](https://codeberg.org/Zillowe/Zoi)
 
-- Packages Database (`Zoi-Pkgs`)
-  - Primary: [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi-Pkgs)
-  - Mirrors: [GitHub](https://github.com/Zillowe/Zoi-Pkgs), [Codeberg](https://codeberg.org/Zillowe/Zoi-Pkgs)
+- Packages Database (Zoidberg)
+  - Primary: [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg)
+  - Mirrors: [GitHub](https://github.com/Zillowe/Zoidberg), [Codeberg](https://codeberg.org/Zillowe/Zoidberg)
 
 ### Repository tiers
 

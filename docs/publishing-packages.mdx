@@ -11,11 +11,11 @@ Once your `.pkg.lua` file works locally, it's time to share it with the world! T
 
 The Zoi package database is hosted on GitLab and mirrored on GitHub and Codeberg.
 
-- **GitLab (Primary):** [Zillowe/Zillwen/Zusty/Zoi-Pkgs](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi-Pkgs)
-- **GitHub (Mirror):** [Zillowe/Zoi-Pkgs](https://github.com/Zillowe/Zoi-Pkgs)
-- **Codeberg (Mirror):** [Zillowe/Zoi-Pkgs](https://codeberg.org/Zillowe/Zoi-Pkgs)
+- **GitLab (Primary):** [Zillowe/Zillwen/Zusty/Zoidberg](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg)
+- **GitHub (Mirror):** [Zillowe/Zoidberg](https://github.com/Zillowe/Zoidberg)
+- **Codeberg (Mirror):** [Zillowe/Zoidberg](https://codeberg.org/Zillowe/Zoidberg)
 
-You can contribute by opening a **Merge/Pull Request** to either repository, or by **opening an issue** to request a new package. The following steps outline the process for creating a Merge Request on GitLab, which is very similar to the process on GitHub.
+You can contribute by opening a **Merge Request** to the GitLab repository, or by **opening an issue** to request a new package. The following steps outline the process for creating a Merge Request on GitLab, which is very similar to the process on GitHub.
 
 1.  **Fork the Repository:**
     Go to the repository's page on GitLab or GitHub and click the "Fork" button to create your own copy.
@@ -25,7 +25,7 @@ You can contribute by opening a **Merge/Pull Request** to either repository, or 
 
     ```sh
     # For GitLab
-    git clone https://gitlab.com/YourUsername/Zoi-pkgs.git
+    git clone https://gitlab.com/YourUsername/Zoidberg.git
     cd Zoi-pkgs
     ```
 
@@ -138,7 +138,7 @@ This allows you to maintain and version your own collections of packages complet
 
 ## Creating Your Own Zoi-Type Package Registry
 
-For advanced use cases, such as creating a corporate mirror or a completely separate package ecosystem, you can create your own Zoi-type package registry. This is a git repository that mimics the structure of the official `Zoi-Pkgs` database.
+For advanced use cases, such as creating a corporate mirror or a completely separate package ecosystem, you can create your own Zoi-type package registry. This is a git repository that mimics the structure of the official Zoidberg database.
 
 ### Step 1: Set Up the Registry Repository
 
@@ -149,7 +149,7 @@ For advanced use cases, such as creating a corporate mirror or a completely sepa
     description: A collection of my personal packages.
     repo-git: https://github.com/YourOrg/my-zoi-registry.git
     ```
-3.  Structure the rest of your repository like the official `Zoi-Pkgs` database, with directories for tiers like `core`, `main`, `community`, etc.
+3.  Structure the rest of your repository like the official Zoidberg database, with directories for tiers like `core`, `main`, `community`, etc.
 
     ```
     my-zoi-registry/

@@ -118,7 +118,7 @@ pub fn remove(ext_name: &str, _yes: bool) -> Result<(), Box<dyn Error>> {
                     }
                 }
                 types::ExtensionChange::RegistryRepo { add: _ } => {
-                    let default_registry = "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi-Pkgs.git";
+                    let default_registry = "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg.git";
                     println!("Setting registry back to default");
                     if let Err(e) = config::set_registry(default_registry) {
                         eprintln!("Warning: failed to set registry to default: {}", e);

@@ -11,9 +11,9 @@ This page explains Zoi's official repositories and mirrors, and how package repo
   - Primary: [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi)
   - Mirrors: [GitHub](https://github.com/Zillowe/Zoi), [Codeberg](https://codeberg.org/Zillowe/Zoi)
 
-- Packages database (Zoi-Pkgs)
-  - Primary: [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi-Pkgs)
-  - Mirrors: [GitHub](https://github.com/Zillowe/Zoi-Pkgs), [Codeberg](https://codeberg.org/Zillowe/Zoi-Pkgs)
+- Packages database (Zoidberg)
+  - Primary: [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg)
+  - Mirrors: [GitHub](https://github.com/Zillowe/Zoidberg), [Codeberg](https://codeberg.org/Zillowe/Zoidberg)
 
 ## Managing the Package Database Registry
 
@@ -36,7 +36,7 @@ zoi sync show
 zoi sync set github
 
 # Set the registry to a custom URL
-zoi sync set https://my-custom-registry.com/zoi-pkgs.git
+zoi sync set https://my-custom-registry.com/Zoidberg.git
 ```
 
 ### Automatic Fallback
@@ -177,10 +177,10 @@ The `repo-pkg` and `mirrors-pkg` URLs can contain the following placeholders, wh
 ```yaml
 name: Zoi repo
 description: The official Zoi package repository.
-repo-git: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi-Pkgs.git
+repo-git: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoiberg.git
 mirrors-git:
-  - https://github.com/Zillowe/Zoi-Pkgs.git
-  - https://codeberg.org/Zillowe/Zoi-Pkgs.git
+  - https://github.com/Zillowe/Zoidberg.git
+  - https://codeberg.org/Zillowe/Zoidberg.git
 repo-pkg: https://zoi.zillowe.qzz.io/pkgs/{os}/{arch}/{version}/{package}
 mirrors-pkg:
   - https://zoi.zilo.qzz.io/pkgs/{os}/{arch}/{version}/{package}
