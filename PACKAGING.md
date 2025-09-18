@@ -15,6 +15,7 @@ These are required to compile Zoi from source.
 - **OpenSSL**: The development libraries for OpenSSL are required. This is usually `libssl-dev` (Debian/Ubuntu) or `openssl-devel` (Fedora/CentOS).
 - **pkg-config**: The `pkg-config` utility is needed to locate libraries.
 - **liblzma**: The development libraries for lzma (`liblzma-dev`).
+- **Git**: Required to embed the commit hash in the binary version information.
 
 #### Runtime Dependencies
 
@@ -27,57 +28,99 @@ These are required for Zoi to run correctly after installation.
 
 ## Build Process
 
-Zoi can be built from source using Cargo.
+Zoi can be built from source using several methods.
 
-### Dependencies
+### Using Cargo
 
-- Rust (`cargo`) + [Build-time Dependencies](#build-time-dependencies)
-- `make` for building with Makefile
+This is the standard way to build Rust projects. The build process can be influenced by environment variables (see [Environment Variables](#environment-variables)).
 
-### Building from source
+```sh
+# Build the main zoi binary in release mode
+cargo build --bin zoi --release
+```
 
-The project can be built in two ways:
+This will produce the `zoi` binary in `target/release/`. To build all binaries (`zoi`, `zoi-completions`, `zoi-mangen`), run:
 
-1.  **Using Cargo:**
-    This is the standard way to build Rust projects.
+```sh
+cargo build --release
+```
 
-    ```sh
-    cargo build --release
-    ```
+### Using the Makefile
 
-    This will produce the main `zoi` binary and other helper binaries `zoi-completion` and `zoi-mangen` in `target/release/`, use `--bin zoi` to only build the main `zoi` binary.
+The project provides a `Makefile` for convenience, which simplifies building and installing.
 
-2.  **Using Makefile:**
-    The project also provides a `Makefile` for convenience.
-    ```sh
-    ./configure
-    make build
-    ```
-    This will also build the project in release mode for only `zoi` binary. The `Makefile` can also be used to install Zoi locally.
+```sh
+# Configure build paths (creates config.mk)
+./configure
 
-### Binaries
+# Build the zoi binary in release mode
+make build
 
-The build process generates several binaries defined in `Cargo.toml`:
+# Install the binary to the configured location
+sudo make install
+```
+
+### Using Build Scripts
+
+The `scripts/` directory contains scripts for creating release builds for different platforms. These are used in our CI/CD pipeline.
+
+- `scripts/build-linux.sh`: Builds for Linux (and64, arm64) and cross-compiles for Windows (amd64).
+- `scripts/build-macos.sh`: Builds for macOS (amd64, arm64).
+- `scripts/build-release.sh` & `build-release.ps1`: Helper scripts for creating a single release build on the current platform.
+
+These scripts embed the current git commit hash into the binary via the `ZOI_COMMIT_HASH` environment variable.
+
+### Using Docker
+
+A `Dockerfile` is provided to build Zoi in a containerized environment. This is useful for creating reproducible builds.
+
+```sh
+# Build the docker image
+docker build -t zoi .
+
+# Build with custom telemetry keys (see Environment Variables)
+docker build \
+  --build-arg POSTHOG_API_KEY="your_key" \
+  --build-arg POSTHOG_API_HOST="your_host" \
+  -t zoi .
+```
+
+## Environment Variables
+
+Zoi uses a few environment variables at build time.
+
+- **`ZOI_COMMIT_HASH`**: Embeds the git commit hash into the binary. This is used by the `zoi version` command. The build scripts in `scripts/` set this automatically.
+- **`POSTHOG_API_KEY`** & **`POSTHOG_API_HOST`**: These are used to configure the optional, opt-in telemetry feature. They can be set in a `.env` file at the root of the project or passed as build arguments to Docker. The `.env.example` file shows the format.
+
+## Binaries
+
+The build process generates three binaries:
 
 - `zoi`: The main application binary.
 - `zoi-completions`: A helper binary to generate shell completion scripts.
 - `zoi-mangen`: A helper binary to generate the man page.
 
-### Completions and Man Pages
+For most packaging purposes, you will only need to package the `zoi` binary, as it can also generate completions and man pages itself.
+
+## Completions and Man Pages
 
 Zoi provides commands to generate shell completions and man pages. These should be included in the package.
 
 - **Shell Completions:**
-  Completions can be generated for various shells using the `generate-completions` command:
+  Completions can be generated for various shells using the `shell` command:
 
   ```sh
-  ./target/release/zoi generate-completions <shell>
+  ./target/release/zoi shell <shell> # generates completions and set them up for the user
+  ```
+
+  ```sh
+  ./target/release/zoi generate-completions <shell> # generates completions and prints them
   ```
 
   Where `<shell>` can be `bash`, `fish`, `zsh`, etc.
 
 - **Man Page:**
-  The man page can be generated using the `generate-manual` command:
+  The man page can be generated using the `generate-manual` command (which is an alias for `zoi-mangen` but prints it instead):
   ```sh
   ./target/release/zoi generate-manual > zoi.1
   ```

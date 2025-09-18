@@ -10,6 +10,7 @@ packages/*
 app/*
 docs/*
 scripts/*
+dist/*
 .gitlab-ci.yml
 CONTRIBUTING.md
 zoi.yaml

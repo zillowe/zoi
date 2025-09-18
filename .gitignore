@@ -8,7 +8,7 @@ config.mk
 .env
 packages/js/node_modules
 packages/js/dist
-dist
+dist/*
 
 # Added by GCT
 gct.yaml
