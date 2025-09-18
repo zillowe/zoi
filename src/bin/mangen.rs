@@ -10,9 +10,11 @@ use zoi::cli::Cli;
 /// in a directory specified by the environment variable `OUT_DIR`.
 fn main() -> Result<()> {
     let out_dir = env::var("OUT_DIR").expect("OUT_DIR is not set");
-    let out_path = PathBuf::from(&out_dir).join(format!("{}.1", env!("CARGO_PKG_NAME")));
 
     let app = Cli::command();
+    let name = app.get_name().to_string();
+    let out_path = PathBuf::from(&out_dir).join(format!("{}.1", name));
+
     let man = Man::new(app);
     let mut buffer = Vec::<u8>::new();
 

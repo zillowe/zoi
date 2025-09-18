@@ -6,7 +6,7 @@ use clap::{
 };
 use clap_complete::Shell;
 use clap_complete::generate;
-use std::io;
+use std::io::{self};
 
 // Development, Special, Public or Production
 const BRANCH: &str = "Development";
@@ -121,6 +121,10 @@ enum Commands {
         #[arg(value_enum)]
         shell: Shell,
     },
+
+    /// Generates a man page for zoi
+    #[command(hide = true)]
+    GenerateManual,
 
     /// Prints concise version and build information
     #[command(
@@ -552,6 +556,7 @@ pub fn run() {
                 generate(shell, &mut cmd, bin_name, &mut io::stdout());
                 Ok(())
             }
+            Commands::GenerateManual => cmd::gen_man::run().map_err(Into::into),
             Commands::Version => {
                 cmd::version::run(BRANCH, STATUS, NUMBER, commit);
                 Ok(())
