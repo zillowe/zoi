@@ -135,17 +135,18 @@ pub fn is_package_installed(
     }
 }
 
-pub fn get_all_available_packages() -> Result<Vec<super::types::Package>, Box<dyn Error>> {
+pub fn get_packages_from_repos(
+    repos: &[String],
+) -> Result<Vec<super::types::Package>, Box<dyn Error>> {
     let db_root = get_db_root()?;
     if !db_root.exists() {
         return Err("Package database not found. Please run 'zoi sync' first.".into());
     }
 
-    let config = config::read_config()?;
     let mut available = Vec::new();
 
-    for repo_name in config.repos {
-        let repo_path = db_root.join(&repo_name);
+    for repo_name in repos {
+        let repo_path = db_root.join(repo_name);
         if !repo_path.exists() {
             continue;
         }
@@ -174,6 +175,11 @@ pub fn get_all_available_packages() -> Result<Vec<super::types::Package>, Box<dy
 
     available.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(available)
+}
+
+pub fn get_all_available_packages() -> Result<Vec<super::types::Package>, Box<dyn Error>> {
+    let config = config::read_config()?;
+    get_packages_from_repos(&config.repos)
 }
 
 pub fn write_manifest(manifest: &InstallManifest) -> Result<(), Box<dyn Error>> {

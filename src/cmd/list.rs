@@ -1,4 +1,4 @@
-use crate::pkg::{local, types};
+use crate::pkg::{config, local, types};
 
 use comfy_table::{Table, presets::UTF8_FULL};
 use std::collections::HashSet;
@@ -112,11 +112,16 @@ fn run_list_all(
         .map(|p| p.name)
         .collect::<HashSet<_>>();
 
-    let mut available_pkgs = local::get_all_available_packages()?;
-
-    if let Some(repo) = &repo_filter {
-        available_pkgs.retain(|pkg| pkg.repo.starts_with(repo));
-    }
+    let available_pkgs = if let Some(repo) = &repo_filter {
+        let all_repos = config::get_all_repos()?;
+        let repos_to_search: Vec<String> = all_repos
+            .into_iter()
+            .filter(|r| r.starts_with(repo))
+            .collect();
+        local::get_packages_from_repos(&repos_to_search)?
+    } else {
+        local::get_all_available_packages()?
+    };
 
     if available_pkgs.is_empty() {
         if let Some(repo) = repo_filter {

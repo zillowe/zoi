@@ -42,14 +42,19 @@ pub fn run(
         "' ---".yellow()
     );
 
-    let packages = local::get_all_available_packages();
+    let packages = if let Some(repo_name) = &repo {
+        let all_repos = crate::pkg::config::get_all_repos()?;
+        let repos_to_search: Vec<String> = all_repos
+            .into_iter()
+            .filter(|r| r.starts_with(repo_name))
+            .collect();
+        local::get_packages_from_repos(&repos_to_search)
+    } else {
+        local::get_all_available_packages()
+    };
 
     match packages {
-        Ok(mut all_packages) => {
-            if let Some(repo_name) = &repo {
-                all_packages.retain(|pkg| pkg.repo.starts_with(repo_name));
-            }
-
+        Ok(all_packages) => {
             let search_term_lower = search_term.to_lowercase();
 
             let type_filter = package_type.and_then(|s| match s.to_lowercase().as_str() {
