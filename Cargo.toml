@@ -1,6 +1,6 @@
 [package]
 name = "zoi-rs"
-version = "5.0.6-beta"
+version = "1.0.0"
 edition = "2024"
 description = "Universal Package Manager & Environment Setup Tool"
 license = "Apache-2.0"
