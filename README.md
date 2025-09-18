@@ -33,11 +33,9 @@
 
 <div align="center">
   <a href="https://zillowe.qzz.io/docs/zds/zoi"><strong>Docs</strong></a> •
-  <a href="https://nel.zillowe.qzz.io"><strong>Package Registry</strong></a> •
   <a href="https://discord.gg/P4R7yaA3hf"><strong>Discord</strong></a> •
   <a href="./SECURITY.md"><strong>Security</strong></a> •
   <a href="./CONTRIBUTING.md"><strong>Contributing</strong></a> •
-  <a href="./ROADMAP.md"><strong>Roadmap</strong></a> •
   <a href="./CHANGELOG.md"><strong>Changelog</strong></a>
   <br/>
   <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Bug%20Report"><strong>Report a Bug</strong></a> •
@@ -45,6 +43,7 @@
   <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Enhancement%20Request"><strong>Request an Enhancement</strong></a>
   <br/>
   <a href="./CODE_OF_CONDUCT.md"><strong>Code of Conduct</strong></a> •
+  <a href="./PACKAGING.md"><strong>Packaging</strong></a> •
   <a href="./RELEASE.md"><strong>Release Guidelines</strong></a>
 </div>
 
