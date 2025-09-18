@@ -21,81 +21,47 @@
 ### ♻️ Refactor
 
 - _(pkg)_ Simplify archive filename and URL template
-
 - _(cmd)_ Adapt modules to new package resolution signature
-
 - _(pkg)_ Remove dynamic variable replacements
-
 - _(cli)_ Restructure update command arguments and improve help output
 
 ### ✨ Features
 
 - _(meta)_ Allow specifying installation type for meta generation
-
 - _(api)_ Expose core functionality as public library API
-
 - _(package)_ Add source installation support
-
 - _(pgp)_ Add command to search PGP keys
-
 - _(package)_ Add multi-platform build capability
-
 - _(pkg)_ Support direct package names in repo installs
-
 - _(install)_ Add support for installing from git repositories
-
 - _(pkg)_ Add package installation scope
-
 - _(pkg)_ Implement meta-build-install and update package resolution
-
 - _(pkg)_ Implement pre-built package installation from repos
-
 - _(pgp)_ Implement PGP key import from URL and list command
-
 - _(pgp)_ Add PGP key management
-
 - _(package)_ Add package install command
-
 - _(package)_ Add CLI commands for package creation
-
 - _(pkg)_ Support structured package database
-
 - _(extension)_ Allow extensions to manage project configuration file
-
 - _(script-handler)_ Implement script package uninstallation
-
 - _(man)_ Enhance man command with local caching and raw display
-
 - _(dev-setup)_ Implement comprehensive testing and formatting
-
 - _(cli)_ Add new 'man' command for package manuals
-
 - _(script)_ Add support for script package type
-
 - _(show)_ Display package installation status
-
 - _(pkg)_ Implement interactive package selection
-
 - _(install)_ Add --all-optional flag to install command
-
 - _(show)_ Add license verification
-
 - _(cli)_ Enhance package completions and auto-setup
-
 - _(config)_ Allow platform-specific commands and environment variables
-
 - _(sync)_ Add --no-pm flag to skip package manager checks
-
 - _(sync)_ Add fallback mirrors for package database
-
 - _(gemini)_ Add AI flow for GitLab operations
 
 ### ➡️ Migrations
 
 - _(pkg-format)_ Switch to Lua for package definitions
-
 - _(parser)_ Transition to Lua package definitions
-
 - _(scripts)_ Migrate install scripts to zillowe.pages.dev
 
 ### 🎨 Styling
@@ -105,25 +71,21 @@
 ### 🎯 UX
 
 - _(cmd)_ Condense repository names in list and search output
-
 - _(cli)_ Add package name suggestions to CLI arguments
 
 ### 🔒 Security
 
 - _(package)_ Implement PGP signature verification
-
 - _(install)_ Implement GPG signature verification
 
 ### 🔧 Configuration
 
 - _(about)_ Add contact email to about command
-
 - _(gemini)_ Set up client credentials
 
 ### 🛠️ Build
 
 - _(sync)_ Load sync fallbacks from repo.yaml
-
 - _(docker)_ Add Docker build configuration
 
 ### 🛡️ Dependencies
@@ -137,7 +99,6 @@
 ### 🩹 Bug Fixes
 
 - _(build)_ Correct checksum mismatch error message formatting
-
 - _(windows)_ Initialize colored crate output
 
 ## [Prod-Beta-4.3.7] - 2025-08-20
@@ -145,13 +106,11 @@
 ### ♻️ Refactor
 
 - _(dependencies)_ Remove pre-installation conflict checks
-
 - Enhance package resolution and CLI output
 
 ### ✨ Features
 
 - _(pkg)_ Add package update command
-
 - _(exec)_ Execute commands via shell
 
 ### 🧹 Cleanup
@@ -163,7 +122,6 @@
 ### ♻️ Refactor
 
 - _(pkg-resolve)_ Remove alt source caching and improve download reliability
-
 - _(path)_ Refine PATH check output logic
 
 ### ✨ Features
@@ -179,7 +137,6 @@
 ### ✨ Features
 
 - _(shell)_ Add Elvish shell path setup
-
 - _(shell)_ Add setup command to configure shell PATH
 
 ### 🎯 UX
@@ -203,13 +160,11 @@
 ### ♻️ Refactor
 
 - _(deps)_ Specify optional dependency type in installation output
-
 - _(upgrade)_ Streamline patch upgrade by using current executable
 
 ### ✨ Features
 
 - _(service)_ Add Docker Compose support
-
 - _(about)_ Include documentation URL in output
 
 ## [Prod-Beta-4.3.1] - 2025-08-16
@@ -221,13 +176,9 @@
 ### ✨ Features
 
 - _(pkg)_ Prompt user with important package updates
-
 - _(pkg)_ Add library package type and pkg-config command
-
 - _(pkg)_ Add rollback command and functionality
-
 - _(extension)_ Add extension management commands
-
 - _(config)_ Manage external git repositories
 
 ### 🛠️ Build
@@ -243,19 +194,12 @@
 ### ✨ Features
 
 - _(search)_ Paginate search command output
-
 - _(git)_ Add Codeberg support for latest tag resolution
-
 - _(pkg)_ Add {git} placeholder to package install URLs
-
 - _(show)_ Add specific binary types to package info
-
 - _(pkg)_ Allow {git} placeholder in install URLs
-
 - _(install)_ Implement binary package installation
-
 - _(upgrade)_ Allow specifying tag or branch for upgrade
-
 - _(shell)_ Add shell command for completion management
 
 ### 🛠️ Build
@@ -265,7 +209,6 @@
 ### 🩹 Bug Fixes
 
 - _(ci)_ Fixing CI add bash
-
 - _(pkg)_ Conditionally compile symlink calls for Unix
 
 ## [Prod-Beta-4.2.3] - 2025-08-13
@@ -299,9 +242,7 @@
 ### ✨ Features
 
 - _(sync)_ Add registry management for package database
-
 - _(pkg)_ Allow nested paths for git package sources
-
 - _(pkg)_ Improve conflict detection
 
 ### 🏗️ Structure
@@ -319,9 +260,7 @@
 ### ✨ Features
 
 - _(cmd)_ Pass arguments to custom commands
-
 - _(cmd)_ Add interactive package file creation command
-
 - _(schema)_ Add JSON schema for pkg.yaml validation
 
 ### 🔧 Configuration
@@ -333,7 +272,6 @@
 ### ✨ Features
 
 - _(create)_ Add pre-creation check for existing app directory
-
 - _(cmd)_ Add 'create' command for application packages
 
 ## [Prod-Beta-4.1.0] - 2025-08-11
@@ -351,7 +289,6 @@
 ### ✨ Features
 
 - _(pkg)_ Add script and Volta package manager support
-
 - _(deps)_ Add support for dependency versioning
 
 ## [Prod-Beta-4.0.3] - 2025-08-09
@@ -365,7 +302,6 @@
 ### ✨ Features
 
 - _(pkg)_ Add readme field to package type
-
 - _(telemetry)_ Include package version
 
 ## [Prod-Beta-4.0.1] - 2025-08-09
@@ -379,9 +315,7 @@
 ### ✨ Features
 
 - _(telemetry)_ Add opt-in usage analytics
-
 - _(install)_ Add tag and branch options for source installs
-
 - Introduce package tags and improve network resilience
 
 ### 📈 Tracking
@@ -411,9 +345,7 @@
 ### ✨ Features
 
 - _(deps)_ Expand supported package managers and document dependencies
-
 - _(repo)_ Add git subcommands and command aliases
-
 - _(deps)_ Enhance dependency schema with selectable options
 
 ### 🎯 UX
@@ -451,7 +383,6 @@
 ### ✨ Features
 
 - _(pkg)_ Add pre-installation conflict detection
-
 - _(pkg)_ Improve dependency handling and uninstallation
 
 ## [Prod-Beta-3.4.1] - 2025-08-05
@@ -465,9 +396,7 @@
 ### ✨ Features
 
 - Enhance package management and CLI command capabilities
-
 - _(install)_ Enable multi-package installation
-
 - _(sync)_ Add external Git repository synchronization
 
 ## [Prod-Beta-3.3.2] - 2025-08-04
@@ -487,7 +416,6 @@
 ### ✨ Features
 
 - _(repo)_ Allow adding git repos as package sources
-
 - Add optional dependency resolution and CLI aliases
 
 ## [Prod-Beta-3.2.7] - 2025-08-02
@@ -517,7 +445,5 @@
 ## [Prod-Beta-3.2.0] - 2025-07-30
 
 ### ✨ Features
-
-- Introduce service and config package types
 
 - Introduce service and config package types

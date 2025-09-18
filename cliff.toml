@@ -14,16 +14,11 @@ body = """
 {% endif %}\
 {% for group, commits in commits | group_by(attribute="group") %}
     ### {{ group | striptags | trim | upper_first }}
-    {% for commit in commits %}
+    {% for commit in commits | unique(attribute="message") %}
         - {% if commit.scope %}*({{ commit.scope }})* {% endif %}\
             {% if commit.breaking %}[**breaking**] {% endif %}\
             {{ commit.message | upper_first }}\
-            {% if commit.remote.username %} by @{{ commit.remote.username }}{%- endif %}\
-            {% if commit.remote.pr_number %} in #{{ commit.remote.pr_number }}{%- endif %}
     {% endfor %}
-    {% for contributor in gitlab.contributors | filter(attribute="is_first_time", value=true) %}
-        * @{{ contributor.username }} made their first contribution in #{{ contributor.pr_number }}
-    {%- endfor -%}
 {% endfor %}
 """
 trim = true
@@ -67,7 +62,7 @@ commit_parsers = [
     { message = "^Git", group = "🔀 Git" },
 
     { message = "^chore", group = "⚙️ Miscellaneous Tasks" },
-    { body = ".*security", group = "🛡️ Security" },
+    { body = ".*security", group = "🔒 Security" },
     { message = ".*", group = "💼 Other" },
 ]
 link_parsers = [
