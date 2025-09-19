@@ -58,13 +58,16 @@
 - [Getting Started](#-getting-started)
 - [Installation](#-installation)
   - [Package Managers](#package-managers)
-    - [Arch Linux (AUR)](#arch-linux-aur)
-    - [macOS (Homebrew)](#macos-homebrew)
-    - [Windows (Scoop)](#windows-scoop)
-    - [Fedora](#fedora)
+    - [Scripts](#-scripts)
+    - [Linux](#linux)
+      - [Arch Linux (AUR)](#arch-linux-aur)
+      - [Fedora](#fedora)
+    - [macOS](#macos)
+      - [Homebrew](#homebrew)
+    - [Windows](#windows)
+      - [Scoop](#scoop)
     - [Crates.io](#cratesio)
     - [NPM](#npm)
-  - [Scripts](#-scripts)
   - [Build from Source](#%EF%B8%8F-build-from-source)
 - [Platforms](#-platforms)
 - [Dependencies Support](#-dependencies-support)
@@ -123,9 +126,29 @@ Getting started with Zoi is simple. Just follow these three steps:
 
 You can install Zoi using a package manager, an installer script, or by building it from source.
 
+### 📜 Scripts
+
+You can also use our installer scripts for a quick setup.
+
+**Linux / macOS :**
+
+```sh
+curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash
+```
+
+**Windows:**
+
+```powershell
+powershell -c "irm zillowe.pages.dev/scripts/zoi/install.ps1|iex"
+```
+
 ### Package Managers
 
-#### Arch Linux (AUR)
+#### Linux
+
+Install Zoi on Linux distros.
+
+##### Arch Linux (AUR)
 
 Install [`zoi-bin`](https://aur.archlinux.org/packages/zoi-bin) (Pre-compiled binary) or [`zoi`](https://aur.archlinux.org/packages/zoi) (built from source) from the AUR using your favorite helper (e.g. `yay`, `paru`):
 
@@ -141,24 +164,7 @@ cd zoi-bin
 makepkg -si
 ```
 
-#### macOS (Homebrew)
-
-Install Zoi using Homebrew:
-
-```sh
-brew install Zillowe/tap/zoi
-```
-
-#### Windows (Scoop)
-
-Install Zoi using Scoop:
-
-```powershell
-scoop bucket add zillowe https://github.com/Zillowe/scoop.git
-scoop install zoi
-```
-
-#### Fedora
+##### Fedora
 
 Install `zoi-rs` on Fedora from [Terra](https://terra.fyralabs.com) repo (not maintained by us, uses [Crates.io](#cratesio) so may not be up-to-date):
 
@@ -170,6 +176,31 @@ sudo dnf install zoi-rs
 ```
 
 More information and instructions for using Terra are available [here](https://developer.fyralabs.com/terra/installing).
+
+#### macOS
+
+Install Zoi on macOS.
+
+##### Homebrew
+
+Install Zoi using Homebrew (Also supports linux):
+
+```sh
+brew install Zillowe/tap/zoi
+```
+
+#### Windows
+
+Install Zoi on Windows.
+
+##### Scoop
+
+Install Zoi using Scoop:
+
+```powershell
+scoop bucket add zillowe https://github.com/Zillowe/scoop.git
+scoop install zoi
+```
 
 #### Crates.io
 
@@ -188,22 +219,6 @@ npx @zillowe/zoi
 bunx @zillowe/zoi
 pnpm dlx @zillowe/zoi
 yarn dlx @zillowe/zoi
-```
-
-### 📜 Scripts
-
-You can also use our installer scripts for a quick setup.
-
-**Linux / macOS :**
-
-```sh
-curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash
-```
-
-**Windows:**
-
-```powershell
-powershell -c "irm zillowe.pages.dev/scripts/zoi/install.ps1|iex"
 ```
 
 ### 🛠️ Build from Source
@@ -384,10 +399,6 @@ Zoi is hosted on multiple forges. The primary locations and mirrors are:
 - Archive: Archived packages that are no longer maintained.
 
 For details and CLI usage examples, see the docs page: [Repositories](https://zillowe.qzz.io/docs/zds/zoi/repositories).
-
-### Nel Package Registry
-
-Zoi has an online package registry, the [Nel Registry](https://nel.zillowe.qzz.io), where you can browse, search, and view packages available in the official Zoi repositories.
 
 ## 📜 License
 
