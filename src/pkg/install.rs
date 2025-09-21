@@ -527,15 +527,19 @@ pub fn run_installation(
     let platform = utils::get_platform()?;
     println!("Current platform: {}", &platform);
 
+    let mut install_manual = true;
+
     let result = match mode {
         InstallMode::ForceSource => run_source_flow(&pkg, &platform),
-        InstallMode::PreferBinary => run_default_flow(&pkg, &pkg_lua_path, &platform, yes),
+        InstallMode::PreferBinary => {
+            run_default_flow(&pkg, &pkg_lua_path, &platform, yes, &mut install_manual)
+        }
         InstallMode::Interactive => run_interactive_flow(&pkg, &pkg_lua_path, &platform),
         InstallMode::Updater(ref method_name) => run_updater_flow(&pkg, &platform, method_name),
     };
 
     if result.is_ok() {
-        if let Err(e) = install_manual_if_available(&pkg) {
+        if install_manual && let Err(e) = install_manual_if_available(&pkg) {
             eprintln!("Warning: failed to install manual: {}", e);
         }
         if pkg.package_type == types::PackageType::Library
@@ -915,6 +919,7 @@ fn run_default_flow(
     pkg_lua_path: &std::path::Path,
     platform: &str,
     yes: bool,
+    install_manual: &mut bool,
 ) -> Result<(), Box<dyn Error>> {
     let db_path = resolve::get_db_root()?;
     if let Ok(repo_config) = config::read_repo_config(&db_path)
@@ -950,6 +955,7 @@ fn run_default_flow(
                 println!("Successfully downloaded pre-built package.");
                 if crate::pkg::package::install::run(&temp_archive_path, Some(pkg.scope)).is_ok() {
                     println!("Successfully installed pre-built package.");
+                    *install_manual = false;
                     return Ok(());
                 } else {
                     println!("Failed to install downloaded package. Trying next source.");
@@ -974,6 +980,7 @@ fn run_default_flow(
         );
     } else {
         println!("{}", "meta-build-install flow successful.".green());
+        *install_manual = false;
         return Ok(());
     }
 
