@@ -10,7 +10,7 @@ Zoi has several dependencies that need to be installed for building from source 
 
 These are required to compile Zoi from source.
 
-- **Rust**: Current minimum version is `1.89.0` from the stable channel.
+- **Rust**: Current minimum version is `1.88.0` 2024 edition from the stable channel (see [`rust-toolchan.toml`](./rust-toolchain.toml) for the channel and [`Cargo.toml`](./Cargo.toml) for the Rust version and edition).
 - **C Compiler**: A C compiler like `gcc` is required. Packages like `build-essential` (Debian/Ubuntu) or `base-devel` (Arch Linux) usually provide this.
 - **OpenSSL**: The development libraries for OpenSSL are required. This is usually `libssl-dev` (Debian/Ubuntu) or `openssl-devel` (Fedora/CentOS).
 - **pkg-config**: The `pkg-config` utility is needed to locate libraries.
