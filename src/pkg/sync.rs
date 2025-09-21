@@ -262,6 +262,50 @@ fn try_sync(db_url: &str, verbose: bool) -> Result<(), Box<dyn std::error::Error
     }
 }
 
+fn sync_pgp_keys() -> Result<(), Box<dyn std::error::Error>> {
+    println!("\n{}", "Syncing PGP keys from repository...".green());
+    let db_path = get_db_path()?;
+    if !db_path.join("repo.yaml").exists() {
+        println!("{}", "repo.yaml not found, skipping PGP key sync.".yellow());
+        return Ok(());
+    }
+
+    let repo_config = config::read_repo_config(&db_path)?;
+
+    if repo_config.pgp.is_empty() {
+        println!("No PGP keys defined in repo.yaml.");
+        return Ok(());
+    }
+
+    for key_info in repo_config.pgp {
+        let key_source = &key_info.key;
+        let key_name = &key_info.name;
+
+        let result = if key_source.starts_with("http") {
+            crate::pkg::pgp::add_key_from_url(key_source, key_name)
+        } else if key_source.len() == 40 && key_source.chars().all(|c| c.is_ascii_hexdigit()) {
+            crate::pkg::pgp::add_key_from_fingerprint(key_source, key_name)
+        } else {
+            Err(format!(
+                "Invalid key source '{}': must be a URL or a 40-character fingerprint.",
+                key_source
+            )
+            .into())
+        };
+
+        if let Err(e) = result {
+            eprintln!(
+                "{} Failed to import key '{}': {}",
+                "Warning:".yellow(),
+                key_name,
+                e
+            );
+        }
+    }
+
+    Ok(())
+}
+
 pub fn run(verbose: bool, fallback: bool, no_pm: bool) -> Result<(), Box<dyn std::error::Error>> {
     let db_url = get_db_url()?;
 
@@ -273,13 +317,21 @@ pub fn run(verbose: bool, fallback: bool, no_pm: bool) -> Result<(), Box<dyn std
         if repo_config_path.exists() {
             println!("Found repo.yaml, using it for sync fallbacks.");
             let repo_config = config::read_repo_config(&db_path)?;
-            if repo_config.repo_git != db_url {
+            if let Some(main_git) = repo_config.git.iter().find(|g| g.link_type == "main")
+                && main_git.url != db_url
+            {
                 println!(
-                    "{}",
-                    "Warning: Registry URL in config differs from repo.yaml. Using config URL as primary.".yellow()
-                );
+                        "{}",
+                        "Warning: Registry URL in config differs from repo.yaml. Using config URL as primary.".yellow()
+                    );
             }
-            urls_to_try.extend(repo_config.mirrors_git);
+            urls_to_try.extend(
+                repo_config
+                    .git
+                    .iter()
+                    .filter(|g| g.link_type == "mirror")
+                    .map(|g| g.url.clone()),
+            );
         } else {
             println!("repo.yaml not found in database, no fallbacks available.");
         }
@@ -313,13 +365,10 @@ pub fn run(verbose: bool, fallback: bool, no_pm: bool) -> Result<(), Box<dyn std
     }
 
     sync_git_repos(verbose)?;
+    sync_pgp_keys()?;
 
     if !no_pm {
-        println!(
-            "
-{}",
-            "Updating system configuration...".green()
-        );
+        println!("\n{}", "Updating system configuration...".green());
         let mut config_data = config::read_config()?;
         config_data.native_package_manager = utils::get_native_package_manager();
         config_data.package_managers = Some(utils::get_all_available_package_managers());

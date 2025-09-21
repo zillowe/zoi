@@ -242,22 +242,31 @@ pub fn get_native_package_manager() -> Option<String> {
     }
 }
 
-pub fn print_repo_warning(repo_name: &Option<String>) {
-    if let Some(repo) = repo_name {
-        let major_repo = repo.split('/').next().unwrap_or("");
-        let warning_message = match major_repo {
-            "community" => Some("This package is from a community repository. Use with caution."),
-            "test" => {
-                Some("This package is from a testing repository and may not function correctly.")
-            }
-            "archive" => {
-                Some("This package is from an archive repository and is no longer maintained.")
-            }
-            _ => None,
-        };
+pub fn print_repo_warning(repo_name: &str) {
+    if let Ok(db_path) = crate::pkg::resolve::get_db_root()
+        && let Ok(repo_config) = crate::pkg::config::read_repo_config(&db_path)
+    {
+        let major_repo = repo_name.split('/').next().unwrap_or("");
+        if let Some(repo_entry) = repo_config.repos.iter().find(|r| r.name == major_repo) {
+            let warning_message = match repo_entry.repo_type.as_str() {
+                "unoffical" => {
+                    Some("This package is from an unofficial repository and is not trusted.")
+                }
+                "community" => {
+                    Some("This package is from a community repository. Use with caution.")
+                }
+                "test" => Some(
+                    "This package is from a testing repository and may not function correctly.",
+                ),
+                "archive" => {
+                    Some("This package is from an archive repository and is no longer maintained.")
+                }
+                _ => None,
+            };
 
-        if let Some(message) = warning_message {
-            println!("\n{}: {}", "NOTE".yellow().bold(), message.yellow());
+            if let Some(message) = warning_message {
+                println!("\n{}: {}", "NOTE".yellow().bold(), message.yellow());
+            }
         }
     }
 }

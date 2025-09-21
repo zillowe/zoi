@@ -23,8 +23,21 @@ fn get_git_root() -> Result<PathBuf, Box<dyn Error>> {
 pub fn read_config() -> Result<Config, Box<dyn Error>> {
     let config_path = get_config_path()?;
     if !config_path.exists() {
+        let db_path = get_db_root()?;
+        let default_repos = if db_path.join("repo.yaml").exists() {
+            let repo_config = read_repo_config(&db_path)?;
+            repo_config
+                .repos
+                .into_iter()
+                .filter(|r| r.active)
+                .map(|r| r.name)
+                .collect()
+        } else {
+            Vec::new()
+        };
+
         let default_config = Config {
-            repos: vec!["core".to_string(), "main".to_string(), "extra".to_string()],
+            repos: default_repos,
             package_managers: None,
             native_package_manager: None,
             telemetry_enabled: false,
@@ -59,11 +72,6 @@ pub fn read_config() -> Result<Config, Box<dyn Error>> {
     config.repos = new_repos;
 
     if config.repos != original_repos {
-        needs_update = true;
-    }
-
-    if !config.repos.contains(&"core".to_string()) {
-        config.repos.insert(0, "core".to_string());
         needs_update = true;
     }
 

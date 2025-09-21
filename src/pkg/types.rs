@@ -370,15 +370,42 @@ pub struct SharableInstallManifest {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GitLink {
+    #[serde(rename = "type")]
+    pub link_type: String,
+    pub url: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PkgLink {
+    #[serde(rename = "type")]
+    pub link_type: String,
+    pub url: String,
+    pub pgp: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PgpKey {
+    pub name: String,
+    pub key: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RepoEntry {
+    pub name: String,
+    #[serde(rename = "type")]
+    pub repo_type: String,
+    pub active: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RepoConfig {
     pub name: String,
     pub description: String,
-    #[serde(rename = "repo-git")]
-    pub repo_git: String,
-    #[serde(rename = "mirrors-git", default)]
-    pub mirrors_git: Vec<String>,
-    #[serde(rename = "repo-pkg")]
-    pub repo_pkg: Option<String>,
-    #[serde(rename = "mirrors-pkg", default)]
-    pub mirrors_pkg: Vec<String>,
+    pub git: Vec<GitLink>,
+    #[serde(default)]
+    pub pkg: Vec<PkgLink>,
+    #[serde(default)]
+    pub pgp: Vec<PgpKey>,
+    pub repos: Vec<RepoEntry>,
 }

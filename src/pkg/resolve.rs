@@ -120,6 +120,7 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
     }
 
     let mut found_packages = Vec::new();
+    let repo_config = config::read_repo_config(&db_root).ok();
 
     if request.name.contains('/') {
         let pkg_name = Path::new(&request.name)
@@ -137,15 +138,21 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
                 let pkg: types::Package =
                     crate::pkg::lua_parser::parse_lua_package(path.to_str().unwrap(), None)?;
                 let major_repo = repo_name.split('/').next().unwrap_or("").to_lowercase();
-                let source_type = if major_repo == "core"
-                    || major_repo == "main"
-                    || major_repo == "extra"
-                    || major_repo == "zillowe"
-                {
-                    SourceType::OfficialRepo
+
+                let source_type = if let Some(ref cfg) = repo_config {
+                    if let Some(repo_entry) = cfg.repos.iter().find(|r| r.name == major_repo) {
+                        if repo_entry.repo_type == "offical" {
+                            SourceType::OfficialRepo
+                        } else {
+                            SourceType::UntrustedRepo(repo_name.clone())
+                        }
+                    } else {
+                        SourceType::UntrustedRepo(repo_name.clone())
+                    }
                 } else {
                     SourceType::UntrustedRepo(repo_name.clone())
                 };
+
                 found_packages.push(FoundPackage {
                     path,
                     source_type,
@@ -183,12 +190,17 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
                         None,
                     )?;
                     let major_repo = repo_name.split('/').next().unwrap_or("").to_lowercase();
-                    let source_type = if major_repo == "core"
-                        || major_repo == "main"
-                        || major_repo == "extra"
-                        || major_repo == "zillowe"
-                    {
-                        SourceType::OfficialRepo
+
+                    let source_type = if let Some(ref cfg) = repo_config {
+                        if let Some(repo_entry) = cfg.repos.iter().find(|r| r.name == major_repo) {
+                            if repo_entry.repo_type == "offical" {
+                                SourceType::OfficialRepo
+                            } else {
+                                SourceType::UntrustedRepo(repo_name.clone())
+                            }
+                        } else {
+                            SourceType::UntrustedRepo(repo_name.clone())
+                        }
                     } else {
                         SourceType::UntrustedRepo(repo_name.clone())
                     };

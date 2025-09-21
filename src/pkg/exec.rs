@@ -427,7 +427,9 @@ fn find_executable(pkg: &types::Package) -> Result<PathBuf, Box<dyn Error>> {
 pub fn run(source: &str, args: Vec<String>) -> Result<(), Box<dyn Error>> {
     let resolved_source = resolve::resolve_source(source)?;
 
-    utils::print_repo_warning(&resolved_source.repo_name);
+    if let Some(repo_name) = &resolved_source.repo_name {
+        utils::print_repo_warning(repo_name);
+    }
 
     let pkg: types::Package =
         crate::pkg::lua_parser::parse_lua_package(resolved_source.path.to_str().unwrap(), None)?;
