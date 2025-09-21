@@ -8,11 +8,8 @@
 
 ## Bugs
 
-- [ ] Make it to not install the manual if the installation method uses a pre-built archive or meta-build-install method
 - [ ] `app/install.sh/ps1` and `src/pkg/upgrade.rs` gitlab api
 - [ ] `update` command to work again
-- [ ] Make support for `DMG`, `MSI` and `AppImage` work and make it installer type installation and remove it from the binary.
-- [ ] See if self-upgrade works with AUR/Scoop/Brew, install script and from source.
 
 ## Features
 
