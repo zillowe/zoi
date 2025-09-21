@@ -1,11 +1,11 @@
 use bsdiff;
 use colored::*;
+use dirs;
 use hex;
 use indicatif::{ProgressBar, ProgressStyle};
 use self_update::self_replace;
 use serde::Deserialize;
 use sha2::{Digest, Sha512};
-
 use std::env;
 use std::error::Error;
 use std::fs::{self, File};
@@ -254,6 +254,61 @@ pub fn run(
     tag: Option<String>,
     custom_branch: Option<String>,
 ) -> Result<(), Box<dyn Error>> {
+    let current_exe_path = env::current_exe()?;
+    let path_str = current_exe_path.to_string_lossy();
+
+    let is_cargo_install = dirs::home_dir()
+        .map(|home| current_exe_path.starts_with(home.join(".cargo").join("bin")))
+        .unwrap_or(false);
+
+    let pkg_manager = if path_str.contains("/Cellar/") {
+        Some("Homebrew")
+    } else if path_str.contains("scoop/apps/") {
+        Some("Scoop")
+    } else if path_str.starts_with("/usr/bin/") {
+        Some("a system package manager")
+    } else if is_cargo_install {
+        Some("Cargo")
+    } else {
+        None
+    };
+
+    if let Some(pm) = pkg_manager {
+        if !force {
+            eprintln!(
+                "{}{}{}",
+                "Warning: ".yellow().bold(),
+                "It looks like Zoi was installed via ".yellow(),
+                pm.yellow().bold()
+            );
+            eprintln!(
+                "{}",
+                "Using 'zoi upgrade' may conflict with your package manager.".yellow()
+            );
+            let upgrade_command = match pm {
+                "Homebrew" => "brew upgrade zoi",
+                "Scoop" => "scoop update zoi",
+                "Cargo" => "cargo install zoi-rs",
+                _ => "your package manager's upgrade command",
+            };
+            eprintln!(
+                "It is recommended to use '{}' to upgrade Zoi.",
+                upgrade_command.cyan()
+            );
+            eprintln!(
+                "To override this check and proceed anyway, run with the '{}' flag.",
+                "--force".cyan()
+            );
+            return Err("managed_by_package_manager".into());
+        } else {
+            println!(
+                "{}{}",
+                "Warning: ".yellow().bold(),
+                "Forcing self-upgrade on a package-manager-controlled installation.".yellow()
+            );
+        }
+    }
+
     let current_version = if status.is_empty() || status.eq_ignore_ascii_case("stable") {
         number.to_string()
     } else {
