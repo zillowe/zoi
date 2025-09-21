@@ -1,4 +1,4 @@
-use crate::pkg::types::{Config, RepoConfig};
+use crate::pkg::types::{Config, Registry, RepoConfig};
 use colored::*;
 use std::error::Error;
 use std::fs;
@@ -45,7 +45,12 @@ pub fn read_config() -> Result<Config, Box<dyn Error>> {
             package_managers: None,
             native_package_manager: None,
             telemetry_enabled: false,
-            registry: Some(get_default_registry()),
+            registry: None,
+            default_registry: Some(Registry {
+                handle: "zoidberg".to_string(),
+                url: get_default_registry(),
+            }),
+            added_registries: Vec::new(),
             git_repos: Vec::new(),
             rollback_enabled: true,
         };
@@ -56,12 +61,24 @@ pub fn read_config() -> Result<Config, Box<dyn Error>> {
     let content = fs::read_to_string(config_path)?;
     let mut config: Config = serde_yaml::from_str(&content)?;
 
-    let mut needs_update = if config.registry.is_none() {
-        config.registry = Some(get_default_registry());
-        true
-    } else {
-        false
-    };
+    let mut needs_update = false;
+    if let Some(url) = config.registry.take() {
+        if config.default_registry.is_none() {
+            config.default_registry = Some(Registry {
+                handle: String::new(),
+                url,
+            });
+        }
+        needs_update = true;
+    }
+
+    if config.default_registry.is_none() {
+        config.default_registry = Some(Registry {
+            handle: "zoidberg".to_string(),
+            url: get_default_registry(),
+        });
+        needs_update = true;
+    }
 
     let original_repos = config.repos.clone();
 
@@ -281,10 +298,44 @@ pub fn remove_git_repo(repo_name: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn set_registry(url: &str) -> Result<(), Box<dyn Error>> {
+pub fn set_default_registry(url: &str) -> Result<(), Box<dyn Error>> {
     let mut config = read_config()?;
-    config.registry = Some(url.to_string());
+    config.default_registry = Some(Registry {
+        handle: String::new(),
+        url: url.to_string(),
+    });
     write_config(&config)
+}
+
+pub fn add_added_registry(url: &str) -> Result<(), Box<dyn Error>> {
+    let mut config = read_config()?;
+    if config.added_registries.iter().any(|r| r.url == url) {
+        return Err(format!("Registry with URL '{}' already exists.", url).into());
+    }
+    config.added_registries.push(Registry {
+        handle: String::new(),
+        url: url.to_string(),
+    });
+    write_config(&config)
+}
+
+pub fn remove_added_registry(handle: &str) -> Result<(), Box<dyn Error>> {
+    let mut config = read_config()?;
+    if let Some(pos) = config
+        .added_registries
+        .iter()
+        .position(|r| r.handle == handle)
+    {
+        config.added_registries.remove(pos);
+        let db_root = get_db_root()?;
+        let repo_path = db_root.join(handle);
+        if repo_path.exists() {
+            fs::remove_dir_all(repo_path)?;
+        }
+        write_config(&config)
+    } else {
+        Err(format!("Added registry with handle '{}' not found.", handle).into())
+    }
 }
 
 pub fn read_repo_config(db_path: &Path) -> Result<RepoConfig, Box<dyn Error>> {

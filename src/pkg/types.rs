@@ -343,14 +343,25 @@ pub struct InstallManifest {
     pub installed_files: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct Registry {
+    pub handle: String,
+    pub url: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Config {
     pub repos: Vec<String>,
     pub package_managers: Option<Vec<String>>,
     pub native_package_manager: Option<String>,
     #[serde(default)]
     pub telemetry_enabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub registry: Option<String>,
+    #[serde(default)]
+    pub default_registry: Option<Registry>,
+    #[serde(default)]
+    pub added_registries: Vec<Registry>,
     #[serde(default)]
     pub git_repos: Vec<String>,
     #[serde(default)]

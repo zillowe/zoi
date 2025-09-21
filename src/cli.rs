@@ -507,13 +507,24 @@ pub enum ExtensionCommands {
 
 #[derive(clap::Subcommand, Clone)]
 pub enum SyncCommands {
-    /// Set the registry URL
+    /// Add a new registry
+    Add {
+        /// URL of the registry to add
+        url: String,
+    },
+    /// Remove a configured registry by its handle
+    Remove {
+        /// Handle of the registry to remove
+        handle: String,
+    },
+    /// List configured registries
+    #[command(alias = "ls")]
+    List,
+    /// Set the default registry URL
     Set {
         /// URL or keyword (default, github, gitlab, codeberg)
         url: String,
     },
-    /// Show the current registry URL
-    Show,
 }
 
 #[derive(clap::ValueEnum, Clone)]
@@ -582,8 +593,10 @@ pub fn run() {
             } => {
                 if let Some(cmd) = command {
                     match cmd {
+                        SyncCommands::Add { url } => cmd::sync::add_registry(&url),
+                        SyncCommands::Remove { handle } => cmd::sync::remove_registry(&handle),
+                        SyncCommands::List => cmd::sync::list_registries(),
                         SyncCommands::Set { url } => cmd::sync::set_registry(&url),
-                        SyncCommands::Show => cmd::sync::show_registry(),
                     }
                 } else {
                     cmd::sync::run(verbose, fallback, no_package_managers, no_shell_setup);

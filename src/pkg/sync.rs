@@ -7,13 +7,9 @@ use git2::{
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use std::collections::HashSet;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-
-fn get_db_url() -> Result<String, Box<dyn std::error::Error>> {
-    let config = config::read_config()?;
-    Ok(config.registry.unwrap_or_else(config::get_default_registry))
-}
+use tempfile::Builder;
 
 fn get_db_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
     let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
@@ -31,11 +27,7 @@ fn sync_git_repos(verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    println!(
-        "
-{}",
-        "Syncing external git repositories...".green()
-    );
+    println!("\n{}", "Syncing external git repositories...".green());
 
     let config = config::read_config()?;
     let configured_git_repos_names: HashSet<String> = config
@@ -99,9 +91,7 @@ fn sync_git_repos(verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn run_verbose(db_url: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let db_path = get_db_path()?;
-
+fn run_verbose_at_path(db_url: &str, db_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     if db_path.exists() {
         let status = Command::new("git")
             .arg("-C")
@@ -118,7 +108,7 @@ fn run_verbose(db_url: &str) -> Result<(), Box<dyn std::error::Error>> {
             .arg("clone")
             .arg("--progress")
             .arg(db_url)
-            .arg(&db_path)
+            .arg(db_path)
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
             .status()?;
@@ -129,25 +119,23 @@ fn run_verbose(db_url: &str) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn run_non_verbose(db_url: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let db_path = get_db_path()?;
-    println!("Database path: {}", db_path.display());
-
+fn run_non_verbose_at_path(db_url: &str, db_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let m = MultiProgress::new();
     let fetch_pb = m.add(ProgressBar::new(0).with_style(
         ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] Fetching: [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)")? 
+            .template("{spinner:.green} [{elapsed_precise}] Fetching: [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)?")
+            .unwrap()
             .progress_chars("#>-"),
     ));
     let checkout_pb = m.add(ProgressBar::new(0).with_style(
-    ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] Checkout: [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)")? 
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] Checkout: [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)?")
+            .unwrap()
             .progress_chars("#>-"),
     ));
 
     if db_path.exists() {
-        println!("Database found. Pulling changes...");
-        let repo = Repository::open(&db_path)?;
+        let repo = Repository::open(db_path)?;
         let mut remote = repo.find_remote("origin")?;
 
         let mut cb = RemoteCallbacks::new();
@@ -196,7 +184,6 @@ fn run_non_verbose(db_url: &str) -> Result<(), Box<dyn std::error::Error>> {
             );
         }
     } else {
-        println!("No local database found. Cloning from remote...");
         if let Some(parent) = db_path.parent() {
             fs::create_dir_all(parent)?;
         }
@@ -226,7 +213,7 @@ fn run_non_verbose(db_url: &str) -> Result<(), Box<dyn std::error::Error>> {
         RepoBuilder::new()
             .fetch_options(fo)
             .with_checkout(checkout_builder)
-            .clone(db_url, &db_path)?;
+            .clone(db_url, db_path)?;
 
         fetch_pb.finish_with_message("Fetched.");
         checkout_pb.finish_with_message("Checked out.");
@@ -236,11 +223,13 @@ fn run_non_verbose(db_url: &str) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn try_sync(db_url: &str, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
-    let db_path = get_db_path()?;
-
+fn try_sync_at_path(
+    db_url: &str,
+    db_path: &Path,
+    verbose: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
     if db_path.exists()
-        && let Ok(repo) = Repository::open(&db_path)
+        && let Ok(repo) = Repository::open(db_path)
         && let Ok(remote) = repo.find_remote("origin")
         && let Some(remote_url) = remote.url()
         && remote_url != db_url
@@ -250,25 +239,24 @@ fn try_sync(db_url: &str, verbose: bool) -> Result<(), Box<dyn std::error::Error
             remote_url.yellow(),
             db_url.cyan()
         );
-        fs::remove_dir_all(&db_path)?;
+        fs::remove_dir_all(db_path)?;
     }
 
     if verbose {
-        run_verbose(db_url)
+        run_verbose_at_path(db_url, db_path)
     } else {
-        run_non_verbose(db_url)
+        run_non_verbose_at_path(db_url, db_path)
     }
 }
 
-fn sync_pgp_keys() -> Result<(), Box<dyn std::error::Error>> {
+fn sync_pgp_keys_at_path(db_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     println!("\n{}", "Syncing PGP keys from repository...".green());
-    let db_path = get_db_path()?;
     if !db_path.join("repo.yaml").exists() {
         println!("{}", "repo.yaml not found, skipping PGP key sync.".yellow());
         return Ok(());
     }
 
-    let repo_config = config::read_repo_config(&db_path)?;
+    let repo_config = config::read_repo_config(db_path)?;
 
     if repo_config.pgp.is_empty() {
         println!("No PGP keys defined in repo.yaml.");
@@ -304,66 +292,89 @@ fn sync_pgp_keys() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-pub fn run(verbose: bool, fallback: bool, no_pm: bool) -> Result<(), Box<dyn std::error::Error>> {
-    let db_url = get_db_url()?;
+fn fetch_handle_for_url(url: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let temp_dir = Builder::new().prefix("zoi-handle-fetch").tempdir()?;
+    println!("Cloning '{}' to fetch handle...", url.cyan());
+    let status = std::process::Command::new("git")
+        .arg("clone")
+        .arg("--depth=1")
+        .arg(url)
+        .arg(temp_dir.path())
+        .status()?;
 
-    let mut urls_to_try = vec![db_url.clone()];
+    if !status.success() {
+        return Err("git clone failed to fetch handle".into());
+    }
 
-    if fallback {
-        let db_path = get_db_path()?;
-        let repo_config_path = db_path.join("repo.yaml");
-        if repo_config_path.exists() {
-            println!("Found repo.yaml, using it for sync fallbacks.");
-            let repo_config = config::read_repo_config(&db_path)?;
-            if let Some(main_git) = repo_config.git.iter().find(|g| g.link_type == "main")
-                && main_git.url != db_url
-            {
-                println!(
-                        "{}",
-                        "Warning: Registry URL in config differs from repo.yaml. Using config URL as primary.".yellow()
-                    );
-            }
-            urls_to_try.extend(
-                repo_config
-                    .git
-                    .iter()
-                    .filter(|g| g.link_type == "mirror")
-                    .map(|g| g.url.clone()),
+    let repo_config = config::read_repo_config(temp_dir.path())?;
+    Ok(repo_config.name)
+}
+
+pub fn run(verbose: bool, _fallback: bool, no_pm: bool) -> Result<(), Box<dyn std::error::Error>> {
+    let mut config = config::read_config()?;
+    let mut needs_config_update = false;
+
+    let db_root = get_db_path()?;
+
+    if let Some(mut default_reg) = config.default_registry.clone() {
+        println!("Syncing default registry...");
+        let mut reg_changed = false;
+        if default_reg.handle.is_empty() {
+            let handle = fetch_handle_for_url(&default_reg.url)?;
+            default_reg.handle = handle;
+            reg_changed = true;
+        }
+
+        let target_dir = db_root.join(&default_reg.handle);
+        if let Err(e) = try_sync_at_path(&default_reg.url, &target_dir, verbose) {
+            eprintln!("Sync with {} failed: {}", default_reg.url.yellow(), e);
+        } else {
+            println!(
+                "{} with {}",
+                "Sync successful".green(),
+                default_reg.url.cyan()
             );
-        } else {
-            println!("repo.yaml not found in database, no fallbacks available.");
+            sync_pgp_keys_at_path(&target_dir)?;
+        }
+
+        if reg_changed {
+            config.default_registry = Some(default_reg);
+            needs_config_update = true;
         }
     }
 
-    if urls_to_try.is_empty() {
-        return Err("No repository URL found to sync from.".into());
+    let mut updated_added_registries = Vec::new();
+    if !config.added_registries.is_empty() {
+        println!("\nSyncing added registries...");
     }
-
-    let mut success = false;
-    for (i, url) in urls_to_try.iter().enumerate() {
-        if i == 0 {
-            println!("Attempting to sync with primary URL: {}", url.cyan());
-        } else {
-            println!("Trying fallback: {}", url.cyan());
+    for mut reg in config.added_registries.clone() {
+        let mut reg_changed = false;
+        if reg.handle.is_empty() {
+            let handle = fetch_handle_for_url(&reg.url)?;
+            reg.handle = handle;
+            reg_changed = true;
         }
 
-        if let Err(e) = try_sync(url, verbose) {
-            println!("Sync with {} failed: {}", url.yellow(), e);
+        let target_dir = db_root.join(&reg.handle);
+        if let Err(e) = try_sync_at_path(&reg.url, &target_dir, verbose) {
+            eprintln!("Sync with {} failed: {}", reg.url.yellow(), e);
         } else {
-            println!("{} with {}", "Sync successful".green(), url.cyan());
-            success = true;
-            break;
+            println!("{} with {}", "Sync successful".green(), reg.url.cyan());
+            sync_pgp_keys_at_path(&target_dir)?;
         }
-    }
 
-    if !success {
-        return Err(
-            "All mirrors failed. Please check your connection and the repository status.".into(),
-        );
+        if reg_changed {
+            needs_config_update = true;
+        }
+        updated_added_registries.push(reg);
+    }
+    config.added_registries = updated_added_registries;
+
+    if needs_config_update {
+        config::write_config(&config)?;
     }
 
     sync_git_repos(verbose)?;
-    sync_pgp_keys()?;
 
     if !no_pm {
         println!("\n{}", "Updating system configuration...".green());

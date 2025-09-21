@@ -29,7 +29,7 @@ pub fn add(ext_name: &str, _yes: bool) -> Result<(), Box<dyn Error>> {
                 }
                 types::ExtensionChange::RegistryRepo { add } => {
                     println!("Setting registry to: {}", add);
-                    config::set_registry(&add)?;
+                    config::set_default_registry(&add)?;
                 }
                 types::ExtensionChange::RepoAdd { add } => {
                     println!("Adding repository: {}", add);
@@ -122,7 +122,7 @@ pub fn remove(ext_name: &str, _yes: bool) -> Result<(), Box<dyn Error>> {
                 types::ExtensionChange::RegistryRepo { add: _ } => {
                     let default_registry = "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg.git";
                     println!("Setting registry back to default");
-                    if let Err(e) = config::set_registry(default_registry) {
+                    if let Err(e) = config::set_default_registry(default_registry) {
                         eprintln!("Warning: failed to set registry to default: {}", e);
                     }
                 }

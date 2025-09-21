@@ -17,6 +17,7 @@ pub enum PgpCommands {
     /// Remove a PGP key
     Remove(RemoveKey),
     /// List all imported PGP keys
+    #[command(alias = "ls")]
     List,
     /// Search for a PGP key by user ID or fingerprint
     Search(SearchKey),

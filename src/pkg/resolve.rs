@@ -30,12 +30,13 @@ pub struct ResolvedSource {
 
 #[derive(Debug, Default)]
 struct PackageRequest {
+    handle: Option<String>,
     repo: Option<String>,
     name: String,
     version_spec: Option<String>,
 }
 
-pub(crate) fn get_db_root() -> Result<PathBuf, Box<dyn Error>> {
+pub fn get_db_root() -> Result<PathBuf, Box<dyn Error>> {
     let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
     Ok(home_dir.join(".zoi").join("pkgs").join("db"))
 }
@@ -54,28 +55,41 @@ fn parse_source_string(source_str: &str) -> Result<PackageRequest, Box<dyn Error
             file_stem.to_string()
         };
         return Ok(PackageRequest {
+            handle: None,
             repo: None,
             name,
             version_spec: None,
         });
     }
 
+    let mut handle = None;
+    let mut main_part = source_str;
+
+    if main_part.starts_with('#') {
+        if let Some((handle_part, rest)) = main_part.split_once(' ') {
+            handle = Some(handle_part.trim_start_matches('#').to_string());
+            main_part = rest.trim();
+        } else {
+            return Err("Invalid format: missing space after registry handle".into());
+        }
+    }
+
     let mut repo = None;
     let name: &str;
     let mut version_spec = None;
 
-    let mut main_part = source_str;
+    let mut version_part_str = main_part;
 
-    if let Some(at_pos) = source_str.rfind('@')
+    if let Some(at_pos) = main_part.rfind('@')
         && at_pos > 0
     {
-        let (pkg_part, ver_part) = source_str.split_at(at_pos);
-        main_part = pkg_part;
+        let (pkg_part, ver_part) = main_part.split_at(at_pos);
+        version_part_str = pkg_part;
         version_spec = Some(ver_part[1..].to_string());
     }
 
-    if main_part.starts_with('@') {
-        let s = main_part.trim_start_matches('@');
+    if version_part_str.starts_with('@') {
+        let s = version_part_str.trim_start_matches('@');
         if let Some((repo_str, name_str)) = s.split_once('/') {
             if !name_str.is_empty() {
                 repo = Some(repo_str.to_lowercase());
@@ -89,7 +103,7 @@ fn parse_source_string(source_str: &str) -> Result<PackageRequest, Box<dyn Error
             );
         }
     } else {
-        name = main_part;
+        name = version_part_str;
     }
 
     if name.is_empty() {
@@ -97,6 +111,7 @@ fn parse_source_string(source_str: &str) -> Result<PackageRequest, Box<dyn Error
     }
 
     Ok(PackageRequest {
+        handle,
         repo,
         name: name.to_lowercase(),
         version_spec,
@@ -105,11 +120,27 @@ fn parse_source_string(source_str: &str) -> Result<PackageRequest, Box<dyn Error
 
 fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dyn Error>> {
     let db_root = get_db_root()?;
+    let config = config::read_config()?;
 
-    let search_repos = if let Some(r) = &request.repo {
-        vec![r.clone()]
+    let (registry_db_path, search_repos, is_default_registry) = if let Some(h) = &request.handle {
+        let registry = config
+            .added_registries
+            .iter()
+            .find(|r| r.handle == *h)
+            .ok_or_else(|| format!("Registry with handle '{}' not found.", h))?;
+        let repo_path = db_root.join(&registry.handle);
+        let all_sub_repos = fs::read_dir(&repo_path)?
+            .filter_map(Result::ok)
+            .filter(|entry| entry.path().is_dir())
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .collect();
+        (repo_path, all_sub_repos, false)
     } else {
-        config::read_config()?.repos
+        let default_registry = config
+            .default_registry
+            .as_ref()
+            .ok_or("No default registry set.")?;
+        (db_root.join(&default_registry.handle), config.repos, true)
     };
 
     struct FoundPackage {
@@ -120,7 +151,6 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
     }
 
     let mut found_packages = Vec::new();
-    let repo_config = config::read_repo_config(&db_root).ok();
 
     if request.name.contains('/') {
         let pkg_name = Path::new(&request.name)
@@ -129,7 +159,7 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
             .ok_or_else(|| format!("Invalid package path: {}", request.name))?;
 
         for repo_name in &search_repos {
-            let path = db_root
+            let path = registry_db_path
                 .join(repo_name)
                 .join(&request.name)
                 .join(format!("{}.pkg.lua", pkg_name));
@@ -139,10 +169,15 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
                     crate::pkg::lua_parser::parse_lua_package(path.to_str().unwrap(), None)?;
                 let major_repo = repo_name.split('/').next().unwrap_or("").to_lowercase();
 
-                let source_type = if let Some(ref cfg) = repo_config {
-                    if let Some(repo_entry) = cfg.repos.iter().find(|r| r.name == major_repo) {
-                        if repo_entry.repo_type == "offical" {
-                            SourceType::OfficialRepo
+                let source_type = if is_default_registry {
+                    let repo_config = config::read_repo_config(&registry_db_path).ok();
+                    if let Some(ref cfg) = repo_config {
+                        if let Some(repo_entry) = cfg.repos.iter().find(|r| r.name == major_repo) {
+                            if repo_entry.repo_type == "offical" {
+                                SourceType::OfficialRepo
+                            } else {
+                                SourceType::UntrustedRepo(repo_name.clone())
+                            }
                         } else {
                             SourceType::UntrustedRepo(repo_name.clone())
                         }
@@ -163,7 +198,7 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
         }
     } else {
         for repo_name in &search_repos {
-            let repo_path = db_root.join(repo_name);
+            let repo_path = registry_db_path.join(repo_name);
             if !repo_path.is_dir() {
                 continue;
             }
@@ -191,10 +226,17 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
                     )?;
                     let major_repo = repo_name.split('/').next().unwrap_or("").to_lowercase();
 
-                    let source_type = if let Some(ref cfg) = repo_config {
-                        if let Some(repo_entry) = cfg.repos.iter().find(|r| r.name == major_repo) {
-                            if repo_entry.repo_type == "offical" {
-                                SourceType::OfficialRepo
+                    let source_type = if is_default_registry {
+                        let repo_config = config::read_repo_config(&registry_db_path).ok();
+                        if let Some(ref cfg) = repo_config {
+                            if let Some(repo_entry) =
+                                cfg.repos.iter().find(|r| r.name == major_repo)
+                            {
+                                if repo_entry.repo_type == "offical" {
+                                    SourceType::OfficialRepo
+                                } else {
+                                    SourceType::UntrustedRepo(repo_name.clone())
+                                }
                             } else {
                                 SourceType::UntrustedRepo(repo_name.clone())
                             }
