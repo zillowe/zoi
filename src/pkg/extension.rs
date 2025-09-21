@@ -62,6 +62,8 @@ pub fn add(ext_name: &str, _yes: bool) -> Result<(), Box<dyn Error>> {
         scope: pkg.scope,
         bins: None,
         installed_dependencies: vec![],
+        install_method: None,
+        installed_files: vec![],
     };
     local::write_manifest(&manifest)?;
 

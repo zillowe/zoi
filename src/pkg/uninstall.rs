@@ -127,6 +127,42 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
             dependents.join("\n  - ")
         ).into());
     }
+
+    if manifest.install_method == Some("installer".to_string()) {
+        let os = std::env::consts::OS;
+        if os == "windows" {
+            if let Some(msi_path) = manifest.installed_files.first() {
+                println!("Uninstalling MSI package...");
+                let status = Command::new("msiexec")
+                    .arg("/x")
+                    .arg(msi_path)
+                    .arg("/qn")
+                    .status()?;
+                if !status.success() {
+                    eprintln!("{}", "Warning: Failed to run MSI uninstaller. The application might not be fully uninstalled.".yellow());
+                }
+            }
+        } else if os == "macos" {
+            for file_path in &manifest.installed_files {
+                let path = PathBuf::from(file_path);
+                if path.exists() {
+                    println!("Removing {}...", path.display());
+                    if path.is_dir() {
+                        if let Err(e) = fs::remove_dir_all(&path) {
+                            eprintln!(
+                                "Warning: failed to remove directory {}: {}",
+                                path.display(),
+                                e
+                            );
+                        }
+                    } else if let Err(e) = fs::remove_file(&path) {
+                        eprintln!("Warning: failed to remove file {}: {}", path.display(), e);
+                    }
+                }
+            }
+        }
+    }
+
     let dependencies_to_check = &manifest.installed_dependencies;
     println!(
         "Uninstalling '{}' and its unused dependencies...",

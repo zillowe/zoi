@@ -254,8 +254,6 @@ pub struct InstallationMethod {
     #[serde(default)]
     pub docker_image: Option<String>,
     #[serde(default)]
-    pub binary_types: Option<Vec<String>>,
-    #[serde(default)]
     pub lib_types: Option<Vec<String>>,
     #[serde(default)]
     pub files: Option<Vec<FileGroup>>,
@@ -336,10 +334,13 @@ pub struct InstallManifest {
     pub installed_at: String,
     pub reason: InstallReason,
     pub scope: Scope,
-    #[serde(default)]
     pub bins: Option<Vec<String>>,
     #[serde(default)]
     pub installed_dependencies: Vec<String>,
+    #[serde(default)]
+    pub install_method: Option<String>,
+    #[serde(default)]
+    pub installed_files: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

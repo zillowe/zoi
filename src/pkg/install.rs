@@ -227,7 +227,7 @@ pub fn run_installation(
         } else {
             println!("Collection has no dependencies to install.");
         }
-        write_manifest(&pkg, reason, installed_deps_list)?;
+        write_manifest(&pkg, reason, installed_deps_list, None, Vec::new())?;
         if let Err(e) = recorder::record_package(&pkg, &chosen_options, &chosen_optionals) {
             eprintln!("Warning: failed to record package installation: {}", e);
         }
@@ -309,7 +309,7 @@ pub fn run_installation(
                 )?;
             }
         }
-        write_manifest(&pkg, reason, installed_deps_list)?;
+        write_manifest(&pkg, reason, installed_deps_list, None, Vec::new())?;
         if let Err(e) = recorder::record_package(&pkg, &chosen_options, &chosen_optionals) {
             eprintln!("Warning: failed to record package installation: {}", e);
         }
@@ -396,7 +396,7 @@ pub fn run_installation(
                 )?;
             }
         }
-        write_manifest(&pkg, reason, installed_deps_list)?;
+        write_manifest(&pkg, reason, installed_deps_list, None, Vec::new())?;
         if let Err(e) = recorder::record_package(&pkg, &chosen_options, &chosen_optionals) {
             eprintln!("Warning: failed to record package installation: {}", e);
         }
@@ -529,13 +529,33 @@ pub fn run_installation(
 
     let mut install_manual = true;
 
+    let mut install_method_name = None;
+    let mut installed_files = Vec::new();
+
     let result = match mode {
-        InstallMode::ForceSource => run_source_flow(&pkg, &platform),
-        InstallMode::PreferBinary => {
-            run_default_flow(&pkg, &pkg_lua_path, &platform, yes, &mut install_manual)
+        InstallMode::ForceSource => {
+            install_method_name = Some("source".to_string());
+            run_source_flow(&pkg, &platform)
         }
-        InstallMode::Interactive => run_interactive_flow(&pkg, &pkg_lua_path, &platform),
-        InstallMode::Updater(ref method_name) => run_updater_flow(&pkg, &platform, method_name),
+        InstallMode::PreferBinary => run_default_flow(
+            &pkg,
+            &pkg_lua_path,
+            &platform,
+            yes,
+            &mut install_manual,
+            &mut install_method_name,
+            &mut installed_files,
+        ),
+        InstallMode::Interactive => run_interactive_flow(
+            &pkg,
+            &platform,
+            &mut install_method_name,
+            &mut installed_files,
+        ),
+        InstallMode::Updater(ref method_name) => {
+            install_method_name = Some(method_name.clone());
+            run_updater_flow(&pkg, &platform, method_name, &mut installed_files)
+        }
     };
 
     if result.is_ok() {
@@ -547,7 +567,13 @@ pub fn run_installation(
         {
             eprintln!("Warning: failed to install pkg-config file: {}", e);
         }
-        write_manifest(&pkg, reason, installed_deps_list)?;
+        write_manifest(
+            &pkg,
+            reason,
+            installed_deps_list,
+            install_method_name,
+            installed_files,
+        )?;
         if let Err(e) = recorder::record_package(&pkg, &chosen_options, &chosen_optionals) {
             eprintln!("Warning: failed to record package installation: {}", e);
         }
@@ -741,11 +767,13 @@ fn run_updater_flow(
     pkg: &types::Package,
     platform: &str,
     method_name: &str,
+    installed_files: &mut Vec<String>,
 ) -> Result<(), Box<dyn Error>> {
     if let Some(method) = find_method(pkg, method_name, platform) {
         println!("Using '{}' method specified by updater.", method_name);
         return match method_name {
             "binary" => handle_binary_install(method, pkg),
+            "installer" => handle_installer_install(method, pkg, installed_files),
             "com_binary" => handle_com_binary_install(method, pkg),
             "script" => handle_script_install(method, pkg),
             "source" => handle_source_install(method, pkg),
@@ -765,8 +793,9 @@ fn run_updater_flow(
 
 fn run_interactive_flow(
     pkg: &types::Package,
-    _pkg_lua_path: &std::path::Path,
     platform: &str,
+    install_method_name: &mut Option<String>,
+    installed_files: &mut Vec<String>,
 ) -> Result<(), Box<dyn Error>> {
     let mut available_methods = Vec::new();
     for method in &pkg.installation {
@@ -798,8 +827,10 @@ fn run_interactive_flow(
 
     let selected_method = available_methods[selection];
 
+    *install_method_name = Some(selected_method.install_type.clone());
     match selected_method.install_type.as_str() {
         "binary" => handle_binary_install(selected_method, pkg),
+        "installer" => handle_installer_install(selected_method, pkg, installed_files),
         "com_binary" => handle_com_binary_install(selected_method, pkg),
         "script" => handle_script_install(selected_method, pkg),
         "source" => handle_source_install(selected_method, pkg),
@@ -920,6 +951,8 @@ fn run_default_flow(
     platform: &str,
     yes: bool,
     install_manual: &mut bool,
+    install_method_name: &mut Option<String>,
+    installed_files: &mut Vec<String>,
 ) -> Result<(), Box<dyn Error>> {
     let db_path = resolve::get_db_root()?;
     if let Ok(repo_config) = config::read_repo_config(&db_path)
@@ -984,14 +1017,22 @@ fn run_default_flow(
         return Ok(());
     }
 
+    if let Some(method) = find_method(pkg, "installer", platform) {
+        println!("Found 'installer' method. Installing...");
+        *install_method_name = Some("installer".to_string());
+        return handle_installer_install(method, pkg, installed_files);
+    }
+
     if let Some(method) = find_method(pkg, "binary", platform) {
         println!("Found 'binary' method. Installing...");
+        *install_method_name = Some("binary".to_string());
         return handle_binary_install(method, pkg);
     }
 
     println!("No binary found, checking for compressed binary...");
     if let Some(method) = find_method(pkg, "com_binary", platform) {
         println!("Found 'com_binary' method. Installing...");
+        *install_method_name = Some("com_binary".to_string());
         return handle_com_binary_install(method, pkg);
     }
 
@@ -999,6 +1040,7 @@ fn run_default_flow(
     if let Some(method) = find_method(pkg, "script", platform)
         && utils::ask_for_confirmation("Found a 'script' method. Do you want to execute it?", yes)
     {
+        *install_method_name = Some("script".to_string());
         return handle_script_install(method, pkg);
     }
 
@@ -1009,6 +1051,7 @@ fn run_default_flow(
             yes,
         )
     {
+        *install_method_name = Some("source".to_string());
         return handle_source_install(method, pkg);
     }
 
@@ -1056,6 +1099,8 @@ fn write_manifest(
     pkg: &types::Package,
     reason: types::InstallReason,
     installed_dependencies: Vec<String>,
+    install_method: Option<String>,
+    installed_files: Vec<String>,
 ) -> Result<(), Box<dyn Error>> {
     let manifest = types::InstallManifest {
         name: pkg.name.clone(),
@@ -1066,6 +1111,8 @@ fn write_manifest(
         scope: pkg.scope,
         bins: pkg.bins.clone(),
         installed_dependencies,
+        install_method,
+        installed_files,
     };
     local::write_manifest(&manifest)
 }
@@ -1282,6 +1329,182 @@ fn verify_signatures(
             })?;
         }
     }
+    Ok(())
+}
+
+fn handle_installer_install(
+    method: &types::InstallationMethod,
+    pkg: &types::Package,
+    installed_files: &mut Vec<String>,
+) -> Result<(), Box<dyn Error>> {
+    let os = std::env::consts::OS;
+
+    let installer_type = if os == "macos" {
+        "dmg"
+    } else if os == "windows" {
+        "msi"
+    } else if os == "linux" {
+        "appimage"
+    } else {
+        return Err(format!("Installer method not supported on this OS: {}", os).into());
+    };
+
+    if pkg.package_type == types::PackageType::Library {
+        return Err(format!(
+            "{} installers are not supported for libraries.",
+            installer_type.to_uppercase()
+        )
+        .into());
+    }
+    let url_string;
+    let url: &str = if !method.url.ends_with(installer_type) {
+        url_string = format!("{}.{}", &method.url, installer_type);
+        &url_string
+    } else {
+        &method.url
+    };
+
+    let downloaded_bytes = download_file_with_progress(url)?;
+
+    let file_to_verify = get_filename_from_url(url);
+    verify_checksum(&downloaded_bytes, method, pkg, file_to_verify)?;
+    verify_signatures(&downloaded_bytes, method, pkg, file_to_verify)?;
+
+    let temp_dir = Builder::new()
+        .prefix(&format!("zoi-install-{}", pkg.name))
+        .tempdir()?;
+    let file_name = get_filename_from_url(url);
+    let temp_file_path = temp_dir.path().join(file_name);
+    fs::write(&temp_file_path, &downloaded_bytes)?;
+
+    println!("Installing {}...", file_name.cyan());
+
+    if installer_type == "dmg" {
+        let output = Command::new("hdiutil")
+            .arg("attach")
+            .arg(&temp_file_path)
+            .output()?;
+        if !output.status.success() {
+            return Err(format!(
+                "Failed to mount DMG: {}",
+                String::from_utf8_lossy(&output.stderr)
+            )
+            .into());
+        }
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mount_path_line = stdout.lines().last().unwrap_or("");
+        let mount_path_parts: Vec<&str> = mount_path_line.split('\t').collect();
+        let mount_path = PathBuf::from(mount_path_parts.last().unwrap_or(&"").trim());
+
+        if mount_path.as_os_str().is_empty() {
+            return Err("Could not determine mount path for DMG.".into());
+        }
+
+        let app_path = fs::read_dir(&mount_path)?
+            .filter_map(Result::ok)
+            .find(|entry| entry.path().extension().is_some_and(|ext| ext == "app"))
+            .map(|entry| entry.path());
+
+        if let Some(app_path) = app_path {
+            let app_name = app_path.file_name().unwrap().to_str().unwrap();
+            let app_dest_dir = if pkg.scope == types::Scope::System {
+                PathBuf::from("/Applications")
+            } else {
+                home::home_dir().ok_or("No home dir")?.join("Applications")
+            };
+            fs::create_dir_all(&app_dest_dir)?;
+            let dest_path = app_dest_dir.join(app_name);
+
+            println!(
+                "Copying {} to {}...",
+                app_name.cyan(),
+                app_dest_dir.display()
+            );
+            let cp_status = Command::new("cp")
+                .arg("-R")
+                .arg(&app_path)
+                .arg(&app_dest_dir)
+                .status()?;
+            if !cp_status.success() {
+                return Err("Failed to copy .app from DMG.".into());
+            }
+
+            installed_files.push(dest_path.to_str().unwrap().to_string());
+
+            let bin_dir = home::home_dir().ok_or("No home dir")?.join(".zoi/pkgs/bin");
+            fs::create_dir_all(&bin_dir)?;
+            let symlink_path = bin_dir.join(&pkg.name);
+
+            let executable_name = app_path.file_stem().unwrap().to_str().unwrap();
+            let app_executable = dest_path.join("Contents/MacOS").join(executable_name);
+
+            if app_executable.exists() {
+                if symlink_path.exists() {
+                    fs::remove_file(&symlink_path)?;
+                }
+                #[cfg(unix)]
+                std::os::unix::fs::symlink(&app_executable, &symlink_path)?;
+            } else {
+                println!(
+                    "{} Could not find executable inside .app bundle to create a symlink.",
+                    "Warning:".yellow()
+                );
+            }
+        } else {
+            return Err("Could not find an .app file in the mounted DMG.".into());
+        }
+
+        Command::new("hdiutil")
+            .arg("detach")
+            .arg(&mount_path)
+            .status()?;
+    } else if installer_type == "msi" {
+        let store_dir = home::home_dir()
+            .ok_or("No home dir")?
+            .join(".zoi/pkgs/store")
+            .join(&pkg.name);
+        fs::create_dir_all(&store_dir)?;
+        let msi_path = store_dir.join(file_name);
+        fs::copy(&temp_file_path, &msi_path)?;
+        installed_files.push(msi_path.to_str().unwrap().to_string());
+
+        let status = Command::new("msiexec")
+            .arg("/i")
+            .arg(&temp_file_path)
+            .arg("/qn")
+            .status()?;
+        if !status.success() {
+            return Err("Failed to run MSI installer.".into());
+        }
+    } else if installer_type == "appimage" {
+        let store_dir = home::home_dir()
+            .ok_or("No home dir")?
+            .join(".zoi/pkgs/store")
+            .join(&pkg.name)
+            .join("bin");
+        fs::create_dir_all(&store_dir)?;
+
+        let bin_path = store_dir.join(&pkg.name);
+        fs::copy(&temp_file_path, &bin_path)?;
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&bin_path, fs::Permissions::from_mode(0o755))?;
+        }
+
+        let symlink_dir = home::home_dir().ok_or("No home dir")?.join(".zoi/pkgs/bin");
+        fs::create_dir_all(&symlink_dir)?;
+        let symlink_path = symlink_dir.join(&pkg.name);
+
+        if symlink_path.exists() {
+            fs::remove_file(&symlink_path)?;
+        }
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&bin_path, symlink_path)?;
+    }
+
+    println!("{}", "Installer finished successfully.".green());
     Ok(())
 }
 
@@ -1530,224 +1753,6 @@ fn handle_binary_install(
     method: &types::InstallationMethod,
     pkg: &types::Package,
 ) -> Result<(), Box<dyn Error>> {
-    let os = std::env::consts::OS;
-
-    let mut binary_type = None;
-    if let Some(binary_types) = &method.binary_types {
-        if os == "macos" && binary_types.contains(&"dmg".to_string()) {
-            binary_type = Some("dmg");
-        } else if os == "windows" && binary_types.contains(&"msi".to_string()) {
-            binary_type = Some("msi");
-        } else if os == "linux" && binary_types.contains(&"appimage".to_string()) {
-            binary_type = Some("appimage");
-        }
-    }
-
-    if let Some(ext) = binary_type {
-        if pkg.package_type == types::PackageType::Library {
-            return Err("DMG/MSI/AppImage installers are not supported for libraries.".into());
-        }
-        let url_string;
-        let url: &str = if !method.url.ends_with(ext) {
-            url_string = format!("{}.{}", &method.url, ext);
-            &url_string
-        } else {
-            &method.url
-        };
-
-        if url.starts_with("http://") {
-            println!(
-                "{} downloading over insecure HTTP: {}",
-                "Warning:".yellow(),
-                url
-            );
-        }
-        println!("Downloading from: {url}");
-
-        let client = crate::utils::build_blocking_http_client(60)?;
-        let mut attempt = 0u32;
-        let response = loop {
-            attempt += 1;
-            match client.get(url).send() {
-                Ok(resp) => break resp,
-                Err(e) => {
-                    if attempt < 3 {
-                        eprintln!(
-                            "{}: download failed ({}). Retrying...",
-                            "Network".yellow(),
-                            e
-                        );
-                        crate::utils::retry_backoff_sleep(attempt);
-                        continue;
-                    } else {
-                        return Err(format!(
-                            "Failed to download '{}' after {} attempts: {}",
-                            url, attempt, e
-                        )
-                        .into());
-                    }
-                }
-            }
-        };
-        if !response.status().is_success() {
-            return Err(format!(
-                "Failed to download binary (HTTP {}): {}",
-                response.status(),
-                url
-            )
-            .into());
-        }
-
-        let total_size = response.content_length().unwrap_or(0);
-        let pb = ProgressBar::new(total_size);
-        pb.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})")? 
-        .progress_chars("#>- "));
-
-        let mut downloaded_bytes = Vec::new();
-        let mut stream = response;
-        let mut buffer = [0; 8192];
-        loop {
-            let bytes_read = stream.read(&mut buffer)?;
-            if bytes_read == 0 {
-                break;
-            }
-            downloaded_bytes.extend_from_slice(&buffer[..bytes_read]);
-            pb.inc(bytes_read as u64);
-        }
-        pb.finish_with_message("Download complete.");
-
-        let file_to_verify = get_filename_from_url(url);
-        verify_checksum(&downloaded_bytes, method, pkg, file_to_verify)?;
-        verify_signatures(&downloaded_bytes, method, pkg, file_to_verify)?;
-
-        let temp_dir = Builder::new()
-            .prefix(&format!("zoi-install-{}", pkg.name))
-            .tempdir()?;
-        let file_name = get_filename_from_url(url);
-        let temp_file_path = temp_dir.path().join(file_name);
-        fs::write(&temp_file_path, downloaded_bytes)?;
-
-        println!("Installing {}...", file_name.cyan());
-
-        if ext == "dmg" {
-            let output = Command::new("hdiutil")
-                .arg("attach")
-                .arg(&temp_file_path)
-                .output()?;
-            if !output.status.success() {
-                return Err(format!(
-                    "Failed to mount DMG: {}",
-                    String::from_utf8_lossy(&output.stderr)
-                )
-                .into());
-            }
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            let mount_path_line = stdout.lines().last().unwrap_or("");
-            let mount_path_parts: Vec<&str> = mount_path_line.split('\t').collect();
-            let mount_path = PathBuf::from(mount_path_parts.last().unwrap_or(&"").trim());
-
-            if mount_path.as_os_str().is_empty() {
-                return Err("Could not determine mount path for DMG.".into());
-            }
-
-            let app_path = fs::read_dir(&mount_path)?
-                .filter_map(Result::ok)
-                .find(|entry| entry.path().extension().is_some_and(|ext| ext == "app"))
-                .map(|entry| entry.path());
-
-            if let Some(app_path) = app_path {
-                let app_name = app_path.file_name().unwrap().to_str().unwrap();
-                let app_dest_dir = if pkg.scope == types::Scope::System {
-                    PathBuf::from("/Applications")
-                } else {
-                    home::home_dir().ok_or("No home dir")?.join("Applications")
-                };
-                fs::create_dir_all(&app_dest_dir)?;
-                let dest_path = app_dest_dir.join(app_name);
-
-                println!(
-                    "Copying {} to {}...",
-                    app_name.cyan(),
-                    app_dest_dir.display()
-                );
-                let cp_status = Command::new("cp")
-                    .arg("-R")
-                    .arg(&app_path)
-                    .arg(&app_dest_dir)
-                    .status()?;
-                if !cp_status.success() {
-                    return Err("Failed to copy .app from DMG.".into());
-                }
-
-                let bin_dir = home::home_dir().ok_or("No home dir")?.join(".zoi/pkgs/bin");
-                fs::create_dir_all(&bin_dir)?;
-                let symlink_path = bin_dir.join(&pkg.name);
-
-                let executable_name = app_path.file_stem().unwrap().to_str().unwrap();
-                let app_executable = dest_path.join("Contents/MacOS").join(executable_name);
-
-                if app_executable.exists() {
-                    if symlink_path.exists() {
-                        fs::remove_file(&symlink_path)?;
-                    }
-                    #[cfg(unix)]
-                    std::os::unix::fs::symlink(&app_executable, &symlink_path)?;
-                } else {
-                    println!(
-                        "{} Could not find executable inside .app bundle to create a symlink.",
-                        "Warning:".yellow()
-                    );
-                }
-            } else {
-                return Err("Could not find an .app file in the mounted DMG.".into());
-            }
-
-            Command::new("hdiutil")
-                .arg("detach")
-                .arg(&mount_path)
-                .status()?;
-        } else if ext == "msi" {
-            let status = Command::new("msiexec")
-                .arg("/i")
-                .arg(&temp_file_path)
-                .arg("/qn")
-                .status()?;
-            if !status.success() {
-                return Err("Failed to run MSI installer.".into());
-            }
-        } else if ext == "appimage" {
-            let store_dir = home::home_dir()
-                .ok_or("No home dir")?
-                .join(".zoi/pkgs/store")
-                .join(&pkg.name)
-                .join("bin");
-            fs::create_dir_all(&store_dir)?;
-
-            let bin_path = store_dir.join(&pkg.name);
-            fs::copy(&temp_file_path, &bin_path)?;
-
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                fs::set_permissions(&bin_path, fs::Permissions::from_mode(0o755))?;
-            }
-
-            let symlink_dir = home::home_dir().ok_or("No home dir")?.join(".zoi/pkgs/bin");
-            fs::create_dir_all(&symlink_dir)?;
-            let symlink_path = symlink_dir.join(&pkg.name);
-
-            if symlink_path.exists() {
-                fs::remove_file(&symlink_path)?;
-            }
-            #[cfg(unix)]
-            std::os::unix::fs::symlink(&bin_path, symlink_path)?;
-        }
-
-        println!("{}", "Binary installed successfully.".green());
-        return Ok(());
-    }
-
     let url = &method.url;
 
     if url.starts_with("http://") {
