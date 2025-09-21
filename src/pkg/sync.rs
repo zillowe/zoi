@@ -12,9 +12,7 @@ use std::process::{Command, Stdio};
 
 fn get_db_url() -> Result<String, Box<dyn std::error::Error>> {
     let config = config::read_config()?;
-    Ok(config
-        .registry
-        .unwrap_or_else(|| "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg.git".to_string()))
+    Ok(config.registry.unwrap_or_else(config::get_default_registry))
 }
 
 fn get_db_path() -> Result<PathBuf, Box<dyn std::error::Error>> {

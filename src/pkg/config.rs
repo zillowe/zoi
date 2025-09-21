@@ -5,6 +5,10 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
+pub fn get_default_registry() -> String {
+    env!("ZOI_DEFAULT_REGISTRY").to_string()
+}
+
 fn get_config_path() -> Result<PathBuf, Box<dyn Error>> {
     let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
     Ok(home_dir.join(".zoi").join("pkgs").join("config.yaml"))
@@ -41,7 +45,7 @@ pub fn read_config() -> Result<Config, Box<dyn Error>> {
             package_managers: None,
             native_package_manager: None,
             telemetry_enabled: false,
-            registry: Some("https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg.git".to_string()),
+            registry: Some(get_default_registry()),
             git_repos: Vec::new(),
             rollback_enabled: true,
         };
@@ -53,7 +57,7 @@ pub fn read_config() -> Result<Config, Box<dyn Error>> {
     let mut config: Config = serde_yaml::from_str(&content)?;
 
     let mut needs_update = if config.registry.is_none() {
-        config.registry = Some("https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg.git".to_string());
+        config.registry = Some(get_default_registry());
         true
     } else {
         false

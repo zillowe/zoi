@@ -32,8 +32,13 @@ pub fn run(verbose: bool, fallback: bool, no_pm: bool, no_shell_setup: bool) {
 }
 
 pub fn set_registry(url_or_keyword: &str) {
+    let url_storage;
     let url = match url_or_keyword {
-        "default" | "gitlab" => "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg.git",
+        "default" => {
+            url_storage = pkg::config::get_default_registry();
+            &url_storage
+        }
+        "gitlab" => "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg.git",
         "github" => "https://github.com/Zillowe/Zoidberg.git",
         "codeberg" => "https://codeberg.org/Zillowe/Zoidberg.git",
         _ => url_or_keyword,
@@ -50,9 +55,9 @@ pub fn set_registry(url_or_keyword: &str) {
 pub fn show_registry() {
     match pkg::config::read_config() {
         Ok(config) => {
-            let registry = config.registry.unwrap_or_else(|| {
-                "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg.git".to_string()
-            });
+            let registry = config
+                .registry
+                .unwrap_or_else(pkg::config::get_default_registry);
             println!("Current registry: {}", registry.cyan());
         }
         Err(e) => {
