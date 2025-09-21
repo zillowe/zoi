@@ -3,7 +3,8 @@
 ## Goals
 
 - [ ] Package `ghostty` and all of its packages
-- [ ] Package `fastfetch`, `kitty` and `wezterm`
+- [ ] Package `fastfetch`, `bat`, `kitty`, `minisign` and `wezterm`
+- [ ] Package `zig`
 
 ## Bugs
 
