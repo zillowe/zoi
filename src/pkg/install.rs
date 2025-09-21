@@ -88,6 +88,7 @@ pub fn run_installation(
         pkg.scope = scope;
     }
 
+    utils::print_repo_warning(&pkg.repo);
     utils::check_license(&pkg.license);
 
     if !display_updates(&pkg, yes)? {
@@ -955,18 +956,26 @@ fn run_default_flow(
     installed_files: &mut Vec<String>,
 ) -> Result<(), Box<dyn Error>> {
     let db_path = resolve::get_db_root()?;
-    if let Ok(repo_config) = config::read_repo_config(&db_path)
-        && let Some(repo_pkg_url_template) = repo_config.repo_pkg
-    {
-        let mut urls_to_try = vec![repo_pkg_url_template];
-        urls_to_try.extend(repo_config.mirrors_pkg);
+    if let Ok(repo_config) = config::read_repo_config(&db_path) {
+        let mut pkg_links_to_try = Vec::new();
+        if let Some(main_pkg) = repo_config.pkg.iter().find(|p| p.link_type == "main") {
+            pkg_links_to_try.push(main_pkg.clone());
+        }
+        pkg_links_to_try.extend(
+            repo_config
+                .pkg
+                .iter()
+                .filter(|p| p.link_type == "mirror")
+                .cloned(),
+        );
 
-        for url_template in urls_to_try {
+        for pkg_link in pkg_links_to_try {
             let (os, arch) = (
                 platform.split('-').next().unwrap_or(""),
                 platform.split('-').nth(1).unwrap_or(""),
             );
-            let url_dir = url_template
+            let url_dir = pkg_link
+                .url
                 .replace("{os}", os)
                 .replace("{arch}", arch)
                 .replace("{version}", pkg.version.as_deref().unwrap_or(""))
@@ -981,6 +990,41 @@ fn run_default_flow(
             );
 
             if let Ok(downloaded_data) = download_file_with_progress(&final_url) {
+                if let Some(pgp_url_template) = &pkg_link.pgp {
+                    let pgp_url = pgp_url_template
+                        .replace("{os}", os)
+                        .replace("{arch}", arch)
+                        .replace("{version}", pkg.version.as_deref().unwrap_or(""))
+                        .replace("{repo}", &pkg.repo);
+
+                    println!("Downloading signature from: {}", pgp_url.cyan());
+                    match download_file_with_progress(&pgp_url) {
+                        Ok(sig_bytes) => {
+                            if let Err(e) = verify_prebuilt_signature(&downloaded_data, &sig_bytes)
+                            {
+                                return Err(format!(
+                                    "Signature verification failed for {}: {}",
+                                    final_url, e
+                                )
+                                .into());
+                            }
+                        }
+                        Err(e) => {
+                            return Err(format!(
+                                "Failed to download PGP signature from {}: {}",
+                                pgp_url, e
+                            )
+                            .into());
+                        }
+                    }
+                } else {
+                    println!(
+                        "{}",
+                        "No PGP signature configured for this pre-built package source. Skipping verification."
+                            .yellow()
+                    );
+                }
+
                 let temp_dir = Builder::new().prefix("zoi-prebuilt").tempdir()?;
                 let temp_archive_path = temp_dir.path().join(&archive_filename);
                 fs::write(&temp_archive_path, downloaded_data)?;
@@ -1247,6 +1291,26 @@ impl VerificationHelper for Helper {
         }
         Err(anyhow::anyhow!("No signature layer found"))
     }
+}
+
+fn verify_prebuilt_signature(data: &[u8], signature_bytes: &[u8]) -> Result<(), Box<dyn Error>> {
+    println!("Verifying signature of pre-built package...");
+
+    let certs = crate::pkg::pgp::get_all_local_certs()?;
+    if certs.is_empty() {
+        return Err("No PGP keys found in local store to verify signature. Please run 'zoi sync' or add keys manually.".into());
+    }
+
+    let policy = &StandardPolicy::new();
+    let helper = Helper { certs };
+
+    let mut verifier =
+        DetachedVerifierBuilder::from_bytes(signature_bytes)?.with_policy(policy, None, helper)?;
+
+    verifier.verify_bytes(data)?;
+
+    println!("{}", "Signature verified successfully.".green());
+    Ok(())
 }
 
 fn verify_signatures(

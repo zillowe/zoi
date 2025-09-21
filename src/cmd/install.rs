@@ -135,7 +135,9 @@ pub fn run(
                     continue;
                 }
 
-                utils::print_repo_warning(&resolved_source.repo_name);
+                if let Some(repo_name) = &resolved_source.repo_name {
+                    utils::print_repo_warning(repo_name);
+                }
 
                 if let Err(e) = install::run_installation(
                     source,
