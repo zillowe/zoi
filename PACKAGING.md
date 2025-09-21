@@ -82,6 +82,7 @@ docker build -t zoi .
 docker build \
   --build-arg POSTHOG_API_KEY="your_key" \
   --build-arg POSTHOG_API_HOST="your_host" \
+  --build-arg ZOI_DEFAULT_REGISTRY="https://my-registry.com/repo.git" \
   -t zoi .
 ```
 
@@ -91,6 +92,7 @@ Zoi uses a few environment variables at build time.
 
 - **`ZOI_COMMIT_HASH`**: Embeds the git commit hash into the binary. This is used by the `zoi version` command. The build scripts in `scripts/` set this automatically.
 - **`POSTHOG_API_KEY`** & **`POSTHOG_API_HOST`**: These are used to configure the optional, opt-in telemetry feature. They can be set in a `.env` file at the root of the project or passed as build arguments to Docker. The `.env.example` file shows the format.
+- **`ZOI_DEFAULT_REGISTRY`**: Sets the default package registry URL. This is used when no registry is configured by the user. It can be set in a `.env` file or as a build argument to Docker.
 
 ## Binaries
 

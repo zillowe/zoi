@@ -5,6 +5,7 @@ FROM rust:1-slim-bookworm AS builder
 # docker build --build-arg POSTHOG_API_KEY="your_key"
 ARG POSTHOG_API_KEY="phc_abcdefg"
 ARG POSTHOG_API_HOST="https://eu.i.posthog.com"
+ARG ZOI_DEFAULT_REGISTRY="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg.git"
 
 RUN apt-get update && apt-get install -y build-essential pkg-config libssl-dev git && rm -rf /var/lib/apt/lists/*
 
@@ -13,6 +14,7 @@ WORKDIR /usr/src/app
 
 RUN echo "POSTHOG_API_KEY=${POSTHOG_API_KEY}" > .env
 RUN echo "POSTHOG_API_HOST=${POSTHOG_API_HOST}" >> .env
+RUN echo "ZOI_DEFAULT_REGISTRY=${ZOI_DEFAULT_REGISTRY}" >> .env
 
 COPY Cargo.toml Cargo.lock ./
 
