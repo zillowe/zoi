@@ -11,23 +11,29 @@ pub enum UpdateResult {
 }
 
 pub fn run(package_name: &str, yes: bool) -> Result<UpdateResult, Box<dyn Error>> {
-    let lower_package_name = package_name.to_lowercase();
+    let (new_pkg, new_version, _, _) = match resolve::resolve_package_and_version(package_name) {
+        Ok(result) => result,
+        Err(e) => {
+            return Err(format!("Could not resolve package '{}': {}", package_name, e).into());
+        }
+    };
 
-    if pin::is_pinned(&lower_package_name)? {
+    if pin::is_pinned(&new_pkg.name)? {
         return Ok(UpdateResult::Pinned);
     }
 
-    let manifest = local::is_package_installed(&lower_package_name, types::Scope::User)?
-        .or(local::is_package_installed(
-            &lower_package_name,
-            types::Scope::System,
-        )?)
-        .ok_or(format!(
-            "Package '{}' is not installed. Use 'zoi install' instead.",
-            package_name
-        ))?;
-
-    let (new_pkg, new_version, _, _) = resolve::resolve_package_and_version(&lower_package_name)?;
+    let manifest = match local::is_package_installed(&new_pkg.name, types::Scope::User)?.or(
+        local::is_package_installed(&new_pkg.name, types::Scope::System)?,
+    ) {
+        Some(m) => m,
+        None => {
+            return Err(format!(
+                "Package '{}' is not installed. Use 'zoi install' instead.",
+                package_name
+            )
+            .into());
+        }
+    };
 
     if manifest.version == new_version {
         return Ok(UpdateResult::AlreadyUpToDate);
@@ -48,7 +54,7 @@ pub fn run(package_name: &str, yes: bool) -> Result<UpdateResult, Box<dyn Error>
 
     let mut processed_deps = HashSet::new();
     install::run_installation(
-        &lower_package_name,
+        package_name,
         mode,
         true,
         types::InstallReason::Direct,

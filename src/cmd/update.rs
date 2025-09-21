@@ -57,9 +57,15 @@ fn run_update_single_logic(
     yes: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("--- Updating package '{}' ---", package_name.blue().bold());
-    let lower_package_name = package_name.to_lowercase();
 
-    if pin::is_pinned(&lower_package_name)? {
+    let (new_pkg, new_version, _, _) = match resolve::resolve_package_and_version(package_name) {
+        Ok(result) => result,
+        Err(e) => {
+            return Err(format!("Could not resolve package '{}': {}", package_name, e).into());
+        }
+    };
+
+    if pin::is_pinned(&new_pkg.name)? {
         println!(
             "Package '{}' is pinned. Skipping update.",
             package_name.yellow()
@@ -67,19 +73,19 @@ fn run_update_single_logic(
         return Ok(());
     }
 
-    let manifest = local::is_package_installed(&lower_package_name, types::Scope::User)?
-        .or(local::is_package_installed(
-            &lower_package_name,
-            types::Scope::System,
-        )?)
-        .ok_or(format!(
-            "Package '{package_name}' is not installed. Use 'zoi install' instead."
-        ))?;
+    let manifest = match local::is_package_installed(&new_pkg.name, types::Scope::User)?.or(
+        local::is_package_installed(&new_pkg.name, types::Scope::System)?,
+    ) {
+        Some(m) => m,
+        None => {
+            return Err(format!(
+                "Package '{package_name}' is not installed. Use 'zoi install' instead."
+            )
+            .into());
+        }
+    };
 
     println!("Currently installed version: {}", manifest.version.yellow());
-
-    let (new_pkg, new_version, _, _) = resolve::resolve_package_and_version(&lower_package_name)?;
-
     println!("Available version: {}", new_version.green());
 
     if manifest.version == new_version {
@@ -102,7 +108,7 @@ fn run_update_single_logic(
 
     let mut processed_deps = HashSet::new();
     install::run_installation(
-        &lower_package_name,
+        package_name,
         mode,
         true,
         types::InstallReason::Direct,
