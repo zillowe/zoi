@@ -27,7 +27,9 @@ pub fn run(sources: &[String], force: bool, yes: bool) {
                     return;
                 }
 
-                utils::print_repo_warning(&resolved_source.repo_name);
+                if let Some(repo_name) = &resolved_source.repo_name {
+                    utils::print_repo_warning(repo_name);
+                }
 
                 let mut processed_deps = HashSet::new();
                 if let Err(e) = install::run_installation(

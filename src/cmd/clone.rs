@@ -26,7 +26,9 @@ pub fn run(sources: Vec<String>, target_dir: Option<String>, yes: bool) {
                     continue;
                 }
 
-                utils::print_repo_warning(&resolved_source.repo_name);
+                if let Some(repo_name) = &resolved_source.repo_name {
+                    utils::print_repo_warning(repo_name);
+                }
 
                 if let Err(e) = clone::run(&resolved_source.path, target_dir.as_deref()) {
                     eprintln!("\n{}: {}", "Error".red().bold(), e);
