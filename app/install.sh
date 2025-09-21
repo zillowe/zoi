@@ -2,6 +2,7 @@
 
 set -euo pipefail
 
+GITLAB_PROJECT_ID="71087662"
 GITLAB_PROJECT_PATH="Zillowe/Zillwen/Zusty/Zoi"
 BIN_NAME="zoi"
 COMMENT_LINE="# Zoi PATH addition"
@@ -34,7 +35,7 @@ require_util "gpg"
 PUBLIC_KEY_URL="https://zillowe.pages.dev/keys/zillowe-main.asc"
 
 info "Fetching the latest release tag from GitLab API..."
-LATEST_TAG=$(curl --silent "https://gitlab.com/api/v4/projects/${GITLAB_PROJECT_PATH//\/\%2F}/releases" | tr ',' '\n' | grep '"tag_name"' | sed 's/.*"tag_name":"\([^"]*\)".*/\1/' | head -n 1)
+LATEST_TAG=$(curl --silent "https://gitlab.com/api/v4/projects/${GITLAB_PROJECT_ID}/releases" | tr ',' '\n' | grep '"tag_name"' | sed 's/.*"tag_name":"\([^"]*\)".*/\1/' | head -n 1)
 
 if [ -z "$LATEST_TAG" ]; then
     error "Could not fetch the latest release tag. Please check the repository path and network."

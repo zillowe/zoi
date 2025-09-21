@@ -7,6 +7,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $GitLabProjectPath = "Zillowe/Zillwen/Zusty/Zoi"
+$GitLabProjectId = "71087662"
 $InstallDir = Join-Path $env:USERPROFILE ".zoi\bin"
 $BinName = "zoi.exe"
 $PublicKeyUrl = "https://zillowe.pages.dev/keys/zillowe-main.asc"
@@ -25,8 +26,7 @@ function Write-Error-Exit {
 
 Write-Info "Fetching the latest release tag from GitLab API..."
 try {
-    $EncodedProjectPath = [System.Web.HttpUtility]::UrlEncode($GitLabProjectPath)
-    $ApiUrl = "https://gitlab.com/api/v4/projects/$EncodedProjectPath/releases"
+    $ApiUrl = "https://gitlab.com/api/v4/projects/$GitLabProjectId/releases"
     
     $Releases = Invoke-RestMethod -Uri $ApiUrl -Method Get
     

@@ -17,6 +17,7 @@ use zip::ZipArchive;
 use zstd::stream::read::Decoder as ZstdDecoder;
 
 const GITLAB_PROJECT_PATH: &str = "Zillowe/Zillwen/Zusty/Zoi";
+const GITLAB_PROJECT_ID: &str = "71087662";
 
 #[derive(Debug, Deserialize)]
 struct GitLabRelease {
@@ -27,7 +28,7 @@ fn get_latest_tag(branch_prefix: &str) -> Result<String, Box<dyn Error>> {
     println!("Fetching latest release information from GitLab...");
     let api_url = format!(
         "https://gitlab.com/api/v4/projects/{}/releases",
-        GITLAB_PROJECT_PATH.replace('/', "%2F")
+        GITLAB_PROJECT_ID
     );
     let client = reqwest::blocking::Client::builder()
         .user_agent("Zoi-Upgrader")
