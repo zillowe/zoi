@@ -36,10 +36,15 @@ path = "src/main.rs"
 [[bin]]
 name = "zoi-completions"
 path = "src/bin/completions.rs"
+required-features = ["tools"]
 
 [[bin]]
 name = "zoi-mangen"
 path = "src/bin/mangen.rs"
+required-features = ["tools"]
+
+[features]
+tools = []
 
 [lints.clippy]
 too_many_arguments = "allow"
