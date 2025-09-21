@@ -391,12 +391,15 @@ Zoi is hosted on multiple forges. The primary locations and mirrors are:
 
 ### Repository tiers
 
+Repository tiers for [Zoidberg](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg), Zoi's official packages repo.
+
 - Core: Essential packages, libraries and very common/maintained packages.
 - Main: Packages that don't fit in Core but are essential for most people.
 - Extra: Packages that are new, not very common or maintained, not preferable.
 - Community: User submitted packages that are new, can be upgraded to a higher repo.
 - Test: Testing repo for new Zoi features and for new packages before release.
 - Archive: Archived packages that are no longer maintained.
+- Zillowe: Zillowe's own official packages.
 
 For details and CLI usage examples, see the docs page: [Repositories](https://zillowe.qzz.io/docs/zds/zoi/repositories).
 
