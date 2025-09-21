@@ -2,7 +2,7 @@
 name = "zoi-rs"
 version = "1.0.0"
 edition = "2024"
-rust-version = "1.89.0"
+rust-version = "1.88.0"
 description = "Universal Package Manager & Environment Setup Tool"
 license = "Apache-2.0"
 repository = "https://github.com/Zillowe/Zoi"
