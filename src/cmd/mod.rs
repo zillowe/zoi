@@ -14,6 +14,7 @@ pub mod info;
 pub mod install;
 pub mod list;
 pub mod man;
+pub mod meta;
 pub mod package;
 pub mod pgp;
 pub mod pin;

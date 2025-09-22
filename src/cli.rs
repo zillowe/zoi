@@ -475,6 +475,19 @@ enum Commands {
         raw: bool,
     },
 
+    /// Generates a static, resolved JSON representation of a package
+    Meta {
+        /// The name of the package
+        #[arg(value_parser = PackageValueParser, hide_possible_values = true)]
+        package_name: String,
+        /// Output file path. If not provided, prints to stdout.
+        #[arg(short, long)]
+        output: Option<String>,
+        /// Specify a version to resolve
+        #[arg(long)]
+        version: Option<String>,
+    },
+
     /// Build, create, and manage Zoi packages
     #[command(alias = "pkg")]
     Package(cmd::package::PackageCommand),
@@ -747,6 +760,12 @@ pub fn run() {
                 upstream,
                 raw,
             } => cmd::man::run(&package_name, upstream, raw),
+            Commands::Meta {
+                package_name,
+                output,
+                version,
+            } => cmd::meta::run(&package_name, output.as_deref(), version.as_deref())
+                .map_err(|e| e.into()),
             Commands::Package(args) => {
                 cmd::package::run(args);
                 Ok(())
