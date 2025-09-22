@@ -92,11 +92,17 @@ pub fn run(
                 .find(|m| m.install_type == "source")
                 .ok_or("Could not find source install method in platform-specific parse")?;
 
-            if let Some(cmds) = &method_for_platform.build_commands {
-                build_commands_map.insert(platform_str.clone(), cmds.clone());
+            let os_part = platform_str.split('-').next().unwrap_or(platform_str);
+
+            if let Some(cmds) = &method_for_platform.build_commands
+                && !build_commands_map.contains_key(os_part)
+            {
+                build_commands_map.insert(os_part.to_string(), cmds.clone());
             }
-            if let Some(path) = &method_for_platform.binary_path {
-                binary_path_map.insert(platform_str.clone(), path.clone());
+            if let Some(path) = &method_for_platform.binary_path
+                && !binary_path_map.contains_key(os_part)
+            {
+                binary_path_map.insert(os_part.to_string(), path.clone());
             }
         }
         installation.build_commands = Some(build_commands_map);
