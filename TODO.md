@@ -10,7 +10,7 @@
 
 ## Features
 
-- [ ] `meta` command that generates a static version of the `pkg.lua`, `pkg.json`, this is not the same as `package meta` (used only for `pkg.tar.zst`), this will be used for searching and viewing packages.
+- [ ] Better `generate-manual` man generation with all subcommands, flags and subflags, and long-description when available.
 - [ ] Exposed Lua functions:
       SYSTEM.[OS, ARCH, DISTRO, MANAGER (native package manager)] system info
       PKG.[every field defined in package({}) metadata]
