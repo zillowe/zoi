@@ -70,29 +70,54 @@ pub fn remove_registry(handle: &str) {
 }
 
 pub fn list_registries() {
-    match pkg::config::read_config() {
+    match crate::pkg::config::read_config() {
         Ok(config) => {
+            let db_root = match crate::pkg::resolve::get_db_root() {
+                Ok(path) => path,
+                Err(e) => {
+                    eprintln!("\n{}: {}", "Error".red().bold(), e);
+                    std::process::exit(1);
+                }
+            };
+
             println!("{}", "--- Configured Registries ---".bold());
+
             if let Some(default) = config.default_registry {
-                let handle_str = if default.handle.is_empty() {
+                let handle = &default.handle;
+                let mut desc = "".to_string();
+                if !handle.is_empty() {
+                    let repo_path = db_root.join(handle);
+                    if let Ok(repo_config) = crate::pkg::config::read_repo_config(&repo_path) {
+                        desc = format!(" - {}", repo_config.description);
+                    }
+                }
+                let handle_str = if handle.is_empty() {
                     "<not synced>".italic().to_string()
                 } else {
-                    default.handle.cyan().to_string()
+                    handle.cyan().to_string()
                 };
-                println!("Default: {} ({})", handle_str, default.url);
+                println!("[Set] {}: {}{}", handle_str, default.url, desc);
             } else {
-                println!("Default: <not set>");
+                println!("[Set]: <not set>");
             }
 
             if !config.added_registries.is_empty() {
-                println!("\n{}", "Added Registries:".bold());
+                println!();
                 for reg in config.added_registries {
-                    let handle_str = if reg.handle.is_empty() {
+                    let handle = &reg.handle;
+                    let mut desc = "".to_string();
+                    if !handle.is_empty() {
+                        let repo_path = db_root.join(handle);
+                        if let Ok(repo_config) = crate::pkg::config::read_repo_config(&repo_path) {
+                            desc = format!(" - {}", repo_config.description);
+                        }
+                    }
+                    let handle_str = if handle.is_empty() {
                         "<not synced>".italic().to_string()
                     } else {
-                        reg.handle.cyan().to_string()
+                        handle.cyan().to_string()
                     };
-                    println!("- {} ({})", handle_str, reg.url);
+                    println!("[Add] {}: {}{}", handle_str, reg.url, desc);
                 }
             }
         }

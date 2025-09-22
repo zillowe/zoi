@@ -123,18 +123,29 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
     let config = config::read_config()?;
 
     let (registry_db_path, search_repos, is_default_registry) = if let Some(h) = &request.handle {
-        let registry = config
-            .added_registries
-            .iter()
-            .find(|r| r.handle == *h)
-            .ok_or_else(|| format!("Registry with handle '{}' not found.", h))?;
-        let repo_path = db_root.join(&registry.handle);
-        let all_sub_repos = fs::read_dir(&repo_path)?
-            .filter_map(Result::ok)
-            .filter(|entry| entry.path().is_dir())
-            .map(|entry| entry.file_name().to_string_lossy().into_owned())
-            .collect();
-        (repo_path, all_sub_repos, false)
+        let is_default = config
+            .default_registry
+            .as_ref()
+            .is_some_and(|reg| reg.handle == *h);
+
+        if is_default {
+            let default_registry = config.default_registry.as_ref().unwrap(); // Safe due to check above
+            (db_root.join(&default_registry.handle), config.repos, true)
+        } else if let Some(registry) = config.added_registries.iter().find(|r| r.handle == *h) {
+            let repo_path = db_root.join(&registry.handle);
+            let all_sub_repos = if repo_path.exists() {
+                fs::read_dir(&repo_path)?
+                    .filter_map(Result::ok)
+                    .filter(|entry| entry.path().is_dir() && entry.file_name() != ".git")
+                    .map(|entry| entry.file_name().to_string_lossy().into_owned())
+                    .collect()
+            } else {
+                Vec::new()
+            };
+            (repo_path, all_sub_repos, false)
+        } else {
+            return Err(format!("Registry with handle '{}' not found.", h).into());
+        }
     } else {
         let default_registry = config
             .default_registry

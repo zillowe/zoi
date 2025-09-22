@@ -185,21 +185,19 @@ pub fn interactive_add_repo() -> Result<(), Box<dyn Error>> {
 
 pub fn get_all_repos() -> Result<Vec<String>, Box<dyn Error>> {
     let db_root = get_db_root()?;
-    if !db_root.exists() {
-        return Ok(Vec::new());
+    let config = read_config()?;
+
+    if let Some(default_reg) = config.default_registry
+        && !default_reg.handle.is_empty()
+    {
+        let default_reg_path = db_root.join(default_reg.handle);
+        if default_reg_path.join("repo.yaml").exists() {
+            let repo_config = read_repo_config(&default_reg_path)?;
+            return Ok(repo_config.repos.into_iter().map(|r| r.name).collect());
+        }
     }
 
-    let all_repos: Vec<String> = fs::read_dir(db_root)?
-        .filter_map(Result::ok)
-        .filter(|entry| {
-            let path = entry.path();
-            let file_name = entry.file_name();
-            path.is_dir() && file_name != ".git"
-        })
-        .map(|entry| entry.file_name().to_string_lossy().into_owned())
-        .collect();
-
-    Ok(all_repos)
+    Ok(Vec::new())
 }
 
 pub fn clone_git_repo(url: &str) -> Result<(), Box<dyn Error>> {
