@@ -74,10 +74,32 @@ pub fn read_config() -> Result<Config, Box<dyn Error>> {
 
     if config.default_registry.is_none() {
         config.default_registry = Some(Registry {
-            handle: "zoidberg".to_string(),
+            handle: String::new(),
             url: get_default_registry(),
         });
         needs_update = true;
+    }
+
+    if config.repos.is_empty()
+        && let Some(reg) = &config.default_registry
+        && !reg.handle.is_empty()
+    {
+        let db_root = get_db_root()?;
+        let repo_path = db_root.join(&reg.handle);
+        if repo_path.join("repo.yaml").exists()
+            && let Ok(repo_config) = read_repo_config(&repo_path)
+        {
+            let active_repos: Vec<String> = repo_config
+                .repos
+                .into_iter()
+                .filter(|r| r.active)
+                .map(|r| r.name)
+                .collect();
+            if !active_repos.is_empty() {
+                config.repos = active_repos;
+                needs_update = true;
+            }
+        }
     }
 
     let original_repos = config.repos.clone();

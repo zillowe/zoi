@@ -66,11 +66,18 @@ fn parse_source_string(source_str: &str) -> Result<PackageRequest, Box<dyn Error
     let mut main_part = source_str;
 
     if main_part.starts_with('#') {
-        if let Some((handle_part, rest)) = main_part.split_once(' ') {
-            handle = Some(handle_part.trim_start_matches('#').to_string());
-            main_part = rest.trim();
+        if let Some(at_pos) = main_part.find('@') {
+            if at_pos > 1 {
+                handle = Some(main_part[1..at_pos].to_string());
+                main_part = &main_part[at_pos..];
+            } else {
+                return Err("Invalid format: empty registry handle".into());
+            }
         } else {
-            return Err("Invalid format: missing space after registry handle".into());
+            return Err(
+                "Invalid format: missing '@' after registry handle. Expected format: #handle@repo/package"
+                    .into(),
+            );
         }
     }
 
@@ -154,6 +161,12 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
         (db_root.join(&default_registry.handle), config.repos, true)
     };
 
+    let repos_to_search = if let Some(r) = &request.repo {
+        vec![r.clone()]
+    } else {
+        search_repos
+    };
+
     struct FoundPackage {
         path: PathBuf,
         source_type: SourceType,
@@ -169,7 +182,7 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
             .and_then(|s| s.to_str())
             .ok_or_else(|| format!("Invalid package path: {}", request.name))?;
 
-        for repo_name in &search_repos {
+        for repo_name in &repos_to_search {
             let path = registry_db_path
                 .join(repo_name)
                 .join(&request.name)
@@ -208,7 +221,7 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
             }
         }
     } else {
-        for repo_name in &search_repos {
+        for repo_name in &repos_to_search {
             let repo_path = registry_db_path.join(repo_name);
             if !repo_path.is_dir() {
                 continue;
