@@ -6,6 +6,7 @@ pub mod config_handler;
 pub mod dependencies;
 pub mod exec;
 pub mod extension;
+pub mod helper;
 pub mod install;
 pub mod library;
 pub mod local;

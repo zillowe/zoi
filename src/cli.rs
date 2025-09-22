@@ -481,6 +481,9 @@ enum Commands {
 
     /// Manage PGP keys for package signature verification
     Pgp(cmd::pgp::PgpCommand),
+
+    /// Helper commands for various tasks
+    Helper(cmd::helper::HelperCommand),
 }
 
 #[derive(clap::Parser, Debug)]
@@ -749,6 +752,7 @@ pub fn run() {
                 Ok(())
             }
             Commands::Pgp(args) => cmd::pgp::run(args),
+            Commands::Helper(args) => cmd::helper::run(args),
         };
 
         if let Err(e) = result {
