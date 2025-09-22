@@ -413,6 +413,49 @@ fn download_from_url(url: &str) -> Result<ResolvedSource, Box<dyn Error>> {
     })
 }
 
+fn download_content_from_url(url: &str) -> Result<String, Box<dyn Error>> {
+    println!("Downloading from: {}", url.cyan());
+    let client = crate::utils::build_blocking_http_client(20)?;
+    let mut attempt = 0u32;
+    let response = loop {
+        attempt += 1;
+        match client.get(url).send() {
+            Ok(resp) => break resp,
+            Err(e) => {
+                if attempt < 3 {
+                    eprintln!(
+                        "{}: download failed ({}). Retrying...",
+                        "Network".yellow(),
+                        e
+                    );
+                    crate::utils::retry_backoff_sleep(attempt);
+                    continue;
+                } else {
+                    return Err(format!(
+                        "Failed to download from {} after {} attempts: {}",
+                        url, attempt, e
+                    )
+                    .into());
+                }
+            }
+        }
+    };
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "Failed to download from {} (HTTP {}). Content: {}",
+            url,
+            response.status(),
+            response
+                .text()
+                .unwrap_or_else(|_| "Could not read response body".to_string())
+        )
+        .into());
+    }
+
+    Ok(response.text()?)
+}
+
 fn resolve_version_from_url(url: &str, channel: &str) -> Result<String, Box<dyn Error>> {
     println!(
         "Resolving version for channel '{}' from {}",
@@ -698,6 +741,93 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, B
     }
 
     let request = parse_source_string(source)?;
+
+    if let Some(handle) = &request.handle
+        && handle.starts_with("git:")
+    {
+        let git_source = handle.strip_prefix("git:").unwrap();
+        println!(
+            "Warning: using remote git repo '{}' not from official Zoi database.",
+            git_source.yellow()
+        );
+
+        let (host, repo_path) = git_source
+            .split_once('/')
+            .ok_or("Invalid git source format. Expected host/owner/repo.")?;
+
+        let (base_url, branch_sep) = match host {
+            "github.com" => (
+                format!("https://raw.githubusercontent.com/{}", repo_path),
+                "/",
+            ),
+            "gitlab.com" => (format!("https://gitlab.com/{}/-/raw", repo_path), "/"),
+            "codeberg.org" => (
+                format!("https://codeberg.org/{}/raw/branch", repo_path),
+                "/",
+            ),
+            _ => return Err(format!("Unsupported git host: {}", host).into()),
+        };
+
+        let (_, branch) = {
+            let mut last_error = None;
+            let mut content = None;
+            for b in ["main", "master"] {
+                let repo_yaml_url = format!("{}{}{}/repo.yaml", base_url, branch_sep, b);
+                match download_content_from_url(&repo_yaml_url) {
+                    Ok(c) => {
+                        content = Some((c, b.to_string()));
+                        break;
+                    }
+                    Err(e) => {
+                        last_error = Some(e);
+                    }
+                }
+            }
+            content
+                .ok_or(last_error.unwrap_or_else(|| {
+                    "Could not find repo.yaml on main or master branch".into()
+                }))?
+        };
+
+        let full_pkg_path = if let Some(r) = &request.repo {
+            format!("{}/{}", r, request.name)
+        } else {
+            request.name.clone()
+        };
+
+        let pkg_name = Path::new(&full_pkg_path)
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap();
+        let pkg_lua_filename = format!("{}.pkg.lua", pkg_name);
+        let pkg_lua_path_in_repo = Path::new(&full_pkg_path).join(pkg_lua_filename);
+
+        let pkg_lua_url = format!(
+            "{}{}{}/{}",
+            base_url,
+            branch_sep,
+            branch,
+            pkg_lua_path_in_repo.to_str().unwrap().replace('\\', "/")
+        );
+
+        let pkg_lua_content = download_content_from_url(&pkg_lua_url)?;
+
+        let temp_path = env::temp_dir().join(format!(
+            "zoi-temp-git-{}.pkg.lua",
+            Utc::now().timestamp_nanos_opt().unwrap_or(0)
+        ));
+        fs::write(&temp_path, pkg_lua_content)?;
+
+        let repo_name = format!("git:{}", git_source);
+
+        return Ok(ResolvedSource {
+            path: temp_path,
+            source_type: SourceType::GitRepo(repo_name.clone()),
+            repo_name: Some(repo_name),
+            sharable_manifest: None,
+        });
+    }
 
     let resolved_source = if source.starts_with("@git/") {
         let full_path_str = source.trim_start_matches("@git/");
