@@ -8,15 +8,15 @@
 
 ## Supported Packages
 
-| Packages                                                    | Supported |
-| ----------------------------------------------------------- | --------- |
-| [AUR `zoi`](https://aur.archlinux.org/packages/zoi)         | ✔️        |
-| [AUR `zoi-bin`](https://aur.archlinux.org/packages/zoi-bin) | ✔️        |
-| [Homebrew](https://github.com/Zillowe/homebrew-tap)         | ✔️        |
-| [Scoop](https://github.com/Zillowe/scoop)                   | ✔️        |
-| [Crates.io `zoi-rs`](https://crates.io/crates/zoi-rs)       | ❔        |
-| [Fedora `zoi-rs`]()                                         | ❌        |
-| NPM `@zillowe/zoi`                                          | ❌        |
+| Packages                                                                                  | Supported |
+| ----------------------------------------------------------------------------------------- | --------- |
+| [AUR `zoi`](https://aur.archlinux.org/packages/zoi)                                       | ✔️        |
+| [AUR `zoi-bin`](https://aur.archlinux.org/packages/zoi-bin)                               | ✔️        |
+| [Homebrew](https://github.com/Zillowe/homebrew-tap)                                       | ✔️        |
+| [Scoop](https://github.com/Zillowe/scoop)                                                 | ✔️        |
+| [Crates.io `zoi-rs`](https://crates.io/crates/zoi-rs)                                     | ❔        |
+| [Fedora `zoi-rs`](https://github.com/terrapkg/packages/tree/frawhide/anda/langs/rust/zoi) | ❌        |
+| NPM `@zillowe/zoi`                                                                        | ❌        |
 
 Crates.io package can be out-of-date sometimes.
 
