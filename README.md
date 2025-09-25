@@ -1,5 +1,5 @@
 <div align="center">
-    <img width="320" hspace="10" alt="Zoi Banner" src="./app/images/banner.png"/>
+    <img width="320" hspace="10" alt="Zoi Banner" src="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/images/banner.png"/>
     <p><strong>Universal Package Manager & Environment Setup Tool</strong></p>
 </div>
 <hr/>
