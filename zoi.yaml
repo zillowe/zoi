@@ -5,7 +5,7 @@ packages:
 
 commands:
   - cmd: "build"
-    run: "./scripts/build.sh"
+    run: "rm -rf scripts/compiled && ./scripts/build.sh"
   - cmd: "lines"
     run: "cloc src build.rs"
   - cmd: "install"
