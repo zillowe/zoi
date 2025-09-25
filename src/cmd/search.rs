@@ -1,4 +1,4 @@
-use crate::pkg::{local, types::PackageType};
+use crate::pkg::{config, local, types::PackageType};
 use colored::*;
 use comfy_table::{ContentArrangement, Table, presets::UTF8_FULL};
 use std::io::{self, Write};
@@ -42,11 +42,27 @@ pub fn run(
         "' ---".yellow()
     );
 
-    let packages = if let Some(repo_name) = &repo {
-        let all_repos = crate::pkg::config::get_all_repos()?;
-        let repos_to_search: Vec<String> = all_repos
+    let packages = if let Some(repo_filter) = &repo {
+        let config = config::read_config()?;
+        let handle = if let Some(reg) = config.default_registry {
+            reg.handle
+        } else {
+            return Err("Default registry not configured.".into());
+        };
+        if handle.is_empty() {
+            return Err("Default registry handle is not set. Please run 'zoi sync'..".into());
+        }
+        let all_repo_names = config::get_all_repos()?;
+        let repos_to_search: Vec<String> = all_repo_names
             .into_iter()
-            .filter(|r| r.starts_with(repo_name))
+            .map(|r_name| format!("{}/{}", handle, r_name))
+            .filter(|full_repo_name| {
+                if repo_filter.contains('/') {
+                    full_repo_name == repo_filter
+                } else {
+                    full_repo_name.split('/').any(|part| part == repo_filter)
+                }
+            })
             .collect();
         local::get_packages_from_repos(&repos_to_search)
     } else {
@@ -133,8 +149,7 @@ pub fn run(
                 let version = crate::pkg::resolve::get_default_version(&pkg)
                     .unwrap_or_else(|_| "N/A".to_string());
 
-                let mut parts = pkg.repo.splitn(2, '/');
-                let repo_display = parts.next().unwrap_or(&pkg.repo);
+                let repo_display = pkg.repo.split_once('/').map(|x| x.1).unwrap_or(&pkg.repo);
 
                 let tags_display = if pkg.tags.is_empty() {
                     String::from("")

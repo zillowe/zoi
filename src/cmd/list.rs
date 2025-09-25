@@ -73,17 +73,21 @@ fn run_list_installed(
 
     let mut found_packages = false;
     for pkg in packages {
-        if let Some(repo) = &repo_filter
-            && !pkg.repo.starts_with(repo)
-        {
-            continue;
+        if let Some(repo_filter) = &repo_filter {
+            let repo_matches = if repo_filter.contains('/') {
+                pkg.repo == *repo_filter
+            } else {
+                pkg.repo.split('/').any(|part| part == *repo_filter)
+            };
+            if !repo_matches {
+                continue;
+            }
         }
         if type_filter.is_some() && pkg.package_type != type_filter.unwrap() {
             continue;
         }
 
-        let mut parts = pkg.repo.splitn(2, '/');
-        let repo_display = parts.next().unwrap_or(&pkg.repo);
+        let repo_display = pkg.repo.split_once('/').map(|x| x.1).unwrap_or(&pkg.repo);
 
         table.add_row(vec![
             pkg.name,
@@ -112,11 +116,27 @@ fn run_list_all(
         .map(|p| p.name)
         .collect::<HashSet<_>>();
 
-    let available_pkgs = if let Some(repo) = &repo_filter {
-        let all_repos = config::get_all_repos()?;
-        let repos_to_search: Vec<String> = all_repos
+    let available_pkgs = if let Some(repo_filter) = &repo_filter {
+        let config = config::read_config()?;
+        let handle = if let Some(reg) = config.default_registry {
+            reg.handle
+        } else {
+            return Err("Default registry not configured.".into());
+        };
+        if handle.is_empty() {
+            return Err("Default registry handle is not set. Please run 'zoi sync'..".into());
+        }
+        let all_repo_names = config::get_all_repos()?;
+        let repos_to_search: Vec<String> = all_repo_names
             .into_iter()
-            .filter(|r| r.starts_with(repo))
+            .map(|r_name| format!("{}/{}", handle, r_name))
+            .filter(|full_repo_name| {
+                if repo_filter.contains('/') {
+                    full_repo_name == repo_filter
+                } else {
+                    full_repo_name.split('/').any(|part| part == repo_filter)
+                }
+            })
             .collect();
         local::get_packages_from_repos(&repos_to_search)?
     } else {
@@ -150,9 +170,7 @@ fn run_list_all(
         let version =
             crate::pkg::resolve::get_default_version(&pkg).unwrap_or_else(|_| "N/A".to_string());
 
-        let mut parts = pkg.repo.splitn(2, '/');
-        let repo_display = parts.next().unwrap_or(&pkg.repo);
-
+        let repo_display = pkg.repo.split_once('/').map(|x| x.1).unwrap_or(&pkg.repo);
         table.add_row(vec![
             status.to_string(),
             pkg.name,

@@ -179,7 +179,21 @@ pub fn get_packages_from_repos(
 
 pub fn get_all_available_packages() -> Result<Vec<super::types::Package>, Box<dyn Error>> {
     let config = config::read_config()?;
-    get_packages_from_repos(&config.repos)
+    if let Some(handle) = config
+        .default_registry
+        .as_ref()
+        .map(|r| &r.handle)
+        .filter(|h| !h.is_empty())
+    {
+        let repos_with_handle: Vec<String> = config
+            .repos
+            .iter()
+            .map(|repo| format!("{}/{}", handle, repo))
+            .collect();
+        get_packages_from_repos(&repos_with_handle)
+    } else {
+        Ok(Vec::new())
+    }
 }
 
 pub fn write_manifest(manifest: &InstallManifest) -> Result<(), Box<dyn Error>> {
