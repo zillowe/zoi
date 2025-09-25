@@ -136,7 +136,7 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
             .is_some_and(|reg| reg.handle == *h);
 
         if is_default {
-            let default_registry = config.default_registry.as_ref().unwrap(); // Safe due to check above
+            let default_registry = config.default_registry.as_ref().unwrap();
             (db_root.join(&default_registry.handle), config.repos, true)
         } else if let Some(registry) = config.added_registries.iter().find(|r| r.handle == *h) {
             let repo_path = db_root.join(&registry.handle);
