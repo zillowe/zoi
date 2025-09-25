@@ -1,9 +1,8 @@
 <div align="center">
-    <img width="120" height="120" hspace="10" alt="ZDS Logo" src="https://gitlab.com/Zillowe/Zillwen/Zusty/ZDS/-/raw/main/img/zds.png"/>
-    <h1>Zoi</h1>
+    <img width="320" hspace="10" alt="Zoi Banner" src="./app/images/banner.png"/>
     <p><strong>Universal Package Manager & Environment Setup Tool</strong></p>
 </div>
-
+<hr/>
 <br/>
 
 <div align="center">
