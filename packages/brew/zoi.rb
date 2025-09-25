@@ -34,8 +34,8 @@ class Zoi < Formula
 
   def install
     bin.install "zoi"
-    (buildpath/"zoi.1").write `#{bin}/zoi generate-manual`
-    man1.install "zoi.1"
+    system "#{bin}/zoi", "generate-manual"
+    man1.install Dir["manuals/*.1"]
     (bash_completion/"zoi").write `#{bin}/zoi generate-completions bash`
     (zsh_completion/"_zoi").write `#{bin}/zoi generate-completions zsh`
     (fish_completion/"zoi.fish").write `#{bin}/zoi generate-completions fish`

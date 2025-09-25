@@ -48,5 +48,6 @@ package() {
 
   local _man_dir="$pkgdir/usr/share/man/man1"
   install -d "$_man_dir"
-  "$pkgdir/usr/bin/${pkgname%-bin}" generate-manual > "$_man_dir/${pkgname%-bin}.1"
+  "$pkgdir/usr/bin/${pkgname%-bin}" generate-manual
+  install -Dm644 manuals/*.1 "$_man_dir"
 }

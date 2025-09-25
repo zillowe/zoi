@@ -121,17 +121,19 @@ Zoi provides commands to generate shell completions and man pages. These should 
 
   Where `<shell>` can be `bash`, `fish`, `zsh`, etc.
 
-- **Man Page:**
-  The man page can be generated using the `generate-manual` command (which is an alias for `zoi-mangen` but prints it instead):
+- **Man Pages:**
+  The man pages can be generated using the `generate-manual` command. This will create a `manuals/` directory containing man pages for `zoi` and all of its subcommands.
   ```sh
-  ./target/release/zoi generate-manual > zoi.1
+  ./target/release/zoi generate-manual
+  # This creates a `manuals/` directory with `zoi.1`, `zoi-install.1`, etc.
   ```
+  These files should be installed to the appropriate man page directory (e.g. `/usr/share/man/man1`).
 
-Alternatively, the `zoi-completions` and `zoi-mangen` binaries can be used directly:
+Alternatively, the `zoi-mangen` binary can be used directly, which is useful for build scripts that specify an output directory:
 
 ```sh
-OUT_DIR=dist/completions/ ./target/release/zoi-completions
-OUT_DIR=dis/man/ ./target/release/zoi-mangen
+OUT_DIR=dist/man/ ./target/release/zoi-mangen
+# This creates `zoi.1`, `zoi-install.1`, etc. in `dist/man/`
 ```
 
 ## Existing Packaging Files
