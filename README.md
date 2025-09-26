@@ -106,7 +106,7 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
 Thanks you all for helping with developing Zoi.
 
 - [GitLab](https://gitlab.com): For offering their Ultimate plan for OSS projects.
-- [Cloudflare](http://cloudflare.com): For offering their Pro plan through [Project Alexandria](https://www.cloudflare.com/lp/project-alexandria) for OSS projects.
+- [Cloudflare](http://cloudflare.com): For offering their Pro plan through [Project Alexandria](https://www.cloudflare.com/lp/project-alexandria).
 
 ## 🚀 Getting Started
 
