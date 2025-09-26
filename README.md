@@ -1,5 +1,5 @@
 <div align="center">
-    <img width="320" hspace="10" alt="Zoi Banner" src="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/images/banner.png"/>
+    <img width="320" hspace="10" alt="Zoi Banner" src="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/images/zoi-banner.svg"/>
     <p><strong>Universal Package Manager & Environment Setup Tool</strong></p>
 </div>
 <hr/>
@@ -54,6 +54,7 @@
 <summary>Table of Contents</summary>
 
 - [Features](#-features)
+- [Special Thanks](#-special-thanks)
 - [Getting Started](#-getting-started)
 - [Installation](#-installation)
   - [Package Managers](#package-managers)
@@ -99,6 +100,13 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
   - `zoi pin`: Pin a package to a specific version.
   - `zoi exec`: Run a package without installing it.
 - **Library Support:** Use as a Rust library and get compiler/linker flags via `zoi pkg-config`.
+
+## 💓 Special Thanks
+
+Thanks you all for helping with developing Zoi.
+
+- [GitLab](https://gitlab.com): For offering their Ultimate plan for OSS projects.
+- [Cloudflare](http://cloudflare.com): For offering their Pro plan through [Project Alexandria](https://www.cloudflare.com/lp/project-alexandria) for OSS projects.
 
 ## 🚀 Getting Started
 
