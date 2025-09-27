@@ -122,7 +122,7 @@ enum Commands {
         shell: Shell,
     },
 
-    /// Generates a man page for zoi
+    /// Generates man pages for zoi
     #[command(hide = true)]
     GenerateManual,
 
