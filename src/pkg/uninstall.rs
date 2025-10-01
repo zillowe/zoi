@@ -180,7 +180,7 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
         println!("{}", "Successfully removed stored files.".green());
     }
     let symlink_path = get_bin_root()?.join(&pkg.name);
-    if symlink_path.exists() {
+    if fs::symlink_metadata(&symlink_path).is_ok() {
         println!("Removing symlink from {}...", symlink_path.display());
         fs::remove_file(&symlink_path)?;
         println!("{}", "Successfully removed symlink.".green());
