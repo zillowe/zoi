@@ -50,4 +50,4 @@ If you discover a security vulnerability, please follow these steps:
    - A description of the vulnerability
    - Steps to reproduce the issue
    - Potential impact
-4. If you're creating an issue make sure you turn on confidentiality.
+4. If you're creating a GitLab issue on make sure you turn on confidentiality.
