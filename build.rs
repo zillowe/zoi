@@ -2,38 +2,30 @@ use std::env;
 use std::path::Path;
 
 fn main() {
-    let env_path_str = if Path::new(".env").exists() {
-        ".env"
+    let env_path = if Path::new(".env").exists() {
+        Some(".env")
+    } else if Path::new(".env.local").exists() {
+        Some(".env.local")
     } else {
-        ".env.local"
+        None
     };
 
-    let mut registry_is_set = false;
-    if Path::new(env_path_str).exists() {
-        println!("cargo:rerun-if-changed={}", env_path_str);
-
-        if let Ok(iter) = dotenvy::from_filename_iter(env_path_str) {
-            for (key, val) in iter.flatten() {
-                if key == "ZOI_DEFAULT_REGISTRY" {
-                    registry_is_set = true;
-                }
-                println!("cargo:rustc-env={}={}", key, val);
-            }
-        } else {
-            println!("cargo:warning=failed to load env file: {}", env_path_str);
+    if let Some(path) = env_path {
+        println!("cargo:rerun-if-changed={}", path);
+        if dotenvy::from_filename(path).is_err() {
+            println!("cargo:warning=failed to load env file: {}", path);
         }
     }
 
-    if let Ok(val) = env::var("ZOI_DEFAULT_REGISTRY") {
-        if !registry_is_set {
-            println!("cargo:rustc-env=ZOI_DEFAULT_REGISTRY={}", val);
-        }
-        registry_is_set = true;
+    if let Ok(val) = env::var("POSTHOG_API_KEY") {
+        println!("cargo:rustc-env=POSTHOG_API_KEY={}", val);
     }
 
-    if !registry_is_set {
-        println!(
-            "cargo:rustc-env=ZOI_DEFAULT_REGISTRY=https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg.git"
-        );
+    if let Ok(val) = env::var("POSTHOG_API_HOST") {
+        println!("cargo:rustc-env=POSTHOG_API_HOST={}", val);
     }
+
+    let zoi_registry = env::var("ZOI_DEFAULT_REGISTRY")
+        .unwrap_or_else(|_| "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg.git".to_string());
+    println!("cargo:rustc-env=ZOI_DEFAULT_REGISTRY={}", zoi_registry);
 }
