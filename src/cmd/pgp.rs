@@ -15,6 +15,7 @@ pub enum PgpCommands {
     /// Add a PGP key from a file, URL, or a keyserver
     Add(AddKey),
     /// Remove a PGP key
+    #[command(alias = "rm")]
     Remove(RemoveKey),
     /// List all imported PGP keys
     #[command(alias = "ls")]
