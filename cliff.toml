@@ -36,6 +36,7 @@ commit_parsers = [
     { message = "(?i)^Docs", skip = true },
     { message = "(?i)^CI", skip = true },
     { message = "(?i)^Release", skip = true },
+    { message = "(?i)^Git", skip = true },
 
     { message = "^Build", group = "🛠️ Build" },
     { message = "^Feat", group = "✨ Features" },
@@ -59,10 +60,7 @@ commit_parsers = [
     { message = "^Auth", group = "🔐 Authentication" },
     { message = "^Track", group = "📈 Tracking" },
     { message = "^API", group = "📋 API" },
-    { message = "^Git", group = "🔀 Git" },
 
-    { message = "^chore", group = "⚙️ Miscellaneous Tasks" },
-    { body = ".*security", group = "🔒 Security" },
     { message = ".*", group = "💼 Other" },
 ]
 link_parsers = [
