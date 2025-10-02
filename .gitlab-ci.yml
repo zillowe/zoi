@@ -192,3 +192,31 @@ release:packages:
     - ./build/publish.sh
   rules:
     - if: "$CI_COMMIT_MESSAGE =~ /^Release: Bump packages version to .*/"
+
+docs:update:
+  stage: test
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache git
+    - git config --global user.email "contact@zillowe.qzz.io"
+    - git config --global user.name "Zillowe CI/CD"
+  script:
+    - echo "Cloning website repository..."
+    - git clone "https://oauth2:${GITLAB_TOKEN_DOCS}@gitlab.com/Zillowe/Website.git"
+    - cd Website
+    - echo "Removing old documentation..."
+    - rm -rf "content/docs/\(main\)/zds/zoi"
+    - mkdir -p "content/docs/\(main\)/zds/zoi"
+    - echo "Copying new documentation..."
+    - cp -r "$CI_PROJECT_DIR/docs/". "content/docs/\(main\)/zds/zoi"
+    - |
+      git add .
+      if git diff --staged --quiet; then
+        echo "No changes to the documentation."
+      else
+        echo "Committing and pushing changes..."
+        git commit -m "Docs: Update Zoi documentation from $CI_COMMIT_SHA"
+        git push
+      fi
+  rules:
+    - if: "$CI_COMMIT_MESSAGE =~ /^Docs: Docs/"
