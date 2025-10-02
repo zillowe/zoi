@@ -205,10 +205,10 @@ docs:update:
     - git clone "https://oauth2:${GITLAB_TOKEN_DOCS}@gitlab.com/Zillowe/Website.git"
     - cd Website
     - echo "Removing old documentation..."
-    - rm -rf "content/docs/\(main\)/zds/zoi"
-    - mkdir -p "content/docs/\(main\)/zds/zoi"
+    - rm -rf "content/docs/(main)/zds/zoi"
+    - mkdir -p "content/docs/(main)/zds/zoi"
     - echo "Copying new documentation..."
-    - cp -r "$CI_PROJECT_DIR/docs/". "content/docs/\(main\)/zds/zoi"
+    - cp -r "$CI_PROJECT_DIR/docs/". "content/docs/(main)/zds/zoi"
     - |
       git add .
       if git diff --staged --quiet; then
