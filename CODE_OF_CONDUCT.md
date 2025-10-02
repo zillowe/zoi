@@ -43,13 +43,13 @@ We agree to restrict the following behaviors in our community. Instances, threat
 
 Tensions can occur between community members even when they are trying their best to collaborate. Not every conflict represents a code of conduct violation, and this Code of Conduct reinforces encouraged behaviors and norms that can help avoid conflicts and minimize harm.
 
-When an incident does occur, it is important to report it promptly. To report a possible violation, **please check our [issue tracker](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues) to see if it has already been reported. If not, feel free to open a new issue. You can report the issue on all of [Zoi's git repo mirrors](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/CONTRIBUTING.md#reporting-bugs-or-requesting-features).**
+When an incident does occur, it is important to report it promptly. To report a possible violation, please check our [issue tracker](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues) to see if it has already been reported. If not, feel free to open a new issue. You can report the issue on all of [Zoi's git repo mirrors](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/CONTRIBUTING.md#reporting-bugs-or-requesting-features).
 
 Community Moderators take reports of violations seriously and will make every effort to respond in a timely manner. They will investigate all reports of code of conduct violations, reviewing messages, logs, and recordings, or interviewing witnesses and other participants. Community Moderators will keep investigation and enforcement actions as transparent as possible while prioritizing safety and confidentiality. In order to honor these values, enforcement actions are carried out in private with the involved parties, but communicating to the whole community may be part of a mutually agreed upon resolution.
 
 ## Addressing and Repairing Harm
 
-**Violations of these rules or any other form of abuse can be reported confidentially to [contact@zillowe.qzz.io](mailto:contact@zillowe.qzz.io).**
+Violations of these rules or any other form of abuse can be reported confidentially to [contact@zillowe.qzz.io](mailto:contact@zillowe.qzz.io).
 
 If an investigation by the Community Moderators finds that this Code of Conduct has been violated, the following enforcement ladder may be used to determine how best to repair harm, based on the incident's impact on the individuals involved and the community as a whole. Depending on the severity of a violation, lower rungs on the ladder may be skipped.
 
