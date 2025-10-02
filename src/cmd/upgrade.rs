@@ -20,6 +20,10 @@ pub fn run(
                     .green()
             );
             println!(
+                "\n{}: https://github.com/Zillowe/Zoi/blob/main/CHANGELOG.md",
+                "Changelog".cyan().bold()
+            );
+            println!(
                 "\n{}: To update shell completions, run 'zoi shell <your-shell>'.",
                 "Hint".cyan().bold()
             );
