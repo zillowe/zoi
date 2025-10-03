@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PinnedPackage {
-    pub name: String,
+    pub source: String,
     pub version: String,
 }
 
@@ -42,15 +42,15 @@ pub fn write_pinned_packages(packages: &[PinnedPackage]) -> Result<(), io::Error
     Ok(())
 }
 
-pub fn get_pinned_version(package_name: &str) -> Result<Option<String>, io::Error> {
+pub fn get_pinned_version(source: &str) -> Result<Option<String>, io::Error> {
     let pinned_packages = get_pinned_packages()?;
     Ok(pinned_packages
         .iter()
-        .find(|p| p.name == package_name)
+        .find(|p| p.source == source)
         .map(|p| p.version.clone()))
 }
 
-pub fn is_pinned(package_name: &str) -> Result<bool, io::Error> {
+pub fn is_pinned(source: &str) -> Result<bool, io::Error> {
     let pinned_packages = get_pinned_packages()?;
-    Ok(pinned_packages.iter().any(|p| p.name == package_name))
+    Ok(pinned_packages.iter().any(|p| p.source == source))
 }
