@@ -1,5 +1,7 @@
 # Security Policy
 
+The Security for this repository can be found online at [zillowe.qzz.io/docs/book/guidelines/security](https://zillowe.qzz.io/docs/book/guidelines/security).
+
 ## Supported Versions
 
 | Version          | Supported |
@@ -45,9 +47,10 @@ zoi upgrade
 If you discover a security vulnerability, please follow these steps:
 
 1. **DO NOT** disclose the vulnerability publicly.
-2. Send a detailed report to: [GitLab Issues\*](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new), [GitHub Security Advisory](https://github.com/Zillowe/Zoi/security/advisories/new) or email: [contact@zillowe.qzz.io](mailto:contact@zillowe.qzz.io).
+2. Send a detailed report to: [GitLab Issues\*](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new), [GitHub Security Advisory](https://github.com/Zillowe/Zoi/security/advisories/new) or email\*: [contact@zillowe.qzz.io](mailto:contact@zillowe.qzz.io).
 3. Include in your report:
    - A description of the vulnerability
    - Steps to reproduce the issue
    - Potential impact
 4. If you're creating a GitLab issue on make sure you turn on confidentiality.
+5. If you're sending an email make sure to encrypt your email with our [public PGP key](https://zillowe.pages.dev/keys/zillowe-main.asc) and link your public key.
