@@ -5,6 +5,7 @@
 //! capabilities.
 //!
 //! If you're looking for the user documentation visit [Zoi Docs](https://zillowe.qzz.io/docs/zds/zoi).
+//! For more library examples and more docs visit [Zoi Library Docs](https://zillowe.qzz.io/docs/zds/zoi/lib).
 //!
 //! # Key Features
 //!
@@ -24,7 +25,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! zoi = { version = "5.0.2-beta" } # subjet to change
+//! zoi = { version = "1.0.0" } # subjet to change
 //! ```
 //!
 //! # Examples
@@ -209,7 +210,7 @@ pub fn autoremove(non_interactive: bool) -> Result<(), Box<dyn Error>> {
 ///
 /// A `Result` containing the resolved `Package` on success, or an error.
 pub fn resolve_package(source: &str) -> Result<Package, Box<dyn Error>> {
-    let (pkg, _, _, _) = pkg::resolve::resolve_package_and_version(source)?;
+    let (pkg, _, _, _, _) = pkg::resolve::resolve_package_and_version(source)?;
     Ok(pkg)
 }
 
@@ -261,13 +262,13 @@ pub fn get_all_available_packages() -> Result<Vec<Package>, Box<dyn Error>> {
 /// # Returns
 ///
 /// `Ok(())` on success, or an error.
-pub fn pin(package_name: &str, version: &str) -> Result<(), Box<dyn Error>> {
+pub fn pin(source: &str, version: &str) -> Result<(), Box<dyn Error>> {
     let mut pinned_packages = pkg::pin::get_pinned_packages()?;
-    if pinned_packages.iter().any(|p| p.name == package_name) {
-        return Err(format!("Package '{}' is already pinned.", package_name).into());
+    if pinned_packages.iter().any(|p| p.source == source) {
+        return Err(format!("Package '{}' is already pinned.", source).into());
     }
     let new_pin = PinnedPackage {
-        name: package_name.to_string(),
+        source: source.to_string(),
         version: version.to_string(),
     };
     pinned_packages.push(new_pin);
@@ -284,12 +285,12 @@ pub fn pin(package_name: &str, version: &str) -> Result<(), Box<dyn Error>> {
 /// # Returns
 ///
 /// `Ok(())` on success, or an error.
-pub fn unpin(package_name: &str) -> Result<(), Box<dyn Error>> {
+pub fn unpin(source: &str) -> Result<(), Box<dyn Error>> {
     let mut pinned_packages = pkg::pin::get_pinned_packages()?;
     let initial_len = pinned_packages.len();
-    pinned_packages.retain(|p| p.name != package_name);
+    pinned_packages.retain(|p| p.source != source);
     if pinned_packages.len() == initial_len {
-        return Err(format!("Package '{}' was not pinned.", package_name).into());
+        return Err(format!("Package '{}' was not pinned.", source).into());
     }
     pkg::pin::write_pinned_packages(&pinned_packages)?;
     Ok(())

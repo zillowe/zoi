@@ -320,10 +320,10 @@ pub struct Dependencies {
     pub build: Option<DependencyGroup>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub enum InstallReason {
     Direct,
-    Dependency,
+    Dependency { parent: String },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -331,12 +331,19 @@ pub struct InstallManifest {
     pub name: String,
     pub version: String,
     pub repo: String,
+    pub registry_handle: String,
+    pub package_type: PackageType,
     pub installed_at: String,
     pub reason: InstallReason,
     pub scope: Scope,
     pub bins: Option<Vec<String>>,
+    pub conflicts: Option<Vec<String>>,
     #[serde(default)]
     pub installed_dependencies: Vec<String>,
+    #[serde(default)]
+    pub chosen_options: Vec<String>,
+    #[serde(default)]
+    pub chosen_optionals: Vec<String>,
     #[serde(default)]
     pub install_method: Option<String>,
     #[serde(default)]

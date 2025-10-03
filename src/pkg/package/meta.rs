@@ -13,7 +13,7 @@ pub fn run(
     println!("Generating metadata for: {}", package_file.display());
 
     let temp_pkg = lua_parser::parse_lua_package(package_file.to_str().unwrap(), None)?;
-    let default_version = resolve::get_default_version(&temp_pkg)?;
+    let default_version = resolve::get_default_version(&temp_pkg, None)?;
 
     let version = version_override
         .map(|s| s.to_string())

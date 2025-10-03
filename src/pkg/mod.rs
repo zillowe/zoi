@@ -26,3 +26,4 @@ pub mod types;
 pub mod uninstall;
 pub mod update;
 pub mod upgrade;
+pub mod utils;
