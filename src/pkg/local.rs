@@ -1,11 +1,14 @@
 use crate::pkg::config;
 use crate::pkg::types::{InstallManifest, Package, Scope};
+use crate::pkg::utils;
+#[cfg(windows)]
+use junction;
 use std::error::Error;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
-pub fn get_store_root(scope: Scope) -> Result<PathBuf, Box<dyn Error>> {
+pub fn get_store_base_dir(scope: Scope) -> Result<PathBuf, Box<dyn Error>> {
     match scope {
         Scope::User => {
             let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
@@ -21,6 +24,29 @@ pub fn get_store_root(scope: Scope) -> Result<PathBuf, Box<dyn Error>> {
     }
 }
 
+pub fn get_package_dir(
+    scope: Scope,
+    registry_handle: &str,
+    repo_path: &str,
+    package_name: &str,
+) -> Result<PathBuf, Box<dyn Error>> {
+    let base_dir = get_store_base_dir(scope)?;
+    let package_id = utils::generate_package_id(registry_handle, repo_path);
+    let package_dir_name = utils::get_package_dir_name(&package_id, package_name);
+    Ok(base_dir.join(package_dir_name))
+}
+
+pub fn get_package_version_dir(
+    scope: Scope,
+    registry_handle: &str,
+    repo_path: &str,
+    package_name: &str,
+    version: &str,
+) -> Result<PathBuf, Box<dyn Error>> {
+    let package_dir = get_package_dir(scope, registry_handle, repo_path, package_name)?;
+    Ok(package_dir.join(version))
+}
+
 fn get_db_root() -> Result<PathBuf, Box<dyn Error>> {
     let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
     Ok(home_dir.join(".zoi").join("pkgs").join("db"))
@@ -28,28 +54,25 @@ fn get_db_root() -> Result<PathBuf, Box<dyn Error>> {
 
 pub fn get_installed_packages() -> Result<Vec<InstallManifest>, Box<dyn Error>> {
     let mut installed = Vec::new();
-    let user_store_root = get_store_root(Scope::User)?;
-    if user_store_root.exists() {
-        for entry in fs::read_dir(user_store_root)? {
-            let entry = entry?;
-            let manifest_path = entry.path().join("manifest.yaml");
-            if manifest_path.exists() {
-                let content = fs::read_to_string(manifest_path)?;
-                let manifest: InstallManifest = serde_yaml::from_str(&content)?;
-                installed.push(manifest);
-            }
+    for scope in [Scope::User, Scope::System] {
+        let store_root = get_store_base_dir(scope)?;
+        if !store_root.exists() {
+            continue;
         }
-    }
-
-    let system_store_root = get_store_root(Scope::System)?;
-    if system_store_root.exists() {
-        for entry in fs::read_dir(system_store_root)? {
+        for entry in fs::read_dir(store_root)? {
             let entry = entry?;
-            let manifest_path = entry.path().join("manifest.yaml");
-            if manifest_path.exists() {
-                let content = fs::read_to_string(manifest_path)?;
-                let manifest: InstallManifest = serde_yaml::from_str(&content)?;
-                installed.push(manifest);
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            let latest_path = path.join("latest");
+            if latest_path.is_symlink() || latest_path.is_dir() {
+                let manifest_path = latest_path.join("manifest.yaml");
+                if manifest_path.exists() {
+                    let content = fs::read_to_string(manifest_path)?;
+                    let manifest: InstallManifest = serde_yaml::from_str(&content)?;
+                    installed.push(manifest);
+                }
             }
         }
     }
@@ -123,16 +146,36 @@ pub fn is_package_installed(
     package_name: &str,
     scope: Scope,
 ) -> Result<Option<InstallManifest>, Box<dyn Error>> {
-    let manifest_path = get_store_root(scope)?
-        .join(package_name)
-        .join("manifest.yaml");
-    if manifest_path.exists() {
-        let content = fs::read_to_string(manifest_path)?;
-        let manifest: InstallManifest = serde_yaml::from_str(&content)?;
-        Ok(Some(manifest))
-    } else {
-        Ok(None)
+    let store_root = get_store_base_dir(scope)?;
+    if !store_root.exists() {
+        return Ok(None);
     }
+
+    for entry in fs::read_dir(store_root)? {
+        let entry = entry?;
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+
+        if let Some(file_name) = path.file_name().and_then(|n| n.to_str())
+            && file_name.ends_with(&format!("-{}", package_name))
+        {
+            let latest_path = path.join("latest");
+            if latest_path.is_symlink() || latest_path.is_dir() {
+                let manifest_path = latest_path.join("manifest.yaml");
+                if manifest_path.exists() {
+                    let content = fs::read_to_string(manifest_path)?;
+                    let manifest: InstallManifest = serde_yaml::from_str(&content)?;
+                    if manifest.name == package_name {
+                        return Ok(Some(manifest));
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(None)
 }
 
 pub fn get_packages_from_repos(
@@ -196,21 +239,78 @@ pub fn get_all_available_packages() -> Result<Vec<super::types::Package>, Box<dy
     }
 }
 
-pub fn write_manifest(manifest: &InstallManifest) -> Result<(), Box<dyn Error>> {
-    let store_dir = get_store_root(manifest.scope)?.join(&manifest.name);
-    fs::create_dir_all(&store_dir)?;
-    let manifest_path = store_dir.join("manifest.yaml");
-    let content = serde_yaml::to_string(&manifest)?;
-    fs::write(manifest_path, content)?;
+pub fn add_dependent(package_dir: &Path, dependent_id: &str) -> Result<(), Box<dyn Error>> {
+    let dependents_dir = package_dir.join("dependents");
+    fs::create_dir_all(&dependents_dir)?;
+    let dependent_file = dependents_dir.join(hex::encode(dependent_id));
+    fs::write(dependent_file, "")?;
     Ok(())
 }
 
-pub fn remove_manifest(package_name: &str, scope: Scope) -> Result<(), Box<dyn Error>> {
-    let manifest_path = get_store_root(scope)?
-        .join(package_name)
-        .join("manifest.yaml");
-    if manifest_path.exists() {
-        fs::remove_file(manifest_path)?;
+pub fn remove_dependent(package_dir: &Path, dependent_id: &str) -> Result<(), Box<dyn Error>> {
+    let dependents_dir = package_dir.join("dependents");
+    if dependents_dir.exists() {
+        let dependent_file = dependents_dir.join(hex::encode(dependent_id));
+        if dependent_file.exists() {
+            fs::remove_file(dependent_file)?;
+        }
     }
+    Ok(())
+}
+
+pub fn get_dependents(package_dir: &Path) -> Result<Vec<String>, Box<dyn Error>> {
+    let dependents_dir = package_dir.join("dependents");
+    let mut dependents = Vec::new();
+    if dependents_dir.exists() {
+        for entry in fs::read_dir(dependents_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_file()
+                && let Some(file_name) = path.file_name().and_then(|s| s.to_str())
+                && let Ok(decoded) = hex::decode(file_name)
+                && let Ok(dependent_id) = String::from_utf8(decoded)
+            {
+                dependents.push(dependent_id);
+            }
+        }
+    }
+    Ok(dependents)
+}
+
+pub fn write_manifest(manifest: &InstallManifest) -> Result<(), Box<dyn Error>> {
+    let version_dir = get_package_version_dir(
+        manifest.scope,
+        &manifest.registry_handle,
+        &manifest.repo,
+        &manifest.name,
+        &manifest.version,
+    )?;
+    fs::create_dir_all(&version_dir)?;
+    let manifest_path = version_dir.join("manifest.yaml");
+    let content = serde_yaml::to_string(&manifest)?;
+    fs::write(manifest_path, content)?;
+
+    let package_dir = get_package_dir(
+        manifest.scope,
+        &manifest.registry_handle,
+        &manifest.repo,
+        &manifest.name,
+    )?;
+    let latest_symlink_path = package_dir.join("latest");
+    if latest_symlink_path.exists() || latest_symlink_path.is_symlink() {
+        if latest_symlink_path.is_dir() {
+            fs::remove_dir_all(&latest_symlink_path)?;
+        } else {
+            fs::remove_file(&latest_symlink_path)?;
+        }
+    }
+
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&version_dir, &latest_symlink_path)?;
+    #[cfg(windows)]
+    {
+        junction::create(&version_dir, &latest_symlink_path)?;
+    }
+
     Ok(())
 }

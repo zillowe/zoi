@@ -1,63 +1,19 @@
-use crate::pkg::{local, types};
+use crate::pkg::{local, resolve, types};
 use crate::utils;
 use colored::*;
+use semver::Version;
 use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-fn get_rollback_dir(package_name: &str, scope: types::Scope) -> Result<PathBuf, Box<dyn Error>> {
-    let store_dir = local::get_store_root(scope)?.join(package_name);
-    Ok(store_dir.join("rollback"))
-}
-
-pub fn backup_package(package_name: &str, scope: types::Scope) -> Result<(), Box<dyn Error>> {
-    println!(
-        "Backing up current version of '{}' for rollback...",
-        package_name.cyan()
-    );
-
-    let store_dir = local::get_store_root(scope)?.join(package_name);
-    if !store_dir.exists() {
-        println!(
-            "{}",
-            "No existing installation found to back up. Skipping.".yellow()
-        );
-        return Ok(());
-    }
-
-    let rollback_dir = get_rollback_dir(package_name, scope)?;
-
-    if rollback_dir.exists() {
-        fs::remove_dir_all(&rollback_dir)?;
-    }
-    fs::create_dir_all(&rollback_dir)?;
-
-    let manifest_path = store_dir.join("manifest.yaml");
-    if manifest_path.exists() {
-        fs::copy(&manifest_path, rollback_dir.join("manifest.yaml"))?;
-    }
-
-    let bin_dir = store_dir.join("bin");
-    if bin_dir.exists() {
-        let rollback_bin_dir = rollback_dir.join("bin");
-        fs::create_dir_all(&rollback_bin_dir)?;
-        for entry in fs::read_dir(bin_dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_file() {
-                fs::copy(&path, rollback_bin_dir.join(path.file_name().unwrap()))?;
-            }
-        }
-    }
-
-    println!("{}", "Backup complete.".green());
-    Ok(())
-}
+#[cfg(windows)]
+use junction;
 
 pub fn run(package_name: &str, yes: bool) -> Result<(), Box<dyn Error>> {
     println!("Attempting to roll back '{}'...", package_name.cyan());
 
-    let (manifest, scope) =
+    let (pkg, _, _, _, registry_handle) = resolve::resolve_package_and_version(package_name)?;
+    let (_manifest, scope) =
         if let Some(m) = local::is_package_installed(package_name, types::Scope::User)? {
             (m, types::Scope::User)
         } else if let Some(m) = local::is_package_installed(package_name, types::Scope::System)? {
@@ -66,93 +22,83 @@ pub fn run(package_name: &str, yes: bool) -> Result<(), Box<dyn Error>> {
             return Err(format!("Package '{}' is not installed.", package_name).into());
         };
 
-    let rollback_dir = get_rollback_dir(package_name, scope)?;
-    if !rollback_dir.exists() {
-        return Err(format!("No rollback version found for '{}'.", package_name).into());
+    let handle = registry_handle.as_deref().unwrap_or("local");
+    let package_dir = local::get_package_dir(scope, handle, &pkg.repo, &pkg.name)?;
+
+    let mut versions = Vec::new();
+    if let Ok(entries) = fs::read_dir(&package_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir()
+                && let Some(version_str) = path.file_name().and_then(|s| s.to_str())
+                && version_str != "latest"
+                && let Ok(version) = Version::parse(version_str.trim_start_matches('v'))
+            {
+                versions.push(version);
+            }
+        }
+    }
+    versions.sort();
+
+    if versions.len() < 2 {
+        return Err("No previous version to roll back to.".into());
     }
 
-    let rollback_manifest_path = rollback_dir.join("manifest.yaml");
-    if !rollback_manifest_path.exists() {
-        return Err("Rollback manifest not found.".into());
-    }
-
-    let content = fs::read_to_string(&rollback_manifest_path)?;
-    let rollback_manifest: types::InstallManifest = serde_yaml::from_str(&content)?;
+    let current_version = versions.pop().unwrap();
+    let previous_version = versions.pop().unwrap();
 
     println!(
         "Rolling back from version {} to {}",
-        manifest.version.yellow(),
-        rollback_manifest.version.green()
+        current_version.to_string().yellow(),
+        previous_version.to_string().green()
     );
 
-    if !utils::ask_for_confirmation("This will uninstall the current version. Continue?", yes) {
+    if !utils::ask_for_confirmation("This will remove the current version. Continue?", yes) {
         println!("Operation aborted.");
         return Ok(());
     }
 
-    println!("Uninstalling current version...");
-    let store_dir = local::get_store_root(scope)?.join(package_name);
+    let latest_symlink_path = package_dir.join("latest");
+    let previous_version_dir = package_dir.join(format!("v{}", previous_version));
+    if latest_symlink_path.exists() || latest_symlink_path.is_symlink() {
+        if latest_symlink_path.is_dir() {
+            fs::remove_dir_all(&latest_symlink_path)?;
+        } else {
+            fs::remove_file(&latest_symlink_path)?;
+        }
+    }
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&previous_version_dir, &latest_symlink_path)?;
+    #[cfg(windows)]
+    {
+        junction::create(&previous_version_dir, &latest_symlink_path)?;
+    }
 
-    if let Some(bins) = &manifest.bins {
+    let prev_manifest_path = previous_version_dir.join("manifest.yaml");
+    let content = fs::read_to_string(&prev_manifest_path)?;
+    let prev_manifest: types::InstallManifest = serde_yaml::from_str(&content)?;
+
+    if let Some(bins) = &prev_manifest.bins {
         let bin_root = get_bin_root()?;
         for bin in bins {
             let symlink_path = bin_root.join(bin);
-            if symlink_path.exists()
-                && let Ok(target) = fs::read_link(&symlink_path)
-                && target.starts_with(&store_dir)
-            {
+            if symlink_path.exists() {
                 fs::remove_file(&symlink_path)?;
             }
-        }
-    } else {
-        let symlink_path = get_bin_root()?.join(package_name);
-        if symlink_path.exists()
-            && let Ok(target) = fs::read_link(&symlink_path)
-            && target.starts_with(&store_dir)
-        {
-            fs::remove_file(symlink_path)?;
-        }
-    }
-
-    if store_dir.exists() {
-        fs::remove_dir_all(&store_dir)?;
-    }
-
-    println!("Restoring previous version...");
-    fs::rename(&rollback_dir, &store_dir)?;
-
-    let store_bin_dir = store_dir.join("bin");
-    if let Some(bins) = &rollback_manifest.bins {
-        let bin_root = get_bin_root()?;
-        for bin_name in bins {
-            let mut bin_path_in_store = store_bin_dir.join(bin_name);
-            if !bin_path_in_store.exists() {
-                bin_path_in_store = store_bin_dir.join(format!("{}.exe", bin_name));
-                if !bin_path_in_store.exists() {
-                    eprintln!(
-                        "Warning: Binary '{}' not found in restored package.",
-                        bin_name
-                    );
-                    continue;
-                }
+            let bin_path_in_store = previous_version_dir.join("bin").join(bin);
+            if bin_path_in_store.exists() {
+                create_symlink(&bin_path_in_store, &symlink_path)?;
             }
-            create_symlink(&bin_path_in_store, &bin_root.join(bin_name))?;
-        }
-    } else {
-        let bin_root = get_bin_root()?;
-        let mut bin_path_in_store = store_bin_dir.join(package_name);
-        if !bin_path_in_store.exists() {
-            bin_path_in_store = store_bin_dir.join(format!("{}.exe", package_name));
-        }
-        if bin_path_in_store.exists() {
-            create_symlink(&bin_path_in_store, &bin_root.join(package_name))?;
         }
     }
+
+    let current_version_dir = package_dir.join(format!("v{}", current_version));
+    fs::remove_dir_all(current_version_dir)?;
 
     println!(
         "Successfully rolled back '{}' to version {}.",
         package_name.cyan(),
-        rollback_manifest.version.green()
+        previous_version.to_string().green()
     );
 
     Ok(())

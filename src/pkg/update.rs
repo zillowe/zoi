@@ -1,7 +1,9 @@
 use crate::pkg::{install, local, pin, resolve, types};
 use crate::utils;
+use semver::Version;
 use std::collections::HashSet;
 use std::error::Error;
+use std::fs;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum UpdateResult {
@@ -11,14 +13,15 @@ pub enum UpdateResult {
 }
 
 pub fn run(package_name: &str, yes: bool) -> Result<UpdateResult, Box<dyn Error>> {
-    let (new_pkg, new_version, _, _) = match resolve::resolve_package_and_version(package_name) {
-        Ok(result) => result,
-        Err(e) => {
-            return Err(format!("Could not resolve package '{}': {}", package_name, e).into());
-        }
-    };
+    let (new_pkg, new_version, _, _, registry_handle) =
+        match resolve::resolve_package_and_version(package_name) {
+            Ok(result) => result,
+            Err(e) => {
+                return Err(format!("Could not resolve package '{}': {}", package_name, e).into());
+            }
+        };
 
-    if pin::is_pinned(&new_pkg.name)? {
+    if pin::is_pinned(package_name)? {
         return Ok(UpdateResult::Pinned);
     }
 
@@ -63,6 +66,35 @@ pub fn run(package_name: &str, yes: bool) -> Result<UpdateResult, Box<dyn Error>
         &mut processed_deps,
         None,
     )?;
+
+    let handle = registry_handle.as_deref().unwrap_or("local");
+    let package_dir = local::get_package_dir(manifest.scope, handle, &new_pkg.repo, &new_pkg.name)?;
+
+    let mut versions = Vec::new();
+    if let Ok(entries) = fs::read_dir(&package_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir()
+                && let Some(version_str) = path.file_name().and_then(|s| s.to_str())
+                && version_str != "latest"
+                && let Ok(version) = Version::parse(version_str.trim_start_matches('v'))
+            {
+                versions.push(version);
+            }
+        }
+    }
+
+    versions.sort();
+
+    if versions.len() > 2 {
+        let versions_to_delete = &versions[..versions.len() - 2];
+        for version in versions_to_delete {
+            let version_dir = package_dir.join(format!("v{}", version));
+            if version_dir.exists() {
+                fs::remove_dir_all(version_dir)?;
+            }
+        }
+    }
 
     Ok(UpdateResult::Updated {
         from: manifest.version,
