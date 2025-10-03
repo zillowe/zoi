@@ -282,17 +282,11 @@ What dependency installation we support.
 | `script`         | Script execution                | `script:website.com/install`                                                    |
 | `apt`, `apt-get` | Debian, Ubuntu, etc.            | `apt:libssl-dev`                                                                |
 | `pacman`         | Arch Linux                      | `pacman:base-devel`                                                             |
-| `yay`, `paru`    | Arch Linux (AUR)                | `yay:google-chrome`                                                             |
 | `aur`            | Arch Linux (AUR)                | `aur:visual-studio-code-bin`                                                    |
 | `brew`           | macOS (Homebrew)                | `brew:node`                                                                     |
 | `scoop`          | Windows                         | `scoop:git`                                                                     |
 | `snap`           | Linux (Snapcraft)               | `snap:node`                                                                     |
 | `flatpak`        | Linux (Flathub)                 | `flatpak:org.gimp.GIMP`                                                         |
-| `pkg`            | FreeBSD                         | `pkg:git`                                                                       |
-| `pkg_add`        | OpenBSD                         | `pkg_add:git`                                                                   |
-| `cargo`          | Rust                            | `cargo:ripgrep`                                                                 |
-| `cargo-binstall` | Rust (pre-compiled binaries)    | `cargo-binstall:ripgrep`                                                        |
-| `go`             | Go                              | `go:golang.org/x/tools/cmd/goimports`                                           |
 | `npm`            | Node.js                         | `npm:typescript`                                                                |
 | `bun`            | Bun                             | `bun:elysia`                                                                    |
 | `deno`           | Deno                            | `deno:npm-chalk` or `deno:jsr-@std/bytes` (the `-` instead of `:` is important) |
@@ -351,7 +345,7 @@ Here are some common commands to get you started.
 - **Search for a package from a specific repo:**
 
   ```sh
-  zoi search <term> @<repo_name>
+  zoi search <term> --repo <repo_name>
   ```
 
 - **Add a new repository:**
@@ -417,5 +411,5 @@ Zoi is licensed under the [Apache 2.0 License](./LICENSE).
 <hr/>
 
 <div align="center">
-  <p>Zoi is developed by Zusty < Zillowe Foundation<br/>Part of the <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/ZDS">Zillowe Development Suite (ZDS)</a></p>
+  <p>Zoi is developed by Zusty < Zillowe Foundation<br/>Part of the <a href="https://zillowe.qzz.io/docs/zds">Zillowe Development Suite (ZDS)</a></p>
 </div>
