@@ -1,7 +1,6 @@
 use crate::pkg::{local, types};
 use colored::*;
 use std::error::Error;
-use std::fs;
 
 pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
     let trimmed_source = package_name.trim();
@@ -30,26 +29,19 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
         }
     };
 
-    let pkg_dir = local::get_store_root(manifest.scope)?.join(&lower_name_only);
+    let pkg_dir = local::get_package_dir(
+        manifest.scope,
+        &manifest.registry_handle,
+        &manifest.repo,
+        &manifest.name,
+    )?;
     let mut reasons = Vec::new();
 
     if manifest.reason == types::InstallReason::Direct {
         reasons.push("it was installed directly by the user".to_string());
     }
 
-    let dependents_dir = pkg_dir.join("dependents");
-    let mut dependents = Vec::new();
-    if dependents_dir.exists() {
-        for entry in fs::read_dir(dependents_dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_file()
-                && let Some(pkg_name) = path.file_name().and_then(|n| n.to_str())
-            {
-                dependents.push(pkg_name.to_string());
-            }
-        }
-    }
+    let mut dependents = local::get_dependents(&pkg_dir)?;
 
     if !dependents.is_empty() {
         dependents.sort();
@@ -60,7 +52,7 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
     }
 
     if reasons.is_empty() {
-        if manifest.reason == types::InstallReason::Dependency {
+        if matches!(manifest.reason, types::InstallReason::Dependency { .. }) {
             println!(
                 "Package '{}' is installed as a dependency, but no packages list it as a requirement. It may be an orphan.",
                 package_name.bold()

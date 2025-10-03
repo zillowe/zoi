@@ -23,8 +23,10 @@ pub fn run(source: &str, raw: bool) {
             if let Some(repo_name) = resolved_source.repo_name {
                 pkg.repo = repo_name;
             }
-            pkg.version =
-                Some(resolve::get_default_version(&pkg).unwrap_or_else(|_| "N/A".to_string()));
+            pkg.version = Some(
+                resolve::get_default_version(&pkg, resolved_source.registry_handle.as_deref())
+                    .unwrap_or_else(|_| "N/A".to_string()),
+            );
 
             let installed_manifest = match local::is_package_installed(&pkg.name, pkg.scope) {
                 Ok(manifest) => manifest,

@@ -1,4 +1,4 @@
-use crate::pkg::resolve;
+use crate::pkg::{local, resolve};
 use anyhow::anyhow;
 use crossterm::{
     event::{
@@ -44,7 +44,8 @@ pub fn run(
     upstream: bool,
     raw: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let (pkg, _version, _, _) = resolve::resolve_package_and_version(package_name)?;
+    let (pkg, _version, _, _, registry_handle) =
+        resolve::resolve_package_and_version(package_name)?;
 
     let fetch_from_upstream = || -> Result<String, Box<dyn std::error::Error>> {
         if let Some(url) = pkg.man.as_ref() {
@@ -60,12 +61,11 @@ pub fn run(
     let content = if upstream {
         fetch_from_upstream()?
     } else {
-        let store_dir = home::home_dir()
-            .ok_or("No home dir")?
-            .join(".zoi/pkgs/store")
-            .join(&pkg.name);
-        let man_md_path = store_dir.join("man.md");
-        let man_txt_path = store_dir.join("man.txt");
+        let handle = registry_handle.as_deref().unwrap_or("local");
+        let package_dir = local::get_package_dir(pkg.scope, handle, &pkg.repo, &pkg.name)?;
+        let latest_dir = package_dir.join("latest");
+        let man_md_path = latest_dir.join("man.md");
+        let man_txt_path = latest_dir.join("man.txt");
 
         if man_md_path.exists() {
             if !raw {

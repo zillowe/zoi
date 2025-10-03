@@ -42,10 +42,15 @@ pub fn run(
         "' ---".yellow()
     );
 
+    let config = config::read_config()?;
+    let handle = config
+        .default_registry
+        .as_ref()
+        .map(|reg| reg.handle.as_str());
+
     let packages = if let Some(repo_filter) = &repo {
-        let config = config::read_config()?;
-        let handle = if let Some(reg) = config.default_registry {
-            reg.handle
+        let handle = if let Some(reg) = &config.default_registry {
+            reg.handle.clone()
         } else {
             return Err("Default registry not configured.".into());
         };
@@ -146,7 +151,7 @@ pub fn run(
                     desc.push_str("...");
                 }
 
-                let version = crate::pkg::resolve::get_default_version(&pkg)
+                let version = crate::pkg::resolve::get_default_version(&pkg, handle)
                     .unwrap_or_else(|_| "N/A".to_string());
 
                 let repo_display = pkg.repo.split_once('/').map(|x| x.1).unwrap_or(&pkg.repo);

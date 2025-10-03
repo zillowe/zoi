@@ -11,13 +11,14 @@ pub fn generate_metadata(
     package_file: &Path,
     version_override: Option<&str>,
     repo: String,
+    registry_handle: Option<String>,
 ) -> Result<FinalMetadata> {
     println!("Generating metadata for: {}", package_file.display());
 
     let temp_pkg = lua_parser::parse_lua_package(package_file.to_str().unwrap(), None)
         .map_err(|e| anyhow!(e.to_string()))?;
-    let default_version =
-        resolve::get_default_version(&temp_pkg).map_err(|e| anyhow!(e.to_string()))?;
+    let default_version = resolve::get_default_version(&temp_pkg, registry_handle.as_deref())
+        .map_err(|e| anyhow!(e.to_string()))?;
 
     let version = version_override
         .map(|s| s.to_string())
@@ -205,7 +206,12 @@ pub fn run(package_name: &str, output: Option<&str>, version: Option<&str>) -> R
     let resolved_source =
         resolve::resolve_source(package_name).map_err(|e| anyhow!(e.to_string()))?;
     let repo_name = resolved_source.repo_name.clone().unwrap_or_default();
-    let final_metadata = generate_metadata(&resolved_source.path, version, repo_name)?;
+    let final_metadata = generate_metadata(
+        &resolved_source.path,
+        version,
+        repo_name,
+        resolved_source.registry_handle.clone(),
+    )?;
 
     let json_output = serde_json::to_string_pretty(&final_metadata)?;
 

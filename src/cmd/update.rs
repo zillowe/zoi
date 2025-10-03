@@ -58,14 +58,14 @@ fn run_update_single_logic(
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("--- Updating package '{}' ---", package_name.blue().bold());
 
-    let (new_pkg, new_version, _, _) = match resolve::resolve_package_and_version(package_name) {
+    let (new_pkg, new_version, _, _, _) = match resolve::resolve_package_and_version(package_name) {
         Ok(result) => result,
         Err(e) => {
             return Err(format!("Could not resolve package '{}': {}", package_name, e).into());
         }
     };
 
-    if pin::is_pinned(&new_pkg.name)? {
+    if pin::is_pinned(package_name)? {
         println!(
             "Package '{}' is pinned. Skipping update.",
             package_name.yellow()
@@ -128,7 +128,7 @@ fn run_update_all_logic(yes: bool) -> Result<(), Box<dyn std::error::Error>> {
 
     let installed_packages = local::get_installed_packages()?;
     let pinned_packages = pin::get_pinned_packages()?;
-    let pinned_names: Vec<String> = pinned_packages.into_iter().map(|p| p.name).collect();
+    let pinned_sources: Vec<String> = pinned_packages.into_iter().map(|p| p.source).collect();
 
     let mut packages_to_upgrade = Vec::new();
     let mut upgrade_messages = Vec::new();
@@ -145,12 +145,13 @@ fn run_update_all_logic(yes: bool) -> Result<(), Box<dyn std::error::Error>> {
     pb.set_message("Checking packages...");
 
     for manifest in installed_packages {
-        if pinned_names.contains(&manifest.name) {
+        let source = format!("#{}@{}", manifest.registry_handle, manifest.repo);
+        if pinned_sources.contains(&source) {
             upgrade_messages.push(format!("- {} is pinned, skipping.", manifest.name.cyan()));
             continue;
         }
 
-        let resolved_source = match resolve::resolve_source(&manifest.name) {
+        let resolved_source = match resolve::resolve_source(&source) {
             Ok(source) => source,
             Err(_) => {
                 upgrade_messages.push(format!(
@@ -161,18 +162,26 @@ fn run_update_all_logic(yes: bool) -> Result<(), Box<dyn std::error::Error>> {
             }
         };
 
-        let content = std::fs::read_to_string(&resolved_source.path)?;
-        let new_pkg: crate::pkg::types::Package = serde_yaml::from_str(&content)?;
+        let (new_pkg, new_version, _, _, _) = match resolve::resolve_package_and_version(&source) {
+            Ok(result) => result,
+            Err(e) => {
+                upgrade_messages.push(format!(
+                    "- Could not resolve package '{}': {}, skipping.",
+                    manifest.name, e
+                ));
+                continue;
+            }
+        };
 
-        if manifest.version != new_pkg.version.as_deref().unwrap_or_default() {
+        if manifest.version != new_version {
             upgrade_messages.push(format!(
                 "- {} can be upgraded from {} to {}",
                 manifest.name.cyan(),
                 manifest.version.yellow(),
-                new_pkg.version.as_deref().unwrap_or("N/A").green()
+                new_version.green()
             ));
             packages_to_upgrade.push((
-                manifest.name.clone(),
+                source.clone(),
                 new_pkg.version.clone(),
                 resolved_source.path.clone(),
                 new_pkg.updater.clone(),
@@ -197,10 +206,10 @@ fn run_update_all_logic(yes: bool) -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    for (name, version, path, updater) in packages_to_upgrade {
+    for (source, version, path, updater) in packages_to_upgrade {
         println!(
             "\n--- Upgrading {} to {} ---",
-            name.cyan(),
+            source.cyan(),
             version.as_deref().unwrap_or("N/A").green()
         );
         let mode = if let Some(updater_method) = updater {
