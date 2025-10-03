@@ -5,7 +5,7 @@ use std::fs;
 pub fn add(ext_name: &str, _yes: bool) -> Result<(), Box<dyn Error>> {
     println!("Adding extension: {}", ext_name);
 
-    let (pkg, _, _, _) = resolve::resolve_package_and_version(ext_name)?;
+    let (pkg, _, _, _, registry_handle) = resolve::resolve_package_and_version(ext_name)?;
 
     if pkg.package_type != types::PackageType::Extension {
         return Err(format!("'{}' is not an extension package.", ext_name).into());
@@ -57,11 +57,16 @@ pub fn add(ext_name: &str, _yes: bool) -> Result<(), Box<dyn Error>> {
         name: pkg.name.clone(),
         version: pkg.version.clone().unwrap_or_default(),
         repo: pkg.repo.clone(),
+        registry_handle: registry_handle.unwrap_or_default(),
+        package_type: pkg.package_type,
         installed_at: chrono::Utc::now().to_rfc3339(),
         reason: types::InstallReason::Direct,
         scope: pkg.scope,
         bins: None,
+        conflicts: None,
         installed_dependencies: vec![],
+        chosen_options: vec![],
+        chosen_optionals: vec![],
         install_method: None,
         installed_files: vec![],
     };
@@ -75,16 +80,16 @@ pub fn add(ext_name: &str, _yes: bool) -> Result<(), Box<dyn Error>> {
 pub fn remove(ext_name: &str, _yes: bool) -> Result<(), Box<dyn Error>> {
     println!("Removing extension: {}", ext_name);
 
-    let (_manifest, scope) =
+    let (manifest, scope) =
         if let Some(m) = local::is_package_installed(ext_name, types::Scope::User)? {
             (m, types::Scope::User)
         } else if let Some(m) = local::is_package_installed(ext_name, types::Scope::System)? {
             (m, types::Scope::System)
         } else {
-            return Err(format!("Extension '\'{}\' is not installed.", ext_name).into());
+            return Err(format!("Extension '{}' is not installed.", ext_name).into());
         };
 
-    let (pkg, _, _, _) = resolve::resolve_package_and_version(ext_name)?;
+    let (pkg, _, _, _, _) = resolve::resolve_package_and_version(ext_name)?;
 
     if pkg.package_type != types::PackageType::Extension {
         return Err(format!("'{}' is not an extension package.", ext_name).into());
@@ -112,10 +117,7 @@ pub fn remove(ext_name: &str, _yes: bool) -> Result<(), Box<dyn Error>> {
                     if !repo_name.is_empty() {
                         println!("Removing git repository: {}", repo_name);
                         if let Err(e) = config::remove_git_repo(repo_name) {
-                            eprintln!(
-                                "Warning: failed to remove git repo '\'{}\'': {}",
-                                repo_name, e
-                            );
+                            eprintln!("Warning: failed to remove git repo '{}': {}", repo_name, e);
                         }
                     }
                 }
@@ -129,7 +131,7 @@ pub fn remove(ext_name: &str, _yes: bool) -> Result<(), Box<dyn Error>> {
                 types::ExtensionChange::RepoAdd { add } => {
                     println!("Removing repository: {}", add);
                     if let Err(e) = config::remove_repo(add) {
-                        eprintln!("Warning: failed to remove repo '\'{}\'': {}", add, e);
+                        eprintln!("Warning: failed to remove repo '{}': {}", add, e);
                     }
                 }
                 types::ExtensionChange::Project { add: _ } => {
@@ -148,9 +150,18 @@ pub fn remove(ext_name: &str, _yes: bool) -> Result<(), Box<dyn Error>> {
         .into());
     }
 
-    local::remove_manifest(&pkg.name, scope)?;
+    let package_dir = local::get_package_dir(
+        scope,
+        &manifest.registry_handle,
+        &manifest.repo,
+        &manifest.name,
+    )?;
 
-    println!("Successfully removed extension '\'{}\''.", ext_name);
+    if package_dir.exists() {
+        fs::remove_dir_all(&package_dir)?;
+    }
+
+    println!("Successfully removed extension '{}'.", ext_name);
 
     Ok(())
 }

@@ -388,7 +388,7 @@ fn ensure_binary_is_cached(pkg: &types::Package) -> Result<PathBuf, Box<dyn Erro
 
 fn find_executable(pkg: &types::Package) -> Result<PathBuf, Box<dyn Error>> {
     if let Ok(Some(_)) = local::is_package_installed(&pkg.name, types::Scope::User) {
-        let store_root = local::get_store_root(types::Scope::User)?;
+        let store_root = local::get_store_base_dir(types::Scope::User)?;
         let binary_filename = if cfg!(target_os = "windows") {
             format!("{}.exe", pkg.name)
         } else {
@@ -405,7 +405,7 @@ fn find_executable(pkg: &types::Package) -> Result<PathBuf, Box<dyn Error>> {
     }
 
     if let Ok(Some(_)) = local::is_package_installed(&pkg.name, types::Scope::System) {
-        let store_root = local::get_store_root(types::Scope::System)?;
+        let store_root = local::get_store_base_dir(types::Scope::System)?;
         let binary_filename = if cfg!(target_os = "windows") {
             format!("{}.exe", pkg.name)
         } else {
