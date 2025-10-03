@@ -17,6 +17,7 @@ pub fn handle_installer_install(
     method: &types::InstallationMethod,
     pkg: &types::Package,
     installed_files: &mut Vec<String>,
+    version_dir: &std::path::Path,
 ) -> Result<(), Box<dyn Error>> {
     let os = std::env::consts::OS;
 
@@ -140,11 +141,8 @@ pub fn handle_installer_install(
             .arg(&mount_path)
             .status()?;
     } else if installer_type == "msi" {
-        let store_dir = home::home_dir()
-            .ok_or("No home dir")?
-            .join(".zoi/pkgs/store")
-            .join(&pkg.name);
-        fs::create_dir_all(&store_dir)?;
+        let store_dir = version_dir;
+        fs::create_dir_all(store_dir)?;
         let msi_path = store_dir.join(file_name);
         fs::copy(&temp_file_path, &msi_path)?;
         installed_files.push(msi_path.to_str().unwrap().to_string());
@@ -158,11 +156,7 @@ pub fn handle_installer_install(
             return Err("Failed to run MSI installer.".into());
         }
     } else if installer_type == "appimage" {
-        let store_dir = home::home_dir()
-            .ok_or("No home dir")?
-            .join(".zoi/pkgs/store")
-            .join(&pkg.name)
-            .join("bin");
+        let store_dir = version_dir.join("bin");
         fs::create_dir_all(&store_dir)?;
 
         let bin_path = store_dir.join(&pkg.name);

@@ -17,6 +17,7 @@ use tempfile::Builder;
 pub fn handle_script_install(
     method: &types::InstallationMethod,
     pkg: &types::Package,
+    version_dir: &std::path::Path,
 ) -> Result<(), Box<dyn Error>> {
     println!("Using 'script' installation method...");
 
@@ -62,11 +63,12 @@ pub fn handle_script_install(
         cmd.arg("-ExecutionPolicy")
             .arg("Bypass")
             .arg("-File")
-            .arg(&script_path);
+            .arg(&script_path)
+            .arg(version_dir);
         cmd
     } else {
         let mut cmd = Command::new("bash");
-        cmd.arg(&script_path);
+        cmd.arg(&script_path).arg(version_dir);
         cmd
     };
 

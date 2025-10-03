@@ -1,6 +1,7 @@
 use super::structs::FinalMetadata;
 use crate::pkg::{local, types};
 use crate::utils;
+use chrono::Utc;
 use colored::*;
 use std::error::Error;
 use std::fs::{self, File};
@@ -45,6 +46,9 @@ pub fn run(
     archive.unpack(temp_dir.path())?;
 
     let metadata_path = temp_dir.path().join("metadata.json");
+    if !metadata_path.exists() {
+        return Err("metadata.json not found in package archive.".into());
+    }
     let metadata_content = fs::read_to_string(metadata_path)?;
     let metadata: FinalMetadata = serde_json::from_str(&metadata_content)?;
 
@@ -54,12 +58,25 @@ pub fn run(
         metadata.version.yellow()
     );
 
-    let store_dir = local::get_store_root(scope)?.join(&metadata.name);
-    if store_dir.exists() {
-        println!("Removing existing installation...");
-        fs::remove_dir_all(&store_dir)?;
+    let registry_handle = "local";
+    let version_dir = local::get_package_version_dir(
+        scope,
+        registry_handle,
+        &metadata.repo,
+        &metadata.name,
+        &metadata.version,
+    )?;
+
+    if version_dir.exists() {
+        println!(
+            "Removing existing installation at version {}...",
+            metadata.version
+        );
+        fs::remove_dir_all(&version_dir)?;
     }
-    fs::create_dir_all(&store_dir)?;
+    fs::create_dir_all(&version_dir)?;
+
+    let mut installed_files: Vec<String> = Vec::new();
 
     let data_dir = temp_dir.path().join("data");
     if data_dir.exists() {
@@ -69,24 +86,29 @@ pub fn run(
             .filter_map(|e| e.ok())
             .skip(1)
         {
-            let dest_path = store_dir.join(entry.path().strip_prefix(&data_dir)?);
+            let dest_path = version_dir.join(entry.path().strip_prefix(&data_dir)?);
             if entry.file_type().is_dir() {
                 fs::create_dir_all(&dest_path)?;
             } else {
                 fs::copy(entry.path(), &dest_path)?;
+                installed_files.push(dest_path.to_string_lossy().to_string());
             }
         }
     }
 
     let man_md_path = temp_dir.path().join("man.md");
     if man_md_path.exists() {
-        fs::copy(man_md_path, store_dir.join("man.md"))?;
+        let dest = version_dir.join("man.md");
+        fs::copy(man_md_path, &dest)?;
+        installed_files.push(dest.to_string_lossy().to_string());
         println!("Installed manual (man.md).");
     }
 
     let man_txt_path = temp_dir.path().join("man.txt");
     if man_txt_path.exists() {
-        fs::copy(man_txt_path, store_dir.join("man.txt"))?;
+        let dest = version_dir.join("man.txt");
+        fs::copy(man_txt_path, &dest)?;
+        installed_files.push(dest.to_string_lossy().to_string());
         println!("Installed manual (man.txt).");
     }
 
@@ -96,7 +118,10 @@ pub fn run(
 
         for bin_name in bins {
             let mut found_bin = false;
-            for entry in WalkDir::new(&store_dir).into_iter().filter_map(|e| e.ok()) {
+            for entry in WalkDir::new(&version_dir)
+                .into_iter()
+                .filter_map(|e| e.ok())
+            {
                 if entry.file_type().is_file() && entry.file_name().to_string_lossy() == *bin_name {
                     let target_path = entry.path();
                     let link_path = bin_root.join(bin_name);
@@ -104,13 +129,16 @@ pub fn run(
                     #[cfg(unix)]
                     {
                         use std::os::unix::fs as unix_fs;
-                        if link_path.exists() {
+                        if link_path.exists() || link_path.is_symlink() {
                             fs::remove_file(&link_path)?;
                         }
                         unix_fs::symlink(target_path, &link_path)?;
                     }
                     #[cfg(windows)]
                     {
+                        if link_path.exists() {
+                            fs::remove_file(&link_path)?;
+                        }
                         fs::copy(target_path, &link_path)?;
                     }
 
@@ -200,10 +228,12 @@ pub fn run(
                                 fs::create_dir_all(&target_path)?;
                             } else {
                                 fs::copy(entry.path(), &target_path)?;
+                                installed_files.push(target_path.to_string_lossy().to_string());
                             }
                         }
                     } else {
                         fs::copy(&source_in_archive, &dest_path)?;
+                        installed_files.push(dest_path.to_string_lossy().to_string());
                     }
                     println!(
                         "Copied {} to {}",
@@ -215,6 +245,26 @@ pub fn run(
         }
     }
 
-    println!("{}", "Installation complete.".green());
+    let manifest = types::InstallManifest {
+        name: metadata.name.clone(),
+        version: metadata.version.clone(),
+        repo: metadata.repo.clone(),
+        registry_handle: registry_handle.to_string(),
+        package_type: types::PackageType::Package,
+        installed_at: Utc::now().to_rfc3339(),
+        reason: types::InstallReason::Direct,
+        scope,
+        bins: metadata.bins.clone(),
+        conflicts: None,
+        installed_dependencies: vec![],
+        chosen_options: vec![],
+        chosen_optionals: vec![],
+        install_method: Some("prebuilt-archive".to_string()),
+        installed_files,
+    };
+
+    local::write_manifest(&manifest)?;
+
+    println!("{} Installation complete.", "Success:".green());
     Ok(())
 }

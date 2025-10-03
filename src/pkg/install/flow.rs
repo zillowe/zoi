@@ -1,7 +1,6 @@
 use super::{manifest, methods, post_install, prebuilt, util, verification};
 use crate::pkg::{
-    config, config_handler, dependencies, library, local, recorder, resolve, rollback, service,
-    types,
+    config, config_handler, dependencies, library, local, recorder, resolve, service, types,
 };
 use crate::utils;
 use anyhow::Result;
@@ -31,8 +30,13 @@ pub fn run_installation(
     processed_deps: &mut HashSet<String>,
     scope_override: Option<types::Scope>,
 ) -> Result<(), Box<dyn Error>> {
-    let (mut pkg, version, sharable_manifest, pkg_lua_path) =
+    let (mut pkg, version, sharable_manifest, pkg_lua_path, registry_handle) =
         resolve::resolve_package_and_version(source)?;
+
+    let handle = registry_handle.as_deref().unwrap_or("local");
+    let version_dir =
+        local::get_package_version_dir(pkg.scope, handle, &pkg.repo, &pkg.name, &version)?;
+    std::fs::create_dir_all(&version_dir)?;
 
     if let Some(scope) = scope_override {
         pkg.scope = scope;
@@ -44,16 +48,6 @@ pub fn run_installation(
     if !util::display_updates(&pkg, yes)? {
         println!("Operation aborted.");
         return Ok(());
-    }
-
-    if let Some(manifest) = local::is_package_installed(&pkg.name, pkg.scope)?
-        && manifest.version != version
-    {
-        let config = config::read_config()?;
-        let rollback_enabled = pkg.rollback.unwrap_or(config.rollback_enabled);
-        if rollback_enabled {
-            rollback::backup_package(&pkg.name, pkg.scope)?;
-        }
     }
 
     util::check_for_conflicts(&pkg, yes)?;
@@ -178,7 +172,16 @@ pub fn run_installation(
         } else {
             println!("Collection has no dependencies to install.");
         }
-        manifest::write_manifest(&pkg, reason, installed_deps_list, None, Vec::new())?;
+        manifest::write_manifest(
+            &pkg,
+            reason,
+            installed_deps_list,
+            None,
+            Vec::new(),
+            handle,
+            &chosen_options,
+            &chosen_optionals,
+        )?;
         if let Err(e) = recorder::record_package(&pkg, &chosen_options, &chosen_optionals) {
             eprintln!("Warning: failed to record package installation: {}", e);
         }
@@ -260,7 +263,16 @@ pub fn run_installation(
                 )?;
             }
         }
-        manifest::write_manifest(&pkg, reason, installed_deps_list, None, Vec::new())?;
+        manifest::write_manifest(
+            &pkg,
+            reason,
+            installed_deps_list,
+            None,
+            Vec::new(),
+            handle,
+            &chosen_options,
+            &chosen_optionals,
+        )?;
         if let Err(e) = recorder::record_package(&pkg, &chosen_options, &chosen_optionals) {
             eprintln!("Warning: failed to record package installation: {}", e);
         }
@@ -347,7 +359,16 @@ pub fn run_installation(
                 )?;
             }
         }
-        manifest::write_manifest(&pkg, reason, installed_deps_list, None, Vec::new())?;
+        manifest::write_manifest(
+            &pkg,
+            reason,
+            installed_deps_list,
+            None,
+            Vec::new(),
+            handle,
+            &chosen_options,
+            &chosen_optionals,
+        )?;
         if let Err(e) = recorder::record_package(&pkg, &chosen_options, &chosen_optionals) {
             eprintln!("Warning: failed to record package installation: {}", e);
         }
@@ -362,7 +383,7 @@ pub fn run_installation(
     }
 
     if let Some(mut manifest) = local::is_package_installed(&pkg.name, pkg.scope)?
-        && manifest.reason == types::InstallReason::Dependency
+        && matches!(manifest.reason, types::InstallReason::Dependency { .. })
         && reason == types::InstallReason::Direct
     {
         println!("Updating package '{}' to be directly managed.", pkg.name);
@@ -486,7 +507,7 @@ pub fn run_installation(
     let result = match mode {
         InstallMode::ForceSource => {
             install_method_name = Some("source".to_string());
-            run_source_flow(&pkg, &platform)
+            run_source_flow(&pkg, &platform, &version_dir)
         }
         InstallMode::PreferBinary => run_default_flow(
             &pkg,
@@ -496,20 +517,32 @@ pub fn run_installation(
             &mut install_manual,
             &mut install_method_name,
             &mut installed_files,
+            &version_dir,
         ),
         InstallMode::Interactive => run_interactive_flow(
             &pkg,
             &platform,
             &mut install_method_name,
             &mut installed_files,
+            &version_dir,
         ),
         InstallMode::Updater(ref method_name) => {
             install_method_name = Some(method_name.clone());
-            run_updater_flow(&pkg, &platform, method_name, &mut installed_files)
+            run_updater_flow(
+                &pkg,
+                &platform,
+                method_name,
+                &mut installed_files,
+                &version_dir,
+            )
         }
     };
 
     if result.is_ok() {
+        if let types::InstallReason::Dependency { ref parent } = reason {
+            let package_dir = version_dir.parent().ok_or("Invalid version dir")?;
+            local::add_dependent(package_dir, parent)?;
+        }
         if install_manual && let Err(e) = post_install::install_manual_if_available(&pkg) {
             eprintln!("Warning: failed to install manual: {}", e);
         }
@@ -524,6 +557,9 @@ pub fn run_installation(
             installed_deps_list,
             install_method_name,
             installed_files,
+            handle,
+            &chosen_options,
+            &chosen_optionals,
         )?;
         if let Err(e) = recorder::record_package(&pkg, &chosen_options, &chosen_optionals) {
             eprintln!("Warning: failed to record package installation: {}", e);
@@ -591,17 +627,23 @@ fn run_updater_flow(
     platform: &str,
     method_name: &str,
     installed_files: &mut Vec<String>,
+    version_dir: &std::path::Path,
 ) -> Result<(), Box<dyn Error>> {
     if let Some(method) = util::find_method(pkg, method_name, platform) {
         println!("Using '{}' method specified by updater.", method_name);
         return match method_name {
-            "binary" => methods::binary::handle_binary_install(method, pkg),
-            "installer" => {
-                methods::installer::handle_installer_install(method, pkg, installed_files)
+            "binary" => methods::binary::handle_binary_install(method, pkg, version_dir),
+            "installer" => methods::installer::handle_installer_install(
+                method,
+                pkg,
+                installed_files,
+                version_dir,
+            ),
+            "com_binary" => {
+                methods::com_binary::handle_com_binary_install(method, pkg, version_dir)
             }
-            "com_binary" => methods::com_binary::handle_com_binary_install(method, pkg),
-            "script" => methods::script::handle_script_install(method, pkg),
-            "source" => methods::source::handle_source_install(method, pkg),
+            "script" => methods::script::handle_script_install(method, pkg, version_dir),
+            "source" => methods::source::handle_source_install(method, pkg, version_dir),
             _ => Err(format!(
                 "Invalid installation method '{}' specified in updater.",
                 method_name
@@ -621,6 +663,7 @@ fn run_interactive_flow(
     platform: &str,
     install_method_name: &mut Option<String>,
     installed_files: &mut Vec<String>,
+    version_dir: &std::path::Path,
 ) -> Result<(), Box<dyn Error>> {
     let mut available_methods = Vec::new();
     for method in &pkg.installation {
@@ -654,13 +697,18 @@ fn run_interactive_flow(
 
     *install_method_name = Some(selected_method.install_type.clone());
     match selected_method.install_type.as_str() {
-        "binary" => methods::binary::handle_binary_install(selected_method, pkg),
-        "installer" => {
-            methods::installer::handle_installer_install(selected_method, pkg, installed_files)
+        "binary" => methods::binary::handle_binary_install(selected_method, pkg, version_dir),
+        "installer" => methods::installer::handle_installer_install(
+            selected_method,
+            pkg,
+            installed_files,
+            version_dir,
+        ),
+        "com_binary" => {
+            methods::com_binary::handle_com_binary_install(selected_method, pkg, version_dir)
         }
-        "com_binary" => methods::com_binary::handle_com_binary_install(selected_method, pkg),
-        "script" => methods::script::handle_script_install(selected_method, pkg),
-        "source" => methods::source::handle_source_install(selected_method, pkg),
+        "script" => methods::script::handle_script_install(selected_method, pkg, version_dir),
+        "source" => methods::source::handle_source_install(selected_method, pkg, version_dir),
         _ => Err("Invalid installation method selected.".into()),
     }
 }
@@ -673,6 +721,7 @@ fn run_default_flow(
     install_manual: &mut bool,
     install_method_name: &mut Option<String>,
     installed_files: &mut Vec<String>,
+    version_dir: &std::path::Path,
 ) -> Result<(), Box<dyn Error>> {
     let db_path = resolve::get_db_root()?;
     if let Ok(repo_config) = config::read_repo_config(&db_path) {
@@ -785,20 +834,25 @@ fn run_default_flow(
     if let Some(method) = util::find_method(pkg, "installer", platform) {
         println!("Found 'installer' method. Installing...");
         *install_method_name = Some("installer".to_string());
-        return methods::installer::handle_installer_install(method, pkg, installed_files);
+        return methods::installer::handle_installer_install(
+            method,
+            pkg,
+            installed_files,
+            version_dir,
+        );
     }
 
     if let Some(method) = util::find_method(pkg, "binary", platform) {
         println!("Found 'binary' method. Installing...");
         *install_method_name = Some("binary".to_string());
-        return methods::binary::handle_binary_install(method, pkg);
+        return methods::binary::handle_binary_install(method, pkg, version_dir);
     }
 
     println!("No binary found, checking for compressed binary...");
     if let Some(method) = util::find_method(pkg, "com_binary", platform) {
         println!("Found 'com_binary' method. Installing...");
         *install_method_name = Some("com_binary".to_string());
-        return methods::com_binary::handle_com_binary_install(method, pkg);
+        return methods::com_binary::handle_com_binary_install(method, pkg, version_dir);
     }
 
     println!("No compressed binary found, checking for script...");
@@ -806,7 +860,7 @@ fn run_default_flow(
         && utils::ask_for_confirmation("Found a 'script' method. Do you want to execute it?", yes)
     {
         *install_method_name = Some("script".to_string());
-        return methods::script::handle_script_install(method, pkg);
+        return methods::script::handle_script_install(method, pkg, version_dir);
     }
 
     println!("No script found, checking for source...");
@@ -817,15 +871,19 @@ fn run_default_flow(
         )
     {
         *install_method_name = Some("source".to_string());
-        return methods::source::handle_source_install(method, pkg);
+        return methods::source::handle_source_install(method, pkg, version_dir);
     }
 
     Err("No compatible and accepted installation method found for your platform.".into())
 }
 
-fn run_source_flow(pkg: &types::Package, platform: &str) -> Result<(), Box<dyn Error>> {
+fn run_source_flow(
+    pkg: &types::Package,
+    platform: &str,
+    version_dir: &std::path::Path,
+) -> Result<(), Box<dyn Error>> {
     if let Some(method) = util::find_method(pkg, "source", platform) {
-        return methods::source::handle_source_install(method, pkg);
+        return methods::source::handle_source_install(method, pkg, version_dir);
     }
     Err("No compatible 'source' installation method found.".into())
 }

@@ -22,6 +22,7 @@ use zstd::stream::read::Decoder as ZstdDecoder;
 pub fn handle_com_binary_install(
     method: &types::InstallationMethod,
     pkg: &types::Package,
+    version_dir: &std::path::Path,
 ) -> Result<(), Box<dyn Error>> {
     let platform = utils::get_platform()?;
     let target_os = platform.split('-').next().unwrap_or("");
@@ -63,11 +64,7 @@ pub fn handle_com_binary_install(
         return Err(format!("Unsupported compression format: {}", com_ext).into());
     }
 
-    let store_dir = home::home_dir()
-        .ok_or("No home dir")?
-        .join(".zoi/pkgs/store")
-        .join(&pkg.name)
-        .join("bin");
+    let store_dir = version_dir.join("bin");
     fs::create_dir_all(&store_dir)?;
     let mut dest_filename = pkg.name.clone();
     if let Some(bp) = &method.binary_path

@@ -10,14 +10,11 @@ use std::path::PathBuf;
 pub fn handle_source_install(
     method: &types::InstallationMethod,
     pkg: &types::Package,
+    version_dir: &std::path::Path,
 ) -> Result<(), Box<dyn Error>> {
     println!("{}", "Building from source...".bold());
-    let store_path = home::home_dir()
-        .ok_or("No home dir")?
-        .join(".zoi/pkgs/store")
-        .join(&pkg.name);
-    let git_path = store_path.join("git");
-    let bin_path = store_path.join("bin");
+    let git_path = version_dir.join("git");
+    let bin_path = version_dir.join("bin");
     fs::create_dir_all(&bin_path)?;
 
     let repo_url = &method.url;
@@ -77,7 +74,7 @@ pub fn handle_source_install(
 
     if let Some(commands) = &method.build_commands {
         for cmd_str in commands {
-            let final_cmd = cmd_str.replace("{prefix}", store_path.to_str().unwrap());
+            let final_cmd = cmd_str.replace("{prefix}", version_dir.to_str().unwrap());
             println!("Executing: {}", final_cmd.cyan());
 
             let pb_cmd = ProgressBar::new_spinner();

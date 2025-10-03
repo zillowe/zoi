@@ -15,6 +15,7 @@ use std::process::Command;
 pub fn handle_binary_install(
     method: &types::InstallationMethod,
     pkg: &types::Package,
+    version_dir: &std::path::Path,
 ) -> Result<(), Box<dyn Error>> {
     let url = &method.url;
 
@@ -48,11 +49,7 @@ pub fn handle_binary_install(
         return Ok(());
     }
 
-    let store_dir = home::home_dir()
-        .ok_or("No home dir")?
-        .join(".zoi/pkgs/store")
-        .join(&pkg.name)
-        .join("bin");
+    let store_dir = version_dir.join("bin");
     fs::create_dir_all(&store_dir)?;
 
     let binary_filename = if cfg!(target_os = "windows") {
