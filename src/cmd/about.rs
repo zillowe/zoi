@@ -19,7 +19,7 @@ pub fn run(branch: &str, status: &str, number: &str, commit: &str) {
     println!("  {:<12}{}", "Homepage:".cyan(), HOMEPAGE);
     println!("  {:<12}{}", "Docs:".cyan(), DOCS);
     println!("  {:<12}{}", "Email:".cyan(), EMAIL);
-    println!("  {:<12}{}", "Git Repo:".cyan(), GITREPO);
+    println!("  {:<12}{}", "GitLab:".cyan(), GITREPO);
     println!("  {:<12}{}", "License:".cyan(), LICENSE);
     println!();
 }
