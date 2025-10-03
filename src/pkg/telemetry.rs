@@ -112,7 +112,7 @@ pub fn posthog_capture_event(
         package_type: package_type_str,
     };
 
-    let ph_host = option_env!("POSTHOG_HOST").unwrap_or("https://eu.i.posthog.com");
+    let ph_host = option_env!("POSTHOG_API_HOST").unwrap_or("https://eu.i.posthog.com");
     let ph_key = option_env!("POSTHOG_API_KEY").unwrap_or_default();
     if ph_key.is_empty() {
         return Err("Telemetry enabled but POSTHOG_API_KEY is not set".into());

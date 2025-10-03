@@ -21,5 +21,23 @@ pub fn run(branch: &str, status: &str, number: &str, commit: &str) {
     println!("  {:<12}{}", "Email:".cyan(), EMAIL);
     println!("  {:<12}{}", "GitLab:".cyan(), GITREPO);
     println!("  {:<12}{}", "License:".cyan(), LICENSE);
+
+    let posthog_host = option_env!("POSTHOG_API_HOST");
+    let zoi_registry = option_env!("ZOI_DEFAULT_REGISTRY");
+
+    if posthog_host.is_some() || zoi_registry.is_some() {
+        println!();
+    }
+
+    if let Some(host) = posthog_host
+        && !host.is_empty()
+    {
+        println!("  {:<12}{}", "PostHog URL:".cyan(), host);
+    }
+
+    if let Some(registry) = zoi_registry {
+        println!("  {:<12}{}", "Registry:".cyan(), registry);
+    }
+
     println!();
 }
