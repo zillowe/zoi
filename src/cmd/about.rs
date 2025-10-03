@@ -32,7 +32,7 @@ pub fn run(branch: &str, status: &str, number: &str, commit: &str) {
     if let Some(host) = posthog_host
         && !host.is_empty()
     {
-        println!("  {:<12}{}", "PostHog URL:".cyan(), host);
+        println!("  {:<12}{}", "PostHog:".cyan(), host);
     }
 
     if let Some(registry) = zoi_registry {
