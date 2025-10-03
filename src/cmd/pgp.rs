@@ -22,6 +22,8 @@ pub enum PgpCommands {
     List,
     /// Search for a PGP key by user ID or fingerprint
     Search(SearchKey),
+    /// Show the public key of a stored PGP key
+    Show(ShowKey),
 }
 
 #[derive(Parser, Debug)]
@@ -70,6 +72,13 @@ pub struct SearchKey {
     pub term: String,
 }
 
+#[derive(Parser, Debug)]
+pub struct ShowKey {
+    /// The name of the key to show
+    #[arg(required = true)]
+    pub name: String,
+}
+
 pub fn run(args: PgpCommand) -> Result<(), Box<dyn Error>> {
     match args.command {
         PgpCommands::Add(add_args) => {
@@ -106,6 +115,9 @@ pub fn run(args: PgpCommand) -> Result<(), Box<dyn Error>> {
         }
         PgpCommands::Search(search_args) => {
             pkg::pgp::search_keys(&search_args.term)?;
+        }
+        PgpCommands::Show(show_args) => {
+            pkg::pgp::show_key(&show_args.name)?;
         }
     }
     Ok(())

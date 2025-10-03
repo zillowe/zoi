@@ -260,6 +260,20 @@ pub fn search_keys(term: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+pub fn show_key(name: &str) -> Result<(), Box<dyn Error>> {
+    let pgp_dir = get_pgp_dir()?;
+    let key_path = pgp_dir.join(format!("{}.asc", name));
+
+    if !key_path.exists() {
+        return Err(format!("Key with name '{}' not found.", name).into());
+    }
+
+    let key_contents = fs::read_to_string(&key_path)?;
+    println!("{}", key_contents);
+
+    Ok(())
+}
+
 pub struct KeyInfo {
     pub name: String,
     pub cert: Cert,
