@@ -5,74 +5,23 @@ use dialoguer::{Input, Select, theme::ColorfulTheme};
 use indicatif::{ProgressBar, ProgressStyle};
 use regex::Regex;
 use semver::{Version, VersionReq};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::error::Error;
 use std::fs;
 use std::io::Read;
-use std::path::PathBuf;
 use std::process::Command;
 use tempfile::Builder;
 
 #[derive(Debug)]
-struct Dependency<'a> {
-    manager: &'a str,
-    package: &'a str,
-    req: Option<VersionReq>,
-    version_str: Option<String>,
-    description: Option<&'a str>,
+pub struct Dependency<'a> {
+    pub manager: &'a str,
+    pub package: &'a str,
+    pub req: Option<VersionReq>,
+    pub version_str: Option<String>,
+    pub description: Option<&'a str>,
 }
 
-fn get_dependency_graph_path() -> Result<PathBuf, Box<dyn Error>> {
-    let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
-    let path = home_dir.join(".zoi").join("pkgs").join("dependencies.json");
-    fs::create_dir_all(path.parent().unwrap())?;
-    Ok(path)
-}
-
-fn read_dependency_graph() -> Result<HashMap<String, Vec<String>>, Box<dyn Error>> {
-    let path = get_dependency_graph_path()?;
-    if !path.exists() {
-        return Ok(HashMap::new());
-    }
-    let content = fs::read_to_string(path)?;
-    if content.trim().is_empty() {
-        return Ok(HashMap::new());
-    }
-    let graph: HashMap<String, Vec<String>> = serde_json::from_str(&content)?;
-    Ok(graph)
-}
-
-fn write_dependency_graph(graph: &HashMap<String, Vec<String>>) -> Result<(), Box<dyn Error>> {
-    let path = get_dependency_graph_path()?;
-    let content = serde_json::to_string_pretty(graph)?;
-    fs::write(path, content)?;
-    Ok(())
-}
-
-fn add_dependency_link(dependent: &str, dependency: &str) -> Result<(), Box<dyn Error>> {
-    let mut graph = read_dependency_graph()?;
-    let dependents = graph.entry(dependency.to_string()).or_default();
-    if !dependents.contains(&dependent.to_string()) {
-        dependents.push(dependent.to_string());
-    }
-    write_dependency_graph(&graph)
-}
-
-pub fn remove_dependency_link(dependent: &str, dependency: &str) -> Result<(), Box<dyn Error>> {
-    let mut graph = read_dependency_graph()?;
-    if let Some(dependents) = graph.get_mut(dependency) {
-        dependents.retain(|d| d != dependent);
-    }
-    graph.retain(|_, dependents| !dependents.is_empty());
-    write_dependency_graph(&graph)
-}
-
-pub fn get_dependents(dependency: &str) -> Result<Vec<String>, Box<dyn Error>> {
-    let graph = read_dependency_graph()?;
-    Ok(graph.get(dependency).cloned().unwrap_or_default())
-}
-
-fn parse_dependency_string(dep_str: &str) -> Result<Dependency<'_>, Box<dyn Error>> {
+pub fn parse_dependency_string(dep_str: &str) -> Result<Dependency<'_>, Box<dyn Error>> {
     let (manager, rest) = dep_str.split_once(':').unwrap_or(("zoi", dep_str));
 
     let (package_and_version, description) = if manager != "go" {
@@ -163,7 +112,7 @@ fn get_native_command_version(command_name: &str) -> Result<Option<Version>, Box
 
 fn install_dependency(
     dep: &Dependency,
-    parent_pkg_name: &str,
+    parent_id: &str,
     scope: types::Scope,
     yes: bool,
     all_optional: bool,
@@ -220,7 +169,6 @@ fn install_dependency(
         return Ok(());
     }
 
-    add_dependency_link(parent_pkg_name, &dep_id)?;
     installed_deps.push(dep_id.clone());
 
     match manager {
@@ -240,6 +188,13 @@ fn install_dependency(
                                     "Already installed (version {} satisfies {}). Skipping.",
                                     installed_version, req
                                 );
+                                let package_dir = local::get_package_dir(
+                                    scope,
+                                    &manifest.registry_handle,
+                                    &manifest.repo,
+                                    &manifest.name,
+                                )?;
+                                local::add_dependent(&package_dir, parent_id)?;
                                 return Ok(());
                             } else {
                                 return Err(format!(
@@ -253,6 +208,13 @@ fn install_dependency(
                                 "Already installed (version {}). Skipping.",
                                 installed_version
                             );
+                            let package_dir = local::get_package_dir(
+                                scope,
+                                &manifest.registry_handle,
+                                &manifest.repo,
+                                &manifest.name,
+                            )?;
+                            local::add_dependent(&package_dir, parent_id)?;
                             return Ok(());
                         }
                     }
@@ -268,6 +230,13 @@ fn install_dependency(
                             println!("Proceeding with installation due to version check failure.");
                         } else {
                             println!("Assuming package is installed and skipping.");
+                            let package_dir = local::get_package_dir(
+                                scope,
+                                &manifest.registry_handle,
+                                &manifest.repo,
+                                &manifest.name,
+                            )?;
+                            local::add_dependent(&package_dir, parent_id)?;
                             return Ok(());
                         }
                     }
@@ -276,7 +245,14 @@ fn install_dependency(
 
             println!("Not installed. Proceeding with installation...");
 
-            install_zoi_dependency(&zoi_dep_name, yes, all_optional, processed_deps, scope)?;
+            install_zoi_dependency(
+                &zoi_dep_name,
+                parent_id,
+                yes,
+                all_optional,
+                processed_deps,
+                scope,
+            )?;
         }
         "native" => {
             if let Some(installed_version) = get_native_command_version(dep.package)? {
@@ -982,7 +958,7 @@ fn install_dependency(
 
 pub fn resolve_and_install_required(
     deps: &[String],
-    parent_pkg_name: &str,
+    parent_id: &str,
     _parent_version: &str,
     scope: types::Scope,
     yes: bool,
@@ -999,7 +975,7 @@ pub fn resolve_and_install_required(
         let dependency = parse_dependency_string(dep_str)?;
         install_dependency(
             &dependency,
-            parent_pkg_name,
+            parent_id,
             scope,
             yes,
             all_optional,
@@ -1013,7 +989,7 @@ pub fn resolve_and_install_required(
 
 pub fn resolve_and_install_required_options(
     option_groups: &[types::DependencyOptionGroup],
-    parent_pkg_name: &str,
+    parent_id: &str,
     _parent_version: &str,
     scope: types::Scope,
     yes: bool,
@@ -1061,7 +1037,7 @@ pub fn resolve_and_install_required_options(
                     chosen_options.push(format!("{}:{}", dep.manager, dep.package));
                     install_dependency(
                         dep,
-                        parent_pkg_name,
+                        parent_id,
                         scope,
                         yes,
                         all_optional,
@@ -1078,7 +1054,7 @@ pub fn resolve_and_install_required_options(
                     chosen_options.push(format!("{}:{}", dep.manager, dep.package));
                     install_dependency(
                         dep,
-                        parent_pkg_name,
+                        parent_id,
                         scope,
                         yes,
                         all_optional,
@@ -1122,7 +1098,7 @@ pub fn resolve_and_install_required_options(
                 chosen_options.push(format!("{}:{}", dep.manager, dep.package));
                 install_dependency(
                     dep,
-                    parent_pkg_name,
+                    parent_id,
                     scope,
                     yes,
                     all_optional,
@@ -1152,7 +1128,7 @@ pub fn resolve_and_install_required_options(
             chosen_options.push(format!("{}:{}", dep.manager, dep.package));
             install_dependency(
                 dep,
-                parent_pkg_name,
+                parent_id,
                 scope,
                 yes,
                 all_optional,
@@ -1166,7 +1142,7 @@ pub fn resolve_and_install_required_options(
 
 pub fn resolve_and_install_optional(
     deps: &[String],
-    parent_pkg_name: &str,
+    parent_id: &str,
     _parent_version: &str,
     scope: types::Scope,
     yes: bool,
@@ -1192,7 +1168,7 @@ pub fn resolve_and_install_optional(
             let dependency = parse_dependency_string(dep_str)?;
             install_dependency(
                 &dependency,
-                parent_pkg_name,
+                parent_id,
                 scope,
                 true,
                 all_optional,
@@ -1261,7 +1237,7 @@ pub fn resolve_and_install_optional(
         chosen_optionals.push(format!("{}:{}", dep.manager, dep.package));
         install_dependency(
             dep,
-            parent_pkg_name,
+            parent_id,
             scope,
             yes,
             all_optional,
@@ -1275,6 +1251,7 @@ pub fn resolve_and_install_optional(
 
 fn install_zoi_dependency(
     package_name: &str,
+    parent_id: &str,
     yes: bool,
     all_optional: bool,
     processed_deps: &mut HashSet<String>,
@@ -1286,7 +1263,9 @@ fn install_zoi_dependency(
         resolved_source.path.to_str().unwrap(),
         install::InstallMode::PreferBinary,
         false,
-        crate::pkg::types::InstallReason::Dependency,
+        crate::pkg::types::InstallReason::Dependency {
+            parent: parent_id.to_string(),
+        },
         yes,
         all_optional,
         processed_deps,

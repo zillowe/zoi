@@ -1,4 +1,4 @@
-use crate::pkg::{dependencies, local, types::InstallReason};
+use crate::pkg::{local, types::InstallReason};
 use crate::utils;
 use colored::*;
 use std::error::Error;
@@ -9,12 +9,17 @@ pub fn run(yes: bool) -> Result<(), Box<dyn Error>> {
     let mut packages_to_remove: Vec<String> = Vec::new();
 
     for package in &all_installed {
-        if package.reason != InstallReason::Dependency {
+        if !matches!(package.reason, InstallReason::Dependency { .. }) {
             continue;
         }
 
-        let pkg_id = format!("zoi:{}", package.name);
-        let dependents = dependencies::get_dependents(&pkg_id)?;
+        let package_dir = local::get_package_dir(
+            package.scope,
+            &package.registry_handle,
+            &package.repo,
+            &package.name,
+        )?;
+        let dependents = local::get_dependents(&package_dir)?;
 
         if dependents.is_empty() {
             packages_to_remove.push(package.name.clone());

@@ -25,6 +25,7 @@ pub struct ResolvedSource {
     pub path: PathBuf,
     pub source_type: SourceType,
     pub repo_name: Option<String>,
+    pub registry_handle: Option<String>,
     pub sharable_manifest: Option<types::SharableInstallManifest>,
 }
 
@@ -129,37 +130,53 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
     let db_root = get_db_root()?;
     let config = config::read_config()?;
 
-    let (registry_db_path, search_repos, is_default_registry) = if let Some(h) = &request.handle {
-        let is_default = config
-            .default_registry
-            .as_ref()
-            .is_some_and(|reg| reg.handle == *h);
+    let (registry_db_path, search_repos, is_default_registry, registry_handle) =
+        if let Some(h) = &request.handle {
+            let is_default = config
+                .default_registry
+                .as_ref()
+                .is_some_and(|reg| reg.handle == *h);
 
-        if is_default {
-            let default_registry = config.default_registry.as_ref().unwrap();
-            (db_root.join(&default_registry.handle), config.repos, true)
-        } else if let Some(registry) = config.added_registries.iter().find(|r| r.handle == *h) {
-            let repo_path = db_root.join(&registry.handle);
-            let all_sub_repos = if repo_path.exists() {
-                fs::read_dir(&repo_path)?
-                    .filter_map(Result::ok)
-                    .filter(|entry| entry.path().is_dir() && entry.file_name() != ".git")
-                    .map(|entry| entry.file_name().to_string_lossy().into_owned())
-                    .collect()
+            if is_default {
+                let default_registry = config.default_registry.as_ref().unwrap();
+                (
+                    db_root.join(&default_registry.handle),
+                    config.repos,
+                    true,
+                    Some(default_registry.handle.clone()),
+                )
+            } else if let Some(registry) = config.added_registries.iter().find(|r| r.handle == *h) {
+                let repo_path = db_root.join(&registry.handle);
+                let all_sub_repos = if repo_path.exists() {
+                    fs::read_dir(&repo_path)?
+                        .filter_map(Result::ok)
+                        .filter(|entry| entry.path().is_dir() && entry.file_name() != ".git")
+                        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+                        .collect()
+                } else {
+                    Vec::new()
+                };
+                (
+                    repo_path,
+                    all_sub_repos,
+                    false,
+                    Some(registry.handle.clone()),
+                )
             } else {
-                Vec::new()
-            };
-            (repo_path, all_sub_repos, false)
+                return Err(format!("Registry with handle '{}' not found.", h).into());
+            }
         } else {
-            return Err(format!("Registry with handle '{}' not found.", h).into());
-        }
-    } else {
-        let default_registry = config
-            .default_registry
-            .as_ref()
-            .ok_or("No default registry set.")?;
-        (db_root.join(&default_registry.handle), config.repos, true)
-    };
+            let default_registry = config
+                .default_registry
+                .as_ref()
+                .ok_or("No default registry set.")?;
+            (
+                db_root.join(&default_registry.handle),
+                config.repos,
+                true,
+                Some(default_registry.handle.clone()),
+            )
+        };
 
     let repos_to_search = if let Some(r) = &request.repo {
         vec![r.clone()]
@@ -309,6 +326,7 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
             path: chosen.path.clone(),
             source_type: chosen.source_type.clone(),
             repo_name: Some(chosen.repo_name.clone()),
+            registry_handle: registry_handle.clone(),
             sharable_manifest: None,
         })
     } else {
@@ -338,6 +356,7 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
             path: chosen.path.clone(),
             source_type: chosen.source_type.clone(),
             repo_name: Some(chosen.repo_name.clone()),
+            registry_handle: registry_handle.clone(),
             sharable_manifest: None,
         })
     }
@@ -409,6 +428,7 @@ fn download_from_url(url: &str) -> Result<ResolvedSource, Box<dyn Error>> {
         path: temp_path,
         source_type: SourceType::Url,
         repo_name: None,
+        registry_handle: Some("local".to_string()),
         sharable_manifest: None,
     })
 }
@@ -522,25 +542,32 @@ fn resolve_channel(
     }
 }
 
-pub fn get_default_version(pkg: &types::Package) -> Result<String, Box<dyn Error>> {
-    if let Some(pinned_version) = pin::get_pinned_version(&pkg.name)? {
-        println!(
-            "Using pinned version '{}' for {}.",
-            pinned_version.yellow(),
-            pkg.name.cyan()
-        );
-        return if pinned_version.starts_with('@') {
-            let channel = pinned_version.trim_start_matches('@');
-            let versions = pkg.versions.as_ref().ok_or_else(|| {
-                format!(
-                    "Package '{}' has no 'versions' map to resolve pinned channel '{}'.",
-                    pkg.name, pinned_version
-                )
-            })?;
-            resolve_channel(versions, channel)
-        } else {
-            Ok(pinned_version)
-        };
+pub fn get_default_version(
+    pkg: &types::Package,
+    registry_handle: Option<&str>,
+) -> Result<String, Box<dyn Error>> {
+    if let Some(handle) = registry_handle {
+        let source = format!("#{}@{}", handle, pkg.repo);
+
+        if let Some(pinned_version) = pin::get_pinned_version(&source)? {
+            println!(
+                "Using pinned version '{}' for {}.",
+                pinned_version.yellow(),
+                source.cyan()
+            );
+            return if pinned_version.starts_with('@') {
+                let channel = pinned_version.trim_start_matches('@');
+                let versions = pkg.versions.as_ref().ok_or_else(|| {
+                    format!(
+                        "Package '{}' has no 'versions' map to resolve pinned channel '{}'.",
+                        pkg.name, pinned_version
+                    )
+                })?;
+                resolve_channel(versions, channel)
+            } else {
+                Ok(pinned_version)
+            };
+        }
     }
 
     if let Some(versions) = &pkg.versions {
@@ -634,6 +661,7 @@ pub fn get_default_version(pkg: &types::Package) -> Result<String, Box<dyn Error
 fn get_version_for_install(
     pkg: &types::Package,
     version_spec: &Option<String>,
+    registry_handle: Option<&str>,
 ) -> Result<String, Box<dyn Error>> {
     if let Some(spec) = version_spec {
         if spec.starts_with('@') {
@@ -657,7 +685,7 @@ fn get_version_for_install(
         return Ok(spec.clone());
     }
 
-    get_default_version(pkg)
+    get_default_version(pkg, registry_handle)
 }
 
 pub fn resolve_source(source: &str) -> Result<ResolvedSource, Box<dyn Error>> {
@@ -684,11 +712,13 @@ pub fn resolve_package_and_version(
         String,
         Option<types::SharableInstallManifest>,
         PathBuf,
+        Option<String>,
     ),
     Box<dyn Error>,
 > {
     let request = parse_source_string(source_str)?;
     let resolved_source = resolve_source_recursive(source_str, 0)?;
+    let registry_handle = resolved_source.registry_handle.clone();
     let pkg_lua_path = resolved_source.path.clone();
 
     let pkg_template =
@@ -699,7 +729,11 @@ pub fn resolve_package_and_version(
         pkg_with_repo.repo = repo_name;
     }
 
-    let version_string = get_version_for_install(&pkg_with_repo, &request.version_spec)?;
+    let version_string = get_version_for_install(
+        &pkg_with_repo,
+        &request.version_spec,
+        registry_handle.as_deref(),
+    )?;
 
     let mut pkg = crate::pkg::lua_parser::parse_lua_package(
         resolved_source.path.to_str().unwrap(),
@@ -710,11 +744,14 @@ pub fn resolve_package_and_version(
     }
     pkg.version = Some(version_string.clone());
 
+    let registry_handle = resolved_source.registry_handle.clone();
+
     Ok((
         pkg,
         version_string,
         resolved_source.sharable_manifest,
         pkg_lua_path,
+        registry_handle,
     ))
 }
 
@@ -825,6 +862,7 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, B
             path: temp_path,
             source_type: SourceType::GitRepo(repo_name.clone()),
             repo_name: Some(repo_name),
+            registry_handle: None,
             sharable_manifest: None,
         });
     }
@@ -873,6 +911,7 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, B
             path,
             source_type: SourceType::GitRepo(repo_name.to_string()),
             repo_name: Some(format!("git/{}", repo_name)),
+            registry_handle: Some("local".to_string()),
             sharable_manifest: None,
         }
     } else if source.starts_with("http://") || source.starts_with("https://") {
@@ -887,6 +926,7 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, B
             path,
             source_type: SourceType::LocalFile,
             repo_name: None,
+            registry_handle: Some("local".to_string()),
             sharable_manifest: None,
         }
     } else {
