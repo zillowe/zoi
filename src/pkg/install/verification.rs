@@ -179,15 +179,31 @@ pub fn verify_signatures(
         if let Some(sig_info) = sig_info {
             println!("Verifying signature for {}...", file_to_verify);
 
-            let keys = [
-                pkg.maintainer.key.as_deref(),
-                pkg.author.as_ref().and_then(|a| a.key.as_deref()),
-            ]
-            .iter()
-            .filter_map(|&k| k)
-            .collect::<Vec<_>>();
+            struct KeyInfo<'a> {
+                key_source: &'a str,
+                key_name: Option<&'a str>,
+                one_time: bool,
+            }
 
-            if keys.is_empty() {
+            let mut keys_to_process: Vec<KeyInfo> = Vec::new();
+            if let Some(key) = pkg.maintainer.key.as_deref() {
+                keys_to_process.push(KeyInfo {
+                    key_source: key,
+                    key_name: pkg.maintainer.key_name.as_deref(),
+                    one_time: pkg.maintainer.one_time,
+                });
+            }
+            if let Some(author) = &pkg.author
+                && let Some(key) = author.key.as_deref()
+            {
+                keys_to_process.push(KeyInfo {
+                    key_source: key,
+                    key_name: author.key_name.as_deref(),
+                    one_time: author.one_time,
+                });
+            }
+
+            if keys_to_process.is_empty() {
                 println!(
                     "{} Signature found for '{}', but no maintainer or author key is defined. Skipping verification.",
                     "Warning:".yellow(),
@@ -199,36 +215,71 @@ pub fn verify_signatures(
             let rt = Runtime::new()?;
             rt.block_on(async {
                 let mut certs = Vec::new();
-                for key_source in &keys {
-                    let key_bytes_result = if key_source.starts_with("http") {
-                        println!("Importing key from URL: {}", key_source.cyan());
-                        reqwest::get(*key_source).await?.bytes().await
-                    } else if key_source.len() == 40 && key_source.chars().all(|c| c.is_ascii_hexdigit()) {
-                        let fingerprint = key_source.to_uppercase();
-                        let key_server_url = format!("https://keys.openpgp.org/vks/v1/by-fingerprint/{}", fingerprint);
-                        println!("Importing key for fingerprint {} from keyserver...", fingerprint.cyan());
+                for key_info in &keys_to_process {
+                    let key_bytes_result = if key_info.key_source.starts_with("http") {
+                        println!("Importing key from URL: {}", key_info.key_source.cyan());
+                        reqwest::get(key_info.key_source).await?.bytes().await
+                    } else if key_info.key_source.len() == 40
+                        && key_info.key_source.chars().all(|c| c.is_ascii_hexdigit())
+                    {
+                        let fingerprint = key_info.key_source.to_uppercase();
+                        let key_server_url = format!(
+                            "https://keys.openpgp.org/vks/v1/by-fingerprint/{}",
+                            fingerprint
+                        );
+                        println!(
+                            "Importing key for fingerprint {} from keyserver...",
+                            fingerprint.cyan()
+                        );
                         reqwest::get(&key_server_url).await?.bytes().await
                     } else {
-                        println!("{} Invalid key source: '{}'. Must be a URL or a 40-character GPG fingerprint.", "Warning:".yellow(), key_source);
+                        println!(
+                            "{} Invalid key source: '{}'. Must be a URL or a 40-character GPG fingerprint.",
+                            "Warning:".yellow(),
+                            key_info.key_source
+                        );
                         continue;
                     };
 
                     match key_bytes_result {
                         Ok(key_bytes) => {
                             if let Ok(cert) = Cert::from_bytes(&key_bytes) {
+                                if !key_info.one_time
+                                    && let Some(name) = key_info.key_name
+                                        && let Err(e) =
+                                            crate::pkg::pgp::add_key_from_bytes(&key_bytes, name)
+                                        {
+                                            println!(
+                                                "{} Failed to save key for {}: {}",
+                                                "Warning:".yellow(),
+                                                name,
+                                                e
+                                            );
+                                        }
                                 certs.push(cert);
                             } else {
-                                println!("{} Failed to parse certificate from source: {}", "Warning:".yellow(), key_source);
+                                println!(
+                                    "{} Failed to parse certificate from source: {}",
+                                    "Warning:".yellow(),
+                                    key_info.key_source
+                                );
                             }
-                        },
+                        }
                         Err(e) => {
-                             println!("{} Failed to download key from source {}: {}", "Warning:".yellow(), key_source, e);
+                            println!(
+                                "{} Failed to download key from source {}: {}",
+                                "Warning:".yellow(),
+                                key_info.key_source,
+                                e
+                            );
                         }
                     }
                 }
 
                 if certs.is_empty() {
-                    return Err(anyhow::anyhow!("No valid public keys found to verify signature."));
+                    return Err(anyhow::anyhow!(
+                        "No valid public keys found to verify signature."
+                    ));
                 }
 
                 println!("Downloading signature from: {}", sig_info.sig);

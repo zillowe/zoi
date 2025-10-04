@@ -132,14 +132,18 @@ fn verify_signature(
 ) -> Result<(), Box<dyn Error>> {
     println!("Verifying signature for downloaded asset...");
 
-    let mut keys_to_check: Vec<(&str, Option<&str>)> = Vec::new();
+    let mut keys_to_check: Vec<(&str, Option<&str>, bool)> = Vec::new();
     if let Some(key) = metadata.maintainer.key.as_deref() {
-        keys_to_check.push((key, metadata.maintainer.key_name.as_deref()));
+        keys_to_check.push((
+            key,
+            metadata.maintainer.key_name.as_deref(),
+            metadata.maintainer.one_time,
+        ));
     }
     if let Some(author) = &metadata.author
         && let Some(key) = author.key.as_deref()
     {
-        keys_to_check.push((key, author.key_name.as_deref()));
+        keys_to_check.push((key, author.key_name.as_deref(), author.one_time));
     }
 
     if keys_to_check.is_empty() {
@@ -160,10 +164,10 @@ fn verify_signature(
             .map(|c| c.fingerprint().to_string().to_uppercase())
             .collect();
 
-        for (key_source, key_name) in &keys_to_check {
+        for (key_source, key_name, one_time) in &keys_to_check {
             let mut key_found_locally = false;
 
-            if let Some(name) = key_name
+            if let Some(name) = *key_name
                 && local_key_names.iter().any(|n| n == name)
             {
                 key_found_locally = true;
@@ -218,7 +222,8 @@ fn verify_signature(
             match key_bytes_result {
                 Ok(key_bytes) => {
                     if let Ok(cert) = Cert::from_bytes(&key_bytes) {
-                        if let Some(name) = key_name
+                        if !*one_time
+                            && let Some(name) = *key_name
                             && let Err(e) = pkg::pgp::add_key_from_bytes(&key_bytes, name)
                         {
                             println!(

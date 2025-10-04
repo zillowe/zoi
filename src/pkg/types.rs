@@ -175,6 +175,8 @@ pub struct Maintainer {
     pub website: Option<String>,
     pub key: Option<String>,
     pub key_name: Option<String>,
+    #[serde(default)]
+    pub one_time: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -185,6 +187,8 @@ pub struct Author {
     pub website: Option<String>,
     pub key: Option<String>,
     pub key_name: Option<String>,
+    #[serde(default)]
+    pub one_time: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
