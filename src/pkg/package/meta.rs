@@ -1,5 +1,5 @@
 use super::structs::{FinalMetadata, PlatformAsset, ResolvedInstallation};
-use crate::pkg::{lua_parser, resolve, types};
+use crate::pkg::{lua, resolve, types};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
@@ -12,7 +12,7 @@ pub fn run(
 ) -> Result<(), Box<dyn Error>> {
     println!("Generating metadata for: {}", package_file.display());
 
-    let temp_pkg = lua_parser::parse_lua_package(package_file.to_str().unwrap(), None)?;
+    let temp_pkg = lua::parser::parse_lua_package(package_file.to_str().unwrap(), None)?;
     let default_version = resolve::get_default_version(&temp_pkg, None)?;
 
     let version = version_override
@@ -20,7 +20,7 @@ pub fn run(
         .unwrap_or(default_version);
 
     let package_template =
-        lua_parser::parse_lua_package(package_file.to_str().unwrap(), Some(&version))?;
+        lua::parser::parse_lua_package(package_file.to_str().unwrap(), Some(&version))?;
 
     let best_method_template = if let Some(t) = &install_type {
         package_template
@@ -80,7 +80,7 @@ pub fn run(
         let mut binary_path_map = HashMap::new();
 
         for platform_str in &platforms_to_process {
-            let parsed_for_platform = lua_parser::parse_lua_package_for_platform(
+            let parsed_for_platform = lua::parser::parse_lua_package_for_platform(
                 package_file.to_str().unwrap(),
                 platform_str,
                 Some(&version),
@@ -135,7 +135,7 @@ pub fn run(
         let mut assets = Vec::new();
 
         for platform_str in &platforms_to_process {
-            let parsed_for_platform = lua_parser::parse_lua_package_for_platform(
+            let parsed_for_platform = lua::parser::parse_lua_package_for_platform(
                 package_file.to_str().unwrap(),
                 platform_str,
                 Some(&version),

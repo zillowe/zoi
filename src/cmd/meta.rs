@@ -1,7 +1,7 @@
 use crate::pkg::package::structs::{
     FileCopy, FileGroup, FinalMetadata, PlatformAsset, ResolvedInstallation,
 };
-use crate::pkg::{lua_parser, resolve, types};
+use crate::pkg::{lua, resolve, types};
 use anyhow::{Result, anyhow};
 use std::collections::HashMap;
 use std::fs;
@@ -15,7 +15,7 @@ pub fn generate_metadata(
 ) -> Result<FinalMetadata> {
     println!("Generating metadata for: {}", package_file.display());
 
-    let temp_pkg = lua_parser::parse_lua_package(package_file.to_str().unwrap(), None)
+    let temp_pkg = lua::parser::parse_lua_package(package_file.to_str().unwrap(), None)
         .map_err(|e| anyhow!(e.to_string()))?;
     let default_version = resolve::get_default_version(&temp_pkg, registry_handle.as_deref())
         .map_err(|e| anyhow!(e.to_string()))?;
@@ -25,7 +25,7 @@ pub fn generate_metadata(
         .unwrap_or(default_version);
 
     let package_template =
-        lua_parser::parse_lua_package(package_file.to_str().unwrap(), Some(&version))
+        lua::parser::parse_lua_package(package_file.to_str().unwrap(), Some(&version))
             .map_err(|e| anyhow!(e.to_string()))?;
 
     let method_priority = ["com_binary", "binary", "source", "installer", "script"];
@@ -78,7 +78,7 @@ pub fn generate_metadata(
         let mut binary_path_map = HashMap::new();
 
         for platform_str in &platforms_to_process {
-            let parsed_for_platform = lua_parser::parse_lua_package_for_platform(
+            let parsed_for_platform = lua::parser::parse_lua_package_for_platform(
                 package_file.to_str().unwrap(),
                 platform_str,
                 Some(&version),
@@ -130,7 +130,7 @@ pub fn generate_metadata(
         let mut assets = Vec::new();
 
         for platform_str in &platforms_to_process {
-            let parsed_for_platform = lua_parser::parse_lua_package_for_platform(
+            let parsed_for_platform = lua::parser::parse_lua_package_for_platform(
                 package_file.to_str().unwrap(),
                 platform_str,
                 Some(&version),

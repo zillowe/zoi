@@ -8,7 +8,7 @@ use std::process::Command;
 
 pub fn run(pkg_path: &Path, target_dir: Option<&str>) -> Result<(), Box<dyn Error>> {
     let pkg: types::Package =
-        crate::pkg::lua_parser::parse_lua_package(pkg_path.to_str().unwrap(), None)?;
+        crate::pkg::lua::parser::parse_lua_package(pkg_path.to_str().unwrap(), None)?;
 
     println!("Found package: '{}'", pkg.name.bold());
     println!("Git repository: {}", pkg.git.cyan());

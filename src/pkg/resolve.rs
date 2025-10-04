@@ -207,7 +207,7 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
 
             if path.exists() {
                 let pkg: types::Package =
-                    crate::pkg::lua_parser::parse_lua_package(path.to_str().unwrap(), None)?;
+                    crate::pkg::lua::parser::parse_lua_package(path.to_str().unwrap(), None)?;
                 let major_repo = repo_name.split('/').next().unwrap_or("").to_lowercase();
 
                 let source_type = if is_default_registry {
@@ -261,7 +261,7 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
                 let pkg_file_path = pkg_dir_path.join(format!("{}.pkg.lua", request.name));
 
                 if pkg_file_path.exists() {
-                    let pkg: types::Package = crate::pkg::lua_parser::parse_lua_package(
+                    let pkg: types::Package = crate::pkg::lua::parser::parse_lua_package(
                         pkg_file_path.to_str().unwrap(),
                         None,
                     )?;
@@ -722,7 +722,7 @@ pub fn resolve_package_and_version(
     let pkg_lua_path = resolved_source.path.clone();
 
     let pkg_template =
-        crate::pkg::lua_parser::parse_lua_package(resolved_source.path.to_str().unwrap(), None)?;
+        crate::pkg::lua::parser::parse_lua_package(resolved_source.path.to_str().unwrap(), None)?;
 
     let mut pkg_with_repo = pkg_template;
     if let Some(repo_name) = resolved_source.repo_name.clone() {
@@ -735,7 +735,7 @@ pub fn resolve_package_and_version(
         registry_handle.as_deref(),
     )?;
 
-    let mut pkg = crate::pkg::lua_parser::parse_lua_package(
+    let mut pkg = crate::pkg::lua::parser::parse_lua_package(
         resolved_source.path.to_str().unwrap(),
         Some(&version_string),
     )?;
@@ -934,7 +934,7 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, B
     };
 
     let pkg_for_alt_check =
-        crate::pkg::lua_parser::parse_lua_package(resolved_source.path.to_str().unwrap(), None)?;
+        crate::pkg::lua::parser::parse_lua_package(resolved_source.path.to_str().unwrap(), None)?;
 
     if let Some(alt_source) = pkg_for_alt_check.alt {
         println!("Found 'alt' source. Resolving from: {}", alt_source.cyan());

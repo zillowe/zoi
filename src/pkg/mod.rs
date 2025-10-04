@@ -10,7 +10,7 @@ pub mod helper;
 pub mod install;
 pub mod library;
 pub mod local;
-pub mod lua_parser;
+pub mod lua;
 pub mod package;
 pub mod pgp;
 pub mod pin;

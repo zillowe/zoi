@@ -1,30 +1,8 @@
+use super::functions;
 use crate::{pkg::types, utils};
 use mlua::{self, Lua, LuaSerdeExt, Table, Value};
 use std::error::Error;
 use std::fs;
-
-fn add_fetch_util(lua: &Lua) -> Result<(), mlua::Error> {
-    let fetch_fn = lua.create_function(|lua, url: String| -> Result<Table, mlua::Error> {
-        let response =
-            reqwest::blocking::get(url).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-
-        let fetch_response = lua.create_table()?;
-
-        fetch_response.set("status", response.status().as_u16())?;
-
-        let response_text = response
-            .text()
-            .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-
-        fetch_response.set("text", response_text)?;
-
-        Ok(fetch_response)
-    })?;
-
-    lua.globals().set("fetch", fetch_fn)?;
-
-    Ok(())
-}
 
 pub fn parse_lua_package_for_platform(
     file_path: &str,
@@ -43,19 +21,7 @@ pub fn parse_lua_package_for_platform(
     lua.globals().set("__ZoiPackageDeps", pkg_deps_table)?;
     lua.globals().set("__ZoiPackageSelectable", false)?;
 
-    let system_table = lua.create_table()?;
-    let parts: Vec<&str> = platform.split('-').collect();
-    system_table.set("OS", *parts.first().unwrap_or(&""))?;
-    system_table.set("ARCH", *parts.get(1).unwrap_or(&""))?;
-    if let Some(distro) = utils::get_linux_distribution()
-        && platform.starts_with("linux")
-    {
-        system_table.set("DISTRO", distro)?;
-    }
-    if let Some(ver) = version_override {
-        system_table.set("VERSION", ver)?;
-    }
-    lua.globals().set("SYSTEM", system_table)?;
+    functions::setup_lua_environment(&lua, platform, version_override, Some(file_path))?;
 
     let pkg_table = lua.create_table()?;
     lua.globals().set("PKG", pkg_table)?;
@@ -99,8 +65,6 @@ pub fn parse_lua_package_for_platform(
         Ok(())
     })?;
     lua.globals().set("dependencies", dependencies_fn)?;
-
-    add_fetch_util(&lua)?;
 
     lua.load(&lua_code).exec()?;
 
