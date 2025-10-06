@@ -1,6 +1,6 @@
 # Security Policy
 
-The Security for this repository can be found online at [zillowe.qzz.io/docs/book/guidelines/security](https://zillowe.qzz.io/docs/book/guidelines/security).
+The Security Policy can be found online at [zillowe.qzz.io/docs/book/guidelines/security](https://zillowe.qzz.io/docs/book/guidelines/security).
 
 ## Supported Versions
 
