@@ -105,16 +105,6 @@ pub fn get_filename_from_url(url: &str) -> &str {
     url.split('/').next_back().unwrap_or("")
 }
 
-pub fn find_method<'a>(
-    pkg: &'a types::Package,
-    type_name: &str,
-    platform: &str,
-) -> Option<&'a types::InstallationMethod> {
-    pkg.installation.iter().find(|m| {
-        m.install_type == type_name && crate::utils::is_platform_compatible(platform, &m.platforms)
-    })
-}
-
 pub fn download_file_with_progress(url: &str) -> Result<Vec<u8>, Box<dyn Error>> {
     if url.starts_with("http://") {
         println!(

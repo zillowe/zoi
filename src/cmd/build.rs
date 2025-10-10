@@ -34,7 +34,7 @@ pub fn run(sources: &[String], force: bool, yes: bool) {
                 let mut processed_deps = HashSet::new();
                 if let Err(e) = install::run_installation(
                     resolved_source.path.to_str().unwrap(),
-                    install::InstallMode::ForceSource,
+                    install::InstallMode::ForceBuild,
                     true,
                     InstallReason::Direct,
                     yes,

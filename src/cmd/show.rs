@@ -136,66 +136,7 @@ fn print_beautiful(pkg: &crate::pkg::types::Package, installed_manifest: Option<
     }
 
     if pkg.package_type == crate::pkg::types::PackageType::Package {
-        println!("{}:", "Available installation methods".bold());
-        for method in &pkg.installation {
-            let type_str = &method.install_type;
-            let display_type = match type_str.as_str() {
-                "com_binary" => "Compressed Binary".to_string(),
-                _ => {
-                    let mut chars = type_str.chars();
-                    match chars.next() {
-                        None => String::new(),
-                        Some(f) => f.to_uppercase().collect::<String>() + chars.as_str(),
-                    }
-                }
-            };
-
-            let platforms_str = if method.platforms.is_empty()
-                || method.platforms.iter().any(|p| p == "any")
-            {
-                "any".italic().to_string()
-            } else {
-                let mut platform_map: std::collections::HashMap<String, Vec<String>> =
-                    std::collections::HashMap::new();
-                for p in &method.platforms {
-                    let parts: Vec<&str> = p.split('-').collect();
-                    if parts.len() == 2 {
-                        let os = parts[0];
-                        let arch = parts[1];
-                        platform_map
-                            .entry(os.to_string())
-                            .or_default()
-                            .push(arch.to_string());
-                    } else {
-                        platform_map.entry(p.to_string()).or_default();
-                    }
-                }
-
-                let mut display_parts = Vec::new();
-                let mut sorted_os: Vec<_> = platform_map.keys().collect();
-                sorted_os.sort();
-
-                for os in sorted_os {
-                    let archs = platform_map.get(os).unwrap();
-                    let mut capitalized_os = os.chars();
-                    let os_display = match capitalized_os.next() {
-                        None => String::new(),
-                        Some(f) => f.to_uppercase().collect::<String>() + capitalized_os.as_str(),
-                    };
-
-                    let extra_info = archs.join(", ");
-
-                    if extra_info.is_empty() {
-                        display_parts.push(os_display);
-                    } else {
-                        display_parts.push(format!("{} ({})", os_display, extra_info));
-                    }
-                }
-                display_parts.join(", ")
-            };
-
-            println!("  - {}: {}", display_type.yellow(), platforms_str);
-        }
+        println!("{}: {}", "Available types".bold(), pkg.types.join(", "));
     }
 
     if let Some(deps) = &pkg.dependencies {

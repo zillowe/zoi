@@ -5,37 +5,36 @@ use colored::*;
 use std::error::Error;
 use std::fs;
 
-pub fn try_meta_build_install(
+pub fn try_build_install(
     pkg_lua_path: &std::path::Path,
     pkg: &types::Package,
 ) -> Result<(), Box<dyn Error>> {
-    println!(
-        "{}",
-        "Attempting to build and install from meta files...".yellow()
-    );
+    println!("{}", "Attempting to build and install package...".yellow());
 
-    if let Err(e) = crate::pkg::package::meta::run(pkg_lua_path, None, pkg.version.as_deref()) {
-        return Err(format!("'meta' step failed: {}", e).into());
-    }
-    let meta_filename = format!("{}.meta.json", pkg.name);
-    let meta_path = pkg_lua_path.with_file_name(meta_filename);
-    if !meta_path.exists() {
-        return Err("meta.json file not created".into());
-    }
-    println!("'meta' step successful.");
+    let build_type = if pkg.types.contains(&"pre-compiled".to_string()) {
+        "pre-compiled"
+    } else if pkg.types.contains(&"source".to_string()) {
+        "source"
+    } else {
+        return Err("No supported build types found in package".into());
+    };
 
     let current_platform = utils::get_platform()?;
-    if let Err(e) = crate::pkg::package::build::run(&meta_path, &[current_platform]) {
+    if let Err(e) = crate::pkg::package::build::run(
+        pkg_lua_path,
+        build_type,
+        std::slice::from_ref(&current_platform),
+    ) {
         return Err(format!("'build' step failed: {}", e).into());
     }
-    let platform = utils::get_platform()?;
+
     let archive_filename = format!(
         "{}-{}-{}.pkg.tar.zst",
         pkg.name,
         pkg.version.as_deref().unwrap_or(""),
-        platform
+        current_platform
     );
-    let archive_path = meta_path.with_file_name(archive_filename);
+    let archive_path = pkg_lua_path.parent().unwrap().join(archive_filename);
     if !archive_path.exists() {
         return Err("package archive not created".into());
     }
@@ -46,7 +45,6 @@ pub fn try_meta_build_install(
     }
     println!("'install' step successful.");
 
-    let _ = fs::remove_file(&meta_path);
     let _ = fs::remove_file(&archive_path);
 
     Ok(())

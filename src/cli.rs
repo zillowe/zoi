@@ -241,9 +241,6 @@ enum Commands {
         /// Force re-installation even if the package is already installed
         #[arg(long)]
         force: bool,
-        /// Run in interactive mode
-        #[arg(short, long)]
-        interactive: bool,
         /// Accept all optional dependencies
         #[arg(long)]
         all_optional: bool,
@@ -294,20 +291,6 @@ enum Commands {
     Env {
         /// The alias of the environment to set up
         env_alias: Option<String>,
-    },
-
-    /// Clones the source code repository of one or more packages
-    #[command(
-        long_about = "Clones the source code repository of one or more packages. A target directory can only be specified when cloning a single package."
-    )]
-    Clone {
-        /// Package names, local paths, or URLs to resolve the git repo from
-        #[arg(value_name = "SOURCES", required = true, value_hint = ValueHint::FilePath, hide_possible_values = true)]
-        sources: Vec<String>,
-
-        /// Optional directory to clone into. Defaults to the package name.
-        #[arg(value_name = "TARGET_DIRECTORY", last = true)]
-        target_directory: Option<String>,
     },
 
     /// Upgrades the Zoi binary to the latest version
@@ -404,20 +387,6 @@ enum Commands {
     )]
     Repo(cmd::repo::RepoCommand),
 
-    /// Starts a service
-    Start {
-        /// The name of the service to start
-        #[arg(value_name = "PACKAGE_NAME")]
-        package: String,
-    },
-
-    /// Stops a service
-    Stop {
-        /// The name of the service to stop
-        #[arg(value_name = "PACKAGE_NAME")]
-        package: String,
-    },
-
     /// Manage telemetry settings (opt-in analytics)
     #[command(
         long_about = "Manage opt-in anonymous telemetry used to understand package popularity. Default is disabled."
@@ -446,22 +415,6 @@ enum Commands {
         package: String,
     },
 
-    /// Provides pkg-config compatible information for installed libraries
-    #[command(name = "pkg-config")]
-    PkgConfig {
-        /// Print library linking information
-        #[arg(long)]
-        libs: bool,
-
-        /// Print C compiler flags
-        #[arg(long)]
-        cflags: bool,
-
-        /// The package to query
-        #[arg(required = true)]
-        packages: Vec<String>,
-    },
-
     /// Shows a package's manual
     Man {
         /// The name of the package to show the manual for
@@ -473,19 +426,6 @@ enum Commands {
         /// Print the manual to the terminal raw
         #[arg(long)]
         raw: bool,
-    },
-
-    /// Generates a static, resolved JSON representation of a package
-    Meta {
-        /// The name of the package
-        #[arg(value_parser = PackageValueParser, hide_possible_values = true)]
-        package_name: String,
-        /// Output file path. If not provided, prints to stdout.
-        #[arg(short, long)]
-        output: Option<String>,
-        /// Specify a version to resolve
-        #[arg(long)]
-        version: Option<String>,
     },
 
     /// Build, create, and manage Zoi packages
@@ -654,19 +594,10 @@ pub fn run() {
                 sources,
                 repo,
                 force,
-                interactive,
                 all_optional,
                 scope,
             } => {
-                cmd::install::run(
-                    &sources,
-                    repo,
-                    force,
-                    interactive,
-                    all_optional,
-                    cli.yes,
-                    scope,
-                );
+                cmd::install::run(&sources, repo, force, all_optional, cli.yes, scope);
                 Ok(())
             }
             Commands::Build { sources, force } => {
@@ -683,13 +614,6 @@ pub fn run() {
             }
             Commands::Env { env_alias } => {
                 cmd::env::run(env_alias);
-                Ok(())
-            }
-            Commands::Clone {
-                sources,
-                target_directory,
-            } => {
-                cmd::clone::run(sources, target_directory, cli.yes);
                 Ok(())
             }
             Commands::Upgrade {
@@ -732,8 +656,6 @@ pub fn run() {
                 cmd::repo::run(args);
                 Ok(())
             }
-            Commands::Start { package } => cmd::start::run(&package, cli.yes),
-            Commands::Stop { package } => cmd::stop::run(&package),
             Commands::Telemetry { action } => {
                 use cmd::telemetry::{TelemetryCommand, run};
                 let cmd = match action {
@@ -750,22 +672,11 @@ pub fn run() {
             }
             Commands::Extension(args) => cmd::extension::run(args, cli.yes),
             Commands::Rollback { package } => cmd::rollback::run(&package, cli.yes),
-            Commands::PkgConfig {
-                libs,
-                cflags,
-                packages,
-            } => cmd::pkg_config::run(libs, cflags, &packages),
             Commands::Man {
                 package_name,
                 upstream,
                 raw,
             } => cmd::man::run(&package_name, upstream, raw),
-            Commands::Meta {
-                package_name,
-                output,
-                version,
-            } => cmd::meta::run(&package_name, output.as_deref(), version.as_deref())
-                .map_err(|e| e.into()),
             Commands::Package(args) => {
                 cmd::package::run(args);
                 Ok(())

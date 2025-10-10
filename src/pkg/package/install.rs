@@ -1,5 +1,4 @@
-use super::structs::FinalMetadata;
-use crate::pkg::{local, types};
+use crate::pkg::{local, lua, types};
 use crate::utils;
 use chrono::Utc;
 use colored::*;
@@ -27,6 +26,20 @@ fn get_bin_root(scope: types::Scope) -> Result<PathBuf, Box<dyn Error>> {
     }
 }
 
+fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), std::io::Error> {
+    fs::create_dir_all(dst)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        if ty.is_dir() {
+            copy_dir_all(&entry.path(), &dst.join(entry.file_name()))?;
+        } else {
+            fs::copy(entry.path(), dst.join(entry.file_name()))?;
+        }
+    }
+    Ok(())
+}
+
 pub fn run(
     package_file: &Path,
     scope_override: Option<types::Scope>,
@@ -41,21 +54,36 @@ pub fn run(
     let file = File::open(package_file)?;
     let decoder = ZstdDecoder::new(file)?;
     let mut archive = Archive::new(decoder);
-
     let temp_dir = Builder::new().prefix("zoi-install-").tempdir()?;
     archive.unpack(temp_dir.path())?;
 
-    let metadata_path = temp_dir.path().join("metadata.json");
-    if !metadata_path.exists() {
-        return Err("metadata.json not found in package archive.".into());
+    let mut pkg_lua_path = None;
+    for entry in WalkDir::new(temp_dir.path())
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
+        if entry.file_name().to_string_lossy().ends_with(".pkg.lua") {
+            pkg_lua_path = Some(entry.path().to_path_buf());
+            break;
+        }
     }
-    let metadata_content = fs::read_to_string(metadata_path)?;
-    let metadata: FinalMetadata = serde_json::from_str(&metadata_content)?;
+    let pkg_lua_path = pkg_lua_path.ok_or("Could not find .pkg.lua file in archive")?;
+
+    let platform = utils::get_platform()?;
+    let metadata = lua::parser::parse_lua_package_for_platform(
+        pkg_lua_path.to_str().unwrap(),
+        &platform,
+        None,
+    )?;
+    let version = metadata
+        .version
+        .as_ref()
+        .ok_or("Package is missing version")?;
 
     println!(
         "Installing package: {} v{}",
         metadata.name.cyan(),
-        metadata.version.yellow()
+        version.yellow()
     );
 
     let registry_handle = "local";
@@ -64,14 +92,11 @@ pub fn run(
         registry_handle,
         &metadata.repo,
         &metadata.name,
-        &metadata.version,
+        version,
     )?;
 
     if version_dir.exists() {
-        println!(
-            "Removing existing installation at version {}...",
-            metadata.version
-        );
+        println!("Removing existing installation at version {}...", version);
         fs::remove_dir_all(&version_dir)?;
     }
     fs::create_dir_all(&version_dir)?;
@@ -81,35 +106,54 @@ pub fn run(
     let data_dir = temp_dir.path().join("data");
     if data_dir.exists() {
         println!("Copying package files...");
-        for entry in WalkDir::new(&data_dir)
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .skip(1)
-        {
-            let dest_path = version_dir.join(entry.path().strip_prefix(&data_dir)?);
-            if entry.file_type().is_dir() {
-                fs::create_dir_all(&dest_path)?;
-            } else {
-                fs::copy(entry.path(), &dest_path)?;
-                installed_files.push(dest_path.to_string_lossy().to_string());
+
+        let pkgstore_src = data_dir.join("pkgstore");
+        if pkgstore_src.exists() {
+            copy_dir_all(&pkgstore_src, &version_dir)?;
+            for entry in WalkDir::new(version_dir.clone())
+                .into_iter()
+                .filter_map(|e| e.ok())
+            {
+                if entry.file_type().is_file() {
+                    installed_files.push(entry.path().to_string_lossy().to_string());
+                }
             }
         }
-    }
 
-    let man_md_path = temp_dir.path().join("man.md");
-    if man_md_path.exists() {
-        let dest = version_dir.join("man.md");
-        fs::copy(man_md_path, &dest)?;
-        installed_files.push(dest.to_string_lossy().to_string());
-        println!("Installed manual (man.md).");
-    }
+        let usrroot_src = data_dir.join("usrroot");
+        if usrroot_src.exists() {
+            if !utils::is_admin() {
+                return Err("Administrator privileges required to install system-wide files. Please run with sudo or as an administrator.".into());
+            }
+            let root_dest = PathBuf::from("/");
+            copy_dir_all(&usrroot_src, &root_dest)?;
+            for entry in WalkDir::new(&usrroot_src)
+                .into_iter()
+                .filter_map(|e| e.ok())
+                .skip(1)
+            {
+                let dest_path = root_dest.join(entry.path().strip_prefix(&usrroot_src)?);
+                if dest_path.is_file() {
+                    installed_files.push(dest_path.to_string_lossy().to_string());
+                }
+            }
+        }
 
-    let man_txt_path = temp_dir.path().join("man.txt");
-    if man_txt_path.exists() {
-        let dest = version_dir.join("man.txt");
-        fs::copy(man_txt_path, &dest)?;
-        installed_files.push(dest.to_string_lossy().to_string());
-        println!("Installed manual (man.txt).");
+        let usrhome_src = data_dir.join("usrhome");
+        if usrhome_src.exists() {
+            let home_dest = home::home_dir().ok_or("Could not find home directory")?;
+            copy_dir_all(&usrhome_src, &home_dest)?;
+            for entry in WalkDir::new(&usrhome_src)
+                .into_iter()
+                .filter_map(|e| e.ok())
+                .skip(1)
+            {
+                let dest_path = home_dest.join(entry.path().strip_prefix(&usrhome_src)?);
+                if dest_path.is_file() {
+                    installed_files.push(dest_path.to_string_lossy().to_string());
+                }
+            }
+        }
     }
 
     if let Some(bins) = &metadata.bins {
@@ -156,106 +200,17 @@ pub fn run(
         }
     }
 
-    let files_dir = temp_dir.path().join("files");
-    if files_dir.exists()
-        && let Some(file_groups) = &metadata.installation.files
-    {
-        println!("Copying additional files...");
-        let platform = crate::utils::get_platform()?;
-
-        for group in file_groups {
-            if crate::utils::is_platform_compatible(&platform, &group.platforms) {
-                for file_copy in &group.files {
-                    let source_in_archive = files_dir.join(&file_copy.source);
-
-                    if !source_in_archive.exists() {
-                        eprintln!(
-                            "{} File specified in metadata not found in archive: {}",
-                            "Warning:".yellow(),
-                            source_in_archive.display()
-                        );
-                        continue;
-                    }
-
-                    let mut dest_path_str = file_copy.destination.clone();
-                    if dest_path_str.starts_with("~/") {
-                        if scope == types::Scope::System {
-                            eprintln!(
-                                "{} Cannot use home directory ('~') destination for a system-wide package install. Skipping '{}'",
-                                "Warning:".yellow(),
-                                file_copy.destination
-                            );
-                            continue;
-                        }
-                        if let Some(home) = home::home_dir() {
-                            dest_path_str = dest_path_str.replacen("~/", home.to_str().unwrap(), 1);
-                        } else {
-                            eprintln!(
-                                "{} Could not determine home directory. Skipping '{}'",
-                                "Warning:".yellow(),
-                                file_copy.destination
-                            );
-                            continue;
-                        }
-                    }
-
-                    let dest_path = PathBuf::from(&dest_path_str);
-
-                    let home = home::home_dir();
-                    let is_system_path = if let Some(ref h) = home {
-                        !dest_path.starts_with(h)
-                    } else {
-                        true
-                    };
-
-                    if is_system_path && !utils::is_admin() {
-                        return Err(format!("Administrator privileges required to write to {}. Please run with sudo or as an administrator.", dest_path.display()).into());
-                    }
-
-                    if let Some(parent) = dest_path.parent() {
-                        fs::create_dir_all(parent)?;
-                    }
-
-                    if source_in_archive.is_dir() {
-                        fs::create_dir_all(&dest_path)?;
-                        for entry in WalkDir::new(&source_in_archive)
-                            .into_iter()
-                            .filter_map(|e| e.ok())
-                        {
-                            let target_path =
-                                dest_path.join(entry.path().strip_prefix(&source_in_archive)?);
-                            if entry.file_type().is_dir() {
-                                fs::create_dir_all(&target_path)?;
-                            } else {
-                                fs::copy(entry.path(), &target_path)?;
-                                installed_files.push(target_path.to_string_lossy().to_string());
-                            }
-                        }
-                    } else {
-                        fs::copy(&source_in_archive, &dest_path)?;
-                        installed_files.push(dest_path.to_string_lossy().to_string());
-                    }
-                    println!(
-                        "Copied {} to {}",
-                        file_copy.source.cyan(),
-                        dest_path.display()
-                    );
-                }
-            }
-        }
-    }
-
     let manifest = types::InstallManifest {
         name: metadata.name.clone(),
-        version: metadata.version.clone(),
+        version: version.clone(),
         repo: metadata.repo.clone(),
         registry_handle: registry_handle.to_string(),
-        package_type: types::PackageType::Package,
+        package_type: metadata.package_type,
         installed_at: Utc::now().to_rfc3339(),
         reason: types::InstallReason::Direct,
         scope,
         bins: metadata.bins.clone(),
-        conflicts: None,
+        conflicts: metadata.conflicts,
         installed_dependencies: vec![],
         chosen_options: vec![],
         chosen_optionals: vec![],

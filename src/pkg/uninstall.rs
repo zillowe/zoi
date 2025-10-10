@@ -2,6 +2,7 @@ use crate::pkg::{config_handler, dependencies, local, recorder, resolve, script_
 use crate::utils;
 use colored::*;
 use indicatif::{ProgressBar, ProgressStyle};
+use mlua::Lua;
 use std::error::Error;
 use std::fs;
 use std::io::{self, Write};
@@ -109,7 +110,8 @@ fn uninstall_collection(
 }
 
 pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
-    let (pkg, _, _, _, registry_handle) = resolve::resolve_package_and_version(package_name)?;
+    let (pkg, _, _, pkg_lua_path, registry_handle) =
+        resolve::resolve_package_and_version(package_name)?;
     let (manifest, scope) =
         if let Some(m) = local::is_package_installed(&pkg.name, types::Scope::User)? {
             (m, types::Scope::User)
@@ -134,35 +136,35 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
         ).into());
     }
 
-    if manifest.install_method == Some("installer".to_string()) {
-        let os = std::env::consts::OS;
-        if os == "windows" {
-            if let Some(msi_path) = manifest.installed_files.first() {
-                println!("Uninstalling MSI package...");
-                let status = Command::new("msiexec")
-                    .arg("/x")
-                    .arg(msi_path)
-                    .arg("/qn")
-                    .status()?;
-                if !status.success() {
-                    eprintln!("{}", "Warning: Failed to run MSI uninstaller. The application might not be fully uninstalled.".yellow());
-                }
-            }
-        } else if os == "macos" {
-            for file_path in &manifest.installed_files {
-                let path = PathBuf::from(file_path);
+    let lua = Lua::new();
+    crate::pkg::lua::functions::setup_lua_environment(
+        &lua,
+        &utils::get_platform()?,
+        Some(&manifest.version),
+        pkg_lua_path.to_str(),
+    )?;
+    let lua_code = fs::read_to_string(pkg_lua_path)?;
+    lua.load(&lua_code).exec()?;
+
+    if let Ok(uninstall_fn) = lua.globals().get::<mlua::Function>("uninstall") {
+        println!("Running uninstall() script...");
+        uninstall_fn.call::<()>(())?;
+    }
+
+    if let Ok(uninstall_ops) = lua.globals().get::<mlua::Table>("__ZoiUninstallOperations") {
+        for op in uninstall_ops.sequence_values::<mlua::Table>() {
+            let op = op?;
+            if let Ok(op_type) = op.get::<String>("op")
+                && op_type == "zrm"
+            {
+                let path_to_remove: String = op.get("path")?;
+                let path = std::path::PathBuf::from(path_to_remove);
                 if path.exists() {
                     println!("Removing {}...", path.display());
                     if path.is_dir() {
-                        if let Err(e) = fs::remove_dir_all(&path) {
-                            eprintln!(
-                                "Warning: failed to remove directory {}: {}",
-                                path.display(),
-                                e
-                            );
-                        }
-                    } else if let Err(e) = fs::remove_file(&path) {
-                        eprintln!("Warning: failed to remove file {}: {}", path.display(), e);
+                        fs::remove_dir_all(path)?;
+                    } else {
+                        fs::remove_file(path)?;
                     }
                 }
             }

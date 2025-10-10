@@ -14,7 +14,6 @@ struct RepoFile {
 pub fn run(
     repo_spec: &str,
     force: bool,
-    interactive: bool,
     all_optional: bool,
     yes: bool,
     scope: Option<crate::cli::SetupScope>,
@@ -51,11 +50,7 @@ pub fn run(
 
     let package_source = &repo_file.package;
 
-    let mode = if interactive {
-        install::InstallMode::Interactive
-    } else {
-        install::InstallMode::PreferBinary
-    };
+    let mode = install::InstallMode::PreferPrebuilt;
 
     let scope_override = scope.map(|s| match s {
         crate::cli::SetupScope::User => types::Scope::User,

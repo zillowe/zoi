@@ -1,6 +1,8 @@
 use crate::utils;
 use mlua::{self, Lua, LuaSerdeExt, Table, Value};
 use serde::Deserialize;
+use sha2::{Digest, Sha256, Sha512};
+use std::io::Read;
 use std::{fs, path::Path};
 use urlencoding;
 
@@ -28,6 +30,17 @@ fn add_parse_util(lua: &Lua) -> Result<(), mlua::Error> {
     })?;
     parse_table.set("toml", toml_fn)?;
 
+    let checksum_fn = lua.create_function(|_, (content, file_name): (String, String)| {
+        for line in content.lines() {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() == 2 && parts[1] == file_name {
+                return Ok(Some(parts[0].to_string()));
+            }
+        }
+        Ok(None)
+    })?;
+    parse_table.set("checksumFile", checksum_fn)?;
+
     let utils_table: Table = lua.globals().get("UTILS")?;
     utils_table.set("PARSE", parse_table)?;
 
@@ -47,12 +60,8 @@ fn add_fetch_util(lua: &Lua) -> Result<(), mlua::Error> {
     })?;
     fetch_table.set("url", fetch_fn)?;
 
-    let utils_table: Table = lua
-        .globals()
-        .get("UTILS")
-        .unwrap_or_else(|_| lua.create_table().unwrap());
+    let utils_table: Table = lua.globals().get("UTILS")?;
     utils_table.set("FETCH", fetch_table)?;
-    lua.globals().set("UTILS", utils_table)?;
 
     Ok(())
 }
@@ -282,6 +291,179 @@ fn add_include_util(lua: &Lua, current_path: &Path) -> Result<(), mlua::Error> {
     Ok(())
 }
 
+fn add_zcp(lua: &Lua) -> Result<(), mlua::Error> {
+    let zcp_fn = lua.create_function(|lua, (source, destination): (String, String)| {
+        let ops_table: Table = match lua.globals().get("__ZoiBuildOperations") {
+            Ok(t) => t,
+            Err(_) => {
+                let new_t = lua.create_table()?;
+                lua.globals().set("__ZoiBuildOperations", new_t.clone())?;
+                new_t
+            }
+        };
+        let op = lua.create_table()?;
+        op.set("op", "zcp")?;
+        op.set("source", source)?;
+        op.set("destination", destination)?;
+        ops_table.push(op)?;
+        Ok(())
+    })?;
+    lua.globals().set("zcp", zcp_fn)?;
+    Ok(())
+}
+
+fn add_verify_hash(lua: &Lua) -> Result<(), mlua::Error> {
+    let verify_hash_fn = lua.create_function(|_lua, (file_path, hash_str): (String, String)| {
+        let parts: Vec<&str> = hash_str.splitn(2, '-').collect();
+        if parts.len() != 2 {
+            return Err(mlua::Error::RuntimeError(
+                "Invalid hash format. Expected 'algo-hash'".to_string(),
+            ));
+        }
+        let algo = parts[0];
+        let expected_hash = parts[1];
+
+        let mut file = fs::File::open(&file_path)
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to open file: {}", e)))?;
+        let mut buffer = Vec::new();
+        file.read_to_end(&mut buffer)
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to read file: {}", e)))?;
+
+        let actual_hash = match algo {
+            "sha256" => {
+                let mut hasher = Sha256::new();
+                hasher.update(&buffer);
+                hex::encode(hasher.finalize())
+            }
+            "sha512" => {
+                let mut hasher = Sha512::new();
+                hasher.update(&buffer);
+                hex::encode(hasher.finalize())
+            }
+            _ => {
+                return Err(mlua::Error::RuntimeError(format!(
+                    "Unsupported hash algorithm: {}",
+                    algo
+                )));
+            }
+        };
+
+        if actual_hash.eq_ignore_ascii_case(expected_hash) {
+            Ok(true)
+        } else {
+            println!(
+                "Hash mismatch for {}: expected {}, got {}",
+                file_path, expected_hash, actual_hash
+            );
+            Ok(false)
+        }
+    })?;
+    lua.globals().set("verifyHash", verify_hash_fn)?;
+    Ok(())
+}
+
+fn add_zrm(lua: &Lua) -> Result<(), mlua::Error> {
+    let zrm_fn = lua.create_function(|lua, path: String| {
+        let ops_table: Table = match lua.globals().get("__ZoiUninstallOperations") {
+            Ok(t) => t,
+            Err(_) => {
+                let new_t = lua.create_table()?;
+                lua.globals()
+                    .set("__ZoiUninstallOperations", new_t.clone())?;
+                new_t
+            }
+        };
+        let op = lua.create_table()?;
+        op.set("op", "zrm")?;
+        op.set("path", path)?;
+        ops_table.push(op)?;
+        Ok(())
+    })?;
+    lua.globals().set("zrm", zrm_fn)?;
+    Ok(())
+}
+
+fn add_cmd_util(lua: &Lua) -> Result<(), mlua::Error> {
+    let cmd_fn = lua.create_function(|_, command: String| {
+        println!("Executing: {}", command);
+        let output = if cfg!(target_os = "windows") {
+            std::process::Command::new("pwsh")
+                .arg("-Command")
+                .arg(&command)
+                .output()
+        } else {
+            std::process::Command::new("bash")
+                .arg("-c")
+                .arg(&command)
+                .output()
+        };
+
+        match output {
+            Ok(out) => {
+                if !out.status.success() {
+                    eprintln!("[cmd] {}", String::from_utf8_lossy(&out.stderr));
+                }
+                Ok(out.status.success())
+            }
+            Err(e) => {
+                eprintln!("[cmd] Failed to execute command: {}", e);
+                Ok(false)
+            }
+        }
+    })?;
+    lua.globals().set("cmd", cmd_fn)?;
+    Ok(())
+}
+
+pub fn add_package_lifecycle_functions(lua: &Lua) -> Result<(), mlua::Error> {
+    let metadata_fn = lua.create_function(move |lua, pkg_def: Table| {
+        if let Ok(meta_table) = lua.globals().get::<Table>("__ZoiPackageMeta")
+            && let Ok(pkg_global) = lua.globals().get::<Table>("PKG")
+        {
+            for pair in pkg_def.pairs::<Value, Value>() {
+                let (key, value) = pair?;
+                meta_table.set(key.clone(), value.clone())?;
+                pkg_global.set(key, value)?;
+            }
+        }
+        Ok(())
+    })?;
+    lua.globals().set("metadata", metadata_fn)?;
+
+    let dependencies_fn = lua.create_function(move |lua, deps_def: Table| {
+        if let Ok(deps_table) = lua.globals().get::<Table>("__ZoiPackageDeps") {
+            for pair in deps_def.pairs::<String, Value>() {
+                let (key, value) = pair?;
+                deps_table.set(key, value)?;
+            }
+        }
+        Ok(())
+    })?;
+    lua.globals().set("dependencies", dependencies_fn)?;
+
+    let updates_fn = lua.create_function(move |lua, updates_list: Table| {
+        if let Ok(updates_table) = lua.globals().get::<Table>("__ZoiPackageUpdates") {
+            for pair in updates_list.pairs::<Value, Table>() {
+                let (_, update_info) = pair?;
+                updates_table.push(update_info)?;
+            }
+        }
+        Ok(())
+    })?;
+    lua.globals().set("updates", updates_fn)?;
+
+    let prepare_fn = lua.create_function(|_, _: Table| Ok(()))?;
+    lua.globals().set("prepare", prepare_fn)?;
+    let package_fn = lua.create_function(|_, _: Table| Ok(()))?;
+    lua.globals().set("package", package_fn)?;
+    let verify_fn = lua.create_function(|_, _: Table| Ok(()))?;
+    lua.globals().set("verify", verify_fn)?;
+    let uninstall_fn = lua.create_function(|_, _: Table| Ok(()))?;
+    lua.globals().set("uninstall", uninstall_fn)?;
+
+    Ok(())
+}
+
 pub fn setup_lua_environment(
     lua: &Lua,
     platform: &str,
@@ -327,6 +509,11 @@ pub fn setup_lua_environment(
     add_parse_util(lua)?;
     add_git_fetch_util(lua)?;
     add_file_util(lua)?;
+    add_zcp(lua)?;
+    add_verify_hash(lua)?;
+    add_zrm(lua)?;
+    add_cmd_util(lua)?;
+    add_package_lifecycle_functions(lua)?;
 
     if let Some(path_str) = file_path {
         let path = Path::new(path_str);

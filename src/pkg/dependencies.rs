@@ -1261,7 +1261,7 @@ fn install_zoi_dependency(
 
     install::run_installation(
         resolved_source.path.to_str().unwrap(),
-        install::InstallMode::PreferBinary,
+        install::InstallMode::PreferPrebuilt,
         false,
         crate::pkg::types::InstallReason::Dependency {
             parent: parent_id.to_string(),

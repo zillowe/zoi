@@ -49,11 +49,7 @@ pub fn run(package_name: &str, yes: bool) -> Result<UpdateResult, Box<dyn Error>
         return Err("Update aborted by user.".into());
     }
 
-    let mode = if let Some(updater_method) = &new_pkg.updater {
-        install::InstallMode::Updater(updater_method.clone())
-    } else {
-        install::InstallMode::PreferBinary
-    };
+    let mode = install::InstallMode::PreferPrebuilt;
 
     let mut processed_deps = HashSet::new();
     install::run_installation(

@@ -133,9 +133,8 @@ pub struct Package {
     #[serde(default)]
     pub license: String,
     #[serde(default)]
-    pub installation: Vec<InstallationMethod>,
+    pub types: Vec<String>,
     pub dependencies: Option<Dependencies>,
-    pub updater: Option<String>,
     #[serde(rename = "type", default)]
     pub package_type: PackageType,
     pub alt: Option<String>,
@@ -163,8 +162,6 @@ pub struct Package {
     pub pkg_config: Option<PkgConfig>,
     #[serde(default)]
     pub updates: Option<Vec<UpdateInfo>>,
-    #[serde(default)]
-    pub selectable: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -189,78 +186,6 @@ pub struct Author {
     pub key_name: Option<String>,
     #[serde(default)]
     pub one_time: bool,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[allow(dead_code)]
-pub struct Signature {
-    pub file: String,
-    pub sig: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct FileCopy {
-    pub source: String,
-    pub destination: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct FileGroup {
-    pub platforms: Vec<String>,
-    pub files: Vec<FileCopy>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(untagged)]
-pub enum Checksums {
-    Url(String),
-    List {
-        #[serde(rename = "type", default = "default_checksum_type")]
-        checksum_type: String,
-        #[serde(rename = "list")]
-        items: Vec<ChecksumInfo>,
-    },
-}
-
-fn default_checksum_type() -> String {
-    "sha512".to_string()
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ChecksumInfo {
-    pub file: String,
-    pub checksum: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[allow(dead_code)]
-pub struct InstallationMethod {
-    #[serde(default)]
-    pub name: Option<String>,
-    #[serde(rename = "type")]
-    pub install_type: String,
-    pub url: String,
-    pub platforms: Vec<String>,
-    #[serde(alias = "commands")]
-    pub build_commands: Option<Vec<String>>,
-    #[serde(rename = "platformComExt")]
-    pub platform_com_ext: Option<HashMap<String, String>>,
-    pub checksums: Option<Checksums>,
-    #[serde(default)]
-    pub checksum_type: Option<String>,
-    pub sigs: Option<Vec<Signature>>,
-    #[serde(default, alias = "bin_path")]
-    pub binary_path: Option<String>,
-    #[serde(default)]
-    pub tag: Option<String>,
-    #[serde(default)]
-    pub branch: Option<String>,
-    #[serde(default)]
-    pub docker_image: Option<String>,
-    #[serde(default)]
-    pub lib_types: Option<Vec<String>>,
-    #[serde(default)]
-    pub files: Option<Vec<FileGroup>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

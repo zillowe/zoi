@@ -16,15 +16,12 @@ pub fn run(
     sources: &[String],
     repo: Option<String>,
     force: bool,
-    interactive: bool,
     all_optional: bool,
     yes: bool,
     scope: Option<crate::cli::SetupScope>,
 ) {
     if let Some(repo_spec) = repo {
-        if let Err(e) =
-            crate::pkg::repo_install::run(&repo_spec, force, interactive, all_optional, yes, scope)
-        {
+        if let Err(e) = crate::pkg::repo_install::run(&repo_spec, force, all_optional, yes, scope) {
             eprintln!(
                 "{}: Failed to install from repo '{}': {}",
                 "Error".red().bold(),
@@ -35,11 +32,7 @@ pub fn run(
         }
         return;
     }
-    let mode = if interactive {
-        install::InstallMode::Interactive
-    } else {
-        install::InstallMode::PreferBinary
-    };
+    let mode = install::InstallMode::PreferPrebuilt;
 
     let scope_override = scope.map(|s| match s {
         crate::cli::SetupScope::User => types::Scope::User,

@@ -1,118 +1,13 @@
 use crate::pkg::{cache, local, resolve, types};
 use crate::utils;
 use colored::*;
-use flate2::read::GzDecoder;
-use indicatif::{ProgressBar, ProgressStyle};
-use sha2::{Digest, Sha256, Sha512};
 use std::error::Error;
-use std::fs::{self, File};
-use std::io::{Cursor, Read, Write};
+use std::fs;
+use std::io::Cursor;
 use std::path::PathBuf;
 use std::process::Command;
 use tar::Archive;
-use tempfile::Builder;
-use walkdir::WalkDir;
-use xz2::read::XzDecoder;
-use zip::ZipArchive;
 use zstd::stream::read::Decoder as ZstdDecoder;
-
-fn get_filename_from_url(url: &str) -> &str {
-    url.split('/').next_back().unwrap_or("")
-}
-
-fn get_expected_checksum(
-    checksums: &types::Checksums,
-    file_to_verify: &str,
-    _pkg: &types::Package,
-    _platform: &str,
-) -> Result<Option<String>, Box<dyn Error>> {
-    match checksums {
-        types::Checksums::Url(url) => {
-            println!("Downloading checksums from: {}", url.cyan());
-            let response = reqwest::blocking::get(url)?.text()?;
-            for line in response.lines() {
-                let parts: Vec<&str> = line.split_whitespace().collect();
-                if parts.len() == 2 && parts[1] == file_to_verify {
-                    return Ok(Some(parts[0].to_string()));
-                }
-            }
-            if response.lines().count() == 1 && response.split_whitespace().count() == 1 {
-                return Ok(Some(response.trim().to_string()));
-            }
-            Ok(None)
-        }
-        types::Checksums::List {
-            checksum_type,
-            items,
-        } => {
-            for item in items {
-                if item.file == file_to_verify {
-                    if item.checksum.starts_with("http") {
-                        println!("Downloading checksum from: {}", item.checksum.cyan());
-                        let response = reqwest::blocking::get(&item.checksum)?.text()?;
-                        return Ok(Some(format!("{}:{}", checksum_type, response.trim())));
-                    } else {
-                        return Ok(Some(format!("{}:{}", checksum_type, item.checksum.clone())));
-                    }
-                }
-            }
-            Ok(None)
-        }
-    }
-}
-
-fn verify_checksum(
-    data: &[u8],
-    method: &types::InstallationMethod,
-    pkg: &types::Package,
-    file_to_verify: &str,
-) -> Result<(), Box<dyn Error>> {
-    if let Some(checksums) = &method.checksums {
-        println!("Verifying checksum for {}...", file_to_verify);
-        let platform = utils::get_platform()?;
-        if let Some(expected_checksum) =
-            get_expected_checksum(checksums, file_to_verify, pkg, &platform)?
-        {
-            let (algo, expected) = if let Some((a, b)) = expected_checksum.split_once(':') {
-                (a.to_lowercase(), b.to_string())
-            } else {
-                ("sha512".to_string(), expected_checksum)
-            };
-            let computed_checksum = match algo.as_str() {
-                "sha256" => {
-                    let mut hasher = Sha256::new();
-                    hasher.update(data);
-                    format!("{:x}", hasher.finalize())
-                }
-                _ => {
-                    let mut hasher = Sha512::new();
-                    hasher.update(data);
-                    format!("{:x}", hasher.finalize())
-                }
-            };
-
-            if computed_checksum.eq_ignore_ascii_case(&expected) {
-                println!("{}", "Checksum verified successfully.".green());
-                Ok(())
-            } else {
-                Err(format!(
-                    "Checksum mismatch for {}.\nExpected: {}\nComputed: {}",
-                    file_to_verify, expected, computed_checksum
-                )
-                .into())
-            }
-        } else {
-            println!(
-                "{} No checksum found for file '{}'. Skipping verification.",
-                "Warning:".yellow(),
-                file_to_verify
-            );
-            Ok(())
-        }
-    } else {
-        Ok(())
-    }
-}
 
 fn ensure_binary_is_cached(pkg: &types::Package) -> Result<PathBuf, Box<dyn Error>> {
     let cache_dir = cache::get_cache_root()?;
@@ -128,262 +23,90 @@ fn ensure_binary_is_cached(pkg: &types::Package) -> Result<PathBuf, Box<dyn Erro
         return Ok(bin_path);
     }
 
+    if !pkg.types.contains(&"pre-compiled".to_string()) {
+        return Err("zoi exec only works with 'pre-compiled' package types.".into());
+    }
+
     println!(
-        "No cached binary found for '{}'. Downloading...",
+        "No cached binary found for '{}'. Downloading pre-built package...",
         pkg.name.cyan()
     );
     fs::create_dir_all(&cache_dir)?;
 
-    let platform = utils::get_platform()?;
+    let db_path = resolve::get_db_root()?;
+    let config = crate::pkg::config::read_config()?;
+    let repo_config = if let Some(handle) = config.default_registry.as_ref().map(|r| &r.handle) {
+        crate::pkg::config::read_repo_config(&db_path.join(handle)).ok()
+    } else {
+        None
+    };
 
-    if let Some(method) = pkg.installation.iter().find(|m| {
-        m.install_type == "binary" && utils::is_platform_compatible(&platform, &m.platforms)
-    }) {
-        let url = &method.url;
+    if let Some(repo_config) = repo_config {
+        let mut pkg_links_to_try = Vec::new();
+        if let Some(main_pkg) = repo_config.pkg.iter().find(|p| p.link_type == "main") {
+            pkg_links_to_try.push(main_pkg.clone());
+        }
+        pkg_links_to_try.extend(
+            repo_config
+                .pkg
+                .iter()
+                .filter(|p| p.link_type == "mirror")
+                .cloned(),
+        );
 
-        if url.starts_with("http://") {
-            println!(
-                "{} downloading over insecure HTTP: {}",
-                "Warning:".yellow(),
-                url
+        for pkg_link in pkg_links_to_try {
+            let platform = utils::get_platform()?;
+            let (os, arch) = (
+                platform.split('-').next().unwrap_or(""),
+                platform.split('-').nth(1).unwrap_or(""),
             );
-        }
-        println!("Downloading from: {url}");
+            let url_dir = pkg_link
+                .url
+                .replace("{os}", os)
+                .replace("{arch}", arch)
+                .replace("{version}", pkg.version.as_deref().unwrap_or(""))
+                .replace("{repo}", &pkg.repo);
 
-        let response = reqwest::blocking::get(url)?;
-        if !response.status().is_success() {
-            return Err(format!("Failed to download binary: HTTP {}", response.status()).into());
-        }
+            let archive_filename = format!("{}.pkg.tar.zst", pkg.name);
+            let final_url = format!("{}/{}", url_dir.trim_end_matches('/'), archive_filename);
 
-        let total_size = response.content_length().unwrap_or(0);
-        let pb = ProgressBar::new(total_size);
-        pb.set_style(ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})")?
-            .progress_chars("#>- "));
-
-        let mut downloaded_bytes = Vec::new();
-        let mut stream = response;
-        let mut buffer = [0; 8192];
-        loop {
-            let bytes_read = stream.read(&mut buffer)?;
-            if bytes_read == 0 {
-                break;
-            }
-            downloaded_bytes.extend_from_slice(&buffer[..bytes_read]);
-            pb.inc(bytes_read as u64);
-        }
-        pb.finish_with_message("Download complete.");
-
-        let file_to_verify = get_filename_from_url(url);
-        verify_checksum(&downloaded_bytes, method, pkg, file_to_verify)?;
-
-        let mut dest = File::create(&bin_path)?;
-        dest.write_all(&downloaded_bytes)?;
-
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&bin_path, fs::Permissions::from_mode(0o755))?;
-        }
-
-        return Ok(bin_path);
-    }
-
-    if let Some(method) = pkg.installation.iter().find(|m| {
-        m.install_type == "com_binary" && utils::is_platform_compatible(&platform, &m.platforms)
-    }) {
-        let os = std::env::consts::OS;
-        let com_ext = method
-            .platform_com_ext
-            .as_ref()
-            .and_then(|ext_map| ext_map.get(os))
-            .map(|s| s.as_str())
-            .unwrap_or(if os == "windows" { "zip" } else { "tar.zst" });
-
-        let url = &method.url;
-
-        if url.starts_with("http://") {
             println!(
-                "{} downloading over insecure HTTP: {}",
-                "Warning:".yellow(),
-                url
+                "Attempting to download pre-built package from: {}",
+                final_url.cyan()
             );
-        }
-        println!("Downloading from: {url}");
 
-        let client = crate::utils::build_blocking_http_client(60)?;
-        let mut attempt = 0u32;
-        let response = loop {
-            attempt += 1;
-            match client.get(url).send() {
-                Ok(resp) => break resp,
-                Err(e) => {
-                    if attempt < 3 {
-                        eprintln!(
-                            "{}: download failed ({}). Retrying...",
-                            "Network".yellow(),
-                            e
-                        );
-                        crate::utils::retry_backoff_sleep(attempt);
-                        continue;
-                    } else {
-                        return Err(format!(
-                            "Failed to download '{}' after {} attempts: {}",
-                            url, attempt, e
-                        )
-                        .into());
+            if let Ok(downloaded_data) =
+                crate::pkg::install::util::download_file_with_progress(&final_url)
+            {
+                let temp_dir = tempfile::Builder::new().prefix("zoi-exec-ext").tempdir()?;
+                let mut archive = Archive::new(ZstdDecoder::new(Cursor::new(downloaded_data))?);
+                archive.unpack(temp_dir.path())?;
+
+                let bin_dir_in_archive = temp_dir.path().join("data/pkgstore/bin");
+                if bin_dir_in_archive.exists()
+                    && let Some(bin_name) = &pkg.bins.as_ref().and_then(|b| b.first())
+                {
+                    let bin_in_archive = bin_dir_in_archive.join(bin_name);
+                    if bin_in_archive.exists() {
+                        let final_bin_path = cache_dir.join(bin_name);
+                        fs::copy(&bin_in_archive, &final_bin_path)?;
+                        #[cfg(unix)]
+                        {
+                            use std::os::unix::fs::PermissionsExt;
+                            fs::set_permissions(
+                                &final_bin_path,
+                                fs::Permissions::from_mode(0o755),
+                            )?;
+                        }
+                        println!("Binary cached successfully.");
+                        return Ok(final_bin_path);
                     }
                 }
             }
-        };
-        if !response.status().is_success() {
-            return Err(format!("Failed to download (HTTP {}): {}", response.status(), url).into());
         }
-
-        let total_size = response.content_length().unwrap_or(0);
-        let pb = ProgressBar::new(total_size);
-        pb.set_style(ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})")?
-            .progress_chars("#>- "));
-
-        let mut downloaded_bytes = Vec::new();
-        let mut stream = response;
-        let mut buffer = [0; 8192];
-        loop {
-            let bytes_read = stream.read(&mut buffer)?;
-            if bytes_read == 0 {
-                break;
-            }
-            downloaded_bytes.extend_from_slice(&buffer[..bytes_read]);
-            pb.inc(bytes_read as u64);
-        }
-        pb.finish_with_message("Download complete.");
-
-        let file_to_verify = get_filename_from_url(url);
-        verify_checksum(&downloaded_bytes, method, pkg, file_to_verify)?;
-
-        let temp_dir = Builder::new().prefix("zoi-exec-ext").tempdir()?;
-
-        if com_ext == "zip" {
-            let mut archive = ZipArchive::new(Cursor::new(downloaded_bytes))?;
-            archive.extract(temp_dir.path())?;
-        } else if com_ext == "tar.zst" {
-            let tar = ZstdDecoder::new(Cursor::new(downloaded_bytes))?;
-            let mut archive = Archive::new(tar);
-            archive.unpack(temp_dir.path())?;
-        } else if com_ext == "tar.xz" {
-            let tar = XzDecoder::new(Cursor::new(downloaded_bytes));
-            let mut archive = Archive::new(tar);
-            archive.unpack(temp_dir.path())?;
-        } else if com_ext == "tar.gz" {
-            let tar = GzDecoder::new(Cursor::new(downloaded_bytes));
-            let mut archive = Archive::new(tar);
-            archive.unpack(temp_dir.path())?;
-        } else {
-            return Err(format!("Unsupported compression format: {}", com_ext).into());
-        }
-
-        let binary_name = &pkg.name;
-        let binary_name_with_ext = format!("{}.exe", pkg.name);
-        let declared_binary_path = method.binary_path.as_deref();
-        let mut found_binary_path = None;
-        let mut files_in_archive = Vec::new();
-
-        for entry in WalkDir::new(temp_dir.path())
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.path().is_file())
-        {
-            let path = entry.path();
-            files_in_archive.push(path.to_path_buf());
-            if let Some(bp) = declared_binary_path {
-                let rel = path
-                    .strip_prefix(temp_dir.path())
-                    .unwrap_or(path)
-                    .to_path_buf();
-                let rel_str = rel.to_string_lossy().replace('\\', "/");
-                let bp_norm = bp.replace('\\', "/");
-                let file_name = path.file_name().and_then(|o| o.to_str()).unwrap_or("");
-                let mut matched = rel_str == bp_norm;
-                if !matched && !bp_norm.contains('/') {
-                    matched = file_name == bp_norm
-                        || (cfg!(target_os = "windows")
-                            && bp_norm == binary_name.as_str()
-                            && file_name == binary_name_with_ext.as_str());
-                }
-                if matched {
-                    found_binary_path = Some(path.to_path_buf());
-                }
-            } else {
-                let file_name = path.file_name().unwrap_or_default();
-                if file_name == binary_name.as_str()
-                    || (cfg!(target_os = "windows") && file_name == binary_name_with_ext.as_str())
-                {
-                    found_binary_path = Some(path.to_path_buf());
-                }
-            }
-        }
-
-        if let Some(found_path) = found_binary_path {
-            if found_path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .map(|n| n.ends_with(".exe"))
-                .unwrap_or(false)
-            {
-                let cache_dir = cache::get_cache_root()?;
-                let bin_path_new = cache_dir.join(format!("{}.exe", pkg.name));
-                fs::copy(found_path, &bin_path_new)?;
-                #[cfg(unix)]
-                {
-                    use std::os::unix::fs::PermissionsExt;
-                    fs::set_permissions(&bin_path_new, fs::Permissions::from_mode(0o755))?;
-                }
-                return Ok(bin_path_new);
-            }
-            fs::copy(found_path, &bin_path)?;
-        } else if files_in_archive.len() == 1 {
-            println!(
-                "{}",
-                "Could not find binary by package name. Found one file, assuming it's the correct one."
-                    .yellow()
-            );
-            let only = &files_in_archive[0];
-            if only
-                .file_name()
-                .and_then(|n| n.to_str())
-                .map(|n| n.ends_with(".exe"))
-                .unwrap_or(false)
-            {
-                let cache_dir = cache::get_cache_root()?;
-                let bin_path_new = cache_dir.join(format!("{}.exe", pkg.name));
-                fs::copy(only, &bin_path_new)?;
-                #[cfg(unix)]
-                {
-                    use std::os::unix::fs::PermissionsExt;
-                    fs::set_permissions(&bin_path_new, fs::Permissions::from_mode(0o755))?;
-                }
-                return Ok(bin_path_new);
-            }
-            fs::copy(only, &bin_path)?;
-        } else {
-            return Err(format!(
-                "Could not find binary '{}' in the extracted archive.",
-                binary_name
-            )
-            .into());
-        }
-
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&bin_path, fs::Permissions::from_mode(0o755))?;
-        }
-
-        return Ok(bin_path);
     }
 
-    Err("No compatible 'binary' or 'com_binary' installation method found for this package.".into())
+    Err("Could not download pre-built package for exec.".into())
 }
 
 fn find_executable(pkg: &types::Package) -> Result<PathBuf, Box<dyn Error>> {

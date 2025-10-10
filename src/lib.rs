@@ -5,7 +5,7 @@
 //! capabilities.
 //!
 //! If you're looking for the user documentation visit [Zoi Docs](https://zillowe.qzz.io/docs/zds/zoi).
-//! For more library examples and more docs visit [Zoi Library Docs](https://zillowe.qzz.io/docs/zds/zoi/lib).
+//! For better library docs visit [Zoi Library Docs](https://zillowe.qzz.io/docs/zds/zoi/lib).
 //!
 //! # Key Features
 //!
@@ -25,7 +25,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! zoi = { version = "1.0.0" } # subjet to change
+//! zoi = { version = "1.0.0" } # subject to change
 //! ```
 //!
 //! # Examples
@@ -71,8 +71,8 @@ pub mod utils;
 pub use pkg::install::InstallMode;
 pub use pkg::pin::PinnedPackage;
 pub use pkg::types::{
-    self, Author, Checksums, Config, Dependencies, InstallManifest, InstallReason,
-    InstallationMethod, Maintainer, Package, PackageType, Scope,
+    self, Author, Config, Dependencies, InstallManifest, InstallReason, Maintainer, Package,
+    PackageType, Scope,
 };
 pub use pkg::update::UpdateResult;
 
@@ -98,20 +98,19 @@ use std::error::Error;
 /// `Ok(())` on success, or an error if installation fails.
 pub fn install(
     source: &str,
-    mode: InstallMode,
     force: bool,
     reason: InstallReason,
-    non_interactive: bool,
+    yes: bool,
 ) -> Result<(), Box<dyn Error>> {
     // Internally, run_installation uses this to track dependencies and avoid cycles.
     // For a top-level install call, we start with an empty set.
     let mut processed_deps = HashSet::new();
     pkg::install::run_installation(
         source,
-        mode,
+        InstallMode::PreferPrebuilt,
         force,
         reason,
-        non_interactive,
+        yes,
         false, // all_optional
         &mut processed_deps,
         None, // scope_override

@@ -100,11 +100,7 @@ fn run_update_single_logic(
         return Ok(());
     }
 
-    let mode = if let Some(updater_method) = &new_pkg.updater {
-        install::InstallMode::Updater(updater_method.clone())
-    } else {
-        install::InstallMode::PreferBinary
-    };
+    let mode = install::InstallMode::PreferPrebuilt;
 
     let mut processed_deps = HashSet::new();
     install::run_installation(
@@ -184,7 +180,6 @@ fn run_update_all_logic(yes: bool) -> Result<(), Box<dyn std::error::Error>> {
                 source.clone(),
                 new_pkg.version.clone(),
                 resolved_source.path.clone(),
-                new_pkg.updater.clone(),
             ));
         } else {
             upgrade_messages.push(format!("- {} is up to date.", manifest.name.cyan()));
@@ -206,17 +201,13 @@ fn run_update_all_logic(yes: bool) -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    for (source, version, path, updater) in packages_to_upgrade {
+    for (source, version, path) in packages_to_upgrade {
         println!(
             "\n--- Upgrading {} to {} ---",
             source.cyan(),
             version.as_deref().unwrap_or("N/A").green()
         );
-        let mode = if let Some(updater_method) = updater {
-            install::InstallMode::Updater(updater_method)
-        } else {
-            install::InstallMode::PreferBinary
-        };
+        let mode = install::InstallMode::PreferPrebuilt;
         let mut processed_deps = HashSet::new();
         install::run_installation(
             path.to_str().unwrap(),
