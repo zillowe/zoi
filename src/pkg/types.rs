@@ -170,8 +170,6 @@ pub struct Maintainer {
     pub name: String,
     pub email: String,
     pub website: Option<String>,
-    pub key: Option<String>,
-    pub key_name: Option<String>,
     #[serde(default)]
     pub one_time: bool,
 }
@@ -182,8 +180,6 @@ pub struct Author {
     pub name: String,
     pub email: Option<String>,
     pub website: Option<String>,
-    pub key: Option<String>,
-    pub key_name: Option<String>,
     #[serde(default)]
     pub one_time: bool,
 }

@@ -82,9 +82,6 @@ fn print_beautiful(pkg: &crate::pkg::types::Package, installed_manifest: Option<
     if let Some(website) = &pkg.maintainer.website {
         maintainer_line.push_str(&format!(" - {}", website.cyan().underline()));
     }
-    if pkg.maintainer.key.is_some() {
-        maintainer_line.push_str(&format!(" {}", "(Has Key)".dimmed()));
-    }
     println!("{}", maintainer_line);
 
     if let Some(author) = &pkg.author {
@@ -94,9 +91,6 @@ fn print_beautiful(pkg: &crate::pkg::types::Package, installed_manifest: Option<
         }
         if let Some(website) = &author.website {
             author_line.push_str(&format!(" - {}", website.cyan().underline()));
-        }
-        if author.key.is_some() {
-            author_line.push_str(&format!(" {}", "(Has Key)".dimmed()));
         }
         println!("{}", author_line);
     }

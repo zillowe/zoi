@@ -5,7 +5,7 @@ use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-fn get_pgp_dir() -> Result<PathBuf, Box<dyn Error>> {
+pub fn get_pgp_dir() -> Result<PathBuf, Box<dyn Error>> {
     let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
     let pgp_dir = home_dir.join(".zoi").join("pgps");
     fs::create_dir_all(&pgp_dir)?;
@@ -301,6 +301,8 @@ pub fn get_all_local_keys_info() -> Result<Vec<KeyInfo>, Box<dyn Error>> {
     Ok(keys)
 }
 
+use sequoia_openpgp::policy::StandardPolicy;
+
 pub fn get_all_local_certs() -> Result<Vec<Cert>, Box<dyn Error>> {
     let pgp_dir = get_pgp_dir()?;
     let mut certs = Vec::new();
@@ -319,4 +321,78 @@ pub fn get_all_local_certs() -> Result<Vec<Cert>, Box<dyn Error>> {
         }
     }
     Ok(certs)
+}
+
+use sequoia_openpgp::{
+    KeyHandle,
+    parse::stream::{DetachedVerifierBuilder, MessageLayer, MessageStructure, VerificationHelper},
+};
+
+struct OneCertHelper {
+    cert: Cert,
+}
+
+impl VerificationHelper for OneCertHelper {
+    fn get_certs(&mut self, _ids: &[KeyHandle]) -> anyhow::Result<Vec<Cert>> {
+        Ok(vec![self.cert.clone()])
+    }
+
+    fn check(&mut self, structure: MessageStructure) -> anyhow::Result<()> {
+        if let Some(layer) = structure.into_iter().next() {
+            match layer {
+                MessageLayer::SignatureGroup { results } => {
+                    if results.iter().any(|r| r.is_ok()) {
+                        return Ok(());
+                    } else {
+                        return Err(anyhow::anyhow!("No valid signature found"));
+                    }
+                }
+                _ => return Err(anyhow::anyhow!("Unexpected message structure")),
+            }
+        }
+        Err(anyhow::anyhow!("No signature layer found"))
+    }
+}
+
+pub fn cli_verify_signature(
+    file_path: &str,
+    sig_path: &str,
+    key_name: &str,
+) -> Result<(), Box<dyn Error>> {
+    println!(
+        "Verifying {} with signature {} using key '{}'",
+        file_path, sig_path, key_name
+    );
+
+    let pgp_dir = get_pgp_dir()?;
+    let key_path = pgp_dir.join(format!("{}.asc", key_name));
+    if !key_path.exists() {
+        return Err(format!("Key '{}' not found in local store.", key_name).into());
+    }
+    let key_bytes = fs::read(key_path)?;
+    let cert = Cert::from_bytes(&key_bytes)?;
+
+    verify_detached_signature(Path::new(file_path), Path::new(sig_path), &cert)?;
+
+    println!("{}", "Signature is valid.".green());
+    Ok(())
+}
+
+pub fn verify_detached_signature(
+    data_path: &Path,
+    signature_path: &Path,
+    cert: &Cert,
+) -> Result<(), Box<dyn Error>> {
+    let policy = &StandardPolicy::new();
+    let data = fs::read(data_path)?;
+    let signature = fs::read(signature_path)?;
+
+    let helper = OneCertHelper { cert: cert.clone() };
+
+    let mut verifier =
+        DetachedVerifierBuilder::from_bytes(&signature)?.with_policy(policy, None, helper)?;
+
+    verifier.verify_bytes(&data)?;
+
+    Ok(())
 }

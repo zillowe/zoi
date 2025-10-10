@@ -24,6 +24,8 @@ pub enum PgpCommands {
     Search(SearchKey),
     /// Show the public key of a stored PGP key
     Show(ShowKey),
+    /// Verify a file's detached signature
+    Verify(VerifySig),
 }
 
 #[derive(Parser, Debug)]
@@ -79,6 +81,21 @@ pub struct ShowKey {
     pub name: String,
 }
 
+#[derive(Parser, Debug)]
+pub struct VerifySig {
+    /// Path to the file to verify
+    #[arg(long)]
+    pub file: String,
+
+    /// Path to the detached signature file
+    #[arg(long)]
+    pub sig: String,
+
+    /// Name of the key in the local store to use for verification
+    #[arg(long)]
+    pub key: String,
+}
+
 pub fn run(args: PgpCommand) -> Result<(), Box<dyn Error>> {
     match args.command {
         PgpCommands::Add(add_args) => {
@@ -118,6 +135,9 @@ pub fn run(args: PgpCommand) -> Result<(), Box<dyn Error>> {
         }
         PgpCommands::Show(show_args) => {
             pkg::pgp::show_key(&show_args.name)?;
+        }
+        PgpCommands::Verify(verify_args) => {
+            pkg::pgp::cli_verify_signature(&verify_args.file, &verify_args.sig, &verify_args.key)?;
         }
     }
     Ok(())
