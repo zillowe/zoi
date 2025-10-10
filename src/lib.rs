@@ -33,16 +33,15 @@
 //! ## Installing a package
 //!
 //! ```no_run
-//! use zoi::{install, InstallMode, types::InstallReason};
+//! use zoi::{install, types::InstallReason};
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     let source = "hello";
-//!     let mode = InstallMode::PreferBinary;
 //!     let force = false;
 //!     let reason = InstallReason::Direct;
 //!     let non_interactive = true;
 //!
-//!     zoi::install(source, mode, force, reason, non_interactive)?;
+//!     zoi::install(source, force, reason, non_interactive)?;
 //!
 //!     Ok(())
 //! }
@@ -88,10 +87,9 @@ use std::error::Error;
 /// # Arguments
 ///
 /// * `source` - The package source identifier (e.g. "package-name", "@repo/package-name", "http://...", "/path/to/file.pkg.lua").
-/// * `mode` - The installation mode to use.
 /// * `force` - If true, forces re-installation even if the package is already installed.
 /// * `reason` - The reason for installation (direct user action or as a dependency).
-/// * `non_interactive` - If true, automatically confirms any prompts (answers "yes").
+/// * `yes` - If true, automatically confirms any prompts (answers "yes").
 ///
 /// # Returns
 ///
