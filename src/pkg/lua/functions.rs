@@ -9,6 +9,7 @@ use std::io::Read;
 use std::path::PathBuf;
 use std::{fs, path::Path};
 use urlencoding;
+use walkdir::WalkDir;
 use xz2::read::XzDecoder;
 use zip::ZipArchive;
 use zstd::stream::read::Decoder as ZstdDecoder;
@@ -426,8 +427,32 @@ fn add_cmd_util(lua: &Lua) -> Result<(), mlua::Error> {
     Ok(())
 }
 
+fn add_find_util(lua: &Lua) -> Result<(), mlua::Error> {
+    let find_table = lua.create_table()?;
+
+    let find_file_fn = lua.create_function(|lua, (dir, name): (String, String)| {
+        let build_dir_str: String = lua.globals().get("BUILD_DIR")?;
+        let search_dir = Path::new(&build_dir_str).join(dir);
+        for entry in WalkDir::new(search_dir) {
+            let entry = entry.map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+            if entry.file_name().to_string_lossy() == name {
+                let path = entry.path();
+                let relative_path = path.strip_prefix(Path::new(&build_dir_str)).unwrap();
+                return Ok(Some(relative_path.to_string_lossy().to_string()));
+            }
+        }
+        Ok(None)
+    })?;
+    find_table.set("file", find_file_fn)?;
+
+    let utils_table: Table = lua.globals().get("UTILS")?;
+    utils_table.set("FIND", find_table)?;
+
+    Ok(())
+}
+
 fn add_extract_util(lua: &Lua) -> Result<(), mlua::Error> {
-    let extract_fn = lua.create_function(|lua, source: String| {
+    let extract_fn = lua.create_function(|lua, (source, out_name): (String, Option<String>)| {
         let build_dir_str: String = lua.globals().get("BUILD_DIR")?;
         let build_dir = Path::new(&build_dir_str);
 
@@ -446,7 +471,8 @@ fn add_extract_util(lua: &Lua) -> Result<(), mlua::Error> {
             PathBuf::from(source)
         };
 
-        let out_dir = build_dir.join("extracted");
+        let out_dir_name = out_name.unwrap_or_else(|| "extracted".to_string());
+        let out_dir = build_dir.join(out_dir_name);
         fs::create_dir_all(&out_dir).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
 
         println!(
@@ -692,6 +718,7 @@ pub fn setup_lua_environment(
     add_verify_hash(lua)?;
     add_zrm(lua)?;
     add_cmd_util(lua)?;
+    add_find_util(lua)?;
     add_extract_util(lua)?;
     add_verify_signature(lua)?;
     add_add_pgp_key(lua)?;
