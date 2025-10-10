@@ -1,12 +1,17 @@
 use crate::utils;
+use flate2::read::GzDecoder;
 use md5;
 use mlua::{self, Lua, LuaSerdeExt, Table, Value};
 use sequoia_openpgp::{Cert, parse::Parse};
 use serde::Deserialize;
 use sha2::{Digest, Sha256, Sha512};
 use std::io::Read;
+use std::path::PathBuf;
 use std::{fs, path::Path};
 use urlencoding;
+use xz2::read::XzDecoder;
+use zip::ZipArchive;
+use zstd::stream::read::Decoder as ZstdDecoder;
 
 fn add_parse_util(lua: &Lua) -> Result<(), mlua::Error> {
     let parse_table = lua.create_table()?;
@@ -421,6 +426,81 @@ fn add_cmd_util(lua: &Lua) -> Result<(), mlua::Error> {
     Ok(())
 }
 
+fn add_extract_util(lua: &Lua) -> Result<(), mlua::Error> {
+    let extract_fn = lua.create_function(|lua, source: String| {
+        let build_dir_str: String = lua.globals().get("BUILD_DIR")?;
+        let build_dir = Path::new(&build_dir_str);
+
+        let archive_file = if source.starts_with("http") {
+            println!("Downloading: {}", source);
+            let file_name = source.split('/').next_back().unwrap_or("download.tmp");
+            let temp_path = build_dir.join(file_name);
+            let response = reqwest::blocking::get(&source)
+                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+            let content = response
+                .bytes()
+                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+            fs::write(&temp_path, content).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+            temp_path
+        } else {
+            PathBuf::from(source)
+        };
+
+        let out_dir = build_dir.join("extracted");
+        fs::create_dir_all(&out_dir).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+
+        println!(
+            "Extracting {} to {}",
+            archive_file.display(),
+            out_dir.display()
+        );
+
+        let file =
+            fs::File::open(&archive_file).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+
+        let archive_path_str = archive_file.to_string_lossy();
+
+        if archive_path_str.ends_with(".zip") {
+            let mut archive =
+                ZipArchive::new(file).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+            archive
+                .extract(&out_dir)
+                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+        } else if archive_path_str.ends_with(".tar.gz") {
+            let tar_gz = GzDecoder::new(file);
+            let mut archive = tar::Archive::new(tar_gz);
+            archive
+                .unpack(&out_dir)
+                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+        } else if archive_path_str.ends_with(".tar.zst") {
+            let tar_zst =
+                ZstdDecoder::new(file).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+            let mut archive = tar::Archive::new(tar_zst);
+            archive
+                .unpack(&out_dir)
+                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+        } else if archive_path_str.ends_with(".tar.xz") {
+            let tar_xz = XzDecoder::new(file);
+            let mut archive = tar::Archive::new(tar_xz);
+            archive
+                .unpack(&out_dir)
+                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+        } else {
+            return Err(mlua::Error::RuntimeError(format!(
+                "Unsupported archive format for file: {}",
+                archive_path_str
+            )));
+        }
+
+        Ok(())
+    })?;
+
+    let utils_table: Table = lua.globals().get("UTILS")?;
+    utils_table.set("EXTRACT", extract_fn)?;
+
+    Ok(())
+}
+
 fn add_verify_signature(lua: &Lua) -> Result<(), mlua::Error> {
     let verify_sig_fn = lua.create_function(
         |_, (file_path, sig_path, key_source): (String, String, String)| {
@@ -612,6 +692,7 @@ pub fn setup_lua_environment(
     add_verify_hash(lua)?;
     add_zrm(lua)?;
     add_cmd_util(lua)?;
+    add_extract_util(lua)?;
     add_verify_signature(lua)?;
     add_add_pgp_key(lua)?;
     add_package_lifecycle_functions(lua)?;
