@@ -37,6 +37,7 @@ commit_parsers = [
     { message = "(?i)^CI", skip = true },
     { message = "(?i)^Release", skip = true },
     { message = "(?i)^Git", skip = true },
+    { message = "(?i)^Ignore", skip = true },
 
     { message = "^Build", group = "🛠️ Build" },
     { message = "^Feat", group = "✨ Features" },
