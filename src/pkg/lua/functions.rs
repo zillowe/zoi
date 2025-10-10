@@ -1,5 +1,7 @@
 use crate::utils;
+use md5;
 use mlua::{self, Lua, LuaSerdeExt, Table, Value};
+use sequoia_openpgp::{Cert, parse::Parse};
 use serde::Deserialize;
 use sha2::{Digest, Sha256, Sha512};
 use std::io::Read;
@@ -330,6 +332,10 @@ fn add_verify_hash(lua: &Lua) -> Result<(), mlua::Error> {
             .map_err(|e| mlua::Error::RuntimeError(format!("Failed to read file: {}", e)))?;
 
         let actual_hash = match algo {
+            "md5" => {
+                let digest = md5::compute(&buffer);
+                format!("{:x}", digest)
+            }
             "sha256" => {
                 let mut hasher = Sha256::new();
                 hasher.update(&buffer);
@@ -412,6 +418,99 @@ fn add_cmd_util(lua: &Lua) -> Result<(), mlua::Error> {
         }
     })?;
     lua.globals().set("cmd", cmd_fn)?;
+    Ok(())
+}
+
+fn add_verify_signature(lua: &Lua) -> Result<(), mlua::Error> {
+    let verify_sig_fn = lua.create_function(
+        |_, (file_path, sig_path, key_source): (String, String, String)| {
+            let key_bytes: Vec<u8> = if key_source.starts_with("http") {
+                match reqwest::blocking::get(&key_source).and_then(|r| r.bytes()) {
+                    Ok(b) => b.to_vec(),
+                    Err(e) => {
+                        return Err(mlua::Error::RuntimeError(format!(
+                            "Failed to download key: {}",
+                            e
+                        )));
+                    }
+                }
+            } else if Path::new(&key_source).exists() {
+                match fs::read(&key_source) {
+                    Ok(b) => b,
+                    Err(e) => {
+                        return Err(mlua::Error::RuntimeError(format!(
+                            "Failed to read key file: {}",
+                            e
+                        )));
+                    }
+                }
+            } else {
+                let pgp_dir = match crate::pkg::pgp::get_pgp_dir() {
+                    Ok(dir) => dir,
+                    Err(e) => {
+                        return Err(mlua::Error::RuntimeError(format!(
+                            "Failed to get PGP dir: {}",
+                            e
+                        )));
+                    }
+                };
+                let key_path = pgp_dir.join(format!("{}.asc", key_source));
+                if !key_path.exists() {
+                    return Err(mlua::Error::RuntimeError(format!(
+                        "Key with name '{}' not found.",
+                        key_source
+                    )));
+                }
+                match fs::read(&key_path) {
+                    Ok(b) => b,
+                    Err(e) => {
+                        return Err(mlua::Error::RuntimeError(format!(
+                            "Failed to read key file: {}",
+                            e
+                        )));
+                    }
+                }
+            };
+
+            let cert = match Cert::from_bytes(&key_bytes) {
+                Ok(c) => c,
+                Err(e) => return Err(mlua::Error::RuntimeError(format!("Invalid PGP key: {}", e))),
+            };
+
+            let result = crate::pkg::pgp::verify_detached_signature(
+                Path::new(&file_path),
+                Path::new(&sig_path),
+                &cert,
+            );
+
+            match result {
+                Ok(_) => Ok(true),
+                Err(e) => {
+                    eprintln!("Signature verification failed: {}", e);
+                    Ok(false)
+                }
+            }
+        },
+    )?;
+    lua.globals().set("verifySignature", verify_sig_fn)?;
+    Ok(())
+}
+
+fn add_add_pgp_key(lua: &Lua) -> Result<(), mlua::Error> {
+    let add_pgp_key_fn = lua.create_function(|_, (source, name): (String, String)| {
+        let result = if source.starts_with("http") {
+            crate::pkg::pgp::add_key_from_url(&source, &name)
+        } else {
+            crate::pkg::pgp::add_key_from_path(&source, Some(&name))
+        };
+
+        if let Err(e) = result {
+            eprintln!("Failed to add PGP key '{}': {}", name, e);
+            return Ok(false);
+        }
+        Ok(true)
+    })?;
+    lua.globals().set("addPgpKey", add_pgp_key_fn)?;
     Ok(())
 }
 
@@ -513,6 +612,8 @@ pub fn setup_lua_environment(
     add_verify_hash(lua)?;
     add_zrm(lua)?;
     add_cmd_util(lua)?;
+    add_verify_signature(lua)?;
+    add_add_pgp_key(lua)?;
     add_package_lifecycle_functions(lua)?;
 
     if let Some(path_str) = file_path {
