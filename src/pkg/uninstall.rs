@@ -9,9 +9,20 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process::Command;
 
-fn get_bin_root() -> Result<PathBuf, Box<dyn Error>> {
-    let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
-    Ok(home_dir.join(".zoi").join("pkgs").join("bin"))
+fn get_bin_root(scope: types::Scope) -> Result<PathBuf, Box<dyn Error>> {
+    match scope {
+        types::Scope::User => {
+            let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
+            Ok(home_dir.join(".zoi/pkgs/bin"))
+        }
+        types::Scope::System => {
+            if cfg!(target_os = "windows") {
+                Ok(PathBuf::from("C:\\ProgramData\\zoi\\pkgs\\bin"))
+            } else {
+                Ok(PathBuf::from("/usr/local/bin"))
+            }
+        }
+    }
 }
 
 fn run_post_uninstall_hooks(pkg: &types::Package) -> Result<(), Box<dyn Error>> {
@@ -180,6 +191,24 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
     } else if pkg.package_type == types::PackageType::Script {
         script_handler::run_uninstall_commands(&pkg)?;
     }
+    if let Some(bins) = &manifest.bins {
+        let bin_root = get_bin_root(scope)?;
+        for bin in bins {
+            let symlink_path = bin_root.join(bin);
+            if symlink_path.is_symlink() || symlink_path.exists() {
+                println!("Removing symlink from {}...", symlink_path.display());
+                fs::remove_file(&symlink_path)?;
+                println!("{}", "Successfully removed symlink.".green());
+            }
+        }
+    } else {
+        let symlink_path = get_bin_root(scope)?.join(&pkg.name);
+        if symlink_path.is_symlink() || symlink_path.exists() {
+            println!("Removing symlink from {}...", symlink_path.display());
+            fs::remove_file(symlink_path)?;
+            println!("{}", "Successfully removed symlink.".green());
+        }
+    }
     let handle = registry_handle.as_deref().unwrap_or("local");
     let package_dir = local::get_package_dir(scope, handle, &pkg.repo, &pkg.name)?;
 
@@ -187,24 +216,6 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
         println!("Removing stored files from {}...", package_dir.display());
         fs::remove_dir_all(&package_dir)?;
         println!("{}", "Successfully removed stored files.".green());
-    }
-    if let Some(bins) = &manifest.bins {
-        let bin_root = get_bin_root()?;
-        for bin in bins {
-            let symlink_path = bin_root.join(bin);
-            if symlink_path.exists() {
-                println!("Removing symlink from {}...", symlink_path.display());
-                fs::remove_file(&symlink_path)?;
-                println!("{}", "Successfully removed symlink.".green());
-            }
-        }
-    } else {
-        let symlink_path = get_bin_root()?.join(&pkg.name);
-        if symlink_path.exists() {
-            println!("Removing symlink from {}...", symlink_path.display());
-            fs::remove_file(symlink_path)?;
-            println!("{}", "Successfully removed symlink.".green());
-        }
     }
     if let Err(e) = run_post_uninstall_hooks(&pkg) {
         eprintln!(
