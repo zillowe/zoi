@@ -315,6 +315,11 @@ pub struct SharableInstallManifest {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ZoiLock {
+    pub packages: HashMap<String, String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Lockfile {
     pub version: String,
     pub packages: HashMap<String, LockfilePackage>,

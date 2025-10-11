@@ -17,10 +17,13 @@ pub fn run(
         && let Ok(config) = project::config::load()
         && config.config.local
     {
+        let old_lockfile = project::lockfile::read_zoi_lock().ok();
+
         println!("Installing project packages locally...");
         let local_scope = Some(types::Scope::Project);
         let mut failed_packages = Vec::new();
         let mut processed_deps = HashSet::new();
+        let mut installed_packages_info = Vec::new();
 
         for source in &config.pkgs {
             println!("=> Installing package: {}", source.cyan().bold());
@@ -41,6 +44,10 @@ pub fn run(
                     e
                 );
                 failed_packages.push(source.to_string());
+            } else if let Ok((pkg, _, _, _, registry_handle)) =
+                resolve::resolve_package_and_version(source)
+            {
+                installed_packages_info.push((pkg, registry_handle));
             }
         }
 
@@ -54,6 +61,40 @@ pub fn run(
             }
             std::process::exit(1);
         }
+
+        let mut new_lockfile_packages = std::collections::HashMap::new();
+        for (pkg, registry_handle) in &installed_packages_info {
+            let handle = registry_handle.as_deref().unwrap_or("local");
+            if let Ok(package_dir) = crate::pkg::local::get_package_dir(
+                types::Scope::Project,
+                handle,
+                &pkg.repo,
+                &pkg.name,
+            ) {
+                let latest_dir = package_dir.join("latest");
+                if let Ok(hash) = crate::pkg::hash::calculate_dir_hash(&latest_dir) {
+                    new_lockfile_packages.insert(pkg.name.clone(), hash);
+                }
+            }
+        }
+
+        if let Some(old_lock) = old_lockfile {
+            for (pkg_name, new_hash) in &new_lockfile_packages {
+                if let Some(old_hash) = old_lock.packages.get(pkg_name)
+                    && old_hash != new_hash
+                {
+                    println!("Warning: Hash mismatch for package '{}'.", pkg_name);
+                }
+            }
+        }
+
+        let new_lockfile = types::ZoiLock {
+            packages: new_lockfile_packages,
+        };
+        if let Err(e) = project::lockfile::write_zoi_lock(&new_lockfile) {
+            eprintln!("Warning: Failed to write zoi.lock file: {}", e);
+        }
+
         return;
     }
 
