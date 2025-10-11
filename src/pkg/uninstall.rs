@@ -110,6 +110,14 @@ fn uninstall_collection(
     }
     println!("\nRemoved collection '{}'.", pkg.name);
 
+    if let Err(e) = recorder::remove_package_from_record(&pkg.name) {
+        eprintln!(
+            "{} Failed to remove package from lockfile: {}",
+            "Warning:".yellow(),
+            e
+        );
+    }
+
     match crate::pkg::telemetry::posthog_capture_event("uninstall", pkg, env!("CARGO_PKG_VERSION"))
     {
         Ok(true) => println!("{} telemetry sent", "Info:".green()),
@@ -256,7 +264,7 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
 
     if let Err(e) = recorder::remove_package_from_record(&pkg.name) {
         eprintln!(
-            "{} Failed to remove package from SBOM: {}",
+            "{} Failed to remove package from lockfile: {}",
             "Warning:".yellow(),
             e
         );
