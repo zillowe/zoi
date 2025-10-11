@@ -1,4 +1,5 @@
 use crate::pkg::{install, resolve, types};
+use crate::project;
 use crate::utils;
 use colored::Colorize;
 use std::collections::HashSet;
@@ -11,6 +12,51 @@ pub fn run(
     yes: bool,
     scope: Option<crate::cli::SetupScope>,
 ) {
+    if sources.is_empty()
+        && repo.is_none()
+        && let Ok(config) = project::config::load()
+        && config.config.local
+    {
+        println!("Installing project packages locally...");
+        let local_scope = Some(types::Scope::Project);
+        let mut failed_packages = Vec::new();
+        let mut processed_deps = HashSet::new();
+
+        for source in &config.pkgs {
+            println!("=> Installing package: {}", source.cyan().bold());
+            if let Err(e) = install::run_installation(
+                source,
+                install::InstallMode::PreferPrebuilt,
+                force,
+                types::InstallReason::Direct,
+                yes,
+                all_optional,
+                &mut processed_deps,
+                local_scope,
+            ) {
+                eprintln!(
+                    "{}: Failed to install '{}': {}",
+                    "Error".red().bold(),
+                    source,
+                    e
+                );
+                failed_packages.push(source.to_string());
+            }
+        }
+
+        if !failed_packages.is_empty() {
+            eprintln!(
+                "\n{}: The following packages failed to install:",
+                "Error".red().bold()
+            );
+            for pkg in &failed_packages {
+                eprintln!("  - {}", pkg);
+            }
+            std::process::exit(1);
+        }
+        return;
+    }
+
     if let Some(repo_spec) = repo {
         if let Err(e) = crate::pkg::repo_install::run(&repo_spec, force, all_optional, yes, scope) {
             eprintln!(

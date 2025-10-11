@@ -22,6 +22,10 @@ fn get_bin_root(scope: types::Scope) -> Result<PathBuf, Box<dyn Error>> {
                 Ok(PathBuf::from("/usr/local/bin"))
             }
         }
+        types::Scope::Project => {
+            let current_dir = std::env::current_dir()?;
+            Ok(current_dir.join(".zoi").join("pkgs").join("bin"))
+        }
     }
 }
 

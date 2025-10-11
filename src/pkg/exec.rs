@@ -9,7 +9,10 @@ use std::process::Command;
 use tar::Archive;
 use zstd::stream::read::Decoder as ZstdDecoder;
 
-fn ensure_binary_is_cached(pkg: &types::Package) -> Result<PathBuf, Box<dyn Error>> {
+fn ensure_binary_is_cached(
+    pkg: &types::Package,
+    upstream: bool,
+) -> Result<PathBuf, Box<dyn Error>> {
     let cache_dir = cache::get_cache_root()?;
     let binary_filename = if cfg!(target_os = "windows") {
         format!("{}.exe", pkg.name)
@@ -17,6 +20,10 @@ fn ensure_binary_is_cached(pkg: &types::Package) -> Result<PathBuf, Box<dyn Erro
         pkg.name.clone()
     };
     let bin_path = cache_dir.join(&binary_filename);
+
+    if upstream && bin_path.exists() {
+        fs::remove_file(&bin_path)?;
+    }
 
     if bin_path.exists() {
         println!("Using cached binary for '{}'.", pkg.name.cyan());
@@ -109,59 +116,105 @@ fn ensure_binary_is_cached(pkg: &types::Package) -> Result<PathBuf, Box<dyn Erro
     Err("Could not download pre-built package for exec.".into())
 }
 
-fn find_executable(pkg: &types::Package) -> Result<PathBuf, Box<dyn Error>> {
-    if let Ok(Some(_)) = local::is_package_installed(&pkg.name, types::Scope::User) {
-        let store_root = local::get_store_base_dir(types::Scope::User)?;
+fn find_executable(
+    pkg: &types::Package,
+    upstream: bool,
+    cache_only: bool,
+    local_only: bool,
+    registry_handle: Option<&str>,
+) -> Result<PathBuf, Box<dyn Error>> {
+    let handle = registry_handle.unwrap_or("local");
+
+    if upstream {
+        return ensure_binary_is_cached(pkg, true);
+    }
+
+    let scopes_to_check = if local_only {
+        vec![types::Scope::Project]
+    } else {
+        vec![
+            types::Scope::Project,
+            types::Scope::User,
+            types::Scope::System,
+        ]
+    };
+
+    for scope in scopes_to_check {
+        if let Ok(package_dir) = local::get_package_dir(scope, handle, &pkg.repo, &pkg.name) {
+            let latest_path = package_dir.join("latest");
+            if latest_path.exists() {
+                let binary_filename = if cfg!(target_os = "windows") {
+                    format!("{}.exe", pkg.name)
+                } else {
+                    pkg.name.clone()
+                };
+                let bin_path = latest_path.join("bin").join(binary_filename);
+                if bin_path.exists() {
+                    let scope_str = match scope {
+                        types::Scope::Project => "project-local",
+                        types::Scope::User => "user",
+                        types::Scope::System => "system",
+                    };
+                    println!("Using {} binary for '{}'.", scope_str, pkg.name.cyan());
+                    return Ok(bin_path);
+                }
+            }
+        }
+    }
+
+    if local_only {
+        return Err("No local project binary found.".into());
+    }
+
+    if cache_only {
+        let cache_dir = cache::get_cache_root()?;
         let binary_filename = if cfg!(target_os = "windows") {
             format!("{}.exe", pkg.name)
         } else {
             pkg.name.clone()
         };
-        let path = store_root
-            .join(&pkg.name)
-            .join("bin")
-            .join(&binary_filename);
-        if path.exists() {
-            println!("Using user-installed binary for '{}'.", pkg.name.cyan());
-            return Ok(path);
+        let bin_path = cache_dir.join(&binary_filename);
+        if bin_path.exists() {
+            println!("Using cached binary for '{}'.", pkg.name.cyan());
+            return Ok(bin_path);
         }
+        return Err("No cached binary found.".into());
     }
 
-    if let Ok(Some(_)) = local::is_package_installed(&pkg.name, types::Scope::System) {
-        let store_root = local::get_store_base_dir(types::Scope::System)?;
-        let binary_filename = if cfg!(target_os = "windows") {
-            format!("{}.exe", pkg.name)
-        } else {
-            pkg.name.clone()
-        };
-        let path = store_root
-            .join(&pkg.name)
-            .join("bin")
-            .join(&binary_filename);
-        if path.exists() {
-            println!("Using system-installed binary for '{}'.", pkg.name.cyan());
-            return Ok(path);
-        }
-    }
-
-    ensure_binary_is_cached(pkg)
+    ensure_binary_is_cached(pkg, false)
 }
 
-pub fn run(source: &str, args: Vec<String>) -> Result<(), Box<dyn Error>> {
+pub fn run(
+    source: &str,
+    args: Vec<String>,
+    upstream: bool,
+    cache_only: bool,
+    local_only: bool,
+) -> Result<(), Box<dyn Error>> {
     let resolved_source = resolve::resolve_source(source)?;
 
     if let Some(repo_name) = &resolved_source.repo_name {
         utils::print_repo_warning(repo_name);
     }
 
-    let pkg: types::Package =
+    let mut pkg: types::Package =
         crate::pkg::lua::parser::parse_lua_package(resolved_source.path.to_str().unwrap(), None)?;
+
+    if let Some(repo_name) = resolved_source.repo_name.clone() {
+        pkg.repo = repo_name;
+    }
 
     if pkg.package_type == types::PackageType::App {
         return Err("This package is an 'app' template. Use 'zoi create <pkg> <appName>' to create an app from it.".into());
     }
 
-    let bin_path = find_executable(&pkg)?;
+    let bin_path = find_executable(
+        &pkg,
+        upstream,
+        cache_only,
+        local_only,
+        resolved_source.registry_handle.as_deref(),
+    )?;
 
     match crate::pkg::telemetry::posthog_capture_event("exec", &pkg, env!("CARGO_PKG_VERSION")) {
         Ok(true) => println!("{} telemetry sent", "Info:".green()),

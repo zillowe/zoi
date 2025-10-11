@@ -4,12 +4,22 @@ use std::error::Error;
 use std::fs;
 use std::path::Path;
 
+#[derive(Debug, Deserialize, Default)]
+pub struct ProjectLocalConfig {
+    #[serde(default)]
+    pub local: bool,
+}
+
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct ProjectConfig {
     pub name: String,
     #[serde(default)]
     pub packages: Vec<PackageCheck>,
+    #[serde(default)]
+    pub pkgs: Vec<String>,
+    #[serde(default)]
+    pub config: ProjectLocalConfig,
     #[serde(default)]
     pub commands: Vec<CommandSpec>,
     #[serde(default)]

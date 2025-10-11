@@ -21,6 +21,10 @@ pub fn get_store_base_dir(scope: Scope) -> Result<PathBuf, Box<dyn Error>> {
                 Ok(PathBuf::from("/var/lib/zoi/pkgs/store"))
             }
         }
+        Scope::Project => {
+            let current_dir = std::env::current_dir()?;
+            Ok(current_dir.join(".zoi").join("pkgs").join("store"))
+        }
     }
 }
 
@@ -54,7 +58,7 @@ fn get_db_root() -> Result<PathBuf, Box<dyn Error>> {
 
 pub fn get_installed_packages() -> Result<Vec<InstallManifest>, Box<dyn Error>> {
     let mut installed = Vec::new();
-    for scope in [Scope::User, Scope::System] {
+    for scope in [Scope::User, Scope::System, Scope::Project] {
         let store_root = get_store_base_dir(scope)?;
         if !store_root.exists() {
             continue;

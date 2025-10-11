@@ -233,7 +233,7 @@ enum Commands {
     #[command(alias = "i")]
     Install {
         /// Package names, local paths, or URLs to .pkg.lua files
-        #[arg(value_name = "SOURCES", value_hint = ValueHint::FilePath, value_parser = PkgOrPathParser, hide_possible_values = true, required_unless_present = "repo")]
+        #[arg(value_name = "SOURCES", value_hint = ValueHint::FilePath, value_parser = PkgOrPathParser, hide_possible_values = true)]
         sources: Vec<String>,
         /// Install from a git repository (e.g. 'Zillowe/Hello', 'gl:Zillowe/Hello')
         #[arg(long, value_name = "REPO", conflicts_with = "sources")]
@@ -371,6 +371,18 @@ enum Commands {
         /// Package name, local path, or URL to execute
         #[arg(value_name = "SOURCE", value_parser = PkgOrPathParser, value_hint = ValueHint::FilePath, hide_possible_values = true)]
         source: String,
+
+        /// Force execution from a fresh download, bypassing any cache.
+        #[arg(long)]
+        upstream: bool,
+
+        /// Force execution from the cache, failing if the package is not cached.
+        #[arg(long)]
+        cache: bool,
+
+        /// Force execution from the local project installation.
+        #[arg(long)]
+        local: bool,
 
         /// Arguments to pass to the executed command
         #[arg(value_name = "ARGS")]
@@ -644,8 +656,14 @@ pub fn run() {
                 cmd::setup::run(scope);
                 Ok(())
             }
-            Commands::Exec { source, args } => {
-                cmd::exec::run(source, args);
+            Commands::Exec {
+                source,
+                upstream,
+                cache,
+                local,
+                args,
+            } => {
+                cmd::exec::run(source, args, upstream, cache, local);
                 Ok(())
             }
             Commands::Clean => {

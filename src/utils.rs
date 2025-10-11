@@ -318,6 +318,10 @@ use crate::pkg::types::Scope;
 use std::path::PathBuf;
 
 pub fn setup_path(scope: Scope) -> Result<(), Box<dyn Error>> {
+    if scope == Scope::Project {
+        return Ok(());
+    }
+
     let zoi_bin_dir = match scope {
         Scope::User => home::home_dir()
             .ok_or("Could not find home directory.")?
@@ -331,6 +335,7 @@ pub fn setup_path(scope: Scope) -> Result<(), Box<dyn Error>> {
                 PathBuf::from("/usr/local/bin")
             }
         }
+        Scope::Project => return Ok(()),
     };
 
     if !zoi_bin_dir.exists() {

@@ -5,17 +5,22 @@ use std::error::Error;
 use std::fs;
 use std::path::PathBuf;
 
-fn get_lockfile_path() -> Result<PathBuf, Box<dyn Error>> {
-    let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
-    let path = home_dir.join(".zoi").join("pkgs").join("zoi.pkgs.json");
+fn get_lockfile_path(scope: types::Scope) -> Result<PathBuf, Box<dyn Error>> {
+    let path = if scope == types::Scope::Project {
+        std::env::current_dir()?.join("zoi.pkgs.json")
+    } else {
+        let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
+        home_dir.join(".zoi").join("pkgs").join("zoi.pkgs.json")
+    };
+
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
     Ok(path)
 }
 
-fn read_lockfile() -> Result<types::Lockfile, Box<dyn Error>> {
-    let path = get_lockfile_path()?;
+fn read_lockfile(scope: types::Scope) -> Result<types::Lockfile, Box<dyn Error>> {
+    let path = get_lockfile_path(scope)?;
     if !path.exists() || fs::read_to_string(&path)?.trim().is_empty() {
         return Ok(types::Lockfile {
             version: env!("CARGO_PKG_VERSION").to_string(),
@@ -27,8 +32,8 @@ fn read_lockfile() -> Result<types::Lockfile, Box<dyn Error>> {
     Ok(lockfile)
 }
 
-fn write_lockfile(lockfile: &types::Lockfile) -> Result<(), Box<dyn Error>> {
-    let path = get_lockfile_path()?;
+fn write_lockfile(lockfile: &types::Lockfile, scope: types::Scope) -> Result<(), Box<dyn Error>> {
+    let path = get_lockfile_path(scope)?;
     let content = serde_json::to_string_pretty(lockfile)?;
     fs::write(path, content)?;
     Ok(())
@@ -42,7 +47,7 @@ pub fn record_package(
     chosen_options: &[String],
     chosen_optionals: &[String],
 ) -> Result<(), Box<dyn Error>> {
-    let mut lockfile = read_lockfile()?;
+    let mut lockfile = read_lockfile(pkg.scope)?;
 
     let package_id = utils::generate_package_id(registry_handle, &pkg.repo);
 
@@ -64,11 +69,14 @@ pub fn record_package(
     lockfile.packages.insert(package_id, lockfile_pkg);
     lockfile.version = env!("CARGO_PKG_VERSION").to_string();
 
-    write_lockfile(&lockfile)
+    write_lockfile(&lockfile, pkg.scope)
 }
 
-pub fn remove_package_from_record(package_name: &str) -> Result<(), Box<dyn Error>> {
-    let mut lockfile = read_lockfile()?;
+pub fn remove_package_from_record(
+    package_name: &str,
+    scope: types::Scope,
+) -> Result<(), Box<dyn Error>> {
+    let mut lockfile = read_lockfile(scope)?;
 
     let key_to_remove = lockfile
         .packages
@@ -80,7 +88,7 @@ pub fn remove_package_from_record(package_name: &str) -> Result<(), Box<dyn Erro
         && lockfile.packages.remove(&key).is_some()
     {
         lockfile.version = env!("CARGO_PKG_VERSION").to_string();
-        write_lockfile(&lockfile)?;
+        write_lockfile(&lockfile, scope)?;
     }
 
     Ok(())

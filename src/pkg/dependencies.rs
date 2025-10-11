@@ -1,4 +1,4 @@
-use crate::pkg::{install, local, resolve, types};
+use crate::pkg::{install, local, types};
 use crate::utils;
 use colored::*;
 use dialoguer::{Input, Select, theme::ColorfulTheme};
@@ -1257,10 +1257,8 @@ fn install_zoi_dependency(
     processed_deps: &mut HashSet<String>,
     scope: types::Scope,
 ) -> Result<(), Box<dyn Error>> {
-    let resolved_source = resolve::resolve_source(package_name)?;
-
     install::run_installation(
-        resolved_source.path.to_str().unwrap(),
+        package_name,
         install::InstallMode::PreferPrebuilt,
         false,
         crate::pkg::types::InstallReason::Dependency {

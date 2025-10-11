@@ -62,21 +62,47 @@ pub fn run(
         fetch_from_upstream()?
     } else {
         let handle = registry_handle.as_deref().unwrap_or("local");
-        let package_dir = local::get_package_dir(pkg.scope, handle, &pkg.repo, &pkg.name)?;
-        let latest_dir = package_dir.join("latest");
-        let man_md_path = latest_dir.join("man.md");
-        let man_txt_path = latest_dir.join("man.txt");
+        let scopes_to_check = [
+            crate::pkg::types::Scope::Project,
+            crate::pkg::types::Scope::User,
+            crate::pkg::types::Scope::System,
+        ];
+        let mut found_manual = None;
 
-        if man_md_path.exists() {
-            if !raw {
-                println!("Displaying locally installed manual (Markdown)...");
+        for scope in scopes_to_check {
+            if let Ok(package_dir) = local::get_package_dir(scope, handle, &pkg.repo, &pkg.name) {
+                let latest_dir = package_dir.join("latest");
+                if !latest_dir.exists() {
+                    continue;
+                }
+
+                let man_md_path = latest_dir.join("man.md");
+                let man_txt_path = latest_dir.join("man.txt");
+
+                if man_md_path.exists() {
+                    if !raw {
+                        println!(
+                            "Displaying locally installed manual (Markdown) from {:?} scope...",
+                            scope
+                        );
+                    }
+                    found_manual = Some(fs::read_to_string(man_md_path)?);
+                    break;
+                } else if man_txt_path.exists() {
+                    if !raw {
+                        println!(
+                            "Displaying locally installed manual (text) from {:?} scope...",
+                            scope
+                        );
+                    }
+                    found_manual = Some(fs::read_to_string(man_txt_path)?);
+                    break;
+                }
             }
-            fs::read_to_string(man_md_path)?
-        } else if man_txt_path.exists() {
-            if !raw {
-                println!("Displaying locally installed manual (text)...");
-            }
-            fs::read_to_string(man_txt_path)?
+        }
+
+        if let Some(manual_content) = found_manual {
+            manual_content
         } else {
             fetch_from_upstream()?
         }

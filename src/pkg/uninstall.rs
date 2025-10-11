@@ -22,6 +22,10 @@ fn get_bin_root(scope: types::Scope) -> Result<PathBuf, Box<dyn Error>> {
                 Ok(PathBuf::from("/usr/local/bin"))
             }
         }
+        types::Scope::Project => {
+            let current_dir = std::env::current_dir()?;
+            Ok(current_dir.join(".zoi").join("pkgs").join("bin"))
+        }
     }
 }
 
@@ -108,9 +112,7 @@ fn uninstall_collection(
     if package_dir.exists() {
         fs::remove_dir_all(&package_dir)?;
     }
-    println!("\nRemoved collection '{}'.", pkg.name);
-
-    if let Err(e) = recorder::remove_package_from_record(&pkg.name) {
+    if let Err(e) = recorder::remove_package_from_record(&pkg.name, scope) {
         eprintln!(
             "{} Failed to remove package from lockfile: {}",
             "Warning:".yellow(),
@@ -129,16 +131,19 @@ fn uninstall_collection(
 }
 
 pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
-    let (pkg, _, _, pkg_lua_path, registry_handle) =
-        resolve::resolve_package_and_version(package_name)?;
     let (manifest, scope) =
-        if let Some(m) = local::is_package_installed(&pkg.name, types::Scope::User)? {
+        if let Some(m) = local::is_package_installed(package_name, types::Scope::Project)? {
+            (m, types::Scope::Project)
+        } else if let Some(m) = local::is_package_installed(package_name, types::Scope::User)? {
             (m, types::Scope::User)
-        } else if let Some(m) = local::is_package_installed(&pkg.name, types::Scope::System)? {
+        } else if let Some(m) = local::is_package_installed(package_name, types::Scope::System)? {
             (m, types::Scope::System)
         } else {
             return Err(format!("Package '{}' is not installed by Zoi.", package_name).into());
         };
+
+    let (pkg, _, _, pkg_lua_path, registry_handle) =
+        resolve::resolve_package_and_version(&manifest.name)?;
 
     if pkg.package_type == types::PackageType::Collection {
         return uninstall_collection(&pkg, &manifest, scope, registry_handle);
@@ -262,7 +267,7 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
         }
     }
 
-    if let Err(e) = recorder::remove_package_from_record(&pkg.name) {
+    if let Err(e) = recorder::remove_package_from_record(&pkg.name, scope) {
         eprintln!(
             "{} Failed to remove package from lockfile: {}",
             "Warning:".yellow(),

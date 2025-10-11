@@ -8,6 +8,7 @@ pub enum Scope {
     #[default]
     User,
     System,
+    Project,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]

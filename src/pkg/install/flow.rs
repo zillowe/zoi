@@ -607,7 +607,8 @@ fn run_default_flow(
 ) -> Result<Vec<String>, Box<dyn Error>> {
     if mode == InstallMode::PreferPrebuilt {
         let db_path = resolve::get_db_root()?;
-        if let Ok(repo_config) = config::read_repo_config(&db_path) {
+        let repo_db_path = db_path.join(registry_handle);
+        if let Ok(repo_config) = config::read_repo_config(&repo_db_path) {
             let mut pkg_links_to_try = Vec::new();
             if let Some(main_pkg) = repo_config.pkg.iter().find(|p| p.link_type == "main") {
                 pkg_links_to_try.push(main_pkg.clone());

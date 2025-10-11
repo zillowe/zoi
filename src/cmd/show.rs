@@ -110,6 +110,7 @@ fn print_beautiful(pkg: &crate::pkg::types::Package, installed_manifest: Option<
     let scope_display = match pkg.scope {
         crate::pkg::types::Scope::User => "User",
         crate::pkg::types::Scope::System => "System",
+        crate::pkg::types::Scope::Project => "Project",
     };
     println!("{}: {}", "Scope".bold(), scope_display);
 
