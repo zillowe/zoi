@@ -63,7 +63,6 @@ clap_mangen = "0.2.29"
 colored = "3.0.0"
 comfy-table = "7.1.4"
 crossterm = "0.29.0"
-cyclonedx-bom = "0.8.0"
 dialoguer = "0.11.0"
 dirs = "6.0.0"
 flate2 = "1.1.4"
@@ -77,7 +76,6 @@ mlua = { version = "0.11.3", features = ["luau", "serde"] }
 nix = { version = "0.30.1", features = ["user"] }
 openssl = { version = "0.10.73", features = ["vendored"] }
 pulldown-cmark = { version = "0.13.0", default-features = false }
-purl = "0.1.6"
 ratatui = { version = "0.29.0", features = ["crossterm"] }
 regex = "1.11.1"
 reqwest = { version = "0.12.22", features = ["blocking"] }
