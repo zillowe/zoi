@@ -165,15 +165,22 @@ pub fn run_installation(
         }
         manifest::write_manifest(
             &pkg,
-            reason,
-            installed_deps_list,
+            reason.clone(),
+            installed_deps_list.clone(),
             None,
             Vec::new(),
             handle,
             &chosen_options,
             &chosen_optionals,
         )?;
-        if let Err(e) = recorder::record_package(&pkg, &chosen_options, &chosen_optionals) {
+        if let Err(e) = recorder::record_package(
+            &pkg,
+            &reason,
+            &installed_deps_list,
+            handle,
+            &chosen_options,
+            &chosen_optionals,
+        ) {
             eprintln!("Warning: failed to record package installation: {}", e);
         }
         println!("Collection '{}' installed successfully.", pkg.name.green());
@@ -256,17 +263,26 @@ pub fn run_installation(
         }
         manifest::write_manifest(
             &pkg,
-            reason,
-            installed_deps_list,
+            reason.clone(),
+            installed_deps_list.clone(),
             None,
             Vec::new(),
             handle,
             &chosen_options,
             &chosen_optionals,
         )?;
-        if let Err(e) = recorder::record_package(&pkg, &chosen_options, &chosen_optionals) {
+
+        if let Err(e) = recorder::record_package(
+            &pkg,
+            &reason,
+            &installed_deps_list,
+            handle,
+            &chosen_options,
+            &chosen_optionals,
+        ) {
             eprintln!("Warning: failed to record package installation: {}", e);
         }
+
         println!("Configuration '{}' registered.", pkg.name.green());
 
         util::send_telemetry("install", &pkg);
@@ -352,15 +368,22 @@ pub fn run_installation(
         }
         manifest::write_manifest(
             &pkg,
-            reason,
-            installed_deps_list,
+            reason.clone(),
+            installed_deps_list.clone(),
             None,
             Vec::new(),
             handle,
             &chosen_options,
             &chosen_optionals,
         )?;
-        if let Err(e) = recorder::record_package(&pkg, &chosen_options, &chosen_optionals) {
+        if let Err(e) = recorder::record_package(
+            &pkg,
+            &reason,
+            &installed_deps_list,
+            handle,
+            &chosen_options,
+            &chosen_optionals,
+        ) {
             eprintln!("Warning: failed to record package installation: {}", e);
         }
         println!("Script '{}' registered.", pkg.name.green());
@@ -504,15 +527,22 @@ pub fn run_installation(
 
             manifest::write_manifest(
                 &pkg,
-                reason,
-                installed_deps_list,
+                reason.clone(),
+                installed_deps_list.clone(),
                 Some("prebuilt-archive".to_string()),
                 installed_files,
                 handle,
                 &chosen_options,
                 &chosen_optionals,
             )?;
-            if let Err(e) = recorder::record_package(&pkg, &chosen_options, &chosen_optionals) {
+            if let Err(e) = recorder::record_package(
+                &pkg,
+                &reason,
+                &installed_deps_list,
+                handle,
+                &chosen_options,
+                &chosen_optionals,
+            ) {
                 eprintln!("Warning: failed to record package installation: {}", e);
             }
             if let Err(e) = utils::setup_path(pkg.scope) {

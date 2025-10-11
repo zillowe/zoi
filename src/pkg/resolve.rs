@@ -763,8 +763,11 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, B
         let content = fs::read_to_string(&path)?;
         let sharable_manifest: types::SharableInstallManifest = serde_yaml::from_str(&content)?;
         let new_source = format!(
-            "@{}/{}@{}",
-            sharable_manifest.repo, sharable_manifest.name, sharable_manifest.version
+            "#{}@{}/{}@{}",
+            sharable_manifest.registry_handle,
+            sharable_manifest.repo,
+            sharable_manifest.name,
+            sharable_manifest.version
         );
         let mut resolved_source = resolve_source_recursive(&new_source, depth + 1)?;
         resolved_source.sharable_manifest = Some(sharable_manifest);

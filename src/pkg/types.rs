@@ -300,12 +300,40 @@ pub struct Config {
     pub rollback_enabled: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct SharableInstallManifest {
     pub name: String,
     pub version: String,
     pub repo: String,
+    pub registry_handle: String,
     pub scope: Scope,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub chosen_options: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub chosen_optionals: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Lockfile {
+    pub version: String,
+    pub packages: HashMap<String, LockfilePackage>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LockfilePackage {
+    pub name: String,
+    pub repo: String,
+    pub registry: String,
+    pub version: String,
+    pub date: String,
+    pub reason: InstallReason,
+    pub scope: Scope,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bins: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub conflicts: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dependencies: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub chosen_options: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
