@@ -1,5 +1,4 @@
 etc
-test
 scripts/compiled
 scripts/archived
 scripts/release
@@ -9,6 +8,7 @@ config.mk
 packages/js/node_modules
 packages/js/dist
 dist/*
+.zoi/
 
 # Added by GCT
 gct.yaml

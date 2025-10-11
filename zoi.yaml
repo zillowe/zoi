@@ -1,7 +1,4 @@
 name: "Zoi"
-packages:
-  - name: "cargo"
-    check: "cargo --version"
 
 commands:
   - cmd: "build"
