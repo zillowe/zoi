@@ -8,7 +8,8 @@ use std::fs;
 pub fn try_build_install(
     pkg_lua_path: &std::path::Path,
     pkg: &types::Package,
-) -> Result<(), Box<dyn Error>> {
+    registry_handle: &str,
+) -> Result<Vec<String>, Box<dyn Error>> {
     println!("{}", "Attempting to build and install package...".yellow());
 
     let build_type = if pkg.types.contains(&"pre-compiled".to_string()) {
@@ -40,12 +41,11 @@ pub fn try_build_install(
     }
     println!("'build' step successful.");
 
-    if let Err(e) = crate::pkg::package::install::run(&archive_path, Some(pkg.scope)) {
-        return Err(format!("'install' step failed: {}", e).into());
-    }
+    let installed_files =
+        crate::pkg::package::install::run(&archive_path, Some(pkg.scope), registry_handle)?;
     println!("'install' step successful.");
 
     let _ = fs::remove_file(&archive_path);
 
-    Ok(())
+    Ok(installed_files)
 }

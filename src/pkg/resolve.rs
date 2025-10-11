@@ -232,7 +232,7 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
                 found_packages.push(FoundPackage {
                     path,
                     source_type,
-                    repo_name: repo_name.clone(),
+                    repo_name: pkg.repo.clone(),
                     description: pkg.description,
                 });
             }
@@ -288,16 +288,10 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
                         SourceType::UntrustedRepo(repo_name.clone())
                     };
 
-                    let full_repo_path = pkg_dir_path
-                        .strip_prefix(&db_root)
-                        .unwrap_or(pkg_dir_path)
-                        .to_string_lossy()
-                        .to_string();
-
                     found_packages.push(FoundPackage {
                         path: pkg_file_path,
                         source_type,
-                        repo_name: full_repo_path,
+                        repo_name: pkg.repo.clone(),
                         description: pkg.description,
                     });
                 }

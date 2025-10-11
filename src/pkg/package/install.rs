@@ -1,6 +1,5 @@
 use crate::pkg::{local, lua, types};
 use crate::utils;
-use chrono::Utc;
 use colored::*;
 use std::error::Error;
 use std::fs::{self, File};
@@ -43,7 +42,8 @@ fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), std::io::Error> {
 pub fn run(
     package_file: &Path,
     scope_override: Option<types::Scope>,
-) -> Result<(), Box<dyn Error>> {
+    registry_handle: &str,
+) -> Result<Vec<String>, Box<dyn Error>> {
     let scope = scope_override.unwrap_or(types::Scope::User);
 
     println!(
@@ -86,7 +86,6 @@ pub fn run(
         version.yellow()
     );
 
-    let registry_handle = "local";
     let version_dir = local::get_package_version_dir(
         scope,
         registry_handle,
@@ -200,26 +199,6 @@ pub fn run(
         }
     }
 
-    let manifest = types::InstallManifest {
-        name: metadata.name.clone(),
-        version: version.clone(),
-        repo: metadata.repo.clone(),
-        registry_handle: registry_handle.to_string(),
-        package_type: metadata.package_type,
-        installed_at: Utc::now().to_rfc3339(),
-        reason: types::InstallReason::Direct,
-        scope,
-        bins: metadata.bins.clone(),
-        conflicts: metadata.conflicts,
-        installed_dependencies: vec![],
-        chosen_options: vec![],
-        chosen_optionals: vec![],
-        install_method: Some("prebuilt-archive".to_string()),
-        installed_files,
-    };
-
-    local::write_manifest(&manifest)?;
-
-    println!("{} Installation complete.", "Success:".green());
-    Ok(())
+    println!("{} File installation complete.", "Success:".green());
+    Ok(installed_files)
 }

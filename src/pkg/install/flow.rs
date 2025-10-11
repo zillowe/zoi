@@ -479,54 +479,65 @@ pub fn run_installation(
 
     let mut install_manual = true;
 
-    let result = run_default_flow(&pkg, &pkg_lua_path, &platform, &mut install_manual, mode);
+    let result = run_default_flow(
+        &pkg,
+        &pkg_lua_path,
+        &platform,
+        &mut install_manual,
+        mode,
+        handle,
+    );
 
-    if result.is_ok() {
-        let version_dir =
-            local::get_package_version_dir(pkg.scope, handle, &pkg.repo, &pkg.name, &version)?;
-        if let types::InstallReason::Dependency { ref parent } = reason {
-            let package_dir = version_dir.parent().ok_or("Invalid version dir")?;
-            local::add_dependent(package_dir, parent)?;
-        }
-        if install_manual && let Err(e) = post_install::install_manual_if_available(&pkg) {
-            eprintln!("Warning: failed to install manual: {}", e);
-        }
+    match result {
+        Ok(installed_files) => {
+            let version_dir =
+                local::get_package_version_dir(pkg.scope, handle, &pkg.repo, &pkg.name, &version)?;
+            if let types::InstallReason::Dependency { ref parent } = reason {
+                let package_dir = version_dir.parent().ok_or("Invalid version dir")?;
+                local::add_dependent(package_dir, parent)?;
+            }
+            if install_manual
+                && let Err(e) = post_install::install_manual_if_available(&pkg, &version, handle)
+            {
+                eprintln!("Warning: failed to install manual: {}", e);
+            }
 
-        manifest::write_manifest(
-            &pkg,
-            reason,
-            installed_deps_list,
-            Some("prebuilt-archive".to_string()),
-            vec![],
-            handle,
-            &chosen_options,
-            &chosen_optionals,
-        )?;
-        if let Err(e) = recorder::record_package(&pkg, &chosen_options, &chosen_optionals) {
-            eprintln!("Warning: failed to record package installation: {}", e);
-        }
-        if let Err(e) = utils::setup_path(pkg.scope) {
-            eprintln!("{} Failed to configure PATH: {}", "Warning:".yellow(), e);
-        }
+            manifest::write_manifest(
+                &pkg,
+                reason,
+                installed_deps_list,
+                Some("prebuilt-archive".to_string()),
+                installed_files,
+                handle,
+                &chosen_options,
+                &chosen_optionals,
+            )?;
+            if let Err(e) = recorder::record_package(&pkg, &chosen_options, &chosen_optionals) {
+                eprintln!("Warning: failed to record package installation: {}", e);
+            }
+            if let Err(e) = utils::setup_path(pkg.scope) {
+                eprintln!("{} Failed to configure PATH: {}", "Warning:".yellow(), e);
+            }
 
-        util::send_telemetry("install", &pkg);
+            util::send_telemetry("install", &pkg);
 
-        if pkg.post_install.is_some()
-            && utils::ask_for_confirmation(
-                "This package has post-installation commands. Do you want to run them?",
-                yes,
-            )
-            && let Err(e) = post_install::run_post_install_hooks(&pkg)
-        {
-            eprintln!(
-                "{} Post-installation commands failed: {}",
-                "Warning:".yellow(),
-                e
-            );
+            if pkg.post_install.is_some()
+                && utils::ask_for_confirmation(
+                    "This package has post-installation commands. Do you want to run them?",
+                    yes,
+                )
+                && let Err(e) = post_install::run_post_install_hooks(&pkg)
+            {
+                eprintln!(
+                    "{} Post-installation commands failed: {}",
+                    "Warning:".yellow(),
+                    e
+                );
+            }
+            Ok(())
         }
+        Err(e) => Err(e),
     }
-
-    result
 }
 
 fn run_script_install_commands(pkg: &types::Package) -> Result<(), Box<dyn Error>> {
@@ -562,7 +573,8 @@ fn run_default_flow(
     platform: &str,
     install_manual: &mut bool,
     mode: InstallMode,
-) -> Result<(), Box<dyn Error>> {
+    registry_handle: &str,
+) -> Result<Vec<String>, Box<dyn Error>> {
     if mode == InstallMode::PreferPrebuilt {
         let db_path = resolve::get_db_root()?;
         if let Ok(repo_config) = config::read_repo_config(&db_path) {
@@ -604,12 +616,14 @@ fn run_default_flow(
                     std::fs::write(&temp_archive_path, downloaded_data)?;
 
                     println!("Successfully downloaded pre-built package.");
-                    if crate::pkg::package::install::run(&temp_archive_path, Some(pkg.scope))
-                        .is_ok()
-                    {
+                    if let Ok(installed_files) = crate::pkg::package::install::run(
+                        &temp_archive_path,
+                        Some(pkg.scope),
+                        registry_handle,
+                    ) {
                         println!("Successfully installed pre-built package.");
                         *install_manual = false;
-                        return Ok(());
+                        return Ok(installed_files);
                     } else {
                         println!("Failed to install downloaded package. Trying next source.");
                     }
@@ -627,5 +641,5 @@ fn run_default_flow(
         "{}",
         "Could not install pre-built package. Building from source...".yellow()
     );
-    prebuilt::try_build_install(pkg_lua_path, pkg)
+    prebuilt::try_build_install(pkg_lua_path, pkg, registry_handle)
 }

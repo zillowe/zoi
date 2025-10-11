@@ -17,7 +17,7 @@ pub fn run(args: InstallCommand) {
         SetupScope::User => crate::pkg::types::Scope::User,
         SetupScope::System => crate::pkg::types::Scope::System,
     };
-    if let Err(e) = crate::pkg::package::install::run(&args.package_file, Some(scope)) {
+    if let Err(e) = crate::pkg::package::install::run(&args.package_file, Some(scope), "local") {
         eprintln!("Error: {}", e);
         std::process::exit(1);
     }

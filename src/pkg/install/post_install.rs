@@ -8,19 +8,26 @@ use std::fs;
 use std::io::{self, Write};
 use std::process::Command;
 
-pub fn install_manual_if_available(pkg: &types::Package) -> Result<(), Box<dyn Error>> {
+pub fn install_manual_if_available(
+    pkg: &types::Package,
+    version: &str,
+    registry_handle: &str,
+) -> Result<(), Box<dyn Error>> {
     if let Some(url) = &pkg.man {
         println!("Downloading manual from {}...", url);
         let content = reqwest::blocking::get(url)?.bytes()?;
 
-        let store_dir = home::home_dir()
-            .ok_or("No home dir")?
-            .join(".zoi/pkgs/store")
-            .join(&pkg.name);
-        fs::create_dir_all(&store_dir)?;
+        let version_dir = crate::pkg::local::get_package_version_dir(
+            pkg.scope,
+            registry_handle,
+            &pkg.repo,
+            &pkg.name,
+            version,
+        )?;
+        fs::create_dir_all(&version_dir)?;
 
         let extension = if url.ends_with(".md") { "md" } else { "txt" };
-        let man_path = store_dir.join(format!("man.{}", extension));
+        let man_path = version_dir.join(format!("man.{}", extension));
 
         fs::write(man_path, &content)?;
         println!("Manual for '{}' installed.", pkg.name);
