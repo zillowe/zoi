@@ -98,12 +98,8 @@ fn print_beautiful(pkg: &crate::pkg::types::Package, installed_manifest: Option<
     let type_display = match pkg.package_type {
         crate::pkg::types::PackageType::Package => "Package",
         crate::pkg::types::PackageType::Collection => "Collection",
-        crate::pkg::types::PackageType::Service => "Service",
-        crate::pkg::types::PackageType::Config => "Config",
         crate::pkg::types::PackageType::App => "App",
         crate::pkg::types::PackageType::Extension => "Extension",
-        crate::pkg::types::PackageType::Library => "Library",
-        crate::pkg::types::PackageType::Script => "Script",
     };
     println!("{}: {}", "Type".bold(), type_display);
 

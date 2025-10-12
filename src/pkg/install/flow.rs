@@ -1,12 +1,10 @@
 use super::{manifest, post_install, prebuilt, util};
-use crate::pkg::{config, config_handler, dependencies, local, recorder, resolve, types};
+use crate::pkg::{config, dependencies, local, recorder, resolve, types};
 use crate::utils;
 use anyhow::Result;
 use colored::*;
 use std::collections::HashSet;
 use std::error::Error;
-
-use std::process::Command;
 
 #[derive(PartialEq, Eq, Clone)]
 pub enum InstallMode {
@@ -186,214 +184,6 @@ pub fn run_installation(
         println!("Collection '{}' installed successfully.", pkg.name.green());
         util::send_telemetry("install", &pkg);
         return Ok(());
-    } else if pkg.package_type == types::PackageType::Config {
-        println!("Installing configuration '{}'...", pkg.name.bold());
-        if let Some(deps) = &pkg.dependencies {
-            if let Some(runtime_deps) = &deps.runtime {
-                dependencies::resolve_and_install_required(
-                    &runtime_deps.get_required_simple(),
-                    &pkg.name,
-                    &version,
-                    pkg.scope,
-                    yes,
-                    all_optional,
-                    processed_deps,
-                    &mut installed_deps_list,
-                )?;
-                dependencies::resolve_and_install_required_options(
-                    &runtime_deps.get_required_options(),
-                    &pkg.name,
-                    &version,
-                    pkg.scope,
-                    yes,
-                    all_optional,
-                    processed_deps,
-                    &mut installed_deps_list,
-                    &mut chosen_options,
-                )?;
-                dependencies::resolve_and_install_optional(
-                    runtime_deps.get_optional(),
-                    &pkg.name,
-                    &version,
-                    pkg.scope,
-                    yes,
-                    all_optional,
-                    processed_deps,
-                    &mut installed_deps_list,
-                    &mut chosen_optionals,
-                    Some("runtime"),
-                )?;
-            }
-
-            if let Some(build_deps) = &deps.build {
-                dependencies::resolve_and_install_required(
-                    &build_deps.get_required_simple(),
-                    &pkg.name,
-                    &version,
-                    pkg.scope,
-                    yes,
-                    all_optional,
-                    processed_deps,
-                    &mut installed_deps_list,
-                )?;
-                dependencies::resolve_and_install_required_options(
-                    &build_deps.get_required_options(),
-                    &pkg.name,
-                    &version,
-                    pkg.scope,
-                    yes,
-                    all_optional,
-                    processed_deps,
-                    &mut installed_deps_list,
-                    &mut chosen_options,
-                )?;
-                dependencies::resolve_and_install_optional(
-                    build_deps.get_optional(),
-                    &pkg.name,
-                    &version,
-                    pkg.scope,
-                    yes,
-                    all_optional,
-                    processed_deps,
-                    &mut installed_deps_list,
-                    &mut chosen_optionals,
-                    Some("build"),
-                )?;
-            }
-        }
-        manifest::write_manifest(
-            &pkg,
-            reason.clone(),
-            installed_deps_list.clone(),
-            None,
-            Vec::new(),
-            handle,
-            &chosen_options,
-            &chosen_optionals,
-        )?;
-
-        if let Err(e) = recorder::record_package(
-            &pkg,
-            &reason,
-            &installed_deps_list,
-            handle,
-            &chosen_options,
-            &chosen_optionals,
-        ) {
-            eprintln!("Warning: failed to record package installation: {}", e);
-        }
-
-        println!("Configuration '{}' registered.", pkg.name.green());
-
-        util::send_telemetry("install", &pkg);
-
-        if utils::ask_for_confirmation("Do you want to run the setup commands now?", yes) {
-            config_handler::run_install_commands(&pkg)?;
-        }
-        return Ok(());
-    } else if pkg.package_type == types::PackageType::Script {
-        println!("Running script '{}'...", pkg.name.bold());
-        if let Some(deps) = &pkg.dependencies {
-            if let Some(runtime_deps) = &deps.runtime {
-                dependencies::resolve_and_install_required(
-                    &runtime_deps.get_required_simple(),
-                    &pkg.name,
-                    &version,
-                    pkg.scope,
-                    yes,
-                    all_optional,
-                    processed_deps,
-                    &mut installed_deps_list,
-                )?;
-                dependencies::resolve_and_install_required_options(
-                    &runtime_deps.get_required_options(),
-                    &pkg.name,
-                    &version,
-                    pkg.scope,
-                    yes,
-                    all_optional,
-                    processed_deps,
-                    &mut installed_deps_list,
-                    &mut chosen_options,
-                )?;
-                dependencies::resolve_and_install_optional(
-                    runtime_deps.get_optional(),
-                    &pkg.name,
-                    &version,
-                    pkg.scope,
-                    yes,
-                    all_optional,
-                    processed_deps,
-                    &mut installed_deps_list,
-                    &mut chosen_optionals,
-                    Some("runtime"),
-                )?;
-            }
-
-            if let Some(build_deps) = &deps.build {
-                dependencies::resolve_and_install_required(
-                    &build_deps.get_required_simple(),
-                    &pkg.name,
-                    &version,
-                    pkg.scope,
-                    yes,
-                    all_optional,
-                    processed_deps,
-                    &mut installed_deps_list,
-                )?;
-                dependencies::resolve_and_install_required_options(
-                    &build_deps.get_required_options(),
-                    &pkg.name,
-                    &version,
-                    pkg.scope,
-                    yes,
-                    all_optional,
-                    processed_deps,
-                    &mut installed_deps_list,
-                    &mut chosen_options,
-                )?;
-                dependencies::resolve_and_install_optional(
-                    build_deps.get_optional(),
-                    &pkg.name,
-                    &version,
-                    pkg.scope,
-                    yes,
-                    all_optional,
-                    processed_deps,
-                    &mut installed_deps_list,
-                    &mut chosen_optionals,
-                    Some("build"),
-                )?;
-            }
-        }
-        manifest::write_manifest(
-            &pkg,
-            reason.clone(),
-            installed_deps_list.clone(),
-            None,
-            Vec::new(),
-            handle,
-            &chosen_options,
-            &chosen_optionals,
-        )?;
-        if let Err(e) = recorder::record_package(
-            &pkg,
-            &reason,
-            &installed_deps_list,
-            handle,
-            &chosen_options,
-            &chosen_optionals,
-        ) {
-            eprintln!("Warning: failed to record package installation: {}", e);
-        }
-        println!("Script '{}' registered.", pkg.name.green());
-
-        util::send_telemetry("install", &pkg);
-
-        if utils::ask_for_confirmation("Do you want to run the script now?", yes) {
-            run_script_install_commands(&pkg)?;
-        }
-        return Ok(());
     }
 
     if let Some(mut manifest) = local::is_package_installed(&pkg.name, pkg.scope)?
@@ -551,50 +341,10 @@ pub fn run_installation(
 
             util::send_telemetry("install", &pkg);
 
-            if pkg.post_install.is_some()
-                && utils::ask_for_confirmation(
-                    "This package has post-installation commands. Do you want to run them?",
-                    yes,
-                )
-                && let Err(e) = post_install::run_post_install_hooks(&pkg)
-            {
-                eprintln!(
-                    "{} Post-installation commands failed: {}",
-                    "Warning:".yellow(),
-                    e
-                );
-            }
             Ok(())
         }
         Err(e) => Err(e),
     }
-}
-
-fn run_script_install_commands(pkg: &types::Package) -> Result<(), Box<dyn Error>> {
-    if let Some(hooks) = &pkg.script {
-        println!("\n{}", "Running script...".bold());
-        let platform = utils::get_platform()?;
-        let _version = pkg.version.as_deref().unwrap_or("");
-
-        for hook in hooks {
-            if utils::is_platform_compatible(&platform, &hook.platforms) {
-                for cmd_str in &hook.install {
-                    println!("Executing: {}", cmd_str.cyan());
-
-                    let output = if cfg!(target_os = "windows") {
-                        Command::new("pwsh").arg("-Command").arg(cmd_str).output()?
-                    } else {
-                        Command::new("bash").arg("-c").arg(cmd_str).output()?
-                    };
-
-                    if !output.status.success() {
-                        return Err(format!("Script command failed: '{}'", cmd_str).into());
-                    }
-                }
-            }
-        }
-    }
-    Ok(())
 }
 
 fn run_default_flow(

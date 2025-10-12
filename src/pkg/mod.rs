@@ -1,7 +1,6 @@
 pub mod autoremove;
 pub mod cache;
 pub mod config;
-pub mod config_handler;
 pub mod dependencies;
 pub mod exec;
 pub mod extension;
@@ -17,7 +16,6 @@ pub mod recorder;
 pub mod repo_install;
 pub mod resolve;
 pub mod rollback;
-pub mod script_handler;
 pub mod sync;
 pub mod telemetry;
 pub mod types;

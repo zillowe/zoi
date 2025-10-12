@@ -1,5 +1,4 @@
 use crate::pkg::{config, local, types};
-
 use comfy_table::{Table, presets::UTF8_FULL};
 use std::collections::HashSet;
 use std::io::{self, Write};
@@ -13,12 +12,8 @@ pub fn run(
     let package_type = match type_filter.as_deref() {
         Some("package") => Some(types::PackageType::Package),
         Some("collection") => Some(types::PackageType::Collection),
-        Some("service") => Some(types::PackageType::Service),
-        Some("config") => Some(types::PackageType::Config),
         Some("app") => Some(types::PackageType::App),
         Some("extension") => Some(types::PackageType::Extension),
-        Some("library") => Some(types::PackageType::Library),
-        Some("script") => Some(types::PackageType::Script),
         Some(other) => return Err(format!("Invalid package type: {}", other).into()),
         None => None,
     };

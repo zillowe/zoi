@@ -81,12 +81,8 @@ pub fn run(
             let type_filter = package_type.and_then(|s| match s.to_lowercase().as_str() {
                 "package" => Some(PackageType::Package),
                 "collection" => Some(PackageType::Collection),
-                "service" => Some(PackageType::Service),
-                "config" => Some(PackageType::Config),
                 "app" => Some(PackageType::App),
                 "extension" => Some(PackageType::Extension),
-                "library" => Some(PackageType::Library),
-                "script" => Some(PackageType::Script),
                 _ => None,
             });
 

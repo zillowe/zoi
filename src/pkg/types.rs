@@ -18,12 +18,8 @@ pub enum PackageType {
     #[default]
     Package,
     Collection,
-    Service,
-    Config,
     App,
     Extension,
-    Library,
-    Script,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -42,35 +38,6 @@ pub struct UpdateInfo {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(tag = "type")]
-#[serde(rename_all = "kebab-case")]
-pub enum DockerType {
-    Compose { file: String },
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(untagged)]
-pub enum ServiceMethod {
-    Command {
-        platforms: Vec<String>,
-        start: Vec<String>,
-        stop: Vec<String>,
-    },
-    Docker {
-        platforms: Vec<String>,
-        docker: Vec<DockerType>,
-    },
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[allow(dead_code)]
-pub struct ConfigCommands {
-    pub platforms: Vec<String>,
-    pub install: Vec<String>,
-    pub uninstall: Option<Vec<String>>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
 #[allow(dead_code)]
 pub struct AppCommands {
     pub platforms: Vec<String>,
@@ -78,13 +45,6 @@ pub struct AppCommands {
     pub app_create: String,
     #[serde(default)]
     pub commands: Option<Vec<String>>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[allow(dead_code)]
-pub struct PostInstallHook {
-    pub platforms: Vec<String>,
-    pub commands: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -102,16 +62,6 @@ pub struct ExtensionInfo {
     #[serde(rename = "type")]
     pub extension_type: String,
     pub changes: Vec<ExtensionChange>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
-pub struct PkgConfig {
-    #[serde(default)]
-    pub description: String,
-    #[serde(default)]
-    pub libs: String,
-    #[serde(default)]
-    pub cflags: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -141,14 +91,7 @@ pub struct Package {
     pub alt: Option<String>,
     #[serde(default)]
     pub scope: Scope,
-    pub service: Option<Vec<ServiceMethod>>,
-    pub config: Option<Vec<ConfigCommands>>,
     pub app: Option<Vec<AppCommands>>,
-    pub script: Option<Vec<ConfigCommands>>,
-    #[serde(default)]
-    pub post_install: Option<Vec<PostInstallHook>>,
-    #[serde(default)]
-    pub post_uninstall: Option<Vec<PostInstallHook>>,
     #[serde(default)]
     pub bins: Option<Vec<String>>,
     #[serde(default)]
@@ -160,8 +103,6 @@ pub struct Package {
     #[serde(default)]
     pub rollback: Option<bool>,
     #[serde(default)]
-    pub pkg_config: Option<PkgConfig>,
-    #[serde(default)]
     pub updates: Option<Vec<UpdateInfo>>,
 }
 
@@ -171,8 +112,6 @@ pub struct Maintainer {
     pub name: String,
     pub email: String,
     pub website: Option<String>,
-    #[serde(default)]
-    pub one_time: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -181,8 +120,6 @@ pub struct Author {
     pub name: String,
     pub email: Option<String>,
     pub website: Option<String>,
-    #[serde(default)]
-    pub one_time: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
