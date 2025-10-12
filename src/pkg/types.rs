@@ -259,7 +259,6 @@ pub struct InstallManifest {
     pub repo: String,
     pub registry_handle: String,
     pub package_type: PackageType,
-    pub installed_at: String,
     pub reason: InstallReason,
     pub scope: Scope,
     pub bins: Option<Vec<String>>,

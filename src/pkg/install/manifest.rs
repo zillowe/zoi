@@ -1,6 +1,5 @@
 use crate::pkg::{local, types};
 use anyhow::Result;
-use chrono::Utc;
 use std::error::Error;
 
 pub fn write_manifest(
@@ -19,7 +18,6 @@ pub fn write_manifest(
         repo: pkg.repo.clone(),
         registry_handle: registry_handle.to_string(),
         package_type: pkg.package_type,
-        installed_at: Utc::now().to_rfc3339(),
         reason,
         scope: pkg.scope,
         bins: pkg.bins.clone(),

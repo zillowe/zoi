@@ -59,7 +59,6 @@ pub fn add(ext_name: &str, _yes: bool) -> Result<(), Box<dyn Error>> {
         repo: pkg.repo.clone(),
         registry_handle: registry_handle.unwrap_or_default(),
         package_type: pkg.package_type,
-        installed_at: chrono::Utc::now().to_rfc3339(),
         reason: types::InstallReason::Direct,
         scope: pkg.scope,
         bins: None,
