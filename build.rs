@@ -25,6 +25,18 @@ fn main() {
         println!("cargo:rustc-env=POSTHOG_API_HOST={}", val);
     }
 
+    if let Ok(val) = env::var("ZOI_ABOUT_PACKAGER_AUTHOR") {
+        println!("cargo:rustc-env=ZOI_ABOUT_PACKAGER_AUTHOR={}", val);
+    }
+
+    if let Ok(val) = env::var("ZOI_ABOUT_PACKAGER_EMAIL") {
+        println!("cargo:rustc-env=ZOI_ABOUT_PACKAGER_EMAIL={}", val);
+    }
+
+    if let Ok(val) = env::var("ZOI_ABOUT_PACKAGER_HOMEPAGE") {
+        println!("cargo:rustc-env=ZOI_ABOUT_PACKAGER_HOMEPAGE={}", val);
+    }
+
     let zoi_registry = env::var("ZOI_DEFAULT_REGISTRY")
         .unwrap_or_else(|_| "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg.git".to_string());
     println!("cargo:rustc-env=ZOI_DEFAULT_REGISTRY={}", zoi_registry);

@@ -93,6 +93,7 @@ Zoi uses a few environment variables at build time.
 - **`ZOI_COMMIT_HASH`**: Embeds the git commit hash into the binary. This is used by the `zoi version` command. The build scripts in `scripts/` set this automatically.
 - **`POSTHOG_API_KEY`** & **`POSTHOG_API_HOST`**: These are used to configure the optional, opt-in telemetry feature. They can be set in a `.env` file at the root of the project or passed as build arguments to Docker. The `.env.example` file shows the format.
 - **`ZOI_DEFAULT_REGISTRY`**: Sets the default package registry URL. This is used when no registry is configured by the user. It can be set in a `.env` file or as a build argument to Docker.
+- **`ZOI_ABOUT_PACKAGER_AUTHOR`**, **`ZOI_ABOUT_PACKAGER_EMAIL`**, **`ZOI_ABOUT_PACKAGER_HOMEPAGE`**: Allows a packager to embed their own contact details into the binary. This information is displayed in the `zoi about` command output, which is useful for users of a specific package to identify the package maintainer.
 
 ## Binaries
 

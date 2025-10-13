@@ -24,19 +24,56 @@ pub fn run(branch: &str, status: &str, number: &str, commit: &str) {
 
     let posthog_host = option_env!("POSTHOG_API_HOST");
     let zoi_registry = option_env!("ZOI_DEFAULT_REGISTRY");
+    let about_packager_author = option_env!("ZOI_ABOUT_PACKAGER_AUTHOR");
+    let about_packager_email = option_env!("ZOI_ABOUT_PACKAGER_EMAIL");
+    let about_packager_homepage = option_env!("ZOI_ABOUT_PACKAGER_HOMEPAGE");
 
-    if posthog_host.is_some() || zoi_registry.is_some() {
-        println!();
+    let has_build_info =
+        posthog_host.is_some_and(|s| !s.is_empty()) || zoi_registry.is_some_and(|s| !s.is_empty());
+
+    if has_build_info {
+        println!(
+            "
+  {}",
+            "Build Information".green()
+        );
+        if let Some(host) = posthog_host
+            && !host.is_empty()
+        {
+            println!("  {:<19}{}", "Telemetry Host:".cyan(), host);
+        }
+        if let Some(registry) = zoi_registry
+            && !registry.is_empty()
+        {
+            println!("  {:<19}{}", "Default Registry:".cyan(), registry);
+        }
     }
 
-    if let Some(host) = posthog_host
-        && !host.is_empty()
-    {
-        println!("  {:<12}{}", "PostHog:".cyan(), host);
-    }
+    let has_packager_info = about_packager_author.is_some_and(|s| !s.is_empty())
+        || about_packager_email.is_some_and(|s| !s.is_empty())
+        || about_packager_homepage.is_some_and(|s| !s.is_empty());
 
-    if let Some(registry) = zoi_registry {
-        println!("  {:<12}{}", "Registry:".cyan(), registry);
+    if has_packager_info {
+        println!(
+            "
+  {}",
+            "Packager Information".green()
+        );
+        if let Some(author) = about_packager_author
+            && !author.is_empty()
+        {
+            println!("  {:<19}{}", "Packager:".cyan(), author);
+        }
+        if let Some(email) = about_packager_email
+            && !email.is_empty()
+        {
+            println!("  {:<19}{}", "Email:".cyan(), email);
+        }
+        if let Some(homepage) = about_packager_homepage
+            && !homepage.is_empty()
+        {
+            println!("  {:<19}{}", "Homepage:".cyan(), homepage);
+        }
     }
 
     println!();
