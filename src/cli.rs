@@ -186,7 +186,7 @@ enum Commands {
         /// Filter by repository (e.g. 'main', 'extra')
         #[arg(long)]
         repo: Option<String>,
-        /// Filter by package type (package, service, config, collection, extension, library)
+        /// Filter by package type (package, app, collection, extension)
         #[arg(short = 't', long = "type")]
         package_type: Option<String>,
     },
@@ -337,7 +337,7 @@ enum Commands {
         /// Filter by repository (e.g. 'main', 'extra')
         #[arg(long)]
         repo: Option<String>,
-        /// Filter by package type (package, service, config, collection, extension, library)
+        /// Filter by package type (package, app, collection, extension)
         #[arg(long = "type")]
         package_type: Option<String>,
         /// Filter by tags (any match). Multiple via comma or repeated -t
