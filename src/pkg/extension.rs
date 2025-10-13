@@ -43,6 +43,14 @@ pub fn add(ext_name: &str, _yes: bool) -> Result<(), Box<dyn Error>> {
                     }
                     fs::write("zoi.yaml", add)?;
                 }
+                types::ExtensionChange::Pgp { name, key } => {
+                    println!("Adding PGP key: {} from {}", name, key);
+                    if key.starts_with("http") {
+                        crate::pkg::pgp::add_key_from_url(&key, &name)?;
+                    } else {
+                        crate::pkg::pgp::add_key_from_fingerprint(&key, &name)?;
+                    }
+                }
             }
         }
     } else {
@@ -137,6 +145,12 @@ pub fn remove(ext_name: &str, _yes: bool) -> Result<(), Box<dyn Error>> {
                     println!("Removing zoi.yaml...");
                     if let Err(e) = fs::remove_file("zoi.yaml") {
                         eprintln!("Warning: failed to remove 'zoi.yaml': {}", e);
+                    }
+                }
+                types::ExtensionChange::Pgp { name, key: _ } => {
+                    println!("Removing PGP key: {}", name);
+                    if let Err(e) = crate::pkg::pgp::remove_key_by_name(name) {
+                        eprintln!("Warning: failed to remove PGP key '{}': {}", name, e);
                     }
                 }
             }

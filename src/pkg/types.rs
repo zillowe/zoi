@@ -55,6 +55,7 @@ pub enum ExtensionChange {
     RegistryRepo { add: String },
     RepoAdd { add: String },
     Project { add: String },
+    Pgp { name: String, key: String },
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
