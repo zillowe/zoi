@@ -1,4 +1,4 @@
-use crate::pkg::{config, install, local, pin, resolve, sync, types};
+use crate::pkg::{config, hooks, install, local, pin, resolve, sync, types};
 use crate::utils;
 use colored::*;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -103,6 +103,12 @@ fn run_update_single_logic(
         return Ok(());
     }
 
+    if let Some(hooks) = &new_pkg.hooks
+        && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PreUpgrade)
+    {
+        return Err(format!("Pre-upgrade hook failed: {}", e).into());
+    }
+
     let mode = install::InstallMode::PreferPrebuilt;
 
     let mut processed_deps = HashSet::new();
@@ -123,6 +129,12 @@ fn run_update_single_logic(
         &new_pkg.repo,
         registry_handle.as_deref().unwrap_or("local"),
     )?;
+
+    if let Some(hooks) = &new_pkg.hooks
+        && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PostUpgrade)
+    {
+        return Err(format!("Post-upgrade hook failed: {}", e).into());
+    }
 
     println!("\n{}", "Update complete.".green());
     Ok(())
@@ -204,6 +216,19 @@ fn run_update_all_logic(yes: bool) -> Result<(), Box<dyn std::error::Error>> {
             source.cyan(),
             new_pkg.version.as_deref().unwrap_or("N/A").green()
         );
+
+        if let Some(hooks) = &new_pkg.hooks
+            && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PreUpgrade)
+        {
+            eprintln!(
+                "{}: Pre-upgrade hook failed for '{}': {}",
+                "Error".red().bold(),
+                source,
+                e
+            );
+            continue;
+        }
+
         let mode = install::InstallMode::PreferPrebuilt;
         let mut processed_deps = HashSet::new();
         install::run_installation(
@@ -222,6 +247,18 @@ fn run_update_all_logic(yes: bool) -> Result<(), Box<dyn std::error::Error>> {
             &new_pkg.repo,
             registry_handle.as_deref().unwrap_or("local"),
         )?;
+
+        if let Some(hooks) = &new_pkg.hooks
+            && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PostUpgrade)
+        {
+            eprintln!(
+                "{}: Post-upgrade hook failed for '{}': {}",
+                "Error".red().bold(),
+                source,
+                e
+            );
+            continue;
+        }
     }
 
     println!("\n{}", "Upgrade complete.".green());

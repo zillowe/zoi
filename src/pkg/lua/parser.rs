@@ -15,10 +15,12 @@ pub fn parse_lua_package_for_platform(
     let pkg_meta_table = lua.create_table()?;
     let pkg_deps_table = lua.create_table()?;
     let pkg_updates_table = lua.create_table()?;
+    let pkg_hooks_table = lua.create_table()?;
     lua.globals().set("__ZoiPackageMeta", pkg_meta_table)?;
     lua.globals().set("__ZoiPackageDeps", pkg_deps_table)?;
     lua.globals()
         .set("__ZoiPackageUpdates", pkg_updates_table)?;
+    lua.globals().set("__ZoiPackageHooks", pkg_hooks_table)?;
 
     let pkg_table = lua.create_table()?;
     lua.globals().set("PKG", pkg_table)?;
@@ -30,6 +32,7 @@ pub fn parse_lua_package_for_platform(
     let final_pkg_meta: Table = lua.globals().get("__ZoiPackageMeta")?;
     let final_pkg_deps: Table = lua.globals().get("__ZoiPackageDeps")?;
     let final_pkg_updates: Table = lua.globals().get("__ZoiPackageUpdates")?;
+    let final_pkg_hooks: Table = lua.globals().get("__ZoiPackageHooks")?;
 
     let mut package: types::Package = lua.from_value(Value::Table(final_pkg_meta))?;
 
@@ -43,6 +46,12 @@ pub fn parse_lua_package_for_platform(
         None
     } else {
         Some(lua.from_value(Value::Table(final_pkg_updates))?)
+    };
+
+    package.hooks = if final_pkg_hooks.is_empty() {
+        None
+    } else {
+        Some(lua.from_value(Value::Table(final_pkg_hooks))?)
     };
 
     Ok(package)

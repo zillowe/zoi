@@ -1,5 +1,5 @@
 use super::{manifest, post_install, prebuilt, util};
-use crate::pkg::{config, dependencies, local, recorder, resolve, types};
+use crate::pkg::{config, dependencies, hooks, local, recorder, resolve, types};
 use crate::utils;
 use anyhow::Result;
 use colored::*;
@@ -290,6 +290,12 @@ pub fn run_installation(
     let platform = utils::get_platform()?;
     println!("Current platform: {}", &platform);
 
+    if let Some(hooks) = &pkg.hooks
+        && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PreInstall)
+    {
+        return Err(format!("Pre-install hook failed: {}", e).into());
+    }
+
     let mut install_manual = true;
 
     let result = run_default_flow(
@@ -337,6 +343,12 @@ pub fn run_installation(
             }
             if let Err(e) = utils::setup_path(pkg.scope) {
                 eprintln!("{} Failed to configure PATH: {}", "Warning:".yellow(), e);
+            }
+
+            if let Some(hooks) = &pkg.hooks
+                && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PostInstall)
+            {
+                return Err(format!("Post-install hook failed: {}", e).into());
             }
 
             util::send_telemetry("install", &pkg);

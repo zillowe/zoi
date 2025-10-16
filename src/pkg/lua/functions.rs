@@ -657,6 +657,17 @@ pub fn add_package_lifecycle_functions(lua: &Lua) -> Result<(), mlua::Error> {
     })?;
     lua.globals().set("updates", updates_fn)?;
 
+    let hooks_fn = lua.create_function(move |lua, hooks_def: Table| {
+        if let Ok(hooks_table) = lua.globals().get::<Table>("__ZoiPackageHooks") {
+            for pair in hooks_def.pairs::<String, Value>() {
+                let (key, value) = pair?;
+                hooks_table.set(key, value)?;
+            }
+        }
+        Ok(())
+    })?;
+    lua.globals().set("hooks", hooks_fn)?;
+
     let prepare_fn = lua.create_function(|_, _: Table| Ok(()))?;
     lua.globals().set("prepare", prepare_fn)?;
     let package_fn = lua.create_function(|_, _: Table| Ok(()))?;

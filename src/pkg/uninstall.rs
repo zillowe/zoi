@@ -1,4 +1,4 @@
-use crate::pkg::{dependencies, local, recorder, resolve, types};
+use crate::pkg::{dependencies, hooks, local, recorder, resolve, types};
 use crate::utils;
 use colored::*;
 use mlua::Lua;
@@ -91,6 +91,12 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
 
     if pkg.package_type == types::PackageType::Collection {
         return uninstall_collection(&pkg, &manifest, scope, registry_handle);
+    }
+
+    if let Some(hooks) = &pkg.hooks
+        && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PreRemove)
+    {
+        return Err(format!("Pre-remove hook failed: {}", e).into());
     }
 
     let handle = registry_handle.as_deref().unwrap_or("local");
@@ -214,6 +220,12 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
         Ok(true) => println!("{} telemetry sent", "Info:".green()),
         Ok(false) => (),
         Err(e) => eprintln!("{} telemetry failed: {}", "Warning:".yellow(), e),
+    }
+
+    if let Some(hooks) = &pkg.hooks
+        && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PostRemove)
+    {
+        return Err(format!("Post-remove hook failed: {}", e).into());
     }
 
     Ok(())

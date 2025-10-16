@@ -105,6 +105,31 @@ pub struct Package {
     pub rollback: Option<bool>,
     #[serde(default)]
     pub updates: Option<Vec<UpdateInfo>>,
+    #[serde(default)]
+    pub hooks: Option<Hooks>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum PlatformOrStringVec {
+    StringVec(Vec<String>),
+    Platform(HashMap<String, Vec<String>>),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct Hooks {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pre_install: Option<PlatformOrStringVec>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub post_install: Option<PlatformOrStringVec>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pre_upgrade: Option<PlatformOrStringVec>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub post_upgrade: Option<PlatformOrStringVec>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pre_remove: Option<PlatformOrStringVec>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub post_remove: Option<PlatformOrStringVec>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
