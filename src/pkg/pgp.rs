@@ -4,6 +4,7 @@ use sequoia_openpgp::parse::Parse;
 use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 pub fn get_pgp_dir() -> Result<PathBuf, Box<dyn Error>> {
     let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
@@ -393,6 +394,58 @@ pub fn verify_detached_signature(
         DetachedVerifierBuilder::from_bytes(&signature)?.with_policy(policy, None, helper)?;
 
     verifier.verify_bytes(&data)?;
+
+    Ok(())
+}
+
+pub fn sign_detached(
+    data_path: &Path,
+    signature_path: &Path,
+    key_id: &str,
+) -> Result<(), Box<dyn Error>> {
+    if !crate::utils::command_exists("gpg") {
+        return Err(
+            "gpg command not found. Please install GnuPG and ensure it's in your PATH.".into(),
+        );
+    }
+
+    let data_path_str = data_path.to_str().ok_or("Invalid data path for signing.")?;
+    let signature_path_str = signature_path
+        .to_str()
+        .ok_or("Invalid signature path for signing.")?;
+
+    let output = Command::new("gpg")
+        .arg("--batch")
+        .arg("--yes")
+        .arg("--detach-sign")
+        .arg("--local-user")
+        .arg(key_id)
+        .arg("--output")
+        .arg(signature_path_str)
+        .arg(data_path_str)
+        .output()?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let mut error_message = format!("gpg signing failed with status: {}.\n", output.status);
+
+        if stderr.contains("No secret key") {
+            error_message.push_str(&format!(
+                "The secret key for '{}' was not found in your GPG keychain.\n",
+                key_id
+            ));
+            error_message.push_str("Please ensure the key is imported into GPG and is trusted.");
+        } else if stderr.contains("bad passphrase") || stderr.contains("Passphrase check failed") {
+            error_message.push_str(
+                "Incorrect passphrase provided, or the agent could not get the passphrase.\n",
+            );
+            error_message.push_str("Ensure your GPG agent is running and configured correctly if the key is password-protected.");
+        } else {
+            error_message.push_str(&format!("Stderr: {}", stderr));
+        }
+
+        return Err(error_message.into());
+    }
 
     Ok(())
 }

@@ -14,6 +14,7 @@ fn build_for_platform(
     package_file: &Path,
     build_type: &str,
     platform: &str,
+    sign_key: &Option<String>,
 ) -> Result<(), Box<dyn Error>> {
     let pkg_for_meta = pkg::lua::parser::parse_lua_package_for_platform(
         package_file.to_str().unwrap(),
@@ -151,6 +152,23 @@ fn build_for_platform(
         format!("Successfully built package: {}", output_path.display()).green()
     );
 
+    if let Some(key_id) = sign_key {
+        println!("Signing package with key '{}'...", key_id.cyan());
+        let signature_path = output_path.with_extension("pkg.tar.zst.sig");
+        if signature_path.exists() {
+            fs::remove_file(&signature_path)?;
+        }
+        pkg::pgp::sign_detached(&output_path, &signature_path, key_id)?;
+        println!(
+            "{}",
+            format!(
+                "Successfully created signature: {}",
+                signature_path.display()
+            )
+            .green()
+        );
+    }
+
     Ok(())
 }
 
@@ -158,6 +176,7 @@ pub fn run(
     package_file: &Path,
     build_type: &str,
     platforms: &[String],
+    sign_key: Option<String>,
 ) -> Result<(), Box<dyn Error>> {
     println!("Building package from: {}", package_file.display());
 
@@ -179,7 +198,7 @@ pub fn run(
 
     for platform in &platforms_to_build {
         println!("--- Building for platform: {} ---", platform.cyan());
-        if let Err(e) = build_for_platform(package_file, build_type, platform) {
+        if let Err(e) = build_for_platform(package_file, build_type, platform, &sign_key) {
             eprintln!(
                 "{}: Failed to build for platform {}: {}",
                 "Error".red().bold(),

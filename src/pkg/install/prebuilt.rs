@@ -25,6 +25,7 @@ pub fn try_build_install(
         pkg_lua_path,
         build_type,
         std::slice::from_ref(&current_platform),
+        None,
     ) {
         return Err(format!("'build' step failed: {}", e).into());
     }

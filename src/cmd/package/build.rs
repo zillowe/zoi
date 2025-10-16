@@ -15,11 +15,15 @@ pub struct BuildCommand {
     /// Can be specified multiple times.
     #[arg(long, short, num_args = 1.., default_values_t = vec!["current".to_string()])]
     pub platform: Vec<String>,
+
+    /// Sign the package with the given PGP key (name or fingerprint)
+    #[arg(long)]
+    pub sign: Option<String>,
 }
 
 pub fn run(args: BuildCommand) {
     if let Err(e) =
-        crate::pkg::package::build::run(&args.package_file, &args.r#type, &args.platform)
+        crate::pkg::package::build::run(&args.package_file, &args.r#type, &args.platform, args.sign)
     {
         eprintln!("Error: {}", e);
         std::process::exit(1);
