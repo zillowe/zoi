@@ -261,6 +261,9 @@ enum Commands {
         /// Install packages globally for the current user (alias for --scope=user)
         #[arg(long)]
         global: bool,
+        /// Save the package to the project's zoi.yaml
+        #[arg(long)]
+        save: bool,
     },
 
     /// Builds and installs one or more packages from a name, local file, or URL
@@ -661,6 +664,7 @@ pub fn run() {
                 scope,
                 local,
                 global,
+                save,
             } => {
                 cmd::install::run(
                     &sources,
@@ -671,6 +675,7 @@ pub fn run() {
                     scope,
                     local,
                     global,
+                    save,
                 );
                 Ok(())
             }

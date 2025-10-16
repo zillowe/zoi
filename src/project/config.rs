@@ -86,3 +86,34 @@ pub fn load() -> Result<ProjectConfig, Box<dyn Error>> {
     let config: ProjectConfig = serde_yaml::from_str(&content)?;
     Ok(config)
 }
+
+pub fn add_packages_to_config(packages: &[String]) -> Result<(), Box<dyn Error>> {
+    let config_path = Path::new("zoi.yaml");
+    if !config_path.exists() {
+        return Err("No 'zoi.yaml' file found in the current directory.".into());
+    }
+
+    let content = fs::read_to_string(config_path)?;
+    let mut yaml_value: serde_yaml::Value = serde_yaml::from_str(&content)?;
+
+    if let Some(mapping) = yaml_value.as_mapping_mut() {
+        let pkgs_key = serde_yaml::Value::String("pkgs".to_string());
+        let pkgs_list = mapping
+            .entry(pkgs_key)
+            .or_insert_with(|| serde_yaml::Value::Sequence(Vec::new()));
+
+        if let Some(sequence) = pkgs_list.as_sequence_mut() {
+            for package in packages {
+                let new_pkg_value = serde_yaml::Value::String(package.clone());
+                if !sequence.contains(&new_pkg_value) {
+                    sequence.push(new_pkg_value);
+                }
+            }
+        }
+    }
+
+    let new_content = serde_yaml::to_string(&yaml_value)?;
+    fs::write(config_path, new_content)?;
+
+    Ok(())
+}

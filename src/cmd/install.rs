@@ -13,6 +13,7 @@ pub fn run(
     scope: Option<crate::cli::InstallScope>,
     local: bool,
     global: bool,
+    save: bool,
 ) {
     let mut scope_override = scope.map(|s| match s {
         crate::cli::InstallScope::User => types::Scope::User,
@@ -149,6 +150,7 @@ pub fn run(
     let mode = install::InstallMode::PreferPrebuilt;
 
     let mut failed_packages = Vec::new();
+    let mut successfully_installed_sources = Vec::new();
     let mut processed_deps = HashSet::new();
 
     let mut temp_files = Vec::new();
@@ -210,6 +212,8 @@ pub fn run(
                         );
                     }
                     failed_packages.push(source.to_string());
+                } else {
+                    successfully_installed_sources.push(source.clone());
                 }
             }
             Err(e) => {
@@ -217,6 +221,17 @@ pub fn run(
                 failed_packages.push(source.to_string());
             }
         }
+    }
+
+    if save
+        && scope_override == Some(types::Scope::Project)
+        && let Err(e) = project::config::add_packages_to_config(&successfully_installed_sources)
+    {
+        eprintln!(
+            "{}: Failed to save packages to zoi.yaml: {}",
+            "Warning".yellow().bold(),
+            e
+        );
     }
 
     if !failed_packages.is_empty() {
