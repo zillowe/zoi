@@ -219,7 +219,7 @@ pub struct Registry {
     pub url: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone)]
 pub struct Config {
     pub repos: Vec<String>,
     pub package_managers: Option<Vec<String>>,
@@ -236,6 +236,28 @@ pub struct Config {
     pub git_repos: Vec<String>,
     #[serde(default)]
     pub rollback_enabled: bool,
+    #[serde(default)]
+    pub policy: Policy,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct Policy {
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub repos_unoverridable: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub telemetry_enabled_unoverridable: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub rollback_enabled_unoverridable: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub default_registry_unoverridable: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub added_registries_unoverridable: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub git_repos_unoverridable: bool,
+}
+
+fn is_false(b: &bool) -> bool {
+    !*b
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]

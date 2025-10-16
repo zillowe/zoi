@@ -1,5 +1,7 @@
 use crate::pkg::types::{Config, Registry, RepoConfig};
 use colored::*;
+use serde_yaml::Value;
+use std::collections::HashSet;
 use std::error::Error;
 use std::fs;
 use std::io::{self, Write};
@@ -9,9 +11,22 @@ pub fn get_default_registry() -> String {
     env!("ZOI_DEFAULT_REGISTRY").to_string()
 }
 
-fn get_config_path() -> Result<PathBuf, Box<dyn Error>> {
+fn get_system_config_path() -> Result<PathBuf, Box<dyn Error>> {
+    if cfg!(target_os = "windows") {
+        Ok(PathBuf::from(r"C:\ProgramData\zoi\config.yaml"))
+    } else {
+        Ok(PathBuf::from("/etc/zoi/config.yaml"))
+    }
+}
+
+fn get_user_config_path() -> Result<PathBuf, Box<dyn Error>> {
     let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
     Ok(home_dir.join(".zoi").join("pkgs").join("config.yaml"))
+}
+
+fn get_project_config_path() -> Result<PathBuf, Box<dyn Error>> {
+    let current_dir = std::env::current_dir()?;
+    Ok(current_dir.join(".zoi").join("pkgs").join("config.yaml"))
 }
 
 fn get_db_root() -> Result<PathBuf, Box<dyn Error>> {
@@ -24,64 +39,138 @@ fn get_git_root() -> Result<PathBuf, Box<dyn Error>> {
     Ok(home_dir.join(".zoi").join("pkgs").join("git"))
 }
 
+fn read_yaml_value(path: &Path) -> Result<Value, Box<dyn Error>> {
+    if !path.exists() {
+        return Ok(Value::Null);
+    }
+    let content = fs::read_to_string(path)?;
+    serde_yaml::from_str(&content).map_err(Into::into)
+}
+
+fn read_config_from_path(path: &Path) -> Result<Config, Box<dyn Error>> {
+    if !path.exists() {
+        return Ok(Config::default());
+    }
+    let content = fs::read_to_string(path)?;
+    serde_yaml::from_str(&content).map_err(Into::into)
+}
+
 pub fn read_config() -> Result<Config, Box<dyn Error>> {
-    let config_path = get_config_path()?;
-    if !config_path.exists() {
-        let db_path = get_db_root()?;
-        let default_repos = if db_path.join("repo.yaml").exists() {
-            let repo_config = read_repo_config(&db_path)?;
-            repo_config
-                .repos
-                .into_iter()
-                .filter(|r| r.active)
-                .map(|r| r.name)
-                .collect()
-        } else {
-            Vec::new()
-        };
+    let system_val = read_yaml_value(&get_system_config_path()?)?;
+    let user_val = read_yaml_value(&get_user_config_path()?)?;
+    let project_val = read_yaml_value(&get_project_config_path()?)?;
 
-        let default_config = Config {
-            repos: default_repos,
-            package_managers: None,
-            native_package_manager: None,
-            telemetry_enabled: false,
-            registry: None,
-            default_registry: Some(Registry {
-                handle: "zoidberg".to_string(),
-                url: get_default_registry(),
-            }),
-            added_registries: Vec::new(),
-            git_repos: Vec::new(),
-            rollback_enabled: true,
-        };
-        write_config(&default_config)?;
-        return Ok(default_config);
+    let system_cfg: Config = serde_yaml::from_value(system_val.clone()).unwrap_or_default();
+    let user_cfg: Config = serde_yaml::from_value(user_val.clone()).unwrap_or_default();
+    let project_cfg: Config = serde_yaml::from_value(project_val.clone()).unwrap_or_default();
+
+    let system_policy = system_cfg.policy.clone();
+    let mut merged_cfg = Config {
+        policy: system_policy.clone(),
+        ..Default::default()
+    };
+
+    // Lists are additive
+    merged_cfg.repos = system_cfg.repos;
+    if !system_policy.repos_unoverridable {
+        merged_cfg.repos.extend(user_cfg.repos);
+        merged_cfg.repos.extend(project_cfg.repos);
+    }
+    merged_cfg.repos.sort();
+    merged_cfg.repos.dedup();
+
+    merged_cfg.added_registries = system_cfg.added_registries;
+    if !system_policy.added_registries_unoverridable {
+        merged_cfg
+            .added_registries
+            .extend(user_cfg.added_registries);
+        merged_cfg
+            .added_registries
+            .extend(project_cfg.added_registries);
+    }
+    let mut seen_registries = HashSet::new();
+    merged_cfg
+        .added_registries
+        .retain(|r| seen_registries.insert(r.url.clone()));
+
+    merged_cfg.git_repos = system_cfg.git_repos;
+    if !system_policy.git_repos_unoverridable {
+        merged_cfg.git_repos.extend(user_cfg.git_repos);
+        merged_cfg.git_repos.extend(project_cfg.git_repos);
+    }
+    merged_cfg.git_repos.sort();
+    merged_cfg.git_repos.dedup();
+
+    // Options are override: project > user > system
+    merged_cfg.package_managers = project_cfg
+        .package_managers
+        .or(user_cfg.package_managers)
+        .or(system_cfg.package_managers);
+    merged_cfg.native_package_manager = project_cfg
+        .native_package_manager
+        .or(user_cfg.native_package_manager)
+        .or(system_cfg.native_package_manager);
+    merged_cfg.registry = project_cfg
+        .registry
+        .or(user_cfg.registry)
+        .or(system_cfg.registry);
+
+    // Bools and values with policy
+    if project_val.get("telemetry_enabled").is_some()
+        && !system_policy.telemetry_enabled_unoverridable
+    {
+        merged_cfg.telemetry_enabled = project_cfg.telemetry_enabled;
+    } else if user_val.get("telemetry_enabled").is_some()
+        && !system_policy.telemetry_enabled_unoverridable
+    {
+        merged_cfg.telemetry_enabled = user_cfg.telemetry_enabled;
+    } else {
+        merged_cfg.telemetry_enabled = system_cfg.telemetry_enabled;
     }
 
-    let content = fs::read_to_string(config_path)?;
-    let mut config: Config = serde_yaml::from_str(&content)?;
-
-    let mut needs_update = false;
-    if let Some(url) = config.registry.take() {
-        if config.default_registry.is_none() {
-            config.default_registry = Some(Registry {
-                handle: String::new(),
-                url,
-            });
-        }
-        needs_update = true;
+    if project_val.get("rollback_enabled").is_some()
+        && !system_policy.rollback_enabled_unoverridable
+    {
+        merged_cfg.rollback_enabled = project_cfg.rollback_enabled;
+    } else if user_val.get("rollback_enabled").is_some()
+        && !system_policy.rollback_enabled_unoverridable
+    {
+        merged_cfg.rollback_enabled = user_cfg.rollback_enabled;
+    } else {
+        merged_cfg.rollback_enabled = system_cfg.rollback_enabled;
     }
 
-    if config.default_registry.is_none() {
-        config.default_registry = Some(Registry {
+    if project_val.get("default_registry").is_some()
+        && !system_policy.default_registry_unoverridable
+    {
+        merged_cfg.default_registry = project_cfg.default_registry;
+    } else if user_val.get("default_registry").is_some()
+        && !system_policy.default_registry_unoverridable
+    {
+        merged_cfg.default_registry = user_cfg.default_registry;
+    } else {
+        merged_cfg.default_registry = system_cfg.default_registry;
+    }
+
+    // Migration and default logic
+    if let Some(url) = merged_cfg.registry.take()
+        && merged_cfg.default_registry.is_none()
+    {
+        merged_cfg.default_registry = Some(Registry {
             handle: String::new(),
+            url,
+        });
+    }
+
+    if merged_cfg.default_registry.is_none() {
+        merged_cfg.default_registry = Some(Registry {
+            handle: "zoidberg".to_string(),
             url: get_default_registry(),
         });
-        needs_update = true;
     }
 
-    if config.repos.is_empty()
-        && let Some(reg) = &config.default_registry
+    if merged_cfg.repos.is_empty()
+        && let Some(reg) = &merged_cfg.default_registry
         && !reg.handle.is_empty()
     {
         let db_root = get_db_root()?;
@@ -89,44 +178,20 @@ pub fn read_config() -> Result<Config, Box<dyn Error>> {
         if repo_path.join("repo.yaml").exists()
             && let Ok(repo_config) = read_repo_config(&repo_path)
         {
-            let active_repos: Vec<String> = repo_config
+            merged_cfg.repos = repo_config
                 .repos
                 .into_iter()
                 .filter(|r| r.active)
                 .map(|r| r.name)
                 .collect();
-            if !active_repos.is_empty() {
-                config.repos = active_repos;
-                needs_update = true;
-            }
         }
     }
 
-    let original_repos = config.repos.clone();
-
-    let mut new_repos = Vec::new();
-    let mut seen = std::collections::HashSet::new();
-    for repo in &original_repos {
-        let lower = repo.to_lowercase();
-        if seen.insert(lower.clone()) {
-            new_repos.push(lower);
-        }
-    }
-    config.repos = new_repos;
-
-    if config.repos != original_repos {
-        needs_update = true;
-    }
-
-    if needs_update {
-        write_config(&config)?;
-    }
-
-    Ok(config)
+    Ok(merged_cfg)
 }
 
-pub fn write_config(config: &Config) -> Result<(), Box<dyn Error>> {
-    let config_path = get_config_path()?;
+pub fn write_user_config(config: &Config) -> Result<(), Box<dyn Error>> {
+    let config_path = get_user_config_path()?;
     let parent_dir = config_path.parent().ok_or("Invalid config path")?;
     fs::create_dir_all(parent_dir)?;
     let content = serde_yaml::to_string(config)?;
@@ -135,23 +200,23 @@ pub fn write_config(config: &Config) -> Result<(), Box<dyn Error>> {
 }
 
 pub fn add_repo(repo_name: &str) -> Result<(), Box<dyn Error>> {
-    let mut config = read_config()?;
+    let mut config = read_config_from_path(&get_user_config_path()?)?;
     let lower_repo_name = repo_name.to_lowercase();
     if config.repos.contains(&lower_repo_name) {
-        return Err(format!("Repository '{}' already exists.", repo_name).into());
+        return Err(format!("Repository '{}' already exists in user config.", repo_name).into());
     }
     config.repos.push(lower_repo_name);
-    write_config(&config)
+    write_user_config(&config)
 }
 
 pub fn remove_repo(repo_name: &str) -> Result<(), Box<dyn Error>> {
-    let mut config = read_config()?;
+    let mut config = read_config_from_path(&get_user_config_path()?)?;
     let lower_repo_name = repo_name.to_lowercase();
     if let Some(pos) = config.repos.iter().position(|r| r == &lower_repo_name) {
         config.repos.remove(pos);
-        write_config(&config)
+        write_user_config(&config)
     } else {
-        Err(format!("Repository '{}' not found.", repo_name).into())
+        Err(format!("Repository '{}' not found in user config.", repo_name).into())
     }
 }
 
@@ -250,10 +315,10 @@ pub fn clone_git_repo(url: &str) -> Result<(), Box<dyn Error>> {
         return Err("git clone failed".into());
     }
 
-    let mut config = read_config()?;
+    let mut config = read_config_from_path(&get_user_config_path()?)?;
     if !config.git_repos.iter().any(|repo_url| repo_url == url) {
         config.git_repos.push(url.to_string());
-        write_config(&config)?;
+        write_user_config(&config)?;
     }
 
     println!(
@@ -288,7 +353,7 @@ pub fn remove_git_repo(repo_name: &str) -> Result<(), Box<dyn Error>> {
         return Err(format!("Git repository '{}' not found.", repo_name).into());
     }
 
-    let mut config = read_config()?;
+    let mut config = read_config_from_path(&get_user_config_path()?)?;
     let mut removed = false;
     config.git_repos.retain(|url| {
         let name_from_url = url
@@ -306,7 +371,7 @@ pub fn remove_git_repo(repo_name: &str) -> Result<(), Box<dyn Error>> {
     });
 
     if removed {
-        write_config(&config)?;
+        write_user_config(&config)?;
     }
 
     fs::remove_dir_all(&target)?;
@@ -319,16 +384,16 @@ pub fn remove_git_repo(repo_name: &str) -> Result<(), Box<dyn Error>> {
 }
 
 pub fn set_default_registry(url: &str) -> Result<(), Box<dyn Error>> {
-    let mut config = read_config()?;
+    let mut config = read_config_from_path(&get_user_config_path()?)?;
     config.default_registry = Some(Registry {
         handle: String::new(),
         url: url.to_string(),
     });
-    write_config(&config)
+    write_user_config(&config)
 }
 
 pub fn add_added_registry(url: &str) -> Result<(), Box<dyn Error>> {
-    let mut config = read_config()?;
+    let mut config = read_config_from_path(&get_user_config_path()?)?;
     if config.added_registries.iter().any(|r| r.url == url) {
         return Err(format!("Registry with URL '{}' already exists.", url).into());
     }
@@ -336,11 +401,11 @@ pub fn add_added_registry(url: &str) -> Result<(), Box<dyn Error>> {
         handle: String::new(),
         url: url.to_string(),
     });
-    write_config(&config)
+    write_user_config(&config)
 }
 
 pub fn remove_added_registry(handle: &str) -> Result<(), Box<dyn Error>> {
-    let mut config = read_config()?;
+    let mut config = read_config_from_path(&get_user_config_path()?)?;
     if let Some(pos) = config
         .added_registries
         .iter()
@@ -352,7 +417,7 @@ pub fn remove_added_registry(handle: &str) -> Result<(), Box<dyn Error>> {
         if repo_path.exists() {
             fs::remove_dir_all(repo_path)?;
         }
-        write_config(&config)
+        write_user_config(&config)
     } else {
         Err(format!("Added registry with handle '{}' not found.", handle).into())
     }
@@ -366,4 +431,8 @@ pub fn read_repo_config(db_path: &Path) -> Result<RepoConfig, Box<dyn Error>> {
     let content = fs::read_to_string(config_path)?;
     let config: RepoConfig = serde_yaml::from_str(&content)?;
     Ok(config)
+}
+
+pub fn read_user_config() -> Result<Config, Box<dyn Error>> {
+    read_config_from_path(&get_user_config_path()?)
 }

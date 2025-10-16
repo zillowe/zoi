@@ -311,7 +311,7 @@ fn fetch_handle_for_url(url: &str) -> Result<String, Box<dyn std::error::Error>>
 }
 
 pub fn run(verbose: bool, _fallback: bool, no_pm: bool) -> Result<(), Box<dyn std::error::Error>> {
-    let mut config = config::read_config()?;
+    let mut config = config::read_user_config()?;
     let mut needs_config_update = false;
 
     let db_root = get_db_path()?;
@@ -370,20 +370,19 @@ pub fn run(verbose: bool, _fallback: bool, no_pm: bool) -> Result<(), Box<dyn st
     }
     config.added_registries = updated_added_registries;
 
+    if !no_pm {
+        println!("\n{}", "Updating system configuration...".green());
+        config.native_package_manager = utils::get_native_package_manager();
+        config.package_managers = Some(utils::get_all_available_package_managers());
+        needs_config_update = true;
+        println!("System configuration updated.");
+    }
+
     if needs_config_update {
-        config::write_config(&config)?;
+        config::write_user_config(&config)?;
     }
 
     sync_git_repos(verbose)?;
-
-    if !no_pm {
-        println!("\n{}", "Updating system configuration...".green());
-        let mut config_data = config::read_config()?;
-        config_data.native_package_manager = utils::get_native_package_manager();
-        config_data.package_managers = Some(utils::get_all_available_package_managers());
-        config::write_config(&config_data)?;
-        println!("System configuration updated.");
-    }
 
     Ok(())
 }
