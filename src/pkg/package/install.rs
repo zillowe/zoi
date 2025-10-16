@@ -90,19 +90,13 @@ pub fn run(
         version.yellow()
     );
 
-    let version_dir = local::get_package_version_dir(
-        scope,
-        registry_handle,
-        &metadata.repo,
-        &metadata.name,
-        version,
-    )?;
+    let package_dir =
+        local::get_package_dir(scope, registry_handle, &metadata.repo, &metadata.name)?;
+    fs::create_dir_all(&package_dir)?;
 
-    if version_dir.exists() {
-        println!("Removing existing installation at version {}...", version);
-        fs::remove_dir_all(&version_dir)?;
-    }
-    fs::create_dir_all(&version_dir)?;
+    let staging_dir = tempfile::Builder::new()
+        .prefix(".tmp-install-")
+        .tempdir_in(&package_dir)?;
 
     let mut installed_files: Vec<String> = Vec::new();
 
@@ -112,8 +106,8 @@ pub fn run(
 
         let pkgstore_src = data_dir.join("pkgstore");
         if pkgstore_src.exists() {
-            copy_dir_all(&pkgstore_src, &version_dir)?;
-            for entry in WalkDir::new(version_dir.clone())
+            copy_dir_all(&pkgstore_src, staging_dir.path())?;
+            for entry in WalkDir::new(staging_dir.path())
                 .into_iter()
                 .filter_map(|e| e.ok())
             {
@@ -158,6 +152,16 @@ pub fn run(
             }
         }
     }
+
+    let version_dir = package_dir.join(version);
+
+    if version_dir.exists() {
+        println!("Removing existing installation at version {}...", version);
+        fs::remove_dir_all(&version_dir)?;
+    }
+
+    fs::rename(staging_dir.path(), &version_dir)?;
+    staging_dir.close()?;
 
     if let Some(bins) = &metadata.bins {
         let bin_root = get_bin_root(scope)?;

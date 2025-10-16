@@ -8,6 +8,7 @@ pub mod hash;
 pub mod helper;
 pub mod install;
 pub mod local;
+pub mod lock;
 pub mod lua;
 pub mod package;
 pub mod pgp;

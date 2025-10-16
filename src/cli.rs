@@ -1,4 +1,5 @@
 use crate::cmd;
+use crate::pkg::lock;
 use crate::utils;
 use clap::{
     ColorChoice, CommandFactory, FromArgMatches, Parser, Subcommand, ValueHint,
@@ -541,6 +542,28 @@ pub fn run() {
     }
 
     if let Some(command) = cli.command {
+        let needs_lock = matches!(
+            command,
+            Commands::Install { .. }
+                | Commands::Uninstall { .. }
+                | Commands::Update { .. }
+                | Commands::Autoremove
+                | Commands::Rollback { .. }
+                | Commands::Package(_)
+        );
+
+        let _lock_guard = if needs_lock {
+            match lock::acquire_lock() {
+                Ok(guard) => Some(guard),
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        } else {
+            None
+        };
+
         let result = match command {
             Commands::GenerateCompletions { shell } => {
                 let mut cmd = Cli::command();

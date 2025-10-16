@@ -13,7 +13,7 @@ pub fn get_default_registry() -> String {
 
 fn get_system_config_path() -> Result<PathBuf, Box<dyn Error>> {
     if cfg!(target_os = "windows") {
-        Ok(PathBuf::from(r"C:\ProgramData\zoi\config.yaml"))
+        Ok(PathBuf::from("C:\\ProgramData\\zoi\\config.yaml"))
     } else {
         Ok(PathBuf::from("/etc/zoi/config.yaml"))
     }
@@ -70,7 +70,6 @@ pub fn read_config() -> Result<Config, Box<dyn Error>> {
         ..Default::default()
     };
 
-    // Lists are additive
     merged_cfg.repos = system_cfg.repos;
     if !system_policy.repos_unoverridable {
         merged_cfg.repos.extend(user_cfg.repos);
@@ -101,7 +100,6 @@ pub fn read_config() -> Result<Config, Box<dyn Error>> {
     merged_cfg.git_repos.sort();
     merged_cfg.git_repos.dedup();
 
-    // Options are override: project > user > system
     merged_cfg.package_managers = project_cfg
         .package_managers
         .or(user_cfg.package_managers)
@@ -115,7 +113,6 @@ pub fn read_config() -> Result<Config, Box<dyn Error>> {
         .or(user_cfg.registry)
         .or(system_cfg.registry);
 
-    // Bools and values with policy
     if project_val.get("telemetry_enabled").is_some()
         && !system_policy.telemetry_enabled_unoverridable
     {
@@ -152,7 +149,6 @@ pub fn read_config() -> Result<Config, Box<dyn Error>> {
         merged_cfg.default_registry = system_cfg.default_registry;
     }
 
-    // Migration and default logic
     if let Some(url) = merged_cfg.registry.take()
         && merged_cfg.default_registry.is_none()
     {
