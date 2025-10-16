@@ -32,7 +32,7 @@ pub fn run(package_name: &str, yes: bool) -> Result<(), Box<dyn Error>> {
             if path.is_dir()
                 && let Some(version_str) = path.file_name().and_then(|s| s.to_str())
                 && version_str != "latest"
-                && let Ok(version) = Version::parse(version_str.trim_start_matches('v'))
+                && let Ok(version) = Version::parse(version_str)
             {
                 versions.push(version);
             }
@@ -59,7 +59,7 @@ pub fn run(package_name: &str, yes: bool) -> Result<(), Box<dyn Error>> {
     }
 
     let latest_symlink_path = package_dir.join("latest");
-    let previous_version_dir = package_dir.join(format!("v{}", previous_version));
+    let previous_version_dir = package_dir.join(previous_version.to_string());
     if latest_symlink_path.exists() || latest_symlink_path.is_symlink() {
         if latest_symlink_path.is_dir() {
             fs::remove_dir_all(&latest_symlink_path)?;
@@ -92,7 +92,7 @@ pub fn run(package_name: &str, yes: bool) -> Result<(), Box<dyn Error>> {
         }
     }
 
-    let current_version_dir = package_dir.join(format!("v{}", current_version));
+    let current_version_dir = package_dir.join(current_version.to_string());
     fs::remove_dir_all(current_version_dir)?;
 
     println!(

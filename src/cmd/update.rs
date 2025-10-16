@@ -1,8 +1,10 @@
-use crate::pkg::{install, local, pin, resolve, sync, types};
+use crate::pkg::{config, install, local, pin, resolve, sync, types};
 use crate::utils;
 use colored::*;
 use indicatif::{ProgressBar, ProgressStyle};
+use semver::Version;
 use std::collections::HashSet;
+use std::fs;
 
 pub fn run(all: bool, package_names: &[String], yes: bool) {
     if all {
@@ -58,12 +60,13 @@ fn run_update_single_logic(
 ) -> Result<(), Box<dyn std::error::Error>> {
     println!("--- Updating package '{}' ---", package_name.blue().bold());
 
-    let (new_pkg, new_version, _, _, _) = match resolve::resolve_package_and_version(package_name) {
-        Ok(result) => result,
-        Err(e) => {
-            return Err(format!("Could not resolve package '{}': {}", package_name, e).into());
-        }
-    };
+    let (new_pkg, new_version, _, _, registry_handle) =
+        match resolve::resolve_package_and_version(package_name) {
+            Ok(result) => result,
+            Err(e) => {
+                return Err(format!("Could not resolve package '{}': {}", package_name, e).into());
+            }
+        };
 
     if pin::is_pinned(package_name)? {
         println!(
@@ -111,7 +114,14 @@ fn run_update_single_logic(
         yes,
         false,
         &mut processed_deps,
-        None,
+        Some(manifest.scope),
+    )?;
+
+    cleanup_old_versions(
+        &new_pkg.name,
+        manifest.scope,
+        &new_pkg.repo,
+        registry_handle.as_deref().unwrap_or("local"),
     )?;
 
     println!("\n{}", "Update complete.".green());
@@ -147,27 +157,17 @@ fn run_update_all_logic(yes: bool) -> Result<(), Box<dyn std::error::Error>> {
             continue;
         }
 
-        let resolved_source = match resolve::resolve_source(&source) {
-            Ok(source) => source,
-            Err(_) => {
-                upgrade_messages.push(format!(
-                    "- Could not resolve source for {}, skipping.",
-                    manifest.name.red()
-                ));
-                continue;
-            }
-        };
-
-        let (new_pkg, new_version, _, _, _) = match resolve::resolve_package_and_version(&source) {
-            Ok(result) => result,
-            Err(e) => {
-                upgrade_messages.push(format!(
-                    "- Could not resolve package '{}': {}, skipping.",
-                    manifest.name, e
-                ));
-                continue;
-            }
-        };
+        let (new_pkg, new_version, _, _, registry_handle) =
+            match resolve::resolve_package_and_version(&source) {
+                Ok(result) => result,
+                Err(e) => {
+                    upgrade_messages.push(format!(
+                        "- Could not resolve package '{}': {}, skipping.",
+                        manifest.name, e
+                    ));
+                    continue;
+                }
+            };
 
         if manifest.version != new_version {
             upgrade_messages.push(format!(
@@ -176,14 +176,11 @@ fn run_update_all_logic(yes: bool) -> Result<(), Box<dyn std::error::Error>> {
                 manifest.version.yellow(),
                 new_version.green()
             ));
-            packages_to_upgrade.push((
-                source.clone(),
-                new_pkg.version.clone(),
-                resolved_source.path.clone(),
-            ));
+            packages_to_upgrade.push((source.clone(), new_pkg, registry_handle, manifest.scope));
         } else {
             upgrade_messages.push(format!("- {} is up to date.", manifest.name.cyan()));
         }
+        pb.inc(1);
     }
     pb.finish_and_clear();
 
@@ -201,26 +198,82 @@ fn run_update_all_logic(yes: bool) -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    for (source, version, path) in packages_to_upgrade {
+    for (source, new_pkg, registry_handle, scope) in packages_to_upgrade {
         println!(
             "\n--- Upgrading {} to {} ---",
             source.cyan(),
-            version.as_deref().unwrap_or("N/A").green()
+            new_pkg.version.as_deref().unwrap_or("N/A").green()
         );
         let mode = install::InstallMode::PreferPrebuilt;
         let mut processed_deps = HashSet::new();
         install::run_installation(
-            path.to_str().unwrap(),
+            &source,
             mode,
             true,
             types::InstallReason::Direct,
             yes,
             false,
             &mut processed_deps,
-            None,
+            Some(scope),
+        )?;
+        cleanup_old_versions(
+            &new_pkg.name,
+            scope,
+            &new_pkg.repo,
+            registry_handle.as_deref().unwrap_or("local"),
         )?;
     }
 
     println!("\n{}", "Upgrade complete.".green());
+    Ok(())
+}
+
+fn cleanup_old_versions(
+    package_name: &str,
+    scope: types::Scope,
+    repo: &str,
+    registry_handle: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = config::read_config()?;
+    let rollback_enabled = config.rollback_enabled;
+
+    let package_dir = local::get_package_dir(scope, registry_handle, repo, package_name)?;
+
+    let mut versions = Vec::new();
+    if let Ok(entries) = fs::read_dir(&package_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir()
+                && let Some(version_str) = path.file_name().and_then(|s| s.to_str())
+                && version_str != "latest"
+                && let Ok(version) = Version::parse(version_str)
+            {
+                versions.push(version);
+            }
+        }
+    }
+
+    if versions.is_empty() {
+        return Ok(());
+    }
+
+    versions.sort();
+
+    let versions_to_keep = if rollback_enabled { 2 } else { 1 };
+
+    if versions.len() > versions_to_keep {
+        let num_to_delete = versions.len() - versions_to_keep;
+        let versions_to_delete = &versions[..num_to_delete];
+
+        println!("Cleaning up old versions...");
+        for version in versions_to_delete {
+            let version_dir_to_delete = package_dir.join(version.to_string());
+            println!(" - Removing {}", version_dir_to_delete.display());
+            if version_dir_to_delete.exists() {
+                fs::remove_dir_all(version_dir_to_delete)?;
+            }
+        }
+    }
+
     Ok(())
 }
