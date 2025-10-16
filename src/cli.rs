@@ -112,6 +112,13 @@ pub enum SetupScope {
     System,
 }
 
+#[derive(clap::ValueEnum, Clone, Debug, Copy)]
+pub enum InstallScope {
+    User,
+    System,
+    Project,
+}
+
 #[derive(Subcommand)]
 enum Commands {
     /// Generates shell completion scripts
@@ -244,9 +251,15 @@ enum Commands {
         /// Accept all optional dependencies
         #[arg(long)]
         all_optional: bool,
-        /// The scope to install the package to (user or system-wide)
-        #[arg(long, value_enum)]
-        scope: Option<SetupScope>,
+        /// The scope to install the package to
+        #[arg(long, value_enum, conflicts_with_all = &["local", "global"])]
+        scope: Option<InstallScope>,
+        /// Install packages to the current project (alias for --scope=project)
+        #[arg(long, conflicts_with = "global")]
+        local: bool,
+        /// Install packages globally for the current user (alias for --scope=user)
+        #[arg(long)]
+        global: bool,
     },
 
     /// Builds and installs one or more packages from a name, local file, or URL
@@ -608,8 +621,19 @@ pub fn run() {
                 force,
                 all_optional,
                 scope,
+                local,
+                global,
             } => {
-                cmd::install::run(&sources, repo, force, all_optional, cli.yes, scope);
+                cmd::install::run(
+                    &sources,
+                    repo,
+                    force,
+                    all_optional,
+                    cli.yes,
+                    scope,
+                    local,
+                    global,
+                );
                 Ok(())
             }
             Commands::Build { sources, force } => {

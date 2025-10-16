@@ -10,8 +10,22 @@ pub fn run(
     force: bool,
     all_optional: bool,
     yes: bool,
-    scope: Option<crate::cli::SetupScope>,
+    scope: Option<crate::cli::InstallScope>,
+    local: bool,
+    global: bool,
 ) {
+    let mut scope_override = scope.map(|s| match s {
+        crate::cli::InstallScope::User => types::Scope::User,
+        crate::cli::InstallScope::System => types::Scope::System,
+        crate::cli::InstallScope::Project => types::Scope::Project,
+    });
+
+    if local {
+        scope_override = Some(types::Scope::Project);
+    } else if global {
+        scope_override = Some(types::Scope::User);
+    }
+
     if sources.is_empty()
         && repo.is_none()
         && let Ok(config) = project::config::load()
@@ -98,8 +112,30 @@ pub fn run(
         return;
     }
 
+    if scope_override.is_none()
+        && let Ok(config) = project::config::load()
+        && config.config.local
+    {
+        scope_override = Some(types::Scope::Project);
+    }
+
     if let Some(repo_spec) = repo {
-        if let Err(e) = crate::pkg::repo_install::run(&repo_spec, force, all_optional, yes, scope) {
+        if scope_override == Some(types::Scope::Project) {
+            eprintln!(
+                "{}: Installing from a repository to a project scope is not supported.",
+                "Error".red().bold()
+            );
+            std::process::exit(1);
+        }
+        let repo_install_scope = scope_override.map(|s| match s {
+            types::Scope::User => crate::cli::SetupScope::User,
+            types::Scope::System => crate::cli::SetupScope::System,
+            types::Scope::Project => unreachable!(),
+        });
+
+        if let Err(e) =
+            crate::pkg::repo_install::run(&repo_spec, force, all_optional, yes, repo_install_scope)
+        {
             eprintln!(
                 "{}: Failed to install from repo '{}': {}",
                 "Error".red().bold(),
@@ -111,11 +147,6 @@ pub fn run(
         return;
     }
     let mode = install::InstallMode::PreferPrebuilt;
-
-    let scope_override = scope.map(|s| match s {
-        crate::cli::SetupScope::User => types::Scope::User,
-        crate::cli::SetupScope::System => types::Scope::System,
-    });
 
     let mut failed_packages = Vec::new();
     let mut processed_deps = HashSet::new();
