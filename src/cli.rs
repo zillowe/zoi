@@ -340,6 +340,21 @@ enum Commands {
         package_name: String,
     },
 
+    /// Find which package owns a file
+    #[command(alias = "owns")]
+    Owner {
+        /// Path to the file
+        #[arg(value_hint = ValueHint::FilePath)]
+        path: std::path::PathBuf,
+    },
+
+    /// List all files owned by a package
+    Files {
+        /// The name of the package
+        #[arg(value_parser = PackageValueParser, hide_possible_values = true)]
+        package: String,
+    },
+
     /// Searches for packages by name or description
     #[command(
         alias = "s",
@@ -689,6 +704,14 @@ pub fn run() {
                 Ok(())
             }
             Commands::Why { package_name } => cmd::why::run(&package_name),
+            Commands::Owner { path } => {
+                cmd::owner::run(&path);
+                Ok(())
+            }
+            Commands::Files { package } => {
+                cmd::files::run(&package);
+                Ok(())
+            }
             Commands::Search {
                 search_term,
                 repo,
