@@ -1,18 +1,12 @@
-use crate::pkg::{local, types};
+use crate::pkg::{local, resolve, types};
 use anyhow::{Result, anyhow};
 use colored::*;
 
 pub fn run(package_name: &str) -> Result<()> {
-    let trimmed_source = package_name.trim();
-    let name_only = if let Some(slash_pos) = trimmed_source.rfind('/') {
-        &trimmed_source[slash_pos + 1..]
-    } else {
-        trimmed_source
-    };
-    let lower_name_only = name_only.to_lowercase();
+    let (pkg_meta, _, _, _, _) = resolve::resolve_package_and_version(package_name)?;
 
-    let user_manifest = local::is_package_installed(&lower_name_only, types::Scope::User)?;
-    let system_manifest = local::is_package_installed(&lower_name_only, types::Scope::System)?;
+    let user_manifest = local::is_package_installed(&pkg_meta.name, types::Scope::User)?;
+    let system_manifest = local::is_package_installed(&pkg_meta.name, types::Scope::System)?;
 
     let manifest = match (user_manifest, system_manifest) {
         (Some(m), None) => m,

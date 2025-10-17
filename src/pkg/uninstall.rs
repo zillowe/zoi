@@ -76,12 +76,15 @@ fn uninstall_collection(
 }
 
 pub fn run(package_name: &str) -> anyhow::Result<()> {
+    let (pkg, _, _, pkg_lua_path, registry_handle) =
+        resolve::resolve_package_and_version(package_name)?;
+
     let (manifest, scope) =
-        if let Some(m) = local::is_package_installed(package_name, types::Scope::Project)? {
+        if let Some(m) = local::is_package_installed(&pkg.name, types::Scope::Project)? {
             (m, types::Scope::Project)
-        } else if let Some(m) = local::is_package_installed(package_name, types::Scope::User)? {
+        } else if let Some(m) = local::is_package_installed(&pkg.name, types::Scope::User)? {
             (m, types::Scope::User)
-        } else if let Some(m) = local::is_package_installed(package_name, types::Scope::System)? {
+        } else if let Some(m) = local::is_package_installed(&pkg.name, types::Scope::System)? {
             (m, types::Scope::System)
         } else {
             return Err(anyhow::anyhow!(
@@ -89,9 +92,6 @@ pub fn run(package_name: &str) -> anyhow::Result<()> {
                 package_name
             ));
         };
-
-    let (pkg, _, _, pkg_lua_path, registry_handle) =
-        resolve::resolve_package_and_version(&manifest.name)?;
 
     if pkg.package_type == types::PackageType::Collection {
         return uninstall_collection(&pkg, &manifest, scope, registry_handle);

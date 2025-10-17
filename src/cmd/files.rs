@@ -1,4 +1,4 @@
-use crate::pkg::local;
+use crate::pkg::{local, resolve};
 use anyhow::{Result, anyhow};
 use colored::*;
 
@@ -10,9 +10,11 @@ pub fn run(package_name: &str) {
 }
 
 fn run_impl(package_name: &str) -> Result<()> {
+    let (pkg_meta, _, _, _, _) = resolve::resolve_package_and_version(package_name)?;
+
     let installed_packages = local::get_installed_packages()?;
 
-    let Some(pkg) = installed_packages.iter().find(|p| p.name == package_name) else {
+    let Some(pkg) = installed_packages.iter().find(|p| p.name == pkg_meta.name) else {
         return Err(anyhow!("Package '{}' is not installed.", package_name));
     };
 

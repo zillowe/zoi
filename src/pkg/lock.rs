@@ -4,16 +4,8 @@ use std::fs;
 use std::path::PathBuf;
 
 fn get_lock_path() -> Result<PathBuf> {
-    if cfg!(target_os = "windows") {
-        let program_data =
-            std::env::var("PROGRAMDATA").map_err(|_| anyhow!("PROGRAMDATA not set"))?;
-        Ok(PathBuf::from(program_data)
-            .join("zoi")
-            .join("pkgs")
-            .join("lock"))
-    } else {
-        Ok(PathBuf::from("/etc/zoi/pkgs/lock"))
-    }
+    let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
+    Ok(home_dir.join(".zoi").join("pkgs").join("lock"))
 }
 
 pub fn acquire_lock() -> Result<LockGuard> {

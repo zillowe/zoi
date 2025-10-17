@@ -109,14 +109,6 @@ pub fn run(
         let pkgstore_src = data_dir.join("pkgstore");
         if pkgstore_src.exists() {
             copy_dir_all(&pkgstore_src, staging_dir.path())?;
-            for entry in WalkDir::new(staging_dir.path())
-                .into_iter()
-                .filter_map(|e| e.ok())
-            {
-                if entry.file_type().is_file() {
-                    installed_files.push(entry.path().to_string_lossy().to_string());
-                }
-            }
         }
 
         let usrroot_src = data_dir.join("usrroot");
@@ -166,7 +158,16 @@ pub fn run(
     }
 
     fs::rename(staging_dir.path(), &version_dir)?;
-    staging_dir.close()?;
+    let _ = staging_dir.keep();
+
+    for entry in WalkDir::new(&version_dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
+        if entry.file_type().is_file() {
+            installed_files.push(entry.path().to_string_lossy().to_string());
+        }
+    }
 
     if let Some(bins) = &metadata.bins {
         let bin_root = get_bin_root(scope)?;

@@ -1,10 +1,10 @@
-use crate::pkg;
+use crate::pkg::{self};
 use colored::*;
 
 pub fn run(package_names: &[String]) {
     for name in package_names {
         println!(
-            "{}{} {}",
+            "{}{}{}",
             "--- Uninstalling package '".yellow(),
             name.blue().bold(),
             "' ---".yellow()
