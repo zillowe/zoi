@@ -1,4 +1,5 @@
 use crate::pkg::pin;
+use anyhow::Result;
 use colored::*;
 
 pub fn run(source: &str) {
@@ -7,7 +8,7 @@ pub fn run(source: &str) {
     }
 }
 
-fn run_unpin_logic(source: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn run_unpin_logic(source: &str) -> Result<()> {
     let mut pinned_packages = pin::get_pinned_packages()?;
 
     let initial_len = pinned_packages.len();

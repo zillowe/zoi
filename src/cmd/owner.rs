@@ -1,6 +1,6 @@
 use crate::pkg::local;
+use anyhow::Result;
 use colored::*;
-use std::error::Error;
 use std::path::Path;
 
 pub fn run(path: &Path) {
@@ -10,7 +10,7 @@ pub fn run(path: &Path) {
     }
 }
 
-fn run_impl(path: &Path) -> Result<(), Box<dyn Error>> {
+fn run_impl(path: &Path) -> Result<()> {
     let absolute_path = match path.canonicalize() {
         Ok(p) => p,
         Err(_) => path.to_path_buf(),

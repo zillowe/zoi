@@ -1,20 +1,17 @@
 use crate::pkg::{config, local, types};
+use anyhow::{Result, anyhow};
 use comfy_table::{Table, presets::UTF8_FULL};
 use std::collections::HashSet;
 use std::io::{self, Write};
 use std::process::{Command, Stdio};
 
-pub fn run(
-    all: bool,
-    repo_filter: Option<String>,
-    type_filter: Option<String>,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run(all: bool, repo_filter: Option<String>, type_filter: Option<String>) -> Result<()> {
     let package_type = match type_filter.as_deref() {
         Some("package") => Some(types::PackageType::Package),
         Some("collection") => Some(types::PackageType::Collection),
         Some("app") => Some(types::PackageType::App),
         Some("extension") => Some(types::PackageType::Extension),
-        Some(other) => return Err(format!("Invalid package type: {}", other).into()),
+        Some(other) => return Err(anyhow!("Invalid package type: {}", other)),
         None => None,
     };
 
@@ -54,7 +51,7 @@ fn print_with_pager(content: &str) -> io::Result<()> {
 fn run_list_installed(
     repo_filter: Option<String>,
     type_filter: Option<types::PackageType>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<()> {
     let packages = local::get_installed_packages_with_type()?;
     if packages.is_empty() {
         println!("No packages installed by Zoi.");
@@ -105,7 +102,7 @@ fn run_list_installed(
 fn run_list_all(
     repo_filter: Option<String>,
     type_filter: Option<types::PackageType>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<()> {
     let installed_pkgs = local::get_installed_packages()?
         .into_iter()
         .map(|p| p.name)
@@ -121,10 +118,12 @@ fn run_list_all(
         let handle = if let Some(reg) = &config.default_registry {
             reg.handle.clone()
         } else {
-            return Err("Default registry not configured.".into());
+            return Err(anyhow!("Default registry not configured."));
         };
         if handle.is_empty() {
-            return Err("Default registry handle is not set. Please run 'zoi sync'..".into());
+            return Err(anyhow!(
+                "Default registry handle is not set. Please run 'zoi sync'.."
+            ));
         }
         let all_repo_names = config::get_all_repos()?;
         let repos_to_search: Vec<String> = all_repo_names

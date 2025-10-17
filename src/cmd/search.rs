@@ -1,4 +1,5 @@
 use crate::pkg::{config, local, types::PackageType};
+use anyhow::{Result, anyhow};
 use colored::*;
 use comfy_table::{ContentArrangement, Table, presets::UTF8_FULL};
 use std::io::{self, Write};
@@ -34,7 +35,7 @@ pub fn run(
     repo: Option<String>,
     package_type: Option<String>,
     tags: Option<Vec<String>>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<()> {
     println!(
         "{}{}{}",
         "--- Searching for packages matching '".yellow(),
@@ -52,10 +53,12 @@ pub fn run(
         let handle = if let Some(reg) = &config.default_registry {
             reg.handle.clone()
         } else {
-            return Err("Default registry not configured.".into());
+            return Err(anyhow!("Default registry not configured."));
         };
         if handle.is_empty() {
-            return Err("Default registry handle is not set. Please run 'zoi sync'..".into());
+            return Err(anyhow!(
+                "Default registry handle is not set. Please run 'zoi sync'.."
+            ));
         }
         let all_repo_names = config::get_all_repos()?;
         let repos_to_search: Vec<String> = all_repo_names

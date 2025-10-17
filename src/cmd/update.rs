@@ -1,10 +1,13 @@
 use crate::pkg::{config, hooks, install, local, pin, resolve, sync, types};
 use crate::utils;
+use anyhow::{Result, anyhow};
 use colored::*;
 use indicatif::{ProgressBar, ProgressStyle};
+use rayon::prelude::*;
 use semver::Version;
 use std::collections::HashSet;
 use std::fs;
+use std::sync::Mutex;
 
 pub fn run(all: bool, package_names: &[String], yes: bool) {
     if all {
@@ -54,17 +57,18 @@ pub fn run(all: bool, package_names: &[String], yes: bool) {
     }
 }
 
-fn run_update_single_logic(
-    package_name: &str,
-    yes: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
     println!("--- Updating package '{}' ---", package_name.blue().bold());
 
     let (new_pkg, new_version, _, _, registry_handle) =
         match resolve::resolve_package_and_version(package_name) {
             Ok(result) => result,
             Err(e) => {
-                return Err(format!("Could not resolve package '{}': {}", package_name, e).into());
+                return Err(anyhow!(
+                    "Could not resolve package '{}': {}",
+                    package_name,
+                    e
+                ));
             }
         };
 
@@ -81,10 +85,9 @@ fn run_update_single_logic(
     ) {
         Some(m) => m,
         None => {
-            return Err(format!(
+            return Err(anyhow!(
                 "Package '{package_name}' is not installed. Use 'zoi install' instead."
-            )
-            .into());
+            ));
         }
     };
 
@@ -106,12 +109,12 @@ fn run_update_single_logic(
     if let Some(hooks) = &new_pkg.hooks
         && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PreUpgrade)
     {
-        return Err(format!("Pre-upgrade hook failed: {}", e).into());
+        return Err(anyhow!("Pre-upgrade hook failed: {}", e));
     }
 
     let mode = install::InstallMode::PreferPrebuilt;
 
-    let mut processed_deps = HashSet::new();
+    let processed_deps = Mutex::new(HashSet::new());
     install::run_installation(
         package_name,
         mode,
@@ -119,7 +122,7 @@ fn run_update_single_logic(
         types::InstallReason::Direct,
         yes,
         false,
-        &mut processed_deps,
+        &processed_deps,
         Some(manifest.scope),
     )?;
 
@@ -133,14 +136,14 @@ fn run_update_single_logic(
     if let Some(hooks) = &new_pkg.hooks
         && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PostUpgrade)
     {
-        return Err(format!("Post-upgrade hook failed: {}", e).into());
+        return Err(anyhow!("Post-upgrade hook failed: {}", e));
     }
 
     println!("\n{}", "Update complete.".green());
     Ok(())
 }
 
-fn run_update_all_logic(yes: bool) -> Result<(), Box<dyn std::error::Error>> {
+fn run_update_all_logic(yes: bool) -> Result<()> {
     println!("{}", "--- Syncing Package Database ---".yellow().bold());
     sync::run(false, true, true)?;
 
@@ -210,56 +213,64 @@ fn run_update_all_logic(yes: bool) -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    for (source, new_pkg, registry_handle, scope) in packages_to_upgrade {
-        println!(
-            "\n--- Upgrading {} to {} ---",
-            source.cyan(),
-            new_pkg.version.as_deref().unwrap_or("N/A").green()
-        );
+    let processed_deps = Mutex::new(HashSet::new());
 
-        if let Some(hooks) = &new_pkg.hooks
-            && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PreUpgrade)
-        {
-            eprintln!(
-                "{}: Pre-upgrade hook failed for '{}': {}",
-                "Error".red().bold(),
-                source,
-                e
+    packages_to_upgrade
+        .par_iter()
+        .for_each(|(source, new_pkg, registry_handle, scope)| {
+            println!(
+                "\n--- Upgrading {} to {} ---",
+                source.cyan(),
+                new_pkg.version.as_deref().unwrap_or("N/A").green()
             );
-            continue;
-        }
 
-        let mode = install::InstallMode::PreferPrebuilt;
-        let mut processed_deps = HashSet::new();
-        install::run_installation(
-            &source,
-            mode,
-            true,
-            types::InstallReason::Direct,
-            yes,
-            false,
-            &mut processed_deps,
-            Some(scope),
-        )?;
-        cleanup_old_versions(
-            &new_pkg.name,
-            scope,
-            &new_pkg.repo,
-            registry_handle.as_deref().unwrap_or("local"),
-        )?;
+            if let Some(hooks) = &new_pkg.hooks
+                && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PreUpgrade)
+            {
+                eprintln!(
+                    "{}: Pre-upgrade hook failed for '{}': {}",
+                    "Error".red().bold(),
+                    source,
+                    e
+                );
+                return;
+            }
 
-        if let Some(hooks) = &new_pkg.hooks
-            && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PostUpgrade)
-        {
-            eprintln!(
-                "{}: Post-upgrade hook failed for '{}': {}",
-                "Error".red().bold(),
+            let mode = install::InstallMode::PreferPrebuilt;
+            if let Err(e) = install::run_installation(
                 source,
-                e
-            );
-            continue;
-        }
-    }
+                mode,
+                true,
+                types::InstallReason::Direct,
+                yes,
+                false,
+                &processed_deps,
+                Some(*scope),
+            ) {
+                eprintln!("Failed to upgrade {}: {}", source, e);
+                return;
+            }
+
+            if let Err(e) = cleanup_old_versions(
+                &new_pkg.name,
+                *scope,
+                &new_pkg.repo,
+                registry_handle.as_deref().unwrap_or("local"),
+            ) {
+                eprintln!("Failed to clean up old versions for {}: {}", source, e);
+            }
+
+            if let Some(hooks) = &new_pkg.hooks
+                && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PostUpgrade)
+            {
+                eprintln!(
+                    "{}: Post-upgrade hook failed for '{}': {}",
+                    "Error".red().bold(),
+                    source,
+                    e
+                );
+            }
+        });
 
     println!("\n{}", "Upgrade complete.".green());
     Ok(())
@@ -270,7 +281,7 @@ fn cleanup_old_versions(
     scope: types::Scope,
     repo: &str,
     registry_handle: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<()> {
     let config = config::read_config()?;
     let rollback_enabled = config.rollback_enabled;
 

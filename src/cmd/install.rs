@@ -2,7 +2,9 @@ use crate::pkg::{install, resolve, types};
 use crate::project;
 use crate::utils;
 use colored::Colorize;
+use rayon::prelude::*;
 use std::collections::HashSet;
+use std::sync::Mutex;
 
 pub fn run(
     sources: &[String],
@@ -36,11 +38,11 @@ pub fn run(
 
         println!("Installing project packages locally...");
         let local_scope = Some(types::Scope::Project);
-        let mut failed_packages = Vec::new();
-        let mut processed_deps = HashSet::new();
-        let mut installed_packages_info = Vec::new();
+        let failed_packages = Mutex::new(Vec::new());
+        let processed_deps = Mutex::new(HashSet::new());
+        let installed_packages_info = Mutex::new(Vec::new());
 
-        for source in &config.pkgs {
+        config.pkgs.par_iter().for_each(|source| {
             println!("=> Installing package: {}", source.cyan().bold());
             if let Err(e) = install::run_installation(
                 source,
@@ -49,7 +51,7 @@ pub fn run(
                 types::InstallReason::Direct,
                 yes,
                 all_optional,
-                &mut processed_deps,
+                &processed_deps,
                 local_scope,
             ) {
                 eprintln!(
@@ -58,14 +60,18 @@ pub fn run(
                     source,
                     e
                 );
-                failed_packages.push(source.to_string());
+                failed_packages.lock().unwrap().push(source.to_string());
             } else if let Ok((pkg, _, _, _, registry_handle)) =
                 resolve::resolve_package_and_version(source)
             {
-                installed_packages_info.push((pkg, registry_handle));
+                installed_packages_info
+                    .lock()
+                    .unwrap()
+                    .push((pkg, registry_handle));
             }
-        }
+        });
 
+        let failed_packages = failed_packages.into_inner().unwrap();
         if !failed_packages.is_empty() {
             eprintln!(
                 "\n{}: The following packages failed to install:",
@@ -78,6 +84,7 @@ pub fn run(
         }
 
         let mut new_lockfile_packages = std::collections::HashMap::new();
+        let installed_packages_info = installed_packages_info.into_inner().unwrap();
         for (pkg, registry_handle) in &installed_packages_info {
             let handle = registry_handle.as_deref().unwrap_or("local");
             if let Ok(package_dir) = crate::pkg::local::get_package_dir(
@@ -149,9 +156,9 @@ pub fn run(
     }
     let mode = install::InstallMode::PreferPrebuilt;
 
-    let mut failed_packages = Vec::new();
-    let mut successfully_installed_sources = Vec::new();
-    let mut processed_deps = HashSet::new();
+    let failed_packages = Mutex::new(Vec::new());
+    let successfully_installed_sources = Mutex::new(Vec::new());
+    let processed_deps = Mutex::new(HashSet::new());
 
     let mut temp_files = Vec::new();
     let mut sources_to_process: Vec<String> = Vec::new();
@@ -169,59 +176,62 @@ pub fn run(
                     source,
                     e
                 );
-                failed_packages.push(source.to_string());
+                failed_packages.lock().unwrap().push(source.to_string());
             }
         } else {
             sources_to_process.push(source.to_string());
         }
     }
 
-    for source in &sources_to_process {
+    sources_to_process.par_iter().for_each(|source| {
         println!("=> Installing package: {}", source.cyan().bold());
 
-        match resolve::resolve_source(source) {
-            Ok(resolved_source) => {
-                if let Err(e) = utils::confirm_untrusted_source(&resolved_source.source_type, yes) {
-                    eprintln!("\n{}", e.to_string().red());
-                    failed_packages.push(source.to_string());
-                    continue;
-                }
+        let installation_logic = || -> anyhow::Result<()> {
+            let resolved_source = resolve::resolve_source(source)?;
 
-                if let Some(repo_name) = &resolved_source.repo_name {
-                    utils::print_repo_warning(repo_name);
-                }
+            utils::confirm_untrusted_source(&resolved_source.source_type, yes)?;
 
-                if let Err(e) = install::run_installation(
-                    source,
-                    mode.clone(),
-                    force,
-                    types::InstallReason::Direct,
-                    yes,
-                    all_optional,
-                    &mut processed_deps,
-                    scope_override,
-                ) {
-                    if e.to_string().contains("aborted by user") {
-                        eprintln!("\n{}", e.to_string().yellow());
-                    } else {
-                        eprintln!(
-                            "{}: Failed to install '{}': {}",
-                            "Error".red().bold(),
-                            source,
-                            e
-                        );
-                    }
-                    failed_packages.push(source.to_string());
-                } else {
-                    successfully_installed_sources.push(source.clone());
-                }
+            if let Some(repo_name) = &resolved_source.repo_name {
+                utils::print_repo_warning(repo_name);
+            }
+
+            install::run_installation(
+                source,
+                mode.clone(),
+                force,
+                types::InstallReason::Direct,
+                yes,
+                all_optional,
+                &processed_deps,
+                scope_override,
+            )
+        };
+
+        match installation_logic() {
+            Ok(_) => {
+                successfully_installed_sources
+                    .lock()
+                    .unwrap()
+                    .push(source.clone());
             }
             Err(e) => {
-                eprintln!("{}: {}", "Error".red().bold(), e);
-                failed_packages.push(source.to_string());
+                if e.to_string().contains("aborted by user") {
+                    eprintln!("\n{}", e.to_string().yellow());
+                } else {
+                    eprintln!(
+                        "{}: Failed to install '{}': {}",
+                        "Error".red().bold(),
+                        source,
+                        e
+                    );
+                }
+                failed_packages.lock().unwrap().push(source.to_string());
             }
         }
-    }
+    });
+
+    let failed_packages = failed_packages.into_inner().unwrap();
+    let successfully_installed_sources = successfully_installed_sources.into_inner().unwrap();
 
     if save
         && scope_override == Some(types::Scope::Project)

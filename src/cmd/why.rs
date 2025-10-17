@@ -1,8 +1,8 @@
 use crate::pkg::{local, types};
+use anyhow::{Result, anyhow};
 use colored::*;
-use std::error::Error;
 
-pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
+pub fn run(package_name: &str) -> Result<()> {
     let trimmed_source = package_name.trim();
     let name_only = if let Some(slash_pos) = trimmed_source.rfind('/') {
         &trimmed_source[slash_pos + 1..]
@@ -18,14 +18,13 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
         (Some(m), None) => m,
         (None, Some(m)) => m,
         (Some(_), Some(_)) => {
-            return Err(format!(
+            return Err(anyhow!(
                 "Package '{}' is installed in both user and system scopes. This is an ambiguous state.",
                 package_name
-            )
-            .into());
+            ));
         }
         (None, None) => {
-            return Err(format!("Package '{}' is not installed.", package_name).into());
+            return Err(anyhow!("Package '{}' is not installed.", package_name));
         }
     };
 
