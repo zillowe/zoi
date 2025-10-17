@@ -1,15 +1,15 @@
 use crate::pkg::{local, resolve, types};
 use crate::utils;
+use anyhow::{Result, anyhow};
 use colored::*;
 use semver::Version;
-use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 #[cfg(windows)]
 use junction;
 
-pub fn run(package_name: &str, yes: bool) -> Result<(), Box<dyn Error>> {
+pub fn run(package_name: &str, yes: bool) -> Result<()> {
     println!("Attempting to roll back '{}'...", package_name.cyan());
 
     let (pkg, _, _, _, registry_handle) = resolve::resolve_package_and_version(package_name)?;
@@ -19,7 +19,7 @@ pub fn run(package_name: &str, yes: bool) -> Result<(), Box<dyn Error>> {
         } else if let Some(m) = local::is_package_installed(package_name, types::Scope::System)? {
             (m, types::Scope::System)
         } else {
-            return Err(format!("Package '{}' is not installed.", package_name).into());
+            return Err(anyhow!("Package '{}' is not installed.", package_name));
         };
 
     let handle = registry_handle.as_deref().unwrap_or("local");
@@ -41,7 +41,7 @@ pub fn run(package_name: &str, yes: bool) -> Result<(), Box<dyn Error>> {
     versions.sort();
 
     if versions.len() < 2 {
-        return Err("No previous version to roll back to.".into());
+        return Err(anyhow!("No previous version to roll back to."));
     }
 
     let current_version = versions.pop().unwrap();
@@ -104,12 +104,12 @@ pub fn run(package_name: &str, yes: bool) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn get_bin_root() -> Result<PathBuf, Box<dyn Error>> {
-    let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
+fn get_bin_root() -> Result<PathBuf> {
+    let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
     Ok(home_dir.join(".zoi").join("pkgs").join("bin"))
 }
 
-fn create_symlink(target: &Path, link: &Path) -> Result<(), Box<dyn Error>> {
+fn create_symlink(target: &Path, link: &Path) -> Result<()> {
     if link.exists() {
         fs::remove_file(link)?;
     }

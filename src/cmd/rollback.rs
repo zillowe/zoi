@@ -1,6 +1,6 @@
 use crate::pkg;
-use std::error::Error;
+use anyhow::Result;
 
-pub fn run(package_name: &str, yes: bool) -> Result<(), Box<dyn Error>> {
+pub fn run(package_name: &str, yes: bool) -> Result<()> {
     pkg::rollback::run(package_name, yes)
 }
