@@ -1,8 +1,8 @@
 use crate::{pkg, utils};
+use anyhow::{Result, anyhow};
 use chrono::Utc;
 use colored::*;
 use mlua::{Lua, LuaSerdeExt, Table};
-use std::error::Error;
 use std::fs::{self, File};
 use std::path::Path;
 use tar::Builder as TarBuilder;
@@ -15,7 +15,7 @@ fn build_for_platform(
     build_type: &str,
     platform: &str,
     sign_key: &Option<String>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
     let pkg_for_meta = pkg::lua::parser::parse_lua_package_for_platform(
         package_file.to_str().unwrap(),
         platform,
@@ -23,11 +23,11 @@ fn build_for_platform(
     )?;
 
     if !pkg_for_meta.types.iter().any(|t| t == build_type) {
-        return Err(format!(
+        return Err(anyhow!(
             "Build type '{}' not supported by this package. Supported types: {:?}",
-            build_type, pkg_for_meta.types
-        )
-        .into());
+            build_type,
+            pkg_for_meta.types
+        ));
     }
 
     let version = pkg::resolve::get_default_version(&pkg_for_meta, None)?;
@@ -45,36 +45,52 @@ fn build_for_platform(
         platform,
         Some(&version),
         package_file.to_str(),
-    )?;
-    let pkg_table = lua.to_value(&pkg_for_meta)?;
-    lua.globals().set("PKG", pkg_table)?;
+    )
+    .map_err(|e| anyhow!(e.to_string()))?;
+    let pkg_table = lua
+        .to_value(&pkg_for_meta)
+        .map_err(|e| anyhow!(e.to_string()))?;
     lua.globals()
-        .set("BUILD_DIR", build_dir.path().to_str().unwrap())?;
+        .set("PKG", pkg_table)
+        .map_err(|e| anyhow!(e.to_string()))?;
     lua.globals()
-        .set("STAGING_DIR", staging_dir.to_str().unwrap())?;
-    lua.globals().set("BUILD_TYPE", build_type)?;
+        .set("BUILD_DIR", build_dir.path().to_str().unwrap())
+        .map_err(|e| anyhow!(e.to_string()))?;
+    lua.globals()
+        .set("STAGING_DIR", staging_dir.to_str().unwrap())
+        .map_err(|e| anyhow!(e.to_string()))?;
+    lua.globals()
+        .set("BUILD_TYPE", build_type)
+        .map_err(|e| anyhow!(e.to_string()))?;
 
     let lua_code = fs::read_to_string(package_file)?;
-    lua.load(&lua_code).exec()?;
+    lua.load(&lua_code)
+        .exec()
+        .map_err(|e| anyhow!(e.to_string()))?;
 
     if let Ok(prepare_fn) = lua.globals().get::<mlua::Function>("prepare") {
         println!("Running prepare()...");
-        prepare_fn.call::<()>(())?;
+        prepare_fn
+            .call::<()>(())
+            .map_err(|e| anyhow!(e.to_string()))?;
     }
 
     if let Ok(package_fn) = lua.globals().get::<mlua::Function>("package") {
         println!("Running package()...");
-        package_fn.call::<()>(())?;
+        package_fn
+            .call::<()>(())
+            .map_err(|e| anyhow!(e.to_string()))?;
     }
 
     if let Ok(build_ops) = lua.globals().get::<Table>("__ZoiBuildOperations") {
         for op in build_ops.sequence_values::<Table>() {
-            let op = op?;
+            let op = op.map_err(|e| anyhow!(e.to_string()))?;
             if let Ok(op_type) = op.get::<String>("op")
                 && op_type == "zcp"
             {
-                let source: String = op.get("source")?;
-                let mut destination: String = op.get("destination")?;
+                let source: String = op.get("source").map_err(|e| anyhow!(e.to_string()))?;
+                let mut destination: String =
+                    op.get("destination").map_err(|e| anyhow!(e.to_string()))?;
 
                 let source_path = build_dir.path().join(&source);
 
@@ -113,13 +129,17 @@ fn build_for_platform(
 
     if let Ok(verify_fn) = lua.globals().get::<mlua::Function>("verify") {
         println!("Running verify()...");
-        let verification_passed: bool = verify_fn.call::<bool>(())?;
+        let verification_passed: bool = verify_fn
+            .call::<bool>(())
+            .map_err(|e| anyhow!(e.to_string()))?;
         if !verification_passed {
             if !utils::ask_for_confirmation(
                 "Package verification failed. This package may be unsafe. Continue?",
                 false,
             ) {
-                return Err("Build aborted by user due to verification failure.".into());
+                return Err(anyhow!(
+                    "Build aborted by user due to verification failure."
+                ));
             }
         } else {
             println!("Package verification passed.");
@@ -177,7 +197,7 @@ pub fn run(
     build_type: &str,
     platforms: &[String],
     sign_key: Option<String>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
     println!("Building package from: {}", package_file.display());
 
     let platforms_to_build: Vec<String> = if platforms.contains(&"current".to_string()) {
@@ -190,10 +210,9 @@ pub fn run(
     };
 
     if platforms.contains(&"all".to_string()) {
-        return Err(
+        return Err(anyhow!(
             "Building for 'all' platforms is not supported in this flow yet. Please specify platforms explicitly."
-                .into(),
-        );
+        ));
     }
 
     for platform in &platforms_to_build {
