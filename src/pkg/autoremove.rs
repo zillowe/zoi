@@ -1,9 +1,9 @@
 use crate::pkg::{local, types::InstallReason};
 use crate::utils;
+use anyhow::Result;
 use colored::*;
-use std::error::Error;
 
-pub fn run(yes: bool) -> Result<(), Box<dyn Error>> {
+pub fn run(yes: bool) -> Result<()> {
     println!("Checking for unused dependencies...");
     let all_installed = local::get_installed_packages()?;
     let mut packages_to_remove: Vec<String> = Vec::new();

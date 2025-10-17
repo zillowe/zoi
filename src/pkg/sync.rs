@@ -1,4 +1,5 @@
 use crate::{pkg::config, utils};
+use anyhow::{Result, anyhow};
 use colored::*;
 use git2::{
     FetchOptions, RemoteCallbacks, Repository,
@@ -11,17 +12,17 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use tempfile::Builder;
 
-fn get_db_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
-    let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
+fn get_db_path() -> Result<PathBuf> {
+    let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
     Ok(home_dir.join(".zoi").join("pkgs").join("db"))
 }
 
-fn get_git_root() -> Result<PathBuf, Box<dyn std::error::Error>> {
-    let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
+fn get_git_root() -> Result<PathBuf> {
+    let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
     Ok(home_dir.join(".zoi").join("pkgs").join("git"))
 }
 
-fn sync_git_repos(verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
+fn sync_git_repos(verbose: bool) -> Result<()> {
     let git_root = get_git_root()?;
     if !git_root.exists() {
         return Ok(());
@@ -91,7 +92,7 @@ fn sync_git_repos(verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn run_verbose_at_path(db_url: &str, db_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn run_verbose_at_path(db_url: &str, db_path: &Path) -> Result<()> {
     if db_path.exists() {
         let status = Command::new("git")
             .arg("-C")
@@ -101,7 +102,9 @@ fn run_verbose_at_path(db_url: &str, db_path: &Path) -> Result<(), Box<dyn std::
             .stderr(Stdio::inherit())
             .status()?;
         if !status.success() {
-            return Err("Failed to pull changes from the remote repository.".into());
+            return Err(anyhow!(
+                "Failed to pull changes from the remote repository."
+            ));
         }
     } else {
         let status = Command::new("git")
@@ -113,24 +116,26 @@ fn run_verbose_at_path(db_url: &str, db_path: &Path) -> Result<(), Box<dyn std::
             .stderr(Stdio::inherit())
             .status()?;
         if !status.success() {
-            return Err("Failed to clone the package repository.".into());
+            return Err(anyhow!("Failed to clone the package repository."));
         }
     }
     Ok(())
 }
 
-fn run_non_verbose_at_path(db_url: &str, db_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn run_non_verbose_at_path(db_url: &str, db_path: &Path) -> Result<()> {
     let m = MultiProgress::new();
     let fetch_pb = m.add(ProgressBar::new(0).with_style(
         ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] Fetching: [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)?")
-            .unwrap()
+            .template(
+                "{spinner:.green} [{elapsed_precise}] Fetching: [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)?",
+            )?
             .progress_chars("#>-"),
     ));
     let checkout_pb = m.add(ProgressBar::new(0).with_style(
         ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] Checkout: [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)?")
-            .unwrap()
+            .template(
+                "{spinner:.green} [{elapsed_precise}] Checkout: [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)?",
+            )?
             .progress_chars("#>-"),
     ));
 
@@ -223,11 +228,7 @@ fn run_non_verbose_at_path(db_url: &str, db_path: &Path) -> Result<(), Box<dyn s
     Ok(())
 }
 
-fn try_sync_at_path(
-    db_url: &str,
-    db_path: &Path,
-    verbose: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn try_sync_at_path(db_url: &str, db_path: &Path, verbose: bool) -> Result<()> {
     if db_path.exists()
         && let Ok(repo) = Repository::open(db_path)
         && let Ok(remote) = repo.find_remote("origin")
@@ -249,7 +250,7 @@ fn try_sync_at_path(
     }
 }
 
-fn sync_pgp_keys_at_path(db_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn sync_pgp_keys_at_path(db_path: &Path) -> Result<()> {
     println!("\n{}", "Syncing PGP keys from repository...".green());
     if !db_path.join("repo.yaml").exists() {
         println!("{}", "repo.yaml not found, skipping PGP key sync.".yellow());
@@ -272,11 +273,10 @@ fn sync_pgp_keys_at_path(db_path: &Path) -> Result<(), Box<dyn std::error::Error
         } else if key_source.len() == 40 && key_source.chars().all(|c| c.is_ascii_hexdigit()) {
             crate::pkg::pgp::add_key_from_fingerprint(key_source, key_name)
         } else {
-            Err(format!(
+            Err(anyhow!(
                 "Invalid key source '{}': must be a URL or a 40-character fingerprint.",
                 key_source
-            )
-            .into())
+            ))
         };
 
         if let Err(e) = result {
@@ -292,7 +292,7 @@ fn sync_pgp_keys_at_path(db_path: &Path) -> Result<(), Box<dyn std::error::Error
     Ok(())
 }
 
-fn fetch_handle_for_url(url: &str) -> Result<String, Box<dyn std::error::Error>> {
+fn fetch_handle_for_url(url: &str) -> Result<String> {
     let temp_dir = Builder::new().prefix("zoi-handle-fetch").tempdir()?;
     println!("Cloning '{}' to fetch handle...", url.cyan());
     let status = std::process::Command::new("git")
@@ -303,14 +303,14 @@ fn fetch_handle_for_url(url: &str) -> Result<String, Box<dyn std::error::Error>>
         .status()?;
 
     if !status.success() {
-        return Err("git clone failed to fetch handle".into());
+        return Err(anyhow!("git clone failed to fetch handle"));
     }
 
     let repo_config = config::read_repo_config(temp_dir.path())?;
     Ok(repo_config.name)
 }
 
-pub fn run(verbose: bool, _fallback: bool, no_pm: bool) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run(verbose: bool, _fallback: bool, no_pm: bool) -> Result<()> {
     let mut config = config::read_user_config()?;
     let mut needs_config_update = false;
 

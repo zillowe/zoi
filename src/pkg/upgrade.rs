@@ -1,3 +1,4 @@
+use anyhow::{Result, anyhow};
 use bsdiff;
 use colored::*;
 use dirs;
@@ -7,7 +8,6 @@ use self_update::self_replace;
 use serde::Deserialize;
 use sha2::{Digest, Sha512};
 use std::env;
-use std::error::Error;
 use std::fs::{self, File};
 use std::io::{self, Cursor, Read, Write};
 use std::path::{Path, PathBuf};
@@ -24,7 +24,7 @@ struct GitLabRelease {
     tag_name: String,
 }
 
-fn get_latest_tag(branch_prefix: &str) -> Result<String, Box<dyn Error>> {
+fn get_latest_tag(branch_prefix: &str) -> Result<String> {
     println!("Fetching latest release information from GitLab...");
     let api_url = format!(
         "https://gitlab.com/api/v4/projects/{}/releases",
@@ -39,7 +39,7 @@ fn get_latest_tag(branch_prefix: &str) -> Result<String, Box<dyn Error>> {
         .into_iter()
         .find(|r| r.tag_name.starts_with(branch_prefix))
         .map(|r| r.tag_name)
-        .ok_or_else(|| format!("No release found with prefix '{}'", branch_prefix))?;
+        .ok_or_else(|| anyhow!("No release found with prefix '{}'", branch_prefix))?;
 
     println!(
         "Found latest tag for branch prefix '{}': {}",
@@ -49,10 +49,13 @@ fn get_latest_tag(branch_prefix: &str) -> Result<String, Box<dyn Error>> {
     Ok(latest_tag)
 }
 
-fn download_file(url: &str, path: &Path) -> Result<(), Box<dyn Error>> {
+fn download_file(url: &str, path: &Path) -> Result<()> {
     let mut response = reqwest::blocking::get(url)?;
     if !response.status().is_success() {
-        return Err(format!("Failed to download file: HTTP {}", response.status()).into());
+        return Err(anyhow!(
+            "Failed to download file: HTTP {}",
+            response.status()
+        ));
     }
 
     let total_size = response.content_length().unwrap_or(0);
@@ -77,7 +80,7 @@ fn download_file(url: &str, path: &Path) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn download_patch_file(url: &str, path: &Path) -> Result<(), Box<dyn Error>> {
+fn download_patch_file(url: &str, path: &Path) -> Result<()> {
     let client = reqwest::blocking::Client::builder()
         .user_agent("Zoi-Upgrader")
         .no_gzip()
@@ -86,7 +89,10 @@ fn download_patch_file(url: &str, path: &Path) -> Result<(), Box<dyn Error>> {
         .build()?;
     let mut response = client.get(url).send()?;
     if !response.status().is_success() {
-        return Err(format!("Failed to download file: HTTP {}", response.status()).into());
+        return Err(anyhow!(
+            "Failed to download file: HTTP {}",
+            response.status()
+        ));
     }
 
     let total_size = response.content_length().unwrap_or(0);
@@ -111,7 +117,7 @@ fn download_patch_file(url: &str, path: &Path) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn extract_archive(archive_path: &Path, target_dir: &Path) -> Result<(), Box<dyn Error>> {
+fn extract_archive(archive_path: &Path, target_dir: &Path) -> Result<()> {
     println!("Extracting binary...");
     let file = File::open(archive_path)?;
 
@@ -126,17 +132,13 @@ fn extract_archive(archive_path: &Path, target_dir: &Path) -> Result<(), Box<dyn
     Ok(())
 }
 
-fn verify_checksum(
-    file_path: &Path,
-    checksums_content: &str,
-    filename: &str,
-) -> Result<(), Box<dyn Error>> {
+fn verify_checksum(file_path: &Path, checksums_content: &str, filename: &str) -> Result<()> {
     println!("Verifying checksum for {}...", filename);
     let expected_hash = checksums_content
         .lines()
         .find(|line| line.contains(filename))
         .and_then(|line| line.split_whitespace().next())
-        .ok_or(format!("Checksum not found for {}.", filename))?;
+        .ok_or(anyhow!("Checksum not found for {}.", filename))?;
 
     let mut file = File::open(file_path)?;
     let mut hasher = Sha512::new();
@@ -144,29 +146,28 @@ fn verify_checksum(
     let actual_hash = hex::encode(hasher.finalize());
 
     if actual_hash != expected_hash {
-        return Err(format!(
+        return Err(anyhow!(
             "Checksum mismatch for {}! The file may be corrupt.",
             filename
-        )
-        .into());
+        ));
     }
     println!("Checksum verified successfully for {}.", filename.green());
     Ok(())
 }
 
-fn get_platform_info() -> Result<(&'static str, &'static str), Box<dyn Error>> {
+fn get_platform_info() -> Result<(&'static str, &'static str)> {
     let os = match env::consts::OS {
         "linux" => "linux",
         "macos" | "darwin" => "macos",
         "windows" => "windows",
         // "freebsd" => "freebsd",
         // "openbsd" => "openbsd",
-        _ => return Err(format!("Unsupported OS: {}", env::consts::OS).into()),
+        _ => return Err(anyhow!("Unsupported OS: {}", env::consts::OS)),
     };
     let arch = match env::consts::ARCH {
         "x86_64" => "amd64",
         "aarch64" => "arm64",
-        _ => return Err(format!("Unsupported architecture: {}", env::consts::ARCH).into()),
+        _ => return Err(anyhow!("Unsupported architecture: {}", env::consts::ARCH)),
     };
     Ok((os, arch))
 }
@@ -177,7 +178,7 @@ fn attempt_patch_upgrade(
     patch_checksums: &str,
     patch_filename: &str,
     new_binary_checksum_name: &str,
-) -> Result<PathBuf, Box<dyn Error>> {
+) -> Result<PathBuf> {
     println!(
         "
 Attempting patch-based upgrade (bsdiff)..."
@@ -221,7 +222,7 @@ fn fallback_full_upgrade(
     checksums_content: &str,
     os: &str,
     arch: &str,
-) -> Result<PathBuf, Box<dyn Error>> {
+) -> Result<PathBuf> {
     println!(
         "
 Falling back to full binary download..."
@@ -241,7 +242,9 @@ Falling back to full binary download..."
     let binary_filename = if os == "windows" { "zoi.exe" } else { "zoi" };
     let new_binary_path = temp_dir.path().join(binary_filename);
     if !new_binary_path.exists() {
-        return Err("Could not find executable in the extracted archive.".into());
+        return Err(anyhow!(
+            "Could not find executable in the extracted archive."
+        ));
     }
     Ok(new_binary_path)
 }
@@ -254,7 +257,7 @@ pub fn run(
     force: bool,
     tag: Option<String>,
     custom_branch: Option<String>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
     let current_exe_path = env::current_exe()?;
     let path_str = current_exe_path.to_string_lossy();
 
@@ -300,7 +303,7 @@ pub fn run(
                 "To override this check and proceed anyway, run with the '{}' flag.",
                 "--force".cyan()
             );
-            return Err("managed_by_package_manager".into());
+            return Err(anyhow!("managed_by_package_manager"));
         } else {
             println!(
                 "{}{}",
@@ -334,7 +337,7 @@ pub fn run(
     let parts: Vec<&str> = latest_tag.split('-').collect();
     let latest_version_num = parts
         .last()
-        .ok_or("Could not get version number from tag")?;
+        .ok_or(anyhow!("Could not get version number from tag"))?;
 
     let latest_version_str = if parts.len() > 2 {
         let prerelease = parts[1].to_lowercase();
@@ -349,7 +352,7 @@ pub fn run(
 {}",
             "You are already on the latest version!".green()
         );
-        return Err("already_on_latest".into());
+        return Err(anyhow!("already_on_latest"));
     }
 
     let (os, arch) = get_platform_info()?;

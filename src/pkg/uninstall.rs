@@ -1,15 +1,16 @@
 use crate::pkg::{dependencies, hooks, local, recorder, resolve, types};
 use crate::utils;
+use anyhow::anyhow;
 use colored::*;
 use mlua::Lua;
-use std::error::Error;
 use std::fs;
 use std::path::PathBuf;
 
-fn get_bin_root(scope: types::Scope) -> Result<PathBuf, Box<dyn Error>> {
+fn get_bin_root(scope: types::Scope) -> anyhow::Result<PathBuf> {
     match scope {
         types::Scope::User => {
-            let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
+            let home_dir =
+                home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
             Ok(home_dir.join(".zoi/pkgs/bin"))
         }
         types::Scope::System => {
@@ -31,7 +32,7 @@ fn uninstall_collection(
     manifest: &types::InstallManifest,
     scope: types::Scope,
     registry_handle: Option<String>,
-) -> Result<(), Box<dyn Error>> {
+) -> anyhow::Result<()> {
     println!("Uninstalling collection '{}'...", pkg.name.bold());
 
     let dependencies_to_uninstall = &manifest.installed_dependencies;
@@ -74,7 +75,7 @@ fn uninstall_collection(
     Ok(())
 }
 
-pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
+pub fn run(package_name: &str) -> anyhow::Result<()> {
     let (manifest, scope) =
         if let Some(m) = local::is_package_installed(package_name, types::Scope::Project)? {
             (m, types::Scope::Project)
@@ -83,7 +84,10 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
         } else if let Some(m) = local::is_package_installed(package_name, types::Scope::System)? {
             (m, types::Scope::System)
         } else {
-            return Err(format!("Package '{}' is not installed by Zoi.", package_name).into());
+            return Err(anyhow::anyhow!(
+                "Package '{}' is not installed by Zoi.",
+                package_name
+            ));
         };
 
     let (pkg, _, _, pkg_lua_path, registry_handle) =
@@ -96,18 +100,18 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
     if let Some(hooks) = &pkg.hooks
         && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PreRemove)
     {
-        return Err(format!("Pre-remove hook failed: {}", e).into());
+        return Err(anyhow::anyhow!("Pre-remove hook failed: {}", e));
     }
 
     let handle = registry_handle.as_deref().unwrap_or("local");
     let package_dir = local::get_package_dir(scope, handle, &pkg.repo, &pkg.name)?;
     let dependents = local::get_dependents(&package_dir)?;
     if !dependents.is_empty() {
-        return Err(format!(
+        return Err(anyhow::anyhow!(
             "Cannot uninstall '{}' because other packages depend on it:\n  -{}\n\nPlease uninstall these packages first.",
             &pkg.name,
             dependents.join("\n  - ")
-        ).into());
+        ));
     }
 
     let lua = Lua::new();
@@ -116,22 +120,27 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
         &utils::get_platform()?,
         Some(&manifest.version),
         pkg_lua_path.to_str(),
-    )?;
+    )
+    .map_err(|e| anyhow!(e.to_string()))?;
     let lua_code = fs::read_to_string(pkg_lua_path)?;
-    lua.load(&lua_code).exec()?;
+    lua.load(&lua_code)
+        .exec()
+        .map_err(|e| anyhow!(e.to_string()))?;
 
     if let Ok(uninstall_fn) = lua.globals().get::<mlua::Function>("uninstall") {
         println!("Running uninstall() script...");
-        uninstall_fn.call::<()>(())?;
+        uninstall_fn
+            .call::<()>(())
+            .map_err(|e| anyhow!(e.to_string()))?;
     }
 
     if let Ok(uninstall_ops) = lua.globals().get::<mlua::Table>("__ZoiUninstallOperations") {
         for op in uninstall_ops.sequence_values::<mlua::Table>() {
-            let op = op?;
+            let op = op.map_err(|e| anyhow!(e.to_string()))?;
             if let Ok(op_type) = op.get::<String>("op")
                 && op_type == "zrm"
             {
-                let path_to_remove: String = op.get("path")?;
+                let path_to_remove: String = op.get("path").map_err(|e| anyhow!(e.to_string()))?;
                 let path = std::path::PathBuf::from(path_to_remove);
                 if path.exists() {
                     println!("Removing {}...", path.display());
@@ -225,7 +234,7 @@ pub fn run(package_name: &str) -> Result<(), Box<dyn Error>> {
     if let Some(hooks) = &pkg.hooks
         && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PostRemove)
     {
-        return Err(format!("Post-remove hook failed: {}", e).into());
+        return Err(anyhow::anyhow!("Post-remove hook failed: {}", e));
     }
 
     Ok(())
