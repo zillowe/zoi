@@ -3,6 +3,7 @@ use crate::pkg::{cache, config, dependencies, hooks, local, recorder, resolve, t
 use crate::utils;
 use anyhow::{Result, anyhow};
 use colored::*;
+use indicatif::MultiProgress;
 use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
@@ -23,6 +24,7 @@ pub fn run_installation(
     all_optional: bool,
     processed_deps: &Mutex<HashSet<String>>,
     scope_override: Option<types::Scope>,
+    m: Option<&MultiProgress>,
 ) -> Result<()> {
     let (mut pkg, version, sharable_manifest, pkg_lua_path, registry_handle) =
         resolve::resolve_package_and_version(source)?;
@@ -77,6 +79,7 @@ pub fn run_installation(
             true,
             processed_deps,
             &mut installed_deps_list,
+            m,
         )?;
         dependencies::resolve_and_install_required(
             &sm.chosen_optionals,
@@ -87,6 +90,7 @@ pub fn run_installation(
             true,
             processed_deps,
             &mut installed_deps_list,
+            m,
         )?;
         chosen_options = sm.chosen_options.clone();
         chosen_optionals = sm.chosen_optionals.clone();
@@ -103,6 +107,7 @@ pub fn run_installation(
                     all_optional,
                     processed_deps,
                     &mut installed_deps_list,
+                    m,
                 )?;
                 dependencies::resolve_and_install_required_options(
                     &runtime_deps.get_required_options(),
@@ -114,6 +119,7 @@ pub fn run_installation(
                     processed_deps,
                     &mut installed_deps_list,
                     &mut chosen_options,
+                    m,
                 )?;
                 dependencies::resolve_and_install_optional(
                     runtime_deps.get_optional(),
@@ -126,6 +132,7 @@ pub fn run_installation(
                     &mut installed_deps_list,
                     &mut chosen_optionals,
                     Some("runtime"),
+                    m,
                 )?;
             }
 
@@ -139,6 +146,7 @@ pub fn run_installation(
                     all_optional,
                     processed_deps,
                     &mut installed_deps_list,
+                    m,
                 )?;
                 dependencies::resolve_and_install_required_options(
                     &build_deps.get_required_options(),
@@ -150,6 +158,7 @@ pub fn run_installation(
                     processed_deps,
                     &mut installed_deps_list,
                     &mut chosen_options,
+                    m,
                 )?;
                 dependencies::resolve_and_install_optional(
                     build_deps.get_optional(),
@@ -162,6 +171,7 @@ pub fn run_installation(
                     &mut installed_deps_list,
                     &mut chosen_optionals,
                     Some("build"),
+                    m,
                 )?;
             }
         } else {
@@ -230,6 +240,7 @@ pub fn run_installation(
                 all_optional,
                 processed_deps,
                 &mut installed_deps_list,
+                m,
             )?;
             dependencies::resolve_and_install_required_options(
                 &build_deps.get_required_options(),
@@ -241,6 +252,7 @@ pub fn run_installation(
                 processed_deps,
                 &mut installed_deps_list,
                 &mut chosen_options,
+                m,
             )?;
             dependencies::resolve_and_install_optional(
                 build_deps.get_optional(),
@@ -253,6 +265,7 @@ pub fn run_installation(
                 &mut installed_deps_list,
                 &mut chosen_optionals,
                 Some("build"),
+                m,
             )?;
         }
 
@@ -266,6 +279,7 @@ pub fn run_installation(
                 all_optional,
                 processed_deps,
                 &mut installed_deps_list,
+                m,
             )?;
             dependencies::resolve_and_install_required_options(
                 &runtime_deps.get_required_options(),
@@ -277,6 +291,7 @@ pub fn run_installation(
                 processed_deps,
                 &mut installed_deps_list,
                 &mut chosen_options,
+                m,
             )?;
             dependencies::resolve_and_install_optional(
                 runtime_deps.get_optional(),
@@ -289,6 +304,7 @@ pub fn run_installation(
                 &mut installed_deps_list,
                 &mut chosen_optionals,
                 Some("runtime"),
+                m,
             )?;
         }
     }
@@ -311,6 +327,7 @@ pub fn run_installation(
         &mut install_manual,
         mode,
         handle,
+        m,
     );
 
     match result {
@@ -374,6 +391,7 @@ fn run_default_flow(
     install_manual: &mut bool,
     mode: InstallMode,
     registry_handle: &str,
+    m: Option<&MultiProgress>,
 ) -> Result<Vec<String>> {
     if mode == InstallMode::PreferPrebuilt {
         let db_path = resolve::get_db_root()?;
@@ -455,7 +473,6 @@ fn run_default_flow(
                             }
                         }
                     } else {
-                        // No hash to verify, just use the cached file.
                         archive_to_install = Some(cached_archive_path.clone());
                     }
                 }
@@ -464,7 +481,8 @@ fn run_default_flow(
                     let temp_dir = tempfile::Builder::new().prefix("zoi-dl-").tempdir()?;
                     let temp_download_path = temp_dir.path().join(&archive_filename);
 
-                    if util::download_file_with_progress(&final_url, &temp_download_path).is_ok() {
+                    if util::download_file_with_progress(&final_url, &temp_download_path, m).is_ok()
+                    {
                         if let Some(hash) = &expected_hash {
                             match util::verify_file_hash(&temp_download_path, hash) {
                                 Ok(true) => {
@@ -475,7 +493,7 @@ fn run_default_flow(
                                     println!(
                                         "Downloaded archive hash is invalid. Trying next source."
                                     );
-                                    continue; // to next pkg_link
+                                    continue;
                                 }
                                 Err(e) => {
                                     println!(
@@ -494,7 +512,7 @@ fn run_default_flow(
                             "Failed to download from {}. Trying next mirror if available.",
                             final_url
                         );
-                        continue; // to next pkg_link
+                        continue;
                     }
                 }
 

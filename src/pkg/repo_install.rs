@@ -80,6 +80,7 @@ pub fn run(
             all_optional,
             &processed_deps,
             scope_override,
+            None,
         );
         fs::remove_file(temp_path)?;
         result
@@ -106,6 +107,7 @@ pub fn run(
             all_optional,
             &processed_deps,
             scope_override,
+            None,
         );
         fs::remove_file(temp_path)?;
         result
@@ -123,6 +125,7 @@ pub fn run(
             all_optional,
             &processed_deps,
             scope_override,
+            None,
         )
     }
 }

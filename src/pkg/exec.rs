@@ -87,6 +87,7 @@ fn ensure_binary_is_cached(pkg: &types::Package, upstream: bool) -> Result<PathB
             if crate::pkg::install::util::download_file_with_progress(
                 &final_url,
                 &temp_archive_path,
+                None,
             )
             .is_ok()
             {

@@ -3,7 +3,7 @@ use crate::utils;
 use anyhow::Result;
 use colored::*;
 use dialoguer::{Input, Select, theme::ColorfulTheme};
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use regex::Regex;
 use semver::{Version, VersionReq};
 use std::collections::HashSet;
@@ -100,7 +100,7 @@ fn get_native_command_version(command_name: &str) -> Result<Option<Version>> {
         return Ok(None);
     }
 
-    let re = Regex::new(r"(\d+\.\d+\.\d+)")?;
+    let re = Regex::new(r"v?(\d+\.\d+\.\d+[-.a-zA-Z0-9]*)")?;
     if let Some(caps) = re.captures(&output)
         && let Some(matched) = caps.get(1)
         && let Ok(version) = Version::parse(matched.as_str())
@@ -119,6 +119,7 @@ fn install_dependency(
     all_optional: bool,
     processed_deps: &Mutex<HashSet<String>>,
     installed_deps: &mut Vec<String>,
+    m: Option<&MultiProgress>,
 ) -> Result<()> {
     let dep_id = format!("{}:{}", dep.manager, dep.package);
     if !processed_deps.lock().unwrap().insert(dep_id.clone()) {
@@ -254,6 +255,7 @@ fn install_dependency(
                 all_optional,
                 processed_deps,
                 scope,
+                m,
             )?;
         }
         "native" => {
@@ -1086,6 +1088,7 @@ pub fn resolve_and_install_required(
     all_optional: bool,
     processed_deps: &Mutex<HashSet<String>>,
     installed_deps: &mut Vec<String>,
+    m: Option<&MultiProgress>,
 ) -> Result<()> {
     if deps.is_empty() {
         return Ok(());
@@ -1102,6 +1105,7 @@ pub fn resolve_and_install_required(
             all_optional,
             processed_deps,
             installed_deps,
+            m,
         )?;
     }
     println!("{}", "All required dependencies resolved.".green());
@@ -1118,6 +1122,7 @@ pub fn resolve_and_install_required_options(
     processed_deps: &Mutex<HashSet<String>>,
     installed_deps: &mut Vec<String>,
     chosen_options: &mut Vec<String>,
+    m: Option<&MultiProgress>,
 ) -> Result<()> {
     if option_groups.is_empty() {
         return Ok(());
@@ -1164,6 +1169,7 @@ pub fn resolve_and_install_required_options(
                         all_optional,
                         processed_deps,
                         installed_deps,
+                        m,
                     )?;
                 }
             } else {
@@ -1181,6 +1187,7 @@ pub fn resolve_and_install_required_options(
                         all_optional,
                         processed_deps,
                         installed_deps,
+                        m,
                     )?;
                 }
             }
@@ -1225,6 +1232,7 @@ pub fn resolve_and_install_required_options(
                     all_optional,
                     processed_deps,
                     installed_deps,
+                    m,
                 )?;
             }
         } else {
@@ -1255,6 +1263,7 @@ pub fn resolve_and_install_required_options(
                 all_optional,
                 processed_deps,
                 installed_deps,
+                m,
             )?;
         }
     }
@@ -1272,6 +1281,7 @@ pub fn resolve_and_install_optional(
     installed_deps: &mut Vec<String>,
     chosen_optionals: &mut Vec<String>,
     dep_type: Option<&str>,
+    m: Option<&MultiProgress>,
 ) -> Result<()> {
     if deps.is_empty() {
         return Ok(());
@@ -1295,6 +1305,7 @@ pub fn resolve_and_install_optional(
                 all_optional,
                 processed_deps,
                 installed_deps,
+                m,
             )?;
         }
         return Ok(());
@@ -1364,6 +1375,7 @@ pub fn resolve_and_install_optional(
             all_optional,
             processed_deps,
             installed_deps,
+            m,
         )?;
     }
 
@@ -1377,6 +1389,7 @@ fn install_zoi_dependency(
     all_optional: bool,
     processed_deps: &Mutex<HashSet<String>>,
     scope: types::Scope,
+    m: Option<&MultiProgress>,
 ) -> Result<()> {
     install::run_installation(
         package_name,
@@ -1389,6 +1402,7 @@ fn install_zoi_dependency(
         all_optional,
         processed_deps,
         Some(scope),
+        m,
     )
 }
 

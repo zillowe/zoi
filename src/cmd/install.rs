@@ -2,6 +2,7 @@ use crate::pkg::{install, resolve, types};
 use crate::project;
 use crate::utils;
 use colored::Colorize;
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use std::collections::HashSet;
 use std::sync::Mutex;
@@ -53,6 +54,7 @@ pub fn run(
                 all_optional,
                 &processed_deps,
                 local_scope,
+                None,
             ) {
                 eprintln!(
                     "{}: Failed to install '{}': {}",
@@ -183,8 +185,17 @@ pub fn run(
         }
     }
 
+    let m = MultiProgress::new();
+
     sources_to_process.par_iter().for_each(|source| {
-        println!("=> Installing package: {}", source.cyan().bold());
+        let pb = m.add(ProgressBar::new_spinner());
+        pb.enable_steady_tick(std::time::Duration::from_millis(120));
+        pb.set_style(
+            ProgressStyle::default_spinner()
+                .template("{spinner:.green} {msg}")
+                .unwrap(),
+        );
+        pb.set_message(format!("Installing package: {}", source.cyan().bold()));
 
         let installation_logic = || -> anyhow::Result<()> {
             let resolved_source = resolve::resolve_source(source)?;
@@ -204,17 +215,20 @@ pub fn run(
                 all_optional,
                 &processed_deps,
                 scope_override,
+                Some(&m),
             )
         };
 
         match installation_logic() {
             Ok(_) => {
+                pb.finish_with_message(format!("Successfully installed {}", source.cyan().bold()));
                 successfully_installed_sources
                     .lock()
                     .unwrap()
                     .push(source.clone());
             }
             Err(e) => {
+                pb.finish_with_message(format!("Failed to install {}", source.red().bold()));
                 if e.to_string().contains("aborted by user") {
                     eprintln!("\n{}", e.to_string().yellow());
                 } else {

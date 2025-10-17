@@ -2,7 +2,7 @@ use crate::pkg::types;
 use crate::utils;
 use anyhow::{Result, anyhow};
 use colored::*;
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use sha2::{Digest, Sha512};
 use std::collections::HashSet;
 use std::fs::File;
@@ -107,15 +107,33 @@ pub fn get_filename_from_url(url: &str) -> &str {
     url.split('/').next_back().unwrap_or("")
 }
 
-pub fn download_file_with_progress(url: &str, dest_path: &Path) -> Result<()> {
+pub fn download_file_with_progress(
+    url: &str,
+    dest_path: &Path,
+    m: Option<&MultiProgress>,
+) -> Result<()> {
     if url.starts_with("http://") {
-        println!(
-            "{} downloading over insecure HTTP: {}",
-            "Warning:".yellow(),
-            url
-        );
+        let msg = format!("downloading over insecure HTTP: {}", url);
+        if m.is_none() {
+            println!("{}: {}", "Warning:".yellow(), msg);
+        }
     }
-    println!("Downloading from: {url}");
+
+    let mut pb = if let Some(m) = m {
+        let pb = m.add(ProgressBar::new(0));
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template(
+                    "{spinner:.green} {wide_msg:.cyan}\n[{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})",
+                )?
+                .progress_chars("#>-"),
+        );
+        pb.set_message(format!("Connecting to {}", get_filename_from_url(url)));
+        pb
+    } else {
+        println!("Downloading from: {url}");
+        ProgressBar::new(0)
+    };
 
     let client = crate::utils::build_blocking_http_client(60)?;
     let mut attempt = 0u32;
@@ -127,7 +145,12 @@ pub fn download_file_with_progress(url: &str, dest_path: &Path) -> Result<()> {
 
     let mut request = client.get(url);
     if partial_size > 0 {
-        println!("Resuming download from byte {}", partial_size);
+        let msg = format!("Resuming download from byte {}", partial_size);
+        if m.is_some() {
+            pb.set_message(msg);
+        } else {
+            println!("{}", msg);
+        }
         request = request.header("Range", format!("bytes={}-", partial_size));
     }
 
@@ -141,11 +164,12 @@ pub fn download_file_with_progress(url: &str, dest_path: &Path) -> Result<()> {
             Ok(resp) => break resp,
             Err(e) => {
                 if attempt < 3 {
-                    eprintln!(
-                        "{}: download failed ({}). Retrying...",
-                        "Network".yellow(),
-                        e
-                    );
+                    let msg = format!("Download failed ({}). Retrying...", e);
+                    if m.is_some() {
+                        pb.set_message(msg);
+                    } else {
+                        eprintln!("{}: {}", "Network".yellow(), msg);
+                    }
                     crate::utils::retry_backoff_sleep(attempt);
                     continue;
                 } else {
@@ -174,11 +198,19 @@ pub fn download_file_with_progress(url: &str, dest_path: &Path) -> Result<()> {
     }
 
     let total_size = partial_size + response.content_length().unwrap_or(0);
-    let pb = ProgressBar::new(total_size);
-    pb.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})")?
-        .progress_chars("#>-"));
+
+    if m.is_none() {
+        let new_pb = ProgressBar::new(total_size);
+        new_pb.set_style(ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})")?
+            .progress_chars("#>-"));
+        pb.finish_and_clear();
+        let _ = std::mem::replace(&mut pb, new_pb);
+    }
+
+    pb.set_length(total_size);
     pb.set_position(partial_size);
+    pb.set_message(format!("Downloading {}", get_filename_from_url(url)));
 
     let mut dest_file = if is_resumed {
         std::fs::OpenOptions::new().append(true).open(dest_path)?
@@ -196,7 +228,7 @@ pub fn download_file_with_progress(url: &str, dest_path: &Path) -> Result<()> {
         dest_file.write_all(&buffer[..bytes_read])?;
         pb.inc(bytes_read as u64);
     }
-    pb.finish_with_message("Download complete.");
+    pb.finish_with_message(format!("Downloaded {}", get_filename_from_url(url)));
     Ok(())
 }
 

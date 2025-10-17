@@ -124,6 +124,7 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
         false,
         &processed_deps,
         Some(manifest.scope),
+        None,
     )?;
 
     cleanup_old_versions(
@@ -246,6 +247,7 @@ fn run_update_all_logic(yes: bool) -> Result<()> {
                 false,
                 &processed_deps,
                 Some(*scope),
+                None,
             ) {
                 eprintln!("Failed to upgrade {}: {}", source, e);
                 return;

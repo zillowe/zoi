@@ -42,6 +42,7 @@ pub fn run(sources: &[String], force: bool, yes: bool) {
                     false,
                     &processed_deps,
                     None,
+                    None,
                 ) {
                     eprintln!("\n{}: {}", "Build failed".red().bold(), e);
                     std::process::exit(1);

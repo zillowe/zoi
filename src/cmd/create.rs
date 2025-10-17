@@ -89,6 +89,7 @@ fn run_pkg_create(source: &str, app_name: &str, yes: bool) -> Result<()> {
                 false,
                 &processed_deps,
                 &mut _installed_deps_list,
+                None,
             )?;
             let mut chosen_options = Vec::new();
             dependencies::resolve_and_install_required_options(
@@ -101,6 +102,7 @@ fn run_pkg_create(source: &str, app_name: &str, yes: bool) -> Result<()> {
                 &processed_deps,
                 &mut _installed_deps_list,
                 &mut chosen_options,
+                None,
             )?;
         }
 
@@ -114,6 +116,7 @@ fn run_pkg_create(source: &str, app_name: &str, yes: bool) -> Result<()> {
                 false,
                 &processed_deps,
                 &mut _installed_deps_list,
+                None,
             )?;
             let mut chosen_options = Vec::new();
             dependencies::resolve_and_install_required_options(
@@ -126,6 +129,7 @@ fn run_pkg_create(source: &str, app_name: &str, yes: bool) -> Result<()> {
                 &processed_deps,
                 &mut _installed_deps_list,
                 &mut chosen_options,
+                None,
             )?;
         }
     }
