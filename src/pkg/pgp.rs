@@ -1,19 +1,19 @@
+use anyhow::{Result, anyhow};
 use colored::*;
 use sequoia_openpgp::Cert;
 use sequoia_openpgp::parse::Parse;
-use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-pub fn get_pgp_dir() -> Result<PathBuf, Box<dyn Error>> {
-    let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
+pub fn get_pgp_dir() -> Result<PathBuf> {
+    let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
     let pgp_dir = home_dir.join(".zoi").join("pgps");
     fs::create_dir_all(&pgp_dir)?;
     Ok(pgp_dir)
 }
 
-pub fn add_key_from_bytes(key_bytes: &[u8], name: &str) -> Result<(), Box<dyn Error>> {
+pub fn add_key_from_bytes(key_bytes: &[u8], name: &str) -> Result<()> {
     let pgp_dir = get_pgp_dir()?;
     let dest_path = pgp_dir.join(format!("{}.asc", name));
 
@@ -37,10 +37,10 @@ pub fn add_key_from_bytes(key_bytes: &[u8], name: &str) -> Result<(), Box<dyn Er
     Ok(())
 }
 
-pub fn add_key_from_path(path: &str, name: Option<&str>) -> Result<(), Box<dyn Error>> {
+pub fn add_key_from_path(path: &str, name: Option<&str>) -> Result<()> {
     let key_path = Path::new(path);
     if !key_path.exists() {
-        return Err(format!("Key file not found at: {}", path).into());
+        return Err(anyhow!("Key file not found at: {}", path));
     }
 
     let key_name = name.unwrap_or_else(|| {
@@ -57,7 +57,7 @@ pub fn add_key_from_path(path: &str, name: Option<&str>) -> Result<(), Box<dyn E
     add_key_from_bytes(&key_bytes, key_name)
 }
 
-pub fn add_key_from_fingerprint(fingerprint: &str, name: &str) -> Result<(), Box<dyn Error>> {
+pub fn add_key_from_fingerprint(fingerprint: &str, name: &str) -> Result<()> {
     let url = format!(
         "https://keys.openpgp.org/vks/v1/by-fingerprint/{}",
         fingerprint.to_uppercase()
@@ -69,11 +69,10 @@ pub fn add_key_from_fingerprint(fingerprint: &str, name: &str) -> Result<(), Box
 
     let response = reqwest::blocking::get(&url)?;
     if !response.status().is_success() {
-        return Err(format!(
+        return Err(anyhow!(
             "Failed to fetch key from keyserver (HTTP {}).",
             response.status()
-        )
-        .into());
+        ));
     }
 
     let key_bytes = response.bytes()?.to_vec();
@@ -85,7 +84,7 @@ pub fn add_key_from_fingerprint(fingerprint: &str, name: &str) -> Result<(), Box
     add_key_from_bytes(&key_bytes, name)
 }
 
-pub fn add_key_from_url(url: &str, name: &str) -> Result<(), Box<dyn Error>> {
+pub fn add_key_from_url(url: &str, name: &str) -> Result<()> {
     println!(
         "Fetching key for {} from url {}...",
         name.cyan(),
@@ -94,7 +93,10 @@ pub fn add_key_from_url(url: &str, name: &str) -> Result<(), Box<dyn Error>> {
 
     let response = reqwest::blocking::get(url)?;
     if !response.status().is_success() {
-        return Err(format!("Failed to fetch key from url (HTTP {})", response.status()).into());
+        return Err(anyhow!(
+            "Failed to fetch key from url (HTTP {})",
+            response.status()
+        ));
     }
 
     let key_bytes = response.bytes()?.to_vec();
@@ -106,12 +108,12 @@ pub fn add_key_from_url(url: &str, name: &str) -> Result<(), Box<dyn Error>> {
     add_key_from_bytes(&key_bytes, name)
 }
 
-pub fn remove_key_by_name(name: &str) -> Result<(), Box<dyn Error>> {
+pub fn remove_key_by_name(name: &str) -> Result<()> {
     let pgp_dir = get_pgp_dir()?;
     let key_path = pgp_dir.join(format!("{}.asc", name));
 
     if !key_path.exists() {
-        return Err(format!("Key with name '{}' not found.", name).into());
+        return Err(anyhow!("Key with name '{}' not found.", name));
     }
 
     fs::remove_file(&key_path)?;
@@ -120,7 +122,7 @@ pub fn remove_key_by_name(name: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn remove_key_by_fingerprint(fingerprint: &str) -> Result<(), Box<dyn Error>> {
+pub fn remove_key_by_fingerprint(fingerprint: &str) -> Result<()> {
     let pgp_dir = get_pgp_dir()?;
     let fingerprint_upper = fingerprint.to_uppercase();
 
@@ -142,10 +144,10 @@ pub fn remove_key_by_fingerprint(fingerprint: &str) -> Result<(), Box<dyn Error>
         }
     }
 
-    Err(format!("Key with fingerprint '{}' not found.", fingerprint).into())
+    Err(anyhow!("Key with fingerprint '{}' not found.", fingerprint))
 }
 
-pub fn list_keys() -> Result<(), Box<dyn Error>> {
+pub fn list_keys() -> Result<()> {
     let keys = get_all_local_keys_info()?;
 
     if keys.is_empty() {
@@ -183,7 +185,7 @@ pub fn list_keys() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn search_keys(term: &str) -> Result<(), Box<dyn Error>> {
+pub fn search_keys(term: &str) -> Result<()> {
     let keys = get_all_local_keys_info()?;
     let term_lower = term.to_lowercase();
     let mut found_keys = Vec::new();
@@ -261,12 +263,12 @@ pub fn search_keys(term: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn show_key(name: &str) -> Result<(), Box<dyn Error>> {
+pub fn show_key(name: &str) -> Result<()> {
     let pgp_dir = get_pgp_dir()?;
     let key_path = pgp_dir.join(format!("{}.asc", name));
 
     if !key_path.exists() {
-        return Err(format!("Key with name '{}' not found.", name).into());
+        return Err(anyhow!("Key with name '{}' not found.", name));
     }
 
     let key_contents = fs::read_to_string(&key_path)?;
@@ -280,7 +282,7 @@ pub struct KeyInfo {
     pub cert: Cert,
 }
 
-pub fn get_all_local_keys_info() -> Result<Vec<KeyInfo>, Box<dyn Error>> {
+pub fn get_all_local_keys_info() -> Result<Vec<KeyInfo>> {
     let pgp_dir = get_pgp_dir()?;
     let mut keys = Vec::new();
     if !pgp_dir.exists() {
@@ -304,7 +306,7 @@ pub fn get_all_local_keys_info() -> Result<Vec<KeyInfo>, Box<dyn Error>> {
 
 use sequoia_openpgp::policy::StandardPolicy;
 
-pub fn get_all_local_certs() -> Result<Vec<Cert>, Box<dyn Error>> {
+pub fn get_all_local_certs() -> Result<Vec<Cert>> {
     let pgp_dir = get_pgp_dir()?;
     let mut certs = Vec::new();
     if !pgp_dir.exists() {
@@ -345,21 +347,17 @@ impl VerificationHelper for OneCertHelper {
                     if results.iter().any(|r| r.is_ok()) {
                         return Ok(());
                     } else {
-                        return Err(anyhow::anyhow!("No valid signature found"));
+                        return Err(anyhow!("No valid signature found"));
                     }
                 }
-                _ => return Err(anyhow::anyhow!("Unexpected message structure")),
+                _ => return Err(anyhow!("Unexpected message structure")),
             }
         }
-        Err(anyhow::anyhow!("No signature layer found"))
+        Err(anyhow!("No signature layer found"))
     }
 }
 
-pub fn cli_verify_signature(
-    file_path: &str,
-    sig_path: &str,
-    key_name: &str,
-) -> Result<(), Box<dyn Error>> {
+pub fn cli_verify_signature(file_path: &str, sig_path: &str, key_name: &str) -> Result<()> {
     println!(
         "Verifying {} with signature {} using key '{}'",
         file_path, sig_path, key_name
@@ -368,7 +366,7 @@ pub fn cli_verify_signature(
     let pgp_dir = get_pgp_dir()?;
     let key_path = pgp_dir.join(format!("{}.asc", key_name));
     if !key_path.exists() {
-        return Err(format!("Key '{}' not found in local store.", key_name).into());
+        return Err(anyhow!("Key '{}' not found in local store.", key_name));
     }
     let key_bytes = fs::read(key_path)?;
     let cert = Cert::from_bytes(&key_bytes)?;
@@ -383,7 +381,7 @@ pub fn verify_detached_signature(
     data_path: &Path,
     signature_path: &Path,
     cert: &Cert,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
     let policy = &StandardPolicy::new();
     let data = fs::read(data_path)?;
     let signature = fs::read(signature_path)?;
@@ -398,21 +396,19 @@ pub fn verify_detached_signature(
     Ok(())
 }
 
-pub fn sign_detached(
-    data_path: &Path,
-    signature_path: &Path,
-    key_id: &str,
-) -> Result<(), Box<dyn Error>> {
+pub fn sign_detached(data_path: &Path, signature_path: &Path, key_id: &str) -> Result<()> {
     if !crate::utils::command_exists("gpg") {
-        return Err(
-            "gpg command not found. Please install GnuPG and ensure it's in your PATH.".into(),
-        );
+        return Err(anyhow!(
+            "gpg command not found. Please install GnuPG and ensure it's in your PATH."
+        ));
     }
 
-    let data_path_str = data_path.to_str().ok_or("Invalid data path for signing.")?;
+    let data_path_str = data_path
+        .to_str()
+        .ok_or_else(|| anyhow!("Invalid data path for signing."))?;
     let signature_path_str = signature_path
         .to_str()
-        .ok_or("Invalid signature path for signing.")?;
+        .ok_or_else(|| anyhow!("Invalid signature path for signing."))?;
 
     let output = Command::new("gpg")
         .arg("--batch")
@@ -444,7 +440,7 @@ pub fn sign_detached(
             error_message.push_str(&format!("Stderr: {}", stderr));
         }
 
-        return Err(error_message.into());
+        return Err(anyhow!(error_message));
     }
 
     Ok(())

@@ -1,6 +1,6 @@
 use crate::pkg;
+use anyhow::{Result, anyhow};
 use clap::{ArgGroup, Parser, Subcommand};
-use std::error::Error;
 use std::path::Path;
 
 #[derive(Parser, Debug)]
@@ -96,7 +96,7 @@ pub struct VerifySig {
     pub key: String,
 }
 
-pub fn run(args: PgpCommand) -> Result<(), Box<dyn Error>> {
+pub fn run(args: PgpCommand) -> Result<()> {
     match args.command {
         PgpCommands::Add(add_args) => {
             if let Some(path) = add_args.path {
@@ -105,7 +105,9 @@ pub fn run(args: PgpCommand) -> Result<(), Box<dyn Error>> {
                 if let Some(name) = add_args.name {
                     pkg::pgp::add_key_from_fingerprint(&fingerprint, &name)?;
                 } else {
-                    return Err("A name must be provided when adding a key by fingerprint.".into());
+                    return Err(anyhow!(
+                        "A name must be provided when adding a key by fingerprint."
+                    ));
                 }
             } else if let Some(url) = add_args.url {
                 let name = if let Some(n) = add_args.name {
@@ -114,7 +116,7 @@ pub fn run(args: PgpCommand) -> Result<(), Box<dyn Error>> {
                     Path::new(&url)
                         .file_stem()
                         .and_then(|s| s.to_str())
-                        .ok_or("Could not derive name from URL")?
+                        .ok_or(anyhow!("Could not derive name from URL"))?
                         .to_string()
                 };
                 pkg::pgp::add_key_from_url(&url, &name)?;
