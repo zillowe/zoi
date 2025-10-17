@@ -1,23 +1,22 @@
 use crate::pkg::{config, local, resolve, types};
-use std::error::Error;
+use anyhow::{Result, anyhow};
 use std::fs;
 
-pub fn add(ext_name: &str, _yes: bool) -> Result<(), Box<dyn Error>> {
+pub fn add(ext_name: &str, _yes: bool) -> Result<()> {
     println!("Adding extension: {}", ext_name);
 
     let (pkg, _, _, _, registry_handle) = resolve::resolve_package_and_version(ext_name)?;
 
     if pkg.package_type != types::PackageType::Extension {
-        return Err(format!("'{}' is not an extension package.", ext_name).into());
+        return Err(anyhow!("'{}' is not an extension package.", ext_name));
     }
 
     if let Some(extension_info) = pkg.extension {
         if extension_info.extension_type != "zoi" {
-            return Err(format!(
+            return Err(anyhow!(
                 "Unsupported extension type: {}",
                 extension_info.extension_type
-            )
-            .into());
+            ));
         }
 
         println!("Applying extension changes...");
@@ -38,8 +37,9 @@ pub fn add(ext_name: &str, _yes: bool) -> Result<(), Box<dyn Error>> {
                 types::ExtensionChange::Project { add } => {
                     println!("Creating zoi.yaml...");
                     if std::path::Path::new("zoi.yaml").exists() {
-                        return Err("A 'zoi.yaml' file already exists in the current directory. Please remove it first."
-                            .into());
+                        return Err(anyhow!(
+                            "A 'zoi.yaml' file already exists in the current directory. Please remove it first."
+                        ));
                     }
                     fs::write("zoi.yaml", add)?;
                 }
@@ -54,11 +54,10 @@ pub fn add(ext_name: &str, _yes: bool) -> Result<(), Box<dyn Error>> {
             }
         }
     } else {
-        return Err(format!(
+        return Err(anyhow!(
             "'{}' is an extension package but contains no extension data.",
             ext_name
-        )
-        .into());
+        ));
     }
 
     let manifest = types::InstallManifest {
@@ -84,7 +83,7 @@ pub fn add(ext_name: &str, _yes: bool) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn remove(ext_name: &str, _yes: bool) -> Result<(), Box<dyn Error>> {
+pub fn remove(ext_name: &str, _yes: bool) -> Result<()> {
     println!("Removing extension: {}", ext_name);
 
     let (manifest, scope) =
@@ -93,22 +92,21 @@ pub fn remove(ext_name: &str, _yes: bool) -> Result<(), Box<dyn Error>> {
         } else if let Some(m) = local::is_package_installed(ext_name, types::Scope::System)? {
             (m, types::Scope::System)
         } else {
-            return Err(format!("Extension '{}' is not installed.", ext_name).into());
+            return Err(anyhow!("Extension '{}' is not installed.", ext_name));
         };
 
     let (pkg, _, _, _, _) = resolve::resolve_package_and_version(ext_name)?;
 
     if pkg.package_type != types::PackageType::Extension {
-        return Err(format!("'{}' is not an extension package.", ext_name).into());
+        return Err(anyhow!("'{}' is not an extension package.", ext_name));
     }
 
     if let Some(extension_info) = pkg.extension {
         if extension_info.extension_type != "zoi" {
-            return Err(format!(
+            return Err(anyhow!(
                 "Unsupported extension type: {}",
                 extension_info.extension_type
-            )
-            .into());
+            ));
         }
 
         println!("Reverting extension changes...");
@@ -156,11 +154,10 @@ pub fn remove(ext_name: &str, _yes: bool) -> Result<(), Box<dyn Error>> {
             }
         }
     } else {
-        return Err(format!(
+        return Err(anyhow!(
             "'{}' is an extension package but contains no extension data.",
             ext_name
-        )
-        .into());
+        ));
     }
 
     let package_dir = local::get_package_dir(
