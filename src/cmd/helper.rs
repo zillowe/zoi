@@ -1,5 +1,5 @@
+use anyhow::Result;
 use clap::{Parser, Subcommand};
-use std::error::Error;
 
 #[derive(Parser, Debug)]
 pub struct HelperCommand {
@@ -30,7 +30,7 @@ pub enum HashAlgorithm {
     Sha256,
 }
 
-pub fn run(args: HelperCommand) -> Result<(), Box<dyn Error>> {
+pub fn run(args: HelperCommand) -> Result<()> {
     match args.command {
         HelperCommands::GetHash(cmd) => {
             let hash_type = match cmd.hash {

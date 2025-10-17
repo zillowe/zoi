@@ -1,4 +1,5 @@
 use crate::pkg::config;
+use anyhow::Result;
 use clap::{Parser, Subcommand};
 use colored::*;
 use comfy_table::{Table, presets::UTF8_FULL};
@@ -98,7 +99,7 @@ pub fn run(args: RepoCommand) {
     }
 }
 
-fn run_list_active() -> Result<(), Box<dyn std::error::Error>> {
+fn run_list_active() -> Result<()> {
     let config = config::read_config()?;
     if config.repos.is_empty() {
         println!("No active repositories.");
@@ -116,7 +117,7 @@ fn run_list_active() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn run_list_all() -> Result<(), Box<dyn std::error::Error>> {
+fn run_list_all() -> Result<()> {
     let active_repos = config::read_config()?
         .repos
         .into_iter()
@@ -155,7 +156,7 @@ enum GitCommand {
     Rm { repo_name: String },
 }
 
-fn run_list_git_only() -> Result<(), Box<dyn std::error::Error>> {
+fn run_list_git_only() -> Result<()> {
     let repos = config::list_git_repos()?;
     if repos.is_empty() {
         println!("No cloned git repositories.");

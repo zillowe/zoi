@@ -1,10 +1,12 @@
 use crate::pkg::{dependencies, resolve, types};
 use crate::utils;
+use anyhow::{Result, anyhow};
 use clap::Parser;
 use colored::*;
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
+use std::sync::Mutex;
 
 #[derive(Parser)]
 pub struct CreateCommand {
@@ -20,11 +22,7 @@ pub fn run(args: CreateCommand, yes: bool) {
     }
 }
 
-fn run_pkg_create(
-    source: &str,
-    app_name: &str,
-    yes: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn run_pkg_create(source: &str, app_name: &str, yes: bool) -> Result<()> {
     let app_dir = Path::new(app_name);
     if app_dir.exists() {
         if app_dir.is_dir() {
@@ -38,35 +36,38 @@ fn run_pkg_create(
                     .yellow()
                 );
                 if !utils::ask_for_confirmation("Do you want to continue?", yes) {
-                    return Err("Operation aborted by user.".into());
+                    return Err(anyhow!("Operation aborted by user."));
                 }
             }
         } else {
-            return Err(format!("A file with the name '{}' already exists.", app_name).into());
+            return Err(anyhow!(
+                "A file with the name '{}' already exists.",
+                app_name
+            ));
         }
     }
 
     let (pkg, version, _, _, registry_handle) = resolve::resolve_package_and_version(source)?;
 
     if pkg.package_type != types::PackageType::App {
-        return Err(format!(
+        return Err(anyhow!(
             "Package '{}' is not of type 'app' (found {:?}).",
-            pkg.name, pkg.package_type
-        )
-        .into());
+            pkg.name,
+            pkg.package_type
+        ));
     }
 
     let platform = utils::get_platform()?;
     let methods = pkg
         .app
         .as_ref()
-        .ok_or_else(|| format!("Package '{}' has no app commands.", pkg.name))?;
+        .ok_or_else(|| anyhow!("Package '{}' has no app commands.", pkg.name))?;
 
     let method = methods
         .iter()
         .find(|m| utils::is_platform_compatible(&platform, &m.platforms))
         .ok_or_else(|| {
-            format!(
+            anyhow!(
                 "No compatible appCreate commands for platform '{}'.",
                 platform
             )
@@ -75,7 +76,7 @@ fn run_pkg_create(
     if let Some(deps) = &pkg.dependencies {
         let handle = registry_handle.as_deref().unwrap_or("local");
         let parent_id = format!("#{}@{}", handle, pkg.repo);
-        let mut processed_deps = HashSet::new();
+        let processed_deps = Mutex::new(HashSet::new());
         let mut _installed_deps_list: Vec<String> = Vec::new();
 
         if let Some(build_deps) = &deps.build {
@@ -86,7 +87,7 @@ fn run_pkg_create(
                 pkg.scope,
                 yes,
                 false,
-                &mut processed_deps,
+                &processed_deps,
                 &mut _installed_deps_list,
             )?;
             let mut chosen_options = Vec::new();
@@ -97,7 +98,7 @@ fn run_pkg_create(
                 pkg.scope,
                 yes,
                 false,
-                &mut processed_deps,
+                &processed_deps,
                 &mut _installed_deps_list,
                 &mut chosen_options,
             )?;
@@ -111,7 +112,7 @@ fn run_pkg_create(
                 pkg.scope,
                 yes,
                 false,
-                &mut processed_deps,
+                &processed_deps,
                 &mut _installed_deps_list,
             )?;
             let mut chosen_options = Vec::new();
@@ -122,7 +123,7 @@ fn run_pkg_create(
                 pkg.scope,
                 yes,
                 false,
-                &mut processed_deps,
+                &processed_deps,
                 &mut _installed_deps_list,
                 &mut chosen_options,
             )?;
@@ -157,7 +158,7 @@ fn run_pkg_create(
         use std::io::Write;
         std::io::stdout().write_all(&output.stdout)?;
         std::io::stderr().write_all(&output.stderr)?;
-        return Err(format!("Create command failed: '{}'", create_cmd).into());
+        return Err(anyhow!("Create command failed: '{}'", create_cmd));
     }
 
     if let Some(extra_cmds) = &method.commands {
@@ -183,7 +184,7 @@ fn run_pkg_create(
                 use std::io::Write;
                 std::io::stdout().write_all(&output.stdout)?;
                 std::io::stderr().write_all(&output.stderr)?;
-                return Err(format!("Command failed: '{}'", final_cmd).into());
+                return Err(anyhow!("Command failed: '{}'", final_cmd));
             }
         }
     }

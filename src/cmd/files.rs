@@ -1,6 +1,6 @@
 use crate::pkg::local;
+use anyhow::{Result, anyhow};
 use colored::*;
-use std::error::Error;
 
 pub fn run(package_name: &str) {
     if let Err(e) = run_impl(package_name) {
@@ -9,11 +9,11 @@ pub fn run(package_name: &str) {
     }
 }
 
-fn run_impl(package_name: &str) -> Result<(), Box<dyn Error>> {
+fn run_impl(package_name: &str) -> Result<()> {
     let installed_packages = local::get_installed_packages()?;
 
     let Some(pkg) = installed_packages.iter().find(|p| p.name == package_name) else {
-        return Err(format!("Package '{}' is not installed.", package_name).into());
+        return Err(anyhow!("Package '{}' is not installed.", package_name));
     };
 
     println!("Files for {} {}:", pkg.name.cyan(), pkg.version.yellow());

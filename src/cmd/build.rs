@@ -2,6 +2,7 @@ use crate::pkg::{install, local, resolve, types, types::InstallReason};
 use crate::utils;
 use colored::*;
 use std::collections::HashSet;
+use std::sync::Mutex;
 
 pub fn run(sources: &[String], force: bool, yes: bool) {
     for source in sources {
@@ -31,7 +32,7 @@ pub fn run(sources: &[String], force: bool, yes: bool) {
                     utils::print_repo_warning(repo_name);
                 }
 
-                let mut processed_deps = HashSet::new();
+                let processed_deps = Mutex::new(HashSet::new());
                 if let Err(e) = install::run_installation(
                     resolved_source.path.to_str().unwrap(),
                     install::InstallMode::ForceBuild,
@@ -39,7 +40,7 @@ pub fn run(sources: &[String], force: bool, yes: bool) {
                     InstallReason::Direct,
                     yes,
                     false,
-                    &mut processed_deps,
+                    &processed_deps,
                     None,
                 ) {
                     eprintln!("\n{}: {}", "Build failed".red().bold(), e);
