@@ -314,6 +314,13 @@ pub fn run(verbose: bool, _fallback: bool, no_pm: bool) -> Result<()> {
     let mut config = config::read_user_config()?;
     let mut needs_config_update = false;
 
+    if config.default_registry.is_none() {
+        let merged_config = config::read_config()?;
+        if merged_config.default_registry.is_some() {
+            config.default_registry = merged_config.default_registry;
+        }
+    }
+
     let db_root = get_db_path()?;
 
     if let Some(mut default_reg) = config.default_registry.clone() {
