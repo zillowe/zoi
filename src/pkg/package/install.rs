@@ -1,5 +1,5 @@
 use crate::pkg::{local, lua, types};
-use crate::utils;
+use crate::utils::{self, copy_dir_all};
 use anyhow::{Result, anyhow};
 use colored::*;
 use std::fs::{self, File};
@@ -28,20 +28,6 @@ fn get_bin_root(scope: types::Scope) -> Result<PathBuf> {
             Ok(current_dir.join(".zoi").join("pkgs").join("bin"))
         }
     }
-}
-
-fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), std::io::Error> {
-    fs::create_dir_all(dst)?;
-    for entry in fs::read_dir(src)? {
-        let entry = entry?;
-        let ty = entry.file_type()?;
-        if ty.is_dir() {
-            copy_dir_all(&entry.path(), &dst.join(entry.file_name()))?;
-        } else {
-            fs::copy(entry.path(), dst.join(entry.file_name()))?;
-        }
-    }
-    Ok(())
 }
 
 pub fn run(

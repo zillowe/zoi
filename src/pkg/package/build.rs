@@ -15,6 +15,7 @@ fn build_for_platform(
     build_type: &str,
     platform: &str,
     sign_key: &Option<String>,
+    output_dir: Option<&Path>,
 ) -> Result<()> {
     let pkg_for_meta = pkg::lua::parser::parse_lua_package_for_platform(
         package_file.to_str().unwrap(),
@@ -45,6 +46,7 @@ fn build_for_platform(
         platform,
         Some(&version),
         package_file.to_str(),
+        None,
     )
     .map_err(|e| anyhow!(e.to_string()))?;
     let pkg_table = lua
@@ -95,10 +97,20 @@ fn build_for_platform(
                 let source_path = build_dir.path().join(&source);
 
                 destination = destination.replace("${pkgstore}", "data/pkgstore");
+                destination = destination.replace("${createpkgdir}", "data/createpkgdir");
                 destination = destination.replace("${usrroot}", "data/usrroot");
                 destination = destination.replace("${usrhome}", "data/usrhome");
 
-                let dest_path = staging_dir.join(&destination);
+                let dest_path = if destination.starts_with("${createpkgdir}") {
+                    let create_pkg_dir_str: String = lua
+                        .globals()
+                        .get("CREATE_PKG_DIR")
+                        .map_err(|e| anyhow!(e.to_string()))?;
+                    let remaining_path = destination.strip_prefix("${createpkgdir}").unwrap();
+                    Path::new(&create_pkg_dir_str).join(remaining_path.trim_start_matches('/'))
+                } else {
+                    staging_dir.join(&destination)
+                };
 
                 if let Some(parent) = dest_path.parent() {
                     fs::create_dir_all(parent)?;
@@ -159,7 +171,12 @@ fn build_for_platform(
     )?;
 
     let output_filename = format!("{}-{}-{}.pkg.tar.zst", pkg_for_meta.name, version, platform);
-    let output_path = package_file.parent().unwrap().join(output_filename);
+    let output_base = if let Some(dir) = output_dir {
+        dir.to_path_buf()
+    } else {
+        package_file.parent().unwrap().to_path_buf()
+    };
+    let output_path = output_base.join(output_filename);
 
     let file = File::create(&output_path)?;
     let encoder = ZstdEncoder::new(file, 0)?.auto_finish();
@@ -197,6 +214,7 @@ pub fn run(
     build_type: &str,
     platforms: &[String],
     sign_key: Option<String>,
+    output_dir: Option<&Path>,
 ) -> Result<()> {
     println!("Building package from: {}", package_file.display());
 
@@ -217,7 +235,9 @@ pub fn run(
 
     for platform in &platforms_to_build {
         println!("--- Building for platform: {} ---", platform.cyan());
-        if let Err(e) = build_for_platform(package_file, build_type, platform, &sign_key) {
+        if let Err(e) =
+            build_for_platform(package_file, build_type, platform, &sign_key, output_dir)
+        {
             eprintln!(
                 "{}: Failed to build for platform {}: {}",
                 "Error".red().bold(),

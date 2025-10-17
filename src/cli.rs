@@ -445,7 +445,7 @@ enum Commands {
         /// Package name, @repo/name, local .pkg.lua path, or URL
         source: String,
         /// The application name to substitute into template commands
-        app_name: String,
+        app_name: Option<String>,
     },
 
     /// Manage Zoi extensions

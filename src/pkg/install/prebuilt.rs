@@ -25,6 +25,7 @@ pub fn try_build_install(
         build_type,
         std::slice::from_ref(&current_platform),
         None,
+        None,
     ) {
         return Err(anyhow!("'build' step failed: {}", e));
     }

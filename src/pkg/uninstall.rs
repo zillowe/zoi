@@ -120,6 +120,7 @@ pub fn run(package_name: &str) -> anyhow::Result<()> {
         &utils::get_platform()?,
         Some(&manifest.version),
         pkg_lua_path.to_str(),
+        None,
     )
     .map_err(|e| anyhow!(e.to_string()))?;
     let lua_code = fs::read_to_string(pkg_lua_path)?;

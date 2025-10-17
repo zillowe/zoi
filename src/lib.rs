@@ -15,13 +15,13 @@ pub use pkg::types::{self, Scope};
 use std::path::Path;
 
 /// Builds a Zoi package from a local .pkg.lua file.
-pub fn build_package(
+pub fn build(
     package_file: &Path,
     build_type: &str,
     platforms: &[String],
     sign_key: Option<String>,
 ) -> Result<()> {
-    pkg::package::build::run(package_file, build_type, platforms, sign_key)
+    pkg::package::build::run(package_file, build_type, platforms, sign_key, None)
 }
 
 /// Installs a Zoi package from a local package archive.

@@ -22,9 +22,13 @@ pub struct BuildCommand {
 }
 
 pub fn run(args: BuildCommand) {
-    if let Err(e) =
-        crate::pkg::package::build::run(&args.package_file, &args.r#type, &args.platform, args.sign)
-    {
+    if let Err(e) = crate::pkg::package::build::run(
+        &args.package_file,
+        &args.r#type,
+        &args.platform,
+        args.sign,
+        None,
+    ) {
         eprintln!("Error: {}", e);
         std::process::exit(1);
     }

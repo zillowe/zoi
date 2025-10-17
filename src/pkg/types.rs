@@ -38,16 +38,6 @@ pub struct UpdateInfo {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[allow(dead_code)]
-pub struct AppCommands {
-    pub platforms: Vec<String>,
-    #[serde(rename = "appCreate")]
-    pub app_create: String,
-    #[serde(default)]
-    pub commands: Option<Vec<String>>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
 #[serde(rename_all = "kebab-case")]
 pub enum ExtensionChange {
@@ -92,7 +82,6 @@ pub struct Package {
     pub alt: Option<String>,
     #[serde(default)]
     pub scope: Scope,
-    pub app: Option<Vec<AppCommands>>,
     #[serde(default)]
     pub bins: Option<Vec<String>>,
     #[serde(default)]

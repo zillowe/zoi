@@ -35,6 +35,18 @@ pub fn run_installation(
         pkg.scope = scope;
     }
 
+    if pkg.package_type == types::PackageType::App {
+        return Err(anyhow!(
+            "Package '{}' is an app. Use 'zoi create' to create a new app from this template.",
+            pkg.name
+        ));
+    } else if pkg.package_type == types::PackageType::Extension {
+        return Err(anyhow!(
+            "Package '{}' is an extension. Use 'zoi extension add' to add it.",
+            pkg.name
+        ));
+    }
+
     utils::print_repo_warning(&pkg.repo);
     utils::check_license(&pkg.license);
 
