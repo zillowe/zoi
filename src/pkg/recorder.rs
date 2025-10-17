@@ -1,15 +1,15 @@
 use crate::pkg::{types, utils};
+use anyhow::{Result, anyhow};
 use chrono::Utc;
 use std::collections::HashMap;
-use std::error::Error;
 use std::fs;
 use std::path::PathBuf;
 
-fn get_lockfile_path(scope: types::Scope) -> Result<PathBuf, Box<dyn Error>> {
+fn get_lockfile_path(scope: types::Scope) -> Result<PathBuf> {
     let path = if scope == types::Scope::Project {
         std::env::current_dir()?.join("zoi.pkgs.json")
     } else {
-        let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
+        let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
         home_dir.join(".zoi").join("pkgs").join("zoi.pkgs.json")
     };
 
@@ -19,7 +19,7 @@ fn get_lockfile_path(scope: types::Scope) -> Result<PathBuf, Box<dyn Error>> {
     Ok(path)
 }
 
-fn read_lockfile(scope: types::Scope) -> Result<types::Lockfile, Box<dyn Error>> {
+fn read_lockfile(scope: types::Scope) -> Result<types::Lockfile> {
     let path = get_lockfile_path(scope)?;
     if !path.exists() || fs::read_to_string(&path)?.trim().is_empty() {
         return Ok(types::Lockfile {
@@ -32,7 +32,7 @@ fn read_lockfile(scope: types::Scope) -> Result<types::Lockfile, Box<dyn Error>>
     Ok(lockfile)
 }
 
-fn write_lockfile(lockfile: &types::Lockfile, scope: types::Scope) -> Result<(), Box<dyn Error>> {
+fn write_lockfile(lockfile: &types::Lockfile, scope: types::Scope) -> Result<()> {
     let path = get_lockfile_path(scope)?;
     let content = serde_json::to_string_pretty(lockfile)?;
     fs::write(path, content)?;
@@ -46,7 +46,7 @@ pub fn record_package(
     registry_handle: &str,
     chosen_options: &[String],
     chosen_optionals: &[String],
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
     let mut lockfile = read_lockfile(pkg.scope)?;
 
     let package_id = utils::generate_package_id(registry_handle, &pkg.repo);
@@ -55,7 +55,11 @@ pub fn record_package(
         name: pkg.name.clone(),
         repo: pkg.repo.clone(),
         registry: registry_handle.to_string(),
-        version: pkg.version.as_ref().cloned().ok_or("Missing version")?,
+        version: pkg
+            .version
+            .as_ref()
+            .cloned()
+            .ok_or_else(|| anyhow!("Missing version"))?,
         date: Utc::now().to_rfc3339(),
         reason: reason.clone(),
         scope: pkg.scope,
@@ -72,10 +76,7 @@ pub fn record_package(
     write_lockfile(&lockfile, pkg.scope)
 }
 
-pub fn remove_package_from_record(
-    package_name: &str,
-    scope: types::Scope,
-) -> Result<(), Box<dyn Error>> {
+pub fn remove_package_from_record(package_name: &str, scope: types::Scope) -> Result<()> {
     let mut lockfile = read_lockfile(scope)?;
 
     let key_to_remove = lockfile

@@ -1,12 +1,12 @@
+use anyhow::{Result, anyhow};
 use sha2::{Digest, Sha512};
-use std::error::Error;
 use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
 
-pub fn calculate_dir_hash(path: &Path) -> Result<String, Box<dyn Error>> {
+pub fn calculate_dir_hash(path: &Path) -> Result<String> {
     if !path.is_dir() {
-        return Err("Path is not a directory".into());
+        return Err(anyhow!("Path is not a directory"));
     }
 
     let mut hasher = Sha512::new();

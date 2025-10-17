@@ -1,15 +1,16 @@
 use crate::pkg::{install, local, types};
 use crate::utils;
+use anyhow::Result;
 use colored::*;
 use dialoguer::{Input, Select, theme::ColorfulTheme};
 use indicatif::{ProgressBar, ProgressStyle};
 use regex::Regex;
 use semver::{Version, VersionReq};
 use std::collections::HashSet;
-use std::error::Error;
 use std::fs;
 use std::io::Read;
 use std::process::Command;
+use std::sync::Mutex;
 use tempfile::Builder;
 
 #[derive(Debug)]
@@ -21,7 +22,7 @@ pub struct Dependency<'a> {
     pub description: Option<&'a str>,
 }
 
-pub fn parse_dependency_string(dep_str: &str) -> Result<Dependency<'_>, Box<dyn Error>> {
+pub fn parse_dependency_string(dep_str: &str) -> Result<Dependency<'_>> {
     let (manager, rest) = dep_str.split_once(':').unwrap_or(("zoi", dep_str));
 
     let (package_and_version, description) = if manager != "go" {
@@ -72,7 +73,7 @@ pub fn parse_dependency_string(dep_str: &str) -> Result<Dependency<'_>, Box<dyn 
     })
 }
 
-fn get_native_command_version(command_name: &str) -> Result<Option<Version>, Box<dyn Error>> {
+fn get_native_command_version(command_name: &str) -> Result<Option<Version>> {
     if !utils::command_exists(command_name) {
         return Ok(None);
     }
@@ -116,11 +117,11 @@ fn install_dependency(
     scope: types::Scope,
     yes: bool,
     all_optional: bool,
-    processed_deps: &mut HashSet<String>,
+    processed_deps: &Mutex<HashSet<String>>,
     installed_deps: &mut Vec<String>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
     let dep_id = format!("{}:{}", dep.manager, dep.package);
-    if !processed_deps.insert(dep_id.clone()) {
+    if !processed_deps.lock().unwrap().insert(dep_id.clone()) {
         return Ok(());
     }
 
@@ -197,11 +198,12 @@ fn install_dependency(
                                 local::add_dependent(&package_dir, parent_id)?;
                                 return Ok(());
                             } else {
-                                return Err(format!(
+                                return Err(anyhow::anyhow!(
                                     "Version conflict for '{}': need {}, but {} is installed.",
-                                    dep.package, req, installed_version
-                                )
-                                .into());
+                                    dep.package,
+                                    req,
+                                    installed_version
+                                ));
                             }
                         } else {
                             println!(
@@ -283,8 +285,8 @@ fn install_dependency(
                 );
             }
 
-            let pm =
-                utils::get_native_package_manager().ok_or("Native package manager not found")?;
+            let pm = utils::get_native_package_manager()
+                .ok_or(anyhow::anyhow!("Native package manager not found"))?;
             println!("(Using native manager: {pm})");
             let args = match pm.as_str() {
                 "apt" | "apt-get" => vec!["install", "-y"],
@@ -296,7 +298,7 @@ fn install_dependency(
                 "apk" => vec!["add"],
                 "pkg" => vec!["install", "-y"],
                 "pkg_add" => vec!["-I"],
-                _ => return Err(format!("Unsupported native package manager: {pm}").into()),
+                _ => return Err(anyhow::anyhow!("Unsupported native package manager: {pm}")),
             };
 
             let package_to_install = if let Some(v) = &dep.version_str {
@@ -320,7 +322,10 @@ fn install_dependency(
 
             let status = command.status()?;
             if !status.success() {
-                return Err(format!("Failed to install native dependency: {}", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "Failed to install native dependency: {}",
+                    dep.package
+                ));
             }
         }
         "cargo" => {
@@ -332,7 +337,10 @@ fn install_dependency(
             command.arg(dep.package);
             let status = command.status()?;
             if !status.success() {
-                return Err(format!("Cargo dependency failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "Cargo dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "cargo-binstall" => {
@@ -344,9 +352,10 @@ fn install_dependency(
             command.arg(dep.package);
             let status = command.status()?;
             if !status.success() {
-                return Err(
-                    format!("cargo-binstall dependency failed for '{}'", dep.package).into(),
-                );
+                return Err(anyhow::anyhow!(
+                    "cargo-binstall dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "go" => {
@@ -360,7 +369,10 @@ fn install_dependency(
                 .arg(package_with_version)
                 .status()?;
             if !status.success() {
-                return Err(format!("Go dependency failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "Go dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "npm" | "yarn" | "pnpm" | "bun" | "volta" => {
@@ -380,7 +392,11 @@ fn install_dependency(
             };
             let status = command.arg(package_to_install).status()?;
             if !status.success() {
-                return Err(format!("{} dependency failed for '{}'", manager, dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "{} dependency failed for '{}'",
+                    manager,
+                    dep.package
+                ));
             }
         }
         "deno" => {
@@ -399,7 +415,10 @@ fn install_dependency(
                 .arg(package_to_install)
                 .status()?;
             if !status.success() {
-                return Err(format!("Deno dependency failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "Deno dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "uv" => {
@@ -409,7 +428,10 @@ fn install_dependency(
                 .arg(dep.package)
                 .status()?;
             if !status.success() {
-                return Err(format!("uv tool install failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "uv tool install failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "pip" | "pipx" => {
@@ -423,7 +445,11 @@ fn install_dependency(
                 .arg(package_to_install)
                 .status()?;
             if !status.success() {
-                return Err(format!("{} dependency failed for '{}'", manager, dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "{} dependency failed for '{}'",
+                    manager,
+                    dep.package
+                ));
             }
         }
         "dart-pub" => {
@@ -434,9 +460,10 @@ fn install_dependency(
                 .arg(dep.package)
                 .status()?;
             if !status.success() {
-                return Err(
-                    format!("dart pub global activate failed for '{}'", dep.package).into(),
-                );
+                return Err(anyhow::anyhow!(
+                    "dart pub global activate failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "gem" => {
@@ -448,7 +475,10 @@ fn install_dependency(
             command.arg(dep.package);
             let status = command.status()?;
             if !status.success() {
-                return Err(format!("gem dependency failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "gem dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "composer" => {
@@ -463,7 +493,10 @@ fn install_dependency(
                 .arg(package_to_install)
                 .status()?;
             if !status.success() {
-                return Err(format!("composer dependency failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "composer dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "dotnet" => {
@@ -475,7 +508,10 @@ fn install_dependency(
             command.arg(dep.package);
             let status = command.status()?;
             if !status.success() {
-                return Err(format!("dotnet dependency failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "dotnet dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "nix" => {
@@ -490,7 +526,10 @@ fn install_dependency(
                 .arg(format!("nixpkgs.{}", dep.package))
                 .status()?;
             if !status.success() {
-                return Err(format!("nix dependency failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "nix dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "jsr" => {
@@ -500,7 +539,10 @@ fn install_dependency(
                 .arg(dep.package)
                 .status()?;
             if !status.success() {
-                return Err(format!("JSR dependency failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "JSR dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "apt" | "apt-get" => {
@@ -516,7 +558,11 @@ fn install_dependency(
                 .arg(package_to_install)
                 .status()?;
             if !status.success() {
-                return Err(format!("{} dependency failed for '{}'", manager, dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "{} dependency failed for '{}'",
+                    manager,
+                    dep.package
+                ));
             }
         }
         "pacman" => {
@@ -534,7 +580,10 @@ fn install_dependency(
                 .arg(dep.package)
                 .status()?;
             if !status.success() {
-                return Err(format!("pacman dependency failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "pacman dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "yay" | "paru" => {
@@ -552,7 +601,11 @@ fn install_dependency(
                 .arg(dep.package)
                 .status()?;
             if !status.success() {
-                return Err(format!("{} dependency failed for '{}'", manager, dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "{} dependency failed for '{}'",
+                    manager,
+                    dep.package
+                ));
             }
         }
         "aur" => {
@@ -571,11 +624,11 @@ fn install_dependency(
                 .status()?;
 
             if !clone_status.success() {
-                return Err(format!(
+                return Err(anyhow::anyhow!(
                     "Failed to clone AUR package '{}' from '{}'",
-                    dep.package, url
-                )
-                .into());
+                    dep.package,
+                    url
+                ));
             }
 
             let makepkg_status = Command::new("makepkg")
@@ -585,9 +638,10 @@ fn install_dependency(
                 .status()?;
 
             if !makepkg_status.success() {
-                return Err(
-                    format!("Failed to build and install AUR package '{}'", dep.package).into(),
-                );
+                return Err(anyhow::anyhow!(
+                    "Failed to build and install AUR package '{}'",
+                    dep.package
+                ));
             }
 
             fs::remove_dir_all(&temp_dir)?;
@@ -605,7 +659,11 @@ fn install_dependency(
                 .arg(package_to_install)
                 .status()?;
             if !status.success() {
-                return Err(format!("{} dependency failed for '{}'", manager, dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "{} dependency failed for '{}'",
+                    manager,
+                    dep.package
+                ));
             }
         }
         "brew" => {
@@ -619,7 +677,10 @@ fn install_dependency(
                 .arg(package_to_install)
                 .status()?;
             if !status.success() {
-                return Err(format!("brew dependency failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "brew dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "brew-cask" => {
@@ -634,7 +695,10 @@ fn install_dependency(
                 .arg(package_to_install)
                 .status()?;
             if !status.success() {
-                return Err(format!("brew --cask dependency failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "brew --cask dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "mas" => {
@@ -643,7 +707,10 @@ fn install_dependency(
                 .arg(dep.package)
                 .status()?;
             if !status.success() {
-                return Err(format!("mas dependency failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "mas dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "scoop" => {
@@ -657,7 +724,10 @@ fn install_dependency(
                 .arg(package_to_install)
                 .status()?;
             if !status.success() {
-                return Err(format!("scoop dependency failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "scoop dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "choco" => {
@@ -669,7 +739,10 @@ fn install_dependency(
             command.arg(dep.package);
             let status = command.status()?;
             if !status.success() {
-                return Err(format!("choco dependency failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "choco dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "apk" => {
@@ -685,7 +758,10 @@ fn install_dependency(
                 .arg(dep.package)
                 .status()?;
             if !status.success() {
-                return Err(format!("apk dependency failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "apk dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "xbps" | "xbps-install" => {
@@ -701,7 +777,10 @@ fn install_dependency(
                 .arg(dep.package)
                 .status()?;
             if !status.success() {
-                return Err(format!("xbps-install dependency failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "xbps-install dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "eopkg" => {
@@ -718,7 +797,10 @@ fn install_dependency(
                 .arg(dep.package)
                 .status()?;
             if !status.success() {
-                return Err(format!("eopkg dependency failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "eopkg dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "guix" => {
@@ -733,7 +815,10 @@ fn install_dependency(
                 .arg(dep.package)
                 .status()?;
             if !status.success() {
-                return Err(format!("guix dependency failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "guix dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "pkg" => {
@@ -750,7 +835,10 @@ fn install_dependency(
                 .arg(dep.package)
                 .status()?;
             if !status.success() {
-                return Err(format!("pkg dependency failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "pkg dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "pkg_add" => {
@@ -766,7 +854,10 @@ fn install_dependency(
                 .arg(dep.package)
                 .status()?;
             if !status.success() {
-                return Err(format!("pkg_add dependency failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "pkg_add dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "zypper" => {
@@ -782,7 +873,10 @@ fn install_dependency(
                 .arg(package_to_install)
                 .status()?;
             if !status.success() {
-                return Err(format!("zypper dependency failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "zypper dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "portage" => {
@@ -797,7 +891,10 @@ fn install_dependency(
                 .arg(dep.package)
                 .status()?;
             if !status.success() {
-                return Err(format!("Portage dependency failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "Portage dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "snap" => {
@@ -813,7 +910,10 @@ fn install_dependency(
                 .arg(dep.package)
                 .status()?;
             if !status.success() {
-                return Err(format!("snap dependency failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "snap dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "flatpak" => {
@@ -831,7 +931,10 @@ fn install_dependency(
                 .arg("-y")
                 .status()?;
             if !status.success() {
-                return Err(format!("flatpak dependency failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "flatpak dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "winget" => {
@@ -845,7 +948,10 @@ fn install_dependency(
                 .arg("--accept-source-agreements");
             let status = command.status()?;
             if !status.success() {
-                return Err(format!("winget dependency failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "winget dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "conda" => {
@@ -861,7 +967,10 @@ fn install_dependency(
                 .arg(dep.package)
                 .status()?;
             if !status.success() {
-                return Err(format!("conda dependency failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "conda dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "macports" => {
@@ -877,7 +986,10 @@ fn install_dependency(
                 .arg(dep.package)
                 .status()?;
             if !status.success() {
-                return Err(format!("macports dependency failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "macports dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
         "script" => {
@@ -902,9 +1014,10 @@ fn install_dependency(
             let mut response = client.get(&final_url).send()?;
 
             if !response.status().is_success() {
-                return Err(
-                    format!("Failed to download script: HTTP {}", response.status()).into(),
-                );
+                return Err(anyhow::anyhow!(
+                    "Failed to download script: HTTP {}",
+                    response.status()
+                ));
             }
 
             let total_size = response.content_length().unwrap_or(0);
@@ -948,10 +1061,18 @@ fn install_dependency(
 
             let status = command.status()?;
             if !status.success() {
-                return Err(format!("Script dependency failed for '{}'", dep.package).into());
+                return Err(anyhow::anyhow!(
+                    "Script dependency failed for '{}'",
+                    dep.package
+                ));
             }
         }
-        _ => return Err(format!("Unknown package manager in dependency: {}", dep.manager).into()),
+        _ => {
+            return Err(anyhow::anyhow!(
+                "Unknown package manager in dependency: {}",
+                dep.manager
+            ));
+        }
     }
     Ok(())
 }
@@ -963,9 +1084,9 @@ pub fn resolve_and_install_required(
     scope: types::Scope,
     yes: bool,
     all_optional: bool,
-    processed_deps: &mut HashSet<String>,
+    processed_deps: &Mutex<HashSet<String>>,
     installed_deps: &mut Vec<String>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
     if deps.is_empty() {
         return Ok(());
     }
@@ -994,10 +1115,10 @@ pub fn resolve_and_install_required_options(
     scope: types::Scope,
     yes: bool,
     all_optional: bool,
-    processed_deps: &mut HashSet<String>,
+    processed_deps: &Mutex<HashSet<String>>,
     installed_deps: &mut Vec<String>,
     chosen_options: &mut Vec<String>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
     if option_groups.is_empty() {
         return Ok(());
     }
@@ -1083,10 +1204,10 @@ pub fn resolve_and_install_required_options(
                         if num > 0 && num <= parsed_deps.len() {
                             to_install.push(num - 1);
                         } else {
-                            return Err(format!("Invalid number: {}", num).into());
+                            return Err(anyhow::anyhow!("Invalid number: {}", num));
                         }
                     } else {
-                        return Err(format!("Invalid input: {}", part).into());
+                        return Err(anyhow::anyhow!("Invalid input: {}", part));
                     }
                 }
             }
@@ -1147,11 +1268,11 @@ pub fn resolve_and_install_optional(
     scope: types::Scope,
     yes: bool,
     all_optional: bool,
-    processed_deps: &mut HashSet<String>,
+    processed_deps: &Mutex<HashSet<String>>,
     installed_deps: &mut Vec<String>,
     chosen_optionals: &mut Vec<String>,
     dep_type: Option<&str>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
     if deps.is_empty() {
         return Ok(());
     }
@@ -1221,10 +1342,10 @@ pub fn resolve_and_install_optional(
                 if num > 0 && num <= parsed_deps.len() {
                     to_install.push(num - 1);
                 } else {
-                    return Err(format!("Invalid number: {}", num).into());
+                    return Err(anyhow::anyhow!("Invalid number: {}", num));
                 }
             } else {
-                return Err(format!("Invalid input: {}", part).into());
+                return Err(anyhow::anyhow!("Invalid input: {}", part));
             }
         }
     }
@@ -1254,9 +1375,9 @@ fn install_zoi_dependency(
     parent_id: &str,
     yes: bool,
     all_optional: bool,
-    processed_deps: &mut HashSet<String>,
+    processed_deps: &Mutex<HashSet<String>>,
     scope: types::Scope,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
     install::run_installation(
         package_name,
         install::InstallMode::PreferPrebuilt,
@@ -1271,12 +1392,9 @@ fn install_zoi_dependency(
     )
 }
 
-type ZoiUninstaller = dyn Fn(&str) -> Result<(), Box<dyn Error>>;
+type ZoiUninstaller = dyn Fn(&str) -> Result<()>;
 
-pub fn uninstall_dependency(
-    dep_str: &str,
-    zoi_uninstaller: &ZoiUninstaller,
-) -> Result<(), Box<dyn Error>> {
+pub fn uninstall_dependency(dep_str: &str, zoi_uninstaller: &ZoiUninstaller) -> Result<()> {
     let dep = parse_dependency_string(dep_str)?;
     println!(
         "-> Attempting to uninstall dependency: {} via {}",
@@ -1291,8 +1409,8 @@ pub fn uninstall_dependency(
             return zoi_uninstaller(zoi_dep_name);
         }
         "native" => {
-            let pm =
-                utils::get_native_package_manager().ok_or("Native package manager not found")?;
+            let pm = utils::get_native_package_manager()
+                .ok_or(anyhow::anyhow!("Native package manager not found"))?;
             println!("(Using native manager: {pm})");
             let (cmd, args) = match pm.as_str() {
                 "apt" | "apt-get" => ("sudo", vec![pm.as_str(), "remove", "-y"]),
@@ -1304,7 +1422,7 @@ pub fn uninstall_dependency(
                 "apk" => ("sudo", vec!["apk", "del"]),
                 "pkg" => ("sudo", vec!["pkg", "delete", "-y"]),
                 "pkg_add" => ("sudo", vec!["pkg_delete"]),
-                _ => return Err(format!("Unsupported native package manager: {pm}").into()),
+                _ => return Err(anyhow::anyhow!("Unsupported native package manager: {pm}")),
             };
 
             let mut command = Command::new(cmd);
@@ -1514,11 +1632,19 @@ pub fn uninstall_dependency(
             println!("Skipping uninstall for script dependency, as it's a one-time execution.");
             return Ok(());
         }
-        _ => return Err(format!("Unknown package manager for uninstall: {}", dep.manager).into()),
+        _ => {
+            return Err(anyhow::anyhow!(
+                "Unknown package manager for uninstall: {}",
+                dep.manager
+            ));
+        }
     };
 
     if !status.success() {
-        return Err(format!("Failed to uninstall dependency: {}", dep.package).into());
+        return Err(anyhow::anyhow!(
+            "Failed to uninstall dependency: {}",
+            dep.package
+        ));
     }
 
     Ok(())
