@@ -1,6 +1,5 @@
 use crate::pkg::{local, types};
 use anyhow::Result;
-use std::error::Error;
 
 pub fn write_manifest(
     pkg: &types::Package,
@@ -11,7 +10,7 @@ pub fn write_manifest(
     registry_handle: &str,
     chosen_options: &[String],
     chosen_optionals: &[String],
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
     let manifest = types::InstallManifest {
         name: pkg.name.clone(),
         version: pkg.version.clone().expect("Version should be resolved"),

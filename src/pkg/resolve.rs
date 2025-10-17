@@ -1,11 +1,11 @@
 use crate::pkg::{config, pin, types};
+use anyhow::{Result, anyhow};
 use chrono::Utc;
 use colored::*;
 use dialoguer::{Select, theme::ColorfulTheme};
 use indicatif::{ProgressBar, ProgressStyle};
 use std::collections::HashMap;
 use std::env;
-use std::error::Error;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -37,12 +37,12 @@ struct PackageRequest {
     version_spec: Option<String>,
 }
 
-pub fn get_db_root() -> Result<PathBuf, Box<dyn Error>> {
-    let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
+pub fn get_db_root() -> Result<PathBuf> {
+    let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
     Ok(home_dir.join(".zoi").join("pkgs").join("db"))
 }
 
-fn parse_source_string(source_str: &str) -> Result<PackageRequest, Box<dyn Error>> {
+fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
     if source_str.contains('/')
         && (source_str.ends_with(".manifest.yaml") || source_str.ends_with(".pkg.lua"))
     {
@@ -72,13 +72,12 @@ fn parse_source_string(source_str: &str) -> Result<PackageRequest, Box<dyn Error
                 handle = Some(main_part[1..at_pos].to_string());
                 main_part = &main_part[at_pos..];
             } else {
-                return Err("Invalid format: empty registry handle".into());
+                return Err(anyhow!("Invalid format: empty registry handle"));
             }
         } else {
-            return Err(
+            return Err(anyhow!(
                 "Invalid format: missing '@' after registry handle. Expected format: #handle@repo/package"
-                    .into(),
-            );
+            ));
         }
     }
 
@@ -103,19 +102,21 @@ fn parse_source_string(source_str: &str) -> Result<PackageRequest, Box<dyn Error
                 repo = Some(repo_str.to_lowercase());
                 name = name_str;
             } else {
-                return Err("Invalid format: missing package name after repo path.".into());
+                return Err(anyhow!(
+                    "Invalid format: missing package name after repo path."
+                ));
             }
         } else {
-            return Err(
-                "Invalid format: must be in the form @repo/package or @repo/path/to/package".into(),
-            );
+            return Err(anyhow!(
+                "Invalid format: must be in the form @repo/package or @repo/path/to/package"
+            ));
         }
     } else {
         name = version_part_str;
     }
 
     if name.is_empty() {
-        return Err("Invalid source string: package name is empty.".into());
+        return Err(anyhow!("Invalid source string: package name is empty."));
     }
 
     Ok(PackageRequest {
@@ -126,7 +127,7 @@ fn parse_source_string(source_str: &str) -> Result<PackageRequest, Box<dyn Error
     })
 }
 
-fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dyn Error>> {
+fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource> {
     let db_root = get_db_root()?;
     let config = config::read_config()?;
 
@@ -163,13 +164,13 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
                     Some(registry.handle.clone()),
                 )
             } else {
-                return Err(format!("Registry with handle '{}' not found.", h).into());
+                return Err(anyhow!("Registry with handle '{}' not found.", h));
             }
         } else {
             let default_registry = config
                 .default_registry
                 .as_ref()
-                .ok_or("No default registry set.")?;
+                .ok_or_else(|| anyhow!("No default registry set."))?;
             (
                 db_root.join(&default_registry.handle),
                 config.repos,
@@ -197,7 +198,7 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
         let pkg_name = Path::new(&request.name)
             .file_name()
             .and_then(|s| s.to_str())
-            .ok_or_else(|| format!("Invalid package path: {}", request.name))?;
+            .ok_or_else(|| anyhow!("Invalid package path: {}", request.name))?;
 
         for repo_name in &repos_to_search {
             let path = registry_db_path
@@ -301,17 +302,16 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
 
     if found_packages.is_empty() {
         if let Some(repo) = &request.repo {
-            Err(format!(
+            Err(anyhow!(
                 "Package '{}' not found in repository '@{}'.",
-                request.name, repo
-            )
-            .into())
+                request.name,
+                repo
+            ))
         } else {
-            Err(format!(
+            Err(anyhow!(
                 "Package '{}' not found in any active repositories.",
                 request.name
-            )
-            .into())
+            ))
         }
     } else if found_packages.len() == 1 {
         let chosen = &found_packages[0];
@@ -356,7 +356,7 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource, Box<dy
     }
 }
 
-fn download_from_url(url: &str) -> Result<ResolvedSource, Box<dyn Error>> {
+fn download_from_url(url: &str) -> Result<ResolvedSource> {
     println!("Downloading package definition from URL...");
     let client = crate::utils::build_blocking_http_client(20)?;
     let mut attempt = 0u32;
@@ -374,22 +374,21 @@ fn download_from_url(url: &str) -> Result<ResolvedSource, Box<dyn Error>> {
                     crate::utils::retry_backoff_sleep(attempt);
                     continue;
                 } else {
-                    return Err(format!(
+                    return Err(anyhow!(
                         "Failed to download file after {} attempts: {}",
-                        attempt, e
-                    )
-                    .into());
+                        attempt,
+                        e
+                    ));
                 }
             }
         }
     };
     if !response.status().is_success() {
-        return Err(format!(
+        return Err(anyhow!(
             "Failed to download file (HTTP {}): {}",
             response.status(),
             url
-        )
-        .into());
+        ));
     }
 
     let total_size = response.content_length().unwrap_or(0);
@@ -427,7 +426,7 @@ fn download_from_url(url: &str) -> Result<ResolvedSource, Box<dyn Error>> {
     })
 }
 
-fn download_content_from_url(url: &str) -> Result<String, Box<dyn Error>> {
+fn download_content_from_url(url: &str) -> Result<String> {
     println!("Downloading from: {}", url.cyan());
     let client = crate::utils::build_blocking_http_client(20)?;
     let mut attempt = 0u32;
@@ -445,32 +444,32 @@ fn download_content_from_url(url: &str) -> Result<String, Box<dyn Error>> {
                     crate::utils::retry_backoff_sleep(attempt);
                     continue;
                 } else {
-                    return Err(format!(
+                    return Err(anyhow!(
                         "Failed to download from {} after {} attempts: {}",
-                        url, attempt, e
-                    )
-                    .into());
+                        url,
+                        attempt,
+                        e
+                    ));
                 }
             }
         }
     };
 
     if !response.status().is_success() {
-        return Err(format!(
+        return Err(anyhow!(
             "Failed to download from {} (HTTP {}). Content: {}",
             url,
             response.status(),
             response
                 .text()
                 .unwrap_or_else(|_| "Could not read response body".to_string())
-        )
-        .into());
+        ));
     }
 
     Ok(response.text()?)
 }
 
-fn resolve_version_from_url(url: &str, channel: &str) -> Result<String, Box<dyn Error>> {
+fn resolve_version_from_url(url: &str, channel: &str) -> Result<String> {
     println!(
         "Resolving version for channel '{}' from {}",
         channel.cyan(),
@@ -489,11 +488,11 @@ fn resolve_version_from_url(url: &str, channel: &str) -> Result<String, Box<dyn 
                         crate::utils::retry_backoff_sleep(attempt);
                         continue;
                     } else {
-                        return Err(format!(
+                        return Err(anyhow!(
                             "Failed to read response after {} attempts: {}",
-                            attempt, e
-                        )
-                        .into());
+                            attempt,
+                            e
+                        ));
                     }
                 }
             },
@@ -503,7 +502,7 @@ fn resolve_version_from_url(url: &str, channel: &str) -> Result<String, Box<dyn 
                     crate::utils::retry_backoff_sleep(attempt);
                     continue;
                 } else {
-                    return Err(format!("Failed to fetch after {} attempts: {}", attempt, e).into());
+                    return Err(anyhow!("Failed to fetch after {} attempts: {}", attempt, e));
                 }
             }
         }
@@ -518,13 +517,12 @@ fn resolve_version_from_url(url: &str, channel: &str) -> Result<String, Box<dyn 
         return Ok(version.to_string());
     }
 
-    Err(format!("Failed to extract version for channel '{channel}' from JSON URL: {url}").into())
+    Err(anyhow!(
+        "Failed to extract version for channel '{channel}' from JSON URL: {url}"
+    ))
 }
 
-fn resolve_channel(
-    versions: &HashMap<String, String>,
-    channel: &str,
-) -> Result<String, Box<dyn Error>> {
+fn resolve_channel(versions: &HashMap<String, String>, channel: &str) -> Result<String> {
     if let Some(url_or_version) = versions.get(channel) {
         if url_or_version.starts_with("http") {
             resolve_version_from_url(url_or_version, channel)
@@ -532,14 +530,11 @@ fn resolve_channel(
             Ok(url_or_version.clone())
         }
     } else {
-        Err(format!("Channel '@{}' not found in versions map.", channel).into())
+        Err(anyhow!("Channel '@{}' not found in versions map.", channel))
     }
 }
 
-pub fn get_default_version(
-    pkg: &types::Package,
-    registry_handle: Option<&str>,
-) -> Result<String, Box<dyn Error>> {
+pub fn get_default_version(pkg: &types::Package, registry_handle: Option<&str>) -> Result<String> {
     if let Some(handle) = registry_handle {
         let source = format!("#{}@{}", handle, pkg.repo);
 
@@ -552,9 +547,10 @@ pub fn get_default_version(
             return if pinned_version.starts_with('@') {
                 let channel = pinned_version.trim_start_matches('@');
                 let versions = pkg.versions.as_ref().ok_or_else(|| {
-                    format!(
+                    anyhow!(
                         "Package '{}' has no 'versions' map to resolve pinned channel '{}'.",
-                        pkg.name, pinned_version
+                        pkg.name,
+                        pinned_version
                     )
                 })?;
                 resolve_channel(versions, channel)
@@ -575,7 +571,9 @@ pub fn get_default_version(
             );
             return resolve_channel(versions, channel);
         }
-        return Err("Package has a 'versions' map but no versions were found in it.".into());
+        return Err(anyhow!(
+            "Package has a 'versions' map but no versions were found in it."
+        ));
     }
 
     if let Some(ver) = &pkg.version {
@@ -597,11 +595,11 @@ pub fn get_default_version(
                                 crate::utils::retry_backoff_sleep(attempt);
                                 continue;
                             } else {
-                                return Err(format!(
+                                return Err(anyhow!(
                                     "Failed to read response after {} attempts: {}",
-                                    attempt, e
-                                )
-                                .into());
+                                    attempt,
+                                    e
+                                ));
                             }
                         }
                     },
@@ -611,11 +609,11 @@ pub fn get_default_version(
                             crate::utils::retry_backoff_sleep(attempt);
                             continue;
                         } else {
-                            return Err(format!(
+                            return Err(anyhow!(
                                 "Failed to fetch after {} attempts: {}",
-                                attempt, e
-                            )
-                            .into());
+                                attempt,
+                                e
+                            ));
                         }
                     }
                 }
@@ -637,11 +635,10 @@ pub fn get_default_version(
                 {
                     return Ok(tag.to_string());
                 }
-                return Err(format!(
+                return Err(anyhow!(
                     "Could not determine a version from the JSON content at {}",
                     ver
-                )
-                .into());
+                ));
             }
             return Ok(resp.trim().to_string());
         } else {
@@ -649,21 +646,25 @@ pub fn get_default_version(
         }
     }
 
-    Err(format!("Could not determine a version for package '{}'.", pkg.name).into())
+    Err(anyhow!(
+        "Could not determine a version for package '{}'.",
+        pkg.name
+    ))
 }
 
 fn get_version_for_install(
     pkg: &types::Package,
     version_spec: &Option<String>,
     registry_handle: Option<&str>,
-) -> Result<String, Box<dyn Error>> {
+) -> Result<String> {
     if let Some(spec) = version_spec {
         if spec.starts_with('@') {
             let channel = spec.trim_start_matches('@');
             let versions = pkg.versions.as_ref().ok_or_else(|| {
-                format!(
+                anyhow!(
                     "Package '{}' has no 'versions' map to resolve channel '@{}'.",
-                    pkg.name, channel
+                    pkg.name,
+                    channel
                 )
             })?;
             return resolve_channel(versions, channel);
@@ -682,7 +683,7 @@ fn get_version_for_install(
     get_default_version(pkg, registry_handle)
 }
 
-pub fn resolve_source(source: &str) -> Result<ResolvedSource, Box<dyn Error>> {
+pub fn resolve_source(source: &str) -> Result<ResolvedSource> {
     let resolved = resolve_source_recursive(source, 0)?;
 
     if let Ok(request) = parse_source_string(source)
@@ -700,16 +701,13 @@ pub fn resolve_source(source: &str) -> Result<ResolvedSource, Box<dyn Error>> {
 
 pub fn resolve_package_and_version(
     source_str: &str,
-) -> Result<
-    (
-        types::Package,
-        String,
-        Option<types::SharableInstallManifest>,
-        PathBuf,
-        Option<String>,
-    ),
-    Box<dyn Error>,
-> {
+) -> Result<(
+    types::Package,
+    String,
+    Option<types::SharableInstallManifest>,
+    PathBuf,
+    Option<String>,
+)> {
     let request = parse_source_string(source_str)?;
     let resolved_source = resolve_source_recursive(source_str, 0)?;
     let registry_handle = resolved_source.registry_handle.clone();
@@ -749,15 +747,17 @@ pub fn resolve_package_and_version(
     ))
 }
 
-fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, Box<dyn Error>> {
+fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource> {
     if depth > 5 {
-        return Err("Exceeded max resolution depth, possible circular 'alt' reference.".into());
+        return Err(anyhow!(
+            "Exceeded max resolution depth, possible circular 'alt' reference."
+        ));
     }
 
     if source.ends_with(".manifest.yaml") {
         let path = PathBuf::from(source);
         if !path.exists() {
-            return Err(format!("Local file not found at '{source}'").into());
+            return Err(anyhow!("Local file not found at '{source}'"));
         }
         println!("Using local sharable manifest file: {}", path.display());
         let content = fs::read_to_string(&path)?;
@@ -787,7 +787,7 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, B
 
         let (host, repo_path) = git_source
             .split_once('/')
-            .ok_or("Invalid git source format. Expected host/owner/repo.")?;
+            .ok_or_else(|| anyhow!("Invalid git source format. Expected host/owner/repo."))?;
 
         let (base_url, branch_sep) = match host {
             "github.com" => (
@@ -799,7 +799,7 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, B
                 format!("https://codeberg.org/{}/raw/branch", repo_path),
                 "/",
             ),
-            _ => return Err(format!("Unsupported git host: {}", host).into()),
+            _ => return Err(anyhow!("Unsupported git host: {}", host)),
         };
 
         let (_, branch) = {
@@ -817,10 +817,10 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, B
                     }
                 }
             }
-            content
-                .ok_or(last_error.unwrap_or_else(|| {
-                    "Could not find repo.yaml on main or master branch".into()
-                }))?
+            content.ok_or_else(|| {
+                last_error
+                    .unwrap_or_else(|| anyhow!("Could not find repo.yaml on main or master branch"))
+            })?
         };
 
         let full_pkg_path = if let Some(r) = &request.repo {
@@ -869,14 +869,16 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, B
         let parts: Vec<&str> = full_path_str.split('/').collect();
 
         if parts.len() < 2 {
-            return Err("Invalid git source. Use @git/<repo-name>/<path/to/pkg>".into());
+            return Err(anyhow!(
+                "Invalid git source. Use @git/<repo-name>/<path/to/pkg>"
+            ));
         }
 
         let repo_name = parts[0];
         let nested_path_parts = &parts[1..];
         let pkg_name = nested_path_parts.last().unwrap();
 
-        let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
+        let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
         let mut path = home_dir
             .join(".zoi")
             .join("pkgs")
@@ -891,13 +893,12 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, B
 
         if !path.exists() {
             let nested_path_str = nested_path_parts.join("/");
-            return Err(format!(
+            return Err(anyhow!(
                 "Package '{}' not found in git repo '{}' (expected: {})",
                 nested_path_str,
                 repo_name,
                 path.display()
-            )
-            .into());
+            ));
         }
         println!(
             "Warning: using external git repo '{}{}' not from official Zoi database.",
@@ -916,7 +917,7 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, B
     } else if source.ends_with(".pkg.lua") {
         let path = PathBuf::from(source);
         if !path.exists() {
-            return Err(format!("Local file not found at '{source}'").into());
+            return Err(anyhow!("Local file not found at '{source}'"));
         }
         println!("Using local package file: {}", path.display());
         ResolvedSource {
@@ -955,22 +956,21 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource, B
                                 crate::utils::retry_backoff_sleep(attempt);
                                 continue;
                             } else {
-                                return Err(format!(
+                                return Err(anyhow!(
                                     "Failed to download file after {} attempts: {}",
-                                    attempt, e
-                                )
-                                .into());
+                                    attempt,
+                                    e
+                                ));
                             }
                         }
                     }
                 };
                 if !response.status().is_success() {
-                    return Err(format!(
+                    return Err(anyhow!(
                         "Failed to download alt source (HTTP {}): {}",
                         response.status(),
                         alt_source
-                    )
-                    .into());
+                    ));
                 }
 
                 let content = response.text()?;

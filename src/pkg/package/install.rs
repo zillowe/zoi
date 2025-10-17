@@ -1,7 +1,7 @@
 use crate::pkg::{local, lua, types};
 use crate::utils;
+use anyhow::{Result, anyhow};
 use colored::*;
-use std::error::Error;
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 use tar::Archive;
@@ -9,10 +9,11 @@ use tempfile::Builder;
 use walkdir::WalkDir;
 use zstd::stream::read::Decoder as ZstdDecoder;
 
-fn get_bin_root(scope: types::Scope) -> Result<PathBuf, Box<dyn Error>> {
+fn get_bin_root(scope: types::Scope) -> Result<PathBuf> {
     match scope {
         types::Scope::User => {
-            let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
+            let home_dir =
+                home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
             Ok(home_dir.join(".zoi/pkgs/bin"))
         }
         types::Scope::System => {
@@ -47,7 +48,7 @@ pub fn run(
     package_file: &Path,
     scope_override: Option<types::Scope>,
     registry_handle: &str,
-) -> Result<Vec<String>, Box<dyn Error>> {
+) -> Result<Vec<String>> {
     let scope = scope_override.unwrap_or(types::Scope::User);
 
     println!(
@@ -71,7 +72,8 @@ pub fn run(
             break;
         }
     }
-    let pkg_lua_path = pkg_lua_path.ok_or("Could not find .pkg.lua file in archive")?;
+    let pkg_lua_path =
+        pkg_lua_path.ok_or_else(|| anyhow!("Could not find .pkg.lua file in archive"))?;
 
     let platform = utils::get_platform()?;
     let metadata = lua::parser::parse_lua_package_for_platform(
@@ -82,7 +84,7 @@ pub fn run(
     let version = metadata
         .version
         .as_ref()
-        .ok_or("Package is missing version")?;
+        .ok_or_else(|| anyhow!("Package is missing version"))?;
 
     println!(
         "Installing package: {} v{}",
@@ -120,7 +122,9 @@ pub fn run(
         let usrroot_src = data_dir.join("usrroot");
         if usrroot_src.exists() {
             if !utils::is_admin() {
-                return Err("Administrator privileges required to install system-wide files. Please run with sudo or as an administrator.".into());
+                return Err(anyhow!(
+                    "Administrator privileges required to install system-wide files. Please run with sudo or as an administrator."
+                ));
             }
             let root_dest = PathBuf::from("/");
             copy_dir_all(&usrroot_src, &root_dest)?;
@@ -138,7 +142,8 @@ pub fn run(
 
         let usrhome_src = data_dir.join("usrhome");
         if usrhome_src.exists() {
-            let home_dest = home::home_dir().ok_or("Could not find home directory")?;
+            let home_dest =
+                home::home_dir().ok_or_else(|| anyhow!("Could not find home directory"))?;
             copy_dir_all(&usrhome_src, &home_dest)?;
             for entry in WalkDir::new(&usrhome_src)
                 .into_iter()

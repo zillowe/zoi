@@ -1,10 +1,11 @@
 use crate::pkg::{install, types};
+use anyhow::{Result, anyhow};
 use colored::*;
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::env;
-use std::error::Error;
 use std::fs;
+use std::sync::Mutex;
 
 #[derive(Debug, Deserialize)]
 struct RepoFile {
@@ -17,7 +18,7 @@ pub fn run(
     all_optional: bool,
     yes: bool,
     scope: Option<crate::cli::SetupScope>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
     println!(
         "Installing from git repository: {}",
         repo_spec.cyan().bold()
@@ -42,8 +43,9 @@ pub fn run(
         }
     }
 
-    let repo_file_content = repo_file_content
-        .ok_or("Could not find zoi.yaml in the repository on main/master branches.")?;
+    let repo_file_content = repo_file_content.ok_or_else(|| {
+        anyhow!("Could not find zoi.yaml in the repository on main/master branches.")
+    })?;
     println!("Using repo config from: {}", used_url.cyan());
 
     let repo_file: RepoFile = serde_yaml::from_str(&repo_file_content)?;
@@ -57,7 +59,7 @@ pub fn run(
         crate::cli::SetupScope::System => types::Scope::System,
     });
 
-    let mut processed_deps = HashSet::new();
+    let processed_deps = Mutex::new(HashSet::new());
 
     println!("Starting installation of package from git repo...");
 
@@ -76,7 +78,7 @@ pub fn run(
             types::InstallReason::Direct,
             yes,
             all_optional,
-            &mut processed_deps,
+            &processed_deps,
             scope_override,
         );
         fs::remove_file(temp_path)?;
@@ -102,7 +104,7 @@ pub fn run(
             types::InstallReason::Direct,
             yes,
             all_optional,
-            &mut processed_deps,
+            &processed_deps,
             scope_override,
         );
         fs::remove_file(temp_path)?;
@@ -119,19 +121,19 @@ pub fn run(
             types::InstallReason::Direct,
             yes,
             all_optional,
-            &mut processed_deps,
+            &processed_deps,
             scope_override,
         )
     }
 }
 
-fn parse_repo_spec(spec: &str) -> Result<(String, String), Box<dyn Error>> {
+fn parse_repo_spec(spec: &str) -> Result<(String, String)> {
     if let Some((provider_alias, path)) = spec.split_once(':') {
         let provider = match provider_alias {
             "gh" | "github" => "github",
             "gl" | "gitlab" => "gitlab",
             "cb" | "codeberg" => "codeberg",
-            _ => return Err(format!("Unknown provider alias: {}", provider_alias).into()),
+            _ => return Err(anyhow!("Unknown provider alias: {}", provider_alias)),
         };
         Ok((provider.to_string(), path.to_string()))
     } else {
@@ -139,11 +141,7 @@ fn parse_repo_spec(spec: &str) -> Result<(String, String), Box<dyn Error>> {
     }
 }
 
-fn get_repo_file_url(
-    provider: &str,
-    repo_path: &str,
-    file_path: &str,
-) -> Result<String, Box<dyn Error>> {
+fn get_repo_file_url(provider: &str, repo_path: &str, file_path: &str) -> Result<String> {
     let branches = ["main", "master"];
     for branch in &branches {
         let url = match provider {
@@ -159,7 +157,7 @@ fn get_repo_file_url(
                 "https://codeberg.org/{}/raw/branch/{}/{}",
                 repo_path, branch, file_path
             ),
-            _ => return Err("Unknown provider".into()),
+            _ => return Err(anyhow!("Unknown provider")),
         };
 
         let res = reqwest::blocking::get(&url);
@@ -169,9 +167,9 @@ fn get_repo_file_url(
             return Ok(url);
         }
     }
-    Err(format!(
+    Err(anyhow!(
         "Could not find '{}' in repo '{}' on branches main or master.",
-        file_path, repo_path
-    )
-    .into())
+        file_path,
+        repo_path
+    ))
 }

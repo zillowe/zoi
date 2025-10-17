@@ -1,13 +1,12 @@
 use crate::pkg::types;
 use anyhow::Result;
-use std::error::Error;
 use std::fs;
 
 pub fn install_manual_if_available(
     pkg: &types::Package,
     version: &str,
     registry_handle: &str,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
     if let Some(url) = &pkg.man {
         println!("Downloading manual from {}...", url);
         let content = reqwest::blocking::get(url)?.bytes()?;

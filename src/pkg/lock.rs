@@ -1,11 +1,12 @@
+use anyhow::{Result, anyhow};
 use colored::*;
-use std::error::Error;
 use std::fs;
 use std::path::PathBuf;
 
-fn get_lock_path() -> Result<PathBuf, Box<dyn Error>> {
+fn get_lock_path() -> Result<PathBuf> {
     if cfg!(target_os = "windows") {
-        let program_data = std::env::var("PROGRAMDATA").map_err(|_| "PROGRAMDATA not set")?;
+        let program_data =
+            std::env::var("PROGRAMDATA").map_err(|_| anyhow!("PROGRAMDATA not set"))?;
         Ok(PathBuf::from(program_data)
             .join("zoi")
             .join("pkgs")
@@ -15,7 +16,7 @@ fn get_lock_path() -> Result<PathBuf, Box<dyn Error>> {
     }
 }
 
-pub fn acquire_lock() -> Result<LockGuard, Box<dyn Error>> {
+pub fn acquire_lock() -> Result<LockGuard> {
     let lock_path = match get_lock_path() {
         Ok(p) => p,
         Err(_) => {
@@ -33,7 +34,7 @@ pub fn acquire_lock() -> Result<LockGuard, Box<dyn Error>> {
         );
         eprintln!("  {}", lock_path.display());
         eprintln!("This can happen if a previous operation was interrupted.");
-        return Err("Could not acquire lock.".into());
+        return Err(anyhow!("Could not acquire lock."));
     }
 
     if let Some(parent) = lock_path.parent()

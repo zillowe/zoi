@@ -1,7 +1,7 @@
 use crate::pkg::types::{Hooks, PlatformOrStringVec};
 use crate::utils;
+use anyhow::{Result, anyhow};
 use colored::*;
-use std::error::Error;
 use std::process::Command;
 
 pub enum HookType {
@@ -13,7 +13,7 @@ pub enum HookType {
     PostRemove,
 }
 
-fn execute_commands(commands: &[String]) -> Result<(), Box<dyn Error>> {
+fn execute_commands(commands: &[String]) -> Result<()> {
     for cmd_str in commands {
         println!("> {}", cmd_str.cyan());
         let status = if cfg!(target_os = "windows") {
@@ -23,13 +23,13 @@ fn execute_commands(commands: &[String]) -> Result<(), Box<dyn Error>> {
         };
 
         if !status.success() {
-            return Err(format!("Hook command failed: {}", cmd_str).into());
+            return Err(anyhow!("Hook command failed: {}", cmd_str));
         }
     }
     Ok(())
 }
 
-pub fn run_hooks(hooks: &Hooks, hook_type: HookType) -> Result<(), Box<dyn Error>> {
+pub fn run_hooks(hooks: &Hooks, hook_type: HookType) -> Result<()> {
     let platform = utils::get_platform()?;
 
     let commands_to_run = match hook_type {

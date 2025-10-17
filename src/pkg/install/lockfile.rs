@@ -1,5 +1,5 @@
 use crate::pkg::types;
-use std::error::Error;
+use anyhow::Result;
 use std::fs;
 use std::io::Write;
 use tempfile::NamedTempFile;
@@ -8,7 +8,7 @@ pub fn process_lockfile(
     lockfile_path: &str,
     sources_to_process: &mut Vec<String>,
     temp_files: &mut Vec<NamedTempFile>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
     println!("=> Installing packages from lockfile: {}", lockfile_path);
     let content = fs::read_to_string(lockfile_path)?;
     let lockfile: types::Lockfile = serde_json::from_str(&content)?;

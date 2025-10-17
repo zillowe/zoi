@@ -1,17 +1,18 @@
 use crate::pkg::config;
 use crate::pkg::types::{InstallManifest, Package, Scope};
 use crate::pkg::utils;
+use anyhow::Result;
 #[cfg(windows)]
 use junction;
-use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
-pub fn get_store_base_dir(scope: Scope) -> Result<PathBuf, Box<dyn Error>> {
+pub fn get_store_base_dir(scope: Scope) -> Result<PathBuf> {
     match scope {
         Scope::User => {
-            let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
+            let home_dir = home::home_dir()
+                .ok_or_else(|| anyhow::anyhow!("Could not find home directory."))?;
             Ok(home_dir.join(".zoi").join("pkgs").join("store"))
         }
         Scope::System => {
@@ -33,7 +34,7 @@ pub fn get_package_dir(
     registry_handle: &str,
     repo_path: &str,
     package_name: &str,
-) -> Result<PathBuf, Box<dyn Error>> {
+) -> Result<PathBuf> {
     let base_dir = get_store_base_dir(scope)?;
     let package_id = utils::generate_package_id(registry_handle, repo_path);
     let package_dir_name = utils::get_package_dir_name(&package_id, package_name);
@@ -46,17 +47,18 @@ pub fn get_package_version_dir(
     repo_path: &str,
     package_name: &str,
     version: &str,
-) -> Result<PathBuf, Box<dyn Error>> {
+) -> Result<PathBuf> {
     let package_dir = get_package_dir(scope, registry_handle, repo_path, package_name)?;
     Ok(package_dir.join(version))
 }
 
-fn get_db_root() -> Result<PathBuf, Box<dyn Error>> {
-    let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
+fn get_db_root() -> Result<PathBuf> {
+    let home_dir =
+        home::home_dir().ok_or_else(|| anyhow::anyhow!("Could not find home directory."))?;
     Ok(home_dir.join(".zoi").join("pkgs").join("db"))
 }
 
-pub fn get_installed_packages() -> Result<Vec<InstallManifest>, Box<dyn Error>> {
+pub fn get_installed_packages() -> Result<Vec<InstallManifest>> {
     let mut installed = Vec::new();
     for scope in [Scope::User, Scope::System, Scope::Project] {
         let store_root = get_store_base_dir(scope)?;
@@ -93,7 +95,7 @@ pub struct InstalledPackage {
     pub package_type: super::types::PackageType,
 }
 
-pub fn get_installed_packages_with_type() -> Result<Vec<InstalledPackage>, Box<dyn Error>> {
+pub fn get_installed_packages_with_type() -> Result<Vec<InstalledPackage>> {
     let manifests = get_installed_packages()?;
     let mut packages = Vec::new();
 
@@ -146,10 +148,7 @@ pub fn get_installed_packages_with_type() -> Result<Vec<InstalledPackage>, Box<d
     Ok(packages)
 }
 
-pub fn is_package_installed(
-    package_name: &str,
-    scope: Scope,
-) -> Result<Option<InstallManifest>, Box<dyn Error>> {
+pub fn is_package_installed(package_name: &str, scope: Scope) -> Result<Option<InstallManifest>> {
     let store_root = get_store_base_dir(scope)?;
     if !store_root.exists() {
         return Ok(None);
@@ -182,12 +181,12 @@ pub fn is_package_installed(
     Ok(None)
 }
 
-pub fn get_packages_from_repos(
-    repos: &[String],
-) -> Result<Vec<super::types::Package>, Box<dyn Error>> {
+pub fn get_packages_from_repos(repos: &[String]) -> Result<Vec<super::types::Package>> {
     let db_root = get_db_root()?;
     if !db_root.exists() {
-        return Err("Package database not found. Please run 'zoi sync' first.".into());
+        return Err(anyhow::anyhow!(
+            "Package database not found. Please run 'zoi sync' first."
+        ));
     }
 
     let mut available = Vec::new();
@@ -224,7 +223,7 @@ pub fn get_packages_from_repos(
     Ok(available)
 }
 
-pub fn get_all_available_packages() -> Result<Vec<super::types::Package>, Box<dyn Error>> {
+pub fn get_all_available_packages() -> Result<Vec<super::types::Package>> {
     let config = config::read_config()?;
     if let Some(handle) = config
         .default_registry
@@ -243,7 +242,7 @@ pub fn get_all_available_packages() -> Result<Vec<super::types::Package>, Box<dy
     }
 }
 
-pub fn add_dependent(package_dir: &Path, dependent_id: &str) -> Result<(), Box<dyn Error>> {
+pub fn add_dependent(package_dir: &Path, dependent_id: &str) -> Result<()> {
     let dependents_dir = package_dir.join("dependents");
     fs::create_dir_all(&dependents_dir)?;
     let dependent_file = dependents_dir.join(hex::encode(dependent_id));
@@ -251,7 +250,7 @@ pub fn add_dependent(package_dir: &Path, dependent_id: &str) -> Result<(), Box<d
     Ok(())
 }
 
-pub fn remove_dependent(package_dir: &Path, dependent_id: &str) -> Result<(), Box<dyn Error>> {
+pub fn remove_dependent(package_dir: &Path, dependent_id: &str) -> Result<()> {
     let dependents_dir = package_dir.join("dependents");
     if dependents_dir.exists() {
         let dependent_file = dependents_dir.join(hex::encode(dependent_id));
@@ -262,7 +261,7 @@ pub fn remove_dependent(package_dir: &Path, dependent_id: &str) -> Result<(), Bo
     Ok(())
 }
 
-pub fn get_dependents(package_dir: &Path) -> Result<Vec<String>, Box<dyn Error>> {
+pub fn get_dependents(package_dir: &Path) -> Result<Vec<String>> {
     let dependents_dir = package_dir.join("dependents");
     let mut dependents = Vec::new();
     if dependents_dir.exists() {
@@ -281,7 +280,7 @@ pub fn get_dependents(package_dir: &Path) -> Result<Vec<String>, Box<dyn Error>>
     Ok(dependents)
 }
 
-pub fn write_manifest(manifest: &InstallManifest) -> Result<(), Box<dyn Error>> {
+pub fn write_manifest(manifest: &InstallManifest) -> Result<()> {
     let version_dir = get_package_version_dir(
         manifest.scope,
         &manifest.registry_handle,

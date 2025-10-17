@@ -1,7 +1,7 @@
 use crate::pkg::{cache, local, resolve, types};
 use crate::utils;
+use anyhow::{Result, anyhow};
 use colored::*;
-use std::error::Error;
 use std::fs;
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -9,10 +9,7 @@ use std::process::Command;
 use tar::Archive;
 use zstd::stream::read::Decoder as ZstdDecoder;
 
-fn ensure_binary_is_cached(
-    pkg: &types::Package,
-    upstream: bool,
-) -> Result<PathBuf, Box<dyn Error>> {
+fn ensure_binary_is_cached(pkg: &types::Package, upstream: bool) -> Result<PathBuf> {
     let cache_dir = cache::get_cache_root()?;
     let binary_filename = if cfg!(target_os = "windows") {
         format!("{}.exe", pkg.name)
@@ -31,7 +28,9 @@ fn ensure_binary_is_cached(
     }
 
     if !pkg.types.contains(&"pre-compiled".to_string()) {
-        return Err("zoi exec only works with 'pre-compiled' package types.".into());
+        return Err(anyhow!(
+            "zoi exec only works with 'pre-compiled' package types."
+        ));
     }
 
     println!(
@@ -82,14 +81,21 @@ fn ensure_binary_is_cached(
                 final_url.cyan()
             );
 
-            if let Ok(downloaded_data) =
-                crate::pkg::install::util::download_file_with_progress(&final_url)
-            {
-                let temp_dir = tempfile::Builder::new().prefix("zoi-exec-ext").tempdir()?;
-                let mut archive = Archive::new(ZstdDecoder::new(Cursor::new(downloaded_data))?);
-                archive.unpack(temp_dir.path())?;
+            let temp_dir = tempfile::Builder::new().prefix("zoi-exec-dl-").tempdir()?;
+            let temp_archive_path = temp_dir.path().join(&archive_filename);
 
-                let bin_dir_in_archive = temp_dir.path().join("data/pkgstore/bin");
+            if crate::pkg::install::util::download_file_with_progress(
+                &final_url,
+                &temp_archive_path,
+            )
+            .is_ok()
+            {
+                let downloaded_data = fs::read(&temp_archive_path)?;
+                let temp_ext_dir = tempfile::Builder::new().prefix("zoi-exec-ext").tempdir()?;
+                let mut archive = Archive::new(ZstdDecoder::new(Cursor::new(downloaded_data))?);
+                archive.unpack(temp_ext_dir.path())?;
+
+                let bin_dir_in_archive = temp_ext_dir.path().join("data/pkgstore/bin");
                 if bin_dir_in_archive.exists()
                     && let Some(bin_name) = &pkg.bins.as_ref().and_then(|b| b.first())
                 {
@@ -113,7 +119,7 @@ fn ensure_binary_is_cached(
         }
     }
 
-    Err("Could not download pre-built package for exec.".into())
+    Err(anyhow!("Could not download pre-built package for exec."))
 }
 
 fn find_executable(
@@ -122,7 +128,7 @@ fn find_executable(
     cache_only: bool,
     local_only: bool,
     registry_handle: Option<&str>,
-) -> Result<PathBuf, Box<dyn Error>> {
+) -> Result<PathBuf> {
     let handle = registry_handle.unwrap_or("local");
 
     if upstream {
@@ -163,7 +169,7 @@ fn find_executable(
     }
 
     if local_only {
-        return Err("No local project binary found.".into());
+        return Err(anyhow!("No local project binary found."));
     }
 
     if cache_only {
@@ -178,7 +184,7 @@ fn find_executable(
             println!("Using cached binary for '{}'.", pkg.name.cyan());
             return Ok(bin_path);
         }
-        return Err("No cached binary found.".into());
+        return Err(anyhow!("No cached binary found."));
     }
 
     ensure_binary_is_cached(pkg, false)
@@ -190,7 +196,7 @@ pub fn run(
     upstream: bool,
     cache_only: bool,
     local_only: bool,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
     let resolved_source = resolve::resolve_source(source)?;
 
     if let Some(repo_name) = &resolved_source.repo_name {
@@ -205,7 +211,9 @@ pub fn run(
     }
 
     if pkg.package_type == types::PackageType::App {
-        return Err("This package is an 'app' template. Use 'zoi create <pkg> <appName>' to create an app from it.".into());
+        return Err(anyhow!(
+            "This package is an 'app' template. Use 'zoi create <pkg> <appName>' to create an app from it."
+        ));
     }
 
     let bin_path = find_executable(

@@ -1,10 +1,12 @@
 use super::{manifest, post_install, prebuilt, util};
-use crate::pkg::{config, dependencies, hooks, local, recorder, resolve, types};
+use crate::pkg::{cache, config, dependencies, hooks, local, recorder, resolve, types};
 use crate::utils;
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use colored::*;
 use std::collections::HashSet;
-use std::error::Error;
+use std::fs;
+use std::path::PathBuf;
+use std::sync::Mutex;
 
 #[derive(PartialEq, Eq, Clone)]
 pub enum InstallMode {
@@ -19,9 +21,9 @@ pub fn run_installation(
     reason: types::InstallReason,
     yes: bool,
     all_optional: bool,
-    processed_deps: &mut HashSet<String>,
+    processed_deps: &Mutex<HashSet<String>>,
     scope_override: Option<types::Scope>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<()> {
     let (mut pkg, version, sharable_manifest, pkg_lua_path, registry_handle) =
         resolve::resolve_package_and_version(source)?;
 
@@ -42,18 +44,22 @@ pub fn run_installation(
     util::check_for_conflicts(&pkg, yes)?;
 
     if pkg.package_type == types::PackageType::App {
-        return Err("This package is an 'app' template. Use 'zoi create pkg <source> <appName>' to create an app from it.".into());
+        return Err(anyhow!(
+            "This package is an 'app' template. Use 'zoi create pkg <source> <appName>' to create an app from it."
+        ));
     }
 
     if pkg.scope == types::Scope::System {
         if !utils::is_admin() {
-            return Err("System-wide installation requires administrative privileges. Please run with sudo or as an administrator.".into());
+            return Err(anyhow!(
+                "System-wide installation requires administrative privileges. Please run with sudo or as an administrator."
+            ));
         }
         if !utils::ask_for_confirmation(
             "This package will be installed system-wide. Are you sure you want to continue?",
             yes,
         ) {
-            return Err("Operation aborted by user.".into());
+            return Err(anyhow!("Operation aborted by user."));
         }
     }
 
@@ -293,7 +299,7 @@ pub fn run_installation(
     if let Some(hooks) = &pkg.hooks
         && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PreInstall)
     {
-        return Err(format!("Pre-install hook failed: {}", e).into());
+        return Err(anyhow!("Pre-install hook failed: {}", e));
     }
 
     let mut install_manual = true;
@@ -312,7 +318,9 @@ pub fn run_installation(
             let version_dir =
                 local::get_package_version_dir(pkg.scope, handle, &pkg.repo, &pkg.name, &version)?;
             if let types::InstallReason::Dependency { ref parent } = reason {
-                let package_dir = version_dir.parent().ok_or("Invalid version dir")?;
+                let package_dir = version_dir
+                    .parent()
+                    .ok_or_else(|| anyhow!("Invalid version dir"))?;
                 local::add_dependent(package_dir, parent)?;
             }
             if install_manual
@@ -348,7 +356,7 @@ pub fn run_installation(
             if let Some(hooks) = &pkg.hooks
                 && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PostInstall)
             {
-                return Err(format!("Post-install hook failed: {}", e).into());
+                return Err(anyhow!("Post-install hook failed: {}", e));
             }
 
             util::send_telemetry("install", &pkg);
@@ -366,7 +374,7 @@ fn run_default_flow(
     install_manual: &mut bool,
     mode: InstallMode,
     registry_handle: &str,
-) -> Result<Vec<String>, Box<dyn Error>> {
+) -> Result<Vec<String>> {
     if mode == InstallMode::PreferPrebuilt {
         let db_path = resolve::get_db_root()?;
         let repo_db_path = db_path.join(registry_handle);
@@ -395,22 +403,105 @@ fn run_default_flow(
                     .replace("{version}", pkg.version.as_deref().unwrap_or(""))
                     .replace("{repo}", &pkg.repo);
 
-                let archive_filename = format!("{}.pkg.tar.zst", pkg.name);
+                let archive_filename = format!(
+                    "{}-{}-{}.pkg.tar.zst",
+                    pkg.name,
+                    pkg.version.as_deref().unwrap_or(""),
+                    platform
+                );
                 let final_url = format!("{}/{}", url_dir.trim_end_matches('/'), archive_filename);
 
-                println!(
-                    "Attempting to download pre-built package from: {}",
-                    final_url.cyan()
-                );
+                let archive_cache_root = cache::get_archive_cache_root()?;
+                fs::create_dir_all(&archive_cache_root)?;
+                let cached_archive_path = archive_cache_root.join(&archive_filename);
 
-                if let Ok(downloaded_data) = util::download_file_with_progress(&final_url) {
-                    let temp_dir = tempfile::Builder::new().prefix("zoi-prebuilt").tempdir()?;
-                    let temp_archive_path = temp_dir.path().join(&archive_filename);
-                    std::fs::write(&temp_archive_path, downloaded_data)?;
+                let mut expected_hash: Option<String> = None;
+                if let Some(hash_template) = &pkg_link.hash {
+                    let hash_url = hash_template
+                        .replace("{os}", os)
+                        .replace("{arch}", arch)
+                        .replace("{version}", pkg.version.as_deref().unwrap_or(""))
+                        .replace("{repo}", &pkg.repo);
 
-                    println!("Successfully downloaded pre-built package.");
+                    match util::get_expected_hash(&hash_url) {
+                        Ok(h) => {
+                            if !h.is_empty() {
+                                expected_hash = Some(h);
+                            }
+                        }
+                        Err(e) => println!("Warning: could not get hash from {}: {}", hash_url, e),
+                    }
+                }
+
+                let mut archive_to_install: Option<PathBuf> = None;
+
+                if cached_archive_path.exists() {
+                    println!("Found cached archive: {}", cached_archive_path.display());
+                    if let Some(hash) = &expected_hash {
+                        match util::verify_file_hash(&cached_archive_path, hash) {
+                            Ok(true) => {
+                                archive_to_install = Some(cached_archive_path.clone());
+                            }
+                            Ok(false) => {
+                                println!("Cached archive hash is invalid. Re-downloading.");
+                                fs::remove_file(&cached_archive_path)?;
+                            }
+                            Err(e) => {
+                                println!(
+                                    "Could not verify hash of cached archive: {}. Re-downloading.",
+                                    e
+                                );
+                                fs::remove_file(&cached_archive_path)?;
+                            }
+                        }
+                    } else {
+                        // No hash to verify, just use the cached file.
+                        archive_to_install = Some(cached_archive_path.clone());
+                    }
+                }
+
+                if archive_to_install.is_none() {
+                    let temp_dir = tempfile::Builder::new().prefix("zoi-dl-").tempdir()?;
+                    let temp_download_path = temp_dir.path().join(&archive_filename);
+
+                    if util::download_file_with_progress(&final_url, &temp_download_path).is_ok() {
+                        if let Some(hash) = &expected_hash {
+                            match util::verify_file_hash(&temp_download_path, hash) {
+                                Ok(true) => {
+                                    fs::copy(&temp_download_path, &cached_archive_path)?;
+                                    archive_to_install = Some(cached_archive_path.clone());
+                                }
+                                Ok(false) => {
+                                    println!(
+                                        "Downloaded archive hash is invalid. Trying next source."
+                                    );
+                                    continue; // to next pkg_link
+                                }
+                                Err(e) => {
+                                    println!(
+                                        "Could not verify hash of downloaded archive: {}. Trying next source.",
+                                        e
+                                    );
+                                    continue;
+                                }
+                            }
+                        } else {
+                            fs::copy(&temp_download_path, &cached_archive_path)?;
+                            archive_to_install = Some(cached_archive_path.clone());
+                        }
+                    } else {
+                        println!(
+                            "Failed to download from {}. Trying next mirror if available.",
+                            final_url
+                        );
+                        continue; // to next pkg_link
+                    }
+                }
+
+                if let Some(archive_path) = archive_to_install {
+                    println!("Using archive: {}", archive_path.display());
                     if let Ok(installed_files) = crate::pkg::package::install::run(
-                        &temp_archive_path,
+                        &archive_path,
                         Some(pkg.scope),
                         registry_handle,
                     ) {
@@ -418,13 +509,8 @@ fn run_default_flow(
                         *install_manual = false;
                         return Ok(installed_files);
                     } else {
-                        println!("Failed to install downloaded package. Trying next source.");
+                        println!("Failed to install from archive. Trying next source.");
                     }
-                } else {
-                    println!(
-                        "Failed to download from {}. Trying next mirror if available.",
-                        final_url
-                    );
                 }
             }
         }
