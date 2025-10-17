@@ -343,6 +343,7 @@ pub struct PkgLink {
     pub link_type: String,
     pub url: String,
     pub pgp: Option<String>,
+    pub hash: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

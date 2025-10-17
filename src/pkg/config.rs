@@ -1,8 +1,8 @@
 use crate::pkg::types::{Config, Registry, RepoConfig};
+use anyhow::{Result, anyhow};
 use colored::*;
 use serde_yaml::Value;
 use std::collections::HashSet;
-use std::error::Error;
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -11,7 +11,7 @@ pub fn get_default_registry() -> String {
     env!("ZOI_DEFAULT_REGISTRY").to_string()
 }
 
-fn get_system_config_path() -> Result<PathBuf, Box<dyn Error>> {
+fn get_system_config_path() -> Result<PathBuf> {
     if cfg!(target_os = "windows") {
         Ok(PathBuf::from("C:\\ProgramData\\zoi\\config.yaml"))
     } else {
@@ -19,27 +19,27 @@ fn get_system_config_path() -> Result<PathBuf, Box<dyn Error>> {
     }
 }
 
-fn get_user_config_path() -> Result<PathBuf, Box<dyn Error>> {
-    let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
+fn get_user_config_path() -> Result<PathBuf> {
+    let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
     Ok(home_dir.join(".zoi").join("pkgs").join("config.yaml"))
 }
 
-fn get_project_config_path() -> Result<PathBuf, Box<dyn Error>> {
+fn get_project_config_path() -> Result<PathBuf> {
     let current_dir = std::env::current_dir()?;
     Ok(current_dir.join(".zoi").join("pkgs").join("config.yaml"))
 }
 
-fn get_db_root() -> Result<PathBuf, Box<dyn Error>> {
-    let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
+fn get_db_root() -> Result<PathBuf> {
+    let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
     Ok(home_dir.join(".zoi").join("pkgs").join("db"))
 }
 
-fn get_git_root() -> Result<PathBuf, Box<dyn Error>> {
-    let home_dir = home::home_dir().ok_or("Could not find home directory.")?;
+fn get_git_root() -> Result<PathBuf> {
+    let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
     Ok(home_dir.join(".zoi").join("pkgs").join("git"))
 }
 
-fn read_yaml_value(path: &Path) -> Result<Value, Box<dyn Error>> {
+fn read_yaml_value(path: &Path) -> Result<Value> {
     if !path.exists() {
         return Ok(Value::Null);
     }
@@ -47,7 +47,7 @@ fn read_yaml_value(path: &Path) -> Result<Value, Box<dyn Error>> {
     serde_yaml::from_str(&content).map_err(Into::into)
 }
 
-fn read_config_from_path(path: &Path) -> Result<Config, Box<dyn Error>> {
+fn read_config_from_path(path: &Path) -> Result<Config> {
     if !path.exists() {
         return Ok(Config::default());
     }
@@ -55,7 +55,7 @@ fn read_config_from_path(path: &Path) -> Result<Config, Box<dyn Error>> {
     serde_yaml::from_str(&content).map_err(Into::into)
 }
 
-pub fn read_config() -> Result<Config, Box<dyn Error>> {
+pub fn read_config() -> Result<Config> {
     let system_val = read_yaml_value(&get_system_config_path()?)?;
     let user_val = read_yaml_value(&get_user_config_path()?)?;
     let project_val = read_yaml_value(&get_project_config_path()?)?;
@@ -186,37 +186,45 @@ pub fn read_config() -> Result<Config, Box<dyn Error>> {
     Ok(merged_cfg)
 }
 
-pub fn write_user_config(config: &Config) -> Result<(), Box<dyn Error>> {
+pub fn write_user_config(config: &Config) -> Result<()> {
     let config_path = get_user_config_path()?;
-    let parent_dir = config_path.parent().ok_or("Invalid config path")?;
+    let parent_dir = config_path
+        .parent()
+        .ok_or_else(|| anyhow!("Invalid config path"))?;
     fs::create_dir_all(parent_dir)?;
     let content = serde_yaml::to_string(config)?;
     fs::write(config_path, content)?;
     Ok(())
 }
 
-pub fn add_repo(repo_name: &str) -> Result<(), Box<dyn Error>> {
+pub fn add_repo(repo_name: &str) -> Result<()> {
     let mut config = read_config_from_path(&get_user_config_path()?)?;
     let lower_repo_name = repo_name.to_lowercase();
     if config.repos.contains(&lower_repo_name) {
-        return Err(format!("Repository '{}' already exists in user config.", repo_name).into());
+        return Err(anyhow!(
+            "Repository '{}' already exists in user config.",
+            repo_name
+        ));
     }
     config.repos.push(lower_repo_name);
     write_user_config(&config)
 }
 
-pub fn remove_repo(repo_name: &str) -> Result<(), Box<dyn Error>> {
+pub fn remove_repo(repo_name: &str) -> Result<()> {
     let mut config = read_config_from_path(&get_user_config_path()?)?;
     let lower_repo_name = repo_name.to_lowercase();
     if let Some(pos) = config.repos.iter().position(|r| r == &lower_repo_name) {
         config.repos.remove(pos);
         write_user_config(&config)
     } else {
-        Err(format!("Repository '{}' not found in user config.", repo_name).into())
+        Err(anyhow!(
+            "Repository '{}' not found in user config.",
+            repo_name
+        ))
     }
 }
 
-pub fn interactive_add_repo() -> Result<(), Box<dyn Error>> {
+pub fn interactive_add_repo() -> Result<()> {
     let config = read_config()?;
     let all_repos = get_all_repos()?;
 
@@ -252,7 +260,7 @@ pub fn interactive_add_repo() -> Result<(), Box<dyn Error>> {
 
     let choice: usize = match input.parse() {
         Ok(num) => num,
-        Err(_) => return Err("Invalid input.".into()),
+        Err(_) => return Err(anyhow!("Invalid input.")),
     };
 
     if choice > 0 && choice <= available_repos.len() {
@@ -260,13 +268,13 @@ pub fn interactive_add_repo() -> Result<(), Box<dyn Error>> {
         add_repo(repo_to_add)?;
         println!("Repository '{}' added successfully.", repo_to_add.green());
     } else {
-        return Err("Invalid selection.".into());
+        return Err(anyhow!("Invalid selection."));
     }
 
     Ok(())
 }
 
-pub fn get_all_repos() -> Result<Vec<String>, Box<dyn Error>> {
+pub fn get_all_repos() -> Result<Vec<String>> {
     let db_root = get_db_root()?;
     let config = read_config()?;
 
@@ -283,7 +291,7 @@ pub fn get_all_repos() -> Result<Vec<String>, Box<dyn Error>> {
     Ok(Vec::new())
 }
 
-pub fn clone_git_repo(url: &str) -> Result<(), Box<dyn Error>> {
+pub fn clone_git_repo(url: &str) -> Result<()> {
     let git_root = get_git_root()?;
     fs::create_dir_all(&git_root)?;
     let repo_name = url
@@ -294,12 +302,11 @@ pub fn clone_git_repo(url: &str) -> Result<(), Box<dyn Error>> {
         .trim_end_matches(".git");
     let target = git_root.join(repo_name);
     if target.exists() {
-        return Err(format!(
+        return Err(anyhow!(
             "Git repo '{}' already exists at {}",
             repo_name,
             target.display()
-        )
-        .into());
+        ));
     }
     println!("Cloning '{}' into {}...", url.cyan(), target.display());
     let status = std::process::Command::new("git")
@@ -308,7 +315,7 @@ pub fn clone_git_repo(url: &str) -> Result<(), Box<dyn Error>> {
         .arg(&target)
         .status()?;
     if !status.success() {
-        return Err("git clone failed".into());
+        return Err(anyhow!("git clone failed"));
     }
 
     let mut config = read_config_from_path(&get_user_config_path()?)?;
@@ -325,7 +332,7 @@ pub fn clone_git_repo(url: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn list_git_repos() -> Result<Vec<String>, Box<dyn Error>> {
+pub fn list_git_repos() -> Result<Vec<String>> {
     let git_root = get_git_root()?;
     if !git_root.exists() {
         return Ok(Vec::new());
@@ -342,11 +349,11 @@ pub fn list_git_repos() -> Result<Vec<String>, Box<dyn Error>> {
     Ok(repos)
 }
 
-pub fn remove_git_repo(repo_name: &str) -> Result<(), Box<dyn Error>> {
+pub fn remove_git_repo(repo_name: &str) -> Result<()> {
     let git_root = get_git_root()?;
     let target = git_root.join(repo_name);
     if !target.exists() {
-        return Err(format!("Git repository '{}' not found.", repo_name).into());
+        return Err(anyhow!("Git repository '{}' not found.", repo_name));
     }
 
     let mut config = read_config_from_path(&get_user_config_path()?)?;
@@ -379,7 +386,7 @@ pub fn remove_git_repo(repo_name: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn set_default_registry(url: &str) -> Result<(), Box<dyn Error>> {
+pub fn set_default_registry(url: &str) -> Result<()> {
     let mut config = read_config_from_path(&get_user_config_path()?)?;
     config.default_registry = Some(Registry {
         handle: String::new(),
@@ -388,10 +395,10 @@ pub fn set_default_registry(url: &str) -> Result<(), Box<dyn Error>> {
     write_user_config(&config)
 }
 
-pub fn add_added_registry(url: &str) -> Result<(), Box<dyn Error>> {
+pub fn add_added_registry(url: &str) -> Result<()> {
     let mut config = read_config_from_path(&get_user_config_path()?)?;
     if config.added_registries.iter().any(|r| r.url == url) {
-        return Err(format!("Registry with URL '{}' already exists.", url).into());
+        return Err(anyhow!("Registry with URL '{}' already exists.", url));
     }
     config.added_registries.push(Registry {
         handle: String::new(),
@@ -400,7 +407,7 @@ pub fn add_added_registry(url: &str) -> Result<(), Box<dyn Error>> {
     write_user_config(&config)
 }
 
-pub fn remove_added_registry(handle: &str) -> Result<(), Box<dyn Error>> {
+pub fn remove_added_registry(handle: &str) -> Result<()> {
     let mut config = read_config_from_path(&get_user_config_path()?)?;
     if let Some(pos) = config
         .added_registries
@@ -415,20 +422,25 @@ pub fn remove_added_registry(handle: &str) -> Result<(), Box<dyn Error>> {
         }
         write_user_config(&config)
     } else {
-        Err(format!("Added registry with handle '{}' not found.", handle).into())
+        Err(anyhow!(
+            "Added registry with handle '{}' not found.",
+            handle
+        ))
     }
 }
 
-pub fn read_repo_config(db_path: &Path) -> Result<RepoConfig, Box<dyn Error>> {
+pub fn read_repo_config(db_path: &Path) -> Result<RepoConfig> {
     let config_path = db_path.join("repo.yaml");
     if !config_path.exists() {
-        return Err("repo.yaml not found in the root of the package database.".into());
+        return Err(anyhow!(
+            "repo.yaml not found in the root of the package database."
+        ));
     }
     let content = fs::read_to_string(config_path)?;
     let config: RepoConfig = serde_yaml::from_str(&content)?;
     Ok(config)
 }
 
-pub fn read_user_config() -> Result<Config, Box<dyn Error>> {
+pub fn read_user_config() -> Result<Config> {
     read_config_from_path(&get_user_config_path()?)
 }

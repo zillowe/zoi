@@ -1,5 +1,5 @@
+use anyhow::{Result, anyhow};
 use sha2::{Digest, Sha256, Sha512};
-use std::error::Error;
 use std::fs::File;
 use std::io::Read;
 
@@ -8,12 +8,15 @@ pub enum HashType {
     Sha256,
 }
 
-pub fn get_hash(source: &str, hash_type: HashType) -> Result<String, Box<dyn Error>> {
+pub fn get_hash(source: &str, hash_type: HashType) -> Result<String> {
     let bytes: Vec<u8> = if source.starts_with("http://") || source.starts_with("https://") {
         let client = crate::utils::build_blocking_http_client(60)?;
         let response = client.get(source).send()?;
         if !response.status().is_success() {
-            return Err(format!("Failed to download file from URL: {}", response.status()).into());
+            return Err(anyhow!(
+                "Failed to download file from URL: {}",
+                response.status()
+            ));
         }
         response.bytes()?.to_vec()
     } else {

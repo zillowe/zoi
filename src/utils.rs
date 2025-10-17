@@ -1,6 +1,6 @@
 use crate::pkg::resolve::SourceType;
+use anyhow::anyhow;
 use colored::*;
-use std::error::Error;
 use std::fmt::Display;
 use std::fs;
 use std::io::{Write, stdin, stdout};
@@ -8,8 +8,9 @@ use std::process::Command;
 use std::time::Duration;
 use walkdir::WalkDir;
 
+use crate::pkg::types::Scope;
 use clap_complete::Shell;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub fn is_admin() -> bool {
     #[cfg(windows)]
@@ -271,7 +272,7 @@ pub fn print_repo_warning(repo_name: &str) {
     }
 }
 
-pub fn confirm_untrusted_source(source_type: &SourceType, yes: bool) -> Result<(), Box<dyn Error>> {
+pub fn confirm_untrusted_source(source_type: &SourceType, yes: bool) -> anyhow::Result<()> {
     if source_type == &SourceType::OfficialRepo {
         return Ok(());
     }
@@ -300,7 +301,7 @@ pub fn confirm_untrusted_source(source_type: &SourceType, yes: bool) -> Result<(
     ) {
         Ok(())
     } else {
-        Err("Operation aborted by user.".into())
+        Err(anyhow!("Operation aborted by user."))
     }
 }
 
@@ -314,17 +315,14 @@ pub fn is_platform_compatible(current_platform: &str, allowed_platforms: &[Strin
         .any(|p| p == "all" || p == os || p == current_platform)
 }
 
-use crate::pkg::types::Scope;
-use std::path::PathBuf;
-
-pub fn setup_path(scope: Scope) -> Result<(), Box<dyn Error>> {
+pub fn setup_path(scope: Scope) -> anyhow::Result<()> {
     if scope == Scope::Project {
         return Ok(());
     }
 
     let zoi_bin_dir = match scope {
         Scope::User => home::home_dir()
-            .ok_or("Could not find home directory.")?
+            .ok_or_else(|| anyhow!("Could not find home directory."))?
             .join(".zoi")
             .join("pkgs")
             .join("bin"),
@@ -355,7 +353,7 @@ pub fn setup_path(scope: Scope) -> Result<(), Box<dyn Error>> {
     #[cfg(unix)]
     {
         use std::fs::{File, OpenOptions};
-        let home = home::home_dir().ok_or("Could not find home directory.")?;
+        let home = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
         let zoi_bin_str = "$HOME/.zoi/pkgs/bin";
 
         let shell_name = std::env::var("SHELL").unwrap_or_default();
@@ -510,20 +508,20 @@ pub fn check_path() {
     }
 }
 
-pub fn get_platform() -> Result<String, String> {
+pub fn get_platform() -> anyhow::Result<String> {
     let os = match std::env::consts::OS {
         "linux" => "linux",
         "macos" | "darwin" => "macos",
         "windows" => "windows",
         "freebsd" => "freebsd",
         "openbsd" => "openbsd",
-        unsupported_os => return Err(format!("Unsupported operating system: {}", unsupported_os)),
+        unsupported_os => return Err(anyhow!("Unsupported operating system: {}", unsupported_os)),
     };
 
     let arch = match std::env::consts::ARCH {
         "x86_64" => "amd64",
         "aarch64" => "arm64",
-        unsupported_arch => return Err(format!("Unsupported architecture: {}", unsupported_arch)),
+        unsupported_arch => return Err(anyhow!("Unsupported architecture: {}", unsupported_arch)),
     };
 
     Ok(format!("{}-{}", os, arch))
@@ -570,9 +568,7 @@ pub fn get_all_available_package_managers() -> Vec<String> {
     managers
 }
 
-pub fn build_blocking_http_client(
-    timeout_secs: u64,
-) -> Result<reqwest::blocking::Client, Box<dyn Error>> {
+pub fn build_blocking_http_client(timeout_secs: u64) -> anyhow::Result<reqwest::blocking::Client> {
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(timeout_secs))
         .build()?;
@@ -675,16 +671,15 @@ pub fn get_all_packages_for_completion() -> Vec<PackageCompletion> {
             let pkg_file_path = entry.path().join(format!("{}.pkg.lua", pkg_name));
 
             if pkg_file_path.is_file() {
-                let pkg_info: Result<PackageForCompletion, _> =
-                    (|| -> Result<_, Box<dyn Error>> {
-                        let pkg = crate::pkg::lua::parser::parse_lua_package(
-                            pkg_file_path.to_str().unwrap(),
-                            None,
-                        )?;
-                        Ok(PackageForCompletion {
-                            description: Some(pkg.description),
-                        })
-                    })();
+                let pkg_info: anyhow::Result<PackageForCompletion> = (|| -> anyhow::Result<_> {
+                    let pkg = crate::pkg::lua::parser::parse_lua_package(
+                        pkg_file_path.to_str().unwrap(),
+                        None,
+                    )?;
+                    Ok(PackageForCompletion {
+                        description: Some(pkg.description),
+                    })
+                })();
 
                 let description = match pkg_info {
                     Ok(pi) => pi.description.unwrap_or_default(),
