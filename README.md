@@ -73,7 +73,7 @@
 - [Dependencies Support](#-dependencies-support)
 - [Usage](#-usage)
 - [Packaging Status](#-packaging-status)
-- [Repositories & Mirrors](#-repositories-mirrors)
+- [Repositories & Mirrors](#-repositories--mirrors)
 - [Contributing](#-contributing)
 - [License](#-license)
 
