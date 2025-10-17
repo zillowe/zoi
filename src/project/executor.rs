@@ -1,12 +1,9 @@
+use anyhow::{Result, anyhow};
 use colored::*;
 use std::collections::HashMap;
-use std::error::Error;
 use std::process::Command;
 
-pub fn run_shell_command(
-    command_str: &str,
-    envs: &HashMap<String, String>,
-) -> Result<(), Box<dyn Error>> {
+pub fn run_shell_command(command_str: &str, envs: &HashMap<String, String>) -> Result<()> {
     println!("> {}", command_str.cyan());
     let status = if cfg!(target_os = "windows") {
         Command::new("pwsh")
@@ -23,7 +20,7 @@ pub fn run_shell_command(
     };
 
     if !status.success() {
-        return Err(format!("Command failed with exit code {status}").into());
+        return Err(anyhow!("Command failed with exit code {status}"));
     }
     Ok(())
 }

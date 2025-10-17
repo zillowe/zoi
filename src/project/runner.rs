@@ -1,16 +1,12 @@
 use super::{config, executor};
 use crate::utils;
+use anyhow::{Result, anyhow};
 use colored::*;
 use dialoguer::{Select, theme::ColorfulTheme};
-use std::error::Error;
 
-pub fn run(
-    cmd_alias: Option<&str>,
-    args: &[String],
-    config: &config::ProjectConfig,
-) -> Result<(), Box<dyn Error>> {
+pub fn run(cmd_alias: Option<&str>, args: &[String], config: &config::ProjectConfig) -> Result<()> {
     if config.commands.is_empty() {
-        return Err("No commands defined in zoi.yaml".into());
+        return Err(anyhow!("No commands defined in zoi.yaml"));
     }
 
     let command_to_run = match cmd_alias {
@@ -18,11 +14,11 @@ pub fn run(
             .commands
             .iter()
             .find(|c| c.cmd == alias)
-            .ok_or_else(|| format!("Command alias '{}' not found in zoi.yaml", alias))?
+            .ok_or_else(|| anyhow!("Command alias '{}' not found in zoi.yaml", alias))?
             .clone(),
         None => {
             if !args.is_empty() {
-                return Err("Cannot pass arguments when in interactive mode.".into());
+                return Err(anyhow!("Cannot pass arguments when in interactive mode."));
             }
             let selections: Vec<&str> = config.commands.iter().map(|c| c.cmd.as_str()).collect();
             let selection = Select::with_theme(&ColorfulTheme::default())
@@ -30,7 +26,7 @@ pub fn run(
                 .items(&selections)
                 .default(0)
                 .interact_opt()?
-                .ok_or("No command chosen.")?;
+                .ok_or(anyhow!("No command chosen."))?;
 
             config.commands[selection].clone()
         }
@@ -45,7 +41,7 @@ pub fn run(
             .or_else(|| p.get("default"))
             .cloned()
             .ok_or_else(|| {
-                format!(
+                anyhow!(
                     "No command found for platform '{}' and no default specified",
                     platform
                 )

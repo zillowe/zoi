@@ -1,16 +1,13 @@
 use super::{config, executor};
 use crate::utils;
+use anyhow::{Result, anyhow};
 use colored::*;
 use dialoguer::{Select, theme::ColorfulTheme};
-use std::error::Error;
 use std::process::Command;
 
-pub fn setup(
-    env_alias: Option<&str>,
-    config: &config::ProjectConfig,
-) -> Result<(), Box<dyn Error>> {
+pub fn setup(env_alias: Option<&str>, config: &config::ProjectConfig) -> Result<()> {
     if config.environments.is_empty() {
-        return Err("No environments defined in zoi.yaml".into());
+        return Err(anyhow!("No environments defined in zoi.yaml"));
     }
 
     let env_to_setup = match env_alias {
@@ -18,7 +15,7 @@ pub fn setup(
             .environments
             .iter()
             .find(|e| e.cmd == alias)
-            .ok_or_else(|| format!("Environment '{alias}' not found in zoi.yaml"))?
+            .ok_or_else(|| anyhow!("Environment '{alias}' not found in zoi.yaml"))?
             .clone(),
         None => {
             let selections: Vec<&str> = config
@@ -31,7 +28,7 @@ pub fn setup(
                 .items(&selections)
                 .default(0)
                 .interact_opt()?
-                .ok_or("No environment chosen.")?;
+                .ok_or(anyhow!("No environment chosen."))?;
 
             config.environments[selection].clone()
         }
@@ -53,7 +50,7 @@ pub fn setup(
             .or_else(|| p.get("default"))
             .cloned()
             .ok_or_else(|| {
-                format!(
+                anyhow!(
                     "No commands found for platform '{}' and no default specified",
                     platform
                 )
@@ -76,7 +73,7 @@ pub fn setup(
     Ok(())
 }
 
-fn check_packages(config: &config::ProjectConfig) -> Result<(), Box<dyn Error>> {
+fn check_packages(config: &config::ProjectConfig) -> Result<()> {
     if config.packages.is_empty() {
         return Ok(());
     }
@@ -96,7 +93,7 @@ fn check_packages(config: &config::ProjectConfig) -> Result<(), Box<dyn Error>> 
         }
     }
     if !all_ok {
-        return Err("One or more required packages are missing.".into());
+        return Err(anyhow!("One or more required packages are missing."));
     }
     Ok(())
 }

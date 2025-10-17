@@ -1,6 +1,6 @@
+use anyhow::{Result, anyhow};
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::error::Error;
 use std::fs;
 use std::path::Path;
 
@@ -76,10 +76,12 @@ pub struct EnvironmentSpec {
     pub env: PlatformOrEnvMap,
 }
 
-pub fn load() -> Result<ProjectConfig, Box<dyn Error>> {
+pub fn load() -> Result<ProjectConfig> {
     let config_path = Path::new("zoi.yaml");
     if !config_path.exists() {
-        return Err("No 'zoi.yaml' file found in the current directory.".into());
+        return Err(anyhow!(
+            "No 'zoi.yaml' file found in the current directory."
+        ));
     }
 
     let content = fs::read_to_string(config_path)?;
@@ -87,10 +89,12 @@ pub fn load() -> Result<ProjectConfig, Box<dyn Error>> {
     Ok(config)
 }
 
-pub fn add_packages_to_config(packages: &[String]) -> Result<(), Box<dyn Error>> {
+pub fn add_packages_to_config(packages: &[String]) -> Result<()> {
     let config_path = Path::new("zoi.yaml");
     if !config_path.exists() {
-        return Err("No 'zoi.yaml' file found in the current directory.".into());
+        return Err(anyhow!(
+            "No 'zoi.yaml' file found in the current directory."
+        ));
     }
 
     let content = fs::read_to_string(config_path)?;
