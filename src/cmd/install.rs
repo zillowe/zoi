@@ -1,8 +1,6 @@
-use crate::pkg::{install, resolve, types};
+use crate::pkg::{config, install, resolve, types};
 use crate::project;
-use crate::utils;
 use colored::Colorize;
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use std::collections::HashSet;
 use std::sync::Mutex;
@@ -156,13 +154,24 @@ pub fn run(
         }
         return;
     }
+
+    let config = config::read_config().unwrap_or_default();
+
+    let parallel_jobs = config.parallel_jobs.unwrap_or(3);
+
+    if parallel_jobs > 0 {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(parallel_jobs)
+            .build_global()
+            .unwrap();
+    }
+
     let mode = install::InstallMode::PreferPrebuilt;
 
     let failed_packages = Mutex::new(Vec::new());
-    let successfully_installed_sources = Mutex::new(Vec::new());
-    let processed_deps = Mutex::new(HashSet::new());
 
     let mut temp_files = Vec::new();
+
     let mut sources_to_process: Vec<String> = Vec::new();
 
     for source in sources {
@@ -178,6 +187,7 @@ pub fn run(
                     source,
                     e
                 );
+
                 failed_packages.lock().unwrap().push(source.to_string());
             }
         } else {
@@ -185,87 +195,117 @@ pub fn run(
         }
     }
 
-    let m = MultiProgress::new();
+    let successfully_installed_sources = Mutex::new(Vec::new());
 
-    sources_to_process.par_iter().for_each(|source| {
-        let pb = m.add(ProgressBar::new_spinner());
-        pb.enable_steady_tick(std::time::Duration::from_millis(120));
-        pb.set_style(
-            ProgressStyle::default_spinner()
-                .template("{spinner:.green} {msg}")
-                .unwrap(),
+    println!("{}", "Resolving dependencies...".bold());
+
+    let graph = match install::resolver::resolve_dependency_graph(
+        &sources_to_process,
+        scope_override,
+        force,
+        yes,
+        all_optional,
+    ) {
+        Ok(g) => g,
+
+        Err(e) => {
+            eprintln!("{}: {}", "Failed to resolve dependencies".red().bold(), e);
+
+            std::process::exit(1);
+        }
+    };
+
+    let stages = match graph.toposort() {
+        Ok(s) => s,
+
+        Err(e) => {
+            eprintln!("{}: {}", "Failed to sort dependencies".red().bold(), e);
+
+            std::process::exit(1);
+        }
+    };
+
+    println!("\nStarting installation...");
+
+    for (i, stage) in stages.iter().enumerate() {
+        println!(
+            "--- Installing Stage {}/{} ({} packages) ---",
+            i + 1,
+            stages.len(),
+            stage.len()
         );
-        pb.set_message(format!("Installing package: {}", source.cyan().bold()));
 
-        let installation_logic = || -> anyhow::Result<()> {
-            let resolved_source = resolve::resolve_source(source)?;
+        stage.par_iter().for_each(|pkg_id| {
+            let node = graph.nodes.get(pkg_id).unwrap();
 
-            utils::confirm_untrusted_source(&resolved_source.source_type, yes)?;
+            println!("Installing {}...", node.pkg.name.cyan());
 
-            if let Some(repo_name) = &resolved_source.repo_name {
-                utils::print_repo_warning(repo_name);
-            }
+            match install::installer::install_node(node, mode, None) {
+                Ok(_) => {
+                    println!("Successfully installed {}", node.pkg.name.green());
 
-            install::run_installation(
-                source,
-                mode.clone(),
-                force,
-                types::InstallReason::Direct,
-                yes,
-                all_optional,
-                &processed_deps,
-                scope_override,
-                Some(&m),
-            )
-        };
+                    if matches!(node.reason, types::InstallReason::Direct) {
+                        successfully_installed_sources
+                            .lock()
+                            .unwrap()
+                            .push(node.source.clone());
+                    }
+                }
 
-        match installation_logic() {
-            Ok(_) => {
-                pb.finish_with_message(format!("Successfully installed {}", source.cyan().bold()));
-                successfully_installed_sources
-                    .lock()
-                    .unwrap()
-                    .push(source.clone());
-            }
-            Err(e) => {
-                pb.finish_with_message(format!("Failed to install {}", source.red().bold()));
-                if e.to_string().contains("aborted by user") {
-                    eprintln!("\n{}", e.to_string().yellow());
-                } else {
+                Err(e) => {
                     eprintln!(
-                        "{}: Failed to install '{}': {}",
+                        "{}: Failed to install {}: {}",
                         "Error".red().bold(),
-                        source,
+                        node.pkg.name,
                         e
                     );
+
+                    failed_packages.lock().unwrap().push(node.pkg.name.clone());
                 }
-                failed_packages.lock().unwrap().push(source.to_string());
             }
+        });
+
+        let failed = failed_packages.lock().unwrap();
+
+        if !failed.is_empty() {
+            eprintln!(
+                "\n{}: Installation failed at stage {}.",
+                "Error".red().bold(),
+                i + 1
+            );
+
+            break;
         }
-    });
+    }
 
     let failed_packages = failed_packages.into_inner().unwrap();
-    let successfully_installed_sources = successfully_installed_sources.into_inner().unwrap();
-
-    if save
-        && scope_override == Some(types::Scope::Project)
-        && let Err(e) = project::config::add_packages_to_config(&successfully_installed_sources)
-    {
-        eprintln!(
-            "{}: Failed to save packages to zoi.yaml: {}",
-            "Warning".yellow().bold(),
-            e
-        );
-    }
 
     if !failed_packages.is_empty() {
         eprintln!(
             "\n{}: The following packages failed to install:",
             "Error".red().bold()
         );
+
         for pkg in &failed_packages {
             eprintln!("  - {}", pkg);
         }
+
         std::process::exit(1);
     }
+
+    if save && scope_override == Some(types::Scope::Project) {
+        let successfully_installed = successfully_installed_sources.into_inner().unwrap();
+
+        if !successfully_installed.is_empty()
+            && let Err(e) = project::config::add_packages_to_config(&successfully_installed)
+        {
+            eprintln!(
+                "{}: Failed to save packages to zoi.yaml: {}",
+                "Warning".yellow().bold(),
+                e
+            );
+        }
+    }
+
+    println!("\n{}", "Installation complete!".green().bold());
 }

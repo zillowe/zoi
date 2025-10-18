@@ -1663,3 +1663,132 @@ pub fn uninstall_dependency(dep_str: &str, zoi_uninstaller: &ZoiUninstaller) -> 
 
     Ok(())
 }
+
+pub fn prompt_for_options(
+    option_groups: &[types::DependencyOptionGroup],
+    yes: bool,
+) -> Result<Vec<String>> {
+    let mut chosen = Vec::new();
+    if option_groups.is_empty() {
+        return Ok(chosen);
+    }
+
+    for group in option_groups {
+        println!(
+            "[{}] There are {} options available for {}",
+            group.name.bold(),
+            group.depends.len(),
+            group.desc.italic()
+        );
+
+        let parsed_deps: Vec<_> = group
+            .depends
+            .iter()
+            .map(|d| parse_dependency_string(d))
+            .collect::<Result<_>>()?;
+
+        if yes {
+            if group.all {
+                println!("--yes provided, selecting all options for '{}'", group.name);
+                chosen.extend(group.depends.clone());
+            } else {
+                println!(
+                    "--yes provided, selecting first option for '{}'",
+                    group.name
+                );
+                if let Some(dep) = group.depends.first() {
+                    chosen.push(dep.clone());
+                }
+            }
+            continue;
+        }
+
+        if group.all {
+            let items: Vec<_> = parsed_deps
+                .iter()
+                .map(|d| {
+                    format!(
+                        "{}:{} - {}",
+                        d.manager,
+                        d.package,
+                        d.description.unwrap_or("No description")
+                    )
+                })
+                .collect();
+            let selections = dialoguer::MultiSelect::with_theme(&ColorfulTheme::default())
+                .with_prompt("Choose which to install (space to select, enter to confirm)")
+                .items(&items)
+                .interact()?;
+
+            for i in selections {
+                chosen.push(group.depends[i].clone());
+            }
+        } else {
+            let items: Vec<_> = parsed_deps
+                .iter()
+                .map(|d| {
+                    format!(
+                        "{}:{} - {}",
+                        d.manager,
+                        d.package,
+                        d.description.unwrap_or("No description")
+                    )
+                })
+                .collect();
+            let selection = Select::with_theme(&ColorfulTheme::default())
+                .with_prompt("Choose one to install")
+                .items(&items)
+                .default(0)
+                .interact()?;
+            chosen.push(group.depends[selection].clone());
+        }
+    }
+    Ok(chosen)
+}
+
+pub fn prompt_for_optionals(
+    deps: &[String],
+    dep_type: Option<&str>,
+    yes: bool,
+    all_optional: bool,
+) -> Result<Vec<String>> {
+    if deps.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let type_str = dep_type.map(|s| format!("{} ", s)).unwrap_or_default();
+
+    if yes || all_optional {
+        println!("Installing all optional {}dependencies...", type_str);
+        return Ok(deps.to_vec());
+    }
+
+    let items: Vec<_> = deps
+        .iter()
+        .map(|d| {
+            parse_dependency_string(d).map(|dep| {
+                format!(
+                    "{}:{} - {}",
+                    dep.manager,
+                    dep.package,
+                    dep.description.unwrap_or("No description")
+                )
+            })
+        })
+        .collect::<Result<_>>()?;
+
+    let selections = dialoguer::MultiSelect::with_theme(&ColorfulTheme::default())
+        .with_prompt(format!(
+            "Select optional {}dependencies to install",
+            type_str
+        ))
+        .items(&items)
+        .defaults(&vec![false; deps.len()])
+        .interact()?;
+
+    let mut chosen = Vec::new();
+    for i in selections {
+        chosen.push(deps[i].clone());
+    }
+    Ok(chosen)
+}

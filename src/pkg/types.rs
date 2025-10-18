@@ -252,6 +252,8 @@ pub struct Config {
     pub rollback_enabled: bool,
     #[serde(default)]
     pub policy: Policy,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parallel_jobs: Option<usize>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
