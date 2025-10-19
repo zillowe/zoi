@@ -34,6 +34,6 @@ pub fn install_package(
 }
 
 /// Uninstalls a Zoi package.
-pub fn uninstall_package(package_name: &str) -> Result<()> {
-    pkg::uninstall::run(package_name)
+pub fn uninstall_package(package_name: &str, scope_override: Option<Scope>) -> Result<()> {
+    pkg::uninstall::run(package_name, scope_override)
 }

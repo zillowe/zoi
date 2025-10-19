@@ -43,7 +43,9 @@ fn uninstall_collection(
         println!("Uninstalling dependencies of the collection...");
         for dep_str in dependencies_to_uninstall {
             println!("\n--- Uninstalling dependency: {} ---", dep_str.bold());
-            if let Err(e) = dependencies::uninstall_dependency(dep_str, &run) {
+            if let Err(e) =
+                dependencies::uninstall_dependency(dep_str, &move |name| run(name, Some(scope)))
+            {
                 eprintln!(
                     "Warning: Could not uninstall dependency '{}': {}",
                     dep_str, e
@@ -75,23 +77,31 @@ fn uninstall_collection(
     Ok(())
 }
 
-pub fn run(package_name: &str) -> anyhow::Result<()> {
+pub fn run(package_name: &str, scope_override: Option<types::Scope>) -> anyhow::Result<()> {
     let (pkg, _, _, pkg_lua_path, registry_handle) =
         resolve::resolve_package_and_version(package_name)?;
 
-    let (manifest, scope) =
-        if let Some(m) = local::is_package_installed(&pkg.name, types::Scope::Project)? {
-            (m, types::Scope::Project)
-        } else if let Some(m) = local::is_package_installed(&pkg.name, types::Scope::User)? {
-            (m, types::Scope::User)
-        } else if let Some(m) = local::is_package_installed(&pkg.name, types::Scope::System)? {
-            (m, types::Scope::System)
+    let (manifest, scope) = if let Some(scope) = scope_override {
+        if let Some(m) = local::is_package_installed(&pkg.name, scope)? {
+            (m, scope)
         } else {
             return Err(anyhow::anyhow!(
-                "Package '{}' is not installed by Zoi.",
+                "Package '{}' is not installed in the specified scope.",
                 package_name
             ));
-        };
+        }
+    } else if let Some(m) = local::is_package_installed(&pkg.name, types::Scope::Project)? {
+        (m, types::Scope::Project)
+    } else if let Some(m) = local::is_package_installed(&pkg.name, types::Scope::User)? {
+        (m, types::Scope::User)
+    } else if let Some(m) = local::is_package_installed(&pkg.name, types::Scope::System)? {
+        (m, types::Scope::System)
+    } else {
+        return Err(anyhow::anyhow!(
+            "Package '{}' is not installed by Zoi.",
+            package_name
+        ));
+    };
 
     if pkg.package_type == types::PackageType::Collection {
         return uninstall_collection(&pkg, &manifest, scope, registry_handle);

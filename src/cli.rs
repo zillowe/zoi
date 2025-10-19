@@ -288,6 +288,15 @@ enum Commands {
         /// One or more packages to uninstall
         #[arg(value_name = "PACKAGES", required = true, value_parser = PackageValueParser, hide_possible_values = true)]
         packages: Vec<String>,
+        /// The scope to uninstall the package from
+        #[arg(long, value_enum, conflicts_with_all = &["local", "global"])]
+        scope: Option<InstallScope>,
+        /// Uninstall packages from the current project (alias for --scope=project)
+        #[arg(long, conflicts_with = "global")]
+        local: bool,
+        /// Uninstall packages globally for the current user (alias for --scope=user)
+        #[arg(long)]
+        global: bool,
     },
 
     /// Execute a command defined in a local zoi.yaml file
@@ -683,8 +692,13 @@ pub fn run() {
                 cmd::build::run(&sources, force, cli.yes);
                 Ok(())
             }
-            Commands::Uninstall { packages } => {
-                cmd::uninstall::run(&packages);
+            Commands::Uninstall {
+                packages,
+                scope,
+                local,
+                global,
+            } => {
+                cmd::uninstall::run(&packages, scope, local, global);
                 Ok(())
             }
             Commands::Run { cmd_alias, args } => {
