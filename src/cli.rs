@@ -327,10 +327,6 @@ enum Commands {
     Upgrade {
         /// Force a full download, skipping the patch-based upgrade
         #[arg(long)]
-        full: bool,
-
-        /// Force the upgrade even if the version is the same
-        #[arg(long)]
         force: bool,
 
         /// Upgrade to a specific git tag
@@ -713,13 +709,8 @@ pub fn run() {
                 cmd::env::run(env_alias);
                 Ok(())
             }
-            Commands::Upgrade {
-                full,
-                force,
-                tag,
-                branch,
-            } => {
-                cmd::upgrade::run(BRANCH, STATUS, NUMBER, full, force, tag, branch);
+            Commands::Upgrade { force, tag, branch } => {
+                cmd::upgrade::run(BRANCH, STATUS, NUMBER, force, tag, branch);
                 Ok(())
             }
             Commands::Autoremove => {

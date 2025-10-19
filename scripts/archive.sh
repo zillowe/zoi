@@ -32,7 +32,6 @@ function sign_file() {
 
 check_command "7z"
 check_command "zstd"
-check_command "bsdiff"
 check_command "curl"
 check_command "jq"
 check_command "gpg"
@@ -153,56 +152,6 @@ for binary_path in "$COMPILED_DIR"/*; do
     rm -rf "$TMP_ARCHIVE_DIR"
 done
 
-echo -e "${CYAN}🔗 Generating binary diffs...${NC}"
-
-if [ -z "$LATEST_TAG" ]; then
-    echo -e "${YELLOW}Could not fetch the latest release tag. This might be because:${NC}"
-    echo -e "${YELLOW}  - No releases exist yet${NC}"
-    echo -e "${YELLOW}  - API requires authentication${NC}"
-    echo -e "${YELLOW}  - Network connectivity issues${NC}"
-    echo -e "${YELLOW}Skipping diff generation.${NC}"
-else
-    echo -e "${CYAN}Latest tag found: ${LATEST_TAG}${NC}"
-    
-    for new_binary_path in "$COMPILED_DIR"/*; do
-        filename=$(basename "$new_binary_path")
-        if [[ "$filename" == *"windows"* ]]; then
-            archive_name="${filename%.exe}.zip"
-            old_bin_name="zoi.exe"
-        else
-            archive_name="${filename}.tar.zst"
-            old_bin_name="zoi"
-        fi
-
-        OLD_ARCHIVE_URL="https://gitlab.com/${GITLAB_PROJECT_PATH}/-/releases/${LATEST_TAG}/downloads/${archive_name}"
-        OLD_ARCHIVE_TMP=$(mktemp)
-        OLD_EXTRACT_DIR=$(mktemp -d)
-
-        echo -e "  -> Downloading old archive for ${filename} from ${LATEST_TAG}..."
-        if curl --fail -sL -o "$OLD_ARCHIVE_TMP" "$OLD_ARCHIVE_URL"; then
-            echo -e "  -> Extracting old archive..."
-            if [[ "$archive_name" == *.zip ]]; then
-                7z x -y -o"$OLD_EXTRACT_DIR" "$OLD_ARCHIVE_TMP" >/dev/null
-            else
-                tar --use-compress-program=zstd -xf "$OLD_ARCHIVE_TMP" -C "$OLD_EXTRACT_DIR"
-            fi
-
-            OLD_BINARY_PATH="${OLD_EXTRACT_DIR}/${old_bin_name}"
-            if [[ ! -f "$OLD_BINARY_PATH" ]]; then
-                echo -e "${YELLOW}  -> Could not locate old binary (${old_bin_name}) inside archive. Skipping patch for ${filename}.${NC}"
-            else
-                PATCH_FILE="${ARCHIVE_DIR}/${filename}.patch"
-                echo -e "  -> Creating patch (old binary -> new binary) for ${filename}..."
-                bsdiff "$OLD_BINARY_PATH" "$new_binary_path" "$PATCH_FILE"
-                sign_file "$PATCH_FILE"
-            fi
-        else
-            echo -e "${YELLOW}  -> Could not download old archive for ${filename}. Skipping patch.${NC}"
-        fi
-        rm -rf "$OLD_ARCHIVE_TMP" "$OLD_EXTRACT_DIR"
-    done
-fi
-
 echo -e "${CYAN}🔐 Generating sha512 checksums...${NC}"
 (
   cd "$ARCHIVE_DIR" || exit 1
@@ -242,6 +191,6 @@ fi
 sign_file "$CHECKSUM_FILE"
 sign_file "$CHECKSUM_SHA256_FILE"
 
-echo -e "\n${GREEN}✅ Archiving, diffing, and checksum generation complete!${NC}"
+echo -e "\n${GREEN}✅ Archiving and checksum generation complete!${NC}"
 echo -e "${CYAN}Output files are in the '${ARCHIVE_DIR}' directory.${NC}"
 ls -lh "$ARCHIVE_DIR"

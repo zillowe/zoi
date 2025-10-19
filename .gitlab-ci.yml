@@ -122,7 +122,7 @@ package:archive:
   stage: package
   image: ubuntu:latest
   before_script:
-    - apt-get update -y && apt-get install -y p7zip-full tar zstd bsdiff curl git jq unzip gnupg coreutils
+    - apt-get update -y && apt-get install -y p7zip-full tar zstd curl git jq unzip gnupg coreutils
   script:
     - |
       set -euo pipefail

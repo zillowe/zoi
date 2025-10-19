@@ -1,5 +1,4 @@
 use anyhow::{Result, anyhow};
-use bsdiff;
 use colored::*;
 use dirs;
 use hex;
@@ -8,8 +7,8 @@ use self_update::self_replace;
 use serde::Deserialize;
 use sha2::{Digest, Sha512};
 use std::env;
-use std::fs::{self, File};
-use std::io::{self, Cursor, Read, Write};
+use std::fs::File;
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use tar::Archive;
 use tempfile::Builder;
@@ -51,43 +50,6 @@ fn get_latest_tag(branch_prefix: &str) -> Result<String> {
 
 fn download_file(url: &str, path: &Path) -> Result<()> {
     let mut response = reqwest::blocking::get(url)?;
-    if !response.status().is_success() {
-        return Err(anyhow!(
-            "Failed to download file: HTTP {}",
-            response.status()
-        ));
-    }
-
-    let total_size = response.content_length().unwrap_or(0);
-    let pb = ProgressBar::new(total_size);
-    pb.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})")?
-        .progress_chars("#>- "));
-
-    let mut dest = File::create(path)?;
-    let mut buffer = [0; 8192];
-
-    loop {
-        let bytes_read = response.read(&mut buffer)?;
-        if bytes_read == 0 {
-            break;
-        }
-        dest.write_all(&buffer[..bytes_read])?;
-        pb.inc(bytes_read as u64);
-    }
-
-    pb.finish_with_message("Download complete.");
-    Ok(())
-}
-
-fn download_patch_file(url: &str, path: &Path) -> Result<()> {
-    let client = reqwest::blocking::Client::builder()
-        .user_agent("Zoi-Upgrader")
-        .no_gzip()
-        .no_brotli()
-        .no_deflate()
-        .build()?;
-    let mut response = client.get(url).send()?;
     if !response.status().is_success() {
         return Err(anyhow!(
             "Failed to download file: HTTP {}",
@@ -172,51 +134,6 @@ fn get_platform_info() -> Result<(&'static str, &'static str)> {
     Ok((os, arch))
 }
 
-fn attempt_patch_upgrade(
-    base_url: &str,
-    bin_checksums: &str,
-    patch_checksums: &str,
-    patch_filename: &str,
-    new_binary_checksum_name: &str,
-) -> Result<PathBuf> {
-    println!(
-        "
-Attempting patch-based upgrade (bsdiff)..."
-    );
-    let temp_dir = Builder::new().prefix("zoi-patch-upgrade").tempdir()?;
-
-    let patch_url = format!("{}/{}", base_url, patch_filename);
-    let patch_path = temp_dir.path().join(patch_filename);
-    println!("Downloading patch from: {}", patch_url);
-    download_patch_file(&patch_url, &patch_path)?;
-    verify_checksum(&patch_path, patch_checksums, patch_filename)?;
-
-    println!("Reading current executable to apply patch...");
-    let old_data = fs::read(env::current_exe()?)?;
-    let patch_data = fs::read(&patch_path)?;
-
-    println!("Applying patch to derive new binary...");
-    let mut new_binary_data = Vec::new();
-    let mut patch_reader = Cursor::new(patch_data);
-    bsdiff::patch(&old_data, &mut patch_reader, &mut new_binary_data)?;
-
-    let new_binary_temp_path = temp_dir.path().join(if cfg!(target_os = "windows") {
-        "zoi.exe"
-    } else {
-        "zoi"
-    });
-    fs::write(&new_binary_temp_path, &new_binary_data)?;
-
-    println!("Verifying patched binary...");
-    verify_checksum(
-        &new_binary_temp_path,
-        bin_checksums,
-        new_binary_checksum_name,
-    )?;
-
-    Ok(new_binary_temp_path)
-}
-
 fn fallback_full_upgrade(
     base_url: &str,
     checksums_content: &str,
@@ -253,7 +170,6 @@ pub fn run(
     branch: &str,
     status: &str,
     number: &str,
-    full: bool,
     force: bool,
     tag: Option<String>,
     custom_branch: Option<String>,
@@ -356,19 +272,10 @@ pub fn run(
     }
 
     let (os, arch) = get_platform_info()?;
-    let patch_filename = if os == "windows" {
-        format!("zoi-{}-{}.exe.patch", os, arch)
-    } else {
-        format!("zoi-{}-{}.patch", os, arch)
-    };
 
     let base_url =
         format!("https://gitlab.com/{GITLAB_PROJECT_PATH}/-/releases/{latest_tag}/downloads");
-    let checksums_bin_url = format!("{base_url}/checksums-bin.txt");
     let checksums_txt_url = format!("{base_url}/checksums.txt");
-
-    println!("Downloading binary checksums from: {}", checksums_bin_url);
-    let checksums_bin_content = reqwest::blocking::get(&checksums_bin_url)?.text()?;
 
     println!(
         "Downloading archive and patch checksums from: {}",
@@ -376,37 +283,7 @@ pub fn run(
     );
     let checksums_txt_content = reqwest::blocking::get(&checksums_txt_url)?.text()?;
 
-    let new_binary_checksum_name = format!("zoi-{}-{}-v{}", os, arch, latest_version_str);
-
-    let new_binary_path = if full {
-        println!(
-            "
-Full flag specified, forcing full download..."
-        );
-        fallback_full_upgrade(&base_url, &checksums_txt_content, os, arch)?
-    } else {
-        match attempt_patch_upgrade(
-            &base_url,
-            &checksums_bin_content,
-            &checksums_txt_content,
-            &patch_filename,
-            &new_binary_checksum_name,
-        ) {
-            Ok(path) => {
-                println!("{}", "Patch upgrade successful!".green());
-                path
-            }
-            Err(e) => {
-                println!(
-                    "{}: {}. {}",
-                    "Patch upgrade failed".yellow(),
-                    e,
-                    "Attempting full download.".yellow()
-                );
-                fallback_full_upgrade(&base_url, &checksums_txt_content, os, arch)?
-            }
-        }
-    };
+    let new_binary_path = fallback_full_upgrade(&base_url, &checksums_txt_content, os, arch)?;
 
     println!("Replacing current executable...");
     self_replace::self_replace(&new_binary_path)?;
