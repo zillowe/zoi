@@ -44,16 +44,21 @@ Zoi is packed with features designed to make package management and environment 
   - `zoi package install`: Install a package from a local archive for testing.
 
 - **Powerful CLI Tools:** Zoi offers a rich set of commands for package management and inspection:
-  - `zoi man`: Read package manuals directly in the terminal.
-  - `zoi why`: Understand why a specific package is installed (e.g. as a dependency).
-  - `zoi rollback`: Revert a package to its previously installed version or the entire last transaction.
-  - `zoi pin`: Lock a package to a specific version to prevent updates.
-  - `zoi exec`: Download and run a package's binary in a temporary cache without a full installation.
-  - `zoi clean`: Clear the cache of downloaded package binaries.
+  - `zoi about`: Show application information, credits, and build details.
   - `zoi autoremove`: Remove packages that were installed as dependencies but are no longer needed.
+  - `zoi check`: Verify that essential third-party tools (like `git`) are installed.
+  - `zoi clean`: Clear the cache of downloaded package binaries.
+  - `zoi exec`: Download and run a package's binary in a temporary cache without a full installation.
   - `zoi files`: List all files owned by an installed package.
-  - `zoi owner`: Find which package owns a specific file on the system.
   - `zoi info`: Display detected system information, including OS, architecture, and available package managers.
+  - `zoi list`: List all installed packages, or all available packages from active repositories.
+  - `zoi man`: Read package manuals directly in the terminal.
+  - `zoi owner`: Find which package owns a specific file on the system.
+  - `zoi pin`: Lock a package to a specific version to prevent updates.
+  - `zoi rollback`: Revert a package to its previously installed version or the entire last transaction.
+  - `zoi unpin`: Unpin a package, allowing it to be updated again.
+  - `zoi version`: Print concise version and build information.
+  - `zoi why`: Understand why a specific package is installed (e.g. as a dependency).
 
 - **Shell Integration:**
   - `zoi setup`: Automatically configures your shell's PATH for Zoi.
