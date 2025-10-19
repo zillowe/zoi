@@ -266,19 +266,6 @@ enum Commands {
         save: bool,
     },
 
-    /// Builds and installs one or more packages from a name, local file, or URL
-    #[command(
-        long_about = "Builds one or more packages from various sources using the 'source' installation method:\n- A package name from the database (e.g. 'vim')\n- A local .pkg.lua file (e.g. './my-package.pkg.lua')\n- A URL pointing to a raw .pkg.lua file"
-    )]
-    Build {
-        /// Package names, local paths, or URLs to .pkg.lua files
-        #[arg(value_name = "SOURCES", required = true, value_hint = ValueHint::FilePath, value_parser = PkgOrPathParser, hide_possible_values = true)]
-        sources: Vec<String>,
-        /// Force re-installation even if the package is already installed
-        #[arg(long)]
-        force: bool,
-    },
-
     /// Uninstalls one or more packages previously installed by Zoi
     #[command(
         aliases = ["un", "rm", "remove"],
@@ -686,10 +673,6 @@ pub fn run() {
                     global,
                     save,
                 );
-                Ok(())
-            }
-            Commands::Build { sources, force } => {
-                cmd::build::run(&sources, force, cli.yes);
                 Ok(())
             }
             Commands::Uninstall {
