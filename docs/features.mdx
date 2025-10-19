@@ -1,0 +1,162 @@
+---
+title: Features & Usage
+description: A comprehensive list of Zoi's features and command examples.
+---
+
+Zoi is packed with features designed to make package management and environment setup seamless and powerful across all your systems.
+
+## Core Features
+
+- **Cross-Platform:** Works natively on Linux, macOS, and Windows, supporting `amd64` and `arm64` architectures. Write one package definition and let Zoi handle the platform differences.
+
+- **Dynamic Package Definitions:** Packages are defined using `.pkg.lua` scripts, offering unparalleled flexibility. Use Lua to dynamically determine download URLs, set up build steps, and handle platform-specific logic.
+
+- **Universal Package Support:** Install software from any source:
+  - Pre-compiled binaries
+  - Compressed archives (`.tar.gz`, `.zip`, `.tar.xz`, etc.)
+  - Build from source code
+
+- **Extensive Dependency Management:** Zoi integrates with over 40 external package managers. You can define dependencies from `apt`, `brew`, `cargo`, `npm`, `pip`, `go`, `zig`, and many more, and Zoi will install them using the native manager, [learn more](/docs/zds/zoi/dependencies).
+
+- **Rich Dependencies:** Go beyond simple lists. Define `runtime` and `build` dependencies with:
+  - `required`: Dependencies that are always installed.
+  - `optional`: Dependencies that the user is prompted to install.
+  - `options`: Groups of dependencies where the user can select one or more.
+
+- **Project-Level Environments:** Use a `zoi.yaml` file in your project root to define custom commands and development environments. Manage project-specific tasks, tools, packages, and environment variables with `zoi run` and `zoi env`, [learn more](/docs/zds/zoi/project-config).
+
+- **Repository-Based System:** Zoi uses Git-based repositories to store package definitions. Use the official Zoidberg registry, add community repositories, or create your own private or public repositories with `zoi repo add`.
+
+- **Secure and Verifiable:** Ensure the integrity and authenticity of your packages:
+  - **Checksums:** Verify downloads against `SHA512`, `SHA256`, or `MD5` hashes.
+  - **GPG Signatures:** Verify package archives against maintainer PGP keys. Manage keys easily with the `zoi pgp` command set.
+
+## Advanced Capabilities
+
+- **Versatile Package Types:** Zoi supports more than just standard applications:
+  - `Package`: A standard software package.
+  - `Collection`: A metapackage that groups other packages together.
+  - `App`: A template for bootstrapping new projects (`zoi create`).
+  - `Extension`: A package that modifies Zoi's own configuration.
+
+- **Local Package Development:** A dedicated `zoi package` command set streamlines the creation and testing of packages locally:
+  - `zoi package build`: Build a distributable package archive (`.pkg.tar.zst`).
+  - `zoi package install`: Install a package from a local archive for testing.
+
+- **Powerful CLI Tools:** Zoi offers a rich set of commands for package management and inspection:
+  - `zoi man`: Read package manuals directly in the terminal.
+  - `zoi why`: Understand why a specific package is installed (e.g. as a dependency).
+  - `zoi rollback`: Revert a package to its previously installed version or the entire last transaction.
+  - `zoi pin`: Lock a package to a specific version to prevent updates.
+  - `zoi exec`: Download and run a package's binary in a temporary cache without a full installation.
+  - `zoi clean`: Clear the cache of downloaded package binaries.
+  - `zoi autoremove`: Remove packages that were installed as dependencies but are no longer needed.
+  - `zoi files`: List all files owned by an installed package.
+  - `zoi owner`: Find which package owns a specific file on the system.
+  - `zoi info`: Display detected system information, including OS, architecture, and available package managers.
+
+- **Shell Integration:**
+  - `zoi setup`: Automatically configures your shell's PATH for Zoi.
+  - `zoi shell`: Installs shell completion scripts for Bash, Zsh, Fish, and more.
+
+- **Library Support:** Use `zoi` as a Rust library in your own applications to programmatically manage packages. The `zoi-rs` crate is available on [crates.io](https://crates.io/crates/zoi-rs), [learn more](/docs/zds/zoi/lib).
+
+## Usage Examples
+
+Here are some common commands to get you started.
+
+- **Install a package:**
+
+  ```sh
+  zoi install <package_name>
+  ```
+
+- **Uninstall a package:**
+
+  ```sh
+  zoi uninstall <package_name>
+  ```
+
+- **Update packages:**
+
+  ```sh
+  # Update all installed packages
+  zoi update --all
+
+  # Update specific packages
+  zoi update <package1> <package2>
+  ```
+
+- **Search for a package:**
+
+  ```sh
+  zoi search <term>
+  ```
+
+- **Show package details:**
+
+  ```sh
+  zoi show <package_name>
+  ```
+
+- **Run a project command:**
+
+  ```sh
+  # Run a command defined in zoi.yaml
+  zoi run <command_alias>
+  ```
+
+- **Update Zoi to the latest version:**
+
+  ```sh
+  zoi upgrade
+  ```
+
+### Advanced Examples
+
+- **Execute a package without installing it:**
+
+  ```sh
+  zoi exec <package_name> -- <args_for_the_package>
+  ```
+
+- **See why a package is installed:**
+
+  ```sh
+  zoi why <package_name>
+  ```
+
+- **Pin a package to a specific version:**
+
+  ```sh
+  # Pinning prevents 'zoi update' from changing this package
+  zoi pin <package_name> 1.2.3
+  ```
+
+- **Rollback a package to its previous version:**
+
+  ```sh
+  zoi rollback <package_name>
+  ```
+
+- **Manage repositories:**
+
+  ```sh
+  # List all configured repositories
+  zoi repo list
+
+  # List all available repositories from the default registry
+  zoi repo list all
+
+  # Add a repository from a git URL
+  zoi repo add https://github.com/<user_name>/<repo_name>.git
+
+  # Remove a repository
+  zoi repo rm <repo_name>
+  ```
+
+- **Install a package to a project and save it to `zoi.yaml`:**
+
+  ```sh
+  zoi install --local --save <package_name>
+  ```

@@ -159,7 +159,7 @@ fn install_dependency(
         "pkg_add" => os == "openbsd",
         "zoi" | "cargo" | "native" | "go" | "npm" | "deno" | "jsr" | "bun" | "pip" | "pipx"
         | "cargo-binstall" | "gem" | "yarn" | "pnpm" | "composer" | "dotnet" | "nix" | "conda"
-        | "script" | "volta" => true,
+        | "script" | "volta" | "uv" | "dart-pub" => true,
         _ => false,
     };
 
@@ -588,7 +588,7 @@ fn install_dependency(
                 ));
             }
         }
-        "yay" | "paru" => {
+        "yay" | "paru" | "pikaur" | "trizen" => {
             if dep.version_str.is_some() {
                 println!(
                     "{} Version specifications for {} are not supported. Installing latest.",
@@ -1495,6 +1495,10 @@ pub fn uninstall_dependency(dep_str: &str, zoi_uninstaller: &ZoiUninstaller) -> 
             println!("Skipping uninstall for Volta, please remove binary manually.");
             return Ok(());
         }
+        "uv" => {
+            println!("Skipping uninstall for uv, please remove binary manually.");
+            return Ok(());
+        }
         "pip" | "pipx" => Command::new(manager)
             .arg("uninstall")
             .arg(dep.package)
@@ -1535,7 +1539,7 @@ pub fn uninstall_dependency(dep_str: &str, zoi_uninstaller: &ZoiUninstaller) -> 
             .arg("--noconfirm")
             .arg(dep.package)
             .status()?,
-        "yay" | "paru" => Command::new(manager)
+        "yay" | "paru" | "pikaur" | "trizen" => Command::new(manager)
             .arg("-Rns")
             .arg("--noconfirm")
             .arg(dep.package)

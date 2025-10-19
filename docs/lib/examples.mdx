@@ -5,156 +5,95 @@ description: Practical examples of how to use the Zoi library in your Rust code.
 
 This page provides practical, copy-paste-ready examples for using Zoi's library features.
 
-## Basic Package Installation
+## Building a Package
 
-This example demonstrates the most common use case: installing a package using the default settings. We will install the `hello` package, automatically confirming any prompts.
-
-### Code
-
-```rust
-use zoi::{install, InstallMode, types::InstallReason};
-
-fn main() {
-    let package_source = "hello";
-
-    println!("Attempting to install '{}'...", package_source);
-
-    // Call the install function with default preferences.
-    let result = zoi::install(
-        package_source,
-        InstallMode::PreferBinary, // Try to get a binary, fall back to source.
-        false,                     // Don't force re-installation.
-        InstallReason::Direct,     // This is a direct request from the user.
-        true,                      // `non_interactive`: Automatically say "yes" to any prompts.
-    );
-
-    // Check the result and print a message.
-    match result {
-        Ok(()) => println!("'{}' was installed successfully!", package_source),
-        Err(e) => eprintln!("Error installing '{}': {}", package_source, e),
-    }
-}
-```
-
-## Listing Installed Packages
-
-You can easily get a list of all packages currently installed by Zoi.
+This example demonstrates how to build a package from a `.pkg.lua` file. This will create a distributable package archive (`.pkg.tar.zst`).
 
 ### Code
 
 ```rust
-use zoi::get_installed_packages;
+use zoi::{build, Scope};
+use std::path::Path;
+use anyhow::Result;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Fetching installed packages...");
-    let installed_packages = get_installed_packages()?;
+fn main() -> Result<()> {
+    // Path to your package definition file.
+    let package_file = Path::new("path/to/your/package.pkg.lua");
 
-    if installed_packages.is_empty() {
-        println!("No packages are installed.");
-    } else {
-        println!("Installed packages:");
-        for pkg in installed_packages {
-            println!(
-                "- {} (Version: {}, Repo: {}, Scope: {:?})",
-                pkg.name,
-                pkg.version,
-                pkg.repo,
-                pkg.scope
-            );
-        }
-    }
-    Ok(())
-}
-```
+    // Specify the build type, e.g. "source" or "pre-compiled".
+    let build_type = "source";
 
-## Resolving Package Information
+    // Specify the target platforms.
+    let platforms = vec!["linux-amd64".to_string()];
 
-Before installing, you might want to inspect a package's metadata.
+    // Optionally, provide a PGP key to sign the package.
+    let sign_key = Some("YourPgpKeyNameOrFingerprint".to_string());
 
-### Code
+    println!("Building package: {}", package_file.display());
 
-```rust
-use zoi::resolve_package;
+    // Call the build function.
+    build(package_file, build_type, &platforms, sign_key)?;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let package_source = "git";
-    println!("Resolving package info for '{}'...", package_source);
-
-    match resolve_package(package_source) {
-        Ok(pkg) => {
-            println!("Successfully resolved package: {}", pkg.name);
-            println!("  Description: {}", pkg.description);
-            println!("  License: {}", pkg.license);
-            println!("  Maintainer: {} <{}>", pkg.maintainer.name, pkg.maintainer.email);
-        }
-        Err(e) => eprintln!("Error resolving package: {}", e),
-    }
+    println!("Package built successfully!");
 
     Ok(())
 }
 ```
 
-## Updating a Package
+## Installing a Package
 
-This example shows how to check for and apply updates to an installed package.
+This example shows how to install a package from a local archive file that you have either built or downloaded.
 
 ### Code
 
 ```rust
-use zoi::{update, UpdateResult};
+use zoi::{install_package, Scope};
+use std::path::Path;
+use anyhow::Result;
 
-fn main() {
-    let package_source = "hello";
+fn main() -> Result<()> {
+    // Path to the package archive.
+    let archive_path = Path::new("path/to/your/package-1.0.0-linux-amd64.pkg.tar.zst");
 
-    println!("Checking for updates for '{}'...", package_source);
+    // Optionally override the installation scope.
+    let scope = Some(Scope::User);
 
-    // Call the update function.
-    match zoi::update(package_source, true) {
-        Ok(result) => match result {
-            UpdateResult::Updated { from, to } => {
-                println!("Successfully updated '{}' from v{} to v{}", package_source, from, to);
-            }
-            UpdateResult::AlreadyUpToDate => {
-                println!("'{}' is already up to date.", package_source);
-            }
-            UpdateResult::Pinned => {
-                println!("'{}' is pinned and was not updated.", package_source);
-            }
-        },
-        Err(e) => {
-            // This can happen if the package is not installed,
-            // or if the user cancels the update prompt.
-            eprintln!("Error updating '{}': {}", package_source, e);
-        }
-    }
+    // Specify the registry handle. Use "local" if it's not from a registry.
+    let registry_handle = "local";
+
+    println!("Installing from archive: {}", archive_path.display());
+
+    // Call the install function.
+    let installed_files = install_package(archive_path, scope, registry_handle)?;
+
+    println!("Package installed successfully. {} files were installed.", installed_files.len());
+
+    Ok(())
 }
 ```
 
-## Pinning a Package
+## Uninstalling a Package
 
-Pinning a package prevents it from being accidentally updated.
+This example demonstrates how to programmatically uninstall a package.
 
 ### Code
 
 ```rust
-use zoi::{pin, unpin, get_pinned_packages};
+use zoi::{uninstall_package, Scope};
+use anyhow::Result;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let package_to_pin = "hello";
-    let version_to_pin = "1.0.0";
+fn main() -> Result<()> {
+    let package_name = "my-package-name";
 
-    println!("Pinning {} to version {}", package_to_pin, version_to_pin);
-    pin(package_to_pin, version_to_pin)?;
+    // Optionally specify the scope from which to uninstall.
+    let scope = Some(Scope::User);
 
-    println!("\nCurrently pinned packages:");
-    let pinned = get_pinned_packages()?;
-    for p in &pinned {
-        println!("- {}@{}", p.name, p.version);
-    }
+    println!("Uninstalling package: {}", package_name);
 
-    println!("\nUnpinning {}...", package_to_pin);
-    unpin(package_to_pin)?;
-    println!("'{}' has been unpinned.", package_to_pin);
+    // Call the uninstall function.
+    uninstall_package(package_name, scope)?;
+
+    println!("Package '{}' uninstalled successfully.", package_name);
 
     Ok(())
 }

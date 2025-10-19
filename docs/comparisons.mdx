@@ -1,0 +1,27 @@
+---
+title: Comparisons
+description: How Zoi compares to other popular package managers like Pacman, APT, and Nix.
+---
+
+Zoi is a universal package manager that can be thought of as a meta-package manager or a package-manager-manager. It leverages existing system and language-specific package managers to install dependencies, but manages its own packages in a sandboxed way.
+
+This page compares Zoi to some other popular package managers.
+
+| Feature                   | Zoi                                                                                                              | Pacman (Arch Linux)                                              | APT (Debian/Ubuntu)                                  | Nix                                                                                              |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| **Type**                  | Universal / Meta                                                                                                 | OS-specific (Arch Linux)                                         | OS-specific (Debian-based)                           | Universal                                                                                        |
+| **Package Definition**    | `.pkg.lua` (Lua script)                                                                                          | `PKGBUILD` (Shell script)                                        | `debian/` directory                                  | `.nix` expression                                                                                |
+| **Dependency Management** | Leverages system/language managers. Installs its own packages to `~/.zoi/pkgs/store`.                            | System-wide, managed by Pacman.                                  | System-wide, managed by APT.                         | Purely functional. Dependencies are stored in `/nix/store` with unique hashes.                   |
+| **Package Isolation**     | High. Packages are installed into versioned directories. Bins are symlinked.                                     | Low. Files are installed into system-wide locations like `/usr`. | Low. Files are installed into system-wide locations. | Very High. Packages are isolated in the Nix store. Environments are built from these components. |
+| **Reproducibility**       | Medium. Zoi packages are versioned, but dependencies from other managers can change.                             | Medium. Depends on the state of Arch repositories.               | Medium. Depends on the state of APT repositories.    | Very High. Builds are bit-for-bit reproducible.                                                  |
+| **Configuration**         | Declarative (`.pkg.lua`) and imperative scripting.                                                               | Declarative (`PKGBUILD`).                                        | Declarative (`debian/control`).                      | Purely functional and declarative (`.nix` files).                                                |
+| **Cross-platform**        | Yes (Linux, macOS, Windows).                                                                                     | No (Arch Linux only).                                            | No (Debian-based Linux only).                        | Yes (Linux, macOS).                                                                              |
+| **Key Idea**              | Unify package management across different systems and ecosystems with a single interface and powerful scripting. | Simplicity and user-centrism for a specific rolling-release OS.  | Robustness and stability for a stable-release OS.    | Purely functional package management for reproducible, declarative, and reliable systems.        |
+
+## Summary
+
+- **Choose Zoi if:** You work across multiple operating systems, use many different programming languages, and want a unified way to manage your tools and project dependencies without interfering with your system's state. Its Lua-based packaging offers great flexibility.
+
+- **Choose Pacman/APT if:** You are happy with your OS's native package manager and primarily need to manage system-wide applications and libraries on a single machine.
+
+- **Choose Nix if:** Your primary goal is maximum reproducibility and reliability. You want to build environments declaratively and are willing to learn the Nix language and its functional concepts.

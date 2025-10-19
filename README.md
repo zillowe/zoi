@@ -85,21 +85,25 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
 
 - **Cross-Platform:** Works seamlessly on Linux, macOS, and Windows.
 - **Dynamic Package Definitions:** Define packages with dynamic Lua scripts (`.pkg.lua`) for maximum flexibility.
-- **Universal Package Support:** Install from binaries, compressed archives, source, or installer scripts.
-- **Extensive Dependency Management:** Integrates with over 40 package managers (`apt`, `brew`, `cargo`, `npm`, `pip`, etc.).
+- **Universal Package Support:** Install packages from pre-built binaries, compressed archives, or build them from source.
+- **Extensive Dependency Management:** Integrates with over 40 system and language package managers (`apt`, `brew`, `cargo`, `npm`, `pip`, `go`, `bun`, etc.).
 - **Rich Dependencies:** Define runtime and build dependencies with required, optional, and selectable options.
-- **Project Environments:** Manage project-specific commands and environments with `zoi.yaml`.
-- **Repository-Based:** Use official, community, or your own private/public Git-based repositories.
-- **Secure & Verifiable:** Verifies package integrity and authenticity with checksums and GPG signatures. Manage keys with `zoi pgp`.
-- **Versatile Package Types:** Supports standard packages, collections, services, configs, app templates, extensions, libraries, and inline scripts.
-- **Local Package Development:** A dedicated `zoi package` command set (`meta`, `build`, `install`) to streamline creating and testing packages locally.
+- **Project Environments:** Manage project-specific commands and environments using a local `zoi.yaml` file.
+- **Repository-Based:** Use official, community, or your own private/public Git-based repositories. Manage multiple registries.
+- **Secure & Verifiable:** Verifies package integrity with checksums and authenticity with GPG signatures. Includes a built-in PGP key manager.
+- **Versatile Package Types:** Supports different types of packages:
+  - `Package`: A standard software package.
+  - `Collection`: A meta-package that groups other packages together.
+  - `App`: A template for bootstrapping new projects (`zoi create`).
+  - `Extension`: A package to extend Zoi's own functionality or configuration.
+- **Local Package Development:** A dedicated `zoi package` command set (`build`, `install`) to streamline creating and testing packages locally.
 - **Advanced CLI Tools:**
   - `zoi man`: Read package manuals in the terminal.
   - `zoi why`: Understand why a package is installed.
-  - `zoi rollback`: Revert a package to its previous version.
+  - `zoi rollback`: Revert a package to its previous version or rollback the last transaction.
   - `zoi pin`: Pin a package to a specific version.
-  - `zoi exec`: Run a package without installing it.
-- **Library Support:** Use as a Rust library and get compiler/linker flags via `zoi pkg-config`.
+  - `zoi exec`: Run a package's binary without installing it.
+- **Library Support:** Core functionality is available as a Rust library to be integrated into other applications.
 
 ## 💓 Special Thanks
 
@@ -318,22 +322,14 @@ Here are some common commands to get you started.
   zoi uninstall <package_name>
   ```
 
-- **Install from a specific repository:**
+- **Update packages:**
 
   ```sh
-  zoi install @<repo_name>/<package_name>
-  ```
+  # Update all installed packages
+  zoi update --all
 
-- **List all available packages from active repos:**
-
-  ```sh
-  zoi list --all
-  ```
-
-- **List packages from a specific repo:**
-
-  ```sh
-  zoi list --all --repo <repo_name>
+  # Update specific packages
+  zoi update <package1> <package2>
   ```
 
 - **Search for a package:**
@@ -342,10 +338,17 @@ Here are some common commands to get you started.
   zoi search <term>
   ```
 
-- **Search for a package from a specific repo:**
+- **Show package details:**
 
   ```sh
-  zoi search <term> --repo <repo_name>
+  zoi show <package_name>
+  ```
+
+- **Run a project command:**
+
+  ```sh
+  # Run a command defined in zoi.yaml
+  zoi run <command_alias>
   ```
 
 - **Add a new repository:**
@@ -354,9 +357,10 @@ Here are some common commands to get you started.
   # Interactively
   zoi repo add
 
-  # By name
+  # By name from the default registry
   zoi repo add <repo_name>
-  # From a git repo
+
+  # From a git repo URL
   zoi repo add https://github.com/<user_name>/<repo_name>.git
   ```
 

@@ -5,10 +5,6 @@ description: Universal Package Manager & Environment Setup Tool.
 
 This guide will provide you with everything you need to know to get started, from installation to advanced usage.
 
-## Nel Package Registry
-
-Zoi provides an online package registry, the [Nel Registry](https://nel.zillowe.qzz.io), to help you discover and search for packages. It provides a user-friendly web interface to browse all the packages available in the official Zoi repositories.
-
 [Repository](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi)
 
 ## Introduction
@@ -18,22 +14,9 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
 ## Features
 
 - **Cross-Platform:** Works seamlessly on Linux, macOS, and Windows.
-- **Dynamic Package Definitions:** Define packages with dynamic Lua scripts (`.pkg.lua`) for maximum flexibility.
-- **Universal Package Support:** Install from binaries, compressed archives, source, or installer scripts.
-- **Extensive Dependency Management:** Integrates with over 40 package managers (`apt`, `brew`, `cargo`, `npm`, `pip`, etc.).
-- **Rich Dependencies:** Define runtime and build dependencies with required, optional, and selectable options.
-- **Project Environments:** Manage project-specific commands and environments with `zoi.yaml`.
-- **Repository-Based:** Use official, community, or your own private/public Git-based repositories.
-- **Secure & Verifiable:** Verifies package integrity and authenticity with checksums and GPG signatures. Manage keys with `zoi pgp`.
-- **Versatile Package Types:** Supports standard packages, collections, services, configs, app templates, extensions, libraries, and inline scripts.
-- **Local Package Development:** A dedicated `zoi package` command set (`meta`, `build`, `install`) to streamline creating and testing packages locally.
-- **Advanced CLI Tools:**
-  - `zoi man`: Read package manuals in the terminal.
-  - `zoi why`: Understand why a package is installed.
-  - `zoi rollback`: Revert a package to its previous version.
-  - `zoi pin`: Pin a package to a specific version.
-  - `zoi exec`: Run a package without installing it.
-- **Library Support:** Use as a Rust library and get compiler/linker flags via `zoi pkg-config`.
+- **Dynamic Package Definitions:** Define packages with dynamic Lua scripts for maximum flexibility
+- **Extensive Dependency Management:** Integrates with over 40 package managers.
+- **And much more!** [See the full list of features](/docs/zds/zoi/features).
 
 ## Getting Started
 
@@ -100,7 +83,7 @@ makepkg -si
 
 ##### Fedora
 
-Install `zoi-rs` on Fedora from [Terra](https://terra.fyralabs.com) repo (not maintained by us, uses [Crates.io](#cratesio) so may not be up-to-date):
+Install `zoi-rs` on Fedora from [Terra](https://terra.fyralabs.com) repo (not maintained by us so updates can be late, uses [Crates.io](#cratesio) version):
 
 ```sh
 # add terra repo
@@ -253,201 +236,23 @@ What platforms we currently support.
 | OpenBSD | amd64 | ❌         | ✔️               |
 | OpenBSD | arm64 | ❌         | ✔️               |
 
-We're planning to add support for more platforms.
-
-## Usage & Commands
-
-Zoi provides a wide range of commands to manage your packages and environment. For a full list of commands and their options, you can always run `zoi --help`.
-
-### General Commands
-
-| Command      | Description                                                                                                                                                                                                                                                                                                                                                                                    |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `version`    | Displays the version number, build status, branch, and commit hash.                                                                                                                                                                                                                                                                                                                            |
-| `about`      | Displays the full application name, description, author, license, and homepage.                                                                                                                                                                                                                                                                                                                |
-| `info`       | Displays key system details like OS, CPU architecture, and available package managers (requires `zoi sync` to be run first for package manager detection).                                                                                                                                                                                                                                     |
-| `check`      | Verifies that all required dependencies (like git) are installed.                                                                                                                                                                                                                                                                                                                              |
-| `setup`      | Configures the shell environment for Zoi to make package binaries available. <br/>`--scope <user                                                                                                                                                                                                                                                      system>`: Set the scope (default: user). |
-| `sync`       | Clones or updates the package database from the configured registry. <br/>`--verbose`: Show the full git output. <br/>`--fallback`: If the primary registry fails, try to sync from official mirrors (GitHub, Codeberg, GitLab). <br/>`--no-pm`: Skip checking for installed package managers.                                                                                                 |
-| `upgrade`    | Downloads the latest release of Zoi and replaces the current executable. <br/>`--full`: Force a full download, skipping the patch-based upgrade. <br/>`--force`: Force the upgrade even if the version is the same. <br/>`--tag <tag>`: Upgrade to a specific git tag. <br/>`--branch <branch>`: Upgrade to the latest release of a specific branch.                                           |
-| `clean`      | Clears the cache of downloaded package binaries.                                                                                                                                                                                                                                                                                                                                               |
-| `autoremove` | Removes packages that were installed as dependencies but are no longer needed.                                                                                                                                                                                                                                                                                                                 |
-| `telemetry`  | Manages [opt-in telemetry](./telemetry).                                                                                                                                                                                                                                                                                                                                                       |
-
-### Package Management
-
-| Command      | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `list`       | Lists installed or all available packages. <br/>`--all`: List all packages, not just installed. <br/>`--repo <repo>`: Filter by repository. <br/>`--type <type>`: Filter by package type.                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `show`       | Shows detailed information about a package. <br/>`--raw`: Display the raw, unformatted package file.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `search`     | Searches packages by name, description, and tags. <br/>`--repo <repo>`: Filter by repository. <br/>`--type <type>`: Filter by package type. <br/>`-t, --tag <tag>`: Filter by one or more tags (repeat or comma-separate).                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| `shell`      | Installs completion scripts for a given shell (e.g. `zoi shell bash`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| `install`    | Installs one or more packages. Can also install from a `zoi.pkgs.json` file (to restore all packages) or a `<pkg>.manifest.yaml` file (for reproducible dependency choices). <br/>`--repo <repo>`: Install a package directly from a git repository (e.g. `Zillowe/Hello` or `gl:Zillowe/Hello`). The repository must contain a `zoi.yaml` file with a `package` field specifying a package name, a path to a `.pkg.lua` file, or a URL to one. <br/>`--force`: Force re-installation if the package already exists. <br/>`--interactive`: Choose the installation method interactively. <br/>`--all-optional`: Install all optional dependencies. |
-| `build`      | Builds and installs one or more packages from source. <br/>`--force`: Force the package to be rebuilt.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| `uninstall`  | Removes one or more packages. Also removes any of its dependencies that are no longer needed. For collections, it removes all of its dependencies.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `update`     | Updates one or more packages to the latest version.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| `pin`        | Pins a package to a specific version to prevent updates.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| `unpin`      | Unpins a package, allowing it to be updated again.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `rollback`   | Rolls back a package to its previously installed version. See [Package Rollbacks](/docs/zds/zoi/rollbacks).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `why`        | Explains why a package is installed (e.g. as a dependency or directly).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `clone`      | Clones the source code repository of one or more packages. A target directory can only be specified when cloning a single package.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `exec`       | Downloads a binary to a temporary cache and runs it without installing it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| `extension`  | Manages Zoi extensions (`add`, `remove`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `create`     | Creates an application from an app template. Usage: `zoi create <source> <appName>`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| `man`        | Renders a package's manual in the terminal. <br/>`--upstream`: Fetch the manual from its remote URL, ignoring any local copy. <br/>`--raw`: Print the raw manual content without rendering.                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `pkg-config` | Provides compiler and linker flags for installed libraries.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-
-### Project Environment
-
-| Command | Description                                                                    |
-| ------- | ------------------------------------------------------------------------------ |
-| `run`   | Executes a command from a local `zoi.yaml` file. Can be run interactively.     |
-| `env`   | Sets up project environments from a `zoi.yaml` file. Can be run interactively. |
-
-See the full schema and examples in [Project Configuration (zoi.yaml)](/docs/zds/zoi/project-config).
-
-### Service Management
-
-| Command | Description                         |
-| ------- | ----------------------------------- |
-| `start` | Starts a package that is a service. |
-| `stop`  | Stops a running service package.    |
-
-### Package Development
-
-| Command   | Description                                                                   |
-| --------- | ----------------------------------------------------------------------------- |
-| `package` | Build, create, and manage Zoi packages (`meta`, `build`, `install`).          |
-| `pgp`     | Manage PGP keys for package signature verification (`add`, `remove`, `list`). |
-
-### Sync Management (`sync`)
-
-Manages the package database registry URL.
-
-| Subcommand                  | Description                                                                                  |
-| --------------------------- | -------------------------------------------------------------------------------------------- |
-| `sync set <url or keyword>` | Sets the package database registry URL. Keywords: `default`, `gitlab`, `github`, `codeberg`. |
-| `sync show`                 | Displays the current registry URL.                                                           |
-
-### Repository Management (`repo`)
-
-Manages the list of package repositories that Zoi uses.
-
-| Subcommand                | Description                                                                     |
-| ------------------------- | ------------------------------------------------------------------------------- |
-| `repo add <name-or-url>`  | Add an official repo by name or clone from a git URL (interactive if no args).  |
-| `repo rm <name>`          | Remove a repository from the active list.                                       |
-| `repo ls`                 | Show active repositories. Use `repo ls all` to show all available repositories. |
-| `repo git ls`             | List cloned git repositories under `~/.zoi/pkgs/git`.                           |
-| `repo git rm <repo-name>` | Remove a cloned git repository directory (`~/.zoi/pkgs/git/<repo-name>`).       |
-
-**Example:**
-
-```sh
-# Add a repository interactively
-zoi repo add
-
-# Add a repository by name
-zoi repo add community
-
-# Add a repository by git URL (auto-clone)
-zoi repo add https://example.com/my-zoi-repo.git
-
-# Remove a repository
-zoi repo rm community
-
-# List active repositories
-zoi repo ls
-```
-
-For an overview of official repositories, mirrors, and repository tiers, see [Repositories](/docs/zds/zoi/repositories).
-
-Zoi supports different types of packages, defined in the `.pkg.lua` file.
-
-| Type         | Description                                                                                                                                                                                                                         |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Package`    | A standard software package that can be installed. This is the default type.                                                                                                                                                        |
-| `Collection` | A meta-package that groups other packages together as dependencies.                                                                                                                                                                 |
-| `Service`    | A package that runs as a background service. Can be managed with shell commands or via Docker Compose.                                                                                                                              |
-| `Config`     | A package that manages configuration files. It includes commands for installing and uninstalling the configuration.                                                                                                                 |
-| `App`        | An app template. Not installable; used via `zoi create` to scaffold an application (e.g. frameworks like Rails).                                                                                                                    |
-| `Extension`  | A package that can modify Zoi's configuration, such as adding new package repositories. It is not installed in the traditional sense but its changes are applied or reverted. See the [Extensions Guide](/docs/zds/zoi/extensions). |
-| `Library`    | A software library with headers and/or binaries (.so, .dll, .a). Can provide pkg-config files.                                                                                                                                      |
-| `Script`     | A package that runs a series of inline shell commands instead of installing a binary.                                                                                                                                               |
-
-## Creating Packages (`.pkg.lua`)
-
-Packages for Zoi are defined using `.pkg.lua` files. These are Lua scripts that define package metadata and installation logic, allowing for highly dynamic and flexible package definitions.
-
-- **Dynamic & Flexible:** Use Lua scripting to define dynamic URLs, platform-specific logic, and complex installation steps.
-- **Comprehensive Examples:** For a deep dive into creating packages, see the [Creating Packages guide](/docs/zds/zoi/creating-packages) and the [Package Examples](/docs/zds/zoi/examples).
-
-### `.pkg.lua` Structure
-
-A `.pkg.lua` file is a Lua script that calls global functions like `package{}`, `install{}`, and `dependencies{}` to define the package.
-
-```lua
--- my-cli.pkg.lua
-package({
-  name = "my-cli",
-  repo = "community",
-  version = "1.2.3",
-  description = "A simple command-line utility.",
-  -- ... more metadata
-})
-
-install({
-  {
-    type = "binary",
-    url = "https://example.com/my-cli-v" .. PKG.version .. "-" .. SYSTEM.OS .. "-" .. SYSTEM.ARCH,
-    platforms = { "all" },
-  }
-})
-```
-
-This approach allows you to use Lua's full power to construct your package definition. You have access to global variables like `PKG` (the package table) and `SYSTEM` (with `OS`, `ARCH`, `DISTRO`).
-
-### Installation Methods
-
-Zoi supports four types of installation methods within the `installation` list:
-
-1.  **`binary`**: Downloads a pre-compiled binary directly from a URL.
-2.  **`com_binary`**: Downloads a compressed archive (`.zip`, `.tar.gz`, etc.), extracts it, and finds the binary within. Supports `bin_path` to point to the executable inside the archive and a `files` field to copy additional files (e.g. manuals, licenses). On Windows targets, if `bin_path` lacks `.exe`, Zoi will also try with `.exe` appended.
-3.  **`source`**: Clones a git repository and runs your defined `build_commands`. Zoi then moves the final executable to the installation directory. By default, Zoi looks for an executable with the same name as the package. If the executable has a different name or is in a subdirectory, you must specify its location with the `bin_path` field. Also supports a `files` field to copy additional files from the build directory. Supports optional `tag` or `branch` (use only one). If none is provided, the default branch HEAD is used. For reproducible builds, you can specify a `docker_image` to run the build inside a container.
-4.  **`script`**: Downloads and executes an installation script (e.g. `install.sh`).
-
-For the list of supported archive formats for `com_binary`, see [Supported Archives for Compressed Binaries](/docs/zds/zoi/archives).
-
-### Dependencies
-
-For the full list of supported dependency managers, usage semantics, and commands Zoi runs, see [Dependencies & Supported Package Managers](/docs/zds/zoi/dependencies).
-
 ## FAQ
 
 <Accordions type="single">
   <Accordion title="How do I create my own package for Zoi?">
-    You can create a `.pkg.lua` file that defines your package. This file includes metadata like the package name, version, description, and installation instructions. The `Package` struct in [`types.rs`](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/src/pkg/types.rs) shows all available fields. For more info about creating and publishing a package please visit [this guide](/docs/zds/zoi/creating-packages).
+    You can create a `.pkg.lua` file that defines your package. This file includes metadata like the package name, version, description, and installation instructions. For a complete guide, please visit the [Creating Packages guide](/docs/zds/zoi/creating-packages).
   </Accordion>
 </Accordions>
 <br />
 <Accordions type="single">
   <Accordion title="How do I publish a package?">
-    If the package maintainer has provided a `man` URL in the package definition, you can run `zoi man <package-name>` to view it in your terminal.
+    To learn how to publish a package to the official repositories or your own, please visit the [Publishing Packages guide](/docs/zds/zoi/publishing-packages).
   </Accordion>
 </Accordions>
 <br />
 <Accordions type="single">
   <Accordion title="How do I view a package's manual?">
     If the package maintainer has provided a `man` URL in the package definition, you can run `zoi man <package-name>` to view it in your terminal.
-  </Accordion>
-</Accordions>
-<br />
-<Accordions type="single">
-  <Accordion title="How do optional dependencies work?">
-    You can specify `optional` dependencies in your `.pkg.lua` file under the `build`
-    or `runtime` sections. When a user installs your package, they will be shown
-    the list of optional dependencies and their descriptions, and they can choose which ones to install.
-    This is great for plugins or extra features.
   </Accordion>
 </Accordions>
 <br />
@@ -536,7 +341,7 @@ For the full list of supported dependency managers, usage semantics, and command
 <br />
 <Accordions type="single">
   <Accordion title="How can I back up and restore my installed packages?">
-    Zoi automatically keeps a record of all your installed packages in an SBOM file at `~/.zoi/pkgs/zoi.pkgs.json`. You can back up this file. To restore all your packages on a new system, simply run `zoi install /path/to/your/zoi.pkgs.json`.
+    Zoi automatically keeps a record of all your installed packages in a JSON file at `~/.zoi/pkgs/zoi.pkgs.json`. You can back up this file. To restore all your packages on a new system, simply run `zoi install /path/to/your/zoi.pkgs.json`.
   </Accordion>
 </Accordions>
 
@@ -549,118 +354,3 @@ For the full list of supported dependency managers, usage semantics, and command
     see our [Telemetry & Analytics](/docs/zds/zoi/telemetry) page.
   </Accordion>
 </Accordions>
-
-## Examples
-
-- **Install a package:**
-
-  ```sh
-  zoi install <package_name>
-  ```
-
-- **Install multiple packages:**
-
-  ```sh
-  zoi install <package_1> <package_2>
-  ```
-
-- **Update a package:**
-
-  ```sh
-  zoi update <package_name>
-  ```
-
-- **Update multiple packages:**
-
-  ```sh
-  zoi update <package_1> <package_2>
-  ```
-
-- **Update all packages:**
-
-  ```sh
-  zoi update all
-  ```
-
-- **Uninstall a package:**
-
-  ```sh
-  zoi uninstall <package_name>
-  ```
-
-- **Uninstall multiple packages:**
-
-  ```sh
-  zoi uninstall <package_1> <package_2>
-  ```
-
-- **Install from a specific repository:**
-
-  ```sh
-  # Install from a top-level repository
-  zoi install @community/htop
-
-  # Install from a nested repository
-  zoi install @core/linux/amd64/nvidia-driver
-  ```
-
-- **List all available packages from active repos:**
-
-  ```sh
-  zoi list --all
-  ```
-
-- **Search for a package:**
-
-  ```sh
-  zoi search <term>
-  ```
-
-- **Search by tag directly:**
-
-  ```sh
-  # The term matches tags too
-  zoi search editor
-
-  # Require specific tag(s)
-  zoi search editor -t cli,devtools
-  zoi search editor -t cli -t devtools
-  ```
-
-- **Check why a package is installed:**
-
-  ```sh
-  zoi why <package_name>
-  ```
-
-- **Create an app from a template:**
-
-  ```sh
-  zoi create <source> <appName>
-  # e.g.
-  zoi create rails-app MyBlog
-  zoi create @community/rails-app MyBlog
-  ```
-
-  ```sh
-  # The term matches tags too
-  zoi search editor
-
-  # Require specific tag(s)
-  zoi search editor -t cli,devtools
-  zoi search editor -t cli -t devtools
-  ```
-
-- **Check why a package is installed:**
-
-  ```sh
-  zoi why <package_name>
-  ```
-
-- **Create an app from a template:**
-  ```sh
-  zoi create <source> <appName>
-  # e.g.
-  zoi create rails-app MyBlog
-  zoi create @community/rails-app MyBlog
-  ```

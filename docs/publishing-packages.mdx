@@ -73,31 +73,6 @@ You can contribute by opening a **Merge Request** to the GitLab repository, or b
 
 A Zoi maintainer will review your submission. They may suggest some changes. Once approved, it will be merged, and your package will be available to everyone after the next `zoi sync`!
 
-Once your package is merged, it will also be visible on the [Nel Registry](https://nel.zillowe.qzz.io).
-
-## Advanced: Publishing Pre-Built Packages
-
-While the above method works for publishing package definitions (`.pkg.lua`), the official Zoi repositories store pre-built package archives (`.pkg.tar.zst`) for faster and more reliable installations. This avoids having every user download assets from upstream URLs.
-
-You can create these archives yourself using the `zoi package` command set. This is the same workflow used by Zoi's CI/CD.
-
-1.  **Generate Metadata:**
-    Run `zoi package meta` on your `.pkg.lua` file. This creates a `.meta.json` file, resolving all dynamic Lua code into a static list of assets for all platforms. You can use the `--type` flag to target a specific installation method (e.g. `zoi package meta ./my-package.pkg.lua --type source`).
-
-    ```sh
-    zoi package meta ./my-package.pkg.lua
-    ```
-
-2.  **Build the Archive:**
-    Run `zoi package build` on the generated metadata file. This command downloads the assets for your **current platform** (or builds them from source, potentially inside a Docker container if specified), verifies them, and creates a distributable `.pkg.tar.zst` archive.
-
-    ```sh
-    zoi package build ./my-package.meta.json
-    ```
-
-3.  **Publish the Archive:**
-    You can then upload this `.pkg.tar.zst` archive to a web server or a release page. The official Zoi repositories are hosted on a dedicated server. For community contributions, you would typically provide the `.pkg.lua` file in your pull request, and the Zoi maintainers would handle the build and hosting of the archive.
-
 ## Creating Your Own Git-Based Package Repository
 
 While contributing to the official repositories is great for public packages, you might want to manage your own set of packages for private projects, company-internal tools, or personal use. Zoi makes this easy by allowing you to add any git repository as a package source.

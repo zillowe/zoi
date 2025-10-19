@@ -15,30 +15,39 @@ Extensions are ideal for:
 - **Corporate Mirrors:** Point Zoi to a company's internal mirror of the official package database.
 - **Project Starters:** Distribute a standard `zoi.yaml` file for a specific type of project (e.g. Rust library, web service) to bootstrap development environments quickly.
 - **Easy Configuration Sharing:** Simplify the process of setting up a new machine with a standard Zoi configuration.
+- **Distributing PGP Keys:** Share PGP keys for trusted package maintainers to enable signature verification.
 
 ## Creating an Extension
 
 An extension is defined in a `.pkg.lua` file, just like any other package. The key differences are setting the `type` to `extension` and defining an `extension` block.
 
-```yaml
-# my-repo-extension.pkg.lua
-name: my-repo-extension
-repo: community
-type: extension
-version: "1.0"
-description: "Adds my custom repositories to Zoi."
-maintainer:
-  name: "Your Name"
-  email: "your.email@example.com"
-
-# The 'extension' block contains the configuration changes.
-extension:
-  type: zoi
-  changes:
-    - type: repo-git
-      add: https://github.com/user/my-cool-pkgs.git
-    - type: repo-add
-      add: test
+```lua
+-- my-repo-extension.pkg.lua
+metadata({
+  name = "my-repo-extension",
+  repo = "community",
+  type = "extension",
+  version = "1.0",
+  description = "Adds my custom repositories to Zoi.",
+  maintainer = {
+    name = "Your Name",
+    email = "your.email@example.com"
+  },
+  -- The 'extension' block contains the configuration changes.
+  extension = {
+    type = "zoi",
+    changes = {
+      {
+        type = "repo-git",
+        add = "https://github.com/user/my-cool-pkgs.git"
+      },
+      {
+        type = "repo-add",
+        add = "test"
+      }
+    }
+  }
+})
 ```
 
 ### The `extension` Field
@@ -50,7 +59,7 @@ This is the core of an extension package.
 
 ### Change Types
 
-Zoi supports four types of changes that can be made by an extension.
+Zoi supports several types of changes that can be made by an extension.
 
 #### `repo-git`
 
@@ -88,6 +97,17 @@ Creates a `zoi.yaml` file in the current directory, allowing for sharable projec
 - **Effect:** A new `zoi.yaml` file is created in the current directory with the content from the `add` field. The command will fail if a `zoi.yaml` file already exists.
 - **On Removal:** The `zoi.yaml` file is deleted.
 
+#### `pgp`
+
+Adds a PGP key to Zoi's local key store.
+
+- **Purpose:** To add a PGP key for verifying package signatures.
+- **Fields:**
+  - `name`: A string that will be used as the name for the key in Zoi's store.
+  - `key`: A string containing either a URL to the PGP key file (`.asc`) or the key's fingerprint.
+- **Effect:** Zoi downloads or fetches the key and adds it to `~/.zoi/pgps/`.
+- **On Removal:** The PGP key file is deleted from the store.
+
 ## Examples
 
 Here are a couple of examples demonstrating different use cases for extensions.
@@ -96,32 +116,46 @@ Here are a couple of examples demonstrating different use cases for extensions.
 
 This example combines multiple changes to configure Zoi for a corporate environment.
 
-```yaml
-# extensions/corp-bundle.pkg.lua
-name: corp-bundle
-repo: community
-type: extension
-version: "1.1"
-description: "Configures Zoi for the corporate environment at MyCorp."
-tags: [extension, config, mycorp]
-maintainer:
-  name: "MyCorp IT"
-  email: "it@mycorp.com"
-
-extension:
-  type: zoi
-  changes:
-    # 1. Point Zoi to the official corporate mirror of the package database.
-    - type: registry-repo
-      add: https://git.mycorp.com/zoi/Zoidberg.git
-
-    # 2. Add the 'test' repository to the active list for developers.
-    - type: repo-add
-      add: test
-
-    # 3. Add the private git repository for MyCorp's internal tools.
-    - type: repo-git
-      add: https://git.mycorp.com/zoi/internal-tools.git
+```lua
+-- extensions/corp-bundle.pkg.lua
+metadata({
+  name = "corp-bundle",
+  repo = "community",
+  type = "extension",
+  version = "1.1",
+  description = "Configures Zoi for the corporate environment at MyCorp.",
+  tags = {"extension", "config", "mycorp"},
+  maintainer = {
+    name = "MyCorp IT",
+    email = "it@mycorp.com"
+  },
+  extension = {
+    type = "zoi",
+    changes = {
+      -- 1. Point Zoi to the official corporate mirror of the package database.
+      {
+        type = "registry-repo",
+        add = "https://git.mycorp.com/zoi/Zoidberg.git"
+      },
+      -- 2. Add the 'test' repository to the active list for developers.
+      {
+        type = "repo-add",
+        add = "test"
+      },
+      -- 3. Add the private git repository for MyCorp's internal tools.
+      {
+        type = "repo-git",
+        add = "https://git.mycorp.com/zoi/internal-tools.git"
+      },
+      -- 4. Add the corporate PGP key for package signing.
+      {
+        type = "pgp",
+        name = "mycorp-signing-key",
+        key = "https://keys.mycorp.com/zoi-signing-key.asc"
+      }
+    }
+  }
+})
 ```
 
 ### Project Starter Extension
@@ -130,7 +164,7 @@ This example shows how to create a "project starter" that provides a ready-to-us
 
 ```lua
 -- my-rust-starter.pkg.lua
-package({
+metadata({
   name = "my-rust-starter",
   repo = "community",
   type = "extension",
@@ -210,4 +244,3 @@ This ensures that the configuration is returned to the state it was in before th
 ## Publishing Extensions
 
 Extensions are published and shared just like any other Zoi package: by adding their `.pkg.lua` file to a package repository. Learn more in the [Publishing Packages guide](/docs/zds/zoi/publishing-packages).
-ile to a package repository. Learn more in the [Publishing Packages guide](/docs/zds/zoi/publishing-packages).

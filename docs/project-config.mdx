@@ -18,6 +18,16 @@ The `zoi.yaml` file allows for simple and complex configurations, including plat
 # Required project name (used in output)
 name: my-project
 
+# Optional: Enable project-level package management
+config:
+  local: true
+
+# Optional: List of packages to install for this project
+# Requires `config.local: true`
+pkgs:
+  - eza
+  - fzf
+
 # Optional: Verify important tools are available
 # Each item runs a check command; non-zero exit indicates missing or incompatible
 packages:
@@ -80,7 +90,10 @@ environments:
 ### Field Reference
 
 - `name`: `string` (required)
-- `packages`: `list` of objects (optional)
+- `config`: `object` (optional)
+  - `local`: `boolean` (default: `false`). If `true`, enables project-local package management.
+- `pkgs`: `list` of `strings` (optional). A list of packages to be installed locally to the project. Requires `config.local: true`.
+- `packages`: `list` of objects (optional). Note: this is for validating tools, not for installing packages. See `pkgs` for installation.
   - `name`: `string` (label only)
   - `check`: `string` (command to validate presence/version)
 - `commands`: `list` of objects (optional)
@@ -100,6 +113,32 @@ environments:
   - `env`: `map` (optional) - Same structure as in `commands`.
 
 Zoi determines the platform from the OS and architecture (e.g. `linux-amd64`, `macos-arm64`, `windows-amd64`).
+
+## Project-local Package Management
+
+Zoi can manage project-specific package dependencies, similar to `package.json` in Node.js or `Cargo.toml` in Rust.
+
+To enable this feature, set `config.local` to `true` in your `zoi.yaml`. Then, list the packages your project needs under the `pkgs` key.
+
+```yaml
+name: my-awesome-project
+config:
+  local: true
+pkgs:
+  - eza
+  - bat
+  - fzf
+```
+
+When this is configured, running `zoi install` (with no arguments) in the project directory will:
+
+1.  Read the `pkgs` list.
+2.  Install the specified packages into a project-local directory. These packages will not affect your global user or system installations.
+3.  Create two files:
+    - `zoi.pkgs.json`: A detailed manifest of all installed packages, their dependencies, and metadata. This file is intended for local tracking and can be added to your `.gitignore`.
+    - `zoi.lock`: A file containing cryptographic hashes of the installed packages. This file is used to verify the integrity of the packages and should be committed to your repository.
+
+Commit `zoi.yaml` and `zoi.lock` to your repository. This ensures that other developers who clone the project can run `zoi install` to get the exact same versions of the dependencies, creating a reproducible and secure environment.
 
 ## CLI usage
 

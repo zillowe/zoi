@@ -1,0 +1,27 @@
+---
+title: Zoidberg
+description: Zoi's official package registry.
+---
+
+Zoidberg is the official package registry for Zoi. It is a Git repository that contains the definitions for all the official packages.
+
+- **Primary:** [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg)
+- **Mirrors:** [GitHub](https://github.com/Zillowe/Zoidberg), [Codeberg](https://codeberg.org/Zillowe/Zoidberg)
+
+## Repository Tiers
+
+Zoidberg organizes packages into tiers. These tiers help to indicate the stability and maintenance status of a package.
+
+| Repository  | Purpose                                                                           |
+| ----------- | --------------------------------------------------------------------------------- |
+| `core`      | Essential packages and libraries; very common and well-maintained.                |
+| `main`      | Important packages that don't fit in `core` but are essential for most users.     |
+| `extra`     | New or niche packages; less common and may be less actively maintained.           |
+| `community` | User-submitted packages. New entries start here and may graduate to higher tiers. |
+| `test`      | Testing ground for new Zoi features and packages prior to release.                |
+| `archive`   | Archived packages that are no longer maintained.                                  |
+| `zillowe`   | Zillowe's own official packages.                                                  |
+
+Note: Packages from `community`, `test`, and `archive` may carry higher risk. Zoi prints warnings where appropriate.
+
+For details on how to use and manage repositories, see the [Repositories guide](/docs/zds/zoi/repositories).

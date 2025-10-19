@@ -3,254 +3,197 @@ title: Creating Packages
 description: A complete guide on how to create a package for Zoi.
 ---
 
-This guide provides a start-to-finish walkthrough of creating a new package, testing it locally, and publishing it to the official Zoi package repositories for everyone to use.
+This guide provides a comprehensive overview of how to create packages for Zoi. The core of Zoi packaging is the `.pkg.lua` file, a Lua script that gives you immense power and flexibility to define how your software is built, packaged, and installed.
 
-## Understanding Zoi Repositories
+## The `.pkg.lua` File
 
-Zoi organizes its packages into several repositories, each with a specific purpose. When you contribute a new package, you'll need to decide which repository is the best fit.
+At its heart, a Zoi package is defined by a `.pkg.lua` file. This file uses a series of global functions and variables provided by the Zoi runtime to declare metadata, handle dependencies, and script the entire build and installation process.
 
-| Repository  | Description                                                                       |
-| ----------- | --------------------------------------------------------------------------------- |
-| `core`      | Essential packages and libraries; very common and well-maintained.                |
-| `main`      | Important packages that don't fit in `core` but are essential for most users.     |
-| `extra`     | New or niche packages; less common and may be less actively maintained.           |
-| `community` | User-submitted packages. New entries start here and may graduate to higher tiers. |
-| `test`      | Testing ground for new Zoi features and packages prior to release.                |
-| `archive`   | Archived packages that are no longer maintained.                                  |
+### Core Functions
 
-For your first contribution, you will almost always be adding your package to the **`community`** repository.
+These are the main functions you'll use to structure your package definition.
 
-For more information about repositories [visit here](/docs/zds/zoi/repositories)
+- `metadata{...}`: **(Required)** This function defines all the essential information about your package. It takes a Lua table as an argument. See the "Metadata" section below for details.
+- `dependencies{...}`: Defines runtime or build-time dependencies. This can be a simple list of packages or a more complex structure with optional and selectable dependencies. For a detailed guide, see the [Dependencies & Supported Package Managers](/docs/zds/zoi/dependencies) page.
+- `prepare()`: This function is executed first during the build process. It's used for fetching sources, extracting archives, and setting up the build environment inside a temporary directory.
+- `package()`: This function is executed after `prepare()`. Its job is to take the prepared sources and copy the final files into the staging area, from which the package archive will be created.
+- `verify()`: Executed after `package()`, this function can be used to run checks to ensure the package is safe and correct, such as verifying checksums and PGP signatures of downloaded files. If it returns `false`, the build will be halted.
+- `uninstall()`: This function is reserved for custom uninstallation logic. It can be used to run commands to clean up files or configurations created by the package outside of the main Zoi store.
 
-## Step 1: Creating Your Package File
+### The Lua Environment
 
-The heart of every Zoi package is its `.pkg.lua` definition file. This is a Lua script that allows for dynamic logic, making it powerful for complex packages with variable URLs or platform-specific needs.
+When Zoi executes your `.pkg.lua` script, it provides a set of global variables and helper functions to assist with the packaging process.
 
-A `.pkg.lua` file defines a package by calling global functions like `package{}`, `install{}`, and `dependencies{}`. You have access to global variables like `PKG` (the package being defined) and `SYSTEM` (with `OS`, `ARCH`, `DISTRO`) to make your package definition dynamic.
+#### Global Variables
 
-Here is a basic example:
+- `SYSTEM`: A table containing information about the user's system (`SYSTEM.OS`, `SYSTEM.ARCH`, `SYSTEM.DISTRO`, `SYSTEM.MANAGER`).
+- `ZOI`: A table with Zoi-specific information, like the running version (`ZOI.VERSION`) and installation paths (`ZOI.PATH.user`, `ZOI.PATH.system`).
+- `PKG`: A table containing the metadata you defined in the `metadata{}` block. This is useful for dynamically accessing version numbers, names, etc.
+- `BUILD_DIR`: The absolute path to the temporary directory where the build takes place. Use this as the root for all your build operations.
+- `STAGING_DIR`: The absolute path to the directory where final package contents should be placed.
+- `BUILD_TYPE`: A string indicating the current build type (e.g. `"source"` or `"pre-compiled"`), passed via the `zoi package build --type` flag.
+
+#### Helper Functions
+
+- `cmd(command)`: Executes a shell command.
+- `zcp(source, destination)`: Copies files or directories into the staging area. This is the primary function used in the `package()` step.
+- `zrm(path)`: A function for the `uninstall()` step to remove files or directories.
+- `verifyHash(file_path, "algo-hash")`: Verifies the checksum of a file.
+- `verifySignature(file_path, sig_path, key_name)`: Verifies a PGP signature.
+- `addPgpKey(url_or_path, name)`: Adds a PGP key to Zoi's keyring.
+- `UTILS.EXTRACT(url_or_path, out_dir)`: Downloads (if URL) and extracts an archive.
+- `UTILS.FETCH.url(url)`: Fetches the content of a URL as a string.
+- `UTILS.FETCH.GITHUB.LATEST.release{...}`: Fetches the latest release tag from a GitHub repository.
+- `UTILS.FIND.file(dir, name)`: Finds a file within the build directory.
+- `UTILS.PARSE.checksumFile(content, file_name)`: Parses a checksum from a checksums file.
+
+#### Staging Destinations for `zcp`
+
+The `destination` argument for `zcp` uses special variables to target different locations in the final installed package:
+
+- `${pkgstore}`: The main directory for the package's files within the Zoi store. Binaries, libraries, and assets usually go here (e.g. `${pkgstore}/bin/my-cli`, `${pkgstore}/share/icons/icon.png`).
+- `${createpkgdir}`: **For `app` packages only.** Files copied here are used as the template when a user runs `zoi create`.
+- `${usrroot}`: Copies files to the system's root directory (`/`). **Use with extreme caution**, as this can modify system files and requires administrator privileges to install.
+- `${usrhome}`: Copies files to the user's home directory (`~`).
+
+## Package Types
+
+You can define the type of your package in the `metadata` block using the `package_type` field.
 
 ```lua
--- my-cli.pkg.lua
+metadata({
+  name = "my-package",
+  package_type = "package", -- "package", "collection", "app", or "extension"
+  ...
+})
+```
 
--- Use local variables for repeated values
-local repo_owner = "user"
-local repo_name = "my-cli"
-local version = "1.2.3"
+### 1. `package` (Default)
 
--- The main package definition table
-package({
-  name = repo_name,
+This is the standard package type for distributing software, tools, or any set of files.
+
+- **Goal**: Install applications, command-line tools, libraries, etc.
+- **How it works**: The `package()` function stages the final files (binaries, assets) into the `${pkgstore}` directory. Upon installation, Zoi places these files in a versioned directory inside `~/.zoi/pkgs/store` and symlinks any executables listed in the `bins` metadata field into `~/.zoi/pkgs/bin`.
+- **Example**: See the "Simple Pre-compiled Binary" or "Simple Source Build" examples in the [Package Examples](/docs/zds/zoi/examples) document.
+
+### 2. `collection`
+
+A collection is a meta-package that groups other packages together.
+
+- **Goal**: Install a list of related packages with a single command.
+- **How it works**: A collection package typically has no `prepare` or `package` steps. Its main purpose is to list other packages in its `dependencies` block. When a user installs the collection, Zoi simply installs all the listed dependencies.
+- **Example**: A `rust-dev-tools` collection.
+
+```lua
+metadata({
+  name = "rust-dev-tools",
   repo = "community",
-  version = version,
-  description = "A simple command-line utility.",
-  website = "https://example.com/" .. repo_name,
-  git = "https://github.com/" .. repo_owner .. "/" .. repo_name,
-  maintainer = {
-    name = "Your Name",
-    email = "your.email@example.com",
-    key = "DEADC0DEDEADBEEFDEADC0DEDEADBEEFDEADC0DE" -- GPG Key Fingerprint or URL
-  },
-  license = "MIT",
-  tags = { "cli", "devtools" },
-  bins = { "my-cli" }, -- Binaries this package provides
-  conflicts = { "old-cli" } -- Packages this conflicts with
+  version = "1.0.0",
+  description = "A collection of useful Rust development tools.",
+  package_type = "collection",
 })
 
--- The installation methods
-install({
-  {
-    name = "Binary",
-    type = "binary",
-    -- Use Lua to construct the URL dynamically
-    url = "https://github.com/" .. repo_owner .. "/" .. repo_name .. "/releases/download/v" .. PKG.version .. "/" .. repo_name .. "-" .. SYSTEM.OS .. "-" .. SYSTEM.ARCH,
-    platforms = { "all" }
-  }
-})
-
--- Dependencies
 dependencies({
-  build = {
-    required = { "native:go" }
+  runtime = {
+    required = {
+      "zoi:rustup",
+      "cargo:cargo-edit",
+      "cargo:cargo-watch",
+      "cargo:cargo-audit",
+    }
   }
 })
 ```
 
-## Step 2: Defining an Installation Method
+### 3. `app`
 
-The `install{}` block tells Zoi how to get the software. You can provide multiple methods, and Zoi will pick the best one. If you set `selectable = true`, the user will be prompted to choose.
+An `app` package is a template or boilerplate used to bootstrap new projects.
+
+- **Goal**: Create a starter project structure for users.
+- **How it works**: In the `package()` function, you copy your template files into the `${createpkgdir}` staging directory. When a user runs `zoi create <my-new-app> --source your-app-package`, Zoi builds your package and extracts the contents of `${createpkgdir}` into a new directory named `<my-new-app>`.
+- **Example**: A "Hello World" web server template.
 
 ```lua
-install({
-  selectable = true, -- Allows the user to choose between these methods
-  {
-    name = "Binary", -- A descriptive name for the method
-    type = "binary",
-    url = "...",
-    platforms = { "linux-amd64", "macos-amd64", "windows-amd64" }
-  },
-  {
-    name = "Build from Source",
-    type = "source",
-    url = PKG.git, -- Use the git URL from the package definition
-    platforms = { "all" },
-    -- Optional: build inside a Docker container for reproducibility.
-    -- Use "hub:" for Docker Hub and "ghcr:" for GitHub Container Registry.
-    docker_image = "hub:golang:1.21",
-    build_commands = { "make" },
-    -- After building, Zoi will look for an executable with the same name as the package.
-    -- If the binary has a different name or is in a subdirectory, specify its path.
-    -- When using docker_image, this path is inside the container.
-    bin_path = "build/my-cli"
-  }
+metadata({
+  name = "hello-web-server",
+  repo = "community",
+  version = "1.0.0",
+  description = "A simple Node.js web server template.",
+  package_type = "app",
 })
+
+function package()
+  -- These files would be created or downloaded in the prepare() step
+  zcp("template/package.json", "${createpkgdir}/package.json")
+  zcp("template/index.js", "${createpkgdir}/index.js")
+  zcp("template/README.md", "${createpkgdir}/README.md")
+end
 ```
 
-For a full list of installation types (`binary`, `com_binary`, `source`, `script`) and their options, see the [Package Examples](/docs/zds/zoi/examples).
+### 4. `extension`
 
-### Copying Additional Files
+An extension is a special package type that modifies the user's Zoi configuration.
 
-For `source` and `com_binary` installation types, you can specify additional files or directories to be copied from the build environment (or extracted archive) to the user's system. This is useful for installing things like documentation, shell completions, or other assets that are not part of the main binary.
-
-This is done using the `files` field within an installation method:
+- **Goal**: Add new repositories, change the default registry, or import PGP keys.
+- **How it works**: The package must contain an `extension` table within its `metadata`. This table lists the changes to be applied. When a user runs `zoi extension add your-extension-package`, Zoi reads this table and performs the specified actions.
+- **Example**: An extension to add a third-party repository.
 
 ```lua
-install({
-  {
-    name = "Build from Source",
-    type = "source",
-    url = "...",
-    build_commands = { "make" },
-    bin_path = "build/my-cli",
-    files = {
+metadata({
+  name = "my-cool-repo-ext",
+  repo = "community",
+  version = "1.0.0",
+  description = "Adds the 'my-cool-repo' to Zoi.",
+  package_type = "extension",
+  extension = {
+    type = "zoi", -- Required, currently only "zoi" is supported
+    changes = {
       {
-        platforms = { "linux", "macos" },
-        files = {
-          { source = "man/my-cli.1", destination = "/usr/local/share/man/man1/my-cli.1" },
-          { source = "completions/my-cli.bash", destination = "/usr/share/bash-completion/completions/my-cli" }
-        }
+        type = "repo-add",
+        add = "my-cool-repo"
       },
       {
-        platforms = { "windows" },
-        files = {
-          { source = "docs/LICENSE", destination = "C:\ProgramData\my-cli\LICENSE" }
-        }
+        type = "pgp",
+        name = "my-cool-repo-key",
+        key = "https://example.com/key.asc" -- URL or fingerprint
       }
     }
   }
 })
 ```
 
-- The `files` field is a list of `FileGroup` tables.
-- Each `FileGroup` has a `platforms` list to specify which OS it applies to.
-- The `files` field inside the group is a list of `FileCopy` tables.
-- Each `FileCopy` has a `source` (relative to the build/archive root) and a `destination` (an absolute path on the user's system). You can use `~/` in the destination to refer to the user's home directory.
+## Building and Testing Your Package
 
-### Security: Checksums and Signatures
+### Testing Locally
 
-It is **highly recommended** to include checksums and GPG signatures to verify downloads.
-
-```lua
-install({
-  {
-    type = "binary",
-    url = "...",
-    platforms = { "all" },
-    -- URL to a checksums file (e.g. checksums.txt)
-    checksums = release_base_url .. "/checksums.txt",
-    -- GPG signature for the file
-    sigs = {
-      {
-        file = "my-cli-" .. SYSTEM.OS .. "-" .. SYSTEM.ARCH,
-        sig = release_base_url .. "/my-cli.sig"
-      }
-    }
-  }
-})
-```
-
-Zoi will use the `key` from the `maintainer` or `author` block to verify the signature. You can manage keys with the `zoi pgp` command.
-
-## Step 3: Adding Dependencies
-
-Define dependencies in the `dependencies{}` block.
-
-```lua
-dependencies({
-  -- Build-time dependencies
-  build = {
-    required = { "native:make", "native:gcc" },
-    optional = { "native:rust:for rust language support" }
-  },
-  -- Runtime dependencies
-  runtime = {
-    required = { "zoi:some-base-library" },
-    -- Let the user choose a GUI provider
-    options = {
-      {
-        name = "GUI",
-        desc = "GUI Providers",
-        all = false, -- 'false' means choose one, 'true' allows multiple
-        depends = {
-          "native:qt6:for KDE desktop environments",
-          "native:gtk4:for GNOME-based desktop environments"
-        }
-      }
-    }
-  }
-})
-```
-
-For more details, see the [Dependencies guide](/docs/zds/zoi/dependencies).
-
-## Step 4: Advanced Features
-
-Zoi supports many advanced features in the `package{}` block:
-
-- `alt`: Redirect to another package, URL, or file.
-- `updater`: Force `zoi update` to use a specific install method (e.g. `source`).
-- `rollback = false`: Disable rollback backups for this package.
-- `updates`: A list of messages (breaking changes, vulnerabilities) to show the user before installation.
-
-See the [Package Examples](/docs/zds/zoi/examples) for how to use these.
-
-## Step 5: Testing Your Package Locally
-
-Before publishing, you **must** test your package locally.
+The fastest way to test your `.pkg.lua` file is to install it directly. This command will resolve dependencies and run the full installation logic without creating an intermediate package archive. It's perfect for iterating on your `prepare` and `package` functions.
 
 ```sh
-# Install from your local .pkg.lua file
-zoi install ./my-package.pkg.lua
-
-# If testing a source build specifically
-zoi build ./my-package.pkg.lua
+zoi install /path/to/your-package.pkg.lua
 ```
 
-After installation, run the package's command to ensure it works, then uninstall it to test cleanup.
+### Building the Package Archive
+
+Once you are confident your package works, you can build a distributable archive. This is what Zoi would download from a pre-built package registry.
 
 ```sh
-zoi uninstall my-package
+zoi package build --type <build-type> /path/to/your-package.pkg.lua
 ```
 
-## Step 6: The `zoi package` Workflow (Advanced)
+- `--type`: Specify the build type, e.g. `source` or `pre-compiled`. This value is available in your script as the `BUILD_TYPE` global variable.
 
-For more complex packages, Zoi provides a dedicated `package` command set for a structured build process.
+This command creates a `.pkg.tar.zst` file in the same directory as your `.pkg.lua` file.
 
-1.  **`zoi package meta <path/to/file.pkg.lua>`**:
-    Generates a `*.meta.json` file. This file resolves all the dynamic Lua script logic for each platform into a static description of all assets, checksums, and signatures. You can also specify `--type <type>` to force generation from a specific installation method (`binary`, `com_binary`, or `source`).
+### Installing the Built Archive
 
-2.  **`zoi package build <path/to/file.meta.json>`**:
-    Takes the `meta.json` file, downloads all the assets for the **current platform**, verifies them, and bundles them into a single Zoi package archive (`.pkg.tar.zst`).
+To ensure your final archive is correct, you can install it locally using the `zoi package install` command.
 
-3.  **`zoi package install <path/to/file.pkg.tar.zst>`**:
-    Installs a package from a local Zoi package archive. This is how Zoi installs pre-built packages from a repository.
+```sh
+zoi package install /path/to/your-package-1.0.0-linux-amd64.pkg.tar.zst
+```
 
-This workflow is used internally by Zoi's CI/CD to build and publish official packages, but you can also use it for your own complex build pipelines.
+This command unpacks the archive and runs the same installation procedure that a user would experience, providing a final end-to-end test of your package.
 
-## Step 7: Publishing Your Package
+## Next Steps: Publishing Your Package
 
-Once your package is tested and ready, you can publish it to the official repositories or host your own.
-
-For a complete guide on publishing, please see:
-
-- **[Publishing Packages](/docs/zds/zoi/publishing-packages)**
+Once you have created and tested your package, the next step is to make it available to others. For a detailed guide on how to submit your package to the official Zoidberg repository or how to host your own, see the [Publishing Packages](/docs/zds/zoi/publishing-packages) guide.

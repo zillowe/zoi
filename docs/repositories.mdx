@@ -1,19 +1,15 @@
 ---
 title: Repositories
-description: Official Zoi repositories, mirrors, and repository tiers.
+description: Zoi repositories, mirrors, teirs and registries.
 ---
 
 This page explains Zoi's official repositories and mirrors, and how package repositories are organized by tier.
 
-## Official project and package database
-
-- Source code (Zoi)
-  - Primary: [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi)
-  - Mirrors: [GitHub](https://github.com/Zillowe/Zoi), [Codeberg](https://codeberg.org/Zillowe/Zoi)
+## Official package database
 
 - Packages database (Zoidberg)
-  - Primary: [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg)
-  - Mirrors: [GitHub](https://github.com/Zillowe/Zoidberg), [Codeberg](https://codeberg.org/Zillowe/Zoidberg)
+  - Primary: [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg.git)
+  - Mirrors: [GitHub](https://github.com/Zillowe/Zoidberg.git), [Codeberg](https://codeberg.org/Zillowe/Zoidberg.git)
 
 ## Managing the Package Database Registry
 
@@ -24,13 +20,15 @@ This is useful if you want to use a mirror or a completely different package dat
 | Command                         | Description                                                                                  |
 | ------------------------------- | -------------------------------------------------------------------------------------------- |
 | `zoi sync set <url-or-keyword>` | Sets the package database registry URL. Keywords: `default`, `gitlab`, `github`, `codeberg`. |
-| `zoi sync show`                 | Displays the current registry URL.                                                           |
+| `zoi sync list`                 | Displays the current configured registries.                                                  |
+| `zoi sync add <url>`            | Adds a new registry to be synced.                                                            |
+| `zoi sync remove <handle>`      | Removes a configured registry by its handle.                                                 |
 
 ### Examples
 
 ```sh
-# Show the current registry URL
-zoi sync show
+# Show the current configured registries
+zoi sync list
 
 # Set the registry to the official GitHub mirror
 zoi sync set github
@@ -39,16 +37,9 @@ zoi sync set github
 zoi sync set https://my-custom-registry.com/Zoidberg.git
 ```
 
-### Automatic Fallback
-
-To improve reliability, Zoi can automatically try syncing from the mirrors defined in the `mirrors-git` list of the `repo.yaml` file if your configured primary registry is unavailable.
-
-- **`zoi sync --fallback`**: If the sync fails, Zoi will attempt to use the mirrors one by one until it succeeds.
-- **`zoi update`**: The `update` command uses this fallback mechanism by default to ensure that package updates are as reliable as possible.
-
 ## Repository tiers
 
-Zoi organizes packages into tiers. Use these to decide where a package belongs and to assess stability.
+Zoi organizes packages into tiers. Use these to decide where a package belongs and to assess stability, example tiers (from [Zoidberg](/docs/zds/zoi/zoidberg).
 
 | Repository  | Purpose                                                                           |
 | ----------- | --------------------------------------------------------------------------------- |
@@ -121,68 +112,122 @@ This works if the target repository has a `zoi.yaml` file in its root. The `pack
 
 ## Installing from a specific repository
 
-- Top-level repository:
+You can specify which repository or registry to install a package from using special prefixes.
 
-```sh
-zoi install @community/htop
-```
+- **From a top-level repository in the default registry:**
 
-- Nested repository path (e.g. platform-specific):
+  This installs `htop` from the `community` repository.
 
-```sh
-zoi install @core/linux/amd64/nvidia-driver
-```
+  ```sh
+  zoi install @community/htop
+  ```
 
-To install a package from your custom git repository, use the `@git/` prefix, followed by the repository name and the package name.
+- **From a nested repository path:**
 
-```sh
-# Install from the root of 'my-zoi-repo'
-zoi install @git/my-zoi-repo/package
+  This is useful for platform-specific packages.
 
-# Install from a nested directory within the git repo
-zoi install @git/my-zoi-repo/path/to/package
-```
+  ```sh
+  zoi install @core/linux/amd64/nvidia-driver
+  ```
+
+- **From a specific registry:**
+
+  If you have multiple registries configured (see `zoi sync list`), you can target one using its handle. This installs `my-package` from the `my-repo` repository within the `my-registry` registry.
+
+  ```sh
+  zoi install #my-registry@my-repo/my-package
+  ```
+
+- **From a custom git repository:**
+
+  Use the `@git/` prefix, followed by the repository name (the directory name in `~/.zoi/pkgs/git/`) and the package name.
+
+  ```sh
+  # Install from a nested directory within the git repo
+  zoi install @git/my-zoi-repo/path/to/package
+  ```
+
+- **From a remote git repository on the fly:**
+
+  You can install a package directly from a remote git repository that acts as a Zoi registry, without adding it first. This is useful for testing or one-off installations. The repository must contain a `repo.yaml` file.
+
+  The syntax is `#git:<host>/<user>/<repo>@<repo_in_registry>/<package>`.
+
+  Supported hosts are `github.com`, `gitlab.com`, and `codeberg.org`.
+
+  ```sh
+  # Install 'my-package' from the 'community' repo inside a registry hosted on GitHub
+  zoi install '#git:github.com/some-user/my-zoi-registry@community/my-package'
+  ```
 
 For creating packages, see [Creating Packages](/docs/zds/zoi/creating-packages).
 
 For publishing packages, see [Publishing Packages](/docs/zds/zoi/publishing-packages).
 
-## Nel Package Registry
-
-All packages from the official `core`, `main`, `extra`, and `community` repositories are browsable and searchable on the [Nel Registry](https://nel.zillowe.qzz.io). This provides a convenient way to discover new packages and view their details online.
-
 ## The `repo.yaml` file
 
-A Zoi package registry is defined by a `repo.yaml` file at its root. This file contains metadata about the repository, such as its name, description, and the URLs for its git repository and pre-built packages.
+A Zoi package registry is defined by a `repo.yaml` file at its root. This file contains metadata about the repository, such as its name, description, and the URLs for its git repository and pre-built packages. When you run `zoi sync`, Zoi also automatically imports any PGP keys listed in the `pgp` section.
 
 Here are the fields available in `repo.yaml`:
 
-| Field         | Type     | Description                                                                                                                                      |
-| ------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `name`        | `string` | The name of the repository.                                                                                                                      |
-| `description` | `string` | A short description of the repository.                                                                                                           |
-| `repo-git`    | `string` | The primary git URL for the package database. This is where Zoi will clone the repository from.                                                  |
-| `mirrors-git` | `list`   | (Optional) A list of fallback git URLs to use if the primary `repo-git` fails. Zoi will try them in order.                                       |
-| `repo-pkg`    | `string` | (Optional) The URL template for a pre-built package registry. Zoi will try to download pre-built packages from here before building from source. |
-| `mirrors-pkg` | `list`   | (Optional) A list of fallback URLs for the pre-built package registry.                                                                           |
+| Field         | Type                | Description                                                                                                                                                         |
+| ------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`        | `string`            | The name of the repository. This is used as the handle for the registry.                                                                                            |
+| `description` | `string`            | A short description of the repository.                                                                                                                              |
+| `git`         | `list` of `GitLink` | A list of git repository URLs. The `type` can be `main` for the primary repository or `mirror` for fallbacks.                                                       |
+| `pkg`         | `list` of `PkgLink` | (Optional) A list of URLs for pre-built package registries. Zoi will try to download pre-built packages from here before building from source.                      |
+| `pgp`         | `list` of `PgpKey`  | (Optional) A list of PGP keys to import for package signature verification. The `key` can be a URL to the key file or a PGP fingerprint.                            |
+| `repos`       | `list` of `Repo`    | A list of the sub-repositories (or tiers) contained within the registry. `type` can be `offical`, `community`, etc. `active` determines if it's enabled by default. |
 
-The `repo-pkg` and `mirrors-pkg` URLs can contain the following placeholders, which Zoi will replace at runtime:
+### `PkgLink` Placeholders
+
+The `url`, `pgp`, and `hash` fields within a `PkgLink` object can contain the following placeholders, which Zoi will replace at runtime:
 
 - `{os}`: The operating system (e.g. `linux`, `macos`, `windows`).
 - `{arch}`: The CPU architecture (e.g. `amd64`, `arm64`).
 - `{version}`: The version of the package.
-- `{package}`: The name of the package.
+- `{repo}`: The name of the sub-repository (e.g. `core`, `main`).
 
 ### Example
 
 ```yaml
-name: Zoi repo
-description: The official Zoi package repository.
-repo-git: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoiberg.git
-mirrors-git:
-  - https://github.com/Zillowe/Zoidberg.git
-  - https://codeberg.org/Zillowe/Zoidberg.git
-repo-pkg: https://zoi.zillowe.qzz.io/pkgs/{os}/{arch}/{version}/{package}
-mirrors-pkg:
-  - https://zoi.zilo.qzz.io/pkgs/{os}/{arch}/{version}/{package}
+name: Zoidberg
+description: Official Zoi packages repository
+git:
+  - type: main
+    url: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg.git
+  - type: mirror
+    url: https://github.com/Zillowe/Zoidberg.git
+  - type: mirror
+    url: https://codeberg.org/Zillowe/Zoidberg.git
+pkg:
+  - type: main
+    url: https://zillowe.pages.dev/pkgs/{repo}/{os}/{arch}/{version}
+    pgp: https://zillowe.pages.dev/pkgs/{repo}/{os}/{arch}/{version}.asc
+    hash: https://zillowe.pages.dev/pkgs/{repo}/{os}/{arch}/{version}.txt
+pgp:
+  - name: zillowe-main
+    key: https://zillowe.pages.dev/keys/zillowe-main.asc
+repos:
+  - name: core
+    type: offical
+    active: true
+  - name: main
+    type: offical
+    active: true
+  - name: extra
+    type: offical
+    active: true
+  - name: community
+    type: community
+    active: false
+  - name: archive
+    type: archive
+    active: false
+  - name: test
+    type: test
+    active: false
+  - name: zillowe
+    type: offical
+    active: false
 ```

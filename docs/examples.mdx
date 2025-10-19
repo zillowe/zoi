@@ -5,438 +5,221 @@ description: A set of `.pkg.lua` examples for creating Zoi packages.
 
 This document provides a set of examples for creating `.pkg.lua` files. These files are the core of Zoi's packaging system, defining everything from metadata to installation methods using the power of Lua scripting.
 
-## Comprehensive Package Example
+## Simple Pre-compiled Binary
 
-This is a comprehensive example that showcases many of Zoi's packaging features. It defines a package with multiple, selectable installation methods, including pre-compiled binaries, compressed archives, an installer script, and building from source, with platform-specific logic.
+This example shows how to package a simple pre-compiled binary that is downloaded from a URL (like a GitHub release). It's for a hypothetical tool called `my-cli`.
 
 ```lua
--- hello.pkg.lua
+-- my-cli.pkg.lua
+metadata({
+  name = "my-cli",
+  repo = "community",
+  version = "1.2.3",
+  description = "A cool command-line tool.",
+  website = "https://example.com/my-cli",
+  license = "MIT",
+  bins = { "my-cli" },
+  types = { "pre-compiled" },
+})
 
--- Using local variables to follow DRY principle.
+function prepare()
+  local version = PKG.version
+  local os = SYSTEM.OS
+  local arch = SYSTEM.ARCH
+  local ext = "tar.gz"
+  if os == "windows" then
+    ext = "zip"
+  end
+
+  -- Construct the download URL, e.g. from GitHub releases
+  local url = "https://example.com/my-cli/releases/download/v" .. version .. "/my-cli-" .. os .. "-" .. arch .. "." .. ext
+
+  -- Download and extract the archive into a directory named "extracted_cli" inside the temporary build directory
+  UTILS.EXTRACT(url, "extracted_cli")
+end
+
+function package()
+  local bin_name = "my-cli"
+  if SYSTEM.OS == "windows" then
+    bin_name = "my-cli.exe"
+  end
+
+  -- Copy the binary from the extracted directory to the package store.
+  -- ${pkgstore} is a special variable that points to the final installation directory for the package.
+  zcp("extracted_cli/" .. bin_name, "${pkgstore}/bin/" .. bin_name)
+end
+```
+
+## Simple Source Build
+
+This example shows how to build a package from source. It clones a git repository and runs `make` to build the binary.
+
+```lua
+-- my-git-tool.pkg.lua
+metadata({
+  name = "my-git-tool",
+  repo = "community",
+  version = "1.0.0",
+  description = "A simple tool built from a git repository.",
+  website = "https://example.com/my-git-tool",
+  license = "GPL-3.0-or-later",
+  bins = { "my-git-tool" },
+  types = { "source" },
+})
+
+-- Define build-time dependencies. Zoi will ensure these are available.
+dependencies({
+  build = {
+    required = { "native:gcc", "native:make", "native:git" }
+  }
+})
+
+function prepare()
+  -- Clone the git repository into a "source" directory inside the temporary build directory
+  cmd("git clone https://example.com/my-git-tool.git source")
+end
+
+function package()
+  -- Run build commands inside the cloned repository
+  cmd("cd source && make")
+
+  -- Copy the final binary to the package store
+  zcp("source/my-git-tool", "${pkgstore}/bin/my-git-tool")
+end
+```
+
+## Advanced Example
+
+This example, based on the real `hello` package from the `zillowe` repository, demonstrates more advanced features like platform mapping, checksum and signature verification, and handling both pre-compiled and source builds in one file.
+
+```lua
 local repo_owner = "Zillowe"
 local repo_name = "Hello"
-local version = "2.0.0"
+local version = ZOI.VERSION or "3.0.0"
 local git_url = "https://github.com/" .. repo_owner .. "/" .. repo_name .. ".git"
 local release_base_url = "https://github.com/" .. repo_owner .. "/" .. repo_name .. "/releases/download/v" .. version
 
--- Platform mapping allows customizing OS and architecture names for URLs and filenames.
--- The key is the platform string reported by Zoi (e.g. "macos", "linux-amd64").
--- The value is the desired platform string to be used in the package script.
 local platform_map = {
-	macos = "darwin",
+  macos = "darwin",
 }
 
 local function get_mapped_platform()
-	local current_platform = SYSTEM.OS .. "-" .. SYSTEM.ARCH
-	return platform_map[current_platform] or platform_map[SYSTEM.OS] or current_platform
+  local current_platform = SYSTEM.OS .. "-" .. SYSTEM.ARCH
+  return platform_map[current_platform] or platform_map[SYSTEM.OS] or current_platform
 end
 
 local function get_mapped_os()
-	return get_mapped_platform():match("([^%-]+)")
+  return get_mapped_platform():match("([^-]+)")
 end
 
-package({
-	name = "hello",
-	repo = "zillowe",
-	version = version,
-	description = "Hello World",
-	website = "https://github.com/Zillowe/Hello",
-	git = git_url,
-	maintainer = {
-		name = "Your Name",
-		email = "your-email@example.com",
-	},
-	author = {
-		name = "Zillowe Foundation",
-		website = "https://zillowe.qzz.io",
-		email = "contact@zillowe.qzz.io",
-		key = "https://zillowe.pages.dev/keys/zillowe-main.asc",
-		key_name = "zillowe-main",
-	},
-	license = "Apache-2.0",
-	bins = { "hello" },
-	conflicts = { "hello" },
-})
-
-install({
-	selectable = true,
-	{
-		name = "Binary",
-		type = "binary",
-		url = (function()
-			return release_base_url .. "/hello-" .. get_mapped_os() .. "-" .. SYSTEM.ARCH
-		end)(),
-		platforms = { "all" },
-		checksums = (function()
-			return release_base_url .. "/checksums-512.txt"
-		end)(),
-		sigs = {
-			{
-				file = (function()
-					return "hello-" .. get_mapped_os() .. "-" .. SYSTEM.ARCH
-				end)(),
-				sig = (function()
-					return release_base_url .. "/hello-" .. get_mapped_os() .. "-" .. SYSTEM.ARCH .. ".sig"
-				end)(),
-			},
-		},
-	},
-	{
-		name = "Compressed Binary",
-		type = "com_binary",
-		url = (function()
-			local ext
-			if SYSTEM.OS == "windows" then
-				ext = "zip"
-			else
-				ext = "tar.xz"
-			end
-			return release_base_url .. "/hello-" .. get_mapped_os() .. "-" .. SYSTEM.ARCH .. "." .. ext
-		end)(),
-		platforms = { "all" },
-		checksums = (function()
-			return release_base_url .. "/checksums-512.txt"
-		end)(),
-		sigs = {
-			{
-				file = (function()
-					local ext
-					if SYSTEM.OS == "windows" then
-						ext = "zip"
-					else
-						ext = "tar.xz"
-					end
-					return "hello-" .. get_mapped_os() .. "-" .. SYSTEM.ARCH .. "." .. ext
-				end)(),
-				sig = (function()
-					local ext
-					if SYSTEM.OS == "windows" then
-						ext = "zip"
-					else
-						ext = "tar.xz"
-					end
-					return release_base_url
-							.. "/hello-"
-							.. get_mapped_os()
-							.. "-"
-							.. SYSTEM.ARCH
-							.. "."
-							.. ext
-							.. ".sig"
-				end)(),
-			},
-		},
-	},
-	{
-		name = "Install Script",
-		type = "script",
-		url = (function()
-			local ext
-			if SYSTEM.OS == "windows" then
-				ext = "ps1"
-			else
-				ext = "sh"
-			end
-			return "https://raw.githubusercontent.com/Zillowe/Hello/refs/heads/main/app/install." .. ext
-		end)(),
-		platforms = { "all" },
-	},
-	{
-		name = "Build from source",
-		type = "source",
-		url = git_url,
-		platforms = { "linux", "macos", "windows" },
-		build_commands = {
-			'go build -o hello -ldflags="-s -w" ./src',
-		},
-		bin_path = (function() -- the final binary path
-			local bin
-			if SYSTEM.OS == "windows" then
-				bin = "hello.exe"
-			else
-				bin = "./hello"
-			end
-			return bin
-		end)(),
-		files = {
-			{
-				platforms = { "linux", "macos" },
-				files = {
-					{
-						source = "README.md",
-						destination = "/usr/local/share/doc/hello/README.md",
-					},
-				},
-			},
-			{
-				platforms = { "windows" },
-				files = {
-					{
-						source = "README.md",
-						destination = "C:\\ProgramData\\hello\\README.md",
-					},
-				},
-			},
-		},
-	},
-})
-
-dependencies({
-	build = {
-		required = { "native:go" },
-	},
-})
-```
-
-## Build from Source Package
-
-For packages that need to be compiled on the user's machine, use the `source` installation type.
-
-```lua
--- dev/compiler.pkg.lua
-package({
-  name = "compiler",
-  repo = "community",
-  version = "0.1.0",
-  description = "A new programming language compiler.",
-  git = "https://github.com/user/compiler",
-  tags = { "compiler", "devtools" },
+metadata({
+  name = "hello",
+  repo = "zillowe",
+  version = version,
+  description = "Hello World",
+  website = "https://github.com/Zillowe/Hello",
+  git = git_url,
+  man = "https://raw.githubusercontent.com/Zillowe/Hello/refs/heads/main/app/man.md",
   maintainer = {
-    name = "Your Name",
-    email = "your.email@example.com"
-  }
-})
-
-install({
-  {
-    type = "source",
-    url = PKG.git, -- URL to the git repository.
-    platforms = { "linux-amd64", "macos-amd64", "windows-amd64" },
-    -- Optional: build inside a Docker container for reproducibility.
-    docker_image = "hub:golang:1.21-alpine",
-    -- Commands to execute in the cloned repository to build.
-    build_commands = {
-      "go build -o compiler"
-    },
-    -- Path to the built binary, relative to the repo root.
-    -- When using docker_image, this is the path inside the container.
-    bin_path = "./compiler"
-  }
+    name = "Zillowe Foundation",
+    website = "https://zillowe.qzz.io",
+    email = "contact@zillowe.qzz.io",
+  },
+  author = {
+    name = "Zillowe Foundation",
+    website = "https://zillowe.qzz.io",
+    email = "contact@zillowe.qzz.io",
+  },
+  license = "Apache-2.0",
+  bins = { "hello" },
+  conflicts = { "hello" },
+  types = { "source", "pre-compiled" },
 })
 
 dependencies({
   build = {
-    required = { "zoi:go", "native:make" },
-    optional = { "cargo:some-build-tool:additional build helper" }
+    required = { "native:zig" },
   },
-  runtime = {
-    required = { "native:openssl" }
-  }
-})
-```
-
-## Package Collection
-
-A `collection` is a meta-package that only installs other packages as dependencies.
-
-```lua
--- collections/web-dev-essentials.pkg.lua
-package({
-  name = "web-dev-essentials",
-  repo = "community",
-  type = "collection", -- Set the package type to 'collection'.
-  version = "1.0",
-  description = "A collection of essential tools for web development.",
-  tags = { "collection", "web", "devtools" },
-  maintainer = {
-    name = "Community",
-    email = "community@example.com"
-  }
 })
 
--- The 'runtime' dependencies are the packages that will be installed.
-dependencies({
-  runtime = {
-    required = {
-      "zoi:node",
-      "zoi:bun",
-      "native:git"
-    },
-    optional = {
-      "npm:pnpm",
-      "npm:serve",
-      "npm:typescript"
-    }
-  }
-})
-```
+function prepare()
+  print("Adding PGP key for verification...")
+  addPgpKey("https://zillowe.pages.dev/keys/zillowe-main.asc", "zillowe-main")
 
-## Service Package
+  if BUILD_TYPE == "pre-compiled" then
+    local ext
+    if SYSTEM.OS == "windows" then
+      ext = "zip"
+    else
+      ext = "tar.xz"
+    end
+    local file_name = "hello-" .. get_mapped_os() .. "-" .. SYSTEM.ARCH .. "." .. ext
+    local url = release_base_url .. "/" .. file_name
 
-A `service` package is for applications that need to run in the background. Zoi can manage starting and stopping them.
+    UTILS.EXTRACT(url, "precompiled")
+  elseif BUILD_TYPE == "source" then
+    cmd("git clone " .. PKG.git .. " " .. BUILD_DIR .. "/source")
+    cmd("cd " .. BUILD_DIR .. "/source && zig build-exe main.zig -O ReleaseSmall --name hello")
+  end
+end
 
-```lua
--- services/my-database.pkg.lua
-package({
-  name = "my-database",
-  repo = "community",
-  type = "service", -- Set the package type to 'service'.
-  version = "5.7",
-  description = "A lightweight database server.",
-  tags = { "service", "database" },
-  maintainer = {
-    name = "Your Name",
-    email = "your.email@example.com"
-  },
-  -- The 'service' block defines how to manage the service.
-  service = {
-    {
-      platforms = { "linux-amd64", "macos-amd64" },
-      start = { "my-database --config /etc/my-database.conf" },
-      stop = { "pkill my-database" }
-    }
-  }
-})
+function package()
+  local bin_name = "hello"
+  if SYSTEM.OS == "windows" then
+    bin_name = "hello.exe"
+  end
 
-install({
-  {
-    type = "binary",
-    url = "https://example.com/my-database-v" .. PKG.version .. "-" .. SYSTEM.OS .. "-" .. SYSTEM.ARCH,
-    platforms = { "linux-amd64", "macos-amd64" }
-  }
-})
-```
+  if BUILD_TYPE == "pre-compiled" then
+    local bin_path = UTILS.FIND.file("precompiled", bin_name)
+    if bin_path then
+      zcp(bin_path, "${pkgstore}/bin/" .. bin_name)
+    else
+      error("Could not find '" .. bin_name .. "' in pre-compiled archive.")
+    end
+  elseif BUILD_TYPE == "source" then
+    zcp("source/" .. bin_name, "${pkgstore}/bin/" .. bin_name)
+  end
+end
 
-## Library Package
+function verify()
+  if BUILD_TYPE == "pre-compiled" then
+    local checksum_url = release_base_url .. "/checksums-512.txt"
+    local checksum_content = UTILS.FETCH.url(checksum_url)
 
-A `library` package installs shared/static libraries and header files. It can also generate a `.pc` file for `pkg-config`.
+    local ext
+    if SYSTEM.OS == "windows" then
+      ext = "zip"
+    else
+      ext = "tar.xz"
+    end
+    local file_name = "hello-" .. get_mapped_os() .. "-" .. SYSTEM.ARCH .. "." .. ext
+    local file_path = BUILD_DIR .. "/" .. file_name
 
-```lua
--- libs/my-library.pkg.lua
-package({
-  name = "my-library",
-  repo = "community",
-  type = "library",
-  version = "1.2.0",
-  description = "A library for doing awesome things.",
-  tags = { "library", "c++" },
-  maintainer = {
-    name = "Your Name",
-    email = "your.email@example.com"
-  },
-  -- This block is used to generate the .pc file
-  pkg_config = {
-    description = "My Awesome Library",
-    libs = "-L/usr/local/lib -lmy-library",
-    cflags = "-I/usr/local/include/my-library"
-  }
-})
+    local expected_checksum = UTILS.PARSE.checksumFile(checksum_content, file_name)
 
-install({
-  {
-    type = "com_binary",
-    url = "https://example.com/my-library/v" .. PKG.version .. "-" .. SYSTEM.OS .. "-" .. SYSTEM.ARCH .. ".tar.gz",
-    platforms = { "linux-amd64" }
-  }
-})
-```
+    if not expected_checksum or not verifyHash(file_path, "sha512-" .. expected_checksum) then
+      print("Checksum verification failed!")
+      return false
+    end
+    print("Checksum verified successfully.")
 
-## Script Package
+    print("Verifying signature...")
+    local sig_url = release_base_url .. "/" .. file_name .. ".sig"
+    local sig_path = BUILD_DIR .. "/" .. file_name .. ".sig"
 
-A `script` package runs a series of inline shell commands instead of installing a binary. This is useful for complex setup actions.
+    print("Downloading signature from " .. sig_url)
+    UTILS.FILE(sig_url, sig_path)
 
-```lua
--- my-setup-script.pkg.lua
-package({
-  name = "my-setup-script",
-  repo = "community",
-  type = "script",
-  version = "1.0",
-  description = "A package that runs a series of setup commands.",
-  tags = { "script", "setup" },
-  maintainer = {
-    name = "Your Name",
-    email = "your.email@example.com"
-  },
-  -- The 'script' field contains the commands to run.
-  script = {
-    {
-      platforms = { "linux", "macos" },
-      install = {
-        "echo 'Creating configuration directory...'",
-        "mkdir -p ~/.config/my-app",
-        "echo 'hello: world' > ~/.config/my-app/config.yml"
-      },
-      uninstall = {
-        "echo 'Removing configuration...'",
-        "rm -rf ~/.config/my-app"
-      }
-    }
-  }
-})
-```
+    if not verifySignature(file_path, sig_path, "zillowe-main") then
+      print("Signature verification failed!")
+      return false
+    end
 
-## App Template Package
+    print("Signature verified successfully.")
+    return true
+  end
+  return true
+end
 
-An `app` package defines a template to scaffold applications via `zoi create <source> <appName>`. It is not installable directly.
-
-```lua
--- apps/rails-app.pkg.lua
-package({
-  name = "rails-app",
-  repo = "community",
-  type = "app",
-  version = "7",
-  description = "Rails app template",
-  tags = { "app", "rails", "ruby" },
-  maintainer = {
-    name = "Your Name",
-    email = "you@example.com"
-  },
-  -- Platform-specific create command and optional follow-up commands
-  app = {
-    {
-      platforms = { "all" },
-      appCreate = "rails new ${appName}",
-      commands = {
-        "cd ${appName} && bundle install",
-        "cd ${appName} && git init"
-      }
-    }
-  }
-})
-
-dependencies({
-  runtime = {
-    required = { "zoi:@core/ruby", "zoi:@main/gems/rails" }
-  }
-})
-```
-
-## Extension Package
-
-An `extension` package modifies Zoi's configuration. It is managed with `zoi extension add` and `zoi extension remove`.
-
-```lua
--- extensions/corp-repos.pkg.lua
-package({
-  name = "corp-repos",
-  repo = "community",
-  type = "extension",
-  version = "1.0",
-  description = "Adds the official corporate package repositories for MyCorp.",
-  tags = { "extension", "config" },
-  maintainer = {
-    name = "MyCorp IT",
-    email = "it@mycorp.com"
-  },
-  extension = {
-    type = "zoi",
-    changes = {
-      { type = "repo-git", add = "https://git.mycorp.com/zoi-packages.git" },
-      { type = "repo-add", add = "test" },
-      { type = "registry-repo", add = "https://zoi-mirror.mycorp.com/Zoidberg.git" }
-    }
-  }
-})
+function uninstall() end
 ```
