@@ -173,7 +173,7 @@ makepkg -si
 
 ##### Fedora
 
-Install `zoi-rs` on Fedora from [Terra](https://terra.fyralabs.com) repo (not maintained by us, uses [Crates.io](#cratesio) so may not be up-to-date):
+Install `zoi-rs` on Fedora from [Terra](https://terra.fyralabs.com) repo (not maintained by us so updates can be late, uses [Crates.io](#cratesio) version):
 
 ```sh
 # add terra repo

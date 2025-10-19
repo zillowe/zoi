@@ -16,20 +16,18 @@ The Security Policy can be found online at [zillowe.qzz.io/docs/book/guidelines/
 | [AUR `zoi-bin`](https://aur.archlinux.org/packages/zoi-bin)                               | ✔️        |
 | [Homebrew](https://github.com/Zillowe/homebrew-tap)                                       | ✔️        |
 | [Scoop](https://github.com/Zillowe/scoop)                                                 | ✔️        |
-| [Crates.io `zoi-rs`](https://crates.io/crates/zoi-rs)                                     | ❔        |
+| [Crates.io `zoi-rs`](https://crates.io/crates/zoi-rs)                                     | ✔️        |
 | [Fedora `zoi-rs`](https://github.com/terrapkg/packages/tree/frawhide/anda/langs/rust/zoi) | ❌        |
 | NPM `@zillowe/zoi`                                                                        | ❌        |
 
-Crates.io package can be out-of-date sometimes.
-
 The NPM package just runs the installer script.
 
-Fedora package is from an external [Terra](https://terra.fyralabs.com/) repo and is not maintained by us, it uses the [Crates.io](./README.md#cratesio) version so it may not be up-to-date.
+Fedora package is from an external [Terra](https://terra.fyralabs.com/) repo and is not maintained by us, updates can be late.
 
 Meanings:
 
 - ✔️ Fully supported
-- ❔ Could be out-of-date
+- ❔ Not fully supported
 - ❌ Not supported
 
 ## Security Updates
