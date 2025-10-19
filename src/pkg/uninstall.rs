@@ -32,7 +32,7 @@ fn uninstall_collection(
     manifest: &types::InstallManifest,
     scope: types::Scope,
     registry_handle: Option<String>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<types::InstallManifest> {
     println!("Uninstalling collection '{}'...", pkg.name.bold());
 
     let dependencies_to_uninstall = &manifest.installed_dependencies;
@@ -43,9 +43,9 @@ fn uninstall_collection(
         println!("Uninstalling dependencies of the collection...");
         for dep_str in dependencies_to_uninstall {
             println!("\n--- Uninstalling dependency: {} ---", dep_str.bold());
-            if let Err(e) =
-                dependencies::uninstall_dependency(dep_str, &move |name| run(name, Some(scope)))
-            {
+            if let Err(e) = dependencies::uninstall_dependency(dep_str, &move |name| {
+                run(name, Some(scope)).map(|_| ())
+            }) {
                 eprintln!(
                     "Warning: Could not uninstall dependency '{}': {}",
                     dep_str, e
@@ -74,10 +74,13 @@ fn uninstall_collection(
         Err(e) => eprintln!("{} telemetry failed: {}", "Warning:".yellow(), e),
     }
 
-    Ok(())
+    Ok(manifest.clone())
 }
 
-pub fn run(package_name: &str, scope_override: Option<types::Scope>) -> anyhow::Result<()> {
+pub fn run(
+    package_name: &str,
+    scope_override: Option<types::Scope>,
+) -> anyhow::Result<types::InstallManifest> {
     let (pkg, _, _, pkg_lua_path, registry_handle) =
         resolve::resolve_package_and_version(package_name)?;
 
@@ -248,5 +251,5 @@ pub fn run(package_name: &str, scope_override: Option<types::Scope>) -> anyhow::
         return Err(anyhow::anyhow!("Post-remove hook failed: {}", e));
     }
 
-    Ok(())
+    Ok(manifest)
 }

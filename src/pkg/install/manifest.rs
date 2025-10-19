@@ -1,7 +1,7 @@
 use crate::pkg::{local, types};
 use anyhow::Result;
 
-pub fn write_manifest(
+pub fn create_manifest(
     pkg: &types::Package,
     reason: types::InstallReason,
     installed_dependencies: Vec<String>,
@@ -10,8 +10,8 @@ pub fn write_manifest(
     registry_handle: &str,
     chosen_options: &[String],
     chosen_optionals: &[String],
-) -> Result<()> {
-    let manifest = types::InstallManifest {
+) -> Result<types::InstallManifest> {
+    Ok(types::InstallManifest {
         name: pkg.name.clone(),
         version: pkg.version.clone().expect("Version should be resolved"),
         repo: pkg.repo.clone(),
@@ -26,6 +26,28 @@ pub fn write_manifest(
         chosen_optionals: chosen_optionals.to_vec(),
         install_method,
         installed_files,
-    };
+    })
+}
+
+pub fn write_manifest(
+    pkg: &types::Package,
+    reason: types::InstallReason,
+    installed_dependencies: Vec<String>,
+    install_method: Option<String>,
+    installed_files: Vec<String>,
+    registry_handle: &str,
+    chosen_options: &[String],
+    chosen_optionals: &[String],
+) -> Result<()> {
+    let manifest = create_manifest(
+        pkg,
+        reason,
+        installed_dependencies,
+        install_method,
+        installed_files,
+        registry_handle,
+        chosen_options,
+        chosen_optionals,
+    )?;
     local::write_manifest(&manifest)
 }

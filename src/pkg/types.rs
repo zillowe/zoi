@@ -204,7 +204,7 @@ pub enum InstallReason {
     Dependency { parent: String },
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct InstallManifest {
     pub name: String,
     pub version: String,
@@ -225,6 +225,28 @@ pub struct InstallManifest {
     pub install_method: Option<String>,
     #[serde(default)]
     pub installed_files: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub enum TransactionOperation {
+    Install {
+        manifest: Box<InstallManifest>,
+    },
+    Uninstall {
+        manifest: Box<InstallManifest>,
+    },
+    Upgrade {
+        old_manifest: Box<InstallManifest>,
+        new_manifest: Box<InstallManifest>,
+    },
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Transaction {
+    pub id: String,
+    pub start_time: String,
+    pub operations: Vec<TransactionOperation>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]

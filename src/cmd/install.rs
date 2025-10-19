@@ -1,4 +1,4 @@
-use crate::pkg::{config, install, resolve, types};
+use crate::pkg::{config, install, resolve, transaction, types};
 use crate::project;
 use colored::Colorize;
 use rayon::prelude::*;
@@ -225,7 +225,16 @@ pub fn run(
         }
     };
 
+    let transaction = match transaction::begin() {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("Failed to begin transaction: {}", e);
+            std::process::exit(1);
+        }
+    };
+
     println!("\nStarting installation...");
+    let mut overall_success = true;
 
     for (i, stage) in stages.iter().enumerate() {
         println!(
@@ -241,8 +250,21 @@ pub fn run(
             println!("Installing {}...", node.pkg.name.cyan());
 
             match install::installer::install_node(node, mode, None) {
-                Ok(_) => {
+                Ok(manifest) => {
                     println!("Successfully installed {}", node.pkg.name.green());
+
+                    if let Err(e) = transaction::record_operation(
+                        &transaction.id,
+                        types::TransactionOperation::Install {
+                            manifest: Box::new(manifest),
+                        },
+                    ) {
+                        eprintln!(
+                            "Error: Failed to record transaction operation for {}: {}",
+                            node.pkg.name, e
+                        );
+                        failed_packages.lock().unwrap().push(node.pkg.name.clone());
+                    }
 
                     if matches!(node.reason, types::InstallReason::Direct) {
                         successfully_installed_sources
@@ -273,24 +295,36 @@ pub fn run(
                 "Error".red().bold(),
                 i + 1
             );
-
+            overall_success = false;
             break;
         }
     }
 
-    let failed_packages = failed_packages.into_inner().unwrap();
-
-    if !failed_packages.is_empty() {
+    if !overall_success {
         eprintln!(
             "\n{}: The following packages failed to install:",
             "Error".red().bold()
         );
-
-        for pkg in &failed_packages {
+        for pkg in &failed_packages.into_inner().unwrap() {
             eprintln!("  - {}", pkg);
         }
 
+        eprintln!("\n{} Rolling back changes...", "---".yellow().bold());
+        if let Err(e) = transaction::rollback(&transaction.id) {
+            eprintln!("\nCRITICAL: Rollback failed: {}", e);
+            eprintln!(
+                "The system may be in an inconsistent state. The transaction log is at ~/.zoi/transactions/{}.json",
+                transaction.id
+            );
+        } else {
+            println!("\n{} Rollback successful.", "Success:".green().bold());
+        }
+
         std::process::exit(1);
+    }
+
+    if let Err(e) = transaction::commit(&transaction.id) {
+        eprintln!("Warning: Failed to commit transaction: {}", e);
     }
 
     if save && scope_override == Some(types::Scope::Project) {
@@ -307,5 +341,5 @@ pub fn run(
         }
     }
 
-    println!("\n{}", "Installation complete!".green().bold());
+    println!("\n{} Installation complete!", "Success:".green().bold());
 }

@@ -13,7 +13,7 @@ pub fn install_node(
     node: &InstallNode,
     mode: InstallMode,
     m: Option<&MultiProgress>,
-) -> Result<()> {
+) -> Result<types::InstallManifest> {
     let pkg = &node.pkg;
     let version = &node.version;
     let handle = &node.registry_handle;
@@ -38,7 +38,7 @@ pub fn install_node(
         );
     }
 
-    manifest::write_manifest(
+    let manifest = manifest::create_manifest(
         pkg,
         node.reason.clone(),
         vec![],
@@ -48,6 +48,8 @@ pub fn install_node(
         &node.chosen_options,
         &node.chosen_optionals,
     )?;
+
+    local::write_manifest(&manifest)?;
 
     if let Err(e) = recorder::record_package(
         pkg,
@@ -75,7 +77,7 @@ pub fn install_node(
 
     util::send_telemetry("install", pkg);
 
-    Ok(())
+    Ok(manifest)
 }
 
 fn run_install_flow(

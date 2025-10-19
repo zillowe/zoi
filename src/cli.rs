@@ -464,8 +464,12 @@ enum Commands {
     /// Rollback a package to the previously installed version
     Rollback {
         /// The name of the package to rollback
-        #[arg(value_name = "PACKAGE", value_parser = PackageValueParser, hide_possible_values = true)]
-        package: String,
+        #[arg(value_name = "PACKAGE", value_parser = PackageValueParser, hide_possible_values = true, required_unless_present = "last_transaction")]
+        package: Option<String>,
+
+        /// Rollback the last transaction
+        #[arg(long, conflicts_with = "package")]
+        last_transaction: bool,
     },
 
     /// Shows a package's manual
@@ -778,7 +782,18 @@ pub fn run() {
                 Ok(())
             }
             Commands::Extension(args) => cmd::extension::run(args, cli.yes),
-            Commands::Rollback { package } => cmd::rollback::run(&package, cli.yes),
+            Commands::Rollback {
+                package,
+                last_transaction,
+            } => {
+                if last_transaction {
+                    cmd::rollback::run_transaction_rollback(cli.yes)
+                } else if let Some(pkg) = package {
+                    cmd::rollback::run(&pkg, cli.yes)
+                } else {
+                    Ok(())
+                }
+            }
             Commands::Man {
                 package_name,
                 upstream,

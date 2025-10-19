@@ -19,7 +19,7 @@ pub fn run_installation(
     _processed_deps: &std::sync::Mutex<std::collections::HashSet<String>>,
     scope_override: Option<types::Scope>,
     m: Option<&MultiProgress>,
-) -> Result<()> {
+) -> Result<types::InstallManifest> {
     let (mut pkg, version, _, _, registry_handle) = resolve::resolve_package_and_version(source)?;
 
     if let Some(scope) = scope_override {

@@ -81,7 +81,8 @@ pub fn run(
             &processed_deps,
             scope_override,
             None,
-        );
+        )
+        .map(|_| ());
         fs::remove_file(temp_path)?;
         result
     } else if package_source.ends_with(".pkg.lua")
@@ -108,7 +109,8 @@ pub fn run(
             &processed_deps,
             scope_override,
             None,
-        );
+        )
+        .map(|_| ());
         fs::remove_file(temp_path)?;
         result
     } else {
@@ -127,6 +129,7 @@ pub fn run(
             scope_override,
             None,
         )
+        .map(|_| ())
     }
 }
 

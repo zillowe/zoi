@@ -1404,6 +1404,7 @@ fn install_zoi_dependency(
         Some(scope),
         m,
     )
+    .map(|_| ())
 }
 
 type ZoiUninstaller = dyn Fn(&str) -> Result<()>;

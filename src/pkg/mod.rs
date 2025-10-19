@@ -21,6 +21,7 @@ pub mod resolve;
 pub mod rollback;
 pub mod sync;
 pub mod telemetry;
+pub mod transaction;
 pub mod types;
 pub mod uninstall;
 pub mod upgrade;

@@ -1,4 +1,4 @@
-use crate::pkg::{config, hooks, install, local, pin, resolve, sync, types};
+use crate::pkg::{config, hooks, install, local, pin, resolve, sync, transaction, types};
 use crate::utils;
 use anyhow::{Result, anyhow};
 use colored::*;
@@ -50,10 +50,7 @@ pub fn run(all: bool, package_names: &[String], yes: bool) {
         }
         std::process::exit(1);
     } else if !package_names.is_empty() {
-        println!(
-            "\n{}",
-            "Update process finished for all specified packages.".green()
-        );
+        println!("\n{}", "Success:".green());
     }
 }
 
@@ -80,7 +77,7 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
         return Ok(());
     }
 
-    let manifest = match local::is_package_installed(&new_pkg.name, types::Scope::User)?.or(
+    let old_manifest = match local::is_package_installed(&new_pkg.name, types::Scope::User)?.or(
         local::is_package_installed(&new_pkg.name, types::Scope::System)?,
     ) {
         Some(m) => m,
@@ -91,20 +88,25 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
         }
     };
 
-    println!("Currently installed version: {}", manifest.version.yellow());
+    println!(
+        "Currently installed version: {}",
+        old_manifest.version.yellow()
+    );
     println!("Available version: {}", new_version.green());
 
-    if manifest.version == new_version {
+    if old_manifest.version == new_version {
         println!("\nPackage is already up to date.");
         return Ok(());
     }
 
     if !utils::ask_for_confirmation(
-        &format!("Update from {} to {}?", manifest.version, new_version),
+        &format!("Update from {} to {}?", old_manifest.version, new_version),
         yes,
     ) {
         return Ok(());
     }
+
+    let transaction = transaction::begin()?;
 
     if let Some(hooks) = &new_pkg.hooks
         && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PreUpgrade)
@@ -113,9 +115,9 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
     }
 
     let mode = install::InstallMode::PreferPrebuilt;
-
     let processed_deps = Mutex::new(HashSet::new());
-    install::run_installation(
+
+    match install::run_installation(
         package_name,
         mode,
         true,
@@ -123,25 +125,45 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
         yes,
         false,
         &processed_deps,
-        Some(manifest.scope),
+        Some(old_manifest.scope),
         None,
-    )?;
+    ) {
+        Ok(new_manifest) => {
+            if let Err(e) = transaction::record_operation(
+                &transaction.id,
+                types::TransactionOperation::Upgrade {
+                    old_manifest: Box::new(old_manifest.clone()),
+                    new_manifest: Box::new(new_manifest),
+                },
+            ) {
+                eprintln!("Warning: Failed to record transaction for update: {}", e);
+                transaction::delete_log(&transaction.id)?;
+            } else {
+                transaction::commit(&transaction.id)?;
+            }
 
-    cleanup_old_versions(
-        &new_pkg.name,
-        manifest.scope,
-        &new_pkg.repo,
-        registry_handle.as_deref().unwrap_or("local"),
-    )?;
+            cleanup_old_versions(
+                &new_pkg.name,
+                old_manifest.scope,
+                &new_pkg.repo,
+                registry_handle.as_deref().unwrap_or("local"),
+            )?;
 
-    if let Some(hooks) = &new_pkg.hooks
-        && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PostUpgrade)
-    {
-        return Err(anyhow!("Post-upgrade hook failed: {}", e));
+            if let Some(hooks) = &new_pkg.hooks
+                && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PostUpgrade)
+            {
+                return Err(anyhow!("Post-upgrade hook failed: {}", e));
+            }
+
+            println!("\n{}", "Success:".green());
+            Ok(())
+        }
+        Err(e) => {
+            eprintln!("\nError: Update failed during installation. Rolling back...");
+            transaction::rollback(&transaction.id)?;
+            Err(anyhow!("Update failed: {}", e))
+        }
     }
-
-    println!("\n{}", "Update complete.".green());
-    Ok(())
 }
 
 fn run_update_all_logic(yes: bool) -> Result<()> {
@@ -192,7 +214,7 @@ fn run_update_all_logic(yes: bool) -> Result<()> {
                 manifest.version.yellow(),
                 new_version.green()
             ));
-            packages_to_upgrade.push((source.clone(), new_pkg, registry_handle, manifest.scope));
+            packages_to_upgrade.push((source.clone(), new_pkg, registry_handle, manifest));
         } else {
             upgrade_messages.push(format!("- {} is up to date.", manifest.name.cyan()));
         }
@@ -205,7 +227,7 @@ fn run_update_all_logic(yes: bool) -> Result<()> {
     }
 
     if packages_to_upgrade.is_empty() {
-        println!("\n{}", "All packages are up to date.".green());
+        println!("\n{}", "Success:".green());
         return Ok(());
     }
 
@@ -214,11 +236,13 @@ fn run_update_all_logic(yes: bool) -> Result<()> {
         return Ok(());
     }
 
-    let processed_deps = Mutex::new(HashSet::new());
+    let transaction = transaction::begin()?;
+    let failed_updates = Mutex::new(Vec::new());
+    let successful_upgrades = Mutex::new(Vec::new());
 
     packages_to_upgrade
         .par_iter()
-        .for_each(|(source, new_pkg, registry_handle, scope)| {
+        .for_each(|(source, new_pkg, registry_handle, old_manifest)| {
             println!(
                 "\n--- Upgrading {} to {} ---",
                 source.cyan(),
@@ -234,11 +258,13 @@ fn run_update_all_logic(yes: bool) -> Result<()> {
                     source,
                     e
                 );
+                failed_updates.lock().unwrap().push(source.clone());
                 return;
             }
 
             let mode = install::InstallMode::PreferPrebuilt;
-            if let Err(e) = install::run_installation(
+            let processed_deps = Mutex::new(HashSet::new());
+            match install::run_installation(
                 source,
                 mode,
                 true,
@@ -246,35 +272,72 @@ fn run_update_all_logic(yes: bool) -> Result<()> {
                 yes,
                 false,
                 &processed_deps,
-                Some(*scope),
+                Some(old_manifest.scope),
                 None,
             ) {
-                eprintln!("Failed to upgrade {}: {}", source, e);
-                return;
-            }
-
-            if let Err(e) = cleanup_old_versions(
-                &new_pkg.name,
-                *scope,
-                &new_pkg.repo,
-                registry_handle.as_deref().unwrap_or("local"),
-            ) {
-                eprintln!("Failed to clean up old versions for {}: {}", source, e);
-            }
-
-            if let Some(hooks) = &new_pkg.hooks
-                && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PostUpgrade)
-            {
-                eprintln!(
-                    "{}: Post-upgrade hook failed for '{}': {}",
-                    "Error".red().bold(),
-                    source,
-                    e
-                );
+                Ok(new_manifest) => {
+                    if let Err(e) = transaction::record_operation(
+                        &transaction.id,
+                        types::TransactionOperation::Upgrade {
+                            old_manifest: Box::new(old_manifest.clone()),
+                            new_manifest: Box::new(new_manifest),
+                        },
+                    ) {
+                        eprintln!("Error: Failed to record transaction for {}: {}", source, e);
+                        failed_updates.lock().unwrap().push(source.clone());
+                    } else {
+                        successful_upgrades.lock().unwrap().push((
+                            source.clone(),
+                            new_pkg.clone(),
+                            registry_handle.clone(),
+                            old_manifest.scope,
+                        ));
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Failed to upgrade {}: {}", source, e);
+                    failed_updates.lock().unwrap().push(source.clone());
+                }
             }
         });
 
-    println!("\n{}", "Upgrade complete.".green());
+    let failed = failed_updates.into_inner().unwrap();
+    if !failed.is_empty() {
+        eprintln!("\nError: Some packages failed to upgrade. Rolling back all changes...");
+        for pkg in &failed {
+            eprintln!("  - {}", pkg);
+        }
+        transaction::rollback(&transaction.id)?;
+        return Err(anyhow!("Update failed for some packages."));
+    }
+
+    transaction::commit(&transaction.id)?;
+
+    println!("\n{}", "Success:".green());
+    let successful_upgrades = successful_upgrades.into_inner().unwrap();
+    for (source, new_pkg, registry_handle, scope) in &successful_upgrades {
+        if let Err(e) = cleanup_old_versions(
+            &new_pkg.name,
+            *scope,
+            &new_pkg.repo,
+            registry_handle.as_deref().unwrap_or("local"),
+        ) {
+            eprintln!("Failed to clean up old versions for {}: {}", source, e);
+        }
+
+        if let Some(hooks) = &new_pkg.hooks
+            && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PostUpgrade)
+        {
+            eprintln!(
+                "{}: Post-upgrade hook failed for '{}': {}",
+                "Error".red().bold(),
+                source,
+                e
+            );
+        }
+    }
+
+    println!("\n{}", "Success:".green());
     Ok(())
 }
 
