@@ -451,7 +451,9 @@ set paths = [ ~/.zoi/pkgs/bin $paths... ]
         use winreg::RegKey;
         use winreg::enums::*;
 
-        let zoi_bin_path_str = zoi_bin_dir.to_str().ok_or("Invalid path string")?;
+        let zoi_bin_path_str = zoi_bin_dir
+            .to_str()
+            .ok_or_else(|| anyhow!("Invalid path string"))?;
 
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         let env = hkcu.open_subkey_with_flags("Environment", KEY_READ | KEY_WRITE)?;
