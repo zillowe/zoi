@@ -12,12 +12,21 @@ use junction;
 pub fn run(package_name: &str, yes: bool) -> Result<()> {
     println!("Attempting to roll back '{}'...", package_name.cyan());
 
-    let (pkg, _, _, _, registry_handle) = resolve::resolve_package_and_version(package_name)?;
+    let resolved_source = resolve::resolve_source(package_name)?;
+    let mut pkg =
+        crate::pkg::lua::parser::parse_lua_package(resolved_source.path.to_str().unwrap(), None)?;
+    if let Some(repo_name) = resolved_source.repo_name {
+        pkg.repo = repo_name;
+    }
+    let registry_handle = resolved_source.registry_handle;
+
     let (_manifest, scope) =
-        if let Some(m) = local::is_package_installed(package_name, types::Scope::User)? {
+        if let Some(m) = local::is_package_installed(&pkg.name, types::Scope::User)? {
             (m, types::Scope::User)
-        } else if let Some(m) = local::is_package_installed(package_name, types::Scope::System)? {
+        } else if let Some(m) = local::is_package_installed(&pkg.name, types::Scope::System)? {
             (m, types::Scope::System)
+        } else if let Some(m) = local::is_package_installed(&pkg.name, types::Scope::Project)? {
+            (m, types::Scope::Project)
         } else {
             return Err(anyhow!("Package '{}' is not installed.", package_name));
         };
