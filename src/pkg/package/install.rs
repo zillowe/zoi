@@ -34,6 +34,7 @@ pub fn run(
     package_file: &Path,
     scope_override: Option<types::Scope>,
     registry_handle: &str,
+    version_override: Option<&str>,
 ) -> Result<Vec<String>> {
     let scope = scope_override.unwrap_or(types::Scope::User);
 
@@ -65,7 +66,7 @@ pub fn run(
     let metadata = lua::parser::parse_lua_package_for_platform(
         pkg_lua_path.to_str().unwrap(),
         &platform,
-        None,
+        version_override,
     )?;
     let version = metadata
         .version

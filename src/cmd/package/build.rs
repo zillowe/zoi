@@ -28,6 +28,7 @@ pub fn run(args: BuildCommand) {
         &args.platform,
         args.sign,
         None,
+        None,
     ) {
         eprintln!("Error: {}", e);
         std::process::exit(1);

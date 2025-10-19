@@ -21,7 +21,7 @@ pub fn build(
     platforms: &[String],
     sign_key: Option<String>,
 ) -> Result<()> {
-    pkg::package::build::run(package_file, build_type, platforms, sign_key, None)
+    pkg::package::build::run(package_file, build_type, platforms, sign_key, None, None)
 }
 
 /// Installs a Zoi package from a local package archive.
@@ -30,7 +30,7 @@ pub fn install_package(
     scope_override: Option<Scope>,
     registry_handle: &str,
 ) -> Result<Vec<String>> {
-    pkg::package::install::run(package_file, scope_override, registry_handle)
+    pkg::package::install::run(package_file, scope_override, registry_handle, None)
 }
 
 /// Uninstalls a Zoi package.

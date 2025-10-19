@@ -20,12 +20,17 @@ pub fn try_build_install(
     };
 
     let current_platform = utils::get_platform()?;
+    let version = pkg
+        .version
+        .as_deref()
+        .ok_or_else(|| anyhow!("Version not resolved for build"))?;
     if let Err(e) = crate::pkg::package::build::run(
         pkg_lua_path,
         build_type,
         std::slice::from_ref(&current_platform),
         None,
         None,
+        Some(version),
     ) {
         return Err(anyhow!("'build' step failed: {}", e));
     }
@@ -42,8 +47,12 @@ pub fn try_build_install(
     }
     println!("'build' step successful.");
 
-    let installed_files =
-        crate::pkg::package::install::run(&archive_path, Some(pkg.scope), registry_handle)?;
+    let installed_files = crate::pkg::package::install::run(
+        &archive_path,
+        Some(pkg.scope),
+        registry_handle,
+        Some(version),
+    )?;
     println!("'install' step successful.");
 
     let _ = fs::remove_file(&archive_path);

@@ -212,6 +212,7 @@ fn run_install_flow(
                         &archive_path,
                         Some(pkg.scope),
                         &node.registry_handle,
+                        Some(&node.version),
                     ) {
                         println!("Successfully installed pre-built package.");
                         return Ok(installed_files);

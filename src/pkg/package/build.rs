@@ -16,11 +16,12 @@ fn build_for_platform(
     platform: &str,
     sign_key: &Option<String>,
     output_dir: Option<&Path>,
+    version_override: Option<&str>,
 ) -> Result<()> {
     let pkg_for_meta = pkg::lua::parser::parse_lua_package_for_platform(
         package_file.to_str().unwrap(),
         platform,
-        None,
+        version_override,
     )?;
 
     if !pkg_for_meta.types.iter().any(|t| t == build_type) {
@@ -31,7 +32,11 @@ fn build_for_platform(
         ));
     }
 
-    let version = pkg::resolve::get_default_version(&pkg_for_meta, None)?;
+    let version = if let Some(v) = version_override {
+        v.to_string()
+    } else {
+        pkg::resolve::get_default_version(&pkg_for_meta, None)?
+    };
 
     let build_dir = Builder::new()
         .prefix(&format!("zoi-build-{}-{}", pkg_for_meta.name, platform))
@@ -215,6 +220,7 @@ pub fn run(
     platforms: &[String],
     sign_key: Option<String>,
     output_dir: Option<&Path>,
+    version_override: Option<&str>,
 ) -> Result<()> {
     println!("Building package from: {}", package_file.display());
 
@@ -235,9 +241,14 @@ pub fn run(
 
     for platform in &platforms_to_build {
         println!("--- Building for platform: {} ---", platform.cyan());
-        if let Err(e) =
-            build_for_platform(package_file, build_type, platform, &sign_key, output_dir)
-        {
+        if let Err(e) = build_for_platform(
+            package_file,
+            build_type,
+            platform,
+            &sign_key,
+            output_dir,
+            version_override,
+        ) {
             eprintln!(
                 "{}: Failed to build for platform {}: {}",
                 "Error".red().bold(),

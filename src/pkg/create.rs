@@ -84,6 +84,7 @@ pub fn run(source: &str, app_name: Option<String>, yes: bool) -> Result<()> {
         &[utils::get_platform()?],
         None,
         Some(build_dir.path()),
+        pkg.version.as_deref(),
     )?;
 
     let archive_filename = format!(
