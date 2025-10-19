@@ -157,7 +157,7 @@ package:changelog:
       if [ $(git tag -l | wc -l) -gt 1 ]; then
         PREVIOUS_TAG=$(git describe --tags --abbrev=0 $(git rev-list --tags --skip=1 --max-count=1))
       fi
-    - chmox +x ./scripts/log.sh
+    - chmod +x ./scripts/log.sh
     - ./scripts/log.sh $PREVIOUS_TAG $CI_COMMIT_TAG
   needs:
     - package:archive

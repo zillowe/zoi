@@ -14,6 +14,6 @@ OUTPUT_FILE="release_notes.md"
 
 echo "Generating changelog from $OLD_TAG to $NEW_TAG..."
 
-git-cliff --tag-range "${OLD_TAG}..${NEW_TAG}" -o "${OUTPUT_FILE}"
+git-cliff --tag "${OLD_TAG}..${NEW_TAG}" -o "${OUTPUT_FILE}"
 
 echo "Changelog generated successfully: ${OUTPUT_FILE}"

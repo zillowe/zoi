@@ -12,7 +12,7 @@ use std::io::{self};
 // Development, Special, Public or Production
 const BRANCH: &str = "Production";
 const STATUS: &str = "Release";
-const NUMBER: &str = "1.0.1";
+const NUMBER: &str = "1.0.0";
 
 /// Zoi - The Universal Package Manager & Environment Setup Tool.
 ///
