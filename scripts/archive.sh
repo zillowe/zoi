@@ -68,62 +68,6 @@ else
     echo -e "${YELLOW}API call failed: $RESPONSE${NC}"
 fi
 
-echo -e "${CYAN}🔐 Generating sha512 checksums for raw binaries...${NC}"
-rm -f "${ARCHIVE_DIR}/checksums-bin.txt"
-
-(
-  cd "$COMPILED_DIR" || exit 1
-  for f in *; do
-    final_name="zoi"
-    [[ "$f" == *".exe" ]] && final_name="zoi.exe"
-    sha512sum "$f" | awk -v name="$final_name" '{print $1 "  " name}'
-  done
-) > "${ARCHIVE_DIR}/checksums-bin.txt"
-
-if [ -n "${CI_COMMIT_TAG:-}" ]; then
-    IFS='-' read -ra parts <<< "$CI_COMMIT_TAG"
-    num_parts=${#parts[@]}
-    
-    version_num=""
-    if [ $num_parts -gt 0 ]; then
-        version_num=${parts[$num_parts-1]}
-    fi
-
-    if [ $num_parts -gt 2 ]; then
-        prerelease=$(echo "${parts[1]}" | tr '[:upper:]' '[:lower:]')
-        VERSION="${version_num}-${prerelease}"
-    else
-        VERSION="$version_num"
-    fi
-
-    echo -e "${CYAN}Adding versioned checksums for version ${VERSION}...${NC}"
-    (
-      cd "$COMPILED_DIR" || exit 1
-      for f in *; do
-        os_arch_part=$(basename "$f" .exe)
-        os_arch_part=${os_arch_part#zoi-}
-        versioned_name="zoi-${os_arch_part}-v${VERSION}"
-        sha512sum "$f" | awk -v name="$versioned_name" '{print $1 "  " name}'
-      done
-    ) >> "${ARCHIVE_DIR}/checksums-bin.txt"
-fi
-
-if [ -n "$LATEST_TAG" ]; then
-    echo -e "${CYAN}Downloading and appending checksums from latest release ${LATEST_TAG}...${NC}"
-    OLD_CHECKSUMS_URL="https://gitlab.com/${GITLAB_PROJECT_PATH}/-/releases/${LATEST_TAG}/downloads/checksums-bin.txt"
-    TEMP_OLD_CHECKSUMS=$(mktemp)
-    if curl --fail -sL -o "$TEMP_OLD_CHECKSUMS" "$OLD_CHECKSUMS_URL"; then
-        cat "$TEMP_OLD_CHECKSUMS" >> "${ARCHIVE_DIR}/checksums-bin.txt"
-        sort -u -k2,2 -o "${ARCHIVE_DIR}/checksums-bin.txt" "${ARCHIVE_DIR}/checksums-bin.txt"
-        echo -e "${GREEN}Successfully appended and deduplicated old checksums.${NC}"
-    else
-        echo -e "${YELLOW}Could not download old checksums-bin.txt. Patching from older versions might fail.${NC}"
-    fi
-    rm -f "$TEMP_OLD_CHECKSUMS"
-else
-    echo -e "${YELLOW}No latest tag found, skipping checksum accumulation. This is normal for a first release.${NC}"
-fi
-
 echo -e "${CYAN}📦 Starting archival process...${NC}"
 
 for binary_path in "$COMPILED_DIR"/*; do
