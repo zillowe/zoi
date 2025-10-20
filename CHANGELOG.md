@@ -36,6 +36,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 
 ### ✨ Features
 
+- _(lua)_ Run cmd_util commands in build directory
 - _(telemetry)_ Add registry handle to events
 - _(pkg)_ Implement transaction system for package operations
 - _(pkg)_ Allow explicit version for package build and install
