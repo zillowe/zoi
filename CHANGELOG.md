@@ -1,3 +1,149 @@
+# Changelog
+
+You can install any of these versions: `zoi upgrade --tag <tag>`
+
+To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
+
+## [Prod-Release-1.0.0] - 2025-10-20
+
+### ♻️ Refactor
+
+- Remove 'zoi build' command
+- Remove patch upgrades and generation
+- _(rollback)_ Improve package resolution logic
+- _(pkg)_ Centralize package name resolution
+- _(project)_ Use anyhow for error management
+- _(pkg/build)_ Use anyhow for error handling
+- Establish core utilities and package configuration
+- _(lib)_ Simplify package management library API
+- _(pkg)_ Move update logic and enhance version cleanup
+- Remove Library, Config and Service package type
+- _(pkg)_ Revamp package definitions and build lifecycle
+- _(pkg)_ Streamline package lifecycle operations
+- _(pkg)_ Enhance package execution and extension handling
+- _(pkg)_ Improve package pinning logic
+- _(pkg)_ Enhance dependency resolution and autoremoval
+- _(install)_ Implement version-aware package installation
+- _(cmd)_ Standardize CLI command definitions and package resolution
+- _(core)_ Overhaul package module and type definitions
+- _(install)_ Modularize package installation logic
+- _(cmd)_ Handle optional repo name for warnings
+- _(pkg)_ Revamp repository configuration and sync
+- _(pkg)_ Improve package retrieval with repo filters
+- _(utils)_ Refactor PATH environment variable check
+- Rename Zoi-Pkgs to Zoidberg
+- _(pkg)_ Pass resolved version to Lua parser
+
+### ✨ Features
+
+- _(pkg)_ Implement transaction system for package operations
+- _(pkg)_ Allow explicit version for package build and install
+- _(uninstall)_ Add scope options for uninstall command
+- _(install)_ Implement parallel package installation
+- _(create)_ Revamp app creation with package templates
+- _(install)_ Add multi-progress bars for parallel operations
+- _(cmd)_ Improve package CLI commands and error handling
+- _(cli)_ Add CLI commands for package state and queries
+- _(pkg)_ Implement package rollback system
+- _(extension)_ Introduce package extension management
+- _(pgp)_ Integrate PGP for package verification
+- _(pkg)_ Add package lifecycle management operations
+- Implement robust package installation and execution flow
+- _(pkg)_ Add package recording and robust error handling
+- _(install)_ Add --save option for project packages
+- _(hooks)_ Add package lifecycle hooks
+- _(cli)_ Add 'owner' and 'files' commands
+- _(pkg)_ Implement global lock and atomic package installation
+- _(build)_ Add PGP signing for packages
+- _(install)_ Add project scope and CLI flags
+- _(config)_ Implement layered configuration system
+- _(ext)_ Implement PGP key management to extensions
+- _(about)_ Add packager information to about command
+- _(lockfile)_ Implement zoi.lock for package integrity
+- _(pkg)_ Introduce project-local package scope
+- _(lua/utils)_ Add find and enhance extract utilities
+- _(lua)_ Add utility to extract various archive formats
+- _(security)_ Add PGP signature verification and MD5 hashing to Lua
+- _(pgp)_ Add command to verify detached signatures
+- _(lua)_ Add advanced Git API and file import to Lua
+- _(lua)_ Introduce Lua scripting utilities
+- _(pkg-keys)_ Enhance key management for signature verification
+- _(about)_ Show PostHog and Registry configuration
+- _(pgp)_ Add command to show stored public key
+- _(upgrade)_ Display changelog link after successful upgrade
+- _(pkg)_ Enhance repository filtering and display
+- _(man)_ Generate man pages for subcommands
+- _(pkg)_ Refine build command mapping for OS platforms
+- _(meta)_ Add meta command to generate resolved package JSON
+- _(resolve)_ Add support for direct git package sources
+- _(pkg)_ Enhance package resolution and initial config
+- _(registry)_ Display descriptions and refine repo resolution
+- _(cli)_ Add helper command
+- _(registry)_ Implement support for multiple package registries
+- _(pkg)_ Enhance package installation with PGP verification
+- _(upgrade)_ Warn when self-upgrading package manager installations
+- _(install)_ Implement installer package method and uninstall
+- _(install)_ Prevent redundant manual installs after binary installation
+- _(meta)_ Add version argument for metadata generation
+- _(cli)_ Add hidden command to print man page
+- _(packaging)_ Add man page generation to package builds
+- _(lua)_ Add fetch utility for making web requests
+- _(pkg/package)_ Expand platform resolution for architecture inference
+
+### ➡️ Migrations
+
+- _(lockfile)_ Introduce custom package lockfile
+
+### 🎯 UX
+
+- _(pgp)_ Add 'rm' alias for remove command
+
+### 🏗️ Structure
+
+- _(scripts)_ Rename build directory to scripts
+
+### 🔒 Security
+
+- _(reporting)_ Update vulnerability reporting guidelines
+
+### 🔧 Configuration
+
+- _(registry)_ Use build-time configurable default registry
+- _(Cargo)_ Specify minimum Rust version
+
+### 🛠️ Build
+
+- _(build)_ Refactor environment variable loading
+- Update zoi.yaml
+- _(cargo)_ Gate utility binaries behind 'tools' feature
+- Update Cargo dependencies and minimum Rust version to 1.88.0
+- Add '--bin zoi' to build scripts
+- _(tools)_ Add CLI completion and man page generation
+- Add 'build' make command
+- Add 'help' make command
+- _(setup)_ Consolidate shell configuration
+- Remove FreeBSD/OpenBSD support
+- Update build scripts
+
+### 🛡️ Dependencies
+
+- Add rayon parallel iteration library
+- _(cargo)_ Remove unused cyclonedx-bom and purl crates
+
+### 🩹 Bug Fixes
+
+- _(sync)_ Use compiled-in default registry when unset
+- Remove installed_at for zoi.lock
+- _(pkg)_ Improve uninstall error handling and messages
+- _(pkg)_ Remove symlinks before package directory during uninstall
+- _(install)_ Prevent duplicate package installations
+- Tests in lib.rs
+- _(pkg)_ Ensure symlinks are removed on uninstall
+- _(packaging)_ Use GitLab project ID for release fetching
+- _(update)_ Correct package resolution for update command
+- _(path)_ Correct PATH verification for custom definitions
+- _(pkg)_ Prevent resolution of nested packages
+
 ## [Prod-Beta-5.0.5] - 2025-09-09
 
 ### ➡️ Migrations
