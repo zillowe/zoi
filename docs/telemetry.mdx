@@ -3,28 +3,33 @@ title: Telemetry & Analytics
 description: How Zoi uses opt-in telemetry to improve the application.
 ---
 
-At Zoi, we are committed to protecting your privacy while also working to improve our application. To achieve this, we use an opt-in telemetry system that collects a minimal amount of anonymous data. This data helps us understand which packages are popular and which platforms are most commonly used, allowing us to prioritize our development efforts.
+At Zillowe, we are committed to protecting your privacy while also working to improve our application. To achieve this, we use an opt-in telemetry system that collects a minimal amount of anonymous data. This data helps us understand which packages are popular and which platforms are most commonly used, allowing us to prioritize our development efforts.
+
+This page aims to be radically transparent about what we collect, why we collect it, and how you can control it.
 
 ## What We Collect
 
-When you choose to enable telemetry, Zoi sends a secure, anonymous event to our cloud-hosted PostHog instance when you perform certain actions. The data we collect is strictly limited to the following:
+When you choose to enable telemetry, Zoi sends a secure, anonymous event to our self-hosted PostHog instance when you perform certain actions. The data we collect is strictly limited to the following fields:
 
 - **Event Type:** The action you performed. This can be one of the following:
   - `install`: A package was successfully installed.
-  - `build`: A package was successfully built from source.
   - `uninstall`: A package was uninstalled.
-  - `clone`: A package's source code was cloned.
-  - `exec`: A package was executed without being installed.
-- **A unique, anonymous client ID:** This is a randomly generated UUID that is not tied to any of your personal information.
+  - `exec`: A package was executed without being installed via `zoi exec`.
+- **A unique, anonymous client ID:** This is a randomly generated UUID that is not tied to any of your personal information. It allows us to distinguish between usage patterns from many users versus a single power user, which helps in prioritizing features.
 - **Package Details:**
-  - The name of the package.
-  - The version of the package.
-  - The package's repository, description, maintainer, and author.
-- **The type of package** (e.g. `package`, `collection`, `service`).
+  - The `name` of the package.
+  - The `version` of the package.
+  - The package's `repo` (the sub-repository path, e.g. `core`, `community/editors`).
+  - The `description` of the package.
+  - The `maintainer` and `author` of the package (name, email, and website, if provided).
+- **Registry Details:**
+  - The `registry` handle (e.g. `zoidberg`, `my-custom-registry`).
+  - The `registry_url` (the git URL of the registry).
+- **The type of package:** This will be one of `Package`, `Collection`, `App`, or `Extension`.
 - **Your operating system and CPU architecture** (e.g. `linux-amd64`, `windows-amd64`).
 - **The version of the Zoi application you are using.**
 
-**We do not and will never collect any personal or identifying information.** We do not track your IP address, hostname, or any other data that is not explicitly listed above.
+**We do not and will never collect any personal or identifying information.** We do not track your IP address, hostname, or any other data that is not explicitly listed above. The code that collects and sends this data is fully open-source and can be reviewed in `src/pkg/telemetry.rs`.
 
 ## Why We Collect It
 
@@ -32,7 +37,8 @@ The data we collect helps us answer important questions that guide the developme
 
 - Which packages are the most popular? This helps us focus our maintenance efforts on the tools that matter most to the community.
 - Which operating systems and architectures are most widely used? This informs our decisions about which platforms to prioritize for testing and binary releases.
-- Are there installation errors we need to address? (Note: We only track successful installations, not failures.)
+- Which custom registries are being used? This helps us understand how the community is extending Zoi.
+- Are there installation errors we need to address? (Note: We only track successful events, not failures.)
 
 By understanding how Zoi is used, we can make it a better tool for everyone.
 
