@@ -396,17 +396,21 @@ fn add_zrm(lua: &Lua) -> Result<(), mlua::Error> {
 }
 
 fn add_cmd_util(lua: &Lua) -> Result<(), mlua::Error> {
-    let cmd_fn = lua.create_function(|_, command: String| {
+    let cmd_fn = lua.create_function(|lua, command: String| {
+        let build_dir: String = lua.globals().get("BUILD_DIR")?;
+
         println!("Executing: {}", command);
         let output = if cfg!(target_os = "windows") {
             std::process::Command::new("pwsh")
                 .arg("-Command")
                 .arg(&command)
+                .current_dir(&build_dir)
                 .output()
         } else {
             std::process::Command::new("bash")
                 .arg("-c")
                 .arg(&command)
+                .current_dir(&build_dir)
                 .output()
         };
 
