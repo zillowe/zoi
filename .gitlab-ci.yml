@@ -155,8 +155,6 @@ create_release:
     - glab auth login --token $GITLAB_TOKEN_RELEASE
     - RELEASE_NAME="${CI_COMMIT_TAG_MESSAGE:-$CI_COMMIT_TAG}"
     - glab release create "$CI_COMMIT_TAG" ./scripts/archived/* --name "$RELEASE_NAME"
-  needs:
-    - package:changelog
   rules:
     - if: $CI_COMMIT_TAG
 
