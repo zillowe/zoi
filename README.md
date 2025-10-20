@@ -69,7 +69,6 @@
     - [Crates.io](#cratesio)
     - [NPM](#npm)
   - [Build from Source](#%EF%B8%8F-build-from-source)
-- [Platforms](#-platforms)
 - [Dependencies Support](#-dependencies-support)
 - [Usage](#-usage)
 - [Packaging Status](#-packaging-status)
@@ -255,25 +254,6 @@ sudo make install
 # (optional) Install CLI completions and setup Zoi's PATH
 make setup
 ```
-
-## 💻 Platforms
-
-What platforms we currently support.
-
-| OS      | Arch  | Zoi Binary | Packages Support |
-| ------- | ----- | ---------- | ---------------- |
-| Linux   | amd64 | ✔️         | ✔️               |
-| Linux   | arm64 | ✔️         | ✔️               |
-| macOS   | arm64 | ✔️         | ✔️               |
-| macOS   | amd64 | ✔️         | ✔️               |
-| Windows | amd64 | ✔️         | ✔️               |
-| Windows | arm64 | ❌         | ✔️               |
-| FreeBSD | amd64 | ❌         | ✔️               |
-| FreeBSD | arm64 | ❌         | ✔️               |
-| OpenBSD | amd64 | ❌         | ✔️               |
-| OpenBSD | arm64 | ❌         | ✔️               |
-
-We're planning to add support for more platforms.
 
 ## 🔗 Dependencies Support
 
