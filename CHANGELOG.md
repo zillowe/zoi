@@ -36,6 +36,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 
 ### ✨ Features
 
+- _(telemetry)_ Add registry handle to events
 - _(pkg)_ Implement transaction system for package operations
 - _(pkg)_ Allow explicit version for package build and install
 - _(uninstall)_ Add scope options for uninstall command
@@ -127,6 +128,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 
 ### 🛡️ Dependencies
 
+- Update Cargo dependencies
 - Add rayon parallel iteration library
 - _(cargo)_ Remove unused cyclonedx-bom and purl crates
 
