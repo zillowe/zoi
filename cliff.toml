@@ -11,7 +11,8 @@ header = """
 
 You can install any of these versions: `zoi upgrade --tag <tag>`
 
-To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi)
+To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
+
 """
 body = """
 {% if version %}\
@@ -46,6 +47,7 @@ commit_parsers = [
     { message = "(?i)^Git", skip = true },
     { message = "(?i)^Ignore", skip = true },
 
+    { message = "^Merge", group = "⏩ Merged" },
     { message = "^Build", group = "🛠️ Build" },
     { message = "^Feat", group = "✨ Features" },
     { message = "^Fix", group = "🩹 Bug Fixes" },
