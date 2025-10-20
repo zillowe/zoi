@@ -67,8 +67,12 @@ fn uninstall_collection(
         );
     }
 
-    match crate::pkg::telemetry::posthog_capture_event("uninstall", pkg, env!("CARGO_PKG_VERSION"))
-    {
+    match crate::pkg::telemetry::posthog_capture_event(
+        "uninstall",
+        pkg,
+        env!("CARGO_PKG_VERSION"),
+        registry_handle.as_deref().unwrap_or("local"),
+    ) {
         Ok(true) => println!("{} telemetry sent", "Info:".green()),
         Ok(false) => (),
         Err(e) => eprintln!("{} telemetry failed: {}", "Warning:".yellow(), e),
@@ -238,8 +242,12 @@ pub fn run(
     }
     println!("Removed manifest for '{}'.", pkg.name);
 
-    match crate::pkg::telemetry::posthog_capture_event("uninstall", &pkg, env!("CARGO_PKG_VERSION"))
-    {
+    match crate::pkg::telemetry::posthog_capture_event(
+        "uninstall",
+        &pkg,
+        env!("CARGO_PKG_VERSION"),
+        registry_handle.as_deref().unwrap_or("local"),
+    ) {
         Ok(true) => println!("{} telemetry sent", "Info:".green()),
         Ok(false) => (),
         Err(e) => eprintln!("{} telemetry failed: {}", "Warning:".yellow(), e),

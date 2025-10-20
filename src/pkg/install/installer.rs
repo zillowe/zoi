@@ -75,7 +75,7 @@ pub fn install_node(
         ));
     }
 
-    util::send_telemetry("install", pkg);
+    util::send_telemetry("install", pkg, handle);
 
     Ok(manifest)
 }

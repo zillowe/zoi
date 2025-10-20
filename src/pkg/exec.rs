@@ -225,7 +225,15 @@ pub fn run(
         resolved_source.registry_handle.as_deref(),
     )?;
 
-    match crate::pkg::telemetry::posthog_capture_event("exec", &pkg, env!("CARGO_PKG_VERSION")) {
+    match crate::pkg::telemetry::posthog_capture_event(
+        "exec",
+        &pkg,
+        env!("CARGO_PKG_VERSION"),
+        resolved_source
+            .registry_handle
+            .as_deref()
+            .unwrap_or("local"),
+    ) {
         Ok(true) => println!("{} telemetry sent", "Info:".green()),
         Ok(false) => (),
         Err(e) => eprintln!("{} telemetry failed: {}", "Warning:".yellow(), e),

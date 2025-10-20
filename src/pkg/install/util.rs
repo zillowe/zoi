@@ -9,8 +9,13 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
 
-pub fn send_telemetry(event: &str, pkg: &types::Package) {
-    match crate::pkg::telemetry::posthog_capture_event(event, pkg, env!("CARGO_PKG_VERSION")) {
+pub fn send_telemetry(event: &str, pkg: &types::Package, registry_handle: &str) {
+    match crate::pkg::telemetry::posthog_capture_event(
+        event,
+        pkg,
+        env!("CARGO_PKG_VERSION"),
+        registry_handle,
+    ) {
         Ok(true) => println!("{} telemetry sent", "Info:".green()),
         Ok(false) => (),
         Err(e) => eprintln!("{} telemetry failed: {}", "Warning:".yellow(), e),

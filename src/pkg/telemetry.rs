@@ -21,6 +21,8 @@ pub struct MinimalPackage<'a> {
     pub description: &'a str,
     pub maintainer: MinimalPerson<'a>,
     pub author: Option<MinimalPerson<'a>>,
+    pub registry: &'a str,
+    pub registry_url: &'a str,
 }
 
 #[derive(Debug, Serialize)]
@@ -62,6 +64,7 @@ pub fn posthog_capture_event(
     event_name: &str,
     pkg: &crate::pkg::types::Package,
     app_version: &str,
+    registry_handle: &str,
 ) -> Result<bool, Box<dyn Error>> {
     let config = crate::pkg::config::read_config()?;
     if !config.telemetry_enabled {
@@ -76,11 +79,25 @@ pub fn posthog_capture_event(
     let arch = parts.next().unwrap_or("unknown");
 
     let package_type_str = match pkg.package_type {
-        crate::pkg::types::PackageType::Package => "package",
-        crate::pkg::types::PackageType::Collection => "collection",
-        crate::pkg::types::PackageType::App => "app",
-        crate::pkg::types::PackageType::Extension => "extension",
+        crate::pkg::types::PackageType::Package => "Package",
+        crate::pkg::types::PackageType::Collection => "Collection",
+        crate::pkg::types::PackageType::App => "App",
+        crate::pkg::types::PackageType::Extension => "Extension",
     };
+
+    let registry_url = config
+        .default_registry
+        .as_ref()
+        .filter(|r| r.handle == registry_handle)
+        .map(|r| r.url.as_str())
+        .or_else(|| {
+            config
+                .added_registries
+                .iter()
+                .find(|r| r.handle == registry_handle)
+                .map(|r| r.url.as_str())
+        })
+        .unwrap_or("unknown");
 
     let ev = PackageEvent {
         client_id: &client_id,
@@ -104,6 +121,8 @@ pub fn posthog_capture_event(
                 email: a.email.as_deref().unwrap_or(""),
                 website: a.website.as_ref(),
             }),
+            registry: registry_handle,
+            registry_url,
         },
         package_type: package_type_str,
     };
