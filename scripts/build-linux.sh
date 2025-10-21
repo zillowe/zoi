@@ -7,7 +7,7 @@ GREEN='\033[0;32m'
 CYAN='\033[0;36m'
 NC='\033[0m' 
 
-OUTPUT_DIR="./script/release"
+OUTPUT_DIR="./scripts/release"
 COMMIT=$(git rev-parse --short=10 HEAD 2>/dev/null || echo "dev")
 
 TARGETS=(
