@@ -4,13 +4,20 @@
 //! Rust applications to leverage its package management and environment setup
 //! capabilities.
 //!
+//! For user documentation please visit [Zoi's Docs](https://zillowe.qzz.io/docs/zds/zoi), for the library documentation using this or
+//! [Zoi's Lib Docs](https://zillowe.qzz.io/docs/zds/zoi/lib) is fine.
+//!
 //! ## Getting Started
 //!
-//! To use Zoi as a library, add it as a dependency in your `Cargo.toml`:
+//! To use Zoi as a library, add it using `cargo` or as a dependency in your `Cargo.toml`:
+//!
+//! ```sh
+//! cargo add zoi-rs
+//! ```
 //!
 //! ```toml
 //! [dependencies]
-//! zoi = { version = "1.0.0" } // Replace with the desired version
+//! zoi = { version = "1.1.0" } // Replace with the desired version
 //! ```
 //!
 //! ## Example: Install a package
