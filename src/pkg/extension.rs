@@ -30,6 +30,10 @@ pub fn add(ext_name: &str, _yes: bool) -> Result<()> {
                     println!("Setting registry to: {}", add);
                     config::set_default_registry(&add)?;
                 }
+                types::ExtensionChange::RegistryAdd { add } => {
+                    println!("Adding registry: {}", add);
+                    config::add_added_registry(&add)?;
+                }
                 types::ExtensionChange::RepoAdd { add } => {
                     println!("Adding repository: {}", add);
                     config::add_repo(&add)?;
@@ -131,6 +135,12 @@ pub fn remove(ext_name: &str, _yes: bool) -> Result<()> {
                     println!("Setting registry back to default");
                     if let Err(e) = config::set_default_registry(default_registry) {
                         eprintln!("Warning: failed to set registry to default: {}", e);
+                    }
+                }
+                types::ExtensionChange::RegistryAdd { add } => {
+                    println!("Removing registry: {}", add);
+                    if let Err(e) = config::remove_added_registry(add) {
+                        eprintln!("Warning: failed to remove registry '{}': {}", add, e);
                     }
                 }
                 types::ExtensionChange::RepoAdd { add } => {

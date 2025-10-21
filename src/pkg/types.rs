@@ -43,6 +43,7 @@ pub struct UpdateInfo {
 pub enum ExtensionChange {
     RepoGit { add: String },
     RegistryRepo { add: String },
+    RegistryAdd { add: String },
     RepoAdd { add: String },
     Project { add: String },
     Pgp { name: String, key: String },

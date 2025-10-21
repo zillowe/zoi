@@ -418,24 +418,26 @@ pub fn add_added_registry(url: &str) -> Result<()> {
     write_user_config(&config)
 }
 
-pub fn remove_added_registry(handle: &str) -> Result<()> {
+pub fn remove_added_registry(handle_or_url: &str) -> Result<()> {
     let mut config = read_config_from_path(&get_user_config_path()?)?;
     if let Some(pos) = config
         .added_registries
         .iter()
-        .position(|r| r.handle == handle)
+        .position(|r| r.handle == handle_or_url || r.url == handle_or_url)
     {
-        config.added_registries.remove(pos);
-        let db_root = get_db_root()?;
-        let repo_path = db_root.join(handle);
-        if repo_path.exists() {
-            fs::remove_dir_all(repo_path)?;
+        let removed_registry = config.added_registries.remove(pos);
+        if !removed_registry.handle.is_empty() {
+            let db_root = get_db_root()?;
+            let repo_path = db_root.join(removed_registry.handle);
+            if repo_path.exists() {
+                fs::remove_dir_all(repo_path)?;
+            }
         }
         write_user_config(&config)
     } else {
         Err(anyhow!(
-            "Added registry with handle '{}' not found.",
-            handle
+            "Added registry with handle or URL '{}' not found.",
+            handle_or_url
         ))
     }
 }

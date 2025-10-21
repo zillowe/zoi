@@ -66,7 +66,7 @@ pub fn remove_registry(handle: &str) {
         eprintln!("\n{}: {}", "Error".red().bold(), e);
         std::process::exit(1);
     }
-    println!("Registry with handle '{}' removed.", handle.cyan());
+    println!("Registry '{}' removed.", handle.cyan());
 }
 
 pub fn list_registries() {
