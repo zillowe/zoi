@@ -81,6 +81,7 @@ pub fn run(
             &processed_deps,
             scope_override,
             None,
+            None,
         )
         .map(|_| ());
         fs::remove_file(temp_path)?;
@@ -109,6 +110,7 @@ pub fn run(
             &processed_deps,
             scope_override,
             None,
+            None,
         )
         .map(|_| ());
         fs::remove_file(temp_path)?;
@@ -127,6 +129,7 @@ pub fn run(
             all_optional,
             &processed_deps,
             scope_override,
+            None,
             None,
         )
         .map(|_| ())

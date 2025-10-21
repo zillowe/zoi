@@ -8,13 +8,23 @@ pub fn try_build_install(
     pkg_lua_path: &std::path::Path,
     pkg: &types::Package,
     registry_handle: &str,
+    build_type_override: Option<&str>,
 ) -> Result<Vec<String>> {
     println!("{}", "Attempting to build and install package...".yellow());
 
-    let build_type = if pkg.types.contains(&"pre-compiled".to_string()) {
+    let build_type = if let Some(t) = build_type_override {
+        if !pkg.types.contains(&t.to_string()) {
+            return Err(anyhow!(
+                "Build type '{}' not supported by this package. Supported types: {:?}",
+                t,
+                pkg.types
+            ));
+        }
+        t
+    } else if pkg.types.contains(&"pre-compiled".to_string()) {
         "pre-compiled"
-    } else if pkg.types.contains(&"source".to_string()) {
-        "source"
+    } else if !pkg.types.is_empty() {
+        &pkg.types[0]
     } else {
         return Err(anyhow!("No supported build types found in package"));
     };

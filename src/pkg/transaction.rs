@@ -114,6 +114,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                     &Mutex::new(HashSet::new()),
                     Some(manifest.scope),
                     None,
+                    None,
                 ) {
                     eprintln!(
                         "{} Failed to rollback uninstall of '{}': {}",
@@ -157,6 +158,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                     true,
                     &Mutex::new(HashSet::new()),
                     Some(old_manifest.scope),
+                    None,
                     None,
                 ) {
                     eprintln!(

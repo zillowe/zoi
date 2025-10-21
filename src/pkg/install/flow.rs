@@ -19,6 +19,7 @@ pub fn run_installation(
     _processed_deps: &std::sync::Mutex<std::collections::HashSet<String>>,
     scope_override: Option<types::Scope>,
     m: Option<&MultiProgress>,
+    build_type: Option<&str>,
 ) -> Result<types::InstallManifest> {
     let (mut pkg, version, _, _, registry_handle) = resolve::resolve_package_and_version(source)?;
 
@@ -36,5 +37,5 @@ pub fn run_installation(
         chosen_optionals: vec![],
     };
 
-    installer::install_node(&node, mode, m)
+    installer::install_node(&node, mode, m, build_type)
 }

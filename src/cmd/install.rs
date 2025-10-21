@@ -15,6 +15,7 @@ pub fn run(
     local: bool,
     global: bool,
     save: bool,
+    build_type: Option<String>,
 ) {
     let mut scope_override = scope.map(|s| match s {
         crate::cli::InstallScope::User => types::Scope::User,
@@ -53,6 +54,7 @@ pub fn run(
                 &processed_deps,
                 local_scope,
                 None,
+                build_type.as_deref(),
             ) {
                 eprintln!(
                     "{}: Failed to install '{}': {}",
@@ -249,7 +251,7 @@ pub fn run(
 
             println!("Installing {}...", node.pkg.name.cyan());
 
-            match install::installer::install_node(node, mode, None) {
+            match install::installer::install_node(node, mode, None, build_type.as_deref()) {
                 Ok(manifest) => {
                     println!("Successfully installed {}", node.pkg.name.green());
 

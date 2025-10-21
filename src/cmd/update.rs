@@ -127,6 +127,7 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
         &processed_deps,
         Some(old_manifest.scope),
         None,
+        None,
     ) {
         Ok(new_manifest) => {
             if let Err(e) = transaction::record_operation(
@@ -273,6 +274,7 @@ fn run_update_all_logic(yes: bool) -> Result<()> {
                 false,
                 &processed_deps,
                 Some(old_manifest.scope),
+                None,
                 None,
             ) {
                 Ok(new_manifest) => {

@@ -13,6 +13,7 @@ pub fn install_node(
     node: &InstallNode,
     mode: InstallMode,
     m: Option<&MultiProgress>,
+    build_type: Option<&str>,
 ) -> Result<types::InstallManifest> {
     let pkg = &node.pkg;
     let version = &node.version;
@@ -24,7 +25,7 @@ pub fn install_node(
         return Err(anyhow!("Pre-install hook failed for '{}': {}", pkg.name, e));
     }
 
-    let installed_files = run_install_flow(node, mode, m)?;
+    let installed_files = run_install_flow(node, mode, m, build_type)?;
 
     if let types::InstallReason::Dependency { ref parent } = node.reason {
         let package_dir = local::get_package_dir(pkg.scope, handle, &pkg.repo, &pkg.name)?;
@@ -84,6 +85,7 @@ fn run_install_flow(
     node: &InstallNode,
     mode: InstallMode,
     m: Option<&MultiProgress>,
+    build_type: Option<&str>,
 ) -> Result<Vec<String>> {
     let pkg = &node.pkg;
     let pkg_lua_path = Path::new(&node.source);
@@ -230,5 +232,5 @@ fn run_install_flow(
         "{}",
         "Could not install pre-built package. Building from source...".yellow()
     );
-    prebuilt::try_build_install(pkg_lua_path, pkg, &node.registry_handle)
+    prebuilt::try_build_install(pkg_lua_path, pkg, &node.registry_handle, build_type)
 }

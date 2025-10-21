@@ -264,6 +264,9 @@ enum Commands {
         /// Save the package to the project's zoi.yaml
         #[arg(long)]
         save: bool,
+        /// The type of package to build if building from source (e.g. 'source', 'pre-compiled').
+        #[arg(long)]
+        r#type: Option<String>,
     },
 
     /// Uninstalls one or more packages previously installed by Zoi
@@ -661,6 +664,7 @@ pub fn run() {
                 local,
                 global,
                 save,
+                r#type,
             } => {
                 cmd::install::run(
                     &sources,
@@ -672,6 +676,7 @@ pub fn run() {
                     local,
                     global,
                     save,
+                    r#type,
                 );
                 Ok(())
             }

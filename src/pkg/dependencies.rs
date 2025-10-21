@@ -1403,6 +1403,7 @@ fn install_zoi_dependency(
         processed_deps,
         Some(scope),
         m,
+        None,
     )
     .map(|_| ())
 }
