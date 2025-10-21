@@ -66,102 +66,435 @@ Zoi is packed with features designed to make package management and environment 
 
 - **Library Support:** Use `zoi` as a Rust library in your own applications to programmatically manage packages. The `zoi-rs` crate is available on [crates.io](https://crates.io/crates/zoi-rs), [learn more](/docs/zds/zoi/lib).
 
-## Usage Examples
+## Command Reference
 
-Here are some common commands to get you started.
+This section provides a detailed reference for all of Zoi's commands.
 
-- **Install a package:**
+### Global Options
 
-  ```sh
-  zoi install <package_name>
-  ```
+These options can be used with any command:
 
-- **Uninstall a package:**
+- `-y`, `--yes`: Automatically answer "yes" to all confirmation prompts.
+- `-v`, `--version`: Print detailed version information.
 
-  ```sh
-  zoi uninstall <package_name>
-  ```
+---
 
-- **Update packages:**
+### `zoi about`
 
-  ```sh
-  # Update all installed packages
-  zoi update --all
+Shows detailed application information and credits.
 
-  # Update specific packages
-  zoi update <package1> <package2>
-  ```
+---
 
-- **Search for a package:**
+### `zoi autoremove`
 
-  ```sh
-  zoi search <term>
-  ```
+Removes packages that were installed as dependencies but are no longer needed.
 
-- **Show package details:**
+---
 
-  ```sh
-  zoi show <package_name>
-  ```
+### `zoi check`
 
-- **Run a project command:**
+Checks for essential third-party command-line tools like `git`.
 
-  ```sh
-  # Run a command defined in zoi.yaml
-  zoi run <command_alias>
-  ```
+---
 
-- **Update Zoi to the latest version:**
+### `zoi clean`
 
-  ```sh
-  zoi upgrade
-  ```
+Clears the cache of downloaded package binaries.
 
-### Advanced Examples
+---
 
-- **Execute a package without installing it:**
+### `zoi create <source> [app_name]`
 
-  ```sh
-  zoi exec <package_name> -- <args_for_the_package>
-  ```
+Create an application using a package template.
 
-- **See why a package is installed:**
+**Arguments:**
 
-  ```sh
-  zoi why <package_name>
-  ```
+- `<source>`: Package name, `@repo/name`, local `.pkg.lua` path, or URL.
+- `[app_name]`: The application name to substitute into template commands.
 
-- **Pin a package to a specific version:**
+---
 
-  ```sh
-  # Pinning prevents 'zoi update' from changing this package
-  zoi pin <package_name> 1.2.3
-  ```
+### `zoi env [env_alias]`
 
-- **Rollback a package to its previous version:**
+Manage and set up project environments from a local `zoi.yaml` file.
 
-  ```sh
-  zoi rollback <package_name>
-  ```
+**Arguments:**
 
-- **Manage repositories:**
+- `[env_alias]`: The alias of the environment to set up. If not provided, an interactive prompt is shown.
 
-  ```sh
-  # List all configured repositories
-  zoi repo list
+---
 
-  # List all available repositories from the default registry
-  zoi repo list all
+### `zoi exec <SOURCE> [ARGS]...`
 
-  # Add a repository from a git URL
-  zoi repo add https://github.com/<user_name>/<repo_name>.git
+(alias: `x`)
 
-  # Remove a repository
-  zoi repo rm <repo_name>
-  ```
+Download and execute a binary package without installing it.
 
-- **Install a package to a project and save it to `zoi.yaml`:**
+**Arguments:**
 
-  ```sh
-  zoi install --local --save <package_name>
-  ```
+- `<SOURCE>`: Package name, local path, or URL to execute.
+- `[ARGS]...`: Arguments to pass to the executed command.
+
+**Options:**
+
+- `--upstream`: Force execution from a fresh download, bypassing any cache.
+- `--cache`: Force execution from the cache, failing if the package is not cached.
+- `--local`: Force execution from the local project installation.
+
+---
+
+### `zoi extension`
+
+(alias: `ext`)
+
+Manage Zoi extensions.
+
+**Subcommands:**
+
+- `add <name>`: Add an extension.
+- `remove <name>`: Remove an extension.
+
+---
+
+### `zoi files <package>`
+
+List all files owned by a package.
+
+**Arguments:**
+
+- `<package>`: The name of the package.
+
+---
+
+### `zoi helper`
+
+Helper commands for various tasks.
+
+**Subcommands:**
+
+- `get-hash <source>`: Get a hash of a local file or a file from a URL.
+  - `--hash <sha512|sha256>`: The hash algorithm to use (default: `sha512`).
+
+---
+
+### `zoi info`
+
+Displays detected operating system and architecture information.
+
+---
+
+### `zoi install [SOURCES]...`
+
+(alias: `i`)
+
+Installs one or more packages from a name, local file, URL, or git repository.
+
+**Arguments:**
+
+- `[SOURCES]...`: Package names, local paths, or URLs to `.pkg.lua` files.
+
+**Options:**
+
+- `--repo <REPO>`: Install from a git repository (e.g. 'Zillowe/Hello', 'gl:Zillowe/Hello').
+- `--force`: Force re-installation even if the package is already installed.
+- `--all-optional`: Accept all optional dependencies.
+- `--scope <user|system|project>`: The scope to install the package to.
+- `--local`: Install packages to the current project (alias for `--scope=project`).
+- `--global`: Install packages globally for the current user (alias for `--scope=user`).
+- `--save`: Save the package to the project's `zoi.yaml`.
+- `--type <TYPE>`: The type of package to build if building from source.
+
+---
+
+### `zoi list`
+
+(alias: `ls`)
+
+Lists installed or all available packages.
+
+**Options:**
+
+- `-a`, `--all`: List all packages from the database, not just installed ones.
+- `--repo <REPO>`: Filter by repository.
+- `-t`, `--type <TYPE>`: Filter by package type (`package`, `app`, `collection`, `extension`).
+
+---
+
+### `zoi man <package_name>`
+
+Shows a package's manual.
+
+**Arguments:**
+
+- `<package_name>`: The name of the package to show the manual for.
+
+**Options:**
+
+- `--upstream`: Always look at the upstream manual even if it's downloaded.
+- `--raw`: Print the manual to the terminal raw.
+
+---
+
+### `zoi owner <path>`
+
+(alias: `owns`)
+
+Find which package owns a file.
+
+**Arguments:**
+
+- `<path>`: Path to the file.
+
+---
+
+### `zoi package`
+
+(alias: `pkg`)
+
+Build, create, and manage Zoi packages.
+
+**Subcommands:**
+
+- `build <package_file>`: Build a package from a `.pkg.lua` file.
+  - `--type <TYPE>`: (Required) The type of package to build (e.g. 'source', 'pre-compiled').
+  - `-p`, `--platform <PLATFORM>`: The platform to build for (default: `current`).
+  - `--sign <KEY>`: Sign the package with the given PGP key.
+- `install <package_file>`: Install a package from a local archive.
+  - `--scope <user|system>`: The scope to install the package to (default: `user`).
+
+---
+
+### `zoi pgp`
+
+Manage PGP keys for package signature verification.
+
+**Subcommands:**
+
+- `add`: Add a PGP key from a file, URL, or a keyserver.
+  - `--path <PATH>`: Path to the PGP key file.
+  - `--fingerprint <FINGERPRINT>`: Fingerprint of the PGP key to fetch.
+  - `--url <URL>`: URL of the PGP key to import.
+  - `--name <NAME>`: Name to associate with the key.
+- `remove` (alias: `rm`): Remove a PGP key.
+  - `<name>`: Name of the key to remove.
+  - `--fingerprint <FINGERPRINT>`: Fingerprint of the key to remove.
+- `list` (alias: `ls`): List all imported PGP keys.
+- `search <term>`: Search for a PGP key by user ID or fingerprint.
+- `show <name>`: Show the public key of a stored PGP key.
+- `verify`: Verify a file's detached signature.
+  - `--file <FILE>`: Path to the file to verify.
+  - `--sig <SIG>`: Path to the detached signature file.
+  - `--key <KEY>`: Name of the key in the local store to use for verification.
+
+---
+
+### `zoi pin <package> <version>`
+
+Pin a package to a specific version.
+
+**Arguments:**
+
+- `<package>`: The name of the package to pin.
+- `<version>`: The version to pin the package to.
+
+---
+
+### `zoi repo`
+
+(aliases: `repositories`)
+
+Manage package repositories.
+
+**Subcommands:**
+
+- `add [repo_or_url]`: Add an official repo by name or clone from a git URL.
+- `remove <repo_name>` (alias: `rm`): Remove a repository from the active configuration.
+- `list [all]` (alias: `ls`): List active repositories. Use `list all` to show all available.
+- `git`: Manage cloned git repositories.
+  - `list` (alias: `ls`): Show cloned git repositories.
+  - `rm <repo_name>`: Remove a cloned git repository.
+
+---
+
+### `zoi rollback [PACKAGE]`
+
+Rollback a package to the previously installed version.
+
+**Arguments:**
+
+- `[PACKAGE]`: The name of the package to rollback.
+
+**Options:**
+
+- `--last-transaction`: Rollback the last transaction.
+
+---
+
+### `zoi run [cmd_alias] [args]...`
+
+Execute a command defined in a local `zoi.yaml` file.
+
+**Arguments:**
+
+- `[cmd_alias]`: The alias of the command to execute.
+- `[args]...`: Arguments to pass to the command.
+
+---
+
+### `zoi search <search_term>`
+
+(alias: `s`)
+
+Searches for packages by name or description.
+
+**Arguments:**
+
+- `<search_term>`: The term to search for.
+
+**Options:**
+
+- `--repo <REPO>`: Filter by repository.
+- `--type <TYPE>`: Filter by package type.
+- `-t`, `--tag <TAGS>`: Filter by tags (comma-separated).
+
+---
+
+### `zoi setup`
+
+Configures the shell environment for Zoi.
+
+**Options:**
+
+- `--scope <user|system>`: The scope to apply the setup to (default: `user`).
+
+---
+
+### `zoi shell <shell>`
+
+Installs completion scripts for a given shell.
+
+**Arguments:**
+
+- `<shell>`: The shell to install completions for (`bash`, `zsh`, `fish`, `elvish`, `powershell`).
+
+---
+
+### `zoi show <package_name>`
+
+Shows detailed information about a package.
+
+**Arguments:**
+
+- `<package_name>`: The name of the package to show.
+
+**Options:**
+
+- `--raw`: Display the raw, unformatted package file.
+
+---
+
+### `zoi sync`
+
+(alias: `sy`)
+
+Downloads or updates the package database from the remote repository.
+
+**Options:**
+
+- `-v`, `--verbose`: Show the full git output.
+- `--fallback`: Fallback to other mirrors if the default one fails.
+- `--no-pm`: Do not check for installed package managers.
+- `--no-shell-setup`: Do not attempt to set up shell completions after syncing.
+
+**Subcommands:**
+
+- `add <url>`: Add a new registry.
+- `remove <handle>`: Remove a configured registry by its handle.
+- `list`: List configured registries.
+- `set <url>`: Set the default registry URL (`default`, `github`, `gitlab`, `codeberg`, or a URL).
+
+---
+
+### `zoi telemetry <action>`
+
+Manage telemetry settings.
+
+**Arguments:**
+
+- `<action>`: `status`, `enable`, or `disable`.
+
+---
+
+### `zoi uninstall <PACKAGES>...`
+
+(aliases: `un`, `rm`, `remove`)
+
+Uninstalls one or more packages previously installed by Zoi.
+
+**Arguments:**
+
+- `<PACKAGES>...`: One or more packages to uninstall.
+
+**Options:**
+
+- `--scope <user|system|project>`: The scope to uninstall the package from.
+- `--local`: Uninstall packages from the current project.
+- `--global`: Uninstall packages globally for the current user.
+
+---
+
+### `zoi unpin <package>`
+
+Unpin a package, allowing it to be updated.
+
+**Arguments:**
+
+- `<package>`: The name of the package to unpin.
+
+---
+
+### `zoi update [PACKAGES]...`
+
+(alias: `up`)
+
+Updates one or more packages to their latest versions.
+
+**Arguments:**
+
+- `[PACKAGES]...`: The name(s) of the package(s) to update. If none are provided, you must use `--all`.
+
+**Options:**
+
+- `--all`: Update all installed packages.
+
+---
+
+### `zoi upgrade`
+
+(alias: `ug`)
+
+Upgrades the Zoi binary to the latest version.
+
+**Options:**
+
+- `--force`: Force a full download, skipping the patch-based upgrade.
+- `--tag <TAG>`: Upgrade to a specific git tag.
+- `--branch <BRANCH>`: Upgrade to the latest release of a specific branch.
+
+---
+
+### `zoi version`
+
+(alias: `v`)
+
+Prints concise version and build information.
+
+---
+
+### `zoi why <package_name>`
+
+Explains why a package is installed.
+
+**Arguments:**
+
+- `<package_name>`: The name of the package to inspect.

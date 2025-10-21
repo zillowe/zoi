@@ -88,6 +88,15 @@ Changes the URL of the main package database that Zoi clones and syncs with.
 - **Effect:** The registry URL in Zoi's configuration is updated to the new URL.
 - **On Removal:** The registry URL is reverted to the default Zoi package database on GitLab.
 
+#### `registry-add`
+
+Adds an additional package database (registry) for Zoi to sync with.
+
+- **Purpose:** To add supplementary package databases from different sources.
+- **`add` Value:** A valid Git repository URL.
+- **Effect:** The URL is added to the list of `added_registries` in Zoi's configuration. Zoi will sync with this registry on the next `zoi sync`.
+- **On Removal:** The registry is removed from the configuration and its cloned data is deleted.
+
 #### `project`
 
 Creates a `zoi.yaml` file in the current directory, allowing for sharable project configurations.
@@ -152,6 +161,11 @@ metadata({
         type = "pgp",
         name = "mycorp-signing-key",
         key = "https://keys.mycorp.com/zoi-signing-key.asc"
+      },
+      -- 5. Add a partner company's registry.
+      {
+        type = "registry-add",
+        add = "https://git.partner.com/zoi/packages.git"
       }
     }
   }
