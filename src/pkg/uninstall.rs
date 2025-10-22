@@ -158,7 +158,19 @@ pub fn run(
             if let Ok(op_type) = op.get::<String>("op")
                 && op_type == "zrm"
             {
-                let path_to_remove: String = op.get("path").map_err(|e| anyhow!(e.to_string()))?;
+                let mut path_to_remove: String =
+                    op.get("path").map_err(|e| anyhow!(e.to_string()))?;
+
+                let version_dir = package_dir.join(&manifest.version);
+                path_to_remove =
+                    path_to_remove.replace("${pkgstore}", &version_dir.to_string_lossy());
+
+                if let Some(home_dir) = home::home_dir() {
+                    path_to_remove =
+                        path_to_remove.replace("${usrhome}", &home_dir.to_string_lossy());
+                }
+                path_to_remove = path_to_remove.replace("${usrroot}", "/");
+
                 let path = std::path::PathBuf::from(path_to_remove);
                 if path.exists() {
                     println!("Removing {}...", path.display());
