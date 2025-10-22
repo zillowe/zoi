@@ -30,11 +30,53 @@ fn get_bin_root(scope: types::Scope) -> Result<PathBuf> {
     }
 }
 
+fn check_and_handle_file_conflicts(source_dir: &Path, dest_dir: &Path, yes: bool) -> Result<()> {
+    let mut conflicting_files = Vec::new();
+
+    for entry in WalkDir::new(source_dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .skip(1)
+    {
+        if entry.file_type().is_file() {
+            let relative_path = entry.path().strip_prefix(source_dir)?;
+            let dest_path = dest_dir.join(relative_path);
+            if dest_path.exists() {
+                conflicting_files.push(dest_path);
+            }
+        }
+    }
+
+    if !conflicting_files.is_empty() {
+        println!();
+        println!("{}", "File Conflict Detected:".red().bold());
+        println!(
+            "The following files that this package wants to install already exist on your system:"
+        );
+        for file in &conflicting_files {
+            println!("- {}", file.display());
+        }
+        println!();
+
+        if !utils::ask_for_confirmation(
+            "Do you want to overwrite these files and continue with the installation?",
+            yes,
+        ) {
+            return Err(anyhow!(
+                "Installation aborted by user due to file conflicts."
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 pub fn run(
     package_file: &Path,
     scope_override: Option<types::Scope>,
     registry_handle: &str,
     version_override: Option<&str>,
+    yes: bool,
 ) -> Result<Vec<String>> {
     let scope = scope_override.unwrap_or(types::Scope::User);
 
@@ -106,6 +148,7 @@ pub fn run(
                 ));
             }
             let root_dest = PathBuf::from("/");
+            check_and_handle_file_conflicts(&usrroot_src, &root_dest, yes)?;
             copy_dir_all(&usrroot_src, &root_dest)?;
             for entry in WalkDir::new(&usrroot_src)
                 .into_iter()
@@ -123,6 +166,7 @@ pub fn run(
         if usrhome_src.exists() {
             let home_dest =
                 home::home_dir().ok_or_else(|| anyhow!("Could not find home directory"))?;
+            check_and_handle_file_conflicts(&usrhome_src, &home_dest, yes)?;
             copy_dir_all(&usrhome_src, &home_dest)?;
             for entry in WalkDir::new(&usrhome_src)
                 .into_iter()

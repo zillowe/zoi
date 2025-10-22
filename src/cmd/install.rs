@@ -251,7 +251,7 @@ pub fn run(
 
             println!("Installing {}...", node.pkg.name.cyan());
 
-            match install::installer::install_node(node, mode, None, build_type.as_deref()) {
+            match install::installer::install_node(node, mode, None, build_type.as_deref(), yes) {
                 Ok(manifest) => {
                     println!("Successfully installed {}", node.pkg.name.green());
 

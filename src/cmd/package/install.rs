@@ -10,6 +10,9 @@ pub struct InstallCommand {
     /// The scope to install the package to (user or system-wide)
     #[arg(long, value_enum, default_value_t = SetupScope::User)]
     pub scope: SetupScope,
+    /// Automatically answer yes to all prompts
+    #[arg(long)]
+    pub yes: bool,
 }
 
 pub fn run(args: InstallCommand) {
@@ -18,7 +21,7 @@ pub fn run(args: InstallCommand) {
         SetupScope::System => crate::pkg::types::Scope::System,
     };
     if let Err(e) =
-        crate::pkg::package::install::run(&args.package_file, Some(scope), "local", None)
+        crate::pkg::package::install::run(&args.package_file, Some(scope), "local", None, args.yes)
     {
         eprintln!("Error: {}", e);
         std::process::exit(1);

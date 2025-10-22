@@ -14,7 +14,7 @@ pub fn run_installation(
     mode: InstallMode,
     _force: bool,
     reason: types::InstallReason,
-    _yes: bool,
+    yes: bool,
     _all_optional: bool,
     _processed_deps: &std::sync::Mutex<std::collections::HashSet<String>>,
     scope_override: Option<types::Scope>,
@@ -37,5 +37,5 @@ pub fn run_installation(
         chosen_optionals: vec![],
     };
 
-    installer::install_node(&node, mode, m, build_type)
+    installer::install_node(&node, mode, m, build_type, yes)
 }

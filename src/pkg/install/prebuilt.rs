@@ -9,6 +9,7 @@ pub fn try_build_install(
     pkg: &types::Package,
     registry_handle: &str,
     build_type_override: Option<&str>,
+    yes: bool,
 ) -> Result<Vec<String>> {
     println!("{}", "Attempting to build and install package...".yellow());
 
@@ -62,6 +63,7 @@ pub fn try_build_install(
         Some(pkg.scope),
         registry_handle,
         Some(version),
+        yes,
     )?;
     println!("'install' step successful.");
 

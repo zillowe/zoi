@@ -17,7 +17,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! zoi = { version = "1.1.0" } // Replace with the desired version
+//! zoi = { version = "1" } // Replace with the latest version
 //! ```
 //!
 //! ## Example: Install a package
@@ -32,16 +32,13 @@
 //!     let scope = Some(Scope::User);
 //!     let registry_handle = "local";
 //!
-//!     let installed_files = install_package(archive_path, scope, registry_handle)?;
+//!     let installed_files = install_package(archive_path, scope, registry_handle, true)?;
 //!
 //!     println!("Package installed successfully. {} files were installed.", installed_files.len());
 //!
 //!     Ok(())
 //! }
 //! ```
-//!
-//! For more detailed documentation, see the [Zoi Documentation Hub](https://zillowe.qzz.io/docs/zds/zoi).
-//! For more library examples, see the [Library Examples page](https://zillowe.qzz.io/docs/zds/zoi/lib/examples).
 
 pub mod cli;
 pub mod cmd;
@@ -104,6 +101,7 @@ pub fn build(
 /// * `package_file`: Path to the local package archive.
 /// * `scope_override`: Optionally override the installation scope (`User`, `System`, `Project`).
 /// * `registry_handle`: The handle of the registry this package belongs to (e.g. "zoidberg", or "local").
+/// * `yes`: Automatically answer "yes" to any confirmation prompts (e.g. file conflicts).
 ///
 /// # Returns
 ///
@@ -123,7 +121,7 @@ pub fn build(
 ///
 /// fn main() -> Result<()> {
 ///     let archive_path = Path::new("my-package-1.0.0-linux-amd64.pkg.tar.zst");
-///     install_package(archive_path, Some(Scope::User), "local")?;
+///     install_package(archive_path, Some(Scope::User), "local", true)?;
 ///     println!("Package installed!");
 ///     Ok(())
 /// }
@@ -132,8 +130,9 @@ pub fn install_package(
     package_file: &Path,
     scope_override: Option<Scope>,
     registry_handle: &str,
+    yes: bool,
 ) -> Result<Vec<String>> {
-    pkg::package::install::run(package_file, scope_override, registry_handle, None)
+    pkg::package::install::run(package_file, scope_override, registry_handle, None, yes)
 }
 
 /// Uninstalls a Zoi package.
