@@ -4,6 +4,16 @@ You can install any of these versions: `zoi upgrade --tag <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
+## [Prod-Release-1.1.1] - 2025-10-22
+
+### ✨ Features
+
+- _(install)_ Implement file conflict detection and auto-overwrite
+
+### 🩹 Bug Fixes
+
+- _(uninstall)_ Resolve path placeholders
+
 ## [Prod-Release-1.1.0] - 2025-10-21
 
 ### ✨ Features
