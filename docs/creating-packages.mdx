@@ -37,7 +37,7 @@ When Zoi executes your `.pkg.lua` script, it provides a set of global variables 
 
 - `cmd(command)`: Executes a shell command.
 - `zcp(source, destination)`: Copies files/directories into the staging area.
-- `zrm(path)`: A function for the `uninstall()` step to remove files.
+- `zrm(path)`: A function for the `uninstall()` step to remove files. The path can contain variables like `${pkgstore}`, `${usrhome}`, and `${usrroot}`.
 - `verifyHash(file_path, "algo-hash")`: Verifies a file's checksum.
 - `verifySignature(file_path, sig_path, key_name)`: Verifies a PGP signature.
 - `addPgpKey(url_or_path, name)`: Adds a PGP key to Zoi's keyring.
@@ -209,14 +209,23 @@ The `hello` package is simple. Here are some features you might need for more co
 
 ### `uninstall()` function
 
-If your package creates files outside of its installation directory (e.g. config files in `~/.config`), you can define an `uninstall` function to clean them up.
+If your package creates files outside of its installation directory (e.g. config files in the user's home directory), you can define an `uninstall` function to clean them up.
 
 ```lua
 function uninstall()
-  -- zrm is a helper to remove files/directories
-  zrm("~/.config/my-app")
+  -- zrm can use variables to target specific locations
+  zrm("${usrhome}/.config/my-app")
+  zrm("${usrroot}/etc/my-app.conf")
 end
 ```
+
+#### Target Paths for `zrm`
+
+The `path` for `zrm` uses special variables to target common locations:
+
+- `${pkgstore}`: The package's versioned installation directory inside the Zoi store.
+- `${usrhome}`: The current user's home directory (`~`).
+- `${usrroot}`: The system's root directory (`/`). **Use with extreme caution.**
 
 ### `updates` block
 

@@ -19,7 +19,7 @@ Or in your `Cargo.toml` file:
 
 ```toml
 [dependencies]
-zoi-rs = "1.1.0" # Check crates.io for the latest version
+zoi-rs = "1" # Check crates.io for the latest version
 ```
 
 ## Core Functions
@@ -83,6 +83,7 @@ pub fn install_package(
     package_file: &Path,
     scope_override: Option<Scope>,
     registry_handle: &str,
+    yes: bool,
 ) -> Result<Vec<String>>
 ```
 
@@ -93,6 +94,7 @@ pub fn install_package(
 | `package_file`    | `&Path`         | The path to the local package archive (`.pkg.tar.zst`).                                                 |
 | `scope_override`  | `Option<Scope>` | An optional `Scope` (`User`, `System`, `Project`) to override the default scope defined in the package. |
 | `registry_handle` | `&str`          | The handle of the registry this package belongs to. Use `"local"` for packages not from a registry.     |
+| `yes`             | `bool`          | Automatically answer "yes" to any confirmation prompts (e.g. file conflicts).                           |
 
 ---
 

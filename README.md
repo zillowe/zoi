@@ -129,7 +129,7 @@ Getting started with Zoi is simple. Just follow these three steps:
    Now you can install any package you want. For example, to install `hello`:
 
    ```sh
-   zoi install hello
+   zoi install @zillowe/hello
    ```
 
 ## 📦 Installation
@@ -370,7 +370,7 @@ Zoi is hosted on multiple forges. The primary locations and mirrors are:
   - Primary: [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi)
   - Mirrors: [GitHub](https://github.com/Zillowe/Zoi), [Codeberg](https://codeberg.org/Zillowe/Zoi)
 
-- Packages Database (Zoidberg)
+- Packages Database ([Zoidberg](https://zillowe.qzz.io/docs/zds/zoi/zoidberg))
   - Primary: [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg)
   - Mirrors: [GitHub](https://github.com/Zillowe/Zoidberg), [Codeberg](https://codeberg.org/Zillowe/Zoidberg)
 
