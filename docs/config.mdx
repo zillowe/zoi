@@ -1,0 +1,156 @@
+---
+title: Zoi Configuration
+description: A detailed guide to Zoi's config.yaml file for customizing its behavior.
+---
+
+Zoi's behavior can be customized through one or more `config.yaml` files. This allows users and system administrators to configure everything from active package repositories to security policies. This document covers the structure of the configuration file, where to place it, and all the available options.
+
+## Configuration File Locations
+
+Zoi uses a hierarchical configuration system, merging settings from up to three different locations. This allows for global system-wide settings to be overridden by user-specific or project-specific configurations.
+
+The files are loaded and merged in the following order of precedence (lower numbers are overridden by higher numbers):
+
+1.  **System:** Global configuration for all users on the machine. This is the only location where a `policy` can be set to enforce settings.
+    - **Linux/macOS:** `/etc/zoi/config.yaml`
+    - **Windows:** `C:\ProgramData\zoi\config.yaml`
+
+2.  **User:** User-specific configuration. This is the most common file for users to edit.
+    - **Linux/macOS:** `~/.zoi/pkgs/config.yaml`
+    - **Windows:** `%USERPROFILE%\.zoi\pkgs\config.yaml`
+
+3.  **Project:** Project-specific configuration, useful for team-based settings.
+    - **Path:** `./.zoi/pkgs/config.yaml` (relative to the current directory)
+
+Settings from a higher-precedence file will override those from a lower-precedence file, unless a `policy` in the system configuration prevents it.
+
+## Configuration Schema
+
+Here are all the fields available in `config.yaml`.
+
+### `repos`
+
+A list of active repository tiers from the default registry that Zoi will search for packages.
+
+- **Type:** `list` of `string`
+- **Example:**
+  ```yaml
+  repos:
+    - core
+    - main
+    - community
+  ```
+
+### `default_registry`
+
+Configures the primary package database (registry) that Zoi syncs with.
+
+- **Type:** `object`
+- **Fields:**
+  - `handle`: (string) A short, unique name for the registry. Zoi will determine this automatically on the first sync if left empty.
+  - `url`: (string) The Git URL of the registry repository.
+- **Example:**
+  ```yaml
+  default_registry:
+    handle: zoidberg
+    url: https://github.com/Zillowe/Zoidberg.git
+  ```
+
+### `added_registries`
+
+A list of supplementary package registries to sync with, in addition to the `default_registry`.
+
+- **Type:** `list` of `object`
+- **Fields:** Same as `default_registry`.
+- **Example:**
+  ```yaml
+  added_registries:
+    - handle: my-corp-registry
+      url: https://git.mycorp.com/zoi-packages.git
+  ```
+
+### `git_repos`
+
+A list of raw Git repository URLs that contain Zoi packages. These are cloned into `~/.zoi/pkgs/git/` and can be used for personal or third-party package collections that are not full registries.
+
+- **Type:** `list` of `string`
+- **Example:**
+  ```yaml
+  git_repos:
+    - https://github.com/user/my-cool-pkgs.git
+  ```
+
+### `telemetry_enabled`
+
+Enables or disables Zoi's opt-in anonymous telemetry. See the [Telemetry page](/docs/zds/zoi/telemetry) for more details.
+
+- **Type:** `boolean`
+- **Default:** `false`
+- **Example:** `telemetry_enabled: true`
+
+### `rollback_enabled`
+
+If `true`, Zoi will keep the previous version of a package when upgrading, allowing for `zoi rollback` to function. If `false`, old versions are deleted immediately.
+
+- **Type:** `boolean`
+- **Default:** `true`
+- **Example:** `rollback_enabled: false`
+
+### `parallel_jobs`
+
+The number of parallel jobs to use during package installation. This can speed up the installation of multiple packages or packages with many dependencies.
+
+- **Type:** `integer`
+- **Default:** `3`
+- **Example:** `parallel_jobs: 5`
+
+### `policy`
+
+A special object that can only be set in the **system-wide** configuration file (`/etc/zoi/config.yaml`). It allows administrators to lock down certain settings, preventing them from being overridden by user or project configs.
+
+- **Type:** `object`
+- **See:** [The `policy` Object](#the-policy-object) section below for details.
+
+---
+
+## The `policy` Object
+
+The `policy` object is designed for system administrators to enforce a consistent and secure Zoi environment across a machine. It can only be defined in the system-level `config.yaml`. All fields are `boolean` and default to `false`.
+
+When a policy field is set to `true`, the corresponding configuration from the system `config.yaml` cannot be changed by a user or project `config.yaml`.
+
+### Policy Fields
+
+- `repos_unoverridable`: If `true`, the `repos` list is locked.
+- `default_registry_unoverridable`: If `true`, the `default_registry` cannot be changed.
+- `added_registries_unoverridable`: If `true`, the `added_registries` list is locked.
+- `git_repos_unoverridable`: If `true`, the `git_repos` list is locked.
+- `telemetry_enabled_unoverridable`: If `true`, the `telemetry_enabled` setting is locked.
+- `rollback_enabled_unoverridable`: If `true`, the `rollback_enabled` setting is locked.
+
+### Example Policy
+
+This example (in `/etc/zoi/config.yaml`) configures Zoi to use a corporate registry, enables telemetry, and prevents users from changing these settings.
+
+```yaml
+# /etc/zoi/config.yaml
+
+# Set the default registry to the corporate mirror
+default_registry:
+  handle: my-corp
+  url: https://git.mycorp.com/zoi/zoidberg.git
+
+# Activate only the 'core' and 'internal' repos
+repos:
+  - core
+  - internal
+
+# Enforce telemetry for internal metrics
+telemetry_enabled: true
+
+# Define the policy to lock these settings
+policy:
+  default_registry_unoverridable: true
+  repos_unoverridable: true
+  telemetry_enabled_unoverridable: true
+```
