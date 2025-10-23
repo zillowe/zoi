@@ -35,15 +35,11 @@ Zoi can be built from source using several methods.
 This is the standard way to build Rust projects. The build process can be influenced by environment variables (see [Environment Variables](#environment-variables)).
 
 ```sh
-# Build the main zoi binary in release mode
+# Build zoi in release mode
 cargo build --bin zoi --release
 ```
 
-This will produce the `zoi` binary in `target/release/`. To build all binaries (`zoi`, `zoi-completions`, `zoi-mangen`), run:
-
-```sh
-cargo build --release
-```
+This will produce the `zoi` binary in `target/release/`.
 
 ### Using the Makefile
 
@@ -53,7 +49,7 @@ The project provides a `Makefile` for convenience, which simplifies building and
 # Configure build paths (creates config.mk)
 ./configure
 
-# Build the zoi binary in release mode
+# Build zoi in release mode
 make build
 
 # Install the binary to the configured location
@@ -95,16 +91,6 @@ Zoi uses a few environment variables at build time.
 - **`ZOI_DEFAULT_REGISTRY`**: Sets the default package registry URL. This is used when no registry is configured by the user. It can be set in a `.env` file or as a build argument to Docker.
 - **`ZOI_ABOUT_PACKAGER_AUTHOR`**, **`ZOI_ABOUT_PACKAGER_EMAIL`**, **`ZOI_ABOUT_PACKAGER_HOMEPAGE`**: Allows a packager to embed their own contact details into the binary. This information is displayed in the `zoi about` command output, which is useful for users of a specific package to identify the package maintainer.
 
-## Binaries
-
-The build process generates three binaries:
-
-- `zoi`: The main application binary.
-- `zoi-completions`: A helper binary to generate shell completion scripts.
-- `zoi-mangen`: A helper binary to generate the man page.
-
-For most packaging purposes, you will only need to package the `zoi` binary, as it can also generate completions and man pages itself.
-
 ## Completions and Man Pages
 
 Zoi provides commands to generate shell completions and man pages. These should be included in the package.
@@ -127,15 +113,10 @@ Zoi provides commands to generate shell completions and man pages. These should 
   ```sh
   ./target/release/zoi generate-manual
   # This creates a `manuals/` directory with `zoi.1`, `zoi-install.1`, etc.
+  OUT_DIR=dist/man/ ./target/release/zoi generate-manual
+  # This creates `zoi.1`, `zoi-install.1`, etc. in `dist/man/`
   ```
   These files should be installed to the appropriate man page directory (e.g. `/usr/share/man/man1`).
-
-Alternatively, the `zoi-mangen` binary can be used directly, which is useful for build scripts that specify an output directory:
-
-```sh
-OUT_DIR=dist/man/ ./target/release/zoi-mangen
-# This creates `zoi.1`, `zoi-install.1`, etc. in `dist/man/`
-```
 
 ## Existing Packaging Files
 

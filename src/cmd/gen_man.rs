@@ -1,21 +1,23 @@
 use crate::cli::Cli;
 use clap::{Command, CommandFactory};
 use clap_mangen::Man;
+use std::env;
 use std::fs;
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub fn run() -> io::Result<()> {
-    let out_path = Path::new("manuals");
-    fs::create_dir_all(out_path)?;
+    let out_dir = env::var("OUT_DIR").unwrap_or_else(|_| "manuals".to_string());
+    let out_path = PathBuf::from(out_dir);
+    fs::create_dir_all(&out_path)?;
 
     let app = Cli::command();
     println!("Generating man pages in {}...", out_path.display());
 
-    generate_man_page(&app, out_path)?;
+    generate_man_page(&app, &out_path)?;
 
     for sub_command in app.get_subcommands() {
-        generate_man_pages_recursive(sub_command, out_path, app.get_name())?;
+        generate_man_pages_recursive(sub_command, &out_path, app.get_name())?;
     }
 
     println!(
