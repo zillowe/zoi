@@ -4,7 +4,7 @@ class Zoi < Formula
   desc "Universal Package Manager & Environment Setup Tool"
   homepage "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi"
   version "1.1.1"
-  _tag = "Prod-Release-1.0.0"
+  _tag = "Prod-Release-1.1.1"
   license "Apache-2.0"
 
   on_macos do
