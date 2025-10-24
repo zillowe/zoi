@@ -127,10 +127,32 @@ When a policy field is set to `true`, the corresponding configuration from the s
 - `git_repos_unoverridable`: If `true`, the `git_repos` list is locked.
 - `telemetry_enabled_unoverridable`: If `true`, the `telemetry_enabled` setting is locked.
 - `rollback_enabled_unoverridable`: If `true`, the `rollback_enabled` setting is locked.
+- `allow_deny_lists_unoverridable`: If `true`, the various allow/deny lists (`allowed_packages`, `denied_licenses`, etc.) are locked.
+- `signature_enforcement_unoverridable`: If `true`, the `signature_enforcement` policy is locked.
+
+### Allow/Deny Lists
+
+These lists allow administrators to control which packages, repositories, and licenses are permitted on a system. These are lists of strings.
+
+- `allowed_packages`: If set, only packages from this list can be installed.
+- `denied_packages`: Packages from this list cannot be installed.
+- `allowed_repos`: If set, packages can only be installed from repositories in this list.
+- `denied_repos`: Packages from repositories in this list cannot be installed.
+- `allowed_licenses`: If set, only packages with licenses from this list (using valid [SPDX identifiers](https://spdx.org/licenses/)) can be installed.
+- `denied_licenses`: Packages with licenses from this list cannot be installed.
+
+### `signature_enforcement`
+
+This object configures mandatory PGP signature verification for all pre-built packages.
+
+- **Type:** `object`
+- **Fields:**
+  - `enable`: (boolean) If `true`, Zoi will _only_ install pre-built packages (`.pkg.tar.zst` archives) that are signed by a trusted PGP key. It will not fall back to building from source.
+  - `trusted_keys`: (list of string) A list of trusted PGP key names or fingerprints. These keys must already be present in the Zoi PGP keyring (see `zoi pgp list`).
 
 ### Example Policy
 
-This example (in `/etc/zoi/config.yaml`) configures Zoi to use a corporate registry, enables telemetry, and prevents users from changing these settings.
+This example (in `/etc/zoi/config.yaml`) enforces a strict security policy suitable for an enterprise environment.
 
 ```yaml
 # /etc/zoi/config.yaml
@@ -145,12 +167,34 @@ repos:
   - core
   - internal
 
-# Enforce telemetry for internal metrics
-telemetry_enabled: true
-
-# Define the policy to lock these settings
+# Define the policy to lock settings and enforce security constraints
 policy:
+  # Lock down the repository configuration
   default_registry_unoverridable: true
   repos_unoverridable: true
-  telemetry_enabled_unoverridable: true
+  added_registries_unoverridable: true
+
+  # Enforce signature checking for all pre-built packages
+  signature_enforcement_unoverridable: true
+  signature_enforcement:
+    enable: true
+    trusted_keys:
+      - MyCorp-Build-Key
+      - 842293159C4B03357C8328D3A75793A3E674252E # Fingerprint for a specific admin
+
+  # Lock down the allow/deny lists
+  allow_deny_lists_unoverridable: true
+
+  # Only allow OSI-approved licenses, but deny specific ones we don't want
+  allowed_licenses:
+    - MIT
+    - Apache-2.0
+    - BSD-3-Clause
+  denied_licenses:
+    - AGPL-3.0-only
+
+  # Deny specific packages that are not approved for use
+  denied_packages:
+    - some-insecure-tool
+    - another-unwanted-app
 ```
