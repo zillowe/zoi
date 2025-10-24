@@ -331,6 +331,38 @@ use sequoia_openpgp::{
     parse::stream::{DetachedVerifierBuilder, MessageLayer, MessageStructure, VerificationHelper},
 };
 
+struct MultiCertHelper {
+    certs: Vec<Cert>,
+}
+
+impl VerificationHelper for MultiCertHelper {
+    fn get_certs(&mut self, _ids: &[KeyHandle]) -> anyhow::Result<Vec<Cert>> {
+        Ok(self.certs.clone())
+    }
+
+    fn check(&mut self, structure: MessageStructure) -> anyhow::Result<()> {
+        if let Some(layer) = structure.into_iter().next() {
+            match layer {
+                MessageLayer::SignatureGroup { results } => {
+                    if results.iter().any(|r| r.is_ok()) {
+                        return Ok(());
+                    } else {
+                        return Err(anyhow!("No valid signature found from any trusted key."));
+                    }
+                }
+                _ => {
+                    return Err(anyhow!(
+                        "Unexpected message structure: not a signature group."
+                    ));
+                }
+            }
+        }
+        Err(anyhow!(
+            "No signature layer found in the message structure."
+        ))
+    }
+}
+
 struct OneCertHelper {
     cert: Cert,
 }
@@ -442,6 +474,52 @@ pub fn sign_detached(data_path: &Path, signature_path: &Path, key_id: &str) -> R
 
         return Err(anyhow!(error_message));
     }
+
+    Ok(())
+}
+
+pub fn get_certs_by_name_or_fingerprint(identifiers: &[String]) -> Result<Vec<Cert>> {
+    let all_keys = get_all_local_keys_info()?;
+    let mut found_certs = Vec::new();
+
+    for identifier in identifiers {
+        let identifier_lower = identifier.to_lowercase();
+        let mut found = false;
+        for key_info in &all_keys {
+            let fingerprint_lower = key_info.cert.fingerprint().to_string().to_lowercase();
+            if key_info.name == *identifier || fingerprint_lower.starts_with(&identifier_lower) {
+                found_certs.push(key_info.cert.clone());
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            return Err(anyhow!(
+                "Trusted key '{}' not found in Zoi's PGP keyring.",
+                identifier
+            ));
+        }
+    }
+    Ok(found_certs)
+}
+
+pub fn verify_detached_signature_multi_key(
+    data_path: &Path,
+    signature_path: &Path,
+    trusted_certs: Vec<Cert>,
+) -> Result<()> {
+    let policy = &StandardPolicy::new();
+    let data = fs::read(data_path)?;
+    let signature = fs::read(signature_path)?;
+
+    let helper = MultiCertHelper {
+        certs: trusted_certs,
+    };
+
+    let mut verifier =
+        DetachedVerifierBuilder::from_bytes(&signature)?.with_policy(policy, None, helper)?;
+
+    verifier.verify_bytes(&data)?;
 
     Ok(())
 }

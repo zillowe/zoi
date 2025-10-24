@@ -160,6 +160,47 @@ pub fn read_config() -> Result<Config> {
         merged_cfg.parallel_jobs = system_cfg.parallel_jobs;
     }
 
+    if !system_policy.allow_deny_lists_unoverridable {
+        if project_cfg.policy.allowed_licenses.is_some() {
+            merged_cfg.policy.allowed_licenses = project_cfg.policy.allowed_licenses;
+        } else if user_cfg.policy.allowed_licenses.is_some() {
+            merged_cfg.policy.allowed_licenses = user_cfg.policy.allowed_licenses;
+        }
+        if project_cfg.policy.denied_licenses.is_some() {
+            merged_cfg.policy.denied_licenses = project_cfg.policy.denied_licenses;
+        } else if user_cfg.policy.denied_licenses.is_some() {
+            merged_cfg.policy.denied_licenses = user_cfg.policy.denied_licenses;
+        }
+        if project_cfg.policy.allowed_packages.is_some() {
+            merged_cfg.policy.allowed_packages = project_cfg.policy.allowed_packages;
+        } else if user_cfg.policy.allowed_packages.is_some() {
+            merged_cfg.policy.allowed_packages = user_cfg.policy.allowed_packages;
+        }
+        if project_cfg.policy.denied_packages.is_some() {
+            merged_cfg.policy.denied_packages = project_cfg.policy.denied_packages;
+        } else if user_cfg.policy.denied_packages.is_some() {
+            merged_cfg.policy.denied_packages = user_cfg.policy.denied_packages;
+        }
+        if project_cfg.policy.allowed_repos.is_some() {
+            merged_cfg.policy.allowed_repos = project_cfg.policy.allowed_repos;
+        } else if user_cfg.policy.allowed_repos.is_some() {
+            merged_cfg.policy.allowed_repos = user_cfg.policy.allowed_repos;
+        }
+        if project_cfg.policy.denied_repos.is_some() {
+            merged_cfg.policy.denied_repos = project_cfg.policy.denied_repos;
+        } else if user_cfg.policy.denied_repos.is_some() {
+            merged_cfg.policy.denied_repos = user_cfg.policy.denied_repos;
+        }
+    }
+
+    if !system_policy.signature_enforcement_unoverridable {
+        if project_cfg.policy.signature_enforcement.is_some() {
+            merged_cfg.policy.signature_enforcement = project_cfg.policy.signature_enforcement;
+        } else if user_cfg.policy.signature_enforcement.is_some() {
+            merged_cfg.policy.signature_enforcement = user_cfg.policy.signature_enforcement;
+        }
+    }
+
     if let Some(url) = merged_cfg.registry.take()
         && merged_cfg.default_registry.is_none()
     {

@@ -293,6 +293,36 @@ pub struct Policy {
     pub added_registries_unoverridable: bool,
     #[serde(default, skip_serializing_if = "is_false")]
     pub git_repos_unoverridable: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub allow_deny_lists_unoverridable: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub signature_enforcement_unoverridable: bool,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub allowed_licenses: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub denied_licenses: Option<Vec<String>>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub allowed_packages: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub denied_packages: Option<Vec<String>>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub allowed_repos: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub denied_repos: Option<Vec<String>>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signature_enforcement: Option<SignatureEnforcementPolicy>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct SignatureEnforcementPolicy {
+    #[serde(default)]
+    pub enable: bool,
+    #[serde(default)]
+    pub trusted_keys: Vec<String>,
 }
 
 fn is_false(b: &bool) -> bool {

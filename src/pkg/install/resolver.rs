@@ -1,5 +1,5 @@
 use crate::pkg::{
-    dependencies, local, resolve,
+    config, dependencies, local, resolve,
     types::{self, InstallReason, Package},
 };
 use anyhow::{Result, anyhow};
@@ -78,6 +78,86 @@ impl DependencyGraph {
     }
 }
 
+fn check_policy(pkg: &Package, config: &types::Config) -> Result<()> {
+    let policy = &config.policy;
+
+    if let Some(denied) = &policy.denied_packages
+        && denied.contains(&pkg.name)
+    {
+        return Err(anyhow!(
+            "Installation of package '{}' is denied by system policy.",
+            pkg.name
+        ));
+    }
+    if let Some(allowed) = &policy.allowed_packages
+        && !allowed.contains(&pkg.name)
+    {
+        return Err(anyhow!(
+            "Installation of package '{}' is not allowed by system policy.",
+            pkg.name
+        ));
+    }
+
+    if let Some(denied) = &policy.denied_repos
+        && denied.contains(&pkg.repo)
+    {
+        return Err(anyhow!(
+            "Packages from repository '{}' are denied by system policy.",
+            pkg.repo
+        ));
+    }
+    if let Some(allowed) = &policy.allowed_repos
+        && !allowed.contains(&pkg.repo)
+    {
+        return Err(anyhow!(
+            "Packages from repository '{}' are not allowed by system policy.",
+            pkg.repo
+        ));
+    }
+
+    if !pkg.license.is_empty() {
+        if let Ok(expr) = spdx::Expression::parse(&pkg.license) {
+            if let Some(denied) = &policy.denied_licenses {
+                for req in expr.requirements() {
+                    if let spdx::LicenseItem::Spdx { id, .. } = req.req.license
+                        && denied.contains(&id.name.to_string())
+                    {
+                        return Err(anyhow!(
+                            "Package license '{}' is denied by system policy.",
+                            pkg.license
+                        ));
+                    }
+                }
+            }
+            if let Some(allowed) = &policy.allowed_licenses {
+                for req in expr.requirements() {
+                    if let spdx::LicenseItem::Spdx { id, .. } = req.req.license {
+                        if !allowed.contains(&id.name.to_string()) {
+                            return Err(anyhow!(
+                                "Package license '{}' contains '{}', which is not in the list of allowed licenses.",
+                                pkg.license,
+                                id.name
+                            ));
+                        }
+                    } else {
+                        return Err(anyhow!(
+                            "Package license '{}' contains a non-SPDX license, which is not allowed by system policy.",
+                            pkg.license
+                        ));
+                    }
+                }
+            }
+        } else if policy.allowed_licenses.is_some() || policy.denied_licenses.is_some() {
+            return Err(anyhow!(
+                "Could not parse package license '{}' to check against system policy.",
+                pkg.license
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 pub fn resolve_dependency_graph(
     initial_sources: &[String],
     scope_override: Option<types::Scope>,
@@ -85,6 +165,7 @@ pub fn resolve_dependency_graph(
     yes: bool,
     all_optional: bool,
 ) -> Result<DependencyGraph> {
+    let config = config::read_config()?;
     let mut graph = DependencyGraph::new();
     let mut queue: VecDeque<(String, Option<String>)> =
         initial_sources.iter().map(|s| (s.clone(), None)).collect();
@@ -96,6 +177,8 @@ pub fn resolve_dependency_graph(
                 Ok(res) => res,
                 Err(e) => return Err(anyhow!("Failed to resolve '{}': {}", source, e)),
             };
+
+        check_policy(&pkg, &config)?;
 
         let handle = registry_handle.as_deref().unwrap_or("local");
         if let Some(scope) = scope_override {
