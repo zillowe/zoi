@@ -3,6 +3,7 @@ pub mod cache;
 pub mod config;
 pub mod create;
 pub mod dependencies;
+pub mod doctor;
 pub mod exec;
 pub mod extension;
 pub mod hash;

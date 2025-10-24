@@ -480,6 +480,9 @@ enum Commands {
 
     /// Helper commands for various tasks
     Helper(cmd::helper::HelperCommand),
+
+    /// Checks for common issues and provides actionable suggestions
+    Doctor,
 }
 
 #[derive(clap::Parser, Debug)]
@@ -784,6 +787,7 @@ pub fn run() {
             }
             Commands::Pgp(args) => cmd::pgp::run(args),
             Commands::Helper(args) => cmd::helper::run(args),
+            Commands::Doctor => cmd::doctor::run(),
         };
 
         if let Err(e) = result {

@@ -3,6 +3,7 @@ pub mod autoremove;
 pub mod check;
 pub mod clean;
 pub mod create;
+pub mod doctor;
 pub mod env;
 pub mod exec;
 pub mod extension;
