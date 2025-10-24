@@ -619,6 +619,11 @@ pub fn check_license(license: &str) {
         return;
     }
 
+    if license.eq_ignore_ascii_case("Unkown") {
+        println!("{}", "Warning: Package license is unkown.".red());
+        return;
+    }
+
     match spdx::Expression::parse(license) {
         Ok(expr) => {
             if !expr.evaluate(|req| match req.license {
