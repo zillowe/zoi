@@ -53,7 +53,13 @@ fn build_for_platform(
         package_file.to_str(),
         None,
     )
-    .map_err(|e| anyhow!(e.to_string()))?;
+    .map_err(|e| {
+        anyhow!(
+            "Failed to setup Lua build environment for '{}': {}",
+            package_file.display(),
+            e
+        )
+    })?;
     let pkg_table = lua
         .to_value(&pkg_for_meta)
         .map_err(|e| anyhow!(e.to_string()))?;
@@ -71,22 +77,34 @@ fn build_for_platform(
         .map_err(|e| anyhow!(e.to_string()))?;
 
     let lua_code = fs::read_to_string(package_file)?;
-    lua.load(&lua_code)
-        .exec()
-        .map_err(|e| anyhow!(e.to_string()))?;
+    lua.load(&lua_code).exec().map_err(|e| {
+        anyhow!(
+            "Failed to execute Lua package file '{}' during build:\n{}",
+            package_file.display(),
+            e
+        )
+    })?;
 
     if let Ok(prepare_fn) = lua.globals().get::<mlua::Function>("prepare") {
         println!("Running prepare()...");
-        prepare_fn
-            .call::<()>(())
-            .map_err(|e| anyhow!(e.to_string()))?;
+        prepare_fn.call::<()>(()).map_err(|e| {
+            anyhow!(
+                "The 'prepare' function in '{}' failed:\n{}",
+                package_file.display(),
+                e
+            )
+        })?;
     }
 
     if let Ok(package_fn) = lua.globals().get::<mlua::Function>("package") {
         println!("Running package()...");
-        package_fn
-            .call::<()>(())
-            .map_err(|e| anyhow!(e.to_string()))?;
+        package_fn.call::<()>(()).map_err(|e| {
+            anyhow!(
+                "The 'package' function in '{}' failed:\n{}",
+                package_file.display(),
+                e
+            )
+        })?;
     }
 
     if let Ok(build_ops) = lua.globals().get::<Table>("__ZoiBuildOperations") {
@@ -146,9 +164,13 @@ fn build_for_platform(
 
     if let Ok(verify_fn) = lua.globals().get::<mlua::Function>("verify") {
         println!("Running verify()...");
-        let verification_passed: bool = verify_fn
-            .call::<bool>(())
-            .map_err(|e| anyhow!(e.to_string()))?;
+        let verification_passed: bool = verify_fn.call::<bool>(()).map_err(|e| {
+            anyhow!(
+                "The 'verify' function in '{}' failed:\n{}",
+                package_file.display(),
+                e
+            )
+        })?;
         if !verification_passed {
             if !utils::ask_for_confirmation(
                 "Package verification failed. This package may be unsafe. Continue?",

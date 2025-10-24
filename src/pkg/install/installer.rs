@@ -289,7 +289,8 @@ fn run_install_flow(
 
     if signature_policy.is_some() {
         return Err(anyhow!(
-            "Signature enforcement is active and no valid signed pre-built package was found."
+            "Signature enforcement is active and no valid signed pre-built package was found for '{}'.",
+            pkg.name
         ));
     }
 

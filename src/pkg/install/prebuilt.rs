@@ -27,14 +27,19 @@ pub fn try_build_install(
     } else if !pkg.types.is_empty() {
         &pkg.types[0]
     } else {
-        return Err(anyhow!("No supported build types found in package"));
+        return Err(anyhow!(
+            "No supported build types found in package '{}'. Please specify a `types` field in the package file (e.g. `types = {{ 'source' }}`).",
+            pkg.name
+        ));
     };
 
     let current_platform = utils::get_platform()?;
-    let version = pkg
-        .version
-        .as_deref()
-        .ok_or_else(|| anyhow!("Version not resolved for build"))?;
+    let version = pkg.version.as_deref().ok_or_else(|| {
+        anyhow!(
+            "Version not resolved for build for package '{}'. This is an internal error.",
+            pkg.name
+        )
+    })?;
     if let Err(e) = crate::pkg::package::build::run(
         pkg_lua_path,
         build_type,
@@ -54,7 +59,10 @@ pub fn try_build_install(
     );
     let archive_path = pkg_lua_path.parent().unwrap().join(archive_filename);
     if !archive_path.exists() {
-        return Err(anyhow!("package archive not created"));
+        return Err(anyhow!(
+            "Package archive '{}' was not created after a successful build. This is an unexpected error.",
+            archive_path.display()
+        ));
     }
     println!("'build' step successful.");
 
@@ -64,7 +72,8 @@ pub fn try_build_install(
         registry_handle,
         Some(version),
         yes,
-    )?;
+    )
+    .map_err(|e| anyhow!("Failed to install built package archive: {}", e))?;
     println!("'install' step successful.");
 
     let _ = fs::remove_file(&archive_path);

@@ -101,8 +101,12 @@ pub fn run(
             break;
         }
     }
-    let pkg_lua_path =
-        pkg_lua_path.ok_or_else(|| anyhow!("Could not find .pkg.lua file in archive"))?;
+    let pkg_lua_path = pkg_lua_path.ok_or_else(|| {
+        anyhow!(
+            "Could not find .pkg.lua file in archive '{}'",
+            package_file.display()
+        )
+    })?;
 
     let platform = utils::get_platform()?;
     let metadata = lua::parser::parse_lua_package_for_platform(
@@ -110,10 +114,12 @@ pub fn run(
         &platform,
         version_override,
     )?;
-    let version = metadata
-        .version
-        .as_ref()
-        .ok_or_else(|| anyhow!("Package is missing version"))?;
+    let version = metadata.version.as_ref().ok_or_else(|| {
+        anyhow!(
+            "Package '{}' is missing version field in its metadata.",
+            metadata.name
+        )
+    })?;
 
     println!(
         "Installing package: {} v{}",

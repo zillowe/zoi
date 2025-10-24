@@ -35,11 +35,16 @@ pub fn parse_lua_package_for_platform(
         .map_err(|e| anyhow!(e.to_string()))?;
 
     functions::setup_lua_environment(&lua, platform, version_override, Some(file_path), None)
-        .map_err(|e| anyhow!(e.to_string()))?;
+        .map_err(|e| anyhow!("Failed to setup Lua environment for '{}': {}", file_path, e))?;
 
-    lua.load(&lua_code)
-        .exec()
-        .map_err(|e| anyhow!(e.to_string()))?;
+    lua.load(&lua_code).exec().map_err(|e| {
+        anyhow!(
+            "Failed to execute Lua package file '{}':
+{}",
+            file_path,
+            e
+        )
+    })?;
 
     let final_pkg_meta: Table = lua
         .globals()
@@ -58,17 +63,27 @@ pub fn parse_lua_package_for_platform(
         .get("__ZoiPackageHooks")
         .map_err(|e| anyhow!(e.to_string()))?;
 
-    let mut package: types::Package = lua
-        .from_value(Value::Table(final_pkg_meta))
-        .map_err(|e| anyhow!(e.to_string()))?;
+    let mut package: types::Package =
+        lua.from_value(Value::Table(final_pkg_meta)).map_err(|e| {
+            anyhow!(
+                "Failed to parse 'metadata' block in package file '{}':
+{}",
+                file_path,
+                e
+            )
+        })?;
 
     package.dependencies = if final_pkg_deps.is_empty() {
         None
     } else {
-        Some(
-            lua.from_value(Value::Table(final_pkg_deps))
-                .map_err(|e| anyhow!(e.to_string()))?,
-        )
+        Some(lua.from_value(Value::Table(final_pkg_deps)).map_err(|e| {
+            anyhow!(
+                "Failed to parse 'dependencies' block in package file '{}':
+{}",
+                file_path,
+                e
+            )
+        })?)
     };
 
     package.updates = if final_pkg_updates.is_empty() {
@@ -76,17 +91,28 @@ pub fn parse_lua_package_for_platform(
     } else {
         Some(
             lua.from_value(Value::Table(final_pkg_updates))
-                .map_err(|e| anyhow!(e.to_string()))?,
+                .map_err(|e| {
+                    anyhow!(
+                        "Failed to parse 'updates' block in package file '{}':
+{}",
+                        file_path,
+                        e
+                    )
+                })?,
         )
     };
 
     package.hooks = if final_pkg_hooks.is_empty() {
         None
     } else {
-        Some(
-            lua.from_value(Value::Table(final_pkg_hooks))
-                .map_err(|e| anyhow!(e.to_string()))?,
-        )
+        Some(lua.from_value(Value::Table(final_pkg_hooks)).map_err(|e| {
+            anyhow!(
+                "Failed to parse 'hooks' block in package file '{}':
+{}",
+                file_path,
+                e
+            )
+        })?)
     };
 
     Ok(package)
