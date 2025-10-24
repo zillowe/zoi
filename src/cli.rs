@@ -315,7 +315,7 @@ enum Commands {
         long_about = "Downloads the latest release from GitLab, verifies its checksum, and replaces the current executable."
     )]
     Upgrade {
-        /// Force a full download, skipping the patch-based upgrade
+        /// Force a full download
         #[arg(long)]
         force: bool,
 

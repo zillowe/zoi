@@ -278,7 +278,7 @@ pub fn run(
     let checksums_txt_url = format!("{base_url}/checksums.txt");
 
     println!(
-        "Downloading archive and patch checksums from: {}",
+        "Downloading archive and checksums from: {}",
         checksums_txt_url
     );
     let checksums_txt_content = reqwest::blocking::get(&checksums_txt_url)?.text()?;
