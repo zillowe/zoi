@@ -32,7 +32,7 @@
 //!     let scope = Some(Scope::User);
 //!     let registry_handle = "local";
 //!
-//!     let installed_files = install_package(archive_path, scope, registry_handle, true)?;
+//!     let installed_files = install_package(archive_path, scope, registry_handle, true, None)?;
 //!
 //!     println!("Package installed successfully. {} files were installed.", installed_files.len());
 //!
