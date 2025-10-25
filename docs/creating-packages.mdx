@@ -13,12 +13,84 @@ At its heart, a Zoi package is defined by a `.pkg.lua` file. This file uses a se
 
 These are the main functions you'll use to structure your package definition. Zoi calls them in a specific order during the build process: `prepare` -> `package` -> `verify`.
 
-- `metadata{...}`: **(Required)** This function defines all the essential information about your package. It takes a Lua table as an argument.
+- `metadata{...}`: **(Required)** This function defines all the essential information about your package. It takes a Lua table as an argument. See the [Metadata Fields](#metadata-fields) section for all available options.
 - `dependencies{...}`: Defines runtime or build-time dependencies.
-- `prepare()`: This function is executed first. It's used for fetching sources, extracting archives, and setting up the build environment inside a temporary directory.
-- `package()`: This function is executed after `prepare()`. Its job is to take the prepared sources and copy the final files into the staging area, from which the package archive will be created.
-- `verify()`: Executed after `package()`, this function can be used to run checks to ensure the package is safe and correct, such as verifying checksums and PGP signatures of downloaded files. If it returns `false`, the build will be halted.
-- `uninstall()`: This function is reserved for custom uninstallation logic. It can be used to run commands to clean up files or configurations created by the package outside of the main Zoi store.
+- `prepare(...)`: This function is executed first. It's used for fetching sources, extracting archives, and setting up the build environment inside a temporary directory.
+- `package(...)`: This function is executed after `prepare()`. Its job is to take the prepared sources and copy the final files into the staging area, from which the package archive will be created.
+- `verify(...)`: Executed after `package()`, this function can be used to run checks to ensure the package is safe and correct, such as verifying checksums and PGP signatures of downloaded files. If it returns `false`, the build will be halted.
+- `uninstall(...)`: This function is reserved for custom uninstallation logic. It can be used to run commands to clean up files or configurations created by the package outside of the main Zoi store.
+
+## Metadata Fields
+
+| Field          | Type     | Description                                                        |
+| -------------- | -------- | ------------------------------------------------------------------ |
+| `name`         | `string` | The name of the package.                                           |
+| `repo`         | `string` | The repository where the package belongs.                          |
+| `version`      | `string` | The package version.                                               |
+| `description`  | `string` | A short description of the package.                                |
+| `website`      | `string` | The official website of the package.                               |
+| `git`          | `string` | The git repository URL.                                            |
+| `man`          | `string` | A URL to the package's manual.                                     |
+| `maintainer`   | `table`  | A table with `name`, `email`, and `website` fields.                |
+| `author`       | `table`  | A table with `name`, `email`, and `website` fields.                |
+| `license`      | `string` | The SPDX license identifier.                                       |
+| `bins`         | `list`   | A list of binaries that the package provides.                      |
+| `conflicts`    | `list`   | A list of packages that this package conflicts with.               |
+| `types`        | `list`   | A list of supported build types (e.g. `source`, `pre-compiled`).   |
+| `sub_packages` | `list`   | A list of sub-packages for a split package.                        |
+| `main_subs`    | `list`   | A list of default sub-packages to install for a split package.     |
+| `updates`      | `list`   | A list of update information tables.                               |
+| `hooks`        | `table`  | A table of lifecycle hooks.                                        |
+| `package_type` | `string` | The type of package (`package`, `collection`, `app`, `extension`). |
+
+## Split Packages
+
+Zoi supports "split packages", which allow a single `.pkg.lua` file to produce multiple, smaller packages. This is useful for large projects like the Linux kernel, where you might want to install the kernel, headers, and documentation as separate packages.
+
+To create a split package, you use the `sub_packages` and `main_subs` fields in your `metadata`.
+
+- `sub_packages`: A list of all the sub-packages that can be built from this source.
+- `main_subs`: A list of the sub-packages that should be installed by default when a user installs the base package name.
+
+**Example:**
+
+```lua
+metadata({
+  name = "linux",
+  sub_packages = { "kernel", "headers", "docs" },
+  main_subs = { "kernel", "headers" },
+  ...
+})
+```
+
+With this configuration:
+
+- `zoi install linux` will install `linux:kernel` and `linux:headers`.
+- `zoi install linux:docs` will install only the documentation.
+
+### Lifecycle Functions with Split Packages
+
+When working with split packages, the `prepare`, `package`, `verify`, and `uninstall` functions receive a table as an argument containing the name of the sub-package being processed.
+
+```lua
+function package(args)
+  if args.sub == "kernel" then
+    -- packaging logic for the kernel
+    zcp("src/vmlinuz", "${pkgstore}/boot/vmlinuz-linux")
+  elseif args.sub == "headers" then
+    -- packaging logic for the headers
+    zcp("src/include", "${pkgstore}/usr/include")
+  end
+end
+```
+
+### The `SUBPKG` Global Variable
+
+Inside your `.pkg.lua`, you can also use the `SUBPKG` global string variable to get the name of the sub-package currently being processed. This is useful for conditional logic outside of the main lifecycle functions.
+
+### Staging Files with `zcp`
+
+When building a split package, `zcp` will automatically stage files into a sub-package-specific directory within the final archive. This ensures that when a user installs a specific sub-package, only the correct files are extracted.
 
 ## The Lua Environment
 
@@ -326,7 +398,8 @@ Once you are confident your package works, you can build a distributable archive
 zoi package build --type <build-type> /path/to/your-package.pkg.lua
 ```
 
-- `--type`: Specify the build type, e.g. `source` or `pre-compiled`. This value is available in your script as the `BUILD_TYPE` global variable.
+- `--type <TYPE>`: Specify the build type, e.g. `source` or `pre-compiled`. This value is available in your script as the `BUILD_TYPE` global variable.
+- `--sub <SUB_PACKAGE>`: For a split package, build only the specified sub-package(s).
 
 This command creates a `.pkg.tar.zst` file in the same directory as your `.pkg.lua` file.
 
@@ -337,6 +410,8 @@ To ensure your final archive is correct, you can install it locally using the `z
 ```sh
 zoi package install /path/to/your-package-1.0.0-linux-amd64.pkg.tar.zst
 ```
+
+- `--sub <SUB_PACKAGE>`: For a split package, install only the specified sub-package(s) from the archive.
 
 This command unpacks the archive and runs the same installation procedure that a user would experience, providing a final end-to-end test of your package.
 

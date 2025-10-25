@@ -40,6 +40,8 @@ Zoi is packed with features designed to make package management and environment 
   - `App`: A template for bootstrapping new projects (`zoi create`).
   - `Extension`: A package that modifies Zoi's own configuration.
 
+- **Split Packages:** Define a package that can be split into multiple, independently installable sub-packages. This is perfect for large projects like the Linux kernel, where you can separate the kernel, headers, and docs.
+
 - **Local Package Development:** A dedicated `zoi package` command set streamlines the creation and testing of packages locally:
   - `zoi package build`: Build a distributable package archive (`.pkg.tar.zst`).
   - `zoi package install`: Install a package from a local archive for testing.
@@ -189,11 +191,11 @@ Displays detected operating system and architecture information.
 
 (alias: `i`)
 
-Installs one or more packages from a name, local file, URL, or git repository.
+Installs one or more packages. For split packages, you can specify a sub-package using the `package:sub-package` syntax. If you specify a base package, Zoi will install the `main_subs` defined in the package.
 
 **Arguments:**
 
-- `[SOURCES]...`: Package names, local paths, or URLs to `.pkg.lua` files.
+- `[SOURCES]...`: Package names (e.g. `my-pkg`, `my-pkg:sub`), local paths, or URLs to `.pkg.lua` files.
 
 **Options:**
 
@@ -261,8 +263,10 @@ Build, create, and manage Zoi packages.
   - `--type <TYPE>`: (Required) The type of package to build (e.g. 'source', 'pre-compiled').
   - `-p`, `--platform <PLATFORM>`: The platform to build for (default: `current`).
   - `--sign <KEY>`: Sign the package with the given PGP key.
+  - `--sub <SUB_PACKAGES...>`: For a split package, build only the specified sub-packages.
 - `install <package_file>`: Install a package from a local archive.
   - `--scope <user|system>`: The scope to install the package to (default: `user`).
+  - `--sub <SUB_PACKAGES...>`: For a split package, install only the specified sub-packages from the archive.
 
 ---
 
@@ -431,7 +435,7 @@ Manage telemetry settings.
 
 (aliases: `un`, `rm`, `remove`)
 
-Uninstalls one or more packages previously installed by Zoi.
+Uninstalls one or more packages. To uninstall a sub-package, use the `package:sub-package` syntax. Uninstalling a base package will remove all its installed sub-packages.
 
 **Arguments:**
 

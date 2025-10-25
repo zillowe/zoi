@@ -140,6 +140,45 @@ When this is configured, running `zoi install` (with no arguments) in the projec
 
 Commit `zoi.yaml` and `zoi.lock` to your repository. This ensures that other developers who clone the project can run `zoi install` to get the exact same versions of the dependencies, creating a reproducible and secure environment.
 
+## The `zoi.lock` File
+
+The `zoi.lock` file is a JSON file that records the exact versions and integrity hashes of all the packages installed in a project. It's automatically generated and updated when you run `zoi install` in a project with local packages enabled.
+
+Its primary purpose is to ensure that every developer on a team has the exact same version of every dependency, providing a reproducible environment. It also serves as a security measure, as it allows `zoi` to verify that the installed packages have not been tampered with.
+
+### Lockfile Schema
+
+- `version`: The version of the lockfile format.
+- `registries`: A map of registry handles to their URLs.
+- `packages`: A map of package IDs to their resolved versions.
+- `details`: A nested map containing detailed information about each package, including its version, integrity hash, dependencies, and any chosen optional dependencies.
+
+Here is a simplified example of a `zoi.lock` file:
+
+```json
+{
+  "version": "1",
+  "registries": {
+    "zoidberg": "https://github.com/Zillowe/Zoidberg.git"
+  },
+  "packages": {
+    "#zoidberg@core/linux:headers": "6.5.9"
+  },
+  "details": {
+    "#zoidberg": {
+      "@core/linux:headers": {
+        "version": "6.5.9",
+        "sub_package": "headers",
+        "integrity": "sha512-....",
+        "dependencies": [],
+        "options_dependencies": [],
+        "optionals_dependencies": []
+      }
+    }
+  }
+}
+```
+
 ## CLI usage
 
 - Run a command by alias:

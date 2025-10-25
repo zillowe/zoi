@@ -122,6 +122,14 @@ You can specify which repository or registry to install a package from using spe
   zoi install @community/htop
   ```
 
+- **From a specific sub-package:**
+
+  This installs the `headers` sub-package from the `linux` package in the `core` repository.
+
+  ```sh
+  zoi install @core/linux:headers
+  ```
+
 - **From a nested repository path:**
 
   This is useful for platform-specific packages.

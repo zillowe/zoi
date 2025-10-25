@@ -15,9 +15,11 @@ Dependencies are specified in the `dependencies` section. Both `runtime` and `bu
 
 ### Dependency String Format
 
-Each entry follows the format: `manager:package` with an optional version and an optional inline description.
+Each entry follows the format: `manager:package[:sub-package]` with an optional version and an optional inline description.
 
-- **Format:** `manager:package[@version][:description]`
+- **Format:** `manager:package[:sub-package][@version][:description]`
+- **Sub-packages:** For `zoi` packages that are split, you can specify a sub-package.
+  - Example: `zoi:linux:headers`
 - **Version:** Can be specified with `@<semver>` or a comparator string like `=1.2.3`, `>=2.0.0`, `^1.2`, `~1.2.3`. Do not prefix with `v`.
   - Examples: `npm:typescript@5.3.2`, `cargo:bat@0.24.0`, `apt:curl=7.68.0-1ubuntu2.18`.
   - For `zoi` packages, you can use a channel name like `zoi:my-pkg@stable`.

@@ -84,17 +84,19 @@ pub fn install_package(
     scope_override: Option<Scope>,
     registry_handle: &str,
     yes: bool,
+    sub_packages: Option<Vec<String>>,
 ) -> Result<Vec<String>>
 ```
 
 ### Parameters
 
-| Parameter         | Type            | Description                                                                                             |
-| ----------------- | --------------- | ------------------------------------------------------------------------------------------------------- |
-| `package_file`    | `&Path`         | The path to the local package archive (`.pkg.tar.zst`).                                                 |
-| `scope_override`  | `Option<Scope>` | An optional `Scope` (`User`, `System`, `Project`) to override the default scope defined in the package. |
-| `registry_handle` | `&str`          | The handle of the registry this package belongs to. Use `"local"` for packages not from a registry.     |
-| `yes`             | `bool`          | Automatically answer "yes" to any confirmation prompts (e.g. file conflicts).                           |
+| Parameter         | Type                  | Description                                                                                             |
+| ----------------- | --------------------- | ------------------------------------------------------------------------------------------------------- |
+| `package_file`    | `&Path`               | The path to the local package archive (`.pkg.tar.zst`).                                                 |
+| `scope_override`  | `Option<Scope>`       | An optional `Scope` (`User`, `System`, `Project`) to override the default scope defined in the package. |
+| `registry_handle` | `&str`                | The handle of the registry this package belongs to. Use `"local"` for packages not from a registry.     |
+| `yes`             | `bool`                | Automatically answer "yes" to any confirmation prompts (e.g. file conflicts).                           |
+| `sub_packages`    | `Option<Vec<String>>` | For split packages, optionally specify which sub-packages to install.                                   |
 
 ---
 
