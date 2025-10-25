@@ -22,7 +22,12 @@ pub fn run(yes: bool) -> Result<()> {
         let dependents = local::get_dependents(&package_dir)?;
 
         if dependents.is_empty() {
-            packages_to_remove.push(package.name.clone());
+            let full_name = if let Some(sub) = &package.sub_package {
+                format!("{}:{}", package.name, sub)
+            } else {
+                package.name.clone()
+            };
+            packages_to_remove.push(full_name);
         }
     }
 

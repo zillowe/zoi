@@ -28,6 +28,45 @@ pub fn run(
         std::process::exit(1);
     }
 
+    let installed_packages = match pkg::local::get_installed_packages() {
+        Ok(pkgs) => pkgs,
+        Err(e) => {
+            eprintln!("Error reading installed packages: {}", e);
+            std::process::exit(1);
+        }
+    };
+    let mut final_package_names = Vec::new();
+
+    for name in package_names {
+        if let Ok(request) = pkg::resolve::parse_source_string(name)
+            && request.sub_package.is_none()
+        {
+            let mut subs_to_uninstall = Vec::new();
+            let mut is_split = false;
+            for manifest in &installed_packages {
+                if manifest.name == request.name {
+                    is_split = true;
+                    if let Some(sub) = &manifest.sub_package {
+                        subs_to_uninstall.push(format!("{}:{}", manifest.name, sub));
+                    }
+                }
+            }
+
+            if is_split && !subs_to_uninstall.is_empty() {
+                println!(
+                    "'{}' is a split package. Queueing all installed sub-packages for uninstallation: {}",
+                    name,
+                    subs_to_uninstall.join(", ")
+                );
+                final_package_names.extend(subs_to_uninstall);
+                continue;
+            }
+        }
+        final_package_names.push(name.clone());
+    }
+    final_package_names.sort();
+    final_package_names.dedup();
+
     let transaction = match transaction::begin() {
         Ok(t) => t,
         Err(e) => {
@@ -39,7 +78,7 @@ pub fn run(
     let mut failed_packages = Vec::new();
     let mut successfully_uninstalled = Vec::new();
 
-    for name in package_names {
+    for name in &final_package_names {
         println!("--- Uninstalling package '{}' ---", name.blue().bold(),);
 
         match pkg::uninstall::run(name, scope_override) {
