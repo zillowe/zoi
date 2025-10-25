@@ -10,9 +10,9 @@ use clap_complete::generate;
 use std::io::{self};
 
 // Development, Special, Public or Production
-const BRANCH: &str = "Production";
+const BRANCH: &str = "Development";
 const STATUS: &str = "Release";
-const NUMBER: &str = "1.2.0";
+const NUMBER: &str = "1.3.0";
 
 /// Zoi - The Universal Package Manager & Environment Setup Tool.
 ///
