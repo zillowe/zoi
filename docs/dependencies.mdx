@@ -57,7 +57,16 @@ dependencies({
         }
       }
     },
-    optional = { "zoi:extra-utils:handy extras" }
+    optional = { "zoi:extra-utils:handy extras" },
+    -- Per-sub-package dependencies
+    sub_packages = {
+      kernel = {
+        required = { "zoi:linux-firmware" }
+      },
+      headers = {
+        required = { "native:pahole" }
+      }
+    }
   },
   build = {
     required = { "zoi:build-utils" }
@@ -68,6 +77,7 @@ dependencies({
 - `required`: A list of dependencies that are always installed.
 - `options`: A list of groups where the user is prompted to choose one or more dependencies.
 - `optional`: A list of dependencies that the user is prompted to install.
+- `sub_packages`: A table where keys are sub-package names and values are dependency groups (`required`, `options`, `optional`). These dependencies are only installed for the specified sub-package.
 
 ### Dynamic Versions with Lua
 
