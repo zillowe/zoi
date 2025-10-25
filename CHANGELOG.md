@@ -4,6 +4,23 @@ You can install any of these versions: `zoi upgrade --tag <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
+## [Prod-Release-1.2.0] - 2025-10-25
+
+### ✨ Features
+
+- _(deps)_ Support sub-package dependencies
+- _(pkg)_ Implement uninstall sub-package logic
+- _(pkg)_ Implement support for split packages
+- _(project)_ Introduce new zoi.lock format and verification
+- Add Unkown license custom warning message
+- _(doctor)_ Add doctor command for system diagnostics
+- Better error messages
+- _(pkg-policy)_ Implement package installation policy
+
+### 🧹 Cleanup
+
+- _(build)_ Remove redundant completion and man page binaries
+
 ## [Prod-Release-1.1.1] - 2025-10-22
 
 ### ✨ Features
