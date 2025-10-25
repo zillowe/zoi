@@ -193,6 +193,8 @@ pub struct ComplexDependencyGroup {
     pub options: Vec<DependencyOptionGroup>,
     #[serde(default)]
     pub optional: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sub_packages: Option<HashMap<String, DependencyGroup>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

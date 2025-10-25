@@ -7,6 +7,53 @@ use colored::*;
 use semver::{Version, VersionReq};
 use std::collections::{HashMap, HashSet, VecDeque};
 
+fn collect_dependencies_for_group(
+    group: &types::DependencyGroup,
+    sub_package_name: Option<&str>,
+    dep_type: Option<&str>,
+    yes: bool,
+    all_optional: bool,
+) -> Result<(Vec<String>, Vec<String>, Vec<String>)> {
+    let mut deps = Vec::new();
+    let mut chosen_options = Vec::new();
+    let mut chosen_optionals = Vec::new();
+
+    match group {
+        types::DependencyGroup::Simple(d) => {
+            deps.extend(d.clone());
+        }
+        types::DependencyGroup::Complex(g) => {
+            deps.extend(g.required.clone());
+
+            let options = dependencies::prompt_for_options(&g.options, yes)?;
+            chosen_options.extend(options.clone());
+            deps.extend(options);
+
+            let optionals =
+                dependencies::prompt_for_optionals(&g.optional, dep_type, yes, all_optional)?;
+            chosen_optionals.extend(optionals.clone());
+            deps.extend(optionals);
+
+            if let Some(sub_name) = sub_package_name
+                && let Some(sub_deps_map) = &g.sub_packages
+                && let Some(sub_dep_group) = sub_deps_map.get(sub_name)
+            {
+                let (sub_d, sub_co, sub_coo) = collect_dependencies_for_group(
+                    sub_dep_group,
+                    None, // No recursion on sub-package name
+                    dep_type,
+                    yes,
+                    all_optional,
+                )?;
+                deps.extend(sub_d);
+                chosen_options.extend(sub_co);
+                chosen_optionals.extend(sub_coo);
+            }
+        }
+    }
+    Ok((deps, chosen_options, chosen_optionals))
+}
+
 #[derive(Debug, Clone)]
 pub struct InstallNode {
     pub pkg: Package,
@@ -274,25 +321,20 @@ pub fn resolve_dependency_graph(
 
         let mut chosen_options = Vec::new();
         let mut chosen_optionals = Vec::new();
+        let mut deps_to_process = Vec::new();
 
         if let Some(deps) = &pkg.dependencies {
-            let mut deps_to_process = Vec::new();
             if let Some(runtime) = &deps.runtime {
-                deps_to_process.extend(runtime.get_required_simple());
-
-                let options =
-                    dependencies::prompt_for_options(&runtime.get_required_options(), yes)?;
-                chosen_options.extend(options.clone());
-                deps_to_process.extend(options);
-
-                let optionals = dependencies::prompt_for_optionals(
-                    runtime.get_optional(),
+                let (d, co, coo) = collect_dependencies_for_group(
+                    runtime,
+                    request.sub_package.as_deref(),
                     Some("runtime"),
                     yes,
                     all_optional,
                 )?;
-                chosen_optionals.extend(optionals.clone());
-                deps_to_process.extend(optionals);
+                deps_to_process.extend(d);
+                chosen_options.extend(co);
+                chosen_optionals.extend(coo);
             }
 
             if let Some(build) = &deps.build {
@@ -300,27 +342,22 @@ pub fn resolve_dependency_graph(
                     && !pkg.types.contains(&"pre-compiled".to_string());
                 if needs_build {
                     println!("Resolving build dependencies for {}", pkg.name.cyan());
-                    deps_to_process.extend(build.get_required_simple());
-
-                    let options =
-                        dependencies::prompt_for_options(&build.get_required_options(), yes)?;
-                    chosen_options.extend(options.clone());
-                    deps_to_process.extend(options);
-
-                    let optionals = dependencies::prompt_for_optionals(
-                        build.get_optional(),
+                    let (d, co, coo) = collect_dependencies_for_group(
+                        build,
+                        request.sub_package.as_deref(),
                         Some("build"),
                         yes,
                         all_optional,
                     )?;
-                    chosen_optionals.extend(optionals.clone());
-                    deps_to_process.extend(optionals);
+                    deps_to_process.extend(d);
+                    chosen_options.extend(co);
+                    chosen_optionals.extend(coo);
                 }
             }
+        }
 
-            for dep_source in deps_to_process {
-                queue.push_back((dep_source, Some(pkg_id.clone())));
-            }
+        for dep_source in deps_to_process {
+            queue.push_back((dep_source, Some(pkg_id.clone())));
         }
 
         let node = InstallNode {
