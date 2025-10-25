@@ -118,6 +118,13 @@ This function runs after `package()`. It's a security step where you can verify 
 - **Common tasks:** Checking checksums with `verifyHash()`, verifying PGP signatures with `verifySignature()`.
 - **Return value:** If this function returns `false`, the build process is aborted.
 
+### `test()`
+
+This optional function runs after a successful `package()` step and is executed by the `zoi package test` command. It allows you to run validation and integration tests against your staged package files.
+
+- **Common tasks:** Running the packaged binary with a `--version` flag, checking for the existence of specific library files, or running a small test script.
+- **Return value:** Should return `true` if all tests pass and `false` otherwise. A failure will cause `zoi package test` to exit with an error.
+
 ### `uninstall()`
 
 This function is not part of the build process. Its contents are executed when a user runs `zoi uninstall` on the package. It's used for cleanup tasks outside of the main package directory.
@@ -156,6 +163,7 @@ When Zoi executes your script, it provides a rich environment of global variable
 | `UTILS.FETCH.url(url)`                    | Fetches a URL's content as a string.                                                                                       |
 | `UTILS.FETCH.GITHUB.LATEST.release{...}`  | Fetches the latest release tag from a GitHub repository.                                                                   |
 | `UTILS.FIND.file(dir, name)`              | Finds a file within the `BUILD_DIR`.                                                                                       |
+| `UTILS.FS.exists(path)`                   | Returns `true` if a file or directory exists at the given path.                                                            |
 | `UTILS.PARSE.checksumFile(content, file)` | Parses a checksum from a string (e.g. the content of a `checksums.txt` file).                                              |
 
 ### Staging Destinations for `zcp`
@@ -281,7 +289,7 @@ When building a split package, `zcp` automatically stages files into a sub-packa
 
 Follow these steps to develop, build, and test your package.
 
-### Step 1: Develop and Test Locally
+### Step 1: Develop and Iterate
 
 The fastest way to iterate on your `.pkg.lua` file is to use `zoi install` with the direct path to your script. This runs the full dependency resolution and build logic without creating an intermediate archive.
 
@@ -289,18 +297,28 @@ The fastest way to iterate on your `.pkg.lua` file is to use `zoi install` with 
 zoi install /path/to/your-package.pkg.lua
 ```
 
-If your package has multiple `types` (e.g. `source`, `pre-compiled`), Zoi will automatically select one. You can force a specific type with the `--type` flag:
+### Step 2: Test Your Package
+
+Once your package seems to be working, run your tests using the `zoi package test` command.
 
 ```sh
-zoi install --type source /path/to/your-package.pkg.lua
+zoi package test --type <build-type> /path/to/your-package.pkg.lua
 ```
 
-### Step 2: Build the Distributable Archive
+This command will execute the `prepare()`, `package()`, and `test()` functions. If `test()` returns `false` or errors, the command will fail.
 
-Once your package installs correctly locally, build the final `.pkg.tar.zst` archive. This is the file that would be distributed via a package registry.
+### Step 3: Build the Distributable Archive
+
+Once your tests are passing, build the final `.pkg.tar.zst` archive.
 
 ```sh
 zoi package build --type <build-type> /path/to/your-package.pkg.lua
+```
+
+You can also combine testing and building in one step with the `--test` flag. The build will only proceed if the tests pass.
+
+```sh
+zoi package build --type <build-type> --test /path/to/your-package.pkg.lua
 ```
 
 **`zoi package build` Flags:**
@@ -309,8 +327,9 @@ zoi package build --type <build-type> /path/to/your-package.pkg.lua
 - `--platform <PLATFORM>`: Build for a specific platform (e.g. `linux-arm64`). Defaults to your current platform.
 - `--sub <SUB_PACKAGE...>`: For a split package, build only the specified sub-packages.
 - `--sign <KEY>`: Sign the resulting archive with a PGP key from your Zoi keyring.
+- `--test`: Run the `test()` function before building the archive.
 
-### Step 3: Test the Final Archive
+### Step 4: Verify the Final Archive
 
 Install the built archive to ensure it's correct and installs properly for end-users.
 

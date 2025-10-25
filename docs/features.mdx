@@ -40,6 +40,8 @@ Zoi is packed with features designed to make package management and environment 
   - `App`: A template for bootstrapping new projects (`zoi create`).
   - `Extension`: A package that modifies Zoi's own configuration.
 
+- **Package Testing:** An integrated testing framework (`zoi package test`) allows authors to define and run tests for their packages directly from the `.pkg.lua` file, ensuring package quality and correctness before publishing.
+
 - **Split Packages:** Define a package that can be split into multiple, independently installable sub-packages. This is perfect for large projects like the Linux kernel, where you can separate the kernel, headers, and docs.
 
 - **Local Package Development:** A dedicated `zoi package` command set streamlines the creation and testing of packages locally:
@@ -264,6 +266,11 @@ Build, create, and manage Zoi packages.
   - `-p`, `--platform <PLATFORM>`: The platform to build for (default: `current`).
   - `--sign <KEY>`: Sign the package with the given PGP key.
   - `--sub <SUB_PACKAGES...>`: For a split package, build only the specified sub-packages.
+  - `--test`: Run package tests before building.
+- `test <package_file>`: Run tests for a package.
+  - `--type <TYPE>`: (Required) The build type to use for testing.
+  - `-p`, `--platform <PLATFORM>`: The platform to test on.
+  - `--sub <SUB_PACKAGES...>`: For a split package, test only the specified sub-packages.
 - `install <package_file>`: Install a package from a local archive.
   - `--scope <user|system>`: The scope to install the package to (default: `user`).
   - `--sub <SUB_PACKAGES...>`: For a split package, install only the specified sub-packages from the archive.
