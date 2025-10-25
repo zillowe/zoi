@@ -1,0 +1,377 @@
+---
+title: Migrating to Zoi
+description: A guide for migrating packages from other managers to Zoi's .pkg.lua format.
+---
+
+This guide is for package maintainers who want to port an existing package from another system (like Homebrew, APT, or Pacman) to Zoi's `.pkg.lua` format. Zoi's Lua-based scripting provides immense flexibility, and you'll find that most concepts from other package managers map over quite naturally.
+
+## General Concept Mapping
+
+Most packaging systems split the process into metadata definition, dependency declaration, and scripted build steps. Here's how they generally correspond to Zoi's `.pkg.lua`:
+
+| Concept                  | Other Managers                                 | Zoi (`.pkg.lua`)                                                                               |
+| ------------------------ | ---------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **Metadata**             | `pkgname`, `version`, `desc`, `license`, `url` | The `metadata{...}` block.                                                                     |
+| **Dependencies**         | `depends`, `makedepends`, `BuildRequires`      | The `dependencies{...}` block, with `runtime` and `build` sections.                            |
+| **Source Fetching**      | `source` array, `Source0` URL                  | The `prepare()` function, often using `UTILS.EXTRACT` or `cmd("git clone ...")`.               |
+| **Source Verification**  | `sha256sums`, `validpgpkeys`                   | The `verify()` function, using `verifyHash()` and `verifySignature()`.                         |
+| **Build/Compile**        | `build()` function, `%build` section           | The `package()` function (or sometimes `prepare()`), using `cmd("...")` to run build commands. |
+| **Staging/Installation** | `package()` function, `%install` section       | The `package()` function, using `zcp()` to copy files to the staging area.                     |
+| **Testing**              | `check()` function, `%check` section           | The `test()` function, run via `zoi package test`.                                             |
+
+---
+
+## Migration Examples
+
+Let's walk through migrating a simple package from several popular formats.
+
+### 1. From Arch Linux `PKGBUILD`
+
+A `PKGBUILD` is a shell script, which makes it very straightforward to migrate to Zoi's Lua-based `cmd()` calls.
+
+#### Side-by-Side Comparison
+
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div>
+
+**`PKGBUILD`**
+
+```bash
+# Maintainer: Your Name <you@email.com>
+pkgname=my-cli
+pkgver=1.2.3
+pkgrel=1
+pkgdesc="A simple CLI tool"
+arch=('x86_64')
+url="https://example.com"
+license=('MIT')
+depends=('openssl')
+makedepends=('gcc' 'make')
+source=("https://example.com/dist/my-cli-$pkgver.tar.gz")
+sha256sums=('...')
+
+build() {
+  cd "$srcdir/my-cli-$pkgver"
+  ./configure --prefix=/usr
+  make
+}
+
+package() {
+  cd "$srcdir/my-cli-$pkgver"
+  make install DESTDIR="$pkgdir"
+}
+```
+
+</div>
+<div>
+
+**`.pkg.lua`**
+
+```lua
+metadata({
+  name = "my-cli",
+  repo = "community",
+  version = "1.2.3",
+  description = "A simple CLI tool",
+  website = "https://example.com",
+  license = "MIT",
+  maintainer = { name = "Your Name", email = "you@email.com" },
+  bins = { "my-cli" },
+  types = { "source" }
+})
+
+dependencies({
+  build = { required = { "native:gcc", "native:make" } },
+  runtime = { required = { "native:openssl" } }
+})
+
+function prepare()
+  local url = "https://example.com/dist/my-cli-" .. PKG.version .. ".tar.gz"
+  UTILS.EXTRACT(url, "source")
+end
+
+function verify()
+  -- verifyHash("source.tar.gz", "sha256-...")
+  return true
+end
+
+function package()
+  cmd("cd source && ./configure --prefix=/usr")
+  cmd("cd source && make")
+  cmd("cd source && make install DESTDIR=" .. STAGING_DIR .. "/usr")
+  -- Zoi automatically handles usrroot, so we adjust the path
+  zcp(STAGING_DIR .. "/usr/bin/my-cli", "${usrroot}/usr/bin/my-cli")
+end
+```
+
+</div>
+</div>
+
+**Key Differences:**
+
+- `depends` and `makedepends` map to `runtime` and `build` dependencies, respectively. We use the `native:` prefix to let Zoi use the system's package manager.
+- The `source` URL is constructed dynamically in `prepare()`.
+- The `build()` logic from the `PKGBUILD` is moved into Zoi's `package()` function.
+- Instead of installing to a `$pkgdir`, we use `zcp` to copy files from the build directory to special staging destinations like `${usrroot}`.
+
+---
+
+### 2. From Debian (`debian/control`)
+
+Debian packaging involves multiple files in a `debian/` directory. We'll focus on `control` (for metadata/deps) and `rules` (for the build script, which is often a `Makefile`).
+
+#### Side-by-Side Comparison
+
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div>
+
+**`debian/control`**
+
+```
+Source: my-app
+Maintainer: Your Name <you@email.com>
+Build-Depends: debhelper, cmake, libssl-dev
+
+Package: my-app
+Architecture: any
+Depends: libssl3, ${shlibs:Depends}
+Description: A short description.
+ A longer description of the app.
+```
+
+**`debian/rules` (simplified)**
+
+```makefile
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure -- -DCMAKE_BUILD_TYPE=Release
+
+override_dh_auto_build:
+	make
+
+override_dh_auto_install:
+	make install DESTDIR=debian/my-app
+```
+
+</div>
+<div>
+
+**`.pkg.lua`**
+
+```lua
+metadata({
+  name = "my-app",
+  repo = "community",
+  version = "1.0.0", -- Version is usually managed outside the control file
+  description = "A short description. A longer description of the app.",
+  maintainer = { name = "Your Name", email = "you@email.com" },
+  bins = { "my-app" },
+  types = { "source" }
+})
+
+dependencies({
+  build = { required = { "native:cmake", "native:libssl-dev" } },
+  runtime = { required = { "native:libssl3" } }
+})
+
+function prepare()
+  -- Assuming source is in a parent directory or fetched
+  cmd("git clone https://example.com/my-app.git source")
+end
+
+function package()
+  cmd("cd source && cmake -B build -DCMAKE_BUILD_TYPE=Release")
+  cmd("cd source/build && make")
+  -- Copy the final binary to the pkgstore
+  zcp("source/build/my-app", "${pkgstore}/bin/my-app")
+end
+```
+
+</div>
+</div>
+
+**Key Differences:**
+
+- `Build-Depends` maps to `dependencies.build` and `Depends` maps to `dependencies.runtime`.
+- The complex `debian/rules` file, which often uses `debhelper` abstractions, is simplified into direct `cmake` and `make` calls within the `package()` function.
+- Instead of installing into a `debian/` subdirectory, we copy the final artifacts directly with `zcp`.
+
+---
+
+### 3. From Fedora RPM (`.spec` file)
+
+RPM `.spec` files have distinct sections for metadata, prep, build, and install, which map cleanly to Zoi's structure.
+
+#### Side-by-Side Comparison
+
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div>
+
+**`my-app.spec`**
+
+```spec
+Name:     my-app
+Version:  1.0
+Release:  1%{?dist}
+Summary:  My awesome application
+License:  MIT
+URL:      https://example.com
+Source0:  https://example.com/my-app-%{version}.tar.gz
+BuildRequires: gcc
+Requires: openssl-libs
+
+%description
+A longer description.
+
+%prep
+%setup -q
+
+%build
+%configure
+make %{?_smp_mflags}
+
+%install
+make install DESTDIR=%{buildroot}
+
+%files
+%{_bindir}/my-app
+```
+
+</div>
+<div>
+
+**`.pkg.lua`**
+
+```lua
+metadata({
+  name = "my-app",
+  repo = "community",
+  version = "1.0",
+  description = "My awesome application. A longer description.",
+  website = "https://example.com",
+  license = "MIT",
+  bins = { "my-app" },
+  types = { "source" }
+})
+
+dependencies({
+  build = { required = { "native:gcc" } },
+  runtime = { required = { "native:openssl-libs" } }
+})
+
+function prepare()
+  local url = "https://example.com/my-app-" .. PKG.version .. ".tar.gz"
+  UTILS.EXTRACT(url, "source")
+end
+
+function package()
+  -- The %configure and make steps from %build
+  cmd("cd source && ./configure --prefix=/usr")
+  cmd("cd source && make")
+
+  -- The make install step from %install
+  -- We install into a temp dir inside BUILD_DIR, then zcp
+  cmd("cd source && make install DESTDIR=" .. BUILD_DIR .. "/install_tmp")
+
+  -- Copy the final binary from the temp install dir
+  zcp("install_tmp/usr/bin/my-app", "${pkgstore}/bin/my-app")
+end
+```
+
+</div>
+</div>
+
+**Key Differences:**
+
+- `BuildRequires` maps to `dependencies.build`, and `Requires` maps to `dependencies.runtime`.
+- The `%prep` section's `%setup` macro is equivalent to `UTILS.EXTRACT` in `prepare()`.
+- The `%build` and `%install` sections are combined into the `package()` function.
+- Instead of using the `%buildroot` macro, we can install to a temporary directory and then use `zcp` to precisely copy only the needed files to their final destinations in the Zoi store.
+
+---
+
+### 4. From Homebrew Formula (`.rb` file)
+
+Homebrew formulae are Ruby classes. The mapping is also quite direct.
+
+#### Side-by-Side Comparison
+
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div>
+
+**`my-tool.rb`**
+
+```ruby
+class MyTool < Formula
+  desc "A simple command-line tool"
+  homepage "https://example.com"
+  url "https://example.com/my-tool-1.0.tar.gz"
+  sha256 "..."
+
+  depends_on "openssl"
+  depends_on "cmake" => :build
+
+  def install
+    system "./configure", "--prefix=#{prefix}"
+    system "make"
+    system "make", "install"
+  end
+
+  test do
+    system "#{bin}/my-tool", "--version"
+  end
+end
+```
+
+</div>
+<div>
+
+**`.pkg.lua`**
+
+```lua
+metadata({
+  name = "my-tool",
+  repo = "community",
+  version = "1.0",
+  description = "A simple command-line tool",
+  website = "https://example.com",
+  bins = { "my-tool" },
+  types = { "source" }
+})
+
+dependencies({
+  build = { required = { "brew:cmake" } },
+  runtime = { required = { "brew:openssl" } }
+})
+
+function prepare()
+  local url = "https://example.com/my-tool-" .. PKG.version .. ".tar.gz"
+  UTILS.EXTRACT(url, "source")
+end
+
+function package()
+  cmd("cd source && ./configure --prefix=" .. STAGING_DIR .. "/usr")
+  cmd("cd source && make")
+  cmd("cd source && make install")
+  zcp("source/my-tool", "${pkgstore}/bin/my-tool")
+end
+
+function test()
+  local output = cmd(STAGING_DIR .. "/${pkgstore}/bin/my-tool --version")
+  return string.find(output, PKG.version)
+end
+```
+
+</div>
+</div>
+
+**Key Differences:**
+
+- `desc`, `homepage`, `url`, and `license` map directly to fields in `metadata`.
+- `depends_on "cmake" => :build` maps to a `build` dependency. Regular `depends_on` maps to a `runtime` dependency.
+- The `install` block's commands are translated into `cmd()` calls in the `package()` function.
+- The `test do...end` block maps directly to Zoi's `test()` function.
