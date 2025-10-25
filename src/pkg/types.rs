@@ -343,8 +343,31 @@ pub struct SharableInstallManifest {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ZoiLock {
+pub struct ZoiLockOld {
     pub packages: HashMap<String, String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct ZoiLock {
+    pub version: String,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub registries: HashMap<String, String>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub packages: HashMap<String, String>,
+    #[serde(flatten)]
+    pub details: HashMap<String, HashMap<String, LockPackageDetail>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LockPackageDetail {
+    pub version: String,
+    pub integrity: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dependencies: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub options_dependencies: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub optionals_dependencies: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

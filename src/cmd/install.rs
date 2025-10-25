@@ -1,8 +1,7 @@
-use crate::pkg::{config, install, resolve, transaction, types};
+use crate::pkg::{config, install, transaction, types};
 use crate::project;
 use colored::Colorize;
 use rayon::prelude::*;
-use std::collections::HashSet;
 use std::sync::Mutex;
 
 pub fn run(
@@ -29,104 +28,30 @@ pub fn run(
         scope_override = Some(types::Scope::User);
     }
 
+    let lockfile_exists = sources.is_empty()
+        && repo.is_none()
+        && std::path::Path::new("zoi.lock").exists()
+        && std::path::Path::new("zoi.yaml").exists();
+
+    let mut sources_to_process: Vec<String> = sources.to_vec();
+    let mut is_project_install = false;
     if sources.is_empty()
         && repo.is_none()
         && let Ok(config) = project::config::load()
         && config.config.local
     {
-        let old_lockfile = project::lockfile::read_zoi_lock().ok();
-
-        println!("Installing project packages locally...");
-        let local_scope = Some(types::Scope::Project);
-        let failed_packages = Mutex::new(Vec::new());
-        let processed_deps = Mutex::new(HashSet::new());
-        let installed_packages_info = Mutex::new(Vec::new());
-
-        config.pkgs.par_iter().for_each(|source| {
-            println!("=> Installing package: {}", source.cyan().bold());
-            if let Err(e) = install::run_installation(
-                source,
-                install::InstallMode::PreferPrebuilt,
-                force,
-                types::InstallReason::Direct,
-                yes,
-                all_optional,
-                &processed_deps,
-                local_scope,
-                None,
-                build_type.as_deref(),
-            ) {
-                eprintln!(
-                    "{}: Failed to install '{}': {}",
-                    "Error".red().bold(),
-                    source,
-                    e
-                );
-                failed_packages.lock().unwrap().push(source.to_string());
-            } else if let Ok((pkg, _, _, _, registry_handle)) =
-                resolve::resolve_package_and_version(source)
-            {
-                installed_packages_info
-                    .lock()
-                    .unwrap()
-                    .push((pkg, registry_handle));
-            }
-        });
-
-        let failed_packages = failed_packages.into_inner().unwrap();
-        if !failed_packages.is_empty() {
-            eprintln!(
-                "\n{}: The following packages failed to install:",
-                "Error".red().bold()
-            );
-            for pkg in &failed_packages {
-                eprintln!("  - {}", pkg);
-            }
-            std::process::exit(1);
+        if lockfile_exists {
+            println!("zoi.lock found. Installing from zoi.yaml then verifying...");
+        } else {
+            println!("Installing project packages from zoi.yaml...");
         }
-
-        let mut new_lockfile_packages = std::collections::HashMap::new();
-        let installed_packages_info = installed_packages_info.into_inner().unwrap();
-        for (pkg, registry_handle) in &installed_packages_info {
-            let handle = registry_handle.as_deref().unwrap_or("local");
-            if let Ok(package_dir) = crate::pkg::local::get_package_dir(
-                types::Scope::Project,
-                handle,
-                &pkg.repo,
-                &pkg.name,
-            ) {
-                let latest_dir = package_dir.join("latest");
-                if let Ok(hash) = crate::pkg::hash::calculate_dir_hash(&latest_dir) {
-                    new_lockfile_packages.insert(pkg.name.clone(), hash);
-                }
-            }
-        }
-
-        if let Some(old_lock) = old_lockfile {
-            for (pkg_name, new_hash) in &new_lockfile_packages {
-                if let Some(old_hash) = old_lock.packages.get(pkg_name)
-                    && old_hash != new_hash
-                {
-                    println!("Warning: Hash mismatch for package '{}'.", pkg_name);
-                }
-            }
-        }
-
-        let new_lockfile = types::ZoiLock {
-            packages: new_lockfile_packages,
-        };
-        if let Err(e) = project::lockfile::write_zoi_lock(&new_lockfile) {
-            eprintln!("Warning: Failed to write zoi.lock file: {}", e);
-        }
-
-        return;
+        sources_to_process = config.pkgs.clone();
+        scope_override = Some(types::Scope::Project);
+        is_project_install = true;
     }
 
-    if scope_override.is_none()
-        && let Ok(config) = project::config::load()
-        && config.config.local
-    {
-        scope_override = Some(types::Scope::Project);
+    if sources_to_process.is_empty() {
+        return;
     }
 
     if let Some(repo_spec) = repo {
@@ -158,9 +83,7 @@ pub fn run(
     }
 
     let config = config::read_config().unwrap_or_default();
-
     let parallel_jobs = config.parallel_jobs.unwrap_or(3);
-
     if parallel_jobs > 0 {
         rayon::ThreadPoolBuilder::new()
             .num_threads(parallel_jobs)
@@ -169,60 +92,51 @@ pub fn run(
     }
 
     let mode = install::InstallMode::PreferPrebuilt;
-
     let failed_packages = Mutex::new(Vec::new());
-
     let mut temp_files = Vec::new();
+    let mut final_sources = Vec::new();
 
-    let mut sources_to_process: Vec<String> = Vec::new();
-
-    for source in sources {
+    for source in &sources_to_process {
         if source.ends_with("zoi.pkgs.json") {
-            if let Err(e) = install::lockfile::process_lockfile(
-                source,
-                &mut sources_to_process,
-                &mut temp_files,
-            ) {
+            if let Err(e) =
+                install::lockfile::process_lockfile(source, &mut final_sources, &mut temp_files)
+            {
                 eprintln!(
                     "{}: Failed to process lockfile '{}': {}",
                     "Error".red().bold(),
                     source,
                     e
                 );
-
                 failed_packages.lock().unwrap().push(source.to_string());
             }
         } else {
-            sources_to_process.push(source.to_string());
+            final_sources.push(source.to_string());
         }
     }
 
     let successfully_installed_sources = Mutex::new(Vec::new());
+    let installed_manifests = Mutex::new(Vec::new());
 
     println!("{}", "Resolving dependencies...".bold());
 
     let graph = match install::resolver::resolve_dependency_graph(
-        &sources_to_process,
+        &final_sources,
         scope_override,
         force,
         yes,
         all_optional,
     ) {
         Ok(g) => g,
-
         Err(e) => {
             eprintln!("{}: {}", "Failed to resolve dependencies".red().bold(), e);
-
             std::process::exit(1);
         }
     };
 
     let stages = match graph.toposort() {
         Ok(s) => s,
-
         Err(e) => {
             eprintln!("{}: {}", "Failed to sort dependencies".red().bold(), e);
-
             std::process::exit(1);
         }
     };
@@ -240,7 +154,7 @@ pub fn run(
 
     for (i, stage) in stages.iter().enumerate() {
         println!(
-            "--- Installing Stage {}/{} ({} packages) ---",
+            "--- Installing Stage {}/{} ({} packages)",
             i + 1,
             stages.len(),
             stage.len()
@@ -248,12 +162,12 @@ pub fn run(
 
         stage.par_iter().for_each(|pkg_id| {
             let node = graph.nodes.get(pkg_id).unwrap();
-
             println!("Installing {}...", node.pkg.name.cyan());
 
             match install::installer::install_node(node, mode, None, build_type.as_deref(), yes) {
                 Ok(manifest) => {
                     println!("Successfully installed {}", node.pkg.name.green());
+                    installed_manifests.lock().unwrap().push(manifest.clone());
 
                     if let Err(e) = transaction::record_operation(
                         &transaction.id,
@@ -275,7 +189,6 @@ pub fn run(
                             .push(node.source.clone());
                     }
                 }
-
                 Err(e) => {
                     eprintln!(
                         "{}: Failed to install {}: {}",
@@ -283,14 +196,12 @@ pub fn run(
                         node.pkg.name,
                         e
                     );
-
                     failed_packages.lock().unwrap().push(node.pkg.name.clone());
                 }
             }
         });
 
         let failed = failed_packages.lock().unwrap();
-
         if !failed.is_empty() {
             eprintln!(
                 "\n{}: Installation failed at stage {}.",
@@ -329,9 +240,104 @@ pub fn run(
         eprintln!("Warning: Failed to commit transaction: {}", e);
     }
 
+    let is_any_project_install = scope_override == Some(types::Scope::Project);
+
+    if is_any_project_install {
+        if is_project_install && lockfile_exists {
+        } else {
+            println!("\nUpdating zoi.lock...");
+            let mut lockfile =
+                project::lockfile::read_zoi_lock().unwrap_or_else(|_| types::ZoiLock {
+                    version: "1".to_string(),
+                    ..Default::default()
+                });
+
+            lockfile.packages.clear();
+            lockfile.details.clear();
+
+            let all_regs_config = crate::pkg::config::read_config().unwrap_or_default();
+            let mut all_configured_regs = all_regs_config.added_registries;
+            if let Some(default_reg) = all_regs_config.default_registry {
+                all_configured_regs.push(default_reg);
+            }
+
+            let installed_manifests = installed_manifests.into_inner().unwrap();
+            for manifest in &installed_manifests {
+                let full_id = format!(
+                    "#{}@{}/{}",
+                    manifest.registry_handle, manifest.repo, manifest.name
+                );
+                lockfile.packages.insert(full_id, manifest.version.clone());
+
+                if let Some(reg) = all_configured_regs
+                    .iter()
+                    .find(|r| r.handle == manifest.registry_handle)
+                {
+                    lockfile
+                        .registries
+                        .insert(reg.handle.clone(), reg.url.clone());
+                }
+
+                let package_dir = crate::pkg::local::get_package_dir(
+                    types::Scope::Project,
+                    &manifest.registry_handle,
+                    &manifest.repo,
+                    &manifest.name,
+                )
+                .unwrap();
+                let latest_dir = package_dir.join("latest");
+                let integrity =
+                    crate::pkg::hash::calculate_dir_hash(&latest_dir).unwrap_or_else(|e| {
+                        eprintln!(
+                            "Warning: could not calculate integrity for {}: {}",
+                            manifest.name, e
+                        );
+                        String::new()
+                    });
+
+                let pkg_id = format!("{}@{}", manifest.name, manifest.version);
+                let dependencies: Vec<String> = graph
+                    .adj
+                    .get(&pkg_id)
+                    .map(|deps| {
+                        deps.iter()
+                            .map(|dep_id| {
+                                let node = graph.nodes.get(dep_id).unwrap();
+                                format!(
+                                    "#{}@{}/{}",
+                                    node.registry_handle, node.pkg.repo, node.pkg.name
+                                )
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+
+                let detail = types::LockPackageDetail {
+                    version: manifest.version.clone(),
+                    integrity,
+                    dependencies,
+                    options_dependencies: manifest.chosen_options.clone(),
+                    optionals_dependencies: manifest.chosen_optionals.clone(),
+                };
+
+                let registry_key = format!("#{}", manifest.registry_handle);
+                let short_id = format!("@{}/{}", manifest.repo, manifest.name);
+
+                lockfile
+                    .details
+                    .entry(registry_key)
+                    .or_default()
+                    .insert(short_id, detail);
+            }
+
+            if let Err(e) = project::lockfile::write_zoi_lock(&lockfile) {
+                eprintln!("Warning: Failed to write zoi.lock file: {}", e);
+            }
+        }
+    }
+
     if save && scope_override == Some(types::Scope::Project) {
         let successfully_installed = successfully_installed_sources.into_inner().unwrap();
-
         if !successfully_installed.is_empty()
             && let Err(e) = project::config::add_packages_to_config(&successfully_installed)
         {
@@ -344,4 +350,15 @@ pub fn run(
     }
 
     println!("\n{} Installation complete!", "Success:".green().bold());
+
+    if is_project_install && lockfile_exists {
+        println!();
+        if let Err(e) = project::verify::run() {
+            eprintln!("{}: {}", "Error".red().bold(), e);
+            eprintln!(
+                "\nzoi.lock is out of sync with zoi.yaml. Run `rm zoi.lock && zoi install` to update it."
+            );
+            std::process::exit(1);
+        }
+    }
 }

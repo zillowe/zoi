@@ -30,11 +30,11 @@ pub struct ResolvedSource {
 }
 
 #[derive(Debug, Default)]
-struct PackageRequest {
-    handle: Option<String>,
-    repo: Option<String>,
-    name: String,
-    version_spec: Option<String>,
+pub struct PackageRequest {
+    pub handle: Option<String>,
+    pub repo: Option<String>,
+    pub name: String,
+    pub version_spec: Option<String>,
 }
 
 pub fn get_db_root() -> Result<PathBuf> {
@@ -42,7 +42,7 @@ pub fn get_db_root() -> Result<PathBuf> {
     Ok(home_dir.join(".zoi").join("pkgs").join("db"))
 }
 
-fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
+pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
     if source_str.contains('/')
         && (source_str.ends_with(".manifest.yaml") || source_str.ends_with(".pkg.lua"))
     {

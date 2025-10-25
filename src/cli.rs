@@ -287,6 +287,9 @@ enum Commands {
         /// Uninstall packages globally for the current user (alias for --scope=user)
         #[arg(long)]
         global: bool,
+        /// Remove the package from the project's zoi.yaml
+        #[arg(long)]
+        save: bool,
     },
 
     /// Execute a command defined in a local zoi.yaml file
@@ -688,8 +691,9 @@ pub fn run() {
                 scope,
                 local,
                 global,
+                save,
             } => {
-                cmd::uninstall::run(&packages, scope, local, global);
+                cmd::uninstall::run(&packages, scope, local, global, save);
                 Ok(())
             }
             Commands::Run { cmd_alias, args } => {

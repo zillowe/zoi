@@ -6,6 +6,7 @@ pub fn run(
     scope: Option<crate::cli::InstallScope>,
     local: bool,
     global: bool,
+    save: bool,
 ) {
     let mut scope_override = scope.map(|s| match s {
         crate::cli::InstallScope::User => types::Scope::User,
@@ -19,6 +20,14 @@ pub fn run(
         scope_override = Some(types::Scope::User);
     }
 
+    if save && scope_override != Some(types::Scope::Project) {
+        eprintln!(
+            "{}: The --save flag can only be used with project-scoped uninstalls.",
+            "Error".red().bold()
+        );
+        std::process::exit(1);
+    }
+
     let transaction = match transaction::begin() {
         Ok(t) => t,
         Err(e) => {
@@ -28,6 +37,7 @@ pub fn run(
     };
 
     let mut failed_packages = Vec::new();
+    let mut successfully_uninstalled = Vec::new();
 
     for name in package_names {
         println!("--- Uninstalling package '{}' ---", name.blue().bold(),);
@@ -43,6 +53,7 @@ pub fn run(
                     eprintln!("Failed to record transaction operation for {}: {}", name, e);
                     failed_packages.push(name.clone());
                 } else {
+                    successfully_uninstalled.push(name.clone());
                     println!("\n{} Uninstallation complete.", "Success:".green());
                 }
             }
@@ -68,5 +79,16 @@ pub fn run(
         std::process::exit(1);
     } else if let Err(e) = transaction::commit(&transaction.id) {
         eprintln!("Warning: Failed to commit transaction: {}", e);
+    }
+
+    if save
+        && let Err(e) =
+            crate::project::config::remove_packages_from_config(&successfully_uninstalled)
+    {
+        eprintln!(
+            "{}: Failed to remove packages from zoi.yaml: {}",
+            "Warning".yellow().bold(),
+            e
+        );
     }
 }

@@ -1,5 +1,5 @@
 use anyhow::{Result, anyhow};
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -15,8 +15,10 @@ pub struct ProjectLocalConfig {
 pub struct ProjectConfig {
     pub name: String,
     #[serde(default)]
-    pub packages: Vec<PackageCheck>,
+    pub registries: Option<Vec<String>>,
     #[serde(default)]
+    pub packages: Vec<PackageCheck>,
+    #[serde(default, deserialize_with = "deserialize_pkgs")]
     pub pkgs: Vec<String>,
     #[serde(default)]
     pub config: ProjectLocalConfig,
@@ -24,6 +26,32 @@ pub struct ProjectConfig {
     pub commands: Vec<CommandSpec>,
     #[serde(default)]
     pub environments: Vec<EnvironmentSpec>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum PkgOrPkgWithVersion {
+    Name(String),
+    Versioned(HashMap<String, String>),
+}
+
+fn deserialize_pkgs<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let v = Vec::<PkgOrPkgWithVersion>::deserialize(deserializer)?;
+    Ok(v.into_iter()
+        .flat_map(|item| {
+            let strings: Vec<String> = match item {
+                PkgOrPkgWithVersion::Name(name) => vec![name],
+                PkgOrPkgWithVersion::Versioned(map) => map
+                    .into_iter()
+                    .map(|(k, v)| format!("{}@{}", k, v))
+                    .collect(),
+            };
+            strings
+        })
+        .collect())
 }
 
 #[derive(Debug, Deserialize)]
@@ -114,6 +142,47 @@ pub fn add_packages_to_config(packages: &[String]) -> Result<()> {
                 }
             }
         }
+    }
+
+    let new_content = serde_yaml::to_string(&yaml_value)?;
+    fs::write(config_path, new_content)?;
+
+    Ok(())
+}
+
+pub fn remove_packages_from_config(packages_to_remove: &[String]) -> Result<()> {
+    let config_path = Path::new("zoi.yaml");
+    if !config_path.exists() {
+        return Ok(());
+    }
+
+    let content = fs::read_to_string(config_path)?;
+    let mut yaml_value: serde_yaml::Value = serde_yaml::from_str(&content)?;
+
+    if let Some(mapping) = yaml_value.as_mapping_mut()
+        && let Some(pkgs_list) = mapping.get_mut("pkgs")
+        && let Some(sequence) = pkgs_list.as_sequence_mut()
+    {
+        let packages_to_remove_names: Vec<_> = packages_to_remove
+            .iter()
+            .map(|p| {
+                crate::pkg::resolve::parse_source_string(p)
+                    .map(|req| req.name)
+                    .unwrap_or_else(|_| p.to_string())
+            })
+            .collect();
+
+        sequence.retain(|v| {
+            if let Some(s) = v.as_str() {
+                if let Ok(req) = crate::pkg::resolve::parse_source_string(s) {
+                    !packages_to_remove_names.contains(&req.name)
+                } else {
+                    true
+                }
+            } else {
+                true
+            }
+        });
     }
 
     let new_content = serde_yaml::to_string(&yaml_value)?;

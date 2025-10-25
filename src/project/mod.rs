@@ -3,3 +3,4 @@ pub mod environment;
 pub mod executor;
 pub mod lockfile;
 pub mod runner;
+pub mod verify;

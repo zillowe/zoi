@@ -7,7 +7,10 @@ use std::path::PathBuf;
 
 fn get_lockfile_path(scope: types::Scope) -> Result<PathBuf> {
     let path = if scope == types::Scope::Project {
-        std::env::current_dir()?.join("zoi.pkgs.json")
+        std::env::current_dir()?
+            .join(".zoi")
+            .join("pkgs")
+            .join("zoi.pkgs.json")
     } else {
         let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
         home_dir.join(".zoi").join("pkgs").join("zoi.pkgs.json")

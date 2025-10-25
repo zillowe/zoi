@@ -21,7 +21,7 @@ pub struct InstallNode {
 #[derive(Default, Debug)]
 pub struct DependencyGraph {
     pub nodes: HashMap<String, InstallNode>,
-    adj: HashMap<String, HashSet<String>>,
+    pub adj: HashMap<String, HashSet<String>>,
 }
 
 impl DependencyGraph {
