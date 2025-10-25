@@ -1,56 +1,245 @@
 ---
 title: Creating Packages
-description: A complete guide on how to create a package for Zoi.
+description: A complete guide on how to create and build Zoi packages.
 ---
 
 This guide provides a comprehensive overview of how to create packages for Zoi. The core of Zoi packaging is the `.pkg.lua` file, a Lua script that gives you immense power and flexibility to define how your software is built, packaged, and installed.
 
-## The `.pkg.lua` File
+## Anatomy of a `.pkg.lua` File
 
-At its heart, a Zoi package is defined by a `.pkg.lua` file. This file uses a series of global functions and variables provided by the Zoi runtime to declare metadata, handle dependencies, and script the entire build and installation process. This imperative approach gives you fine-grained control over every step.
+A Zoi package is defined by a single `.pkg.lua` file. This file is a Lua script that Zoi executes to get information about your package and to perform the build. It's not a simple configuration file; it's a powerful script that can contain logic, functions, and variables.
 
-## Core Lifecycle Functions
+A typical `.pkg.lua` file is structured around a few key global functions:
 
-These are the main functions you'll use to structure your package definition. Zoi calls them in a specific order during the build process: `prepare` -> `package` -> `verify`.
+1.  **`metadata{...}`**: **(Required)** A function call that declares all the static information about your package, like its name, version, and description.
+2.  **`dependencies{...}`**: A function call that defines the package's build-time and runtime dependencies.
+3.  **Lifecycle Functions**: A set of functions (`prepare`, `package`, `verify`, `uninstall`) that contain the logic for fetching, building, and installing the software.
 
-- `metadata{...}`: **(Required)** This function defines all the essential information about your package. It takes a Lua table as an argument. See the [Metadata Fields](#metadata-fields) section for all available options.
-- `dependencies{...}`: Defines runtime or build-time dependencies.
-- `prepare(...)`: This function is executed first. It's used for fetching sources, extracting archives, and setting up the build environment inside a temporary directory.
-- `package(...)`: This function is executed after `prepare()`. Its job is to take the prepared sources and copy the final files into the staging area, from which the package archive will be created.
-- `verify(...)`: Executed after `package()`, this function can be used to run checks to ensure the package is safe and correct, such as verifying checksums and PGP signatures of downloaded files. If it returns `false`, the build will be halted.
-- `uninstall(...)`: This function is reserved for custom uninstallation logic. It can be used to run commands to clean up files or configurations created by the package outside of the main Zoi store.
+Let's look at the core components in detail.
 
-## Metadata Fields
+---
 
-| Field          | Type     | Description                                                        |
-| -------------- | -------- | ------------------------------------------------------------------ |
-| `name`         | `string` | The name of the package.                                           |
-| `repo`         | `string` | The repository where the package belongs.                          |
-| `version`      | `string` | The package version.                                               |
-| `description`  | `string` | A short description of the package.                                |
-| `website`      | `string` | The official website of the package.                               |
-| `git`          | `string` | The git repository URL.                                            |
-| `man`          | `string` | A URL to the package's manual.                                     |
-| `maintainer`   | `table`  | A table with `name`, `email`, and `website` fields.                |
-| `author`       | `table`  | A table with `name`, `email`, and `website` fields.                |
-| `license`      | `string` | The SPDX license identifier.                                       |
-| `bins`         | `list`   | A list of binaries that the package provides.                      |
-| `conflicts`    | `list`   | A list of packages that this package conflicts with.               |
-| `types`        | `list`   | A list of supported build types (e.g. `source`, `pre-compiled`).   |
-| `sub_packages` | `list`   | A list of sub-packages for a split package.                        |
-| `main_subs`    | `list`   | A list of default sub-packages to install for a split package.     |
-| `updates`      | `list`   | A list of update information tables.                               |
-| `hooks`        | `table`  | A table of lifecycle hooks.                                        |
-| `package_type` | `string` | The type of package (`package`, `collection`, `app`, `extension`). |
+## 1. Metadata
 
-## Split Packages
+The `metadata{...}` function is the only **required** part of a `.pkg.lua` file. It takes a single Lua table as an argument, where you define all the essential properties of your package.
 
-Zoi supports "split packages", which allow a single `.pkg.lua` file to produce multiple, smaller packages. This is useful for large projects like the Linux kernel, where you might want to install the kernel, headers, and documentation as separate packages.
+### Example
 
-To create a split package, you use the `sub_packages` and `main_subs` fields in your `metadata`.
+```lua
+metadata({
+  name = "my-cli",
+  repo = "community",
+  version = "1.2.3",
+  description = "A cool command-line tool.",
+  license = "MIT",
+  bins = { "my-cli" },
+  types = { "source", "pre-compiled" }
+})
+```
 
-- `sub_packages`: A list of all the sub-packages that can be built from this source.
-- `main_subs`: A list of the sub-packages that should be installed by default when a user installs the base package name.
+### All Metadata Fields
+
+This table lists all the available fields you can use inside the `metadata` block.
+
+| Field          | Type     | Description                                                                                                                       |
+| -------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `name`         | `string` | **Required.** The name of the package.                                                                                            |
+| `repo`         | `string` | **Required.** The repository tier where the package belongs (e.g. `core`, `community`).                                           |
+| `version`      | `string` | The package version. Can be hardcoded or determined dynamically.                                                                  |
+| `versions`     | `table`  | A map of channels to versions (e.g. `{ stable = "1.2.3", beta = "1.4.0" }`). Used for version resolution if `version` is not set. |
+| `description`  | `string` | A short, one-line description of the package.                                                                                     |
+| `website`      | `string` | The official website of the software.                                                                                             |
+| `git`          | `string` | The source code's git repository URL.                                                                                             |
+| `man`          | `string` | A URL to the package's manual page (can be a raw markdown or text file).                                                          |
+| `maintainer`   | `table`  | **Required.** A table with `name`, `email`, and optionally `website` of the package maintainer.                                   |
+| `author`       | `table`  | A table with `name`, `email`, and `website` of the original software author.                                                      |
+| `license`      | `string` | The [SPDX license identifier](https://spdx.org/licenses/) for the software (e.g. `MIT`, `GPL-3.0-or-later`).                      |
+| `bins`         | `list`   | A list of binary names the package provides. Zoi will create symlinks for these in a directory on the user's `PATH`.              |
+| `conflicts`    | `list`   | A list of other package names that this package conflicts with.                                                                   |
+| `types`        | `list`   | A list of supported build methods (e.g. `source`, `pre-compiled`).                                                                |
+| `package_type` | `string` | The type of package. Can be `package` (default), `collection`, `app`, or `extension`. See [Package Types](#package-types).        |
+| `sub_packages` | `list`   | A list of sub-package names to define a split package. See [Split Packages](#split-packages).                                     |
+| `main_subs`    | `list`   | For a split package, a list of the default sub-packages to install.                                                               |
+| `updates`      | `list`   | A list of tables providing structured update information (e.g. for security notices).                                             |
+| `hooks`        | `table`  | A table defining scripts to run at different points in the package lifecycle. See [Advanced Features](#advanced-features).        |
+| `alt`          | `string` | A URL or source string for an alternative package definition to use instead of this one.                                          |
+| `tags`         | `list`   | A list of keywords to help users find the package via `zoi search`.                                                               |
+
+---
+
+## 2. Dependencies
+
+The `dependencies{...}` block declares build-time and runtime dependencies. Zoi can pull these from over 40 different package managers.
+
+<Callout title="Learn More">
+  For a complete guide on the dependency format, version pinning, and all
+  supported managers, see the [Dependencies & Supported Package
+  Managers](/docs/zds/zoi/dependencies) page.
+</Callout>
+
+### Example
+
+```lua
+dependencies({
+  -- Dependencies needed to build the package
+  build = {
+    required = { "native:make", "native:gcc" }
+  },
+  -- Dependencies needed to run the package
+  runtime = {
+    required = { "native:openssl" },
+    optional = { "zoi:my-plugin:Provides extra features" }
+  }
+})
+```
+
+---
+
+## 3. Lifecycle Functions
+
+These functions define the imperative steps for building your package. Zoi calls them in a specific order: `prepare` -> `package` -> `verify`.
+
+### `prepare()`
+
+This function runs first. Its main job is to fetch all necessary source code, binaries, or other assets and place them inside the temporary `BUILD_DIR`.
+
+- **Common tasks:** Cloning git repos, downloading release archives, extracting files.
+
+### `package()`
+
+This function runs after `prepare()`. It takes the prepared files from the `BUILD_DIR` and copies only the final, distributable files into the `STAGING_DIR`. The contents of the staging directory are what will be included in the final `.pkg.tar.zst` archive.
+
+- **Common tasks:** Running `make install`, copying binaries, libraries, and documentation.
+
+### `verify()`
+
+This function runs after `package()`. It's a security step where you can verify the integrity and authenticity of the files you downloaded in the `prepare` step.
+
+- **Common tasks:** Checking checksums with `verifyHash()`, verifying PGP signatures with `verifySignature()`.
+- **Return value:** If this function returns `false`, the build process is aborted.
+
+### `uninstall()`
+
+This function is not part of the build process. Its contents are executed when a user runs `zoi uninstall` on the package. It's used for cleanup tasks outside of the main package directory.
+
+- **Common tasks:** Removing user-specific configuration files or system-wide service files.
+
+---
+
+## 4. The Lua Environment
+
+When Zoi executes your script, it provides a rich environment of global variables and helper functions to make packaging easier.
+
+### Global Variables
+
+| Variable      | Type     | Description                                                                                                         |
+| ------------- | -------- | ------------------------------------------------------------------------------------------------------------------- |
+| `SYSTEM`      | `table`  | Contains system info: `OS` (`linux`, `macos`, `windows`), `ARCH` (`amd64`, `arm64`), `DISTRO`, `MANAGER`.           |
+| `ZOI`         | `table`  | Contains Zoi-specific info: `VERSION` (the version being built), `PATH.user`, `PATH.system`.                        |
+| `PKG`         | `table`  | A read-only table containing all the fields you defined in your `metadata{...}` block.                              |
+| `BUILD_DIR`   | `string` | The absolute path to the temporary build directory. Use this as the destination for all downloaded and built files. |
+| `STAGING_DIR` | `string` | The absolute path to the staging directory. Use this as the base for all `zcp` operations.                          |
+| `BUILD_TYPE`  | `string` | The build type specified by the user (e.g. `"source"`, `"pre-compiled"`).                                           |
+| `SUBPKG`      | `string` | For split packages, the name of the sub-package currently being processed. `nil` for non-split packages.            |
+
+### Helper Functions
+
+| Function                                  | Description                                                                                                                |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `cmd(command)`                            | Executes a shell command within the `BUILD_DIR`.                                                                           |
+| `zcp(source, dest)`                       | Copies files/directories from `BUILD_DIR` to the `STAGING_DIR`. See [Staging Destinations](#staging-destinations-for-zcp). |
+| `zrm(path)`                               | Used in `uninstall()` to remove files/directories. See [Target Paths for `zrm`](#target-paths-for-zrm).                    |
+| `verifyHash(file, "algo-hash")`           | Verifies a file's checksum (e.g. `"sha512-..."`).                                                                          |
+| `verifySignature(file, sig, key)`         | Verifies a PGP signature.                                                                                                  |
+| `addPgpKey(url_or_path, name)`            | Adds a PGP key to Zoi's keyring for verification.                                                                          |
+| `UTILS.EXTRACT(url_or_path, out_dir)`     | Downloads and extracts a `.zip` or `.tar.*` archive.                                                                       |
+| `UTILS.FETCH.url(url)`                    | Fetches a URL's content as a string.                                                                                       |
+| `UTILS.FETCH.GITHUB.LATEST.release{...}`  | Fetches the latest release tag from a GitHub repository.                                                                   |
+| `UTILS.FIND.file(dir, name)`              | Finds a file within the `BUILD_DIR`.                                                                                       |
+| `UTILS.PARSE.checksumFile(content, file)` | Parses a checksum from a string (e.g. the content of a `checksums.txt` file).                                              |
+
+### Staging Destinations for `zcp`
+
+The `destination` argument for the `zcp` function uses special variables to place files in the correct location within the final package archive.
+
+| Variable          | Description                                                                                                                      |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `${pkgstore}`     | The main directory for the package's files in the Zoi store. This is where most files should go (e.g. `${pkgstore}/bin/my-cli`). |
+| `${createpkgdir}` | For `app` type packages, this is the root of the project template.                                                               |
+| `${usrroot}`      | Copies files to the system's root (`/`). **Use with extreme caution.** This requires administrator privileges to install.        |
+| `${usrhome}`      | Copies files to the user's home directory (`~`).                                                                                 |
+
+---
+
+## 5. Package Types
+
+Zoi supports different types of packages, specified via the `package_type` field in your metadata.
+
+### `package` (Default)
+
+This is the standard type for distributing software, tools, libraries, or any other set of files. If you don't specify a `package_type`, it defaults to this.
+
+### `collection`
+
+A `collection` is a meta-package that groups other packages. Its main purpose is to list other packages in its `dependencies` block. Installing a collection simply installs all of its dependencies.
+
+**Example:**
+
+```lua
+metadata({
+  name = "rust-dev-tools",
+  package_type = "collection",
+  -- ...
+})
+dependencies({
+  runtime = {
+    "zoi:rust",
+    "cargo:cargo-watch",
+    "cargo:cargo-edit"
+  }
+})
+```
+
+### `app`
+
+An `app` package is a template or boilerplate used to bootstrap new projects with the `zoi create <app-name>` command. Files staged with `zcp` to the `${createpkgdir}` destination will be copied into the user's current directory when they run `zoi create`.
+
+**Example:**
+
+```lua
+metadata({
+  name = "rust-starter",
+  package_type = "app",
+  -- ...
+})
+function package()
+  -- These files will be copied when a user runs `zoi create rust-starter`
+  zcp("template/Cargo.toml", "${createpkgdir}/Cargo.toml")
+  zcp("template/src/main.rs", "${createpkgdir}/src/main.rs")
+end
+```
+
+### `extension`
+
+An `extension` is a special package that modifies the user's Zoi configuration. It's used for distributing repository lists, PGP keys, or project starters.
+
+<Callout title="Learn More">
+  For a complete guide on creating extensions, see the
+  [Extensions](/docs/zds/zoi/extensions) page.
+</Callout>
+
+---
+
+## 6. Split Packages
+
+Zoi supports "split packages," allowing a single `.pkg.lua` to produce multiple, smaller packages. This is ideal for large projects where you want to separate components, like a kernel, its headers, and its documentation.
+
+### Defining a Split Package
+
+You use the `sub_packages` and `main_subs` fields in your `metadata`:
+
+- `sub_packages`: A list of all sub-packages that can be built.
+- `main_subs`: A list of the default sub-packages to install when a user installs the base package name.
 
 **Example:**
 
@@ -59,110 +248,98 @@ metadata({
   name = "linux",
   sub_packages = { "kernel", "headers", "docs" },
   main_subs = { "kernel", "headers" },
-  ...
+  -- ...
 })
 ```
-
-With this configuration:
 
 - `zoi install linux` will install `linux:kernel` and `linux:headers`.
 - `zoi install linux:docs` will install only the documentation.
 
-### Lifecycle Functions with Split Packages
+### Lifecycle Functions in Split Packages
 
-When working with split packages, the `prepare`, `package`, `verify`, and `uninstall` functions receive a table as an argument containing the name of the sub-package being processed.
+The `prepare`, `package`, `verify`, and `uninstall` functions receive a table containing the name of the sub-package being processed.
 
 ```lua
 function package(args)
   if args.sub == "kernel" then
-    -- packaging logic for the kernel
+    -- Packaging logic for the kernel
     zcp("src/vmlinuz", "${pkgstore}/boot/vmlinuz-linux")
   elseif args.sub == "headers" then
-    -- packaging logic for the headers
+    -- Packaging logic for the headers
     zcp("src/include", "${pkgstore}/usr/include")
   end
 end
 ```
 
-### The `SUBPKG` Global Variable
+### Staging Files
 
-Inside your `.pkg.lua`, you can also use the `SUBPKG` global string variable to get the name of the sub-package currently being processed. This is useful for conditional logic outside of the main lifecycle functions.
+When building a split package, `zcp` automatically stages files into a sub-package-specific directory (e.g. `data/kernel/...`, `data/headers/...`) within the final archive. This ensures that installing a sub-package only extracts the correct files.
 
-### Staging Files with `zcp`
+---
 
-When building a split package, `zcp` will automatically stage files into a sub-package-specific directory within the final archive. This ensures that when a user installs a specific sub-package, only the correct files are extracted.
+## 7. The Packaging Workflow
 
-## The Lua Environment
+Follow these steps to develop, build, and test your package.
 
-When Zoi executes your `.pkg.lua` script, it provides a set of global variables and helper functions.
+### Step 1: Develop and Test Locally
 
-#### Global Variables
+The fastest way to iterate on your `.pkg.lua` file is to use `zoi install` with the direct path to your script. This runs the full dependency resolution and build logic without creating an intermediate archive.
 
-- `SYSTEM`: A table with system info (`OS`, `ARCH`, `DISTRO`, `MANAGER`).
-- `ZOI`: A table with Zoi-specific info (`VERSION`, `PATH.user`, `PATH.system`).
-- `PKG`: A table containing the metadata you defined in `metadata{...}`.
-- `BUILD_DIR`: The absolute path to the temporary build directory.
-- `STAGING_DIR`: The absolute path to the directory where final package contents should be placed.
-- `BUILD_TYPE`: A string indicating the build type (e.g. `"source"`, `"pre-compiled"`), from the `zoi package build --type` flag.
-
-#### Helper Functions
-
-- `cmd(command)`: Executes a shell command.
-- `zcp(source, destination)`: Copies files/directories into the staging area.
-- `zrm(path)`: A function for the `uninstall()` step to remove files. The path can contain variables like `${pkgstore}`, `${usrhome}`, and `${usrroot}`.
-- `verifyHash(file_path, "algo-hash")`: Verifies a file's checksum.
-- `verifySignature(file_path, sig_path, key_name)`: Verifies a PGP signature.
-- `addPgpKey(url_or_path, name)`: Adds a PGP key to Zoi's keyring.
-- `UTILS.EXTRACT(url_or_path, out_dir)`: Downloads and extracts an archive.
-- `UTILS.FETCH.url(url)`: Fetches a URL's content as a string.
-- `UTILS.FETCH.GITHUB.LATEST.release{...}`: Fetches the latest release tag from GitHub.
-- `UTILS.FIND.file(dir, name)`: Finds a file within the build directory.
-- `UTILS.PARSE.checksumFile(content, file_name)`: Parses a checksum from a file's content.
-
-#### Staging Destinations for `zcp`
-
-The `destination` for `zcp` uses special variables:
-
-- `${pkgstore}`: The main directory for the package's files in the Zoi store (e.g. `${pkgstore}/bin/my-cli`).
-- `${createpkgdir}`: For `app` packages, to be used as a template.
-- `${usrroot}`: Copies files to the system's root (`/`). **Use with extreme caution.**
-- `${usrhome}`: Copies files to the user's home directory (`~`).
-
-## Packaging 'hello': A Walkthrough
-
-Let's walk through packaging a simple "Hello, World!" program written in Zig. This example demonstrates a package that can be built from source or installed from a pre-compiled binary.
-
-**Source files:**
-
-- `main.zig`:
-
-```zig
-const std = @import("std");
-
-pub fn main() !void {
-    const stdout_writer = std.io.getStdOut().writer();
-    try stdout_writer.print("Hello, World!\n", .{});
-}
+```sh
+zoi install /path/to/your-package.pkg.lua
 ```
 
-- `app/hello.pkg.lua`: (content below)
-- `app/man.md`: A simple markdown manual.
+If your package has multiple `types` (e.g. `source`, `pre-compiled`), Zoi will automatically select one. You can force a specific type with the `--type` flag:
 
-### `app/hello.pkg.lua`
+```sh
+zoi install --type source /path/to/your-package.pkg.lua
+```
+
+### Step 2: Build the Distributable Archive
+
+Once your package installs correctly locally, build the final `.pkg.tar.zst` archive. This is the file that would be distributed via a package registry.
+
+```sh
+zoi package build --type <build-type> /path/to/your-package.pkg.lua
+```
+
+**`zoi package build` Flags:**
+
+- `--type <TYPE>`: **(Required)** The build type to use (e.g. `source`).
+- `--platform <PLATFORM>`: Build for a specific platform (e.g. `linux-arm64`). Defaults to your current platform.
+- `--sub <SUB_PACKAGE...>`: For a split package, build only the specified sub-packages.
+- `--sign <KEY>`: Sign the resulting archive with a PGP key from your Zoi keyring.
+
+### Step 3: Test the Final Archive
+
+Install the built archive to ensure it's correct and installs properly for end-users.
+
+```sh
+zoi package install /path/to/your-package-1.0.0-linux-amd64.pkg.tar.zst
+```
+
+**`zoi package install` Flags:**
+
+- `--scope <user|system>`: Override the installation scope.
+- `--sub <SUB_PACKAGE...>`: For a split package, install only the specified sub-packages from the archive.
+
+---
+
+## 8. Full Walkthrough: 'hello' Package
+
+This example demonstrates many of the concepts above by packaging a simple "Hello, World!" program written in Zig.
+
+_For the full source code of this example, see the `hello` package in the [Zoidberg repository](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg/-/tree/main/zillowe/hello)._
+
+### `hello.pkg.lua`
 
 ```lua
--- 1. Helper variables and functions
+-- 1. Helper variables
 local repo_owner = "Zillowe"
 local repo_name = "Hello"
 local version = ZOI.VERSION or "3.0.0"
 local git_url = "https://github.com/" .. repo_owner .. "/" .. repo_name .. ".git"
 local release_base_url = "https://github.com/" .. repo_owner .. "/" .. repo_name .. "/releases/download/v" .. version
-
-local platform_map = { macos = "darwin" }
-
-local function get_mapped_os()
-  return platform_map[SYSTEM.OS] or SYSTEM.OS
-end
 
 -- 2. Metadata
 metadata({
@@ -173,88 +350,39 @@ metadata({
   website = "https://github.com/Zillowe/Hello",
   git = git_url,
   man = "https://raw.githubusercontent.com/Zillowe/Hello/refs/heads/main/app/man.md",
-  maintainer = {
-    name = "Zillowe Foundation",
-    website = "https://zillowe.qzz.io",
-    email = "contact@zillowe.qzz.io",
-  },
-  author = {
-    name = "Zillowe Foundation",
-    website = "https://zillowe.qzz.io",
-    email = "contact@zillowe.qzz.io",
-  },
+  maintainer = { name = "Zillowe", email = "contact@zillowe.org" },
   license = "Apache-2.0",
   bins = { "hello" },
-  conflicts = { "hello" },
   types = { "source", "pre-compiled" },
 })
 
 -- 3. Dependencies
 dependencies({
-  build = {
-    required = { "native:zig" },
-  },
+  build = { required = { "native:zig" } },
 })
 
--- 4. Prepare Step
+-- 4. Lifecycle Functions
 function prepare()
-  print("Adding PGP key for verification...")
-  addPgpKey("https://zillowe.pages.dev/keys/zillowe-main.asc", "zillowe-main")
-
   if BUILD_TYPE == "pre-compiled" then
     local ext = (SYSTEM.OS == "windows") and "zip" or "tar.xz"
-    local file_name = "hello-" .. get_mapped_os() .. "-" .. SYSTEM.ARCH .. "." .. ext
+    local file_name = "hello-" .. SYSTEM.OS .. "-" .. SYSTEM.ARCH .. "." .. ext
     local url = release_base_url .. "/" .. file_name
     UTILS.EXTRACT(url, "precompiled")
   elseif BUILD_TYPE == "source" then
-    cmd("git clone " .. PKG.git .. " " .. BUILD_DIR .. "/source")
-    cmd("cd " .. BUILD_DIR .. "/source && zig build-exe main.zig -O ReleaseSmall --name hello")
+    cmd("git clone " .. PKG.git .. " source")
+    cmd("cd source && zig build-exe main.zig -O ReleaseSmall --name hello")
   end
 end
 
--- 5. Package Step
 function package()
   local bin_name = (SYSTEM.OS == "windows") and "hello.exe" or "hello"
-
-  if BUILD_TYPE == "pre-compiled" then
-    local bin_path = UTILS.FIND.file("precompiled", bin_name)
-    if bin_path then
-      zcp(bin_path, "${pkgstore}/bin/" .. bin_name)
-    else
-      error("Could not find '" .. bin_name .. "' in pre-compiled archive.")
-    end
-  elseif BUILD_TYPE == "source" then
-    zcp("source/" .. bin_name, "${pkgstore}/bin/" .. bin_name)
-  end
+  local source_path = (BUILD_TYPE == "source") and "source/" or "precompiled/"
+  zcp(source_path .. bin_name, "${pkgstore}/bin/" .. bin_name)
 end
 
--- 6. Verify Step
 function verify()
   if BUILD_TYPE == "pre-compiled" then
-    local checksum_url = release_base_url .. "/checksums-512.txt"
-    local checksum_content = UTILS.FETCH.url(checksum_url)
-    local ext = (SYSTEM.OS == "windows") and "zip" or "tar.xz"
-    local file_name = "hello-" .. get_mapped_os() .. "-" .. SYSTEM.ARCH .. "." .. ext
-    local file_path = BUILD_DIR .. "/" .. file_name
-    local expected_checksum = UTILS.PARSE.checksumFile(checksum_content, file_name)
-
-    if not expected_checksum or not verifyHash(file_path, "sha512-" .. expected_checksum) then
-      print("Checksum verification failed!")
-      return false
-    end
-    print("Checksum verified successfully.")
-
-    print("Verifying signature...")
-    local sig_url = release_base_url .. "/" .. file_name .. ".sig"
-    local sig_path = BUILD_DIR .. "/" .. file_name .. ".sig"
-    UTILS.FILE(sig_url, sig_path)
-
-    if not verifySignature(file_path, sig_path, "zillowe-main") then
-      print("Signature verification failed!")
-      return false
-    end
-    print("Signature verified successfully.")
-    return true
+    -- (Checksum and signature verification logic would go here)
   end
   return true
 end
@@ -262,159 +390,6 @@ end
 function uninstall() end
 ```
 
-**Explanation:**
+## Next Steps
 
-1.  **Helpers:** The script starts with Lua variables and functions to dynamically construct URLs based on the version and platform.
-2.  **`metadata` block:** Defines all the metadata. `types = { "source", "pre-compiled" }` declares that this package supports two build methods.
-3.  **`dependencies` block:** Declares that `zig` is needed to build from source.
-4.  **`prepare()`:** This function's behavior depends on the `BUILD_TYPE` global variable.
-    - If `pre-compiled`, it downloads and extracts the release archive.
-    - If `source`, it clones the git repository and compiles the binary using `zig`.
-5.  **`package()`:** This function copies the final binary into the staging area.
-    - If `pre-compiled`, it finds the binary in the extracted archive.
-    - If `source`, it copies the binary from the build directory.
-6.  **`verify()`:** For `pre-compiled` builds, this function downloads checksum and signature files, then uses `verifyHash()` and `verifySignature()` to ensure the download is authentic and intact. It returns `false` if verification fails, which aborts the build.
-
-## Advanced Features & Unused Features
-
-The `hello` package is simple. Here are some features you might need for more complex packages.
-
-### `uninstall()` function
-
-If your package creates files outside of its installation directory (e.g. config files in the user's home directory), you can define an `uninstall` function to clean them up.
-
-```lua
-function uninstall()
-  -- zrm can use variables to target specific locations
-  zrm("${usrhome}/.config/my-app")
-  zrm("${usrroot}/etc/my-app.conf")
-end
-```
-
-#### Target Paths for `zrm`
-
-The `path` for `zrm` uses special variables to target common locations:
-
-- `${pkgstore}`: The package's versioned installation directory inside the Zoi store.
-- `${usrhome}`: The current user's home directory (`~`).
-- `${usrroot}`: The system's root directory (`/`). **Use with extreme caution.**
-
-### `updates` block
-
-You can provide structured update information in your metadata. This is shown to the user when they run `zoi show` or `zoi update`.
-
-```lua
-metadata({
-  ...
-  updates = {
-    {
-      type = "vulnerability", -- 'vulnerability', 'change', or 'update'
-      message = "Critical security vulnerability CVE-2025-12345 fixed."
-    },
-    {
-      type = "change",
-      message = "The --foo flag has been deprecated. Use --bar instead."
-    }
-  }
-})
-```
-
-### `hooks` block
-
-You can run scripts at different points in the package lifecycle.
-
-```lua
-metadata({
-  ...
-  hooks = {
-    -- Can be a string or a list of strings
-    post_install = "echo 'Package installed! Run my-app --help to get started.'",
-    pre_remove = {
-      "echo 'Backing up your config...'",
-      "cp ~/.config/my-app/config.toml ~/.config/my-app/config.toml.bak"
-    }
-  }
-})
-```
-
-Hooks can also be platform-specific. See the [Project Configuration](/docs/zds/zoi/project-config) docs for platform-specific examples which also apply here.
-
-## Package Types
-
-You can define the type of your package in the `metadata` block using the `package_type` field.
-
-```lua
-metadata({
-  name = "my-package",
-  package_type = "package", -- "package", "collection", "app", or "extension"
-  ...
-})
-```
-
-### 1. `package` (Default)
-
-This is the standard package type for distributing software, tools, or any set of files.
-
-### 2. `collection`
-
-A collection is a meta-package that groups other packages together. Its main purpose is to list other packages in its `dependencies` block.
-
-### 3. `app`
-
-An `app` package is a template or boilerplate used to bootstrap new projects with `zoi create`.
-
-### 4. `extension`
-
-An extension is a special package type that modifies the user's Zoi configuration.
-
-## Building and Testing Your Package
-
-### Testing Locally
-
-The fastest way to test your `.pkg.lua` file is to install it directly. This command will resolve dependencies and run the full installation logic without creating an intermediate package archive. It's perfect for iterating on your `prepare` and `package` functions.
-
-```sh
-zoi install /path/to/your-package.pkg.lua
-```
-
-### Build Type Selection during Installation
-
-When `zoi install` determines that a package needs to be built from source (i.e., a pre-built binary archive is not available), it automatically selects a build type from the `types` array in your package's metadata. The selection logic is as follows:
-
-1.  **User Override:** You can explicitly specify a build type using the `--type` flag. Zoi will use this type if it's listed in the package's `types` array.
-    ```sh
-    zoi install --type source my-package
-    ```
-2.  **Default to `pre-compiled`:** If no type is specified, Zoi will automatically look for and use the `pre-compiled` type if it is available.
-3.  **Fallback to First Type:** If `pre-compiled` is not available, Zoi will fall back to using the _first_ type listed in the `types` array in your `metadata`.
-
-This makes it important to order your `types` array thoughtfully. For example, if you have `types = { "source", "pre-compiled" }`, Zoi will default to `pre-compiled` if available, otherwise it will use `source`.
-
-### Building the Package Archive
-
-Once you are confident your package works, you can build a distributable archive. This is what Zoi would download from a pre-built package registry.
-
-```sh
-zoi package build --type <build-type> /path/to/your-package.pkg.lua
-```
-
-- `--type <TYPE>`: Specify the build type, e.g. `source` or `pre-compiled`. This value is available in your script as the `BUILD_TYPE` global variable.
-- `--sub <SUB_PACKAGE>`: For a split package, build only the specified sub-package(s).
-
-This command creates a `.pkg.tar.zst` file in the same directory as your `.pkg.lua` file.
-
-### Installing the Built Archive
-
-To ensure your final archive is correct, you can install it locally using the `zoi package install` command.
-
-```sh
-zoi package install /path/to/your-package-1.0.0-linux-amd64.pkg.tar.zst
-```
-
-- `--sub <SUB_PACKAGE>`: For a split package, install only the specified sub-package(s) from the archive.
-
-This command unpacks the archive and runs the same installation procedure that a user would experience, providing a final end-to-end test of your package.
-
-## Next Steps: Publishing Your Package
-
-Once you have created and tested your package, the next step is to make it available to others. For a detailed guide on how to submit your package to the official Zoidberg repository or how to host your own, see the [Publishing Packages](/docs/zds/zoi/publishing-packages) guide.
+Once you have created and tested your package, the next step is to make it available to others. See the [Publishing Packages](/docs/zds/zoi/publishing-packages) guide for details.

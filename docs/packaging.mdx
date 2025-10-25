@@ -1,0 +1,126 @@
+---
+title: Packaging Zoi
+description: A comprehensive guide for packagers on how to build and distribute Zoi.
+---
+
+This document provides detailed guidance for packagers on how to build and package Zoi for various distributions and package managers.
+
+## Build Dependencies
+
+These are required to compile Zoi from source.
+
+- **Rust Toolchain**: Zoi requires a specific version of the Rust compiler. Refer to `rust-toolchain.toml` for the exact channel and `Cargo.toml` for the Rust version and edition.
+- **C Compiler**: A C compiler like `gcc` or `clang`.
+- **OpenSSL**: Development libraries for OpenSSL (`libssl-dev` or `openssl-devel`).
+- **pkg-config**: The `pkg-config` utility.
+- **liblzma**: Development libraries for lzma (`liblzma-dev`).
+- **Git**: Required to embed the commit hash in the binary.
+
+## Runtime Dependencies
+
+- **Essential**: `git` is required for most of Zoi's functionality.
+- **Optional**: `less` or `more` for viewing manuals and other paged content.
+
+## Build Process
+
+Zoi can be built in several ways, depending on the packaging requirements.
+
+### Using Cargo
+
+The standard Rust build process. The release profile is optimized for size and performance (see `.cargo/config.toml`).
+
+```sh
+cargo build --release
+```
+
+This produces the `zoi` binary in `target/release/`.
+
+### Using the Makefile
+
+The provided `Makefile` simplifies the build and installation process.
+
+```sh
+# Configure installation paths (creates config.mk)
+./configure
+
+# Build the release binary
+make build
+
+# Install to configured location
+sudo make install
+```
+
+### Using Build Scripts
+
+The `scripts/` directory contains CI/CD scripts for creating release builds. These scripts automatically embed the git commit hash.
+
+- `scripts/build-release.sh`: Creates a release build for the current platform.
+
+### Using Docker
+
+A `Dockerfile` is provided for reproducible, containerized builds. You can pass build arguments to customize the embedded configuration.
+
+```sh
+# Build the docker image
+docker build -t zoi .
+
+# Build with custom telemetry and registry info
+docker build \
+  --build-arg POSTHOG_API_KEY="your_key" \
+  --build-arg ZOI_DEFAULT_REGISTRY="https://my-registry.com/repo.git" \
+  -t zoi .
+```
+
+## Build-time Configuration
+
+Several aspects of Zoi can be configured at build time by setting environment variables. These are processed by `build.rs`.
+
+| Environment Variable          | Description                                                   |
+| ----------------------------- | ------------------------------------------------------------- |
+| `ZOI_COMMIT_HASH`             | Embeds the git commit hash into the binary for `zoi version`. |
+| `POSTHOG_API_KEY`             | Sets the API key for the opt-in telemetry feature.            |
+| `POSTHOG_API_HOST`            | Sets the host for the opt-in telemetry feature.               |
+| `ZOI_DEFAULT_REGISTRY`        | Sets the default package registry URL.                        |
+| `ZOI_ABOUT_PACKAGER_AUTHOR`   | Embeds the packager's name in the `zoi about` output.         |
+| `ZOI_ABOUT_PACKAGER_EMAIL`    | Embeds the packager's email.                                  |
+| `ZOI_ABOUT_PACKAGER_HOMEPAGE` | Embeds the packager's homepage.                               |
+
+These can be set in a `.env` file at the project root (see `.env.example`) or passed directly to the build command.
+
+## Generating Completions and Man Pages
+
+Your package should include shell completions and man pages.
+
+### Shell Completions
+
+Generate and install completions for various shells.
+
+```sh
+# This command will also attempt to install the completions
+./target/release/zoi shell <shell>
+
+# To just print the completions to stdout
+./target/release/zoi generate-completions <shell>
+```
+
+### Man Pages
+
+Generate man pages for `zoi` and all its subcommands.
+
+```sh
+# Generate pages into a `manuals/` directory
+./target/release/zoi generate-manual
+
+# Specify an output directory
+OUT_DIR=dist/man/ ./target/release/zoi generate-manual
+```
+
+These files should be installed to the appropriate system location (e.g. `/usr/share/man/man1`).
+
+## Existing Packaging Files
+
+Refer to the `packages/` directory for examples of how Zoi is packaged for other managers:
+
+- **Arch Linux (AUR):** `packages/aur/zoi/PKGBUILD`
+- **Homebrew:** `packages/brew/zoi.rb`
+- **Scoop:** `packages/scoop/zoi.json`
