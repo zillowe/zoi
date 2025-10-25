@@ -23,9 +23,22 @@ pub struct BuildCommand {
     /// Sign the package with the given PGP key (name or fingerprint)
     #[arg(long)]
     pub sign: Option<String>,
+
+    /// Run tests before building
+    #[arg(long)]
+    pub test: bool,
 }
 
 pub fn run(args: BuildCommand) {
+    if args.test {
+        println!("Running tests before building...");
+        if let Err(e) = crate::pkg::package::test::run(&args) {
+            eprintln!("Tests failed: {}", e);
+            std::process::exit(1);
+        }
+        println!("Tests passed, proceeding with build...");
+    }
+
     if let Err(e) = crate::pkg::package::build::run(
         &args.package_file,
         &args.r#type,

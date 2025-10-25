@@ -40,7 +40,7 @@ fn collect_dependencies_for_group(
             {
                 let (sub_d, sub_co, sub_coo) = collect_dependencies_for_group(
                     sub_dep_group,
-                    None, // No recursion on sub-package name
+                    None,
                     dep_type,
                     yes,
                     all_optional,

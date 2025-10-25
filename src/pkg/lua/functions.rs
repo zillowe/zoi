@@ -418,16 +418,30 @@ fn add_cmd_util(lua: &Lua) -> Result<(), mlua::Error> {
             Ok(out) => {
                 if !out.status.success() {
                     eprintln!("[cmd] {}", String::from_utf8_lossy(&out.stderr));
+                    Ok(String::new())
+                } else {
+                    Ok(String::from_utf8_lossy(&out.stdout).to_string())
                 }
-                Ok(out.status.success())
             }
             Err(e) => {
                 eprintln!("[cmd] Failed to execute command: {}", e);
-                Ok(false)
+                Ok(String::new())
             }
         }
     })?;
     lua.globals().set("cmd", cmd_fn)?;
+    Ok(())
+}
+
+fn add_fs_util(lua: &Lua) -> Result<(), mlua::Error> {
+    let fs_table = lua.create_table()?;
+
+    let exists_fn = lua.create_function(|_, path: String| Ok(Path::new(&path).exists()))?;
+    fs_table.set("exists", exists_fn)?;
+
+    let utils_table: Table = lua.globals().get("UTILS")?;
+    utils_table.set("FS", fs_table)?;
+
     Ok(())
 }
 
@@ -678,6 +692,8 @@ pub fn add_package_lifecycle_functions(lua: &Lua) -> Result<(), mlua::Error> {
     lua.globals().set("package", package_fn)?;
     let verify_fn = lua.create_function(|_, _: Table| Ok(()))?;
     lua.globals().set("verify", verify_fn)?;
+    let test_fn = lua.create_function(|_, _: Table| Ok(true))?;
+    lua.globals().set("test", test_fn)?;
     let uninstall_fn = lua.create_function(|_, _: Table| Ok(()))?;
     lua.globals().set("uninstall", uninstall_fn)?;
 
@@ -743,6 +759,7 @@ pub fn setup_lua_environment(
     add_verify_hash(lua)?;
     add_zrm(lua)?;
     add_cmd_util(lua)?;
+    add_fs_util(lua)?;
     add_find_util(lua)?;
     add_extract_util(lua)?;
     add_verify_signature(lua)?;
