@@ -263,9 +263,15 @@ pub fn run(
 
             let installed_manifests = installed_manifests.into_inner().unwrap();
             for manifest in &installed_manifests {
+                let name_with_sub = if let Some(sub) = &manifest.sub_package {
+                    format!("{}:{}", manifest.name, sub)
+                } else {
+                    manifest.name.clone()
+                };
+
                 let full_id = format!(
                     "#{}@{}/{}",
-                    manifest.registry_handle, manifest.repo, manifest.name
+                    manifest.registry_handle, manifest.repo, name_with_sub
                 );
                 lockfile.packages.insert(full_id, manifest.version.clone());
 
@@ -295,7 +301,12 @@ pub fn run(
                         String::new()
                     });
 
-                let pkg_id = format!("{}@{}", manifest.name, manifest.version);
+                let pkg_id = if let Some(sub) = &manifest.sub_package {
+                    format!("{}@{}:{}", manifest.name, manifest.version, sub)
+                } else {
+                    format!("{}@{}", manifest.name, manifest.version)
+                };
+
                 let dependencies: Vec<String> = graph
                     .adj
                     .get(&pkg_id)
@@ -303,10 +314,20 @@ pub fn run(
                         deps.iter()
                             .map(|dep_id| {
                                 let node = graph.nodes.get(dep_id).unwrap();
-                                format!(
-                                    "#{}@{}/{}",
-                                    node.registry_handle, node.pkg.repo, node.pkg.name
-                                )
+                                if let Some(sub) = &node.pkg.sub_packages {
+                                    format!(
+                                        "#{}@{}/{}:{}",
+                                        node.registry_handle,
+                                        node.pkg.repo,
+                                        node.pkg.name,
+                                        sub.join(",")
+                                    )
+                                } else {
+                                    format!(
+                                        "#{}@{}/{}",
+                                        node.registry_handle, node.pkg.repo, node.pkg.name
+                                    )
+                                }
                             })
                             .collect()
                     })
@@ -314,6 +335,7 @@ pub fn run(
 
                 let detail = types::LockPackageDetail {
                     version: manifest.version.clone(),
+                    sub_package: manifest.sub_package.clone(),
                     integrity,
                     dependencies,
                     options_dependencies: manifest.chosen_options.clone(),
@@ -321,7 +343,7 @@ pub fn run(
                 };
 
                 let registry_key = format!("#{}", manifest.registry_handle);
-                let short_id = format!("@{}/{}", manifest.repo, manifest.name);
+                let short_id = format!("@{}/{}", manifest.repo, name_with_sub);
 
                 lockfile
                     .details

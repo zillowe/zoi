@@ -657,7 +657,7 @@ pub fn run() {
                         subcmd.print_help().unwrap();
                     }
                 } else {
-                    cmd::update::run(all, &package_names, cli.yes);
+                    let _ = cmd::update::run(all, &package_names, cli.yes);
                 }
                 Ok(())
             }

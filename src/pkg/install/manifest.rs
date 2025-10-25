@@ -10,10 +10,12 @@ pub fn create_manifest(
     registry_handle: &str,
     chosen_options: &[String],
     chosen_optionals: &[String],
+    sub_package: Option<String>,
 ) -> Result<types::InstallManifest> {
     Ok(types::InstallManifest {
         name: pkg.name.clone(),
         version: pkg.version.clone().expect("Version should be resolved"),
+        sub_package,
         repo: pkg.repo.clone(),
         registry_handle: registry_handle.to_string(),
         package_type: pkg.package_type,
@@ -38,6 +40,7 @@ pub fn write_manifest(
     registry_handle: &str,
     chosen_options: &[String],
     chosen_optionals: &[String],
+    sub_package: Option<String>,
 ) -> Result<()> {
     let manifest = create_manifest(
         pkg,
@@ -48,6 +51,7 @@ pub fn write_manifest(
         registry_handle,
         chosen_options,
         chosen_optionals,
+        sub_package,
     )?;
     local::write_manifest(&manifest)
 }

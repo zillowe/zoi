@@ -24,9 +24,14 @@ pub fn run() -> Result<()> {
 
     let mut installed_pkgs_map = HashMap::new();
     for installed_pkg in &installed_packages {
+        let name_with_sub = if let Some(sub) = &installed_pkg.sub_package {
+            format!("{}:{}", installed_pkg.name, sub)
+        } else {
+            installed_pkg.name.clone()
+        };
         let full_id = format!(
             "#{}@{}/{}",
-            installed_pkg.registry_handle, installed_pkg.repo, installed_pkg.name
+            installed_pkg.registry_handle, installed_pkg.repo, name_with_sub
         );
         installed_pkgs_map.insert(full_id, installed_pkg);
     }
@@ -44,11 +49,17 @@ pub fn run() -> Result<()> {
 
             let parts: Vec<&str> = full_id.split('@').collect();
             let registry_handle = parts[0].strip_prefix('#').unwrap();
-            let repo_and_name = parts[1];
+            let repo_and_name_with_sub = parts[1];
 
-            if let Some(last_slash_idx) = repo_and_name.rfind('/') {
-                let (repo, name) = repo_and_name.split_at(last_slash_idx);
-                let name = &name[1..];
+            if let Some(last_slash_idx) = repo_and_name_with_sub.rfind('/') {
+                let (repo, name_with_sub) = repo_and_name_with_sub.split_at(last_slash_idx);
+                let name_with_sub = &name_with_sub[1..];
+
+                let name = if let Some(colon_idx) = name_with_sub.rfind(':') {
+                    &name_with_sub[..colon_idx]
+                } else {
+                    name_with_sub
+                };
 
                 let package_dir =
                     local::get_package_dir(types::Scope::Project, registry_handle, repo, name)?;

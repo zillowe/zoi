@@ -16,6 +16,10 @@ pub struct BuildCommand {
     #[arg(long, short, num_args = 1.., default_values_t = vec!["current".to_string()])]
     pub platform: Vec<String>,
 
+    /// The sub-packages to build.
+    #[arg(long, num_args = 1..)]
+    pub sub: Option<Vec<String>>,
+
     /// Sign the package with the given PGP key (name or fingerprint)
     #[arg(long)]
     pub sign: Option<String>,
@@ -29,6 +33,7 @@ pub fn run(args: BuildCommand) {
         args.sign,
         None,
         None,
+        args.sub,
     ) {
         eprintln!("Error: {}", e);
         std::process::exit(1);

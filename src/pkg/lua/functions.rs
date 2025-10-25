@@ -690,6 +690,7 @@ pub fn setup_lua_environment(
     version_override: Option<&str>,
     file_path: Option<&str>,
     create_pkg_dir: Option<&str>,
+    sub_package: Option<&str>,
 ) -> Result<(), mlua::Error> {
     let system_table = lua.create_table()?;
     let parts: Vec<&str> = platform.split('-').collect();
@@ -710,6 +711,10 @@ pub fn setup_lua_environment(
 
     if let Some(dir) = create_pkg_dir {
         zoi_table.set("CREATE_PKG_DIR", dir)?;
+    }
+
+    if let Some(sub) = sub_package {
+        lua.globals().set("SUBPKG", sub)?;
     }
 
     let path_table = lua.create_table()?;

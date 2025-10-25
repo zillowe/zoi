@@ -49,13 +49,20 @@ pub fn record_package(
     registry_handle: &str,
     chosen_options: &[String],
     chosen_optionals: &[String],
+    sub_package: Option<String>,
 ) -> Result<()> {
     let mut lockfile = read_lockfile(pkg.scope)?;
 
-    let package_id = utils::generate_package_id(registry_handle, &pkg.repo);
+    let base_package_id = utils::generate_package_id(registry_handle, &pkg.repo);
+    let package_id = if let Some(sub) = &sub_package {
+        format!("{}:{}", base_package_id, sub)
+    } else {
+        base_package_id
+    };
 
     let lockfile_pkg = types::LockfilePackage {
         name: pkg.name.clone(),
+        sub_package,
         repo: pkg.repo.clone(),
         registry: registry_handle.to_string(),
         version: pkg
@@ -79,13 +86,17 @@ pub fn record_package(
     write_lockfile(&lockfile, pkg.scope)
 }
 
-pub fn remove_package_from_record(package_name: &str, scope: types::Scope) -> Result<()> {
+pub fn remove_package_from_record(
+    package_name: &str,
+    sub_package_name: Option<&str>,
+    scope: types::Scope,
+) -> Result<()> {
     let mut lockfile = read_lockfile(scope)?;
 
     let key_to_remove = lockfile
         .packages
         .iter()
-        .find(|(_, p)| p.name == package_name)
+        .find(|(_, p)| p.name == package_name && p.sub_package.as_deref() == sub_package_name)
         .map(|(k, _)| k.clone());
 
     if let Some(key) = key_to_remove

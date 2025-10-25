@@ -172,6 +172,55 @@ pub fn resolve_dependency_graph(
     let mut processed_sources = HashSet::new();
 
     while let Some((source, parent_id)) = queue.pop_front() {
+        if processed_sources.contains(&source) {
+            continue;
+        }
+
+        let request = resolve::parse_source_string(&source)?;
+
+        if request.sub_package.is_none()
+            && let Ok(resolved) = resolve::resolve_source(&source)
+        {
+            let pkg_template =
+                crate::pkg::lua::parser::parse_lua_package(resolved.path.to_str().unwrap(), None)?;
+
+            if pkg_template.sub_packages.is_some() {
+                let subs_to_install = pkg_template.main_subs.clone().unwrap_or_default();
+
+                if !subs_to_install.is_empty() {
+                    println!(
+                        "'{}' is a split package, queueing main sub-packages for installation: {}",
+                        source,
+                        subs_to_install.join(", ")
+                    );
+
+                    let mut base_source = String::new();
+                    if let Some(h) = &request.handle {
+                        base_source.push('#');
+                        base_source.push_str(h);
+                    }
+                    if let Some(r) = &request.repo {
+                        base_source.push('@');
+                        base_source.push_str(r);
+                        base_source.push('/');
+                    }
+                    base_source.push_str(&request.name);
+
+                    for sub in subs_to_install {
+                        let sub_source = format!("{}:{}", base_source, sub);
+                        let final_source = if let Some(v) = &request.version_spec {
+                            format!("{}@{}", sub_source, v)
+                        } else {
+                            sub_source
+                        };
+                        queue.push_back((final_source, parent_id.clone()));
+                    }
+                    processed_sources.insert(source.clone());
+                    continue;
+                }
+            }
+        }
+
         let (mut pkg, version, _, pkg_lua_path, registry_handle) =
             match resolve::resolve_package_and_version(&source) {
                 Ok(res) => res,
@@ -185,7 +234,11 @@ pub fn resolve_dependency_graph(
             pkg.scope = scope;
         }
 
-        let pkg_id = format!("{}@{}", pkg.name, version);
+        let pkg_id = if let Some(sub) = &request.sub_package {
+            format!("{}@{}:{}", pkg.name, version, sub)
+        } else {
+            format!("{}@{}", pkg.name, version)
+        };
 
         if let Some(parent_id) = &parent_id {
             graph
@@ -195,14 +248,15 @@ pub fn resolve_dependency_graph(
                 .insert(pkg_id.clone());
         }
 
-        if graph.nodes.contains_key(&pkg_id) || processed_sources.contains(&source) {
+        if graph.nodes.contains_key(&pkg_id) {
             continue;
         }
 
         processed_sources.insert(source.clone());
 
         if !force
-            && let Some(installed) = local::is_package_installed(&pkg.name, pkg.scope)?
+            && let Some(installed) =
+                local::is_package_installed(&pkg.name, request.sub_package.as_deref(), pkg.scope)?
             && let (Ok(installed_v), Ok(req_v)) = (
                 Version::parse(&installed.version),
                 VersionReq::parse(&version),

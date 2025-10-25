@@ -77,6 +77,7 @@ pub fn run(
     registry_handle: &str,
     version_override: Option<&str>,
     yes: bool,
+    sub_packages: Option<Vec<String>>,
 ) -> Result<Vec<String>> {
     let scope = scope_override.unwrap_or(types::Scope::User);
 
@@ -141,61 +142,85 @@ pub fn run(
     if data_dir.exists() {
         println!("Copying package files...");
 
-        let pkgstore_src = data_dir.join("pkgstore");
-        if pkgstore_src.exists() {
-            copy_dir_all(&pkgstore_src, staging_dir.path())?;
-        }
-
-        let usrroot_src = data_dir.join("usrroot");
-        if usrroot_src.exists() {
-            if !utils::is_admin() {
-                return Err(anyhow!(
-                    "Administrator privileges required to install system-wide files. Please run with sudo or as an administrator."
-                ));
+        let subs_to_install = if let Some(subs) = sub_packages {
+            subs
+        } else if let Some(subs) = &metadata.sub_packages {
+            if let Some(main_subs) = &metadata.main_subs {
+                main_subs.clone()
+            } else {
+                subs.clone()
             }
-            let root_dest = PathBuf::from("/");
-            check_and_handle_file_conflicts(&usrroot_src, &root_dest, yes)?;
-            copy_dir_all(&usrroot_src, &root_dest)?;
-            for entry in WalkDir::new(&usrroot_src)
-                .into_iter()
-                .filter_map(|e| e.ok())
-                .skip(1)
-            {
-                let dest_path = root_dest.join(entry.path().strip_prefix(&usrroot_src)?);
-                if dest_path.is_file() {
-                    installed_files.push(dest_path.to_string_lossy().to_string());
+        } else {
+            vec!["".to_string()]
+        };
+
+        for sub in subs_to_install {
+            let sub_data_dir = if sub.is_empty() {
+                data_dir.clone()
+            } else {
+                println!("Installing sub-package: {}", sub.bold());
+                data_dir.join(&sub)
+            };
+
+            if !sub_data_dir.exists() {
+                eprintln!(
+                    "Warning: sub-package '{}' not found in archive, skipping.",
+                    sub
+                );
+                continue;
+            }
+
+            let pkgstore_src = sub_data_dir.join("pkgstore");
+            if pkgstore_src.exists() {
+                copy_dir_all(&pkgstore_src, staging_dir.path())?;
+            }
+
+            let usrroot_src = sub_data_dir.join("usrroot");
+            if usrroot_src.exists() {
+                if !utils::is_admin() {
+                    return Err(anyhow!(
+                        "Administrator privileges required to install system-wide files. Please run with sudo or as an administrator."
+                    ));
+                }
+                let root_dest = PathBuf::from("/");
+                check_and_handle_file_conflicts(&usrroot_src, &root_dest, yes)?;
+                copy_dir_all(&usrroot_src, &root_dest)?;
+                for entry in WalkDir::new(&usrroot_src)
+                    .into_iter()
+                    .filter_map(|e| e.ok())
+                    .skip(1)
+                {
+                    let dest_path = root_dest.join(entry.path().strip_prefix(&usrroot_src)?);
+                    if dest_path.is_file() {
+                        installed_files.push(dest_path.to_string_lossy().to_string());
+                    }
                 }
             }
-        }
 
-        let usrhome_src = data_dir.join("usrhome");
-        if usrhome_src.exists() {
-            let home_dest =
-                home::home_dir().ok_or_else(|| anyhow!("Could not find home directory"))?;
-            check_and_handle_file_conflicts(&usrhome_src, &home_dest, yes)?;
-            copy_dir_all(&usrhome_src, &home_dest)?;
-            for entry in WalkDir::new(&usrhome_src)
-                .into_iter()
-                .filter_map(|e| e.ok())
-                .skip(1)
-            {
-                let dest_path = home_dest.join(entry.path().strip_prefix(&usrhome_src)?);
-                if dest_path.is_file() {
-                    installed_files.push(dest_path.to_string_lossy().to_string());
+            let usrhome_src = sub_data_dir.join("usrhome");
+            if usrhome_src.exists() {
+                let home_dest =
+                    home::home_dir().ok_or_else(|| anyhow!("Could not find home directory"))?;
+                check_and_handle_file_conflicts(&usrhome_src, &home_dest, yes)?;
+                copy_dir_all(&usrhome_src, &home_dest)?;
+                for entry in WalkDir::new(&usrhome_src)
+                    .into_iter()
+                    .filter_map(|e| e.ok())
+                    .skip(1)
+                {
+                    let dest_path = home_dest.join(entry.path().strip_prefix(&usrhome_src)?);
+                    if dest_path.is_file() {
+                        installed_files.push(dest_path.to_string_lossy().to_string());
+                    }
                 }
             }
         }
     }
 
     let version_dir = package_dir.join(version);
+    fs::create_dir_all(&version_dir)?;
 
-    if version_dir.exists() {
-        println!("Removing existing installation at version {}...", version);
-        fs::remove_dir_all(&version_dir)?;
-    }
-
-    fs::rename(staging_dir.path(), &version_dir)?;
-    let _ = staging_dir.keep();
+    copy_dir_all(staging_dir.path(), &version_dir)?;
 
     for entry in WalkDir::new(&version_dir)
         .into_iter()

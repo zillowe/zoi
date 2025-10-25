@@ -62,6 +62,10 @@ pub struct Package {
     pub name: String,
     pub repo: String,
     pub version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sub_packages: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub main_subs: Option<Vec<String>>,
     pub versions: Option<HashMap<String, String>>,
     pub description: String,
     pub website: Option<String>,
@@ -209,6 +213,8 @@ pub enum InstallReason {
 pub struct InstallManifest {
     pub name: String,
     pub version: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sub_package: Option<String>,
     pub repo: String,
     pub registry_handle: String,
     pub package_type: PackageType,
@@ -361,6 +367,8 @@ pub struct ZoiLock {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LockPackageDetail {
     pub version: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sub_package: Option<String>,
     pub integrity: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub dependencies: Vec<String>,
@@ -379,6 +387,8 @@ pub struct Lockfile {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LockfilePackage {
     pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sub_package: Option<String>,
     pub repo: String,
     pub registry: String,
     pub version: String,

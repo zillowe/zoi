@@ -85,6 +85,7 @@ pub fn run(source: &str, app_name: Option<String>, yes: bool) -> Result<()> {
         None,
         Some(build_dir.path()),
         pkg.version.as_deref(),
+        None,
     )?;
 
     let archive_filename = format!(

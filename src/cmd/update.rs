@@ -9,12 +9,12 @@ use std::collections::HashSet;
 use std::fs;
 use std::sync::Mutex;
 
-pub fn run(all: bool, package_names: &[String], yes: bool) {
+pub fn run(all: bool, package_names: &[String], yes: bool) -> Result<()> {
     if all {
         if let Err(e) = run_update_all_logic(yes) {
             eprintln!("{}: {}", "Update failed".red().bold(), e);
         }
-        return;
+        return Ok(());
     }
 
     println!("{}", "--- Syncing Package Database ---".yellow().bold());
@@ -23,9 +23,40 @@ pub fn run(all: bool, package_names: &[String], yes: bool) {
         std::process::exit(1);
     }
 
+    let mut expanded_package_names = Vec::new();
+    for name in package_names {
+        let request = resolve::parse_source_string(name)?;
+        if request.sub_package.is_none()
+            && let Ok((pkg, _, _, _, _)) = resolve::resolve_package_and_version(name)
+            && pkg.sub_packages.is_some()
+        {
+            let installed = local::get_installed_packages()?;
+            let mut installed_subs = Vec::new();
+            for manifest in installed {
+                if manifest.name == pkg.name
+                    && let Some(sub) = manifest.sub_package
+                {
+                    installed_subs.push(sub);
+                }
+            }
+            if !installed_subs.is_empty() {
+                println!(
+                    "'{}' is a split package. Updating all installed sub-packages: {}",
+                    name,
+                    installed_subs.join(", ")
+                );
+                for sub in installed_subs {
+                    expanded_package_names.push(format!("{}:{}", name, sub));
+                }
+                continue;
+            }
+        }
+        expanded_package_names.push(name.clone());
+    }
+
     let mut failed_packages = Vec::new();
 
-    for (i, package_name) in package_names.iter().enumerate() {
+    for (i, package_name) in expanded_package_names.iter().enumerate() {
         if i > 0 {
             println!();
         }
@@ -52,10 +83,13 @@ pub fn run(all: bool, package_names: &[String], yes: bool) {
     } else if !package_names.is_empty() {
         println!("\n{}", "Success:".green());
     }
+    Ok(())
 }
 
 fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
     println!("--- Updating package '{}' ---", package_name.blue().bold());
+
+    let request = resolve::parse_source_string(package_name)?;
 
     let (new_pkg, new_version, _, _, registry_handle) =
         match resolve::resolve_package_and_version(package_name) {
@@ -77,9 +111,16 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
         return Ok(());
     }
 
-    let old_manifest = match local::is_package_installed(&new_pkg.name, types::Scope::User)?.or(
-        local::is_package_installed(&new_pkg.name, types::Scope::System)?,
-    ) {
+    let old_manifest = match local::is_package_installed(
+        &new_pkg.name,
+        request.sub_package.as_deref(),
+        types::Scope::User,
+    )?
+    .or(local::is_package_installed(
+        &new_pkg.name,
+        request.sub_package.as_deref(),
+        types::Scope::System,
+    )?) {
         Some(m) => m,
         None => {
             return Err(anyhow!(

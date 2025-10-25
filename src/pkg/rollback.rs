@@ -20,16 +20,17 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
     }
     let registry_handle = resolved_source.registry_handle;
 
-    let (_manifest, scope) =
-        if let Some(m) = local::is_package_installed(&pkg.name, types::Scope::User)? {
-            (m, types::Scope::User)
-        } else if let Some(m) = local::is_package_installed(&pkg.name, types::Scope::System)? {
-            (m, types::Scope::System)
-        } else if let Some(m) = local::is_package_installed(&pkg.name, types::Scope::Project)? {
-            (m, types::Scope::Project)
-        } else {
-            return Err(anyhow!("Package '{}' is not installed.", package_name));
-        };
+    let (_manifest, scope) = if let Some(m) =
+        local::is_package_installed(&pkg.name, None, types::Scope::User)?
+    {
+        (m, types::Scope::User)
+    } else if let Some(m) = local::is_package_installed(&pkg.name, None, types::Scope::System)? {
+        (m, types::Scope::System)
+    } else if let Some(m) = local::is_package_installed(&pkg.name, None, types::Scope::Project)? {
+        (m, types::Scope::Project)
+    } else {
+        return Err(anyhow!("Package '{}' is not installed.", package_name));
+    };
 
     let handle = registry_handle.as_deref().unwrap_or("local");
     let package_dir = local::get_package_dir(scope, handle, &pkg.repo, &pkg.name)?;

@@ -73,11 +73,16 @@ pub fn get_installed_packages() -> Result<Vec<InstallManifest>> {
             }
             let latest_path = path.join("latest");
             if latest_path.is_symlink() || latest_path.is_dir() {
-                let manifest_path = latest_path.join("manifest.yaml");
-                if manifest_path.exists() {
-                    let content = fs::read_to_string(manifest_path)?;
-                    let manifest: InstallManifest = serde_yaml::from_str(&content)?;
-                    installed.push(manifest);
+                for entry in fs::read_dir(&latest_path)?.filter_map(Result::ok) {
+                    let file_name = entry.file_name().to_string_lossy().to_string();
+                    if file_name.starts_with("manifest") && file_name.ends_with(".yaml") {
+                        let manifest_path = entry.path();
+                        if manifest_path.exists() {
+                            let content = fs::read_to_string(manifest_path)?;
+                            let manifest: InstallManifest = serde_yaml::from_str(&content)?;
+                            installed.push(manifest);
+                        }
+                    }
                 }
             }
         }
@@ -90,6 +95,7 @@ pub fn get_installed_packages() -> Result<Vec<InstallManifest>> {
 #[derive(Debug)]
 pub struct InstalledPackage {
     pub name: String,
+    pub sub_package: Option<String>,
     pub version: String,
     pub repo: String,
     pub package_type: super::types::PackageType,
@@ -139,6 +145,7 @@ pub fn get_installed_packages_with_type() -> Result<Vec<InstalledPackage>> {
 
             packages.push(InstalledPackage {
                 name: manifest.name,
+                sub_package: manifest.sub_package,
                 version: manifest.version,
                 repo: repo_field,
                 package_type: pkg.package_type,
@@ -148,7 +155,11 @@ pub fn get_installed_packages_with_type() -> Result<Vec<InstalledPackage>> {
     Ok(packages)
 }
 
-pub fn is_package_installed(package_name: &str, scope: Scope) -> Result<Option<InstallManifest>> {
+pub fn is_package_installed(
+    package_name: &str,
+    sub_package_name: Option<&str>,
+    scope: Scope,
+) -> Result<Option<InstallManifest>> {
     let store_root = get_store_base_dir(scope)?;
     if !store_root.exists() {
         return Ok(None);
@@ -166,12 +177,19 @@ pub fn is_package_installed(package_name: &str, scope: Scope) -> Result<Option<I
         {
             let latest_path = path.join("latest");
             if latest_path.is_symlink() || latest_path.is_dir() {
-                let manifest_path = latest_path.join("manifest.yaml");
-                if manifest_path.exists() {
-                    let content = fs::read_to_string(manifest_path)?;
-                    let manifest: InstallManifest = serde_yaml::from_str(&content)?;
-                    if manifest.name == package_name {
-                        return Ok(Some(manifest));
+                for entry in fs::read_dir(&latest_path)?.filter_map(Result::ok) {
+                    let file_name = entry.file_name().to_string_lossy().to_string();
+                    if file_name.starts_with("manifest") && file_name.ends_with(".yaml") {
+                        let manifest_path = entry.path();
+                        if manifest_path.exists() {
+                            let content = fs::read_to_string(manifest_path)?;
+                            let manifest: InstallManifest = serde_yaml::from_str(&content)?;
+                            if manifest.name == package_name
+                                && manifest.sub_package.as_deref() == sub_package_name
+                            {
+                                return Ok(Some(manifest));
+                            }
+                        }
                     }
                 }
             }
@@ -289,7 +307,14 @@ pub fn write_manifest(manifest: &InstallManifest) -> Result<()> {
         &manifest.version,
     )?;
     fs::create_dir_all(&version_dir)?;
-    let manifest_path = version_dir.join("manifest.yaml");
+
+    let manifest_filename = if let Some(sub) = &manifest.sub_package {
+        format!("manifest-{}.yaml", sub)
+    } else {
+        "manifest.yaml".to_string()
+    };
+    let manifest_path = version_dir.join(manifest_filename);
+
     let content = serde_yaml::to_string(&manifest)?;
     fs::write(manifest_path, content)?;
 

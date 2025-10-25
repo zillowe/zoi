@@ -7,6 +7,9 @@ pub struct InstallCommand {
     /// Path to the package archive file (e.g. path/to/name-os-arch.pkg.tar.zst)
     #[arg(required = true)]
     pub package_file: PathBuf,
+    /// The sub-packages to install from the archive.
+    #[arg(long, short, num_args = 1..)]
+    pub sub: Option<Vec<String>>,
     /// The scope to install the package to (user or system-wide)
     #[arg(long, value_enum, default_value_t = SetupScope::User)]
     pub scope: SetupScope,
@@ -20,9 +23,14 @@ pub fn run(args: InstallCommand) {
         SetupScope::User => crate::pkg::types::Scope::User,
         SetupScope::System => crate::pkg::types::Scope::System,
     };
-    if let Err(e) =
-        crate::pkg::package::install::run(&args.package_file, Some(scope), "local", None, args.yes)
-    {
+    if let Err(e) = crate::pkg::package::install::run(
+        &args.package_file,
+        Some(scope),
+        "local",
+        None,
+        args.yes,
+        args.sub,
+    ) {
         eprintln!("Error: {}", e);
         std::process::exit(1);
     }

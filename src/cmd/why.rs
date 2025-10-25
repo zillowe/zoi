@@ -3,10 +3,24 @@ use anyhow::{Result, anyhow};
 use colored::*;
 
 pub fn run(package_name: &str) -> Result<()> {
+    let request = resolve::parse_source_string(package_name)?;
     let (pkg_meta, _, _, _, _) = resolve::resolve_package_and_version(package_name)?;
 
-    let user_manifest = local::is_package_installed(&pkg_meta.name, types::Scope::User)?;
-    let system_manifest = local::is_package_installed(&pkg_meta.name, types::Scope::System)?;
+    let user_manifest = local::is_package_installed(
+        &pkg_meta.name,
+        request.sub_package.as_deref(),
+        types::Scope::User,
+    )?;
+    let system_manifest = local::is_package_installed(
+        &pkg_meta.name,
+        request.sub_package.as_deref(),
+        types::Scope::System,
+    )?;
+    let _project_manifest = local::is_package_installed(
+        &pkg_meta.name,
+        request.sub_package.as_deref(),
+        types::Scope::Project,
+    )?;
 
     let manifest = match (user_manifest, system_manifest) {
         (Some(m), None) => m,

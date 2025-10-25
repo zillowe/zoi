@@ -26,7 +26,17 @@ pub fn install_node(
         return Err(anyhow!("Pre-install hook failed for '{}': {}", pkg.name, e));
     }
 
-    let installed_files = run_install_flow(node, mode, m, build_type, yes)?;
+    let request = resolve::parse_source_string(&node.source)?;
+    let sub_package_to_install = request.sub_package;
+
+    let installed_files = run_install_flow(
+        node,
+        mode,
+        m,
+        build_type,
+        yes,
+        sub_package_to_install.clone(),
+    )?;
 
     if let types::InstallReason::Dependency { ref parent } = node.reason {
         let package_dir = local::get_package_dir(pkg.scope, handle, &pkg.repo, &pkg.name)?;
@@ -49,6 +59,7 @@ pub fn install_node(
         handle,
         &node.chosen_options,
         &node.chosen_optionals,
+        sub_package_to_install.clone(),
     )?;
 
     local::write_manifest(&manifest)?;
@@ -60,6 +71,7 @@ pub fn install_node(
         handle,
         &node.chosen_options,
         &node.chosen_optionals,
+        sub_package_to_install.clone(),
     ) {
         eprintln!(
             "Warning: failed to record package installation for '{}': {}",
@@ -88,6 +100,7 @@ fn run_install_flow(
     m: Option<&MultiProgress>,
     build_type: Option<&str>,
     yes: bool,
+    sub_package_to_install: Option<String>,
 ) -> Result<Vec<String>> {
     let pkg = &node.pkg;
     let pkg_lua_path = Path::new(&node.source);
@@ -270,6 +283,8 @@ fn run_install_flow(
                     }
                 }
 
+                let sub_packages_vec = sub_package_to_install.clone().map(|s| vec![s]);
+
                 println!("Using archive: {}", cached_archive_path.display());
                 if let Ok(installed_files) = crate::pkg::package::install::run(
                     &cached_archive_path,
@@ -277,6 +292,7 @@ fn run_install_flow(
                     &node.registry_handle,
                     Some(&node.version),
                     yes,
+                    sub_packages_vec,
                 ) {
                     println!("Successfully installed pre-built package.");
                     return Ok(installed_files);
@@ -298,5 +314,12 @@ fn run_install_flow(
         "{}",
         "Could not install pre-built package. Building from source...".yellow()
     );
-    prebuilt::try_build_install(pkg_lua_path, pkg, &node.registry_handle, build_type, yes)
+    prebuilt::try_build_install(
+        pkg_lua_path,
+        pkg,
+        &node.registry_handle,
+        build_type,
+        yes,
+        sub_package_to_install,
+    )
 }

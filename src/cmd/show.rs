@@ -28,7 +28,13 @@ pub fn run(source: &str, raw: bool) {
                     .unwrap_or_else(|_| "N/A".to_string()),
             );
 
-            let installed_manifest = match local::is_package_installed(&pkg.name, pkg.scope) {
+            let request = resolve::parse_source_string(source).unwrap();
+
+            let installed_manifest = match local::is_package_installed(
+                &pkg.name,
+                request.sub_package.as_deref(),
+                pkg.scope,
+            ) {
                 Ok(manifest) => manifest,
                 Err(e) => {
                     eprintln!("Warning: could not check installation status: {}", e);
@@ -57,11 +63,23 @@ fn print_beautiful(pkg: &crate::pkg::types::Package, installed_manifest: Option<
     }
     println!("{}", pkg.description);
 
+    if let Some(subs) = &pkg.sub_packages {
+        println!("{}: {}", "Sub-packages".bold(), subs.join(", "));
+        if let Some(main_subs) = &pkg.main_subs {
+            println!("{}: {}", "Main sub-packages".bold(), main_subs.join(", "));
+        }
+    }
+
     if let Some(manifest) = installed_manifest {
+        let status_text = if let Some(sub) = &manifest.sub_package {
+            format!("Installed ({})", sub)
+        } else {
+            "Installed".to_string()
+        };
         println!(
             "{}: {} ({})",
             "Status".bold(),
-            "Installed".green(),
+            status_text.green(),
             manifest.version
         );
     } else {

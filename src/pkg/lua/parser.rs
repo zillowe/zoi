@@ -34,8 +34,15 @@ pub fn parse_lua_package_for_platform(
         .set("PKG", pkg_table)
         .map_err(|e| anyhow!(e.to_string()))?;
 
-    functions::setup_lua_environment(&lua, platform, version_override, Some(file_path), None)
-        .map_err(|e| anyhow!("Failed to setup Lua environment for '{}': {}", file_path, e))?;
+    functions::setup_lua_environment(
+        &lua,
+        platform,
+        version_override,
+        Some(file_path),
+        None,
+        None,
+    )
+    .map_err(|e| anyhow!("Failed to setup Lua environment for '{}': {}", file_path, e))?;
 
     lua.load(&lua_code).exec().map_err(|e| {
         anyhow!(

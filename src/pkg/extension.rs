@@ -67,6 +67,7 @@ pub fn add(ext_name: &str, _yes: bool) -> Result<()> {
     let manifest = types::InstallManifest {
         name: pkg.name.clone(),
         version: pkg.version.clone().unwrap_or_default(),
+        sub_package: None,
         repo: pkg.repo.clone(),
         registry_handle: registry_handle.unwrap_or_default(),
         package_type: pkg.package_type,
@@ -92,14 +93,15 @@ pub fn remove(ext_name: &str, _yes: bool) -> Result<()> {
 
     let (pkg, _, _, _, _) = resolve::resolve_package_and_version(ext_name)?;
 
-    let (manifest, scope) =
-        if let Some(m) = local::is_package_installed(&pkg.name, types::Scope::User)? {
-            (m, types::Scope::User)
-        } else if let Some(m) = local::is_package_installed(&pkg.name, types::Scope::System)? {
-            (m, types::Scope::System)
-        } else {
-            return Err(anyhow!("Extension '{}' is not installed.", ext_name));
-        };
+    let (manifest, scope) = if let Some(m) =
+        local::is_package_installed(&pkg.name, None, types::Scope::User)?
+    {
+        (m, types::Scope::User)
+    } else if let Some(m) = local::is_package_installed(&pkg.name, None, types::Scope::System)? {
+        (m, types::Scope::System)
+    } else {
+        return Err(anyhow!("Extension '{}' is not installed.", ext_name));
+    };
 
     if pkg.package_type != types::PackageType::Extension {
         return Err(anyhow!("'{}' is not an extension package.", ext_name));

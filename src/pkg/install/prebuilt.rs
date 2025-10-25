@@ -10,6 +10,7 @@ pub fn try_build_install(
     registry_handle: &str,
     build_type_override: Option<&str>,
     yes: bool,
+    sub_package_to_install: Option<String>,
 ) -> Result<Vec<String>> {
     println!("{}", "Attempting to build and install package...".yellow());
 
@@ -40,6 +41,8 @@ pub fn try_build_install(
             pkg.name
         )
     })?;
+    let sub_packages_vec = sub_package_to_install.clone().map(|s| vec![s]);
+
     if let Err(e) = crate::pkg::package::build::run(
         pkg_lua_path,
         build_type,
@@ -47,6 +50,7 @@ pub fn try_build_install(
         None,
         None,
         Some(version),
+        sub_packages_vec,
     ) {
         return Err(anyhow!("'build' step failed: {}", e));
     }
@@ -66,12 +70,15 @@ pub fn try_build_install(
     }
     println!("'build' step successful.");
 
+    let sub_packages_vec = sub_package_to_install.map(|s| vec![s]);
+
     let installed_files = crate::pkg::package::install::run(
         &archive_path,
         Some(pkg.scope),
         registry_handle,
         Some(version),
         yes,
+        sub_packages_vec,
     )
     .map_err(|e| anyhow!("Failed to install built package archive: {}", e))?;
     println!("'install' step successful.");

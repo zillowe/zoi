@@ -59,7 +59,7 @@ fn uninstall_collection(
     if package_dir.exists() {
         fs::remove_dir_all(&package_dir)?;
     }
-    if let Err(e) = recorder::remove_package_from_record(&pkg.name, scope) {
+    if let Err(e) = recorder::remove_package_from_record(&pkg.name, None, scope) {
         eprintln!(
             "{} Failed to remove package from lockfile: {}",
             "Warning:".yellow(),
@@ -85,11 +85,16 @@ pub fn run(
     package_name: &str,
     scope_override: Option<types::Scope>,
 ) -> anyhow::Result<types::InstallManifest> {
+    let request = resolve::parse_source_string(package_name)?;
+    let sub_package_to_uninstall = request.sub_package.clone();
+
     let (pkg, _, _, pkg_lua_path, registry_handle) =
         resolve::resolve_package_and_version(package_name)?;
 
     let (manifest, scope) = if let Some(scope) = scope_override {
-        if let Some(m) = local::is_package_installed(&pkg.name, scope)? {
+        if let Some(m) =
+            local::is_package_installed(&pkg.name, sub_package_to_uninstall.as_deref(), scope)?
+        {
             (m, scope)
         } else {
             return Err(anyhow::anyhow!(
@@ -97,11 +102,23 @@ pub fn run(
                 package_name
             ));
         }
-    } else if let Some(m) = local::is_package_installed(&pkg.name, types::Scope::Project)? {
+    } else if let Some(m) = local::is_package_installed(
+        &pkg.name,
+        sub_package_to_uninstall.as_deref(),
+        types::Scope::Project,
+    )? {
         (m, types::Scope::Project)
-    } else if let Some(m) = local::is_package_installed(&pkg.name, types::Scope::User)? {
+    } else if let Some(m) = local::is_package_installed(
+        &pkg.name,
+        sub_package_to_uninstall.as_deref(),
+        types::Scope::User,
+    )? {
         (m, types::Scope::User)
-    } else if let Some(m) = local::is_package_installed(&pkg.name, types::Scope::System)? {
+    } else if let Some(m) = local::is_package_installed(
+        &pkg.name,
+        sub_package_to_uninstall.as_deref(),
+        types::Scope::System,
+    )? {
         (m, types::Scope::System)
     } else {
         return Err(anyhow::anyhow!(
@@ -138,6 +155,7 @@ pub fn run(
         Some(&manifest.version),
         pkg_lua_path.to_str(),
         None,
+        sub_package_to_uninstall.as_deref(),
     )
     .map_err(|e| anyhow!(e.to_string()))?;
     let lua_code = fs::read_to_string(pkg_lua_path)?;
@@ -207,45 +225,84 @@ pub fn run(
             println!("{}", "Successfully removed symlink.".green());
         }
     }
-    let handle = registry_handle.as_deref().unwrap_or("local");
-    let package_dir = local::get_package_dir(scope, handle, &pkg.repo, &pkg.name)?;
+    for file_path_str in &manifest.installed_files {
+        let file_path = PathBuf::from(file_path_str);
+        if file_path.exists() {
+            if file_path.is_dir() {
+                let _ = fs::remove_dir_all(&file_path);
+            } else {
+                let _ = fs::remove_file(&file_path);
+            }
+        }
+    }
 
-    if package_dir.exists() {
-        println!("Removing stored files from {}...", package_dir.display());
+    let version_dir = local::get_package_version_dir(
+        scope,
+        &manifest.registry_handle,
+        &manifest.repo,
+        &manifest.name,
+        &manifest.version,
+    )?;
+
+    let manifest_filename = if let Some(sub) = &manifest.sub_package {
+        format!("manifest-{}.yaml", sub)
+    } else {
+        "manifest.yaml".to_string()
+    };
+    let manifest_path = version_dir.join(manifest_filename);
+    if manifest_path.exists() {
+        fs::remove_file(manifest_path)?;
+    }
+
+    if let Ok(read_dir) = fs::read_dir(&version_dir)
+        && read_dir.count() == 0
+    {
+        fs::remove_dir_all(&version_dir)?;
+    }
+
+    let package_dir = local::get_package_dir(scope, handle, &pkg.repo, &pkg.name)?;
+    if let Ok(read_dir) = fs::read_dir(&package_dir)
+        && read_dir.count() == 0
+    {
         fs::remove_dir_all(&package_dir)?;
-        println!("{}", "Successfully removed stored files.".green());
     }
     let parent_id = format!("#{}@{}", manifest.registry_handle, manifest.repo);
     for dep_str in &manifest.installed_dependencies {
         if let Ok(dep) = dependencies::parse_dependency_string(dep_str)
             && dep.manager == "zoi"
-            && let Ok(Some(dep_manifest)) = local::is_package_installed(dep.package, scope)
         {
-            match local::get_package_dir(
-                dep_manifest.scope,
-                &dep_manifest.registry_handle,
-                &dep_manifest.repo,
-                &dep_manifest.name,
-            ) {
-                Ok(dep_pkg_dir) => {
-                    if let Err(e) = local::remove_dependent(&dep_pkg_dir, &parent_id) {
+            let dep_req = resolve::parse_source_string(dep.package)?;
+            if let Ok(Some(dep_manifest)) =
+                local::is_package_installed(&dep_req.name, dep_req.sub_package.as_deref(), scope)
+            {
+                match local::get_package_dir(
+                    dep_manifest.scope,
+                    &dep_manifest.registry_handle,
+                    &dep_manifest.repo,
+                    &dep_manifest.name,
+                ) {
+                    Ok(dep_pkg_dir) => {
+                        if let Err(e) = local::remove_dependent(&dep_pkg_dir, &parent_id) {
+                            eprintln!(
+                                "Warning: failed to remove dependent link for {}: {}",
+                                dep.package, e
+                            );
+                        }
+                    }
+                    Err(e) => {
                         eprintln!(
-                            "Warning: failed to remove dependent link for {}: {}",
+                            "Warning: failed to get package dir for {}: {}",
                             dep.package, e
                         );
                     }
-                }
-                Err(e) => {
-                    eprintln!(
-                        "Warning: failed to get package dir for {}: {}",
-                        dep.package, e
-                    );
                 }
             }
         }
     }
 
-    if let Err(e) = recorder::remove_package_from_record(&pkg.name, scope) {
+    if let Err(e) =
+        recorder::remove_package_from_record(&pkg.name, sub_package_to_uninstall.as_deref(), scope)
+    {
         eprintln!(
             "{} Failed to remove package from lockfile: {}",
             "Warning:".yellow(),

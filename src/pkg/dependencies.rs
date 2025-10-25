@@ -180,8 +180,12 @@ fn install_dependency(
             } else {
                 dep.package.to_string()
             };
-            if let Some(manifest) = local::is_package_installed(&dep.package.to_lowercase(), scope)?
-            {
+            let req = crate::pkg::resolve::parse_source_string(&zoi_dep_name)?;
+            if let Some(manifest) = local::is_package_installed(
+                &req.name.to_lowercase(),
+                req.sub_package.as_deref(),
+                scope,
+            )? {
                 match Version::parse(&manifest.version) {
                     Ok(installed_version) => {
                         if let Some(req) = &dep.req {

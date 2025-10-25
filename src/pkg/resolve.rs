@@ -34,6 +34,7 @@ pub struct PackageRequest {
     pub handle: Option<String>,
     pub repo: Option<String>,
     pub name: String,
+    pub sub_package: Option<String>,
     pub version_spec: Option<String>,
 }
 
@@ -59,6 +60,7 @@ pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
             handle: None,
             repo: None,
             name,
+            sub_package: None,
             version_spec: None,
         });
     }
@@ -83,6 +85,7 @@ pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
 
     let mut repo = None;
     let name: &str;
+    let mut sub_package = None;
     let mut version_spec = None;
 
     let mut version_part_str = main_part;
@@ -95,12 +98,12 @@ pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
         version_spec = Some(ver_part[1..].to_string());
     }
 
-    if version_part_str.starts_with('@') {
+    let name_part = if version_part_str.starts_with('@') {
         let s = version_part_str.trim_start_matches('@');
         if let Some((repo_str, name_str)) = s.split_once('/') {
             if !name_str.is_empty() {
                 repo = Some(repo_str.to_lowercase());
-                name = name_str;
+                name_str
             } else {
                 return Err(anyhow!(
                     "Invalid format: missing package name after repo path."
@@ -112,7 +115,14 @@ pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
             ));
         }
     } else {
-        name = version_part_str;
+        version_part_str
+    };
+
+    if let Some((base_name, sub_name)) = name_part.split_once(':') {
+        name = base_name;
+        sub_package = Some(sub_name.to_string());
+    } else {
+        name = name_part;
     }
 
     if name.is_empty() {
@@ -123,6 +133,7 @@ pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
         handle,
         repo,
         name: name.to_lowercase(),
+        sub_package,
         version_spec,
     })
 }

@@ -88,7 +88,15 @@ pub fn build(
     platforms: &[String],
     sign_key: Option<String>,
 ) -> Result<()> {
-    pkg::package::build::run(package_file, build_type, platforms, sign_key, None, None)
+    pkg::package::build::run(
+        package_file,
+        build_type,
+        platforms,
+        sign_key,
+        None,
+        None,
+        None,
+    )
 }
 
 /// Installs a Zoi package from a local package archive.
@@ -102,6 +110,7 @@ pub fn build(
 /// * `scope_override`: Optionally override the installation scope (`User`, `System`, `Project`).
 /// * `registry_handle`: The handle of the registry this package belongs to (e.g. "zoidberg", or "local").
 /// * `yes`: Automatically answer "yes" to any confirmation prompts (e.g. file conflicts).
+/// * `sub_packages`: For split packages, optionally specify which sub-packages to install.
 ///
 /// # Returns
 ///
@@ -121,7 +130,7 @@ pub fn build(
 ///
 /// fn main() -> Result<()> {
 ///     let archive_path = Path::new("my-package-1.0.0-linux-amd64.pkg.tar.zst");
-///     install_package(archive_path, Some(Scope::User), "local", true)?;
+///     install_package(archive_path, Some(Scope::User), "local", true, None)?;
 ///     println!("Package installed!");
 ///     Ok(())
 /// }
@@ -131,8 +140,16 @@ pub fn install_package(
     scope_override: Option<Scope>,
     registry_handle: &str,
     yes: bool,
+    sub_packages: Option<Vec<String>>,
 ) -> Result<Vec<String>> {
-    pkg::package::install::run(package_file, scope_override, registry_handle, None, yes)
+    pkg::package::install::run(
+        package_file,
+        scope_override,
+        registry_handle,
+        None,
+        yes,
+        sub_packages,
+    )
 }
 
 /// Uninstalls a Zoi package.

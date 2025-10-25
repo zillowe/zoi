@@ -79,10 +79,16 @@ fn run_list_installed(
             continue;
         }
 
+        let package_display = if let Some(sub) = pkg.sub_package {
+            format!("{}:{}", pkg.name, sub)
+        } else {
+            pkg.name
+        };
+
         let repo_display = pkg.repo.split_once('/').map(|x| x.1).unwrap_or(&pkg.repo);
 
         table.add_row(vec![
-            pkg.name,
+            package_display,
             pkg.version,
             repo_display.to_string(),
             format!("{:?}", pkg.package_type),
@@ -105,7 +111,13 @@ fn run_list_all(
 ) -> Result<()> {
     let installed_pkgs = local::get_installed_packages()?
         .into_iter()
-        .map(|p| p.name)
+        .map(|p| {
+            if let Some(sub) = p.sub_package {
+                format!("{}:{}", p.name, sub)
+            } else {
+                p.name
+            }
+        })
         .collect::<HashSet<_>>();
 
     let config = config::read_config()?;
@@ -161,22 +173,40 @@ fn run_list_all(
             continue;
         }
 
-        let status = if installed_pkgs.contains(&pkg.name) {
-            "✓"
-        } else {
-            ""
-        };
         let version = crate::pkg::resolve::get_default_version(&pkg, handle)
             .unwrap_or_else(|_| "N/A".to_string());
-
         let repo_display = pkg.repo.split_once('/').map(|x| x.1).unwrap_or(&pkg.repo);
-        table.add_row(vec![
-            status.to_string(),
-            pkg.name,
-            version,
-            repo_display.to_string(),
-            format!("{:?}", pkg.package_type),
-        ]);
+
+        if let Some(subs) = &pkg.sub_packages {
+            for sub in subs {
+                let full_name = format!("{}:{}", pkg.name, sub);
+                let status = if installed_pkgs.contains(&full_name) {
+                    "✓"
+                } else {
+                    ""
+                };
+                table.add_row(vec![
+                    status.to_string(),
+                    full_name,
+                    version.clone(),
+                    repo_display.to_string(),
+                    format!("{:?}", pkg.package_type),
+                ]);
+            }
+        } else {
+            let status = if installed_pkgs.contains(&pkg.name) {
+                "✓"
+            } else {
+                ""
+            };
+            table.add_row(vec![
+                status.to_string(),
+                pkg.name,
+                version,
+                repo_display.to_string(),
+                format!("{:?}", pkg.package_type),
+            ]);
+        }
     }
 
     print_with_pager(&table.to_string())?;

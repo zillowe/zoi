@@ -17,6 +17,7 @@ fn build_for_platform(
     sign_key: &Option<String>,
     output_dir: Option<&Path>,
     version_override: Option<&str>,
+    sub_packages: Option<&Vec<String>>,
 ) -> Result<()> {
     let pkg_for_meta = pkg::lua::parser::parse_lua_package_for_platform(
         package_file.to_str().unwrap(),
@@ -45,143 +46,175 @@ fn build_for_platform(
     let staging_dir = build_dir.path().join("staging");
     fs::create_dir_all(&staging_dir)?;
 
-    let lua = Lua::new();
-    pkg::lua::functions::setup_lua_environment(
-        &lua,
-        platform,
-        Some(&version),
-        package_file.to_str(),
-        None,
-    )
-    .map_err(|e| {
-        anyhow!(
-            "Failed to setup Lua build environment for '{}': {}",
-            package_file.display(),
-            e
-        )
-    })?;
-    let pkg_table = lua
-        .to_value(&pkg_for_meta)
-        .map_err(|e| anyhow!(e.to_string()))?;
-    lua.globals()
-        .set("PKG", pkg_table)
-        .map_err(|e| anyhow!(e.to_string()))?;
-    lua.globals()
-        .set("BUILD_DIR", build_dir.path().to_str().unwrap())
-        .map_err(|e| anyhow!(e.to_string()))?;
-    lua.globals()
-        .set("STAGING_DIR", staging_dir.to_str().unwrap())
-        .map_err(|e| anyhow!(e.to_string()))?;
-    lua.globals()
-        .set("BUILD_TYPE", build_type)
-        .map_err(|e| anyhow!(e.to_string()))?;
+    let subs_to_build = if let Some(subs) = sub_packages {
+        subs.clone()
+    } else if let Some(subs) = &pkg_for_meta.sub_packages {
+        subs.clone()
+    } else {
+        vec!["".to_string()]
+    };
 
-    let lua_code = fs::read_to_string(package_file)?;
-    lua.load(&lua_code).exec().map_err(|e| {
-        anyhow!(
-            "Failed to execute Lua package file '{}' during build:\n{}",
-            package_file.display(),
-            e
-        )
-    })?;
+    for sub_package in subs_to_build {
+        let sub_pkg_name = if sub_package.is_empty() {
+            None
+        } else {
+            Some(sub_package.as_str())
+        };
 
-    if let Ok(prepare_fn) = lua.globals().get::<mlua::Function>("prepare") {
-        println!("Running prepare()...");
-        prepare_fn.call::<()>(()).map_err(|e| {
+        if !sub_package.is_empty() {
+            println!("--- Building sub-package: {} ---", sub_package.cyan());
+        }
+
+        let lua = Lua::new();
+        pkg::lua::functions::setup_lua_environment(
+            &lua,
+            platform,
+            Some(&version),
+            package_file.to_str(),
+            None,
+            sub_pkg_name,
+        )
+        .map_err(|e| {
             anyhow!(
-                "The 'prepare' function in '{}' failed:\n{}",
+                "Failed to setup Lua build environment for '{}': {}",
                 package_file.display(),
                 e
             )
         })?;
-    }
+        let pkg_table = lua
+            .to_value(&pkg_for_meta)
+            .map_err(|e| anyhow!(e.to_string()))?;
+        lua.globals()
+            .set("PKG", pkg_table)
+            .map_err(|e| anyhow!(e.to_string()))?;
+        lua.globals()
+            .set("BUILD_DIR", build_dir.path().to_str().unwrap())
+            .map_err(|e| anyhow!(e.to_string()))?;
+        lua.globals()
+            .set("STAGING_DIR", staging_dir.to_str().unwrap())
+            .map_err(|e| anyhow!(e.to_string()))?;
+        lua.globals()
+            .set("BUILD_TYPE", build_type)
+            .map_err(|e| anyhow!(e.to_string()))?;
 
-    if let Ok(package_fn) = lua.globals().get::<mlua::Function>("package") {
-        println!("Running package()...");
-        package_fn.call::<()>(()).map_err(|e| {
+        let lua_code = fs::read_to_string(package_file)?;
+        lua.load(&lua_code).exec().map_err(|e| {
             anyhow!(
-                "The 'package' function in '{}' failed:\n{}",
+                "Failed to execute Lua package file '{}' during build:\n{}",
                 package_file.display(),
                 e
             )
         })?;
-    }
 
-    if let Ok(build_ops) = lua.globals().get::<Table>("__ZoiBuildOperations") {
-        for op in build_ops.sequence_values::<Table>() {
-            let op = op.map_err(|e| anyhow!(e.to_string()))?;
-            if let Ok(op_type) = op.get::<String>("op")
-                && op_type == "zcp"
-            {
-                let source: String = op.get("source").map_err(|e| anyhow!(e.to_string()))?;
-                let mut destination: String =
-                    op.get("destination").map_err(|e| anyhow!(e.to_string()))?;
+        let args = lua.create_table().map_err(|e| anyhow!(e.to_string()))?;
+        if !sub_package.is_empty() {
+            args.set("sub", sub_package.clone())
+                .map_err(|e| anyhow!(e.to_string()))?;
+        }
 
-                let source_path = build_dir.path().join(&source);
+        if let Ok(prepare_fn) = lua.globals().get::<mlua::Function>("prepare") {
+            println!("Running prepare()...");
+            prepare_fn.call::<()>(args.clone()).map_err(|e| {
+                anyhow!(
+                    "The 'prepare' function in '{}' failed for sub-package '{}':\n{}",
+                    package_file.display(),
+                    sub_package,
+                    e
+                )
+            })?;
+        }
 
-                destination = destination.replace("${pkgstore}", "data/pkgstore");
-                destination = destination.replace("${createpkgdir}", "data/createpkgdir");
-                destination = destination.replace("${usrroot}", "data/usrroot");
-                destination = destination.replace("${usrhome}", "data/usrhome");
+        if let Ok(package_fn) = lua.globals().get::<mlua::Function>("package") {
+            println!("Running package()...");
+            package_fn.call::<()>(args.clone()).map_err(|e| {
+                anyhow!(
+                    "The 'package' function in '{}' failed for sub-package '{}':\n{}",
+                    package_file.display(),
+                    sub_package,
+                    e
+                )
+            })?;
+        }
 
-                let dest_path = if destination.starts_with("${createpkgdir}") {
-                    let create_pkg_dir_str: String = lua
-                        .globals()
-                        .get("CREATE_PKG_DIR")
-                        .map_err(|e| anyhow!(e.to_string()))?;
-                    let remaining_path = destination.strip_prefix("${createpkgdir}").unwrap();
-                    Path::new(&create_pkg_dir_str).join(remaining_path.trim_start_matches('/'))
-                } else {
-                    staging_dir.join(&destination)
-                };
+        if let Ok(build_ops) = lua.globals().get::<Table>("__ZoiBuildOperations") {
+            for op in build_ops.sequence_values::<Table>() {
+                let op = op.map_err(|e| anyhow!(e.to_string()))?;
+                if let Ok(op_type) = op.get::<String>("op")
+                    && op_type == "zcp"
+                {
+                    let source: String = op.get("source").map_err(|e| anyhow!(e.to_string()))?;
+                    let mut destination: String =
+                        op.get("destination").map_err(|e| anyhow!(e.to_string()))?;
 
-                if let Some(parent) = dest_path.parent() {
-                    fs::create_dir_all(parent)?;
-                }
+                    let source_path = build_dir.path().join(&source);
 
-                if source_path.is_dir() {
-                    for entry in WalkDir::new(&source_path)
-                        .into_iter()
-                        .filter_map(|e| e.ok())
-                    {
-                        let target_path = dest_path.join(entry.path().strip_prefix(&source_path)?);
-                        if entry.file_type().is_dir() {
-                            fs::create_dir_all(&target_path)?;
-                        } else {
-                            if let Some(p) = target_path.parent() {
-                                fs::create_dir_all(p)?;
-                            }
-                            fs::copy(entry.path(), &target_path)?;
-                        }
+                    let data_prefix = if sub_package.is_empty() {
+                        "data".to_string()
+                    } else {
+                        format!("data/{}", sub_package)
+                    };
+
+                    destination =
+                        destination.replace("${pkgstore}", &format!("{}/pkgstore", data_prefix));
+                    destination = destination
+                        .replace("${createpkgdir}", &format!("{}/createpkgdir", data_prefix));
+                    destination =
+                        destination.replace("${usrroot}", &format!("{}/usrroot", data_prefix));
+                    destination =
+                        destination.replace("${usrhome}", &format!("{}/usrhome", data_prefix));
+
+                    let dest_path = staging_dir.join(&destination);
+
+                    if let Some(parent) = dest_path.parent() {
+                        fs::create_dir_all(parent)?;
                     }
-                } else {
-                    fs::copy(&source_path, &dest_path)?;
+
+                    if source_path.is_dir() {
+                        for entry in WalkDir::new(&source_path)
+                            .into_iter()
+                            .filter_map(|e| e.ok())
+                        {
+                            let target_path =
+                                dest_path.join(entry.path().strip_prefix(&source_path)?);
+                            if entry.file_type().is_dir() {
+                                fs::create_dir_all(&target_path)?;
+                            } else {
+                                if let Some(p) = target_path.parent() {
+                                    fs::create_dir_all(p)?;
+                                }
+                                fs::copy(entry.path(), &target_path)?;
+                            }
+                        }
+                    } else {
+                        fs::copy(&source_path, &dest_path)?;
+                    }
+                    println!("Staged '{}' to '{}'", source, destination);
                 }
-                println!("Staged '{}' to '{}'", source, destination);
             }
         }
-    }
 
-    if let Ok(verify_fn) = lua.globals().get::<mlua::Function>("verify") {
-        println!("Running verify()...");
-        let verification_passed: bool = verify_fn.call::<bool>(()).map_err(|e| {
-            anyhow!(
-                "The 'verify' function in '{}' failed:\n{}",
-                package_file.display(),
-                e
-            )
-        })?;
-        if !verification_passed {
-            if !utils::ask_for_confirmation(
-                "Package verification failed. This package may be unsafe. Continue?",
-                false,
-            ) {
-                return Err(anyhow!(
-                    "Build aborted by user due to verification failure."
-                ));
+        if let Ok(verify_fn) = lua.globals().get::<mlua::Function>("verify") {
+            println!("Running verify()...");
+            let verification_passed: bool = verify_fn.call::<bool>(args.clone()).map_err(|e| {
+                anyhow!(
+                    "The 'verify' function in '{}' failed for sub-package '{}':\n{}",
+                    package_file.display(),
+                    sub_package,
+                    e
+                )
+            })?;
+            if !verification_passed {
+                if !utils::ask_for_confirmation(
+                    "Package verification failed. This package may be unsafe. Continue?",
+                    false,
+                ) {
+                    return Err(anyhow!(
+                        "Build aborted by user due to verification failure."
+                    ));
+                }
+            } else {
+                println!("Package verification passed.");
             }
-        } else {
-            println!("Package verification passed.");
         }
     }
 
@@ -243,6 +276,7 @@ pub fn run(
     sign_key: Option<String>,
     output_dir: Option<&Path>,
     version_override: Option<&str>,
+    sub_packages: Option<Vec<String>>,
 ) -> Result<()> {
     println!("Building package from: {}", package_file.display());
 
@@ -270,6 +304,7 @@ pub fn run(
             &sign_key,
             output_dir,
             version_override,
+            sub_packages.as_ref(),
         ) {
             eprintln!(
                 "{}: Failed to build for platform {}: {}",
