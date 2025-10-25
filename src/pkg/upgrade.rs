@@ -139,11 +139,7 @@ fn fallback_full_upgrade(
     checksums_content: &str,
     os: &str,
     arch: &str,
-) -> Result<PathBuf> {
-    println!(
-        "
-Falling back to full binary download..."
-    );
+) -> Result<(PathBuf, tempfile::TempDir)> {
     let archive_ext = if os == "windows" { "zip" } else { "tar.zst" };
     let archive_filename = format!("zoi-{os}-{arch}.{archive_ext}");
     let download_url = format!("{base_url}/{archive_filename}");
@@ -163,7 +159,7 @@ Falling back to full binary download..."
             "Could not find executable in the extracted archive."
         ));
     }
-    Ok(new_binary_path)
+    Ok((new_binary_path, temp_dir))
 }
 
 pub fn run(
@@ -283,7 +279,8 @@ pub fn run(
     );
     let checksums_txt_content = reqwest::blocking::get(&checksums_txt_url)?.text()?;
 
-    let new_binary_path = fallback_full_upgrade(&base_url, &checksums_txt_content, os, arch)?;
+    let (new_binary_path, _temp_dir_guard) =
+        fallback_full_upgrade(&base_url, &checksums_txt_content, os, arch)?;
 
     println!("Replacing current executable...");
     self_replace::self_replace(&new_binary_path)?;
