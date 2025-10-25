@@ -29,12 +29,7 @@ Let's walk through migrating a simple package from several popular formats.
 
 A `PKGBUILD` is a shell script, which makes it very straightforward to migrate to Zoi's Lua-based `cmd()` calls.
 
-#### Side-by-Side Comparison
-
-<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-<div>
-
-**`PKGBUILD`**
+#### Original `PKGBUILD`
 
 ```bash
 # Maintainer: Your Name <you@email.com>
@@ -62,10 +57,7 @@ package() {
 }
 ```
 
-</div>
-<div>
-
-**`.pkg.lua`**
+#### Zoi `.pkg.lua` Equivalent
 
 ```lua
 metadata({
@@ -104,10 +96,7 @@ function package()
 end
 ```
 
-</div>
-</div>
-
-**Key Differences:**
+**Key Mappings:**
 
 - `depends` and `makedepends` map to `runtime` and `build` dependencies, respectively. We use the `native:` prefix to let Zoi use the system's package manager.
 - The `source` URL is constructed dynamically in `prepare()`.
@@ -120,10 +109,7 @@ end
 
 Debian packaging involves multiple files in a `debian/` directory. We'll focus on `control` (for metadata/deps) and `rules` (for the build script, which is often a `Makefile`).
 
-#### Side-by-Side Comparison
-
-<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-<div>
+#### Original Debian Files
 
 **`debian/control`**
 
@@ -157,10 +143,7 @@ override_dh_auto_install:
 	make install DESTDIR=debian/my-app
 ```
 
-</div>
-<div>
-
-**`.pkg.lua`**
+#### Zoi `.pkg.lua` Equivalent
 
 ```lua
 metadata({
@@ -178,12 +161,12 @@ dependencies({
   runtime = { required = { "native:libssl3" } }
 })
 
-function prepare()
+function prepare() {
   -- Assuming source is in a parent directory or fetched
   cmd("git clone https://example.com/my-app.git source")
 end
 
-function package()
+function package() {
   cmd("cd source && cmake -B build -DCMAKE_BUILD_TYPE=Release")
   cmd("cd source/build && make")
   -- Copy the final binary to the pkgstore
@@ -191,12 +174,9 @@ function package()
 end
 ```
 
-</div>
-</div>
+**Key Mappings:**
 
-**Key Differences:**
-
-- `Build-Depends` maps to `dependencies.build` and `Depends` maps to `dependencies.runtime`.
+- `Build-Depends` maps to `dependencies.build`, and `Depends` maps to `dependencies.runtime`.
 - The complex `debian/rules` file, which often uses `debhelper` abstractions, is simplified into direct `cmake` and `make` calls within the `package()` function.
 - Instead of installing into a `debian/` subdirectory, we copy the final artifacts directly with `zcp`.
 
@@ -206,12 +186,7 @@ end
 
 RPM `.spec` files have distinct sections for metadata, prep, build, and install, which map cleanly to Zoi's structure.
 
-#### Side-by-Side Comparison
-
-<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-<div>
-
-**`my-app.spec`**
+#### Original `.spec` File
 
 ```spec
 Name:     my-app
@@ -241,10 +216,7 @@ make install DESTDIR=%{buildroot}
 %{_bindir}/my-app
 ```
 
-</div>
-<div>
-
-**`.pkg.lua`**
+#### Zoi `.pkg.lua` Equivalent
 
 ```lua
 metadata({
@@ -263,12 +235,12 @@ dependencies({
   runtime = { required = { "native:openssl-libs" } }
 })
 
-function prepare()
+function prepare() {
   local url = "https://example.com/my-app-" .. PKG.version .. ".tar.gz"
   UTILS.EXTRACT(url, "source")
 end
 
-function package()
+function package() {
   -- The %configure and make steps from %build
   cmd("cd source && ./configure --prefix=/usr")
   cmd("cd source && make")
@@ -282,10 +254,7 @@ function package()
 end
 ```
 
-</div>
-</div>
-
-**Key Differences:**
+**Key Mappings:**
 
 - `BuildRequires` maps to `dependencies.build`, and `Requires` maps to `dependencies.runtime`.
 - The `%prep` section's `%setup` macro is equivalent to `UTILS.EXTRACT` in `prepare()`.
@@ -298,12 +267,7 @@ end
 
 Homebrew formulae are Ruby classes. The mapping is also quite direct.
 
-#### Side-by-Side Comparison
-
-<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-<div>
-
-**`my-tool.rb`**
+#### Original `.rb` Formula
 
 ```ruby
 class MyTool < Formula
@@ -327,10 +291,7 @@ class MyTool < Formula
 end
 ```
 
-</div>
-<div>
-
-**`.pkg.lua`**
+#### Zoi `.pkg.lua` Equivalent
 
 ```lua
 metadata({
@@ -348,28 +309,25 @@ dependencies({
   runtime = { required = { "brew:openssl" } }
 })
 
-function prepare()
+function prepare() {
   local url = "https://example.com/my-tool-" .. PKG.version .. ".tar.gz"
   UTILS.EXTRACT(url, "source")
 end
 
-function package()
+function package() {
   cmd("cd source && ./configure --prefix=" .. STAGING_DIR .. "/usr")
   cmd("cd source && make")
   cmd("cd source && make install")
   zcp("source/my-tool", "${pkgstore}/bin/my-tool")
 end
 
-function test()
+function test() {
   local output = cmd(STAGING_DIR .. "/${pkgstore}/bin/my-tool --version")
   return string.find(output, PKG.version)
 end
 ```
 
-</div>
-</div>
-
-**Key Differences:**
+**Key Mappings:**
 
 - `desc`, `homepage`, `url`, and `license` map directly to fields in `metadata`.
 - `depends_on "cmake" => :build` maps to a `build` dependency. Regular `depends_on` maps to a `runtime` dependency.
