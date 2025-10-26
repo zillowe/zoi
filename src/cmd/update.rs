@@ -1,4 +1,4 @@
-use crate::pkg::{config, hooks, install, local, pin, resolve, sync, transaction, types};
+use crate::pkg::{config, hooks, install, local, pin, resolve, transaction, types};
 use crate::utils;
 use anyhow::{Result, anyhow};
 use colored::*;
@@ -15,12 +15,6 @@ pub fn run(all: bool, package_names: &[String], yes: bool) -> Result<()> {
             eprintln!("{}: {}", "Update failed".red().bold(), e);
         }
         return Ok(());
-    }
-
-    println!("{}", "--- Syncing Package Database ---".yellow().bold());
-    if let Err(e) = sync::run(false, true, true) {
-        eprintln!("{}: {}", "Sync failed".red().bold(), e);
-        std::process::exit(1);
     }
 
     let mut expanded_package_names = Vec::new();
@@ -209,9 +203,6 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
 }
 
 fn run_update_all_logic(yes: bool) -> Result<()> {
-    println!("{}", "--- Syncing Package Database ---".yellow().bold());
-    sync::run(false, true, true)?;
-
     let installed_packages = local::get_installed_packages()?;
     let pinned_packages = pin::get_pinned_packages()?;
     let pinned_sources: Vec<String> = pinned_packages.into_iter().map(|p| p.source).collect();
