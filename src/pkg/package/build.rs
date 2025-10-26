@@ -1,6 +1,5 @@
 use crate::{pkg, utils};
 use anyhow::{Result, anyhow};
-use chrono::Utc;
 use colored::*;
 use mlua::{Lua, LuaSerdeExt, Table};
 use std::fs::{self, File};
@@ -218,11 +217,7 @@ fn build_for_platform(
         }
     }
 
-    let manifest_content = format!(
-        "zoi_version: {}\nbuild_date: {}",
-        env!("CARGO_PKG_VERSION"),
-        Utc::now().to_rfc3339()
-    );
+    let manifest_content = format!("zoi_version: {}", env!("CARGO_PKG_VERSION"),);
     fs::write(staging_dir.join("manifest.yaml"), manifest_content)?;
 
     fs::copy(
