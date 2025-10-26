@@ -285,6 +285,8 @@ pub struct Config {
     pub policy: Policy,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parallel_jobs: Option<usize>,
+    #[serde(default)]
+    pub protect_db: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -305,6 +307,8 @@ pub struct Policy {
     pub allow_deny_lists_unoverridable: bool,
     #[serde(default, skip_serializing_if = "is_false")]
     pub signature_enforcement_unoverridable: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub protect_db_unoverridable: bool,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub allowed_licenses: Option<Vec<String>>,

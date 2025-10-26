@@ -140,6 +140,45 @@ pub fn ask_for_confirmation(prompt: &str, yes: bool) -> bool {
     input.trim().eq_ignore_ascii_case("y")
 }
 
+pub fn set_path_read_only(path: &Path) -> anyhow::Result<()> {
+    if !path.exists() {
+        return Ok(());
+    }
+    for entry in WalkDir::new(path) {
+        let entry = entry?;
+        let mut perms = fs::metadata(entry.path())?.permissions();
+        if !perms.readonly() {
+            perms.set_readonly(true);
+            fs::set_permissions(entry.path(), perms)?;
+        }
+    }
+    Ok(())
+}
+
+pub fn set_path_writable(path: &Path) -> anyhow::Result<()> {
+    if !path.exists() {
+        return Ok(());
+    }
+    for entry in WalkDir::new(path) {
+        let entry = entry?;
+        let mut perms = fs::metadata(entry.path())?.permissions();
+        if perms.readonly() {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let mode = perms.mode();
+                perms.set_mode(mode | 0o200);
+            }
+            #[cfg(not(unix))]
+            {
+                perms.set_readonly(false);
+            }
+            fs::set_permissions(entry.path(), perms)?;
+        }
+    }
+    Ok(())
+}
+
 use std::collections::HashMap;
 
 pub fn get_linux_distribution_info() -> Option<HashMap<String, String>> {

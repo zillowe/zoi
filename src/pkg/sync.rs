@@ -311,6 +311,17 @@ fn fetch_handle_for_url(url: &str) -> Result<String> {
 }
 
 pub fn run(verbose: bool, _fallback: bool, no_pm: bool) -> Result<()> {
+    let merged_config = config::read_config()?;
+    if merged_config.protect_db {
+        let db_root = get_db_path()?;
+        if db_root.exists() {
+            println!("Making package database writable...");
+            if let Err(e) = utils::set_path_writable(&db_root) {
+                eprintln!("Warning: could not make db writable: {}", e);
+            }
+        }
+    }
+
     let mut config = config::read_user_config()?;
     let mut needs_config_update = false;
 
@@ -390,6 +401,16 @@ pub fn run(verbose: bool, _fallback: bool, no_pm: bool) -> Result<()> {
     }
 
     sync_git_repos(verbose)?;
+
+    if merged_config.protect_db {
+        let db_root = get_db_path()?;
+        if db_root.exists() {
+            println!("Making package database read-only...");
+            if let Err(e) = utils::set_path_read_only(&db_root) {
+                eprintln!("Warning: could not make db read-only: {}", e);
+            }
+        }
+    }
 
     Ok(())
 }

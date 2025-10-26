@@ -160,6 +160,14 @@ pub fn read_config() -> Result<Config> {
         merged_cfg.parallel_jobs = system_cfg.parallel_jobs;
     }
 
+    if project_val.get("protect_db").is_some() && !system_policy.protect_db_unoverridable {
+        merged_cfg.protect_db = project_cfg.protect_db;
+    } else if user_val.get("protect_db").is_some() && !system_policy.protect_db_unoverridable {
+        merged_cfg.protect_db = user_cfg.protect_db;
+    } else {
+        merged_cfg.protect_db = system_cfg.protect_db;
+    }
+
     if !system_policy.allow_deny_lists_unoverridable {
         if project_cfg.policy.allowed_licenses.is_some() {
             merged_cfg.policy.allowed_licenses = project_cfg.policy.allowed_licenses;
