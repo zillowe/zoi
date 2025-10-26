@@ -104,6 +104,14 @@ The number of parallel jobs to use during package installation. This can speed u
 - **Default:** `3`
 - **Example:** `parallel_jobs: 5`
 
+### `protect_db`
+
+If `true`, Zoi will make the package database directory (`~/.zoi/pkgs/db`) read-only after a `zoi sync` operation. Before syncing, it will automatically make it writable. This is a security feature to prevent accidental or malicious modification of package definitions.
+
+- **Type:** `boolean`
+- **Default:** `false`
+- **Example:** `protect_db: true`
+
 ### `policy`
 
 A special object that can only be set in the **system-wide** configuration file (`/etc/zoi/config.yaml`). It allows administrators to lock down certain settings, preventing them from being overridden by user or project configs.
@@ -127,6 +135,7 @@ When a policy field is set to `true`, the corresponding configuration from the s
 - `git_repos_unoverridable`: If `true`, the `git_repos` list is locked.
 - `telemetry_enabled_unoverridable`: If `true`, the `telemetry_enabled` setting is locked.
 - `rollback_enabled_unoverridable`: If `true`, the `rollback_enabled` setting is locked.
+- `protect_db_unoverridable`: If `true`, the `protect_db` setting is locked.
 - `allow_deny_lists_unoverridable`: If `true`, the various allow/deny lists (`allowed_packages`, `denied_licenses`, etc.) are locked.
 - `signature_enforcement_unoverridable`: If `true`, the `signature_enforcement` policy is locked.
 
