@@ -84,7 +84,23 @@ Once you have a working `zoi` command, you can use it for all other development 
 
 ### Development with Docker
 
-While a local Rust installation is recommended for active development, you can use Docker to build Zoi, which is useful for creating builds without polluting your local machine.
+While a local Rust installation is recommended for active development, you can use Docker to develop and build Zoi without polluting your local machine.
+
+#### Using the Official Zoi CLI Docker Image
+
+For quick development or testing, you can pull and use the official Zoi CLI Docker image directly from the GitLab Container Registry. This image contains the `zoi` binary and its runtime dependencies.
+
+```sh
+# Pull the latest Zoi CLI image
+docker pull registry.gitlab.com/Zillowe/Zillwen/Zusty/Zoi/zoi:latest
+
+# Run a Zoi command using the image
+docker run --rm registry.gitlab.com/Zillowe/Zillwen/Zusty/Zoi/zoi:latest zoi --version
+```
+
+#### Building the Docker Image Locally
+
+If you need to build the Docker image locally (e.g. for custom configurations or testing changes to the `Dockerfile`), you can do so:
 
 1.  **Build the image:**
     The following command builds the final, lightweight Docker image containing the `zoi` binary.

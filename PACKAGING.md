@@ -66,9 +66,9 @@ The `scripts/` directory contains scripts for creating release builds for differ
 
 These scripts embed the current git commit hash into the binary via the `ZOI_COMMIT_HASH` environment variable.
 
-### Using Docker
+### Building the Docker Image Locally
 
-A `Dockerfile` is provided to build Zoi in a containerized environment. This is useful for creating reproducible builds.
+A `Dockerfile` is provided to build Zoi in a containerized environment. This is useful for creating reproducible builds or for custom image configurations.
 
 ```sh
 # Build the docker image
@@ -80,6 +80,23 @@ docker build \
   --build-arg POSTHOG_API_HOST="your_host" \
   --build-arg ZOI_DEFAULT_REGISTRY="https://my-registry.com/repo.git" \
   -t zoi .
+```
+
+### Using the Official Zoi CLI Docker Image
+
+For CI/CD pipelines or environments where you need a pre-built Zoi CLI, an official Docker image is available on the GitLab Container Registry. This image contains the `zoi` binary and its runtime dependencies, making it suitable for tasks like building Zoi packages.
+
+The image is tagged with both the specific release version (e.g. `zoi:Prod-Release-1.2.2`) and `zoi:latest`.
+
+```sh
+# Pull the latest Zoi CLI image
+docker pull registry.gitlab.com/Zillowe/Zillwen/Zusty/Zoi/zoi:latest
+
+# Example usage in a GitLab CI/CD job
+my-job:
+  image: registry.gitlab.com/Zillowe/Zillwen/Zusty/Zoi/zoi:latest
+  script:
+    - zoi package build my-package.pkg.lua --type source --platform linux-amd64
 ```
 
 ## Environment Variables
