@@ -27,6 +27,10 @@ pub struct BuildCommand {
     /// Run tests before building
     #[arg(long)]
     pub test: bool,
+
+    /// Directory to output the built package to
+    #[arg(long, short = 'o')]
+    pub output_dir: Option<PathBuf>,
 }
 
 pub fn run(args: BuildCommand) {
@@ -44,7 +48,7 @@ pub fn run(args: BuildCommand) {
         &args.r#type,
         &args.platform,
         args.sign,
-        None,
+        args.output_dir.as_deref(),
         None,
         args.sub,
     ) {
