@@ -165,7 +165,7 @@ build-docker-image:
   script:
     - echo "Building Zoi Docker image..."
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker build -t $CI_REGISTRY_IMAGE/zoi:$CI_COMMIT_TAG -t $CI_REGISTRY_IMAGE/zoi:latest -f Dockerfile .
+    - docker build --build-arg POSTHOG_API_KEY="$POSTHOG_API_KEY" --build-arg POSTHOG_API_HOST="$POSTHOG_API_HOST" --build-arg ZOI_DEFAULT_REGISTRY="$ZOI_DEFAULT_REGISTRY" -t $CI_REGISTRY_IMAGE/zoi:$CI_COMMIT_TAG -t $CI_REGISTRY_IMAGE/zoi:latest -f Dockerfile .
     - docker push $CI_REGISTRY_IMAGE/zoi:$CI_COMMIT_TAG
     - docker push $CI_REGISTRY_IMAGE/zoi:latest
   rules:
