@@ -4,6 +4,18 @@ You can install any of these versions: `zoi upgrade --tag <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
+## [Prod-Release-1.3.0] - 2025-10-29
+
+### ✨ Features
+
+- _(pkg)_ Implement package replacement, provides, and backup
+- _(Lua)_ Add support for in package sources
+- _(pkg)_ Refine package management UI
+
+### 🔒 Security
+
+- Closes #26 Docker image vulnerability
+
 ## [Prod-Release-1.2.2] - 2025-10-27
 
 ### ✨ Features
