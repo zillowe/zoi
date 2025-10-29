@@ -7,6 +7,7 @@ pub fn run(
     local: bool,
     global: bool,
     save: bool,
+    yes: bool,
 ) {
     let mut scope_override = scope.map(|s| match s {
         crate::cli::InstallScope::User => types::Scope::User,
@@ -66,6 +67,34 @@ pub fn run(
     }
     final_package_names.sort();
     final_package_names.dedup();
+
+    let mut total_size_freed_bytes: u64 = 0;
+    for name in &final_package_names {
+        if let Some(manifest) = installed_packages.iter().find(|m| {
+            let manifest_name = if let Some(sub) = &m.sub_package {
+                format!("{}:{}", m.name, sub)
+            } else {
+                m.name.clone()
+            };
+            &manifest_name == name
+        }) {
+            total_size_freed_bytes += manifest.installed_size.unwrap_or(0);
+        }
+    }
+
+    println!("Packages to remove:");
+    for name in &final_package_names {
+        println!("  - {}", name);
+    }
+
+    println!(
+        "\nTotal size to be freed: {}",
+        crate::utils::format_bytes(total_size_freed_bytes)
+    );
+
+    if !crate::utils::ask_for_confirmation(":: Proceed with removal?", yes) {
+        return;
+    }
 
     let transaction = match transaction::begin() {
         Ok(t) => t,

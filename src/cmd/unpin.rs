@@ -9,7 +9,7 @@ pub fn run(source: &str) {
 }
 
 fn run_unpin_logic(source: &str) -> Result<()> {
-    let (pkg, _, _, _, _) = resolve::resolve_package_and_version(source)?;
+    let (pkg, _, _, _, _) = resolve::resolve_package_and_version(source, false)?;
     let mut pinned_packages = pin::get_pinned_packages()?;
 
     let initial_len = pinned_packages.len();

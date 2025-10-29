@@ -211,9 +211,11 @@ pub fn resolve_dependency_graph(
     force: bool,
     yes: bool,
     all_optional: bool,
-) -> Result<DependencyGraph> {
+    quiet: bool,
+) -> Result<(DependencyGraph, Vec<String>)> {
     let config = config::read_config()?;
     let mut graph = DependencyGraph::new();
+    let mut non_zoi_deps = Vec::new();
     let mut queue: VecDeque<(String, Option<String>)> =
         initial_sources.iter().map(|s| (s.clone(), None)).collect();
     let mut processed_sources = HashSet::new();
@@ -223,13 +225,26 @@ pub fn resolve_dependency_graph(
             continue;
         }
 
+        if let Ok(dep) = dependencies::parse_dependency_string(&source)
+            && dep.manager != "zoi"
+        {
+            if !non_zoi_deps.contains(&source) {
+                non_zoi_deps.push(source.clone());
+            }
+            processed_sources.insert(source.clone());
+            continue;
+        }
+
         let request = resolve::parse_source_string(&source)?;
 
         if request.sub_package.is_none()
-            && let Ok(resolved) = resolve::resolve_source(&source)
+            && let Ok(resolved) = resolve::resolve_source(&source, quiet)
         {
-            let pkg_template =
-                crate::pkg::lua::parser::parse_lua_package(resolved.path.to_str().unwrap(), None)?;
+            let pkg_template = crate::pkg::lua::parser::parse_lua_package(
+                resolved.path.to_str().unwrap(),
+                None,
+                quiet,
+            )?;
 
             if pkg_template.sub_packages.is_some() {
                 let subs_to_install = pkg_template.main_subs.clone().unwrap_or_default();
@@ -269,7 +284,7 @@ pub fn resolve_dependency_graph(
         }
 
         let (mut pkg, version, _, pkg_lua_path, registry_handle) =
-            match resolve::resolve_package_and_version(&source) {
+            match resolve::resolve_package_and_version(&source, quiet) {
                 Ok(res) => res,
                 Err(e) => return Err(anyhow!("Failed to resolve '{}': {}", source, e)),
             };
@@ -377,5 +392,5 @@ pub fn resolve_dependency_graph(
         graph.nodes.insert(pkg_id, node);
     }
 
-    Ok(graph)
+    Ok((graph, non_zoi_deps))
 }

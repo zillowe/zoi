@@ -101,6 +101,10 @@ pub struct Package {
     pub updates: Option<Vec<UpdateInfo>>,
     #[serde(default)]
     pub hooks: Option<Hooks>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub installed_size: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub archive_size: Option<u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -234,6 +238,8 @@ pub struct InstallManifest {
     pub install_method: Option<String>,
     #[serde(default)]
     pub installed_files: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub installed_size: Option<u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -22,6 +22,7 @@ fn build_for_platform(
         package_file.to_str().unwrap(),
         platform,
         version_override,
+        false,
     )?;
 
     if !pkg_for_meta.types.iter().any(|t| t == build_type) {
@@ -72,6 +73,7 @@ fn build_for_platform(
             package_file.to_str(),
             None,
             sub_pkg_name,
+            false,
         )
         .map_err(|e| {
             anyhow!(
@@ -217,7 +219,22 @@ fn build_for_platform(
         }
     }
 
-    let manifest_content = format!("zoi_version: {}", env!("CARGO_PKG_VERSION"),);
+    let mut files_list = Vec::new();
+    for entry in WalkDir::new(&staging_dir) {
+        let entry = entry?;
+        if entry.file_type().is_file()
+            && let Ok(relative_path) = entry.path().strip_prefix(&staging_dir)
+        {
+            files_list.push(relative_path.to_string_lossy().replace('\\', "/"));
+        }
+    }
+    files_list.sort();
+
+    let manifest_content = format!(
+        "zoi_version: {}\nfiles:\n  - {}",
+        env!("CARGO_PKG_VERSION"),
+        files_list.join("\n  - ")
+    );
     fs::write(staging_dir.join("manifest.yaml"), manifest_content)?;
 
     fs::copy(

@@ -8,6 +8,33 @@ use std::process::Command;
 use std::time::Duration;
 use walkdir::WalkDir;
 
+pub fn format_bytes(bytes: u64) -> String {
+    const KIB: u64 = 1024;
+    const MIB: u64 = 1024 * KIB;
+    const GIB: u64 = 1024 * MIB;
+
+    if bytes >= GIB {
+        format!("{:.2} GiB", bytes as f64 / GIB as f64)
+    } else if bytes >= MIB {
+        format!("{:.2} MiB", bytes as f64 / MIB as f64)
+    } else if bytes >= KIB {
+        format!("{:.2} KiB", bytes as f64 / KIB as f64)
+    } else {
+        format!("{} B", bytes)
+    }
+}
+
+pub fn format_size_diff(diff: i64) -> String {
+    if diff == 0 {
+        return "0 B".to_string();
+    }
+
+    let sign = if diff > 0 { "+" } else { "-" };
+    let bytes = diff.unsigned_abs();
+
+    format!("{} {}", sign, format_bytes(bytes))
+}
+
 use crate::pkg::types::Scope;
 use clap_complete::Shell;
 use std::path::{Path, PathBuf};
@@ -735,6 +762,7 @@ pub fn get_all_packages_for_completion() -> Vec<PackageCompletion> {
                     let pkg = crate::pkg::lua::parser::parse_lua_package(
                         pkg_file_path.to_str().unwrap(),
                         None,
+                        true,
                     )?;
                     Ok(PackageForCompletion {
                         description: Some(pkg.description),

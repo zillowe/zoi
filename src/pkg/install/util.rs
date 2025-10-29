@@ -2,12 +2,17 @@ use crate::pkg::types;
 use crate::utils;
 use anyhow::{Result, anyhow};
 use colored::*;
+use home;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use sha2::{Digest, Sha512};
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use tar::Archive;
+use tempfile::Builder;
+use walkdir::WalkDir;
+use zstd::stream::read::Decoder as ZstdDecoder;
 
 pub fn send_telemetry(event: &str, pkg: &types::Package, registry_handle: &str) {
     match crate::pkg::telemetry::posthog_capture_event(
@@ -44,65 +49,70 @@ pub fn display_updates(pkg: &types::Package, yes: bool) -> Result<bool> {
     Ok(true)
 }
 
-pub fn check_for_conflicts(pkg: &types::Package, yes: bool) -> Result<()> {
+pub fn get_conflicts(
+    pkg: &types::Package,
+    installed_packages: &[types::InstallManifest],
+) -> Result<Vec<String>> {
+    let mut conflict_messages = Vec::new();
+
+    if let Some(conflicts_with) = &pkg.conflicts {
+        for conflict_pkg_name in conflicts_with {
+            let is_zoi_conflict = installed_packages
+                .iter()
+                .any(|p| &p.name == conflict_pkg_name);
+
+            if is_zoi_conflict {
+                conflict_messages.push(format!(
+                    "Package '{}' conflicts with installed package '{}'.",
+                    pkg.name, conflict_pkg_name
+                ));
+            } else if utils::command_exists(conflict_pkg_name) {
+                conflict_messages.push(format!(
+                    "Package '{}' conflicts with existing command '{}' on your system.",
+                    pkg.name, conflict_pkg_name
+                ));
+            }
+        }
+    }
+
+    if let Some(bins_provided) = &pkg.bins {
+        for bin in bins_provided {
+            for installed_pkg in installed_packages {
+                if let Some(installed_bins) = &installed_pkg.bins
+                    && installed_bins.contains(bin)
+                {
+                    conflict_messages.push(format!(
+                            "Binary '{}' provided by '{}' is already provided by installed package '{}'.",
+                            bin, pkg.name, installed_pkg.name
+                        ));
+                }
+            }
+        }
+    }
+
+    Ok(conflict_messages)
+}
+
+pub fn check_for_conflicts(packages_to_install: &[&types::Package], yes: bool) -> Result<()> {
     let installed_packages = crate::pkg::local::get_installed_packages()?;
+    let mut all_conflict_messages = HashSet::new();
 
-    if pkg.conflicts.is_some() || pkg.bins.is_some() {
-        let mut conflict_messages = Vec::new();
+    for pkg in packages_to_install {
+        let conflicts = get_conflicts(pkg, &installed_packages)?;
+        all_conflict_messages.extend(conflicts);
+    }
 
-        if let Some(conflicts_with) = &pkg.conflicts {
-            for conflict_pkg_name in conflicts_with {
-                let is_zoi_conflict = installed_packages
-                    .iter()
-                    .any(|p| &p.name == conflict_pkg_name);
-
-                if is_zoi_conflict {
-                    conflict_messages.push(format!(
-                        "Package '{}' conflicts with installed package '{}'.",
-                        pkg.name.cyan(),
-                        conflict_pkg_name.cyan()
-                    ));
-                } else if utils::command_exists(conflict_pkg_name) {
-                    conflict_messages.push(format!(
-                        "Package '{}' conflicts with existing command '{}' on your system.",
-                        pkg.name.cyan(),
-                        conflict_pkg_name.cyan()
-                    ));
-                }
-            }
+    if !all_conflict_messages.is_empty() {
+        println!("\n{}", "Conflict Detected:".red().bold());
+        for msg in &all_conflict_messages {
+            println!("- {}", msg);
         }
-
-        if let Some(bins_provided) = &pkg.bins {
-            for bin in bins_provided {
-                for installed_pkg in &installed_packages {
-                    if let Some(installed_bins) = &installed_pkg.bins
-                        && installed_bins.contains(bin)
-                    {
-                        conflict_messages.push(format!(
-                                "Binary '{}' provided by '{}' is already provided by installed package '{}'.",
-                                bin.cyan(),
-                                pkg.name.cyan(),
-                                installed_pkg.name.cyan()
-                            ));
-                    }
-                }
-            }
+        if !utils::ask_for_confirmation(
+            "\nDo you want to continue with the installation anyway?",
+            yes,
+        ) {
+            return Err(anyhow!("Operation aborted by user due to conflicts."));
         }
-
-        let unique_messages: HashSet<String> = conflict_messages.into_iter().collect();
-        if !unique_messages.is_empty() {
-            println!("{}", "Conflict Detected:".red().bold());
-            for msg in unique_messages {
-                println!("- {}", msg);
-            }
-            if !utils::ask_for_confirmation(
-                "Do you want to continue with the installation anyway?",
-                yes,
-            ) {
-                return Err(anyhow!("Operation aborted by user due to conflicts."));
-            }
-        }
-        return Ok(());
     }
 
     Ok(())
@@ -255,6 +265,145 @@ pub fn verify_file_hash(file_path: &Path, expected_hash: &str) -> Result<bool> {
         );
     }
     Ok(result)
+}
+
+pub fn check_file_conflicts(
+    graph: &super::resolver::DependencyGraph,
+    yes: bool,
+    m: &MultiProgress,
+) -> Result<()> {
+    let mut all_conflicts = HashSet::new();
+
+    for node in graph.nodes.values() {
+        if let Ok(archive_path) = super::installer::ensure_archive_is_cached(node, Some(m)) {
+            let request = match crate::pkg::resolve::parse_source_string(&node.source) {
+                Ok(req) => req,
+                Err(_) => {
+                    eprintln!(
+                        "{} Could not parse source string for {} to check for file conflicts.",
+                        "Warning:".yellow(),
+                        node.pkg.name
+                    );
+                    continue;
+                }
+            };
+
+            if let Ok(conflicts) = get_file_conflicts_from_archive(
+                &archive_path,
+                &node.pkg,
+                request.sub_package.as_deref(),
+            ) {
+                for conflict in conflicts {
+                    all_conflicts.insert(format!(
+                        "File '{}' from package '{}' already exists on filesystem.",
+                        conflict, node.pkg.name
+                    ));
+                }
+            } else {
+                eprintln!(
+                    "{} Could not parse archive for {} to check for file conflicts.",
+                    "Warning:".yellow(),
+                    node.pkg.name
+                );
+            }
+        } else {
+            eprintln!(
+                "{} Could not find a pre-built archive for {} to check for file conflicts. Will check during installation.",
+                "Warning:".yellow(),
+                node.pkg.name
+            );
+        }
+    }
+
+    if !all_conflicts.is_empty() {
+        println!("\n{}", "File Conflict Detected:".red().bold());
+        for msg in &all_conflicts {
+            println!("- {}", msg);
+        }
+        if !utils::ask_for_confirmation(
+            "\nDo you want to overwrite these files and continue with the installation?",
+            yes,
+        ) {
+            return Err(anyhow!("Operation aborted by user due to file conflicts."));
+        }
+    }
+
+    Ok(())
+}
+
+pub fn get_file_conflicts_from_archive(
+    archive_path: &Path,
+    pkg: &types::Package,
+    sub_package_to_check: Option<&str>,
+) -> Result<Vec<String>> {
+    let file = File::open(archive_path)?;
+    let decoder = ZstdDecoder::new(file)?;
+    let mut archive = Archive::new(decoder);
+    let temp_dir = Builder::new().prefix("zoi-conflict-check-").tempdir()?;
+    archive.unpack(temp_dir.path())?;
+
+    let mut conflicts = Vec::new();
+    let data_dir = temp_dir.path().join("data");
+    if !data_dir.exists() {
+        return Ok(conflicts);
+    }
+
+    let subs_to_check = if let Some(sub) = sub_package_to_check {
+        vec![sub.to_string()]
+    } else {
+        vec!["".to_string()]
+    };
+
+    for sub in subs_to_check {
+        let sub_data_dir = if sub.is_empty() {
+            data_dir.clone()
+        } else {
+            data_dir.join(&sub)
+        };
+
+        if !sub_data_dir.exists() {
+            continue;
+        }
+
+        let usrroot_src = sub_data_dir.join("usrroot");
+        if usrroot_src.exists() && pkg.scope == types::Scope::System {
+            let root_dest = PathBuf::from("/");
+            for entry in WalkDir::new(&usrroot_src)
+                .into_iter()
+                .filter_map(|e| e.ok())
+                .skip(1)
+            {
+                if entry.file_type().is_file() {
+                    let relative_path = entry.path().strip_prefix(&usrroot_src)?;
+                    let dest_path = root_dest.join(relative_path);
+                    if dest_path.exists() {
+                        conflicts.push(dest_path.to_string_lossy().to_string());
+                    }
+                }
+            }
+        }
+
+        let usrhome_src = sub_data_dir.join("usrhome");
+        if usrhome_src.exists()
+            && let Some(home_dest) = home::home_dir()
+        {
+            for entry in WalkDir::new(&usrhome_src)
+                .into_iter()
+                .filter_map(|e| e.ok())
+                .skip(1)
+            {
+                if entry.file_type().is_file() {
+                    let relative_path = entry.path().strip_prefix(&usrhome_src)?;
+                    let dest_path = home_dest.join(relative_path);
+                    if dest_path.exists() {
+                        conflicts.push(dest_path.to_string_lossy().to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(conflicts)
 }
 
 pub fn get_expected_hash(hash_url: &str) -> Result<String> {

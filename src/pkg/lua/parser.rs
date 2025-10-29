@@ -8,6 +8,7 @@ pub fn parse_lua_package_for_platform(
     file_path: &str,
     platform: &str,
     version_override: Option<&str>,
+    quiet: bool,
 ) -> Result<types::Package> {
     let lua_code = fs::read_to_string(file_path)?;
     let lua = Lua::new();
@@ -41,6 +42,7 @@ pub fn parse_lua_package_for_platform(
         Some(file_path),
         None,
         None,
+        quiet,
     )
     .map_err(|e| anyhow!("Failed to setup Lua environment for '{}': {}", file_path, e))?;
 
@@ -128,7 +130,8 @@ pub fn parse_lua_package_for_platform(
 pub fn parse_lua_package(
     file_path: &str,
     version_override: Option<&str>,
+    quiet: bool,
 ) -> Result<types::Package> {
     let platform = utils::get_platform()?;
-    parse_lua_package_for_platform(file_path, &platform, version_override)
+    parse_lua_package_for_platform(file_path, &platform, version_override, quiet)
 }

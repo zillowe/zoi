@@ -8,7 +8,7 @@ use std::fs;
 
 pub fn run(source: &str, raw: bool) {
     let source = source.trim();
-    match resolve::resolve_source(source) {
+    match resolve::resolve_source(source, false) {
         Ok(resolved_source) => {
             if raw {
                 let content = fs::read_to_string(&resolved_source.path).unwrap();
@@ -18,6 +18,7 @@ pub fn run(source: &str, raw: bool) {
             let mut pkg: Package = crate::pkg::lua::parser::parse_lua_package(
                 resolved_source.path.to_str().unwrap(),
                 None,
+                false,
             )
             .unwrap();
             if let Some(repo_name) = resolved_source.repo_name {

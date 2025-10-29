@@ -5,7 +5,7 @@ use std::fs;
 pub fn add(ext_name: &str, _yes: bool) -> Result<()> {
     println!("Adding extension: {}", ext_name);
 
-    let (pkg, _, _, _, registry_handle) = resolve::resolve_package_and_version(ext_name)?;
+    let (pkg, _, _, _, registry_handle) = resolve::resolve_package_and_version(ext_name, false)?;
 
     if pkg.package_type != types::PackageType::Extension {
         return Err(anyhow!("'{}' is not an extension package.", ext_name));
@@ -80,6 +80,7 @@ pub fn add(ext_name: &str, _yes: bool) -> Result<()> {
         chosen_optionals: vec![],
         install_method: None,
         installed_files: vec![],
+        installed_size: pkg.installed_size,
     };
     local::write_manifest(&manifest)?;
 
@@ -91,7 +92,7 @@ pub fn add(ext_name: &str, _yes: bool) -> Result<()> {
 pub fn remove(ext_name: &str, _yes: bool) -> Result<()> {
     println!("Removing extension: {}", ext_name);
 
-    let (pkg, _, _, _, _) = resolve::resolve_package_and_version(ext_name)?;
+    let (pkg, _, _, _, _) = resolve::resolve_package_and_version(ext_name, false)?;
 
     let (manifest, scope) = if let Some(m) =
         local::is_package_installed(&pkg.name, None, types::Scope::User)?

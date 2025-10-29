@@ -114,6 +114,7 @@ pub fn run(
         pkg_lua_path.to_str().unwrap(),
         &platform,
         version_override,
+        false,
     )?;
     let version = metadata.version.as_ref().ok_or_else(|| {
         anyhow!(

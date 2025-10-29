@@ -198,14 +198,17 @@ pub fn run(
     cache_only: bool,
     local_only: bool,
 ) -> Result<()> {
-    let resolved_source = resolve::resolve_source(source)?;
+    let resolved_source = resolve::resolve_source(source, false)?;
 
     if let Some(repo_name) = &resolved_source.repo_name {
         utils::print_repo_warning(repo_name);
     }
 
-    let mut pkg: types::Package =
-        crate::pkg::lua::parser::parse_lua_package(resolved_source.path.to_str().unwrap(), None)?;
+    let mut pkg: types::Package = crate::pkg::lua::parser::parse_lua_package(
+        resolved_source.path.to_str().unwrap(),
+        None,
+        false,
+    )?;
 
     if let Some(repo_name) = resolved_source.repo_name.clone() {
         pkg.repo = repo_name;

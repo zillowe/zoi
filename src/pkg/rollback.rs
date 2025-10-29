@@ -12,9 +12,12 @@ use junction;
 pub fn run(package_name: &str, yes: bool) -> Result<()> {
     println!("Attempting to roll back '{}'...", package_name.cyan());
 
-    let resolved_source = resolve::resolve_source(package_name)?;
-    let mut pkg =
-        crate::pkg::lua::parser::parse_lua_package(resolved_source.path.to_str().unwrap(), None)?;
+    let resolved_source = resolve::resolve_source(package_name, false)?;
+    let mut pkg = crate::pkg::lua::parser::parse_lua_package(
+        resolved_source.path.to_str().unwrap(),
+        None,
+        false,
+    )?;
     if let Some(repo_name) = resolved_source.repo_name {
         pkg.repo = repo_name;
     }

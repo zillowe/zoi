@@ -10,7 +10,7 @@ pub fn run(package_name: &str) {
 }
 
 fn run_impl(package_name: &str) -> Result<()> {
-    let (pkg_meta, _, _, _, _) = resolve::resolve_package_and_version(package_name)?;
+    let (pkg_meta, _, _, _, _) = resolve::resolve_package_and_version(package_name, false)?;
 
     let installed_packages = local::get_installed_packages()?;
 

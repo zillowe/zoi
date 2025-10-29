@@ -16,12 +16,14 @@ pub fn run_installation(
     reason: types::InstallReason,
     yes: bool,
     _all_optional: bool,
+    quiet: bool,
     _processed_deps: &std::sync::Mutex<std::collections::HashSet<String>>,
     scope_override: Option<types::Scope>,
     m: Option<&MultiProgress>,
     build_type: Option<&str>,
 ) -> Result<types::InstallManifest> {
-    let (mut pkg, version, _, _, registry_handle) = resolve::resolve_package_and_version(source)?;
+    let (mut pkg, version, _, _, registry_handle) =
+        resolve::resolve_package_and_version(source, quiet)?;
 
     if let Some(scope) = scope_override {
         pkg.scope = scope;

@@ -138,7 +138,7 @@ pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
     })
 }
 
-fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource> {
+fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedSource> {
     let db_root = get_db_root()?;
     let config = config::read_config()?;
 
@@ -218,8 +218,11 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource> {
                 .join(format!("{}.pkg.lua", pkg_name));
 
             if path.exists() {
-                let pkg: types::Package =
-                    crate::pkg::lua::parser::parse_lua_package(path.to_str().unwrap(), None)?;
+                let pkg: types::Package = crate::pkg::lua::parser::parse_lua_package(
+                    path.to_str().unwrap(),
+                    None,
+                    quiet,
+                )?;
                 let major_repo = repo_name.split('/').next().unwrap_or("").to_lowercase();
 
                 let source_type = if is_default_registry {
@@ -276,6 +279,7 @@ fn find_package_in_db(request: &PackageRequest) -> Result<ResolvedSource> {
                     let pkg: types::Package = crate::pkg::lua::parser::parse_lua_package(
                         pkg_file_path.to_str().unwrap(),
                         None,
+                        quiet,
                     )?;
                     let major_repo = repo_name.split('/').next().unwrap_or("").to_lowercase();
 
@@ -694,8 +698,8 @@ fn get_version_for_install(
     get_default_version(pkg, registry_handle)
 }
 
-pub fn resolve_source(source: &str) -> Result<ResolvedSource> {
-    let resolved = resolve_source_recursive(source, 0)?;
+pub fn resolve_source(source: &str, quiet: bool) -> Result<ResolvedSource> {
+    let resolved = resolve_source_recursive(source, 0, quiet)?;
 
     if let Ok(request) = parse_source_string(source)
         && !matches!(
@@ -712,6 +716,7 @@ pub fn resolve_source(source: &str) -> Result<ResolvedSource> {
 
 pub fn resolve_package_and_version(
     source_str: &str,
+    quiet: bool,
 ) -> Result<(
     types::Package,
     String,
@@ -720,12 +725,15 @@ pub fn resolve_package_and_version(
     Option<String>,
 )> {
     let request = parse_source_string(source_str)?;
-    let resolved_source = resolve_source_recursive(source_str, 0)?;
+    let resolved_source = resolve_source_recursive(source_str, 0, quiet)?;
     let registry_handle = resolved_source.registry_handle.clone();
     let pkg_lua_path = resolved_source.path.clone();
 
-    let pkg_template =
-        crate::pkg::lua::parser::parse_lua_package(resolved_source.path.to_str().unwrap(), None)?;
+    let pkg_template = crate::pkg::lua::parser::parse_lua_package(
+        resolved_source.path.to_str().unwrap(),
+        None,
+        quiet,
+    )?;
 
     let mut pkg_with_repo = pkg_template;
     if let Some(repo_name) = resolved_source.repo_name.clone() {
@@ -741,6 +749,7 @@ pub fn resolve_package_and_version(
     let mut pkg = crate::pkg::lua::parser::parse_lua_package(
         resolved_source.path.to_str().unwrap(),
         Some(&version_string),
+        quiet,
     )?;
     if let Some(repo_name) = resolved_source.repo_name.clone() {
         pkg.repo = repo_name;
@@ -758,7 +767,7 @@ pub fn resolve_package_and_version(
     ))
 }
 
-fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource> {
+fn resolve_source_recursive(source: &str, depth: u8, quiet: bool) -> Result<ResolvedSource> {
     if depth > 5 {
         return Err(anyhow!(
             "Exceeded max resolution depth, possible circular 'alt' reference."
@@ -780,7 +789,7 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource> {
             sharable_manifest.name,
             sharable_manifest.version
         );
-        let mut resolved_source = resolve_source_recursive(&new_source, depth + 1)?;
+        let mut resolved_source = resolve_source_recursive(&new_source, depth + 1, quiet)?;
         resolved_source.sharable_manifest = Some(sharable_manifest);
         return Ok(resolved_source);
     }
@@ -939,11 +948,14 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource> {
             sharable_manifest: None,
         }
     } else {
-        find_package_in_db(&request)?
+        find_package_in_db(&request, quiet)?
     };
 
-    let pkg_for_alt_check =
-        crate::pkg::lua::parser::parse_lua_package(resolved_source.path.to_str().unwrap(), None)?;
+    let pkg_for_alt_check = crate::pkg::lua::parser::parse_lua_package(
+        resolved_source.path.to_str().unwrap(),
+        None,
+        quiet,
+    )?;
 
     if let Some(alt_source) = pkg_for_alt_check.alt {
         println!("Found 'alt' source. Resolving from: {}", alt_source.cyan());
@@ -990,9 +1002,9 @@ fn resolve_source_recursive(source: &str, depth: u8) -> Result<ResolvedSource> {
                     Utc::now().timestamp_nanos_opt().unwrap_or(0)
                 ));
                 fs::write(&temp_path, &content)?;
-                resolve_source_recursive(temp_path.to_str().unwrap(), depth + 1)?
+                resolve_source_recursive(temp_path.to_str().unwrap(), depth + 1, quiet)?
             } else {
-                resolve_source_recursive(&alt_source, depth + 1)?
+                resolve_source_recursive(&alt_source, depth + 1, quiet)?
             };
 
         if resolved_source.source_type == SourceType::OfficialRepo {

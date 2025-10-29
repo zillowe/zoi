@@ -28,6 +28,7 @@ pub fn create_manifest(
         chosen_optionals: chosen_optionals.to_vec(),
         install_method,
         installed_files,
+        installed_size: pkg.installed_size,
     })
 }
 

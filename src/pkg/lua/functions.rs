@@ -707,6 +707,7 @@ pub fn setup_lua_environment(
     file_path: Option<&str>,
     create_pkg_dir: Option<&str>,
     sub_package: Option<&str>,
+    quiet: bool,
 ) -> Result<(), mlua::Error> {
     let system_table = lua.create_table()?;
     let parts: Vec<&str> = platform.split('-').collect();
@@ -770,6 +771,11 @@ pub fn setup_lua_environment(
         let path = Path::new(path_str);
         add_import_util(lua, path)?;
         add_include_util(lua, path)?;
+    }
+
+    if quiet {
+        let quiet_print = lua.create_function(|_, _: mlua::MultiValue| Ok(()))?;
+        lua.globals().set("print", quiet_print)?;
     }
 
     Ok(())

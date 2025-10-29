@@ -111,7 +111,7 @@ fn get_native_command_version(command_name: &str) -> Result<Option<Version>> {
     Ok(None)
 }
 
-fn install_dependency(
+pub fn install_dependency(
     dep: &Dependency,
     parent_id: &str,
     scope: types::Scope,
@@ -257,6 +257,7 @@ fn install_dependency(
                 parent_id,
                 yes,
                 all_optional,
+                true,
                 processed_deps,
                 scope,
                 m,
@@ -1391,6 +1392,7 @@ fn install_zoi_dependency(
     parent_id: &str,
     yes: bool,
     all_optional: bool,
+    quiet: bool,
     processed_deps: &Mutex<HashSet<String>>,
     scope: types::Scope,
     m: Option<&MultiProgress>,
@@ -1404,6 +1406,7 @@ fn install_zoi_dependency(
         },
         yes,
         all_optional,
+        quiet,
         processed_deps,
         Some(scope),
         m,

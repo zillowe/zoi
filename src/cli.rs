@@ -693,7 +693,7 @@ pub fn run() {
                 global,
                 save,
             } => {
-                cmd::uninstall::run(&packages, scope, local, global, save);
+                cmd::uninstall::run(&packages, scope, local, global, save, cli.yes);
                 Ok(())
             }
             Commands::Run { cmd_alias, args } => {

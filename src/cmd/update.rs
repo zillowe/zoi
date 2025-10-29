@@ -21,7 +21,7 @@ pub fn run(all: bool, package_names: &[String], yes: bool) -> Result<()> {
     for name in package_names {
         let request = resolve::parse_source_string(name)?;
         if request.sub_package.is_none()
-            && let Ok((pkg, _, _, _, _)) = resolve::resolve_package_and_version(name)
+            && let Ok((pkg, _, _, _, _)) = resolve::resolve_package_and_version(name, true)
             && pkg.sub_packages.is_some()
         {
             let installed = local::get_installed_packages()?;
@@ -86,7 +86,7 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
     let request = resolve::parse_source_string(package_name)?;
 
     let (new_pkg, new_version, _, _, registry_handle) =
-        match resolve::resolve_package_and_version(package_name) {
+        match resolve::resolve_package_and_version(package_name, true) {
             Ok(result) => result,
             Err(e) => {
                 return Err(anyhow!(
@@ -134,6 +134,22 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
         return Ok(());
     }
 
+    let download_size = new_pkg.archive_size.unwrap_or(0);
+    let old_installed_size = old_manifest.installed_size.unwrap_or(0);
+    let new_installed_size = new_pkg.installed_size.unwrap_or(0);
+    let installed_size_diff = new_installed_size as i64 - old_installed_size as i64;
+
+    println!();
+    println!(
+        "Total Download Size: {}",
+        crate::utils::format_bytes(download_size)
+    );
+    println!(
+        "Net Upgrade Size:    {}",
+        crate::utils::format_size_diff(installed_size_diff)
+    );
+    println!();
+
     if !utils::ask_for_confirmation(
         &format!("Update from {} to {}?", old_manifest.version, new_version),
         yes,
@@ -159,6 +175,7 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
         types::InstallReason::Direct,
         yes,
         false,
+        true,
         &processed_deps,
         Some(old_manifest.scope),
         None,
@@ -229,7 +246,7 @@ fn run_update_all_logic(yes: bool) -> Result<()> {
         }
 
         let (new_pkg, new_version, _, _, registry_handle) =
-            match resolve::resolve_package_and_version(&source) {
+            match resolve::resolve_package_and_version(&source, true) {
                 Ok(result) => result,
                 Err(e) => {
                     upgrade_messages.push(format!(
@@ -260,9 +277,33 @@ fn run_update_all_logic(yes: bool) -> Result<()> {
     }
 
     if packages_to_upgrade.is_empty() {
-        println!("\n{}", "Success:".green());
+        println!("\nAll packages are up to date.");
         return Ok(());
     }
+
+    let total_download_size: u64 = packages_to_upgrade
+        .iter()
+        .map(|(_, pkg, _, _)| pkg.archive_size.unwrap_or(0))
+        .sum();
+
+    let total_installed_size_diff: i64 = packages_to_upgrade
+        .iter()
+        .map(|(_, new_pkg, _, old_manifest)| {
+            let old_size = old_manifest.installed_size.unwrap_or(0) as i64;
+            let new_size = new_pkg.installed_size.unwrap_or(0) as i64;
+            new_size - old_size
+        })
+        .sum();
+
+    println!();
+    println!(
+        "Total Download Size: {}",
+        crate::utils::format_bytes(total_download_size)
+    );
+    println!(
+        "Net Upgrade Size:    {}",
+        crate::utils::format_size_diff(total_installed_size_diff)
+    );
 
     println!();
     if !utils::ask_for_confirmation("Do you want to upgrade these packages?", yes) {
@@ -304,6 +345,7 @@ fn run_update_all_logic(yes: bool) -> Result<()> {
                 types::InstallReason::Direct,
                 yes,
                 false,
+                true,
                 &processed_deps,
                 Some(old_manifest.scope),
                 None,

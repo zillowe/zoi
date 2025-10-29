@@ -35,7 +35,7 @@ fn install_app_from_archive(archive_path: &Path, destination_dir: &Path) -> Resu
 }
 
 pub fn run(source: &str, app_name: Option<String>, yes: bool) -> Result<()> {
-    let (pkg, _, _, pkg_lua_path, _) = resolve::resolve_package_and_version(source)?;
+    let (pkg, _, _, pkg_lua_path, _) = resolve::resolve_package_and_version(source, false)?;
 
     if pkg.package_type != types::PackageType::App {
         return Err(anyhow!(

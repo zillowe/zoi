@@ -89,7 +89,7 @@ pub fn run(
     let sub_package_to_uninstall = request.sub_package.clone();
 
     let (pkg, _, _, pkg_lua_path, registry_handle) =
-        resolve::resolve_package_and_version(package_name)?;
+        resolve::resolve_package_and_version(package_name, true)?;
 
     let (manifest, scope) = if let Some(scope) = scope_override {
         if let Some(m) =
@@ -156,6 +156,7 @@ pub fn run(
         pkg_lua_path.to_str(),
         None,
         sub_package_to_uninstall.as_deref(),
+        true,
     )
     .map_err(|e| anyhow!(e.to_string()))?;
     let lua_code = fs::read_to_string(pkg_lua_path)?;

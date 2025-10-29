@@ -16,6 +16,7 @@ pub fn run(args: &cmd::package::build::BuildCommand) -> Result<()> {
         args.package_file.to_str().unwrap(),
         &platform,
         None,
+        false,
     )?;
 
     let version = pkg::resolve::get_default_version(&pkg_for_meta, None)?;
@@ -54,6 +55,7 @@ pub fn run(args: &cmd::package::build::BuildCommand) -> Result<()> {
             args.package_file.to_str(),
             None,
             sub_pkg_name,
+            false,
         )
         .map_err(|e| anyhow!(e.to_string()))?;
 
