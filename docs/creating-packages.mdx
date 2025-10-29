@@ -151,24 +151,37 @@ When Zoi executes your script, it provides a rich environment of global variable
 
 ### Helper Functions
 
-| Function                                  | Description                                                                                                                |
-| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `cmd(command)`                            | Executes a shell command within the `BUILD_DIR`.                                                                           |
-| `zcp(source, dest)`                       | Copies files/directories from `BUILD_DIR` to the `STAGING_DIR`. See [Staging Destinations](#staging-destinations-for-zcp). |
-| `zrm(path)`                               | Used in `uninstall()` to remove files/directories. See [Target Paths for `zrm`](#target-paths-for-zrm).                    |
-| `verifyHash(file, "algo-hash")`           | Verifies a file's checksum (e.g. `"sha512-..."`).                                                                          |
-| `verifySignature(file, sig, key)`         | Verifies a PGP signature.                                                                                                  |
-| `addPgpKey(url_or_path, name)`            | Adds a PGP key to Zoi's keyring for verification.                                                                          |
-| `UTILS.EXTRACT(url_or_path, out_dir)`     | Downloads and extracts a `.zip` or `.tar.*` archive.                                                                       |
-| `UTILS.FETCH.url(url)`                    | Fetches a URL's content as a string.                                                                                       |
-| `UTILS.FETCH.GITHUB.LATEST.release{...}`  | Fetches the latest release tag from a GitHub repository.                                                                   |
-| `UTILS.FIND.file(dir, name)`              | Finds a file within the `BUILD_DIR`.                                                                                       |
-| `UTILS.FS.exists(path)`                   | Returns `true` if a file or directory exists at the given path.                                                            |
-| `UTILS.PARSE.checksumFile(content, file)` | Parses a checksum from a string (e.g. the content of a `checksums.txt` file).                                              |
+| Function                                  | Description                                                                                                                                                                                                                              |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cmd(command)`                            | Executes a shell command within the `BUILD_DIR`.                                                                                                                                                                                         |
+| `zcp(source, dest)`                       | Copies files/directories to the `STAGING_DIR`. The `source` can be a path inside `BUILD_DIR`, an absolute path, or a path relative to the `.pkg.lua` file using `${pkgluadir}`. See [Staging Files with `zcp`](#staging-files-with-zcp). |
+| `zrm(path)`                               | Used in `uninstall()` to remove files/directories. See [Target Paths for `zrm`](#target-paths-for-zrm).                                                                                                                                  |
+| `verifyHash(file, "algo-hash")`           | Verifies a file's checksum (e.g. `"sha512-..."`).                                                                                                                                                                                        |
+| `verifySignature(file, sig, key)`         | Verifies a PGP signature.                                                                                                                                                                                                                |
+| `addPgpKey(url_or_path, name)`            | Adds a PGP key to Zoi's keyring for verification.                                                                                                                                                                                        |
+| `UTILS.EXTRACT(url_or_path, out_dir)`     | Downloads and extracts a `.zip` or `.tar.*` archive.                                                                                                                                                                                     |
+| `UTILS.FETCH.url(url)`                    | Fetches a URL's content as a string.                                                                                                                                                                                                     |
+| `UTILS.FETCH.GITHUB.LATEST.release{...}`  | Fetches the latest release tag from a GitHub repository.                                                                                                                                                                                 |
+| `UTILS.FIND.file(dir, name)`              | Finds a file within the `BUILD_DIR`.                                                                                                                                                                                                     |
+| `UTILS.FS.exists(path)`                   | Returns `true` if a file or directory exists at the given path.                                                                                                                                                                          |
+| `UTILS.PARSE.checksumFile(content, file)` | Parses a checksum from a string (e.g. the content of a `checksums.txt` file).                                                                                                                                                            |
 
-### Staging Destinations for `zcp`
+### Staging Files with `zcp`
 
-The `destination` argument for the `zcp` function uses special variables to place files in the correct location within the final package archive.
+The `zcp(source, destination)` function is used to copy files from your build environment into the final package archive.
+
+#### Source Path
+
+The `source` argument can be:
+
+1.  A path relative to the `BUILD_DIR` (e.g. `"source/my-binary"`).
+2.  An absolute path on the build machine.
+3.  A path relative to your `.pkg.lua` file using the `${pkgluadir}` variable. This is useful for bundling assets that are stored alongside your package definition.
+    - Example: `zcp("${pkgluadir}/my-asset.png", "${pkgstore}/share/my-asset.png")`
+
+#### Destination Path
+
+The `destination` argument uses special variables to place files in the correct location within the final package archive.
 
 | Variable          | Description                                                                                                                      |
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------- |

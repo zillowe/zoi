@@ -50,6 +50,36 @@ function package()
 end
 ```
 
+## Bundling a Local Asset
+
+This example shows how to use the `${pkgluadir}` variable to bundle a file that is located in the same directory as your `.pkg.lua` file.
+
+Assume you have the following file structure:
+
+```
+my-package/
+├── my-package.pkg.lua
+└── icon.png
+```
+
+```lua
+-- my-package.pkg.lua
+metadata({
+  name = "my-package-with-asset",
+  repo = "community",
+  version = "1.0.0",
+  description = "A package that bundles a local asset.",
+  license = "MIT",
+  types = { "source" },
+})
+
+function package()
+  -- Copy the icon.png from the same directory as the pkg.lua file
+  -- into the package's shared data directory.
+  zcp("${pkgluadir}/icon.png", "${pkgstore}/share/icons/my-package.png")
+end
+```
+
 ## Simple Source Build
 
 This example shows how to build a package from source. It clones a git repository and runs `make` to build the binary.
