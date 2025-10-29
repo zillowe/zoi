@@ -18,6 +18,10 @@ fn build_for_platform(
     version_override: Option<&str>,
     sub_packages: Option<&Vec<String>>,
 ) -> Result<()> {
+    let pkg_lua_dir_str = package_file
+        .parent()
+        .and_then(Path::to_str)
+        .ok_or_else(|| anyhow!("Could not get parent directory of package file"))?;
     let pkg_for_meta = pkg::lua::parser::parse_lua_package_for_platform(
         package_file.to_str().unwrap(),
         platform,
@@ -147,8 +151,11 @@ fn build_for_platform(
                     let mut destination: String =
                         op.get("destination").map_err(|e| anyhow!(e.to_string()))?;
 
-                    let source_path = build_dir.path().join(&source);
-
+                    let source_path = if source.contains("${pkgluadir}") {
+                        Path::new(&source.replace("${pkgluadir}", pkg_lua_dir_str)).to_path_buf()
+                    } else {
+                        build_dir.path().join(&source)
+                    };
                     let data_prefix = if sub_package.is_empty() {
                         "data".to_string()
                     } else {
