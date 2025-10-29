@@ -1,4 +1,4 @@
-FROM rust:1-slim-bookworm AS builder
+FROM rust:1.90.0-slim-trixie AS builder
 
 # These are used by build.rs to embed telemetry configuration.
 # You can override them during the build process, e.g.:
@@ -26,7 +26,7 @@ COPY src ./src
 
 RUN cargo build --bin zoi --release
 
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 RUN apt-get update && apt-get install -y git ca-certificates && rm -rf /var/lib/apt/lists/*
 
