@@ -18,6 +18,7 @@ Dependencies are specified in the `dependencies` section. Both `runtime` and `bu
 Each entry follows the format: `manager:package[:sub-package]` with an optional version and an optional inline description.
 
 - **Format:** `manager:package[:sub-package][@version][:description]`
+- **Virtual Packages:** You can depend on a virtual package name that is satisfied by any package that includes it in its `provides` list.
 - **Sub-packages:** For `zoi` packages that are split, you can specify a sub-package.
   - Example: `zoi:linux:headers`
 - **Version:** Can be specified with `@<semver>` or a comparator string like `=1.2.3`, `>=2.0.0`, `^1.2`, `~1.2.3`. Do not prefix with `v`.
