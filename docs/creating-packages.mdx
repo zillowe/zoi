@@ -56,6 +56,9 @@ This table lists all the available fields you can use inside the `metadata` bloc
 | `license`      | `string` | The [SPDX license identifier](https://spdx.org/licenses/) for the software (e.g. `MIT`, `GPL-3.0-or-later`).                      |
 | `bins`         | `list`   | A list of binary names the package provides. Zoi will create symlinks for these in a directory on the user's `PATH`.              |
 | `conflicts`    | `list`   | A list of other package names that this package conflicts with.                                                                   |
+| `provides`     | `list`   | A list of virtual package names this package provides. Other packages can depend on these.                                        |
+| `replaces`     | `list`   | A list of packages that this package replaces. Zoi will offer to remove them upon installation.                                   |
+| `backup`       | `list`   | A list of configuration files to preserve during upgrades. Zoi will create `.zoinew` and `.zoisave` files for these.              |
 | `types`        | `list`   | A list of supported build methods (e.g. `source`, `pre-compiled`).                                                                |
 | `package_type` | `string` | The type of package. Can be `package` (default), `collection`, `app`, or `extension`. See [Package Types](#package-types).        |
 | `sub_packages` | `list`   | A list of sub-package names to define a split package. See [Split Packages](#split-packages).                                     |

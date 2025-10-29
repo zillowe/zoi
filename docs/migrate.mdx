@@ -42,6 +42,10 @@ url="https://example.com"
 license=('MIT')
 depends=('openssl')
 makedepends=('gcc' 'make')
+conflicts=('other-cli')
+provides=('cli-tool')
+replaces=('old-cli')
+backup=('etc/my-cli/config.conf')
 source=("https://example.com/dist/my-cli-$pkgver.tar.gz")
 sha256sums=('...')
 
@@ -69,6 +73,10 @@ metadata({
   license = "MIT",
   maintainer = { name = "Your Name", email = "you@email.com" },
   bins = { "my-cli" },
+  conflicts = { "other-cli" },
+  provides = { "cli-tool" },
+  replaces = { "old-cli" },
+  backup = { "etc/my-cli/config.conf" },
   types = { "source" }
 })
 

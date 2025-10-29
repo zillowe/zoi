@@ -32,7 +32,13 @@ Zoi is packed with features designed to make package management and environment 
   - **GPG Signatures:** Verify package archives against maintainer PGP keys. Manage keys easily with the `zoi pgp` command set.
   - **File Conflict Detection:** Prevents packages from accidentally overwriting existing files by prompting for confirmation.
 
+- **Configuration File Handling:** Automatically handles updates to configuration files, creating `.zoinew` files for new versions and `.zoisave` files for user-modified configurations upon removal.
+
 ## Advanced Capabilities
+
+- **Virtual Packages (`provides`):** Declare that a package provides a certain feature or virtual package, allowing other packages to depend on it.
+
+- **Package Replacement (`replaces`):** Explicitly declare that a package replaces another, prompting for the removal of the old package upon installation.
 
 - **Versatile Package Types:** Zoi supports more than just standard applications:
   - `Package`: A standard software package.
