@@ -89,8 +89,12 @@ pub struct Package {
     pub scope: Scope,
     #[serde(default)]
     pub bins: Option<Vec<String>>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub conflicts: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replaces: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provides: Option<Vec<String>>,
     #[serde(default)]
     pub tags: Vec<String>,
     #[serde(default)]
@@ -101,6 +105,9 @@ pub struct Package {
     pub updates: Option<Vec<UpdateInfo>>,
     #[serde(default)]
     pub hooks: Option<Hooks>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backup: Option<Vec<String>>,
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub installed_size: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -227,7 +234,14 @@ pub struct InstallManifest {
     pub reason: InstallReason,
     pub scope: Scope,
     pub bins: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub conflicts: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replaces: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provides: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backup: Option<Vec<String>>,
     #[serde(default)]
     pub installed_dependencies: Vec<String>,
     #[serde(default)]
@@ -411,6 +425,12 @@ pub struct LockfilePackage {
     pub bins: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub conflicts: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replaces: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provides: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backup: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub dependencies: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

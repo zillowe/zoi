@@ -1,4 +1,4 @@
-use crate::pkg::{config, install, transaction, types};
+use crate::pkg::{self, config, install, local, transaction, types};
 use crate::project;
 use colored::Colorize;
 use indicatif::MultiProgress;
@@ -136,12 +136,38 @@ pub fn run(
         }
     };
 
-    println!(
-        "
-{}",
-        "Looking for conflicts...".bold()
-    );
     let packages_to_install: Vec<&types::Package> = graph.nodes.values().map(|n| &n.pkg).collect();
+
+    let mut packages_to_replace = std::collections::HashSet::new();
+    if let Ok(installed_packages) = local::get_installed_packages() {
+        for pkg in &packages_to_install {
+            if let Some(replaces) = &pkg.replaces {
+                for replaced_pkg_name in replaces {
+                    if installed_packages
+                        .iter()
+                        .any(|p| &p.name == replaced_pkg_name)
+                    {
+                        packages_to_replace.insert(replaced_pkg_name.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    if !packages_to_replace.is_empty() {
+        println!("\nThe following packages will be replaced:");
+        for pkg_name in &packages_to_replace {
+            println!("- {}", pkg_name);
+        }
+        if !crate::utils::ask_for_confirmation(
+            "\nDo you want to continue with the replacement?",
+            yes,
+        ) {
+            return;
+        }
+    }
+
+    println!("\n{}", "Looking for conflicts...".bold());
     if let Err(e) = install::util::check_for_conflicts(&packages_to_install, yes) {
         eprintln!("{}: {}", "Error".red().bold(), e);
         std::process::exit(1);
@@ -286,6 +312,25 @@ pub fn run(
             std::process::exit(1);
         }
     };
+
+    for pkg_name in packages_to_replace {
+        println!("Replacing package: {}", pkg_name);
+        match pkg::uninstall::run(&pkg_name, None) {
+            Ok(uninstalled_manifest) => {
+                if let Err(e) = transaction::record_operation(
+                    &transaction.id,
+                    types::TransactionOperation::Uninstall {
+                        manifest: Box::new(uninstalled_manifest),
+                    },
+                ) {
+                    eprintln!("Failed to record uninstall of replaced package: {}", e);
+                }
+            }
+            Err(e) => {
+                eprintln!("Failed to uninstall replaced package '{}': {}", pkg_name, e);
+            }
+        }
+    }
 
     println!(
         "

@@ -90,6 +90,21 @@ pub fn get_conflicts(
         }
     }
 
+    if let Some(provides) = &pkg.provides {
+        for p in provides {
+            for installed_pkg in installed_packages {
+                if let Some(installed_provides) = &installed_pkg.provides
+                    && installed_provides.contains(p)
+                {
+                    conflict_messages.push(format!(
+                            "Virtual package '{}' provided by '{}' is already provided by installed package '{}'.",
+                            p, pkg.name, installed_pkg.name
+                        ));
+                }
+            }
+        }
+    }
+
     Ok(conflict_messages)
 }
 

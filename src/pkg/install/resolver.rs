@@ -316,22 +316,48 @@ pub fn resolve_dependency_graph(
 
         processed_sources.insert(source.clone());
 
-        if !force
-            && let Some(installed) =
-                local::is_package_installed(&pkg.name, request.sub_package.as_deref(), pkg.scope)?
-            && let (Ok(installed_v), Ok(req_v)) = (
+        if !force {
+            let installed_packages = local::get_installed_packages()?;
+            let mut satisfied = false;
+
+            if let Some(installed) = installed_packages.iter().find(|m| {
+                m.name == pkg.name && m.sub_package.as_deref() == request.sub_package.as_deref()
+            }) && let (Ok(installed_v), Ok(req_v)) = (
                 Version::parse(&installed.version),
                 VersionReq::parse(&version),
-            )
-            && req_v.matches(&installed_v)
-        {
-            println!(
-                "Already installed: {} ({}) satisfies {}. Skipping.",
-                pkg.name.cyan(),
-                installed.version.yellow(),
-                version.yellow()
-            );
-            continue;
+            ) && req_v.matches(&installed_v)
+            {
+                println!(
+                    "Already installed: {} ({}) satisfies {}. Skipping.",
+                    pkg.name.cyan(),
+                    installed.version.yellow(),
+                    version.yellow()
+                );
+                satisfied = true;
+            }
+
+            if !satisfied
+                && let Some(provider) = installed_packages.iter().find(|m| {
+                    m.provides
+                        .as_ref()
+                        .is_some_and(|p| p.contains(&request.name))
+                })
+                && let (Ok(installed_v), Ok(req_v)) = (
+                    Version::parse(&provider.version),
+                    VersionReq::parse(&version),
+                )
+                && req_v.matches(&installed_v)
+            {
+                println!(
+                    "'{}' is provided by installed package '{}'. Skipping.",
+                    request.name, provider.name
+                );
+                satisfied = true;
+            }
+
+            if satisfied {
+                continue;
+            }
         }
 
         let mut chosen_options = Vec::new();

@@ -186,13 +186,86 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
                 &transaction.id,
                 types::TransactionOperation::Upgrade {
                     old_manifest: Box::new(old_manifest.clone()),
-                    new_manifest: Box::new(new_manifest),
+                    new_manifest: Box::new(new_manifest.clone()),
                 },
             ) {
                 eprintln!("Warning: Failed to record transaction for update: {}", e);
                 transaction::delete_log(&transaction.id)?;
             } else {
                 transaction::commit(&transaction.id)?;
+            }
+
+            if let Some(backup_files) = &old_manifest.backup {
+                println!("Restoring configuration files...");
+                let old_version_dir = local::get_package_version_dir(
+                    old_manifest.scope,
+                    &old_manifest.registry_handle,
+                    &old_manifest.repo,
+                    &old_manifest.name,
+                    &old_manifest.version,
+                )?;
+                let new_version_dir = local::get_package_version_dir(
+                    new_manifest.scope,
+                    &new_manifest.registry_handle,
+                    &new_manifest.repo,
+                    &new_manifest.name,
+                    &new_manifest.version,
+                )?;
+                for backup_file_rel in backup_files {
+                    let backup_src = old_version_dir.join(backup_file_rel);
+                    if backup_src.exists() {
+                        let restore_dest = new_version_dir.join(backup_file_rel);
+                        if let Some(p) = restore_dest.parent() {
+                            fs::create_dir_all(p)?;
+                        }
+                        fs::copy(&backup_src, &restore_dest)?;
+                    }
+                }
+            }
+
+            if let Some(backup_files) = &old_manifest.backup {
+                println!("Restoring configuration files...");
+                let old_version_dir = local::get_package_version_dir(
+                    old_manifest.scope,
+                    &old_manifest.registry_handle,
+                    &old_manifest.repo,
+                    &old_manifest.name,
+                    &old_manifest.version,
+                )?;
+                let new_version_dir = local::get_package_version_dir(
+                    new_manifest.scope,
+                    &new_manifest.registry_handle,
+                    &new_manifest.repo,
+                    &new_manifest.name,
+                    &new_manifest.version,
+                )?;
+                for backup_file_rel in backup_files {
+                    let old_path = old_version_dir.join(backup_file_rel);
+                    let new_path = new_version_dir.join(backup_file_rel);
+
+                    if old_path.exists() {
+                        if new_path.exists() {
+                            let zoinew_path = new_path.with_extension(format!(
+                                "{}.zoinew",
+                                new_path.extension().and_then(|s| s.to_str()).unwrap_or("")
+                            ));
+                            println!(
+                                "Configuration file '{}' exists in new version. Saving as .zoinew",
+                                new_path.display()
+                            );
+                            if let Err(e) = fs::rename(&new_path, &zoinew_path) {
+                                eprintln!("Warning: failed to rename to .zoinew: {}", e);
+                                continue;
+                            }
+                        }
+                        if let Some(p) = new_path.parent() {
+                            fs::create_dir_all(p)?;
+                        }
+                        if let Err(e) = fs::rename(&old_path, &new_path) {
+                            eprintln!("Warning: failed to restore backup file: {}", e);
+                        }
+                    }
+                }
             }
 
             cleanup_old_versions(

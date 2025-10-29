@@ -203,6 +203,44 @@ pub fn run(
         }
     }
 
+    if let Some(backup_files) = &manifest.backup {
+        println!("Saving configuration files...");
+        let version_dir = local::get_package_version_dir(
+            scope,
+            &manifest.registry_handle,
+            &manifest.repo,
+            &manifest.name,
+            &manifest.version,
+        )?;
+        for backup_file_rel in backup_files {
+            let backup_src = version_dir.join(backup_file_rel);
+            if backup_src.exists() {
+                let backup_dest = version_dir
+                    .parent()
+                    .unwrap()
+                    .join(format!("{}.zoisave", backup_file_rel));
+                if let Some(p) = backup_dest.parent()
+                    && let Err(e) = fs::create_dir_all(p)
+                {
+                    eprintln!(
+                        "Warning: could not create backup directory {}: {}",
+                        p.display(),
+                        e
+                    );
+                    continue;
+                }
+                println!(
+                    "Saving {} to {}",
+                    backup_src.display(),
+                    backup_dest.display()
+                );
+                if let Err(e) = fs::rename(&backup_src, &backup_dest) {
+                    eprintln!("Warning: failed to save {}: {}", backup_src.display(), e);
+                }
+            }
+        }
+    }
+
     println!(
         "Uninstalling '{}' and its unused dependencies...",
         pkg.name.bold()
