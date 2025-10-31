@@ -86,7 +86,10 @@ The `dependencies{...}` block declares build-time and runtime dependencies. Zoi 
 dependencies({
   -- Dependencies needed to build the package
   build = {
-    required = { "native:make", "native:gcc" }
+    -- Dependencies for building from source
+    source = {
+      required = { "native:make", "native:gcc" }
+    }
   },
   -- Dependencies needed to run the package
   runtime = {

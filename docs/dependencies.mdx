@@ -70,7 +70,14 @@ dependencies({
     }
   },
   build = {
-    required = { "zoi:build-utils" }
+    -- For source builds
+    source = {
+      required = { "native:gcc", "native:make" }
+    },
+    -- For pre-compiled builds (e.g. if you only need to extract an archive)
+    ["pre-compiled"] = {
+      optional = { "native:unzip" }
+    }
   }
 })
 ```
