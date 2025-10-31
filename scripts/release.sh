@@ -15,7 +15,7 @@ fi
 VERSION=$(echo "$CI_COMMIT_TAG" | sed -r 's/.*([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
 echo "Updating files to version: ${VERSION}"
 
-sed -i -e "s/^version = \".*\"/version = \"${VERSION}\"" "Cargo.toml"
+sed -i -e "s/^version = ".*"/version = "${VERSION}"/" "Cargo.toml"
 
 CHECKSUMS_256="scripts/archived/checksums-256.txt"
 CHECKSUMS_512="scripts/archived/checksums.txt"
