@@ -209,11 +209,18 @@ pub struct ComplexDependencyGroup {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum BuildDependencies {
+    Group(DependencyGroup),
+    Typed(HashMap<String, DependencyGroup>),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Dependencies {
     #[serde(default)]
     pub runtime: Option<DependencyGroup>,
     #[serde(default)]
-    pub build: Option<DependencyGroup>,
+    pub build: Option<BuildDependencies>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]

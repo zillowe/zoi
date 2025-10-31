@@ -1,7 +1,4 @@
-use crate::pkg::{
-    local, resolve,
-    types::{InstallManifest, Package},
-};
+use crate::pkg::{local, resolve, types};
 use crate::utils;
 use colored::*;
 use std::fs;
@@ -15,7 +12,7 @@ pub fn run(source: &str, raw: bool) {
                 println!("{content}");
                 return;
             }
-            let mut pkg: Package = crate::pkg::lua::parser::parse_lua_package(
+            let mut pkg: types::Package = crate::pkg::lua::parser::parse_lua_package(
                 resolved_source.path.to_str().unwrap(),
                 None,
                 false,
@@ -49,7 +46,10 @@ pub fn run(source: &str, raw: bool) {
     }
 }
 
-fn print_beautiful(pkg: &crate::pkg::types::Package, installed_manifest: Option<&InstallManifest>) {
+fn print_beautiful(
+    pkg: &crate::pkg::types::Package,
+    installed_manifest: Option<&types::InstallManifest>,
+) {
     println!(
         "{} {} - {}",
         pkg.name.bold().green(),
@@ -153,39 +153,63 @@ fn print_beautiful(pkg: &crate::pkg::types::Package, installed_manifest: Option<
         println!("{}:", "Dependencies".bold());
 
         if let Some(build) = &deps.build {
-            println!("  {}:", "Build".bold());
-            for dep in build.get_required_simple() {
-                println!("    - {}", dep);
-            }
-            for group in build.get_required_options() {
-                println!(
-                    "    - {}: {} (choose {})",
-                    group.name.bold(),
-                    group.desc,
-                    if group.all { "any" } else { "one" }
-                );
-                for dep in &group.depends {
-                    let parts: Vec<&str> = dep.rsplitn(2, ':').collect();
-                    if parts.len() == 2
-                        && !parts[0].contains(['=', '>', '<', '~', '^'])
-                        && !parts[1].is_empty()
-                    {
-                        println!("      - {}: {}", parts[1], parts[0].italic());
-                    } else {
-                        println!("      - {}", dep);
+            println!(
+                "
+{}",
+                "Build Dependencies:".bold()
+            );
+            let mut build_deps_count = 0;
+
+            let mut handle_group = |group: &types::DependencyGroup| {
+                for dep in group.get_required_simple() {
+                    println!("- {} (required)", dep);
+                    build_deps_count += 1;
+                }
+                for group in group.get_required_options() {
+                    println!(
+                        "
+  > (Option group): {}",
+                        group.name.cyan()
+                    );
+                    println!("    Description: {}", group.desc);
+                    for (i, dep) in group.depends.iter().enumerate() {
+                        let dep_info =
+                            crate::pkg::dependencies::parse_dependency_string(dep).unwrap();
+                        let desc = dep_info.description.unwrap_or("No description");
+                        println!(
+                            "    {}. {} - {}",
+                            (i + 1).to_string().yellow(),
+                            dep.bold(),
+                            desc.italic()
+                        );
+                    }
+                    build_deps_count += group.depends.len();
+                }
+
+                for dep in group.get_optional() {
+                    println!("- {} (optional)", dep);
+                    build_deps_count += 1;
+                }
+            };
+
+            match build {
+                types::BuildDependencies::Group(group) => {
+                    handle_group(group);
+                }
+                types::BuildDependencies::Typed(typed_map) => {
+                    for (build_type, group) in typed_map {
+                        println!(
+                            "
+  For build type '{}':",
+                            build_type.yellow()
+                        );
+                        handle_group(group);
                     }
                 }
             }
-            for dep in build.get_optional() {
-                let parts: Vec<&str> = dep.rsplitn(2, ':').collect();
-                if parts.len() == 2
-                    && !parts[0].contains(['=', '>', '<', '~', '^'])
-                    && !parts[1].is_empty()
-                {
-                    println!("    - {} (optional): {}", parts[1], parts[0].italic());
-                } else {
-                    println!("    - {} (optional)", dep);
-                }
+
+            if build_deps_count == 0 {
+                println!("- {}", "None".italic());
             }
         }
 

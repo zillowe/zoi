@@ -379,20 +379,29 @@ pub fn resolve_dependency_graph(
             }
 
             if let Some(build) = &deps.build {
-                let needs_build = pkg.types.contains(&"source".to_string())
-                    && !pkg.types.contains(&"pre-compiled".to_string());
+                let needs_build = pkg.types.contains(&"source".to_string());
                 if needs_build {
                     println!("Resolving build dependencies for {}", pkg.name.cyan());
-                    let (d, co, coo) = collect_dependencies_for_group(
-                        build,
-                        request.sub_package.as_deref(),
-                        Some("build"),
-                        yes,
-                        all_optional,
-                    )?;
-                    deps_to_process.extend(d);
-                    chosen_options.extend(co);
-                    chosen_optionals.extend(coo);
+
+                    let build_dep_groups = match build {
+                        types::BuildDependencies::Group(group) => vec![group.clone()],
+                        types::BuildDependencies::Typed(typed_map) => {
+                            typed_map.values().cloned().collect()
+                        }
+                    };
+
+                    for group in build_dep_groups {
+                        let (d, co, coo) = collect_dependencies_for_group(
+                            &group,
+                            request.sub_package.as_deref(),
+                            Some("build"),
+                            yes,
+                            all_optional,
+                        )?;
+                        deps_to_process.extend(d);
+                        chosen_options.extend(co);
+                        chosen_optionals.extend(coo);
+                    }
                 }
             }
         }
