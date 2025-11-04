@@ -22,7 +22,7 @@ pub fn run(verbose: bool, fallback: bool, no_pm: bool, no_shell_setup: bool) {
     );
     if let Some(shell) = utils::get_current_shell() {
         println!("Detected shell: {}", shell.to_string().cyan());
-        crate::cmd::shell::run(shell);
+        crate::cmd::shell::run(shell, crate::cli::SetupScope::User);
     } else {
         println!(
             "{}",

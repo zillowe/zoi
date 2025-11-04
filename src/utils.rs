@@ -585,7 +585,7 @@ pub fn check_path() {
 
     if !is_in_path {
         eprintln!(
-            "Please run 'zoi setup --scope user' or add it to your PATH manually for commands to be available."
+            "Please run 'zoi shell <shell>' or add it to your PATH manually for commands to be available."
         );
     }
 }

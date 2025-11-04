@@ -43,7 +43,7 @@ pub fn run() -> Result<()> {
         Ok(Some(warning)) => {
             issues_found += 1;
             println!("{}: {}", "Warning".yellow(), warning);
-            println!("Please run 'zoi setup' to add Zoi's binary directory to your PATH.");
+            println!("Please run 'zoi shell <shell>' to add Zoi's binary directory to your PATH.");
         }
         Ok(None) => {
             println!("{}", "PATH configuration looks good.".green());

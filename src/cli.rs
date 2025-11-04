@@ -44,9 +44,9 @@ pub struct Cli {
 }
 
 #[derive(Clone, Debug)]
-struct PackageValueParser;
+struct PackageCompletionParser;
 
-impl TypedValueParser for PackageValueParser {
+impl TypedValueParser for PackageCompletionParser {
     type Value = String;
 
     fn parse_ref(
@@ -64,9 +64,9 @@ impl TypedValueParser for PackageValueParser {
                 .into_iter()
                 .map(|pkg| {
                     let help = if pkg.description.is_empty() {
-                        pkg.repo
+                        pkg.display.clone()
                     } else {
-                        format!("[{}] {}", pkg.repo, pkg.description)
+                        format!("{} - {}", pkg.display, pkg.description)
                     };
                     PossibleValue::new(Box::leak(pkg.display.into_boxed_str()) as &'static str)
                         .help(Box::leak(help.into_boxed_str()) as &'static str)
@@ -75,39 +75,7 @@ impl TypedValueParser for PackageValueParser {
     }
 }
 
-#[derive(Clone, Debug)]
-struct PkgOrPathParser;
-
-impl TypedValueParser for PkgOrPathParser {
-    type Value = String;
-
-    fn parse_ref(
-        &self,
-        _cmd: &clap::Command,
-        _arg: Option<&clap::Arg>,
-        value: &std::ffi::OsStr,
-    ) -> Result<Self::Value, clap::Error> {
-        Ok(value.to_string_lossy().into_owned())
-    }
-
-    fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {
-        Some(Box::new(
-            utils::get_all_packages_for_completion()
-                .into_iter()
-                .map(|pkg| {
-                    let help = if pkg.description.is_empty() {
-                        pkg.repo
-                    } else {
-                        format!("[{}] {}", pkg.repo, pkg.description)
-                    };
-                    PossibleValue::new(Box::leak(pkg.display.into_boxed_str()) as &'static str)
-                        .help(Box::leak(help.into_boxed_str()) as &'static str)
-                }),
-        ))
-    }
-}
-
-#[derive(clap::ValueEnum, Clone, Debug, Copy)]
+#[derive(clap::ValueEnum, Clone, Debug, Copy, PartialEq, Eq)]
 pub enum SetupScope {
     User,
     System,
@@ -202,7 +170,7 @@ enum Commands {
     /// Shows detailed information about a package
     Show {
         /// The name of the package to show
-        #[arg(value_parser = PackageValueParser, hide_possible_values = true)]
+        #[arg(value_parser = PackageCompletionParser, hide_possible_values = true)]
         package_name: String,
         /// Display the raw, unformatted package file
         #[arg(long)]
@@ -212,7 +180,7 @@ enum Commands {
     /// Pin a package to a specific version
     Pin {
         /// The name of the package to pin
-        #[arg(value_parser = PackageValueParser, hide_possible_values = true)]
+        #[arg(value_parser = PackageCompletionParser, hide_possible_values = true)]
         package: String,
         /// The version to pin the package to
         version: String,
@@ -221,7 +189,7 @@ enum Commands {
     /// Unpin a package, allowing it to be updated
     Unpin {
         /// The name of the package to unpin
-        #[arg(value_parser = PackageValueParser, hide_possible_values = true)]
+        #[arg(value_parser = PackageCompletionParser, hide_possible_values = true)]
         package: String,
     },
 
@@ -229,7 +197,7 @@ enum Commands {
     #[command(alias = "up")]
     Update {
         /// The name(s) of the package(s) to update
-        #[arg(value_name = "PACKAGES", value_parser = PackageValueParser, hide_possible_values = true)]
+        #[arg(value_name = "PACKAGES", value_parser = PackageCompletionParser, hide_possible_values = true)]
         package_names: Vec<String>,
 
         /// Update all installed packages
@@ -241,7 +209,7 @@ enum Commands {
     #[command(alias = "i")]
     Install {
         /// Package names, local paths, or URLs to .pkg.lua files
-        #[arg(value_name = "SOURCES", value_hint = ValueHint::FilePath, value_parser = PkgOrPathParser, hide_possible_values = true)]
+        #[arg(value_name = "SOURCES", value_hint = ValueHint::FilePath, value_parser = PackageCompletionParser, hide_possible_values = true)]
         sources: Vec<String>,
         /// Install from a git repository (e.g. 'Zillowe/Hello', 'gl:Zillowe/Hello')
         #[arg(long, value_name = "REPO", conflicts_with = "sources")]
@@ -276,7 +244,7 @@ enum Commands {
     )]
     Uninstall {
         /// One or more packages to uninstall
-        #[arg(value_name = "PACKAGES", required = true, value_parser = PackageValueParser, hide_possible_values = true)]
+        #[arg(value_name = "PACKAGES", required = true, value_parser = PackageCompletionParser, hide_possible_values = true)]
         packages: Vec<String>,
         /// The scope to uninstall the package from
         #[arg(long, value_enum, conflicts_with_all = &["local", "global"])]
@@ -337,7 +305,7 @@ enum Commands {
     /// Explains why a package is installed
     Why {
         /// The name of the package to inspect
-        #[arg(value_parser = PackageValueParser, hide_possible_values = true)]
+        #[arg(value_parser = PackageCompletionParser, hide_possible_values = true)]
         package_name: String,
     },
 
@@ -352,7 +320,7 @@ enum Commands {
     /// List all files owned by a package
     Files {
         /// The name of the package
-        #[arg(value_parser = PackageValueParser, hide_possible_values = true)]
+        #[arg(value_parser = PackageCompletionParser, hide_possible_values = true)]
         package: String,
     },
 
@@ -375,18 +343,14 @@ enum Commands {
         tags: Option<Vec<String>>,
     },
 
-    /// Installs completion scripts for a given shell
+    /// Installs completion scripts and sets up the shell environment.
+    #[command(
+        long_about = "Installs completion scripts for a given shell and adds the Zoi binary directory to your shell's PATH."
+    )]
     Shell {
-        /// The shell to install completions for
+        /// The shell to set up
         #[arg(value_enum)]
         shell: Shell,
-    },
-
-    /// Configures the shell environment for Zoi
-    #[command(
-        long_about = "Adds the Zoi binary directory to your shell's PATH to make Zoi packages' executables available as commands."
-    )]
-    Setup {
         /// The scope to apply the setup to (user or system-wide)
         #[arg(long, value_enum, default_value = "user")]
         scope: SetupScope,
@@ -399,7 +363,7 @@ enum Commands {
     )]
     Exec {
         /// Package name, local path, or URL to execute
-        #[arg(value_name = "SOURCE", value_parser = PkgOrPathParser, value_hint = ValueHint::FilePath, hide_possible_values = true)]
+        #[arg(value_name = "SOURCE", value_parser = PackageCompletionParser, value_hint = ValueHint::FilePath, hide_possible_values = true)]
         source: String,
 
         /// Force execution from a fresh download, bypassing any cache.
@@ -453,7 +417,7 @@ enum Commands {
     /// Rollback a package to the previously installed version
     Rollback {
         /// The name of the package to rollback
-        #[arg(value_name = "PACKAGE", value_parser = PackageValueParser, hide_possible_values = true, required_unless_present = "last_transaction")]
+        #[arg(value_name = "PACKAGE", value_parser = PackageCompletionParser, hide_possible_values = true, required_unless_present = "last_transaction")]
         package: Option<String>,
 
         /// Rollback the last transaction
@@ -464,7 +428,7 @@ enum Commands {
     /// Shows a package's manual
     Man {
         /// The name of the package to show the manual for
-        #[arg(value_parser = PackageValueParser, hide_possible_values = true)]
+        #[arg(value_parser = PackageCompletionParser, hide_possible_values = true)]
         package_name: String,
         /// Always look at the upstream manual even if it's downloaded
         #[arg(long)]
@@ -727,12 +691,8 @@ pub fn run() {
                 package_type,
                 tags,
             } => cmd::search::run(search_term, repo, package_type, tags),
-            Commands::Shell { shell } => {
-                cmd::shell::run(shell);
-                Ok(())
-            }
-            Commands::Setup { scope } => {
-                cmd::setup::run(scope);
+            Commands::Shell { shell, scope } => {
+                cmd::shell::run(shell, scope);
                 Ok(())
             }
             Commands::Exec {
