@@ -396,7 +396,7 @@ Zoi is hosted on multiple forges. The primary locations and mirrors are:
   <Accordion title="Where are binaries installed and how do I fix PATH?">
     Binaries are placed in `~/.zoi/pkgs/store/<name>/bin` and linked into
     `~/.zoi/pkgs/bin`. Zoi attempts to add this to your shell PATH on Unix and user PATH on Windows.
-    If commands are not found, run `zoi setup` to configure your shell, or add `~/.zoi/pkgs/bin` to your PATH manually.
+    If commands are not found, run `zoi shell <shell>` to configure your shell, or add `~/.zoi/pkgs/bin` to your PATH manually.
   </Accordion>
   <Accordion title="How do I accept all prompts (non-interactive)?">
     Pass `--yes` to installation commands to auto-accept confirmations and optional dependency prompts. To install all optional dependencies without being prompted, use `--all-optional`.

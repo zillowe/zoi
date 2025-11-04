@@ -73,8 +73,7 @@ Zoi is packed with features designed to make package management and environment 
   - `zoi doctor`: Checks for common issues and provides actionable suggestions.
 
 - **Shell Integration:**
-  - `zoi setup`: Automatically configures your shell's PATH for Zoi.
-  - `zoi shell`: Installs shell completion scripts for Bash, Zsh, Fish, and more.
+  - `zoi shell`: Automatically configures your shell's PATH for Zoi and installs shell completion scripts for Bash, Zsh, Fish, Elvish and Powershell.
 
 - **Library Support:** Use `zoi` as a Rust library in your own applications to programmatically manage packages. The `zoi-rs` crate is available on [crates.io](https://crates.io/crates/zoi-rs), [learn more](/docs/zds/zoi/lib).
 
@@ -378,23 +377,17 @@ Searches for packages by name or description.
 
 ---
 
-### `zoi setup`
-
-Configures the shell environment for Zoi.
-
-**Options:**
-
-- `--scope <user|system>`: The scope to apply the setup to (default: `user`).
-
----
-
 ### `zoi shell <shell>`
 
-Installs completion scripts for a given shell.
+Installs completion scripts for a given shell and setup PATH for Zoi.
 
 **Arguments:**
 
 - `<shell>`: The shell to install completions for (`bash`, `zsh`, `fish`, `elvish`, `powershell`).
+
+**Options:**
+
+- `--scope <user|system>`: The scope to apply the shell setup to (default: `user`).
 
 ---
 

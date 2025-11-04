@@ -60,11 +60,11 @@ This table lists all the available fields you can use inside the `metadata` bloc
 | `replaces`     | `list`   | A list of packages that this package replaces. Zoi will offer to remove them upon installation.                                   |
 | `backup`       | `list`   | A list of configuration files to preserve during upgrades. Zoi will create `.zoinew` and `.zoisave` files for these.              |
 | `types`        | `list`   | A list of supported build methods (e.g. `source`, `pre-compiled`).                                                                |
-| `package_type` | `string` | The type of package. Can be `package` (default), `collection`, `app`, or `extension`. See [Package Types](#package-types).        |
-| `sub_packages` | `list`   | A list of sub-package names to define a split package. See [Split Packages](#split-packages).                                     |
+| `package_type` | `string` | The type of package. Can be `package` (default), `collection`, `app`, or `extension`. See [Package Types](#5-package-types).      |
+| `sub_packages` | `list`   | A list of sub-package names to define a split package. See [Split Packages](#6-split-packages).                                   |
 | `main_subs`    | `list`   | For a split package, a list of the default sub-packages to install.                                                               |
 | `updates`      | `list`   | A list of tables providing structured update information (e.g. for security notices).                                             |
-| `hooks`        | `table`  | A table defining scripts to run at different points in the package lifecycle. See [Advanced Features](#advanced-features).        |
+| `hooks`        | `table`  | A table defining scripts to run at different points in the package lifecycle.                                                     |
 | `alt`          | `string` | A URL or source string for an alternative package definition to use instead of this one.                                          |
 | `tags`         | `list`   | A list of keywords to help users find the package via `zoi search`.                                                               |
 
@@ -396,7 +396,7 @@ metadata({
 
 -- 3. Dependencies
 dependencies({
-  build = { required = { "native:zig" } },
+  build = { source = { required = { "native:zig" } } },
 })
 
 -- 4. Lifecycle Functions
