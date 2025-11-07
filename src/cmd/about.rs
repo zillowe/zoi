@@ -33,8 +33,7 @@ pub fn run(branch: &str, status: &str, number: &str, commit: &str) {
 
     if has_build_info {
         println!(
-            "
-  {}",
+            "\n  {}",
             "Build Information".green()
         );
         if let Some(host) = posthog_host
@@ -55,8 +54,7 @@ pub fn run(branch: &str, status: &str, number: &str, commit: &str) {
 
     if has_packager_info {
         println!(
-            "
-  {}",
+            "\n  {}",
             "Packager Information".green()
         );
         if let Some(author) = about_packager_author

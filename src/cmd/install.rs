@@ -245,8 +245,7 @@ pub fn run(
     let total_deps = zoi_dependencies.len() + non_zoi_deps.len();
 
     println!(
-        "
---- Packages ({}) ---",
+        "\n--- Packages ({}) ---",
         direct_installs.len()
     );
     let package_list = direct_installs
@@ -258,8 +257,7 @@ pub fn run(
 
     if total_deps > 0 {
         println!(
-            "
---- Dependencies ({}) ---",
+            "\n--- Dependencies ({}) ---",
             total_deps
         );
         let zoi_dep_list = zoi_dependencies
@@ -290,8 +288,7 @@ pub fn run(
     );
 
     if !crate::utils::ask_for_confirmation(
-        "
-:: Proceed with installation?",
+        "\n:: Proceed with installation?",
         yes,
     ) {
         return;
@@ -333,8 +330,7 @@ pub fn run(
     }
 
     println!(
-        "
-:: Starting installation..."
+        "\n:: Starting installation..."
     );
     let mut overall_success = true;
     let m = MultiProgress::new();

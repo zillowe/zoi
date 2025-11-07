@@ -154,8 +154,7 @@ fn print_beautiful(
 
         if let Some(build) = &deps.build {
             println!(
-                "
-{}",
+                "\n{}",
                 "Build Dependencies:".bold()
             );
             let mut build_deps_count = 0;
@@ -167,8 +166,7 @@ fn print_beautiful(
                 }
                 for group in group.get_required_options() {
                     println!(
-                        "
-  > (Option group): {}",
+                        "\n  > (Option group): {}",
                         group.name.cyan()
                     );
                     println!("    Description: {}", group.desc);
@@ -199,8 +197,7 @@ fn print_beautiful(
                 types::BuildDependencies::Typed(typed_map) => {
                     for (build_type, group) in typed_map {
                         println!(
-                            "
-  For build type '{}':",
+                            "\n  For build type '{}':",
                             build_type.yellow()
                         );
                         handle_group(group);
