@@ -63,14 +63,14 @@ fn ensure_binary_is_cached(pkg: &types::Package, upstream: bool) -> Result<PathB
         for pkg_link in pkg_links_to_try {
             let platform = utils::get_platform()?;
             let (os, arch) = (
-                platform.split('-').next().unwrap_or(""),
-                platform.split('-').nth(1).unwrap_or(""),
+                platform.split('-').next().unwrap_or_default(),
+                platform.split('-').nth(1).unwrap_or_default(),
             );
             let url_dir = pkg_link
                 .url
                 .replace("{os}", os)
                 .replace("{arch}", arch)
-                .replace("{version}", pkg.version.as_deref().unwrap_or(""))
+                .replace("{version}", pkg.version.as_deref().unwrap_or_default())
                 .replace("{repo}", &pkg.repo);
 
             let archive_filename = format!("{}.pkg.tar.zst", pkg.name);

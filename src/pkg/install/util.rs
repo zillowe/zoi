@@ -134,7 +134,7 @@ pub fn check_for_conflicts(packages_to_install: &[&types::Package], yes: bool) -
 }
 
 pub fn get_filename_from_url(url: &str) -> &str {
-    url.split('/').next_back().unwrap_or("")
+    url.split('/').next_back().unwrap_or_default()
 }
 
 pub fn download_file_with_progress(
@@ -436,7 +436,11 @@ pub fn get_expected_hash(hash_url: &str) -> Result<String> {
     println!("Fetching hash from: {}", hash_url);
     let client = crate::utils::build_blocking_http_client(10)?;
     let resp = client.get(hash_url).send()?.text()?;
-    Ok(resp.split_whitespace().next().unwrap_or("").to_string())
+    Ok(resp
+        .split_whitespace()
+        .next()
+        .unwrap_or_default()
+        .to_string())
 }
 
 pub fn get_expected_size(size_url: &str) -> Result<u64> {
@@ -467,8 +471,8 @@ pub fn find_prebuilt_info(node: &InstallNode) -> Result<Option<types::PrebuiltIn
 
         if let Some(pkg_link) = pkg_links_to_try.into_iter().next() {
             let (os, arch) = (
-                platform.split('-').next().unwrap_or(""),
-                platform.split('-').nth(1).unwrap_or(""),
+                platform.split('-').next().unwrap_or_default(),
+                platform.split('-').nth(1).unwrap_or_default(),
             );
 
             let replace_vars = |url: &str| {

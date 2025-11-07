@@ -423,7 +423,7 @@ pub fn remove_git_repo(repo_name: &str) -> Result<()> {
             .trim_end_matches('/')
             .split('/')
             .next_back()
-            .unwrap_or("")
+            .unwrap_or_default()
             .trim_end_matches(".git");
         if name_from_url == repo_name {
             removed = true;

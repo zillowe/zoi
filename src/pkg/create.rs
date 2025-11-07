@@ -92,7 +92,7 @@ pub fn run(source: &str, app_name: Option<String>, yes: bool) -> Result<()> {
     let archive_filename = format!(
         "{}-{}-{}.pkg.tar.zst",
         pkg.name,
-        pkg.version.as_deref().unwrap_or(""),
+        pkg.version.as_deref().unwrap_or_default(),
         utils::get_platform()?,
     );
     let archive_path = build_dir.path().join(archive_filename);

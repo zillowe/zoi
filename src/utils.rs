@@ -343,7 +343,7 @@ pub fn print_repo_warning(repo_name: &str) {
     if let Ok(db_path) = crate::pkg::resolve::get_db_root()
         && let Ok(repo_config) = crate::pkg::config::read_repo_config(&db_path)
     {
-        let major_repo = repo_name.split('/').next().unwrap_or("");
+        let major_repo = repo_name.split('/').next().unwrap_or_default();
         if let Some(repo_entry) = repo_config.repos.iter().find(|r| r.name == major_repo) {
             let warning_message = match repo_entry.repo_type.as_str() {
                 "unoffical" => {

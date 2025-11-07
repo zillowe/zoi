@@ -229,7 +229,11 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
             None,
             quiet,
         )?;
-        let major_repo = repo_name.split('/').next().unwrap_or("").to_lowercase();
+        let major_repo = repo_name
+            .split('/')
+            .next()
+            .unwrap_or_default()
+            .to_lowercase();
 
         let source_type = if is_default_registry {
             let repo_config = config::read_repo_config(registry_db_path).ok();
@@ -346,7 +350,11 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
                     && let Some(provides) = &pkg.provides
                     && provides.iter().any(|p| p == &request.name)
                 {
-                    let major_repo = repo_name.split('/').next().unwrap_or("").to_lowercase();
+                    let major_repo = repo_name
+                        .split('/')
+                        .next()
+                        .unwrap_or_default()
+                        .to_lowercase();
                     let source_type = if is_default_registry {
                         let repo_config = config::read_repo_config(&registry_db_path).ok();
                         if let Some(ref cfg) = repo_config {

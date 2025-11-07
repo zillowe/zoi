@@ -234,7 +234,10 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
                     if new_path.exists() {
                         let zoinew_path = new_path.with_extension(format!(
                             "{}.zoinew",
-                            new_path.extension().and_then(|s| s.to_str()).unwrap_or("")
+                            new_path
+                                .extension()
+                                .and_then(|s| s.to_str())
+                                .unwrap_or_default()
                         ));
                         println!(
                             "Configuration file '{}' exists in new version. Saving as .zoinew",
@@ -529,7 +532,10 @@ fn run_update_all_logic(yes: bool) -> Result<()> {
                     if new_path.exists() {
                         let zoinew_path = new_path.with_extension(format!(
                             "{}.zoinew",
-                            new_path.extension().and_then(|s| s.to_str()).unwrap_or("")
+                            new_path
+                                .extension()
+                                .and_then(|s| s.to_str())
+                                .unwrap_or_default()
                         ));
                         println!(
                             "Configuration file '{}' exists in new version. Saving as .zoinew",

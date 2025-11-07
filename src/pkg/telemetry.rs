@@ -118,7 +118,7 @@ pub fn posthog_capture_event(
             },
             author: pkg.author.as_ref().map(|a| MinimalPerson {
                 name: &a.name,
-                email: a.email.as_deref().unwrap_or(""),
+                email: a.email.as_deref().unwrap_or_default(),
                 website: a.website.as_ref(),
             }),
             registry: registry_handle,

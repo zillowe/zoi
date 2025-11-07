@@ -81,7 +81,7 @@ pub fn try_build_install(
     let archive_filename = format!(
         "{}-{}-{}.pkg.tar.zst",
         pkg.name,
-        pkg.version.as_deref().unwrap_or(""),
+        pkg.version.as_deref().unwrap_or_default(),
         current_platform
     );
     let archive_path = pkg_lua_path.parent().unwrap().join(archive_filename);
