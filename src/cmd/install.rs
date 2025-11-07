@@ -194,12 +194,12 @@ pub fn run(
     for (id, node) in &graph.nodes {
         match install_plan.get(id) {
             Some(install::plan::InstallAction::DownloadAndInstall(details)) => {
-                to_download.insert(id.clone(), (node, details));
+                to_download.insert(id.clone(), (node, details.clone()));
             }
             Some(install::plan::InstallAction::BuildAndInstall) => {
                 to_build.insert(id.clone(), node);
             }
-            None => {}
+            _ => {}
         }
     }
 
@@ -215,7 +215,13 @@ pub fn run(
         println!("\nPackages to download:");
         let pkg_list: Vec<_> = to_download
             .values()
-            .map(|(n, _)| format!("{}@{}", n.pkg.name, n.version))
+            .map(|(n, _)| {
+                if let Some(sub) = &n.sub_package {
+                    format!("{}:{}@{}", n.pkg.name, sub, n.version)
+                } else {
+                    format!("{}@{}", n.pkg.name, n.version)
+                }
+            })
             .collect();
         println!("{}", pkg_list.join(" "));
         println!(
@@ -232,7 +238,13 @@ pub fn run(
         println!("Packages to build from source:");
         let pkg_list: Vec<_> = to_build
             .values()
-            .map(|n| format!("{}@{}", n.pkg.name, n.version))
+            .map(|n| {
+                if let Some(sub) = &n.sub_package {
+                    format!("{}:{}@{}", n.pkg.name, sub, n.version)
+                } else {
+                    format!("{}@{}", n.pkg.name, n.version)
+                }
+            })
             .collect();
         println!("{}", pkg_list.join(" "));
         println!(
@@ -304,6 +316,62 @@ pub fn run(
         return;
     }
 
+    let mut final_install_plan = install_plan.clone();
+
+    if !to_download.is_empty() {
+        println!("\n:: Downloading packages...");
+        let mut download_groups: HashMap<String, (&install::plan::PrebuiltDetails, Vec<&str>)> =
+            HashMap::new();
+
+        for (node, details) in to_download.values() {
+            let entry = download_groups
+                .entry(details.info.final_url.clone())
+                .or_insert((details, Vec::new()));
+            if let Some(sub) = &node.sub_package {
+                entry.1.push(sub);
+            }
+        }
+
+        let downloaded_archives: Mutex<HashMap<String, std::path::PathBuf>> =
+            Mutex::new(HashMap::new());
+        let m_for_dl = MultiProgress::new();
+
+        download_groups.par_iter().for_each(|(url, (details, _))| {
+            let first_node = to_download
+                .values()
+                .find(|(_, d)| d.info.final_url == *url)
+                .unwrap()
+                .0;
+
+            match install::installer::download_and_cache_archive(
+                first_node,
+                details,
+                Some(&m_for_dl),
+            ) {
+                Ok(path) => {
+                    downloaded_archives
+                        .lock()
+                        .unwrap()
+                        .insert(url.clone(), path);
+                }
+                Err(e) => {
+                    eprintln!("Failed to download {}: {}", url, e);
+                    failed_packages.lock().unwrap().push(url.clone());
+                }
+            }
+        });
+
+        let downloaded_archives_map = downloaded_archives.lock().unwrap();
+        for (id, (_, details)) in &to_download {
+            if let Some(downloaded_path) = downloaded_archives_map.get(&details.info.final_url) {
+                final_install_plan.insert(
+                    id.clone(),
+                    install::plan::InstallAction::InstallFromArchive(downloaded_path.clone()),
+                );
+            }
+        }
+    }
+
     let stages = match graph.toposort() {
         Ok(s) => s,
         Err(e) => {
@@ -353,7 +421,7 @@ pub fn run(
 
         stage.par_iter().for_each(|pkg_id| {
             let node = graph.nodes.get(pkg_id).unwrap();
-            let action = install_plan.get(pkg_id).unwrap();
+            let action = final_install_plan.get(pkg_id).unwrap();
 
             match install::installer::install_node(
                 node,

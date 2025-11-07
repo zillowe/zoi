@@ -1,3 +1,4 @@
+use crate::cmd::utils;
 use crate::pkg::{self, lock, transaction, types};
 use colored::*;
 use std::fs;
@@ -43,41 +44,15 @@ pub fn run(
     let mut manifests_to_uninstall: Vec<types::InstallManifest> = Vec::new();
     let mut failed_resolution = false;
 
-    for name in package_names {
-        if let Ok(request) = pkg::resolve::parse_source_string(name)
-            && request.sub_package.is_none()
-        {
-            let mut subs_to_uninstall = Vec::new();
-            let mut is_split = false;
-            for manifest in &installed_packages {
-                if manifest.name == request.name {
-                    is_split = true;
-                    if let Some(sub) = &manifest.sub_package {
-                        subs_to_uninstall.push(format!("{}:{}", manifest.name, sub));
-                    }
-                }
-            }
-
-            if is_split && !subs_to_uninstall.is_empty() {
-                println!(
-                    "'{}' is a split package. Queueing all installed sub-packages for uninstallation: {}",
-                    name,
-                    subs_to_uninstall.join(", ")
-                );
-                for sub_name in subs_to_uninstall {
-                    if let Err(e) = resolve_and_add_manifest(
-                        &sub_name,
-                        &installed_packages,
-                        &mut manifests_to_uninstall,
-                    ) {
-                        eprintln!("{}", e);
-                        failed_resolution = true;
-                    }
-                }
-                continue;
-            }
+    let expanded_names = match utils::expand_split_packages(package_names, "Uninstalling") {
+        Ok(names) => names,
+        Err(e) => {
+            eprintln!("Error expanding packages: {}", e);
+            std::process::exit(1);
         }
+    };
 
+    for name in &expanded_names {
         if let Err(e) =
             resolve_and_add_manifest(name, &installed_packages, &mut manifests_to_uninstall)
         {

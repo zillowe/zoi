@@ -5,13 +5,18 @@ use anyhow::Result;
 use rayon::prelude::*;
 use std::collections::HashMap;
 
+use std::path::PathBuf;
+
+#[derive(Clone)]
 pub struct PrebuiltDetails {
     pub info: types::PrebuiltInfo,
     pub download_size: u64,
 }
 
+#[derive(Clone)]
 pub enum InstallAction {
     DownloadAndInstall(PrebuiltDetails),
+    InstallFromArchive(PathBuf),
     BuildAndInstall,
 }
 

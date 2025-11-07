@@ -44,10 +44,20 @@ pub fn get_db_root() -> Result<PathBuf> {
 }
 
 pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
-    if source_str.contains('/')
-        && (source_str.ends_with(".manifest.yaml") || source_str.ends_with(".pkg.lua"))
+    let (path_part, sub_package) = if let Some((base, sub)) = source_str.rsplit_once(':') {
+        if (base.ends_with(".pkg.lua") || base.ends_with(".manifest.yaml")) && !sub.contains('/') {
+            (base, Some(sub.to_string()))
+        } else {
+            (source_str, None)
+        }
+    } else {
+        (source_str, None)
+    };
+
+    if path_part.contains('/')
+        && (path_part.ends_with(".manifest.yaml") || path_part.ends_with(".pkg.lua"))
     {
-        let path = std::path::Path::new(source_str);
+        let path = std::path::Path::new(path_part);
         let file_stem = path.file_stem().unwrap_or_default().to_string_lossy();
         let name = if let Some(stripped) = file_stem.strip_suffix(".manifest") {
             stripped.to_string()
@@ -60,7 +70,7 @@ pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
             handle: None,
             repo: None,
             name,
-            sub_package: None,
+            sub_package,
             version_spec: None,
         });
     }
@@ -85,7 +95,7 @@ pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
 
     let mut repo = None;
     let name: &str;
-    let mut sub_package = None;
+    let mut sub_package_repo = None;
     let mut version_spec = None;
 
     let mut version_part_str = main_part;
@@ -120,7 +130,7 @@ pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
 
     if let Some((base_name, sub_name)) = name_part.split_once(':') {
         name = base_name;
-        sub_package = Some(sub_name.to_string());
+        sub_package_repo = Some(sub_name.to_string());
     } else {
         name = name_part;
     }
@@ -133,7 +143,7 @@ pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
         handle,
         repo,
         name: name.to_lowercase(),
-        sub_package,
+        sub_package: sub_package_repo,
         version_spec,
     })
 }
@@ -150,7 +160,10 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
                 .is_some_and(|reg| reg.handle == *h);
 
             if is_default {
-                let default_registry = config.default_registry.as_ref().unwrap();
+                let default_registry = config
+                    .default_registry
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("Default registry not found"))?;
                 (
                     db_root.join(&default_registry.handle),
                     config.repos,
@@ -210,8 +223,12 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
         registry_db_path: &Path,
         quiet: bool,
     ) -> Result<FoundPackage> {
-        let pkg: types::Package =
-            crate::pkg::lua::parser::parse_lua_package(path.to_str().unwrap(), None, quiet)?;
+        let pkg: types::Package = crate::pkg::lua::parser::parse_lua_package(
+            path.to_str()
+                .ok_or_else(|| anyhow!("Path contains invalid UTF-8 characters: {:?}", path))?,
+            None,
+            quiet,
+        )?;
         let major_repo = repo_name.split('/').next().unwrap_or("").to_lowercase();
 
         let source_type = if is_default_registry {
@@ -319,10 +336,14 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
                 })
             {
                 if let Ok(pkg) = crate::pkg::lua::parser::parse_lua_package(
-                    entry.path().to_str().unwrap(),
+                    entry.path().to_str().ok_or_else(|| {
+                        anyhow!("Path contains invalid UTF-8 characters: {:?}", entry.path())
+                    })?,
                     None,
                     true,
                 ) && let Some(provides) = &pkg.provides
+                    && provides.iter().any(|p| p == &request.name)
+                    && let Some(provides) = &pkg.provides
                     && provides.iter().any(|p| p == &request.name)
                 {
                     let major_repo = repo_name.split('/').next().unwrap_or("").to_lowercase();
@@ -772,7 +793,12 @@ pub fn resolve_package_and_version(
     let pkg_lua_path = resolved_source.path.clone();
 
     let pkg_template = crate::pkg::lua::parser::parse_lua_package(
-        resolved_source.path.to_str().unwrap(),
+        resolved_source.path.to_str().ok_or_else(|| {
+            anyhow!(
+                "Path contains invalid UTF-8 characters: {:?}",
+                resolved_source.path
+            )
+        })?,
         None,
         quiet,
     )?;
@@ -789,7 +815,12 @@ pub fn resolve_package_and_version(
     )?;
 
     let mut pkg = crate::pkg::lua::parser::parse_lua_package(
-        resolved_source.path.to_str().unwrap(),
+        resolved_source.path.to_str().ok_or_else(|| {
+            anyhow!(
+                "Path contains invalid UTF-8 characters: {:?}",
+                resolved_source.path
+            )
+        })?,
         Some(&version_string),
         quiet,
     )?;
@@ -835,6 +866,16 @@ fn resolve_source_recursive(source: &str, depth: u8, quiet: bool) -> Result<Reso
         resolved_source.sharable_manifest = Some(sharable_manifest);
         return Ok(resolved_source);
     }
+
+    let (path_part, _sub_package) = if let Some((base, sub)) = source.rsplit_once(':') {
+        if (base.ends_with(".pkg.lua") || base.ends_with(".manifest.yaml")) && !sub.contains('/') {
+            (base, Some(sub.to_string()))
+        } else {
+            (source, None)
+        }
+    } else {
+        (source, None)
+    };
 
     let request = parse_source_string(source)?;
 
@@ -893,9 +934,9 @@ fn resolve_source_recursive(source: &str, depth: u8, quiet: bool) -> Result<Reso
 
         let pkg_name = Path::new(&full_pkg_path)
             .file_name()
-            .unwrap()
+            .ok_or_else(|| anyhow!("Invalid package path: {}", full_pkg_path))?
             .to_str()
-            .unwrap();
+            .ok_or_else(|| anyhow!("Package name contains invalid UTF-8: {}", full_pkg_path))?;
         let pkg_lua_filename = format!("{}.pkg.lua", pkg_name);
         let pkg_lua_path_in_repo = Path::new(&full_pkg_path).join(pkg_lua_filename);
 
@@ -904,7 +945,10 @@ fn resolve_source_recursive(source: &str, depth: u8, quiet: bool) -> Result<Reso
             base_url,
             branch_sep,
             branch,
-            pkg_lua_path_in_repo.to_str().unwrap().replace('\\', "/")
+            pkg_lua_path_in_repo
+                .to_str()
+                .ok_or_else(|| anyhow!("Package path contains invalid UTF-8"))?
+                .replace('\\', "/")
         );
 
         let pkg_lua_content = download_content_from_url(&pkg_lua_url)?;
@@ -976,10 +1020,10 @@ fn resolve_source_recursive(source: &str, depth: u8, quiet: bool) -> Result<Reso
         }
     } else if source.starts_with("http://") || source.starts_with("https://") {
         download_from_url(source)?
-    } else if source.ends_with(".pkg.lua") {
-        let path = PathBuf::from(source);
+    } else if path_part.ends_with(".pkg.lua") {
+        let path = PathBuf::from(path_part);
         if !path.exists() {
-            return Err(anyhow!("Local file not found at '{source}'"));
+            return Err(anyhow!("Local file not found at '{path_part}'"));
         }
         ResolvedSource {
             path,
@@ -993,7 +1037,12 @@ fn resolve_source_recursive(source: &str, depth: u8, quiet: bool) -> Result<Reso
     };
 
     let pkg_for_alt_check = crate::pkg::lua::parser::parse_lua_package(
-        resolved_source.path.to_str().unwrap(),
+        resolved_source.path.to_str().ok_or_else(|| {
+            anyhow!(
+                "Path contains invalid UTF-8 characters: {:?}",
+                resolved_source.path
+            )
+        })?,
         None,
         quiet,
     )?;
@@ -1043,7 +1092,16 @@ fn resolve_source_recursive(source: &str, depth: u8, quiet: bool) -> Result<Reso
                     Utc::now().timestamp_nanos_opt().unwrap_or(0)
                 ));
                 fs::write(&temp_path, &content)?;
-                resolve_source_recursive(temp_path.to_str().unwrap(), depth + 1, quiet)?
+                resolve_source_recursive(
+                    temp_path.to_str().ok_or_else(|| {
+                        anyhow!(
+                            "Temporary path contains invalid UTF-8 characters: {:?}",
+                            temp_path
+                        )
+                    })?,
+                    depth + 1,
+                    quiet,
+                )?
             } else {
                 resolve_source_recursive(&alt_source, depth + 1, quiet)?
             };

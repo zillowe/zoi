@@ -20,7 +20,12 @@ pub struct Dependency<'a> {
 pub fn parse_dependency_string(dep_str: &str) -> Result<Dependency<'_>> {
     (|| {
         let (manager, rest) = match dep_str.split_once(':') {
-            Some((m, r)) if !m.is_empty() => (m, r),
+            Some((m, r))
+                if !m.is_empty()
+                    && (pm::MANAGERS.contains_key(m) || m == "zoi" || m == "native") =>
+            {
+                (m, r)
+            }
             _ => ("zoi", dep_str),
         };
 

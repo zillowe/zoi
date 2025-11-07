@@ -30,5 +30,6 @@ pub mod uninstall;
 pub mod unpin;
 pub mod update;
 pub mod upgrade;
+pub mod utils;
 pub mod version;
 pub mod why;

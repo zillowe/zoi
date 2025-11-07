@@ -1,5 +1,6 @@
 use crate::pkg::{
     config, dependencies, local, resolve,
+    resolve::SourceType,
     types::{self, InstallReason, Package},
 };
 use anyhow::{Result, anyhow};
@@ -58,6 +59,7 @@ pub fn collect_dependencies_for_group(
 pub struct InstallNode {
     pub pkg: Package,
     pub version: String,
+    pub sub_package: Option<String>,
     pub reason: InstallReason,
     pub source: String,
     pub registry_handle: String,
@@ -259,20 +261,25 @@ pub fn resolve_dependency_graph(
                         subs_to_install.join(", ")
                     );
 
-                    let mut base_source = String::new();
-                    if let Some(h) = &request.handle {
-                        base_source.push('#');
-                        base_source.push_str(h);
-                    }
-                    if let Some(r) = &request.repo {
-                        base_source.push('@');
-                        base_source.push_str(r);
-                        base_source.push('/');
-                    }
-                    base_source.push_str(&request.name);
+                    let base_source_for_subs = if resolved.source_type == SourceType::LocalFile {
+                        source.clone()
+                    } else {
+                        let mut base_source = String::new();
+                        if let Some(h) = &request.handle {
+                            base_source.push('#');
+                            base_source.push_str(h);
+                        }
+                        if let Some(r) = &request.repo {
+                            base_source.push('@');
+                            base_source.push_str(r);
+                            base_source.push('/');
+                        }
+                        base_source.push_str(&request.name);
+                        base_source
+                    };
 
                     for sub in subs_to_install {
-                        let sub_source = format!("{}:{}", base_source, sub);
+                        let sub_source = format!("{}:{}", base_source_for_subs, sub);
                         let final_source = if let Some(v) = &request.version_spec {
                             format!("{}@{}", sub_source, v)
                         } else {
@@ -423,6 +430,7 @@ pub fn resolve_dependency_graph(
         let node = InstallNode {
             pkg: pkg.clone(),
             version,
+            sub_package: request.sub_package.clone(),
             reason: if let Some(parent) = parent_id {
                 InstallReason::Dependency { parent }
             } else {

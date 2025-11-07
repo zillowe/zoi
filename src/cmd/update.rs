@@ -1,5 +1,5 @@
+use crate::cmd::utils as cmd_utils;
 use crate::pkg::{config, hooks, install, local, pin, resolve, transaction, types};
-use crate::utils;
 use anyhow::{Result, anyhow};
 use colored::*;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -16,36 +16,7 @@ pub fn run(all: bool, package_names: &[String], yes: bool) -> Result<()> {
         return Ok(());
     }
 
-    let mut expanded_package_names = Vec::new();
-    for name in package_names {
-        let request = resolve::parse_source_string(name)?;
-        if request.sub_package.is_none()
-            && let Ok((pkg, _, _, _, _)) = resolve::resolve_package_and_version(name, true)
-            && pkg.sub_packages.is_some()
-        {
-            let installed = local::get_installed_packages()?;
-            let mut installed_subs = Vec::new();
-            for manifest in installed {
-                if manifest.name == pkg.name
-                    && let Some(sub) = manifest.sub_package
-                {
-                    installed_subs.push(sub);
-                }
-            }
-            if !installed_subs.is_empty() {
-                println!(
-                    "'{}' is a split package. Updating all installed sub-packages: {}",
-                    name,
-                    installed_subs.join(", ")
-                );
-                for sub in installed_subs {
-                    expanded_package_names.push(format!("{}:{}", name, sub));
-                }
-                continue;
-            }
-        }
-        expanded_package_names.push(name.clone());
-    }
+    let expanded_package_names = cmd_utils::expand_split_packages(package_names, "Updating")?;
 
     let mut failed_packages = Vec::new();
 
@@ -149,7 +120,7 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
     );
     println!();
 
-    if !utils::ask_for_confirmation(
+    if !crate::utils::ask_for_confirmation(
         &format!("Update from {} to {}?", old_manifest.version, new_version),
         yes,
     ) {
@@ -399,7 +370,7 @@ fn run_update_all_logic(yes: bool) -> Result<()> {
     );
 
     println!();
-    if !utils::ask_for_confirmation("Do you want to upgrade these packages?", yes) {
+    if !crate::utils::ask_for_confirmation("Do you want to upgrade these packages?", yes) {
         return Ok(());
     }
 

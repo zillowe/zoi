@@ -13,6 +13,7 @@ use std::io::{self};
 const BRANCH: &str = "Production";
 const STATUS: &str = "Release";
 const NUMBER: &str = "1.4.0";
+const PKG_SOURCE_HELP: &str = "Package identifier (e.g. @repo/name, path, or URL)";
 
 /// Zoi - The Universal Package Manager & Environment Setup Tool.
 ///
@@ -169,8 +170,7 @@ enum Commands {
 
     /// Shows detailed information about a package
     Show {
-        /// The name of the package to show
-        #[arg(value_parser = PackageCompletionParser, hide_possible_values = true)]
+        #[arg(value_parser = PackageCompletionParser, hide_possible_values = true, help = PKG_SOURCE_HELP)]
         package_name: String,
         /// Display the raw, unformatted package file
         #[arg(long)]
@@ -179,8 +179,7 @@ enum Commands {
 
     /// Pin a package to a specific version
     Pin {
-        /// The name of the package to pin
-        #[arg(value_parser = PackageCompletionParser, hide_possible_values = true)]
+        #[arg(value_parser = PackageCompletionParser, hide_possible_values = true, help = PKG_SOURCE_HELP)]
         package: String,
         /// The version to pin the package to
         version: String,
@@ -188,16 +187,14 @@ enum Commands {
 
     /// Unpin a package, allowing it to be updated
     Unpin {
-        /// The name of the package to unpin
-        #[arg(value_parser = PackageCompletionParser, hide_possible_values = true)]
+        #[arg(value_parser = PackageCompletionParser, hide_possible_values = true, help = PKG_SOURCE_HELP)]
         package: String,
     },
 
     /// Updates one or more packages to their latest versions
     #[command(alias = "up")]
     Update {
-        /// The name(s) of the package(s) to update
-        #[arg(value_name = "PACKAGES", value_parser = PackageCompletionParser, hide_possible_values = true)]
+        #[arg(value_name = "PACKAGES", value_parser = PackageCompletionParser, hide_possible_values = true, help = PKG_SOURCE_HELP)]
         package_names: Vec<String>,
 
         /// Update all installed packages
@@ -208,8 +205,7 @@ enum Commands {
     /// Installs one or more packages from a name, local file, URL, or git repository
     #[command(alias = "i")]
     Install {
-        /// Package names, local paths, or URLs to .pkg.lua files
-        #[arg(value_name = "SOURCES", value_hint = ValueHint::FilePath, value_parser = PackageCompletionParser, hide_possible_values = true)]
+        #[arg(value_name = "SOURCES", value_hint = ValueHint::FilePath, value_parser = PackageCompletionParser, hide_possible_values = true, help = PKG_SOURCE_HELP)]
         sources: Vec<String>,
         /// Install from a git repository (e.g. 'Zillowe/Hello', 'gl:Zillowe/Hello')
         #[arg(long, value_name = "REPO", conflicts_with = "sources")]
@@ -243,8 +239,7 @@ enum Commands {
         long_about = "Removes one or more packages' files from the Zoi store and deletes their symlinks from the bin directory. This command will fail if a package was not installed by Zoi."
     )]
     Uninstall {
-        /// One or more packages to uninstall
-        #[arg(value_name = "PACKAGES", required = true, value_parser = PackageCompletionParser, hide_possible_values = true)]
+        #[arg(value_name = "PACKAGES", required = true, value_parser = PackageCompletionParser, hide_possible_values = true, help = PKG_SOURCE_HELP)]
         packages: Vec<String>,
         /// The scope to uninstall the package from
         #[arg(long, value_enum, conflicts_with_all = &["local", "global"])]
@@ -304,8 +299,7 @@ enum Commands {
 
     /// Explains why a package is installed
     Why {
-        /// The name of the package to inspect
-        #[arg(value_parser = PackageCompletionParser, hide_possible_values = true)]
+        #[arg(value_parser = PackageCompletionParser, hide_possible_values = true, help = PKG_SOURCE_HELP)]
         package_name: String,
     },
 
@@ -319,8 +313,7 @@ enum Commands {
 
     /// List all files owned by a package
     Files {
-        /// The name of the package
-        #[arg(value_parser = PackageCompletionParser, hide_possible_values = true)]
+        #[arg(value_parser = PackageCompletionParser, hide_possible_values = true, help = PKG_SOURCE_HELP)]
         package: String,
     },
 
@@ -362,8 +355,7 @@ enum Commands {
         long_about = "Downloads a binary to a temporary cache and executes it in a shell. All arguments after the package name are passed as arguments to the shell command."
     )]
     Exec {
-        /// Package name, local path, or URL to execute
-        #[arg(value_name = "SOURCE", value_parser = PackageCompletionParser, value_hint = ValueHint::FilePath, hide_possible_values = true)]
+        #[arg(value_name = "SOURCE", value_parser = PackageCompletionParser, value_hint = ValueHint::FilePath, hide_possible_values = true, help = PKG_SOURCE_HELP)]
         source: String,
 
         /// Force execution from a fresh download, bypassing any cache.
@@ -404,7 +396,7 @@ enum Commands {
 
     /// Create an application using a package template
     Create {
-        /// Package name, @repo/name, local .pkg.lua path, or URL
+        #[arg(help = PKG_SOURCE_HELP)]
         source: String,
         /// The application name to substitute into template commands
         app_name: Option<String>,
@@ -416,8 +408,7 @@ enum Commands {
 
     /// Rollback a package to the previously installed version
     Rollback {
-        /// The name of the package to rollback
-        #[arg(value_name = "PACKAGE", value_parser = PackageCompletionParser, hide_possible_values = true, required_unless_present = "last_transaction")]
+        #[arg(value_name = "PACKAGE", value_parser = PackageCompletionParser, hide_possible_values = true, required_unless_present = "last_transaction", help = PKG_SOURCE_HELP)]
         package: Option<String>,
 
         /// Rollback the last transaction
@@ -427,8 +418,7 @@ enum Commands {
 
     /// Shows a package's manual
     Man {
-        /// The name of the package to show the manual for
-        #[arg(value_parser = PackageCompletionParser, hide_possible_values = true)]
+        #[arg(value_parser = PackageCompletionParser, hide_possible_values = true, help = PKG_SOURCE_HELP)]
         package_name: String,
         /// Always look at the upstream manual even if it's downloaded
         #[arg(long)]

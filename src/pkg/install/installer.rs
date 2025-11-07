@@ -7,15 +7,14 @@ use anyhow::{Result, anyhow};
 use colored::Colorize;
 use indicatif::MultiProgress;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-fn download_and_install(
+pub fn download_and_cache_archive(
     node: &InstallNode,
     details: &plan::PrebuiltDetails,
     m: Option<&MultiProgress>,
-    yes: bool,
-) -> Result<Vec<String>> {
-    let pkg = &node.pkg;
+) -> Result<PathBuf> {
+    let _pkg = &node.pkg;
     let config = config::read_config()?;
     let signature_policy = config.policy.signature_enforcement.filter(|p| p.enable);
 
@@ -85,24 +84,13 @@ fn download_and_install(
         fs::copy(&temp_archive_path, &cached_archive_path)?;
     }
 
-    let sub_packages_vec = resolve::parse_source_string(&node.source)?
-        .sub_package
-        .map(|s| vec![s]);
-
-    crate::pkg::package::install::run(
-        &cached_archive_path,
-        Some(pkg.scope),
-        &node.registry_handle,
-        Some(&node.version),
-        yes,
-        sub_packages_vec,
-    )
+    Ok(cached_archive_path)
 }
 
 pub fn install_node(
     node: &InstallNode,
     action: &plan::InstallAction,
-    m: Option<&MultiProgress>,
+    _m: Option<&MultiProgress>,
     build_type: Option<&str>,
     yes: bool,
 ) -> Result<types::InstallManifest> {
@@ -119,10 +107,20 @@ pub fn install_node(
     let request = resolve::parse_source_string(&node.source)?;
     let sub_package_to_install = request.sub_package;
 
+    let sub_packages_vec = sub_package_to_install.clone().map(|s| vec![s]);
+
     let installed_files = match action {
-        plan::InstallAction::DownloadAndInstall(details) => {
-            download_and_install(node, details, m, yes)?
+        plan::InstallAction::DownloadAndInstall(_) => {
+            unreachable!("Download should have been handled before install_node")
         }
+        plan::InstallAction::InstallFromArchive(archive_path) => crate::pkg::package::install::run(
+            archive_path,
+            Some(pkg.scope),
+            &node.registry_handle,
+            Some(&node.version),
+            yes,
+            sub_packages_vec,
+        )?,
         plan::InstallAction::BuildAndInstall => {
             println!(
                 "{}",
