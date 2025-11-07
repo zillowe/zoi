@@ -1,11 +1,9 @@
-use crate::pkg::{install, types};
+use crate::pkg::types;
 use anyhow::{Result, anyhow};
 use colored::*;
 use serde::Deserialize;
-use std::collections::HashSet;
 use std::env;
 use std::fs;
-use std::sync::Mutex;
 
 #[derive(Debug, Deserialize)]
 struct RepoFile {
@@ -52,18 +50,14 @@ pub fn run(
 
     let package_source = &repo_file.package;
 
-    let mode = install::InstallMode::PreferPrebuilt;
-
     let scope_override = scope.map(|s| match s {
         crate::cli::SetupScope::User => types::Scope::User,
         crate::cli::SetupScope::System => types::Scope::System,
     });
 
-    let processed_deps = Mutex::new(HashSet::new());
-
     println!("Starting installation of package from git repo...");
 
-    if package_source.starts_with("http") {
+    let source_to_install = if package_source.starts_with("http") {
         println!("Package source is a URL: {}", package_source.cyan());
         let pkg_content = reqwest::blocking::get(package_source)?.text()?;
         let temp_path = env::temp_dir().join(format!(
@@ -71,22 +65,7 @@ pub fn run(
             chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
         ));
         fs::write(&temp_path, pkg_content)?;
-        let result = install::run_installation(
-            temp_path.to_str().unwrap(),
-            mode,
-            force,
-            types::InstallReason::Direct,
-            yes,
-            all_optional,
-            false,
-            &processed_deps,
-            scope_override,
-            None,
-            None,
-        )
-        .map(|_| ());
-        fs::remove_file(temp_path)?;
-        result
+        temp_path.to_str().unwrap().to_string()
     } else if package_source.ends_with(".pkg.lua")
         || (package_source.contains('/') && !package_source.starts_with('@'))
     {
@@ -101,42 +80,33 @@ pub fn run(
             chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
         ));
         fs::write(&temp_path, pkg_content)?;
-        let result = install::run_installation(
-            temp_path.to_str().unwrap(),
-            mode,
-            force,
-            types::InstallReason::Direct,
-            yes,
-            all_optional,
-            false,
-            &processed_deps,
-            scope_override,
-            None,
-            None,
-        )
-        .map(|_| ());
-        fs::remove_file(temp_path)?;
-        result
+        temp_path.to_str().unwrap().to_string()
     } else {
         println!(
             "Package source is a package name: {}",
             package_source.cyan()
         );
-        install::run_installation(
-            package_source,
-            mode,
-            force,
-            types::InstallReason::Direct,
-            yes,
-            all_optional,
-            false,
-            &processed_deps,
-            scope_override,
-            None,
-            None,
-        )
-        .map(|_| ())
-    }
+        package_source.to_string()
+    };
+
+    crate::cmd::install::run(
+        &[source_to_install],
+        None,
+        force,
+        all_optional,
+        yes,
+        scope_override.map(|s| match s {
+            types::Scope::User => crate::cli::InstallScope::User,
+            types::Scope::System => crate::cli::InstallScope::System,
+            types::Scope::Project => crate::cli::InstallScope::Project,
+        }),
+        false,
+        false,
+        false,
+        None,
+    );
+
+    Ok(())
 }
 
 fn parse_repo_spec(spec: &str) -> Result<(String, String)> {

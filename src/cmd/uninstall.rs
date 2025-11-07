@@ -1,5 +1,8 @@
 use crate::pkg::{self, transaction, types};
 use colored::*;
+use std::fs;
+use std::path::Path;
+use walkdir::WalkDir;
 
 pub fn run(
     package_names: &[String],
@@ -36,7 +39,9 @@ pub fn run(
             std::process::exit(1);
         }
     };
-    let mut final_package_names = Vec::new();
+
+    let mut manifests_to_uninstall: Vec<types::InstallManifest> = Vec::new();
+    let mut failed_resolution = false;
 
     for name in package_names {
         if let Ok(request) = pkg::resolve::parse_source_string(name)
@@ -59,32 +64,82 @@ pub fn run(
                     name,
                     subs_to_uninstall.join(", ")
                 );
-                final_package_names.extend(subs_to_uninstall);
+                for sub_name in subs_to_uninstall {
+                    if let Err(e) = resolve_and_add_manifest(
+                        &sub_name,
+                        &installed_packages,
+                        &mut manifests_to_uninstall,
+                    ) {
+                        eprintln!("{}", e);
+                        failed_resolution = true;
+                    }
+                }
                 continue;
             }
         }
-        final_package_names.push(name.clone());
-    }
-    final_package_names.sort();
-    final_package_names.dedup();
 
-    let mut total_size_freed_bytes: u64 = 0;
-    for name in &final_package_names {
-        if let Some(manifest) = installed_packages.iter().find(|m| {
-            let manifest_name = if let Some(sub) = &m.sub_package {
-                format!("{}:{}", m.name, sub)
-            } else {
-                m.name.clone()
-            };
-            &manifest_name == name
-        }) {
-            total_size_freed_bytes += manifest.installed_size.unwrap_or(0);
+        if let Err(e) =
+            resolve_and_add_manifest(name, &installed_packages, &mut manifests_to_uninstall)
+        {
+            eprintln!("{}", e);
+            failed_resolution = true;
         }
     }
 
+    if failed_resolution {
+        std::process::exit(1);
+    }
+
+    if manifests_to_uninstall.is_empty() {
+        println!("No packages to uninstall.");
+        return;
+    }
+
+    manifests_to_uninstall.sort_by(|a, b| a.name.cmp(&b.name));
+    manifests_to_uninstall.dedup_by(|a, b| {
+        a.name == b.name
+            && a.sub_package == b.sub_package
+            && a.repo == b.repo
+            && a.registry_handle == b.registry_handle
+    });
+
+    let mut total_size_freed_bytes: u64 = 0;
+    for manifest in &manifests_to_uninstall {
+        let mut package_size: u64 = 0;
+        for file_path_str in &manifest.installed_files {
+            let path = Path::new(file_path_str);
+            if !path.exists() {
+                continue;
+            }
+            if path.is_dir() {
+                package_size += WalkDir::new(path)
+                    .into_iter()
+                    .filter_map(|e| e.ok())
+                    .filter_map(|e| e.metadata().ok())
+                    .filter(|m| m.is_file())
+                    .map(|m| m.len())
+                    .sum::<u64>();
+            } else if let Ok(metadata) = fs::metadata(path) {
+                package_size += metadata.len();
+            }
+        }
+        total_size_freed_bytes += package_size;
+    }
+
     println!("Packages to remove:");
-    for name in &final_package_names {
-        println!("  - {}", name);
+    for manifest in &manifests_to_uninstall {
+        let source_str = if let Some(sub) = &manifest.sub_package {
+            format!(
+                "#{}@{}/{}:{}",
+                manifest.registry_handle, manifest.repo, manifest.name, sub
+            )
+        } else {
+            format!(
+                "#{}@{}/{}",
+                manifest.registry_handle, manifest.repo, manifest.name
+            )
+        };
+        println!("  - {}", source_str);
     }
 
     println!(
@@ -107,10 +162,25 @@ pub fn run(
     let mut failed_packages = Vec::new();
     let mut successfully_uninstalled = Vec::new();
 
-    for name in &final_package_names {
-        println!("--- Uninstalling package '{}' ---", name.blue().bold(),);
+    for manifest in &manifests_to_uninstall {
+        let source_str = if let Some(sub) = &manifest.sub_package {
+            format!(
+                "#{}@{}/{}:{}",
+                manifest.registry_handle, manifest.repo, manifest.name, sub
+            )
+        } else {
+            format!(
+                "#{}@{}/{}",
+                manifest.registry_handle, manifest.repo, manifest.name
+            )
+        };
 
-        match pkg::uninstall::run(name, scope_override) {
+        println!(
+            "--- Uninstalling package '{}' ---",
+            source_str.blue().bold()
+        );
+
+        match pkg::uninstall::run(&source_str, scope_override) {
             Ok(uninstalled_manifest) => {
                 if let Err(e) = transaction::record_operation(
                     &transaction.id,
@@ -118,16 +188,19 @@ pub fn run(
                         manifest: Box::new(uninstalled_manifest),
                     },
                 ) {
-                    eprintln!("Failed to record transaction operation for {}: {}", name, e);
-                    failed_packages.push(name.clone());
+                    eprintln!(
+                        "Failed to record transaction operation for {}: {}",
+                        source_str, e
+                    );
+                    failed_packages.push(source_str.clone());
                 } else {
-                    successfully_uninstalled.push(name.clone());
+                    successfully_uninstalled.push(source_str.clone());
                     println!("\n{} Uninstallation complete.", "Success:".green());
                 }
             }
             Err(e) => {
                 eprintln!("\nError: {}", e);
-                failed_packages.push(name.clone());
+                failed_packages.push(source_str.clone());
             }
         }
     }
@@ -158,5 +231,61 @@ pub fn run(
             "Warning".yellow().bold(),
             e
         );
+    }
+}
+
+fn resolve_and_add_manifest(
+    name: &str,
+    installed_packages: &[types::InstallManifest],
+    manifests_to_uninstall: &mut Vec<types::InstallManifest>,
+) -> Result<(), String> {
+    let request = match pkg::resolve::parse_source_string(name) {
+        Ok(req) => req,
+        Err(e) => return Err(format!("Error: Invalid package name '{}': {}", name, e)),
+    };
+
+    let mut candidates: Vec<_> = installed_packages
+        .iter()
+        .filter(|m| {
+            let name_matches = m.name == request.name;
+            let sub_matches = m.sub_package == request.sub_package;
+            name_matches && sub_matches
+        })
+        .collect();
+
+    if let Some(repo) = &request.repo {
+        candidates.retain(|m| m.repo == *repo);
+    }
+    if let Some(handle) = &request.handle {
+        candidates.retain(|m| m.registry_handle == *handle);
+    }
+
+    match candidates.len() {
+        0 => Err(format!("Error: Package '{}' is not installed.", name)),
+        1 => {
+            if !manifests_to_uninstall.iter().any(|m| {
+                m.name == candidates[0].name
+                    && m.sub_package == candidates[0].sub_package
+                    && m.repo == candidates[0].repo
+                    && m.registry_handle == candidates[0].registry_handle
+            }) {
+                manifests_to_uninstall.push(candidates[0].clone());
+            }
+            Ok(())
+        }
+        _ => {
+            let mut error_msg = format!(
+                "Error: Ambiguous package name '{}'. It is installed from multiple repositories:\n",
+                name
+            );
+            for manifest in candidates {
+                error_msg.push_str(&format!(
+                    "  - #{}@{}/{}\n",
+                    manifest.registry_handle, manifest.repo, manifest.name
+                ));
+            }
+            error_msg.push_str("Please be more specific, e.g. '#handle@repo/name'.");
+            Err(error_msg)
+        }
     }
 }

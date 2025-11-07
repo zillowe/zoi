@@ -3,7 +3,7 @@ use crate::project;
 use colored::Colorize;
 use indicatif::MultiProgress;
 use rayon::prelude::*;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 
 pub fn run(
@@ -93,7 +93,6 @@ pub fn run(
             .unwrap();
     }
 
-    let mode = install::InstallMode::PreferPrebuilt;
     let failed_packages = Mutex::new(Vec::new());
     let mut temp_files = Vec::new();
     let mut final_sources = Vec::new();
@@ -127,6 +126,7 @@ pub fn run(
         force,
         yes,
         all_optional,
+        build_type.as_deref(),
         true,
     ) {
         Ok(res) => res,
@@ -167,7 +167,7 @@ pub fn run(
         }
     }
 
-    println!("\n{}", "Looking for conflicts...".bold());
+    println!("{}", "Looking for conflicts...".bold());
     if let Err(e) = install::util::check_for_conflicts(&packages_to_install, yes) {
         eprintln!("{}: {}", "Error".red().bold(), e);
         std::process::exit(1);
@@ -180,117 +180,126 @@ pub fn run(
     }
     let _ = m_for_conflict_check.clear();
 
-    println!("{}", "Checking available disk space...".bold());
-    let total_installed_size_bytes: u64 = graph
-        .nodes
-        .values()
-        .map(|n| n.pkg.installed_size.unwrap_or(0))
-        .sum();
-
-    let install_path =
-        match crate::pkg::local::get_store_base_dir(scope_override.unwrap_or_default()) {
-            Ok(path) => path,
-            Err(e) => {
-                eprintln!(
-                    "{}: Could not determine install path: {}",
-                    "Error".red().bold(),
-                    e
-                );
-                std::process::exit(1);
-            }
-        };
-
-    if let Err(e) = std::fs::create_dir_all(&install_path) {
-        eprintln!(
-            "{}: Could not create install directory: {}",
-            "Error".red().bold(),
-            e
-        );
-        std::process::exit(1);
-    }
-
-    let available_space_bytes = match fs2::available_space(&install_path) {
-        Ok(space) => space,
+    let install_plan = match install::plan::create_install_plan(&graph.nodes) {
+        Ok(plan) => plan,
         Err(e) => {
-            eprintln!(
-                "{}: Could not check available disk space: {}",
-                "Warning".yellow().bold(),
-                e
-            );
-            u64::MAX
+            eprintln!("{}: {}", "Failed to create install plan".red().bold(), e);
+            std::process::exit(1);
         }
     };
 
-    if total_installed_size_bytes > available_space_bytes {
-        eprintln!(
-            "{}: Not enough disk space. Required: {}, Available: {}",
-            "Error".red().bold(),
-            crate::utils::format_bytes(total_installed_size_bytes),
-            crate::utils::format_bytes(available_space_bytes)
-        );
-        std::process::exit(1);
+    let mut to_download = HashMap::new();
+    let mut to_build = HashMap::new();
+
+    for (id, node) in &graph.nodes {
+        match install_plan.get(id) {
+            Some(install::plan::InstallAction::DownloadAndInstall(details)) => {
+                to_download.insert(id.clone(), (node, details));
+            }
+            Some(install::plan::InstallAction::BuildAndInstall) => {
+                to_build.insert(id.clone(), node);
+            }
+            None => {}
+        }
     }
 
-    let direct_installs: Vec<_> = graph
-        .nodes
+    let total_download_size: u64 = to_download.values().map(|(_, d)| d.download_size).sum();
+    let total_installed_size: u64 = to_download
         .values()
-        .filter(|n| matches!(n.reason, types::InstallReason::Direct))
-        .collect();
-    let zoi_dependencies: Vec<_> = graph
-        .nodes
-        .values()
-        .filter(|n| matches!(n.reason, types::InstallReason::Dependency { .. }))
-        .collect();
-
-    let total_deps = zoi_dependencies.len() + non_zoi_deps.len();
-
-    println!(
-        "\n--- Packages ({}) ---",
-        direct_installs.len()
-    );
-    let package_list = direct_installs
-        .iter()
-        .map(|n| format!("{}@{}", n.pkg.name, n.version))
-        .collect::<Vec<_>>()
-        .join(" ");
-    println!("{}", package_list);
-
-    if total_deps > 0 {
-        println!(
-            "\n--- Dependencies ({}) ---",
-            total_deps
-        );
-        let zoi_dep_list = zoi_dependencies
-            .iter()
-            .map(|n| format!("zoi:{}@{}", n.pkg.name, n.version))
-            .collect::<Vec<_>>();
-
-        let mut all_deps = zoi_dep_list;
-        all_deps.extend(non_zoi_deps.clone());
-        all_deps.sort();
-
-        println!("{}", all_deps.join(" "));
-    }
-
-    let total_download_size_bytes: u64 = graph
-        .nodes
-        .values()
-        .map(|n| n.pkg.archive_size.unwrap_or(0))
+        .map(|(n, _)| n.pkg.installed_size.unwrap_or(0))
         .sum();
 
-    println!(
-        "\nTotal Download Size:   {}",
-        crate::utils::format_bytes(total_download_size_bytes)
-    );
-    println!(
-        "Total Installed Size:  {}",
-        crate::utils::format_bytes(total_installed_size_bytes)
-    );
+    println!("\n--- Summary ---");
 
-    if !crate::utils::ask_for_confirmation(
-        "\n:: Proceed with installation?",
-        yes,
-    ) {
+    if !to_download.is_empty() {
+        println!("\nPackages to download:");
+        let pkg_list: Vec<_> = to_download
+            .values()
+            .map(|(n, _)| format!("{}@{}", n.pkg.name, n.version))
+            .collect();
+        println!("{}", pkg_list.join(" "));
+        println!(
+            "Total Download Size:  {}",
+            crate::utils::format_bytes(total_download_size)
+        );
+        println!(
+            "Total Installed Size: {}",
+            crate::utils::format_bytes(total_installed_size)
+        );
+    }
+
+    if !to_build.is_empty() {
+        println!("Packages to build from source:");
+        let pkg_list: Vec<_> = to_build
+            .values()
+            .map(|n| format!("{}@{}", n.pkg.name, n.version))
+            .collect();
+        println!("{}", pkg_list.join(" "));
+        println!(
+            "{}",
+            "(Sizes for built packages are not available beforehand)".yellow()
+        );
+    }
+
+    if !non_zoi_deps.is_empty() {
+        println!("\nExternal dependencies:");
+        let pkg_list: Vec<_> = non_zoi_deps.iter().map(|d| d.cyan().to_string()).collect();
+        println!("{}", pkg_list.join(" "));
+    }
+
+    if !to_build.is_empty() {
+        println!(
+            "\n{}: Disk space check is skipped when packages need to be built from source.",
+            "Warning".yellow()
+        );
+    } else {
+        println!("\n{}", "Checking available disk space...".bold());
+        let install_path =
+            match crate::pkg::local::get_store_base_dir(scope_override.unwrap_or_default()) {
+                Ok(path) => path,
+                Err(e) => {
+                    eprintln!(
+                        "{}: Could not determine install path: {}",
+                        "Error".red().bold(),
+                        e
+                    );
+                    std::process::exit(1);
+                }
+            };
+
+        if let Err(e) = std::fs::create_dir_all(&install_path) {
+            eprintln!(
+                "{}: Could not create install directory: {}",
+                "Error".red().bold(),
+                e
+            );
+            std::process::exit(1);
+        }
+
+        let available_space = match fs2::available_space(&install_path) {
+            Ok(space) => space,
+            Err(e) => {
+                eprintln!(
+                    "{}: Could not check available disk space: {}",
+                    "Warning".yellow().bold(),
+                    e
+                );
+                u64::MAX
+            }
+        };
+
+        if total_installed_size > available_space {
+            eprintln!(
+                "{}: Not enough disk space. Required: {}, Available: {}",
+                "Error".red().bold(),
+                crate::utils::format_bytes(total_installed_size),
+                crate::utils::format_bytes(available_space)
+            );
+            std::process::exit(1);
+        }
+    }
+
+    if !crate::utils::ask_for_confirmation("\n:: Proceed with installation?", yes) {
         return;
     }
 
@@ -329,9 +338,7 @@ pub fn run(
         }
     }
 
-    println!(
-        "\n:: Starting installation..."
-    );
+    println!("\n:: Starting installation...");
     let mut overall_success = true;
     let m = MultiProgress::new();
 
@@ -345,9 +352,15 @@ pub fn run(
 
         stage.par_iter().for_each(|pkg_id| {
             let node = graph.nodes.get(pkg_id).unwrap();
+            let action = install_plan.get(pkg_id).unwrap();
 
-            match install::installer::install_node(node, mode, Some(&m), build_type.as_deref(), yes)
-            {
+            match install::installer::install_node(
+                node,
+                action,
+                Some(&m),
+                build_type.as_deref(),
+                yes,
+            ) {
                 Ok(manifest) => {
                     println!("Successfully installed {}", node.pkg.name.green());
                     installed_manifests.lock().unwrap().push(manifest.clone());

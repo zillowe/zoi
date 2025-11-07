@@ -1,17 +1,12 @@
-use crate::pkg::{install, local, types};
+use crate::pkg::{install, local, pm, types};
 use crate::utils;
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use colored::*;
 use dialoguer::{Input, Select, theme::ColorfulTheme};
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use regex::Regex;
-use semver::{Version, VersionReq};
+use indicatif::MultiProgress;
+use semver::VersionReq;
 use std::collections::HashSet;
-use std::fs;
-use std::io::Read;
-use std::process::Command;
 use std::sync::Mutex;
-use tempfile::Builder;
 
 #[derive(Debug)]
 pub struct Dependency<'a> {
@@ -23,92 +18,78 @@ pub struct Dependency<'a> {
 }
 
 pub fn parse_dependency_string(dep_str: &str) -> Result<Dependency<'_>> {
-    let (manager, rest) = dep_str.split_once(':').unwrap_or(("zoi", dep_str));
+    (|| {
+        let (manager, rest) = match dep_str.split_once(':') {
+            Some((m, r)) if !m.is_empty() => (m, r),
+            _ => ("zoi", dep_str),
+        };
 
-    let (package_and_version, description) = if manager != "go" {
-        if let Some((main, desc)) = rest.rsplit_once(':') {
-            if main.is_empty() || desc.contains(['=', '>', '<', '~', '^', '@']) {
-                (rest, None)
+        if rest.is_empty() {
+            return Err(anyhow!("Invalid dependency string: {}", dep_str));
+        }
+
+        if !rest.contains(['@', '=', '>', '<', '~', '^']) && !rest.contains(':') {
+            return Ok(Dependency {
+                manager,
+                package: rest,
+                req: None,
+                version_str: None,
+                description: None,
+            });
+        }
+
+        let (package_and_version, description) = if manager != "go" {
+            if let Some((main, desc)) = rest.rsplit_once(':') {
+                if main.is_empty() || desc.contains(['=', '>', '<', '~', '^', '@']) {
+                    (rest, None)
+                } else {
+                    (main, Some(desc))
+                }
             } else {
-                (main, Some(desc))
+                (rest, None)
             }
         } else {
             (rest, None)
-        }
-    } else {
-        (rest, None)
-    };
+        };
 
-    let (package, version_str) = if let Some(at_pos) = package_and_version.rfind('@') {
-        if at_pos > 0 {
-            let (p, v) = package_and_version.split_at(at_pos);
-            (p, Some(v[1..].to_string()))
+        let (package, version_str) = if let Some(at_pos) = package_and_version.rfind('@') {
+            if at_pos > 0 {
+                let (p, v) = package_and_version.split_at(at_pos);
+                (p, Some(v[1..].to_string()))
+            } else {
+                (package_and_version, None)
+            }
+        } else if let Some(idx) = package_and_version.find(['=', '>', '<', '~', '^']) {
+            let (p, v) = package_and_version.split_at(idx);
+            (p, Some(v.to_string()))
         } else {
             (package_and_version, None)
-        }
-    } else if let Some(idx) = package_and_version.find(['=', '>', '<', '~', '^']) {
-        let (p, v) = package_and_version.split_at(idx);
-        (p, Some(v.to_string()))
-    } else {
-        (package_and_version, None)
-    };
-
-    let req = if let Some(v_str) = &version_str {
-        let req_parse_str = if v_str.chars().next().unwrap().is_ascii_digit() {
-            format!("={}", v_str)
-        } else {
-            v_str.to_string()
         };
-        Some(VersionReq::parse(&req_parse_str)?)
-    } else {
-        None
-    };
 
-    Ok(Dependency {
-        manager,
-        package,
-        req,
-        version_str,
-        description,
-    })
-}
+        let req = if let Some(v_str) = &version_str {
+            let req_parse_str = if v_str
+                .chars()
+                .next()
+                .ok_or_else(|| anyhow!("Empty version string"))?
+                .is_ascii_digit()
+            {
+                format!("={}", v_str)
+            } else {
+                v_str.to_string()
+            };
+            Some(VersionReq::parse(&req_parse_str)?)
+        } else {
+            None
+        };
 
-fn get_native_command_version(command_name: &str) -> Result<Option<Version>> {
-    if !utils::command_exists(command_name) {
-        return Ok(None);
-    }
-
-    let version_flags = ["--version", "version", "-v", "-V"];
-    let mut output = String::new();
-
-    for flag in &version_flags {
-        let result = Command::new(command_name).arg(flag).output();
-        if let Ok(res) = result
-            && res.status.success()
-        {
-            output = String::from_utf8_lossy(&res.stdout).to_string();
-            if output.is_empty() {
-                output = String::from_utf8_lossy(&res.stderr).to_string();
-            }
-            if !output.is_empty() {
-                break;
-            }
-        }
-    }
-
-    if output.is_empty() {
-        return Ok(None);
-    }
-
-    let re = Regex::new(r"v?(\d+\.\d+\.\d+[-.a-zA-Z0-9]*)")?;
-    if let Some(caps) = re.captures(&output)
-        && let Some(matched) = caps.get(1)
-        && let Ok(version) = Version::parse(matched.as_str())
-    {
-        return Ok(Some(version));
-    }
-
-    Ok(None)
+        Ok(Dependency {
+            manager,
+            package,
+            req,
+            version_str,
+            description,
+        })
+    })()
 }
 
 pub fn install_dependency(
@@ -137,952 +118,167 @@ pub fn install_dependency(
         dep.manager.yellow()
     );
 
-    let os = std::env::consts::OS;
-    let manager = dep.manager;
+    installed_deps.push(dep_id.clone());
 
-    let is_compatible = match manager {
-        "brew" | "macports" | "brew-cask" | "mas" => os == "macos",
-        "scoop" | "choco" | "winget" => os == "windows",
-        "apt" | "apt-get" => utils::get_linux_distro_family().as_deref() == Some("debian"),
-        "pacman" | "yay" | "paru" | "pikaur" | "trizen" | "aur" => {
-            utils::get_linux_distro_family().as_deref() == Some("arch")
-        }
-        "dnf" | "yum" => utils::get_linux_distro_family().as_deref() == Some("fedora"),
-        "zypper" => utils::get_linux_distro_family().as_deref() == Some("suse"),
-        "apk" => utils::get_linux_distro_family().as_deref() == Some("alpine"),
-        "portage" => utils::get_linux_distro_family().as_deref() == Some("gentoo"),
-        "xbps" | "xbps-install" => utils::get_linux_distribution().as_deref() == Some("void"),
-        "eopkg" => utils::get_linux_distribution().as_deref() == Some("solus"),
-        "guix" => utils::get_linux_distribution().as_deref() == Some("guix"),
-        "snap" | "flatpak" => os == "linux",
-        "pkg" => os == "freebsd",
-        "pkg_add" => os == "openbsd",
-        "zoi" | "cargo" | "native" | "go" | "npm" | "deno" | "jsr" | "bun" | "pip" | "pipx"
-        | "cargo-binstall" | "gem" | "yarn" | "pnpm" | "composer" | "dotnet" | "nix" | "conda"
-        | "script" | "volta" | "uv" | "dart-pub" => true,
-        _ => false,
-    };
-
-    if !is_compatible {
-        println!(
-            "Skipping dependency '{}' for manager '{}' on an incompatible OS.",
-            dep.package, manager
-        );
+    if dep.manager == "zoi" {
+        return install_zoi_dependency(dep, parent_id, scope, yes, all_optional, processed_deps, m);
+    } else if dep.manager == "native" {
+        let pm = utils::get_native_package_manager()
+            .ok_or_else(|| anyhow!("Native package manager not found for this OS"))?;
+        println!("-> Using native package manager: {}", pm.cyan());
+        let native_dep_str = format!("{}:{}", pm, dep.package);
+        let native_dep = parse_dependency_string(&native_dep_str)?;
+        install_dependency(
+            &native_dep,
+            parent_id,
+            scope,
+            yes,
+            all_optional,
+            processed_deps,
+            installed_deps,
+            m,
+        )?;
         return Ok(());
     }
 
-    installed_deps.push(dep_id.clone());
+    if let Some(pm_commands) = pm::MANAGERS.get(dep.manager) {
+        if let Some(check_cmd_template) = pm_commands.is_installed {
+            let check_cmd = check_cmd_template.replace("{package}", dep.package);
+            if utils::run_shell_command(&check_cmd).is_ok() {
+                println!("Already installed. Skipping.");
+                return Ok(());
+            }
+        }
 
-    match manager {
-        "zoi" => {
-            let zoi_dep_name = if let Some(v) = &dep.version_str {
-                format!("{}@{}", dep.package, v)
-            } else {
-                dep.package.to_string()
-            };
-            let req = crate::pkg::resolve::parse_source_string(&zoi_dep_name)?;
-            if let Some(manifest) = local::is_package_installed(
-                &req.name.to_lowercase(),
-                req.sub_package.as_deref(),
-                scope,
-            )? {
-                match Version::parse(&manifest.version) {
-                    Ok(installed_version) => {
-                        if let Some(req) = &dep.req {
-                            if req.matches(&installed_version) {
-                                println!(
-                                    "Already installed (version {} satisfies {}). Skipping.",
-                                    installed_version, req
-                                );
-                                let package_dir = local::get_package_dir(
-                                    scope,
-                                    &manifest.registry_handle,
-                                    &manifest.repo,
-                                    &manifest.name,
-                                )?;
-                                local::add_dependent(&package_dir, parent_id)?;
-                                return Ok(());
-                            } else {
-                                return Err(anyhow::anyhow!(
-                                    "Version conflict for '{}': need {}, but {} is installed.",
-                                    dep.package,
-                                    req,
-                                    installed_version
-                                ));
-                            }
-                        } else {
-                            println!(
-                                "Already installed (version {}). Skipping.",
-                                installed_version
-                            );
-                            let package_dir = local::get_package_dir(
-                                scope,
-                                &manifest.registry_handle,
-                                &manifest.repo,
-                                &manifest.name,
-                            )?;
-                            local::add_dependent(&package_dir, parent_id)?;
-                            return Ok(());
-                        }
-                    }
-                    Err(e) => {
-                        println!(
-                            "{} Could not parse version ('{}') for installed package '{}': {}.",
-                            "Warning:".yellow(),
-                            manifest.version,
-                            dep.package,
-                            e
-                        );
-                        if dep.req.is_some() {
-                            println!("Proceeding with installation due to version check failure.");
-                        } else {
-                            println!("Assuming package is installed and skipping.");
-                            let package_dir = local::get_package_dir(
-                                scope,
-                                &manifest.registry_handle,
-                                &manifest.repo,
-                                &manifest.name,
-                            )?;
-                            local::add_dependent(&package_dir, parent_id)?;
-                            return Ok(());
-                        }
-                    }
-                }
+        let package_with_version = if let Some(v) = &dep.version_str {
+            match dep.manager {
+                "apt" | "apt-get" | "zypper" => format!("{}={}", dep.package, v),
+                "dnf" | "yum" => format!("{}-{}", dep.package, v),
+                "pip" | "pipx" => format!("{}=={}", dep.package, v),
+                _ => format!("{}@{}", dep.package, v),
             }
+        } else {
+            dep.package.to_string()
+        };
 
-            println!("Not installed. Proceeding with installation...");
+        let install_cmd = pm_commands
+            .install
+            .replace("{package}", dep.package)
+            .replace("{package_with_version}", &package_with_version);
 
-            install_zoi_dependency(
-                &zoi_dep_name,
-                parent_id,
-                yes,
-                all_optional,
-                true,
-                processed_deps,
-                scope,
-                m,
-            )?;
-        }
-        "native" => {
-            if let Some(installed_version) = get_native_command_version(dep.package)? {
-                if let Some(req) = &dep.req {
-                    if req.matches(&installed_version) {
-                        println!(
-                            "Already installed (version {installed_version} satisfies {req}). Skipping."
-                        );
-                        return Ok(());
-                    } else {
-                        println!(
-                            "{} Installed version {} does not satisfy requirement {}.",
-                            "Warning:".yellow(),
-                            installed_version,
-                            req
-                        );
-                    }
-                } else {
-                    println!("Already installed (version {installed_version}). Skipping.");
-                    return Ok(());
-                }
-            }
+        println!("Running install command: {}", install_cmd.italic());
+        utils::run_shell_command(&install_cmd)
+    } else {
+        Err(anyhow!(
+            "Unknown or unsupported package manager in dependency: {}",
+            dep.manager
+        ))
+    }
+}
 
-            if dep.req.is_some() && get_native_command_version(dep.package)?.is_none() {
-                println!(
-                    "{} Could not determine installed version. Proceeding with installation via system package manager.",
-                    "Warning:".yellow()
-                );
-            }
+pub fn uninstall_dependency(dep_str: &str, zoi_uninstaller: &ZoiUninstaller) -> Result<()> {
+    let dep = parse_dependency_string(dep_str)?;
+    println!(
+        "-> Attempting to uninstall dependency: {} via {}",
+        dep.package.cyan(),
+        dep.manager.yellow()
+    );
 
-            let pm = utils::get_native_package_manager()
-                .ok_or(anyhow::anyhow!("Native package manager not found"))?;
-            println!("(Using native manager: {pm})");
-            let args = match pm.as_str() {
-                "apt" | "apt-get" => vec!["install", "-y"],
-                "pacman" => vec!["-S", "--needed", "--noconfirm"],
-                "dnf" | "yum" => vec!["install", "-y"],
-                "brew" => vec!["install"],
-                "scoop" => vec!["install"],
-                "choco" => vec!["install", "-y"],
-                "apk" => vec!["add"],
-                "pkg" => vec!["install", "-y"],
-                "pkg_add" => vec!["-I"],
-                _ => return Err(anyhow::anyhow!("Unsupported native package manager: {pm}")),
-            };
+    if dep.manager == "zoi" {
+        return zoi_uninstaller(dep.package);
+    }
 
-            let package_to_install = if let Some(v) = &dep.version_str {
-                println!(
-                    "{} Version specifications for native dependencies are not guaranteed to work.",
-                    "Warning:".yellow()
-                );
-                match pm.as_str() {
-                    "apt" | "apt-get" | "zypper" => format!("{}={}", dep.package, v),
-                    "dnf" | "yum" => format!("{}-{}", dep.package, v),
-                    _ => dep.package.to_string(),
-                }
-            } else {
-                dep.package.to_string()
-            };
+    if let Some(pm_commands) = pm::MANAGERS.get(dep.manager) {
+        let uninstall_cmd = pm_commands.uninstall.replace("{package}", dep.package);
+        println!("Running uninstall command: {}", uninstall_cmd.italic());
+        utils::run_shell_command(&uninstall_cmd)
+    } else {
+        Err(anyhow!(
+            "Unknown or unsupported package manager for uninstall: {}",
+            dep.manager
+        ))
+    }
+}
 
-            let mut command = Command::new("sudo");
-            command.arg(&pm);
-            command.args(args);
-            command.arg(package_to_install);
+fn install_zoi_dependency(
+    dep: &Dependency,
+    parent_id: &str,
+    scope: types::Scope,
+    yes: bool,
+    all_optional: bool,
+    _processed_deps: &Mutex<HashSet<String>>,
+    m: Option<&MultiProgress>,
+) -> Result<()> {
+    let zoi_dep_name = if let Some(v) = &dep.version_str {
+        format!("{}@{}", dep.package, v)
+    } else {
+        dep.package.to_string()
+    };
+    let req = crate::pkg::resolve::parse_source_string(&zoi_dep_name)?;
+    if let Some(manifest) =
+        local::is_package_installed(&req.name.to_lowercase(), req.sub_package.as_deref(), scope)?
+    {
+        println!(
+            "Zoi package '{}' is already installed (version {}). Skipping.",
+            dep.package, manifest.version
+        );
+        let package_dir = local::get_package_dir(
+            scope,
+            &manifest.registry_handle,
+            &manifest.repo,
+            &manifest.name,
+        )?;
+        local::add_dependent(&package_dir, parent_id)?;
+        return Ok(());
+    }
 
-            let status = command.status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "Failed to install native dependency: {}",
-                    dep.package
-                ));
-            }
-        }
-        "cargo" => {
-            let mut command = Command::new("cargo");
-            command.arg("install");
-            if let Some(v) = &dep.version_str {
-                command.arg("--version").arg(v);
-            }
-            command.arg(dep.package);
-            let status = command.status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "Cargo dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "cargo-binstall" => {
-            let mut command = Command::new("cargo");
-            command.arg("binstall");
-            if let Some(v) = &dep.version_str {
-                command.arg("--version").arg(v);
-            }
-            command.arg(dep.package);
-            let status = command.status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "cargo-binstall dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "go" => {
-            let package_with_version = if let Some(v) = &dep.version_str {
-                format!("{}@{}", dep.package, v)
-            } else {
-                format!("{}@latest", dep.package)
-            };
-            let status = Command::new("go")
-                .arg("install")
-                .arg(package_with_version)
-                .status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "Go dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "npm" | "yarn" | "pnpm" | "bun" | "volta" => {
-            let package_to_install = if let Some(v) = &dep.version_str {
-                format!("{}@{}", dep.package, v)
-            } else {
-                dep.package.to_string()
-            };
-            let mut command = Command::new(manager);
-            match manager {
-                "npm" => command.args(["install", "-g"]),
-                "yarn" => command.args(["global", "add"]),
-                "pnpm" => command.args(["add", "-g"]),
-                "bun" => command.args(["install", "-g"]),
-                "volta" => command.args(["install"]),
-                _ => unreachable!(),
-            };
-            let status = command.arg(package_to_install).status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "{} dependency failed for '{}'",
-                    manager,
-                    dep.package
-                ));
-            }
-        }
-        "deno" => {
-            let package_to_install = if let Some(pkg) = dep.package.strip_prefix("npm-") {
-                format!("npm:{}", pkg.trim_start())
-            } else if let Some(pkg) = dep.package.strip_prefix("jsr-") {
-                format!("jsr:{}", pkg.trim_start())
-            } else {
-                dep.package.to_string()
-            };
+    println!("Not installed. Proceeding with zoi installation...");
 
-            let status = Command::new("deno")
-                .arg("install")
-                .arg("-g")
-                .arg("-A")
-                .arg(package_to_install)
-                .status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "Deno dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "uv" => {
-            let status = Command::new("uv")
-                .arg("tool")
-                .arg("install")
-                .arg(dep.package)
-                .status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "uv tool install failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "pip" | "pipx" => {
-            let package_to_install = if let Some(v) = &dep.version_str {
-                format!("{}=={}", dep.package, v)
-            } else {
-                dep.package.to_string()
-            };
-            let status = Command::new(manager)
-                .arg("install")
-                .arg(package_to_install)
-                .status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "{} dependency failed for '{}'",
-                    manager,
-                    dep.package
-                ));
-            }
-        }
-        "dart-pub" => {
-            let status = Command::new("dart")
-                .arg("pub")
-                .arg("global")
-                .arg("activate")
-                .arg(dep.package)
-                .status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "dart pub global activate failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "gem" => {
-            let mut command = Command::new("gem");
-            command.arg("install");
-            if let Some(v) = &dep.version_str {
-                command.arg("-v").arg(v);
-            }
-            command.arg(dep.package);
-            let status = command.status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "gem dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "composer" => {
-            let package_to_install = if let Some(v) = &dep.version_str {
-                format!("{}:{}", dep.package, v)
-            } else {
-                dep.package.to_string()
-            };
-            let status = Command::new("composer")
-                .arg("global")
-                .arg("require")
-                .arg(package_to_install)
-                .status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "composer dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "dotnet" => {
-            let mut command = Command::new("dotnet");
-            command.args(["tool", "install", "-g"]);
-            if let Some(v) = &dep.version_str {
-                command.arg("--version").arg(v);
-            }
-            command.arg(dep.package);
-            let status = command.status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "dotnet dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "nix" => {
-            if dep.version_str.is_some() {
-                println!(
-                    "{} Version specifications for nix are not supported. Installing latest.",
-                    "Warning:".yellow()
-                );
-            }
-            let status = Command::new("nix-env")
-                .arg("-iA")
-                .arg(format!("nixpkgs.{}", dep.package))
-                .status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "nix dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "jsr" => {
-            let status = Command::new("npx")
-                .arg("jsr")
-                .arg("add")
-                .arg(dep.package)
-                .status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "JSR dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "apt" | "apt-get" => {
-            let package_to_install = if let Some(v) = &dep.version_str {
-                format!("{}={}", dep.package, v)
-            } else {
-                dep.package.to_string()
-            };
-            let status = Command::new("sudo")
-                .arg(manager)
-                .arg("install")
-                .arg("-y")
-                .arg(package_to_install)
-                .status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "{} dependency failed for '{}'",
-                    manager,
-                    dep.package
-                ));
-            }
-        }
-        "pacman" => {
-            if dep.version_str.is_some() {
-                println!(
-                    "{} Version specifications for pacman are not supported. Installing latest.",
-                    "Warning:".yellow()
-                );
-            }
-            let status = Command::new("sudo")
-                .arg("pacman")
-                .arg("-S")
-                .arg("--needed")
-                .arg("--noconfirm")
-                .arg(dep.package)
-                .status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "pacman dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "yay" | "paru" | "pikaur" | "trizen" => {
-            if dep.version_str.is_some() {
-                println!(
-                    "{} Version specifications for {} are not supported. Installing latest.",
-                    "Warning:".yellow(),
-                    manager
-                );
-            }
-            let status = Command::new(manager)
-                .arg("-S")
-                .arg("--needed")
-                .arg("--noconfirm")
-                .arg(dep.package)
-                .status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "{} dependency failed for '{}'",
-                    manager,
-                    dep.package
-                ));
-            }
-        }
-        "aur" => {
-            let temp_dir = std::env::temp_dir().join(format!("zoi-aur-{}", dep.package));
-            if temp_dir.exists() {
-                fs::remove_dir_all(&temp_dir)?;
-            }
-            fs::create_dir_all(&temp_dir)?;
-
-            let url = format!("https://aur.archlinux.org/{}.git", dep.package);
-            let clone_status = Command::new("git")
-                .arg("clone")
-                .arg("--depth=1")
-                .arg(&url)
-                .arg(&temp_dir)
-                .status()?;
-
-            if !clone_status.success() {
-                return Err(anyhow::anyhow!(
-                    "Failed to clone AUR package '{}' from '{}'",
-                    dep.package,
-                    url
-                ));
-            }
-
-            let makepkg_status = Command::new("makepkg")
-                .arg("-si")
-                .arg("--noconfirm")
-                .current_dir(&temp_dir)
-                .status()?;
-
-            if !makepkg_status.success() {
-                return Err(anyhow::anyhow!(
-                    "Failed to build and install AUR package '{}'",
-                    dep.package
-                ));
-            }
-
-            fs::remove_dir_all(&temp_dir)?;
-        }
-        "dnf" | "yum" => {
-            let package_to_install = if let Some(v) = &dep.version_str {
-                format!("{}-{}", dep.package, v)
-            } else {
-                dep.package.to_string()
-            };
-            let status = Command::new("sudo")
-                .arg(manager)
-                .arg("install")
-                .arg("-y")
-                .arg(package_to_install)
-                .status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "{} dependency failed for '{}'",
-                    manager,
-                    dep.package
-                ));
-            }
-        }
-        "brew" => {
-            let package_to_install = if let Some(v) = &dep.version_str {
-                format!("{}@{}", dep.package, v)
-            } else {
-                dep.package.to_string()
-            };
-            let status = Command::new("brew")
-                .arg("install")
-                .arg(package_to_install)
-                .status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "brew dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "brew-cask" => {
-            let package_to_install = if let Some(v) = &dep.version_str {
-                format!("{}@{}", dep.package, v)
-            } else {
-                dep.package.to_string()
-            };
-            let status = Command::new("brew")
-                .arg("install")
-                .arg("--cask")
-                .arg(package_to_install)
-                .status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "brew --cask dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "mas" => {
-            let status = Command::new("mas")
-                .arg("install")
-                .arg(dep.package)
-                .status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "mas dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "scoop" => {
-            let package_to_install = if let Some(v) = &dep.version_str {
-                format!("{}@{}", dep.package, v)
-            } else {
-                dep.package.to_string()
-            };
-            let status = Command::new("scoop")
-                .arg("install")
-                .arg(package_to_install)
-                .status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "scoop dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "choco" => {
-            let mut command = Command::new("choco");
-            command.args(["install", "-y"]);
-            if let Some(v) = &dep.version_str {
-                command.arg("--version").arg(v);
-            }
-            command.arg(dep.package);
-            let status = command.status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "choco dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "apk" => {
-            if dep.version_str.is_some() {
-                println!(
-                    "{} Version specifications for apk are not supported. Installing latest.",
-                    "Warning:".yellow()
-                );
-            }
-            let status = Command::new("sudo")
-                .arg("apk")
-                .arg("add")
-                .arg(dep.package)
-                .status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "apk dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "xbps" | "xbps-install" => {
-            if dep.version_str.is_some() {
-                println!(
-                    "{} Version specifications for xbps are not supported. Installing latest.",
-                    "Warning:".yellow()
-                );
-            }
-            let status = Command::new("sudo")
-                .arg("xbps-install")
-                .arg("-S")
-                .arg(dep.package)
-                .status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "xbps-install dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "eopkg" => {
-            if dep.version_str.is_some() {
-                println!(
-                    "{} Version specifications for eopkg are not supported. Installing latest.",
-                    "Warning:".yellow()
-                );
-            }
-            let status = Command::new("sudo")
-                .arg("eopkg")
-                .arg("it")
-                .arg("-y")
-                .arg(dep.package)
-                .status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "eopkg dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "guix" => {
-            if dep.version_str.is_some() {
-                println!(
-                    "{} Version specifications for guix are not supported. Installing latest.",
-                    "Warning:".yellow()
-                );
-            }
-            let status = Command::new("guix")
-                .arg("install")
-                .arg(dep.package)
-                .status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "guix dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "pkg" => {
-            if dep.version_str.is_some() {
-                println!(
-                    "{} Version specifications for pkg are not supported. Installing latest.",
-                    "Warning:".yellow()
-                );
-            }
-            let status = Command::new("sudo")
-                .arg("pkg")
-                .arg("install")
-                .arg("-y")
-                .arg(dep.package)
-                .status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "pkg dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "pkg_add" => {
-            if dep.version_str.is_some() {
-                println!(
-                    "{} Version specifications for pkg_add are not supported. Installing latest.",
-                    "Warning:".yellow()
-                );
-            }
-            let status = Command::new("sudo")
-                .arg("pkg_add")
-                .arg("-I")
-                .arg(dep.package)
-                .status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "pkg_add dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "zypper" => {
-            let package_to_install = if let Some(v) = &dep.version_str {
-                format!("'{}={}'", dep.package, v)
-            } else {
-                dep.package.to_string()
-            };
-            let status = Command::new("sudo")
-                .arg("zypper")
-                .arg("install")
-                .arg("-y")
-                .arg(package_to_install)
-                .status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "zypper dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "portage" => {
-            if dep.version_str.is_some() {
-                println!(
-                    "{} Version specifications for portage are not supported. Installing latest.",
-                    "Warning:".yellow()
-                );
-            }
-            let status = Command::new("sudo")
-                .arg("emerge")
-                .arg(dep.package)
-                .status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "Portage dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "snap" => {
-            if dep.version_str.is_some() {
-                println!(
-                    "{} Version specifications for snap are not supported. Installing latest.",
-                    "Warning:".yellow()
-                );
-            }
-            let status = Command::new("sudo")
-                .arg("snap")
-                .arg("install")
-                .arg(dep.package)
-                .status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "snap dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "flatpak" => {
-            if dep.version_str.is_some() {
-                println!(
-                    "{} Version specifications for flatpak are not supported. Installing latest.",
-                    "Warning:".yellow()
-                );
-            }
-            let status = Command::new("sudo")
-                .arg("flatpak")
-                .arg("install")
-                .arg("flathub")
-                .arg(dep.package)
-                .arg("-y")
-                .status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "flatpak dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "winget" => {
-            let mut command = Command::new("winget");
-            command.arg("install").arg(dep.package).arg("--silent");
-            if let Some(v) = &dep.version_str {
-                command.arg("--version").arg(v);
-            }
-            command
-                .arg("--accept-package-agreements")
-                .arg("--accept-source-agreements");
-            let status = command.status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "winget dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "conda" => {
-            if dep.version_str.is_some() {
-                println!(
-                    "{} Version specifications for conda are not supported. Installing latest.",
-                    "Warning:".yellow()
-                );
-            }
-            let status = Command::new("conda")
-                .arg("install")
-                .arg("-y")
-                .arg(dep.package)
-                .status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "conda dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "macports" => {
-            if dep.version_str.is_some() {
-                println!(
-                    "{} Version specifications for macports are not supported. Installing latest.",
-                    "Warning:".yellow()
-                );
-            }
-            let status = Command::new("sudo")
-                .arg("port")
-                .arg("install")
-                .arg(dep.package)
-                .status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "macports dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        "script" => {
-            let url = if dep.package.starts_with("http") {
-                dep.package.to_string()
-            } else {
-                format!("https://{}", dep.package)
-            };
-
-            let platform = utils::get_platform()?;
-            let os = platform.split('-').next().unwrap_or("");
-            let platform_ext = if os == "windows" { "ps1" } else { "sh" };
-
-            let final_url = format!("{}.{}", url, platform_ext);
-            println!("Executing script from URL: {}", final_url.cyan());
-
-            let temp_dir = Builder::new().prefix("zoi-script-dep").tempdir()?;
-            let script_path = temp_dir.path().join(format!("script.{}", platform_ext));
-
-            println!("Downloading script from: {}", final_url.cyan());
-            let client = crate::utils::build_blocking_http_client(60)?;
-            let mut response = client.get(&final_url).send()?;
-
-            if !response.status().is_success() {
-                return Err(anyhow::anyhow!(
-                    "Failed to download script: HTTP {}",
-                    response.status()
-                ));
-            }
-
-            let total_size = response.content_length().unwrap_or(0);
-            let pb = ProgressBar::new(total_size);
-            pb.set_style(ProgressStyle::default_bar()
-                .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})")?
-                .progress_chars("#>- "));
-
-            let mut downloaded_bytes = Vec::new();
-            let mut buffer = [0; 8192];
-            loop {
-                let bytes_read = response.read(&mut buffer)?;
-                if bytes_read == 0 {
-                    break;
-                }
-                downloaded_bytes.extend_from_slice(&buffer[..bytes_read]);
-                pb.inc(bytes_read as u64);
-            }
-            pb.finish_with_message("Download complete.");
-
-            fs::write(&script_path, downloaded_bytes)?;
-
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                fs::set_permissions(&script_path, fs::Permissions::from_mode(0o755))?;
-            }
-
-            let mut command = if cfg!(target_os = "windows") {
-                let mut cmd = Command::new("powershell");
-                cmd.arg("-ExecutionPolicy")
-                    .arg("Bypass")
-                    .arg("-File")
-                    .arg(&script_path);
-                cmd
-            } else {
-                let mut cmd = Command::new("bash");
-                cmd.arg(&script_path);
-                cmd
-            };
-
-            let status = command.status()?;
-            if !status.success() {
-                return Err(anyhow::anyhow!(
-                    "Script dependency failed for '{}'",
-                    dep.package
-                ));
-            }
-        }
-        _ => {
-            return Err(anyhow::anyhow!(
-                "Unknown package manager in dependency: {}",
-                dep.manager
+    let (graph, _) = match install::resolver::resolve_dependency_graph(
+        &[zoi_dep_name.to_string()],
+        Some(scope),
+        false,
+        yes,
+        all_optional,
+        None,
+        true,
+    ) {
+        Ok(res) => res,
+        Err(e) => {
+            return Err(anyhow!(
+                "Failed to resolve dependency graph for '{}': {}",
+                zoi_dep_name,
+                e
             ));
         }
+    };
+
+    if graph.nodes.is_empty() {
+        return Ok(());
     }
+
+    let install_plan = match install::plan::create_install_plan(&graph.nodes) {
+        Ok(plan) => plan,
+        Err(e) => {
+            return Err(anyhow!(
+                "Failed to create install plan for '{}': {}",
+                zoi_dep_name,
+                e
+            ));
+        }
+    };
+
+    for (id, node) in &graph.nodes {
+        let action = install_plan
+            .get(id)
+            .ok_or_else(|| anyhow!("Could not find install action for {}", id))?;
+        install::installer::install_node(node, action, m, None, yes)?;
+    }
+
     Ok(())
 }
+
+type ZoiUninstaller = dyn Fn(&str) -> Result<()>;
 
 pub fn resolve_and_install_required(
     deps: &[String],
@@ -1382,296 +578,6 @@ pub fn resolve_and_install_optional(
             installed_deps,
             m,
         )?;
-    }
-
-    Ok(())
-}
-
-fn install_zoi_dependency(
-    package_name: &str,
-    parent_id: &str,
-    yes: bool,
-    all_optional: bool,
-    quiet: bool,
-    processed_deps: &Mutex<HashSet<String>>,
-    scope: types::Scope,
-    m: Option<&MultiProgress>,
-) -> Result<()> {
-    install::run_installation(
-        package_name,
-        install::InstallMode::PreferPrebuilt,
-        false,
-        crate::pkg::types::InstallReason::Dependency {
-            parent: parent_id.to_string(),
-        },
-        yes,
-        all_optional,
-        quiet,
-        processed_deps,
-        Some(scope),
-        m,
-        None,
-    )
-    .map(|_| ())
-}
-
-type ZoiUninstaller = dyn Fn(&str) -> Result<()>;
-
-pub fn uninstall_dependency(dep_str: &str, zoi_uninstaller: &ZoiUninstaller) -> Result<()> {
-    let dep = parse_dependency_string(dep_str)?;
-    println!(
-        "-> Attempting to uninstall dependency: {} via {}",
-        dep.package.cyan(),
-        dep.manager.yellow()
-    );
-
-    let manager = dep.manager;
-    let status = match manager {
-        "zoi" => {
-            let zoi_dep_name = dep.package;
-            return zoi_uninstaller(zoi_dep_name);
-        }
-        "native" => {
-            let pm = utils::get_native_package_manager()
-                .ok_or(anyhow::anyhow!("Native package manager not found"))?;
-            println!("(Using native manager: {pm})");
-            let (cmd, args) = match pm.as_str() {
-                "apt" | "apt-get" => ("sudo", vec![pm.as_str(), "remove", "-y"]),
-                "pacman" => ("sudo", vec!["pacman", "-Rns", "--noconfirm"]),
-                "dnf" | "yum" => ("sudo", vec![pm.as_str(), "remove", "-y"]),
-                "brew" => ("brew", vec!["uninstall"]),
-                "scoop" => ("scoop", vec!["uninstall"]),
-                "choco" => ("choco", vec!["uninstall", "-y"]),
-                "apk" => ("sudo", vec!["apk", "del"]),
-                "pkg" => ("sudo", vec!["pkg", "delete", "-y"]),
-                "pkg_add" => ("sudo", vec!["pkg_delete"]),
-                _ => return Err(anyhow::anyhow!("Unsupported native package manager: {pm}")),
-            };
-
-            let mut command = Command::new(cmd);
-            command.args(args).arg(dep.package).status()?
-        }
-        "cargo" | "cargo-binstall" => Command::new("cargo")
-            .arg("uninstall")
-            .arg(dep.package)
-            .status()?,
-        "go" => {
-            println!("Skipping uninstall for Go, please remove binary manually.");
-            return Ok(());
-        }
-        "npm" => Command::new("npm")
-            .arg("uninstall")
-            .arg("-g")
-            .arg(dep.package)
-            .status()?,
-        "deno" => {
-            let package_name = if let Some(pkg) = dep.package.strip_prefix("npm-") {
-                pkg.trim_start()
-            } else if let Some(pkg) = dep.package.strip_prefix("jsr-") {
-                pkg.trim_start()
-            } else {
-                dep.package
-            };
-
-            let executable_name = if let Some(idx) = package_name.rfind('/') {
-                &package_name[idx + 1..]
-            } else {
-                package_name
-            };
-
-            Command::new("deno")
-                .arg("uninstall")
-                .arg(executable_name)
-                .status()?
-        }
-        "yarn" => Command::new("yarn")
-            .arg("global")
-            .arg("remove")
-            .arg(dep.package)
-            .status()?,
-        "pnpm" => Command::new("pnpm")
-            .arg("remove")
-            .arg("-g")
-            .arg(dep.package)
-            .status()?,
-        "bun" => Command::new("bun")
-            .arg("remove")
-            .arg("-g")
-            .arg(dep.package)
-            .status()?,
-        "volta" => {
-            println!("Skipping uninstall for Volta, please remove binary manually.");
-            return Ok(());
-        }
-        "uv" => {
-            println!("Skipping uninstall for uv, please remove binary manually.");
-            return Ok(());
-        }
-        "pip" | "pipx" => Command::new(manager)
-            .arg("uninstall")
-            .arg(dep.package)
-            .arg("-y")
-            .status()?,
-        "gem" => Command::new("gem")
-            .arg("uninstall")
-            .arg(dep.package)
-            .status()?,
-        "composer" => Command::new("composer")
-            .arg("global")
-            .arg("remove")
-            .arg(dep.package)
-            .status()?,
-        "dotnet" => Command::new("dotnet")
-            .arg("tool")
-            .arg("uninstall")
-            .arg("-g")
-            .arg(dep.package)
-            .status()?,
-        "nix" => Command::new("nix-env")
-            .arg("-e")
-            .arg(dep.package)
-            .status()?,
-        "jsr" => {
-            println!("Skipping uninstall for JSR.");
-            return Ok(());
-        }
-        "apt" | "apt-get" => Command::new("sudo")
-            .arg(manager)
-            .arg("remove")
-            .arg("-y")
-            .arg(dep.package)
-            .status()?,
-        "pacman" => Command::new("sudo")
-            .arg("pacman")
-            .arg("-Rns")
-            .arg("--noconfirm")
-            .arg(dep.package)
-            .status()?,
-        "yay" | "paru" | "pikaur" | "trizen" => Command::new(manager)
-            .arg("-Rns")
-            .arg("--noconfirm")
-            .arg(dep.package)
-            .status()?,
-        "aur" => {
-            println!("AUR packages are uninstalled via pacman. Trying with pacman...");
-            Command::new("sudo")
-                .arg("pacman")
-                .arg("-Rns")
-                .arg("--noconfirm")
-                .arg(dep.package)
-                .status()?
-        }
-        "dnf" | "yum" => Command::new("sudo")
-            .arg(manager)
-            .arg("remove")
-            .arg("-y")
-            .arg(dep.package)
-            .status()?,
-        "brew" => Command::new("brew")
-            .arg("uninstall")
-            .arg(dep.package)
-            .status()?,
-        "brew-cask" => Command::new("brew")
-            .arg("uninstall")
-            .arg("--cask")
-            .arg(dep.package)
-            .status()?,
-        "mas" => Command::new("mas")
-            .arg("remove")
-            .arg(dep.package)
-            .status()?,
-        "scoop" => Command::new("scoop")
-            .arg("uninstall")
-            .arg(dep.package)
-            .status()?,
-        "choco" => Command::new("choco")
-            .arg("uninstall")
-            .arg("-y")
-            .arg(dep.package)
-            .status()?,
-        "apk" => Command::new("sudo")
-            .arg("apk")
-            .arg("del")
-            .arg(dep.package)
-            .status()?,
-        "xbps" | "xbps-install" => Command::new("sudo")
-            .arg("xbps-remove")
-            .arg("-R")
-            .arg(dep.package)
-            .status()?,
-        "eopkg" => Command::new("sudo")
-            .arg("eopkg")
-            .arg("rm")
-            .arg("-y")
-            .arg(dep.package)
-            .status()?,
-        "guix" => Command::new("guix")
-            .arg("remove")
-            .arg(dep.package)
-            .status()?,
-        "pkg" => Command::new("sudo")
-            .arg("pkg")
-            .arg("delete")
-            .arg("-y")
-            .arg(dep.package)
-            .status()?,
-        "pkg_add" => Command::new("sudo")
-            .arg("pkg_delete")
-            .arg(dep.package)
-            .status()?,
-        "zypper" => Command::new("sudo")
-            .arg("zypper")
-            .arg("remove")
-            .arg("-y")
-            .arg(dep.package)
-            .status()?,
-        "portage" => Command::new("sudo")
-            .arg("emerge")
-            .arg("--unmerge")
-            .arg(dep.package)
-            .status()?,
-        "snap" => Command::new("sudo")
-            .arg("snap")
-            .arg("remove")
-            .arg(dep.package)
-            .status()?,
-        "flatpak" => Command::new("flatpak")
-            .arg("uninstall")
-            .arg(dep.package)
-            .arg("-y")
-            .status()?,
-        "winget" => Command::new("winget")
-            .arg("uninstall")
-            .arg(dep.package)
-            .arg("--silent")
-            .status()?,
-        "conda" => Command::new("conda")
-            .arg("uninstall")
-            .arg("-y")
-            .arg(dep.package)
-            .status()?,
-        "macports" => Command::new("sudo")
-            .arg("port")
-            .arg("uninstall")
-            .arg(dep.package)
-            .status()?,
-        "script" => {
-            println!("Skipping uninstall for script dependency, as it's a one-time execution.");
-            return Ok(());
-        }
-        _ => {
-            return Err(anyhow::anyhow!(
-                "Unknown package manager for uninstall: {}",
-                dep.manager
-            ));
-        }
-    };
-
-    if !status.success() {
-        return Err(anyhow::anyhow!(
-            "Failed to uninstall dependency: {}",
-            dep.package
-        ));
     }
 
     Ok(())

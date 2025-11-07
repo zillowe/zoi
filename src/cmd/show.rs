@@ -3,6 +3,48 @@ use crate::utils;
 use colored::*;
 use std::fs;
 
+fn print_dependency_group(group: &types::DependencyGroup, indent: usize) {
+    let prefix = " ".repeat(indent * 2);
+    let mut count = 0;
+
+    let required = group.get_required_simple();
+    if !required.is_empty() {
+        for dep in required {
+            println!("{}- {} (required)", prefix, dep);
+            count += 1;
+        }
+    }
+
+    let options = group.get_required_options();
+    if !options.is_empty() {
+        for opt_group in options {
+            println!(
+                "{}{}: {} (choose {})",
+                prefix,
+                opt_group.name.bold(),
+                opt_group.desc,
+                if opt_group.all { "any" } else { "one" }
+            );
+            for dep in &opt_group.depends {
+                println!("{}  - {}", prefix, dep);
+                count += 1;
+            }
+        }
+    }
+
+    let optional = group.get_optional();
+    if !optional.is_empty() {
+        for dep in optional {
+            println!("{}- {} (optional)", prefix, dep);
+            count += 1;
+        }
+    }
+
+    if count == 0 {
+        println!("{}- {}", prefix, "None".italic());
+    }
+}
+
 pub fn run(source: &str, raw: bool) {
     let source = source.trim();
     match resolve::resolve_source(source, false) {
@@ -150,99 +192,24 @@ fn print_beautiful(
     }
 
     if let Some(deps) = &pkg.dependencies {
-        println!("{}:", "Dependencies".bold());
-
-        if let Some(build) = &deps.build {
-            println!(
-                "\n{}",
-                "Build Dependencies:".bold()
-            );
-            let mut build_deps_count = 0;
-
-            let mut handle_group = |group: &types::DependencyGroup| {
-                for dep in group.get_required_simple() {
-                    println!("- {} (required)", dep);
-                    build_deps_count += 1;
-                }
-                for group in group.get_required_options() {
-                    println!(
-                        "\n  > (Option group): {}",
-                        group.name.cyan()
-                    );
-                    println!("    Description: {}", group.desc);
-                    for (i, dep) in group.depends.iter().enumerate() {
-                        let dep_info =
-                            crate::pkg::dependencies::parse_dependency_string(dep).unwrap();
-                        let desc = dep_info.description.unwrap_or("No description");
-                        println!(
-                            "    {}. {} - {}",
-                            (i + 1).to_string().yellow(),
-                            dep.bold(),
-                            desc.italic()
-                        );
-                    }
-                    build_deps_count += group.depends.len();
-                }
-
-                for dep in group.get_optional() {
-                    println!("- {} (optional)", dep);
-                    build_deps_count += 1;
-                }
-            };
-
-            match build {
-                types::BuildDependencies::Group(group) => {
-                    handle_group(group);
-                }
-                types::BuildDependencies::Typed(typed_map) => {
-                    for (build_type, group) in typed_map {
-                        println!(
-                            "\n  For build type '{}':",
-                            build_type.yellow()
-                        );
-                        handle_group(group);
-                    }
-                }
-            }
-
-            if build_deps_count == 0 {
-                println!("- {}", "None".italic());
-            }
-        }
+        println!("\n{}:", "Dependencies".bold());
 
         if let Some(runtime) = &deps.runtime {
-            println!("  {}:", "Runtime".bold());
-            for dep in runtime.get_required_simple() {
-                println!("    - {}", dep);
-            }
-            for group in runtime.get_required_options() {
-                println!(
-                    "    - {}: {} (choose {})",
-                    group.name.bold(),
-                    group.desc,
-                    if group.all { "any" } else { "one" }
-                );
-                for dep in &group.depends {
-                    let parts: Vec<&str> = dep.rsplitn(2, ':').collect();
-                    if parts.len() == 2
-                        && !parts[0].contains(['=', '>', '<', '~', '^'])
-                        && !parts[1].is_empty()
-                    {
-                        println!("      - {}: {}", parts[1], parts[0].italic());
-                    } else {
-                        println!("      - {}", dep);
-                    }
+            println!("  Runtime:");
+            print_dependency_group(runtime, 2);
+        }
+
+        if let Some(build_deps) = &deps.build {
+            println!("  Build Dependencies:");
+            match build_deps {
+                types::BuildDependencies::Group(group) => {
+                    print_dependency_group(group, 2);
                 }
-            }
-            for dep in runtime.get_optional() {
-                let parts: Vec<&str> = dep.rsplitn(2, ':').collect();
-                if parts.len() == 2
-                    && !parts[0].contains(['=', '>', '<', '~', '^'])
-                    && !parts[1].is_empty()
-                {
-                    println!("    - {} (optional): {}", parts[1], parts[0].italic());
-                } else {
-                    println!("    - {} (optional)", dep);
+                types::BuildDependencies::Typed(typed_build_deps) => {
+                    for (name, group) in &typed_build_deps.types {
+                        println!("    {}:", name.cyan());
+                        print_dependency_group(group, 3);
+                    }
                 }
             }
         }

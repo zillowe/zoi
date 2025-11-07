@@ -203,6 +203,44 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
         description: String,
     }
 
+    fn process_found_package(
+        path: PathBuf,
+        repo_name: &str,
+        is_default_registry: bool,
+        registry_db_path: &Path,
+        quiet: bool,
+    ) -> Result<FoundPackage> {
+        let pkg: types::Package =
+            crate::pkg::lua::parser::parse_lua_package(path.to_str().unwrap(), None, quiet)?;
+        let major_repo = repo_name.split('/').next().unwrap_or("").to_lowercase();
+
+        let source_type = if is_default_registry {
+            let repo_config = config::read_repo_config(registry_db_path).ok();
+            if let Some(ref cfg) = repo_config {
+                if let Some(repo_entry) = cfg.repos.iter().find(|r| r.name == major_repo) {
+                    if repo_entry.repo_type == "offical" {
+                        SourceType::OfficialRepo
+                    } else {
+                        SourceType::UntrustedRepo(repo_name.to_string())
+                    }
+                } else {
+                    SourceType::UntrustedRepo(repo_name.to_string())
+                }
+            } else {
+                SourceType::UntrustedRepo(repo_name.to_string())
+            }
+        } else {
+            SourceType::UntrustedRepo(repo_name.to_string())
+        };
+
+        Ok(FoundPackage {
+            path,
+            source_type,
+            repo_name: pkg.repo.clone(),
+            description: pkg.description,
+        })
+    }
+
     let mut found_packages = Vec::new();
 
     if request.name.contains('/') {
@@ -217,39 +255,16 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
                 .join(&request.name)
                 .join(format!("{}.pkg.lua", pkg_name));
 
-            if path.exists() {
-                let pkg: types::Package = crate::pkg::lua::parser::parse_lua_package(
-                    path.to_str().unwrap(),
-                    None,
-                    quiet,
-                )?;
-                let major_repo = repo_name.split('/').next().unwrap_or("").to_lowercase();
-
-                let source_type = if is_default_registry {
-                    let repo_config = config::read_repo_config(&registry_db_path).ok();
-                    if let Some(ref cfg) = repo_config {
-                        if let Some(repo_entry) = cfg.repos.iter().find(|r| r.name == major_repo) {
-                            if repo_entry.repo_type == "offical" {
-                                SourceType::OfficialRepo
-                            } else {
-                                SourceType::UntrustedRepo(repo_name.clone())
-                            }
-                        } else {
-                            SourceType::UntrustedRepo(repo_name.clone())
-                        }
-                    } else {
-                        SourceType::UntrustedRepo(repo_name.clone())
-                    }
-                } else {
-                    SourceType::UntrustedRepo(repo_name.clone())
-                };
-
-                found_packages.push(FoundPackage {
+            if path.exists()
+                && let Ok(found) = process_found_package(
                     path,
-                    source_type,
-                    repo_name: pkg.repo.clone(),
-                    description: pkg.description,
-                });
+                    repo_name,
+                    is_default_registry,
+                    &registry_db_path,
+                    quiet,
+                )
+            {
+                found_packages.push(found);
             }
         }
     } else {
@@ -275,41 +290,16 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
 
                 let pkg_file_path = pkg_dir_path.join(format!("{}.pkg.lua", request.name));
 
-                if pkg_file_path.exists() {
-                    let pkg: types::Package = crate::pkg::lua::parser::parse_lua_package(
-                        pkg_file_path.to_str().unwrap(),
-                        None,
+                if pkg_file_path.exists()
+                    && let Ok(found) = process_found_package(
+                        pkg_file_path,
+                        repo_name,
+                        is_default_registry,
+                        &registry_db_path,
                         quiet,
-                    )?;
-                    let major_repo = repo_name.split('/').next().unwrap_or("").to_lowercase();
-
-                    let source_type = if is_default_registry {
-                        let repo_config = config::read_repo_config(&registry_db_path).ok();
-                        if let Some(ref cfg) = repo_config {
-                            if let Some(repo_entry) =
-                                cfg.repos.iter().find(|r| r.name == major_repo)
-                            {
-                                if repo_entry.repo_type == "offical" {
-                                    SourceType::OfficialRepo
-                                } else {
-                                    SourceType::UntrustedRepo(repo_name.clone())
-                                }
-                            } else {
-                                SourceType::UntrustedRepo(repo_name.clone())
-                            }
-                        } else {
-                            SourceType::UntrustedRepo(repo_name.clone())
-                        }
-                    } else {
-                        SourceType::UntrustedRepo(repo_name.clone())
-                    };
-
-                    found_packages.push(FoundPackage {
-                        path: pkg_file_path,
-                        source_type,
-                        repo_name: pkg.repo.clone(),
-                        description: pkg.description,
-                    });
+                    )
+                {
+                    found_packages.push(found);
                 }
             }
         }
@@ -991,7 +981,6 @@ fn resolve_source_recursive(source: &str, depth: u8, quiet: bool) -> Result<Reso
         if !path.exists() {
             return Err(anyhow!("Local file not found at '{source}'"));
         }
-        println!("Using local package file: {}", path.display());
         ResolvedSource {
             path,
             source_type: SourceType::LocalFile,

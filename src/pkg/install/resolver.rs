@@ -7,7 +7,7 @@ use colored::*;
 use semver::{Version, VersionReq};
 use std::collections::{HashMap, HashSet, VecDeque};
 
-fn collect_dependencies_for_group(
+pub fn collect_dependencies_for_group(
     group: &types::DependencyGroup,
     sub_package_name: Option<&str>,
     dep_type: Option<&str>,
@@ -211,6 +211,7 @@ pub fn resolve_dependency_graph(
     force: bool,
     yes: bool,
     all_optional: bool,
+    build_type: Option<&str>,
     quiet: bool,
 ) -> Result<(DependencyGraph, Vec<String>)> {
     let config = config::read_config()?;
@@ -225,7 +226,9 @@ pub fn resolve_dependency_graph(
             continue;
         }
 
-        if let Ok(dep) = dependencies::parse_dependency_string(&source)
+        let parse_result = dependencies::parse_dependency_string(&source);
+
+        if let Ok(dep) = parse_result
             && dep.manager != "zoi"
         {
             if !non_zoi_deps.contains(&source) {
@@ -379,29 +382,36 @@ pub fn resolve_dependency_graph(
             }
 
             if let Some(build) = &deps.build {
-                let needs_build = pkg.types.contains(&"source".to_string());
-                if needs_build {
+                if build_type.is_some() {
                     println!("Resolving build dependencies for {}", pkg.name.cyan());
+                }
 
-                    let build_dep_groups = match build {
-                        types::BuildDependencies::Group(group) => vec![group.clone()],
-                        types::BuildDependencies::Typed(typed_map) => {
-                            typed_map.values().cloned().collect()
+                let build_dep_groups = match build {
+                    types::BuildDependencies::Group(group) => vec![group.clone()],
+                    types::BuildDependencies::Typed(typed_build_deps) => {
+                        if let Some(build_type_str) = build_type {
+                            if let Some(group) = typed_build_deps.types.get(build_type_str) {
+                                vec![group.clone()]
+                            } else {
+                                vec![]
+                            }
+                        } else {
+                            vec![]
                         }
-                    };
-
-                    for group in build_dep_groups {
-                        let (d, co, coo) = collect_dependencies_for_group(
-                            &group,
-                            request.sub_package.as_deref(),
-                            Some("build"),
-                            yes,
-                            all_optional,
-                        )?;
-                        deps_to_process.extend(d);
-                        chosen_options.extend(co);
-                        chosen_optionals.extend(coo);
                     }
+                };
+
+                for group in build_dep_groups {
+                    let (d, co, coo) = collect_dependencies_for_group(
+                        &group,
+                        request.sub_package.as_deref(),
+                        Some("build"),
+                        yes,
+                        all_optional,
+                    )?;
+                    deps_to_process.extend(d);
+                    chosen_options.extend(co);
+                    chosen_optionals.extend(coo);
                 }
             }
         }

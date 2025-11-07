@@ -135,6 +135,22 @@ pub fn print_aligned_info(key: &str, value: &str) {
     println!("{:<18}{}", key_with_colon.cyan(), value);
 }
 
+pub fn run_shell_command(command_str: &str) -> anyhow::Result<()> {
+    let status = if cfg!(target_os = "windows") {
+        Command::new("pwsh")
+            .arg("-Command")
+            .arg(command_str)
+            .status()?
+    } else {
+        Command::new("bash").arg("-c").arg(command_str).status()?
+    };
+
+    if !status.success() {
+        return Err(anyhow!("Command failed: {}", command_str));
+    }
+    Ok(())
+}
+
 pub fn command_exists(command: &str) -> bool {
     if cfg!(target_os = "windows") {
         Command::new("where")
@@ -613,7 +629,6 @@ pub fn get_all_available_package_managers() -> Vec<String> {
     let mut managers = Vec::new();
     let all_possible_managers = [
         "apt",
-        "apt-get",
         "pacman",
         "yay",
         "paru",

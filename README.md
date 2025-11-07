@@ -260,24 +260,23 @@ make setup
 
 What dependency installation we support.
 
-| Manager          | Ecosystem / OS                  | Example                                                                         |
-| ---------------- | ------------------------------- | ------------------------------------------------------------------------------- |
-| `zoi`            | Zoi                             | `zoi:my-other-package`                                                          |
-| `native`         | System's native package manager | `native:openssl`                                                                |
-| `script`         | Script execution                | `script:website.com/install`                                                    |
-| `apt`, `apt-get` | Debian, Ubuntu, etc.            | `apt:libssl-dev`                                                                |
-| `pacman`         | Arch Linux                      | `pacman:base-devel`                                                             |
-| `aur`            | Arch Linux (AUR)                | `aur:visual-studio-code-bin`                                                    |
-| `brew`           | macOS (Homebrew)                | `brew:node`                                                                     |
-| `scoop`          | Windows                         | `scoop:git`                                                                     |
-| `snap`           | Linux (Snapcraft)               | `snap:node`                                                                     |
-| `flatpak`        | Linux (Flathub)                 | `flatpak:org.gimp.GIMP`                                                         |
-| `npm`            | Node.js                         | `npm:typescript`                                                                |
-| `bun`            | Bun                             | `bun:elysia`                                                                    |
-| `deno`           | Deno                            | `deno:npm-chalk` or `deno:jsr-@std/bytes` (the `-` instead of `:` is important) |
-| `jsr`            | JavaScript Registry             | `jsr:@std/http`                                                                 |
-| `pip`            | Python                          | `pip:requests`                                                                  |
-| `nix`            | NixOS / Nix                     | `nix:nixpkgs.hello`                                                             |
+| Manager   | Ecosystem / OS                  | Example                                                                         |
+| --------- | ------------------------------- | ------------------------------------------------------------------------------- |
+| `zoi`     | Zoi                             | `zoi:my-other-package`                                                          |
+| `native`  | System's native package manager | `native:openssl`                                                                |
+| `apt`     | Debian, Ubuntu, etc.            | `apt:libssl-dev`                                                                |
+| `pacman`  | Arch Linux                      | `pacman:base-devel`                                                             |
+| `aur`     | Arch Linux (AUR)                | `aur:visual-studio-code-bin`                                                    |
+| `brew`    | macOS (Homebrew)                | `brew:node`                                                                     |
+| `scoop`   | Windows                         | `scoop:git`                                                                     |
+| `snap`    | Linux (Snapcraft)               | `snap:node`                                                                     |
+| `flatpak` | Linux (Flathub)                 | `flatpak:org.gimp.GIMP`                                                         |
+| `npm`     | Node.js                         | `npm:typescript`                                                                |
+| `bun`     | Bun                             | `bun:elysia`                                                                    |
+| `deno`    | Deno                            | `deno:npm-chalk` or `deno:jsr-@std/bytes` (the `-` instead of `:` is important) |
+| `jsr`     | JavaScript Registry             | `jsr:@std/http`                                                                 |
+| `pip`     | Python                          | `pip:requests`                                                                  |
+| `nix`     | NixOS / Nix                     | `nix:nixpkgs.hello`                                                             |
 
 And many more.
 

@@ -208,11 +208,17 @@ pub struct ComplexDependencyGroup {
     pub sub_packages: Option<HashMap<String, DependencyGroup>>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct TypedBuildDependencies {
+    #[serde(default)]
+    pub types: HashMap<String, DependencyGroup>,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum BuildDependencies {
+    Typed(TypedBuildDependencies),
     Group(DependencyGroup),
-    Typed(HashMap<String, DependencyGroup>),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -460,6 +466,7 @@ pub struct PkgLink {
     pub url: String,
     pub pgp: Option<String>,
     pub hash: Option<String>,
+    pub size: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -486,4 +493,12 @@ pub struct RepoConfig {
     #[serde(default)]
     pub pgp: Vec<PgpKey>,
     pub repos: Vec<RepoEntry>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PrebuiltInfo {
+    pub final_url: String,
+    pub pgp_url: Option<String>,
+    pub hash_url: Option<String>,
+    pub size_url: Option<String>,
 }

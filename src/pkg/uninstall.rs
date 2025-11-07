@@ -275,34 +275,15 @@ pub fn run(
         }
     }
 
-    let version_dir = local::get_package_version_dir(
+    let package_dir = local::get_package_dir(
         scope,
         &manifest.registry_handle,
         &manifest.repo,
         &manifest.name,
-        &manifest.version,
     )?;
 
-    let manifest_filename = if let Some(sub) = &manifest.sub_package {
-        format!("manifest-{}.yaml", sub)
-    } else {
-        "manifest.yaml".to_string()
-    };
-    let manifest_path = version_dir.join(manifest_filename);
-    if manifest_path.exists() {
-        fs::remove_file(manifest_path)?;
-    }
-
-    if let Ok(read_dir) = fs::read_dir(&version_dir)
-        && read_dir.count() == 0
-    {
-        fs::remove_dir_all(&version_dir)?;
-    }
-
-    let package_dir = local::get_package_dir(scope, handle, &pkg.repo, &pkg.name)?;
-    if let Ok(read_dir) = fs::read_dir(&package_dir)
-        && read_dir.count() == 0
-    {
+    if package_dir.exists() {
+        println!("Removing package store: {}", package_dir.display());
         fs::remove_dir_all(&package_dir)?;
     }
     let parent_id = format!("#{}@{}", manifest.registry_handle, manifest.repo);

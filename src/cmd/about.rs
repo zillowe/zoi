@@ -32,10 +32,7 @@ pub fn run(branch: &str, status: &str, number: &str, commit: &str) {
         posthog_host.is_some_and(|s| !s.is_empty()) || zoi_registry.is_some_and(|s| !s.is_empty());
 
     if has_build_info {
-        println!(
-            "\n  {}",
-            "Build Information".green()
-        );
+        println!("\n  {}", "Build Information".green());
         if let Some(host) = posthog_host
             && !host.is_empty()
         {
@@ -53,10 +50,7 @@ pub fn run(branch: &str, status: &str, number: &str, commit: &str) {
         || about_packager_homepage.is_some_and(|s| !s.is_empty());
 
     if has_packager_info {
-        println!(
-            "\n  {}",
-            "Packager Information".green()
-        );
+        println!("\n  {}", "Packager Information".green());
         if let Some(author) = about_packager_author
             && !author.is_empty()
         {

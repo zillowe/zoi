@@ -5,7 +5,6 @@ use colored::*;
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use semver::Version;
-use std::collections::HashSet;
 use std::fs;
 use std::sync::Mutex;
 
@@ -165,130 +164,151 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
         return Err(anyhow!("Pre-upgrade hook failed: {}", e));
     }
 
-    let mode = install::InstallMode::PreferPrebuilt;
-    let processed_deps = Mutex::new(HashSet::new());
-
-    match install::run_installation(
-        package_name,
-        mode,
+    let (graph, _) = match install::resolver::resolve_dependency_graph(
+        &[package_name.to_string()],
+        Some(old_manifest.scope),
         true,
-        types::InstallReason::Direct,
         yes,
         false,
+        None,
         true,
-        &processed_deps,
-        Some(old_manifest.scope),
-        None,
-        None,
     ) {
-        Ok(new_manifest) => {
-            if let Err(e) = transaction::record_operation(
-                &transaction.id,
-                types::TransactionOperation::Upgrade {
-                    old_manifest: Box::new(old_manifest.clone()),
-                    new_manifest: Box::new(new_manifest.clone()),
-                },
-            ) {
-                eprintln!("Warning: Failed to record transaction for update: {}", e);
-                transaction::delete_log(&transaction.id)?;
-            } else {
-                transaction::commit(&transaction.id)?;
-            }
-
-            if let Some(backup_files) = &old_manifest.backup {
-                println!("Restoring configuration files...");
-                let old_version_dir = local::get_package_version_dir(
-                    old_manifest.scope,
-                    &old_manifest.registry_handle,
-                    &old_manifest.repo,
-                    &old_manifest.name,
-                    &old_manifest.version,
-                )?;
-                let new_version_dir = local::get_package_version_dir(
-                    new_manifest.scope,
-                    &new_manifest.registry_handle,
-                    &new_manifest.repo,
-                    &new_manifest.name,
-                    &new_manifest.version,
-                )?;
-                for backup_file_rel in backup_files {
-                    let backup_src = old_version_dir.join(backup_file_rel);
-                    if backup_src.exists() {
-                        let restore_dest = new_version_dir.join(backup_file_rel);
-                        if let Some(p) = restore_dest.parent() {
-                            fs::create_dir_all(p)?;
-                        }
-                        fs::copy(&backup_src, &restore_dest)?;
-                    }
-                }
-            }
-
-            if let Some(backup_files) = &old_manifest.backup {
-                println!("Restoring configuration files...");
-                let old_version_dir = local::get_package_version_dir(
-                    old_manifest.scope,
-                    &old_manifest.registry_handle,
-                    &old_manifest.repo,
-                    &old_manifest.name,
-                    &old_manifest.version,
-                )?;
-                let new_version_dir = local::get_package_version_dir(
-                    new_manifest.scope,
-                    &new_manifest.registry_handle,
-                    &new_manifest.repo,
-                    &new_manifest.name,
-                    &new_manifest.version,
-                )?;
-                for backup_file_rel in backup_files {
-                    let old_path = old_version_dir.join(backup_file_rel);
-                    let new_path = new_version_dir.join(backup_file_rel);
-
-                    if old_path.exists() {
-                        if new_path.exists() {
-                            let zoinew_path = new_path.with_extension(format!(
-                                "{}.zoinew",
-                                new_path.extension().and_then(|s| s.to_str()).unwrap_or("")
-                            ));
-                            println!(
-                                "Configuration file '{}' exists in new version. Saving as .zoinew",
-                                new_path.display()
-                            );
-                            if let Err(e) = fs::rename(&new_path, &zoinew_path) {
-                                eprintln!("Warning: failed to rename to .zoinew: {}", e);
-                                continue;
-                            }
-                        }
-                        if let Some(p) = new_path.parent() {
-                            fs::create_dir_all(p)?;
-                        }
-                        if let Err(e) = fs::rename(&old_path, &new_path) {
-                            eprintln!("Warning: failed to restore backup file: {}", e);
-                        }
-                    }
-                }
-            }
-
-            cleanup_old_versions(
-                &new_pkg.name,
-                old_manifest.scope,
-                &new_pkg.repo,
-                registry_handle.as_deref().unwrap_or("local"),
-            )?;
-
-            if let Some(hooks) = &new_pkg.hooks
-                && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PostUpgrade)
-            {
-                return Err(anyhow!("Post-upgrade hook failed: {}", e));
-            }
-
-            println!("\n{}", "Success:".green());
-            Ok(())
-        }
+        Ok(res) => res,
         Err(e) => {
-            eprintln!("\nError: Update failed during installation. Rolling back...");
-            transaction::rollback(&transaction.id)?;
-            Err(anyhow!("Update failed: {}", e))
+            return Err(anyhow!(
+                "Failed to resolve dependency graph for update: {}",
+                e
+            ));
         }
+    };
+
+    let install_plan = match install::plan::create_install_plan(&graph.nodes) {
+        Ok(plan) => plan,
+        Err(e) => return Err(anyhow!("Failed to create install plan for update: {}", e)),
+    };
+
+    let mut new_manifest_option: Option<types::InstallManifest> = None;
+
+    for (id, node) in &graph.nodes {
+        if let Some(action) = install_plan.get(id) {
+            match install::installer::install_node(node, action, None, None, yes) {
+                Ok(m) => {
+                    if m.name == new_pkg.name {
+                        new_manifest_option = Some(m);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("\nError: Update failed during installation. Rolling back...");
+                    transaction::rollback(&transaction.id)?;
+                    return Err(anyhow!("Update failed: {}", e));
+                }
+            }
+        }
+    }
+
+    if let Some(new_manifest) = new_manifest_option {
+        if let Err(e) = transaction::record_operation(
+            &transaction.id,
+            types::TransactionOperation::Upgrade {
+                old_manifest: Box::new(old_manifest.clone()),
+                new_manifest: Box::new(new_manifest.clone()),
+            },
+        ) {
+            eprintln!("Warning: Failed to record transaction for update: {}", e);
+            transaction::delete_log(&transaction.id)?;
+        } else {
+            transaction::commit(&transaction.id)?;
+        }
+
+        if let Some(backup_files) = &old_manifest.backup {
+            println!("Restoring configuration files...");
+            let old_version_dir = match local::get_package_version_dir(
+                old_manifest.scope,
+                &old_manifest.registry_handle,
+                &old_manifest.repo,
+                &old_manifest.name,
+                &old_manifest.version,
+            ) {
+                Ok(dir) => dir,
+                Err(e) => {
+                    eprintln!(
+                        "Warning: could not get old version dir to restore backups: {}",
+                        e
+                    );
+                    return Ok(());
+                }
+            };
+            let new_version_dir = match local::get_package_version_dir(
+                new_manifest.scope,
+                &new_manifest.registry_handle,
+                &new_manifest.repo,
+                &new_manifest.name,
+                &new_manifest.version,
+            ) {
+                Ok(dir) => dir,
+                Err(e) => {
+                    eprintln!(
+                        "Warning: could not get new version dir to restore backups: {}",
+                        e
+                    );
+                    return Ok(());
+                }
+            };
+
+            for backup_file_rel in backup_files {
+                let old_path = old_version_dir.join(backup_file_rel);
+                let new_path = new_version_dir.join(backup_file_rel);
+
+                if old_path.exists() {
+                    if new_path.exists() {
+                        let zoinew_path = new_path.with_extension(format!(
+                            "{}.zoinew",
+                            new_path.extension().and_then(|s| s.to_str()).unwrap_or("")
+                        ));
+                        println!(
+                            "Configuration file '{}' exists in new version. Saving as .zoinew",
+                            new_path.display()
+                        );
+                        if let Err(e) = fs::rename(&new_path, &zoinew_path) {
+                            eprintln!("Warning: failed to rename to .zoinew: {}", e);
+                            continue;
+                        }
+                    }
+                    if let Some(p) = new_path.parent()
+                        && let Err(e) = fs::create_dir_all(p)
+                    {
+                        eprintln!(
+                            "Warning: failed to create parent dir for backup restoration: {}",
+                            e
+                        );
+                        continue;
+                    }
+                    if let Err(e) = fs::rename(&old_path, &new_path) {
+                        eprintln!("Warning: failed to restore backup file: {}", e);
+                    }
+                }
+            }
+        }
+
+        cleanup_old_versions(
+            &new_pkg.name,
+            old_manifest.scope,
+            &new_pkg.repo,
+            registry_handle.as_deref().unwrap_or("local"),
+        )?;
+
+        if let Some(hooks) = &new_pkg.hooks
+            && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PostUpgrade)
+        {
+            return Err(anyhow!("Post-upgrade hook failed: {}", e));
+        }
+
+        println!("\n{}", "Success:".green());
+        Ok(())
+    } else {
+        eprintln!("\nError: Update failed to produce a new manifest. Rolling back...");
+        transaction::rollback(&transaction.id)?;
+        Err(anyhow!("Update failed: could not get new manifest"))
     }
 }
 
@@ -389,7 +409,7 @@ fn run_update_all_logic(yes: bool) -> Result<()> {
 
     packages_to_upgrade
         .par_iter()
-        .for_each(|(source, new_pkg, registry_handle, old_manifest)| {
+        .for_each(|(source, new_pkg, _registry_handle, old_manifest)| {
             println!(
                 "\n--- Upgrading {} to {} ---",
                 source.cyan(),
@@ -409,44 +429,71 @@ fn run_update_all_logic(yes: bool) -> Result<()> {
                 return;
             }
 
-            let mode = install::InstallMode::PreferPrebuilt;
-            let processed_deps = Mutex::new(HashSet::new());
-            match install::run_installation(
-                source,
-                mode,
+            let (graph, _) = match install::resolver::resolve_dependency_graph(
+                &[source.to_string()],
+                Some(old_manifest.scope),
                 true,
-                types::InstallReason::Direct,
                 yes,
                 false,
+                None,
                 true,
-                &processed_deps,
-                Some(old_manifest.scope),
-                None,
-                None,
             ) {
-                Ok(new_manifest) => {
-                    if let Err(e) = transaction::record_operation(
-                        &transaction.id,
-                        types::TransactionOperation::Upgrade {
-                            old_manifest: Box::new(old_manifest.clone()),
-                            new_manifest: Box::new(new_manifest),
-                        },
-                    ) {
-                        eprintln!("Error: Failed to record transaction for {}: {}", source, e);
-                        failed_updates.lock().unwrap().push(source.clone());
-                    } else {
-                        successful_upgrades.lock().unwrap().push((
-                            source.clone(),
-                            new_pkg.clone(),
-                            registry_handle.clone(),
-                            old_manifest.scope,
-                        ));
+                Ok(res) => res,
+                Err(e) => {
+                    eprintln!("Error resolving dependency graph for update: {}", e);
+                    failed_updates.lock().unwrap().push(source.clone());
+                    return;
+                }
+            };
+
+            let install_plan = match install::plan::create_install_plan(&graph.nodes) {
+                Ok(plan) => plan,
+                Err(e) => {
+                    eprintln!("Error creating install plan for update: {}", e);
+                    failed_updates.lock().unwrap().push(source.clone());
+                    return;
+                }
+            };
+
+            let mut new_manifest_option: Option<types::InstallManifest> = None;
+
+            for (id, node) in &graph.nodes {
+                if let Some(action) = install_plan.get(id) {
+                    match install::installer::install_node(node, action, None, None, yes) {
+                        Ok(m) => {
+                            if m.name == new_pkg.name {
+                                new_manifest_option = Some(m);
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to upgrade {}: {}", source, e);
+                            failed_updates.lock().unwrap().push(source.clone());
+                            return;
+                        }
                     }
                 }
-                Err(e) => {
-                    eprintln!("Failed to upgrade {}: {}", source, e);
+            }
+
+            if let Some(new_manifest) = new_manifest_option {
+                if let Err(e) = transaction::record_operation(
+                    &transaction.id,
+                    types::TransactionOperation::Upgrade {
+                        old_manifest: Box::new(old_manifest.clone()),
+                        new_manifest: Box::new(new_manifest.clone()),
+                    },
+                ) {
+                    eprintln!("Error: Failed to record transaction for {}: {}", source, e);
                     failed_updates.lock().unwrap().push(source.clone());
+                } else {
+                    successful_upgrades.lock().unwrap().push((
+                        old_manifest.clone(),
+                        new_manifest.clone(),
+                        new_pkg.clone(),
+                    ));
                 }
+            } else {
+                eprintln!("Failed to get new manifest for {}", source);
+                failed_updates.lock().unwrap().push(source.clone());
             }
         });
 
@@ -464,14 +511,90 @@ fn run_update_all_logic(yes: bool) -> Result<()> {
 
     println!("\n{}", "Success:".green());
     let successful_upgrades = successful_upgrades.into_inner().unwrap();
-    for (source, new_pkg, registry_handle, scope) in &successful_upgrades {
+    for (old_manifest, new_manifest, new_pkg) in &successful_upgrades {
+        if let Some(backup_files) = &old_manifest.backup {
+            println!(
+                "Restoring configuration for {}...",
+                old_manifest.name.cyan()
+            );
+            let old_version_dir = match local::get_package_version_dir(
+                old_manifest.scope,
+                &old_manifest.registry_handle,
+                &old_manifest.repo,
+                &old_manifest.name,
+                &old_manifest.version,
+            ) {
+                Ok(dir) => dir,
+                Err(e) => {
+                    eprintln!(
+                        "Warning: could not get old version dir to restore backups: {}",
+                        e
+                    );
+                    continue;
+                }
+            };
+            let new_version_dir = match local::get_package_version_dir(
+                new_manifest.scope,
+                &new_manifest.registry_handle,
+                &new_manifest.repo,
+                &new_manifest.name,
+                &new_manifest.version,
+            ) {
+                Ok(dir) => dir,
+                Err(e) => {
+                    eprintln!(
+                        "Warning: could not get new version dir to restore backups: {}",
+                        e
+                    );
+                    continue;
+                }
+            };
+
+            for backup_file_rel in backup_files {
+                let old_path = old_version_dir.join(backup_file_rel);
+                let new_path = new_version_dir.join(backup_file_rel);
+
+                if old_path.exists() {
+                    if new_path.exists() {
+                        let zoinew_path = new_path.with_extension(format!(
+                            "{}.zoinew",
+                            new_path.extension().and_then(|s| s.to_str()).unwrap_or("")
+                        ));
+                        println!(
+                            "Configuration file '{}' exists in new version. Saving as .zoinew",
+                            new_path.display()
+                        );
+                        if let Err(e) = fs::rename(&new_path, &zoinew_path) {
+                            eprintln!("Warning: failed to rename to .zoinew: {}", e);
+                            continue;
+                        }
+                    }
+                    if let Some(p) = new_path.parent()
+                        && let Err(e) = fs::create_dir_all(p)
+                    {
+                        eprintln!(
+                            "Warning: failed to create parent dir for backup restoration: {}",
+                            e
+                        );
+                        continue;
+                    }
+                    if let Err(e) = fs::rename(&old_path, &new_path) {
+                        eprintln!("Warning: failed to restore backup file: {}", e);
+                    }
+                }
+            }
+        }
+
         if let Err(e) = cleanup_old_versions(
-            &new_pkg.name,
-            *scope,
-            &new_pkg.repo,
-            registry_handle.as_deref().unwrap_or("local"),
+            &new_manifest.name,
+            new_manifest.scope,
+            &new_manifest.repo,
+            &new_manifest.registry_handle,
         ) {
-            eprintln!("Failed to clean up old versions for {}: {}", source, e);
+            eprintln!(
+                "Failed to clean up old versions for {}: {}",
+                new_manifest.name, e
+            );
         }
 
         if let Some(hooks) = &new_pkg.hooks
@@ -480,7 +603,7 @@ fn run_update_all_logic(yes: bool) -> Result<()> {
             eprintln!(
                 "{}: Post-upgrade hook failed for '{}': {}",
                 "Error".red().bold(),
-                source,
+                new_manifest.name,
                 e
             );
         }

@@ -1,4 +1,4 @@
-use crate::pkg::types;
+use crate::pkg::{cache, install::resolver::InstallNode, types};
 use crate::utils;
 use anyhow::{Result, anyhow};
 use colored::*;
@@ -141,6 +141,7 @@ pub fn download_file_with_progress(
     url: &str,
     dest_path: &Path,
     m: Option<&MultiProgress>,
+    expected_size: Option<u64>,
 ) -> Result<()> {
     if url.starts_with("http://") {
         let msg = format!("downloading over insecure HTTP: {}", url);
@@ -149,20 +150,18 @@ pub fn download_file_with_progress(
         }
     }
 
+    let pb_style = ProgressStyle::default_bar()
+        .template("{spinner:.green} {msg:30.cyan.bold} [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {elapsed_precise})")?
+        .progress_chars("=>-");
+
     let mut pb = if let Some(m) = m {
-        let pb = m.add(ProgressBar::new(0));
-        pb.set_style(
-            ProgressStyle::default_bar()
-                .template(
-                    "{spinner:.green} {wide_msg:.cyan}\n[{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})",
-                )?
-                .progress_chars("#>-"),
-        );
+        let pb = m.add(ProgressBar::new(expected_size.unwrap_or(0)));
+        pb.set_style(pb_style.clone());
         pb.set_message(format!("Connecting to {}", get_filename_from_url(url)));
         pb
     } else {
         println!("Downloading from: {url}");
-        ProgressBar::new(0)
+        ProgressBar::new(expected_size.unwrap_or(0))
     };
 
     let client = crate::utils::build_blocking_http_client(60)?;
@@ -227,13 +226,15 @@ pub fn download_file_with_progress(
         ));
     }
 
-    let total_size = partial_size + response.content_length().unwrap_or(0);
+    let total_size = if let Some(s) = expected_size {
+        s
+    } else {
+        partial_size + response.content_length().unwrap_or(0)
+    };
 
     if m.is_none() {
         let new_pb = ProgressBar::new(total_size);
-        new_pb.set_style(ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})")?
-            .progress_chars("#>-"));
+        new_pb.set_style(pb_style);
         pb.finish_and_clear();
         let _ = std::mem::replace(&mut pb, new_pb);
     }
@@ -285,12 +286,22 @@ pub fn verify_file_hash(file_path: &Path, expected_hash: &str) -> Result<bool> {
 pub fn check_file_conflicts(
     graph: &super::resolver::DependencyGraph,
     yes: bool,
-    m: &MultiProgress,
+    _m: &MultiProgress,
 ) -> Result<()> {
     let mut all_conflicts = HashSet::new();
 
     for node in graph.nodes.values() {
-        if let Ok(archive_path) = super::installer::ensure_archive_is_cached(node, Some(m)) {
+        if let Ok(Some(info)) = find_prebuilt_info(node) {
+            let archive_filename = info.final_url.split('/').next_back().unwrap_or_default();
+            let archive_cache_root = match cache::get_archive_cache_root() {
+                Ok(path) => path,
+                Err(_) => continue,
+            };
+            let archive_path = archive_cache_root.join(archive_filename);
+
+            if !archive_path.exists() {
+                continue;
+            }
             let request = match crate::pkg::resolve::parse_source_string(&node.source) {
                 Ok(req) => req,
                 Err(_) => {
@@ -325,7 +336,7 @@ pub fn check_file_conflicts(
             eprintln!(
                 "{} Could not find a pre-built archive for {} to check for file conflicts. Will check during installation.",
                 "Warning:".yellow(),
-                node.pkg.name
+                node.pkg.name.cyan()
             );
         }
     }
@@ -426,4 +437,64 @@ pub fn get_expected_hash(hash_url: &str) -> Result<String> {
     let client = crate::utils::build_blocking_http_client(10)?;
     let resp = client.get(hash_url).send()?.text()?;
     Ok(resp.split_whitespace().next().unwrap_or("").to_string())
+}
+
+pub fn get_expected_size(size_url: &str) -> Result<u64> {
+    let client = crate::utils::build_blocking_http_client(10)?;
+    let resp = client.get(size_url).send()?.text()?;
+    let size = resp.trim().parse::<u64>()?;
+    Ok(size)
+}
+
+pub fn find_prebuilt_info(node: &InstallNode) -> Result<Option<types::PrebuiltInfo>> {
+    let pkg = &node.pkg;
+    let platform = crate::utils::get_platform()?;
+
+    let db_path = crate::pkg::resolve::get_db_root()?;
+    let repo_db_path = db_path.join(&node.registry_handle);
+    if let Ok(repo_config) = crate::pkg::config::read_repo_config(&repo_db_path) {
+        let mut pkg_links_to_try = Vec::new();
+        if let Some(main_pkg) = repo_config.pkg.iter().find(|p| p.link_type == "main") {
+            pkg_links_to_try.push(main_pkg.clone());
+        }
+        pkg_links_to_try.extend(
+            repo_config
+                .pkg
+                .iter()
+                .filter(|p| p.link_type == "mirror")
+                .cloned(),
+        );
+
+        if let Some(pkg_link) = pkg_links_to_try.into_iter().next() {
+            let (os, arch) = (
+                platform.split('-').next().unwrap_or(""),
+                platform.split('-').nth(1).unwrap_or(""),
+            );
+
+            let replace_vars = |url: &str| {
+                url.replace("{os}", os)
+                    .replace("{arch}", arch)
+                    .replace("{version}", &node.version)
+                    .replace("{repo}", &pkg.repo)
+            };
+
+            let url_dir = replace_vars(&pkg_link.url);
+            let archive_filename =
+                format!("{}-{}-{}.pkg.tar.zst", pkg.name, &node.version, platform);
+            let final_url = format!("{}/{}", url_dir.trim_end_matches('/'), archive_filename);
+
+            let pgp_url = pkg_link.pgp.as_ref().map(|url| replace_vars(url));
+            let hash_url = pkg_link.hash.as_ref().map(|url| replace_vars(url));
+            let size_url = pkg_link.size.as_ref().map(|url| replace_vars(url));
+
+            return Ok(Some(types::PrebuiltInfo {
+                final_url,
+                pgp_url,
+                hash_url,
+                size_url,
+            }));
+        }
+    }
+
+    Ok(None)
 }

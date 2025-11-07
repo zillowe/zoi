@@ -51,6 +51,7 @@ pub fn run(args: BuildCommand) {
         args.output_dir.as_deref(),
         None,
         args.sub,
+        false,
     ) {
         eprintln!("Error: {}", e);
         std::process::exit(1);

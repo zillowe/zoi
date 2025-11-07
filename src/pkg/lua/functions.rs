@@ -320,56 +320,59 @@ fn add_zcp(lua: &Lua) -> Result<(), mlua::Error> {
     Ok(())
 }
 
-fn add_verify_hash(lua: &Lua) -> Result<(), mlua::Error> {
-    let verify_hash_fn = lua.create_function(|_lua, (file_path, hash_str): (String, String)| {
-        let parts: Vec<&str> = hash_str.splitn(2, '-').collect();
-        if parts.len() != 2 {
-            return Err(mlua::Error::RuntimeError(
-                "Invalid hash format. Expected 'algo-hash'".to_string(),
-            ));
-        }
-        let algo = parts[0];
-        let expected_hash = parts[1];
+fn add_verify_hash(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
+    let verify_hash_fn =
+        lua.create_function(move |_, (file_path, hash_str): (String, String)| {
+            let parts: Vec<&str> = hash_str.splitn(2, '-').collect();
+            if parts.len() != 2 {
+                return Err(mlua::Error::RuntimeError(
+                    "Invalid hash format. Expected 'algo-hash'".to_string(),
+                ));
+            }
+            let algo = parts[0];
+            let expected_hash = parts[1];
 
-        let mut file = fs::File::open(&file_path)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to open file: {}", e)))?;
-        let mut buffer = Vec::new();
-        file.read_to_end(&mut buffer)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to read file: {}", e)))?;
+            let mut file = fs::File::open(&file_path)
+                .map_err(|e| mlua::Error::RuntimeError(format!("Failed to open file: {}", e)))?;
+            let mut buffer = Vec::new();
+            file.read_to_end(&mut buffer)
+                .map_err(|e| mlua::Error::RuntimeError(format!("Failed to read file: {}", e)))?;
 
-        let actual_hash = match algo {
-            "md5" => {
-                let digest = md5::compute(&buffer);
-                format!("{:x}", digest)
-            }
-            "sha256" => {
-                let mut hasher = Sha256::new();
-                hasher.update(&buffer);
-                hex::encode(hasher.finalize())
-            }
-            "sha512" => {
-                let mut hasher = Sha512::new();
-                hasher.update(&buffer);
-                hex::encode(hasher.finalize())
-            }
-            _ => {
-                return Err(mlua::Error::RuntimeError(format!(
-                    "Unsupported hash algorithm: {}",
-                    algo
-                )));
-            }
-        };
+            let actual_hash = match algo {
+                "md5" => {
+                    let digest = md5::compute(&buffer);
+                    format!("{:x}", digest)
+                }
+                "sha256" => {
+                    let mut hasher = Sha256::new();
+                    hasher.update(&buffer);
+                    hex::encode(hasher.finalize())
+                }
+                "sha512" => {
+                    let mut hasher = Sha512::new();
+                    hasher.update(&buffer);
+                    hex::encode(hasher.finalize())
+                }
+                _ => {
+                    return Err(mlua::Error::RuntimeError(format!(
+                        "Unsupported hash algorithm: {}",
+                        algo
+                    )));
+                }
+            };
 
-        if actual_hash.eq_ignore_ascii_case(expected_hash) {
-            Ok(true)
-        } else {
-            println!(
-                "Hash mismatch for {}: expected {}, got {}",
-                file_path, expected_hash, actual_hash
-            );
-            Ok(false)
-        }
-    })?;
+            if actual_hash.eq_ignore_ascii_case(expected_hash) {
+                Ok(true)
+            } else {
+                if !quiet {
+                    println!(
+                        "Hash mismatch for {}: expected {}, got {}",
+                        file_path, expected_hash, actual_hash
+                    );
+                }
+                Ok(false)
+            }
+        })?;
     lua.globals().set("verifyHash", verify_hash_fn)?;
     Ok(())
 }
@@ -395,11 +398,13 @@ fn add_zrm(lua: &Lua) -> Result<(), mlua::Error> {
     Ok(())
 }
 
-fn add_cmd_util(lua: &Lua) -> Result<(), mlua::Error> {
-    let cmd_fn = lua.create_function(|lua, command: String| {
+fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
+    let cmd_fn = lua.create_function(move |lua, command: String| {
         let build_dir: String = lua.globals().get("BUILD_DIR")?;
 
-        println!("Executing: {}", command);
+        if !quiet {
+            println!("Executing: {}", command);
+        }
         let output = if cfg!(target_os = "windows") {
             std::process::Command::new("pwsh")
                 .arg("-Command")
@@ -417,14 +422,18 @@ fn add_cmd_util(lua: &Lua) -> Result<(), mlua::Error> {
         match output {
             Ok(out) => {
                 if !out.status.success() {
-                    eprintln!("[cmd] {}", String::from_utf8_lossy(&out.stderr));
+                    if !quiet {
+                        eprintln!("[cmd] {}", String::from_utf8_lossy(&out.stderr));
+                    }
                     Ok(String::new())
                 } else {
                     Ok(String::from_utf8_lossy(&out.stdout).to_string())
                 }
             }
             Err(e) => {
-                eprintln!("[cmd] Failed to execute command: {}", e);
+                if !quiet {
+                    eprintln!("[cmd] Failed to execute command: {}", e);
+                }
                 Ok(String::new())
             }
         }
@@ -469,75 +478,81 @@ fn add_find_util(lua: &Lua) -> Result<(), mlua::Error> {
     Ok(())
 }
 
-fn add_extract_util(lua: &Lua) -> Result<(), mlua::Error> {
-    let extract_fn = lua.create_function(|lua, (source, out_name): (String, Option<String>)| {
-        let build_dir_str: String = lua.globals().get("BUILD_DIR")?;
-        let build_dir = Path::new(&build_dir_str);
+fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
+    let extract_fn =
+        lua.create_function(move |lua, (source, out_name): (String, Option<String>)| {
+            let build_dir_str: String = lua.globals().get("BUILD_DIR")?;
+            let build_dir = Path::new(&build_dir_str);
 
-        let archive_file = if source.starts_with("http") {
-            println!("Downloading: {}", source);
-            let file_name = source.split('/').next_back().unwrap_or("download.tmp");
-            let temp_path = build_dir.join(file_name);
-            let response = reqwest::blocking::get(&source)
+            let archive_file = if source.starts_with("http") {
+                if !quiet {
+                    println!("Downloading: {}", source);
+                }
+                let file_name = source.split('/').next_back().unwrap_or("download.tmp");
+                let temp_path = build_dir.join(file_name);
+                let response = reqwest::blocking::get(&source)
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                let content = response
+                    .bytes()
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                fs::write(&temp_path, content)
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                temp_path
+            } else {
+                PathBuf::from(source)
+            };
+
+            let out_dir_name = out_name.unwrap_or_else(|| "extracted".to_string());
+            let out_dir = build_dir.join(out_dir_name);
+            fs::create_dir_all(&out_dir).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+
+            if !quiet {
+                println!(
+                    "Extracting {} to {}",
+                    archive_file.display(),
+                    out_dir.display()
+                );
+            }
+
+            let file = fs::File::open(&archive_file)
                 .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-            let content = response
-                .bytes()
-                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-            fs::write(&temp_path, content).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-            temp_path
-        } else {
-            PathBuf::from(source)
-        };
 
-        let out_dir_name = out_name.unwrap_or_else(|| "extracted".to_string());
-        let out_dir = build_dir.join(out_dir_name);
-        fs::create_dir_all(&out_dir).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+            let archive_path_str = archive_file.to_string_lossy();
 
-        println!(
-            "Extracting {} to {}",
-            archive_file.display(),
-            out_dir.display()
-        );
+            if archive_path_str.ends_with(".zip") {
+                let mut archive =
+                    ZipArchive::new(file).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                archive
+                    .extract(&out_dir)
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+            } else if archive_path_str.ends_with(".tar.gz") {
+                let tar_gz = GzDecoder::new(file);
+                let mut archive = tar::Archive::new(tar_gz);
+                archive
+                    .unpack(&out_dir)
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+            } else if archive_path_str.ends_with(".tar.zst") {
+                let tar_zst =
+                    ZstdDecoder::new(file).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                let mut archive = tar::Archive::new(tar_zst);
+                archive
+                    .unpack(&out_dir)
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+            } else if archive_path_str.ends_with(".tar.xz") {
+                let tar_xz = XzDecoder::new(file);
+                let mut archive = tar::Archive::new(tar_xz);
+                archive
+                    .unpack(&out_dir)
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+            } else {
+                return Err(mlua::Error::RuntimeError(format!(
+                    "Unsupported archive format for file: {}",
+                    archive_path_str
+                )));
+            }
 
-        let file =
-            fs::File::open(&archive_file).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-
-        let archive_path_str = archive_file.to_string_lossy();
-
-        if archive_path_str.ends_with(".zip") {
-            let mut archive =
-                ZipArchive::new(file).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-            archive
-                .extract(&out_dir)
-                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-        } else if archive_path_str.ends_with(".tar.gz") {
-            let tar_gz = GzDecoder::new(file);
-            let mut archive = tar::Archive::new(tar_gz);
-            archive
-                .unpack(&out_dir)
-                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-        } else if archive_path_str.ends_with(".tar.zst") {
-            let tar_zst =
-                ZstdDecoder::new(file).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-            let mut archive = tar::Archive::new(tar_zst);
-            archive
-                .unpack(&out_dir)
-                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-        } else if archive_path_str.ends_with(".tar.xz") {
-            let tar_xz = XzDecoder::new(file);
-            let mut archive = tar::Archive::new(tar_xz);
-            archive
-                .unpack(&out_dir)
-                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-        } else {
-            return Err(mlua::Error::RuntimeError(format!(
-                "Unsupported archive format for file: {}",
-                archive_path_str
-            )));
-        }
-
-        Ok(())
-    })?;
+            Ok(())
+        })?;
 
     let utils_table: Table = lua.globals().get("UTILS")?;
     utils_table.set("EXTRACT", extract_fn)?;
@@ -545,9 +560,9 @@ fn add_extract_util(lua: &Lua) -> Result<(), mlua::Error> {
     Ok(())
 }
 
-fn add_verify_signature(lua: &Lua) -> Result<(), mlua::Error> {
+fn add_verify_signature(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let verify_sig_fn = lua.create_function(
-        |_, (file_path, sig_path, key_source): (String, String, String)| {
+        move |_, (file_path, sig_path, key_source): (String, String, String)| {
             let key_bytes: Vec<u8> = if key_source.starts_with("http") {
                 match reqwest::blocking::get(&key_source).and_then(|r| r.bytes()) {
                     Ok(b) => b.to_vec(),
@@ -610,7 +625,9 @@ fn add_verify_signature(lua: &Lua) -> Result<(), mlua::Error> {
             match result {
                 Ok(_) => Ok(true),
                 Err(e) => {
-                    eprintln!("Signature verification failed: {}", e);
+                    if !quiet {
+                        eprintln!("Signature verification failed: {}", e);
+                    }
                     Ok(false)
                 }
             }
@@ -620,8 +637,8 @@ fn add_verify_signature(lua: &Lua) -> Result<(), mlua::Error> {
     Ok(())
 }
 
-fn add_add_pgp_key(lua: &Lua) -> Result<(), mlua::Error> {
-    let add_pgp_key_fn = lua.create_function(|_, (source, name): (String, String)| {
+fn add_add_pgp_key(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
+    let add_pgp_key_fn = lua.create_function(move |_, (source, name): (String, String)| {
         let result = if source.starts_with("http") {
             crate::pkg::pgp::add_key_from_url(&source, &name)
         } else {
@@ -629,7 +646,9 @@ fn add_add_pgp_key(lua: &Lua) -> Result<(), mlua::Error> {
         };
 
         if let Err(e) = result {
-            eprintln!("Failed to add PGP key '{}': {}", name, e);
+            if !quiet {
+                eprintln!("Failed to add PGP key '{}': {}", name, e);
+            }
             return Ok(false);
         }
         Ok(true)
@@ -757,14 +776,14 @@ pub fn setup_lua_environment(
     add_git_fetch_util(lua)?;
     add_file_util(lua)?;
     add_zcp(lua)?;
-    add_verify_hash(lua)?;
+    add_verify_hash(lua, quiet)?;
     add_zrm(lua)?;
-    add_cmd_util(lua)?;
+    add_cmd_util(lua, quiet)?;
     add_fs_util(lua)?;
     add_find_util(lua)?;
-    add_extract_util(lua)?;
-    add_verify_signature(lua)?;
-    add_add_pgp_key(lua)?;
+    add_extract_util(lua, quiet)?;
+    add_verify_signature(lua, quiet)?;
+    add_add_pgp_key(lua, quiet)?;
     add_package_lifecycle_functions(lua)?;
 
     if let Some(path_str) = file_path {

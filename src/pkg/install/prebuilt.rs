@@ -2,7 +2,9 @@ use crate::pkg::types;
 use crate::utils;
 use anyhow::{Result, anyhow};
 use colored::*;
+use indicatif::{ProgressBar, ProgressStyle};
 use std::fs;
+use std::thread;
 
 pub fn try_build_install(
     pkg_lua_path: &std::path::Path,
@@ -12,8 +14,6 @@ pub fn try_build_install(
     yes: bool,
     sub_package_to_install: Option<String>,
 ) -> Result<Vec<String>> {
-    println!("{}", "Attempting to build and install package...".yellow());
-
     let build_type = if let Some(t) = build_type_override {
         if !pkg.types.contains(&t.to_string()) {
             return Err(anyhow!(
@@ -43,17 +43,40 @@ pub fn try_build_install(
     })?;
     let sub_packages_vec = sub_package_to_install.clone().map(|s| vec![s]);
 
-    if let Err(e) = crate::pkg::package::build::run(
-        pkg_lua_path,
-        build_type,
-        std::slice::from_ref(&current_platform),
-        None,
-        None,
-        Some(version),
-        sub_packages_vec,
-    ) {
-        return Err(anyhow!("'build' step failed: {}", e));
+    let pb = ProgressBar::new_spinner();
+    pb.set_style(ProgressStyle::default_spinner().template("{spinner:.green} {msg}")?);
+    pb.set_message(format!("Building {}...", pkg.name.cyan()));
+    pb.enable_steady_tick(std::time::Duration::from_millis(100));
+
+    let pkg_lua_path_clone = pkg_lua_path.to_path_buf();
+    let build_type_clone = build_type.to_string();
+    let current_platform_clone = current_platform.clone();
+    let version_clone = version.to_string();
+
+    let build_handle = thread::spawn(move || {
+        crate::pkg::package::build::run(
+            &pkg_lua_path_clone,
+            &build_type_clone,
+            std::slice::from_ref(&current_platform_clone),
+            None,
+            None,
+            Some(&version_clone),
+            sub_packages_vec,
+            true,
+        )
+    });
+
+    let build_result = build_handle.join().unwrap();
+
+    if let Err(e) = build_result {
+        pb.finish_with_message(format!("{}", "Build failed".red()));
+        return Err(anyhow!(
+            "'build' step failed: {}\nEnable verbose logging with -v to see more details.",
+            e
+        ));
     }
+
+    pb.finish_with_message(format!("Finished building {}.", pkg.name.cyan()));
 
     let archive_filename = format!(
         "{}-{}-{}.pkg.tar.zst",
@@ -68,9 +91,8 @@ pub fn try_build_install(
             archive_path.display()
         ));
     }
-    println!("'build' step successful.");
 
-    let sub_packages_vec = sub_package_to_install.map(|s| vec![s]);
+    let sub_packages_vec_install = sub_package_to_install.map(|s| vec![s]);
 
     let installed_files = crate::pkg::package::install::run(
         &archive_path,
@@ -78,10 +100,9 @@ pub fn try_build_install(
         registry_handle,
         Some(version),
         yes,
-        sub_packages_vec,
+        sub_packages_vec_install,
     )
     .map_err(|e| anyhow!("Failed to install built package archive: {}", e))?;
-    println!("'install' step successful.");
 
     let _ = fs::remove_file(&archive_path);
 

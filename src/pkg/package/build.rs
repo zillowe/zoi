@@ -17,6 +17,7 @@ fn build_for_platform(
     output_dir: Option<&Path>,
     version_override: Option<&str>,
     sub_packages: Option<&Vec<String>>,
+    quiet: bool,
 ) -> Result<()> {
     let pkg_lua_dir_str = package_file
         .parent()
@@ -26,7 +27,7 @@ fn build_for_platform(
         package_file.to_str().unwrap(),
         platform,
         version_override,
-        false,
+        quiet,
     )?;
 
     if !pkg_for_meta.types.iter().any(|t| t == build_type) {
@@ -46,7 +47,9 @@ fn build_for_platform(
     let build_dir = Builder::new()
         .prefix(&format!("zoi-build-{}-{}", pkg_for_meta.name, platform))
         .tempdir()?;
-    println!("Using build directory: {}", build_dir.path().display());
+    if !quiet {
+        println!("Using build directory: {}", build_dir.path().display());
+    }
     let staging_dir = build_dir.path().join("staging");
     fs::create_dir_all(&staging_dir)?;
 
@@ -65,7 +68,7 @@ fn build_for_platform(
             Some(sub_package.as_str())
         };
 
-        if !sub_package.is_empty() {
+        if !sub_package.is_empty() && !quiet {
             println!("--- Building sub-package: {} ---", sub_package.cyan());
         }
 
@@ -77,7 +80,7 @@ fn build_for_platform(
             package_file.to_str(),
             None,
             sub_pkg_name,
-            false,
+            quiet,
         )
         .map_err(|e| {
             anyhow!(
@@ -118,7 +121,9 @@ fn build_for_platform(
         }
 
         if let Ok(prepare_fn) = lua.globals().get::<mlua::Function>("prepare") {
-            println!("Running prepare()...");
+            if !quiet {
+                println!("Running prepare()...");
+            }
             prepare_fn.call::<()>(args.clone()).map_err(|e| {
                 anyhow!(
                     "The 'prepare' function in '{}' failed for sub-package '{}':\n{}",
@@ -130,7 +135,9 @@ fn build_for_platform(
         }
 
         if let Ok(package_fn) = lua.globals().get::<mlua::Function>("package") {
-            println!("Running package()...");
+            if !quiet {
+                println!("Running package()...");
+            }
             package_fn.call::<()>(args.clone()).map_err(|e| {
                 anyhow!(
                     "The 'package' function in '{}' failed for sub-package '{}':\n{}",
@@ -196,13 +203,17 @@ fn build_for_platform(
                     } else {
                         fs::copy(&source_path, &dest_path)?;
                     }
-                    println!("Staged '{}' to '{}'", source, destination);
+                    if !quiet {
+                        println!("Staged '{}' to '{}'", source, destination);
+                    }
                 }
             }
         }
 
         if let Ok(verify_fn) = lua.globals().get::<mlua::Function>("verify") {
-            println!("Running verify()...");
+            if !quiet {
+                println!("Running verify()...");
+            }
             let verification_passed: bool = verify_fn.call::<bool>(args.clone()).map_err(|e| {
                 anyhow!(
                     "The 'verify' function in '{}' failed for sub-package '{}':\n{}",
@@ -220,7 +231,7 @@ fn build_for_platform(
                         "Build aborted by user due to verification failure."
                     ));
                 }
-            } else {
+            } else if !quiet {
                 println!("Package verification passed.");
             }
         }
@@ -263,26 +274,32 @@ fn build_for_platform(
     tar_builder.append_dir_all(".", &staging_dir)?;
     tar_builder.finish()?;
 
-    println!(
-        "{}",
-        format!("Successfully built package: {}", output_path.display()).green()
-    );
+    if !quiet {
+        println!(
+            "{}",
+            format!("Successfully built package: {}", output_path.display()).green()
+        );
+    }
 
     if let Some(key_id) = sign_key {
-        println!("Signing package with key '{}'...", key_id.cyan());
+        if !quiet {
+            println!("Signing package with key '{}'...", key_id.cyan());
+        }
         let signature_path = output_path.with_extension("pkg.tar.zst.sig");
         if signature_path.exists() {
             fs::remove_file(&signature_path)?;
         }
         pkg::pgp::sign_detached(&output_path, &signature_path, key_id)?;
-        println!(
-            "{}",
-            format!(
-                "Successfully created signature: {}",
-                signature_path.display()
-            )
-            .green()
-        );
+        if !quiet {
+            println!(
+                "{}",
+                format!(
+                    "Successfully created signature: {}",
+                    signature_path.display()
+                )
+                .green()
+            );
+        }
     }
 
     Ok(())
@@ -296,8 +313,11 @@ pub fn run(
     output_dir: Option<&Path>,
     version_override: Option<&str>,
     sub_packages: Option<Vec<String>>,
+    quiet: bool,
 ) -> Result<()> {
-    println!("Building package from: {}", package_file.display());
+    if !quiet {
+        println!("Building package from: {}", package_file.display());
+    }
 
     let platforms_to_build: Vec<String> = if platforms.contains(&"current".to_string()) {
         let mut p = platforms.to_vec();
@@ -315,7 +335,9 @@ pub fn run(
     }
 
     for platform in &platforms_to_build {
-        println!("--- Building for platform: {} ---", platform.cyan());
+        if !quiet {
+            println!("--- Building for platform: {} ---", platform.cyan());
+        }
         if let Err(e) = build_for_platform(
             package_file,
             build_type,
@@ -324,6 +346,7 @@ pub fn run(
             output_dir,
             version_override,
             sub_packages.as_ref(),
+            quiet,
         ) {
             eprintln!(
                 "{}: Failed to build for platform {}: {}",

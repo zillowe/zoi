@@ -88,6 +88,7 @@ fn ensure_binary_is_cached(pkg: &types::Package, upstream: bool) -> Result<PathB
                 &final_url,
                 &temp_archive_path,
                 None,
+                None,
             )
             .is_ok()
             {

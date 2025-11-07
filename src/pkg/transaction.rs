@@ -1,14 +1,9 @@
-use crate::pkg::{
-    install::{self, flow::InstallMode},
-    types, uninstall,
-};
+use crate::pkg::{install, types, uninstall};
 use anyhow::{Result, anyhow};
 use chrono::Utc;
 use colored::*;
-use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
-use std::sync::Mutex;
 use uuid::{Timestamp, Uuid};
 
 fn get_transactions_dir() -> Result<PathBuf> {
@@ -104,25 +99,52 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                     "#{}@{}/{}@{}",
                     manifest.registry_handle, manifest.repo, manifest.name, manifest.version
                 );
-                if let Err(e) = install::run_installation(
-                    &source,
-                    InstallMode::PreferPrebuilt,
-                    true,
-                    manifest.reason.clone(),
-                    true,
-                    true,
-                    true,
-                    &Mutex::new(HashSet::new()),
+                let (graph, _) = match install::resolver::resolve_dependency_graph(
+                    &[source],
                     Some(manifest.scope),
+                    true,
+                    true,
+                    true,
                     None,
-                    None,
+                    true,
                 ) {
-                    eprintln!(
-                        "{} Failed to rollback uninstall of '{}': {}",
-                        "Error:".red().bold(),
-                        manifest.name,
-                        e
-                    );
+                    Ok(res) => res,
+                    Err(e) => {
+                        eprintln!(
+                            "{} Failed to resolve dependency graph for rollback of '{}': {}",
+                            "Error:".red().bold(),
+                            manifest.name,
+                            e
+                        );
+                        continue;
+                    }
+                };
+
+                let install_plan = match install::plan::create_install_plan(&graph.nodes) {
+                    Ok(plan) => plan,
+                    Err(e) => {
+                        eprintln!(
+                            "{} Failed to create install plan for rollback of '{}': {}",
+                            "Error:".red().bold(),
+                            manifest.name,
+                            e
+                        );
+                        continue;
+                    }
+                };
+
+                for (id, node) in &graph.nodes {
+                    if let Some(action) = install_plan.get(id)
+                        && let Err(e) =
+                            install::installer::install_node(node, action, None, None, true)
+                    {
+                        eprintln!(
+                            "{} Failed to re-install during rollback of '{}': {}",
+                            "Error:".red().bold(),
+                            manifest.name,
+                            e
+                        );
+                    }
                 }
             }
             types::TransactionOperation::Upgrade {
@@ -150,25 +172,52 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                     old_manifest.name,
                     old_manifest.version
                 );
-                if let Err(e) = install::run_installation(
-                    &source,
-                    InstallMode::PreferPrebuilt,
-                    true,
-                    old_manifest.reason.clone(),
-                    true,
-                    true,
-                    true,
-                    &Mutex::new(HashSet::new()),
+                let (graph, _) = match install::resolver::resolve_dependency_graph(
+                    std::slice::from_ref(&source),
                     Some(old_manifest.scope),
+                    true,
+                    true,
+                    true,
                     None,
-                    None,
+                    true,
                 ) {
-                    eprintln!(
-                        "{} Failed to re-install old version during upgrade-rollback for '{}': {}",
-                        "Error:".red().bold(),
-                        old_manifest.name,
-                        e
-                    );
+                    Ok(res) => res,
+                    Err(e) => {
+                        eprintln!(
+                            "{} Failed to resolve dependency graph for rollback of '{}': {}",
+                            "Error:".red().bold(),
+                            old_manifest.name,
+                            e
+                        );
+                        continue;
+                    }
+                };
+
+                let install_plan = match install::plan::create_install_plan(&graph.nodes) {
+                    Ok(plan) => plan,
+                    Err(e) => {
+                        eprintln!(
+                            "{} Failed to create install plan for rollback of '{}': {}",
+                            "Error:".red().bold(),
+                            old_manifest.name,
+                            e
+                        );
+                        continue;
+                    }
+                };
+
+                for (id, node) in &graph.nodes {
+                    if let Some(action) = install_plan.get(id)
+                        && let Err(e) =
+                            install::installer::install_node(node, action, None, None, true)
+                    {
+                        eprintln!(
+                            "{} Failed to re-install during rollback of '{}': {}",
+                            "Error:".red().bold(),
+                            old_manifest.name,
+                            e
+                        );
+                    }
                 }
             }
         }

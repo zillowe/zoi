@@ -1,0 +1,204 @@
+{
+	"apt": {
+		"is_installed": "dpkg-query -W -f='${Status}' {package} | grep -q \"install ok installed\"",
+		"install": "sudo apt-get install -y {package_with_version}",
+		"uninstall": "sudo apt-get remove -y {package}"
+	},
+	"apt-get": {
+		"is_installed": "dpkg-query -W -f='${Status}' {package} | grep -q \"install ok installed\"",
+		"install": "sudo apt-get install -y {package_with_version}",
+		"uninstall": "sudo apt-get remove -y {package}"
+	},
+	"apk": {
+		"is_installed": "apk info -e {package}",
+		"install": "sudo apk add {package}",
+		"uninstall": "sudo apk del {package}"
+	},
+	"aur": {
+		"install": "# AUR installation is a complex multi-step process (git clone, makepkg) and cannot be expressed as a single command. The application retains special logic for this manager.",
+		"uninstall": "sudo pacman -Rns --noconfirm {package}"
+	},
+	"brew": {
+		"is_installed": "brew list --formula | grep -q \"^{package}$\"",
+		"install": "brew install {package_with_version}",
+		"uninstall": "brew uninstall {package}"
+	},
+	"brew-cask": {
+		"is_installed": "brew list --cask | grep -q \"^{package}$\"",
+		"install": "brew install --cask {package_with_version}",
+		"uninstall": "brew uninstall --cask {package}"
+	},
+	"bun": {
+		"is_installed": "bun pm ls -g | grep -q \"{package}@\"",
+		"install": "bun install -g {package_with_version}",
+		"uninstall": "bun remove -g {package}"
+	},
+	"cargo": {
+		"is_installed": "cargo install --list | grep '{package}'",
+		"install": "cargo install {package_with_version}",
+		"uninstall": "cargo uninstall {package}"
+	},
+	"cargo-binstall": {
+		"is_installed": "cargo install --list | grep '{package}'",
+		"install": "cargo binstall -y {package_with_version}",
+		"uninstall": "cargo uninstall {package}"
+	},
+	"choco": {
+		"is_installed": "choco list --local-only | grep '{package}'",
+		"install": "choco install -y {package_with_version}",
+		"uninstall": "choco uninstall -y {package}"
+	},
+	"composer": {
+		"install": "composer global require {package_with_version}",
+		"uninstall": "composer global remove {package}"
+	},
+	"conda": {
+		"install": "conda install -y {package}",
+		"uninstall": "conda uninstall -y {package}"
+	},
+	"dart-pub": {
+		"install": "dart pub global activate {package}",
+		"uninstall": "dart pub global deactivate {package}"
+	},
+	"deno": {
+		"install": "deno install -g -A {package}",
+		"uninstall": "deno uninstall {package}"
+	},
+	"dnf": {
+		"is_installed": "rpm -q {package}",
+		"install": "sudo dnf install -y {package_with_version}",
+		"uninstall": "sudo dnf remove -y {package}"
+	},
+	"dotnet": {
+		"install": "dotnet tool install -g {package_with_version}",
+		"uninstall": "dotnet tool uninstall -g {package}"
+	},
+	"eopkg": {
+		"install": "sudo eopkg it -y {package}",
+		"uninstall": "sudo eopkg rm -y {package}"
+	},
+	"flatpak": {
+		"install": "sudo flatpak install flathub {package} -y",
+		"uninstall": "flatpak uninstall {package} -y"
+	},
+	"gem": {
+		"install": "gem install {package_with_version}",
+		"uninstall": "gem uninstall {package}"
+	},
+	"go": {
+		"install": "go install {package_with_version}",
+		"uninstall": "echo \"Go binaries are installed in $GOPATH/bin. Please remove the binary for {package} manually.\""
+	},
+	"guix": {
+		"install": "guix install {package}",
+		"uninstall": "guix remove {package}"
+	},
+	"jsr": {
+		"install": "npx jsr add {package}",
+		"uninstall": "echo \"JSR does not have a global uninstall. Please remove from the local project.\""
+	},
+	"macports": {
+		"install": "sudo port install {package}",
+		"uninstall": "sudo port uninstall {package}"
+	},
+	"mas": {
+		"install": "mas install {package}",
+		"uninstall": "mas remove {package}"
+	},
+	"nix": {
+		"install": "nix-env -iA nixpkgs.{package}",
+		"uninstall": "nix-env -e {package}"
+	},
+	"npm": {
+		"is_installed": "npm list -g {package}",
+		"install": "npm install -g {package_with_version}",
+		"uninstall": "npm uninstall -g {package}"
+	},
+	"pacman": {
+		"is_installed": "pacman -Qi {package}",
+		"install": "sudo pacman -S --noconfirm --needed {package}",
+		"uninstall": "sudo pacman -Rns --noconfirm {package}"
+	},
+	"paru": {
+		"install": "paru -S --needed --noconfirm {package}",
+		"uninstall": "paru -Rns --noconfirm {package}"
+	},
+	"pikaur": {
+		"install": "pikaur -S --needed --noconfirm {package}",
+		"uninstall": "pikaur -Rns --noconfirm {package}"
+	},
+	"pip": {
+		"install": "pip install {package_with_version}",
+		"uninstall": "pip uninstall -y {package}"
+	},
+	"pipx": {
+		"install": "pipx install {package_with_version}",
+		"uninstall": "pipx uninstall {package}"
+	},
+	"pkg": {
+		"install": "sudo pkg install -y {package}",
+		"uninstall": "sudo pkg delete -y {package}"
+	},
+	"pkg_add": {
+		"install": "sudo pkg_add -I {package}",
+		"uninstall": "sudo pkg_delete {package}"
+	},
+	"pnpm": {
+		"install": "pnpm add -g {package_with_version}",
+		"uninstall": "pnpm remove -g {package}"
+	},
+	"portage": {
+		"install": "sudo emerge {package}",
+		"uninstall": "sudo emerge --unmerge {package}"
+	},
+	"scoop": {
+		"is_installed": "scoop status {package}",
+		"install": "scoop install {package_with_version}",
+		"uninstall": "scoop uninstall {package}"
+	},
+	"snap": {
+		"install": "sudo snap install {package}",
+		"uninstall": "sudo snap remove {package}"
+	},
+	"trizen": {
+		"install": "trizen -S --needed --noconfirm {package}",
+		"uninstall": "trizen -Rns --noconfirm {package}"
+	},
+	"uv": {
+		"install": "uv tool install {package}",
+		"uninstall": "echo \"uv does not currently support 'tool uninstall'. Please remove the binary manually.\""
+	},
+	"volta": {
+		"install": "volta install {package_with_version}",
+		"uninstall": "echo \"Volta does not have a direct uninstall command. Please remove the binary manually.\""
+	},
+	"winget": {
+		"install": "winget install {package_with_version} --silent --accept-package-agreements --accept-source-agreements",
+		"uninstall": "winget uninstall {package} --silent"
+	},
+	"yarn": {
+		"install": "yarn global add {package_with_version}",
+		"uninstall": "yarn global remove {package}"
+	},
+	"yay": {
+		"install": "yay -S --needed --noconfirm {package}",
+		"uninstall": "yay -Rns --noconfirm {package}"
+	},
+	"yum": {
+		"is_installed": "rpm -q {package}",
+		"install": "sudo yum install -y {package_with_version}",
+		"uninstall": "sudo yum remove -y {package}"
+	},
+	"zypper": {
+		"install": "sudo zypper install -y '{package_with_version}'",
+		"uninstall": "sudo zypper remove -y {package}"
+	},
+	"xbps": {
+		"install": "sudo xbps-install -S {package}",
+		"uninstall": "sudo xbps-remove -R {package}"
+	},
+	"xbps-install": {
+		"install": "sudo xbps-install -S {package}",
+		"uninstall": "sudo xbps-remove -R {package}"
+	}
+}

@@ -49,7 +49,7 @@ clap_mangen = "0.2.29"
 colored = "3.0.0"
 comfy-table = "7.1.4"
 crossterm = "0.29.0"
-dialoguer = "0.11.0"
+dialoguer = "0.12.0"
 dirs = "6.0.0"
 flate2 = "1.1.4"
 fs2 = "0.4.3"
@@ -75,7 +75,7 @@ sequoia-openpgp = { version = "2.0.0", default-features = false, features = [
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.141"
 serde_yaml = "0.9.34"
-
+phf = { version = "0.13.1", features = ["macros"] }
 sha2 = "0.10.9"
 spdx = "0.12.0"
 syntect = "5.2.0"
@@ -87,11 +87,16 @@ uuid = { version = "1.17.0", features = ["v7"] }
 walkdir = "2.5.0"
 winapi = { version = "0.3.9", features = ["securitybaseapi", "winnt"] }
 xz2 = "0.1.7"
-zip = { version = "4.3.0", default-features = false, features = ["deflate"] }
+zip = { version = "6.0.0", default-features = false, features = ["deflate"] }
 zstd = "0.13.3"
 
 [build-dependencies]
 dotenvy = "0.15.7"
+phf = { version = "0.13.1", features = ["macros"] }
+phf_codegen = "0.13.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55.0"
+
