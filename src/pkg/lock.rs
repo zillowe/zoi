@@ -51,6 +51,14 @@ pub fn acquire_lock() -> Result<LockGuard> {
     }
 }
 
+pub fn release_lock() -> Result<()> {
+    let lock_path = get_lock_path()?;
+    if lock_path.exists() {
+        fs::remove_file(lock_path)?;
+    }
+    Ok(())
+}
+
 pub struct LockGuard {
     path: Option<PathBuf>,
 }

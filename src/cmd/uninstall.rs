@@ -1,4 +1,4 @@
-use crate::pkg::{self, transaction, types};
+use crate::pkg::{self, lock, transaction, types};
 use colored::*;
 use std::fs;
 use std::path::Path;
@@ -148,6 +148,7 @@ pub fn run(
     );
 
     if !crate::utils::ask_for_confirmation(":: Proceed with removal?", yes) {
+        let _ = lock::release_lock();
         return;
     }
 

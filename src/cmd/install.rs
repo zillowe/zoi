@@ -1,4 +1,4 @@
-use crate::pkg::{self, config, install, local, transaction, types};
+use crate::pkg::{self, config, install, local, lock, transaction, types};
 use crate::project;
 use colored::Colorize;
 use indicatif::MultiProgress;
@@ -300,6 +300,7 @@ pub fn run(
     }
 
     if !crate::utils::ask_for_confirmation("\n:: Proceed with installation?", yes) {
+        let _ = lock::release_lock();
         return;
     }
 
