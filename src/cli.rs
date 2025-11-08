@@ -2,8 +2,7 @@ use crate::cmd;
 use crate::pkg::lock;
 use crate::utils;
 use clap::{
-    ColorChoice, CommandFactory, FromArgMatches, Parser, Subcommand, ValueHint,
-    builder::PossibleValue, builder::TypedValueParser, builder::styling,
+    ColorChoice, CommandFactory, FromArgMatches, Parser, Subcommand, ValueHint, builder::styling,
 };
 use clap_complete::Shell;
 use clap_complete::generate;
@@ -42,38 +41,6 @@ pub struct Cli {
         global = true
     )]
     yes: bool,
-}
-
-#[derive(Clone, Debug)]
-struct PackageCompletionParser;
-
-impl TypedValueParser for PackageCompletionParser {
-    type Value = String;
-
-    fn parse_ref(
-        &self,
-        _cmd: &clap::Command,
-        _arg: Option<&clap::Arg>,
-        value: &std::ffi::OsStr,
-    ) -> Result<Self::Value, clap::Error> {
-        Ok(value.to_string_lossy().into_owned())
-    }
-
-    fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {
-        Some(Box::new(
-            utils::get_all_packages_for_completion()
-                .into_iter()
-                .map(|pkg| {
-                    let help = if pkg.description.is_empty() {
-                        pkg.display.clone()
-                    } else {
-                        format!("{} - {}", pkg.display, pkg.description)
-                    };
-                    PossibleValue::new(Box::leak(pkg.display.into_boxed_str()) as &'static str)
-                        .help(Box::leak(help.into_boxed_str()) as &'static str)
-                }),
-        ))
-    }
 }
 
 #[derive(clap::ValueEnum, Clone, Debug, Copy, PartialEq, Eq)]
@@ -170,7 +137,7 @@ enum Commands {
 
     /// Shows detailed information about a package
     Show {
-        #[arg(value_parser = PackageCompletionParser, hide_possible_values = true, help = PKG_SOURCE_HELP)]
+        #[arg(help = PKG_SOURCE_HELP)]
         package_name: String,
         /// Display the raw, unformatted package file
         #[arg(long)]
@@ -179,7 +146,7 @@ enum Commands {
 
     /// Pin a package to a specific version
     Pin {
-        #[arg(value_parser = PackageCompletionParser, hide_possible_values = true, help = PKG_SOURCE_HELP)]
+        #[arg(help = PKG_SOURCE_HELP)]
         package: String,
         /// The version to pin the package to
         version: String,
@@ -187,14 +154,14 @@ enum Commands {
 
     /// Unpin a package, allowing it to be updated
     Unpin {
-        #[arg(value_parser = PackageCompletionParser, hide_possible_values = true, help = PKG_SOURCE_HELP)]
+        #[arg(help = PKG_SOURCE_HELP)]
         package: String,
     },
 
     /// Updates one or more packages to their latest versions
     #[command(alias = "up")]
     Update {
-        #[arg(value_name = "PACKAGES", value_parser = PackageCompletionParser, hide_possible_values = true, help = PKG_SOURCE_HELP)]
+        #[arg(value_name = "PACKAGES", help = PKG_SOURCE_HELP)]
         package_names: Vec<String>,
 
         /// Update all installed packages
@@ -205,7 +172,7 @@ enum Commands {
     /// Installs one or more packages from a name, local file, URL, or git repository
     #[command(alias = "i")]
     Install {
-        #[arg(value_name = "SOURCES", value_hint = ValueHint::FilePath, value_parser = PackageCompletionParser, hide_possible_values = true, help = PKG_SOURCE_HELP)]
+        #[arg(value_name = "SOURCES", value_hint = ValueHint::FilePath, help = PKG_SOURCE_HELP)]
         sources: Vec<String>,
         /// Install from a git repository (e.g. 'Zillowe/Hello', 'gl:Zillowe/Hello')
         #[arg(long, value_name = "REPO", conflicts_with = "sources")]
@@ -239,7 +206,7 @@ enum Commands {
         long_about = "Removes one or more packages' files from the Zoi store and deletes their symlinks from the bin directory. This command will fail if a package was not installed by Zoi."
     )]
     Uninstall {
-        #[arg(value_name = "PACKAGES", required = true, value_parser = PackageCompletionParser, hide_possible_values = true, help = PKG_SOURCE_HELP)]
+        #[arg(value_name = "PACKAGES", required = true, help = PKG_SOURCE_HELP)]
         packages: Vec<String>,
         /// The scope to uninstall the package from
         #[arg(long, value_enum, conflicts_with_all = &["local", "global"])]
@@ -299,7 +266,7 @@ enum Commands {
 
     /// Explains why a package is installed
     Why {
-        #[arg(value_parser = PackageCompletionParser, hide_possible_values = true, help = PKG_SOURCE_HELP)]
+        #[arg(help = PKG_SOURCE_HELP)]
         package_name: String,
     },
 
@@ -313,7 +280,7 @@ enum Commands {
 
     /// List all files owned by a package
     Files {
-        #[arg(value_parser = PackageCompletionParser, hide_possible_values = true, help = PKG_SOURCE_HELP)]
+        #[arg(help = PKG_SOURCE_HELP)]
         package: String,
     },
 
@@ -355,7 +322,7 @@ enum Commands {
         long_about = "Downloads a binary to a temporary cache and executes it in a shell. All arguments after the package name are passed as arguments to the shell command."
     )]
     Exec {
-        #[arg(value_name = "SOURCE", value_parser = PackageCompletionParser, value_hint = ValueHint::FilePath, hide_possible_values = true, help = PKG_SOURCE_HELP)]
+        #[arg(value_name = "SOURCE", value_hint = ValueHint::FilePath, help = PKG_SOURCE_HELP)]
         source: String,
 
         /// Force execution from a fresh download, bypassing any cache.
@@ -408,7 +375,7 @@ enum Commands {
 
     /// Rollback a package to the previously installed version
     Rollback {
-        #[arg(value_name = "PACKAGE", value_parser = PackageCompletionParser, hide_possible_values = true, required_unless_present = "last_transaction", help = PKG_SOURCE_HELP)]
+        #[arg(value_name = "PACKAGE", required_unless_present = "last_transaction", help = PKG_SOURCE_HELP)]
         package: Option<String>,
 
         /// Rollback the last transaction
@@ -418,7 +385,7 @@ enum Commands {
 
     /// Shows a package's manual
     Man {
-        #[arg(value_parser = PackageCompletionParser, hide_possible_values = true, help = PKG_SOURCE_HELP)]
+        #[arg(help = PKG_SOURCE_HELP)]
         package_name: String,
         /// Always look at the upstream manual even if it's downloaded
         #[arg(long)]
@@ -493,7 +460,7 @@ enum TelemetryAction {
     Disable,
 }
 
-pub fn run() {
+pub fn run() -> anyhow::Result<()> {
     let styles = styling::Styles::styled()
         .header(styling::AnsiColor::Yellow.on_default() | styling::Effects::BOLD)
         .usage(styling::AnsiColor::Green.on_default() | styling::Effects::BOLD)
@@ -507,7 +474,7 @@ pub fn run() {
         Ok(cli) => cli,
         Err(err) => {
             err.print().unwrap();
-            std::process::exit(1);
+            return Err(anyhow::anyhow!("Failed to parse arguments"));
         }
     };
 
@@ -515,7 +482,7 @@ pub fn run() {
 
     if cli.version_flag {
         cmd::version::run(BRANCH, STATUS, NUMBER, commit);
-        return;
+        return Ok(());
     }
 
     if let Some(command) = cli.command {
@@ -530,13 +497,7 @@ pub fn run() {
         );
 
         let _lock_guard = if needs_lock {
-            match lock::acquire_lock() {
-                Ok(guard) => Some(guard),
-                Err(e) => {
-                    eprintln!("Error: {}", e);
-                    std::process::exit(1);
-                }
-            }
+            Some(lock::acquire_lock()?)
         } else {
             None
         };
@@ -557,14 +518,8 @@ pub fn run() {
                 cmd::about::run(BRANCH, STATUS, NUMBER, commit);
                 Ok(())
             }
-            Commands::Info => {
-                cmd::info::run(BRANCH, STATUS, NUMBER, commit);
-                Ok(())
-            }
-            Commands::Check => {
-                cmd::check::run();
-                Ok(())
-            }
+            Commands::Info => cmd::info::run(BRANCH, STATUS, NUMBER, commit),
+            Commands::Check => cmd::check::run(),
             Commands::Sync {
                 command,
                 verbose,
@@ -580,40 +535,27 @@ pub fn run() {
                         SyncCommands::Set { url } => cmd::sync::set_registry(&url),
                     }
                 } else {
-                    cmd::sync::run(verbose, fallback, no_package_managers, no_shell_setup);
+                    cmd::sync::run(verbose, fallback, no_package_managers, no_shell_setup)
                 }
-                Ok(())
             }
             Commands::List {
                 all,
                 repo,
                 package_type,
-            } => {
-                let _ = cmd::list::run(all, repo, package_type);
-                Ok(())
-            }
-            Commands::Show { package_name, raw } => {
-                cmd::show::run(&package_name, raw);
-                Ok(())
-            }
-            Commands::Pin { package, version } => {
-                cmd::pin::run(&package, &version);
-                Ok(())
-            }
-            Commands::Unpin { package } => {
-                cmd::unpin::run(&package);
-                Ok(())
-            }
+            } => cmd::list::run(all, repo, package_type),
+            Commands::Show { package_name, raw } => cmd::show::run(&package_name, raw),
+            Commands::Pin { package, version } => cmd::pin::run(&package, &version),
+            Commands::Unpin { package } => cmd::unpin::run(&package),
             Commands::Update { package_names, all } => {
                 if !all && package_names.is_empty() {
                     let mut cmd = Cli::command();
                     if let Some(subcmd) = cmd.find_subcommand_mut("update") {
                         subcmd.print_help().unwrap();
                     }
+                    Ok(())
                 } else {
-                    let _ = cmd::update::run(all, &package_names, cli.yes);
+                    cmd::update::run(all, &package_names, cli.yes)
                 }
-                Ok(())
             }
             Commands::Install {
                 sources,
@@ -625,84 +567,54 @@ pub fn run() {
                 global,
                 save,
                 r#type,
-            } => {
-                cmd::install::run(
-                    &sources,
-                    repo,
-                    force,
-                    all_optional,
-                    cli.yes,
-                    scope,
-                    local,
-                    global,
-                    save,
-                    r#type,
-                );
-                Ok(())
-            }
+            } => cmd::install::run(
+                &sources,
+                repo,
+                force,
+                all_optional,
+                cli.yes,
+                scope,
+                local,
+                global,
+                save,
+                r#type,
+            ),
             Commands::Uninstall {
                 packages,
                 scope,
                 local,
                 global,
                 save,
-            } => {
-                cmd::uninstall::run(&packages, scope, local, global, save, cli.yes);
-                Ok(())
-            }
-            Commands::Run { cmd_alias, args } => {
-                cmd::run::run(cmd_alias, args);
-                Ok(())
-            }
-            Commands::Env { env_alias } => {
-                cmd::env::run(env_alias);
-                Ok(())
-            }
+            } => cmd::uninstall::run(&packages, scope, local, global, save, cli.yes),
+            Commands::Run { cmd_alias, args } => cmd::run::run(cmd_alias, args),
+            Commands::Env { env_alias } => cmd::env::run(env_alias),
             Commands::Upgrade { force, tag, branch } => {
-                cmd::upgrade::run(BRANCH, STATUS, NUMBER, force, tag, branch);
-                Ok(())
+                cmd::upgrade::run(BRANCH, STATUS, NUMBER, force, tag, branch)
             }
-            Commands::Autoremove => {
-                cmd::autoremove::run(cli.yes);
-                Ok(())
-            }
+            Commands::Autoremove => cmd::autoremove::run(cli.yes),
             Commands::Why { package_name } => cmd::why::run(&package_name),
-            Commands::Owner { path } => {
-                cmd::owner::run(&path);
-                Ok(())
-            }
-            Commands::Files { package } => {
-                cmd::files::run(&package);
-                Ok(())
-            }
+            Commands::Owner { path } => cmd::owner::run(&path),
+            Commands::Files { package } => cmd::files::run(&package),
             Commands::Search {
                 search_term,
                 repo,
                 package_type,
                 tags,
             } => cmd::search::run(search_term, repo, package_type, tags),
-            Commands::Shell { shell, scope } => {
-                cmd::shell::run(shell, scope);
-                Ok(())
-            }
+            Commands::Shell { shell, scope } => cmd::shell::run(shell, scope),
             Commands::Exec {
                 source,
                 upstream,
                 cache,
                 local,
                 args,
-            } => {
-                cmd::exec::run(source, args, upstream, cache, local);
-                Ok(())
-            }
-            Commands::Clean => {
-                cmd::clean::run();
-                Ok(())
-            }
-            Commands::Repo(args) => {
-                cmd::repo::run(args);
-                Ok(())
-            }
+            } => match cmd::exec::run(source, args, upstream, cache, local) {
+                Ok(0) => Ok(()),
+                Ok(exit_code) => Err(anyhow::anyhow!("process exited with code {}", exit_code)),
+                Err(e) => Err(e),
+            },
+            Commands::Clean => cmd::clean::run(),
+            Commands::Repo(args) => cmd::repo::run(args),
             Commands::Telemetry { action } => {
                 use cmd::telemetry::{TelemetryCommand, run};
                 let cmd = match action {
@@ -710,12 +622,10 @@ pub fn run() {
                     TelemetryAction::Enable => TelemetryCommand::Enable,
                     TelemetryAction::Disable => TelemetryCommand::Disable,
                 };
-                run(cmd);
-                Ok(())
+                run(cmd)
             }
             Commands::Create { source, app_name } => {
-                cmd::create::run(cmd::create::CreateCommand { source, app_name }, cli.yes);
-                Ok(())
+                cmd::create::run(cmd::create::CreateCommand { source, app_name }, cli.yes)
             }
             Commands::Extension(args) => cmd::extension::run(args, cli.yes),
             Commands::Rollback {
@@ -735,10 +645,7 @@ pub fn run() {
                 upstream,
                 raw,
             } => cmd::man::run(&package_name, upstream, raw),
-            Commands::Package(args) => {
-                cmd::package::run(args);
-                Ok(())
-            }
+            Commands::Package(args) => cmd::package::run(args),
             Commands::Pgp(args) => cmd::pgp::run(args),
             Commands::Helper(args) => cmd::helper::run(args),
             Commands::Doctor => cmd::doctor::run(),
@@ -751,4 +658,5 @@ pub fn run() {
     } else {
         cmd.print_help().unwrap();
     }
+    Ok(())
 }

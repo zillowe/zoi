@@ -1,5 +1,6 @@
 use crate::cmd::utils;
 use crate::pkg::{self, lock, transaction, types};
+use anyhow::{Result, anyhow};
 use colored::*;
 use std::fs;
 use std::path::Path;
@@ -12,7 +13,7 @@ pub fn run(
     global: bool,
     save: bool,
     yes: bool,
-) {
+) -> Result<()> {
     let mut scope_override = scope.map(|s| match s {
         crate::cli::InstallScope::User => types::Scope::User,
         crate::cli::InstallScope::System => types::Scope::System,
@@ -26,31 +27,17 @@ pub fn run(
     }
 
     if save && scope_override != Some(types::Scope::Project) {
-        eprintln!(
-            "{}: The --save flag can only be used with project-scoped uninstalls.",
-            "Error".red().bold()
-        );
-        std::process::exit(1);
+        return Err(anyhow!(
+            "The --save flag can only be used with project-scoped uninstalls."
+        ));
     }
 
-    let installed_packages = match pkg::local::get_installed_packages() {
-        Ok(pkgs) => pkgs,
-        Err(e) => {
-            eprintln!("Error reading installed packages: {}", e);
-            std::process::exit(1);
-        }
-    };
+    let installed_packages = pkg::local::get_installed_packages()?;
 
     let mut manifests_to_uninstall: Vec<types::InstallManifest> = Vec::new();
     let mut failed_resolution = false;
 
-    let expanded_names = match utils::expand_split_packages(package_names, "Uninstalling") {
-        Ok(names) => names,
-        Err(e) => {
-            eprintln!("Error expanding packages: {}", e);
-            std::process::exit(1);
-        }
-    };
+    let expanded_names = utils::expand_split_packages(package_names, "Uninstalling")?;
 
     for name in &expanded_names {
         if let Err(e) =
@@ -62,12 +49,14 @@ pub fn run(
     }
 
     if failed_resolution {
-        std::process::exit(1);
+        return Err(anyhow!(
+            "Failed to resolve some packages for uninstallation."
+        ));
     }
 
     if manifests_to_uninstall.is_empty() {
         println!("No packages to uninstall.");
-        return;
+        return Ok(());
     }
 
     manifests_to_uninstall.sort_by(|a, b| a.name.cmp(&b.name));
@@ -124,16 +113,10 @@ pub fn run(
 
     if !crate::utils::ask_for_confirmation(":: Proceed with removal?", yes) {
         let _ = lock::release_lock();
-        return;
+        return Ok(());
     }
 
-    let transaction = match transaction::begin() {
-        Ok(t) => t,
-        Err(e) => {
-            eprintln!("Failed to begin transaction: {}", e);
-            std::process::exit(1);
-        }
-    };
+    let transaction = transaction::begin()?;
 
     let mut failed_packages = Vec::new();
     let mut successfully_uninstalled = Vec::new();
@@ -193,7 +176,10 @@ pub fn run(
         } else {
             println!("\n{} Rollback successful.", "Success:".green().bold());
         }
-        std::process::exit(1);
+        return Err(anyhow!(
+            "Uninstallation failed for: {}",
+            failed_packages.join(", ")
+        ));
     } else if let Err(e) = transaction::commit(&transaction.id) {
         eprintln!("Warning: Failed to commit transaction: {}", e);
     }
@@ -208,6 +194,7 @@ pub fn run(
             e
         );
     }
+    Ok(())
 }
 
 fn resolve_and_add_manifest(

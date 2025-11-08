@@ -1,4 +1,5 @@
 use crate::cli::SetupScope;
+use anyhow::Result;
 use clap::Parser;
 use std::path::PathBuf;
 
@@ -18,20 +19,18 @@ pub struct InstallCommand {
     pub yes: bool,
 }
 
-pub fn run(args: InstallCommand) {
+pub fn run(args: InstallCommand) -> Result<()> {
     let scope = match args.scope {
         SetupScope::User => crate::pkg::types::Scope::User,
         SetupScope::System => crate::pkg::types::Scope::System,
     };
-    if let Err(e) = crate::pkg::package::install::run(
+    crate::pkg::package::install::run(
         &args.package_file,
         Some(scope),
         "local",
         None,
         args.yes,
         args.sub,
-    ) {
-        eprintln!("Error: {}", e);
-        std::process::exit(1);
-    }
+    )?;
+    Ok(())
 }

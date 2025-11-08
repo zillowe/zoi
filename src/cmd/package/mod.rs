@@ -1,3 +1,4 @@
+use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 pub mod build;
@@ -20,7 +21,7 @@ enum Commands {
     Install(install::InstallCommand),
 }
 
-pub fn run(args: PackageCommand) {
+pub fn run(args: PackageCommand) -> Result<()> {
     match args.command {
         Commands::Build(cmd) => build::run(cmd),
         Commands::Test(cmd) => test::run(cmd),

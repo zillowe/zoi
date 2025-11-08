@@ -1,3 +1,4 @@
+use anyhow::Result;
 use colored::*;
 
 pub enum TelemetryCommand {
@@ -6,40 +7,29 @@ pub enum TelemetryCommand {
     Disable,
 }
 
-pub fn run(cmd: TelemetryCommand) {
+pub fn run(cmd: TelemetryCommand) -> Result<()> {
     match cmd {
-        TelemetryCommand::Status => match crate::pkg::config::read_config() {
-            Ok(cfg) => {
-                let status = if cfg.telemetry_enabled {
-                    "Enabled".green()
-                } else {
-                    "Disabled".yellow()
-                };
-                println!("Telemetry: {}", status);
-            }
-            Err(e) => eprintln!("{} failed to read config: {}", "Error".red(), e),
-        },
-        TelemetryCommand::Enable => match crate::pkg::config::read_user_config() {
-            Ok(mut cfg) => {
-                cfg.telemetry_enabled = true;
-                if let Err(e) = crate::pkg::config::write_user_config(&cfg) {
-                    eprintln!("{} failed to enable telemetry: {}", "Error".red(), e);
-                } else {
-                    println!("{} telemetry enabled", "Success:".green());
-                }
-            }
-            Err(e) => eprintln!("{} failed to read config: {}", "Error".red(), e),
-        },
-        TelemetryCommand::Disable => match crate::pkg::config::read_user_config() {
-            Ok(mut cfg) => {
-                cfg.telemetry_enabled = false;
-                if let Err(e) = crate::pkg::config::write_user_config(&cfg) {
-                    eprintln!("{} failed to disable telemetry: {}", "Error".red(), e);
-                } else {
-                    println!("{} telemetry disabled", "Success:".green());
-                }
-            }
-            Err(e) => eprintln!("{} failed to read config: {}", "Error".red(), e),
-        },
+        TelemetryCommand::Status => {
+            let cfg = crate::pkg::config::read_config()?;
+            let status = if cfg.telemetry_enabled {
+                "Enabled".green()
+            } else {
+                "Disabled".yellow()
+            };
+            println!("Telemetry: {}", status);
+        }
+        TelemetryCommand::Enable => {
+            let mut cfg = crate::pkg::config::read_user_config()?;
+            cfg.telemetry_enabled = true;
+            crate::pkg::config::write_user_config(&cfg)?;
+            println!("{} telemetry enabled", "Success:".green());
+        }
+        TelemetryCommand::Disable => {
+            let mut cfg = crate::pkg::config::read_user_config()?;
+            cfg.telemetry_enabled = false;
+            crate::pkg::config::write_user_config(&cfg)?;
+            println!("{} telemetry disabled", "Success:".green());
+        }
     }
+    Ok(())
 }

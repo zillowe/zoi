@@ -1,15 +1,11 @@
 use crate::pkg;
+use anyhow::Result;
 use colored::*;
 
-pub fn run() {
+pub fn run() -> Result<()> {
     println!("{}", "--- Cleaning Cache ---".yellow().bold());
-    if let Err(e) = pkg::cache::clear() {
-        eprintln!("{}: {}", "Error".red(), e);
-        std::process::exit(1);
-    }
-    if let Err(e) = pkg::cache::clear_archives() {
-        eprintln!("{}: {}", "Error".red(), e);
-        std::process::exit(1);
-    }
+    pkg::cache::clear()?;
+    pkg::cache::clear_archives()?;
     println!("{}", "Cache cleaned successfully.".green());
+    Ok(())
 }

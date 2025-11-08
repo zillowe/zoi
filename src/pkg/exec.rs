@@ -198,7 +198,7 @@ pub fn run(
     upstream: bool,
     cache_only: bool,
     local_only: bool,
-) -> Result<()> {
+) -> Result<i32> {
     let resolved_source = resolve::resolve_source(source, false)?;
 
     if let Some(repo_name) = &resolved_source.repo_name {
@@ -262,9 +262,5 @@ pub fn run(
         Command::new("bash").arg("-c").arg(&command_str).status()?
     };
 
-    if let Some(code) = status.code() {
-        std::process::exit(code);
-    }
-
-    Ok(())
+    Ok(status.code().unwrap_or(1))
 }

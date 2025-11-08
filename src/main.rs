@@ -1,6 +1,11 @@
+use colored::*;
+
 fn main() {
     #[cfg(windows)]
     colored::control::set_virtual_terminal(true).ok();
 
-    zoi::cli::run();
+    if let Err(e) = zoi::cli::run() {
+        eprintln!("{}: {}", "Error".red().bold(), e);
+        std::process::exit(1);
+    }
 }

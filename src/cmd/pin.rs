@@ -2,13 +2,7 @@ use crate::pkg::{pin, resolve};
 use anyhow::Result;
 use colored::*;
 
-pub fn run(source: &str, version: &str) {
-    if let Err(e) = run_pin_logic(source, version) {
-        eprintln!("{}: {}", "Pin failed".red().bold(), e);
-    }
-}
-
-fn run_pin_logic(source: &str, version: &str) -> Result<()> {
+pub fn run(source: &str, version: &str) -> Result<()> {
     let (pkg, _, _, _, _) = resolve::resolve_package_and_version(source, false)?;
     let mut pinned_packages = pin::get_pinned_packages()?;
 

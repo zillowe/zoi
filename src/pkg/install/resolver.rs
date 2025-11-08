@@ -389,10 +389,6 @@ pub fn resolve_dependency_graph(
             }
 
             if let Some(build) = &deps.build {
-                if build_type.is_some() {
-                    println!("Resolving build dependencies for {}", pkg.name.cyan());
-                }
-
                 let build_dep_groups = match build {
                     types::BuildDependencies::Group(group) => vec![group.clone()],
                     types::BuildDependencies::Typed(typed_build_deps) => {

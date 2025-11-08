@@ -104,7 +104,7 @@ pub fn run(
         false,
         false,
         None,
-    );
+    )?;
 
     Ok(())
 }

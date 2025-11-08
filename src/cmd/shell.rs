@@ -1,6 +1,7 @@
 use crate::cli::{Cli, SetupScope};
 use crate::pkg::types::Scope;
 use crate::utils;
+use anyhow::Result;
 use clap::CommandFactory;
 use clap_complete::{Shell, generate};
 use colored::*;
@@ -93,13 +94,11 @@ fn install_completions(
     Ok(())
 }
 
-pub fn run(shell: Shell, scope: SetupScope) {
+pub fn run(shell: Shell, scope: SetupScope) -> Result<()> {
     println!("--- Setting up shell: {} ---", shell.to_string().cyan());
 
     let mut cmd = Cli::command();
-    if let Err(e) = install_completions(shell, scope, &mut cmd) {
-        eprintln!("{}: {}", "Error installing completions ".red().bold(), e);
-    }
+    install_completions(shell, scope, &mut cmd)?;
 
     println!();
 
@@ -107,7 +106,6 @@ pub fn run(shell: Shell, scope: SetupScope) {
         SetupScope::User => Scope::User,
         SetupScope::System => Scope::System,
     };
-    if let Err(e) = utils::setup_path(scope_to_pass) {
-        eprintln!("{}: {}", "Error setting up PATH ".red().bold(), e);
-    }
+    utils::setup_path(scope_to_pass)?;
+    Ok(())
 }

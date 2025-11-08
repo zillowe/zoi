@@ -1,7 +1,9 @@
 use crate::utils;
+use anyhow::{Result, anyhow};
 use colored::*;
 use std::io::{Write, stdout};
-pub fn run() {
+
+pub fn run() -> Result<()> {
     println!("{}", "--- Checking for Essential Tools ---".yellow().bold());
 
     let essential_tools = ["git"];
@@ -20,10 +22,9 @@ pub fn run() {
     }
 
     if !all_essential_found {
-        println!(
-            "{}",
-            "One or more essential tools are missing. Please install them.".red()
-        );
+        return Err(anyhow!(
+            "One or more essential tools are missing. Please install them."
+        ));
     }
 
     println!(
@@ -45,7 +46,6 @@ pub fn run() {
 
     println!();
 
-    if all_essential_found {
-        println!("{}", "All essential tools are installed.".green());
-    }
+    println!("{}", "All essential tools are installed.".green());
+    Ok(())
 }

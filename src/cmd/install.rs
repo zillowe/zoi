@@ -1,5 +1,6 @@
 use crate::pkg::{self, config, install, local, lock, transaction, types};
 use crate::project;
+use anyhow::{Result, anyhow};
 use colored::Colorize;
 use indicatif::MultiProgress;
 use rayon::prelude::*;
@@ -17,7 +18,7 @@ pub fn run(
     global: bool,
     save: bool,
     build_type: Option<String>,
-) {
+) -> Result<()> {
     let mut scope_override = scope.map(|s| match s {
         crate::cli::InstallScope::User => types::Scope::User,
         crate::cli::InstallScope::System => types::Scope::System,
@@ -53,16 +54,14 @@ pub fn run(
     }
 
     if sources_to_process.is_empty() {
-        return;
+        return Ok(());
     }
 
     if let Some(repo_spec) = repo {
         if scope_override == Some(types::Scope::Project) {
-            eprintln!(
-                "{}: Installing from a repository to a project scope is not supported.",
-                "Error".red().bold()
-            );
-            std::process::exit(1);
+            return Err(anyhow!(
+                "Installing from a repository to a project scope is not supported."
+            ));
         }
         let repo_install_scope = scope_override.map(|s| match s {
             types::Scope::User => crate::cli::SetupScope::User,
@@ -70,18 +69,8 @@ pub fn run(
             types::Scope::Project => unreachable!(),
         });
 
-        if let Err(e) =
-            crate::pkg::repo_install::run(&repo_spec, force, all_optional, yes, repo_install_scope)
-        {
-            eprintln!(
-                "{}: Failed to install from repo '{}': {}",
-                "Error".red().bold(),
-                repo_spec,
-                e
-            );
-            std::process::exit(1);
-        }
-        return;
+        crate::pkg::repo_install::run(&repo_spec, force, all_optional, yes, repo_install_scope)?;
+        return Ok(());
     }
 
     let config = config::read_config().unwrap_or_default();
@@ -99,17 +88,7 @@ pub fn run(
 
     for source in &sources_to_process {
         if source.ends_with("zoi.pkgs.json") {
-            if let Err(e) =
-                install::lockfile::process_lockfile(source, &mut final_sources, &mut temp_files)
-            {
-                eprintln!(
-                    "{}: Failed to process lockfile '{}': {}",
-                    "Error".red().bold(),
-                    source,
-                    e
-                );
-                failed_packages.lock().unwrap().push(source.to_string());
-            }
+            install::lockfile::process_lockfile(source, &mut final_sources, &mut temp_files)?;
         } else {
             final_sources.push(source.to_string());
         }
@@ -120,7 +99,7 @@ pub fn run(
 
     println!("{}", "Resolving dependencies...".bold());
 
-    let (graph, non_zoi_deps) = match install::resolver::resolve_dependency_graph(
+    let (graph, non_zoi_deps) = install::resolver::resolve_dependency_graph(
         &final_sources,
         scope_override,
         force,
@@ -128,13 +107,7 @@ pub fn run(
         all_optional,
         build_type.as_deref(),
         true,
-    ) {
-        Ok(res) => res,
-        Err(e) => {
-            eprintln!("{}: {}", "Failed to resolve dependencies".red().bold(), e);
-            std::process::exit(1);
-        }
-    };
+    )?;
 
     let packages_to_install: Vec<&types::Package> = graph.nodes.values().map(|n| &n.pkg).collect();
 
@@ -163,30 +136,18 @@ pub fn run(
             "\nDo you want to continue with the replacement?",
             yes,
         ) {
-            return;
+            return Ok(());
         }
     }
 
     println!("{}", "Looking for conflicts...".bold());
-    if let Err(e) = install::util::check_for_conflicts(&packages_to_install, yes) {
-        eprintln!("{}: {}", "Error".red().bold(), e);
-        std::process::exit(1);
-    }
+    install::util::check_for_conflicts(&packages_to_install, yes)?;
 
     let m_for_conflict_check = MultiProgress::new();
-    if let Err(e) = install::util::check_file_conflicts(&graph, yes, &m_for_conflict_check) {
-        eprintln!("{}: {}", "Error".red().bold(), e);
-        std::process::exit(1);
-    }
+    install::util::check_file_conflicts(&graph, yes, &m_for_conflict_check)?;
     let _ = m_for_conflict_check.clear();
 
-    let install_plan = match install::plan::create_install_plan(&graph.nodes) {
-        Ok(plan) => plan,
-        Err(e) => {
-            eprintln!("{}: {}", "Failed to create install plan".red().bold(), e);
-            std::process::exit(1);
-        }
-    };
+    let install_plan = install::plan::create_install_plan(&graph.nodes)?;
 
     let mut to_download = HashMap::new();
     let mut to_build = HashMap::new();
@@ -247,10 +208,6 @@ pub fn run(
             })
             .collect();
         println!("{}", pkg_list.join(" "));
-        println!(
-            "{}",
-            "(Sizes for built packages are not available beforehand)".yellow()
-        );
     }
 
     if !non_zoi_deps.is_empty() {
@@ -260,33 +217,12 @@ pub fn run(
     }
 
     if !to_build.is_empty() {
-        println!(
-            "\n{}: Disk space check is skipped when packages need to be built from source.",
-            "Warning".yellow()
-        );
     } else {
         println!("\n{}", "Checking available disk space...".bold());
         let install_path =
-            match crate::pkg::local::get_store_base_dir(scope_override.unwrap_or_default()) {
-                Ok(path) => path,
-                Err(e) => {
-                    eprintln!(
-                        "{}: Could not determine install path: {}",
-                        "Error".red().bold(),
-                        e
-                    );
-                    std::process::exit(1);
-                }
-            };
+            crate::pkg::local::get_store_base_dir(scope_override.unwrap_or_default())?;
 
-        if let Err(e) = std::fs::create_dir_all(&install_path) {
-            eprintln!(
-                "{}: Could not create install directory: {}",
-                "Error".red().bold(),
-                e
-            );
-            std::process::exit(1);
-        }
+        std::fs::create_dir_all(&install_path)?;
 
         let available_space = match fs2::available_space(&install_path) {
             Ok(space) => space,
@@ -301,19 +237,17 @@ pub fn run(
         };
 
         if total_installed_size > available_space {
-            eprintln!(
-                "{}: Not enough disk space. Required: {}, Available: {}",
-                "Error".red().bold(),
+            return Err(anyhow!(
+                "Not enough disk space. Required: {}, Available: {}",
                 crate::utils::format_bytes(total_installed_size),
                 crate::utils::format_bytes(available_space)
-            );
-            std::process::exit(1);
+            ));
         }
     }
 
     if !crate::utils::ask_for_confirmation("\n:: Proceed with installation?", yes) {
         let _ = lock::release_lock();
-        return;
+        return Ok(());
     }
 
     let mut final_install_plan = install_plan.clone();
@@ -372,21 +306,9 @@ pub fn run(
         }
     }
 
-    let stages = match graph.toposort() {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("{}: {}", "Failed to sort dependencies".red().bold(), e);
-            std::process::exit(1);
-        }
-    };
+    let stages = graph.toposort()?;
 
-    let transaction = match transaction::begin() {
-        Ok(t) => t,
-        Err(e) => {
-            eprintln!("Failed to begin transaction: {}", e);
-            std::process::exit(1);
-        }
-    };
+    let transaction = transaction::begin()?;
 
     for pkg_name in packages_to_replace {
         println!("Replacing package: {}", pkg_name);
@@ -479,11 +401,12 @@ pub fn run(
     }
 
     if !overall_success {
+        let failed_list = failed_packages.into_inner().unwrap();
         eprintln!(
             "\n{}: The following packages failed to install:",
             "Error".red().bold()
         );
-        for pkg in &failed_packages.into_inner().unwrap() {
+        for pkg in &failed_list {
             eprintln!("  - {}", pkg);
         }
 
@@ -498,7 +421,10 @@ pub fn run(
             println!("\n{} Rollback successful.", "Success:".green().bold());
         }
 
-        std::process::exit(1);
+        return Err(anyhow!(
+            "Installation failed for: {}",
+            failed_list.join(", ")
+        ));
     }
 
     if let Err(e) = transaction::commit(&transaction.id) {
@@ -592,8 +518,7 @@ pub fn run(
                     &manifest.registry_handle,
                     &manifest.repo,
                     &manifest.name,
-                )
-                .unwrap();
+                )?;
                 let latest_dir = package_dir.join("latest");
                 let integrity =
                     crate::pkg::hash::calculate_dir_hash(&latest_dir).unwrap_or_else(|e| {
@@ -678,12 +603,7 @@ pub fn run(
 
     if is_project_install && lockfile_exists {
         println!();
-        if let Err(e) = project::verify::run() {
-            eprintln!("{}: {}", "Error".red().bold(), e);
-            eprintln!(
-                "\nzoi.lock is out of sync with zoi.yaml. Run `rm zoi.lock && zoi install` to update it."
-            );
-            std::process::exit(1);
-        }
+        project::verify::run()?;
     }
+    Ok(())
 }

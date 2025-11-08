@@ -1,4 +1,5 @@
 use crate::pkg;
+use anyhow::Result;
 use colored::*;
 
 pub fn run(
@@ -8,7 +9,7 @@ pub fn run(
     force: bool,
     tag: Option<String>,
     custom_branch: Option<String>,
-) {
+) -> Result<()> {
     println!("{}", "--- Upgrading Zoi ---".yellow());
 
     match pkg::upgrade::run(branch, status, number, force, tag, custom_branch) {
@@ -28,9 +29,7 @@ pub fn run(
             );
         }
         Err(e) if e.to_string() == "already_on_latest" => {}
-        Err(e) => {
-            eprintln!("\n{}: {}", "Error".red().bold(), e);
-            std::process::exit(1);
-        }
+        Err(e) => return Err(e),
     }
+    Ok(())
 }

@@ -1,3 +1,4 @@
+use anyhow::Result;
 use clap::Parser;
 use std::path::PathBuf;
 
@@ -33,17 +34,14 @@ pub struct BuildCommand {
     pub output_dir: Option<PathBuf>,
 }
 
-pub fn run(args: BuildCommand) {
+pub fn run(args: BuildCommand) -> Result<()> {
     if args.test {
         println!("Running tests before building...");
-        if let Err(e) = crate::pkg::package::test::run(&args) {
-            eprintln!("Tests failed: {}", e);
-            std::process::exit(1);
-        }
+        crate::pkg::package::test::run(&args)?;
         println!("Tests passed, proceeding with build...");
     }
 
-    if let Err(e) = crate::pkg::package::build::run(
+    crate::pkg::package::build::run(
         &args.package_file,
         &args.r#type,
         &args.platform,
@@ -52,8 +50,5 @@ pub fn run(args: BuildCommand) {
         None,
         args.sub,
         false,
-    ) {
-        eprintln!("Error: {}", e);
-        std::process::exit(1);
-    }
+    )
 }

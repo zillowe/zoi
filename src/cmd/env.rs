@@ -1,15 +1,10 @@
 use crate::project::{config, environment};
+use anyhow::Result;
 use colored::*;
 
-pub fn run(env_alias: Option<String>) {
-    match config::load() {
-        Ok(config) => {
-            if let Err(e) = environment::setup(env_alias.as_deref(), &config) {
-                eprintln!("\n{}: {}", "Error".red().bold(), e);
-            } else {
-                println!("\n{}", "Environment setup complete.".green());
-            }
-        }
-        Err(e) => eprintln!("{}: {}", "Error".red().bold(), e),
-    }
+pub fn run(env_alias: Option<String>) -> Result<()> {
+    let config = config::load()?;
+    environment::setup(env_alias.as_deref(), &config)?;
+    println!("\n{}", "Environment setup complete.".green());
+    Ok(())
 }

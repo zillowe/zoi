@@ -1,5 +1,6 @@
 use crate::pkg::config;
 use anyhow::Result;
+use anyhow::anyhow;
 use clap::{Parser, Subcommand};
 use colored::*;
 use comfy_table::{Table, presets::UTF8_FULL};
@@ -40,7 +41,7 @@ enum Commands {
     Git(GitCommand),
 }
 
-pub fn run(args: RepoCommand) {
+pub fn run(args: RepoCommand) -> Result<()> {
     let yes = args.yes;
     match args.command {
         Commands::Add { repo_or_url } => {
@@ -49,54 +50,33 @@ pub fn run(args: RepoCommand) {
                     || val.starts_with("https://")
                     || val.ends_with(".git")
                 {
-                    if let Err(e) = config::clone_git_repo(&val) {
-                        eprintln!("{}: {}", "Error".red().bold(), e);
-                    }
-                } else if let Err(e) = config::add_repo(&val) {
-                    eprintln!("{}: {}", "Error".red().bold(), e);
+                    config::clone_git_repo(&val)?;
                 } else {
+                    config::add_repo(&val)?;
                     println!("Repository '{}' added successfully.", val.green());
                 }
-            } else if !yes {
-                if let Err(e) = config::interactive_add_repo() {
-                    eprintln!("{}: {}", "Error".red().bold(), e);
-                }
-            } else if let Err(e) = config::interactive_add_repo() {
-                eprintln!("{}: {}", "Error".red().bold(), e);
+            } else if yes {
+                return Err(anyhow!(
+                    "A repository name or URL is required when using --yes."
+                ));
+            } else {
+                config::interactive_add_repo()?;
             }
         }
         Commands::Remove { repo_name } => {
-            if let Err(e) = config::remove_repo(&repo_name) {
-                eprintln!("{}: {}", "Error".red().bold(), e);
-            } else {
-                println!("Repository '{}' removed successfully.", repo_name.green());
-            }
+            config::remove_repo(&repo_name)?;
+            println!("Repository '{}' removed successfully.", repo_name.green());
         }
         Commands::List { which } => match which {
-            None => {
-                if let Err(e) = run_list_active() {
-                    eprintln!("{}: {}", "Error".red().bold(), e);
-                }
-            }
-            Some(ListSub::All) => {
-                if let Err(e) = run_list_all() {
-                    eprintln!("{}: {}", "Error".red().bold(), e);
-                }
-            }
+            None => run_list_active()?,
+            Some(ListSub::All) => run_list_all()?,
         },
         Commands::Git(cmd) => match cmd {
-            GitCommand::List => {
-                if let Err(e) = run_list_git_only() {
-                    eprintln!("{}: {}", "Error".red().bold(), e);
-                }
-            }
-            GitCommand::Rm { repo_name } => {
-                if let Err(e) = config::remove_git_repo(&repo_name) {
-                    eprintln!("{}: {}", "Error".red().bold(), e);
-                }
-            }
+            GitCommand::List => run_list_git_only()?,
+            GitCommand::Rm { repo_name } => config::remove_git_repo(&repo_name)?,
         },
     }
+    Ok(())
 }
 
 fn run_list_active() -> Result<()> {

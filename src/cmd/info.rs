@@ -1,8 +1,9 @@
 use crate::pkg;
 use crate::utils;
+use anyhow::Result;
 use colored::*;
 
-pub fn run(branch: &str, status: &str, number: &str, commit: &str) {
+pub fn run(branch: &str, status: &str, number: &str, commit: &str) -> Result<()> {
     let _branch_short = if branch == "Production" {
         "Prod."
     } else if branch == "Development" {
@@ -17,7 +18,7 @@ pub fn run(branch: &str, status: &str, number: &str, commit: &str) {
 
     println!("{}", "--- System Information ---".yellow().bold());
 
-    let platform = utils::get_platform().unwrap_or_else(|e| e.to_string());
+    let platform = utils::get_platform()?;
     let parts: Vec<&str> = platform.split('-').collect();
     let os = parts.first().cloned().unwrap_or("unknown");
     let arch = parts.get(1).cloned().unwrap_or("unknown");
@@ -31,15 +32,9 @@ pub fn run(branch: &str, status: &str, number: &str, commit: &str) {
         utils::print_aligned_info("Distribution", &dist);
     }
 
-    let config = pkg::config::read_config();
-    let (native_pm, all_pms) = if let Ok(config) = config {
-        (
-            config.native_package_manager,
-            config.package_managers.unwrap_or_default(),
-        )
-    } else {
-        (None, Vec::new())
-    };
+    let config = pkg::config::read_config()?;
+    let native_pm = config.native_package_manager;
+    let all_pms = config.package_managers.unwrap_or_default();
 
     if !all_pms.is_empty() {
         let pm_list: Vec<String> = all_pms
@@ -58,14 +53,12 @@ pub fn run(branch: &str, status: &str, number: &str, commit: &str) {
         utils::print_aligned_info("Package Managers", "Not available (run 'zoi sync')");
     }
 
-    if let Ok(config) = pkg::config::read_config() {
-        let tel = if config.telemetry_enabled {
-            "Enabled".green()
-        } else {
-            "Disabled".yellow()
-        };
-        utils::print_aligned_info("Telemetry", &tel.to_string());
-    }
+    let tel = if config.telemetry_enabled {
+        "Enabled".green()
+    } else {
+        "Disabled".yellow()
+    };
+    utils::print_aligned_info("Telemetry", &tel.to_string());
 
     let key_with_colon = format!("{}:", "Version");
     println!(
@@ -76,4 +69,5 @@ pub fn run(branch: &str, status: &str, number: &str, commit: &str) {
         number,
         commit.green()
     );
+    Ok(())
 }

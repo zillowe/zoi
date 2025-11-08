@@ -1,13 +1,12 @@
 use crate::pkg;
+use anyhow::Result;
 use colored::*;
 
-pub fn run(yes: bool) {
+pub fn run(yes: bool) -> Result<()> {
     println!("{}", "--- Autoremoving Unused Packages ---".yellow());
 
-    if let Err(e) = pkg::autoremove::run(yes) {
-        eprintln!("\n{}: {}", "Error".red().bold(), e);
-        std::process::exit(1);
-    }
+    pkg::autoremove::run(yes)?;
 
     println!("\n{}", "Cleanup complete.".green());
+    Ok(())
 }

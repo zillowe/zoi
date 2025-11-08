@@ -332,12 +332,6 @@ pub fn check_file_conflicts(
                     node.pkg.name
                 );
             }
-        } else {
-            eprintln!(
-                "{} Could not find a pre-built archive for {} to check for file conflicts. Will check during installation.",
-                "Warning:".yellow(),
-                node.pkg.name.cyan()
-            );
         }
     }
 

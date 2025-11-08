@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::env;
+use std::error::Error;
 use std::io::Write;
 use std::path::Path;
 
@@ -10,7 +11,7 @@ struct ManagerCommands {
     uninstall: String,
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     let env_path = if Path::new(".env").exists() {
         Some(".env")
     } else if Path::new(".env.local").exists() {
@@ -48,12 +49,12 @@ fn main() {
     let managers_json_path = Path::new("src/pkg/pm/managers.json");
     println!("cargo:rerun-if-changed={}", managers_json_path.display());
 
-    let out_dir = env::var("OUT_DIR").unwrap();
+    let out_dir = env::var("OUT_DIR")?;
     let dest_path = Path::new(&out_dir).join("generated_managers.rs");
-    let mut file = std::fs::File::create(dest_path).unwrap();
+    let mut file = std::fs::File::create(dest_path)?;
 
-    let json_str = std::fs::read_to_string(managers_json_path).unwrap();
-    let managers: HashMap<String, ManagerCommands> = serde_json::from_str(&json_str).unwrap();
+    let json_str = std::fs::read_to_string(managers_json_path)?;
+    let managers: HashMap<String, ManagerCommands> = serde_json::from_str(&json_str)?;
 
     let mut map = phf_codegen::Map::new();
     let mut values = Vec::new();
@@ -83,13 +84,13 @@ fn main() {
     writeln!(
         &mut file,
         "use ::phf;\n\n#[derive(Debug, Clone)]\npub struct ManagerCommands {{\n    pub is_installed: Option<&'static str>,\n    pub install: &'static str,\n    pub uninstall: &'static str,\n}}\n"
-    )
-    .unwrap();
+    )?;
 
     writeln!(
         &mut file,
         "pub static MANAGERS: phf::Map<&'static str, ManagerCommands> = {};",
         map.build()
-    )
-    .unwrap();
+    )?;
+
+    Ok(())
 }

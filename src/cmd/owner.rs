@@ -3,14 +3,7 @@ use anyhow::Result;
 use colored::*;
 use std::path::Path;
 
-pub fn run(path: &Path) {
-    if let Err(e) = run_impl(path) {
-        eprintln!("{} {}", "Error:".red().bold(), e);
-        std::process::exit(1);
-    }
-}
-
-fn run_impl(path: &Path) -> Result<()> {
+pub fn run(path: &Path) -> Result<()> {
     let absolute_path = match path.canonicalize() {
         Ok(p) => p,
         Err(_) => path.to_path_buf(),

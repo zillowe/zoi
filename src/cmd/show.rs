@@ -1,5 +1,6 @@
 use crate::pkg::{local, resolve, types};
 use crate::utils;
+use anyhow::Result;
 use colored::*;
 use std::fs;
 
@@ -45,47 +46,41 @@ fn print_dependency_group(group: &types::DependencyGroup, indent: usize) {
     }
 }
 
-pub fn run(source: &str, raw: bool) {
+pub fn run(source: &str, raw: bool) -> Result<()> {
     let source = source.trim();
-    match resolve::resolve_source(source, false) {
-        Ok(resolved_source) => {
-            if raw {
-                let content = fs::read_to_string(&resolved_source.path).unwrap();
-                println!("{content}");
-                return;
-            }
-            let mut pkg: types::Package = crate::pkg::lua::parser::parse_lua_package(
-                resolved_source.path.to_str().unwrap(),
-                None,
-                false,
-            )
-            .unwrap();
-            if let Some(repo_name) = resolved_source.repo_name {
-                pkg.repo = repo_name;
-            }
-            pkg.version = Some(
-                resolve::get_default_version(&pkg, resolved_source.registry_handle.as_deref())
-                    .unwrap_or_else(|_| "N/A".to_string()),
-            );
+    let resolved_source = resolve::resolve_source(source, false)?;
 
-            let request = resolve::parse_source_string(source).unwrap();
-
-            let installed_manifest = match local::is_package_installed(
-                &pkg.name,
-                request.sub_package.as_deref(),
-                pkg.scope,
-            ) {
-                Ok(manifest) => manifest,
-                Err(e) => {
-                    eprintln!("Warning: could not check installation status: {}", e);
-                    None
-                }
-            };
-
-            print_beautiful(&pkg, installed_manifest.as_ref());
-        }
-        Err(e) => eprintln!("{}: {}", "Error".red(), e),
+    if raw {
+        let content = fs::read_to_string(&resolved_source.path)?;
+        println!("{content}");
+        return Ok(());
     }
+    let mut pkg: types::Package = crate::pkg::lua::parser::parse_lua_package(
+        resolved_source.path.to_str().unwrap(),
+        None,
+        false,
+    )?;
+    if let Some(repo_name) = resolved_source.repo_name {
+        pkg.repo = repo_name;
+    }
+    pkg.version = Some(
+        resolve::get_default_version(&pkg, resolved_source.registry_handle.as_deref())
+            .unwrap_or_else(|_| "N/A".to_string()),
+    );
+
+    let request = resolve::parse_source_string(source)?;
+
+    let installed_manifest =
+        match local::is_package_installed(&pkg.name, request.sub_package.as_deref(), pkg.scope) {
+            Ok(manifest) => manifest,
+            Err(e) => {
+                eprintln!("Warning: could not check installation status: {}", e);
+                None
+            }
+        };
+
+    print_beautiful(&pkg, installed_manifest.as_ref());
+    Ok(())
 }
 
 fn print_beautiful(

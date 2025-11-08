@@ -2,14 +2,7 @@ use crate::pkg::{local, resolve};
 use anyhow::{Result, anyhow};
 use colored::*;
 
-pub fn run(package_name: &str) {
-    if let Err(e) = run_impl(package_name) {
-        eprintln!("{} {}", "Error:".red().bold(), e);
-        std::process::exit(1);
-    }
-}
-
-fn run_impl(package_name: &str) -> Result<()> {
+pub fn run(package_name: &str) -> Result<()> {
     let (pkg_meta, _, _, _, _) = resolve::resolve_package_and_version(package_name, false)?;
 
     let installed_packages = local::get_installed_packages()?;

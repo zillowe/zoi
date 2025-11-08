@@ -10,10 +10,7 @@ use std::sync::Mutex;
 
 pub fn run(all: bool, package_names: &[String], yes: bool) -> Result<()> {
     if all {
-        if let Err(e) = run_update_all_logic(yes) {
-            eprintln!("{}: {}", "Update failed".red().bold(), e);
-        }
-        return Ok(());
+        return run_update_all_logic(yes);
     }
 
     let expanded_package_names = cmd_utils::expand_split_packages(package_names, "Updating")?;
@@ -36,14 +33,10 @@ pub fn run(all: bool, package_names: &[String], yes: bool) -> Result<()> {
     }
 
     if !failed_packages.is_empty() {
-        eprintln!(
-            "\n{}: The following packages failed to update:",
-            "Error".red().bold()
-        );
-        for pkg in &failed_packages {
-            eprintln!("  - {}", pkg);
-        }
-        std::process::exit(1);
+        return Err(anyhow!(
+            "The following packages failed to update: {}",
+            failed_packages.join(", ")
+        ));
     } else if !package_names.is_empty() {
         println!("\n{}", "Success:".green());
     }
@@ -56,16 +49,7 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
     let request = resolve::parse_source_string(package_name)?;
 
     let (new_pkg, new_version, _, _, registry_handle) =
-        match resolve::resolve_package_and_version(package_name, true) {
-            Ok(result) => result,
-            Err(e) => {
-                return Err(anyhow!(
-                    "Could not resolve package '{}': {}",
-                    package_name,
-                    e
-                ));
-            }
-        };
+        resolve::resolve_package_and_version(package_name, true)?;
 
     if pin::is_pinned(package_name)? {
         println!(
@@ -129,13 +113,11 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
 
     let transaction = transaction::begin()?;
 
-    if let Some(hooks) = &new_pkg.hooks
-        && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PreUpgrade)
-    {
-        return Err(anyhow!("Pre-upgrade hook failed: {}", e));
+    if let Some(hooks) = &new_pkg.hooks {
+        hooks::run_hooks(hooks, hooks::HookType::PreUpgrade)?;
     }
 
-    let (graph, _) = match install::resolver::resolve_dependency_graph(
+    let (graph, _) = install::resolver::resolve_dependency_graph(
         &[package_name.to_string()],
         Some(old_manifest.scope),
         true,
@@ -143,20 +125,9 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
         false,
         None,
         true,
-    ) {
-        Ok(res) => res,
-        Err(e) => {
-            return Err(anyhow!(
-                "Failed to resolve dependency graph for update: {}",
-                e
-            ));
-        }
-    };
+    )?;
 
-    let install_plan = match install::plan::create_install_plan(&graph.nodes) {
-        Ok(plan) => plan,
-        Err(e) => return Err(anyhow!("Failed to create install plan for update: {}", e)),
-    };
+    let install_plan = install::plan::create_install_plan(&graph.nodes)?;
 
     let mut new_manifest_option: Option<types::InstallManifest> = None;
 
@@ -193,38 +164,20 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
 
         if let Some(backup_files) = &old_manifest.backup {
             println!("Restoring configuration files...");
-            let old_version_dir = match local::get_package_version_dir(
+            let old_version_dir = local::get_package_version_dir(
                 old_manifest.scope,
                 &old_manifest.registry_handle,
                 &old_manifest.repo,
                 &old_manifest.name,
                 &old_manifest.version,
-            ) {
-                Ok(dir) => dir,
-                Err(e) => {
-                    eprintln!(
-                        "Warning: could not get old version dir to restore backups: {}",
-                        e
-                    );
-                    return Ok(());
-                }
-            };
-            let new_version_dir = match local::get_package_version_dir(
+            )?;
+            let new_version_dir = local::get_package_version_dir(
                 new_manifest.scope,
                 &new_manifest.registry_handle,
                 &new_manifest.repo,
                 &new_manifest.name,
                 &new_manifest.version,
-            ) {
-                Ok(dir) => dir,
-                Err(e) => {
-                    eprintln!(
-                        "Warning: could not get new version dir to restore backups: {}",
-                        e
-                    );
-                    return Ok(());
-                }
-            };
+            )?;
 
             for backup_file_rel in backup_files {
                 let old_path = old_version_dir.join(backup_file_rel);
@@ -248,14 +201,8 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
                             continue;
                         }
                     }
-                    if let Some(p) = new_path.parent()
-                        && let Err(e) = fs::create_dir_all(p)
-                    {
-                        eprintln!(
-                            "Warning: failed to create parent dir for backup restoration: {}",
-                            e
-                        );
-                        continue;
+                    if let Some(p) = new_path.parent() {
+                        fs::create_dir_all(p)?;
                     }
                     if let Err(e) = fs::rename(&old_path, &new_path) {
                         eprintln!("Warning: failed to restore backup file: {}", e);
@@ -271,10 +218,8 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
             registry_handle.as_deref().unwrap_or("local"),
         )?;
 
-        if let Some(hooks) = &new_pkg.hooks
-            && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PostUpgrade)
-        {
-            return Err(anyhow!("Post-upgrade hook failed: {}", e));
+        if let Some(hooks) = &new_pkg.hooks {
+            hooks::run_hooks(hooks, hooks::HookType::PostUpgrade)?;
         }
 
         println!("\n{}", "Success:".green());
@@ -491,38 +436,20 @@ fn run_update_all_logic(yes: bool) -> Result<()> {
                 "Restoring configuration for {}...",
                 old_manifest.name.cyan()
             );
-            let old_version_dir = match local::get_package_version_dir(
+            let old_version_dir = local::get_package_version_dir(
                 old_manifest.scope,
                 &old_manifest.registry_handle,
                 &old_manifest.repo,
                 &old_manifest.name,
                 &old_manifest.version,
-            ) {
-                Ok(dir) => dir,
-                Err(e) => {
-                    eprintln!(
-                        "Warning: could not get old version dir to restore backups: {}",
-                        e
-                    );
-                    continue;
-                }
-            };
-            let new_version_dir = match local::get_package_version_dir(
+            )?;
+            let new_version_dir = local::get_package_version_dir(
                 new_manifest.scope,
                 &new_manifest.registry_handle,
                 &new_manifest.repo,
                 &new_manifest.name,
                 &new_manifest.version,
-            ) {
-                Ok(dir) => dir,
-                Err(e) => {
-                    eprintln!(
-                        "Warning: could not get new version dir to restore backups: {}",
-                        e
-                    );
-                    continue;
-                }
-            };
+            )?;
 
             for backup_file_rel in backup_files {
                 let old_path = old_version_dir.join(backup_file_rel);
@@ -546,14 +473,8 @@ fn run_update_all_logic(yes: bool) -> Result<()> {
                             continue;
                         }
                     }
-                    if let Some(p) = new_path.parent()
-                        && let Err(e) = fs::create_dir_all(p)
-                    {
-                        eprintln!(
-                            "Warning: failed to create parent dir for backup restoration: {}",
-                            e
-                        );
-                        continue;
+                    if let Some(p) = new_path.parent() {
+                        fs::create_dir_all(p)?;
                     }
                     if let Err(e) = fs::rename(&old_path, &new_path) {
                         eprintln!("Warning: failed to restore backup file: {}", e);
