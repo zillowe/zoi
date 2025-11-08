@@ -9,7 +9,7 @@ repo = "Zoi"
 header = """
 # Changelog
 
-You can install any of these versions: `zoi upgrade --tag <tag>`
+You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 

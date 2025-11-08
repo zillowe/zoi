@@ -269,10 +269,11 @@ Build, create, and manage Zoi packages.
 - `build <package_file>`: Build a package from a `.pkg.lua` file.
   - `--type <TYPE>`: (Required) The type of package to build (e.g. 'source', 'pre-compiled').
   - `-p`, `--platform <PLATFORM>`: The platform to build for (default: `current`).
+  - `-o`, `--output-dir <DIR>`: Directory to output the built package to.
   - `--sign <KEY>`: Sign the package with the given PGP key.
   - `--sub <SUB_PACKAGES...>`: For a split package, build only the specified sub-packages.
   - `--test`: Run package tests before building.
-- `test <package_file>`: Run tests for a package.
+- `test <package_file>`: Run tests for a package. This command accepts the same arguments as `build`.
   - `--type <TYPE>`: (Required) The build type to use for testing.
   - `-p`, `--platform <PLATFORM>`: The platform to test on.
   - `--sub <SUB_PACKAGES...>`: For a split package, test only the specified sub-packages.
@@ -452,6 +453,7 @@ Uninstalls one or more packages. To uninstall a sub-package, use the `package:su
 - `--scope <user|system|project>`: The scope to uninstall the package from.
 - `--local`: Uninstall packages from the current project.
 - `--global`: Uninstall packages globally for the current user.
+- `--save`: Remove the package from the project's `zoi.yaml`.
 
 ---
 

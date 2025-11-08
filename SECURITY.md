@@ -4,9 +4,9 @@ The Security Policy can be found online at [zillowe.qzz.io/docs/book/guidelines/
 
 ## Supported Versions
 
-| Version          | Supported |
-| ---------------- | --------- |
-| Prod. Beta 5.X.X | ✔️        |
+| Version             | Supported |
+| ------------------- | --------- |
+| Prod. Release 1.X.X | ✔️        |
 
 ## Supported Packages
 
