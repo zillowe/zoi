@@ -299,6 +299,12 @@ pub fn resolve_dependency_graph(
                 Err(e) => return Err(anyhow!("Failed to resolve '{}': {}", source, e)),
             };
 
+        let local_build_type = if build_type.is_none() && pkg.types.len() == 1 {
+            Some(pkg.types[0].as_str())
+        } else {
+            build_type
+        };
+
         check_policy(&pkg, &config)?;
 
         let handle = registry_handle.as_deref().unwrap_or("local");
@@ -392,7 +398,7 @@ pub fn resolve_dependency_graph(
                 let build_dep_groups = match build {
                     types::BuildDependencies::Group(group) => vec![group.clone()],
                     types::BuildDependencies::Typed(typed_build_deps) => {
-                        if let Some(build_type_str) = build_type {
+                        if let Some(build_type_str) = local_build_type {
                             if let Some(group) = typed_build_deps.types.get(build_type_str) {
                                 vec![group.clone()]
                             } else {

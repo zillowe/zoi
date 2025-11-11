@@ -4,6 +4,7 @@ use chrono::Utc;
 use colored::*;
 use dialoguer::{Select, theme::ColorfulTheme};
 use indicatif::{ProgressBar, ProgressStyle};
+use regex::Regex;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
@@ -44,7 +45,8 @@ pub fn get_db_root() -> Result<PathBuf> {
 }
 
 pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
-    let (path_part, sub_package) = if let Some((base, sub)) = source_str.rsplit_once(':') {
+    let (path_part, sub_package_from_path) = if let Some((base, sub)) = source_str.rsplit_once(':')
+    {
         if (base.ends_with(".pkg.lua") || base.ends_with(".manifest.yaml")) && !sub.contains('/') {
             (base, Some(sub.to_string()))
         } else {
@@ -70,70 +72,43 @@ pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
             handle: None,
             repo: None,
             name,
-            sub_package,
+            sub_package: sub_package_from_path,
             version_spec: None,
         });
     }
 
-    let mut handle = None;
-    let mut main_part = source_str;
+    let re = Regex::new(r"^(?:#(?P<handle>[^@]+))?(?P<main_part>.*)$").unwrap();
 
-    if main_part.starts_with('#') {
-        if let Some(at_pos) = main_part.find('@') {
-            if at_pos > 1 {
-                handle = Some(main_part[1..at_pos].to_string());
-                main_part = &main_part[at_pos..];
-            } else {
-                return Err(anyhow!("Invalid format: empty registry handle"));
-            }
+    let caps = re
+        .captures(source_str)
+        .ok_or_else(|| anyhow!("Invalid source string format"))?;
+    let handle = caps.name("handle").map(|m| m.as_str().to_string());
+    let main_part = caps.name("main_part").unwrap().as_str();
+
+    let re_main = Regex::new(r"^@?(?P<repo_and_name>[^@]+)(?:@(?P<version>.+))?$").unwrap();
+    let caps_main = re_main
+        .captures(main_part)
+        .ok_or_else(|| anyhow!("Invalid source string format"))?;
+
+    let repo_and_name = caps_main.name("repo_and_name").unwrap().as_str();
+    let version_spec = caps_main.name("version").map(|m| m.as_str().to_string());
+
+    let (repo, name_and_sub) = if main_part.starts_with('@') {
+        if let Some(slash_pos) = repo_and_name.find('/') {
+            let (repo_str, name_str) = repo_and_name.split_at(slash_pos);
+            (Some(repo_str.to_lowercase()), &name_str[1..])
         } else {
-            return Err(anyhow!(
-                "Invalid format: missing '@' after registry handle. Expected format: #handle@repo/package"
-            ));
-        }
-    }
-
-    let mut repo = None;
-    let name: &str;
-    let mut sub_package_repo = None;
-    let mut version_spec = None;
-
-    let mut version_part_str = main_part;
-
-    if let Some(at_pos) = main_part.rfind('@')
-        && at_pos > 0
-    {
-        let (pkg_part, ver_part) = main_part.split_at(at_pos);
-        version_part_str = pkg_part;
-        version_spec = Some(ver_part[1..].to_string());
-    }
-
-    let name_part = if version_part_str.starts_with('@') {
-        let s = version_part_str.trim_start_matches('@');
-        if let Some((repo_str, name_str)) = s.split_once('/') {
-            if !name_str.is_empty() {
-                repo = Some(repo_str.to_lowercase());
-                name_str
-            } else {
-                return Err(anyhow!(
-                    "Invalid format: missing package name after repo path."
-                ));
-            }
-        } else {
-            return Err(anyhow!(
-                "Invalid format: must be in the form @repo/package or @repo/path/to/package"
-            ));
+            return Err(anyhow!("Invalid repo format: expected @repo/name"));
         }
     } else {
-        version_part_str
+        (None, repo_and_name)
     };
 
-    if let Some((base_name, sub_name)) = name_part.split_once(':') {
-        name = base_name;
-        sub_package_repo = Some(sub_name.to_string());
+    let (name, sub_package) = if let Some((n, s)) = name_and_sub.rsplit_once(':') {
+        (n, Some(s.to_string()))
     } else {
-        name = name_part;
-    }
+        (name_and_sub, None)
+    };
 
     if name.is_empty() {
         return Err(anyhow!("Invalid source string: package name is empty."));
@@ -143,7 +118,7 @@ pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
         handle,
         repo,
         name: name.to_lowercase(),
-        sub_package: sub_package_repo,
+        sub_package,
         version_spec,
     })
 }

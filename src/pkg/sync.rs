@@ -6,6 +6,7 @@ use git2::{
     build::{CheckoutBuilder, RepoBuilder},
 };
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use serde_yaml;
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -292,7 +293,7 @@ fn sync_pgp_keys_at_path(db_path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn fetch_handle_for_url(url: &str) -> Result<String> {
+fn fetch_handle_by_cloning(url: &str) -> Result<String> {
     let temp_dir = Builder::new().prefix("zoi-handle-fetch").tempdir()?;
     println!("Cloning '{}' to fetch handle...", url.cyan());
     let status = std::process::Command::new("git")
@@ -308,6 +309,75 @@ fn fetch_handle_for_url(url: &str) -> Result<String> {
 
     let repo_config = config::read_repo_config(temp_dir.path())?;
     Ok(repo_config.name)
+}
+
+fn parse_full_repo_url(url: &str) -> Option<(String, String)> {
+    let url = url.trim_end_matches(".git").trim_end_matches('/');
+    if let Some(path) = url.strip_prefix("https://github.com/") {
+        Some(("github".to_string(), path.to_string()))
+    } else if let Some(path) = url.strip_prefix("https://gitlab.com/") {
+        Some(("gitlab".to_string(), path.to_string()))
+    } else {
+        url.strip_prefix("https://codeberg.org/")
+            .map(|path| ("codeberg".to_string(), path.to_string()))
+    }
+}
+
+fn fetch_repo_yaml_content(url: &str) -> Result<String> {
+    let (provider, repo_path) = parse_full_repo_url(url)
+        .ok_or_else(|| anyhow!("Unsupported git provider or URL format for direct fetch."))?;
+
+    let branches = ["main", "master"];
+    for branch in &branches {
+        let repo_yaml_url = match provider.as_str() {
+            "github" => format!(
+                "https://raw.githubusercontent.com/{}/{}/repo.yaml",
+                repo_path, branch
+            ),
+            "gitlab" => format!(
+                "https://gitlab.com/{}/-/raw/{}/repo.yaml",
+                repo_path, branch
+            ),
+            "codeberg" => format!(
+                "https://codeberg.org/{}/raw/branch/{}/repo.yaml",
+                repo_path, branch
+            ),
+            _ => continue,
+        };
+
+        if let Ok(response) = reqwest::blocking::get(&repo_yaml_url)
+            && response.status().is_success()
+        {
+            println!("Found repo.yaml at: {}", repo_yaml_url.cyan());
+            return Ok(response.text()?);
+        }
+    }
+
+    Err(anyhow!(
+        "Could not find 'repo.yaml' in repo '{}' on branches main or master.",
+        repo_path
+    ))
+}
+
+fn fetch_handle_for_url(url: &str) -> Result<String> {
+    println!(
+        "Attempting to fetch handle for '{}' directly...",
+        url.cyan()
+    );
+    match fetch_repo_yaml_content(url) {
+        Ok(content) => {
+            let repo_config: crate::pkg::types::RepoConfig = serde_yaml::from_str(&content)?;
+            println!("Successfully fetched and parsed repo.yaml.");
+            Ok(repo_config.name)
+        }
+        Err(e) => {
+            println!(
+                "Direct fetch failed: {}. Falling back to cloning repository...",
+                e.to_string().yellow()
+            );
+            fetch_handle_by_cloning(url)
+        }
+    }
 }
 
 pub fn run(verbose: bool, _fallback: bool, no_pm: bool) -> Result<()> {

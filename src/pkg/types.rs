@@ -210,7 +210,6 @@ pub struct ComplexDependencyGroup {
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct TypedBuildDependencies {
-    #[serde(default)]
     pub types: HashMap<String, DependencyGroup>,
 }
 

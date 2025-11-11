@@ -4,6 +4,7 @@ use anyhow::{Result, anyhow};
 use colored::*;
 use dialoguer::{Input, Select, theme::ColorfulTheme};
 use indicatif::MultiProgress;
+use regex::Regex;
 use semver::VersionReq;
 use std::collections::HashSet;
 use std::sync::Mutex;
@@ -18,83 +19,67 @@ pub struct Dependency<'a> {
 }
 
 pub fn parse_dependency_string(dep_str: &str) -> Result<Dependency<'_>> {
-    (|| {
-        let (manager, rest) = match dep_str.split_once(':') {
-            Some((m, r))
-                if !m.is_empty()
-                    && (pm::MANAGERS.contains_key(m) || m == "zoi" || m == "native") =>
-            {
-                (m, r)
-            }
-            _ => ("zoi", dep_str),
-        };
-
-        if rest.is_empty() {
-            return Err(anyhow!("Invalid dependency string: {}", dep_str));
+    let (manager, rest) = match dep_str.split_once(':') {
+        Some((m, r))
+            if !m.is_empty() && (pm::MANAGERS.contains_key(m) || m == "zoi" || m == "native") =>
+        {
+            (m, r)
         }
+        _ => ("zoi", dep_str),
+    };
 
-        if !rest.contains(['@', '=', '>', '<', '~', '^']) && !rest.contains(':') {
-            return Ok(Dependency {
-                manager,
-                package: rest,
-                req: None,
-                version_str: None,
-                description: None,
-            });
-        }
+    if rest.is_empty() {
+        return Err(anyhow!("Invalid dependency string: {}", dep_str));
+    }
 
-        let (package_and_version, description) = if manager != "go" {
-            if let Some((main, desc)) = rest.rsplit_once(':') {
-                if main.is_empty() || desc.contains(['=', '>', '<', '~', '^', '@']) {
-                    (rest, None)
-                } else {
-                    (main, Some(desc))
-                }
-            } else {
-                (rest, None)
-            }
+    let re = Regex::new(r"^(?P<pkg_and_ver>.+?)(?::(?P<desc>[^:].*))?$").unwrap();
+    let caps = re
+        .captures(rest)
+        .ok_or_else(|| anyhow!("Failed to parse dependency string: {}", rest))?;
+
+    let package_and_version = caps.name("pkg_and_ver").unwrap().as_str();
+    let description = caps.name("desc").map(|m| m.as_str());
+
+    let ver_re = Regex::new(r"^(?P<pkg>.*?)(?P<ver>@.+|[=><~^].+)?$").unwrap();
+    let ver_caps = ver_re.captures(package_and_version).ok_or_else(|| {
+        anyhow!(
+            "Failed to parse package and version from: {}",
+            package_and_version
+        )
+    })?;
+
+    let package = ver_caps.name("pkg").unwrap().as_str();
+    let mut version_str = ver_caps.name("ver").map(|m| m.as_str().to_string());
+
+    if let Some(v) = &version_str
+        && v.starts_with('@')
+    {
+        version_str = Some(v[1..].to_string());
+    }
+
+    let req = if let Some(v_str) = &version_str {
+        let req_parse_str = if v_str
+            .chars()
+            .next()
+            .ok_or_else(|| anyhow!("Empty version string"))?
+            .is_ascii_digit()
+        {
+            format!("={}", v_str)
         } else {
-            (rest, None)
+            v_str.to_string()
         };
+        Some(VersionReq::parse(&req_parse_str)?)
+    } else {
+        None
+    };
 
-        let (package, version_str) = if let Some(at_pos) = package_and_version.rfind('@') {
-            if at_pos > 0 {
-                let (p, v) = package_and_version.split_at(at_pos);
-                (p, Some(v[1..].to_string()))
-            } else {
-                (package_and_version, None)
-            }
-        } else if let Some(idx) = package_and_version.find(['=', '>', '<', '~', '^']) {
-            let (p, v) = package_and_version.split_at(idx);
-            (p, Some(v.to_string()))
-        } else {
-            (package_and_version, None)
-        };
-
-        let req = if let Some(v_str) = &version_str {
-            let req_parse_str = if v_str
-                .chars()
-                .next()
-                .ok_or_else(|| anyhow!("Empty version string"))?
-                .is_ascii_digit()
-            {
-                format!("={}", v_str)
-            } else {
-                v_str.to_string()
-            };
-            Some(VersionReq::parse(&req_parse_str)?)
-        } else {
-            None
-        };
-
-        Ok(Dependency {
-            manager,
-            package,
-            req,
-            version_str,
-            description,
-        })
-    })()
+    Ok(Dependency {
+        manager,
+        package,
+        req,
+        version_str,
+        description,
+    })
 }
 
 pub fn install_dependency(
