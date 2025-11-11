@@ -70,13 +70,25 @@ dependencies({
     }
   },
   build = {
-    -- The 'types' key is new and explicitly holds the map
+    -- Build dependencies can be general (for all build types)
+    -- or specific to a build type using the 'types' table.
+  }
+})
+
+-- Example of general build dependencies
+dependencies({
+  build = {
+    required = { "native:cmake" }
+  }
+})
+
+-- Example of build-type-specific dependencies
+dependencies({
+  build = {
     types = {
-      -- For source builds
       source = {
         required = { "native:gcc", "native:make" }
       },
-      -- For pre-compiled builds (e.g. if you only need to extract an archive)
       ["pre-compiled"] = {
         optional = { "native:unzip" }
       }

@@ -64,7 +64,6 @@ This table lists all the available fields you can use inside the `metadata` bloc
 | `sub_packages` | `list`   | A list of sub-package names to define a split package. See [Split Packages](#6-split-packages).                                   |
 | `main_subs`    | `list`   | For a split package, a list of the default sub-packages to install.                                                               |
 | `updates`      | `list`   | A list of tables providing structured update information (e.g. for security notices).                                             |
-| `hooks`        | `table`  | A table defining scripts to run at different points in the package lifecycle.                                                     |
 | `alt`          | `string` | A URL or source string for an alternative package definition to use instead of this one.                                          |
 | `tags`         | `list`   | A list of keywords to help users find the package via `zoi search`.                                                               |
 
@@ -306,7 +305,53 @@ When building a split package, `zcp` automatically stages files into a sub-packa
 
 ---
 
-## 7. The Packaging Workflow
+## 7. Hooks
+
+Zoi allows you to run scripts at specific points in a package's lifecycle using the `hooks{...}` block. This is useful for tasks like starting/stopping system services, creating users, or other setup/cleanup actions that fall outside of simple file installation.
+
+The `hooks` block is a top-level function in your `.pkg.lua`, similar to `dependencies`.
+
+### Available Hooks
+
+The following hooks are available, executed at different stages:
+
+- `pre_install`: Before the package's files are installed.
+- `post_install`: After the package's files are installed and binaries are linked.
+- `pre_upgrade`: Before an existing version of the package is upgraded.
+- `post_upgrade`: After the package has been successfully upgraded to a new version.
+- `pre_remove`: Before the package's files are removed.
+- `post_remove`: After the package's files have been removed.
+
+### Hook Definition
+
+Each hook can be defined as a simple list of command strings or as a platform-specific map.
+
+```lua
+hooks({
+  -- A simple list of commands to run after installation
+  post_install = {
+    "echo 'My package was installed!'",
+    "echo 'Run my-cli --help to get started.'"
+  },
+
+  -- Platform-specific commands to run before removal
+  pre_remove = {
+    linux = { "systemctl stop my-service" },
+    windows = { "sc.exe stop my-service" },
+    default = { "echo 'Stopping my-service...'" }
+  },
+
+  -- Commands to run after an upgrade
+  post_upgrade = {
+    "echo 'Package upgraded. Restarting service...'",
+    "systemctl restart my-service"
+  }
+})
+```
+
+---
+
+## 8. The Packaging Workflow
 
 Follow these steps to develop, build, and test your package.
 
@@ -365,7 +410,7 @@ zoi package install /path/to/your-package-1.0.0-linux-amd64.pkg.tar.zst
 
 ---
 
-## 8. Full Walkthrough: 'hello' Package
+## 9. Full Walkthrough: 'hello' Package
 
 This example demonstrates many of the concepts above by packaging a simple "Hello, World!" program written in Zig.
 

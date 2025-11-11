@@ -70,7 +70,10 @@ Zoi is packed with features designed to make package management and environment 
   - `zoi unpin`: Unpin a package, allowing it to be updated again.
   - `zoi version`: Print concise version and build information.
   - `zoi why`: Understand why a specific package is installed (e.g. as a dependency).
-  - `zoi doctor`: Checks for common issues and provides actionable suggestions.
+  - `zoi doctor`: Checks for common issues with your Zoi installation and provides actionable suggestions. It performs the following checks:
+    - **Broken Symlinks:** Scans for broken symbolic links in Zoi's binary directories.
+    - **PATH Configuration:** Verifies that the Zoi binary directory is included in your system's `PATH`.
+    - **Outdated Repositories:** Checks if your local package database has been synced recently.
 
 - **Shell Integration:**
   - `zoi shell`: Automatically configures your shell's PATH for Zoi and installs shell completion scripts for Bash, Zsh, Fish, Elvish and Powershell.

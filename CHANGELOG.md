@@ -1,16 +1,23 @@
 # Changelog
 
-You can install any of these versions: `zoi upgrade --tag <tag>`
+You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
-## [Prod-Release-1.4.0] - 2025-11-07
+## [Prod-Release-1.4.0] - 2025-11-11
 
 ### ♻️ Refactor
 
+- _(cli)_ Standardize error handling
+- Use `unwrap_or_default` instead of `unwrap_or()`
+- _(pkg)_ Decouple package download from installation
 - More good code
 - Better code i hope
 - Merge 'setup' command into 'shell'
+
+### ✨ Features
+
+- _(pkg)_ Enhance package resolution and parsing
 
 ## [Prod-Release-1.3.1] - 2025-10-31
 
