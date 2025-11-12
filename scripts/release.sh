@@ -55,7 +55,7 @@ sed -i -e "s/pkgver = ZOI_VERSION/pkgver = ${VERSION}/g" \
 sed -i -e "s/pkgver=ZOI_VERSION/pkgver=${VERSION}/g" \
        -e "s/ARCHIVE_SHA512/${ARCHIVE_SHA512}/g" \
        -e "s/LICENSE_SHA512/${LICENSE_SHA512}/g" \
-       -e "s#source=(\".*#source=(\"$url/-/archive/${CI_COMMIT_TAG}/Zoi-${CI_COMMIT_TAG}.tar.gz\"#" \
+       -e "s#source=(\".*#source=(\"\$url/-/archive/${CI_COMMIT_TAG}/Zoi-${CI_COMMIT_TAG}.tar.gz\"#" \
        "packages/aur/zoi/PKGBUILD"
 
 sed -i -e "s/pkgver = VERSION/pkgver = ${VERSION}/g" \
@@ -78,7 +78,7 @@ sed -i -e "s/version \"ZOI_VERSION\"/version \"${VERSION}\"" \
 sed -i -e "s/\"version\": \"ZOI_VERSION\"/\"version\": \"${VERSION}\"" \
        -e "s#\"url\": \".*\"#\"url\": \"https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/${CI_COMMIT_TAG}/downloads/zoi-windows-amd64.zip\"#" \
        -e "s/\"hash\": \"AMD64_SHA256\"/\"hash\": \"${WIN_AMD_SHA256}\"" \
-       -e "s#releases/Prod-Release-\\$version/#releases/${CI_COMMIT_TAG}/#" \
+       -e "s#releases/Prod-Release-\\\$version/#releases/${CI_COMMIT_TAG}/#" \
        "packages/scoop/zoi.json"
 
 echo "Package files updated successfully."
