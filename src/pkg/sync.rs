@@ -154,9 +154,17 @@ fn run_non_verbose_at_path(db_url: &str, db_path: &Path) -> Result<()> {
             true
         });
 
+        let head_symref = repo.find_reference("refs/remotes/origin/HEAD")?;
+        let remote_default_ref = head_symref
+            .symbolic_target()
+            .ok_or_else(|| anyhow!("Remote HEAD is not a symbolic ref"))?;
+        let short_branch_name = remote_default_ref
+            .strip_prefix("refs/remotes/origin/")
+            .ok_or_else(|| anyhow!("Could not determine default branch name from remote HEAD"))?;
+
         let mut fo = FetchOptions::new();
         fo.remote_callbacks(cb);
-        remote.fetch(&["main"], Some(&mut fo), None)?;
+        remote.fetch(&[short_branch_name], Some(&mut fo), None)?;
         fetch_pb.finish_with_message("Fetched.");
 
         let fetch_head = repo.find_reference("FETCH_HEAD")?;
@@ -166,10 +174,10 @@ fn run_non_verbose_at_path(db_url: &str, db_path: &Path) -> Result<()> {
         if analysis.0.is_up_to_date() {
             checkout_pb.finish_with_message("Already up to date.");
         } else if analysis.0.is_fast_forward() {
-            let refname = "refs/heads/main";
-            let mut reference = repo.find_reference(refname)?;
+            let refname = format!("refs/heads/{}", short_branch_name);
+            let mut reference = repo.find_reference(&refname)?;
             reference.set_target(fetch_commit.id(), "Fast-forwarding")?;
-            repo.set_head(refname)?;
+            repo.set_head(&refname)?;
 
             let mut checkout_builder = CheckoutBuilder::new();
             let checkout_pb_clone = checkout_pb.clone();
