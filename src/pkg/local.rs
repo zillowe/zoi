@@ -1,5 +1,5 @@
 use crate::pkg::config;
-use crate::pkg::types::{InstallManifest, Package, Scope};
+use crate::pkg::types::{InstallManifest, Scope};
 use crate::pkg::utils;
 use anyhow::Result;
 #[cfg(windows)]
@@ -36,7 +36,7 @@ pub fn get_package_dir(
     package_name: &str,
 ) -> Result<PathBuf> {
     let base_dir = get_store_base_dir(scope)?;
-    let package_id = utils::generate_package_id(registry_handle, repo_path);
+    let package_id = utils::generate_package_id(registry_handle, repo_path, package_name);
     let package_dir_name = utils::get_package_dir_name(&package_id, package_name);
     Ok(base_dir.join(package_dir_name))
 }
@@ -72,8 +72,10 @@ pub fn get_installed_packages() -> Result<Vec<InstallManifest>> {
                 continue;
             }
             let latest_path = path.join("latest");
-            if latest_path.is_symlink() || latest_path.is_dir() {
-                for entry in fs::read_dir(&latest_path)?.filter_map(Result::ok) {
+            if (latest_path.is_symlink() || latest_path.is_dir())
+                && let Ok(entries) = fs::read_dir(&latest_path)
+            {
+                for entry in entries.filter_map(Result::ok) {
                     let file_name = entry.file_name().to_string_lossy().to_string();
                     if file_name.starts_with("manifest") && file_name.ends_with(".yaml") {
                         let manifest_path = entry.path();
@@ -103,56 +105,16 @@ pub struct InstalledPackage {
 
 pub fn get_installed_packages_with_type() -> Result<Vec<InstalledPackage>> {
     let manifests = get_installed_packages()?;
-    let mut packages = Vec::new();
-
-    for manifest in manifests {
-        let db_root = get_db_root()?;
-        if !db_root.exists() {
-            continue;
-        }
-
-        let mut pkg_file: Option<PathBuf> = None;
-
-        if !manifest.repo.is_empty() {
-            let path = db_root
-                .join(&manifest.repo)
-                .join(format!("{}.pkg.lua", manifest.name));
-            if path.exists() {
-                pkg_file = Some(path);
-            }
-        }
-
-        if pkg_file.is_none() {
-            for entry in WalkDir::new(&db_root).into_iter().filter_map(Result::ok) {
-                if entry.file_name().to_string_lossy() == format!("{}.pkg.lua", manifest.name) {
-                    pkg_file = Some(entry.path().to_path_buf());
-                    break;
-                }
-            }
-        }
-
-        if let Some(path) = pkg_file {
-            let pkg: Package =
-                crate::pkg::lua::parser::parse_lua_package(path.to_str().unwrap(), None, true)?;
-
-            let mut repo_field = manifest.repo.clone();
-            if repo_field.is_empty()
-                && let Some(parent_dir) = path.parent()
-                && let Ok(repo_subpath) = parent_dir.strip_prefix(&db_root)
-            {
-                repo_field = repo_subpath.to_string_lossy().to_string();
-            }
-
-            packages.push(InstalledPackage {
-                name: manifest.name,
-                sub_package: manifest.sub_package,
-                version: manifest.version,
-                repo: repo_field,
-                package_type: pkg.package_type,
-            });
-        }
-    }
-    Ok(packages)
+    Ok(manifests
+        .into_iter()
+        .map(|m| InstalledPackage {
+            name: m.name,
+            sub_package: m.sub_package,
+            version: m.version,
+            repo: m.repo,
+            package_type: m.package_type,
+        })
+        .collect())
 }
 
 pub fn is_package_installed(
@@ -172,22 +134,25 @@ pub fn is_package_installed(
             continue;
         }
 
-        if let Some(file_name) = path.file_name().and_then(|n| n.to_str())
-            && file_name.ends_with(&format!("-{}", package_name))
-        {
-            let latest_path = path.join("latest");
-            if latest_path.is_symlink() || latest_path.is_dir() {
-                for entry in fs::read_dir(&latest_path)?.filter_map(Result::ok) {
-                    let file_name = entry.file_name().to_string_lossy().to_string();
-                    if file_name.starts_with("manifest") && file_name.ends_with(".yaml") {
-                        let manifest_path = entry.path();
-                        if manifest_path.exists() {
-                            let content = fs::read_to_string(manifest_path)?;
-                            let manifest: InstallManifest = serde_yaml::from_str(&content)?;
-                            if manifest.name == package_name
-                                && manifest.sub_package.as_deref() == sub_package_name
-                            {
-                                return Ok(Some(manifest));
+        if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+            let parts: Vec<&str> = file_name.splitn(2, '-').collect();
+            if parts.len() == 2 && parts[1] == package_name && parts[0].len() == 32 {
+                let latest_path = path.join("latest");
+                if (latest_path.is_symlink() || latest_path.is_dir())
+                    && let Ok(entries) = fs::read_dir(&latest_path)
+                {
+                    for entry in entries.filter_map(Result::ok) {
+                        let file_name = entry.file_name().to_string_lossy().to_string();
+                        if file_name.starts_with("manifest") && file_name.ends_with(".yaml") {
+                            let manifest_path = entry.path();
+                            if manifest_path.exists() {
+                                let content = fs::read_to_string(manifest_path)?;
+                                let manifest: InstallManifest = serde_yaml::from_str(&content)?;
+                                if manifest.name == package_name
+                                    && manifest.sub_package.as_deref() == sub_package_name
+                                {
+                                    return Ok(Some(manifest));
+                                }
                             }
                         }
                     }

@@ -346,7 +346,7 @@ pub fn print_repo_warning(repo_name: &str) {
         let major_repo = repo_name.split('/').next().unwrap_or_default();
         if let Some(repo_entry) = repo_config.repos.iter().find(|r| r.name == major_repo) {
             let warning_message = match repo_entry.repo_type.as_str() {
-                "unoffical" => {
+                "unofficial" => {
                     Some("This package is from an unofficial repository and is not trusted.")
                 }
                 "community" => {

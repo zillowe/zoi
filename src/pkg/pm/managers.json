@@ -15,7 +15,8 @@
 		"uninstall": "sudo apk del {package}"
 	},
 	"aur": {
-		"install": "# AUR installation is a complex multi-step process (git clone, makepkg) and cannot be expressed as a single command. The application retains special logic for this manager.",
+		"is_installed": "pacman -Qi {package}",
+		"install": "makepkg -si --noconfirm",
 		"uninstall": "sudo pacman -Rns --noconfirm {package}"
 	},
 	"brew": {

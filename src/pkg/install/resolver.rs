@@ -65,6 +65,7 @@ pub struct InstallNode {
     pub registry_handle: String,
     pub chosen_options: Vec<String>,
     pub chosen_optionals: Vec<String>,
+    pub dependencies: Vec<String>,
 }
 
 #[derive(Default, Debug)]
@@ -122,6 +123,8 @@ impl DependencyGraph {
         if count != self.nodes.len() {
             return Err(anyhow!("Cycle detected in dependency graph."));
         }
+
+        stages.reverse();
 
         Ok(stages)
     }
@@ -425,8 +428,8 @@ pub fn resolve_dependency_graph(
             }
         }
 
-        for dep_source in deps_to_process {
-            queue.push_back((dep_source, Some(pkg_id.clone())));
+        for dep_source in &deps_to_process {
+            queue.push_back((dep_source.clone(), Some(pkg_id.clone())));
         }
 
         let node = InstallNode {
@@ -442,6 +445,7 @@ pub fn resolve_dependency_graph(
             registry_handle: handle.to_string(),
             chosen_options,
             chosen_optionals,
+            dependencies: deps_to_process,
         };
 
         graph.nodes.insert(pkg_id, node);

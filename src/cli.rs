@@ -6,6 +6,7 @@ use clap::{
 };
 use clap_complete::Shell;
 use clap_complete::generate;
+use colored::Colorize;
 use std::io::{self};
 
 // Development, Special, Public or Production
@@ -589,7 +590,27 @@ pub fn run() -> anyhow::Result<()> {
             Commands::Run { cmd_alias, args } => cmd::run::run(cmd_alias, args),
             Commands::Env { env_alias } => cmd::env::run(env_alias),
             Commands::Upgrade { force, tag, branch } => {
-                cmd::upgrade::run(BRANCH, STATUS, NUMBER, force, tag, branch)
+                match cmd::upgrade::run(BRANCH, STATUS, NUMBER, force, tag, branch) {
+                    Ok(()) => {
+                        println!(
+                            "\n{}",
+                            "Zoi upgraded successfully! Please restart your shell for changes to take effect."
+                                .green()
+                        );
+                        println!(
+                            "\n{}: https://github.com/Zillowe/Zoi/blob/main/CHANGELOG.md",
+                            "Changelog".cyan().bold()
+                        );
+                        println!(
+                            "\n{}: To update shell completions, run 'zoi shell <your-shell>'.",
+                            "Hint".cyan().bold()
+                        );
+                    }
+                    Err(e) if e.to_string() == "already_on_latest" => {}
+                    Err(e) if e.to_string() == "managed_by_package_manager" => {}
+                    Err(e) => return Err(e),
+                }
+                Ok(())
             }
             Commands::Autoremove => cmd::autoremove::run(cli.yes),
             Commands::Why { package_name } => cmd::why::run(&package_name),

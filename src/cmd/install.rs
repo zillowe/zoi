@@ -216,33 +216,29 @@ pub fn run(
         println!("{}", pkg_list.join(" "));
     }
 
-    if !to_build.is_empty() {
-    } else {
-        println!("\n{}", "Checking available disk space...".bold());
-        let install_path =
-            crate::pkg::local::get_store_base_dir(scope_override.unwrap_or_default())?;
+    println!("\n{}", "Checking available disk space...".bold());
+    let install_path = crate::pkg::local::get_store_base_dir(scope_override.unwrap_or_default())?;
 
-        std::fs::create_dir_all(&install_path)?;
+    std::fs::create_dir_all(&install_path)?;
 
-        let available_space = match fs2::available_space(&install_path) {
-            Ok(space) => space,
-            Err(e) => {
-                eprintln!(
-                    "{}: Could not check available disk space: {}",
-                    "Warning".yellow().bold(),
-                    e
-                );
-                u64::MAX
-            }
-        };
-
-        if total_installed_size > available_space {
-            return Err(anyhow!(
-                "Not enough disk space. Required: {}, Available: {}",
-                crate::utils::format_bytes(total_installed_size),
-                crate::utils::format_bytes(available_space)
-            ));
+    let available_space = match fs2::available_space(&install_path) {
+        Ok(space) => space,
+        Err(e) => {
+            eprintln!(
+                "{}: Could not check available disk space: {}",
+                "Warning".yellow().bold(),
+                e
+            );
+            u64::MAX
         }
+    };
+
+    if total_installed_size > available_space {
+        return Err(anyhow!(
+            "Not enough disk space. Required: {}, Available: {}",
+            crate::utils::format_bytes(total_installed_size),
+            crate::utils::format_bytes(available_space)
+        ));
     }
 
     if !crate::utils::ask_for_confirmation("\n:: Proceed with installation?", yes) {
@@ -309,6 +305,8 @@ pub fn run(
     let stages = graph.toposort()?;
 
     let transaction = transaction::begin()?;
+    let transaction_id = &transaction.id;
+    let transaction_mutex = Mutex::new(());
 
     for pkg_name in packages_to_replace {
         println!("Replacing package: {}", pkg_name);
@@ -356,8 +354,9 @@ pub fn run(
                     println!("Successfully installed {}", node.pkg.name.green());
                     installed_manifests.lock().unwrap().push(manifest.clone());
 
+                    let _lock = transaction_mutex.lock().unwrap();
                     if let Err(e) = transaction::record_operation(
-                        &transaction.id,
+                        transaction_id,
                         types::TransactionOperation::Install {
                             manifest: Box::new(manifest),
                         },

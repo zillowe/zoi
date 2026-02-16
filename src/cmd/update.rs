@@ -129,20 +129,24 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
 
     let install_plan = install::plan::create_install_plan(&graph.nodes)?;
 
+    let stages = graph.toposort()?;
     let mut new_manifest_option: Option<types::InstallManifest> = None;
 
-    for (id, node) in &graph.nodes {
-        if let Some(action) = install_plan.get(id) {
-            match install::installer::install_node(node, action, None, None, yes) {
-                Ok(m) => {
-                    if m.name == new_pkg.name {
-                        new_manifest_option = Some(m);
+    for stage in stages {
+        for pkg_id in stage {
+            let node = graph.nodes.get(&pkg_id).unwrap();
+            if let Some(action) = install_plan.get(&pkg_id) {
+                match install::installer::install_node(node, action, None, None, yes) {
+                    Ok(m) => {
+                        if m.name == new_pkg.name {
+                            new_manifest_option = Some(m);
+                        }
                     }
-                }
-                Err(e) => {
-                    eprintln!("\nError: Update failed during installation. Rolling back...");
-                    transaction::rollback(&transaction.id)?;
-                    return Err(anyhow!("Update failed: {}", e));
+                    Err(e) => {
+                        eprintln!("\nError: Update failed during installation. Rolling back...");
+                        transaction::rollback(&transaction.id)?;
+                        return Err(anyhow!("Update failed: {}", e));
+                    }
                 }
             }
         }
@@ -323,6 +327,8 @@ fn run_update_all_logic(yes: bool) -> Result<()> {
     }
 
     let transaction = transaction::begin()?;
+    let transaction_id = &transaction.id;
+    let transaction_mutex = Mutex::new(());
     let failed_updates = Mutex::new(Vec::new());
     let successful_upgrades = Mutex::new(Vec::new());
 
@@ -374,28 +380,41 @@ fn run_update_all_logic(yes: bool) -> Result<()> {
                 }
             };
 
+            let stages = match graph.toposort() {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("Error sorting dependency graph for update: {}", e);
+                    failed_updates.lock().unwrap().push(source.clone());
+                    return;
+                }
+            };
+
             let mut new_manifest_option: Option<types::InstallManifest> = None;
 
-            for (id, node) in &graph.nodes {
-                if let Some(action) = install_plan.get(id) {
-                    match install::installer::install_node(node, action, None, None, yes) {
-                        Ok(m) => {
-                            if m.name == new_pkg.name {
-                                new_manifest_option = Some(m);
+            for stage in stages {
+                for pkg_id in stage {
+                    let node = graph.nodes.get(&pkg_id).unwrap();
+                    if let Some(action) = install_plan.get(&pkg_id) {
+                        match install::installer::install_node(node, action, None, None, yes) {
+                            Ok(m) => {
+                                if m.name == new_pkg.name {
+                                    new_manifest_option = Some(m);
+                                }
                             }
-                        }
-                        Err(e) => {
-                            eprintln!("Failed to upgrade {}: {}", source, e);
-                            failed_updates.lock().unwrap().push(source.clone());
-                            return;
+                            Err(e) => {
+                                eprintln!("Failed to upgrade {}: {}", source, e);
+                                failed_updates.lock().unwrap().push(source.clone());
+                                return;
+                            }
                         }
                     }
                 }
             }
 
             if let Some(new_manifest) = new_manifest_option {
+                let _lock = transaction_mutex.lock().unwrap();
                 if let Err(e) = transaction::record_operation(
-                    &transaction.id,
+                    transaction_id,
                     types::TransactionOperation::Upgrade {
                         old_manifest: Box::new(old_manifest.clone()),
                         new_manifest: Box::new(new_manifest.clone()),

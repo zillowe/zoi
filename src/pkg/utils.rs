@@ -1,9 +1,9 @@
 use sha2::{Digest, Sha512};
 
 /// Generates a unique ID for a package based on its origin.
-/// The format for the hash is `#{registry-handle}@{repo/path/to/package}`.
-pub fn generate_package_id(registry_handle: &str, repo_path: &str) -> String {
-    let format_string = format!("#{}@{}", registry_handle, repo_path);
+/// The format for the hash is `#{registry-handle}@{repo/path/to/package}/{package-name}`.
+pub fn generate_package_id(registry_handle: &str, repo_path: &str, package_name: &str) -> String {
+    let format_string = format!("#{}@{}/{}", registry_handle, repo_path, package_name);
     let mut hasher = Sha512::new();
     hasher.update(format_string.as_bytes());
     let result = hasher.finalize();

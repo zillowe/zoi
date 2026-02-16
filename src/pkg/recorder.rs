@@ -53,7 +53,7 @@ pub fn record_package(
 ) -> Result<()> {
     let mut lockfile = read_lockfile(pkg.scope)?;
 
-    let base_package_id = utils::generate_package_id(registry_handle, &pkg.repo);
+    let base_package_id = utils::generate_package_id(registry_handle, &pkg.repo, &pkg.name);
     let package_id = if let Some(sub) = &sub_package {
         format!("{}:{}", base_package_id, sub)
     } else {

@@ -48,6 +48,14 @@ pub fn download_and_cache_archive(
             return Err(anyhow!("Failed to download archive"));
         }
 
+        if let Some(hash_url) = &details.info.hash_url
+            && let Ok(hash) = util::get_expected_hash(hash_url)
+            && !hash.is_empty()
+            && !util::verify_file_hash(&temp_archive_path, &hash).unwrap_or(false)
+        {
+            return Err(anyhow!("Hash verification failed"));
+        }
+
         if let Some(policy) = &signature_policy {
             if let Some(pgp_url) = &details.info.pgp_url {
                 let temp_sig_path = temp_dir.path().join(&sig_filename);
@@ -73,12 +81,6 @@ pub fn download_and_cache_archive(
                     "Signature enforcement is active, but no PGP URL found for package"
                 ));
             }
-        } else if let Some(hash_url) = &details.info.hash_url
-            && let Ok(hash) = util::get_expected_hash(hash_url)
-            && !hash.is_empty()
-            && !util::verify_file_hash(&temp_archive_path, &hash).unwrap_or(false)
-        {
-            return Err(anyhow!("Hash verification failed"));
         }
 
         fs::copy(&temp_archive_path, &cached_archive_path)?;
@@ -153,7 +155,7 @@ pub fn install_node(
     let manifest = manifest::create_manifest(
         pkg,
         node.reason.clone(),
-        vec![],
+        node.dependencies.clone(),
         Some("prebuilt-archive".to_string()),
         installed_files,
         handle,
@@ -167,7 +169,7 @@ pub fn install_node(
     if let Err(e) = recorder::record_package(
         pkg,
         &node.reason,
-        &[],
+        &node.dependencies,
         handle,
         &node.chosen_options,
         &node.chosen_optionals,

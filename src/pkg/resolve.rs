@@ -214,7 +214,7 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
             let repo_config = config::read_repo_config(registry_db_path).ok();
             if let Some(ref cfg) = repo_config {
                 if let Some(repo_entry) = cfg.repos.iter().find(|r| r.name == major_repo) {
-                    if repo_entry.repo_type == "offical" {
+                    if repo_entry.repo_type == "official" {
                         SourceType::OfficialRepo
                     } else {
                         SourceType::UntrustedRepo(repo_name.to_string())
@@ -322,8 +322,6 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
                     true,
                 ) && let Some(provides) = &pkg.provides
                     && provides.iter().any(|p| p == &request.name)
-                    && let Some(provides) = &pkg.provides
-                    && provides.iter().any(|p| p == &request.name)
                 {
                     let major_repo = repo_name
                         .split('/')
@@ -336,7 +334,7 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
                             if let Some(repo_entry) =
                                 cfg.repos.iter().find(|r| r.name == major_repo)
                             {
-                                if repo_entry.repo_type == "offical" {
+                                if repo_entry.repo_type == "official" {
                                     SourceType::OfficialRepo
                                 } else {
                                     SourceType::UntrustedRepo(repo_name.clone())

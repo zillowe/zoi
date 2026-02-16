@@ -2,7 +2,7 @@ use crate::pkg::{install, local, pm, types};
 use crate::utils;
 use anyhow::{Result, anyhow};
 use colored::*;
-use dialoguer::{Input, Select, theme::ColorfulTheme};
+use dialoguer::{Select, theme::ColorfulTheme};
 use indicatif::MultiProgress;
 use regex::Regex;
 use semver::VersionReq;
@@ -112,23 +112,6 @@ pub fn install_dependency(
 
     if dep.manager == "zoi" {
         return install_zoi_dependency(dep, parent_id, scope, yes, all_optional, processed_deps, m);
-    } else if dep.manager == "native" {
-        let pm = utils::get_native_package_manager()
-            .ok_or_else(|| anyhow!("Native package manager not found for this OS"))?;
-        println!("-> Using native package manager: {}", pm.cyan());
-        let native_dep_str = format!("{}:{}", pm, dep.package);
-        let native_dep = parse_dependency_string(&native_dep_str)?;
-        install_dependency(
-            &native_dep,
-            parent_id,
-            scope,
-            yes,
-            all_optional,
-            processed_deps,
-            installed_deps,
-            m,
-        )?;
-        return Ok(());
     }
 
     if let Some(pm_commands) = pm::MANAGERS.get(dep.manager) {
@@ -138,6 +121,10 @@ pub fn install_dependency(
                 println!("Already installed. Skipping.");
                 return Ok(());
             }
+        }
+
+        if dep.manager == "aur" {
+            return install_aur_dependency(dep, yes);
         }
 
         let package_with_version = if let Some(v) = &dep.version_str {
@@ -156,8 +143,32 @@ pub fn install_dependency(
             .replace("{package}", dep.package)
             .replace("{package_with_version}", &package_with_version);
 
+        if install_cmd.starts_with('#') {
+            return Err(anyhow!(
+                "Installation command for '{}' is not configured: {}",
+                dep.manager,
+                install_cmd
+            ));
+        }
+
         println!("Running install command: {}", install_cmd.italic());
         utils::run_shell_command(&install_cmd)
+    } else if dep.manager == "native" {
+        let pm = utils::get_native_package_manager()
+            .ok_or_else(|| anyhow!("Native package manager not found for this OS"))?;
+        println!("-> Using native package manager: {}", pm.cyan());
+        let native_dep_str = format!("{}:{}", pm, dep.package);
+        let native_dep = parse_dependency_string(&native_dep_str)?;
+        install_dependency(
+            &native_dep,
+            parent_id,
+            scope,
+            yes,
+            all_optional,
+            processed_deps,
+            installed_deps,
+            m,
+        )
     } else {
         Err(anyhow!(
             "Unknown or unsupported package manager in dependency: {}",
@@ -188,6 +199,51 @@ pub fn uninstall_dependency(dep_str: &str, zoi_uninstaller: &ZoiUninstaller) -> 
             dep.manager
         ))
     }
+}
+
+fn install_aur_dependency(dep: &Dependency, yes: bool) -> Result<()> {
+    if !crate::utils::command_exists("git") {
+        return Err(anyhow!(
+            "'git' command not found. Needed for AUR installation."
+        ));
+    }
+    if !crate::utils::command_exists("makepkg") {
+        return Err(anyhow!(
+            "'makepkg' command not found. Are you on Arch Linux?"
+        ));
+    }
+
+    let temp_dir = tempfile::Builder::new().prefix("zoi-aur-").tempdir()?;
+    let repo_url = format!("https://aur.archlinux.org/{}.git", dep.package);
+
+    println!("-> Cloning {}...", repo_url.cyan());
+    let clone_status = std::process::Command::new("git")
+        .arg("clone")
+        .arg("--depth=1")
+        .arg(&repo_url)
+        .arg(temp_dir.path())
+        .status()?;
+
+    if !clone_status.success() {
+        return Err(anyhow!(
+            "Failed to clone AUR repository for {}",
+            dep.package
+        ));
+    }
+
+    println!("-> Building and installing with makepkg...");
+    let mut makepkg_cmd = std::process::Command::new("makepkg");
+    makepkg_cmd.arg("-si").current_dir(temp_dir.path());
+    if yes {
+        makepkg_cmd.arg("--noconfirm");
+    }
+
+    let install_status = makepkg_cmd.status()?;
+    if !install_status.success() {
+        return Err(anyhow!("makepkg failed for {}", dep.package));
+    }
+
+    Ok(())
 }
 
 fn install_zoi_dependency(
@@ -258,320 +314,21 @@ fn install_zoi_dependency(
         }
     };
 
-    for (id, node) in &graph.nodes {
-        let action = install_plan
-            .get(id)
-            .ok_or_else(|| anyhow!("Could not find install action for {}", id))?;
-        install::installer::install_node(node, action, m, None, yes)?;
+    let stages = graph.toposort()?;
+    for stage in stages {
+        for id in stage {
+            let node = graph.nodes.get(&id).unwrap();
+            let action = install_plan
+                .get(&id)
+                .ok_or_else(|| anyhow!("Could not find install action for {}", id))?;
+            install::installer::install_node(node, action, m, None, yes)?;
+        }
     }
 
     Ok(())
 }
 
 type ZoiUninstaller = dyn Fn(&str) -> Result<()>;
-
-pub fn resolve_and_install_required(
-    deps: &[String],
-    parent_id: &str,
-    _parent_version: &str,
-    scope: types::Scope,
-    yes: bool,
-    all_optional: bool,
-    processed_deps: &Mutex<HashSet<String>>,
-    installed_deps: &mut Vec<String>,
-    m: Option<&MultiProgress>,
-) -> Result<()> {
-    if deps.is_empty() {
-        return Ok(());
-    }
-
-    println!("{}", "Resolving required dependencies...".bold());
-    for dep_str in deps {
-        let dependency = parse_dependency_string(dep_str)?;
-        install_dependency(
-            &dependency,
-            parent_id,
-            scope,
-            yes,
-            all_optional,
-            processed_deps,
-            installed_deps,
-            m,
-        )?;
-    }
-    println!("{}", "All required dependencies resolved.".green());
-    Ok(())
-}
-
-pub fn resolve_and_install_required_options(
-    option_groups: &[types::DependencyOptionGroup],
-    parent_id: &str,
-    _parent_version: &str,
-    scope: types::Scope,
-    yes: bool,
-    all_optional: bool,
-    processed_deps: &Mutex<HashSet<String>>,
-    installed_deps: &mut Vec<String>,
-    chosen_options: &mut Vec<String>,
-    m: Option<&MultiProgress>,
-) -> Result<()> {
-    if option_groups.is_empty() {
-        return Ok(());
-    }
-
-    for group in option_groups {
-        println!(
-            "[{}] There are {} options available for {}",
-            group.name.bold(),
-            group.depends.len(),
-            group.desc.italic()
-        );
-
-        let mut parsed_deps = Vec::new();
-        for (i, dep_str) in group.depends.iter().enumerate() {
-            let dep = parse_dependency_string(dep_str)?;
-            let desc = dep.description.unwrap_or("No description");
-            let mut dep_display = format!("{}:{}", dep.manager, dep.package);
-            if let Some(req) = &dep.req {
-                dep_display.push_str(&req.to_string());
-            }
-            println!(
-                "  {}. {} - {}",
-                (i + 1).to_string().cyan(),
-                dep_display.bold(),
-                desc.italic()
-            );
-            parsed_deps.push(dep);
-        }
-
-        if yes {
-            if group.all {
-                println!(
-                    "--yes provided, installing all options for '{}'",
-                    group.name
-                );
-                for dep in parsed_deps.iter() {
-                    chosen_options.push(format!("{}:{}", dep.manager, dep.package));
-                    install_dependency(
-                        dep,
-                        parent_id,
-                        scope,
-                        yes,
-                        all_optional,
-                        processed_deps,
-                        installed_deps,
-                        m,
-                    )?;
-                }
-            } else {
-                println!(
-                    "--yes provided, installing the first option for '{}'",
-                    group.name
-                );
-                if let Some(dep) = parsed_deps.first() {
-                    chosen_options.push(format!("{}:{}", dep.manager, dep.package));
-                    install_dependency(
-                        dep,
-                        parent_id,
-                        scope,
-                        yes,
-                        all_optional,
-                        processed_deps,
-                        installed_deps,
-                        m,
-                    )?;
-                }
-            }
-            continue;
-        }
-
-        if group.all {
-            let input: String = Input::with_theme(&ColorfulTheme::default())
-                .with_prompt("Choose which to install (e.g. '1,3', 'all')")
-                .default("1".into())
-                .interact_text()?;
-
-            let trimmed_input = input.trim().to_lowercase();
-            let mut to_install = Vec::new();
-
-            if trimmed_input == "all" {
-                to_install.extend(0..parsed_deps.len());
-            } else {
-                for part in trimmed_input.split([',', ' ']).filter(|s| !s.is_empty()) {
-                    if let Ok(num) = part.parse::<usize>() {
-                        if num > 0 && num <= parsed_deps.len() {
-                            to_install.push(num - 1);
-                        } else {
-                            return Err(anyhow::anyhow!("Invalid number: {}", num));
-                        }
-                    } else {
-                        return Err(anyhow::anyhow!("Invalid input: {}", part));
-                    }
-                }
-            }
-            to_install.sort();
-            to_install.dedup();
-
-            for index in to_install {
-                let dep = &parsed_deps[index];
-                chosen_options.push(format!("{}:{}", dep.manager, dep.package));
-                install_dependency(
-                    dep,
-                    parent_id,
-                    scope,
-                    yes,
-                    all_optional,
-                    processed_deps,
-                    installed_deps,
-                    m,
-                )?;
-            }
-        } else {
-            let items: Vec<_> = parsed_deps
-                .iter()
-                .map(|d| {
-                    let mut dep_display = format!("{}:{}", d.manager, d.package);
-                    if let Some(req) = &d.req {
-                        dep_display.push_str(&req.to_string());
-                    }
-                    dep_display
-                })
-                .collect();
-
-            let selection = Select::with_theme(&ColorfulTheme::default())
-                .with_prompt("Choose which to install")
-                .items(&items)
-                .default(0)
-                .interact()?;
-
-            let dep = &parsed_deps[selection];
-            chosen_options.push(format!("{}:{}", dep.manager, dep.package));
-            install_dependency(
-                dep,
-                parent_id,
-                scope,
-                yes,
-                all_optional,
-                processed_deps,
-                installed_deps,
-                m,
-            )?;
-        }
-    }
-    Ok(())
-}
-
-pub fn resolve_and_install_optional(
-    deps: &[String],
-    parent_id: &str,
-    _parent_version: &str,
-    scope: types::Scope,
-    yes: bool,
-    all_optional: bool,
-    processed_deps: &Mutex<HashSet<String>>,
-    installed_deps: &mut Vec<String>,
-    chosen_optionals: &mut Vec<String>,
-    dep_type: Option<&str>,
-    m: Option<&MultiProgress>,
-) -> Result<()> {
-    if deps.is_empty() {
-        return Ok(());
-    }
-
-    let type_str = dep_type.map(|s| format!("{} ", s)).unwrap_or_default();
-
-    if yes || all_optional {
-        println!(
-            "{}",
-            format!("Installing all optional {} dependencies...", type_str).bold()
-        );
-        for dep_str in deps {
-            chosen_optionals.push(dep_str.clone());
-            let dependency = parse_dependency_string(dep_str)?;
-            install_dependency(
-                &dependency,
-                parent_id,
-                scope,
-                true,
-                all_optional,
-                processed_deps,
-                installed_deps,
-                m,
-            )?;
-        }
-        return Ok(());
-    }
-
-    println!(
-        "{}",
-        format!("This package has optional {} dependencies:", type_str).bold()
-    );
-    let mut parsed_deps = Vec::new();
-    for (i, dep_str) in deps.iter().enumerate() {
-        let dep = parse_dependency_string(dep_str)?;
-        let desc = dep.description.unwrap_or("No description");
-        let mut dep_display = format!("{}:{}", dep.manager, dep.package);
-        if let Some(req) = &dep.req {
-            dep_display.push_str(&req.to_string());
-        }
-        println!(
-            "  {}. {} - {}",
-            (i + 1).to_string().cyan(),
-            dep_display.bold(),
-            desc.italic()
-        );
-        parsed_deps.push(dep);
-    }
-
-    let input: String = Input::with_theme(&ColorfulTheme::default())
-        .with_prompt("Choose which to install (e.g. '1,3', 'all', 'none')")
-        .default("none".into())
-        .interact_text()?;
-
-    let trimmed_input = input.trim().to_lowercase();
-
-    if trimmed_input == "none" || trimmed_input == "n" || trimmed_input == "0" {
-        println!("Skipping optional dependencies.");
-        return Ok(());
-    }
-
-    let mut to_install = Vec::new();
-    if trimmed_input == "all" || trimmed_input == "y" {
-        to_install.extend(0..parsed_deps.len());
-    } else {
-        for part in trimmed_input.split([',', ' ']).filter(|s| !s.is_empty()) {
-            if let Ok(num) = part.parse::<usize>() {
-                if num > 0 && num <= parsed_deps.len() {
-                    to_install.push(num - 1);
-                } else {
-                    return Err(anyhow::anyhow!("Invalid number: {}", num));
-                }
-            } else {
-                return Err(anyhow::anyhow!("Invalid input: {}", part));
-            }
-        }
-    }
-
-    to_install.sort();
-    to_install.dedup();
-
-    for index in to_install {
-        let dep = &parsed_deps[index];
-        chosen_optionals.push(format!("{}:{}", dep.manager, dep.package));
-        install_dependency(
-            dep,
-            parent_id,
-            scope,
-            yes,
-            all_optional,
-            processed_deps,
-            installed_deps,
-            m,
-        )?;
-    }
-
-    Ok(())
-}
 
 pub fn prompt_for_options(
     option_groups: &[types::DependencyOptionGroup],

@@ -178,14 +178,14 @@ A Zoi package registry is defined by a `repo.yaml` file at its root. This file c
 
 Here are the fields available in `repo.yaml`:
 
-| Field         | Type                | Description                                                                                                                                                         |
-| ------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`        | `string`            | The name of the repository. This is used as the handle for the registry.                                                                                            |
-| `description` | `string`            | A short description of the repository.                                                                                                                              |
-| `git`         | `list` of `GitLink` | A list of git repository URLs. The `type` can be `main` for the primary repository or `mirror` for fallbacks.                                                       |
-| `pkg`         | `list` of `PkgLink` | (Optional) A list of URLs for pre-built package registries. Zoi will try to download pre-built packages from here before building from source.                      |
-| `pgp`         | `list` of `PgpKey`  | (Optional) A list of PGP keys to import for package signature verification. The `key` can be a URL to the key file or a PGP fingerprint.                            |
-| `repos`       | `list` of `Repo`    | A list of the sub-repositories (or tiers) contained within the registry. `type` can be `offical`, `community`, etc. `active` determines if it's enabled by default. |
+| Field         | Type                | Description                                                                                                                                                          |
+| ------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`        | `string`            | The name of the repository. This is used as the handle for the registry.                                                                                             |
+| `description` | `string`            | A short description of the repository.                                                                                                                               |
+| `git`         | `list` of `GitLink` | A list of git repository URLs. The `type` can be `main` for the primary repository or `mirror` for fallbacks.                                                        |
+| `pkg`         | `list` of `PkgLink` | (Optional) A list of URLs for pre-built package registries. Zoi will try to download pre-built packages from here before building from source.                       |
+| `pgp`         | `list` of `PgpKey`  | (Optional) A list of PGP keys to import for package signature verification. The `key` can be a URL to the key file or a PGP fingerprint.                             |
+| `repos`       | `list` of `Repo`    | A list of the sub-repositories (or tiers) contained within the registry. `type` can be `official`, `community`, etc. `active` determines if it's enabled by default. |
 
 ### `PkgLink` Placeholders
 
@@ -218,13 +218,13 @@ pgp:
     key: https://zillowe.pages.dev/keys/zillowe-main.asc
 repos:
   - name: core
-    type: offical
+    type: official
     active: true
   - name: main
-    type: offical
+    type: official
     active: true
   - name: extra
-    type: offical
+    type: official
     active: true
   - name: community
     type: community
@@ -236,6 +236,6 @@ repos:
     type: test
     active: false
   - name: zillowe
-    type: offical
+    type: official
     active: false
 ```

@@ -245,22 +245,14 @@ pub fn run(
 
     println!("\n--- Executing '{}' ---\n", pkg.name.bold());
 
-    let mut command_str = format!("\"{}\"", bin_path.display());
+    let mut cmd = Command::new(&bin_path);
     if !args.is_empty() {
-        command_str.push(' ');
-        command_str.push_str(&args.join(" "));
+        cmd.args(&args);
     }
 
-    println!("> {}", command_str.cyan());
+    println!("> \"{}\" {}", bin_path.display(), args.join(" "));
 
-    let status = if cfg!(target_os = "windows") {
-        Command::new("pwsh")
-            .arg("-Command")
-            .arg(&command_str)
-            .status()?
-    } else {
-        Command::new("bash").arg("-c").arg(&command_str).status()?
-    };
+    let status = cmd.status()?;
 
     Ok(status.code().unwrap_or(1))
 }

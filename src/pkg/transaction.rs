@@ -133,17 +133,33 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                     }
                 };
 
-                for (id, node) in &graph.nodes {
-                    if let Some(action) = install_plan.get(id)
-                        && let Err(e) =
-                            install::installer::install_node(node, action, None, None, true)
-                    {
+                let stages = match graph.toposort() {
+                    Ok(s) => s,
+                    Err(e) => {
                         eprintln!(
-                            "{} Failed to re-install during rollback of '{}': {}",
+                            "{} Failed to sort dependency graph for rollback of '{}': {}",
                             "Error:".red().bold(),
                             manifest.name,
                             e
                         );
+                        continue;
+                    }
+                };
+
+                for stage in stages {
+                    for id in stage {
+                        let node = graph.nodes.get(&id).unwrap();
+                        if let Some(action) = install_plan.get(&id)
+                            && let Err(e) =
+                                install::installer::install_node(node, action, None, None, true)
+                        {
+                            eprintln!(
+                                "{} Failed to re-install during rollback of '{}': {}",
+                                "Error:".red().bold(),
+                                manifest.name,
+                                e
+                            );
+                        }
                     }
                 }
             }
@@ -206,17 +222,33 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                     }
                 };
 
-                for (id, node) in &graph.nodes {
-                    if let Some(action) = install_plan.get(id)
-                        && let Err(e) =
-                            install::installer::install_node(node, action, None, None, true)
-                    {
+                let stages = match graph.toposort() {
+                    Ok(s) => s,
+                    Err(e) => {
                         eprintln!(
-                            "{} Failed to re-install during rollback of '{}': {}",
+                            "{} Failed to sort dependency graph for rollback of '{}': {}",
                             "Error:".red().bold(),
                             old_manifest.name,
                             e
                         );
+                        continue;
+                    }
+                };
+
+                for stage in stages {
+                    for id in stage {
+                        let node = graph.nodes.get(&id).unwrap();
+                        if let Some(action) = install_plan.get(&id)
+                            && let Err(e) =
+                                install::installer::install_node(node, action, None, None, true)
+                        {
+                            eprintln!(
+                                "{} Failed to re-install during rollback of '{}': {}",
+                                "Error:".red().bold(),
+                                old_manifest.name,
+                                e
+                            );
+                        }
                     }
                 }
             }

@@ -128,14 +128,14 @@ fn run_non_verbose_at_path(db_url: &str, db_path: &Path) -> Result<()> {
     let fetch_pb = m.add(ProgressBar::new(0).with_style(
         ProgressStyle::default_bar()
             .template(
-                "{spinner:.green} [{elapsed_precise}] Fetching: [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)?",
+                "{spinner:.green} [{elapsed_precise}] Fetching: [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)",
             )?
             .progress_chars("#>-"),
     ));
     let checkout_pb = m.add(ProgressBar::new(0).with_style(
         ProgressStyle::default_bar()
             .template(
-                "{spinner:.green} [{elapsed_precise}] Checkout: [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)?",
+                "{spinner:.green} [{elapsed_precise}] Checkout: [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)",
             )?
             .progress_chars("#>-"),
     ));
