@@ -18,6 +18,7 @@ Dependencies are specified in the `dependencies` section. Both `runtime` and `bu
 Each entry follows the format: `manager:package[:sub-package]` with an optional version and an optional inline description.
 
 - **Format:** `manager:package[:sub-package][@version][:description]`
+  - Note: For `deno` dependencies, use a `-` separator instead of `:` (e.g. `deno:npm-chalk` or `deno:jsr-@std/bytes`).
 - **Virtual Packages:** You can depend on a virtual package name that is satisfied by any package that includes it in its `provides` list.
 - **Sub-packages:** For `zoi` packages that are split, you can specify a sub-package.
   - Example: `zoi:linux:headers`

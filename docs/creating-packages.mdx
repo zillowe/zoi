@@ -41,31 +41,35 @@ metadata({
 
 This table lists all the available fields you can use inside the `metadata` block.
 
-| Field          | Type     | Description                                                                                                                       |
-| -------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `name`         | `string` | **Required.** The name of the package.                                                                                            |
-| `repo`         | `string` | **Required.** The repository tier where the package belongs (e.g. `core`, `community`).                                           |
-| `version`      | `string` | The package version. Can be hardcoded or determined dynamically.                                                                  |
-| `versions`     | `table`  | A map of channels to versions (e.g. `{ stable = "1.2.3", beta = "1.4.0" }`). Used for version resolution if `version` is not set. |
-| `description`  | `string` | A short, one-line description of the package.                                                                                     |
-| `website`      | `string` | The official website of the software.                                                                                             |
-| `git`          | `string` | The source code's git repository URL.                                                                                             |
-| `man`          | `string` | A URL to the package's manual page (can be a raw markdown or text file).                                                          |
-| `maintainer`   | `table`  | **Required.** A table with `name`, `email`, and optionally `website` of the package maintainer.                                   |
-| `author`       | `table`  | A table with `name`, `email`, and `website` of the original software author.                                                      |
-| `license`      | `string` | The [SPDX license identifier](https://spdx.org/licenses/) for the software (e.g. `MIT`, `GPL-3.0-or-later`).                      |
-| `bins`         | `list`   | A list of binary names the package provides. Zoi will create symlinks for these in a directory on the user's `PATH`.              |
-| `conflicts`    | `list`   | A list of other package names that this package conflicts with.                                                                   |
-| `provides`     | `list`   | A list of virtual package names this package provides. Other packages can depend on these.                                        |
-| `replaces`     | `list`   | A list of packages that this package replaces. Zoi will offer to remove them upon installation.                                   |
-| `backup`       | `list`   | A list of configuration files to preserve during upgrades. Zoi will create `.zoinew` and `.zoisave` files for these.              |
-| `types`        | `list`   | A list of supported build methods (e.g. `source`, `pre-compiled`).                                                                |
-| `package_type` | `string` | The type of package. Can be `package` (default), `collection`, `app`, or `extension`. See [Package Types](#5-package-types).      |
-| `sub_packages` | `list`   | A list of sub-package names to define a split package. See [Split Packages](#6-split-packages).                                   |
-| `main_subs`    | `list`   | For a split package, a list of the default sub-packages to install.                                                               |
-| `updates`      | `list`   | A list of tables providing structured update information (e.g. for security notices).                                             |
-| `alt`          | `string` | A URL or source string for an alternative package definition to use instead of this one.                                          |
-| `tags`         | `list`   | A list of keywords to help users find the package via `zoi search`.                                                               |
+| Field            | Type      | Description                                                                                                                       |
+| ---------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `name`           | `string`  | **Required.** The name of the package.                                                                                            |
+| `repo`           | `string`  | **Required.** The repository tier where the package belongs (e.g. `core`, `community`).                                           |
+| `version`        | `string`  | The package version. Can be hardcoded or determined dynamically.                                                                  |
+| `versions`       | `table`   | A map of channels to versions (e.g. `{ stable = "1.2.3", beta = "1.4.0" }`). Used for version resolution if `version` is not set. |
+| `description`    | `string`  | A short, one-line description of the package.                                                                                     |
+| `website`        | `string`  | The official website of the software.                                                                                             |
+| `git`            | `string`  | The source code's git repository URL.                                                                                             |
+| `man`            | `string`  | A URL to the package's manual page (can be a raw markdown or text file).                                                          |
+| `maintainer`     | `table`   | **Required.** A table with `name`, `email`, and optionally `website` of the package maintainer.                                   |
+| `author`         | `table`   | A table with `name`, `email`, and `website` of the original software author.                                                      |
+| `license`        | `string`  | The [SPDX license identifier](https://spdx.org/licenses/) for the software (e.g. `MIT`, `GPL-3.0-or-later`).                      |
+| `bins`           | `list`    | A list of binary names the package provides. Zoi will create symlinks for these in a directory on the user's `PATH`.              |
+| `conflicts`      | `list`    | A list of other package names that this package conflicts with.                                                                   |
+| `provides`       | `list`    | A list of virtual package names this package provides. Other packages can depend on these.                                        |
+| `replaces`       | `list`    | A list of packages that this package replaces. Zoi will offer to remove them upon installation.                                   |
+| `backup`         | `list`    | A list of configuration files to preserve during upgrades. Zoi will create `.zoinew` and `.zoisave` files for these.              |
+| `types`          | `list`    | A list of supported build methods (e.g. `source`, `pre-compiled`).                                                                |
+| `package_type`   | `string`  | The type of package. Can be `package` (default), `collection`, `app`, or `extension`. See [Package Types](#5-package-types).      |
+| `sub_packages`   | `list`    | A list of sub-package names to define a split package. See [Split Packages](#6-split-packages).                                   |
+| `main_subs`      | `list`    | For a split package, a list of the default sub-packages to install.                                                               |
+| `updates`        | `list`    | A list of tables providing structured update information (e.g. for security notices).                                             |
+| `alt`            | `string`  | A URL or source string for an alternative package definition to use instead of this one.                                          |
+| `tags`           | `list`    | A list of keywords to help users find the package via `zoi search`.                                                               |
+| `readme`         | `string`  | A URL to the package's README file.                                                                                               |
+| `rollback`       | `boolean` | If `false`, disables rollback for this specific package even if enabled globally.                                                 |
+| `installed_size` | `integer` | The expected size of the package after installation (in bytes). Used for disk space checks.                                       |
+| `archive_size`   | `integer` | The size of the pre-compiled archive (in bytes).                                                                                  |
 
 ---
 
@@ -105,6 +109,11 @@ dependencies({
 ## 3. Lifecycle Functions
 
 These functions define the imperative steps for building your package. Zoi calls them in a specific order: `prepare` -> `package` -> `verify`.
+
+<Callout title="API Reference">
+  For a full list of available helper functions and global variables, see the
+  [Lua API Reference](/docs/zds/zoi/lua-api).
+</Callout>
 
 ### `prepare()`
 
@@ -163,7 +172,7 @@ When Zoi executes your script, it provides a rich environment of global variable
 | `cmd(command)`                            | Executes a shell command within the `BUILD_DIR`.                                                                                                                                                                                         |
 | `zcp(source, dest)`                       | Copies files/directories to the `STAGING_DIR`. The `source` can be a path inside `BUILD_DIR`, an absolute path, or a path relative to the `.pkg.lua` file using `${pkgluadir}`. See [Staging Files with `zcp`](#staging-files-with-zcp). |
 | `zrm(path)`                               | Used in `uninstall()` to remove files/directories. See [Target Paths for `zrm`](#target-paths-for-zrm).                                                                                                                                  |
-| `verifyHash(file, "algo-hash")`           | Verifies a file's checksum (e.g. `"sha512-..."`).                                                                                                                                                                                        |
+| `verifyHash(file, "algo-hash")`           | Verifies a file's checksum (e.g. `"sha512-..."`). Supported algos: sha512, sha256, md5.                                                                                                                                                  |
 | `verifySignature(file, sig, key)`         | Verifies a PGP signature.                                                                                                                                                                                                                |
 | `addPgpKey(url_or_path, name)`            | Adds a PGP key to Zoi's keyring for verification.                                                                                                                                                                                        |
 | `UTILS.EXTRACT(url_or_path, out_dir)`     | Downloads and extracts a `.zip` or `.tar.*` archive.                                                                                                                                                                                     |

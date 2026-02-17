@@ -48,7 +48,7 @@ Zoi is packed with features designed to make package management and environment 
 
 - **Package Testing:** An integrated testing framework (`zoi package test`) allows authors to define and run tests for their packages directly from the `.pkg.lua` file, ensuring package quality and correctness before publishing.
 
-- **Split Packages:** Define a package that can be split into multiple, independently installable sub-packages. This is perfect for large projects like the Linux kernel, where you can separate the kernel, headers, and docs.
+- **Split Packages:** Define a package that can be split into multiple, independently installable sub-packages. This is perfect for large projects like the Linux kernel, where you can separate the kernel, headers, and docs. Zoi manages these components granularly; uninstalling or rolling back one sub-package will not interfere with other installed components from the same base project.
 
 - **Local Package Development:** A dedicated `zoi package` command set streamlines the creation and testing of packages locally:
   - `zoi package build`: Build a distributable package archive (`.pkg.tar.zst`).
@@ -202,6 +202,8 @@ Displays detected operating system and architecture information.
 (alias: `i`)
 
 Installs one or more packages. For split packages, you can specify a sub-package using the `package:sub-package` syntax. If you specify a base package, Zoi will install the `main_subs` defined in the package.
+
+Zoi resolves dependencies, checks for conflicts, and then sequentially downloads and installs each package, showing progress bars for both download and installation phases.
 
 **Arguments:**
 

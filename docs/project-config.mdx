@@ -18,6 +18,10 @@ The `zoi.yaml` file allows for simple and complex configurations, including plat
 # Required project name (used in output)
 name: my-project
 
+# Optional: List of supplementary registries for this project
+registries:
+  - https://github.com/YourOrg/custom-registry.git
+
 # Optional: Enable project-level package management
 config:
   local: true
@@ -90,6 +94,7 @@ environments:
 ### Field Reference
 
 - `name`: `string` (required)
+- `registries`: `list` of `string` (optional). Additional Git URLs for package registries to search for this project.
 - `config`: `object` (optional)
   - `local`: `boolean` (default: `false`). If `true`, enables project-local package management.
 - `pkgs`: `list` of `strings` (optional). A list of packages to be installed locally to the project. Requires `config.local: true`.

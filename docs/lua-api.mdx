@@ -1,0 +1,115 @@
+---
+title: Lua API Reference
+description: A comprehensive reference for the Lua environment and helper functions available in Zoi packages.
+---
+
+Zoi provides a rich Lua environment for defining packages. This page serves as a complete reference for all global variables, tables, and utility functions available within your `.pkg.lua` scripts.
+
+## Global Variables
+
+These variables are automatically available in your script's scope.
+
+| Variable      | Type     | Description                                                       |
+| :------------ | :------- | :---------------------------------------------------------------- |
+| `SYSTEM`      | `table`  | Information about the host system.                                |
+| `ZOI`         | `table`  | Information about the Zoi environment.                            |
+| `PKG`         | `table`  | A read-only copy of your `metadata{...}` fields.                  |
+| `BUILD_DIR`   | `string` | Absolute path to the temporary build directory.                   |
+| `STAGING_DIR` | `string` | Absolute path to the staging directory.                           |
+| `BUILD_TYPE`  | `string` | The user-requested build method (e.g. `"source"`).                |
+| `SUBPKG`      | `string` | The name of the sub-package being processed (for split packages). |
+
+### The `SYSTEM` Table
+
+- `SYSTEM.OS`: The operating system (`linux`, `macos`, `windows`, `freebsd`, `openbsd`).
+- `SYSTEM.ARCH`: The CPU architecture (`amd64`, `arm64`).
+- `SYSTEM.DISTRO`: (Linux only) The distribution ID (e.g. `ubuntu`, `arch`).
+- `SYSTEM.MANAGER`: The detected native package manager (e.g. `apt`, `pacman`).
+
+### The `ZOI` Table
+
+- `ZOI.VERSION`: The version of the package being built (resolved from metadata).
+- `ZOI.PATH.user`: Path to Zoi's user directory (`~/.zoi`).
+- `ZOI.PATH.system`: Path to Zoi's system-wide binary directory.
+
+---
+
+## Core Functions
+
+### `zcp(source, destination)`
+
+Stages a file or directory to be included in the final package.
+
+- **Source**: Path relative to `BUILD_DIR`, or use `${pkgluadir}` for files next to the script.
+- **Destination**: Use variables like `${pkgstore}`, `${usrroot}`, or `${usrhome}`.
+
+### `zrm(path)`
+
+Used in the `uninstall()` function to remove files or directories outside of the package store.
+
+### `cmd(command)`
+
+Executes a shell command within the `BUILD_DIR`. Returns the command's standard output as a string.
+
+### `IMPORT(file_name)`
+
+Reads and returns the content of a file located in the same directory as the `.pkg.lua` script.
+
+- If the file ends in `.json`, `.yaml`, or `.toml`, it is automatically parsed into a Lua table.
+
+### `INCLUDE(file_name)`
+
+Executes another Lua script located in the same directory. Useful for sharing logic between packages.
+
+---
+
+## Utility Tables (`UTILS`)
+
+### `UTILS.FETCH`
+
+- `UTILS.FETCH.url(url)`: Fetches the content of a URL as a string.
+- `UTILS.FETCH.<PROVIDER>.LATEST.<TYPE>({ repo, domain, branch })`
+  - **Providers**: `GITHUB`, `GITLAB`, `GITEA`, `FORGEJO`.
+  - **Types**: `tag`, `release`, `commit`.
+  - **Example**: `local tag = UTILS.FETCH.GITHUB.LATEST.release({ repo = "Zillowe/Zoi" })`
+
+### `UTILS.PARSE`
+
+- `UTILS.PARSE.json(string)`: Parses a JSON string into a Lua table.
+- `UTILS.PARSE.yaml(string)`: Parses a YAML string into a Lua table.
+- `UTILS.PARSE.toml(string)`: Parses a TOML string into a Lua table.
+- `UTILS.PARSE.checksumFile(content, filename)`: Extracts a checksum for a specific file from a standard checksum file string.
+
+### `UTILS.FILE(url, path)`
+
+Downloads a file from a URL directly to the specified local path.
+
+### `UTILS.FS`
+
+- `UTILS.FS.exists(path)`: Returns `true` if the path exists.
+
+### `UTILS.FIND`
+
+- `UTILS.FIND.file(dir, name)`: Recursively searches for a file within a directory inside `BUILD_DIR` and returns its relative path.
+
+### `UTILS.EXTRACT(source, out_dir)`
+
+Downloads (if URL) and extracts an archive (`.zip`, `.tar.gz`, `.tar.xz`, `.tar.zst`) into `BUILD_DIR/out_dir`.
+
+---
+
+## Security Functions
+
+### `verifyHash(file_path, "algo-hash")`
+
+Verifies a file's integrity. Supported algorithms: `sha512`, `sha256`, `md5`.
+
+- **Example**: `verifyHash(file, "sha256-abc123...")`
+
+### `verifySignature(file_path, sig_path, key_name_or_url)`
+
+Verifies a PGP detached signature.
+
+### `addPgpKey(url_or_path, name)`
+
+Adds a PGP key to Zoi's keyring for use in `verifySignature`.
