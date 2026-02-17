@@ -19,7 +19,7 @@ The Security Policy can be found online at [zillowe.qzz.io/docs/book/guidelines/
 | [Crates.io `zoi-rs`](https://crates.io/crates/zoi-rs)                                     | ✔️        |
 | [Docker Image (GitLab)](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/container_registry)  | ✔️        |
 | [Fedora `zoi-rs`](https://github.com/terrapkg/packages/tree/frawhide/anda/langs/rust/zoi) | ❌        |
-| NPM `@zillowe/zoi`                                                                        | ❌        |
+| [NPM `@zillowe/zoi`](https://www.npmjs.com/package/@zillowe/zoi)                          | ❌        |
 
 The NPM package just runs the installer script.
 
