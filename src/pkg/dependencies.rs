@@ -3,7 +3,7 @@ use crate::utils;
 use anyhow::{Result, anyhow};
 use colored::*;
 use dialoguer::{Select, theme::ColorfulTheme};
-use indicatif::MultiProgress;
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use regex::Regex;
 use semver::VersionReq;
 use std::collections::HashSet;
@@ -97,34 +97,68 @@ pub fn install_dependency(
         return Ok(());
     }
 
-    let version_info = dep
-        .version_str
-        .as_ref()
-        .map_or("any".to_string(), |r| r.to_string());
-    println!(
-        "-> Checking dependency: {} (version: {}) via {}",
-        dep.package.cyan(),
-        version_info.yellow(),
-        dep.manager.yellow()
-    );
+    let pb_style = ProgressStyle::default_bar()
+        .template("{spinner:.green} {msg:30.cyan} [{bar:40.cyan/blue}] {percent}%")?
+        .progress_chars("#>-");
+
+    let pb = if let Some(m_inner) = m {
+        let pb = m_inner.add(ProgressBar::new(100));
+        pb.set_style(pb_style);
+        let version_info = dep
+            .version_str
+            .as_ref()
+            .map_or("any".to_string(), |r| r.to_string());
+        pb.set_message(format!("{}: {}:{}", dep.manager, dep.package, version_info));
+        Some(pb)
+    } else {
+        let version_info = dep
+            .version_str
+            .as_ref()
+            .map_or("any".to_string(), |r| r.to_string());
+        println!(
+            "-> Checking dependency: {} (version: {}) via {}",
+            dep.package.cyan(),
+            version_info.yellow(),
+            dep.manager.yellow()
+        );
+        None
+    };
 
     installed_deps.push(dep_id.clone());
 
     if dep.manager == "zoi" {
-        return install_zoi_dependency(dep, parent_id, scope, yes, all_optional, processed_deps, m);
+        let res =
+            install_zoi_dependency(dep, parent_id, scope, yes, all_optional, processed_deps, m);
+        if let Some(p) = pb {
+            p.finish();
+        }
+        return res;
     }
 
     if let Some(pm_commands) = pm::MANAGERS.get(dep.manager) {
         if let Some(check_cmd_template) = pm_commands.is_installed {
             let check_cmd = check_cmd_template.replace("{package}", dep.package);
             if utils::run_shell_command(&check_cmd).is_ok() {
-                println!("Already installed. Skipping.");
+                if let Some(p) = pb {
+                    p.set_message(format!("{} (already installed)", dep.package));
+                    p.finish();
+                } else {
+                    println!("Already installed. Skipping.");
+                }
                 return Ok(());
             }
         }
 
+        if let Some(p) = &pb {
+            p.set_position(20);
+        }
+
         if dep.manager == "aur" {
-            return install_aur_dependency(dep, yes);
+            let res = install_aur_dependency(dep, yes);
+            if let Some(p) = pb {
+                p.finish();
+            }
+            return res;
         }
 
         let package_with_version = if let Some(v) = &dep.version_str {
@@ -151,14 +185,26 @@ pub fn install_dependency(
             ));
         }
 
-        println!("Running install command: {}", install_cmd.italic());
-        utils::run_shell_command(&install_cmd)
+        if pb.is_none() {
+            println!("Running install command: {}", install_cmd.italic());
+        }
+        let res = utils::run_shell_command(&install_cmd);
+        if let Some(p) = pb {
+            p.set_position(100);
+            p.finish();
+        }
+        res
     } else if dep.manager == "native" {
         let pm = utils::get_native_package_manager()
             .ok_or_else(|| anyhow!("Native package manager not found for this OS"))?;
-        println!("-> Using native package manager: {}", pm.cyan());
+        if pb.is_none() {
+            println!("-> Using native package manager: {}", pm.cyan());
+        }
         let native_dep_str = format!("{}:{}", pm, dep.package);
         let native_dep = parse_dependency_string(&native_dep_str)?;
+        if let Some(p) = pb {
+            p.finish_and_clear();
+        }
         install_dependency(
             &native_dep,
             parent_id,
@@ -341,8 +387,8 @@ pub fn prompt_for_options(
 
     for group in option_groups {
         println!(
-            "[{}] There are {} options available for {}",
-            group.name.bold(),
+            "{} There are {} options available for {}:",
+            "::".bold().blue(),
             group.depends.len(),
             group.desc.italic()
         );
@@ -425,7 +471,11 @@ pub fn prompt_for_optionals(
     let type_str = dep_type.map(|s| format!("{} ", s)).unwrap_or_default();
 
     if yes || all_optional {
-        println!("Installing all optional {}dependencies...", type_str);
+        println!(
+            "{} Installing all optional {}dependencies...",
+            "::".bold().blue(),
+            type_str
+        );
         return Ok(deps.to_vec());
     }
 

@@ -5,14 +5,14 @@ use crate::pkg::{
 };
 use anyhow::{Result, anyhow};
 use colored::Colorize;
-use indicatif::MultiProgress;
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use std::fs;
 use std::path::{Path, PathBuf};
 
 pub fn download_and_cache_archive(
     node: &InstallNode,
     details: &plan::PrebuiltDetails,
-    m: Option<&MultiProgress>,
+    pb: Option<&ProgressBar>,
 ) -> Result<PathBuf> {
     let _pkg = &node.pkg;
     let config = config::read_config()?;
@@ -32,26 +32,31 @@ pub fn download_and_cache_archive(
     let cached_sig_path = archive_cache_root.join(&sig_filename);
 
     if cached_archive_path.exists() {
-        println!("Using cached archive: {}", cached_archive_path.display());
+        if pb.is_none() {
+            println!("Using cached archive: {}", cached_archive_path.display());
+        }
     } else {
         let temp_dir = tempfile::Builder::new().prefix("zoi-dl-").tempdir()?;
         let temp_archive_path = temp_dir.path().join(archive_filename);
 
-        if util::download_file_with_progress(
+        util::download_file_with_progress(
             &details.info.final_url,
             &temp_archive_path,
-            m,
+            pb,
             Some(details.download_size),
         )
-        .is_err()
-        {
-            return Err(anyhow!("Failed to download archive"));
-        }
+        .map_err(|e| {
+            anyhow!(
+                "Failed to download package archive from {}: {}",
+                details.info.final_url,
+                e
+            )
+        })?;
 
         if let Some(hash_url) = &details.info.hash_url
-            && let Ok(hash) = util::get_expected_hash(hash_url)
+            && let Ok(hash) = util::get_expected_hash(hash_url, Some(archive_filename))
             && !hash.is_empty()
-            && !util::verify_file_hash(&temp_archive_path, &hash).unwrap_or(false)
+            && !util::verify_file_hash(&temp_archive_path, &hash, pb).unwrap_or(false)
         {
             return Err(anyhow!("Hash verification failed"));
         }
@@ -59,9 +64,8 @@ pub fn download_and_cache_archive(
         if let Some(policy) = &signature_policy {
             if let Some(pgp_url) = &details.info.pgp_url {
                 let temp_sig_path = temp_dir.path().join(&sig_filename);
-                if util::download_file_with_progress(pgp_url, &temp_sig_path, m, None).is_err() {
-                    return Err(anyhow!("Failed to download signature"));
-                }
+                util::download_file_with_progress(pgp_url, &temp_sig_path, pb, None)
+                    .map_err(|e| anyhow!("Failed to download signature from {}: {}", pgp_url, e))?;
 
                 println!("Verifying signature...");
                 let trusted_certs = pgp::get_certs_by_name_or_fingerprint(&policy.trusted_keys)?;
@@ -92,42 +96,94 @@ pub fn download_and_cache_archive(
 pub fn install_node(
     node: &InstallNode,
     action: &plan::InstallAction,
-    _m: Option<&MultiProgress>,
+    m: Option<&MultiProgress>,
     build_type: Option<&str>,
     yes: bool,
 ) -> Result<types::InstallManifest> {
     let pkg = &node.pkg;
     let version = &node.version;
     let handle = &node.registry_handle;
+    let is_direct = matches!(node.reason, types::InstallReason::Direct);
 
-    if let Some(hooks) = &pkg.hooks
-        && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PreInstall)
-    {
-        return Err(anyhow!("Pre-install hook failed for '{}': {}", pkg.name, e));
+    let pb_style = ProgressStyle::default_bar()
+        .template("{spinner:.green} {msg:30.cyan} [{bar:40.cyan/blue}] {percent}%")?
+        .progress_chars("#>-");
+
+    let main_pb = if let Some(m_inner) = m {
+        if !is_direct {
+            let pb = m_inner.add(ProgressBar::new(100));
+            pb.set_style(pb_style.clone());
+            let name = if let Some(sub) = &node.sub_package {
+                format!("{}:{}", pkg.name, sub)
+            } else {
+                pkg.name.clone()
+            };
+            pb.set_message(format!("zoi: @{}:{}", name, version));
+            Some(pb)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let step_pb = if is_direct && let Some(m_inner) = m {
+        let pb = m_inner.add(ProgressBar::new(100));
+        pb.set_style(pb_style);
+        Some(pb)
+    } else {
+        None
+    };
+
+    if let Some(hooks) = &pkg.hooks {
+        if let Some(pb) = &step_pb {
+            pb.set_message("Running pre-install hooks...");
+        }
+        hooks::run_hooks(hooks, hooks::HookType::PreInstall)?;
     }
 
     let request = resolve::parse_source_string(&node.source)?;
     let sub_package_to_install = request.sub_package;
-
     let sub_packages_vec = sub_package_to_install.clone().map(|s| vec![s]);
 
     let installed_files = match action {
-        plan::InstallAction::DownloadAndInstall(_) => {
-            unreachable!("Download should have been handled before install_node")
+        plan::InstallAction::DownloadAndInstall(details) => {
+            if let Some(pb) = &step_pb {
+                pb.set_message("Downloading package...");
+            }
+            let archive_path = download_and_cache_archive(node, details, step_pb.as_ref())?;
+            if let Some(pb) = &step_pb {
+                pb.set_message("Installing package...");
+                pb.set_position(0);
+            }
+            crate::pkg::package::install::run(
+                &archive_path,
+                Some(pkg.scope),
+                &node.registry_handle,
+                Some(&node.version),
+                yes,
+                sub_packages_vec,
+                step_pb.as_ref().or(main_pb.as_ref()),
+            )?
         }
-        plan::InstallAction::InstallFromArchive(archive_path) => crate::pkg::package::install::run(
-            archive_path,
-            Some(pkg.scope),
-            &node.registry_handle,
-            Some(&node.version),
-            yes,
-            sub_packages_vec,
-        )?,
+        plan::InstallAction::InstallFromArchive(archive_path) => {
+            if let Some(pb) = &step_pb {
+                pb.set_message("Installing package...");
+            }
+            crate::pkg::package::install::run(
+                archive_path,
+                Some(pkg.scope),
+                &node.registry_handle,
+                Some(&node.version),
+                yes,
+                sub_packages_vec,
+                step_pb.as_ref().or(main_pb.as_ref()),
+            )?
+        }
         plan::InstallAction::BuildAndInstall => {
-            println!(
-                "{}",
-                "Could not find a pre-built package. Building from source...".yellow()
-            );
+            if let Some(pb) = &step_pb {
+                pb.set_message("Building package...");
+            }
             let pkg_lua_path = Path::new(&node.source);
             prebuilt::try_build_install(
                 pkg_lua_path,
@@ -136,6 +192,7 @@ pub fn install_node(
                 build_type,
                 yes,
                 sub_package_to_install.clone(),
+                step_pb.as_ref().or(main_pb.as_ref()),
             )?
         }
     };
@@ -145,11 +202,18 @@ pub fn install_node(
         local::add_dependent(&package_dir, parent)?;
     }
 
-    if let Err(e) = post_install::install_manual_if_available(pkg, version, handle) {
-        eprintln!(
+    if let Err(e) =
+        post_install::install_manual_if_available(pkg, version, handle, step_pb.as_ref())
+    {
+        let msg = format!(
             "Warning: failed to install manual for '{}': {}",
             pkg.name, e
         );
+        if let Some(p) = &step_pb {
+            p.println(msg);
+        } else {
+            eprintln!("{}", msg);
+        }
     }
 
     let manifest = manifest::create_manifest(
@@ -181,14 +245,18 @@ pub fn install_node(
         );
     }
 
-    if let Some(hooks) = &pkg.hooks
-        && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PostInstall)
-    {
-        return Err(anyhow!(
-            "Post-install hook failed for '{}': {}",
-            pkg.name,
-            e
-        ));
+    if let Some(hooks) = &pkg.hooks {
+        if let Some(pb) = &step_pb {
+            pb.set_message("Running post-install hooks...");
+        }
+        hooks::run_hooks(hooks, hooks::HookType::PostInstall)?;
+    }
+
+    if let Some(pb) = main_pb {
+        pb.finish();
+    }
+    if let Some(pb) = step_pb {
+        pb.finish();
     }
 
     util::send_telemetry("install", pkg, handle);

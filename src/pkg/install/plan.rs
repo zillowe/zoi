@@ -11,6 +11,7 @@ use std::path::PathBuf;
 pub struct PrebuiltDetails {
     pub info: types::PrebuiltInfo,
     pub download_size: u64,
+    pub installed_size: u64,
 }
 
 #[derive(Clone)]
@@ -28,22 +29,23 @@ pub fn create_install_plan(
         .map(|(id, node)| {
             let action = match util::find_prebuilt_info(node) {
                 Ok(Some(info)) => {
-                    let size = if let Some(size_url) = &info.size_url {
+                    let (down_size, inst_size) = if let Some(size_url) = &info.size_url {
                         util::get_expected_size(size_url).unwrap_or_else(|e| {
                             eprintln!(
                                 "Warning: could not fetch size for {}: {}. Falling back to metadata.",
                                 node.pkg.name,
                                 e
                             );
-                            node.pkg.archive_size.unwrap_or(0)
+                            (node.pkg.archive_size.unwrap_or(0), node.pkg.installed_size.unwrap_or(0))
                         })
                     } else {
-                        node.pkg.archive_size.unwrap_or(0)
+                        (node.pkg.archive_size.unwrap_or(0), node.pkg.installed_size.unwrap_or(0))
                     };
 
                     InstallAction::DownloadAndInstall(PrebuiltDetails {
                         info,
-                        download_size: size,
+                        download_size: down_size,
+                        installed_size: inst_size,
                     })
                 }
                 Ok(None) => InstallAction::BuildAndInstall,

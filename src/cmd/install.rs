@@ -1,10 +1,10 @@
-use crate::pkg::{self, config, install, local, lock, transaction, types};
+use crate::pkg::{config, install, lock, transaction, types};
 use crate::project;
 use anyhow::{Result, anyhow};
 use colored::Colorize;
 use indicatif::MultiProgress;
 use rayon::prelude::*;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::sync::Mutex;
 
 pub fn run(
@@ -97,7 +97,7 @@ pub fn run(
     let successfully_installed_sources = Mutex::new(Vec::new());
     let installed_manifests = Mutex::new(Vec::new());
 
-    println!("{}", "Resolving dependencies...".bold());
+    println!("{} Resolving dependencies...", "::".bold().blue());
 
     let (graph, non_zoi_deps) = install::resolver::resolve_dependency_graph(
         &final_sources,
@@ -109,129 +109,110 @@ pub fn run(
         true,
     )?;
 
+    let mut direct_packages = Vec::new();
+    let mut dependencies = Vec::new();
+
+    for node in graph.nodes.values() {
+        if matches!(node.reason, types::InstallReason::Direct) {
+            direct_packages.push(node);
+        } else {
+            dependencies.push(node);
+        }
+    }
+
+    direct_packages.sort_by(|a, b| a.pkg.name.cmp(&b.pkg.name));
+    dependencies.sort_by(|a, b| a.pkg.name.cmp(&b.pkg.name));
+
+    println!("{} Looking for conflicts...", "::".bold().blue());
     let packages_to_install: Vec<&types::Package> = graph.nodes.values().map(|n| &n.pkg).collect();
-
-    let mut packages_to_replace = std::collections::HashSet::new();
-    if let Ok(installed_packages) = local::get_installed_packages() {
-        for pkg in &packages_to_install {
-            if let Some(replaces) = &pkg.replaces {
-                for replaced_pkg_name in replaces {
-                    if installed_packages
-                        .iter()
-                        .any(|p| &p.name == replaced_pkg_name)
-                    {
-                        packages_to_replace.insert(replaced_pkg_name.clone());
-                    }
-                }
-            }
-        }
-    }
-
-    if !packages_to_replace.is_empty() {
-        println!("\nThe following packages will be replaced:");
-        for pkg_name in &packages_to_replace {
-            println!("- {}", pkg_name);
-        }
-        if !crate::utils::ask_for_confirmation(
-            "\nDo you want to continue with the replacement?",
-            yes,
-        ) {
-            return Ok(());
-        }
-    }
-
-    println!("{}", "Looking for conflicts...".bold());
     install::util::check_for_conflicts(&packages_to_install, yes)?;
 
     let m_for_conflict_check = MultiProgress::new();
     install::util::check_file_conflicts(&graph, yes, &m_for_conflict_check)?;
     let _ = m_for_conflict_check.clear();
 
+    println!("{} Checking available disk space...", "::".bold().blue());
     let install_plan = install::plan::create_install_plan(&graph.nodes)?;
 
-    let mut to_download = HashMap::new();
-    let mut to_build = HashMap::new();
+    let mut total_download_size: u64 = 0;
+    let mut total_installed_size: u64 = 0;
+    let mut unique_downloads = HashSet::new();
 
     for (id, node) in &graph.nodes {
         match install_plan.get(id) {
             Some(install::plan::InstallAction::DownloadAndInstall(details)) => {
-                to_download.insert(id.clone(), (node, details.clone()));
+                if unique_downloads.insert(details.info.final_url.clone()) {
+                    total_download_size += details.download_size;
+                }
+                total_installed_size += if details.installed_size > 0 {
+                    details.installed_size
+                } else {
+                    node.pkg.installed_size.unwrap_or(0)
+                };
             }
             Some(install::plan::InstallAction::BuildAndInstall) => {
-                to_build.insert(id.clone(), node);
+                total_installed_size += node.pkg.installed_size.unwrap_or(0);
             }
             _ => {}
         }
     }
 
-    let total_download_size: u64 = to_download.values().map(|(_, d)| d.download_size).sum();
-    let total_installed_size: u64 = to_download
-        .values()
-        .map(|(n, _)| n.pkg.installed_size.unwrap_or(0))
-        .sum();
+    println!(
+        "\n{} Packages ({}) {}",
+        "---".bold(),
+        direct_packages.len(),
+        "---".bold()
+    );
+    let direct_list: Vec<_> = direct_packages
+        .iter()
+        .map(|n| {
+            let name = if let Some(sub) = &n.sub_package {
+                format!("{}:{}", n.pkg.name, sub)
+            } else {
+                n.pkg.name.clone()
+            };
+            format!("@{}:{}", name, n.version).cyan().to_string()
+        })
+        .collect();
+    println!(" {}", direct_list.join("  "));
 
-    println!("\n--- Summary ---");
-
-    if !to_download.is_empty() {
-        println!("\nPackages to download:");
-        let pkg_list: Vec<_> = to_download
-            .values()
-            .map(|(n, _)| {
-                if let Some(sub) = &n.sub_package {
-                    format!("{}:{}@{}", n.pkg.name, sub, n.version)
-                } else {
-                    format!("{}@{}", n.pkg.name, n.version)
-                }
-            })
-            .collect();
-        println!("{}", pkg_list.join(" "));
+    if !dependencies.is_empty() || !non_zoi_deps.is_empty() {
         println!(
-            "Total Download Size:  {}",
+            "\n{} Dependencies ({}) {}",
+            "---".bold(),
+            dependencies.len() + non_zoi_deps.len(),
+            "---".bold()
+        );
+        let mut dep_list = Vec::new();
+        for n in &dependencies {
+            let name = if let Some(sub) = &n.sub_package {
+                format!("{}:{}", n.pkg.name, sub)
+            } else {
+                n.pkg.name.clone()
+            };
+            dep_list.push(format!("zoi: @{}:{}", name, n.version).dimmed().to_string());
+        }
+        for d in &non_zoi_deps {
+            dep_list.push(d.dimmed().to_string());
+        }
+        println!(" {}", dep_list.join("  "));
+    }
+
+    if total_download_size > 0 {
+        println!(
+            "\nTotal Download Size:  {}",
             crate::utils::format_bytes(total_download_size)
         );
-        println!(
-            "Total Installed Size: {}",
-            crate::utils::format_bytes(total_installed_size)
-        );
     }
+    println!(
+        "Total Installed Size: {}",
+        crate::utils::format_bytes(total_installed_size)
+    );
 
-    if !to_build.is_empty() {
-        println!("Packages to build from source:");
-        let pkg_list: Vec<_> = to_build
-            .values()
-            .map(|n| {
-                if let Some(sub) = &n.sub_package {
-                    format!("{}:{}@{}", n.pkg.name, sub, n.version)
-                } else {
-                    format!("{}@{}", n.pkg.name, n.version)
-                }
-            })
-            .collect();
-        println!("{}", pkg_list.join(" "));
-    }
-
-    if !non_zoi_deps.is_empty() {
-        println!("\nExternal dependencies:");
-        let pkg_list: Vec<_> = non_zoi_deps.iter().map(|d| d.cyan().to_string()).collect();
-        println!("{}", pkg_list.join(" "));
-    }
-
-    println!("\n{}", "Checking available disk space...".bold());
     let install_path = crate::pkg::local::get_store_base_dir(scope_override.unwrap_or_default())?;
-
     std::fs::create_dir_all(&install_path)?;
 
-    let available_space = match fs2::available_space(&install_path) {
-        Ok(space) => space,
-        Err(e) => {
-            eprintln!(
-                "{}: Could not check available disk space: {}",
-                "Warning".yellow().bold(),
-                e
-            );
-            u64::MAX
-        }
-    };
+    let available_space = fs2::available_space(&install_path).unwrap_or(u64::MAX);
 
     if total_installed_size > available_space {
         return Err(anyhow!(
@@ -241,231 +222,138 @@ pub fn run(
         ));
     }
 
-    if !crate::utils::ask_for_confirmation("\n:: Proceed with installation?", yes) {
+    if !crate::utils::ask_for_confirmation("\nProceed with installation?", yes) {
         let _ = lock::release_lock();
         return Ok(());
     }
 
-    let mut final_install_plan = install_plan.clone();
-
-    if !to_download.is_empty() {
-        println!("\n:: Downloading packages...");
-        let mut download_groups: HashMap<String, (&install::plan::PrebuiltDetails, Vec<&str>)> =
-            HashMap::new();
-
-        for (node, details) in to_download.values() {
-            let entry = download_groups
-                .entry(details.info.final_url.clone())
-                .or_insert((details, Vec::new()));
-            if let Some(sub) = &node.sub_package {
-                entry.1.push(sub);
-            }
-        }
-
-        let downloaded_archives: Mutex<HashMap<String, std::path::PathBuf>> =
-            Mutex::new(HashMap::new());
-        let m_for_dl = MultiProgress::new();
-
-        download_groups.par_iter().for_each(|(url, (details, _))| {
-            let first_node = to_download
-                .values()
-                .find(|(_, d)| d.info.final_url == *url)
-                .unwrap()
-                .0;
-
-            match install::installer::download_and_cache_archive(
-                first_node,
-                details,
-                Some(&m_for_dl),
-            ) {
-                Ok(path) => {
-                    downloaded_archives
-                        .lock()
-                        .unwrap()
-                        .insert(url.clone(), path);
-                }
-                Err(e) => {
-                    eprintln!("Failed to download {}: {}", url, e);
-                    failed_packages.lock().unwrap().push(url.clone());
-                }
-            }
-        });
-
-        let downloaded_archives_map = downloaded_archives.lock().unwrap();
-        for (id, (_, details)) in &to_download {
-            if let Some(downloaded_path) = downloaded_archives_map.get(&details.info.final_url) {
-                final_install_plan.insert(
-                    id.clone(),
-                    install::plan::InstallAction::InstallFromArchive(downloaded_path.clone()),
-                );
-            }
-        }
-    }
-
     let stages = graph.toposort()?;
-
     let transaction = transaction::begin()?;
     let transaction_id = &transaction.id;
     let transaction_mutex = Mutex::new(());
 
-    for pkg_name in packages_to_replace {
-        println!("Replacing package: {}", pkg_name);
-        match pkg::uninstall::run(&pkg_name, None) {
-            Ok(uninstalled_manifest) => {
-                if let Err(e) = transaction::record_operation(
-                    &transaction.id,
-                    types::TransactionOperation::Uninstall {
-                        manifest: Box::new(uninstalled_manifest),
-                    },
+    if !dependencies.is_empty() || !non_zoi_deps.is_empty() {
+        println!(
+            "\n{} Installing dependencies {}",
+            "---".bold(),
+            "---".bold()
+        );
+        let m_deps = MultiProgress::new();
+
+        if !non_zoi_deps.is_empty() {
+            let processed_deps = Mutex::new(HashSet::new());
+            let mut installed_deps_ext = Vec::new();
+            for dep_str in &non_zoi_deps {
+                let dep = match crate::pkg::dependencies::parse_dependency_string(dep_str) {
+                    Ok(d) => d,
+                    Err(e) => {
+                        eprintln!("Error parsing dependency {}: {}", dep_str, e);
+                        continue;
+                    }
+                };
+
+                if let Err(e) = crate::pkg::dependencies::install_dependency(
+                    &dep,
+                    "direct",
+                    scope_override.unwrap_or_default(),
+                    yes,
+                    all_optional,
+                    &processed_deps,
+                    &mut installed_deps_ext,
+                    Some(&m_deps),
                 ) {
-                    eprintln!("Failed to record uninstall of replaced package: {}", e);
+                    eprintln!("Failed to install dependency {}: {}", dep_str, e);
                 }
             }
-            Err(e) => {
-                eprintln!("Failed to uninstall replaced package '{}': {}", pkg_name, e);
-            }
+        }
+
+        for stage in &stages {
+            stage.par_iter().for_each(|pkg_id| {
+                let node = graph.nodes.get(pkg_id).unwrap();
+                if matches!(node.reason, types::InstallReason::Direct) {
+                    return;
+                }
+                let action = install_plan.get(pkg_id).unwrap();
+
+                match install::installer::install_node(
+                    node,
+                    action,
+                    Some(&m_deps),
+                    build_type.as_deref(),
+                    yes,
+                ) {
+                    Ok(manifest) => {
+                        let _lock = transaction_mutex.lock().unwrap();
+                        let _ = transaction::record_operation(
+                            transaction_id,
+                            types::TransactionOperation::Install {
+                                manifest: Box::new(manifest),
+                            },
+                        );
+                    }
+                    Err(e) => {
+                        failed_packages.lock().unwrap().push(node.pkg.name.clone());
+                        eprintln!("Error installing {}: {}", node.pkg.name, e);
+                    }
+                }
+            });
         }
     }
 
-    println!("\n:: Starting installation...");
-    let mut overall_success = true;
-    let m = MultiProgress::new();
-
-    for (i, stage) in stages.iter().enumerate() {
-        println!(
-            ":: Installing Stage {}/{} ({} packages)",
-            i + 1,
-            stages.len(),
-            stage.len()
-        );
-
-        stage.par_iter().for_each(|pkg_id| {
+    println!("\n{} Installing packages {}", "---".bold(), "---".bold());
+    for stage in &stages {
+        for pkg_id in stage {
             let node = graph.nodes.get(pkg_id).unwrap();
-            let action = final_install_plan.get(pkg_id).unwrap();
+            if !matches!(node.reason, types::InstallReason::Direct) {
+                continue;
+            }
+            let name = if let Some(sub) = &node.sub_package {
+                format!("{}:{}", node.pkg.name, sub)
+            } else {
+                node.pkg.name.clone()
+            };
+            println!(" @{}:{}", name, node.version);
+
+            let action = install_plan.get(pkg_id).unwrap();
+            let m_pkg = MultiProgress::new();
 
             match install::installer::install_node(
                 node,
                 action,
-                Some(&m),
+                Some(&m_pkg),
                 build_type.as_deref(),
                 yes,
             ) {
                 Ok(manifest) => {
-                    println!("Successfully installed {}", node.pkg.name.green());
                     installed_manifests.lock().unwrap().push(manifest.clone());
-
-                    let _lock = transaction_mutex.lock().unwrap();
-                    if let Err(e) = transaction::record_operation(
+                    let _ = transaction::record_operation(
                         transaction_id,
                         types::TransactionOperation::Install {
                             manifest: Box::new(manifest),
                         },
-                    ) {
-                        eprintln!(
-                            "Error: Failed to record transaction operation for {}: {}",
-                            node.pkg.name, e
-                        );
-                        failed_packages.lock().unwrap().push(node.pkg.name.clone());
-                    }
-
-                    if matches!(node.reason, types::InstallReason::Direct) {
-                        successfully_installed_sources
-                            .lock()
-                            .unwrap()
-                            .push(node.source.clone());
-                    }
+                    );
+                    successfully_installed_sources
+                        .lock()
+                        .unwrap()
+                        .push(node.source.clone());
                 }
                 Err(e) => {
-                    eprintln!(
-                        "{}: Failed to install {}: {}",
-                        "Error".red().bold(),
-                        node.pkg.name,
-                        e
-                    );
                     failed_packages.lock().unwrap().push(node.pkg.name.clone());
+                    eprintln!("Error: {}", e);
                 }
             }
-        });
-
-        let failed = failed_packages.lock().unwrap();
-        if !failed.is_empty() {
-            eprintln!(
-                "\n{}: Installation failed at stage {}.",
-                "Error".red().bold(),
-                i + 1
-            );
-            overall_success = false;
-            break;
         }
     }
 
-    if !overall_success {
-        let failed_list = failed_packages.into_inner().unwrap();
-        eprintln!(
-            "\n{}: The following packages failed to install:",
-            "Error".red().bold()
-        );
-        for pkg in &failed_list {
-            eprintln!("  - {}", pkg);
-        }
-
-        eprintln!("\n{} Rolling back changes...", "---".yellow().bold());
-        if let Err(e) = transaction::rollback(&transaction.id) {
-            eprintln!("\nCRITICAL: Rollback failed: {}", e);
-            eprintln!(
-                "The system may be in an inconsistent state. The transaction log is at ~/.zoi/transactions/{}.json",
-                transaction.id
-            );
-        } else {
-            println!("\n{} Rollback successful.", "Success:".green().bold());
-        }
-
-        return Err(anyhow!(
-            "Installation failed for: {}",
-            failed_list.join(", ")
-        ));
+    let failed = failed_packages.lock().unwrap();
+    if !failed.is_empty() {
+        println!("\n{} Rolling back changes...", "---".yellow().bold());
+        transaction::rollback(&transaction.id)?;
+        return Err(anyhow!("Installation failed for: {}", failed.join(", ")));
     }
 
     if let Err(e) = transaction::commit(&transaction.id) {
         eprintln!("Warning: Failed to commit transaction: {}", e);
-    }
-
-    if !non_zoi_deps.is_empty() {
-        println!("\n:: Installing external dependencies...");
-        let processed_deps = Mutex::new(HashSet::new());
-        let mut installed_deps_ext = Vec::new();
-        for dep_str in &non_zoi_deps {
-            let dep = match crate::pkg::dependencies::parse_dependency_string(dep_str) {
-                Ok(d) => d,
-                Err(e) => {
-                    eprintln!(
-                        "{}: Could not parse dependency string '{}': {}",
-                        "Error".red().bold(),
-                        dep_str,
-                        e
-                    );
-                    continue;
-                }
-            };
-
-            if let Err(e) = crate::pkg::dependencies::install_dependency(
-                &dep,
-                "direct",
-                scope_override.unwrap_or_default(),
-                yes,
-                all_optional,
-                &processed_deps,
-                &mut installed_deps_ext,
-                Some(&m),
-            ) {
-                eprintln!(
-                    "{}: Failed to install external dependency {}: {}",
-                    "Error".red().bold(),
-                    dep_str,
-                    e
-                );
-            }
-        }
     }
 
     let is_any_project_install = scope_override == Some(types::Scope::Project);
@@ -604,5 +492,13 @@ pub fn run(
         println!();
         project::verify::run()?;
     }
+
+    println!("\n{} Done {}", "---".bold(), "---".bold());
+    println!(
+        "Installed ({}) packages and ({}) dependencies.",
+        direct_packages.len(),
+        dependencies.len() + non_zoi_deps.len()
+    );
+
     Ok(())
 }

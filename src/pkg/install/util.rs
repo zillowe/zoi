@@ -140,12 +140,12 @@ pub fn get_filename_from_url(url: &str) -> &str {
 pub fn download_file_with_progress(
     url: &str,
     dest_path: &Path,
-    m: Option<&MultiProgress>,
+    pb_override: Option<&ProgressBar>,
     expected_size: Option<u64>,
 ) -> Result<()> {
     if url.starts_with("http://") {
         let msg = format!("downloading over insecure HTTP: {}", url);
-        if m.is_none() {
+        if pb_override.is_none() {
             println!("{}: {}", "Warning:".yellow(), msg);
         }
     }
@@ -154,14 +154,18 @@ pub fn download_file_with_progress(
         .template("{spinner:.green} {msg:30.cyan.bold} [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {elapsed_precise})")?
         .progress_chars("=>-");
 
-    let mut pb = if let Some(m) = m {
-        let pb = m.add(ProgressBar::new(expected_size.unwrap_or(0)));
-        pb.set_style(pb_style.clone());
-        pb.set_message(format!("Connecting to {}", get_filename_from_url(url)));
-        pb
+    let mut internal_pb = None;
+    let pb = if let Some(p) = pb_override {
+        p.set_style(pb_style.clone());
+        p.set_length(expected_size.unwrap_or(0));
+        p.set_message(format!("Downloading {}", get_filename_from_url(url)));
+        p
     } else {
-        println!("Downloading from: {url}");
-        ProgressBar::new(expected_size.unwrap_or(0))
+        let p = ProgressBar::new(expected_size.unwrap_or(0));
+        p.set_style(pb_style);
+        p.set_message(format!("Downloading {}", get_filename_from_url(url)));
+        internal_pb = Some(p);
+        internal_pb.as_ref().unwrap()
     };
 
     let client = crate::utils::build_blocking_http_client(60)?;
@@ -175,11 +179,7 @@ pub fn download_file_with_progress(
     let mut request = client.get(url);
     if partial_size > 0 {
         let msg = format!("Resuming download from byte {}", partial_size);
-        if m.is_some() {
-            pb.set_message(msg);
-        } else {
-            println!("{}", msg);
-        }
+        pb.set_message(msg);
         request = request.header("Range", format!("bytes={}-", partial_size));
     }
 
@@ -194,11 +194,7 @@ pub fn download_file_with_progress(
             Err(e) => {
                 if attempt < 3 {
                     let msg = format!("Download failed ({}). Retrying...", e);
-                    if m.is_some() {
-                        pb.set_message(msg);
-                    } else {
-                        eprintln!("{}: {}", "Network".yellow(), msg);
-                    }
+                    pb.set_message(msg);
                     crate::utils::retry_backoff_sleep(attempt);
                     continue;
                 } else {
@@ -232,13 +228,6 @@ pub fn download_file_with_progress(
         partial_size + response.content_length().unwrap_or(0)
     };
 
-    if m.is_none() {
-        let new_pb = ProgressBar::new(total_size);
-        new_pb.set_style(pb_style);
-        pb.finish_and_clear();
-        let _ = std::mem::replace(&mut pb, new_pb);
-    }
-
     pb.set_length(total_size);
     pb.set_position(partial_size);
     pb.set_message(format!("Downloading {}", get_filename_from_url(url)));
@@ -259,26 +248,61 @@ pub fn download_file_with_progress(
         dest_file.write_all(&buffer[..bytes_read])?;
         pb.inc(bytes_read as u64);
     }
-    pb.finish_with_message(format!("Downloaded {}", get_filename_from_url(url)));
+
+    if let Some(p) = internal_pb {
+        p.finish_and_clear();
+        println!("Downloaded {}", get_filename_from_url(url));
+    }
     Ok(())
 }
 
-pub fn verify_file_hash(file_path: &Path, expected_hash: &str) -> Result<bool> {
-    println!("Verifying hash for {}...", file_path.display());
+pub fn verify_file_hash(
+    file_path: &Path,
+    expected_hash: &str,
+    pb: Option<&ProgressBar>,
+) -> Result<bool> {
     let mut file = File::open(file_path)?;
     let mut hasher = Sha512::new();
     std::io::copy(&mut file, &mut hasher)?;
     let actual_hash = hex::encode(hasher.finalize());
-    let result = actual_hash.eq_ignore_ascii_case(expected_hash);
+
+    let expected_clean = expected_hash.trim().to_lowercase();
+    let actual_clean = actual_hash.trim().to_lowercase();
+
+    let result = actual_clean == expected_clean;
     if result {
-        println!("{}", "Hash verified successfully.".green());
-    } else {
-        println!(
-            "{}\nExpected: {}\nActual:   {}",
-            "Hash mismatch!".red(),
-            expected_hash,
-            actual_hash
+        let msg = format!(
+            "{} Hash verified: {}",
+            "::".bold().blue(),
+            expected_clean[..12].dimmed()
         );
+        if let Some(p) = pb {
+            p.println(msg);
+        } else {
+            println!("{}", msg);
+        }
+    } else {
+        let mut msg = format!("{}\n", "Hash verification failed!".red().bold());
+        msg.push_str(&format!("  Expected: {}\n", expected_clean.yellow()));
+        msg.push_str(&format!("  Actual:   {}\n", actual_clean.cyan()));
+        msg.push_str(&format!(
+            "  Lengths:  Expected={}, Actual={}",
+            expected_clean.len(),
+            actual_clean.len()
+        ));
+
+        if expected_clean.len() != 128 || actual_clean.len() != 128 {
+            msg.push_str(&format!(
+                "\n  {} One of the hashes is not 128 characters long (SHA-512 requirement).",
+                "Note:".bold().yellow()
+            ));
+        }
+
+        if let Some(p) = pb {
+            p.println(msg);
+        } else {
+            println!("{}", msg);
+        }
     }
     Ok(result)
 }
@@ -426,10 +450,34 @@ pub fn get_file_conflicts_from_archive(
     Ok(conflicts)
 }
 
-pub fn get_expected_hash(hash_url: &str) -> Result<String> {
-    println!("Fetching hash from: {}", hash_url);
+pub fn get_expected_hash(hash_url: &str, filename: Option<&str>) -> Result<String> {
     let client = crate::utils::build_blocking_http_client(10)?;
-    let resp = client.get(hash_url).send()?.text()?;
+    let resp = client
+        .get(hash_url)
+        .send()
+        .map_err(|e| anyhow!("Failed to fetch hash file from {}: {}", hash_url, e))?
+        .text()
+        .map_err(|e| anyhow!("Failed to read hash file content from {}: {}", hash_url, e))?;
+
+    let is_sha512 = |s: &str| s.len() == 128 && s.chars().all(|c| c.is_ascii_hexdigit());
+
+    if let Some(target_file) = filename {
+        for line in resp.lines() {
+            if line.contains(target_file) {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if let Some(hash) = parts.iter().find(|&&p| is_sha512(p)) {
+                    return Ok(hash.to_string());
+                }
+            }
+        }
+    }
+
+    for word in resp.split_whitespace() {
+        if is_sha512(word) {
+            return Ok(word.to_string());
+        }
+    }
+
     Ok(resp
         .split_whitespace()
         .next()
@@ -437,11 +485,42 @@ pub fn get_expected_hash(hash_url: &str) -> Result<String> {
         .to_string())
 }
 
-pub fn get_expected_size(size_url: &str) -> Result<u64> {
+pub fn get_expected_size(size_url: &str) -> Result<(u64, u64)> {
     let client = crate::utils::build_blocking_http_client(10)?;
-    let resp = client.get(size_url).send()?.text()?;
-    let size = resp.trim().parse::<u64>()?;
-    Ok(size)
+    let resp = client
+        .get(size_url)
+        .send()
+        .map_err(|e| anyhow!("Failed to fetch size file from {}: {}", size_url, e))?
+        .text()
+        .map_err(|e| anyhow!("Failed to read size file content from {}: {}", size_url, e))?;
+
+    let mut download_size = 0;
+    let mut installed_size = 0;
+    let mut found_fields = false;
+
+    for line in resp.lines() {
+        if let Some((key, val)) = line.split_once(':')
+            && let Ok(num) = val.trim().parse::<u64>()
+        {
+            match key.trim() {
+                "down" => {
+                    download_size = num;
+                    found_fields = true;
+                }
+                "install" => {
+                    installed_size = num;
+                    found_fields = true;
+                }
+                _ => {}
+            }
+        }
+    }
+
+    if !found_fields && let Ok(num) = resp.trim().parse::<u64>() {
+        download_size = num;
+    }
+
+    Ok((download_size, installed_size))
 }
 
 pub fn find_prebuilt_info(node: &InstallNode) -> Result<Option<types::PrebuiltInfo>> {
@@ -474,12 +553,22 @@ pub fn find_prebuilt_info(node: &InstallNode) -> Result<Option<types::PrebuiltIn
                     .replace("{arch}", arch)
                     .replace("{version}", &node.version)
                     .replace("{repo}", &pkg.repo)
+                    .replace("{name}", &pkg.name)
+                    .replace("{platform}", &platform)
             };
 
-            let url_dir = replace_vars(&pkg_link.url);
-            let archive_filename =
-                format!("{}-{}-{}.pkg.tar.zst", pkg.name, &node.version, platform);
-            let final_url = format!("{}/{}", url_dir.trim_end_matches('/'), archive_filename);
+            let final_url_base = replace_vars(&pkg_link.url);
+            let final_url = if final_url_base.ends_with(".pkg.tar.zst") {
+                final_url_base
+            } else {
+                let archive_filename =
+                    format!("{}-{}-{}.pkg.tar.zst", pkg.name, &node.version, platform);
+                format!(
+                    "{}/{}",
+                    final_url_base.trim_end_matches('/'),
+                    archive_filename
+                )
+            };
 
             let pgp_url = pkg_link.pgp.as_ref().map(|url| replace_vars(url));
             let hash_url = pkg_link.hash.as_ref().map(|url| replace_vars(url));

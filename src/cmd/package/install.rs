@@ -31,6 +31,7 @@ pub fn run(args: InstallCommand) -> Result<()> {
         None,
         args.yes,
         args.sub,
+        None,
     )?;
     Ok(())
 }

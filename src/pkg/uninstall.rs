@@ -139,6 +139,8 @@ pub fn run(
 
     let handle = registry_handle.as_deref().unwrap_or("local");
     let package_dir = local::get_package_dir(scope, handle, &pkg.repo, &pkg.name)?;
+    let version_dir = package_dir.join(&manifest.version);
+
     let dependents = local::get_dependents(&package_dir)?;
     if !dependents.is_empty() {
         return Err(anyhow::anyhow!(
@@ -180,7 +182,6 @@ pub fn run(
                 let mut path_to_remove: String =
                     op.get("path").map_err(|e| anyhow!(e.to_string()))?;
 
-                let version_dir = package_dir.join(&manifest.version);
                 path_to_remove =
                     path_to_remove.replace("${pkgstore}", &version_dir.to_string_lossy());
 
@@ -205,13 +206,6 @@ pub fn run(
 
     if let Some(backup_files) = &manifest.backup {
         println!("Saving configuration files...");
-        let version_dir = local::get_package_version_dir(
-            scope,
-            &manifest.registry_handle,
-            &manifest.repo,
-            &manifest.name,
-            &manifest.version,
-        )?;
         for backup_file_rel in backup_files {
             let backup_src = version_dir.join(backup_file_rel);
             if backup_src.exists() {
@@ -242,8 +236,13 @@ pub fn run(
     }
 
     println!(
-        "Uninstalling '{}' and its unused dependencies...",
-        pkg.name.bold()
+        "Uninstalling '{}'...",
+        if let Some(sub) = &manifest.sub_package {
+            format!("{}:{}", pkg.name, sub)
+        } else {
+            pkg.name.clone()
+        }
+        .bold()
     );
 
     if let Some(bins) = &manifest.bins {
@@ -256,7 +255,7 @@ pub fn run(
                 println!("{}", "Successfully removed symlink.".green());
             }
         }
-    } else {
+    } else if manifest.sub_package.is_none() {
         let symlink_path = get_bin_root(scope)?.join(&pkg.name);
         if symlink_path.is_symlink() || symlink_path.exists() {
             println!("Removing symlink from {}...", symlink_path.display());
@@ -264,6 +263,7 @@ pub fn run(
             println!("{}", "Successfully removed symlink.".green());
         }
     }
+
     for file_path_str in &manifest.installed_files {
         let file_path = PathBuf::from(file_path_str);
         if file_path.exists() {
@@ -275,16 +275,51 @@ pub fn run(
         }
     }
 
-    let package_dir = local::get_package_dir(
-        scope,
-        &manifest.registry_handle,
-        &manifest.repo,
-        &manifest.name,
-    )?;
+    let manifest_filename = if let Some(sub) = &manifest.sub_package {
+        format!("manifest-{}.yaml", sub)
+    } else {
+        "manifest.yaml".to_string()
+    };
+    let manifest_path = version_dir.join(manifest_filename);
+    if manifest_path.exists() {
+        fs::remove_file(manifest_path)?;
+    }
+
+    if version_dir.exists() {
+        let mut has_other_manifests = false;
+        if let Ok(entries) = fs::read_dir(&version_dir) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if name.starts_with("manifest") && name.ends_with(".yaml") {
+                    has_other_manifests = true;
+                    break;
+                }
+            }
+        }
+        if !has_other_manifests {
+            println!(
+                "Removing empty version directory: {}",
+                version_dir.display()
+            );
+            fs::remove_dir_all(&version_dir)?;
+        }
+    }
 
     if package_dir.exists() {
-        println!("Removing package store: {}", package_dir.display());
-        fs::remove_dir_all(&package_dir)?;
+        let mut has_other_versions = false;
+        if let Ok(entries) = fs::read_dir(&package_dir) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if name != "latest" && name != "dependents" {
+                    has_other_versions = true;
+                    break;
+                }
+            }
+        }
+        if !has_other_versions {
+            println!("Removing package store: {}", package_dir.display());
+            fs::remove_dir_all(&package_dir)?;
+        }
     }
     let parent_id = format!("#{}@{}", manifest.registry_handle, manifest.repo);
     for dep_str in &manifest.installed_dependencies {

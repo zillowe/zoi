@@ -3,6 +3,7 @@ use crate::utils::{self, copy_dir_all};
 use anyhow::{Result, anyhow};
 use colored::*;
 use std::fs::{self, File};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use tar::Archive;
 use tempfile::Builder;
@@ -78,19 +79,63 @@ pub fn run(
     version_override: Option<&str>,
     yes: bool,
     sub_packages: Option<Vec<String>>,
+    pb: Option<&indicatif::ProgressBar>,
 ) -> Result<Vec<String>> {
     let scope = scope_override.unwrap_or(types::Scope::User);
 
-    println!(
-        "Installing from package archive: {}",
-        package_file.display()
-    );
+    if pb.is_none() {
+        println!(
+            "Installing from package archive: {}",
+            package_file.display()
+        );
+    }
 
-    let file = File::open(package_file)?;
-    let decoder = ZstdDecoder::new(file)?;
+    let file_metadata =
+        fs::metadata(package_file).map_err(|e| anyhow!("Failed to get archive metadata: {}", e))?;
+    let file_size = file_metadata.len();
+
+    if pb.is_none() {
+        println!("Archive size: {}", crate::utils::format_bytes(file_size));
+    }
+
+    let mut file =
+        File::open(package_file).map_err(|e| anyhow!("Failed to open package archive: {}", e))?;
+
+    let mut magic = [0u8; 4];
+    if file.read_exact(&mut magic).is_ok() && magic != [0x28, 0xB5, 0x2F, 0xFD] {
+        return Err(anyhow!(
+            "Invalid archive format: expected zstd magic number 28 B5 2F FD, but found {:02X?}. This file is likely not a valid .zst archive.",
+            magic
+        ));
+    }
+    use std::io::Seek;
+    file.rewind()
+        .map_err(|e| anyhow!("Failed to rewind archive file: {}", e))?;
+
+    let decoder =
+        ZstdDecoder::new(file).map_err(|e| anyhow!("Failed to initialize zstd decoder: {}", e))?;
     let mut archive = Archive::new(decoder);
     let temp_dir = Builder::new().prefix("zoi-install-").tempdir()?;
-    archive.unpack(temp_dir.path())?;
+    let unpack_path = temp_dir.path().to_path_buf();
+
+    for entry_res in archive
+        .entries()
+        .map_err(|e| anyhow!("Failed to read archive entries: {}", e))?
+    {
+        let mut entry = entry_res.map_err(|e| {
+            anyhow!(
+                "Failed to process archive entry: {}. The archive may be truncated or corrupted.",
+                e
+            )
+        })?;
+        let path = entry
+            .path()
+            .map_err(|e| anyhow!("Failed to get entry path: {}", e))?
+            .to_path_buf();
+        entry
+            .unpack_in(&unpack_path)
+            .map_err(|e| anyhow!("Failed to unpack file '{}': {}", path.display(), e))?;
+    }
 
     let mut pkg_lua_path = None;
     for entry in WalkDir::new(temp_dir.path())
@@ -114,7 +159,7 @@ pub fn run(
         pkg_lua_path.to_str().unwrap(),
         &platform,
         version_override,
-        false,
+        true,
     )?;
     let version = metadata.version.as_ref().ok_or_else(|| {
         anyhow!(
@@ -123,11 +168,13 @@ pub fn run(
         )
     })?;
 
-    println!(
-        "Installing package: {} v{}",
-        metadata.name.cyan(),
-        version.yellow()
-    );
+    if pb.is_none() {
+        println!(
+            "Installing package: {} v{}",
+            metadata.name.cyan(),
+            version.yellow()
+        );
+    }
 
     let package_dir =
         local::get_package_dir(scope, registry_handle, &metadata.repo, &metadata.name)?;
@@ -138,10 +185,15 @@ pub fn run(
         .tempdir_in(&package_dir)?;
 
     let mut installed_files: Vec<String> = Vec::new();
+    let version_dir = package_dir.join(version);
 
     let data_dir = temp_dir.path().join("data");
     if data_dir.exists() {
-        println!("Copying package files...");
+        if let Some(p) = pb {
+            p.set_message("Installing package...");
+        } else {
+            println!("Installing package...");
+        }
 
         let subs_to_install = if let Some(subs) = sub_packages {
             subs
@@ -159,15 +211,19 @@ pub fn run(
             let sub_data_dir = if sub.is_empty() {
                 data_dir.clone()
             } else {
-                println!("Installing sub-package: {}", sub.bold());
+                if pb.is_none() {
+                    println!("Installing sub-package: {}", sub.bold());
+                }
                 data_dir.join(&sub)
             };
 
             if !sub_data_dir.exists() {
-                eprintln!(
-                    "Warning: sub-package '{}' not found in archive, skipping.",
-                    sub
-                );
+                if pb.is_none() {
+                    eprintln!(
+                        "Warning: sub-package '{}' not found in archive, skipping.",
+                        sub
+                    );
+                }
                 continue;
             }
 
@@ -189,10 +245,9 @@ pub fn run(
                 for entry in WalkDir::new(&usrroot_src)
                     .into_iter()
                     .filter_map(|e| e.ok())
-                    .skip(1)
                 {
-                    let dest_path = root_dest.join(entry.path().strip_prefix(&usrroot_src)?);
-                    if dest_path.is_file() {
+                    if entry.file_type().is_file() {
+                        let dest_path = root_dest.join(entry.path().strip_prefix(&usrroot_src)?);
                         installed_files.push(dest_path.to_string_lossy().to_string());
                     }
                 }
@@ -207,10 +262,9 @@ pub fn run(
                 for entry in WalkDir::new(&usrhome_src)
                     .into_iter()
                     .filter_map(|e| e.ok())
-                    .skip(1)
                 {
-                    let dest_path = home_dest.join(entry.path().strip_prefix(&usrhome_src)?);
-                    if dest_path.is_file() {
+                    if entry.file_type().is_file() {
+                        let dest_path = home_dest.join(entry.path().strip_prefix(&usrhome_src)?);
                         installed_files.push(dest_path.to_string_lossy().to_string());
                     }
                 }
@@ -218,19 +272,22 @@ pub fn run(
         }
     }
 
-    let version_dir = package_dir.join(version);
-    fs::create_dir_all(&version_dir)?;
+    if let Some(p) = pb {
+        p.set_position(60);
+    }
 
-    copy_dir_all(staging_dir.path(), &version_dir)?;
-
-    for entry in WalkDir::new(&version_dir)
+    for entry in WalkDir::new(staging_dir.path())
         .into_iter()
         .filter_map(|e| e.ok())
     {
         if entry.file_type().is_file() {
-            installed_files.push(entry.path().to_string_lossy().to_string());
+            let rel_path = entry.path().strip_prefix(staging_dir.path())?;
+            installed_files.push(version_dir.join(rel_path).to_string_lossy().to_string());
         }
     }
+
+    fs::create_dir_all(&version_dir)?;
+    copy_dir_all(staging_dir.path(), &version_dir)?;
 
     if let Some(bins) = &metadata.bins {
         let bin_root = get_bin_root(scope)?;
@@ -262,12 +319,14 @@ pub fn run(
                         fs::copy(target_path, &link_path)?;
                     }
 
-                    println!("Linked binary: {}", bin_name.green());
+                    if pb.is_none() {
+                        println!("Linked binary: {}", bin_name.green());
+                    }
                     found_bin = true;
                     break;
                 }
             }
-            if !found_bin {
+            if !found_bin && pb.is_none() {
                 eprintln!(
                     "Warning: could not find binary '{}' to link.",
                     bin_name.yellow()
@@ -276,6 +335,10 @@ pub fn run(
         }
     }
 
-    println!("{} File installation complete.", "Success:".green());
+    if let Some(p) = pb {
+        p.set_position(100);
+    } else {
+        println!("{} Installation complete.", "Success:".green());
+    }
     Ok(installed_files)
 }
