@@ -74,6 +74,88 @@ pub fn run() -> Result<()> {
         }
     }
 
+    println!("\n{}", "Checking for duplicate package IDs...".bold());
+    match pkg::doctor::check_duplicate_packages() {
+        Ok(duplicates) => {
+            if duplicates.is_empty() {
+                println!("{}", "No duplicate package IDs found.".green());
+            } else {
+                issues_found += duplicates.len();
+                println!(
+                    "{}: Found {} duplicate package IDs across registries:",
+                    "Warning".yellow(),
+                    duplicates.len()
+                );
+                for (pkg_id, registries) in duplicates {
+                    println!(
+                        "  - {} (found in: {})",
+                        pkg_id.cyan(),
+                        registries.join(", ")
+                    );
+                }
+                println!(
+                    "\nThis may cause ambiguity during installation. Consider specifying the registry handle (e.g. #registry@repo/name)."
+                );
+            }
+        }
+        Err(e) => {
+            eprintln!("{}: Failed to check for duplicates: {}", "Error".red(), e);
+            issues_found += 1;
+        }
+    }
+
+    println!("\n{}", "Checking PGP configurations...".bold());
+    match pkg::doctor::check_pgp_configuration() {
+        Ok(missing_keys) => {
+            if missing_keys.is_empty() {
+                println!("{}", "PGP configuration looks valid.".green());
+            } else {
+                issues_found += missing_keys.len();
+                println!(
+                    "{}: The following trusted PGP keys are missing from your keyring:",
+                    "Warning".yellow()
+                );
+                for key in missing_keys {
+                    println!("  - {}", key.red());
+                }
+                println!("\nRun 'zoi pgp add --name <name> --url <url>' to add missing keys.");
+            }
+        }
+        Err(e) => {
+            eprintln!(
+                "{}: Failed to check PGP configuration: {}",
+                "Error".red(),
+                e
+            );
+            issues_found += 1;
+        }
+    }
+
+    println!("\n{}", "Validating zoi.pkgs.json integrity...".bold());
+    match pkg::doctor::validate_pkgs_json_integrity() {
+        Ok(missing_packages) => {
+            if missing_packages.is_empty() {
+                println!("{}", "zoi.pkgs.json integrity is good.".green());
+            } else {
+                issues_found += missing_packages.len();
+                println!(
+                    "{}: The following packages are recorded but missing from the store:",
+                    "Warning".yellow()
+                );
+                for pkg in missing_packages {
+                    println!("  - {}", pkg.red());
+                }
+                println!(
+                    "\nYour package record file is out of sync with the actual installation store."
+                );
+            }
+        }
+        Err(e) => {
+            eprintln!("{}: Failed to validate zoi.pkgs.json: {}", "Error".red(), e);
+            issues_found += 1;
+        }
+    }
+
     if issues_found == 0 {
         println!(
             "\n{}",

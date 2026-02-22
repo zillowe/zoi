@@ -111,3 +111,17 @@ pub fn remove_package_from_record(
 
     Ok(())
 }
+
+pub fn get_recorded_packages() -> Result<Vec<types::LockfilePackage>> {
+    let mut all_packages = Vec::new();
+    for scope in [
+        types::Scope::User,
+        types::Scope::System,
+        types::Scope::Project,
+    ] {
+        if let Ok(lockfile) = read_lockfile(scope) {
+            all_packages.extend(lockfile.packages.into_values());
+        }
+    }
+    Ok(all_packages)
+}
