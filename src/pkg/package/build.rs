@@ -274,6 +274,36 @@ fn build_for_platform(
     tar_builder.append_dir_all(".", &staging_dir)?;
     tar_builder.finish()?;
 
+    let files_manifest_path = output_path.with_extension("pkg.tar.zst.files");
+    fs::write(&files_manifest_path, files_list.join("\n"))?;
+
+    let hash_path = output_path.with_extension("pkg.tar.zst.hash");
+    let hash = pkg::helper::get_hash(output_path.to_str().unwrap(), pkg::helper::HashType::Sha512)?;
+    fs::write(
+        &hash_path,
+        format!(
+            "{}  {}\n",
+            hash,
+            output_path.file_name().unwrap().to_str().unwrap()
+        ),
+    )?;
+
+    let size_path = output_path.with_extension("pkg.tar.zst.size");
+    let compressed_size = fs::metadata(&output_path)?.len();
+    let uncompressed_size: u64 = WalkDir::new(&staging_dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file())
+        .map(|e| e.metadata().unwrap().len())
+        .sum();
+    fs::write(
+        &size_path,
+        format!(
+            "down: {}\ninstall: {}\n",
+            compressed_size, uncompressed_size
+        ),
+    )?;
+
     if !quiet {
         println!(
             "{}",

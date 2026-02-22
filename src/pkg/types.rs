@@ -470,6 +470,7 @@ pub struct PkgLink {
     pub pgp: Option<String>,
     pub hash: Option<String>,
     pub size: Option<String>,
+    pub files: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -504,4 +505,5 @@ pub struct PrebuiltInfo {
     pub pgp_url: Option<String>,
     pub hash_url: Option<String>,
     pub size_url: Option<String>,
+    pub files_url: Option<String>,
 }

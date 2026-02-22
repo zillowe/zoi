@@ -307,62 +307,93 @@ pub fn verify_file_hash(
     Ok(result)
 }
 
+pub fn get_remote_file_list(url: &str) -> Result<Vec<String>> {
+    let client = crate::utils::build_blocking_http_client(10)?;
+    let resp = client
+        .get(url)
+        .send()
+        .map_err(|e| anyhow!("Failed to fetch files list from {}: {}", url, e))?
+        .text()
+        .map_err(|e| anyhow!("Failed to read files list content from {}: {}", url, e))?;
+
+    Ok(resp
+        .lines()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect())
+}
+
 pub fn check_file_conflicts(
     graph: &super::resolver::DependencyGraph,
     yes: bool,
-    _m: &MultiProgress,
+    m: &MultiProgress,
 ) -> Result<()> {
     let mut all_conflicts = HashSet::new();
+    let installed_packages = crate::pkg::local::get_installed_packages()?;
 
     for node in graph.nodes.values() {
+        let request = match crate::pkg::resolve::parse_source_string(&node.source) {
+            Ok(req) => req,
+            Err(_) => continue,
+        };
+
+        let owned_files: HashSet<String> = installed_packages
+            .iter()
+            .find(|p| {
+                p.name == node.pkg.name
+                    && p.sub_package.as_deref() == request.sub_package.as_deref()
+            })
+            .map(|p| p.installed_files.iter().cloned().collect())
+            .unwrap_or_default();
+
+        let mut conflicts_for_this_pkg = Vec::new();
+
         if let Ok(Some(info)) = find_prebuilt_info(node) {
-            let archive_filename = info.final_url.split('/').next_back().unwrap_or_default();
-            let archive_cache_root = match cache::get_archive_cache_root() {
-                Ok(path) => path,
-                Err(_) => continue,
-            };
-            let archive_path = archive_cache_root.join(archive_filename);
-
-            if !archive_path.exists() {
-                continue;
+            let mut file_list = None;
+            if let Some(files_url) = &info.files_url
+                && let Ok(list) = get_remote_file_list(files_url)
+            {
+                file_list = Some(list);
             }
-            let request = match crate::pkg::resolve::parse_source_string(&node.source) {
-                Ok(req) => req,
-                Err(_) => {
-                    eprintln!(
-                        "{} Could not parse source string for {} to check for file conflicts.",
-                        "Warning:".yellow(),
-                        node.pkg.name
-                    );
-                    continue;
-                }
-            };
 
-            if let Ok(conflicts) = get_file_conflicts_from_archive(
-                &archive_path,
-                &node.pkg,
-                request.sub_package.as_deref(),
-            ) {
-                for conflict in conflicts {
-                    all_conflicts.insert(format!(
-                        "File '{}' from package '{}' already exists on filesystem.",
-                        conflict, node.pkg.name
-                    ));
-                }
+            if let Some(list) = file_list {
+                let conflicts =
+                    get_conflicts_from_list(list, &node.pkg, request.sub_package.as_deref())?;
+                conflicts_for_this_pkg.extend(conflicts);
             } else {
-                eprintln!(
-                    "{} Could not parse archive for {} to check for file conflicts.",
-                    "Warning:".yellow(),
-                    node.pkg.name
-                );
+                let archive_filename = info.final_url.split('/').next_back().unwrap_or_default();
+                let archive_cache_root = match cache::get_archive_cache_root() {
+                    Ok(path) => path,
+                    Err(_) => continue,
+                };
+                let archive_path = archive_cache_root.join(archive_filename);
+
+                if archive_path.exists()
+                    && let Ok(conflicts) = get_file_conflicts_from_archive(
+                        &archive_path,
+                        &node.pkg,
+                        request.sub_package.as_deref(),
+                    )
+                {
+                    conflicts_for_this_pkg.extend(conflicts);
+                }
+            }
+        }
+
+        for conflict in conflicts_for_this_pkg {
+            if !owned_files.contains(&conflict) {
+                all_conflicts.insert(format!(
+                    "File '{}' from package '{}' already exists on filesystem.",
+                    conflict, node.pkg.name
+                ));
             }
         }
     }
 
     if !all_conflicts.is_empty() {
-        println!("\n{}", "File Conflict Detected:".red().bold());
+        m.println(format!("\n{}", "File Conflict Detected:".red().bold()))?;
         for msg in &all_conflicts {
-            println!("- {}", msg);
+            m.println(format!("- {}", msg))?;
         }
         if !utils::ask_for_confirmation(
             "\nDo you want to overwrite these files and continue with the installation?",
@@ -373,6 +404,46 @@ pub fn check_file_conflicts(
     }
 
     Ok(())
+}
+
+pub fn get_conflicts_from_list(
+    list: Vec<String>,
+    pkg: &types::Package,
+    sub_package_to_check: Option<&str>,
+) -> Result<Vec<String>> {
+    let mut conflicts = Vec::new();
+    let sub_prefix = if let Some(sub) = sub_package_to_check {
+        format!("data/{}/", sub)
+    } else {
+        "data/".to_string()
+    };
+
+    for path_in_archive in list {
+        if !path_in_archive.starts_with(&sub_prefix) {
+            continue;
+        }
+
+        let rel_to_data = &path_in_archive[sub_prefix.len()..];
+        let dest_path = if let Some(stripped) = rel_to_data.strip_prefix("usrroot/") {
+            if pkg.scope != types::Scope::System {
+                continue;
+            }
+            Some(PathBuf::from("/").join(stripped))
+        } else if let Some(stripped) = rel_to_data.strip_prefix("usrhome/") {
+            home::home_dir().map(|h| h.join(stripped))
+        } else {
+            None
+        };
+
+        if let Some(p) = dest_path
+            && p.exists()
+            && p.is_file()
+        {
+            conflicts.push(p.to_string_lossy().to_string());
+        }
+    }
+
+    Ok(conflicts)
 }
 
 pub fn get_file_conflicts_from_archive(
@@ -573,12 +644,14 @@ pub fn find_prebuilt_info(node: &InstallNode) -> Result<Option<types::PrebuiltIn
             let pgp_url = pkg_link.pgp.as_ref().map(|url| replace_vars(url));
             let hash_url = pkg_link.hash.as_ref().map(|url| replace_vars(url));
             let size_url = pkg_link.size.as_ref().map(|url| replace_vars(url));
+            let files_url = pkg_link.files.as_ref().map(|url| replace_vars(url));
 
             return Ok(Some(types::PrebuiltInfo {
                 final_url,
                 pgp_url,
                 hash_url,
                 size_url,
+                files_url,
             }));
         }
     }
