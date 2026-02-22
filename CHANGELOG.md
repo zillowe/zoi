@@ -4,6 +4,35 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
+## [Prod-Release-1.5.0] - 2026-02-22
+
+### ♻️ Refactor
+
+- _(shell)_ Abstract shell command execution
+
+### ⚡ Performance
+
+- _(sync)_ Synchronize multiple registries in parallel
+
+### ✨ Features
+
+- _(cli)_ Add dry-run option to autoremove and clean commands
+- _(doctor)_ Add package and PGP health checks
+- _(lua/utils)_ Add file system and archive utilities
+- _(cli)_ Add --registry filter to list and search
+- _(install)_ Enhance file conflict detection
+- _(pkg)_ Allow configuring max package resolution depth
+- _(uninstall)_ Add 'yes' flag for non-interactive mode
+- _(pkg)_ Add Arch User Repository (AUR) support
+
+### 🎯 UX
+
+- _(install)_ Enhance install command with detailed progress and summary
+
+### 🩹 Bug Fixes
+
+- _(sync)_ Dynamically determine remote default branch
+
 ## [Prod-Release-1.4.0] - 2025-11-11
 
 ### ♻️ Refactor
