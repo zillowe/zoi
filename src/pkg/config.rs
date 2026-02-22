@@ -168,6 +168,18 @@ pub fn read_config() -> Result<Config> {
         merged_cfg.protect_db = system_cfg.protect_db;
     }
 
+    if project_val.get("max_resolution_depth").is_some()
+        && !system_policy.max_resolution_depth_unoverridable
+    {
+        merged_cfg.max_resolution_depth = project_cfg.max_resolution_depth;
+    } else if user_val.get("max_resolution_depth").is_some()
+        && !system_policy.max_resolution_depth_unoverridable
+    {
+        merged_cfg.max_resolution_depth = user_cfg.max_resolution_depth;
+    } else {
+        merged_cfg.max_resolution_depth = system_cfg.max_resolution_depth;
+    }
+
     if !system_policy.allow_deny_lists_unoverridable {
         if project_cfg.policy.allowed_licenses.is_some() {
             merged_cfg.policy.allowed_licenses = project_cfg.policy.allowed_licenses;

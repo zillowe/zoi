@@ -319,6 +319,8 @@ pub struct Config {
     pub parallel_jobs: Option<usize>,
     #[serde(default)]
     pub protect_db: bool,
+    #[serde(default)]
+    pub max_resolution_depth: Option<u8>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -341,6 +343,8 @@ pub struct Policy {
     pub signature_enforcement_unoverridable: bool,
     #[serde(default, skip_serializing_if = "is_false")]
     pub protect_db_unoverridable: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub max_resolution_depth_unoverridable: bool,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub allowed_licenses: Option<Vec<String>>,

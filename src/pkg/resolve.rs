@@ -743,7 +743,9 @@ fn get_version_for_install(
 }
 
 pub fn resolve_source(source: &str, quiet: bool) -> Result<ResolvedSource> {
-    let resolved = resolve_source_recursive(source, 0, quiet)?;
+    let config = config::read_config().unwrap_or_default();
+    let max_depth = config.max_resolution_depth.unwrap_or(7);
+    let resolved = resolve_source_recursive(source, 0, max_depth, quiet)?;
 
     if let Ok(request) = parse_source_string(source)
         && !matches!(
@@ -768,8 +770,11 @@ pub fn resolve_package_and_version(
     PathBuf,
     Option<String>,
 )> {
+    let config = config::read_config().unwrap_or_default();
+    let max_depth = config.max_resolution_depth.unwrap_or(7);
+
     let request = parse_source_string(source_str)?;
-    let resolved_source = resolve_source_recursive(source_str, 0, quiet)?;
+    let resolved_source = resolve_source_recursive(source_str, 0, max_depth, quiet)?;
     let registry_handle = resolved_source.registry_handle.clone();
     let pkg_lua_path = resolved_source.path.clone();
 
@@ -821,11 +826,22 @@ pub fn resolve_package_and_version(
     ))
 }
 
-fn resolve_source_recursive(source: &str, depth: u8, quiet: bool) -> Result<ResolvedSource> {
-    if depth > 5 {
-        return Err(anyhow!(
-            "Exceeded max resolution depth, possible circular 'alt' reference."
-        ));
+fn resolve_source_recursive(
+    source: &str,
+    depth: u8,
+    max_depth: u8,
+    quiet: bool,
+) -> Result<ResolvedSource> {
+    if max_depth > 0 && depth > max_depth {
+        let msg = format!(
+            "Resolution depth {} exceeds limit {}. Potential circular 'alt' reference.",
+            depth, max_depth
+        );
+        if quiet
+            || !crate::utils::ask_for_confirmation(&format!("{} Continue anyway?", msg), false)
+        {
+            return Err(anyhow!("Exceeded max resolution depth."));
+        }
     }
 
     if source.ends_with(".manifest.yaml") {
@@ -843,7 +859,7 @@ fn resolve_source_recursive(source: &str, depth: u8, quiet: bool) -> Result<Reso
             sharable_manifest.name,
             sharable_manifest.version
         );
-        let mut resolved_source = resolve_source_recursive(&new_source, depth + 1, quiet)?;
+        let mut resolved_source = resolve_source_recursive(&new_source, depth + 1, max_depth, quiet)?;
         resolved_source.sharable_manifest = Some(sharable_manifest);
         return Ok(resolved_source);
     }
@@ -1081,10 +1097,11 @@ fn resolve_source_recursive(source: &str, depth: u8, quiet: bool) -> Result<Reso
                         )
                     })?,
                     depth + 1,
+                    max_depth,
                     quiet,
                 )?
             } else {
-                resolve_source_recursive(&alt_source, depth + 1, quiet)?
+                resolve_source_recursive(&alt_source, depth + 1, max_depth, quiet)?
             };
 
         if resolved_source.source_type == SourceType::OfficialRepo {
