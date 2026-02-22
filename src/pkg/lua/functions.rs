@@ -448,6 +448,40 @@ fn add_fs_util(lua: &Lua) -> Result<(), mlua::Error> {
     let exists_fn = lua.create_function(|_, path: String| Ok(Path::new(&path).exists()))?;
     fs_table.set("exists", exists_fn)?;
 
+    let copy_fn = lua.create_function(|_, (src, dest): (String, String)| {
+        let src_path = Path::new(&src);
+        let dest_path = Path::new(&dest);
+        if src_path.is_dir() {
+            utils::copy_dir_all(src_path, dest_path)
+                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+        } else {
+            fs::copy(src_path, dest_path).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+        }
+        Ok(true)
+    })?;
+    fs_table.set("copy", copy_fn)?;
+
+    let move_fn = lua.create_function(|_, (src, dest): (String, String)| {
+        fs::rename(src, dest).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+        Ok(true)
+    })?;
+    fs_table.set("move", move_fn)?;
+
+    let chmod_fn = lua.create_function(|_, (path, mode): (String, u32)| {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(path, fs::Permissions::from_mode(mode))
+                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+        }
+        #[cfg(windows)]
+        {
+            let _ = (path, mode);
+        }
+        Ok(true)
+    })?;
+    fs_table.set("chmod", chmod_fn)?;
+
     let utils_table: Table = lua.globals().get("UTILS")?;
     utils_table.set("FS", fs_table)?;
 
@@ -657,6 +691,88 @@ fn add_add_pgp_key(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     Ok(())
 }
 
+fn add_archive_util(lua: &Lua) -> Result<(), mlua::Error> {
+    let archive_table = lua.create_table()?;
+
+    let list_fn = lua.create_function(|_, path: String| {
+        let file = fs::File::open(&path).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+        let mut files = Vec::new();
+
+        if path.ends_with(".zip") {
+            let mut archive =
+                ZipArchive::new(file).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+            for i in 0..archive.len() {
+                let file = archive
+                    .by_index(i)
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                files.push(file.name().to_string());
+            }
+        } else if path.ends_with(".tar.gz") {
+            let tar_gz = GzDecoder::new(file);
+            let mut archive = tar::Archive::new(tar_gz);
+            for entry in archive
+                .entries()
+                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?
+            {
+                let entry = entry.map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                files.push(
+                    entry
+                        .path()
+                        .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?
+                        .to_string_lossy()
+                        .to_string(),
+                );
+            }
+        } else if path.ends_with(".tar.zst") {
+            let tar_zst =
+                ZstdDecoder::new(file).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+            let mut archive = tar::Archive::new(tar_zst);
+            for entry in archive
+                .entries()
+                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?
+            {
+                let entry = entry.map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                files.push(
+                    entry
+                        .path()
+                        .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?
+                        .to_string_lossy()
+                        .to_string(),
+                );
+            }
+        } else if path.ends_with(".tar.xz") {
+            let tar_xz = XzDecoder::new(file);
+            let mut archive = tar::Archive::new(tar_xz);
+            for entry in archive
+                .entries()
+                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?
+            {
+                let entry = entry.map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                files.push(
+                    entry
+                        .path()
+                        .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?
+                        .to_string_lossy()
+                        .to_string(),
+                );
+            }
+        } else {
+            return Err(mlua::Error::RuntimeError(format!(
+                "Unsupported archive format: {}",
+                path
+            )));
+        }
+
+        Ok(files)
+    })?;
+    archive_table.set("list", list_fn)?;
+
+    let utils_table: Table = lua.globals().get("UTILS")?;
+    utils_table.set("ARCHIVE", archive_table)?;
+
+    Ok(())
+}
+
 pub fn add_package_lifecycle_functions(lua: &Lua) -> Result<(), mlua::Error> {
     let metadata_fn = lua.create_function(move |lua, pkg_def: Table| {
         if let Ok(meta_table) = lua.globals().get::<Table>("__ZoiPackageMeta")
@@ -781,6 +897,7 @@ pub fn setup_lua_environment(
     add_cmd_util(lua, quiet)?;
     add_fs_util(lua)?;
     add_find_util(lua)?;
+    add_archive_util(lua)?;
     add_extract_util(lua, quiet)?;
     add_verify_signature(lua, quiet)?;
     add_add_pgp_key(lua, quiet)?;
