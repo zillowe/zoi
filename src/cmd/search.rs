@@ -32,6 +32,7 @@ fn print_with_pager(content: &str) -> io::Result<()> {
 
 pub fn run(
     search_term: String,
+    registry_filter: Option<String>,
     repo: Option<String>,
     package_type: Option<String>,
     tags: Option<Vec<String>>,
@@ -44,12 +45,26 @@ pub fn run(
     );
 
     let config = config::read_config()?;
-    let handle = config
-        .default_registry
-        .as_ref()
-        .map(|reg| reg.handle.as_str());
 
-    let packages = if let Some(repo_filter) = &repo {
+    let packages = if let Some(reg_handle) = &registry_filter {
+        let all_repo_names = config::get_all_repos()?;
+        let full_repos: Vec<String> = all_repo_names
+            .into_iter()
+            .map(|r_name| format!("{}/{}", reg_handle, r_name))
+            .filter(|full_repo_name| {
+                if let Some(repo_f) = &repo {
+                    if repo_f.contains('/') {
+                        full_repo_name == repo_f
+                    } else {
+                        full_repo_name.split('/').any(|part| part == repo_f)
+                    }
+                } else {
+                    true
+                }
+            })
+            .collect();
+        local::get_packages_from_repos(&full_repos)
+    } else if let Some(repo_filter) = &repo {
         let handle = if let Some(reg) = &config.default_registry {
             reg.handle.clone()
         } else {
@@ -76,6 +91,11 @@ pub fn run(
     } else {
         local::get_all_available_packages()
     };
+
+    let handle_for_version = registry_filter.as_deref().or(config
+        .default_registry
+        .as_ref()
+        .map(|reg| reg.handle.as_str()));
 
     match packages {
         Ok(all_packages) => {
@@ -150,7 +170,7 @@ pub fn run(
                     desc.push_str("...");
                 }
 
-                let version = crate::pkg::resolve::get_default_version(&pkg, handle)
+                let version = crate::pkg::resolve::get_default_version(&pkg, handle_for_version)
                     .unwrap_or_else(|_| "N/A".to_string());
 
                 let repo_display = pkg.repo.split_once('/').map(|x| x.1).unwrap_or(&pkg.repo);

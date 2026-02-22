@@ -128,6 +128,9 @@ enum Commands {
         /// List all packages from the database, not just installed ones
         #[arg(short, long)]
         all: bool,
+        /// Filter by registry handle (e.g. 'zoidberg')
+        #[arg(long)]
+        registry: Option<String>,
         /// Filter by repository (e.g. 'main', 'extra')
         #[arg(long)]
         repo: Option<String>,
@@ -293,6 +296,9 @@ enum Commands {
     Search {
         /// The term to search for (e.g. 'editor', 'cli')
         search_term: String,
+        /// Filter by registry handle (e.g. 'zoidberg')
+        #[arg(long)]
+        registry: Option<String>,
         /// Filter by repository (e.g. 'main', 'extra')
         #[arg(long)]
         repo: Option<String>,
@@ -541,9 +547,10 @@ pub fn run() -> anyhow::Result<()> {
             }
             Commands::List {
                 all,
+                registry,
                 repo,
                 package_type,
-            } => cmd::list::run(all, repo, package_type),
+            } => cmd::list::run(all, registry, repo, package_type),
             Commands::Show { package_name, raw } => cmd::show::run(&package_name, raw),
             Commands::Pin { package, version } => cmd::pin::run(&package, &version),
             Commands::Unpin { package } => cmd::unpin::run(&package),
@@ -618,10 +625,11 @@ pub fn run() -> anyhow::Result<()> {
             Commands::Files { package } => cmd::files::run(&package),
             Commands::Search {
                 search_term,
+                registry,
                 repo,
                 package_type,
                 tags,
-            } => cmd::search::run(search_term, repo, package_type, tags),
+            } => cmd::search::run(search_term, registry, repo, package_type, tags),
             Commands::Shell { shell, scope } => cmd::shell::run(shell, scope),
             Commands::Exec {
                 source,

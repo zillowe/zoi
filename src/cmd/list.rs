@@ -5,7 +5,12 @@ use std::collections::HashSet;
 use std::io::{self, Write};
 use std::process::{Command, Stdio};
 
-pub fn run(all: bool, repo_filter: Option<String>, type_filter: Option<String>) -> Result<()> {
+pub fn run(
+    all: bool,
+    registry_filter: Option<String>,
+    repo_filter: Option<String>,
+    type_filter: Option<String>,
+) -> Result<()> {
     let package_type = match type_filter.as_deref() {
         Some("package") => Some(types::PackageType::Package),
         Some("collection") => Some(types::PackageType::Collection),
@@ -16,9 +21,9 @@ pub fn run(all: bool, repo_filter: Option<String>, type_filter: Option<String>) 
     };
 
     if all {
-        run_list_all(repo_filter, package_type)?;
+        run_list_all(registry_filter, repo_filter, package_type)?;
     } else {
-        run_list_installed(repo_filter, package_type)?;
+        run_list_installed(registry_filter, repo_filter, package_type)?;
     }
     Ok(())
 }
@@ -49,6 +54,7 @@ fn print_with_pager(content: &str) -> io::Result<()> {
 }
 
 fn run_list_installed(
+    registry_filter: Option<String>,
     repo_filter: Option<String>,
     type_filter: Option<types::PackageType>,
 ) -> Result<()> {
@@ -65,6 +71,31 @@ fn run_list_installed(
 
     let mut found_packages = false;
     for pkg in packages {
+        if let Some(registry_filter) = &registry_filter {
+            let manifest = local::is_package_installed(
+                &pkg.name,
+                pkg.sub_package.as_deref(),
+                types::Scope::User,
+            )?
+            .or(local::is_package_installed(
+                &pkg.name,
+                pkg.sub_package.as_deref(),
+                types::Scope::System,
+            )?)
+            .or(local::is_package_installed(
+                &pkg.name,
+                pkg.sub_package.as_deref(),
+                types::Scope::Project,
+            )?);
+
+            if let Some(m) = manifest {
+                if m.registry_handle != *registry_filter {
+                    continue;
+                }
+            } else {
+                continue;
+            }
+        }
         if let Some(repo_filter) = &repo_filter {
             let repo_matches = if repo_filter.contains('/') {
                 pkg.repo == *repo_filter
@@ -106,6 +137,7 @@ fn run_list_installed(
 }
 
 fn run_list_all(
+    registry_filter: Option<String>,
     repo_filter: Option<String>,
     type_filter: Option<types::PackageType>,
 ) -> Result<()> {
@@ -121,12 +153,26 @@ fn run_list_all(
         .collect::<HashSet<_>>();
 
     let config = config::read_config()?;
-    let handle = config
-        .default_registry
-        .as_ref()
-        .map(|reg| reg.handle.as_str());
 
-    let available_pkgs = if let Some(repo_filter) = &repo_filter {
+    let available_pkgs = if let Some(reg_handle) = &registry_filter {
+        let all_repo_names = config::get_all_repos()?;
+        let full_repos: Vec<String> = all_repo_names
+            .into_iter()
+            .map(|r_name| format!("{}/{}", reg_handle, r_name))
+            .filter(|full_repo_name| {
+                if let Some(repo_f) = &repo_filter {
+                    if repo_f.contains('/') {
+                        full_repo_name == repo_f
+                    } else {
+                        full_repo_name.split('/').any(|part| part == repo_f)
+                    }
+                } else {
+                    true
+                }
+            })
+            .collect();
+        local::get_packages_from_repos(&full_repos)?
+    } else if let Some(repo_filter) = &repo_filter {
         let handle = if let Some(reg) = &config.default_registry {
             reg.handle.clone()
         } else {
@@ -154,6 +200,11 @@ fn run_list_all(
         local::get_all_available_packages()?
     };
 
+    let handle_for_version = registry_filter.as_deref().or(config
+        .default_registry
+        .as_ref()
+        .map(|reg| reg.handle.as_str()));
+
     if available_pkgs.is_empty() {
         if let Some(repo) = repo_filter {
             println!("No packages found in repo '{}'.", repo);
@@ -173,7 +224,7 @@ fn run_list_all(
             continue;
         }
 
-        let version = crate::pkg::resolve::get_default_version(&pkg, handle)
+        let version = crate::pkg::resolve::get_default_version(&pkg, handle_for_version)
             .unwrap_or_else(|_| "N/A".to_string());
         let repo_display = pkg.repo.split_once('/').map(|x| x.1).unwrap_or(&pkg.repo);
 
