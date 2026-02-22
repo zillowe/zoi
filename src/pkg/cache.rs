@@ -12,25 +12,39 @@ pub fn get_archive_cache_root() -> Result<PathBuf> {
     Ok(cache_root.join("archives"))
 }
 
-pub fn clear() -> Result<()> {
+pub fn clear(dry_run: bool) -> Result<()> {
     let cache_dir = get_cache_root()?;
     if cache_dir.exists() {
-        println!("Removing cache directory: {}", cache_dir.display());
-        fs::remove_dir_all(cache_dir)?;
+        if dry_run {
+            println!(
+                "(Dry-run) Would remove cache directory: {}",
+                cache_dir.display()
+            );
+        } else {
+            println!("Removing cache directory: {}", cache_dir.display());
+            fs::remove_dir_all(cache_dir)?;
+        }
     } else {
         println!("Cache directory does not exist. Nothing to clean.");
     }
     Ok(())
 }
 
-pub fn clear_archives() -> Result<()> {
+pub fn clear_archives(dry_run: bool) -> Result<()> {
     let archive_cache_dir = get_archive_cache_root()?;
     if archive_cache_dir.exists() {
-        println!(
-            "Removing archive cache directory: {}",
-            archive_cache_dir.display()
-        );
-        fs::remove_dir_all(archive_cache_dir)?;
+        if dry_run {
+            println!(
+                "(Dry-run) Would remove archive cache directory: {}",
+                archive_cache_dir.display()
+            );
+        } else {
+            println!(
+                "Removing archive cache directory: {}",
+                archive_cache_dir.display()
+            );
+            fs::remove_dir_all(archive_cache_dir)?;
+        }
     } else {
         println!("Archive cache directory does not exist. Nothing to clean.");
     }

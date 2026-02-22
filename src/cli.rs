@@ -266,7 +266,11 @@ enum Commands {
     },
 
     /// Removes packages that were installed as dependencies but are no longer needed
-    Autoremove,
+    Autoremove {
+        /// Do not actually remove packages, just show what would be done
+        #[arg(long)]
+        dry_run: bool,
+    },
 
     /// Explains why a package is installed
     Why {
@@ -350,7 +354,11 @@ enum Commands {
     },
 
     /// Clears the cache of downloaded package binaries
-    Clean,
+    Clean {
+        /// Do not actually clear the cache, just show what would be done
+        #[arg(long)]
+        dry_run: bool,
+    },
 
     /// Manage package repositories
     #[command(
@@ -498,7 +506,7 @@ pub fn run() -> anyhow::Result<()> {
             Commands::Install { .. }
                 | Commands::Uninstall { .. }
                 | Commands::Update { .. }
-                | Commands::Autoremove
+                | Commands::Autoremove { .. }
                 | Commands::Rollback { .. }
                 | Commands::Package(_)
         );
@@ -619,7 +627,7 @@ pub fn run() -> anyhow::Result<()> {
                 }
                 Ok(())
             }
-            Commands::Autoremove => cmd::autoremove::run(cli.yes),
+            Commands::Autoremove { dry_run } => cmd::autoremove::run(cli.yes, dry_run),
             Commands::Why { package_name } => cmd::why::run(&package_name),
             Commands::Owner { path } => cmd::owner::run(&path),
             Commands::Files { package } => cmd::files::run(&package),
@@ -642,7 +650,7 @@ pub fn run() -> anyhow::Result<()> {
                 Ok(exit_code) => Err(anyhow::anyhow!("process exited with code {}", exit_code)),
                 Err(e) => Err(e),
             },
-            Commands::Clean => cmd::clean::run(),
+            Commands::Clean { dry_run } => cmd::clean::run(dry_run),
             Commands::Repo(args) => cmd::repo::run(args),
             Commands::Telemetry { action } => {
                 use cmd::telemetry::{TelemetryCommand, run};

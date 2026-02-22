@@ -3,7 +3,7 @@ use crate::utils;
 use anyhow::Result;
 use colored::*;
 
-pub fn run(yes: bool) -> Result<()> {
+pub fn run(yes: bool, dry_run: bool) -> Result<()> {
     println!("Checking for unused dependencies...");
     let all_installed = local::get_installed_packages()?;
     let mut packages_to_remove: Vec<String> = Vec::new();
@@ -33,6 +33,14 @@ pub fn run(yes: bool) -> Result<()> {
 
     if packages_to_remove.is_empty() {
         println!("{}", "No unused dependencies to remove.".green());
+        return Ok(());
+    }
+
+    if dry_run {
+        println!("\nThe following packages WOULD BE REMOVED (Dry-run):");
+        for pkg_name in &packages_to_remove {
+            println!("    - {}", pkg_name.yellow());
+        }
         return Ok(());
     }
 
