@@ -3,7 +3,8 @@ use crate::utils;
 use anyhow::{Result, anyhow};
 use colored::*;
 use dialoguer::{Select, theme::ColorfulTheme};
-use std::process::Command;
+use std::io::{self, Write};
+use std::process::Stdio;
 
 pub fn setup(env_alias: Option<&str>, config: &config::ProjectConfig) -> Result<()> {
     if config.environments.is_empty() {
@@ -81,11 +82,14 @@ fn check_packages(config: &config::ProjectConfig) -> Result<()> {
     let mut all_ok = true;
     for package in &config.packages {
         print!("- Checking for '{}': ", package.name.cyan());
-        let status = Command::new("bash")
-            .arg("-c")
-            .arg(&package.check)
-            .output()?;
-        if status.status.success() {
+        let _ = io::stdout().flush();
+
+        let status = executor::get_shell_command(&package.check)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()?;
+
+        if status.success() {
             println!("{}", "OK".green());
         } else {
             println!("{}", "MISSING".red());

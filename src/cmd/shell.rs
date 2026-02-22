@@ -37,7 +37,13 @@ fn get_completion_path(shell: Shell, scope: SetupScope) -> Result<PathBuf, Error
             Shell::Zsh => home.join(".zsh/completions/_zoi"),
             Shell::Fish => home.join(".config/fish/completions/zoi.fish"),
             Shell::Elvish => home.join(".config/elvish/completions/zoi.elv"),
-            Shell::PowerShell => home.join("Documents/PowerShell/Microsoft.PowerShell_profile.ps1"),
+            Shell::PowerShell => {
+                if cfg!(windows) {
+                    home.join("Documents/PowerShell/Microsoft.PowerShell_profile.ps1")
+                } else {
+                    home.join(".config/powershell/Microsoft.PowerShell_profile.ps1")
+                }
+            }
             _ => {
                 return Err(Error::new(
                     ErrorKind::InvalidInput,

@@ -436,7 +436,7 @@ pub fn setup_path(scope: Scope) -> anyhow::Result<()> {
         fs::create_dir_all(&zoi_bin_dir)?;
     }
 
-    if scope == Scope::System {
+    if scope == Scope::System && cfg!(unix) {
         println!(
             "{}",
             "System-wide installation complete. Binaries are in the system PATH.".green()
@@ -537,8 +537,23 @@ set paths = [ ~/.zoi/pkgs/bin $paths... ]
             .to_str()
             .ok_or_else(|| anyhow!("Invalid path string"))?;
 
-        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-        let env = hkcu.open_subkey_with_flags("Environment", KEY_READ | KEY_WRITE)?;
+        let (root, subkey, scope_name) = if scope == Scope::System {
+            if !is_admin() {
+                return Err(anyhow!(
+                    "Administrator privileges required to modify system PATH."
+                ));
+            }
+            (
+                HKEY_LOCAL_MACHINE,
+                "System\\CurrentControlSet\\Control\\Session Manager\\Environment",
+                "system",
+            )
+        } else {
+            (HKEY_CURRENT_USER, "Environment", "user")
+        };
+
+        let key = RegKey::predef(root);
+        let env = key.open_subkey_with_flags(subkey, KEY_READ | KEY_WRITE)?;
         let current_path: String = env.get_value("Path")?;
 
         if current_path
@@ -557,8 +572,9 @@ set paths = [ ~/.zoi/pkgs/bin $paths... ]
         env.set_value("Path", &new_path)?;
 
         println!(
-            "{} Zoi bin directory has been added to your user PATH environment variable.",
-            "Success:".green()
+            "{} Zoi bin directory has been added to your {} PATH environment variable.",
+            "Success:".green(),
+            scope_name
         );
         println!(
             "Please restart your shell or log out and log back in for the changes to take effect."
