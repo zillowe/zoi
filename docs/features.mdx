@@ -29,10 +29,9 @@ Zoi is packed with features designed to make package management and environment 
 
 - **Secure and Verifiable:** Ensure the integrity and authenticity of your packages:
   - **Checksums:** Verify downloads against `SHA512`, `SHA256`, or `MD5` hashes.
-  - **GPG Signatures:** Verify package archives against maintainer PGP keys. Manage keys easily with the `zoi pgp` command set.
-  - **File Conflict Detection:** Prevents packages from accidentally overwriting existing files by prompting for confirmation.
-
-- **Configuration File Handling:** Automatically handles updates to configuration files, creating `.zoinew` files for new versions and `.zoisave` files for user-modified configurations upon removal.
+    - **GPG Signatures:** Verify package archives against maintainer PGP keys. Manage keys easily with the `zoi pgp` command set.
+    - **Enhanced File Conflict Detection:** Prevents packages from accidentally overwriting existing files. Supports checking conflicts via remote metadata **before** downloading the package and automatically handles safe upgrades by ignoring existing files owned by the same package.
+    - **Configuration File Handling:** Automatically handles updates to configuration files, creating `.zoinew` files for new versions and `.zoisave` files for user-modified configurations upon removal.
 
 ## Advanced Capabilities
 
@@ -74,6 +73,9 @@ Zoi is packed with features designed to make package management and environment 
     - **Broken Symlinks:** Scans for broken symbolic links in Zoi's binary directories.
     - **PATH Configuration:** Verifies that the Zoi binary directory is included in your system's `PATH`.
     - **Outdated Repositories:** Checks if your local package database has been synced recently.
+    - **Duplicate Package IDs:** Identifies packages with the same name/path across different registries, which can cause ambiguity.
+    - **PGP Configuration:** Verifies if trusted PGP keys specified in your configuration are present in the local keyring.
+    - **Package Record Integrity:** Validates that all packages recorded in `zoi.pkgs.json` are actually present in the installation store.
 
 - **Shell Integration:**
   - `zoi shell`: Automatically configures your shell's PATH for Zoi and installs shell completion scripts for Bash, Zsh, Fish, Elvish and Powershell.
@@ -103,6 +105,10 @@ Shows detailed application information and credits.
 
 Removes packages that were installed as dependencies but are no longer needed.
 
+**Options:**
+
+- `--dry-run`: Do not actually remove packages, just show what would be done.
+
 ---
 
 ### `zoi check`
@@ -114,6 +120,10 @@ Checks for essential third-party command-line tools like `git`.
 ### `zoi clean`
 
 Clears the cache of downloaded package binaries.
+
+**Options:**
+
+- `--dry-run`: Do not actually clear the cache, just show what would be done.
 
 ---
 
@@ -231,6 +241,7 @@ Lists installed or all available packages.
 **Options:**
 
 - `-a`, `--all`: List all packages from the database, not just installed ones.
+- `--registry <HANDLE>`: Filter by specific registry handle.
 - `--repo <REPO>`: Filter by repository.
 - `-t`, `--type <TYPE>`: Filter by package type (`package`, `app`, `collection`, `extension`).
 
@@ -377,6 +388,7 @@ Searches for packages by name or description.
 
 **Options:**
 
+- `--registry <HANDLE>`: Filter by specific registry handle.
 - `--repo <REPO>`: Filter by repository.
 - `--type <TYPE>`: Filter by package type.
 - `-t`, `--tag <TAGS>`: Filter by tags (comma-separated).

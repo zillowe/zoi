@@ -1,0 +1,64 @@
+---
+title: Windows Development Guide
+description: Best practices for creating Zoi packages on Windows.
+---
+
+Developing packages for Windows requires understanding how Zoi handles shell execution and pathing differently than on Unix-like systems.
+
+## Shell Execution: `pwsh` vs `bash`
+
+In a `.pkg.lua` definition, the `cmd()` function behavior depends on the host operating system:
+
+- **Unix (Linux/macOS)**: `cmd()` executes commands via `bash -c`.
+- **Windows**: `cmd()` executes commands via `pwsh -Command` (PowerShell Core).
+
+### Portability Tips
+
+If you want your package to build on both Windows and Linux, avoid shell-specific syntax inside `cmd()`.
+
+**Avoid (Bash-specific):**
+
+```lua
+cmd("export FOO=bar && ./build.sh") -- 'export' doesn't exist in PowerShell
+```
+
+**Prefer (Portable):**
+Zoi provides the `SYSTEM` and `ZOI` tables to help you handle logic in Lua instead of the shell.
+
+```lua
+local build_cmd = "./build.sh"
+if SYSTEM.OS == "windows" then
+    build_cmd = "./build.ps1"
+end
+cmd(build_cmd)
+```
+
+## Paths and Slashes
+
+Zoi internally normalizes most paths to use forward slashes (`/`), even on Windows. However, when passing paths to native Windows tools (like `msbuild` or `cmake`), you may need to ensure backslashes are used.
+
+You can use Lua's `gsub` to convert slashes if necessary:
+
+```lua
+local win_path = some_path:replace("/", "")
+```
+
+## Environment Variables
+
+When setting environment variables for a command, use the `zoi.yaml` `env` mapping for project-level tasks, or set them directly in Lua if building a package.
+
+Note that PowerShell environment variables are set using `$env:VAR_NAME = "value"`, while Bash uses `export VAR_NAME="value"`.
+
+## Common Windows Issues
+
+### Execution Policy
+
+If `zoi` fails to run script dependencies on Windows, ensure your PowerShell Execution Policy allows script execution:
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+### Path Limits
+
+Windows has a legacy 260-character path limit. While Zoi attempts to use long paths, some build tools might still fail in deeply nested directories. It is recommended to keep your `BUILD_DIR` paths as short as possible.

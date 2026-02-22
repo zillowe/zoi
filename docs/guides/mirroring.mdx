@@ -1,0 +1,63 @@
+---
+title: Registry Mirroring & Binary Hosting
+description: How to set up a private Zoi registry mirror with pre-built binaries.
+---
+
+Setting up a mirror of the Zoi registry is useful for enterprise environments, offline usage, or simply to provide faster downloads for your team.
+
+## 1. Mirroring the Package Database
+
+The Zoi package database is a standard Git repository. To mirror it:
+
+1.  **Clone the Upstream**:
+    ```sh
+    git clone --mirror https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg.git
+    ```
+2.  **Push to your Internal Git Forge**:
+    ```sh
+    cd Zoidberg.git
+    git push --mirror https://git.yourcorp.com/zoi/zoidberg.git
+    ```
+
+## 2. Hosting Pre-built Binaries
+
+Zoi can download pre-compiled archives (`.pkg.tar.zst`) to avoid building from source on every client.
+
+### Directory Structure
+
+Your binary server should follow a predictable structure. A common pattern is:
+`https://bin.yourcorp.com/pkgs/{repo}/{os}/{arch}/{version}/{name}-{version}-{platform}.pkg.tar.zst`
+
+### Metadata Generation
+
+For each archive, you should generate `.hash`, `.size`, and `.files` metadata:
+
+- **`.hash`**: A SHA-512 hash of the archive.
+- **`.size`**: A text file containing `down: <compressed_size>` and `install: <uncompressed_size>`.
+- **`.files`**: A plain text list of all files inside the archive (relative to the store root).
+
+Zoi's `zoi package build` command generates these files automatically alongside the archive.
+
+## 3. Configuring the Registry
+
+Update the `repo.yaml` file in the root of your mirrored Git repository to point to your binary server:
+
+```yaml
+name: MyCorp-Registry
+pkg:
+  - type: main
+    url: https://bin.yourcorp.com/pkgs/{repo}/{os}/{arch}/{version}
+    hash: https://bin.yourcorp.com/pkgs/{repo}/{os}/{arch}/{version}/{name}-{version}-{platform}.pkg.tar.zst.hash
+    size: https://bin.yourcorp.com/pkgs/{repo}/{os}/{arch}/{version}/{name}-{version}-{platform}.pkg.tar.zst.size
+    files: https://bin.yourcorp.com/pkgs/{repo}/{os}/{arch}/{version}/{name}-{version}-{platform}.pkg.tar.zst.files
+```
+
+## 4. Client Configuration
+
+To use the mirror, users can update their `config.yaml` or use the `zoi sync set` command:
+
+```sh
+zoi sync set https://git.yourcorp.com/zoi/zoidberg.git
+```
+
+Alternatively, you can distribute an [Extension](/docs/zds/zoi/extensions) that applies these changes automatically.

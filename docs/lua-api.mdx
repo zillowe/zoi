@@ -87,10 +87,17 @@ Downloads a file from a URL directly to the specified local path.
 ### `UTILS.FS`
 
 - `UTILS.FS.exists(path)`: Returns `true` if the path exists.
+- `UTILS.FS.copy(src, dest)`: Copies a file or directory.
+- `UTILS.FS.move(src, dest)`: Moves (renames) a file or directory.
+- `UTILS.FS.chmod(path, mode)`: Changes file permissions (Unix only).
 
 ### `UTILS.FIND`
 
 - `UTILS.FIND.file(dir, name)`: Recursively searches for a file within a directory inside `BUILD_DIR` and returns its relative path.
+
+### `UTILS.ARCHIVE`
+
+- `UTILS.ARCHIVE.list(path)`: Returns a table (list of strings) containing all file paths within an archive (.zip, .tar.\*).
 
 ### `UTILS.EXTRACT(source, out_dir)`
 

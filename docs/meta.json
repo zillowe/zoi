@@ -18,6 +18,8 @@
     "extensions",
     "...",
     "telemetry",
+    "---Guides---",
+    "guides",
     "---Zoi Library---",
     "lib"
   ]

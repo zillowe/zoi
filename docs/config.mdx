@@ -112,6 +112,16 @@ If `true`, Zoi will make the package database directory (`~/.zoi/pkgs/db`) read-
 - **Default:** `false`
 - **Example:** `protect_db: true`
 
+### `max_resolution_depth`
+
+Configures the maximum recursion depth for package resolution when using the `alt` field in package definitions. This is a safety feature to prevent infinite loops caused by circular references.
+
+- **Type:** `integer`
+- **Default:** `7`
+- **Value of 0:** Disables the limit (infinite recursion allowed).
+- **Behavior when exceeded:** Zoi will prompt the user to either continue or cancel the operation.
+- **Example:** `max_resolution_depth: 10`
+
 ### `policy`
 
 A special object that can only be set in the **system-wide** configuration file (`/etc/zoi/config.yaml`). It allows administrators to lock down certain settings, preventing them from being overridden by user or project configs.
@@ -136,6 +146,7 @@ When a policy field is set to `true`, the corresponding configuration from the s
 - `telemetry_enabled_unoverridable`: If `true`, the `telemetry_enabled` setting is locked.
 - `rollback_enabled_unoverridable`: If `true`, the `rollback_enabled` setting is locked.
 - `protect_db_unoverridable`: If `true`, the `protect_db` setting is locked.
+- `max_resolution_depth_unoverridable`: If `true`, the `max_resolution_depth` setting is locked.
 - `allow_deny_lists_unoverridable`: If `true`, the various allow/deny lists (`allowed_packages`, `denied_licenses`, etc.) are locked.
 - `signature_enforcement_unoverridable`: If `true`, the `signature_enforcement` policy is locked.
 
