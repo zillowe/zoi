@@ -139,7 +139,7 @@ pub fn run(
             source_str.blue().bold()
         );
 
-        match pkg::uninstall::run(&source_str, scope_override) {
+        match pkg::uninstall::run(&source_str, scope_override, yes) {
             Ok(uninstalled_manifest) => {
                 if let Err(e) = transaction::record_operation(
                     &transaction.id,

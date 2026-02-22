@@ -32,6 +32,7 @@ fn uninstall_collection(
     manifest: &types::InstallManifest,
     scope: types::Scope,
     registry_handle: Option<String>,
+    yes: bool,
 ) -> anyhow::Result<types::InstallManifest> {
     println!("Uninstalling collection '{}'...", pkg.name.bold());
 
@@ -42,9 +43,40 @@ fn uninstall_collection(
     } else {
         println!("Uninstalling dependencies of the collection...");
         for dep_str in dependencies_to_uninstall {
-            println!("\n--- Uninstalling dependency: {} ---", dep_str.bold());
+            let dep = dependencies::parse_dependency_string(dep_str)?;
+
+            if dep.manager != "zoi" {
+                let prompt = format!(
+                    "Uninstall native dependency '{}' ({})?",
+                    dep.package.cyan(),
+                    dep.manager.yellow()
+                );
+                let warning = "Warning: Zoi cannot track if other non-Zoi applications depend on this package.";
+
+                if yes {
+                    println!(
+                        "\n--- Uninstalling native dependency: {} ---",
+                        dep_str.bold()
+                    );
+                    println!("{}: {}", "Note".yellow(), warning);
+                } else if utils::ask_for_confirmation(
+                    &format!("{}\n   {}", prompt, warning.dimmed()),
+                    false,
+                ) {
+                    println!("\n--- Uninstalling dependency: {} ---", dep_str.bold());
+                } else {
+                    println!(
+                        "Skipping uninstallation of native dependency: {}",
+                        dep.package.yellow()
+                    );
+                    continue;
+                }
+            } else {
+                println!("\n--- Uninstalling zoi dependency: {} ---", dep_str.bold());
+            }
+
             if let Err(e) = dependencies::uninstall_dependency(dep_str, &move |name| {
-                run(name, Some(scope)).map(|_| ())
+                run(name, Some(scope), yes).map(|_| ())
             }) {
                 eprintln!(
                     "Warning: Could not uninstall dependency '{}': {}",
@@ -84,6 +116,7 @@ fn uninstall_collection(
 pub fn run(
     package_name: &str,
     scope_override: Option<types::Scope>,
+    yes: bool,
 ) -> anyhow::Result<types::InstallManifest> {
     let request = resolve::parse_source_string(package_name)?;
     let sub_package_to_uninstall = request.sub_package.clone();
@@ -128,7 +161,7 @@ pub fn run(
     };
 
     if pkg.package_type == types::PackageType::Collection {
-        return uninstall_collection(&pkg, &manifest, scope, registry_handle);
+        return uninstall_collection(&pkg, &manifest, scope, registry_handle, yes);
     }
 
     if let Some(hooks) = &pkg.hooks

@@ -181,5 +181,5 @@ pub fn install_package(
 /// }
 /// ```
 pub fn uninstall_package(package_name: &str, scope_override: Option<Scope>) -> Result<()> {
-    pkg::uninstall::run(package_name, scope_override).map(|_| ())
+    pkg::uninstall::run(package_name, scope_override, false).map(|_| ())
 }

@@ -48,7 +48,7 @@ pub fn run(yes: bool) -> Result<()> {
 
     for pkg_name in &packages_to_remove {
         println!("\n--- Removing {} ---", pkg_name.bold());
-        if let Err(e) = crate::pkg::uninstall::run(pkg_name, None) {
+        if let Err(e) = crate::pkg::uninstall::run(pkg_name, None, yes) {
             eprintln!("{} Failed to remove {}: {}", "Error:".red(), pkg_name, e);
         }
     }
