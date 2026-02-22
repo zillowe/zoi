@@ -837,8 +837,7 @@ fn resolve_source_recursive(
             "Resolution depth {} exceeds limit {}. Potential circular 'alt' reference.",
             depth, max_depth
         );
-        if quiet
-            || !crate::utils::ask_for_confirmation(&format!("{} Continue anyway?", msg), false)
+        if quiet || !crate::utils::ask_for_confirmation(&format!("{} Continue anyway?", msg), false)
         {
             return Err(anyhow!("Exceeded max resolution depth."));
         }
@@ -859,7 +858,8 @@ fn resolve_source_recursive(
             sharable_manifest.name,
             sharable_manifest.version
         );
-        let mut resolved_source = resolve_source_recursive(&new_source, depth + 1, max_depth, quiet)?;
+        let mut resolved_source =
+            resolve_source_recursive(&new_source, depth + 1, max_depth, quiet)?;
         resolved_source.sharable_manifest = Some(sharable_manifest);
         return Ok(resolved_source);
     }

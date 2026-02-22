@@ -1,4 +1,7 @@
-use crate::{pkg::config, utils};
+use crate::{
+    pkg::{config, types},
+    utils,
+};
 use anyhow::{Result, anyhow};
 use colored::*;
 use git2::{
@@ -6,6 +9,7 @@ use git2::{
     build::{CheckoutBuilder, RepoBuilder},
 };
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use rayon::prelude::*;
 use serde_yaml;
 use std::collections::HashSet;
 use std::fs;
@@ -123,8 +127,15 @@ fn run_verbose_at_path(db_url: &str, db_path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn run_non_verbose_at_path(db_url: &str, db_path: &Path) -> Result<()> {
-    let m = MultiProgress::new();
+fn run_non_verbose_at_path(db_url: &str, db_path: &Path, m: Option<&MultiProgress>) -> Result<()> {
+    let internal_m;
+    let m = if let Some(m_ref) = m {
+        m_ref
+    } else {
+        internal_m = MultiProgress::new();
+        &internal_m
+    };
+
     let fetch_pb = m.add(ProgressBar::new(0).with_style(
         ProgressStyle::default_bar()
             .template(
@@ -237,25 +248,35 @@ fn run_non_verbose_at_path(db_url: &str, db_path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn try_sync_at_path(db_url: &str, db_path: &Path, verbose: bool) -> Result<()> {
+fn try_sync_at_path(
+    db_url: &str,
+    db_path: &Path,
+    verbose: bool,
+    m: Option<&MultiProgress>,
+) -> Result<()> {
     if db_path.exists()
         && let Ok(repo) = Repository::open(db_path)
         && let Ok(remote) = repo.find_remote("origin")
         && let Some(remote_url) = remote.url()
         && remote_url != db_url
     {
-        println!(
+        let msg = format!(
             "Registry URL has changed from {}. Removing old database and re-cloning from {}.",
             remote_url.yellow(),
             db_url.cyan()
         );
+        if let Some(m_ref) = m {
+            m_ref.println(&msg)?;
+        } else {
+            println!("{}", msg);
+        }
         fs::remove_dir_all(db_path)?;
     }
 
     if verbose {
         run_verbose_at_path(db_url, db_path)
     } else {
-        run_non_verbose_at_path(db_url, db_path)
+        run_non_verbose_at_path(db_url, db_path, m)
     }
 }
 
@@ -388,6 +409,40 @@ fn fetch_handle_for_url(url: &str) -> Result<String> {
     }
 }
 
+fn sync_registry(
+    mut reg: types::Registry,
+    db_root: &Path,
+    verbose: bool,
+    m: Option<&MultiProgress>,
+) -> Result<(types::Registry, bool)> {
+    let mut reg_changed = false;
+    if reg.handle.is_empty() {
+        let handle = fetch_handle_for_url(&reg.url)?;
+        reg.handle = handle;
+        reg_changed = true;
+    }
+
+    let target_dir = db_root.join(&reg.handle);
+    if let Err(e) = try_sync_at_path(&reg.url, &target_dir, verbose, m) {
+        let msg = format!("Sync with {} failed: {}", reg.url.yellow(), e);
+        if let Some(m_ref) = m {
+            m_ref.println(msg)?;
+        } else {
+            eprintln!("{}", msg);
+        }
+    } else {
+        let msg = format!("{} with {}", "Sync successful".green(), reg.url.cyan());
+        if let Some(m_ref) = m {
+            m_ref.println(msg)?;
+        } else {
+            println!("{}", msg);
+        }
+        sync_pgp_keys_at_path(&target_dir)?;
+    }
+
+    Ok((reg, reg_changed))
+}
+
 pub fn run(verbose: bool, _fallback: bool, no_pm: bool) -> Result<()> {
     let merged_config = config::read_config()?;
     if merged_config.protect_db {
@@ -411,60 +466,50 @@ pub fn run(verbose: bool, _fallback: bool, no_pm: bool) -> Result<()> {
     }
 
     let db_root = get_db_path()?;
+    let mut registries_to_sync = Vec::new();
 
-    if let Some(mut default_reg) = config.default_registry.clone() {
-        println!("Syncing default registry...");
-        let mut reg_changed = false;
-        if default_reg.handle.is_empty() {
-            let handle = fetch_handle_for_url(&default_reg.url)?;
-            default_reg.handle = handle;
-            reg_changed = true;
-        }
+    if let Some(default_reg) = &config.default_registry {
+        registries_to_sync.push((default_reg.clone(), true));
+    }
 
-        let target_dir = db_root.join(&default_reg.handle);
-        if let Err(e) = try_sync_at_path(&default_reg.url, &target_dir, verbose) {
-            eprintln!("Sync with {} failed: {}", default_reg.url.yellow(), e);
+    for reg in &config.added_registries {
+        registries_to_sync.push((reg.clone(), false));
+    }
+
+    if !registries_to_sync.is_empty() {
+        println!("Syncing registries...");
+        let m = if verbose {
+            None
         } else {
-            println!(
-                "{} with {}",
-                "Sync successful".green(),
-                default_reg.url.cyan()
-            );
-            sync_pgp_keys_at_path(&target_dir)?;
+            Some(MultiProgress::new())
+        };
+
+        let results: Vec<Result<(types::Registry, bool, bool)>> = registries_to_sync
+            .into_par_iter()
+            .map(|(reg, is_default)| {
+                let (synced_reg, changed) = sync_registry(reg, &db_root, verbose, m.as_ref())?;
+                Ok((synced_reg, changed, is_default))
+            })
+            .collect();
+
+        if let Some(m_ref) = m {
+            m_ref.clear().ok();
         }
 
-        if reg_changed {
-            config.default_registry = Some(default_reg);
-            needs_config_update = true;
+        let mut updated_added_registries = Vec::new();
+        for res in results {
+            let (reg, changed, is_default) = res?;
+            if changed {
+                needs_config_update = true;
+            }
+            if is_default {
+                config.default_registry = Some(reg);
+            } else {
+                updated_added_registries.push(reg);
+            }
         }
+        config.added_registries = updated_added_registries;
     }
-
-    let mut updated_added_registries = Vec::new();
-    if !config.added_registries.is_empty() {
-        println!("\nSyncing added registries...");
-    }
-    for mut reg in config.added_registries.clone() {
-        let mut reg_changed = false;
-        if reg.handle.is_empty() {
-            let handle = fetch_handle_for_url(&reg.url)?;
-            reg.handle = handle;
-            reg_changed = true;
-        }
-
-        let target_dir = db_root.join(&reg.handle);
-        if let Err(e) = try_sync_at_path(&reg.url, &target_dir, verbose) {
-            eprintln!("Sync with {} failed: {}", reg.url.yellow(), e);
-        } else {
-            println!("{} with {}", "Sync successful".green(), reg.url.cyan());
-            sync_pgp_keys_at_path(&target_dir)?;
-        }
-
-        if reg_changed {
-            needs_config_update = true;
-        }
-        updated_added_registries.push(reg);
-    }
-    config.added_registries = updated_added_registries;
 
     if !no_pm {
         println!("\n{}", "Updating system configuration...".green());
