@@ -189,10 +189,10 @@ release:packages:
   before_script:
     - pacman -Sy --needed --noconfirm base-devel sed git openssh
   script:
-    - chmod +x ./scripts/release.sh
-    - ./scripts/release.sh
+    - chmod +x ./scripts/publish.sh
+    - ./scripts/publish.sh
   rules:
-    - if: $CI_COMMIT_TAG
+    - if: "$CI_COMMIT_MESSAGE =~ /^Release: Bump packages version to .*/"
 
 docs:update:
   stage: test
