@@ -1,10 +1,63 @@
 use anyhow::{Result, anyhow};
+use chrono::{DateTime, Utc};
 use colored::*;
 use sequoia_openpgp::Cert;
 use sequoia_openpgp::parse::Parse;
+use sequoia_openpgp::policy::StandardPolicy;
+use sequoia_openpgp::types::RevocationStatus;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::SystemTime;
+
+pub fn get_cert_status(cert: &Cert) -> String {
+    let policy = StandardPolicy::new();
+    let now = SystemTime::now();
+    match cert.with_policy(&policy, now) {
+        Ok(vc) => {
+            if let RevocationStatus::Revoked(_) = vc.revocation_status() {
+                return "Revoked".red().bold().to_string();
+            }
+            if let Some(expiration) = vc.primary_key().key_expiration_time() {
+                let datetime: DateTime<Utc> = DateTime::<Utc>::from(expiration);
+                if expiration < now {
+                    return format!("Expired ({})", datetime.format("%Y-%m-%d"))
+                        .red()
+                        .to_string();
+                } else {
+                    return format!("Valid (expires {})", datetime.format("%Y-%m-%d"))
+                        .green()
+                        .to_string();
+                }
+            }
+            "Valid (no expiration)".green().to_string()
+        }
+        Err(e) => format!("Invalid: {}", e).red().to_string(),
+    }
+}
+
+pub fn validate_cert(cert: &Cert) -> Result<()> {
+    let policy = StandardPolicy::new();
+    let now = SystemTime::now();
+    match cert.with_policy(&policy, now) {
+        Ok(vc) => {
+            if let RevocationStatus::Revoked(_) = vc.revocation_status() {
+                return Err(anyhow!("The PGP key is revoked."));
+            }
+            if let Some(expiration) = vc.primary_key().key_expiration_time()
+                && expiration < now
+            {
+                let datetime: DateTime<Utc> = DateTime::<Utc>::from(expiration);
+                return Err(anyhow!(
+                    "The PGP key expired on {}.",
+                    datetime.format("%Y-%m-%d")
+                ));
+            }
+            Ok(())
+        }
+        Err(e) => Err(anyhow!("The PGP key is invalid: {}", e)),
+    }
+}
 
 pub fn get_pgp_dir() -> Result<PathBuf> {
     let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
@@ -29,7 +82,8 @@ pub fn add_key_from_bytes(key_bytes: &[u8], name: &str) -> Result<()> {
         );
     }
 
-    Cert::from_bytes(key_bytes)?;
+    let cert = Cert::from_bytes(key_bytes)?;
+    validate_cert(&cert)?;
 
     fs::write(&dest_path, key_bytes)?;
     println!("Successfully added/updated key '{}'.", name.cyan());
@@ -160,6 +214,7 @@ pub fn list_keys() -> Result<()> {
     for key_info in keys {
         println!();
         println!("{}: {}", "Name".cyan(), key_info.name.bold());
+        println!("{}: {}", "  Status".cyan(), get_cert_status(&key_info.cert));
         println!(
             "  {}: {}",
             "Fingerprint".cyan(),
@@ -238,6 +293,7 @@ pub fn search_keys(term: &str) -> Result<()> {
     for key_info in found_keys {
         println!();
         println!("{}: {}", "Name".cyan(), key_info.name.bold());
+        println!("{}: {}", "  Status".cyan(), get_cert_status(&key_info.cert));
         println!(
             "  {}: {}",
             "Fingerprint".cyan(),
@@ -303,8 +359,6 @@ pub fn get_all_local_keys_info() -> Result<Vec<KeyInfo>> {
     keys.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(keys)
 }
-
-use sequoia_openpgp::policy::StandardPolicy;
 
 pub fn get_all_local_certs() -> Result<Vec<Cert>> {
     let pgp_dir = get_pgp_dir()?;
