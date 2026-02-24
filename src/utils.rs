@@ -8,6 +8,9 @@ use std::process::Command;
 use std::time::Duration;
 use walkdir::WalkDir;
 
+#[cfg(windows)]
+use junction;
+
 pub fn format_bytes(bytes: u64) -> String {
     const KIB: u64 = 1024;
     const MIB: u64 = 1024 * KIB;
@@ -51,6 +54,45 @@ pub fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
         }
     }
     Ok(())
+}
+
+pub fn symlink_file(target: &Path, link: &Path) -> std::io::Result<()> {
+    if link.exists() || link.is_symlink() {
+        fs::remove_file(link)?;
+    }
+
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(target, link)
+    }
+    #[cfg(windows)]
+    {
+        if std::os::windows::fs::symlink_file(target, link).is_err() {
+            if fs::hard_link(target, link).is_err() {
+                fs::copy(target, link)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+pub fn symlink_dir(target: &Path, link: &Path) -> std::io::Result<()> {
+    if link.exists() || link.is_symlink() {
+        if link.is_dir() && !link.is_symlink() {
+            fs::remove_dir_all(link)?;
+        } else {
+            fs::remove_file(link)?;
+        }
+    }
+
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(target, link)
+    }
+    #[cfg(windows)]
+    {
+        junction::create(target, link)
+    }
 }
 
 pub fn is_admin() -> bool {

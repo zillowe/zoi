@@ -303,21 +303,7 @@ pub fn run(
                     let target_path = entry.path();
                     let link_path = bin_root.join(bin_name);
 
-                    #[cfg(unix)]
-                    {
-                        use std::os::unix::fs as unix_fs;
-                        if link_path.exists() || link_path.is_symlink() {
-                            fs::remove_file(&link_path)?;
-                        }
-                        unix_fs::symlink(target_path, &link_path)?;
-                    }
-                    #[cfg(windows)]
-                    {
-                        if link_path.exists() {
-                            fs::remove_file(&link_path)?;
-                        }
-                        fs::copy(target_path, &link_path)?;
-                    }
+                    utils::symlink_file(target_path, &link_path)?;
 
                     if pb.is_none() {
                         println!("Linked binary: {}", bin_name.green());

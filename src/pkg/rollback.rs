@@ -4,11 +4,8 @@ use anyhow::{Result, anyhow};
 use colored::*;
 use semver::Version;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use walkdir::WalkDir;
-
-#[cfg(windows)]
-use junction;
 
 pub fn run(package_name: &str, yes: bool) -> Result<()> {
     println!("Attempting to roll back '{}'...", package_name.cyan());
@@ -97,19 +94,7 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
     }
 
     let latest_symlink_path = package_dir.join("latest");
-    if latest_symlink_path.exists() || latest_symlink_path.is_symlink() {
-        if latest_symlink_path.is_dir() {
-            fs::remove_dir_all(&latest_symlink_path)?;
-        } else {
-            fs::remove_file(&latest_symlink_path)?;
-        }
-    }
-    #[cfg(unix)]
-    std::os::unix::fs::symlink(&previous_version_dir, &latest_symlink_path)?;
-    #[cfg(windows)]
-    {
-        junction::create(&previous_version_dir, &latest_symlink_path)?;
-    }
+    utils::symlink_dir(&previous_version_dir, &latest_symlink_path)?;
 
     let content = fs::read_to_string(&prev_manifest_path)?;
     let prev_manifest: types::InstallManifest = serde_yaml::from_str(&content)?;
@@ -134,7 +119,7 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
             }
 
             if let Some(target) = found_bin {
-                create_symlink(&target, &symlink_path)?;
+                utils::symlink_file(&target, &symlink_path)?;
             }
         }
     }
@@ -199,19 +184,4 @@ fn get_bin_root(scope: types::Scope) -> Result<PathBuf> {
             Ok(current_dir.join(".zoi").join("pkgs").join("bin"))
         }
     }
-}
-
-fn create_symlink(target: &Path, link: &Path) -> Result<()> {
-    if link.exists() {
-        fs::remove_file(link)?;
-    }
-    #[cfg(unix)]
-    {
-        std::os::unix::fs::symlink(target, link)?;
-    }
-    #[cfg(windows)]
-    {
-        fs::copy(target, link)?;
-    }
-    Ok(())
 }

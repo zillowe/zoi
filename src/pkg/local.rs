@@ -2,8 +2,6 @@ use crate::pkg::config;
 use crate::pkg::types::{InstallManifest, Scope};
 use crate::pkg::utils;
 use anyhow::Result;
-#[cfg(windows)]
-use junction;
 use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
@@ -291,20 +289,7 @@ pub fn write_manifest(manifest: &InstallManifest) -> Result<()> {
         &manifest.name,
     )?;
     let latest_symlink_path = package_dir.join("latest");
-    if latest_symlink_path.exists() || latest_symlink_path.is_symlink() {
-        if latest_symlink_path.is_dir() {
-            fs::remove_dir_all(&latest_symlink_path)?;
-        } else {
-            fs::remove_file(&latest_symlink_path)?;
-        }
-    }
-
-    #[cfg(unix)]
-    std::os::unix::fs::symlink(&version_dir, &latest_symlink_path)?;
-    #[cfg(windows)]
-    {
-        junction::create(&version_dir, &latest_symlink_path)?;
-    }
+    crate::utils::symlink_dir(&version_dir, &latest_symlink_path)?;
 
     Ok(())
 }
