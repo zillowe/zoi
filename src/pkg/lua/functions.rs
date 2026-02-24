@@ -1,9 +1,11 @@
 use crate::utils;
+use ar::Archive as ArArchive;
 use flate2::read::GzDecoder;
 use md5;
 use mlua::{self, Lua, LuaSerdeExt, Table, Value};
 use sequoia_openpgp::{Cert, parse::Parse};
 use serde::Deserialize;
+use sevenz_rust;
 use sha2::{Digest, Sha256, Sha512};
 use std::io::Read;
 use std::path::PathBuf;
@@ -559,7 +561,7 @@ fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                 archive
                     .extract(&out_dir)
                     .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-            } else if archive_path_str.ends_with(".tar.gz") {
+            } else if archive_path_str.ends_with(".tar.gz") || archive_path_str.ends_with(".tgz") {
                 let tar_gz = GzDecoder::new(file);
                 let mut archive = tar::Archive::new(tar_gz);
                 archive
@@ -578,6 +580,64 @@ fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                 archive
                     .unpack(&out_dir)
                     .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+            } else if archive_path_str.ends_with(".7z") {
+                sevenz_rust::decompress_file(&archive_file, &out_dir)
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+            } else if archive_path_str.ends_with(".rar") {
+                if crate::utils::command_exists("unrar") {
+                    let status = std::process::Command::new("unrar")
+                        .arg("x")
+                        .arg("-y")
+                        .arg(&archive_file)
+                        .arg(&out_dir)
+                        .status()
+                        .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                    if !status.success() {
+                        return Err(mlua::Error::RuntimeError("unrar failed".to_string()));
+                    }
+                } else {
+                    return Err(mlua::Error::RuntimeError(
+                        "unrar command not found. Please install unrar to extract .rar files."
+                            .to_string(),
+                    ));
+                }
+            } else if archive_path_str.ends_with(".deb") {
+                let mut ar = ArArchive::new(file);
+                while let Some(entry_result) = ar.next_entry() {
+                    let mut entry =
+                        entry_result.map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                    let name = String::from_utf8_lossy(entry.header().identifier()).to_string();
+                    if name.starts_with("data.tar") {
+                        let temp_data_path = build_dir.join(&name);
+                        let mut temp_file = fs::File::create(&temp_data_path)
+                            .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                        std::io::copy(&mut entry, &mut temp_file)
+                            .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+
+                        let data_file = fs::File::open(&temp_data_path)
+                            .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                        if name.ends_with(".gz") {
+                            let mut archive = tar::Archive::new(GzDecoder::new(data_file));
+                            archive
+                                .unpack(&out_dir)
+                                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                        } else if name.ends_with(".xz") {
+                            let mut archive = tar::Archive::new(XzDecoder::new(data_file));
+                            archive
+                                .unpack(&out_dir)
+                                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                        } else if name.ends_with(".zst") {
+                            let mut archive = tar::Archive::new(
+                                ZstdDecoder::new(data_file)
+                                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?,
+                            );
+                            archive
+                                .unpack(&out_dir)
+                                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                        }
+                        fs::remove_file(temp_data_path).ok();
+                    }
+                }
             } else {
                 return Err(mlua::Error::RuntimeError(format!(
                     "Unsupported archive format for file: {}",
@@ -707,7 +767,7 @@ fn add_archive_util(lua: &Lua) -> Result<(), mlua::Error> {
                     .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
                 files.push(file.name().to_string());
             }
-        } else if path.ends_with(".tar.gz") {
+        } else if path.ends_with(".tar.gz") || path.ends_with(".tgz") {
             let tar_gz = GzDecoder::new(file);
             let mut archive = tar::Archive::new(tar_gz);
             for entry in archive
@@ -755,6 +815,39 @@ fn add_archive_util(lua: &Lua) -> Result<(), mlua::Error> {
                         .to_string_lossy()
                         .to_string(),
                 );
+            }
+        } else if path.ends_with(".7z") {
+            let file =
+                fs::File::open(&path).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+            let len = file
+                .metadata()
+                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?
+                .len();
+            let reader = sevenz_rust::SevenZReader::new(file, len, sevenz_rust::Password::empty())
+                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+            for entry in &reader.archive().files {
+                files.push(entry.name.to_string());
+            }
+        } else if path.ends_with(".rar") {
+            if crate::utils::command_exists("unrar") {
+                let output = std::process::Command::new("unrar")
+                    .arg("lb")
+                    .arg(&path)
+                    .output()
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                if output.status.success() {
+                    let list = String::from_utf8_lossy(&output.stdout);
+                    for line in list.lines() {
+                        files.push(line.to_string());
+                    }
+                }
+            }
+        } else if path.ends_with(".deb") {
+            let mut ar = ArArchive::new(file);
+            while let Some(entry_result) = ar.next_entry() {
+                let entry = entry_result.map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                let header = entry.header();
+                files.push(String::from_utf8_lossy(header.identifier()).to_string());
             }
         } else {
             return Err(mlua::Error::RuntimeError(format!(
