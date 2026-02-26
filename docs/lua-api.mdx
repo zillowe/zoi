@@ -32,6 +32,18 @@ These variables are automatically available in your script's scope.
 - `ZOI.PATH.user`: Path to Zoi's user directory (`~/.zoi`).
 - `ZOI.PATH.system`: Path to Zoi's system-wide binary directory.
 
+#### The `ZOI.PKG` Table
+
+These variables provide absolute paths related to the current package environment.
+
+| Variable           | Type     | Description                                                     |
+| :----------------- | :------- | :-------------------------------------------------------------- |
+| `ZOI.PKG.store`    | `string` | Absolute path of the package store (`~/.zoi/pkgs/store`).       |
+| `ZOI.PKG.template` | `string` | Absolute path to the current directory (project template root). |
+| `ZOI.PKG.root`     | `string` | Absolute path to the system root (`/` or `C:\`).                |
+| `ZOI.PKG.home`     | `string` | Absolute path to the user's home directory.                     |
+| `ZOI.PKG.lua`      | `string` | Absolute path to the current `pkg.lua` script.                  |
+
 ---
 
 ## Core Functions
@@ -97,11 +109,14 @@ Downloads a file from a URL directly to the specified local path.
 
 ### `UTILS.ARCHIVE`
 
-- `UTILS.ARCHIVE.list(path)`: Returns a table (list of strings) containing all file paths within an archive (.zip, .tar.\*).
+- `UTILS.ARCHIVE.list(path)`: Returns a table (list of strings) containing all file paths within an archive (`.zip`, `.tar.*`, `.7z`, `.rar`, `.deb`).
 
 ### `UTILS.EXTRACT(source, out_dir)`
 
-Downloads (if URL) and extracts an archive (`.zip`, `.tar.gz`, `.tar.xz`, `.tar.zst`) into `BUILD_DIR/out_dir`.
+Downloads (if URL) and extracts an archive (`.zip`, `.tar.gz`, `.tar.xz`, `.tar.zst`, `.7z`, `.rar`, `.deb`) into `BUILD_DIR/out_dir`.
+
+> [!NOTE]
+> Extraction of `.rar` files requires the `unrar` command to be installed on the host system.
 
 ---
 

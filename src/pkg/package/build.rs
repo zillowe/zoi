@@ -248,11 +248,7 @@ fn build_for_platform(
     }
     files_list.sort();
 
-    let manifest_content = format!(
-        "zoi_version: {}\nfiles:\n  - {}",
-        env!("CARGO_PKG_VERSION"),
-        files_list.join("\n  - ")
-    );
+    let manifest_content = format!(files_list.join("\n  - "));
     fs::write(staging_dir.join("manifest.yaml"), manifest_content)?;
 
     fs::copy(
