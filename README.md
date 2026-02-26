@@ -321,7 +321,17 @@ Here are some common commands to get you started.
 - **Search for a package:**
 
   ```sh
+  # Standard search
   zoi search <term>
+
+  # Interactive TUI mode
+  zoi search <term> -i
+  ```
+
+- **View operation history:**
+
+  ```sh
+  zoi history
   ```
 
 - **Show package details:**
