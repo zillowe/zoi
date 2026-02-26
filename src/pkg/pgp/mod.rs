@@ -10,6 +10,20 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::SystemTime;
 
+include!(concat!(env!("OUT_DIR"), "/generated_pgp_keys.rs"));
+
+pub fn ensure_builtin_keys() -> Result<()> {
+    for (name, bytes) in BUILTIN_KEYS {
+        if let Err(e) = add_key_from_bytes(bytes, name) {
+            eprintln!(
+                "Warning: Failed to ensure builtin PGP key '{}': {}",
+                name, e
+            );
+        }
+    }
+    Ok(())
+}
+
 pub fn get_cert_status(cert: &Cert) -> String {
     let policy = StandardPolicy::new();
     let now = SystemTime::now();

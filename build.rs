@@ -105,5 +105,28 @@ fn main() -> Result<(), Box<dyn Error>> {
         map.build()
     )?;
 
+    let pgp_builtin_dir = Path::new("src/pkg/pgp/builtin");
+    println!("cargo:rerun-if-changed={}", pgp_builtin_dir.display());
+
+    let pgp_dest_path = Path::new(&out_dir).join("generated_pgp_keys.rs");
+    let mut pgp_file = std::fs::File::create(pgp_dest_path)?;
+
+    writeln!(
+        &mut pgp_file,
+        "pub static BUILTIN_KEYS: &[(&str, &[u8])] = &["
+    )?;
+    if pgp_builtin_dir.exists() {
+        for entry in std::fs::read_dir(pgp_builtin_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("asc") {
+                let name = path.file_stem().unwrap().to_str().unwrap();
+                let content = std::fs::read(&path)?;
+                writeln!(&mut pgp_file, "    (\"{}\", &{:?}),", name, content)?;
+            }
+        }
+    }
+    writeln!(&mut pgp_file, "];")?;
+
     Ok(())
 }

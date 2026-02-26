@@ -507,6 +507,14 @@ pub fn run() -> anyhow::Result<()> {
 
     utils::check_path();
 
+    if let Err(e) = crate::pkg::pgp::ensure_builtin_keys() {
+        eprintln!(
+            "{}: Failed to ensure builtin PGP keys: {}",
+            "Warning".yellow(),
+            e
+        );
+    }
+
     let plugin_manager = crate::pkg::plugin::PluginManager::new()?;
     if let Err(e) = plugin_manager.load_all() {
         eprintln!("{}: Failed to load plugins: {}", "Warning".yellow(), e);
