@@ -93,15 +93,25 @@ my-job:
 
 Several aspects of Zoi can be configured at build time by setting environment variables. These are processed by `build.rs`.
 
-| Environment Variable          | Description                                                   |
-| ----------------------------- | ------------------------------------------------------------- |
-| `ZOI_COMMIT_HASH`             | Embeds the git commit hash into the binary for `zoi version`. |
-| `POSTHOG_API_KEY`             | Sets the API key for the opt-in telemetry feature.            |
-| `POSTHOG_API_HOST`            | Sets the host for the opt-in telemetry feature.               |
-| `ZOI_DEFAULT_REGISTRY`        | Sets the default package registry URL.                        |
-| `ZOI_ABOUT_PACKAGER_AUTHOR`   | Embeds the packager's name in the `zoi about` output.         |
-| `ZOI_ABOUT_PACKAGER_EMAIL`    | Embeds the packager's email.                                  |
-| `ZOI_ABOUT_PACKAGER_HOMEPAGE` | Embeds the packager's homepage.                               |
+| Environment Variable          | Description                                                       |
+| ----------------------------- | ----------------------------------------------------------------- |
+| `ZOI_COMMIT_HASH`             | Embeds the git commit hash into the binary for `zoi version`.     |
+| `POSTHOG_API_KEY`             | Sets the API key for the opt-in telemetry feature.                |
+| `POSTHOG_API_HOST`            | Sets the host for the opt-in telemetry feature.                   |
+| `ZOI_DEFAULT_REGISTRY`        | Sets the default package registry URL.                            |
+| `ZOI_AUTHORITIES_KEY_1-9`     | Sets the Root of Trust PGP fingerprints for the default registry. |
+| `ZOI_ABOUT_PACKAGER_AUTHOR`   | Embeds the packager's name in the `zoi about` output.             |
+| `ZOI_ABOUT_PACKAGER_EMAIL`    | Embeds the packager's email.                                      |
+| `ZOI_ABOUT_PACKAGER_HOMEPAGE` | Embeds the packager's homepage.                                   |
+
+## Embedding PGP Keys
+
+You can bake trusted PGP public keys directly into your custom Zoi binary to establish a "Root of Trust" for your organization.
+
+1.  Place your public key files (`.asc`) in the `src/pkg/pgp/builtin/` directory.
+2.  Build Zoi as usual.
+
+The build system (`build.rs`) will automatically detect these files and embed them as static assets. When the resulting binary is run, it will ensure these keys are present in the user's local Zoi keyring.
 
 These can be set in a `.env` file at the project root (see `.env.example`) or passed directly to the build command.
 

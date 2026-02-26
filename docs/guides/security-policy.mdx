@@ -30,6 +30,68 @@ The `unoverridable` flags allow you to freeze specific Zoi behaviors.
 | `allow_deny_lists_unoverridable`      | Ensures the `allowed_packages` and `denied_licenses` lists cannot be bypassed.               |
 | `protect_db_unoverridable`            | Forces the package database to remain read-only after sync.                                  |
 | `telemetry_enabled_unoverridable`     | Enforces organization-wide telemetry settings.                                               |
+| `audit_log_enabled_unoverridable`     | Enforces mandatory audit logging for all operations.                                         |
+
+---
+
+## Registry Signing & Chain of Trust
+
+Zoi's most powerful security feature is its ability to verify the entire state of a package registry using Git commit signatures. This prevents "Man-in-the-Middle" attacks where a malicious actor might try to push a tampered `repo.yaml` or malicious package definitions.
+
+### The Authority Mechanism
+
+Trust is established by defining **Authorities** in your local configuration. An authority is a PGP fingerprint or key name that you trust to sign the registry.
+
+```yaml
+# /etc/zoi/config.yaml
+default_registry:
+  handle: zoidberg
+  url: https://gitlab.com/Zillowe/Zoidberg.git
+  authorities:
+    - "842293159C4B03357C8328D3A75793A3E674252E" # Official Zoidberg Key
+```
+
+When `authorities` are defined for a registry:
+
+1. Zoi pulls the latest Git commits.
+2. Zoi extracts the PGP signature from the latest commit (the `HEAD`).
+3. Zoi verifies that the signer matches one of the fingerprints in your local `authorities` list.
+4. **If verification fails, the sync is aborted.**
+
+This ensures that even if the Git server is compromised, Zoi will refuse to process any package definitions that aren't signed by your trusted maintainers.
+
+---
+
+## Audit Logging for Compliance
+
+In enterprise environments, tracking who installed what and when is often a mandatory compliance requirement. Zoi's Audit Logging feature provides a tamper-evident record of all state-changing operations.
+
+### Configuration
+
+Enable system-wide audit logging and lock it to prevent users from disabling it:
+
+```yaml
+# /etc/zoi/config.yaml
+audit_log_enabled: true
+
+policy:
+  audit_log_enabled_unoverridable: true
+```
+
+### Log Storage and Viewing
+
+Logs are stored in a structured JSON Lines format at `~/.zoi/audit.jsonl`. Administrators and users can view the history using the `zoi history` command:
+
+```sh
+zoi history
+```
+
+Each entry includes:
+
+- **Timestamp**: Precise date and time of the action.
+- **User**: The system user who performed the action.
+- **Action**: Install, Uninstall, or Upgrade.
+- **Metadata**: Package name, version, repository, and registry origin.
 
 ---
 
@@ -87,7 +149,9 @@ In enterprise environments, raw Git sources (`@git/`) are a security risk as the
 
 ### 3. Automated Key Distribution
 
-Distribute your organization's PGP public keys via a Zoi [Extension](/docs/zds/zoi/extensions). Developers can run `zoi extension add mycorp-security` to bootstrap their local keyring.
+While you can distribute PGP public keys via a Zoi [Extension](/docs/zds/zoi/extensions), the most secure way to establish a Root of Trust is by **embedding keys into the binary**.
+
+By placing your organization's `.asc` files in `src/pkg/pgp/builtin/` before building Zoi, you ensure that every client starts with the necessary keys to verify your private registry, without requiring any manual setup.
 
 ---
 

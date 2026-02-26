@@ -59,6 +59,19 @@ Binaries are not added to the system `PATH` individually. Instead, Zoi maintains
 
 ---
 
+## PGP Key Management
+
+Zoi uses a dedicated keyring for package and registry verification, separate from the system's GPG keyring.
+
+- **Key Storage:** `~/.zoi/pgps/`
+- **Format:** Public keys are stored as standard ASCII-armored `.asc` files.
+
+### Built-in Keyring
+
+Zoi features a built-in mechanism for embedding "Root of Trust" keys. During the build process, `build.rs` scans `src/pkg/pgp/builtin/` for `.asc` files and generates a static byte array containing their contents. On startup, Zoi's `ensure_builtin_keys()` function compares these embedded keys against the local store and automatically imports any that are missing or have been updated.
+
+---
+
 ## Transaction System
 
 Zoi ensures system integrity by wrapping all state-changing operations (install, uninstall, upgrade) in transactions.

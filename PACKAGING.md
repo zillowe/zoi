@@ -106,7 +106,14 @@ Zoi uses a few environment variables at build time.
 - **`ZOI_COMMIT_HASH`**: Embeds the git commit hash into the binary. This is used by the `zoi version` command. The build scripts in `scripts/` set this automatically.
 - **`POSTHOG_API_KEY`** & **`POSTHOG_API_HOST`**: These are used to configure the optional, opt-in telemetry feature. They can be set in a `.env` file at the root of the project or passed as build arguments to Docker. The `.env.example` file shows the format.
 - **`ZOI_DEFAULT_REGISTRY`**: Sets the default package registry URL. This is used when no registry is configured by the user. It can be set in a `.env` file or as a build argument to Docker.
+- **`ZOI_AUTHORITIES_KEY_1`** to **`ZOI_AUTHORITIES_KEY_9`**: Sets the trusted PGP fingerprints or key names for the default registry. These define the "Root of Trust" for verifying Git commit signatures during `zoi sync`.
 - **`ZOI_ABOUT_PACKAGER_AUTHOR`**, **`ZOI_ABOUT_PACKAGER_EMAIL`**, **`ZOI_ABOUT_PACKAGER_HOMEPAGE`**: Allows a packager to embed their own contact details into the binary. This information is displayed in the `zoi about` command output, which is useful for users of a specific package to identify the package maintainer.
+
+## Built-in PGP Keyring
+
+Zoi supports baking trusted PGP public keys directly into the binary. Any `.asc` file placed in the `src/pkg/pgp/builtin/` directory will be embedded at build time.
+
+On startup, Zoi automatically imports these embedded keys into the user's local keyring (`~/.zoi/pgps/`). This is the recommended way to distribute "Root of Trust" keys for custom or internal registries.
 
 ## Completions and Man Pages
 

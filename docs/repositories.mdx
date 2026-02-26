@@ -182,10 +182,36 @@ Here are the fields available in `repo.yaml`:
 | ------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `name`        | `string`            | The name of the repository. This is used as the handle for the registry.                                                                                             |
 | `description` | `string`            | A short description of the repository.                                                                                                                               |
+| `authorities` | `list` of `string`  | (Optional) A list of PGP fingerprints or key names trusted to sign the registry's Git commits. See [Registry Verification](#registry-verification).                  |
 | `git`         | `list` of `GitLink` | A list of git repository URLs. The `type` can be `main` for the primary repository or `mirror` for fallbacks.                                                        |
 | `pkg`         | `list` of `PkgLink` | (Optional) A list of URLs for pre-built package registries. Zoi will try to download pre-built packages from here before building from source.                       |
 | `pgp`         | `list` of `PgpKey`  | (Optional) A list of PGP keys to import for package signature verification. The `key` can be a URL to the key file or a PGP fingerprint.                             |
 | `repos`       | `list` of `Repo`    | A list of the sub-repositories (or tiers) contained within the registry. `type` can be `official`, `community`, etc. `active` determines if it's enabled by default. |
+
+## Registry Verification
+
+For security-conscious environments, Zoi supports verifying the integrity of an entire registry via Git commit signatures. By defining `authorities` in your **local configuration**, you can ensure that Zoi only syncs with a registry if its latest state has been signed by a trusted maintainer.
+
+### Configuring Authorities
+
+You can add authorities to your `default_registry` or any entries in `added_registries` in your `config.yaml`:
+
+```yaml
+added_registries:
+  - handle: my-team
+    url: https://git.company.com/team/zoidberg.git
+    authorities:
+      - "842293159C4B03357C8328D3A75793A3E674252E"
+```
+
+If a registry has authorities configured, `zoi sync` will:
+
+1. Fetch the latest commit from the Git remote.
+2. Check for a PGP signature on that commit.
+3. Verify that the signature was made by one of the listed authorities.
+4. Abort the sync if verification fails.
+
+This establishes a "Chain of Trust" where the registry maintainer signs the entire repository state, guaranteeing that every `.pkg.lua` file and the `repo.yaml` itself have not been tampered with.
 
 ### `PkgLink` Placeholders
 

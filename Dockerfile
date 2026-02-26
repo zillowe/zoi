@@ -6,6 +6,8 @@ FROM rust:1.90.0-slim-trixie AS builder
 ARG POSTHOG_API_KEY="phc_abcdefg"
 ARG POSTHOG_API_HOST="https://eu.i.posthog.com"
 ARG ZOI_DEFAULT_REGISTRY="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg.git"
+ARG ZOI_AUTHORITIES_KEY_1="842293159C4B03357C8328D3A75793A3E674252E"
+ARG ZOI_AUTHORITIES_KEY_2=""
 
 RUN apt-get update && apt-get install -y build-essential pkg-config libssl-dev git && rm -rf /var/lib/apt/lists/*
 
@@ -15,6 +17,8 @@ WORKDIR /usr/src/app
 RUN echo "POSTHOG_API_KEY=${POSTHOG_API_KEY}" > .env
 RUN echo "POSTHOG_API_HOST=${POSTHOG_API_HOST}" >> .env
 RUN echo "ZOI_DEFAULT_REGISTRY=${ZOI_DEFAULT_REGISTRY}" >> .env
+RUN echo "ZOI_AUTHORITIES_KEY_1=${ZOI_AUTHORITIES_KEY_1}" >> .env
+RUN echo "ZOI_AUTHORITIES_KEY_2=${ZOI_AUTHORITIES_KEY_2}" >> .env
 
 COPY Cargo.toml Cargo.lock ./
 

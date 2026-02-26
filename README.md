@@ -90,7 +90,8 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
 - **Project Environments:** Manage project-specific commands and environments using a local `zoi.yaml` file.
 - **Repository-Based:** Use official, community, or your own private/public Git-based repositories. Manage multiple registries.
 - **Parallel Registry Sync:** Concurrently sync multiple package registries for significantly faster updates.
-- **Secure & Verifiable:** Verifies package integrity with checksums and authenticity with GPG signatures. Includes a built-in PGP key manager.
+- **Secure & Verifiable:** Verifies package integrity with checksums and authenticity with GPG signatures. Supports Git commit signature verification for entire registries (Chain of Trust) and includes a built-in PGP keyring for out-of-the-box security.
+- **Compliance & Audit Logging:** Maintain a persistent, tamper-evident audit log of all package operations (install, uninstall, upgrade), viewable via the `zoi history` command.
 - **Enhanced File Conflict Detection:** Prevents packages from accidentally overwriting existing files. Supports pre-download conflict checking via remote metadata to save bandwidth.
 - **Advanced Dependencies:** Supports virtual packages (`provides`) and package replacement (`replaces`).
 - **Versatile Package Types:** Supports different types of packages:
@@ -100,9 +101,12 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
   - `Extension`: A package to extend Zoi's own functionality or configuration.
 - **Local Package Development:** A dedicated `zoi package` command set (`build`, `install`) to streamline creating and testing packages locally.
 - **Advanced CLI Tools:**
+  - `zoi search`: Interactive TUI mode with result sorting and rich metadata.
+  - `zoi history`: Read the persistent audit trail of past transactions.
+  - `zoi doctor`: Proactive system health checks, including orphaned package detection and broken symlink scanning.
   - `zoi man`: Read package manuals in the terminal.
   - `zoi why`: Understand why a package is installed.
-  - `zoi rollback`: Revert a package to its previous version or rollback the last transaction.
+  - `zoi rollback`: Revert a package to its previous version or rollback the entire last transaction.
   - `zoi pin`: Pin a package to a specific version.
   - `zoi exec`: Run a package's binary without installing it.
 - **Library Support:** Core functionality is available as a Rust library to be integrated into other applications.
