@@ -1,7 +1,20 @@
-use crate::pkg::{config, local, types::PackageType};
+use crate::pkg::{config, local, types::Package, types::PackageType};
 use anyhow::{Result, anyhow};
-use colored::*;
-use comfy_table::{ContentArrangement, Table, presets::UTF8_FULL};
+use colored::Colorize;
+use comfy_table::{Attribute, Cell, ContentArrangement, Table, presets::UTF8_FULL};
+use crossterm::{
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
+    execute,
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+};
+use ratatui::{
+    Terminal,
+    backend::CrosstermBackend,
+    layout::{Constraint, Direction, Layout},
+    style::{Color as RatatuiColor, Modifier, Style as RatatuiStyle},
+    text::{Line, Span},
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
+};
 use std::io::{self, Write};
 use std::process::{Command, Stdio};
 
@@ -36,13 +49,17 @@ pub fn run(
     repo: Option<String>,
     package_type: Option<String>,
     tags: Option<Vec<String>>,
+    sort_by: String,
+    interactive: bool,
 ) -> Result<()> {
-    println!(
-        "{}{}{}",
-        "--- Searching for packages matching '".yellow(),
-        search_term.blue().bold(),
-        "' ---".yellow()
-    );
+    if !interactive {
+        println!(
+            "{}{}{}",
+            "--- Searching for packages matching '".yellow(),
+            search_term.blue().bold(),
+            "' ---".yellow()
+        );
+    }
 
     let config = config::read_config()?;
 
@@ -115,7 +132,7 @@ pub fn run(
                 .map(|t| t.to_lowercase())
                 .collect();
 
-            let matches: Vec<_> = all_packages
+            let mut matches: Vec<_> = all_packages
                 .into_iter()
                 .filter(|pkg| {
                     if let Some(ptype) = type_filter
@@ -153,15 +170,37 @@ pub fn run(
                 .collect();
 
             if matches.is_empty() {
-                println!("\n{}", "No packages found matching your query.".yellow());
+                if !interactive {
+                    println!("\n{}", "No packages found matching your query.".yellow());
+                }
                 return Ok(());
+            }
+
+            match sort_by.as_str() {
+                "name" => matches.sort_by(|a, b| a.name.cmp(&b.name)),
+                "repo" => matches.sort_by(|a, b| a.repo.cmp(&b.repo)),
+                "type" => matches.sort_by(|a, b| {
+                    format!("{:?}", a.package_type).cmp(&format!("{:?}", b.package_type))
+                }),
+                _ => matches.sort_by(|a, b| a.name.cmp(&b.name)),
+            }
+
+            if interactive {
+                return run_tui(matches, handle_for_version);
             }
 
             let mut table = Table::new();
             table
                 .load_preset(UTF8_FULL)
                 .set_content_arrangement(ContentArrangement::Dynamic)
-                .set_header(vec!["Package", "Version", "Repo", "Tags", "Description"]);
+                .set_header(vec![
+                    Cell::new("Package").add_attribute(Attribute::Bold),
+                    Cell::new("Version").add_attribute(Attribute::Bold),
+                    Cell::new("Repo").add_attribute(Attribute::Bold),
+                    Cell::new("License").add_attribute(Attribute::Bold),
+                    Cell::new("Tags").add_attribute(Attribute::Bold),
+                    Cell::new("Description").add_attribute(Attribute::Bold),
+                ]);
 
             for pkg in matches {
                 let mut desc = pkg.description.replace('\n', " ");
@@ -186,12 +225,14 @@ pub fn run(
                         tags.join(", ")
                     }
                 };
+
                 table.add_row(vec![
-                    pkg.name,
-                    version,
-                    repo_display.to_string(),
-                    tags_display,
-                    desc,
+                    Cell::new(pkg.name).fg(comfy_table::Color::Cyan),
+                    Cell::new(version).fg(comfy_table::Color::Yellow),
+                    Cell::new(repo_display).fg(comfy_table::Color::Green),
+                    Cell::new(pkg.license),
+                    Cell::new(tags_display).fg(comfy_table::Color::DarkGrey),
+                    Cell::new(desc),
                 ]);
             }
 
@@ -202,4 +243,173 @@ pub fn run(
         }
     }
     Ok(())
+}
+
+fn run_tui(packages: Vec<Package>, handle_for_version: Option<&str>) -> Result<()> {
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+
+    let mut state = ListState::default();
+    state.select(Some(0));
+
+    let res = run_tui_loop(&mut terminal, packages, &mut state, handle_for_version);
+
+    disable_raw_mode()?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
+    terminal.show_cursor()?;
+
+    if let Err(err) = res {
+        eprintln!("{:?}", err)
+    }
+
+    Ok(())
+}
+
+fn run_tui_loop(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    packages: Vec<Package>,
+    state: &mut ListState,
+    handle_for_version: Option<&str>,
+) -> Result<()> {
+    loop {
+        terminal.draw(|f| {
+            let chunks = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(30), Constraint::Percentage(70)])
+                .split(f.area());
+
+            let items: Vec<ListItem> = packages
+                .iter()
+                .map(|p| {
+                    ListItem::new(Line::from(vec![Span::styled(
+                        p.name.clone(),
+                        RatatuiStyle::default().fg(RatatuiColor::Cyan),
+                    )]))
+                })
+                .collect();
+
+            let list = List::new(items)
+                .block(Block::default().borders(Borders::ALL).title("Packages"))
+                .highlight_style(
+                    RatatuiStyle::default()
+                        .bg(RatatuiColor::DarkGray)
+                        .add_modifier(Modifier::BOLD),
+                )
+                .highlight_symbol(">> ");
+
+            f.render_stateful_widget(list, chunks[0], state);
+
+            if let Some(selected) = state.selected() {
+                let pkg = &packages[selected];
+                let version = crate::pkg::resolve::get_default_version(pkg, handle_for_version)
+                    .unwrap_or_else(|_| "N/A".to_string());
+
+                let details = vec![
+                    Line::from(vec![
+                        Span::styled(
+                            "Name: ",
+                            RatatuiStyle::default().add_modifier(Modifier::BOLD),
+                        ),
+                        Span::styled(
+                            pkg.name.clone(),
+                            RatatuiStyle::default().fg(RatatuiColor::Cyan),
+                        ),
+                    ]),
+                    Line::from(vec![
+                        Span::styled(
+                            "Version: ",
+                            RatatuiStyle::default().add_modifier(Modifier::BOLD),
+                        ),
+                        Span::styled(version, RatatuiStyle::default().fg(RatatuiColor::Yellow)),
+                    ]),
+                    Line::from(vec![
+                        Span::styled(
+                            "Repo: ",
+                            RatatuiStyle::default().add_modifier(Modifier::BOLD),
+                        ),
+                        Span::styled(
+                            pkg.repo.clone(),
+                            RatatuiStyle::default().fg(RatatuiColor::Green),
+                        ),
+                    ]),
+                    Line::from(vec![
+                        Span::styled(
+                            "License: ",
+                            RatatuiStyle::default().add_modifier(Modifier::BOLD),
+                        ),
+                        Span::raw(pkg.license.clone()),
+                    ]),
+                    Line::from(vec![
+                        Span::styled(
+                            "Type: ",
+                            RatatuiStyle::default().add_modifier(Modifier::BOLD),
+                        ),
+                        Span::raw(format!("{:?}", pkg.package_type)),
+                    ]),
+                    Line::from(vec![
+                        Span::styled(
+                            "Tags: ",
+                            RatatuiStyle::default().add_modifier(Modifier::BOLD),
+                        ),
+                        Span::raw(pkg.tags.join(", ")),
+                    ]),
+                    Line::from(""),
+                    Line::from(Span::styled(
+                        "Description:",
+                        RatatuiStyle::default().add_modifier(Modifier::BOLD),
+                    )),
+                    Line::from(pkg.description.clone()),
+                ];
+
+                let details_paragraph = Paragraph::new(details)
+                    .block(Block::default().borders(Borders::ALL).title("Details"))
+                    .wrap(Wrap { trim: true });
+
+                f.render_widget(details_paragraph, chunks[1]);
+            }
+        })?;
+
+        if event::poll(std::time::Duration::from_millis(100))?
+            && let Event::Key(key) = event::read()?
+            && key.kind == KeyEventKind::Press
+        {
+            match key.code {
+                KeyCode::Char('q') | KeyCode::Esc => return Ok(()),
+                KeyCode::Down | KeyCode::Char('j') => {
+                    let i = match state.selected() {
+                        Some(i) => {
+                            if i >= packages.len() - 1 {
+                                0
+                            } else {
+                                i + 1
+                            }
+                        }
+                        None => 0,
+                    };
+                    state.select(Some(i));
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    let i = match state.selected() {
+                        Some(i) => {
+                            if i == 0 {
+                                packages.len() - 1
+                            } else {
+                                i - 1
+                            }
+                        }
+                        None => 0,
+                    };
+                    state.select(Some(i));
+                }
+                _ => {}
+            }
+        }
+    }
 }

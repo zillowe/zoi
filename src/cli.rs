@@ -312,6 +312,12 @@ enum Commands {
         /// Filter by tags (any match). Multiple via comma or repeated -t
         #[arg(short = 't', long = "tag", value_delimiter = ',', num_args = 1..)]
         tags: Option<Vec<String>>,
+        /// Sort results by field (name, repo, type)
+        #[arg(long, default_value = "name")]
+        sort: String,
+        /// Open results in an interactive TUI
+        #[arg(short = 'i', long)]
+        interactive: bool,
     },
 
     /// Installs completion scripts and sets up the shell environment.
@@ -658,7 +664,17 @@ pub fn run() -> anyhow::Result<()> {
                 repo,
                 package_type,
                 tags,
-            } => cmd::search::run(search_term, registry, repo, package_type, tags),
+                sort,
+                interactive,
+            } => cmd::search::run(
+                search_term,
+                registry,
+                repo,
+                package_type,
+                tags,
+                sort,
+                interactive,
+            ),
             Commands::Shell { shell, scope } => cmd::shell::run(shell, scope),
             Commands::Exec {
                 source,
