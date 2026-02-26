@@ -16,6 +16,7 @@ pub fn run(
     all_optional: bool,
     yes: bool,
     scope: Option<crate::cli::SetupScope>,
+    plugin_manager: &crate::pkg::plugin::PluginManager,
 ) -> Result<()> {
     println!(
         "Installing from git repository: {}",
@@ -104,6 +105,7 @@ pub fn run(
         false,
         false,
         None,
+        plugin_manager,
     )?;
 
     Ok(())

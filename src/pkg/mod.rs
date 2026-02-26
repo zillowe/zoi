@@ -16,6 +16,7 @@ pub mod lua;
 pub mod package;
 pub mod pgp;
 pub mod pin;
+pub mod plugin;
 pub mod pm;
 pub mod recorder;
 pub mod repo_install;

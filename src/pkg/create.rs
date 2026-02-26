@@ -2,6 +2,7 @@ use crate::pkg::{package, resolve, types};
 use crate::utils;
 use anyhow::{Result, anyhow};
 use colored::*;
+use mlua::LuaSerdeExt;
 use std::fs;
 use std::path::Path;
 use tar::Archive;
@@ -34,7 +35,12 @@ fn install_app_from_archive(archive_path: &Path, destination_dir: &Path) -> Resu
     Ok(())
 }
 
-pub fn run(source: &str, app_name: Option<String>, yes: bool) -> Result<()> {
+pub fn run(
+    source: &str,
+    app_name: Option<String>,
+    yes: bool,
+    plugin_manager: &crate::pkg::plugin::PluginManager,
+) -> Result<()> {
     let (pkg, _, _, pkg_lua_path, _) = resolve::resolve_package_and_version(source, false)?;
 
     if pkg.package_type != types::PackageType::App {
@@ -43,6 +49,12 @@ pub fn run(source: &str, app_name: Option<String>, yes: bool) -> Result<()> {
             pkg.name
         ));
     }
+
+    let pkg_val = plugin_manager
+        .lua
+        .to_value(&pkg)
+        .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
+    plugin_manager.trigger_hook("on_pre_create", Some(pkg_val.clone()))?;
 
     let dest_name = app_name.unwrap_or_else(|| pkg.name.clone());
     let app_dir = Path::new(&dest_name);
@@ -102,6 +114,8 @@ pub fn run(source: &str, app_name: Option<String>, yes: bool) -> Result<()> {
     }
 
     install_app_from_archive(&archive_path, app_dir)?;
+
+    plugin_manager.trigger_hook("on_post_create", Some(pkg_val))?;
 
     println!("\n{}", "App created successfully.".green());
 

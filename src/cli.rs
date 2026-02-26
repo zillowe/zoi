@@ -422,6 +422,9 @@ enum Commands {
 
     /// Checks for common issues and provides actionable suggestions
     Doctor,
+
+    #[command(external_subcommand)]
+    External(Vec<String>),
 }
 
 #[derive(clap::Parser, Debug)]
@@ -495,6 +498,11 @@ pub fn run() -> anyhow::Result<()> {
 
     utils::check_path();
 
+    let plugin_manager = crate::pkg::plugin::PluginManager::new()?;
+    if let Err(e) = plugin_manager.load_all() {
+        eprintln!("{}: Failed to load plugins: {}", "Warning".yellow(), e);
+    }
+
     if cli.version_flag {
         cmd::version::run(BRANCH, STATUS, NUMBER, commit);
         return Ok(());
@@ -550,7 +558,11 @@ pub fn run() -> anyhow::Result<()> {
                         SyncCommands::Set { url } => cmd::sync::set_registry(&url),
                     }
                 } else {
-                    cmd::sync::run(verbose, fallback, no_package_managers, no_shell_setup)
+                    plugin_manager.trigger_hook("on_pre_sync", None)?;
+                    let res =
+                        cmd::sync::run(verbose, fallback, no_package_managers, no_shell_setup);
+                    plugin_manager.trigger_hook("on_post_sync", None)?;
+                    res
                 }
             }
             Commands::List {
@@ -594,6 +606,7 @@ pub fn run() -> anyhow::Result<()> {
                 global,
                 save,
                 r#type,
+                &plugin_manager,
             ),
             Commands::Uninstall {
                 packages,
@@ -601,7 +614,15 @@ pub fn run() -> anyhow::Result<()> {
                 local,
                 global,
                 save,
-            } => cmd::uninstall::run(&packages, scope, local, global, save, cli.yes),
+            } => cmd::uninstall::run(
+                &packages,
+                scope,
+                local,
+                global,
+                save,
+                cli.yes,
+                &plugin_manager,
+            ),
             Commands::Run { cmd_alias, args } => cmd::run::run(cmd_alias, args),
             Commands::Env { env_alias } => cmd::env::run(env_alias),
             Commands::Upgrade { force, tag, branch } => {
@@ -661,18 +682,20 @@ pub fn run() -> anyhow::Result<()> {
                 };
                 run(cmd)
             }
-            Commands::Create { source, app_name } => {
-                cmd::create::run(cmd::create::CreateCommand { source, app_name }, cli.yes)
-            }
-            Commands::Extension(args) => cmd::extension::run(args, cli.yes),
+            Commands::Create { source, app_name } => cmd::create::run(
+                cmd::create::CreateCommand { source, app_name },
+                cli.yes,
+                &plugin_manager,
+            ),
+            Commands::Extension(args) => cmd::extension::run(args, cli.yes, &plugin_manager),
             Commands::Rollback {
                 package,
                 last_transaction,
             } => {
                 if last_transaction {
-                    cmd::rollback::run_transaction_rollback(cli.yes)
+                    cmd::rollback::run_transaction_rollback(cli.yes, &plugin_manager)
                 } else if let Some(pkg) = package {
-                    cmd::rollback::run(&pkg, cli.yes)
+                    cmd::rollback::run(&pkg, cli.yes, &plugin_manager)
                 } else {
                     Ok(())
                 }
@@ -686,6 +709,41 @@ pub fn run() -> anyhow::Result<()> {
             Commands::Pgp(args) => cmd::pgp::run(args),
             Commands::Helper(args) => cmd::helper::run(args),
             Commands::Doctor => cmd::doctor::run(),
+            Commands::External(args) => {
+                let (cmd_name, cmd_args) = if args.is_empty() {
+                    return Err(anyhow::anyhow!("No command specified"));
+                } else {
+                    (&args[0], args[1..].to_vec())
+                };
+
+                match plugin_manager.run_command(cmd_name, cmd_args) {
+                    Ok(true) => Ok(()),
+                    Ok(false) => {
+                        let mut cmd = Cli::command();
+                        cmd.print_help().unwrap();
+                        println!(
+                            "\n{}: '{}' is not a Zoi command.",
+                            "Error".red().bold(),
+                            cmd_name
+                        );
+
+                        let plugin_cmds = plugin_manager.list_commands()?;
+                        if !plugin_cmds.is_empty() {
+                            println!("\n{}:", "Available Plugin Commands".cyan().bold());
+                            for (pcmd, pdesc) in plugin_cmds {
+                                if pdesc.is_empty() {
+                                    println!("  {}", pcmd);
+                                } else {
+                                    println!("  {:<12} {}", pcmd, pdesc.dimmed());
+                                }
+                            }
+                        }
+
+                        std::process::exit(1);
+                    }
+                    Err(e) => Err(e),
+                }
+            }
         };
 
         if let Err(e) = result {

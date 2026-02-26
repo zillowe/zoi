@@ -10,6 +10,10 @@ pub struct CreateCommand {
     pub app_name: Option<String>,
 }
 
-pub fn run(args: CreateCommand, yes: bool) -> Result<()> {
-    pkg::create::run(&args.source, args.app_name, yes)
+pub fn run(
+    args: CreateCommand,
+    yes: bool,
+    plugin_manager: &crate::pkg::plugin::PluginManager,
+) -> Result<()> {
+    pkg::create::run(&args.source, args.app_name, yes, plugin_manager)
 }

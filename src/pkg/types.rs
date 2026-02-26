@@ -47,6 +47,7 @@ pub enum ExtensionChange {
     RepoAdd { add: String },
     Project { add: String },
     Pgp { name: String, key: String },
+    Plugin { name: String, script: String },
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

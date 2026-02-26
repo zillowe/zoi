@@ -3,6 +3,7 @@ use crate::project;
 use anyhow::{Result, anyhow};
 use colored::Colorize;
 use indicatif::MultiProgress;
+use mlua::LuaSerdeExt;
 use rayon::prelude::*;
 use std::collections::HashSet;
 use std::sync::Mutex;
@@ -18,6 +19,7 @@ pub fn run(
     global: bool,
     save: bool,
     build_type: Option<String>,
+    plugin_manager: &crate::pkg::plugin::PluginManager,
 ) -> Result<()> {
     let mut scope_override = scope.map(|s| match s {
         crate::cli::InstallScope::User => types::Scope::User,
@@ -69,7 +71,14 @@ pub fn run(
             types::Scope::Project => unreachable!(),
         });
 
-        crate::pkg::repo_install::run(&repo_spec, force, all_optional, yes, repo_install_scope)?;
+        crate::pkg::repo_install::run(
+            &repo_spec,
+            force,
+            all_optional,
+            yes,
+            repo_install_scope,
+            plugin_manager,
+        )?;
         return Ok(());
     }
 
@@ -108,6 +117,14 @@ pub fn run(
         build_type.as_deref(),
         true,
     )?;
+
+    for node in graph.nodes.values() {
+        let pkg_val = plugin_manager
+            .lua
+            .to_value(&node.pkg)
+            .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
+        plugin_manager.trigger_hook("on_pre_install", Some(pkg_val))?;
+    }
 
     let mut direct_packages = Vec::new();
     let mut dependencies = Vec::new();
@@ -354,6 +371,15 @@ pub fn run(
 
     if let Err(e) = transaction::commit(&transaction.id) {
         eprintln!("Warning: Failed to commit transaction: {}", e);
+    }
+
+    let installed_manifests_vec = installed_manifests.lock().unwrap().clone();
+    for manifest in &installed_manifests_vec {
+        let pkg_val = plugin_manager
+            .lua
+            .to_value(manifest)
+            .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
+        plugin_manager.trigger_hook("on_post_install", Some(pkg_val))?;
     }
 
     let is_any_project_install = scope_override == Some(types::Scope::Project);

@@ -1,8 +1,13 @@
 use crate::pkg::{config, local, resolve, types};
 use anyhow::{Result, anyhow};
+use mlua::LuaSerdeExt;
 use std::fs;
 
-pub fn add(ext_name: &str, _yes: bool) -> Result<()> {
+pub fn add(
+    ext_name: &str,
+    _yes: bool,
+    plugin_manager: &crate::pkg::plugin::PluginManager,
+) -> Result<()> {
     println!("Adding extension: {}", ext_name);
 
     let (pkg, _, _, _, registry_handle) = resolve::resolve_package_and_version(ext_name, false)?;
@@ -10,6 +15,12 @@ pub fn add(ext_name: &str, _yes: bool) -> Result<()> {
     if pkg.package_type != types::PackageType::Extension {
         return Err(anyhow!("'{}' is not an extension package.", ext_name));
     }
+
+    let pkg_val = plugin_manager
+        .lua
+        .to_value(&pkg)
+        .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
+    plugin_manager.trigger_hook("on_pre_extension_add", Some(pkg_val))?;
 
     if let Some(extension_info) = pkg.extension {
         if extension_info.extension_type != "zoi" {
@@ -55,6 +66,12 @@ pub fn add(ext_name: &str, _yes: bool) -> Result<()> {
                         crate::pkg::pgp::add_key_from_fingerprint(&key, &name)?;
                     }
                 }
+                types::ExtensionChange::Plugin { name, script } => {
+                    println!("Adding plugin: {}", name);
+                    let plugin_dir = crate::pkg::plugin::get_plugin_dir()?;
+                    let plugin_path = plugin_dir.join(format!("{}.lua", name));
+                    fs::write(plugin_path, script)?;
+                }
             }
         }
     } else {
@@ -87,12 +104,22 @@ pub fn add(ext_name: &str, _yes: bool) -> Result<()> {
     };
     local::write_manifest(&manifest)?;
 
+    let manifest_val = plugin_manager
+        .lua
+        .to_value(&manifest)
+        .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
+    plugin_manager.trigger_hook("on_post_extension_add", Some(manifest_val))?;
+
     println!("Successfully added extension '{}'.", ext_name);
 
     Ok(())
 }
 
-pub fn remove(ext_name: &str, _yes: bool) -> Result<()> {
+pub fn remove(
+    ext_name: &str,
+    _yes: bool,
+    plugin_manager: &crate::pkg::plugin::PluginManager,
+) -> Result<()> {
     println!("Removing extension: {}", ext_name);
 
     let (pkg, _, _, _, _) = resolve::resolve_package_and_version(ext_name, false)?;
@@ -106,6 +133,12 @@ pub fn remove(ext_name: &str, _yes: bool) -> Result<()> {
     } else {
         return Err(anyhow!("Extension '{}' is not installed.", ext_name));
     };
+
+    let manifest_val = plugin_manager
+        .lua
+        .to_value(&manifest)
+        .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
+    plugin_manager.trigger_hook("on_pre_extension_remove", Some(manifest_val.clone()))?;
 
     if pkg.package_type != types::PackageType::Extension {
         return Err(anyhow!("'{}' is not an extension package.", ext_name));
@@ -167,6 +200,16 @@ pub fn remove(ext_name: &str, _yes: bool) -> Result<()> {
                         eprintln!("Warning: failed to remove PGP key '{}': {}", name, e);
                     }
                 }
+                types::ExtensionChange::Plugin { name, script: _ } => {
+                    println!("Removing plugin: {}", name);
+                    let plugin_dir = crate::pkg::plugin::get_plugin_dir()?;
+                    let plugin_path = plugin_dir.join(format!("{}.lua", name));
+                    if plugin_path.exists()
+                        && let Err(e) = fs::remove_file(plugin_path)
+                    {
+                        eprintln!("Warning: failed to remove plugin '{}': {}", name, e);
+                    }
+                }
             }
         }
     } else {
@@ -186,6 +229,8 @@ pub fn remove(ext_name: &str, _yes: bool) -> Result<()> {
     if package_dir.exists() {
         fs::remove_dir_all(&package_dir)?;
     }
+
+    plugin_manager.trigger_hook("on_post_extension_remove", Some(manifest_val))?;
 
     println!("Successfully removed extension '{}'.", ext_name);
 

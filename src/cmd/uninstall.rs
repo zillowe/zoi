@@ -2,6 +2,7 @@ use crate::cmd::utils;
 use crate::pkg::{self, lock, transaction, types};
 use anyhow::{Result, anyhow};
 use colored::*;
+use mlua::LuaSerdeExt;
 use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
@@ -13,6 +14,7 @@ pub fn run(
     global: bool,
     save: bool,
     yes: bool,
+    plugin_manager: &crate::pkg::plugin::PluginManager,
 ) -> Result<()> {
     let mut scope_override = scope.map(|s| match s {
         crate::cli::InstallScope::User => types::Scope::User,
@@ -122,6 +124,12 @@ pub fn run(
     let mut successfully_uninstalled = Vec::new();
 
     for manifest in &manifests_to_uninstall {
+        let pkg_val = plugin_manager
+            .lua
+            .to_value(manifest)
+            .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
+        plugin_manager.trigger_hook("on_pre_uninstall", Some(pkg_val.clone()))?;
+
         let source_str = if let Some(sub) = &manifest.sub_package {
             format!(
                 "#{}@{}/{}:{}",
@@ -154,6 +162,7 @@ pub fn run(
                     failed_packages.push(source_str.clone());
                 } else {
                     successfully_uninstalled.push(source_str.clone());
+                    plugin_manager.trigger_hook("on_post_uninstall", Some(pkg_val))?;
                     println!("\n{} Uninstallation complete.", "Success:".green());
                 }
             }
