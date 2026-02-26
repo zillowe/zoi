@@ -468,16 +468,19 @@ pub fn verify_detached_signature(
     signature_path: &Path,
     cert: &Cert,
 ) -> Result<()> {
-    let policy = &StandardPolicy::new();
     let data = fs::read(data_path)?;
     let signature = fs::read(signature_path)?;
+    verify_detached_signature_raw(&data, &signature, cert)
+}
 
+pub fn verify_detached_signature_raw(data: &[u8], signature: &[u8], cert: &Cert) -> Result<()> {
+    let policy = &StandardPolicy::new();
     let helper = OneCertHelper { cert: cert.clone() };
 
     let mut verifier =
-        DetachedVerifierBuilder::from_bytes(&signature)?.with_policy(policy, None, helper)?;
+        DetachedVerifierBuilder::from_bytes(signature)?.with_policy(policy, None, helper)?;
 
-    verifier.verify_bytes(&data)?;
+    verifier.verify_bytes(data)?;
 
     Ok(())
 }

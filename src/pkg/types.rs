@@ -295,6 +295,8 @@ pub struct Transaction {
 pub struct Registry {
     pub handle: String,
     pub url: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authorities: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]

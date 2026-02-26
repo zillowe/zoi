@@ -1,5 +1,5 @@
 use crate::{
-    pkg::{config, types},
+    pkg::{config, pgp, types},
     utils,
 };
 use anyhow::{Result, anyhow};
@@ -16,6 +16,52 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use tempfile::Builder;
+
+fn verify_registry_signature(repo_path: &Path, authorities: &[String]) -> Result<()> {
+    if authorities.is_empty() {
+        return Ok(());
+    }
+
+    println!("Verifying registry signature...");
+
+    let repo = Repository::open(repo_path)
+        .map_err(|e| anyhow!("Failed to open registry repository: {}", e))?;
+    let head = repo
+        .head()
+        .map_err(|e| anyhow!("Failed to get repository HEAD: {}", e))?;
+    let target = head
+        .target()
+        .ok_or_else(|| anyhow!("HEAD is not a direct reference"))?;
+    let commit = repo
+        .find_commit(target)
+        .map_err(|e| anyhow!("Failed to find HEAD commit: {}", e))?;
+
+    let (sig, data) = repo
+        .extract_signature(&commit.id(), None)
+        .map_err(|_| anyhow!("Registry commit is not signed. Sync aborted for security."))?;
+
+    let sig_bytes = &*sig;
+    let data_bytes = &*data;
+
+    let trusted_certs = pgp::get_certs_by_name_or_fingerprint(authorities)?;
+
+    let mut verified = false;
+    for cert in trusted_certs {
+        if pgp::verify_detached_signature_raw(data_bytes, sig_bytes, &cert).is_ok() {
+            verified = true;
+            break;
+        }
+    }
+
+    if verified {
+        println!("{}", "Registry signature verified successfully.".green());
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "Registry commit was signed but not by any authorized authority. Sync aborted."
+        ))
+    }
+}
 
 fn get_db_path() -> Result<PathBuf> {
     let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
@@ -431,6 +477,22 @@ fn sync_registry(
             eprintln!("{}", msg);
         }
     } else {
+        if let Some(authorities) = &reg.authorities
+            && let Err(e) = verify_registry_signature(&target_dir, authorities)
+        {
+            let msg = format!(
+                "Security: Registry signature check failed for {}: {}",
+                reg.url.red(),
+                e
+            );
+            if let Some(m_ref) = m {
+                m_ref.println(&msg)?;
+            } else {
+                eprintln!("{}", msg);
+            }
+            return Err(e);
+        }
+
         let msg = format!("{} with {}", "Sync successful".green(), reg.url.cyan());
         if let Some(m_ref) = m {
             m_ref.println(msg)?;

@@ -46,6 +46,19 @@ fn main() -> Result<(), Box<dyn Error>> {
         .unwrap_or_else(|_| "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg.git".to_string());
     println!("cargo:rustc-env=ZOI_DEFAULT_REGISTRY={}", zoi_registry);
 
+    let mut authorities = Vec::new();
+    for i in 1..10 {
+        if let Ok(val) = env::var(format!("ZOI_AUTHORITIES_KEY_{}", i))
+            && !val.is_empty()
+        {
+            authorities.push(val);
+        }
+    }
+    println!(
+        "cargo:rustc-env=ZOI_BUILTIN_AUTHORITIES={}",
+        authorities.join(",")
+    );
+
     let managers_json_path = Path::new("src/pkg/pm/managers.json");
     println!("cargo:rerun-if-changed={}", managers_json_path.display());
 

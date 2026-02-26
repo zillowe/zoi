@@ -11,6 +11,15 @@ pub fn get_default_registry() -> String {
     env!("ZOI_DEFAULT_REGISTRY").to_string()
 }
 
+pub fn get_builtin_authorities() -> Vec<String> {
+    let auth_str = env!("ZOI_BUILTIN_AUTHORITIES");
+    if auth_str.is_empty() {
+        Vec::new()
+    } else {
+        auth_str.split(',').map(|s| s.to_string()).collect()
+    }
+}
+
 fn get_system_config_path() -> Result<PathBuf> {
     if cfg!(target_os = "windows") {
         Ok(PathBuf::from("C:\\ProgramData\\zoi\\config.yaml"))
@@ -239,6 +248,7 @@ pub fn read_config() -> Result<Config> {
         merged_cfg.default_registry = Some(Registry {
             handle: String::new(),
             url,
+            authorities: None,
         });
     }
 
@@ -246,7 +256,16 @@ pub fn read_config() -> Result<Config> {
         merged_cfg.default_registry = Some(Registry {
             handle: "zoidberg".to_string(),
             url: get_default_registry(),
+            authorities: Some(get_builtin_authorities()),
         });
+    } else if let Some(ref mut reg) = merged_cfg.default_registry
+        && reg.url == get_default_registry()
+        && reg.authorities.is_none()
+    {
+        let builtin = get_builtin_authorities();
+        if !builtin.is_empty() {
+            reg.authorities = Some(builtin);
+        }
     }
 
     if merged_cfg.repos.is_empty()
@@ -475,6 +494,7 @@ pub fn set_default_registry(url: &str) -> Result<()> {
     config.default_registry = Some(Registry {
         handle: String::new(),
         url: url.to_string(),
+        authorities: None,
     });
     write_user_config(&config)
 }
@@ -487,6 +507,7 @@ pub fn add_added_registry(url: &str) -> Result<()> {
     config.added_registries.push(Registry {
         handle: String::new(),
         url: url.to_string(),
+        authorities: None,
     });
     write_user_config(&config)
 }
