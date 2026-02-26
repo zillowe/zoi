@@ -304,6 +304,8 @@ pub struct Config {
     pub native_package_manager: Option<String>,
     #[serde(default)]
     pub telemetry_enabled: bool,
+    #[serde(default)]
+    pub audit_log_enabled: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub registry: Option<String>,
     #[serde(default)]
@@ -330,6 +332,8 @@ pub struct Policy {
     pub repos_unoverridable: bool,
     #[serde(default, skip_serializing_if = "is_false")]
     pub telemetry_enabled_unoverridable: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub audit_log_enabled_unoverridable: bool,
     #[serde(default, skip_serializing_if = "is_false")]
     pub rollback_enabled_unoverridable: bool,
     #[serde(default, skip_serializing_if = "is_false")]

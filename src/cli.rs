@@ -292,6 +292,9 @@ enum Commands {
         package: String,
     },
 
+    /// Shows the history of package operations
+    History,
+
     /// Searches for packages by name or description
     #[command(
         alias = "s",
@@ -658,6 +661,7 @@ pub fn run() -> anyhow::Result<()> {
             Commands::Why { package_name } => cmd::why::run(&package_name),
             Commands::Owner { path } => cmd::owner::run(&path),
             Commands::Files { package } => cmd::files::run(&package),
+            Commands::History => cmd::history::run(),
             Commands::Search {
                 search_term,
                 registry,

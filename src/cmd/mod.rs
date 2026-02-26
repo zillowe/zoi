@@ -10,6 +10,7 @@ pub mod extension;
 pub mod files;
 pub mod gen_man;
 pub mod helper;
+pub mod history;
 pub mod info;
 pub mod install;
 pub mod list;

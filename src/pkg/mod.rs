@@ -1,3 +1,4 @@
+pub mod audit;
 pub mod autoremove;
 pub mod cache;
 pub mod config;

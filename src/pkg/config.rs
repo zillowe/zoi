@@ -125,6 +125,18 @@ pub fn read_config() -> Result<Config> {
         merged_cfg.telemetry_enabled = system_cfg.telemetry_enabled;
     }
 
+    if project_val.get("audit_log_enabled").is_some()
+        && !system_policy.audit_log_enabled_unoverridable
+    {
+        merged_cfg.audit_log_enabled = project_cfg.audit_log_enabled;
+    } else if user_val.get("audit_log_enabled").is_some()
+        && !system_policy.audit_log_enabled_unoverridable
+    {
+        merged_cfg.audit_log_enabled = user_cfg.audit_log_enabled;
+    } else {
+        merged_cfg.audit_log_enabled = system_cfg.audit_log_enabled;
+    }
+
     if project_val.get("rollback_enabled").is_some()
         && !system_policy.rollback_enabled_unoverridable
     {

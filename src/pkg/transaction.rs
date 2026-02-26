@@ -1,4 +1,4 @@
-use crate::pkg::{install, types, uninstall};
+use crate::pkg::{audit, install, types, uninstall};
 use anyhow::{Result, anyhow};
 use chrono::Utc;
 use colored::*;
@@ -38,6 +38,18 @@ pub fn record_operation(
     transaction_id: &str,
     operation: types::TransactionOperation,
 ) -> Result<()> {
+    match &operation {
+        types::TransactionOperation::Install { manifest } => {
+            let _ = audit::log_event(audit::AuditAction::Install, manifest);
+        }
+        types::TransactionOperation::Uninstall { manifest } => {
+            let _ = audit::log_event(audit::AuditAction::Uninstall, manifest);
+        }
+        types::TransactionOperation::Upgrade { new_manifest, .. } => {
+            let _ = audit::log_event(audit::AuditAction::Upgrade, new_manifest);
+        }
+    }
+
     let path = get_transaction_path(transaction_id)?;
     let content = fs::read_to_string(&path)?;
     let mut transaction: types::Transaction = serde_json::from_str(&content)?;
