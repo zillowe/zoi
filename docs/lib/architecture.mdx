@@ -1,0 +1,110 @@
+---
+title: Architecture Deep-Dive
+description: Internal details of Zoi's store structure and transaction log format for contributors.
+---
+
+This document provides a technical deep-dive into Zoi's internal architecture, focusing on how packages are stored on disk and how Zoi ensures atomic operations through its transaction system. This is intended for library contributors and developers looking to integrate Zoi deeply into their own applications.
+
+## Zoi Store Structure
+
+Zoi follows a structured, collision-resistant layout for managing package installations. By default, the Zoi home directory is located at `~/.zoi`.
+
+### Store Root
+
+All installed packages are stored in the `pkgs/store` directory within the Zoi home:
+
+- **User Scope:** `~/.zoi/pkgs/store/`
+- **System Scope:**
+  - **Linux/macOS:** `/var/lib/zoi/pkgs/store/`
+  - **Windows:** `C:\ProgramData\zoi\pkgs\store`
+- **Project Scope:** `./.zoi/pkgs/store/` (relative to project root)
+
+### Package Identification and Hashing
+
+To prevent naming collisions across different registries and repositories, Zoi identifies every package by a unique ID generated from its origin.
+
+1.  **Package ID String:** `#{registry-handle}@{repo-path}/{package-name}`
+    - Example: `#zoidberg@core/linux`
+2.  **Hashing:** The ID string is hashed using **SHA-512**.
+3.  **Directory Name:** Zoi uses the first **32 characters** of the hex-encoded hash, followed by the package name.
+    - Format: `{hash32}-{package-name}`
+    - Example: `8f1a...-linux`
+
+### Directory Layout
+
+Inside the store, each package has its own directory containing versioned installations and metadata.
+
+```text
+{hash}-{name}/
+├── {version}/              # Actual package files
+│   ├── bin/                # Binaries (linked to PATH)
+│   ├── manifest.yaml       # Installation manifest for this version
+│   └── ...                 # Staged package contents (libs, share, etc.)
+├── latest                  # Symlink to the current active version directory
+└── dependents/             # Directory containing files named by hex-encoded IDs
+                            # of packages that depend on this one.
+```
+
+#### The `latest` Symlink
+
+The `latest` symlink always points to the directory of the currently active version. This allows Zoi to perform atomic version swaps by updating a single symlink.
+
+#### Dependents Tracking
+
+Zoi implements simple reference counting using the `dependents/` directory. When package A installs package B as a dependency, Zoi creates an empty file in `B/dependents/` named with the hex-encoded ID of A. This prevents B from being uninstalled as long as the directory is not empty.
+
+### Binary Linking
+
+Binaries are not added to the system `PATH` individually. Instead, Zoi maintains a global `bin` directory (`~/.zoi/pkgs/bin`) and creates symlinks to the binaries located inside the specific `{version}/bin/` directories in the store.
+
+---
+
+## Transaction System
+
+Zoi ensures system integrity by wrapping all state-changing operations (install, uninstall, upgrade) in transactions.
+
+### Transaction Logs
+
+Transaction logs are stored as JSON files in `~/.zoi/transactions/`. They are named using **UUID v7**, which provides both uniqueness and chronological ordering.
+
+### Log Format
+
+A transaction log records the starting time and a sequential list of operations.
+
+```json
+{
+  "id": "018e...-...",
+  "start_time": "2026-02-26T10:00:00Z",
+  "operations": [
+    {
+      "install": {
+        "manifest": {
+          "name": "hello",
+          "version": "1.0.0",
+          "repo": "community",
+          "registry_handle": "zoidberg",
+          "scope": "user",
+          "installed_files": [
+            "/home/user/.zoi/pkgs/store/.../1.0.0/bin/hello"
+          ],
+          ...
+        }
+      }
+    }
+  ]
+}
+```
+
+### Operation Types
+
+The `operations` array contains one of three objects:
+
+1.  **`install`**: Contains the `InstallManifest` of the newly installed package.
+2.  **`uninstall`**: Contains the `InstallManifest` of the package that was removed.
+3.  **`upgrade`**: Contains both `old_manifest` and `new_manifest`.
+
+### Atomicity and Rollback
+
+- **Atomic Commits:** When an operation completes successfully, Zoi deletes the transaction log. A missing log indicates a successful "commit."
+- **Automatic Rollback:** If Zoi crashes or encounters an unhandled error, the transaction log remains on disk. On the next invocation (or via `zoi rollback`), Zoi reads the log and reverts operations in **reverse order**.
+- **Manual Rollback:** Users can trigger a rollback of the last successful transaction using `zoi rollback --last-transaction`, which uses the same mechanism but targets the most recently created log.

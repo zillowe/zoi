@@ -9,6 +9,7 @@
     "creating-packages",
     "lua-api",
     "lua-plugin-api",
+    "lua-api-cookbook",
     "publishing-packages",
     "zoidberg",
     "migrate",

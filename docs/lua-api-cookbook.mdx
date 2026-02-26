@@ -1,0 +1,146 @@
+---
+title: Lua API Cookbook
+description: Common patterns and best practices for writing Zoi package definitions.
+---
+
+This cookbook provides a collection of common patterns and "recipes" for handling various scenarios when creating `.pkg.lua` files.
+
+## Platform Mapping
+
+Upstream projects often use different naming conventions for OS and Architecture than Zoi's standard (`linux-amd64`, `macos-arm64`, etc.). You can use a Lua table to map Zoi's system info to upstream values.
+
+```lua
+local platform_map = {
+    ["linux-amd64"]   = "x86_64-unknown-linux-gnu",
+    ["linux-arm64"]   = "aarch64-unknown-linux-gnu",
+    ["macos-amd64"]   = "x86_64-apple-darwin",
+    ["macos-arm64"]   = "aarch64-apple-darwin",
+    ["windows-amd64"] = "x86_64-pc-windows-msvc",
+}
+
+local current_platform = SYSTEM.OS .. "-" .. SYSTEM.ARCH
+local target_triple = platform_map[current_platform]
+
+function prepare()
+    local url = "https://example.com/releases/download/v" .. PKG.version .. "/" .. target_triple .. ".tar.gz"
+    UTILS.EXTRACT(url, "source")
+end
+```
+
+## Conditional Build Types
+
+Packages that support both `source` and `pre-compiled` builds should use the `BUILD_TYPE` variable to branch logic in `prepare` and `package`.
+
+```lua
+function prepare()
+    if BUILD_TYPE == "pre-compiled" then
+        local ext = (SYSTEM.OS == "windows") and "zip" or "tar.gz"
+        local url = string.format("https://example.com/bin-%s.%s", SYSTEM.OS, ext)
+        UTILS.EXTRACT(url, "bin")
+    elseif BUILD_TYPE == "source" then
+        cmd("git clone " .. PKG.git .. " source")
+    end
+end
+
+function package()
+    if BUILD_TYPE == "source" then
+        cmd("cd source && make")
+        zcp("source/my-app", "${pkgstore}/bin/my-app")
+    else
+        zcp("bin/my-app", "${pkgstore}/bin/my-app")
+    end
+end
+```
+
+## Dynamic Versioning from GitHub
+
+Instead of hardcoding a version, you can fetch the latest release tag directly from GitHub using Zoi's utility functions.
+
+```lua
+local version = ZOI.VERSION or UTILS.FETCH.GITHUB.LATEST.release({ repo = "Zillowe/Zoi" })
+
+metadata({
+    name = "zoi",
+    version = version,
+    -- ...
+})
+```
+
+## Advanced Verification
+
+When a project provides a central `checksums.txt` file, you can use `UTILS.PARSE.checksumFile` to extract the relevant hash for your specific platform archive.
+
+```lua
+function verify()
+    if BUILD_TYPE == "pre-compiled" then
+        local checksum_url = "https://example.com/releases/download/v" .. PKG.version .. "/checksums.txt"
+        local content = UTILS.FETCH.url(checksum_url)
+
+        -- Zoi platform archives follow a pattern
+        local filename = string.format("my-app-%s-%s.tar.gz", SYSTEM.OS, SYSTEM.ARCH)
+        local hash = UTILS.PARSE.checksumFile(content, filename)
+
+        if not hash then return false end
+
+        return verifyHash(BUILD_DIR .. "/" .. filename, "sha256-" .. hash)
+    end
+    return true
+end
+```
+
+## Bundling Local Assets
+
+If your package requires a configuration file or icon that is stored alongside the `.pkg.lua` file, use `${pkgluadir}` to reference it.
+
+```lua
+-- File structure:
+--   my-pkg/
+--     my-pkg.pkg.lua
+--     default-config.toml
+
+function package()
+    -- Copy local config to the package store
+    zcp("${pkgluadir}/default-config.toml", "${pkgstore}/share/default-config.toml")
+
+    -- Copy a local script to user home (use with caution)
+    zcp("${pkgluadir}/init-script.sh", "${usrhome}/.config/my-app/init.sh")
+end
+```
+
+## Multi-stage Build Logic
+
+For complex builds, you might want to install build-time dependencies into a temporary directory or use specific output paths.
+
+```lua
+function package()
+    -- Create a temporary install prefix inside BUILD_DIR
+    local prefix = BUILD_DIR .. "/install_root"
+
+    -- Run build and install to that prefix
+    cmd("cd source && ./configure --prefix=" .. prefix)
+    cmd("cd source && make install")
+
+    -- Selectively copy only what you need to the Zoi store
+    zcp("install_root/bin", "${pkgstore}/bin")
+    zcp("install_root/lib", "${pkgstore}/lib")
+end
+```
+
+## Using Hooks for System Integration
+
+Use hooks to perform actions that `zcp` cannot do, such as updating a system database or reloading a daemon.
+
+```lua
+hooks({
+    post_install = {
+        linux = {
+            "systemctl daemon-reload",
+            "systemctl enable --now my-app.service"
+        },
+        default = { "echo 'Installation complete!'" }
+    },
+    pre_remove = {
+        linux = { "systemctl disable --now my-app.service" }
+    }
+})
+```

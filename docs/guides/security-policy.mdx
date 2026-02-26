@@ -1,0 +1,132 @@
+---
+title: Security Policy Manual
+description: Detailed guide on configuring enterprise-grade security policies in Zoi.
+---
+
+Zoi provides a robust policy engine designed for system administrators to enforce security and compliance across an organization. By using the `policy` object in the **system-wide** configuration file, you can restrict which packages are installed, verify their origins, and lock down user settings.
+
+## Policy Enforcement Mechanism
+
+Policies can **only** be defined in the system-level `config.yaml`:
+
+- **Linux/macOS:** `/etc/zoi/config.yaml`
+- **Windows:** `C:\ProgramData\zoi\config.yaml`
+
+Settings defined here are the "source of truth." When a policy field is marked as `unoverridable`, any attempts by a user to change that setting in their `~/.zoi/pkgs/config.yaml` or a project-local config will be ignored.
+
+---
+
+## Locking Down Configurations
+
+The `unoverridable` flags allow you to freeze specific Zoi behaviors.
+
+| Policy Field                          | Description                                                                                  |
+| :------------------------------------ | :------------------------------------------------------------------------------------------- |
+| `repos_unoverridable`                 | Prevents users from adding or removing repository tiers.                                     |
+| `default_registry_unoverridable`      | Forces all Zoi clients to use a specific central package database (e.g. an internal mirror). |
+| `added_registries_unoverridable`      | Prevents users from syncing with unauthorized third-party registries.                        |
+| `git_repos_unoverridable`             | Disables the ability to use raw Git repositories as package sources.                         |
+| `signature_enforcement_unoverridable` | Forces the use of signed packages across the system.                                         |
+| `allow_deny_lists_unoverridable`      | Ensures the `allowed_packages` and `denied_licenses` lists cannot be bypassed.               |
+| `protect_db_unoverridable`            | Forces the package database to remain read-only after sync.                                  |
+| `telemetry_enabled_unoverridable`     | Enforces organization-wide telemetry settings.                                               |
+
+---
+
+## Content Filtering (Allow/Deny Lists)
+
+Administrators can control package installations based on names, sources, and legal compliance (licenses).
+
+### Package and Repo Filtering
+
+- `allowed_packages`: If defined, Zoi will **only** install packages explicitly named in this list.
+- `denied_packages`: A blacklist of packages that are prohibited.
+- `allowed_repos`: Restricts installations to specific tiers (e.g. `core`, `internal`).
+- `denied_repos`: Blocks specific tiers (e.g. `test`, `archive`).
+
+### License Compliance
+
+Zoi uses [SPDX identifiers](https://spdx.org/licenses/) to verify package licenses during resolution.
+
+- `allowed_licenses`: Useful for ensuring only legally approved software (e.g. `MIT`, `Apache-2.0`) is used.
+- `denied_licenses`: Blocks problematic licenses (e.g. `GPL-3.0-only`, `AGPL-3.0-or-later`).
+
+---
+
+## Mandatory Signature Verification
+
+For maximum security, you can enforce that Zoi **only** installs pre-built archives that have been digitally signed by your organization's trusted keys.
+
+```yaml
+policy:
+  signature_enforcement_unoverridable: true
+  signature_enforcement:
+    enable: true
+    trusted_keys:
+      - MyCorp-Release-Key
+      - 842293159C4B03357C8328D3A75793A3E674252E # Admin Fingerprint
+```
+
+When `enable` is `true`:
+
+1. Zoi will search for a `.sig` file for every `.pkg.tar.zst` archive.
+2. It will verify the signature against the local PGP keyring.
+3. If verification fails or the signature is missing, **installation is aborted**. Zoi will not fall back to building from source.
+
+---
+
+## Enterprise Best Practices
+
+### 1. Centralized Mirroring
+
+Use `default_registry_unoverridable` to point Zoi to an internal Git mirror of Zoidberg. This allows you to audit package definitions before they reach your developers.
+
+### 2. Disabling Raw Git Sources
+
+In enterprise environments, raw Git sources (`@git/`) are a security risk as they bypass the registry's audit trail. Set `git_repos_unoverridable: true` and leave the `git_repos` list empty to disable this feature.
+
+### 3. Automated Key Distribution
+
+Distribute your organization's PGP public keys via a Zoi [Extension](/docs/zds/zoi/extensions). Developers can run `zoi extension add mycorp-security` to bootstrap their local keyring.
+
+---
+
+## Example: "Hardened" Configuration
+
+This configuration enforces a "Private Registry Only" policy with strict license and signature checks.
+
+```yaml
+# /etc/zoi/config.yaml
+
+default_registry:
+  handle: corp-db
+  url: https://git.mycorp.internal/zoi/registry.git
+
+repos:
+  - core
+  - security-tools
+
+policy:
+  # Lock the environment
+  default_registry_unoverridable: true
+  repos_unoverridable: true
+  git_repos_unoverridable: true
+  allow_deny_lists_unoverridable: true
+  signature_enforcement_unoverridable: true
+
+  # Security enforcement
+  signature_enforcement:
+    enable: true
+    trusted_keys:
+      - Security-Dept-Root-Key
+
+  # Compliance
+  allowed_licenses:
+    - MIT
+    - Apache-2.0
+    - BSD-3-Clause
+
+  denied_packages:
+    - telnet
+    - rsh-client
+```
