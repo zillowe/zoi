@@ -32,7 +32,7 @@ fn get_audit_log_path() -> Result<PathBuf> {
     if !zoi_dir.exists() {
         fs::create_dir_all(&zoi_dir)?;
     }
-    Ok(zoi_dir.join("audit.jsonl"))
+    Ok(zoi_dir.join("audit.json"))
 }
 
 fn get_username() -> String {

@@ -60,6 +60,7 @@ Zoi is packed with features designed to make package management and environment 
   - `zoi clean`: Clear the cache of downloaded package binaries.
   - `zoi exec`: Download and run a package's binary in a temporary cache without a full installation.
   - `zoi files`: List all files owned by an installed package.
+  - `zoi history`: View the audit log of past package operations (install, uninstall, upgrade).
   - `zoi info`: Display detected system information, including OS, architecture, and available package managers.
   - `zoi list`: List all installed packages, or all available packages from active repositories.
   - `zoi man`: Read package manuals directly in the terminal.
@@ -187,6 +188,12 @@ List all files owned by a package.
 **Arguments:**
 
 - `<package>`: The name of the package.
+
+---
+
+### `zoi history`
+
+Shows the history of past package operations (install, uninstall, upgrade) from the audit log. Requires `audit_log_enabled: true` in configuration.
 
 ---
 

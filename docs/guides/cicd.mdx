@@ -1,0 +1,167 @@
+---
+title: CI/CD Integration
+description: A guide on integrating Zoi into your CI/CD pipelines for automated environment setup and package building.
+---
+
+Integrating Zoi into your CI/CD workflows allows you to consistently provision build tools, manage project-specific environments, and automate the creation of Zoi packages. This guide covers common strategies for GitHub Actions, GitLab CI, and Jenkins.
+
+## Core Strategies
+
+There are two primary ways to use Zoi in a CI/CD environment:
+
+1.  **Direct Installation:** Use the Zoi installer script to install the CLI directly on the runner.
+2.  **Docker Image:** Use the official Zoi CLI Docker image as the base for your CI jobs.
+
+---
+
+## GitHub Actions
+
+Using Zoi in GitHub Actions is straightforward. You can install it once and use it throughout your workflow.
+
+### Example: Tool Provisioning
+
+This workflow installs Zoi and uses it to provision specific tools (like `eza` and `bat`) for use in subsequent steps.
+
+```yaml
+name: CI
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Zoi
+        run: |
+          curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash
+          echo "$HOME/.zoi/pkgs/bin" >> $GITHUB_PATH
+
+      - name: Sync Zoi
+        run: zoi sync
+
+      - name: Install Build Tools
+        run: zoi install eza bat
+
+      - name: Verify Tools
+        run: |
+          eza --version
+          bat --version
+```
+
+### Example: Building a Zoi Package
+
+```yaml
+publish-pkg:
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+    - name: Install Zoi
+      run: curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash
+    - name: Build Package
+      run: |
+        ~/.zoi/pkgs/bin/zoi package build my-tool.pkg.lua --type source --platform linux-amd64
+```
+
+---
+
+## GitLab CI/CD
+
+GitLab CI is highly compatible with Zoi, especially when using the official Docker image.
+
+### Using the Docker Image
+
+The official image `registry.gitlab.com/zillowe/zillwen/zusty/zoi/zoi:latest` contains the `zoi` binary and its runtime requirements.
+
+```yaml
+stages:
+  - build
+  - test
+
+# Provision tools for the entire pipeline
+provision-env:
+  stage: build
+  image: registry.gitlab.com/zillowe/zillwen/zusty/zoi/zoi:latest
+  script:
+    - zoi sync
+    - zoi install --save # Installs everything listed in your project's zoi.yaml
+  artifacts:
+    paths:
+      - .zoi/pkgs/store/
+
+run-tests:
+  stage: test
+  image: registry.gitlab.com/zillowe/zillwen/zusty/zoi/zoi:latest
+  dependencies:
+    - provision-env
+  script:
+    - zoi env test # Runs the 'test' environment defined in zoi.yaml
+```
+
+---
+
+## Jenkins
+
+For Jenkins, you can either install Zoi on the agent nodes or use a Docker-based pipeline.
+
+### Pipeline Script (Jenkinsfile)
+
+```groovy
+pipeline {
+    agent {
+        docker { image 'registry.gitlab.com/zillowe/zillwen/zusty/zoi/zoi:latest' }
+    }
+    stages {
+        stage('Sync') {
+            steps {
+                sh 'zoi sync'
+            }
+        }
+        stage('Setup Environment') {
+            steps {
+                sh 'zoi env ci'
+            }
+        }
+        stage('Build') {
+            steps {
+                sh 'zoi run build'
+            }
+        }
+    }
+}
+```
+
+---
+
+## Caching Zoi Packages
+
+To speed up your CI/CD pipelines, it is highly recommended to cache the Zoi store directory. This prevents Zoi from re-downloading and re-building the same packages on every run.
+
+### GitHub Actions Caching
+
+```yaml
+- name: Cache Zoi Store
+  uses: actions/cache@v4
+  with:
+    path: ~/.zoi/pkgs/store
+    key: ${{ runner.os }}-zoi-${{ hashFiles('zoi.yaml', 'zoi.lock') }}
+    restore-keys: |
+      ${{ runner.os }}-zoi-
+```
+
+### GitLab CI Caching
+
+```yaml
+cache:
+  paths:
+    - .zoi/pkgs/store/
+```
+
+---
+
+## Best Practices for CI/CD
+
+1.  **Use `zoi.lock`**: Always commit your `zoi.lock` file to ensure that your CI environment uses the exact same package versions as your local development environment.
+2.  **Headless Mode**: Use the `--yes` flag (or `-y`) with all Zoi commands to prevent the pipeline from hanging on interactive prompts.
+3.  **Specific Platforms**: When building packages with `zoi package build`, explicitly specify the `--platform` to ensure you are creating the correct artifacts for your target users.
+4.  **Local Project Scopes**: For CI jobs that only need tools for the current build, use `--scope project` or `--local` to keep the installation isolated to the project directory.

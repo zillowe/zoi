@@ -88,6 +88,14 @@ Enables or disables Zoi's opt-in anonymous telemetry. See the [Telemetry page](/
 - **Default:** `false`
 - **Example:** `telemetry_enabled: true`
 
+### `audit_log_enabled`
+
+Enables or disables persistent audit logging of all package operations (install, uninstall, upgrade). Logs are stored in `~/.zoi/audit.json` and can be viewed with `zoi history`.
+
+- **Type:** `boolean`
+- **Default:** `false`
+- **Example:** `audit_log_enabled: true`
+
 ### `rollback_enabled`
 
 If `true`, Zoi will keep the previous version of a package when upgrading, allowing for `zoi rollback` to function. If `false`, old versions are deleted immediately.
@@ -144,6 +152,7 @@ When a policy field is set to `true`, the corresponding configuration from the s
 - `added_registries_unoverridable`: If `true`, the `added_registries` list is locked.
 - `git_repos_unoverridable`: If `true`, the `git_repos` list is locked.
 - `telemetry_enabled_unoverridable`: If `true`, the `telemetry_enabled` setting is locked.
+- `audit_log_enabled_unoverridable`: If `true`, the `audit_log_enabled` setting is locked.
 - `rollback_enabled_unoverridable`: If `true`, the `rollback_enabled` setting is locked.
 - `protect_db_unoverridable`: If `true`, the `protect_db` setting is locked.
 - `max_resolution_depth_unoverridable`: If `true`, the `max_resolution_depth` setting is locked.

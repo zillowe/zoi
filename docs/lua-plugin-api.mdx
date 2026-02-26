@@ -22,7 +22,7 @@ You can register custom subcommands that appear as if they were built into Zoi.
 
 Registers a new command. The function accepts a table with the following fields:
 
-- `name` (string): The subcommand name (e.g., `"audit"`).
+- `name` (string): The subcommand name (e.g. `"audit"`).
 - `description` (string): A short summary shown when `zoi` is run without arguments.
 - `callback` (function): The function to run. It receives one argument: `args` (a list of strings).
 
@@ -106,7 +106,7 @@ Prints text to the terminal.
 Renders a structured ASCII table.
 
 - `headers`: A list of strings.
-- `rows`: A list of lists (e.g., `{{ "row1-col1", "row1-col2" }, { "row2-col1", "row2-col2" }}`).
+- `rows`: A list of lists (e.g. `{{ "row1-col1", "row1-col2" }, { "row2-col1", "row2-col2" }}`).
 
 ### `zoi.ui.confirm(prompt)`
 
@@ -131,7 +131,7 @@ Runs a command in the system shell (`bash` on Unix, `pwsh` on Windows). Returns 
 
 ### `zoi.version`
 
-Returns the current Zoi version string (e.g., `"1.6.0"`).
+Returns the current Zoi version string (e.g. `"1.6.0"`).
 
 ---
 

@@ -1,0 +1,69 @@
+---
+title: Backup & Restore
+description: How to back up your Zoi environment and restore it on another machine.
+---
+
+Zoi makes it easy to keep your development environment portable. Since Zoi tracks all installed packages in a central manifest, you can back up this manifest and use it to recreate your entire environment on a new system with a single command.
+
+## The Package Record (`zoi.pkgs.json`)
+
+Every time you install or uninstall a package globally (in `user` or `system` scope), Zoi updates a master record of your environment.
+
+- **Linux/macOS:** `~/.zoi/pkgs/zoi.pkgs.json`
+- **Windows:** `%USERPROFILE%\.zoi\pkgs\zoi.pkgs.json`
+
+This file contains a detailed manifest of every package you have installed, including its origin (registry/repo), version, and chosen optional dependencies.
+
+### Backing Up
+
+To back up your Zoi environment, simply copy the `zoi.pkgs.json` file to a safe location (e.g. a cloud drive, a git repository, or your dotfiles manager).
+
+```sh
+cp ~/.zoi/pkgs/zoi.pkgs.json ~/my-backups/zoi-backup.json
+```
+
+### Restoring
+
+To restore your environment on a new machine:
+
+1.  **Install Zoi** on the new system.
+2.  **Sync** the default registries: `zoi sync`.
+3.  **Install from the backup file**:
+
+```sh
+zoi install ~/my-backups/zoi-backup.json
+```
+
+Zoi will read the manifest, resolve all listed packages, and install them sequentially.
+
+---
+
+## Project-Level Backup (`zoi.lock`)
+
+For individual projects, backup and restore are handled automatically via version control.
+
+1.  **`zoi.yaml`**: Defines your project's dependencies.
+2.  **`zoi.lock`**: (Generated when `config.local` is true) Records the exact integrity hashes and versions of your project's local packages.
+
+### Restoring a Project
+
+When you clone a project that uses Zoi:
+
+```sh
+git clone https://github.com/user/my-project.git
+cd my-project
+zoi install
+```
+
+Zoi will detect the `zoi.yaml` and `zoi.lock` files and provision the project-local environment exactly as it was when the lockfile was created.
+
+---
+
+## Configuration Backup
+
+Don't forget to also back up your `config.yaml` and PGP keys if you have custom settings or trusted keys.
+
+- **Config:** `~/.zoi/pkgs/config.yaml`
+- **PGP Keys:** `~/.zoi/pgps/`
+
+You can use a Zoi [Extension](/docs/zds/zoi/extensions) to bundle your custom configuration and keys into a single package, making it even easier to bootstrap new machines.
