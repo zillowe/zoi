@@ -975,6 +975,42 @@ pub fn setup_lua_environment(
     path_table.set("system", system_bin_path)?;
 
     zoi_table.set("PATH", path_table)?;
+
+    let pkg_table = lua.create_table()?;
+    if let Some(home_dir) = home::home_dir() {
+        pkg_table.set("home", home_dir.to_string_lossy().to_string())?;
+        pkg_table.set(
+            "store",
+            home_dir
+                .join(".zoi")
+                .join("pkgs")
+                .join("store")
+                .to_string_lossy()
+                .to_string(),
+        )?;
+    }
+
+    if let Ok(current_dir) = std::env::current_dir() {
+        pkg_table.set("template", current_dir.to_string_lossy().to_string())?;
+    }
+
+    let root = if cfg!(target_os = "windows") {
+        "C:\\"
+    } else {
+        "/"
+    };
+    pkg_table.set("root", root)?;
+
+    if let Some(path_str) = file_path {
+        let abs_path = if let Ok(p) = fs::canonicalize(path_str) {
+            p
+        } else {
+            Path::new(path_str).to_path_buf()
+        };
+        pkg_table.set("lua", abs_path.to_string_lossy().to_string())?;
+    }
+    zoi_table.set("PKG", pkg_table)?;
+
     lua.globals().set("ZOI", zoi_table)?;
 
     let utils_table = lua.create_table()?;
