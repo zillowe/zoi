@@ -196,3 +196,36 @@ pub fn validate_pkgs_json_integrity() -> Result<Vec<String>> {
 
     Ok(missing_packages)
 }
+
+pub fn check_orphaned_packages() -> Result<Vec<String>> {
+    let all_installed = crate::pkg::local::get_installed_packages()?;
+    let mut orphaned = Vec::new();
+
+    for package in all_installed {
+        if !matches!(
+            package.reason,
+            crate::pkg::types::InstallReason::Dependency { .. }
+        ) {
+            continue;
+        }
+
+        let package_dir = crate::pkg::local::get_package_dir(
+            package.scope,
+            &package.registry_handle,
+            &package.repo,
+            &package.name,
+        )?;
+        let dependents = crate::pkg::local::get_dependents(&package_dir)?;
+
+        if dependents.is_empty() {
+            let name = if let Some(sub) = package.sub_package {
+                format!("{}:{}", package.name, sub)
+            } else {
+                package.name
+            };
+            orphaned.push(name);
+        }
+    }
+
+    Ok(orphaned)
+}

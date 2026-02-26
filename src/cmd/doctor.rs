@@ -156,6 +156,34 @@ pub fn run() -> Result<()> {
         }
     }
 
+    println!("\n{}", "Checking for orphaned packages...".bold());
+    match pkg::doctor::check_orphaned_packages() {
+        Ok(orphaned) => {
+            if orphaned.is_empty() {
+                println!("{}", "No orphaned packages found.".green());
+            } else {
+                issues_found += orphaned.len();
+                println!(
+                    "{}: Found {} orphaned packages (unused dependencies):",
+                    "Warning".yellow(),
+                    orphaned.len()
+                );
+                for pkg in orphaned {
+                    println!("  - {}", pkg.cyan());
+                }
+                println!("\nConsider running 'zoi autoremove' to clean up these packages.");
+            }
+        }
+        Err(e) => {
+            eprintln!(
+                "{}: Failed to check for orphaned packages: {}",
+                "Error".red(),
+                e
+            );
+            issues_found += 1;
+        }
+    }
+
     if issues_found == 0 {
         println!(
             "\n{}",
