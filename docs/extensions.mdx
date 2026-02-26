@@ -117,6 +117,17 @@ Adds a PGP key to Zoi's local key store.
 - **Effect:** Zoi downloads or fetches the key and adds it to `~/.zoi/pgps/`.
 - **On Removal:** The PGP key file is deleted from the store.
 
+#### `plugin`
+
+Distributes a Lua script that extends Zoi's core CLI functionality with custom subcommands.
+
+- **Purpose:** To add new logic, workflows, or integrations to Zoi.
+- **Fields:**
+  - `name`: A unique name for the plugin.
+  - `script`: The raw Lua script content.
+- **Effect:** Zoi saves the script to `~/.zoi/plugins/` and loads it on startup. The script can use the `zoi` API to register commands.
+- **On Removal:** The plugin script is deleted.
+
 ## Examples
 
 Here are a couple of examples demonstrating different use cases for extensions.
@@ -215,6 +226,45 @@ commands:
 ```
 
 A user can now navigate to an empty project directory, run `zoi extension add my-rust-starter`, and immediately have a working `zoi.yaml` to start developing.
+
+### Custom Subcommand Plugin
+
+This example shows how to create a plugin that adds a new `zoi hello` command.
+
+```lua
+-- hello-plugin.pkg.lua
+metadata({
+  name = "hello-plugin",
+  repo = "community",
+  type = "extension",
+  version = "1.0",
+  description = "Adds a custom 'hello' command to Zoi.",
+  maintainer = {
+    name = "Your Name",
+    email = "your.email@example.com"
+  },
+  extension = {
+    type = "zoi",
+    changes = {
+      {
+        type = "plugin",
+        name = "hello-cmd",
+        script = [[
+zoi.register_command("hello", function(args)
+    print("Hello from Zoi Plugin!")
+    print("Your OS is: " .. zoi.system.os)
+    if #args > 0 then
+        print("Arguments passed: " .. table.concat(args, ", "))
+    end
+end)
+]]
+      }
+    }
+  }
+})
+```
+
+After adding this extension with `zoi extension add hello-plugin`, you can run `zoi hello world` and see the plugin's output.
 
 ## Managing Extensions
 

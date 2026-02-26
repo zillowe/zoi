@@ -1,0 +1,212 @@
+---
+title: Lua Plugin API
+description: The ultimate reference for extending Zoi's core functionality with Lua plugins.
+---
+
+Plugins are global Lua scripts that allow you to transform Zoi from a tool into a personalized development platform. While package scripts (`.pkg.lua`) are scoped to a single package, **Plugins** are loaded on every Zoi invocation, allowing them to add global commands, enforce security policies, and automate workflows.
+
+## Lifecycle & Location
+
+Plugins are distributed via **Extensions**. When an extension containing a `plugin` change-type is added, the script is saved to the Zoi home directory.
+
+- **Storage Location**: `~/.zoi/plugins/`
+- **Loading**: Every time you run `zoi`, Zoi initializes a Lua VM and executes every `.lua` file in the plugins folder in alphabetical order before processing your command.
+
+---
+
+## Command API
+
+You can register custom subcommands that appear as if they were built into Zoi.
+
+### `zoi.register_command(config)`
+
+Registers a new command. The function accepts a table with the following fields:
+
+- `name` (string): The subcommand name (e.g., `"audit"`).
+- `description` (string): A short summary shown when `zoi` is run without arguments.
+- `callback` (function): The function to run. It receives one argument: `args` (a list of strings).
+
+```lua
+zoi.register_command({
+    name = "hello",
+    description = "A friendly greeting from a plugin",
+    callback = function(args)
+        local target = args[1] or "World"
+        zoi.ui.print("Hello, " .. target .. "!", "green")
+    end
+})
+```
+
+---
+
+## The Hook System
+
+Hooks allow you to intercept Zoi's core operations. This is useful for auditing, logging, or extending Zoi's behavior.
+
+| Hook                       | Argument   | Trigger Point                                    |
+| :------------------------- | :--------- | :----------------------------------------------- |
+| `on_pre_install`           | `pkg`      | Before a package installation starts.            |
+| `on_post_install`          | `manifest` | After a package is successfully installed.       |
+| `on_pre_uninstall`         | `manifest` | Before a package is removed.                     |
+| `on_post_uninstall`        | `manifest` | After a package is removed.                      |
+| `on_pre_extension_add`     | `pkg`      | Before an extension is applied.                  |
+| `on_post_extension_add`    | `manifest` | After an extension is successfully applied.      |
+| `on_pre_extension_remove`  | `manifest` | Before an extension is reverted.                 |
+| `on_post_extension_remove` | `manifest` | After an extension is reverted.                  |
+| `on_pre_create`            | `pkg`      | Before building/creating an app from a template. |
+| `on_post_create`           | `pkg`      | After the app is successfully created.           |
+| `on_pre_sync`              | None       | Before the package database is updated.          |
+| `on_post_sync`             | None       | After the package database sync is complete.     |
+| `on_rollback`              | None       | When a rollback operation is triggered.          |
+
+---
+
+## Data Inspection API
+
+Plugins can query the state of the machine and the Zoi environment.
+
+### `zoi.list_installed()`
+
+Returns an array of [InstallManifest](#installmanifest) objects for every package currently installed on the system across all scopes.
+
+### `zoi.get_package(name)`
+
+Fetches the [Package](#package-metadata) metadata for a specific package from the local database. This works even if the package is not installed.
+
+### `zoi.project`
+
+If you are inside a project with a `zoi.yaml` file, this table is available:
+
+- `zoi.project.name` (string): The project name.
+- `zoi.project.packages` (list): A list of strings representing the packages required by the project.
+
+---
+
+## Persistent State
+
+Plugins can save and retrieve data that persists between different Zoi commands. The data is stored in `~/.zoi/plugins/state.json`.
+
+- **`zoi.set_data(key, value)`**: Store a value. Supports strings, numbers, and booleans.
+- **`zoi.get_data(key)`**: Retrieve a value. Returns `nil` if the key doesn't exist.
+
+---
+
+## UI & Interaction
+
+Use Zoi's internal UI engine to make your plugins look professional.
+
+### `zoi.ui.print(text, color)`
+
+Prints text to the terminal.
+
+- **Colors**: `red`, `green`, `yellow`, `blue`, `cyan`, `magenta`, `white`.
+
+### `zoi.ui.table(headers, rows)`
+
+Renders a structured ASCII table.
+
+- `headers`: A list of strings.
+- `rows`: A list of lists (e.g., `{{ "row1-col1", "row1-col2" }, { "row2-col1", "row2-col2" }}`).
+
+### `zoi.ui.confirm(prompt)`
+
+Displays a `y/N` prompt and returns a boolean.
+
+### `zoi.ui.select(prompt, options)`
+
+Displays a list of options and returns the **1-based index** of the user's choice.
+
+---
+
+## System & Shell
+
+### `zoi.sh(command)`
+
+Runs a command in the system shell (`bash` on Unix, `pwsh` on Windows). Returns the integer exit code.
+
+### `zoi.system`
+
+- `zoi.system.os`: Returns `"linux"`, `"macos"`, or `"windows"`.
+- `zoi.system.arch`: Returns `"amd64"`, `"arm64"`, etc.
+
+### `zoi.version`
+
+Returns the current Zoi version string (e.g., `"1.6.0"`).
+
+---
+
+## Data Structures
+
+### Package Metadata
+
+The object passed to `on_pre_install` or returned by `get_package`.
+
+- `name`: Package name.
+- `version`: Version string.
+- `license`: SPDX license identifier.
+- `description`: Summary.
+- `repo`: Source repository name.
+- `tags`: List of tags.
+
+### InstallManifest
+
+The object passed to `on_post_install` and `on_pre_uninstall`.
+
+- `name`: Package name.
+- `version`: Installed version.
+- `scope`: `"user"`, `"system"`, or `"project"`.
+- `installed_files`: A list of every file path created by the package.
+- `repo`: The repository it originated from.
+
+---
+
+## Advanced Examples
+
+### Example 1: The License Enforcer
+
+Prevents the installation of any package with a restricted license.
+
+```lua
+zoi.on_pre_install(function(pkg)
+    local restricted = { ["GPL-3.0"] = true, ["AGPL-3.0"] = true }
+    if restricted[pkg.license] then
+        zoi.ui.print("SECURITY ALERT: " .. pkg.name .. " uses " .. pkg.license, "red")
+        if not zoi.ui.confirm("This license is restricted in this environment. Continue?") then
+            os.exit(1)
+        end
+    end
+end)
+```
+
+### Example 2: Project Usage Tracker
+
+Tracks how many times you run commands in a specific project.
+
+```lua
+if zoi.project then
+    local key = "runs_" .. zoi.project.name
+    local count = zoi.get_data(key) or 0
+    zoi.set_data(key, count + 1)
+end
+```
+
+### Example 3: Custom "Project Doctor" Command
+
+Adds a command to verify your environment.
+
+```lua
+zoi.register_command({
+    name = "doctor",
+    description = "Check if project dependencies are met",
+    callback = function()
+        if not zoi.project then
+            zoi.ui.print("Not in a Zoi project.", "red")
+            return
+        end
+
+        zoi.ui.print("Checking dependencies for " .. zoi.project.name, "cyan")
+        local installed = zoi.list_installed()
+        -- ... logic to cross-reference zoi.project.packages with installed ...
+    end
+})
+```

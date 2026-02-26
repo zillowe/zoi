@@ -8,6 +8,7 @@
     "---Maintainers Guides---",
     "creating-packages",
     "lua-api",
+    "lua-plugin-api",
     "publishing-packages",
     "zoidberg",
     "migrate",
