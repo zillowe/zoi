@@ -149,54 +149,55 @@ When pinning is not supported, Zoi will install the latest version available fro
 
 Below is a comprehensive list of all supported dependency managers, their target platforms or ecosystems, and an example of how to use them in your `.pkg.lua`.
 
-| Manager          | Platform / Ecosystem | Example Usage                         |
-| ---------------- | -------------------- | ------------------------------------- |
-| `zoi`            | Zoi (all)            | `zoi:my-package`                      |
-| `native`         | System (auto)        | `native:openssl`                      |
-| `apt`            | Debian/Ubuntu        | `apt:build-essential`                 |
-| `pacman`         | Arch Linux           | `pacman:base-devel`                   |
-| `yay`            | Arch Linux (AUR)     | `yay:google-chrome`                   |
-| `paru`           | Arch Linux (AUR)     | `paru:visual-studio-code-bin`         |
-| `pikaur`         | Arch Linux (AUR)     | `pikaur:spotify`                      |
-| `trizen`         | Arch Linux (AUR)     | `trizen:zoom`                         |
-| `aur`            | Arch Linux (AUR)     | `aur:slack-desktop`                   |
-| `dnf`, `yum`     | Fedora/RHEL          | `dnf:libX11-devel`                    |
-| `zypper`         | openSUSE             | `zypper:libopenssl-devel`             |
-| `apk`            | Alpine Linux         | `apk:build-base`                      |
-| `portage`        | Gentoo               | `portage:dev-libs/openssl`            |
-| `xbps-install`   | Void Linux           | `xbps-install:base-devel`             |
-| `eopkg`          | Solus                | `eopkg:system.devel`                  |
-| `guix`           | GNU Guix             | `guix:gcc-toolchain`                  |
-| `brew`           | macOS (Homebrew)     | `brew:node`                           |
-| `brew-cask`      | macOS (Homebrew)     | `brew-cask:visual-studio-code`        |
-| `mas`            | macOS App Store      | `mas:1295203466`                      |
-| `macports`       | macOS (MacPorts)     | `macports:openssl`                    |
-| `scoop`          | Windows              | `scoop:git`                           |
-| `choco`          | Windows (Chocolatey) | `choco:git`                           |
-| `winget`         | Windows              | `winget:Git.Git`                      |
-| `snap`           | Linux (Snapcraft)    | `snap:node`                           |
-| `flatpak`        | Linux (Flathub)      | `flatpak:org.gimp.GIMP`               |
-| `pkg`            | FreeBSD              | `pkg:git`                             |
-| `pkg_add`        | OpenBSD              | `pkg_add:git`                         |
-| `cargo`          | Rust                 | `cargo:ripgrep`                       |
-| `cargo-binstall` | Rust (binary)        | `cargo-binstall:ripgrep`              |
-| `go`             | Go                   | `go:golang.org/x/tools/cmd/goimports` |
-| `npm`            | Node.js              | `npm:typescript`                      |
-| `yarn`           | Node.js              | `yarn:prettier`                       |
-| `pnpm`           | Node.js              | `pnpm:eslint`                         |
-| `bun`            | Bun                  | `bun:elysia`                          |
-| `volta`          | JavaScript           | `volta:node`                          |
-| `deno`           | Deno                 | `deno:npm-chalk`                      |
-| `jsr`            | JavaScript Registry  | `jsr:@std/http`                       |
-| `pip`            | Python               | `pip:requests`                        |
-| `pipx`           | Python               | `pipx:black`                          |
-| `uv`             | Python               | `uv:ruff`                             |
-| `conda`          | Conda                | `conda:numpy`                         |
-| `gem`            | Ruby                 | `gem:rails`                           |
-| `composer`       | PHP                  | `composer:laravel/installer`          |
-| `dotnet`         | .NET                 | `dotnet:fantomas`                     |
-| `nix`            | Nix                  | `nix:nixpkgs.hello`                   |
-| `dart-pub`       | Dart                 | `dart-pub:shelf`                      |
+| Manager          | Platform / Ecosystem | Example Usage                                          |
+| ---------------- | -------------------- | ------------------------------------------------------ |
+| `zoi`            | Zoi (all)            | `zoi:my-package`                                       |
+| `native`         | System (auto)        | `native:openssl`                                       |
+| `apt`            | Debian/Ubuntu        | `apt:build-essential`                                  |
+| `pacman`         | Arch Linux           | `pacman:base-devel`                                    |
+| `yay`            | Arch Linux (AUR)     | `yay:google-chrome`                                    |
+| `paru`           | Arch Linux (AUR)     | `paru:visual-studio-code-bin`                          |
+| `pikaur`         | Arch Linux (AUR)     | `pikaur:spotify`                                       |
+| `trizen`         | Arch Linux (AUR)     | `trizen:zoom`                                          |
+| `aur`            | Arch Linux (AUR)     | `aur:slack-desktop`                                    |
+| `dnf`, `yum`     | Fedora/RHEL          | `dnf:libX11-devel`                                     |
+| `zypper`         | openSUSE             | `zypper:libopenssl-devel`                              |
+| `apk`            | Alpine Linux         | `apk:build-base`                                       |
+| `portage`        | Gentoo               | `portage:dev-libs/openssl`                             |
+| `xbps-install`   | Void Linux           | `xbps-install:base-devel`                              |
+| `eopkg`          | Solus                | `eopkg:system.devel`                                   |
+| `guix`           | GNU Guix             | `guix:gcc-toolchain`                                   |
+| `brew`           | macOS (Homebrew)     | `brew:node`                                            |
+| `brew-cask`      | macOS (Homebrew)     | `brew-cask:visual-studio-code`                         |
+| `mas`            | macOS App Store      | `mas:1295203466`                                       |
+| `macports`       | macOS (MacPorts)     | `macports:openssl`                                     |
+| `scoop`          | Windows              | `scoop:git`                                            |
+| `choco`          | Windows (Chocolatey) | `choco:git`                                            |
+| `winget`         | Windows              | `winget:Git.Git`                                       |
+| `snap`           | Linux (Snapcraft)    | `snap:node`                                            |
+| `flatpak`        | Linux (Flathub)      | `flatpak:org.gimp.GIMP`                                |
+| `pkg`            | FreeBSD              | `pkg:git`                                              |
+| `pkg_add`        | OpenBSD              | `pkg_add:git`                                          |
+| `cargo`          | Rust                 | `cargo:ripgrep`                                        |
+| `cargo-binstall` | Rust (binary)        | `cargo-binstall:ripgrep`                               |
+| `go`             | Go                   | `go:golang.org/x/tools/cmd/goimports`                  |
+| `npm`            | Node.js              | `npm:typescript`                                       |
+| `yarn`           | Node.js              | `yarn:prettier`                                        |
+| `pnpm`           | Node.js              | `pnpm:eslint`                                          |
+| `bun`            | Bun                  | `bun:elysia`                                           |
+| `volta`          | JavaScript           | `volta:node`                                           |
+| `deno`           | Deno                 | `deno:npm-chalk`                                       |
+| `jsr`            | JavaScript Registry  | `jsr:@std/http`                                        |
+| `pip`            | Python               | `pip:requests`                                         |
+| `pipx`           | Python               | `pipx:black`                                           |
+| `uv`             | Python               | `uv:ruff`                                              |
+| `conda`          | Conda                | `conda:numpy`                                          |
+| `gem`            | Ruby                 | `gem:rails`                                            |
+| `composer`       | PHP                  | `composer:laravel/installer`                           |
+| `dotnet`         | .NET                 | `dotnet:fantomas`                                      |
+| `nix`            | Nix                  | `nix:nixpkgs.hello`                                    |
+| `zig`            | Zig                  | `zig:https://github.com/user/repo/archive/main.tar.gz` |
+| `dart-pub`       | Dart                 | `dart-pub:shelf`                                       |
 
 Notes:
 

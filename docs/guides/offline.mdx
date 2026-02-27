@@ -1,0 +1,77 @@
+---
+title: Offline & Air-gapped Usage
+description: How to use Zoi in environments with no internet access.
+---
+
+Zoi provides a strict offline mode designed for high-security, air-gapped, or network-restricted environments. This ensures that Zoi never attempts to touch the network and relies entirely on local metadata and pre-cached package archives.
+
+## Enabling Offline Mode
+
+To force Zoi to operate without network access, use the global `--offline` flag with any command:
+
+```sh
+zoi install my-package --offline
+```
+
+When this flag is set:
+
+1. **No Downloads:** Zoi will never attempt to create an HTTP client or download any files.
+2. **Local Metadata:** Package version resolution (like `@stable`) will skip remote JSON checks and use the information stored in the local SQLite metadata database.
+3. **No Git Pulls:** `zoi sync` and dependency resolution will assume the local registry is the source of truth and skip `git pull` operations.
+
+---
+
+## Provisioning an Offline System
+
+To use Zoi offline, you must first populate the local caches while you have an active internet connection.
+
+### 1. Sync the Metadata
+
+Run a sync to download the latest `.pkg.lua` definitions and build the SQLite search index.
+
+```sh
+zoi sync
+```
+
+### 2. Populate the Archive Cache
+
+You need the actual package binaries (`.pkg.tar.zst`). You can download these on a machine with internet and move them to the air-gapped system.
+
+#### Using `zoi cache add`
+
+If you have a folder of downloaded archives, you can "index" them into Zoi's internal cache:
+
+```sh
+zoi cache add ./my-downloads/*.pkg.tar.zst
+```
+
+#### Using `--pkg-dir`
+
+Alternatively, you can keep your archives in a separate directory and tell Zoi to search it automatically during installation:
+
+```sh
+zoi install my-package --pkg-dir /mnt/usb/packages --offline
+```
+
+---
+
+## Best Practices for Air-gapped Environments
+
+### Registry Bundling
+
+You can bundle an entire Zoi registry (including the Git history and the SQLite `.db` files) into a compressed archive and extract it into `~/.zoi/pkgs/db/` on the target machine.
+
+### Using the Binary Cache
+
+Regularly manage your local archive cache to save space:
+
+- `zoi cache ls`: List all archives currently available for offline install.
+- `zoi cache clear`: Remove all archives from the local cache.
+
+### Sysroot Bootstrapping
+
+You can combine offline mode with the `--root` flag to bootstrap an entire filesystem from an external drive:
+
+```sh
+zoi install base linux vim --root /mnt/new-disk --pkg-dir /mnt/usb/archives --offline
+```

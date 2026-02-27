@@ -59,6 +59,32 @@ Binaries are not added to the system `PATH` individually. Instead, Zoi maintains
 
 ---
 
+## Dependency Resolution (SAT Solver)
+
+Zoi uses a Boolean Satisfiability (SAT) solver to resolve dependencies. This ensures that even the most complex dependency graphs with version constraints and conflicts are solved mathematically.
+
+### The Engine: PubGrub
+
+Zoi integrates the **PubGrub** algorithm (via the `pubgrub` crate), which is a next-generation version solver also used by `cargo` and `uv`. PubGrub provides:
+
+- **Conflict-Driven Clause Learning (CDCL):** Quickly narrows down the search space for valid solutions.
+- **Human-Readable Errors:** If a set of dependencies is impossible to satisfy, Zoi prints a clear explanation of exactly which constraints are clashing.
+- **Backtracking:** If an initial choice leads to a dead-end, the solver can backtrack and try alternative versions.
+
+### SQLite-Powered Metadata
+
+The solver is fed by a high-performance SQLite database. During a `zoi sync`, Zoi builds an index of every available package version and its requirements. This allows the solver to query thousands of versions in milliseconds without parsing thousands of Lua files on the fly.
+
+### Global File Indexing
+
+Zoi supports searching for files across all active registries, even for packages that are not installed. This is achieved via:
+
+- **Remote File Metadata:** Registries can host `.files` metadata files for each package.
+- **SQLite Indexing:** When `zoi sync --files` is run, Zoi downloads these file lists and populates a dedicated `package_files` table in the SQLite database.
+- **FTS5 Integration:** The file table uses a Virtual Table with FTS5 indexing, allowing for near-instant searching of millions of file paths using the `zoi search --files` command.
+
+---
+
 ## PGP Key Management
 
 Zoi uses a dedicated keyring for package and registry verification, separate from the system's GPG keyring.

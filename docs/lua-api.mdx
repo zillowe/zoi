@@ -75,6 +75,76 @@ Executes another Lua script located in the same directory. Useful for sharing lo
 
 ---
 
+## Declarative Functions
+
+These top-level functions are used to define the package's structure and behavior.
+
+### `metadata(table)`
+
+Defines the package's static properties. See [Creating Packages](/docs/zds/zoi/creating-packages#metadata) for a full list of fields.
+
+### `dependencies(table)`
+
+Defines build-time and runtime requirements. See [Dependencies](/docs/zds/zoi/dependencies) for details.
+
+### `updates(list)`
+
+Defines a list of update messages shown to the user.
+
+**Table Fields:**
+
+- `type`: (enum) `update`, `change`, or `vulnerability`.
+- `message`: (string) The message text.
+
+### `hooks(table)`
+
+Defines commands to run at specific points in the package's lifecycle (e.g. `post_install`).
+
+### `service(table)`
+
+Defines a background service managed by the system.
+
+**Table Fields:**
+
+- `run`: (string) The command to execute.
+- `run_at_load`: (boolean) Start on boot/login.
+- `working_dir`: (string) Directory to run in.
+- `env`: (table) Environment variables.
+- `log_path`: (string) Path for standard output.
+- `error_log_path`: (string) Path for error output.
+
+---
+
+## Lifecycle Functions
+
+Zoi calls these functions in a specific order during the build and installation process.
+
+### `prepare(args)`
+
+Runs first to fetch source code or binaries into `BUILD_DIR`.
+
+### `package(args)`
+
+Runs after `prepare` to compile and stage files into `STAGING_DIR`.
+
+### `verify(args)`
+
+Runs after `package` to ensure the integrity of the downloaded files. Should return `true` or `false`.
+
+### `test(args)`
+
+Optional function run by `zoi package test` to validate the staged files.
+
+### `uninstall()`
+
+Runs when the package is uninstalled to clean up external state.
+
+**The `args` table contains:**
+
+- `sub`: (string) The name of the sub-package being processed (for split packages).
+
+---
+
 ## Utility Tables (`UTILS`)
 
 ### `UTILS.FETCH`

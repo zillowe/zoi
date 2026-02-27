@@ -130,6 +130,26 @@ Configures the maximum recursion depth for package resolution when using the `al
 - **Behavior when exceeded:** Zoi will prompt the user to either continue or cancel the operation.
 - **Example:** `max_resolution_depth: 10`
 
+### `offline_mode`
+
+If `true`, Zoi will not attempt to connect to the network. It will rely entirely on local metadata and archive caches.
+
+- **Type:** `boolean`
+- **Default:** `false`
+- **Example:** `offline_mode: true`
+
+### `pkg_dirs`
+
+A list of additional directories to search for `.pkg.tar.zst` archives during installation.
+
+- **Type:** `list` of `string`
+- **Example:**
+  ```yaml
+  pkg_dirs:
+    - /mnt/usb/packages
+    - /opt/zoi/archives
+  ```
+
 ### `policy`
 
 A special object that can only be set in the **system-wide** configuration file (`/etc/zoi/config.yaml`). It allows administrators to lock down certain settings, preventing them from being overridden by user or project configs.
@@ -156,6 +176,8 @@ When a policy field is set to `true`, the corresponding configuration from the s
 - `rollback_enabled_unoverridable`: If `true`, the `rollback_enabled` setting is locked.
 - `protect_db_unoverridable`: If `true`, the `protect_db` setting is locked.
 - `max_resolution_depth_unoverridable`: If `true`, the `max_resolution_depth` setting is locked.
+- `offline_mode_unoverridable`: If `true`, the `offline_mode` setting is locked.
+- `pkg_dirs_unoverridable`: If `true`, the `pkg_dirs` list is locked.
 - `allow_deny_lists_unoverridable`: If `true`, the various allow/deny lists (`allowed_packages`, `denied_licenses`, etc.) are locked.
 - `signature_enforcement_unoverridable`: If `true`, the `signature_enforcement` policy is locked.
 

@@ -1,0 +1,68 @@
+---
+title: Global Transaction Hooks
+description: How to automate system maintenance tasks using path-based transaction hooks.
+---
+
+Zoi features a powerful global transaction hook system designed to automate system maintenance tasks. Similar to `alpm-hooks`, these allow you to define actions that run exactly once at the end of a package operation (install, upgrade, or remove) based on which files were modified.
+
+## Why Use Global Hooks?
+
+In a standard package manager, if you install 50 packages that all contain fonts, you might end up running `fc-cache` 50 times. Zoi's global hooks solve this by:
+
+1. **Deduplication:** Matching modified paths across all packages in a transaction and running the associated command once.
+2. **Decoupling:** Allowing system administrators to define maintenance logic without modifying individual package definitions.
+3. **Efficiency:** Ensuring system caches (like font caches, desktop databases, or ldconfig) are updated only when necessary.
+
+---
+
+## Hook Definition (`.hook.yaml`)
+
+Hooks are defined using simple YAML files. They can be placed in:
+
+- **System:** `/etc/zoi/hooks/`
+- **User:** `~/.zoi/hooks/`
+- **Extensions:** Distributed via Zoi [Extensions](/docs/zds/zoi/extensions).
+
+### Example: update-font-cache.hook.yaml
+
+```yaml
+name: update-font-cache
+description: Rebuilds system font cache when fonts are installed or removed.
+platforms: ["linux"]
+trigger:
+  # Trigger if any files are modified in these directories
+  paths:
+    - "usr/share/fonts/**"
+    - "usr/local/share/fonts/**"
+  # Only trigger for these operations
+  operation: ["install", "upgrade", "remove"]
+action:
+  when: PostTransaction
+  exec: fc-cache -fv
+```
+
+### Schema Reference
+
+| Field               | Type     | Description                                                                 |
+| :------------------ | :------- | :-------------------------------------------------------------------------- |
+| `name`              | `string` | A unique name for the hook.                                                 |
+| `description`       | `string` | A short summary of what the hook does.                                      |
+| `platforms`         | `list`   | (Optional) List of supported platforms (e.g. `["linux"]`).                  |
+| `trigger.paths`     | `list`   | A list of glob patterns. If any modified file matches, the hook triggers.   |
+| `trigger.operation` | `list`   | (Optional) Restrict to specific operations: `install`, `upgrade`, `remove`. |
+| `action.when`       | `enum`   | When to run: `PostTransaction` (currently supported).                       |
+| `action.exec`       | `string` | The shell command to execute.                                               |
+
+---
+
+## Builtin Hooks
+
+Zoi ships with several essential builtin hooks for Linux systems:
+
+- **`update-font-cache`**: Runs `fc-cache -fv` when fonts are modified.
+- **`update-desktop-database`**: Runs `update-desktop-database -q` when `.desktop` files are modified.
+- **`ldconfig`**: Runs `ldconfig` when shared libraries (`.so` files) are modified.
+
+## Overriding Hooks
+
+Zoi follows a hierarchical loading order. If a hook in your user directory (`~/.zoi/hooks/`) has the same **name** as a builtin or system hook, your user hook will take precedence and override the others. This allows you to easily customize or disable standard system behaviors.

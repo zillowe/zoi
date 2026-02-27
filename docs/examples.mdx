@@ -1,13 +1,13 @@
 ---
 title: Package Examples
-description: A set of `.pkg.lua` examples for creating Zoi packages.
+description: A comprehensive set of examples for creating Zoi packages and project configurations.
 ---
 
-This document provides a set of examples for creating `.pkg.lua` files. These files are the core of Zoi's packaging system, defining everything from metadata to installation methods using the power of Lua scripting.
+This document provides a wide range of examples demonstrating the flexibility and power of Zoi's packaging system. These examples cover everything from basic binaries to complex background services and multi-component packages.
 
-## Simple Pre-compiled Binary
+## 1. Simple Pre-compiled Binary
 
-This example shows how to package a simple pre-compiled binary that is downloaded from a URL (like a GitHub release). It's for a hypothetical tool called `my-cli`.
+The most common use case: downloading a pre-built binary from a release page.
 
 ```lua
 -- my-cli.pkg.lua
@@ -26,234 +26,803 @@ function prepare()
   local version = PKG.version
   local os = SYSTEM.OS
   local arch = SYSTEM.ARCH
-  local ext = "tar.gz"
-  if os == "windows" then
-    ext = "zip"
-  end
+  local ext = (os == "windows") and "zip" or "tar.gz"
 
-  -- Construct the download URL, e.g. from GitHub releases
-  local url = "https://example.com/my-cli/releases/download/v" .. version .. "/my-cli-" .. os .. "-" .. arch .. "." .. ext
+  -- Construct the download URL
+  local url = string.format("https://example.com/my-cli/releases/download/v%s/my-cli-%s-%s.%s", version, os, arch, ext)
 
-  -- Download and extract the archive into a directory named "extracted_cli" inside the temporary build directory
-  UTILS.EXTRACT(url, "extracted_cli")
+  -- Download and extract into a directory named "extracted"
+  UTILS.EXTRACT(url, "extracted")
 end
 
 function package()
-  local bin_name = "my-cli"
-  if SYSTEM.OS == "windows" then
-    bin_name = "my-cli.exe"
-  end
-
-  -- Copy the binary from the extracted directory to the package store.
-  -- ${pkgstore} is a special variable that points to the final installation directory for the package.
-  zcp("extracted_cli/" .. bin_name, "${pkgstore}/bin/" .. bin_name)
+  local bin_name = (SYSTEM.OS == "windows") and "my-cli.exe" or "my-cli"
+  -- Stage the binary to the package store
+  zcp("extracted/" .. bin_name, "${pkgstore}/bin/" .. bin_name)
 end
 ```
 
-## Bundling a Local Asset
+## 2. Background Service (Daemon)
 
-This example shows how to use the `${pkgluadir}` variable to bundle a file that is located in the same directory as your `.pkg.lua` file.
-
-Assume you have the following file structure:
-
-```
-my-package/
-├── my-package.pkg.lua
-└── icon.png
-```
+Example of a package that defines a background process managed by the system (`systemd`, `launchd`, or `sc.exe`).
 
 ```lua
--- my-package.pkg.lua
+-- redis-server.pkg.lua
 metadata({
-  name = "my-package-with-asset",
-  repo = "community",
+  name = "redis-server",
+  repo = "core",
+  version = "7.2.4",
+  description = "In-memory data structure store",
+  license = "BSD-3-Clause",
+  bins = { "redis-server", "redis-cli" },
+  types = { "pre-compiled" }
+})
+
+-- Define the background service
+service({
+  -- Command to run the daemon
+  run = "${pkgstore}/bin/redis-server ${pkgstore}/etc/redis.conf",
+  -- Start automatically at boot/login
+  run_at_load = true,
+  working_dir = "${pkgstore}",
+  env = {
+    REDIS_PORT = "6379"
+  },
+  log_path = "/var/log/redis.log"
+})
+
+function prepare()
+  local url = "https://example.com/redis-" .. SYSTEM.OS .. ".tar.zst"
+  UTILS.EXTRACT(url, "src")
+end
+
+function package()
+  zcp("src/bin", "${pkgstore}/bin")
+  -- Bundle a default config file next to the .pkg.lua script
+  zcp("${pkgluadir}/redis.conf", "${pkgstore}/etc/redis.conf")
+end
+```
+
+## 3. Split Package (Library & Headers)
+
+Large projects often split binaries, libraries, and headers into separate sub-packages.
+
+```lua
+-- libexample.pkg.lua
+metadata({
+  name = "libexample",
+  repo = "main",
   version = "1.0.0",
-  description = "A package that bundles a local asset.",
+  description = "An example C library",
+  license = "LGPL-2.1-only",
+  -- Define installable components
+  sub_packages = { "lib", "headers", "docs" },
+  -- Default sub-packages when running 'zoi install libexample'
+  main_subs = { "lib", "headers" },
+  types = { "source" }
+})
+
+function prepare()
+  cmd("git clone https://github.com/example/libexample.git source")
+end
+
+function package(args)
+  cmd("cd source && make")
+
+  if args.sub == "lib" then
+    zcp("source/libexample.so", "${pkgstore}/lib/libexample.so")
+  elseif args.sub == "headers" then
+    zcp("source/include/example.h", "${pkgstore}/include/example.h")
+  elseif args.sub == "docs" then
+    zcp("source/README.md", "${pkgstore}/share/doc/libexample/README.md")
+  end
+end
+```
+
+## 4. App Template (Project Boilerplate)
+
+Templates for `zoi create` to bootstrap new projects.
+
+```lua
+-- rust-web-starter.pkg.lua
+metadata({
+  name = "rust-web-starter",
+  repo = "community",
+  type = "app",
+  version = "1.0.0",
+  description = "A production-ready Rust web service template"
+})
+
+function package()
+  -- Everything staged to ${createpkgdir} is copied to the user's CWD
+  zcp("${pkgluadir}/template/Cargo.toml", "${createpkgdir}/Cargo.toml")
+  zcp("${pkgluadir}/template/src", "${createpkgdir}/src")
+  zcp("${pkgluadir}/template/.env.example", "${createpkgdir}/.env")
+end
+```
+
+## 5. Zoi Extension (Custom Plugin)
+
+Extensions that add new commands to Zoi itself.
+
+```lua
+-- audit-plugin.pkg.lua
+metadata({
+  name = "audit-plugin",
+  repo = "community",
+  type = "extension",
+  version = "1.0",
+  description = "Adds a 'zoi audit' command to check for vulnerabilities",
+  extension = {
+    type = "zoi",
+    changes = {
+      {
+        type = "plugin",
+        name = "audit",
+        script = [[
+zoi.register_command({
+    name = "audit",
+    description = "Check installed packages for security advisories",
+    callback = function(args)
+        zoi.ui.print("Scanning your environment...", "cyan")
+        local installed = zoi.list_installed()
+        for _, pkg in ipairs(installed) do
+            -- Dummy logic: alert on old openssl
+            if pkg.name == "openssl" and pkg.version == "1.1.1" then
+                zoi.ui.print("VULNERABLE: " .. pkg.name .. " v" .. pkg.version, "red")
+            end
+        end
+    end
+})
+]]
+      }
+    }
+  }
+})
+```
+
+## 6. Complex `zoi.yaml` (Project Environment)
+
+A real-world project configuration with custom environments and a development shell.
+
+```yaml
+# zoi.yaml
+name: my-backend-api
+
+# Project-local package isolation
+config:
+  local: true
+
+# Required packages for development
+pkgs:
+  - zoi:postgresql
+  - zoi:redis
+  - zoi:go@1.22
+
+# Environment variables for 'zoi dev'
+shell:
+  env:
+    DEBUG: "true"
+    DATABASE_URL: "postgres://localhost:5432/mydb"
+    platform:
+      linux-amd64:
+        CC: "gcc"
+      macos-arm64:
+        CC: "clang"
+
+# Short aliases for common tasks
+commands:
+  - cmd: build
+    run: go build -o api main.go
+  - cmd: test
+    run: go test ./...
+  - cmd: db:up
+    run: zoi service start postgresql
+
+# Full environment setups
+environments:
+  - name: CI Pipeline
+    cmd: ci
+    run:
+      - go mod download
+      - zoi run build
+      - zoi run test
+    env:
+      NODE_ENV: "test"
+```
+
+## 7. Global Transaction Hook
+
+Automate tasks like reloading shell completions when packages are changed.
+
+```lua
+-- shell-hook.pkg.lua
+metadata({
+  name = "shell-hook",
+  repo = "community",
+  type = "extension",
+  version = "1.0",
+  description = "Auto-reloads Zoi shell completions",
+  extension = {
+    type = "zoi",
+    changes = {
+      {
+        type = "hook",
+        name = "reload-completions",
+        content = [[
+name: reload-completions
+description: Updates completions when Zoi packages change
+trigger:
+  paths:
+    - "home/.zoi/pkgs/bin/**"
+  operation: ["install", "remove"]
+action:
+  when: PostTransaction
+  exec: zoi shell bash --scope user
+]]
+      }
+    }
+  }
+})
+```
+
+## 8. Multi-Manager Dependencies (Hybrid)
+
+Zoi can bridge multiple package managers in a single dependency tree.
+
+```lua
+-- data-cli.pkg.lua
+metadata({
+  name = "data-cli",
+  repo = "community",
+  version = "2.1.0",
+  description = "A CLI tool that requires system and language libs",
   license = "MIT",
-  types = { "source" },
+  bins = { "data-cli" },
+  types = { "source" }
 })
 
-function package()
-  -- Copy the icon.png from the same directory as the pkg.lua file
-  -- into the package's shared data directory.
-  zcp("${pkgluadir}/icon.png", "${pkgstore}/share/icons/my-package.png")
-end
-```
-
-## Simple Source Build
-
-This example shows how to build a package from source. It clones a git repository and runs `make` to build the binary.
-
-```lua
--- my-git-tool.pkg.lua
-metadata({
-  name = "my-git-tool",
-  repo = "community",
-  version = "1.0.0",
-  description = "A simple tool built from a git repository.",
-  website = "https://example.com/my-git-tool",
-  license = "GPL-3.0-or-later",
-  bins = { "my-git-tool" },
-  types = { "source" },
-})
-
--- Define build-time dependencies. Zoi will ensure these are available.
 dependencies({
   build = {
-    required = { "native:gcc", "native:make", "native:git" }
+    -- Use system manager for compiler
+    required = { "native:gcc", "native:make" }
+  },
+  runtime = {
+    -- Require a library from APT/Brew and a tool from Cargo
+    required = {
+      "native:openssl",
+      "cargo:ripgrep",
+      "npm:chalk"
+    },
+    optional = {
+      "zoi:extra-plugins:Additional features"
+    }
+  }
+})
+
+function package()
+  cmd("make build")
+  zcp("bin/data-cli", "${pkgstore}/bin/data-cli")
+end
+```
+
+## 9. Dynamic Versioning from GitHub
+
+Avoid manual version bumps by fetching the latest release tag directly from the GitHub API.
+
+```lua
+-- fetch the latest release tag (e.g. "v1.2.3")
+local tag = UTILS.FETCH.GITHUB.LATEST.release({ repo = "Zillowe/Zoi" })
+-- strip "v" prefix if present
+local version = tag:gsub("^v", "")
+
+metadata({
+  name = "zoi-latest",
+  repo = "test",
+  version = version,
+  description = "Always tracks the latest Zoi release",
+  maintainer = { name = "Automated", email = "bot@example.com" },
+  types = { "pre-compiled" }
+})
+
+function prepare()
+  local url = "https://example.com/download/" .. version .. "/bin.tar.gz"
+  UTILS.EXTRACT(url, "src")
+end
+```
+
+## 10. Platform Mapping
+
+Map Zoi's platform strings to the specific naming convention used by an upstream project.
+
+```lua
+-- mapping table for target triples
+local triples = {
+  ["linux-amd64"]   = "x86_64-unknown-linux-gnu",
+  ["linux-arm64"]   = "aarch64-unknown-linux-gnu",
+  ["macos-amd64"]   = "x86_64-apple-darwin",
+  ["macos-arm64"]   = "aarch64-apple-darwin",
+  ["windows-amd64"] = "x86_64-pc-windows-msvc"
+}
+
+local current = SYSTEM.OS .. "-" .. SYSTEM.ARCH
+local triple = triples[current] or error("Unsupported platform: " .. current)
+
+metadata({
+  name = "cross-tool",
+  repo = "main",
+  version = "1.0.0",
+  description = "A tool with specific platform naming",
+  bins = { "cross-tool" },
+  types = { "pre-compiled" }
+})
+
+function prepare()
+  local url = string.format("https://dl.example.com/%s/tool-%s.zip", PKG.version, triple)
+  UTILS.EXTRACT(url, "out")
+end
+```
+
+## 11. Configuration File Handling (`backup`)
+
+Ensure user modifications to configuration files are preserved during upgrades.
+
+```lua
+-- web-server.pkg.lua
+metadata({
+  name = "web-server",
+  repo = "community",
+  version = "1.5.0",
+  description = "Web server with persistent config",
+  -- Files listed here are saved as .zoisave/zoinew on upgrade/remove
+  backup = { "etc/server.conf" },
+  types = { "pre-compiled" }
+})
+
+function package()
+  zcp("bin/server", "${pkgstore}/bin/web-server")
+  -- Bundle default config
+  zcp("${pkgluadir}/default.conf", "${pkgstore}/etc/server.conf")
+end
+```
+
+## 12. Virtual Provider (`provides`)
+
+Allow other packages to depend on a generic feature regardless of the specific provider.
+
+```lua
+-- mariadb.pkg.lua
+metadata({
+  name = "mariadb",
+  repo = "core",
+  version = "11.2.2",
+  description = "Fast and reliable SQL server",
+  license = "GPL-2.0",
+  -- Provides the virtual 'sql-server' package
+  provides = { "sql-server" },
+  types = { "pre-compiled" }
+})
+
+-- Another package can now depend on "zoi:sql-server"
+-- and Zoi will offer to install mariadb or mysql.
+```
+
+## 13. Conditional Logic in Lifecycle
+
+Use the `SYSTEM` and `BUILD_TYPE` variables to handle platform-specific build steps or architectures.
+
+```lua
+function prepare()
+  if SYSTEM.OS == "windows" then
+    cmd("powershell -File build.ps1")
+  else
+    cmd("./configure --prefix=" .. STAGING_DIR)
+    -- Optimize for ARM64 if detected
+    if SYSTEM.ARCH == "arm64" then
+      cmd("make CFLAGS='-O3 -march=native'")
+    else
+      cmd("make")
+    end
+  end
+end
+
+function package()
+  local ext = (SYSTEM.OS == "windows") and ".exe" or ""
+  local bin = "myapp" .. ext
+
+  if BUILD_TYPE == "source" then
+    zcp("build/" .. bin, "${pkgstore}/bin/" .. bin)
+  else
+    -- Assuming pre-compiled files were extracted to 'dist'
+    zcp("dist/" .. bin, "${pkgstore}/bin/" .. bin)
+  end
+end
+```
+
+## 14. Per-Sub-Package Dependencies
+
+Define specific dependencies that are only installed for certain components of a split package.
+
+```lua
+-- graphics-stack.pkg.lua
+metadata({
+  name = "graphics-stack",
+  repo = "main",
+  version = "1.0",
+  sub_packages = { "runtime", "tools", "devel" },
+  main_subs = { "runtime" },
+  types = { "source" }
+})
+
+dependencies({
+  runtime = {
+    required = { "native:libdrm" },
+    -- Component-specific dependencies
+    sub_packages = {
+      tools = {
+        required = { "native:glx-utils" }
+      },
+      devel = {
+        required = { "native:libdrm-devel", "native:mesa-libgl-devel" }
+      }
+    }
+  }
+})
+```
+
+## 15. Search Indexing & Discovery
+
+Use `tags` to help users discover your package through `zoi search`.
+
+```lua
+metadata({
+  name = "neon-vim",
+  repo = "community",
+  version = "0.9.0",
+  description = "A customized Neovim distribution",
+  -- Keywords for search indexing
+  tags = { "editor", "vim", "neovim", "ide", "lua", "custom" },
+  license = "Apache-2.0",
+  bins = { "nvim" },
+  types = { "pre-compiled" }
+})
+```
+
+## 16. Advanced PGP Management
+
+Add a trusted maintainer key to the local keyring during the build process for signature verification.
+
+```lua
+function prepare()
+  -- Import a maintainer key from a URL
+  addPgpKey("https://keys.example.com/maintainer.asc", "maintainer-key")
+
+  local url = "https://example.com/app.tar.gz"
+  local sig = "https://example.com/app.tar.gz.sig"
+
+  UTILS.FILE(url, "app.tar.gz")
+  UTILS.FILE(sig, "app.tar.gz.sig")
+
+  -- Verify signature using the imported key
+  if not verifySignature("app.tar.gz", "app.tar.gz.sig", "maintainer-key") then
+    error("Security: Invalid PGP signature!")
+  end
+
+  UTILS.EXTRACT("app.tar.gz", "src")
+end
+```
+
+## 17. Complex File System Logic
+
+Use `UTILS.FS` to perform granular file manipulations within the build or staging directories.
+
+```lua
+function package()
+  -- Create a nested directory structure manually
+  local target = "${pkgstore}/share/myapp/icons"
+  cmd("mkdir -p " .. target)
+
+  -- Copy and set permissions
+  if UTILS.FS.exists("assets/logo.png") then
+    UTILS.FS.copy("assets/logo.png", target .. "/logo.png")
+    -- Set to 644 (rw-r--r--)
+    UTILS.FS.chmod(target .. "/logo.png", 420)
+  end
+
+  -- Rename a binary based on platform
+  if SYSTEM.OS == "macos" then
+    UTILS.FS.move("${pkgstore}/bin/tool", "${pkgstore}/bin/tool-darwin")
+  end
+end
+```
+
+## 18. Shared Logic with `INCLUDE`
+
+Keep your package definitions DRY (Don't Repeat Yourself) by including external Lua scripts.
+
+```lua
+-- shared_build.lua
+function common_make()
+  cmd("make clean")
+  cmd("make -j" .. (ZOI.parallel_jobs or 2))
+end
+
+-- package.pkg.lua
+INCLUDE("${pkgluadir}/shared_build.lua")
+
+function package()
+  -- Use function defined in shared_build.lua
+  common_make()
+  zcp("output/bin", "${pkgstore}/bin")
+end
+```
+
+## 19. Selecting Optional Dependencies (`options`)
+
+Provide users with a choice between competing dependencies, such as different database drivers or GUI toolkits.
+
+```lua
+dependencies({
+  runtime = {
+    required = { "zoi:core-lib" },
+    options = {
+      {
+        name = "Database Driver",
+        desc = "Choose which database backend to use",
+        all = false, -- Only allow one selection
+        depends = {
+          "native:libpq:PostgreSQL support",
+          "native:sqlite-devel:SQLite support"
+        }
+      },
+      {
+        name = "Optional Assets",
+        desc = "Install extra high-res textures",
+        all = true, -- Allow selecting multiple
+        depends = {
+          "zoi:textures-hd",
+          "zoi:textures-ultra"
+        }
+      }
+    }
+  }
+})
+```
+
+## 20. Advanced Uninstall Cleanup
+
+Use the `uninstall()` function and `zrm` to clean up state outside of the standard package store, such as user caches or system-wide data directories.
+
+```lua
+function uninstall()
+  -- Remove a package-specific cache directory in the user's home
+  zrm("${usrhome}/.cache/myapp")
+
+  -- Remove a system-wide log directory (requires root)
+  if SYSTEM.OS == "linux" then
+    zrm("/var/log/myapp")
+  end
+end
+```
+
+## 21. Complex Source Build (C++)
+
+Example of a multi-step build process involving `cmake`, `make`, and environment variables.
+
+```lua
+-- graphics-engine.pkg.lua
+metadata({
+  name = "graphics-engine",
+  repo = "community",
+  version = "3.0.1",
+  description = "High-performance C++ rendering engine",
+  license = "MIT",
+  types = { "source" }
+})
+
+dependencies({
+  build = {
+    required = { "native:cmake", "native:gcc-c++", "native:ninja" }
+  },
+  runtime = {
+    required = { "native:vulkan-loader", "native:libx11" }
   }
 })
 
 function prepare()
-  -- Clone the git repository into a "source" directory inside the temporary build directory
-  cmd("git clone https://example.com/my-git-tool.git source")
+  cmd("git clone --recursive https://github.com/engine/graphics.git source")
 end
 
 function package()
-  -- Run build commands inside the cloned repository
-  cmd("cd source && make")
+  -- Use Ninja for faster builds
+  cmd("cmake -S source -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=" .. STAGING_DIR .. "/usr")
+  cmd("cmake --build build")
+  cmd("cmake --install build")
 
-  -- Copy the final binary to the package store
-  zcp("source/my-git-tool", "${pkgstore}/bin/my-git-tool")
+  -- Move files from staging /usr to special Zoi destinations
+  zcp(STAGING_DIR .. "/usr/bin", "${pkgstore}/bin")
+  zcp(STAGING_DIR .. "/usr/lib", "${pkgstore}/lib")
+  zcp(STAGING_DIR .. "/usr/include", "${pkgstore}/include")
 end
 ```
 
-## Advanced Example
+## 22. Platform-Specific Dependencies
 
-This example, based on the real `hello` package from the `zillowe` repository, demonstrates more advanced features like platform mapping, checksum and signature verification, and handling both pre-compiled and source builds in one file.
+Use the `SYSTEM` table within the `dependencies` block to dynamically change requirements.
 
 ```lua
-local repo_owner = "Zillowe"
-local repo_name = "Hello"
-local version = ZOI.VERSION or "3.0.0"
-local git_url = "https://github.com/" .. repo_owner .. "/" .. repo_name .. ".git"
-local release_base_url = "https://github.com/" .. repo_owner .. "/" .. repo_name .. "/releases/download/v" .. version
+-- cross-editor.pkg.lua
+local deps = { "zoi:base-utils" }
 
-local platform_map = {
-  macos = "darwin",
-}
-
-local function get_mapped_platform()
-  local current_platform = SYSTEM.OS .. "-" .. SYSTEM.ARCH
-  return platform_map[current_platform] or platform_map[SYSTEM.OS] or current_platform
-end
-
-local function get_mapped_os()
-  return get_mapped_platform():match("([^-]+)")
+if SYSTEM.OS == "linux" then
+  table.insert(deps, "native:libxkbcommon")
+elseif SYSTEM.OS == "macos" then
+  table.insert(deps, "brew:terminal-notifier")
 end
 
 metadata({
-  name = "hello",
-  repo = "zillowe",
-  version = version,
-  description = "Hello World",
-  website = "https://github.com/Zillowe/Hello",
-  git = git_url,
-  man = "https://raw.githubusercontent.com/Zillowe/Hello/refs/heads/main/app/man.md",
-  maintainer = {
-    name = "Zillowe Foundation",
-    website = "https://zillowe.qzz.io",
-    email = "contact@zillowe.qzz.io",
-  },
-  author = {
-    name = "Zillowe Foundation",
-    website = "https://zillowe.qzz.io",
-    email = "contact@zillowe.qzz.io",
-  },
-  license = "Apache-2.0",
-  bins = { "hello" },
-  conflicts = { "hello" },
-  types = { "source", "pre-compiled" },
+  name = "cross-editor",
+  repo = "main",
+  version = "1.0",
+  description = "Editor with OS-specific helpers",
+  types = { "pre-compiled" }
 })
 
 dependencies({
-  build = {
-    types = {
-      source = {
-        required = { "native:zig" },
-      }
-    }
-  },
+  runtime = deps
+})
+```
+
+## 23. Interactive Selection Logic
+
+Show how to use the `options` field to let users choose between feature sets.
+
+```lua
+-- media-player.pkg.lua
+metadata({
+  name = "media-player",
+  repo = "community",
+  version = "2.0",
+  description = "Extensible media player",
+  types = { "pre-compiled" }
 })
 
-function prepare()
-  print("Adding PGP key for verification...")
-  addPgpKey("https://zillowe.pages.dev/keys/zillowe-main.asc", "zillowe-main")
+dependencies({
+  runtime = {
+    required = { "native:ffmpeg" },
+    options = {
+      {
+        name = "Audio Backend",
+        desc = "Choose how the player outputs sound",
+        all = false,
+        depends = {
+          "native:pulseaudio:Legacy Linux audio",
+          "native:pipewire:Modern Linux audio",
+          "native:alsa-utils:Direct hardware access"
+        }
+      }
+    }
+  }
+})
+```
 
-  if BUILD_TYPE == "pre-compiled" then
-    local ext
-    if SYSTEM.OS == "windows" then
-      ext = "zip"
-    else
-      ext = "tar.xz"
-    end
-    local file_name = "hello-" .. get_mapped_os() .. "-" .. SYSTEM.ARCH .. "." .. ext
-    local url = release_base_url .. "/" .. file_name
+## 24. Collection Package (Metapackage)
 
-    UTILS.EXTRACT(url, "precompiled")
-  elseif BUILD_TYPE == "source" then
-    cmd("git clone " .. PKG.git .. " " .. BUILD_DIR .. "/source")
-    cmd("cd " .. BUILD_DIR .. "/source && zig build-exe main.zig -O ReleaseSmall --name hello")
-  end
-end
+Create a package that groups several other tools together for easy installation.
 
-function package()
-  local bin_name = "hello"
-  if SYSTEM.OS == "windows" then
-    bin_name = "hello.exe"
-  end
+```lua
+-- dev-essentials.pkg.lua
+metadata({
+  name = "dev-essentials",
+  repo = "community",
+  type = "collection", -- No build logic, just dependencies
+  version = "1.0",
+  description = "A bundle of essential development tools"
+})
 
-  if BUILD_TYPE == "pre-compiled" then
-    local bin_path = UTILS.FIND.file("precompiled", bin_name)
-    if bin_path then
-      zcp(bin_path, "${pkgstore}/bin/" .. bin_name)
-    else
-      error("Could not find '" .. bin_name .. "' in pre-compiled archive.")
-    end
-  elseif BUILD_TYPE == "source" then
-    zcp("source/" .. bin_name, "${pkgstore}/bin/" .. bin_name)
-  end
-end
+dependencies({
+  runtime = {
+    "zoi:git",
+    "zoi:curl",
+    "zoi:htop",
+    "cargo:bat",
+    "cargo:exa"
+  }
+})
+```
 
-function verify()
-  if BUILD_TYPE == "pre-compiled" then
-    local checksum_url = release_base_url .. "/checksums-512.txt"
-    local checksum_content = UTILS.FETCH.url(checksum_url)
+## 25. Complex Extension (Corporate Bundle)
 
-    local ext
-    if SYSTEM.OS == "windows" then
-      ext = "zip"
-    else
-      ext = "tar.xz"
-    end
-    local file_name = "hello-" .. get_mapped_os() .. "-" .. SYSTEM.ARCH .. "." .. ext
-    local file_path = BUILD_DIR .. "/" .. file_name
+An extension that applies multiple system-wide configuration changes at once.
 
-    local expected_checksum = UTILS.PARSE.checksumFile(checksum_content, file_name)
+```lua
+-- corp-config.pkg.lua
+metadata({
+  name = "corp-config",
+  repo = "community",
+  type = "extension",
+  version = "2.1",
+  description = "Configures Zoi for the MyCorp internal environment",
+  extension = {
+    type = "zoi",
+    changes = {
+      -- 1. Point to internal mirror
+      {
+        type = "registry-repo",
+        add = "https://git.mycorp.internal/zoi/zoidberg.git"
+      },
+      -- 2. Add private team registry
+      {
+        type = "registry-add",
+        add = "https://git.mycorp.internal/teams/dev/registry.git"
+      },
+      -- 3. Import team PGP key for verification
+      {
+        type = "pgp",
+        name = "mycorp-signing-key",
+        key = "https://keys.mycorp.internal/release.asc"
+      }
+    }
+  }
+})
+```
 
-    if not expected_checksum or not verifyHash(file_path, "sha512-" .. expected_checksum) then
-      print("Checksum verification failed!")
-      return false
-    end
-    print("Checksum verified successfully.")
+## 26. Important Security Updates
 
-    print("Verifying signature...")
-    local sig_url = release_base_url .. "/" .. file_name .. ".sig"
-    local sig_path = BUILD_DIR .. "/" .. file_name .. ".sig"
+Use the `updates()` function to alert users about critical changes or vulnerabilities.
 
-    print("Downloading signature from " .. sig_url)
-    UTILS.FILE(sig_url, sig_path)
+```lua
+-- legacy-app.pkg.lua
+metadata({
+  name = "legacy-app",
+  repo = "archive",
+  version = "0.5.0",
+  description = "A legacy tool with known issues",
+  types = { "pre-compiled" }
+})
 
-    if not verifySignature(file_path, sig_path, "zillowe-main") then
-      print("Signature verification failed!")
-      return false
-    end
+updates({
+  {
+    type = "vulnerability",
+    message = "This version contains CVE-2026-1234. Upgrade to v1.0 immediately!"
+  },
+  {
+    type = "change",
+    message = "The configuration format has changed. See /usr/share/doc/legacy-app/README.md"
+  }
+})
+```
 
-    print("Signature verified successfully.")
-    return true
-  end
-  return true
-end
+## 27. Forced System Scope
 
-function uninstall() end
+Suggest that a package should always be installed system-wide (e.g., for drivers or core services).
+
+```lua
+-- system-driver.pkg.lua
+metadata({
+  name = "system-driver",
+  repo = "core",
+  version = "1.2",
+  description = "A core system driver",
+  -- Default to system scope
+  scope = "system",
+  types = { "pre-compiled" }
+})
+```
+
+## 28. Package Replacement (`replaces`)
+
+Smoothly transition users from an old package name to a new one.
+
+```lua
+-- modern-tool.pkg.lua
+metadata({
+  name = "modern-tool",
+  repo = "main",
+  version = "2.0",
+  description = "The modern successor to 'legacy-tool'",
+  -- Automatically offer to uninstall the old package
+  replaces = { "legacy-tool" },
+  types = { "pre-compiled" }
+})
 ```

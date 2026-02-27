@@ -14,6 +14,7 @@ A typical `.pkg.lua` file is structured around a few key global functions:
 1.  **`metadata{...}`**: **(Required)** A function call that declares all the static information about your package, like its name, version, and description.
 2.  **`dependencies{...}`**: A function call that defines the package's build-time and runtime dependencies.
 3.  **Lifecycle Functions**: A set of functions (`prepare`, `package`, `verify`, `uninstall`) that contain the logic for fetching, building, and installing the software.
+4.  **`service{...}`**: A function call that defines a background service associated with the package.
 
 Let's look at the core components in detail.
 
@@ -60,7 +61,8 @@ This table lists all the available fields you can use inside the `metadata` bloc
 | `replaces`       | `list`    | A list of packages that this package replaces. Zoi will offer to remove them upon installation.                                   |
 | `backup`         | `list`    | A list of configuration files to preserve during upgrades. Zoi will create `.zoinew` and `.zoisave` files for these.              |
 | `types`          | `list`    | A list of supported build methods (e.g. `source`, `pre-compiled`).                                                                |
-| `package_type`   | `string`  | The type of package. Can be `package` (default), `collection`, `app`, or `extension`. See [Package Types](#5-package-types).      |
+| `type`           | `string`  | The type of package. Can be `package` (default), `collection`, `app`, or `extension`. See [Package Types](#5-package-types).      |
+| `scope`          | `string`  | The default installation scope (`user`, `system`, or `project`). Users can override this with CLI flags.                          |
 | `sub_packages`   | `list`    | A list of sub-package names to define a split package. See [Split Packages](#6-split-packages).                                   |
 | `main_subs`      | `list`    | For a split package, a list of the default sub-packages to install.                                                               |
 | `updates`        | `list`    | A list of tables providing structured update information (e.g. for security notices).                                             |
@@ -212,11 +214,11 @@ The `destination` argument uses special variables to place files in the correct 
 
 ## 5. Package Types
 
-Zoi supports different types of packages, specified via the `package_type` field in your metadata.
+Zoi supports different types of packages, specified via the `type` field in your metadata.
 
 ### `package` (Default)
 
-This is the standard type for distributing software, tools, libraries, or any other set of files. If you don't specify a `package_type`, it defaults to this.
+This is the standard type for distributing software, tools, libraries, or any other set of files. If you don't specify a `type`, it defaults to this.
 
 ### `collection`
 
@@ -227,7 +229,7 @@ A `collection` is a meta-package that groups other packages. Its main purpose is
 ```lua
 metadata({
   name = "rust-dev-tools",
-  package_type = "collection",
+  type = "collection",
   -- ...
 })
 dependencies({
@@ -248,7 +250,7 @@ An `app` package is a template or boilerplate used to bootstrap new projects wit
 ```lua
 metadata({
   name = "rust-starter",
-  package_type = "app",
+  type = "app",
   -- ...
 })
 function package()
@@ -362,7 +364,46 @@ hooks({
 
 ---
 
-## 8. The Packaging Workflow
+## 8. Services
+
+Zoi can manage background services for your packages using the `service{...}` block. This is ideal for databases, web servers, or any other long-running process.
+
+When a package with a `service` block is installed, Zoi can automatically generate the appropriate configuration for your system's native service manager (`systemd`, `launchd`, or `sc.exe`).
+
+### Service Definition
+
+```lua
+service({
+  -- The command to run the service
+  run = "${pkgstore}/bin/my-daemon --config ${pkgstore}/etc/config.yaml",
+  -- Whether to start the service automatically on boot/login
+  run_at_load = true,
+  -- The working directory for the service
+  working_dir = "${pkgstore}",
+  -- Environment variables for the service
+  env = {
+    DEBUG = "false",
+    PORT = "8080"
+  },
+  -- Paths for standard and error output logs
+  log_path = "/var/log/my-daemon.log",
+  error_log_path = "/var/log/my-daemon.err.log"
+})
+```
+
+### Managing Services
+
+Once a package with a service is installed, you can manage it using the `zoi service` command:
+
+- `zoi service start <package>`
+- `zoi service stop <package>`
+- `zoi service restart <package>`
+- `zoi service status <package>`
+- `zoi service list`
+
+---
+
+## 9. The Packaging Workflow
 
 Follow these steps to develop, build, and test your package.
 

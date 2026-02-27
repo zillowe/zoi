@@ -22,6 +22,24 @@ You can manually revert the most recent successful operation using the `--last-t
 zoi rollback --last-transaction
 ```
 
+---
+
+## Downgrading to Specific Versions
+
+While `rollback` is useful for quickly undoing the very last action, you may sometimes need to return to a much older version of a package. For this, Zoi provides the `zoi downgrade` command.
+
+### `zoi downgrade <package>`
+
+This command initiates an interactive process:
+
+1. **Version Discovery**: Zoi scans your local installation store, your archive cache, and the registry metadata to find every version of the package that has ever been on your system.
+2. **Interactive Selection**: You are presented with a list of discovered versions (newest first).
+3. **Clean Installation**: Once you select a version, Zoi performs a fresh, dependency-aware installation of that specific version.
+
+Use `downgrade` when a simple `rollback` isn't enough, or if you need to jump back multiple versions at once.
+
+---
+
 ## Rollback Types
 
 ### 1. Zoi-Native Packages

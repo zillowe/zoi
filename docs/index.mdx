@@ -32,6 +32,7 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
   - `zoi rollback`: Revert a package to its previous version or rollback the last transaction.
   - `zoi pin`: Pin a package to a specific version.
   - `zoi exec`: Run a package's binary without installing it.
+  - `zoi dev`: Enter a project-specific development shell with all dependencies.
 - **Library Support:** Core functionality is available as a Rust library to be integrated into other applications.
 
 ## Getting Started
@@ -54,6 +55,40 @@ Getting started with Zoi is simple. Just follow these three steps:
     ```sh
     zoi install @zillowe/hello
     ```
+
+## Common Workflows
+
+Quick snippets for common tasks.
+
+### Setting up a new project
+
+```sh
+mkdir my-app && cd my-app
+zoi extension add my-rust-starter # Add template
+zoi dev                           # Enter environment
+```
+
+### Finding a command
+
+```sh
+zoi provides magick               # Finds 'imagemagick'
+zoi provides libssl.so.3          # Finds 'openssl'
+```
+
+### Debugging dependencies
+
+```sh
+zoi tree @core/linux              # View full graph
+zoi why openssl                   # See what requires it
+```
+
+### Safe Upgrades
+
+```sh
+zoi update --all --dry-run        # See what will change
+zoi update --all                  # Apply changes
+zoi rollback --last-transaction   # Undo if broken
+```
 
 ## Installation
 
@@ -310,6 +345,13 @@ Here are some common commands to get you started.
   zoi run <command_alias>
   ```
 
+- **Enter a development shell:**
+
+  ```sh
+  # Enter a subshell with project dependencies available
+  zoi dev
+  ```
+
 - **Add a new repository:**
 
   ```sh
@@ -389,6 +431,13 @@ Zoi is hosted on multiple forges. The primary locations and mirrors are:
   <Accordion title="How do I run a tool without installing it?">
     Use `zoi exec <package>`. Zoi will fetch a temporary binary and run it
     without adding it to your PATH or installed set.
+  </Accordion>
+  <Accordion title="What is 'zoi dev' and how does it differ from 'zoi env'?">
+    `zoi dev` is used to enter a persistent development subshell. It automatically
+    ensures all packages in your `zoi.yaml` are installed locally and sets up
+    environment variables like `PATH`, `LD_LIBRARY_PATH`, and `CPATH` so you
+    can immediately start compiling or running your code. `zoi env` is more
+    focused on running specific setup scripts or one-off environment configurations.
   </Accordion>
   <Accordion title="How do I use a custom git package repository?">
     Add it with `zoi repo add https://github.com/you/your-zoi-repo.git`.

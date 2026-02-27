@@ -89,6 +89,18 @@ environments:
     run:
       - rustup toolchain install stable
       - rustup component add clippy rustfmt
+
+# Optional: Shell configuration for `zoi dev`
+shell:
+  env:
+    # Custom environment variables for the dev shell
+    DEBUG: "true"
+    # Platform-specific env vars also supported
+    platform:
+      linux-amd64:
+        CC: "gcc"
+      macos-arm64:
+        CC: "clang"
 ```
 
 ### Field Reference
@@ -116,6 +128,8 @@ environments:
     - If a `list of strings`, it's the command list for all platforms.
     - If a `map`, keys are platforms (`<os>-<arch>`) and values are lists of command strings. A `default` key can be used as a fallback.
   - `env`: `map` (optional) - Same structure as in `commands`.
+- `shell`: `object` (optional)
+  - `env`: `map` (optional) - Environment variables to set when entering `zoi dev`. Same structure as in `commands`.
 
 Zoi determines the platform from the OS and architecture (e.g. `linux-amd64`, `macos-arm64`, `windows-amd64`).
 
@@ -185,6 +199,18 @@ Here is a simplified example of a `zoi.lock` file:
 ```
 
 ## CLI usage
+
+- Enter a development shell:
+
+```sh
+zoi dev
+```
+
+- Run a command directly in the dev shell environment and exit:
+
+```sh
+zoi dev --run "make build"
+```
 
 - Run a command by alias:
 

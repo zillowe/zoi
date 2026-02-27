@@ -128,6 +128,17 @@ Distributes a Lua script that extends Zoi's core CLI functionality with custom s
 - **Effect:** Zoi saves the script to `~/.zoi/plugins/` and loads it on startup. The script can use the `zoi` API to register commands.
 - **On Removal:** The plugin script is deleted.
 
+#### `hook`
+
+Distributes a global transaction hook.
+
+- **Purpose:** To perform system-wide maintenance tasks (e.g. updating font caches) automatically when relevant files are modified.
+- **Fields:**
+  - `name`: A unique name for the hook.
+  - `content`: The raw YAML content of the hook definition.
+- **Effect:** Zoi saves the hook to `~/.zoi/hooks/<name>.hook.yaml`. It will be triggered during future transactions based on its path matching logic.
+- **On Removal:** The hook file is deleted.
+
 ## Examples
 
 Here are a couple of examples demonstrating different use cases for extensions.
