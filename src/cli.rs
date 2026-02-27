@@ -305,6 +305,17 @@ enum Commands {
         env_alias: Option<String>,
     },
 
+    /// Enter a development shell for the current project
+    #[command(
+        alias = "develop",
+        long_about = "Loads the project configuration from zoi.yaml, ensures all required packages are installed locally, sets up environment variables (PATH, LD_LIBRARY_PATH, etc.), and drops you into a subshell."
+    )]
+    Dev {
+        /// Command to run in the dev shell instead of an interactive shell
+        #[arg(short, long)]
+        run: Option<String>,
+    },
+
     /// Upgrades the Zoi binary to the latest version
     #[command(
         alias = "ug",
@@ -794,6 +805,7 @@ pub fn run() -> anyhow::Result<()> {
             ),
             Commands::Run { cmd_alias, args } => cmd::run::run(cmd_alias, args),
             Commands::Env { env_alias } => cmd::env::run(env_alias),
+            Commands::Dev { run } => cmd::dev::run(run),
             Commands::Upgrade { force, tag, branch } => {
                 match cmd::upgrade::run(BRANCH, STATUS, NUMBER, force, tag, branch) {
                     Ok(()) => {

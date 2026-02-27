@@ -4,6 +4,7 @@ pub mod cache;
 pub mod check;
 pub mod clean;
 pub mod create;
+pub mod dev;
 pub mod doctor;
 pub mod downgrade;
 pub mod env;

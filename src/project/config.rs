@@ -10,6 +10,12 @@ pub struct ProjectLocalConfig {
     pub local: bool,
 }
 
+#[derive(Debug, Deserialize, Clone, Default)]
+pub struct ShellSpec {
+    #[serde(default)]
+    pub env: PlatformOrEnvMap,
+}
+
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct ProjectConfig {
@@ -26,6 +32,8 @@ pub struct ProjectConfig {
     pub commands: Vec<CommandSpec>,
     #[serde(default)]
     pub environments: Vec<EnvironmentSpec>,
+    #[serde(default)]
+    pub shell: Option<ShellSpec>,
 }
 
 #[derive(Debug, Deserialize)]
