@@ -187,6 +187,12 @@ enum Commands {
         version: String,
     },
 
+    /// Visualize the dependency tree of a package
+    Tree {
+        #[arg(value_name = "PACKAGES", required = true, help = PKG_SOURCE_HELP)]
+        packages: Vec<String>,
+    },
+
     /// Unpin a package, allowing it to be updated
     Unpin {
         #[arg(help = PKG_SOURCE_HELP)]
@@ -730,6 +736,7 @@ pub fn run() -> anyhow::Result<()> {
             } => cmd::list::run(all, registry, repo, package_type, foreign),
             Commands::Show { package_name, raw } => cmd::show::run(&package_name, raw),
             Commands::Pin { package, version } => cmd::pin::run(&package, &version),
+            Commands::Tree { packages } => cmd::tree::run(&packages),
             Commands::Unpin { package } => cmd::unpin::run(&package),
             Commands::Mark {
                 packages,
