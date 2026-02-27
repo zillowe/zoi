@@ -89,6 +89,29 @@ pub fn record_package(
     write_lockfile(&lockfile, pkg.scope)
 }
 
+pub fn update_package_reason(
+    package_name: &str,
+    sub_package_name: Option<&str>,
+    scope: types::Scope,
+    new_reason: types::InstallReason,
+) -> Result<()> {
+    let mut lockfile = read_lockfile(scope)?;
+
+    let package_to_update = lockfile
+        .packages
+        .values_mut()
+        .find(|p| p.name == package_name && p.sub_package.as_deref() == sub_package_name);
+
+    if let Some(pkg) = package_to_update {
+        pkg.reason = new_reason;
+        lockfile.version = env!("CARGO_PKG_VERSION").to_string();
+        write_lockfile(&lockfile, scope)?;
+        Ok(())
+    } else {
+        Err(anyhow!("Package '{}' not found in record.", package_name))
+    }
+}
+
 pub fn remove_package_from_record(
     package_name: &str,
     sub_package_name: Option<&str>,

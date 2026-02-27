@@ -237,6 +237,7 @@ pub fn install_node(
             handle,
             Some(pkg.scope),
             sub_package_to_install.as_deref(),
+            Some(&node.reason),
         );
     }
 
@@ -247,6 +248,7 @@ pub fn install_node(
             handle,
             Some(pkg.scope),
             sub_package_to_install.as_deref(),
+            Some(&node.reason),
         );
     }
 

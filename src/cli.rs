@@ -171,6 +171,24 @@ enum Commands {
         package: String,
     },
 
+    /// Modify the installation reason of a package
+    #[command(
+        alias = "m",
+        long_about = "Changes whether a package is considered explicitly installed or a dependency. Explicit packages are not removed by 'autoremove', while dependencies are if no other package requires them."
+    )]
+    Mark {
+        #[arg(value_name = "PACKAGES", required = true, help = PKG_SOURCE_HELP)]
+        packages: Vec<String>,
+
+        /// Mark packages as dependencies
+        #[arg(long, aliases = ["asdeps"])]
+        as_dependency: bool,
+
+        /// Mark packages as explicitly installed
+        #[arg(long, aliases = ["asexpl"], conflicts_with = "as_dependency")]
+        as_explicit: bool,
+    },
+
     /// Updates one or more packages to their latest versions
     #[command(alias = "up")]
     Update {
@@ -604,6 +622,21 @@ pub fn run() -> anyhow::Result<()> {
             Commands::Show { package_name, raw } => cmd::show::run(&package_name, raw),
             Commands::Pin { package, version } => cmd::pin::run(&package, &version),
             Commands::Unpin { package } => cmd::unpin::run(&package),
+            Commands::Mark {
+                packages,
+                as_dependency,
+                as_explicit,
+            } => {
+                if !as_dependency && !as_explicit {
+                    let mut cmd = Cli::command();
+                    if let Some(subcmd) = cmd.find_subcommand_mut("mark") {
+                        subcmd.print_help().unwrap();
+                    }
+                    Ok(())
+                } else {
+                    cmd::mark::run(&packages, as_dependency, as_explicit)
+                }
+            }
             Commands::Update { package_names, all } => {
                 if !all && package_names.is_empty() {
                     let mut cmd = Cli::command();

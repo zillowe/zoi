@@ -32,6 +32,7 @@ fn setup_schema(conn: &Connection) -> Result<()> {
             license TEXT,
             registry TEXT,
             scope TEXT,
+            reason TEXT,
             UNIQUE(name, sub_package, repo, scope)
         )",
         [],
@@ -90,14 +91,19 @@ pub fn update_package(
     registry: &str,
     scope: Option<types::Scope>,
     sub_package: Option<&str>,
+    reason: Option<&types::InstallReason>,
 ) -> Result<()> {
     let tags_json = serde_json::to_string(&pkg.tags)?;
     let pkg_type = format!("{:?}", pkg.package_type).to_lowercase();
     let scope_str = scope.map(|s| format!("{:?}", s).to_lowercase());
+    let reason_str = reason.map(|r| match r {
+        types::InstallReason::Direct => "direct".to_string(),
+        types::InstallReason::Dependency { parent } => format!("dependency:{}", parent),
+    });
 
     conn.execute(
-        "INSERT OR REPLACE INTO packages (name, sub_package, repo, version, description, package_type, tags, license, registry, scope)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        "INSERT OR REPLACE INTO packages (name, sub_package, repo, version, description, package_type, tags, license, registry, scope, reason)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
         params![
             pkg.name,
             sub_package,
@@ -109,6 +115,7 @@ pub fn update_package(
             pkg.license,
             registry,
             scope_str,
+            reason_str,
         ],
     )?;
     Ok(())

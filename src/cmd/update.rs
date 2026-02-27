@@ -234,6 +234,7 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
                 handle,
                 Some(new_pkg.scope),
                 request.sub_package.as_deref(),
+                Some(&types::InstallReason::Direct),
             );
         }
         if let Ok(conn) = db::open_connection("local") {
@@ -243,6 +244,7 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
                 handle,
                 Some(new_pkg.scope),
                 request.sub_package.as_deref(),
+                Some(&types::InstallReason::Direct),
             );
         }
 
@@ -549,6 +551,7 @@ fn run_update_all_logic(yes: bool) -> Result<()> {
                 &new_manifest.registry_handle,
                 Some(new_manifest.scope),
                 new_manifest.sub_package.as_deref(),
+                Some(&old_manifest.reason),
             );
         }
         if let Ok(conn) = db::open_connection("local") {
@@ -558,6 +561,7 @@ fn run_update_all_logic(yes: bool) -> Result<()> {
                 &new_manifest.registry_handle,
                 Some(new_manifest.scope),
                 new_manifest.sub_package.as_deref(),
+                Some(&old_manifest.reason),
             );
         }
 

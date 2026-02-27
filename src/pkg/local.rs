@@ -1,6 +1,6 @@
 use crate::pkg::config;
 use crate::pkg::sysroot::apply_sysroot;
-use crate::pkg::types::{InstallManifest, Scope};
+use crate::pkg::types::{self, InstallManifest, Scope};
 use crate::pkg::utils;
 use anyhow::Result;
 use std::fs;
@@ -297,4 +297,19 @@ pub fn write_manifest(manifest: &InstallManifest) -> Result<()> {
     crate::utils::symlink_dir(&version_dir, &latest_symlink_path)?;
 
     Ok(())
+}
+
+pub fn update_manifest_reason(
+    name: &str,
+    sub_package: Option<&str>,
+    scope: Scope,
+    new_reason: types::InstallReason,
+) -> Result<()> {
+    if let Some(mut manifest) = is_package_installed(name, sub_package, scope)? {
+        manifest.reason = new_reason;
+        write_manifest(&manifest)?;
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!("Package '{}' not installed.", name))
+    }
 }

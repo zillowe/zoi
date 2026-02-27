@@ -49,7 +49,7 @@ fn refresh_registry_db(registry_handle: &str, registry_path: &Path) -> Result<()
             }
 
             if let Ok(conn) = db::open_connection(registry_handle) {
-                let _ = db::update_package(&conn, &pkg, registry_handle, None, None);
+                let _ = db::update_package(&conn, &pkg, registry_handle, None, None, None);
             }
         }
     });

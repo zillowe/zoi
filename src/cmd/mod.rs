@@ -15,6 +15,7 @@ pub mod info;
 pub mod install;
 pub mod list;
 pub mod man;
+pub mod mark;
 pub mod owner;
 pub mod package;
 pub mod pgp;
