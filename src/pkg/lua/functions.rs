@@ -322,6 +322,91 @@ fn add_zcp(lua: &Lua) -> Result<(), mlua::Error> {
     Ok(())
 }
 
+fn add_zln(lua: &Lua) -> Result<(), mlua::Error> {
+    let zln_fn = lua.create_function(|lua, (target, link): (String, String)| {
+        let ops_table: Table = match lua.globals().get("__ZoiBuildOperations") {
+            Ok(t) => t,
+            Err(_) => {
+                let new_t = lua.create_table()?;
+                lua.globals().set("__ZoiBuildOperations", new_t.clone())?;
+                new_t
+            }
+        };
+        let op = lua.create_table()?;
+        op.set("op", "zln")?;
+        op.set("target", target)?;
+        op.set("link", link)?;
+        ops_table.push(op)?;
+        Ok(())
+    })?;
+    lua.globals().set("zln", zln_fn)?;
+    Ok(())
+}
+
+fn add_zchmod(lua: &Lua) -> Result<(), mlua::Error> {
+    let zchmod_fn = lua.create_function(|lua, (path, mode): (String, u32)| {
+        let ops_table: Table = match lua.globals().get("__ZoiBuildOperations") {
+            Ok(t) => t,
+            Err(_) => {
+                let new_t = lua.create_table()?;
+                lua.globals().set("__ZoiBuildOperations", new_t.clone())?;
+                new_t
+            }
+        };
+        let op = lua.create_table()?;
+        op.set("op", "zchmod")?;
+        op.set("path", path)?;
+        op.set("mode", mode)?;
+        ops_table.push(op)?;
+        Ok(())
+    })?;
+    lua.globals().set("zchmod", zchmod_fn)?;
+    Ok(())
+}
+
+fn add_zchown(lua: &Lua) -> Result<(), mlua::Error> {
+    let zchown_fn =
+        lua.create_function(|lua, (path, owner, group): (String, String, String)| {
+            let ops_table: Table = match lua.globals().get("__ZoiBuildOperations") {
+                Ok(t) => t,
+                Err(_) => {
+                    let new_t = lua.create_table()?;
+                    lua.globals().set("__ZoiBuildOperations", new_t.clone())?;
+                    new_t
+                }
+            };
+            let op = lua.create_table()?;
+            op.set("op", "zchown")?;
+            op.set("path", path)?;
+            op.set("owner", owner)?;
+            op.set("group", group)?;
+            ops_table.push(op)?;
+            Ok(())
+        })?;
+    lua.globals().set("zchown", zchown_fn)?;
+    Ok(())
+}
+
+fn add_zmkdir(lua: &Lua) -> Result<(), mlua::Error> {
+    let zmkdir_fn = lua.create_function(|lua, path: String| {
+        let ops_table: Table = match lua.globals().get("__ZoiBuildOperations") {
+            Ok(t) => t,
+            Err(_) => {
+                let new_t = lua.create_table()?;
+                lua.globals().set("__ZoiBuildOperations", new_t.clone())?;
+                new_t
+            }
+        };
+        let op = lua.create_table()?;
+        op.set("op", "zmkdir")?;
+        op.set("path", path)?;
+        ops_table.push(op)?;
+        Ok(())
+    })?;
+    lua.globals().set("zmkdir", zmkdir_fn)?;
+    Ok(())
+}
+
 fn add_verify_hash(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let verify_hash_fn =
         lua.create_function(move |_, (file_path, hash_str): (String, String)| {
@@ -1032,6 +1117,10 @@ pub fn setup_lua_environment(
     add_git_fetch_util(lua)?;
     add_file_util(lua)?;
     add_zcp(lua)?;
+    add_zln(lua)?;
+    add_zchmod(lua)?;
+    add_zchown(lua)?;
+    add_zmkdir(lua)?;
     add_verify_hash(lua, quiet)?;
     add_zrm(lua)?;
     add_cmd_util(lua, quiet)?;

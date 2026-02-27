@@ -264,6 +264,45 @@ pub fn set_path_writable(path: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(unix)]
+pub fn set_path_owner(path: &Path, owner: &str, group: &str) -> anyhow::Result<()> {
+    use nix::unistd::{Gid, Group, Uid, User, chown};
+
+    let uid = if let Ok(u) = owner.parse::<u32>() {
+        Some(Uid::from_raw(u))
+    } else if !owner.is_empty() {
+        Some(
+            User::from_name(owner)
+                .map_err(|e| anyhow!("Error looking up user '{}': {}", owner, e))?
+                .ok_or_else(|| anyhow!("User not found: {}", owner))?
+                .uid,
+        )
+    } else {
+        None
+    };
+
+    let gid = if let Ok(g) = group.parse::<u32>() {
+        Some(Gid::from_raw(g))
+    } else if !group.is_empty() {
+        Some(
+            Group::from_name(group)
+                .map_err(|e| anyhow!("Error looking up group '{}': {}", group, e))?
+                .ok_or_else(|| anyhow!("Group not found: {}", group))?
+                .gid,
+        )
+    } else {
+        None
+    };
+
+    chown(path, uid, gid).map_err(|e| anyhow!("Failed to chown '{}': {}", path.display(), e))?;
+    Ok(())
+}
+
+#[cfg(not(unix))]
+pub fn set_path_owner(_path: &Path, _owner: &str, _group: &str) -> anyhow::Result<()> {
+    Ok(())
+}
+
 use std::collections::HashMap;
 
 pub fn get_linux_distribution_info() -> Option<HashMap<String, String>> {

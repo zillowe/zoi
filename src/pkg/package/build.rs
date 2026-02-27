@@ -151,61 +151,146 @@ fn build_for_platform(
         if let Ok(build_ops) = lua.globals().get::<Table>("__ZoiBuildOperations") {
             for op in build_ops.sequence_values::<Table>() {
                 let op = op.map_err(|e| anyhow!(e.to_string()))?;
-                if let Ok(op_type) = op.get::<String>("op")
-                    && op_type == "zcp"
-                {
-                    let source: String = op.get("source").map_err(|e| anyhow!(e.to_string()))?;
-                    let mut destination: String =
-                        op.get("destination").map_err(|e| anyhow!(e.to_string()))?;
+                let op_type: String = op.get("op").map_err(|e| anyhow!(e.to_string()))?;
 
-                    let source_path = if source.contains("${pkgluadir}") {
-                        Path::new(&source.replace("${pkgluadir}", pkg_lua_dir_str)).to_path_buf()
-                    } else {
-                        build_dir.path().join(&source)
-                    };
-                    let data_prefix = if sub_package.is_empty() {
-                        "data".to_string()
-                    } else {
-                        format!("data/{}", sub_package)
-                    };
+                let data_prefix = if sub_package.is_empty() {
+                    "data".to_string()
+                } else {
+                    format!("data/{}", sub_package)
+                };
 
-                    destination =
-                        destination.replace("${pkgstore}", &format!("{}/pkgstore", data_prefix));
-                    destination = destination
-                        .replace("${createpkgdir}", &format!("{}/createpkgdir", data_prefix));
-                    destination =
-                        destination.replace("${usrroot}", &format!("{}/usrroot", data_prefix));
-                    destination =
-                        destination.replace("${usrhome}", &format!("{}/usrhome", data_prefix));
+                match op_type.as_str() {
+                    "zcp" => {
+                        let source: String =
+                            op.get("source").map_err(|e| anyhow!(e.to_string()))?;
+                        let mut destination: String =
+                            op.get("destination").map_err(|e| anyhow!(e.to_string()))?;
 
-                    let dest_path = staging_dir.join(&destination);
+                        let source_path = if source.contains("${pkgluadir}") {
+                            Path::new(&source.replace("${pkgluadir}", pkg_lua_dir_str))
+                                .to_path_buf()
+                        } else {
+                            build_dir.path().join(&source)
+                        };
 
-                    if let Some(parent) = dest_path.parent() {
-                        fs::create_dir_all(parent)?;
-                    }
+                        destination = destination
+                            .replace("${pkgstore}", &format!("{}/pkgstore", data_prefix));
+                        destination = destination
+                            .replace("${createpkgdir}", &format!("{}/createpkgdir", data_prefix));
+                        destination =
+                            destination.replace("${usrroot}", &format!("{}/usrroot", data_prefix));
+                        destination =
+                            destination.replace("${usrhome}", &format!("{}/usrhome", data_prefix));
 
-                    if source_path.is_dir() {
-                        for entry in WalkDir::new(&source_path)
-                            .into_iter()
-                            .filter_map(|e| e.ok())
-                        {
-                            let target_path =
-                                dest_path.join(entry.path().strip_prefix(&source_path)?);
-                            if entry.file_type().is_dir() {
-                                fs::create_dir_all(&target_path)?;
-                            } else {
-                                if let Some(p) = target_path.parent() {
-                                    fs::create_dir_all(p)?;
-                                }
-                                fs::copy(entry.path(), &target_path)?;
-                            }
+                        let dest_path = staging_dir.join(&destination);
+
+                        if let Some(parent) = dest_path.parent() {
+                            fs::create_dir_all(parent)?;
                         }
-                    } else {
-                        fs::copy(&source_path, &dest_path)?;
+
+                        if source_path.is_dir() {
+                            for entry in WalkDir::new(&source_path)
+                                .into_iter()
+                                .filter_map(|e| e.ok())
+                            {
+                                let target_path =
+                                    dest_path.join(entry.path().strip_prefix(&source_path)?);
+                                if entry.file_type().is_dir() {
+                                    fs::create_dir_all(&target_path)?;
+                                } else {
+                                    if let Some(p) = target_path.parent() {
+                                        fs::create_dir_all(p)?;
+                                    }
+                                    fs::copy(entry.path(), &target_path)?;
+                                }
+                            }
+                        } else {
+                            fs::copy(&source_path, &dest_path)?;
+                        }
+                        if !quiet {
+                            println!("Staged '{}' to '{}'", source, destination);
+                        }
                     }
-                    if !quiet {
-                        println!("Staged '{}' to '{}'", source, destination);
+                    "zln" => {
+                        let mut target: String =
+                            op.get("target").map_err(|e| anyhow!(e.to_string()))?;
+                        let mut link: String =
+                            op.get("link").map_err(|e| anyhow!(e.to_string()))?;
+
+                        target =
+                            target.replace("${pkgstore}", &format!("{}/pkgstore", data_prefix));
+                        link = link.replace("${pkgstore}", &format!("{}/pkgstore", data_prefix));
+                        link = link
+                            .replace("${createpkgdir}", &format!("{}/createpkgdir", data_prefix));
+                        link = link.replace("${usrroot}", &format!("{}/usrroot", data_prefix));
+                        link = link.replace("${usrhome}", &format!("{}/usrhome", data_prefix));
+
+                        let link_path = staging_dir.join(&link);
+                        if let Some(parent) = link_path.parent() {
+                            fs::create_dir_all(parent)?;
+                        }
+
+                        utils::symlink_file(Path::new(&target), &link_path)?;
+                        if !quiet {
+                            println!("Created symlink '{}' -> '{}'", link, target);
+                        }
                     }
+                    "zchmod" => {
+                        let mut path: String =
+                            op.get("path").map_err(|e| anyhow!(e.to_string()))?;
+                        let mode: u32 = op.get("mode").map_err(|e| anyhow!(e.to_string()))?;
+
+                        path = path.replace("${pkgstore}", &format!("{}/pkgstore", data_prefix));
+                        path = path
+                            .replace("${createpkgdir}", &format!("{}/createpkgdir", data_prefix));
+                        path = path.replace("${usrroot}", &format!("{}/usrroot", data_prefix));
+                        path = path.replace("${usrhome}", &format!("{}/usrhome", data_prefix));
+
+                        let full_path = staging_dir.join(&path);
+                        #[cfg(unix)]
+                        {
+                            use std::os::unix::fs::PermissionsExt;
+                            fs::set_permissions(full_path, fs::Permissions::from_mode(mode))?;
+                        }
+                        if !quiet {
+                            println!("Set permissions {} on '{}'", mode, path);
+                        }
+                    }
+                    "zchown" => {
+                        let mut path: String =
+                            op.get("path").map_err(|e| anyhow!(e.to_string()))?;
+                        let owner: String = op.get("owner").map_err(|e| anyhow!(e.to_string()))?;
+                        let group: String = op.get("group").map_err(|e| anyhow!(e.to_string()))?;
+
+                        path = path.replace("${pkgstore}", &format!("{}/pkgstore", data_prefix));
+                        path = path
+                            .replace("${createpkgdir}", &format!("{}/createpkgdir", data_prefix));
+                        path = path.replace("${usrroot}", &format!("{}/usrroot", data_prefix));
+                        path = path.replace("${usrhome}", &format!("{}/usrhome", data_prefix));
+
+                        let full_path = staging_dir.join(&path);
+                        utils::set_path_owner(&full_path, &owner, &group)?;
+                        if !quiet {
+                            println!("Set ownership {}:{} on '{}'", owner, group, path);
+                        }
+                    }
+                    "zmkdir" => {
+                        let mut path: String =
+                            op.get("path").map_err(|e| anyhow!(e.to_string()))?;
+
+                        path = path.replace("${pkgstore}", &format!("{}/pkgstore", data_prefix));
+                        path = path
+                            .replace("${createpkgdir}", &format!("{}/createpkgdir", data_prefix));
+                        path = path.replace("${usrroot}", &format!("{}/usrroot", data_prefix));
+                        path = path.replace("${usrhome}", &format!("{}/usrhome", data_prefix));
+
+                        let full_path = staging_dir.join(&path);
+                        fs::create_dir_all(full_path)?;
+                        if !quiet {
+                            println!("Created directory '{}'", path);
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
