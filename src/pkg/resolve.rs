@@ -2,6 +2,7 @@ use crate::pkg::{config, pin, types};
 use anyhow::{Result, anyhow};
 use chrono::Utc;
 use colored::*;
+use comfy_table::{Table, presets::UTF8_FULL};
 use dialoguer::{Select, theme::ColorfulTheme};
 use indicatif::{ProgressBar, ProgressStyle};
 use regex::Regex;
@@ -189,6 +190,8 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
         source_type: SourceType,
         repo_name: String,
         description: String,
+        license: String,
+        size: Option<u64>,
     }
 
     fn process_found_package(
@@ -234,6 +237,8 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
             source_type,
             repo_name: pkg.repo.clone(),
             description: pkg.description,
+            license: pkg.license,
+            size: pkg.installed_size,
         })
     }
 
@@ -353,6 +358,8 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
                         source_type,
                         repo_name: pkg.repo.clone(),
                         description: pkg.description,
+                        license: pkg.license,
+                        size: pkg.installed_size,
                     });
                 }
             }
@@ -384,17 +391,34 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
         })
     } else {
         println!(
-            "Found multiple packages named '{}'. Please choose one:",
+            "Found multiple packages named or providing '{}'. Please choose one:",
             request.name.cyan()
         );
 
+        let mut table = Table::new();
+        table.load_preset(UTF8_FULL);
+        table.set_header(vec!["#", "Repo", "License", "Size", "Description"]);
+
+        for (i, p) in found_packages.iter().enumerate() {
+            table.add_row(vec![
+                (i + 1).to_string(),
+                p.repo_name.clone(),
+                p.license.clone(),
+                p.size
+                    .map(crate::utils::format_bytes)
+                    .unwrap_or_else(|| "unknown".to_string()),
+                p.description.clone(),
+            ]);
+        }
+        println!("{table}");
+
         let items: Vec<String> = found_packages
             .iter()
-            .map(|p| format!("@{} - {}", p.repo_name.bold(), p.description))
+            .map(|p| format!("@{}", p.repo_name.bold()))
             .collect();
 
         let selection = Select::with_theme(&ColorfulTheme::default())
-            .with_prompt("Select a package")
+            .with_prompt("Select a provider")
             .items(&items)
             .default(0)
             .interact()?;
