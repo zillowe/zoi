@@ -4,6 +4,39 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
+## [Prod-Release-1.7.0] - 2026-02-27
+
+### ✨ Features
+
+- _(completions)_ Add dynamic package name listing
+- Add zig package manager
+- _(cli)_ Add 'provides' command to find packages
+- _(service)_ Add package background service management
+- _(cmd)_ Add dependency tree visualization command
+- _(cli)_ Add project development shell command
+- _(shell)_ Add ephemeral shell for temporary environments
+- _(cmd)_ Add dry-run flag for install and update
+- _(search)_ Add global file search
+- _(uninstall)_ Add recursive uninstall for orphaned dependencies
+- _(list)_ Add --foreign flag to list packages
+- _(resolver)_ Integrate PubGrub for robust dependency resolution
+- _(hooks)_ Implement global hook system
+- _(pkg)_ Add downgrade command
+- _(pkg)_ Add global offline mode and cache commands
+- _(pkg)_ Add 'mark' command to modify package installation reason
+- _(db)_ Enhance package tracking with sub-packages and scope
+- _(pkg)_ Add SQLite database for package metadata
+- _(sysroot)_ Add option to define alternative root directory
+
+### 🎯 UX
+
+- _(pkg)_ Enhance multiple package selection with table display
+- _(cli)_ Suppress zero size output in install and update commands
+
+### 🔧 Configuration
+
+- Add configurable offline mode and package directories
+
 ## [Prod-Release-1.6.0] - 2026-02-26
 
 ### ♻️ Refactor
