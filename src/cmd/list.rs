@@ -10,6 +10,7 @@ pub fn run(
     registry_filter: Option<String>,
     repo_filter: Option<String>,
     type_filter: Option<String>,
+    foreign: bool,
 ) -> Result<()> {
     let package_type = match type_filter.as_deref() {
         Some("package") => Some(types::PackageType::Package),
@@ -21,9 +22,12 @@ pub fn run(
     };
 
     if all {
+        if foreign {
+            return Err(anyhow!("The --foreign flag cannot be used with --all."));
+        }
         run_list_all(registry_filter, repo_filter, package_type)?;
     } else {
-        run_list_installed(registry_filter, repo_filter, package_type)?;
+        run_list_installed(registry_filter, repo_filter, package_type, foreign)?;
     }
     Ok(())
 }
@@ -57,7 +61,17 @@ fn run_list_installed(
     registry_filter: Option<String>,
     repo_filter: Option<String>,
     type_filter: Option<types::PackageType>,
+    foreign: bool,
 ) -> Result<()> {
+    let config = config::read_config()?;
+    let mut active_registries = HashSet::new();
+    if let Some(default) = &config.default_registry {
+        active_registries.insert(default.handle.clone());
+    }
+    for reg in &config.added_registries {
+        active_registries.insert(reg.handle.clone());
+    }
+
     let mut db_failed = false;
     let packages_from_db = match crate::pkg::db::list_all_packages("local") {
         Ok(pkgs) => pkgs,
@@ -70,12 +84,21 @@ fn run_list_installed(
     let mut table = Table::new();
     table
         .load_preset(UTF8_FULL)
-        .set_header(vec!["Package", "Version", "Repo", "Type"]);
+        .set_header(vec!["Package", "Version", "Repo", "Registry", "Type"]);
 
     let mut found_packages = false;
 
     if !db_failed && !packages_from_db.is_empty() {
         for pkg in packages_from_db {
+            if foreign {
+                if let Some(reg) = &pkg.registry_handle {
+                    if active_registries.contains(reg) {
+                        continue;
+                    }
+                } else {
+                }
+            }
+
             if let Some(registry_filter) = &registry_filter
                 && pkg.registry_handle.as_deref() != Some(registry_filter)
             {
@@ -108,6 +131,7 @@ fn run_list_installed(
                 package_display,
                 pkg.version.unwrap_or_else(|| "N/A".to_string()),
                 repo_display.to_string(),
+                pkg.registry_handle.unwrap_or_else(|| "none".to_string()),
                 format!("{:?}", pkg.package_type),
             ]);
             found_packages = true;
@@ -120,30 +144,32 @@ fn run_list_installed(
         }
 
         for pkg in packages {
-            if let Some(registry_filter) = &registry_filter {
-                let manifest = local::is_package_installed(
-                    &pkg.name,
-                    pkg.sub_package.as_deref(),
-                    types::Scope::User,
-                )?
-                .or(local::is_package_installed(
-                    &pkg.name,
-                    pkg.sub_package.as_deref(),
-                    types::Scope::System,
-                )?)
-                .or(local::is_package_installed(
-                    &pkg.name,
-                    pkg.sub_package.as_deref(),
-                    types::Scope::Project,
-                )?);
+            let manifest = local::is_package_installed(
+                &pkg.name,
+                pkg.sub_package.as_deref(),
+                types::Scope::User,
+            )?
+            .or(local::is_package_installed(
+                &pkg.name,
+                pkg.sub_package.as_deref(),
+                types::Scope::System,
+            )?)
+            .or(local::is_package_installed(
+                &pkg.name,
+                pkg.sub_package.as_deref(),
+                types::Scope::Project,
+            )?);
 
-                if let Some(m) = manifest {
-                    if m.registry_handle != *registry_filter {
-                        continue;
-                    }
-                } else {
-                    continue;
-                }
+            let Some(m) = manifest else { continue };
+
+            if foreign && active_registries.contains(&m.registry_handle) {
+                continue;
+            }
+
+            if let Some(registry_filter) = &registry_filter
+                && m.registry_handle != *registry_filter
+            {
+                continue;
             }
             if let Some(repo_filter) = &repo_filter {
                 let repo_matches = if repo_filter.contains('/') {
@@ -171,6 +197,7 @@ fn run_list_installed(
                 package_display,
                 pkg.version,
                 repo_display.to_string(),
+                m.registry_handle,
                 format!("{:?}", pkg.package_type),
             ]);
             found_packages = true;

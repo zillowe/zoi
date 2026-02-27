@@ -161,6 +161,9 @@ enum Commands {
         /// Filter by package type (package, app, collection, extension)
         #[arg(short = 't', long = "type")]
         package_type: Option<String>,
+        /// List packages not found in any configured registry
+        #[arg(short = 'm', long)]
+        foreign: bool,
     },
 
     /// Shows detailed information about a package
@@ -683,7 +686,8 @@ pub fn run() -> anyhow::Result<()> {
                 registry,
                 repo,
                 package_type,
-            } => cmd::list::run(all, registry, repo, package_type),
+                foreign,
+            } => cmd::list::run(all, registry, repo, package_type, foreign),
             Commands::Show { package_name, raw } => cmd::show::run(&package_name, raw),
             Commands::Pin { package, version } => cmd::pin::run(&package, &version),
             Commands::Unpin { package } => cmd::unpin::run(&package),
