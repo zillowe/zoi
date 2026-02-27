@@ -58,11 +58,14 @@ fn run_list_installed(
     repo_filter: Option<String>,
     type_filter: Option<types::PackageType>,
 ) -> Result<()> {
-    let packages = local::get_installed_packages_with_type()?;
-    if packages.is_empty() {
-        println!("No packages installed by Zoi.");
-        return Ok(());
-    }
+    let mut db_failed = false;
+    let packages_from_db = match crate::pkg::db::list_all_packages("local") {
+        Ok(pkgs) => pkgs,
+        Err(_) => {
+            db_failed = true;
+            Vec::new()
+        }
+    };
 
     let mut table = Table::new();
     table
@@ -70,61 +73,118 @@ fn run_list_installed(
         .set_header(vec!["Package", "Version", "Repo", "Type"]);
 
     let mut found_packages = false;
-    for pkg in packages {
-        if let Some(registry_filter) = &registry_filter {
-            let manifest = local::is_package_installed(
-                &pkg.name,
-                pkg.sub_package.as_deref(),
-                types::Scope::User,
-            )?
-            .or(local::is_package_installed(
-                &pkg.name,
-                pkg.sub_package.as_deref(),
-                types::Scope::System,
-            )?)
-            .or(local::is_package_installed(
-                &pkg.name,
-                pkg.sub_package.as_deref(),
-                types::Scope::Project,
-            )?);
 
-            if let Some(m) = manifest {
-                if m.registry_handle != *registry_filter {
+    if !db_failed && !packages_from_db.is_empty() {
+        for pkg in packages_from_db {
+            if let Some(registry_filter) = &registry_filter {
+                let manifest = local::is_package_installed(&pkg.name, None, types::Scope::User)?
+                    .or(local::is_package_installed(
+                        &pkg.name,
+                        None,
+                        types::Scope::System,
+                    )?)
+                    .or(local::is_package_installed(
+                        &pkg.name,
+                        None,
+                        types::Scope::Project,
+                    )?);
+
+                if let Some(m) = manifest {
+                    if m.registry_handle != *registry_filter {
+                        continue;
+                    }
+                } else {
                     continue;
                 }
-            } else {
+            }
+
+            if let Some(repo_filter) = &repo_filter {
+                let repo_matches = if repo_filter.contains('/') {
+                    pkg.repo == *repo_filter
+                } else {
+                    pkg.repo.split('/').any(|part| part == *repo_filter)
+                };
+                if !repo_matches {
+                    continue;
+                }
+            }
+            if type_filter.is_some() && pkg.package_type != type_filter.unwrap() {
                 continue;
             }
+
+            let repo_display = pkg.repo.split_once('/').map(|x| x.1).unwrap_or(&pkg.repo);
+
+            table.add_row(vec![
+                pkg.name,
+                pkg.version.unwrap_or_else(|| "N/A".to_string()),
+                repo_display.to_string(),
+                format!("{:?}", pkg.package_type),
+            ]);
+            found_packages = true;
         }
-        if let Some(repo_filter) = &repo_filter {
-            let repo_matches = if repo_filter.contains('/') {
-                pkg.repo == *repo_filter
+    } else {
+        let packages = local::get_installed_packages_with_type()?;
+        if packages.is_empty() {
+            println!("No packages installed by Zoi.");
+            return Ok(());
+        }
+
+        for pkg in packages {
+            if let Some(registry_filter) = &registry_filter {
+                let manifest = local::is_package_installed(
+                    &pkg.name,
+                    pkg.sub_package.as_deref(),
+                    types::Scope::User,
+                )?
+                .or(local::is_package_installed(
+                    &pkg.name,
+                    pkg.sub_package.as_deref(),
+                    types::Scope::System,
+                )?)
+                .or(local::is_package_installed(
+                    &pkg.name,
+                    pkg.sub_package.as_deref(),
+                    types::Scope::Project,
+                )?);
+
+                if let Some(m) = manifest {
+                    if m.registry_handle != *registry_filter {
+                        continue;
+                    }
+                } else {
+                    continue;
+                }
+            }
+            if let Some(repo_filter) = &repo_filter {
+                let repo_matches = if repo_filter.contains('/') {
+                    pkg.repo == *repo_filter
+                } else {
+                    pkg.repo.split('/').any(|part| part == *repo_filter)
+                };
+                if !repo_matches {
+                    continue;
+                }
+            }
+            if type_filter.is_some() && pkg.package_type != type_filter.unwrap() {
+                continue;
+            }
+
+            let package_display = if let Some(sub) = pkg.sub_package {
+                format!("{}:{}", pkg.name, sub)
             } else {
-                pkg.repo.split('/').any(|part| part == *repo_filter)
+                pkg.name
             };
-            if !repo_matches {
-                continue;
-            }
+
+            let repo_display = pkg.repo.split_once('/').map(|x| x.1).unwrap_or(&pkg.repo);
+
+            table.add_row(vec![
+                package_display,
+                pkg.version,
+                repo_display.to_string(),
+                format!("{:?}", pkg.package_type),
+            ]);
+            found_packages = true;
         }
-        if type_filter.is_some() && pkg.package_type != type_filter.unwrap() {
-            continue;
-        }
-
-        let package_display = if let Some(sub) = pkg.sub_package {
-            format!("{}:{}", pkg.name, sub)
-        } else {
-            pkg.name
-        };
-
-        let repo_display = pkg.repo.split_once('/').map(|x| x.1).unwrap_or(&pkg.repo);
-
-        table.add_row(vec![
-            package_display,
-            pkg.version,
-            repo_display.to_string(),
-            format!("{:?}", pkg.package_type),
-        ]);
-        found_packages = true;
     }
 
     if !found_packages {
@@ -154,50 +214,96 @@ fn run_list_all(
 
     let config = config::read_config()?;
 
-    let available_pkgs = if let Some(reg_handle) = &registry_filter {
-        let all_repo_names = config::get_all_repos()?;
-        let full_repos: Vec<String> = all_repo_names
-            .into_iter()
-            .map(|r_name| format!("{}/{}", reg_handle, r_name))
-            .filter(|full_repo_name| {
-                if let Some(repo_f) = &repo_filter {
-                    if repo_f.contains('/') {
-                        full_repo_name == repo_f
-                    } else {
-                        full_repo_name.split('/').any(|part| part == repo_f)
-                    }
-                } else {
-                    true
-                }
-            })
-            .collect();
-        local::get_packages_from_repos(&full_repos)?
-    } else if let Some(repo_filter) = &repo_filter {
-        let handle = if let Some(reg) = &config.default_registry {
-            reg.handle.clone()
-        } else {
-            return Err(anyhow!("Default registry not configured."));
-        };
-        if handle.is_empty() {
-            return Err(anyhow!(
-                "Default registry handle is not set. Please run 'zoi sync'.."
-            ));
+    let mut all_available = Vec::new();
+    let mut db_failed = false;
+
+    if let Some(reg_handle) = &registry_filter {
+        match crate::pkg::db::list_all_packages(reg_handle) {
+            Ok(pkgs) => all_available.extend(pkgs),
+            Err(_) => db_failed = true,
         }
-        let all_repo_names = config::get_all_repos()?;
-        let repos_to_search: Vec<String> = all_repo_names
-            .into_iter()
-            .map(|r_name| format!("{}/{}", handle, r_name))
-            .filter(|full_repo_name| {
-                if repo_filter.contains('/') {
-                    full_repo_name == repo_filter
-                } else {
-                    full_repo_name.split('/').any(|part| part == repo_filter)
-                }
-            })
-            .collect();
-        local::get_packages_from_repos(&repos_to_search)?
     } else {
-        local::get_all_available_packages()?
+        let mut registries = Vec::new();
+        if let Some(default) = &config.default_registry {
+            registries.push(default.handle.clone());
+        }
+        for reg in &config.added_registries {
+            registries.push(reg.handle.clone());
+        }
+
+        for handle in registries {
+            if handle.is_empty() {
+                continue;
+            }
+            match crate::pkg::db::list_all_packages(&handle) {
+                Ok(pkgs) => all_available.extend(pkgs),
+                Err(_) => {
+                    db_failed = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    let available_pkgs = if db_failed
+        || (all_available.is_empty() && repo_filter.is_none() && registry_filter.is_none())
+    {
+        if let Some(reg_handle) = &registry_filter {
+            let all_repo_names = config::get_all_repos()?;
+            let full_repos: Vec<String> = all_repo_names
+                .into_iter()
+                .map(|r_name| format!("{}/{}", reg_handle, r_name))
+                .filter(|full_repo_name| {
+                    if let Some(repo_f) = &repo_filter {
+                        if repo_f.contains('/') {
+                            full_repo_name == repo_f
+                        } else {
+                            full_repo_name.split('/').any(|part| part == repo_f)
+                        }
+                    } else {
+                        true
+                    }
+                })
+                .collect();
+            local::get_packages_from_repos(&full_repos)?
+        } else if let Some(repo_filter) = &repo_filter {
+            let handle = if let Some(reg) = &config.default_registry {
+                reg.handle.clone()
+            } else {
+                return Err(anyhow!("Default registry not configured."));
+            };
+            if handle.is_empty() {
+                return Err(anyhow!(
+                    "Default registry handle is not set. Please run 'zoi sync'.."
+                ));
+            }
+            let all_repo_names = config::get_all_repos()?;
+            let repos_to_search: Vec<String> = all_repo_names
+                .into_iter()
+                .map(|r_name| format!("{}/{}", handle, r_name))
+                .filter(|full_repo_name| {
+                    if repo_filter.contains('/') {
+                        full_repo_name == repo_filter
+                    } else {
+                        full_repo_name.split('/').any(|part| part == repo_filter)
+                    }
+                })
+                .collect();
+            local::get_packages_from_repos(&repos_to_search)?
+        } else {
+            local::get_all_available_packages()?
+        }
+    } else {
+        if let Some(rf) = &repo_filter {
+            all_available.retain(|p| {
+                if rf.contains('/') {
+                    p.repo == *rf
+                } else {
+                    p.repo.split('/').any(|part| part == rf)
+                }
+            });
+        }
+        all_available
     };
 
     let handle_for_version = registry_filter.as_deref().or(config

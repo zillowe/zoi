@@ -1,5 +1,5 @@
 use crate::cmd::utils as cmd_utils;
-use crate::pkg::{config, hooks, install, local, pin, resolve, transaction, types};
+use crate::pkg::{config, db, hooks, install, local, pin, resolve, transaction, types};
 use anyhow::{Result, anyhow};
 use colored::*;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -225,6 +225,14 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
             &new_pkg.repo,
             registry_handle.as_deref().unwrap_or("local"),
         )?;
+
+        let handle = registry_handle.as_deref().unwrap_or("local");
+        if let Ok(conn) = db::open_connection(handle) {
+            let _ = db::update_package(&conn, &new_pkg);
+        }
+        if let Ok(conn) = db::open_connection("local") {
+            let _ = db::update_package(&conn, &new_pkg);
+        }
 
         if let Some(hooks) = &new_pkg.hooks {
             hooks::run_hooks(hooks, hooks::HookType::PostUpgrade)?;
@@ -520,6 +528,13 @@ fn run_update_all_logic(yes: bool) -> Result<()> {
                 "Failed to clean up old versions for {}: {}",
                 new_manifest.name, e
             );
+        }
+
+        if let Ok(conn) = db::open_connection(&new_manifest.registry_handle) {
+            let _ = db::update_package(&conn, new_pkg);
+        }
+        if let Ok(conn) = db::open_connection("local") {
+            let _ = db::update_package(&conn, new_pkg);
         }
 
         if let Some(hooks) = &new_pkg.hooks

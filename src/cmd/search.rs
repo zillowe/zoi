@@ -63,50 +63,82 @@ pub fn run(
 
     let config = config::read_config()?;
 
-    let packages = if let Some(reg_handle) = &registry_filter {
-        let all_repo_names = config::get_all_repos()?;
-        let full_repos: Vec<String> = all_repo_names
-            .into_iter()
-            .map(|r_name| format!("{}/{}", reg_handle, r_name))
-            .filter(|full_repo_name| {
-                if let Some(repo_f) = &repo {
-                    if repo_f.contains('/') {
-                        full_repo_name == repo_f
-                    } else {
-                        full_repo_name.split('/').any(|part| part == repo_f)
-                    }
-                } else {
-                    true
-                }
-            })
-            .collect();
-        local::get_packages_from_repos(&full_repos)
-    } else if let Some(repo_filter) = &repo {
-        let handle = if let Some(reg) = &config.default_registry {
-            reg.handle.clone()
-        } else {
-            return Err(anyhow!("Default registry not configured."));
-        };
-        if handle.is_empty() {
-            return Err(anyhow!(
-                "Default registry handle is not set. Please run 'zoi sync'.."
-            ));
+    let mut all_packages = Vec::new();
+    let mut db_failed = false;
+
+    if let Some(reg_handle) = &registry_filter {
+        match crate::pkg::db::search_packages(reg_handle, &search_term) {
+            Ok(pkgs) => all_packages.extend(pkgs),
+            Err(_) => db_failed = true,
         }
-        let all_repo_names = config::get_all_repos()?;
-        let repos_to_search: Vec<String> = all_repo_names
-            .into_iter()
-            .map(|r_name| format!("{}/{}", handle, r_name))
-            .filter(|full_repo_name| {
-                if repo_filter.contains('/') {
-                    full_repo_name == repo_filter
-                } else {
-                    full_repo_name.split('/').any(|part| part == repo_filter)
-                }
-            })
-            .collect();
-        local::get_packages_from_repos(&repos_to_search)
     } else {
-        local::get_all_available_packages()
+        let mut registries = Vec::new();
+        if let Some(default) = &config.default_registry {
+            registries.push(default.handle.clone());
+        }
+        for reg in &config.added_registries {
+            registries.push(reg.handle.clone());
+        }
+
+        for handle in registries {
+            match crate::pkg::db::search_packages(&handle, &search_term) {
+                Ok(pkgs) => all_packages.extend(pkgs),
+                Err(_) => {
+                    db_failed = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    let packages = if db_failed || (all_packages.is_empty() && registry_filter.is_none()) {
+        if let Some(reg_handle) = &registry_filter {
+            let all_repo_names = config::get_all_repos()?;
+            let full_repos: Vec<String> = all_repo_names
+                .into_iter()
+                .map(|r_name| format!("{}/{}", reg_handle, r_name))
+                .filter(|full_repo_name| {
+                    if let Some(repo_f) = &repo {
+                        if repo_f.contains('/') {
+                            full_repo_name == repo_f
+                        } else {
+                            full_repo_name.split('/').any(|part| part == repo_f)
+                        }
+                    } else {
+                        true
+                    }
+                })
+                .collect();
+            local::get_packages_from_repos(&full_repos)
+        } else if let Some(repo_filter) = &repo {
+            let handle = if let Some(reg) = &config.default_registry {
+                reg.handle.clone()
+            } else {
+                return Err(anyhow!("Default registry not configured."));
+            };
+            if handle.is_empty() {
+                return Err(anyhow!(
+                    "Default registry handle is not set. Please run 'zoi sync'.."
+                ));
+            }
+            let all_repo_names = config::get_all_repos()?;
+            let repos_to_search: Vec<String> = all_repo_names
+                .into_iter()
+                .map(|r_name| format!("{}/{}", handle, r_name))
+                .filter(|full_repo_name| {
+                    if repo_filter.contains('/') {
+                        full_repo_name == repo_filter
+                    } else {
+                        full_repo_name.split('/').any(|part| part == repo_filter)
+                    }
+                })
+                .collect();
+            local::get_packages_from_repos(&repos_to_search)
+        } else {
+            local::get_all_available_packages()
+        }
+    } else {
+        Ok(all_packages)
     };
 
     let handle_for_version = registry_filter.as_deref().or(config

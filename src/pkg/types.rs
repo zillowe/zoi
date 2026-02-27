@@ -57,7 +57,7 @@ pub struct ExtensionInfo {
     pub changes: Vec<ExtensionChange>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[allow(dead_code)]
 pub struct Package {
     pub name: String,
@@ -138,7 +138,7 @@ pub struct Hooks {
     pub post_remove: Option<PlatformOrStringVec>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[allow(dead_code)]
 pub struct Maintainer {
     pub name: String,
@@ -146,7 +146,7 @@ pub struct Maintainer {
     pub website: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[allow(dead_code)]
 pub struct Author {
     pub name: String,

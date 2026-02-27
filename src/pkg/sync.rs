@@ -1,5 +1,5 @@
 use crate::{
-    pkg::{config, pgp, types},
+    pkg::{config, db, pgp, types},
     utils,
 };
 use anyhow::{Result, anyhow};
@@ -16,6 +16,46 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use tempfile::Builder;
+use walkdir::WalkDir;
+
+fn refresh_registry_db(registry_handle: &str, registry_path: &Path) -> Result<()> {
+    println!(
+        "Refreshing metadata database for {}...",
+        registry_handle.cyan()
+    );
+    let conn = db::open_connection(registry_handle)?;
+    db::clear_registry(&conn)?;
+
+    let mut pkg_files = Vec::new();
+    for entry in WalkDir::new(registry_path)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
+        if entry.file_type().is_file() && entry.file_name().to_string_lossy().ends_with(".pkg.lua")
+        {
+            pkg_files.push(entry.path().to_path_buf());
+        }
+    }
+
+    pkg_files.par_iter().for_each(|path| {
+        if let Ok(pkg) =
+            crate::pkg::lua::parser::parse_lua_package(path.to_str().unwrap(), None, true)
+        {
+            let mut pkg = pkg;
+            if let Ok(rel_path) = path.strip_prefix(registry_path)
+                && let Some(parent) = rel_path.parent()
+            {
+                pkg.repo = parent.to_string_lossy().to_string().replace('\\', "/");
+            }
+
+            if let Ok(conn) = db::open_connection(registry_handle) {
+                let _ = db::update_package(&conn, &pkg);
+            }
+        }
+    });
+
+    Ok(())
+}
 
 fn verify_registry_signature(repo_path: &Path, authorities: &[String]) -> Result<()> {
     if authorities.is_empty() {
@@ -504,6 +544,7 @@ fn sync_registry(
             println!("{}", msg);
         }
         sync_pgp_keys_at_path(&target_dir)?;
+        refresh_registry_db(&reg.handle, &target_dir)?;
     }
 
     Ok((reg, reg_changed))

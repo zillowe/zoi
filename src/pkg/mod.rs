@@ -3,6 +3,7 @@ pub mod autoremove;
 pub mod cache;
 pub mod config;
 pub mod create;
+pub mod db;
 pub mod dependencies;
 pub mod doctor;
 pub mod exec;

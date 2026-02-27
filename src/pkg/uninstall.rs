@@ -1,4 +1,4 @@
-use crate::pkg::{dependencies, hooks, local, recorder, resolve, types};
+use crate::pkg::{db, dependencies, hooks, local, recorder, resolve, types};
 use crate::utils;
 use anyhow::anyhow;
 use colored::*;
@@ -103,6 +103,10 @@ fn uninstall_collection(
             "Warning:".yellow(),
             e
         );
+    }
+
+    if let Ok(conn) = db::open_connection("local") {
+        let _ = db::delete_package(&conn, &pkg.name, &pkg.repo);
     }
 
     match crate::pkg::telemetry::posthog_capture_event(
@@ -406,6 +410,11 @@ pub fn run(
             e
         );
     }
+
+    if let Ok(conn) = db::open_connection("local") {
+        let _ = db::delete_package(&conn, &pkg.name, &pkg.repo);
+    }
+
     println!("Removed manifest for '{}'.", pkg.name);
 
     match crate::pkg::telemetry::posthog_capture_event(
