@@ -587,8 +587,19 @@ pub fn run() -> anyhow::Result<()> {
         crate::pkg::sysroot::set_sysroot(root);
     }
 
-    crate::pkg::offline::set_offline(cli.offline);
-    crate::pkg::pkgdir::set_pkg_dirs(cli.pkg_dirs);
+    let config = crate::pkg::config::read_config().unwrap_or_default();
+
+    let is_offline = cli.offline || config.offline_mode;
+    crate::pkg::offline::set_offline(is_offline);
+
+    let mut all_pkg_dirs = cli.pkg_dirs;
+    for dir in config.pkg_dirs {
+        let path = std::path::PathBuf::from(dir);
+        if !all_pkg_dirs.contains(&path) {
+            all_pkg_dirs.push(path);
+        }
+    }
+    crate::pkg::pkgdir::set_pkg_dirs(all_pkg_dirs);
 
     utils::check_path();
 

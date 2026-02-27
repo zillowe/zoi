@@ -173,6 +173,7 @@ pub fn search_packages(registry_handle: &str, term: &str) -> Result<Vec<types::P
             package_type,
             tags,
             license: row.get(6)?,
+            sub_package: row.get(7)?,
             maintainer: types::Maintainer {
                 name: String::new(),
                 email: String::new(),
@@ -192,7 +193,7 @@ pub fn search_packages(registry_handle: &str, term: &str) -> Result<Vec<types::P
 pub fn list_all_packages(registry_handle: &str) -> Result<Vec<types::Package>> {
     let conn = open_connection(registry_handle)?;
     let mut stmt = conn.prepare(
-        "SELECT name, repo, version, description, package_type, tags, license, sub_package, scope, registry FROM packages ORDER BY name"
+        "SELECT name, repo, version, description, package_type, tags, license, sub_package, scope, registry, reason FROM packages ORDER BY name"
     )?;
 
     let rows = stmt.query_map([], |row| {
@@ -210,6 +211,7 @@ pub fn list_all_packages(registry_handle: &str) -> Result<Vec<types::Package>> {
         let sub_package: Option<String> = row.get(7)?;
         let scope_raw: Option<String> = row.get(8)?;
         let registry: Option<String> = row.get(9)?;
+        let reason_raw: Option<String> = row.get(10)?;
 
         let scope = match scope_raw.as_deref() {
             Some("system") => types::Scope::System,
@@ -217,7 +219,19 @@ pub fn list_all_packages(registry_handle: &str) -> Result<Vec<types::Package>> {
             _ => types::Scope::User,
         };
 
-        let mut pkg = types::Package {
+        let reason = reason_raw.map(|r| {
+            if r == "direct" {
+                types::InstallReason::Direct
+            } else if let Some(parent) = r.strip_prefix("dependency:") {
+                types::InstallReason::Dependency {
+                    parent: parent.to_string(),
+                }
+            } else {
+                types::InstallReason::Direct
+            }
+        });
+
+        let pkg = types::Package {
             name: row.get(0)?,
             repo: row.get(1)?,
             version: row.get(2)?,
@@ -226,6 +240,9 @@ pub fn list_all_packages(registry_handle: &str) -> Result<Vec<types::Package>> {
             tags,
             license: row.get(6)?,
             scope,
+            registry_handle: registry,
+            sub_package,
+            reason,
             maintainer: types::Maintainer {
                 name: String::new(),
                 email: String::new(),
@@ -233,13 +250,6 @@ pub fn list_all_packages(registry_handle: &str) -> Result<Vec<types::Package>> {
             },
             ..Default::default()
         };
-
-        if let Some(sub) = sub_package {
-            pkg.alt = Some(format!("sub:{}", sub));
-        }
-        if let Some(reg) = registry {
-            pkg.readme = Some(reg);
-        }
 
         Ok(pkg)
     })?;

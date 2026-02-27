@@ -208,6 +208,22 @@ pub fn read_config() -> Result<Config> {
         merged_cfg.max_resolution_depth = system_cfg.max_resolution_depth;
     }
 
+    if project_val.get("offline_mode").is_some() && !system_policy.offline_mode_unoverridable {
+        merged_cfg.offline_mode = project_cfg.offline_mode;
+    } else if user_val.get("offline_mode").is_some() && !system_policy.offline_mode_unoverridable {
+        merged_cfg.offline_mode = user_cfg.offline_mode;
+    } else {
+        merged_cfg.offline_mode = system_cfg.offline_mode;
+    }
+
+    merged_cfg.pkg_dirs = system_cfg.pkg_dirs;
+    if !system_policy.pkg_dirs_unoverridable {
+        merged_cfg.pkg_dirs.extend(user_cfg.pkg_dirs);
+        merged_cfg.pkg_dirs.extend(project_cfg.pkg_dirs);
+    }
+    merged_cfg.pkg_dirs.sort();
+    merged_cfg.pkg_dirs.dedup();
+
     if !system_policy.allow_deny_lists_unoverridable {
         if project_cfg.policy.allowed_licenses.is_some() {
             merged_cfg.policy.allowed_licenses = project_cfg.policy.allowed_licenses;

@@ -89,6 +89,12 @@ pub struct Package {
     pub alt: Option<String>,
     #[serde(default)]
     pub scope: Scope,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub registry_handle: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sub_package: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<InstallReason>,
     #[serde(default)]
     pub bins: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -327,6 +333,10 @@ pub struct Config {
     pub protect_db: bool,
     #[serde(default)]
     pub max_resolution_depth: Option<u8>,
+    #[serde(default)]
+    pub offline_mode: bool,
+    #[serde(default)]
+    pub pkg_dirs: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -353,6 +363,10 @@ pub struct Policy {
     pub protect_db_unoverridable: bool,
     #[serde(default, skip_serializing_if = "is_false")]
     pub max_resolution_depth_unoverridable: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub offline_mode_unoverridable: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub pkg_dirs_unoverridable: bool,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub allowed_licenses: Option<Vec<String>>,

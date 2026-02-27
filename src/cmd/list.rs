@@ -77,7 +77,7 @@ fn run_list_installed(
     if !db_failed && !packages_from_db.is_empty() {
         for pkg in packages_from_db {
             if let Some(registry_filter) = &registry_filter
-                && pkg.readme.as_deref() != Some(registry_filter)
+                && pkg.registry_handle.as_deref() != Some(registry_filter)
             {
                 continue;
             }
@@ -96,10 +96,8 @@ fn run_list_installed(
                 continue;
             }
 
-            let package_display = if let Some(sub_marker) = &pkg.alt
-                && sub_marker.starts_with("sub:")
-            {
-                format!("{}:{}", pkg.name, &sub_marker[4..])
+            let package_display = if let Some(sub) = &pkg.sub_package {
+                format!("{}:{}", pkg.name, sub)
             } else {
                 pkg.name
             };
@@ -326,31 +324,37 @@ fn run_list_all(
             .unwrap_or_else(|_| "N/A".to_string());
         let repo_display = pkg.repo.split_once('/').map(|x| x.1).unwrap_or(&pkg.repo);
 
+        let full_name = if let Some(sub) = &pkg.sub_package {
+            format!("{}:{}", pkg.name, sub)
+        } else {
+            pkg.name.clone()
+        };
+
         if let Some(subs) = &pkg.sub_packages {
             for sub in subs {
-                let full_name = format!("{}:{}", pkg.name, sub);
-                let status = if installed_pkgs.contains(&full_name) {
+                let full_name_sub = format!("{}:{}", pkg.name, sub);
+                let status = if installed_pkgs.contains(&full_name_sub) {
                     "✓"
                 } else {
                     ""
                 };
                 table.add_row(vec![
                     status.to_string(),
-                    full_name,
+                    full_name_sub,
                     version.clone(),
                     repo_display.to_string(),
                     format!("{:?}", pkg.package_type),
                 ]);
             }
         } else {
-            let status = if installed_pkgs.contains(&pkg.name) {
+            let status = if installed_pkgs.contains(&full_name) {
                 "✓"
             } else {
                 ""
             };
             table.add_row(vec![
                 status.to_string(),
-                pkg.name,
+                full_name,
                 version,
                 repo_display.to_string(),
                 format!("{:?}", pkg.package_type),
