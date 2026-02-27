@@ -14,6 +14,7 @@ pub fn open_connection(registry_handle: &str) -> Result<Connection> {
         std::fs::create_dir_all(parent)?;
     }
     let conn = Connection::open(db_path)?;
+    conn.busy_timeout(std::time::Duration::from_secs(5))?;
     setup_schema(&conn)?;
     Ok(conn)
 }
@@ -44,6 +45,21 @@ fn setup_schema(conn: &Connection) -> Result<()> {
     )?;
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_packages_repo ON packages(repo)",
+        [],
+    )?;
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS package_files (
+            id INTEGER PRIMARY KEY,
+            package_id INTEGER,
+            path TEXT NOT NULL,
+            FOREIGN KEY(package_id) REFERENCES packages(id) ON DELETE CASCADE
+        )",
+        [],
+    )?;
+
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_package_files_path ON package_files(path)",
         [],
     )?;
 
@@ -82,6 +98,41 @@ fn setup_schema(conn: &Connection) -> Result<()> {
         );
     }
 
+    let files_fts_exists: bool = conn
+        .query_row(
+            "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='package_files_fts'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0)
+        > 0;
+
+    if !files_fts_exists {
+        let _ = conn.execute(
+            "CREATE VIRTUAL TABLE package_files_fts USING fts5(path, content='package_files', content_rowid='id')",
+            [],
+        );
+        let _ = conn.execute(
+            "CREATE TRIGGER package_files_ai AFTER INSERT ON package_files BEGIN
+                INSERT INTO package_files_fts(rowid, path) VALUES (new.id, new.path);
+            END",
+            [],
+        );
+        let _ = conn.execute(
+            "CREATE TRIGGER package_files_ad AFTER DELETE ON package_files BEGIN
+                INSERT INTO package_files_fts(package_files_fts, rowid, path) VALUES('delete', old.id, old.path);
+            END",
+            [],
+        );
+        let _ = conn.execute(
+            "CREATE TRIGGER package_files_au AFTER UPDATE ON package_files BEGIN
+                INSERT INTO package_files_fts(package_files_fts, rowid, path) VALUES('delete', old.id, old.path);
+                INSERT INTO package_files_fts(rowid, path) VALUES (new.id, new.path);
+            END",
+            [],
+        );
+    }
+
     Ok(())
 }
 
@@ -92,7 +143,7 @@ pub fn update_package(
     scope: Option<types::Scope>,
     sub_package: Option<&str>,
     reason: Option<&types::InstallReason>,
-) -> Result<()> {
+) -> Result<i64> {
     let tags_json = serde_json::to_string(&pkg.tags)?;
     let pkg_type = format!("{:?}", pkg.package_type).to_lowercase();
     let scope_str = scope.map(|s| format!("{:?}", s).to_lowercase());
@@ -118,6 +169,14 @@ pub fn update_package(
             reason_str,
         ],
     )?;
+    Ok(conn.last_insert_rowid())
+}
+
+pub fn index_package_files(conn: &Connection, package_id: i64, files: &[String]) -> Result<()> {
+    let mut stmt = conn.prepare("INSERT INTO package_files (package_id, path) VALUES (?1, ?2)")?;
+    for file in files {
+        stmt.execute(params![package_id, file])?;
+    }
     Ok(())
 }
 
@@ -188,6 +247,58 @@ pub fn search_packages(registry_handle: &str, term: &str) -> Result<Vec<types::P
         pkgs.push(row?);
     }
     Ok(pkgs)
+}
+
+pub fn search_files(registry_handle: &str, term: &str) -> Result<Vec<(types::Package, String)>> {
+    let conn = open_connection(registry_handle)?;
+    let mut stmt = conn.prepare(
+        "SELECT p.name, p.repo, p.version, p.description, p.package_type, p.tags, p.license, p.sub_package, pf.path 
+         FROM packages p
+         JOIN package_files pf ON p.id = pf.package_id
+         WHERE pf.id IN (SELECT rowid FROM package_files_fts WHERE package_files_fts MATCH ?1)
+         OR pf.path LIKE ?2",
+    )?;
+
+    let search_query = format!("*{}*", term.replace('/', " "));
+    let like_query = format!("%{}%", term);
+
+    let rows = stmt.query_map(params![search_query, like_query], |row| {
+        let tags_raw: String = row.get(5)?;
+        let tags: Vec<String> = serde_json::from_str(&tags_raw).unwrap_or_default();
+        let type_raw: String = row.get(4)?;
+
+        let package_type = match type_raw.as_str() {
+            "collection" => types::PackageType::Collection,
+            "app" => types::PackageType::App,
+            "extension" => types::PackageType::Extension,
+            _ => types::PackageType::Package,
+        };
+
+        let pkg = types::Package {
+            name: row.get(0)?,
+            repo: row.get(1)?,
+            version: row.get(2)?,
+            description: row.get(3)?,
+            package_type,
+            tags,
+            license: row.get(6)?,
+            sub_package: row.get(7)?,
+            maintainer: types::Maintainer {
+                name: String::new(),
+                email: String::new(),
+                website: None,
+            },
+            ..Default::default()
+        };
+        let path: String = row.get(8)?;
+        Ok((pkg, path))
+    })?;
+
+    let mut results = Vec::new();
+    for row in rows {
+        results.push(row?);
+    }
+    Ok(results)
 }
 
 pub fn list_all_packages(registry_handle: &str) -> Result<Vec<types::Package>> {

@@ -3,10 +3,16 @@ use crate::utils;
 use anyhow::Result;
 use colored::*;
 
-pub fn run(verbose: bool, fallback: bool, no_pm: bool, no_shell_setup: bool) -> Result<()> {
+pub fn run(
+    verbose: bool,
+    fallback: bool,
+    no_pm: bool,
+    no_shell_setup: bool,
+    files: bool,
+) -> Result<()> {
     println!("{}", "--- Syncing Package Databases ---".yellow().bold());
 
-    pkg::sync::run(verbose, fallback, no_pm)?;
+    pkg::sync::run(verbose, fallback, no_pm, files)?;
 
     println!("{}", "Sync complete.".green());
 

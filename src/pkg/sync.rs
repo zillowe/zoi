@@ -18,11 +18,22 @@ use std::process::{Command, Stdio};
 use tempfile::Builder;
 use walkdir::WalkDir;
 
-fn refresh_registry_db(registry_handle: &str, registry_path: &Path) -> Result<()> {
-    println!(
+fn refresh_registry_db(
+    registry_handle: &str,
+    registry_path: &Path,
+    sync_files: bool,
+    m: Option<&MultiProgress>,
+) -> Result<()> {
+    let msg = format!(
         "Refreshing metadata database for {}...",
         registry_handle.cyan()
     );
+    if let Some(m_ref) = m {
+        let _ = m_ref.println(&msg);
+    } else {
+        println!("{}", msg);
+    }
+
     let conn = db::open_connection(registry_handle)?;
     db::clear_registry(&conn)?;
 
@@ -37,6 +48,9 @@ fn refresh_registry_db(registry_handle: &str, registry_path: &Path) -> Result<()
         }
     }
 
+    let repo_config = config::read_repo_config(registry_path).ok();
+    let platform = utils::get_platform().unwrap_or_default();
+
     pkg_files.par_iter().for_each(|path| {
         if let Ok(pkg) =
             crate::pkg::lua::parser::parse_lua_package(path.to_str().unwrap(), None, true)
@@ -48,8 +62,34 @@ fn refresh_registry_db(registry_handle: &str, registry_path: &Path) -> Result<()
                 pkg.repo = parent.to_string_lossy().to_string().replace('\\', "/");
             }
 
-            if let Ok(conn) = db::open_connection(registry_handle) {
-                let _ = db::update_package(&conn, &pkg, registry_handle, None, None, None);
+            if let Ok(conn) = db::open_connection(registry_handle)
+                && let Ok(pkg_id) =
+                    db::update_package(&conn, &pkg, registry_handle, None, None, None)
+                && sync_files
+                && let Some(rc) = &repo_config
+                && let Some(pkg_link) = rc.pkg.iter().find(|p| p.link_type == "main")
+                && let Some(files_url_template) = &pkg_link.files
+            {
+                let version = pkg.version.clone().unwrap_or_else(|| "latest".to_string());
+                let files_url = crate::pkg::install::util::resolve_url_placeholders(
+                    files_url_template,
+                    &pkg.name,
+                    &pkg.repo,
+                    &version,
+                    &platform,
+                );
+
+                if let Ok(response) = reqwest::blocking::get(&files_url)
+                    && response.status().is_success()
+                    && let Ok(content) = response.text()
+                {
+                    let file_list: Vec<String> = content
+                        .lines()
+                        .map(|l| l.trim().to_string())
+                        .filter(|l| !l.is_empty())
+                        .collect();
+                    let _ = db::index_package_files(&conn, pkg_id, &file_list);
+                }
             }
         }
     });
@@ -529,6 +569,7 @@ fn sync_registry(
     mut reg: types::Registry,
     db_root: &Path,
     verbose: bool,
+    sync_files: bool,
     m: Option<&MultiProgress>,
 ) -> Result<(types::Registry, bool)> {
     let mut reg_changed = false;
@@ -570,13 +611,13 @@ fn sync_registry(
             println!("{}", msg);
         }
         sync_pgp_keys_at_path(&target_dir)?;
-        refresh_registry_db(&reg.handle, &target_dir)?;
+        refresh_registry_db(&reg.handle, &target_dir, sync_files, m)?;
     }
 
     Ok((reg, reg_changed))
 }
 
-pub fn run(verbose: bool, _fallback: bool, no_pm: bool) -> Result<()> {
+pub fn run(verbose: bool, _fallback: bool, no_pm: bool, sync_files: bool) -> Result<()> {
     let merged_config = config::read_config()?;
     if merged_config.protect_db {
         let db_root = get_db_path()?;
@@ -620,7 +661,8 @@ pub fn run(verbose: bool, _fallback: bool, no_pm: bool) -> Result<()> {
         let results: Vec<Result<(types::Registry, bool, bool)>> = registries_to_sync
             .into_par_iter()
             .map(|(reg, is_default)| {
-                let (synced_reg, changed) = sync_registry(reg, &db_root, verbose, m.as_ref())?;
+                let (synced_reg, changed) =
+                    sync_registry(reg, &db_root, verbose, sync_files, m.as_ref())?;
                 Ok((synced_reg, changed, is_default))
             })
             .collect();

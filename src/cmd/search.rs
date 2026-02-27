@@ -50,15 +50,27 @@ pub fn run(
     package_type: Option<String>,
     tags: Option<Vec<String>>,
     sort_by: String,
+    files: bool,
     interactive: bool,
 ) -> Result<()> {
     if !interactive {
+        let mode = if files { "files" } else { "packages" };
         println!(
-            "{}{}{}",
-            "--- Searching for packages matching '".yellow(),
-            search_term.blue().bold(),
-            "' ---".yellow()
+            "{} Searching for {} matching '{}' {}",
+            "::".bold().blue(),
+            mode.yellow(),
+            search_term.cyan().bold(),
+            "::".bold().blue()
         );
+    }
+
+    if files {
+        if interactive {
+            return Err(anyhow!(
+                "Interactive mode is not supported for file search."
+            ));
+        }
+        return run_file_search(search_term, registry_filter, repo, package_type);
     }
 
     let config = config::read_config()?;
@@ -274,6 +286,87 @@ pub fn run(
             return Err(e);
         }
     }
+    Ok(())
+}
+
+fn run_file_search(
+    term: String,
+    registry_filter: Option<String>,
+    repo: Option<String>,
+    package_type: Option<String>,
+) -> Result<()> {
+    let config = config::read_config()?;
+    let mut registries = Vec::new();
+    if let Some(reg) = registry_filter {
+        registries.push(reg);
+    } else {
+        if let Some(default) = &config.default_registry {
+            registries.push(default.handle.clone());
+        }
+        for reg in &config.added_registries {
+            registries.push(reg.handle.clone());
+        }
+    }
+
+    let mut results = Vec::new();
+    for handle in registries {
+        if let Ok(res) = crate::pkg::db::search_files(&handle, &term) {
+            results.extend(res);
+        }
+    }
+
+    let type_filter = package_type.and_then(|s| match s.to_lowercase().as_str() {
+        "package" => Some(PackageType::Package),
+        "collection" => Some(PackageType::Collection),
+        "app" => Some(PackageType::App),
+        "extension" => Some(PackageType::Extension),
+        _ => None,
+    });
+
+    results.retain(|(pkg, _)| {
+        if let Some(pt) = type_filter
+            && pkg.package_type != pt
+        {
+            return false;
+        }
+        if let Some(rf) = &repo {
+            if rf.contains('/') {
+                if pkg.repo != *rf {
+                    return false;
+                }
+            } else if !pkg.repo.split('/').any(|part| part == rf) {
+                return false;
+            }
+        }
+        true
+    });
+
+    if results.is_empty() {
+        println!("\n{}", "No files found matching your query.".yellow());
+        println!("Hint: Ensure you have run 'zoi sync --files' to index remote file lists.");
+        return Ok(());
+    }
+
+    let mut table = Table::new();
+    table
+        .load_preset(UTF8_FULL)
+        .set_content_arrangement(ContentArrangement::Dynamic)
+        .set_header(vec![
+            Cell::new("Package").add_attribute(Attribute::Bold),
+            Cell::new("File Path").add_attribute(Attribute::Bold),
+            Cell::new("Repo").add_attribute(Attribute::Bold),
+        ]);
+
+    for (pkg, path) in results {
+        let repo_display = pkg.repo.split_once('/').map(|x| x.1).unwrap_or(&pkg.repo);
+        table.add_row(vec![
+            Cell::new(pkg.name).fg(comfy_table::Color::Cyan),
+            Cell::new(path).fg(comfy_table::Color::Yellow),
+            Cell::new(repo_display).fg(comfy_table::Color::Green),
+        ]);
+    }
+
+    print_with_pager(&table.to_string())?;
     Ok(())
 }
 

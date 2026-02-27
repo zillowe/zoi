@@ -605,6 +605,26 @@ pub fn get_expected_size(size_url: &str) -> Result<(u64, u64)> {
     Ok((download_size, installed_size))
 }
 
+pub fn resolve_url_placeholders(
+    url: &str,
+    pkg_name: &str,
+    repo: &str,
+    version: &str,
+    platform: &str,
+) -> String {
+    let (os, arch) = (
+        platform.split('-').next().unwrap_or_default(),
+        platform.split('-').nth(1).unwrap_or_default(),
+    );
+
+    url.replace("{os}", os)
+        .replace("{arch}", arch)
+        .replace("{version}", version)
+        .replace("{repo}", repo)
+        .replace("{name}", pkg_name)
+        .replace("{platform}", platform)
+}
+
 pub fn find_prebuilt_info(node: &InstallNode) -> Result<Option<types::PrebuiltInfo>> {
     let pkg = &node.pkg;
     let platform = crate::utils::get_platform()?;
@@ -625,21 +645,13 @@ pub fn find_prebuilt_info(node: &InstallNode) -> Result<Option<types::PrebuiltIn
         );
 
         if let Some(pkg_link) = pkg_links_to_try.into_iter().next() {
-            let (os, arch) = (
-                platform.split('-').next().unwrap_or_default(),
-                platform.split('-').nth(1).unwrap_or_default(),
+            let final_url_base = resolve_url_placeholders(
+                &pkg_link.url,
+                &pkg.name,
+                &pkg.repo,
+                &node.version,
+                &platform,
             );
-
-            let replace_vars = |url: &str| {
-                url.replace("{os}", os)
-                    .replace("{arch}", arch)
-                    .replace("{version}", &node.version)
-                    .replace("{repo}", &pkg.repo)
-                    .replace("{name}", &pkg.name)
-                    .replace("{platform}", &platform)
-            };
-
-            let final_url_base = replace_vars(&pkg_link.url);
             let final_url = if final_url_base.ends_with(".pkg.tar.zst") {
                 final_url_base
             } else {
@@ -652,10 +664,18 @@ pub fn find_prebuilt_info(node: &InstallNode) -> Result<Option<types::PrebuiltIn
                 )
             };
 
-            let pgp_url = pkg_link.pgp.as_ref().map(|url| replace_vars(url));
-            let hash_url = pkg_link.hash.as_ref().map(|url| replace_vars(url));
-            let size_url = pkg_link.size.as_ref().map(|url| replace_vars(url));
-            let files_url = pkg_link.files.as_ref().map(|url| replace_vars(url));
+            let pgp_url = pkg_link.pgp.as_ref().map(|url| {
+                resolve_url_placeholders(url, &pkg.name, &pkg.repo, &node.version, &platform)
+            });
+            let hash_url = pkg_link.hash.as_ref().map(|url| {
+                resolve_url_placeholders(url, &pkg.name, &pkg.repo, &node.version, &platform)
+            });
+            let size_url = pkg_link.size.as_ref().map(|url| {
+                resolve_url_placeholders(url, &pkg.name, &pkg.repo, &node.version, &platform)
+            });
+            let files_url = pkg_link.files.as_ref().map(|url| {
+                resolve_url_placeholders(url, &pkg.name, &pkg.repo, &node.version, &platform)
+            });
 
             return Ok(Some(types::PrebuiltInfo {
                 final_url,

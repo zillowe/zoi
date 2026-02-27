@@ -144,6 +144,10 @@ enum Commands {
         /// Do not attempt to set up shell completions after syncing
         #[arg(long)]
         no_shell_setup: bool,
+
+        /// Download and index file lists for global search
+        #[arg(short, long)]
+        files: bool,
     },
 
     /// Lists installed or all available packages
@@ -366,6 +370,9 @@ enum Commands {
         /// Sort results by field (name, repo, type)
         #[arg(long, default_value = "name")]
         sort: String,
+        /// Search for files provided by packages instead of package names
+        #[arg(short, long)]
+        files: bool,
         /// Open results in an interactive TUI
         #[arg(short = 'i', long)]
         interactive: bool,
@@ -668,6 +675,7 @@ pub fn run() -> anyhow::Result<()> {
                 fallback,
                 no_package_managers,
                 no_shell_setup,
+                files,
             } => {
                 if let Some(cmd) = command {
                     match cmd {
@@ -678,8 +686,13 @@ pub fn run() -> anyhow::Result<()> {
                     }
                 } else {
                     plugin_manager.trigger_hook("on_pre_sync", None)?;
-                    let res =
-                        cmd::sync::run(verbose, fallback, no_package_managers, no_shell_setup);
+                    let res = cmd::sync::run(
+                        verbose,
+                        fallback,
+                        no_package_managers,
+                        no_shell_setup,
+                        files,
+                    );
                     plugin_manager.trigger_hook("on_post_sync", None)?;
                     res
                 }
@@ -797,6 +810,7 @@ pub fn run() -> anyhow::Result<()> {
                 package_type,
                 tags,
                 sort,
+                files,
                 interactive,
             } => cmd::search::run(
                 search_term,
@@ -805,6 +819,7 @@ pub fn run() -> anyhow::Result<()> {
                 package_type,
                 tags,
                 sort,
+                files,
                 interactive,
             ),
             Commands::Shell { shell, scope } => cmd::shell::run(shell, scope),
