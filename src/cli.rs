@@ -187,6 +187,12 @@ enum Commands {
         version: String,
     },
 
+    /// Find which package provides a specific command or file
+    Provides {
+        /// The command or file path to search for
+        term: String,
+    },
+
     /// Visualize the dependency tree of a package
     Tree {
         #[arg(value_name = "PACKAGES", required = true, help = PKG_SOURCE_HELP)]
@@ -740,6 +746,7 @@ pub fn run() -> anyhow::Result<()> {
             } => cmd::list::run(all, registry, repo, package_type, foreign),
             Commands::Show { package_name, raw } => cmd::show::run(&package_name, raw),
             Commands::Pin { package, version } => cmd::pin::run(&package, &version),
+            Commands::Provides { term } => cmd::provides::run(&term),
             Commands::Tree { packages } => cmd::tree::run(&packages),
             Commands::Unpin { package } => cmd::unpin::run(&package),
             Commands::Mark {

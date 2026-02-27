@@ -30,6 +30,7 @@ fn setup_schema(conn: &Connection) -> Result<()> {
             description TEXT,
             package_type TEXT,
             tags TEXT,
+            bins TEXT,
             license TEXT,
             registry TEXT,
             scope TEXT,
@@ -38,6 +39,19 @@ fn setup_schema(conn: &Connection) -> Result<()> {
         )",
         [],
     )?;
+
+    let column_exists: bool = conn
+        .query_row(
+            "SELECT count(*) FROM pragma_table_info('packages') WHERE name='bins'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0)
+        > 0;
+
+    if !column_exists {
+        let _ = conn.execute("ALTER TABLE packages ADD COLUMN bins TEXT", []);
+    }
 
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_packages_name ON packages(name)",
@@ -63,6 +77,7 @@ fn setup_schema(conn: &Connection) -> Result<()> {
         [],
     )?;
 
+    let mut fts_needs_rebuild = false;
     let fts_exists: bool = conn
         .query_row(
             "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='packages_fts'",
@@ -72,27 +87,48 @@ fn setup_schema(conn: &Connection) -> Result<()> {
         .unwrap_or(0)
         > 0;
 
-    if !fts_exists {
+    if fts_exists {
+        let has_bins_fts: bool = conn
+            .query_row(
+                "SELECT count(*) FROM pragma_table_info('packages_fts') WHERE name='bins'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(0)
+            > 0;
+        if !has_bins_fts {
+            fts_needs_rebuild = true;
+        }
+    } else {
+        fts_needs_rebuild = true;
+    }
+
+    if fts_needs_rebuild {
+        let _ = conn.execute("DROP TABLE IF EXISTS packages_fts", []);
+        let _ = conn.execute("DROP TRIGGER IF EXISTS packages_ai", []);
+        let _ = conn.execute("DROP TRIGGER IF EXISTS packages_ad", []);
+        let _ = conn.execute("DROP TRIGGER IF EXISTS packages_au", []);
+
         let _ = conn.execute(
-            "CREATE VIRTUAL TABLE packages_fts USING fts5(name, description, tags, content='packages', content_rowid='id')",
+            "CREATE VIRTUAL TABLE packages_fts USING fts5(name, description, tags, bins, content='packages', content_rowid='id')",
             [],
         );
         let _ = conn.execute(
             "CREATE TRIGGER packages_ai AFTER INSERT ON packages BEGIN
-                INSERT INTO packages_fts(rowid, name, description, tags) VALUES (new.id, new.name, new.description, new.tags);
+                INSERT INTO packages_fts(rowid, name, description, tags, bins) VALUES (new.id, new.name, new.description, new.tags, new.bins);
             END",
             [],
         );
         let _ = conn.execute(
             "CREATE TRIGGER packages_ad AFTER DELETE ON packages BEGIN
-                INSERT INTO packages_fts(packages_fts, rowid, name, description, tags) VALUES('delete', old.id, old.name, old.description, old.tags);
+                INSERT INTO packages_fts(packages_fts, rowid, name, description, tags, bins) VALUES('delete', old.id, old.name, old.description, old.tags, old.bins);
             END",
             [],
         );
         let _ = conn.execute(
             "CREATE TRIGGER packages_au AFTER UPDATE ON packages BEGIN
-                INSERT INTO packages_fts(packages_fts, rowid, name, description, tags) VALUES('delete', old.id, old.name, old.description, old.tags);
-                INSERT INTO packages_fts(rowid, name, description, tags) VALUES (new.id, new.name, new.description, new.tags);
+                INSERT INTO packages_fts(packages_fts, rowid, name, description, tags, bins) VALUES('delete', old.id, old.name, old.description, old.tags, old.bins);
+                INSERT INTO packages_fts(rowid, name, description, tags, bins) VALUES (new.id, new.name, new.description, new.tags, new.bins);
             END",
             [],
         );
@@ -145,6 +181,8 @@ pub fn update_package(
     reason: Option<&types::InstallReason>,
 ) -> Result<i64> {
     let tags_json = serde_json::to_string(&pkg.tags)?;
+    let bins_json =
+        serde_json::to_string(&pkg.bins.as_ref().unwrap_or(&vec![])).unwrap_or_default();
     let pkg_type = format!("{:?}", pkg.package_type).to_lowercase();
     let scope_str = scope.map(|s| format!("{:?}", s).to_lowercase());
     let reason_str = reason.map(|r| match r {
@@ -153,8 +191,8 @@ pub fn update_package(
     });
 
     conn.execute(
-        "INSERT OR REPLACE INTO packages (name, sub_package, repo, version, description, package_type, tags, license, registry, scope, reason)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+        "INSERT OR REPLACE INTO packages (name, sub_package, repo, version, description, package_type, tags, bins, license, registry, scope, reason)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
         params![
             pkg.name,
             sub_package,
@@ -163,6 +201,7 @@ pub fn update_package(
             pkg.description,
             pkg_type,
             tags_json,
+            bins_json,
             pkg.license,
             registry,
             scope_str,
@@ -198,6 +237,102 @@ pub fn delete_package(
 pub fn clear_registry(conn: &Connection) -> Result<()> {
     conn.execute("DELETE FROM packages", [])?;
     Ok(())
+}
+
+pub fn find_provides(registry_handle: &str, term: &str) -> Result<Vec<(types::Package, String)>> {
+    let conn = open_connection(registry_handle)?;
+
+    let mut stmt = conn.prepare(
+        "SELECT name, repo, version, description, package_type, tags, bins, license, sub_package 
+         FROM packages 
+         WHERE name = ?1 OR bins LIKE ?2",
+    )?;
+
+    let bins_like_query = format!("%\"{}\"%", term);
+    let rows = stmt.query_map(params![term, bins_like_query], |row| {
+        let tags_raw: String = row.get(5)?;
+        let tags: Vec<String> = serde_json::from_str(&tags_raw).unwrap_or_default();
+        let bins_raw: String = row.get(6)?;
+        let bins: Vec<String> = serde_json::from_str(&bins_raw).unwrap_or_default();
+        let type_raw: String = row.get(4)?;
+
+        let package_type = match type_raw.as_str() {
+            "collection" => types::PackageType::Collection,
+            "app" => types::PackageType::App,
+            "extension" => types::PackageType::Extension,
+            _ => types::PackageType::Package,
+        };
+
+        Ok(types::Package {
+            name: row.get(0)?,
+            repo: row.get(1)?,
+            version: row.get(2)?,
+            description: row.get(3)?,
+            package_type,
+            tags,
+            bins: Some(bins),
+            license: row.get(7)?,
+            sub_package: row.get(8)?,
+            maintainer: types::Maintainer::default(),
+            ..Default::default()
+        })
+    })?;
+
+    let mut results = Vec::new();
+    for row in rows {
+        let pkg = row?;
+        results.push((pkg, format!("bin/{}", term)));
+    }
+
+    let mut stmt = conn.prepare(
+        "SELECT p.name, p.repo, p.version, p.description, p.package_type, p.tags, p.bins, p.license, p.sub_package, pf.path 
+         FROM packages p
+         JOIN package_files pf ON p.id = pf.package_id
+         WHERE pf.path LIKE ?1 OR pf.path LIKE ?2",
+    )?;
+
+    let path_like_query = format!("%/{}", term);
+    let exact_path_query = term.to_string();
+
+    let rows = stmt.query_map(params![path_like_query, exact_path_query], |row| {
+        let tags_raw: String = row.get(5)?;
+        let tags: Vec<String> = serde_json::from_str(&tags_raw).unwrap_or_default();
+        let bins_raw: String = row.get(6)?;
+        let bins: Vec<String> = serde_json::from_str(&bins_raw).unwrap_or_default();
+        let type_raw: String = row.get(4)?;
+
+        let package_type = match type_raw.as_str() {
+            "collection" => types::PackageType::Collection,
+            "app" => types::PackageType::App,
+            "extension" => types::PackageType::Extension,
+            _ => types::PackageType::Package,
+        };
+
+        let pkg = types::Package {
+            name: row.get(0)?,
+            repo: row.get(1)?,
+            version: row.get(2)?,
+            description: row.get(3)?,
+            package_type,
+            tags,
+            bins: Some(bins),
+            license: row.get(7)?,
+            sub_package: row.get(8)?,
+            maintainer: types::Maintainer::default(),
+            ..Default::default()
+        };
+        let path: String = row.get(9)?;
+        Ok((pkg, path))
+    })?;
+
+    for row in rows {
+        results.push(row?);
+    }
+
+    results.sort_by(|a, b| a.0.name.cmp(&b.0.name));
+    results.dedup_by(|a, b| a.0.name == b.0.name && a.1 == b.1);
+
+    Ok(results)
 }
 
 pub fn search_packages(registry_handle: &str, term: &str) -> Result<Vec<types::Package>> {
