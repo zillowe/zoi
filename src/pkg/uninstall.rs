@@ -95,6 +95,7 @@ fn uninstall_collection(
     let handle = registry_handle.as_deref().unwrap_or("local");
     let package_dir = local::get_package_dir(scope, handle, &pkg.repo, &pkg.name)?;
     if package_dir.exists() {
+        let _ = crate::pkg::service::cleanup_service(&pkg.name, scope);
         fs::remove_dir_all(&package_dir)?;
     }
     if let Err(e) = recorder::remove_package_from_record(&pkg.name, None, scope) {
@@ -352,6 +353,7 @@ pub fn run(
     }
 
     if package_dir.exists() {
+        let _ = crate::pkg::service::cleanup_service(&pkg.name, scope);
         let mut has_other_versions = false;
         if let Ok(entries) = fs::read_dir(&package_dir) {
             for entry in entries.flatten() {

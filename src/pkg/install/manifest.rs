@@ -30,6 +30,7 @@ pub fn create_manifest(
         chosen_options: chosen_options.to_vec(),
         chosen_optionals: chosen_optionals.to_vec(),
         install_method,
+        service: pkg.service.clone(),
         installed_files,
         installed_size: pkg.installed_size,
     })

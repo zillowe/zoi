@@ -105,6 +105,7 @@ pub fn add(
         chosen_options: vec![],
         chosen_optionals: vec![],
         install_method: None,
+        service: None,
         installed_files: vec![],
         installed_size: pkg.installed_size,
     };

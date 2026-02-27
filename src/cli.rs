@@ -402,6 +402,10 @@ enum Commands {
         interactive: bool,
     },
 
+    /// Manage background services for installed packages
+    #[command(alias = "svc")]
+    Service(cmd::service::ServiceCommand),
+
     /// Set up shell completions or enter an ephemeral environment with specific packages
     #[command(
         long_about = "If a shell is provided, it installs completion scripts. If packages are provided via --package/-p, it enters a temporary subshell with those packages available in PATH."
@@ -860,6 +864,7 @@ pub fn run() -> anyhow::Result<()> {
                 files,
                 interactive,
             ),
+            Commands::Service(args) => cmd::service::run(args),
             Commands::Shell {
                 shell,
                 scope,

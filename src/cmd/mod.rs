@@ -27,6 +27,7 @@ pub mod repo;
 pub mod rollback;
 pub mod run;
 pub mod search;
+pub mod service;
 pub mod shell;
 pub mod show;
 pub mod sync;

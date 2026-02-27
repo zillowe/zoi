@@ -914,6 +914,17 @@ pub fn add_package_lifecycle_functions(lua: &Lua) -> Result<(), mlua::Error> {
     })?;
     lua.globals().set("hooks", hooks_fn)?;
 
+    let service_fn = lua.create_function(move |lua, service_def: Table| {
+        if let Ok(service_table) = lua.globals().get::<Table>("__ZoiPackageService") {
+            for pair in service_def.pairs::<String, Value>() {
+                let (key, value) = pair?;
+                service_table.set(key, value)?;
+            }
+        }
+        Ok(())
+    })?;
+    lua.globals().set("service", service_fn)?;
+
     let prepare_fn = lua.create_function(|_, _: Table| Ok(()))?;
     lua.globals().set("prepare", prepare_fn)?;
     let package_fn = lua.create_function(|_, _: Table| Ok(()))?;

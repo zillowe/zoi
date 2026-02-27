@@ -186,6 +186,19 @@ fn print_beautiful(
         println!("{}: {}", "Available types".bold(), pkg.types.join(", "));
     }
 
+    if let Some(service) = &pkg.service {
+        println!("\n{}:", "Service".bold());
+        println!("  Run: {}", service.run.cyan());
+        println!(
+            "  Run at load: {}",
+            if service.run_at_load {
+                "Yes".green()
+            } else {
+                "No".yellow()
+            }
+        );
+    }
+
     if let Some(deps) = &pkg.dependencies {
         println!("\n{}:", "Dependencies".bold());
 

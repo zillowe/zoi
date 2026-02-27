@@ -58,6 +58,17 @@ pub struct ExtensionInfo {
     pub changes: Vec<ExtensionChange>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Service {
+    pub run: String,
+    #[serde(default)]
+    pub run_at_load: bool,
+    pub working_dir: Option<String>,
+    pub env: Option<HashMap<String, String>>,
+    pub log_path: Option<String>,
+    pub error_log_path: Option<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[allow(dead_code)]
 pub struct Package {
@@ -113,6 +124,8 @@ pub struct Package {
     pub updates: Option<Vec<UpdateInfo>>,
     #[serde(default)]
     pub hooks: Option<Hooks>,
+    #[serde(default)]
+    pub service: Option<Service>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub backup: Option<Vec<String>>,
 
@@ -270,6 +283,8 @@ pub struct InstallManifest {
     pub chosen_optionals: Vec<String>,
     #[serde(default)]
     pub install_method: Option<String>,
+    #[serde(default)]
+    pub service: Option<Service>,
     #[serde(default)]
     pub installed_files: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

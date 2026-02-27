@@ -17,6 +17,7 @@ pub fn parse_lua_package_for_platform(
     let pkg_deps_table = lua.create_table().map_err(|e| anyhow!(e.to_string()))?;
     let pkg_updates_table = lua.create_table().map_err(|e| anyhow!(e.to_string()))?;
     let pkg_hooks_table = lua.create_table().map_err(|e| anyhow!(e.to_string()))?;
+    let pkg_service_table = lua.create_table().map_err(|e| anyhow!(e.to_string()))?;
     lua.globals()
         .set("__ZoiPackageMeta", pkg_meta_table)
         .map_err(|e| anyhow!(e.to_string()))?;
@@ -28,6 +29,9 @@ pub fn parse_lua_package_for_platform(
         .map_err(|e| anyhow!(e.to_string()))?;
     lua.globals()
         .set("__ZoiPackageHooks", pkg_hooks_table)
+        .map_err(|e| anyhow!(e.to_string()))?;
+    lua.globals()
+        .set("__ZoiPackageService", pkg_service_table)
         .map_err(|e| anyhow!(e.to_string()))?;
 
     let pkg_table = lua.create_table().map_err(|e| anyhow!(e.to_string()))?;
@@ -70,6 +74,10 @@ pub fn parse_lua_package_for_platform(
     let final_pkg_hooks: Table = lua
         .globals()
         .get("__ZoiPackageHooks")
+        .map_err(|e| anyhow!(e.to_string()))?;
+    let final_pkg_service: Table = lua
+        .globals()
+        .get("__ZoiPackageService")
         .map_err(|e| anyhow!(e.to_string()))?;
 
     let mut package: types::Package =
@@ -122,6 +130,22 @@ pub fn parse_lua_package_for_platform(
                 e
             )
         })?)
+    };
+
+    package.service = if final_pkg_service.is_empty() {
+        None
+    } else {
+        Some(
+            lua.from_value(Value::Table(final_pkg_service))
+                .map_err(|e| {
+                    anyhow!(
+                        "Failed to parse 'service' block in package file '{}':
+{}",
+                        file_path,
+                        e
+                    )
+                })?,
+        )
     };
 
     Ok(package)
