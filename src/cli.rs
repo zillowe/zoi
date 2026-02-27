@@ -441,6 +441,16 @@ enum Commands {
         app_name: Option<String>,
     },
 
+    /// Downgrade a package to a specific version from local cache or store
+    #[command(
+        alias = "dg",
+        long_about = "Interactively choose and install an older version of a package from the local store or archive cache. This is useful if a recent update has introduced bugs or compatibility issues."
+    )]
+    Downgrade {
+        #[arg(help = PKG_SOURCE_HELP)]
+        package: String,
+    },
+
     /// Manage Zoi extensions
     #[command(alias = "ext")]
     Extension(ExtensionCommand),
@@ -810,6 +820,9 @@ pub fn run() -> anyhow::Result<()> {
                 cli.yes,
                 &plugin_manager,
             ),
+            Commands::Downgrade { package } => {
+                cmd::downgrade::run(&package, cli.yes, &plugin_manager)
+            }
             Commands::Extension(args) => cmd::extension::run(args, cli.yes, &plugin_manager),
             Commands::Rollback {
                 package,
