@@ -1,5 +1,6 @@
 pub mod about;
 pub mod autoremove;
+pub mod cache;
 pub mod check;
 pub mod clean;
 pub mod create;

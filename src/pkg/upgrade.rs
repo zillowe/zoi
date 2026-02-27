@@ -170,6 +170,9 @@ pub fn run(
     tag: Option<String>,
     custom_branch: Option<String>,
 ) -> Result<()> {
+    if crate::pkg::offline::is_offline() {
+        return Err(anyhow!("Cannot upgrade Zoi: Zoi is in offline mode."));
+    }
     let current_exe_path = env::current_exe()?;
     let path_str = current_exe_path.to_string_lossy();
 

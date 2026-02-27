@@ -879,6 +879,12 @@ fn resolve_source_recursive(
     if let Some(handle) = &request.handle
         && handle.starts_with("git:")
     {
+        if crate::pkg::offline::is_offline() {
+            return Err(anyhow!(
+                "Cannot resolve remote git repo '{}': Zoi is in offline mode.",
+                handle
+            ));
+        }
         let git_source = handle.strip_prefix("git:").unwrap();
         println!(
             "Warning: using remote git repo '{}' not from official Zoi database.",
@@ -1016,6 +1022,12 @@ fn resolve_source_recursive(
             sharable_manifest: None,
         }
     } else if source.starts_with("http://") || source.starts_with("https://") {
+        if crate::pkg::offline::is_offline() {
+            return Err(anyhow!(
+                "Cannot download package definition from URL '{}': Zoi is in offline mode.",
+                source
+            ));
+        }
         download_from_url(source)?
     } else if path_part.ends_with(".pkg.lua") {
         let path = PathBuf::from(path_part);

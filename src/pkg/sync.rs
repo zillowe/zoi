@@ -118,6 +118,13 @@ fn get_git_root() -> Result<PathBuf> {
 }
 
 fn sync_git_repos(verbose: bool) -> Result<()> {
+    if crate::pkg::offline::is_offline() {
+        println!(
+            "\n{}",
+            "Zoi is offline. Skipping sync of external git repositories.".yellow()
+        );
+        return Ok(());
+    }
     let git_root = get_git_root()?;
     if !git_root.exists() {
         return Ok(());
@@ -344,6 +351,25 @@ fn try_sync_at_path(
     verbose: bool,
     m: Option<&MultiProgress>,
 ) -> Result<()> {
+    if crate::pkg::offline::is_offline() {
+        if db_path.exists() {
+            let msg = format!(
+                "Zoi is offline. Skipping update for existing registry at {}",
+                db_path.display()
+            );
+            if let Some(m_ref) = m {
+                let _ = m_ref.println(&msg);
+            } else {
+                println!("{}", msg);
+            }
+            return Ok(());
+        } else {
+            return Err(anyhow!(
+                "Cannot sync registry '{}': Zoi is offline and registry is not cloned.",
+                db_url
+            ));
+        }
+    }
     if db_path.exists()
         && let Ok(repo) = Repository::open(db_path)
         && let Ok(remote) = repo.find_remote("origin")

@@ -308,6 +308,9 @@ pub fn verify_file_hash(
 }
 
 pub fn get_remote_file_list(url: &str) -> Result<Vec<String>> {
+    if crate::pkg::offline::is_offline() {
+        return Ok(Vec::new());
+    }
     let client = crate::utils::build_blocking_http_client(10)?;
     let resp = client
         .get(url)
@@ -524,6 +527,9 @@ pub fn get_file_conflicts_from_archive(
 }
 
 pub fn get_expected_hash(hash_url: &str, filename: Option<&str>) -> Result<String> {
+    if crate::pkg::offline::is_offline() {
+        return Ok(String::new());
+    }
     let client = crate::utils::build_blocking_http_client(10)?;
     let resp = client
         .get(hash_url)
@@ -559,6 +565,9 @@ pub fn get_expected_hash(hash_url: &str, filename: Option<&str>) -> Result<Strin
 }
 
 pub fn get_expected_size(size_url: &str) -> Result<(u64, u64)> {
+    if crate::pkg::offline::is_offline() {
+        return Ok((0, 0));
+    }
     let client = crate::utils::build_blocking_http_client(10)?;
     let resp = client
         .get(size_url)

@@ -51,6 +51,21 @@ pub struct Cli {
         value_hint = ValueHint::DirPath
     )]
     pub root: Option<std::path::PathBuf>,
+
+    #[arg(
+        long = "offline",
+        help = "Do not attempt to connect to the network",
+        global = true
+    )]
+    pub offline: bool,
+
+    #[arg(
+        long = "pkg-dir",
+        help = "Additional directory to search for .pkg.tar.zst archives",
+        global = true,
+        value_hint = ValueHint::DirPath
+    )]
+    pub pkg_dirs: Vec<std::path::PathBuf>,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug, Copy, PartialEq, Eq)]
@@ -396,6 +411,12 @@ enum Commands {
         dry_run: bool,
     },
 
+    /// Manage Zoi's local cache
+    Cache {
+        #[command(subcommand)]
+        command: CacheCommands,
+    },
+
     /// Manage package repositories
     #[command(
         aliases = ["repositories"],
@@ -507,6 +528,26 @@ pub enum SyncCommands {
     },
 }
 
+#[derive(clap::Subcommand)]
+pub enum CacheCommands {
+    /// Add package archive(s) to the local cache
+    Add {
+        /// Path to the .pkg.tar.zst archive(s)
+        #[arg(required = true)]
+        files: Vec<std::path::PathBuf>,
+    },
+    /// Clear the local cache
+    #[command(alias = "clean")]
+    Clear {
+        /// Do not actually clear the cache, just show what would be done
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// List all archives currently in the cache
+    #[command(alias = "ls")]
+    List,
+}
+
 #[derive(clap::ValueEnum, Clone)]
 enum TelemetryAction {
     Status,
@@ -535,6 +576,9 @@ pub fn run() -> anyhow::Result<()> {
     if let Some(root) = cli.root {
         crate::pkg::sysroot::set_sysroot(root);
     }
+
+    crate::pkg::offline::set_offline(cli.offline);
+    crate::pkg::pkgdir::set_pkg_dirs(cli.pkg_dirs);
 
     utils::check_path();
 
@@ -746,6 +790,11 @@ pub fn run() -> anyhow::Result<()> {
                 Err(e) => Err(e),
             },
             Commands::Clean { dry_run } => cmd::clean::run(dry_run),
+            Commands::Cache { command } => match command {
+                CacheCommands::Add { files } => cmd::cache::add(&files),
+                CacheCommands::Clear { dry_run } => cmd::cache::clear(dry_run),
+                CacheCommands::List => cmd::cache::list(),
+            },
             Commands::Repo(args) => cmd::repo::run(args),
             Commands::Telemetry { action } => {
                 use cmd::telemetry::{TelemetryCommand, run};

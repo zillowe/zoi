@@ -1,7 +1,7 @@
 use crate::pkg::{
     cache, config, db, hooks,
     install::{manifest, plan, post_install, prebuilt, resolver::InstallNode, util},
-    local, pgp, recorder, resolve, types,
+    local, pgp, pkgdir, recorder, resolve, types,
 };
 use anyhow::{Result, anyhow};
 use colored::Colorize;
@@ -31,11 +31,24 @@ pub fn download_and_cache_archive(
     let sig_filename = format!("{}.sig", archive_filename);
     let cached_sig_path = archive_cache_root.join(&sig_filename);
 
+    if let Some(path) = pkgdir::find_in_pkg_dirs(archive_filename) {
+        if pb.is_none() {
+            println!("Found archive in pkg-dir: {}", path.display());
+        }
+        return Ok(path);
+    }
+
     if cached_archive_path.exists() {
         if pb.is_none() {
             println!("Using cached archive: {}", cached_archive_path.display());
         }
     } else {
+        if crate::pkg::offline::is_offline() {
+            return Err(anyhow!(
+                "Archive not found in cache and cannot download: Zoi is in offline mode. Missing: {}",
+                archive_filename
+            ));
+        }
         let temp_dir = tempfile::Builder::new().prefix("zoi-dl-").tempdir()?;
         let temp_archive_path = temp_dir.path().join(archive_filename);
 

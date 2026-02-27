@@ -30,14 +30,18 @@ pub fn create_install_plan(
             let action = match util::find_prebuilt_info(node) {
                 Ok(Some(info)) => {
                     let (down_size, inst_size) = if let Some(size_url) = &info.size_url {
-                        util::get_expected_size(size_url).unwrap_or_else(|e| {
-                            eprintln!(
-                                "Warning: could not fetch size for {}: {}. Falling back to metadata.",
-                                node.pkg.name,
-                                e
-                            );
+                        if crate::pkg::offline::is_offline() {
                             (node.pkg.archive_size.unwrap_or(0), node.pkg.installed_size.unwrap_or(0))
-                        })
+                        } else {
+                            util::get_expected_size(size_url).unwrap_or_else(|e| {
+                                eprintln!(
+                                    "Warning: could not fetch size for {}: {}. Falling back to metadata.",
+                                    node.pkg.name,
+                                    e
+                                );
+                                (node.pkg.archive_size.unwrap_or(0), node.pkg.installed_size.unwrap_or(0))
+                            })
+                        }
                     } else {
                         (node.pkg.archive_size.unwrap_or(0), node.pkg.installed_size.unwrap_or(0))
                     };

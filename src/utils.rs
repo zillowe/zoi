@@ -723,6 +723,11 @@ pub fn get_all_available_package_managers() -> Vec<String> {
 }
 
 pub fn build_blocking_http_client(timeout_secs: u64) -> anyhow::Result<reqwest::blocking::Client> {
+    if crate::pkg::offline::is_offline() {
+        return Err(anyhow!(
+            "Cannot create HTTP client: Zoi is in offline mode."
+        ));
+    }
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(timeout_secs))
         .build()?;
