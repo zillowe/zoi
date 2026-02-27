@@ -19,6 +19,7 @@ pub fn run(
     global: bool,
     save: bool,
     build_type: Option<String>,
+    dry_run: bool,
     plugin_manager: &crate::pkg::plugin::PluginManager,
 ) -> Result<()> {
     let mut scope_override = scope.map(|s| match s {
@@ -71,6 +72,15 @@ pub fn run(
             types::Scope::Project => unreachable!(),
         });
 
+        if dry_run {
+            println!(
+                "{} Dry-run: would install from repository '{}'",
+                "::".bold().yellow(),
+                repo_spec
+            );
+            return Ok(());
+        }
+
         crate::pkg::repo_install::run(
             &repo_spec,
             force,
@@ -118,12 +128,14 @@ pub fn run(
         true,
     )?;
 
-    for node in graph.nodes.values() {
-        let pkg_val = plugin_manager
-            .lua
-            .to_value(&node.pkg)
-            .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
-        plugin_manager.trigger_hook("on_pre_install", Some(pkg_val))?;
+    if !dry_run {
+        for node in graph.nodes.values() {
+            let pkg_val = plugin_manager
+                .lua
+                .to_value(&node.pkg)
+                .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
+            plugin_manager.trigger_hook("on_pre_install", Some(pkg_val))?;
+        }
     }
 
     let mut direct_packages = Vec::new();
@@ -142,11 +154,14 @@ pub fn run(
 
     println!("{} Looking for conflicts...", "::".bold().blue());
     let packages_to_install: Vec<&types::Package> = graph.nodes.values().map(|n| &n.pkg).collect();
-    install::util::check_for_conflicts(&packages_to_install, yes)?;
 
-    let m_for_conflict_check = MultiProgress::new();
-    install::util::check_file_conflicts(&graph, yes, &m_for_conflict_check)?;
-    let _ = m_for_conflict_check.clear();
+    if !dry_run {
+        install::util::check_for_conflicts(&packages_to_install, yes)?;
+
+        let m_for_conflict_check = MultiProgress::new();
+        install::util::check_file_conflicts(&graph, yes, &m_for_conflict_check)?;
+        let _ = m_for_conflict_check.clear();
+    }
 
     println!("{} Checking available disk space...", "::".bold().blue());
     let install_plan = install::plan::create_install_plan(&graph.nodes)?;
@@ -226,6 +241,14 @@ pub fn run(
             "Total Installed Size: {}",
             crate::utils::format_bytes(total_installed_size)
         );
+    }
+
+    if dry_run {
+        println!(
+            "\n{} Dry-run: installation plan above would be executed.",
+            "::".bold().yellow()
+        );
+        return Ok(());
     }
 
     let install_path = crate::pkg::local::get_store_base_dir(scope_override.unwrap_or_default())?;

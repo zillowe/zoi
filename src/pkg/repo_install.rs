@@ -105,6 +105,7 @@ pub fn run(
         false,
         false,
         None,
+        false,
         plugin_manager,
     )?;
 

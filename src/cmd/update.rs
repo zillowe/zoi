@@ -8,9 +8,9 @@ use semver::Version;
 use std::fs;
 use std::sync::Mutex;
 
-pub fn run(all: bool, package_names: &[String], yes: bool) -> Result<()> {
+pub fn run(all: bool, package_names: &[String], yes: bool, dry_run: bool) -> Result<()> {
     if all {
-        return run_update_all_logic(yes);
+        return run_update_all_logic(yes, dry_run);
     }
 
     let expanded_package_names = cmd_utils::expand_split_packages(package_names, "Updating")?;
@@ -21,7 +21,7 @@ pub fn run(all: bool, package_names: &[String], yes: bool) -> Result<()> {
         if i > 0 {
             println!();
         }
-        if let Err(e) = run_update_single_logic(package_name, yes) {
+        if let Err(e) = run_update_single_logic(package_name, yes, dry_run) {
             eprintln!(
                 "{}: Failed to update '{}': {}",
                 "Error".red().bold(),
@@ -37,13 +37,13 @@ pub fn run(all: bool, package_names: &[String], yes: bool) -> Result<()> {
             "The following packages failed to update: {}",
             failed_packages.join(", ")
         ));
-    } else if !package_names.is_empty() {
+    } else if !package_names.is_empty() && !dry_run {
         println!("\n{}", "Success:".green());
     }
     Ok(())
 }
 
-fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
+fn run_update_single_logic(package_name: &str, yes: bool, dry_run: bool) -> Result<()> {
     println!("--- Updating package '{}' ---", package_name.blue().bold());
 
     let request = resolve::parse_source_string(package_name)?;
@@ -107,6 +107,17 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
         );
     }
     println!();
+
+    if dry_run {
+        println!(
+            "{} Dry-run: would upgrade {} from {} to {}",
+            "::".bold().yellow(),
+            new_pkg.name,
+            old_manifest.version,
+            new_version
+        );
+        return Ok(());
+    }
 
     if !crate::utils::ask_for_confirmation(
         &format!("Update from {} to {}?", old_manifest.version, new_version),
@@ -268,7 +279,7 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
     }
 }
 
-fn run_update_all_logic(yes: bool) -> Result<()> {
+fn run_update_all_logic(yes: bool, dry_run: bool) -> Result<()> {
     let installed_packages = local::get_installed_packages()?;
     let pinned_packages = pin::get_pinned_packages()?;
     let pinned_sources: Vec<String> = pinned_packages.into_iter().map(|p| p.source).collect();
@@ -356,6 +367,14 @@ fn run_update_all_logic(yes: bool) -> Result<()> {
             "Net Upgrade Size:    {}",
             crate::utils::format_size_diff(total_installed_size_diff)
         );
+    }
+
+    if dry_run {
+        println!(
+            "\n{} Dry-run: upgrade plan above would be executed.",
+            "::".bold().yellow()
+        );
+        return Ok(());
     }
 
     println!();

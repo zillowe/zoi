@@ -220,6 +220,10 @@ enum Commands {
         /// Update all installed packages
         #[arg(long, conflicts_with = "package_names")]
         all: bool,
+
+        /// Do not actually perform the update, just show what would be done
+        #[arg(long)]
+        dry_run: bool,
     },
 
     /// Installs one or more packages from a name, local file, URL, or git repository
@@ -251,6 +255,9 @@ enum Commands {
         /// The type of package to build if building from source (e.g. 'source', 'pre-compiled').
         #[arg(long)]
         r#type: Option<String>,
+        /// Do not actually perform the installation, just show what would be done
+        #[arg(long)]
+        dry_run: bool,
     },
 
     /// Uninstalls one or more packages previously installed by Zoi
@@ -722,7 +729,11 @@ pub fn run() -> anyhow::Result<()> {
                     cmd::mark::run(&packages, as_dependency, as_explicit)
                 }
             }
-            Commands::Update { package_names, all } => {
+            Commands::Update {
+                package_names,
+                all,
+                dry_run,
+            } => {
                 if !all && package_names.is_empty() {
                     let mut cmd = Cli::command();
                     if let Some(subcmd) = cmd.find_subcommand_mut("update") {
@@ -730,7 +741,7 @@ pub fn run() -> anyhow::Result<()> {
                     }
                     Ok(())
                 } else {
-                    cmd::update::run(all, &package_names, cli.yes)
+                    cmd::update::run(all, &package_names, cli.yes, dry_run)
                 }
             }
             Commands::Install {
@@ -743,6 +754,7 @@ pub fn run() -> anyhow::Result<()> {
                 global,
                 save,
                 r#type,
+                dry_run,
             } => cmd::install::run(
                 &sources,
                 repo,
@@ -754,6 +766,7 @@ pub fn run() -> anyhow::Result<()> {
                 global,
                 save,
                 r#type,
+                dry_run,
                 &plugin_manager,
             ),
             Commands::Uninstall {
