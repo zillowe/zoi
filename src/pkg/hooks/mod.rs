@@ -4,6 +4,8 @@ use anyhow::{Result, anyhow};
 use colored::*;
 use std::process::Command;
 
+pub mod global;
+
 pub enum HookType {
     PreInstall,
     PostInstall,

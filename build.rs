@@ -128,5 +128,28 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     writeln!(&mut pgp_file, "];")?;
 
+    let hooks_builtin_dir = Path::new("src/pkg/hooks/builtin");
+    println!("cargo:rerun-if-changed={}", hooks_builtin_dir.display());
+
+    let hooks_dest_path = Path::new(&out_dir).join("generated_builtin_hooks.rs");
+    let mut hooks_file = std::fs::File::create(hooks_dest_path)?;
+
+    writeln!(
+        &mut hooks_file,
+        "pub static BUILTIN_HOOKS: &[(&str, &str)] = &["
+    )?;
+    if hooks_builtin_dir.exists() {
+        for entry in std::fs::read_dir(hooks_builtin_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("yaml") {
+                let name = path.file_stem().unwrap().to_str().unwrap();
+                let content = std::fs::read_to_string(&path)?;
+                writeln!(&mut hooks_file, "    (\"{}\", {:?}),", name, content)?;
+            }
+        }
+    }
+    writeln!(&mut hooks_file, "];")?;
+
     Ok(())
 }

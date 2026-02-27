@@ -72,6 +72,12 @@ pub fn add(
                     let plugin_path = plugin_dir.join(format!("{}.lua", name));
                     fs::write(plugin_path, script)?;
                 }
+                types::ExtensionChange::Hook { name, content } => {
+                    println!("Adding global hook: {}", name);
+                    let hooks_dir = crate::pkg::hooks::global::get_user_hooks_dir()?;
+                    let hook_path = hooks_dir.join(format!("{}.hook.yaml", name));
+                    fs::write(hook_path, content)?;
+                }
             }
         }
     } else {
@@ -208,6 +214,16 @@ pub fn remove(
                         && let Err(e) = fs::remove_file(plugin_path)
                     {
                         eprintln!("Warning: failed to remove plugin '{}': {}", name, e);
+                    }
+                }
+                types::ExtensionChange::Hook { name, content: _ } => {
+                    println!("Removing global hook: {}", name);
+                    let hooks_dir = crate::pkg::hooks::global::get_user_hooks_dir()?;
+                    let hook_path = hooks_dir.join(format!("{}.hook.yaml", name));
+                    if hook_path.exists()
+                        && let Err(e) = fs::remove_file(hook_path)
+                    {
+                        eprintln!("Warning: failed to remove global hook '{}': {}", name, e);
                     }
                 }
             }

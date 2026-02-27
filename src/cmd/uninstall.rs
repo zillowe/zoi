@@ -189,8 +189,18 @@ pub fn run(
             "Uninstallation failed for: {}",
             failed_packages.join(", ")
         ));
-    } else if let Err(e) = transaction::commit(&transaction.id) {
-        eprintln!("Warning: Failed to commit transaction: {}", e);
+    } else {
+        if let Ok(modified_files) = transaction::get_modified_files(&transaction.id) {
+            let _ = crate::pkg::hooks::global::run_global_hooks(
+                crate::pkg::hooks::global::HookWhen::PostTransaction,
+                &modified_files,
+                "remove",
+            );
+        }
+
+        if let Err(e) = transaction::commit(&transaction.id) {
+            eprintln!("Warning: Failed to commit transaction: {}", e);
+        }
     }
 
     if save

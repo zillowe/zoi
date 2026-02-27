@@ -167,6 +167,13 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
             eprintln!("Warning: Failed to record transaction for update: {}", e);
             transaction::delete_log(&transaction.id)?;
         } else {
+            if let Ok(modified_files) = transaction::get_modified_files(&transaction.id) {
+                let _ = crate::pkg::hooks::global::run_global_hooks(
+                    crate::pkg::hooks::global::HookWhen::PostTransaction,
+                    &modified_files,
+                    "upgrade",
+                );
+            }
             transaction::commit(&transaction.id)?;
         }
 
@@ -473,6 +480,14 @@ fn run_update_all_logic(yes: bool) -> Result<()> {
         }
         transaction::rollback(&transaction.id)?;
         return Err(anyhow!("Update failed for some packages."));
+    }
+
+    if let Ok(modified_files) = transaction::get_modified_files(&transaction.id) {
+        let _ = crate::pkg::hooks::global::run_global_hooks(
+            crate::pkg::hooks::global::HookWhen::PostTransaction,
+            &modified_files,
+            "upgrade",
+        );
     }
 
     transaction::commit(&transaction.id)?;

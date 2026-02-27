@@ -48,6 +48,7 @@ pub enum ExtensionChange {
     Project { add: String },
     Pgp { name: String, key: String },
     Plugin { name: String, script: String },
+    Hook { name: String, content: String },
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

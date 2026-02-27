@@ -2,6 +2,7 @@ use crate::pkg::{audit, install, types, uninstall};
 use anyhow::{Result, anyhow};
 use chrono::Utc;
 use colored::*;
+use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
 use uuid::{Timestamp, Uuid};
@@ -61,6 +62,43 @@ pub fn record_operation(
 
 pub fn commit(transaction_id: &str) -> Result<()> {
     delete_log(transaction_id)
+}
+
+pub fn get_modified_files(transaction_id: &str) -> Result<Vec<String>> {
+    let path = get_transaction_path(transaction_id)?;
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let content = fs::read_to_string(&path)?;
+    let transaction: types::Transaction = serde_json::from_str(&content)?;
+
+    let mut files = HashSet::new();
+    for op in transaction.operations {
+        match op {
+            types::TransactionOperation::Install { manifest } => {
+                for file in manifest.installed_files {
+                    files.insert(file);
+                }
+            }
+            types::TransactionOperation::Uninstall { manifest } => {
+                for file in manifest.installed_files {
+                    files.insert(file);
+                }
+            }
+            types::TransactionOperation::Upgrade {
+                old_manifest,
+                new_manifest,
+            } => {
+                for file in old_manifest.installed_files {
+                    files.insert(file);
+                }
+                for file in new_manifest.installed_files {
+                    files.insert(file);
+                }
+            }
+        }
+    }
+    Ok(files.into_iter().collect())
 }
 
 pub fn delete_log(transaction_id: &str) -> Result<()> {
