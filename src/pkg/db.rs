@@ -507,6 +507,17 @@ pub fn list_all_packages(registry_handle: &str) -> Result<Vec<types::Package>> {
     Ok(pkgs)
 }
 
+pub fn get_all_package_names(registry_handle: &str) -> Result<Vec<String>> {
+    let conn = open_connection(registry_handle)?;
+    let mut stmt = conn.prepare("SELECT DISTINCT name FROM packages")?;
+    let rows = stmt.query_map([], |row| row.get(0))?;
+    let mut names = Vec::new();
+    for name in rows {
+        names.push(name?);
+    }
+    Ok(names)
+}
+
 pub fn get_all_versions(registry_handle: &str, name: &str, repo: &str) -> Result<Vec<String>> {
     let conn = open_connection(registry_handle)?;
     let mut stmt = conn.prepare("SELECT version FROM packages WHERE name = ?1 AND repo = ?2")?;

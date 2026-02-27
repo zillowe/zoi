@@ -80,15 +80,21 @@ fn install_completions(
         writeln!(file)?;
         let mut script_buf = Vec::new();
         generate(shell, cmd, "zoi", &mut script_buf);
-        file.write_all(&script_buf)?;
+        let script =
+            post_process_completions(shell, String::from_utf8_lossy(&script_buf).to_string());
+        file.write_all(script.as_bytes())?;
         println!(
             "PowerShell completion script appended to your profile: {:?}",
             path
         );
         println!("Please restart your shell or run '. $PROFILE' to activate it.");
     } else {
+        let mut script_buf = Vec::new();
+        generate(shell, cmd, "zoi", &mut script_buf);
+        let script =
+            post_process_completions(shell, String::from_utf8_lossy(&script_buf).to_string());
         let mut file = fs::File::create(&path)?;
-        generate(shell, cmd, "zoi", &mut file);
+        file.write_all(script.as_bytes())?;
         println!("{} completions installed in: {:?}", shell, path);
     }
 
@@ -98,6 +104,41 @@ fn install_completions(
     }
 
     Ok(())
+}
+
+fn post_process_completions(shell: Shell, mut script: String) -> String {
+    match shell {
+        Shell::Zsh => {
+            let helper = r#"
+_zoi_all_packages() {
+    local -a packages
+    packages=(${(f)"$(_zoi_do_list_all)"})
+    _describe -t packages 'synced packages' packages
+}
+
+_zoi_do_list_all() {
+    zoi list -a --names 2>/dev/null
+}
+"#;
+            script.push_str(helper);
+            script = script.replace("':SOURCES: '", "':package:(_zoi_all_packages)'");
+            script = script.replace("':PACKAGES: '", "':package:(_zoi_all_packages)'");
+            script = script.replace("':PACKAGE: '", "':package:(_zoi_all_packages)'");
+            script = script.replace("':package_name: '", "':package:(_zoi_all_packages)'");
+        }
+        Shell::Bash => {
+            let helper = r#"
+_zoi_all_packages() {
+    local cur=${COMP_WORDS[COMP_CWORD]}
+    local pkgs=$(zoi list -a --names 2>/dev/null)
+    COMPREPLY=( $(compgen -W "${pkgs}" -- "$cur") )
+}
+"#;
+            script = format!("{}\n{}", helper, script);
+        }
+        _ => {}
+    }
+    script
 }
 
 pub fn run(shell: Shell, scope: SetupScope) -> Result<()> {

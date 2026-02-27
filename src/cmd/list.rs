@@ -11,6 +11,7 @@ pub fn run(
     repo_filter: Option<String>,
     type_filter: Option<String>,
     foreign: bool,
+    names_only: bool,
 ) -> Result<()> {
     let package_type = match type_filter.as_deref() {
         Some("package") => Some(types::PackageType::Package),
@@ -20,6 +21,10 @@ pub fn run(
         Some(other) => return Err(anyhow!("Invalid package type: {}", other)),
         None => None,
     };
+
+    if names_only {
+        return run_list_names(all, registry_filter, repo_filter, package_type);
+    }
 
     if all {
         if foreign {
@@ -206,6 +211,86 @@ fn run_list_installed(
         println!("No installed packages match your criteria.");
     } else {
         print_with_pager(&table.to_string())?;
+    }
+
+    Ok(())
+}
+
+fn run_list_names(
+    all: bool,
+    registry_filter: Option<String>,
+    repo_filter: Option<String>,
+    type_filter: Option<types::PackageType>,
+) -> Result<()> {
+    let mut names = HashSet::new();
+    let config = config::read_config()?;
+
+    if all {
+        let mut registries = Vec::new();
+        if let Some(reg) = registry_filter {
+            registries.push(reg);
+        } else {
+            if let Some(default) = &config.default_registry {
+                registries.push(default.handle.clone());
+            }
+            for reg in &config.added_registries {
+                registries.push(reg.handle.clone());
+            }
+        }
+
+        let default_handle = config.default_registry.as_ref().map(|r| &r.handle);
+
+        for handle in registries {
+            if let Ok(pkgs) = crate::pkg::db::list_all_packages(&handle) {
+                let is_default = default_handle == Some(&handle);
+                for pkg in pkgs {
+                    if let Some(type_f) = type_filter
+                        && pkg.package_type != type_f
+                    {
+                        continue;
+                    }
+                    if let Some(repo_f) = &repo_filter
+                        && !pkg.repo.contains(repo_f)
+                    {
+                        continue;
+                    }
+
+                    let base_name = if is_default {
+                        format!("@{}/{}", pkg.repo, pkg.name)
+                    } else {
+                        format!("#{}@{}/{}", handle, pkg.repo, pkg.name)
+                    };
+
+                    names.insert(base_name.clone());
+                    if let Some(subs) = pkg.sub_packages {
+                        for sub in subs {
+                            names.insert(format!("{}:{}", base_name, sub));
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        let installed = local::get_installed_packages_with_type()?;
+        for pkg in installed {
+            if let Some(type_f) = type_filter
+                && pkg.package_type != type_f
+            {
+                continue;
+            }
+            let name = if let Some(sub) = pkg.sub_package {
+                format!("{}:{}", pkg.name, sub)
+            } else {
+                pkg.name
+            };
+            names.insert(name);
+        }
+    }
+
+    let mut sorted_names: Vec<_> = names.into_iter().collect();
+    sorted_names.sort();
+    for name in sorted_names {
+        println!("{}", name);
     }
 
     Ok(())

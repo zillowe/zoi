@@ -168,6 +168,9 @@ enum Commands {
         /// List packages not found in any configured registry
         #[arg(short = 'm', long)]
         foreign: bool,
+        /// List only package names (internal use for completions)
+        #[arg(long, hide = true)]
+        names: bool,
     },
 
     /// Shows detailed information about a package
@@ -743,7 +746,8 @@ pub fn run() -> anyhow::Result<()> {
                 repo,
                 package_type,
                 foreign,
-            } => cmd::list::run(all, registry, repo, package_type, foreign),
+                names,
+            } => cmd::list::run(all, registry, repo, package_type, foreign, names),
             Commands::Show { package_name, raw } => cmd::show::run(&package_name, raw),
             Commands::Pin { package, version } => cmd::pin::run(&package, &version),
             Commands::Provides { term } => cmd::provides::run(&term),
