@@ -185,6 +185,10 @@
 		"install": "yay -S --needed --noconfirm {package}",
 		"uninstall": "yay -Rns --noconfirm {package}"
 	},
+	"zig": {
+		"install": "zig fetch --save {package}",
+		"uninstall": "echo \"Zig does not have a global uninstall. Please remove from the local build.zig.zon.\""
+	},
 	"yum": {
 		"is_installed": "rpm -q {package}",
 		"install": "sudo yum install -y {package_with_version}",
