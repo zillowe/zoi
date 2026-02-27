@@ -385,17 +385,23 @@ enum Commands {
         interactive: bool,
     },
 
-    /// Installs completion scripts and sets up the shell environment.
+    /// Set up shell completions or enter an ephemeral environment with specific packages
     #[command(
-        long_about = "Installs completion scripts for a given shell and adds the Zoi binary directory to your shell's PATH."
+        long_about = "If a shell is provided, it installs completion scripts. If packages are provided via --package/-p, it enters a temporary subshell with those packages available in PATH."
     )]
     Shell {
-        /// The shell to set up
+        /// The shell to set up completions for
         #[arg(value_enum)]
-        shell: Shell,
+        shell: Option<Shell>,
         /// The scope to apply the setup to (user or system-wide)
         #[arg(long, value_enum, default_value = "user")]
         scope: SetupScope,
+        /// Packages to include in the ephemeral environment
+        #[arg(short, long = "package", value_name = "PACKAGE")]
+        packages: Vec<String>,
+        /// Command to run in the ephemeral environment instead of an interactive shell
+        #[arg(short, long)]
+        run: Option<String>,
     },
 
     /// Download and execute a binary package without installing it
@@ -835,7 +841,24 @@ pub fn run() -> anyhow::Result<()> {
                 files,
                 interactive,
             ),
-            Commands::Shell { shell, scope } => cmd::shell::run(shell, scope),
+            Commands::Shell {
+                shell,
+                scope,
+                packages,
+                run,
+            } => {
+                if !packages.is_empty() {
+                    cmd::shell::enter_ephemeral_shell(&packages, run, &plugin_manager)
+                } else if let Some(s) = shell {
+                    cmd::shell::run(s, scope)
+                } else {
+                    let mut cmd = Cli::command();
+                    if let Some(subcmd) = cmd.find_subcommand_mut("shell") {
+                        subcmd.print_help().unwrap();
+                    }
+                    Ok(())
+                }
+            }
             Commands::Exec {
                 source,
                 upstream,

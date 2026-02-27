@@ -85,6 +85,7 @@ pub fn run(
     version_override: Option<&str>,
     yes: bool,
     sub_packages: Option<Vec<String>>,
+    link_bins: bool,
     pb: Option<&indicatif::ProgressBar>,
 ) -> Result<Vec<String>> {
     let scope = scope_override.unwrap_or(types::Scope::User);
@@ -295,7 +296,7 @@ pub fn run(
     fs::create_dir_all(&version_dir)?;
     copy_dir_all(staging_dir.path(), &version_dir)?;
 
-    if let Some(bins) = &metadata.bins {
+    if link_bins && let Some(bins) = &metadata.bins {
         let bin_root = get_bin_root(scope)?;
         fs::create_dir_all(&bin_root)?;
 

@@ -1,13 +1,14 @@
 use crate::cli::{Cli, SetupScope};
-use crate::pkg::types::Scope;
+use crate::pkg::{install, local, plugin, types};
 use crate::utils;
 use anyhow::Result;
 use clap::CommandFactory;
 use clap_complete::{Shell, generate};
 use colored::*;
 use std::fs;
-use std::io::{Error, ErrorKind};
+use std::io::{Error, ErrorKind, Write};
 use std::path::PathBuf;
+use std::process::Command;
 
 fn get_completion_path(shell: Shell, scope: SetupScope) -> Result<PathBuf, Error> {
     if scope == SetupScope::System {
@@ -76,7 +77,6 @@ fn install_completions(
             .append(true)
             .create(true)
             .open(&path)?;
-        use std::io::Write;
         writeln!(file)?;
         let mut script_buf = Vec::new();
         generate(shell, cmd, "zoi", &mut script_buf);
@@ -109,9 +109,128 @@ pub fn run(shell: Shell, scope: SetupScope) -> Result<()> {
     println!();
 
     let scope_to_pass = match scope {
-        SetupScope::User => Scope::User,
-        SetupScope::System => Scope::System,
+        SetupScope::User => types::Scope::User,
+        SetupScope::System => types::Scope::System,
     };
     utils::setup_path(scope_to_pass)?;
+    Ok(())
+}
+
+pub fn enter_ephemeral_shell(
+    package_sources: &[String],
+    run_cmd: Option<String>,
+    _plugin_manager: &plugin::PluginManager,
+) -> Result<()> {
+    println!("{} Resolving ephemeral environment...", "::".bold().blue());
+
+    let (graph, _non_zoi_deps) = install::resolver::resolve_dependency_graph(
+        package_sources,
+        None,
+        false,
+        true,
+        true,
+        None,
+        true,
+    )?;
+
+    let install_plan = install::plan::create_install_plan(&graph.nodes)?;
+    let stages = graph.toposort()?;
+
+    if !install_plan.is_empty() {
+        println!(
+            "{} Preparing {} ephemeral dependencies...",
+            "::".bold().blue(),
+            install_plan.len()
+        );
+        let m = indicatif::MultiProgress::new();
+        for stage in stages {
+            use rayon::prelude::*;
+            stage.into_par_iter().try_for_each(|pkg_id| -> Result<()> {
+                let node = graph.nodes.get(&pkg_id).unwrap();
+                let action = install_plan.get(&pkg_id).unwrap();
+
+                install::installer::install_node(node, action, Some(&m), None, true, false)?;
+                Ok(())
+            })?;
+        }
+    }
+
+    let temp_dir = tempfile::Builder::new().prefix("zoi-shell-").tempdir()?;
+    let temp_bin_dir = temp_dir.path().join("bin");
+    fs::create_dir_all(&temp_bin_dir)?;
+
+    for node in graph.nodes.values() {
+        let handle = &node.registry_handle;
+        let pkg = &node.pkg;
+
+        let package_dir = local::get_package_dir(pkg.scope, handle, &pkg.repo, &pkg.name)?;
+        let version_dir = package_dir.join(&node.version);
+        let bin_dir = version_dir.join("bin");
+
+        if bin_dir.exists() {
+            for entry in fs::read_dir(bin_dir)? {
+                let entry = entry?;
+                let path = entry.path();
+                if path.is_file() || path.is_symlink() {
+                    let file_name = path.file_name().unwrap();
+                    let dest = temp_bin_dir.join(file_name);
+                    utils::symlink_file(&path, &dest)?;
+                }
+            }
+        }
+    }
+
+    let mut new_path = temp_bin_dir.to_string_lossy().to_string();
+    if let Ok(old_path) = std::env::var("PATH") {
+        new_path = format!(
+            "{}{}{}",
+            new_path,
+            if cfg!(windows) { ";" } else { ":" },
+            old_path
+        );
+    }
+
+    if let Some(cmd_str) = run_cmd {
+        println!("{} Running: {}", "::".bold().blue(), cmd_str.cyan());
+        let mut child = if cfg!(windows) {
+            Command::new("pwsh")
+                .arg("-Command")
+                .arg(&cmd_str)
+                .env("PATH", new_path)
+                .spawn()?
+        } else {
+            Command::new("bash")
+                .arg("-c")
+                .arg(&cmd_str)
+                .env("PATH", new_path)
+                .spawn()?
+        };
+        let status = child.wait()?;
+        if !status.success() {
+            std::process::exit(status.code().unwrap_or(1));
+        }
+    } else {
+        let shell_bin = std::env::var("SHELL").unwrap_or_else(|_| {
+            if cfg!(windows) {
+                "pwsh".to_string()
+            } else {
+                "bash".to_string()
+            }
+        });
+
+        println!(
+            "{} Entering ephemeral shell (type 'exit' to leave)...",
+            "::".bold().green()
+        );
+
+        let mut child = Command::new(&shell_bin)
+            .env("PATH", new_path)
+            .env("ZOI_SHELL", "ephemeral")
+            .spawn()?;
+
+        let _ = child.wait()?;
+        println!("{} Exited ephemeral shell.", "::".bold().blue());
+    }
+
     Ok(())
 }

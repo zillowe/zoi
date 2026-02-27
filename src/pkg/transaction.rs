@@ -200,8 +200,9 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                     for id in stage {
                         let node = graph.nodes.get(&id).unwrap();
                         if let Some(action) = install_plan.get(&id)
-                            && let Err(e) =
-                                install::installer::install_node(node, action, None, None, true)
+                            && let Err(e) = install::installer::install_node(
+                                node, action, None, None, true, true,
+                            )
                         {
                             eprintln!(
                                 "{} Failed to re-install during rollback of '{}': {}",
@@ -289,8 +290,9 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                     for id in stage {
                         let node = graph.nodes.get(&id).unwrap();
                         if let Some(action) = install_plan.get(&id)
-                            && let Err(e) =
-                                install::installer::install_node(node, action, None, None, true)
+                            && let Err(e) = install::installer::install_node(
+                                node, action, None, None, true, true,
+                            )
                         {
                             eprintln!(
                                 "{} Failed to re-install during rollback of '{}': {}",

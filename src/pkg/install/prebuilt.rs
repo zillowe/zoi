@@ -108,6 +108,7 @@ pub fn try_build_install(
         Some(version),
         yes,
         sub_packages_vec_install,
+        true,
         pb,
     )
     .map_err(|e| anyhow!("Failed to install built package archive: {}", e))?;

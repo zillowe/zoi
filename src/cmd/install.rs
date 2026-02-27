@@ -323,6 +323,7 @@ pub fn run(
                     Some(&m_deps),
                     build_type.as_deref(),
                     yes,
+                    true,
                 ) {
                     Ok(manifest) => {
                         let _lock = transaction_mutex.lock().unwrap();
@@ -365,6 +366,7 @@ pub fn run(
                 Some(&m_pkg),
                 build_type.as_deref(),
                 yes,
+                true,
             ) {
                 Ok(manifest) => {
                     installed_manifests.lock().unwrap().push(manifest.clone());

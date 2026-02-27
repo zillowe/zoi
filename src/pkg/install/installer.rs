@@ -112,6 +112,7 @@ pub fn install_node(
     m: Option<&MultiProgress>,
     build_type: Option<&str>,
     yes: bool,
+    link_bins: bool,
 ) -> Result<types::InstallManifest> {
     let pkg = &node.pkg;
     let version = &node.version;
@@ -176,6 +177,7 @@ pub fn install_node(
                 Some(&node.version),
                 yes,
                 sub_packages_vec,
+                link_bins,
                 step_pb.as_ref().or(main_pb.as_ref()),
             )?
         }
@@ -190,6 +192,7 @@ pub fn install_node(
                 Some(&node.version),
                 yes,
                 sub_packages_vec,
+                link_bins,
                 step_pb.as_ref().or(main_pb.as_ref()),
             )?
         }

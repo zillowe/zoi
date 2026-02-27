@@ -151,7 +151,7 @@ fn run_update_single_logic(package_name: &str, yes: bool, dry_run: bool) -> Resu
         for pkg_id in stage {
             let node = graph.nodes.get(&pkg_id).unwrap();
             if let Some(action) = install_plan.get(&pkg_id) {
-                match install::installer::install_node(node, action, None, None, yes) {
+                match install::installer::install_node(node, action, None, None, yes, true) {
                     Ok(m) => {
                         if m.name == new_pkg.name {
                             new_manifest_option = Some(m);
@@ -451,7 +451,8 @@ fn run_update_all_logic(yes: bool, dry_run: bool) -> Result<()> {
                 for pkg_id in stage {
                     let node = graph.nodes.get(&pkg_id).unwrap();
                     if let Some(action) = install_plan.get(&pkg_id) {
-                        match install::installer::install_node(node, action, None, None, yes) {
+                        match install::installer::install_node(node, action, None, None, yes, true)
+                        {
                             Ok(m) => {
                                 if m.name == new_pkg.name {
                                     new_manifest_option = Some(m);
