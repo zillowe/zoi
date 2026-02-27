@@ -428,7 +428,9 @@ pub fn get_conflicts_from_list(
             if pkg.scope != types::Scope::System {
                 continue;
             }
-            Some(PathBuf::from("/").join(stripped))
+            Some(crate::pkg::sysroot::apply_sysroot(
+                PathBuf::from("/").join(stripped),
+            ))
         } else if let Some(stripped) = rel_to_data.strip_prefix("usrhome/") {
             home::home_dir().map(|h| h.join(stripped))
         } else {
@@ -482,7 +484,7 @@ pub fn get_file_conflicts_from_archive(
 
         let usrroot_src = sub_data_dir.join("usrroot");
         if usrroot_src.exists() && pkg.scope == types::Scope::System {
-            let root_dest = PathBuf::from("/");
+            let root_dest = crate::pkg::sysroot::apply_sysroot(PathBuf::from("/"));
             for entry in WalkDir::new(&usrroot_src)
                 .into_iter()
                 .filter_map(|e| e.ok())

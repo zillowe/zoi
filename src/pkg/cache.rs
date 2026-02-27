@@ -1,10 +1,11 @@
+use crate::pkg::sysroot::apply_sysroot;
 use anyhow::{Result, anyhow};
 use std::fs;
 use std::path::PathBuf;
 
 pub fn get_cache_root() -> Result<PathBuf> {
     let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(home_dir.join(".zoi").join("cache"))
+    Ok(apply_sysroot(home_dir.join(".zoi").join("cache")))
 }
 
 pub fn get_archive_cache_root() -> Result<PathBuf> {

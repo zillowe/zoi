@@ -459,16 +459,15 @@ pub fn setup_path(scope: Scope) -> anyhow::Result<()> {
     }
 
     let zoi_bin_dir = match scope {
-        Scope::User => home::home_dir()
-            .ok_or_else(|| anyhow!("Could not find home directory."))?
-            .join(".zoi")
-            .join("pkgs")
-            .join("bin"),
+        Scope::User => {
+            let home = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
+            crate::pkg::sysroot::apply_sysroot(home.join(".zoi").join("pkgs").join("bin"))
+        }
         Scope::System => {
             if cfg!(target_os = "windows") {
-                PathBuf::from("C:\\ProgramData\\zoi\\pkgs\\bin")
+                crate::pkg::sysroot::apply_sysroot(PathBuf::from("C:\\ProgramData\\zoi\\pkgs\\bin"))
             } else {
-                PathBuf::from("/usr/local/bin")
+                crate::pkg::sysroot::apply_sysroot(PathBuf::from("/usr/local/bin"))
             }
         }
         Scope::Project => return Ok(()),
@@ -628,7 +627,7 @@ set paths = [ ~/.zoi/pkgs/bin $paths... ]
 
 pub fn check_path() {
     if let Some(home) = home::home_dir() {
-        let zoi_bin_dir = home.join(".zoi/pkgs/bin");
+        let zoi_bin_dir = crate::pkg::sysroot::apply_sysroot(home.join(".zoi/pkgs/bin"));
         if !zoi_bin_dir.exists() {
             return;
         }

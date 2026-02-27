@@ -11,13 +11,19 @@ fn get_bin_root(scope: Scope) -> Result<PathBuf> {
         Scope::User => {
             let home_dir =
                 home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
-            Ok(home_dir.join(".zoi/pkgs/bin"))
+            Ok(crate::pkg::sysroot::apply_sysroot(
+                home_dir.join(".zoi/pkgs/bin"),
+            ))
         }
         Scope::System => {
             if cfg!(target_os = "windows") {
-                Ok(PathBuf::from("C:\\ProgramData\\zoi\\pkgs\\bin"))
+                Ok(crate::pkg::sysroot::apply_sysroot(PathBuf::from(
+                    "C:\\ProgramData\\zoi\\pkgs\\bin",
+                )))
             } else {
-                Ok(PathBuf::from("/usr/local/bin"))
+                Ok(crate::pkg::sysroot::apply_sysroot(PathBuf::from(
+                    "/usr/local/bin",
+                )))
             }
         }
         Scope::Project => {
@@ -49,7 +55,8 @@ pub fn check_broken_symlinks() -> Result<Vec<PathBuf>> {
 
 pub fn check_path_configuration() -> Result<Option<String>> {
     if let Some(home) = home::home_dir() {
-        let zoi_bin_dir = home.join(".zoi").join("pkgs").join("bin");
+        let zoi_bin_dir =
+            crate::pkg::sysroot::apply_sysroot(home.join(".zoi").join("pkgs").join("bin"));
         if !zoi_bin_dir.exists() {
             return Ok(None);
         }
@@ -67,7 +74,7 @@ pub fn check_path_configuration() -> Result<Option<String>> {
 }
 
 pub fn check_outdated_repos() -> Result<Option<String>> {
-    let db_root = crate::pkg::resolve::get_db_root()?;
+    let db_root = crate::pkg::sysroot::apply_sysroot(crate::pkg::resolve::get_db_root()?);
     let config = crate::pkg::config::read_config()?;
 
     if let Some(default_reg) = config.default_registry
@@ -97,7 +104,7 @@ pub fn check_outdated_repos() -> Result<Option<String>> {
 }
 
 pub fn check_duplicate_packages() -> Result<Vec<(String, Vec<String>)>> {
-    let db_root = crate::pkg::resolve::get_db_root()?;
+    let db_root = crate::pkg::sysroot::apply_sysroot(crate::pkg::resolve::get_db_root()?);
     if !db_root.exists() {
         return Ok(Vec::new());
     }

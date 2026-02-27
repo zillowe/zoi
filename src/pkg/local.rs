@@ -1,4 +1,5 @@
 use crate::pkg::config;
+use crate::pkg::sysroot::apply_sysroot;
 use crate::pkg::types::{InstallManifest, Scope};
 use crate::pkg::utils;
 use anyhow::Result;
@@ -11,13 +12,17 @@ pub fn get_store_base_dir(scope: Scope) -> Result<PathBuf> {
         Scope::User => {
             let home_dir = home::home_dir()
                 .ok_or_else(|| anyhow::anyhow!("Could not find home directory."))?;
-            Ok(home_dir.join(".zoi").join("pkgs").join("store"))
+            Ok(apply_sysroot(
+                home_dir.join(".zoi").join("pkgs").join("store"),
+            ))
         }
         Scope::System => {
             if cfg!(target_os = "windows") {
-                Ok(PathBuf::from("C:\\ProgramData\\zoi\\pkgs\\store"))
+                Ok(apply_sysroot(PathBuf::from(
+                    "C:\\ProgramData\\zoi\\pkgs\\store",
+                )))
             } else {
-                Ok(PathBuf::from("/var/lib/zoi/pkgs/store"))
+                Ok(apply_sysroot(PathBuf::from("/var/lib/zoi/pkgs/store")))
             }
         }
         Scope::Project => {
@@ -53,7 +58,7 @@ pub fn get_package_version_dir(
 fn get_db_root() -> Result<PathBuf> {
     let home_dir =
         home::home_dir().ok_or_else(|| anyhow::anyhow!("Could not find home directory."))?;
-    Ok(home_dir.join(".zoi").join("pkgs").join("db"))
+    Ok(apply_sysroot(home_dir.join(".zoi").join("pkgs").join("db")))
 }
 
 pub fn get_installed_packages() -> Result<Vec<InstallManifest>> {

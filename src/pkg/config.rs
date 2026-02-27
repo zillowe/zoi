@@ -1,3 +1,4 @@
+use crate::pkg::sysroot::apply_sysroot;
 use crate::pkg::types::{Config, Registry, RepoConfig};
 use anyhow::{Result, anyhow};
 use colored::*;
@@ -22,15 +23,19 @@ pub fn get_builtin_authorities() -> Vec<String> {
 
 fn get_system_config_path() -> Result<PathBuf> {
     if cfg!(target_os = "windows") {
-        Ok(PathBuf::from("C:\\ProgramData\\zoi\\config.yaml"))
+        Ok(apply_sysroot(PathBuf::from(
+            "C:\\ProgramData\\zoi\\config.yaml",
+        )))
     } else {
-        Ok(PathBuf::from("/etc/zoi/config.yaml"))
+        Ok(apply_sysroot(PathBuf::from("/etc/zoi/config.yaml")))
     }
 }
 
 fn get_user_config_path() -> Result<PathBuf> {
     let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(home_dir.join(".zoi").join("pkgs").join("config.yaml"))
+    Ok(apply_sysroot(
+        home_dir.join(".zoi").join("pkgs").join("config.yaml"),
+    ))
 }
 
 fn get_project_config_path() -> Result<PathBuf> {
@@ -40,12 +45,14 @@ fn get_project_config_path() -> Result<PathBuf> {
 
 fn get_db_root() -> Result<PathBuf> {
     let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(home_dir.join(".zoi").join("pkgs").join("db"))
+    Ok(apply_sysroot(home_dir.join(".zoi").join("pkgs").join("db")))
 }
 
 fn get_git_root() -> Result<PathBuf> {
     let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(home_dir.join(".zoi").join("pkgs").join("git"))
+    Ok(apply_sysroot(
+        home_dir.join(".zoi").join("pkgs").join("git"),
+    ))
 }
 
 fn read_yaml_value(path: &Path) -> Result<Value> {

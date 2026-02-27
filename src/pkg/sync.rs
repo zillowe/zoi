@@ -65,12 +65,16 @@ fn verify_registry_signature(repo_path: &Path, authorities: &[String]) -> Result
 
 fn get_db_path() -> Result<PathBuf> {
     let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(home_dir.join(".zoi").join("pkgs").join("db"))
+    Ok(crate::pkg::sysroot::apply_sysroot(
+        home_dir.join(".zoi").join("pkgs").join("db"),
+    ))
 }
 
 fn get_git_root() -> Result<PathBuf> {
     let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(home_dir.join(".zoi").join("pkgs").join("git"))
+    Ok(crate::pkg::sysroot::apply_sysroot(
+        home_dir.join(".zoi").join("pkgs").join("git"),
+    ))
 }
 
 fn sync_git_repos(verbose: bool) -> Result<()> {

@@ -15,13 +15,19 @@ fn get_bin_root(scope: types::Scope) -> Result<PathBuf> {
         types::Scope::User => {
             let home_dir =
                 home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
-            Ok(home_dir.join(".zoi/pkgs/bin"))
+            Ok(crate::pkg::sysroot::apply_sysroot(
+                home_dir.join(".zoi/pkgs/bin"),
+            ))
         }
         types::Scope::System => {
             if cfg!(target_os = "windows") {
-                Ok(PathBuf::from("C:\\ProgramData\\zoi\\pkgs\\bin"))
+                Ok(crate::pkg::sysroot::apply_sysroot(PathBuf::from(
+                    "C:\\ProgramData\\zoi\\pkgs\\bin",
+                )))
             } else {
-                Ok(PathBuf::from("/usr/local/bin"))
+                Ok(crate::pkg::sysroot::apply_sysroot(PathBuf::from(
+                    "/usr/local/bin",
+                )))
             }
         }
         types::Scope::Project => {
@@ -239,7 +245,7 @@ pub fn run(
                         "Administrator privileges required to install system-wide files. Please run with sudo or as an administrator."
                     ));
                 }
-                let root_dest = PathBuf::from("/");
+                let root_dest = crate::pkg::sysroot::apply_sysroot(PathBuf::from("/"));
                 check_and_handle_file_conflicts(&usrroot_src, &root_dest, yes)?;
                 copy_dir_all(&usrroot_src, &root_dest)?;
                 for entry in WalkDir::new(&usrroot_src)

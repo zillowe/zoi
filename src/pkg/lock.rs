@@ -7,7 +7,9 @@ use std::path::PathBuf;
 
 fn get_lock_path() -> Result<PathBuf> {
     let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(home_dir.join(".zoi").join("pkgs").join("lock"))
+    Ok(crate::pkg::sysroot::apply_sysroot(
+        home_dir.join(".zoi").join("pkgs").join("lock"),
+    ))
 }
 
 pub fn acquire_lock() -> Result<LockGuard> {

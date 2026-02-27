@@ -75,7 +75,7 @@ pub fn validate_cert(cert: &Cert) -> Result<()> {
 
 pub fn get_pgp_dir() -> Result<PathBuf> {
     let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
-    let pgp_dir = home_dir.join(".zoi").join("pgps");
+    let pgp_dir = crate::pkg::sysroot::apply_sysroot(home_dir.join(".zoi").join("pgps"));
     fs::create_dir_all(&pgp_dir)?;
     Ok(pgp_dir)
 }

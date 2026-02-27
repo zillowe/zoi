@@ -11,13 +11,19 @@ fn get_bin_root(scope: types::Scope) -> anyhow::Result<PathBuf> {
         types::Scope::User => {
             let home_dir =
                 home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
-            Ok(home_dir.join(".zoi/pkgs/bin"))
+            Ok(crate::pkg::sysroot::apply_sysroot(
+                home_dir.join(".zoi/pkgs/bin"),
+            ))
         }
         types::Scope::System => {
             if cfg!(target_os = "windows") {
-                Ok(PathBuf::from("C:\\ProgramData\\zoi\\pkgs\\bin"))
+                Ok(crate::pkg::sysroot::apply_sysroot(PathBuf::from(
+                    "C:\\ProgramData\\zoi\\pkgs\\bin",
+                )))
             } else {
-                Ok(PathBuf::from("/usr/local/bin"))
+                Ok(crate::pkg::sysroot::apply_sysroot(PathBuf::from(
+                    "/usr/local/bin",
+                )))
             }
         }
         types::Scope::Project => {
@@ -222,7 +228,10 @@ pub fn run(
                     path_to_remove =
                         path_to_remove.replace("${usrhome}", &home_dir.to_string_lossy());
                 }
-                path_to_remove = path_to_remove.replace("${usrroot}", "/");
+                path_to_remove = path_to_remove.replace(
+                    "${usrroot}",
+                    &crate::pkg::sysroot::apply_sysroot(PathBuf::from("/")).to_string_lossy(),
+                );
 
                 let path = std::path::PathBuf::from(path_to_remove);
                 if path.exists() {

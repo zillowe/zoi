@@ -42,6 +42,15 @@ pub struct Cli {
         global = true
     )]
     yes: bool,
+
+    #[arg(
+        short = 'r',
+        long = "root",
+        help = "Operate on a different root directory",
+        global = true,
+        value_hint = ValueHint::DirPath
+    )]
+    pub root: Option<std::path::PathBuf>,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug, Copy, PartialEq, Eq)]
@@ -504,6 +513,10 @@ pub fn run() -> anyhow::Result<()> {
             return Err(anyhow::anyhow!("Failed to parse arguments"));
         }
     };
+
+    if let Some(root) = cli.root {
+        crate::pkg::sysroot::set_sysroot(root);
+    }
 
     utils::check_path();
 
