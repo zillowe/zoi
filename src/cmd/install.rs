@@ -221,10 +221,12 @@ pub fn run(
             crate::utils::format_bytes(total_download_size)
         );
     }
-    println!(
-        "Total Installed Size: {}",
-        crate::utils::format_bytes(total_installed_size)
-    );
+    if total_installed_size > 0 {
+        println!(
+            "Total Installed Size: {}",
+            crate::utils::format_bytes(total_installed_size)
+        );
+    }
 
     let install_path = crate::pkg::local::get_store_base_dir(scope_override.unwrap_or_default())?;
     std::fs::create_dir_all(&install_path)?;

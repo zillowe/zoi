@@ -94,14 +94,18 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
     let installed_size_diff = new_installed_size as i64 - old_installed_size as i64;
 
     println!();
-    println!(
-        "Total Download Size: {}",
-        crate::utils::format_bytes(download_size)
-    );
-    println!(
-        "Net Upgrade Size:    {}",
-        crate::utils::format_size_diff(installed_size_diff)
-    );
+    if download_size > 0 {
+        println!(
+            "Total Download Size: {}",
+            crate::utils::format_bytes(download_size)
+        );
+    }
+    if installed_size_diff != 0 {
+        println!(
+            "Net Upgrade Size:    {}",
+            crate::utils::format_size_diff(installed_size_diff)
+        );
+    }
     println!();
 
     if !crate::utils::ask_for_confirmation(
@@ -312,14 +316,18 @@ fn run_update_all_logic(yes: bool) -> Result<()> {
         .sum();
 
     println!();
-    println!(
-        "Total Download Size: {}",
-        crate::utils::format_bytes(total_download_size)
-    );
-    println!(
-        "Net Upgrade Size:    {}",
-        crate::utils::format_size_diff(total_installed_size_diff)
-    );
+    if total_download_size > 0 {
+        println!(
+            "Total Download Size: {}",
+            crate::utils::format_bytes(total_download_size)
+        );
+    }
+    if total_installed_size_diff != 0 {
+        println!(
+            "Net Upgrade Size:    {}",
+            crate::utils::format_size_diff(total_installed_size_diff)
+        );
+    }
 
     println!();
     if !crate::utils::ask_for_confirmation("Do you want to upgrade these packages?", yes) {
