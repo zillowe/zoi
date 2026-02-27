@@ -269,6 +269,9 @@ enum Commands {
         /// Remove the package from the project's zoi.yaml
         #[arg(long)]
         save: bool,
+        /// Recursively remove dependencies that are no longer needed
+        #[arg(short, long)]
+        recursive: bool,
     },
 
     /// Execute a command defined in a local zoi.yaml file
@@ -746,6 +749,7 @@ pub fn run() -> anyhow::Result<()> {
                 local,
                 global,
                 save,
+                recursive,
             } => cmd::uninstall::run(
                 &packages,
                 scope,
@@ -753,6 +757,7 @@ pub fn run() -> anyhow::Result<()> {
                 global,
                 save,
                 cli.yes,
+                recursive,
                 &plugin_manager,
             ),
             Commands::Run { cmd_alias, args } => cmd::run::run(cmd_alias, args),

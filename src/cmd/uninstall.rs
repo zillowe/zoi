@@ -14,6 +14,7 @@ pub fn run(
     global: bool,
     save: bool,
     yes: bool,
+    recursive: bool,
     plugin_manager: &crate::pkg::plugin::PluginManager,
 ) -> Result<()> {
     let mut scope_override = scope.map(|s| match s {
@@ -54,6 +55,10 @@ pub fn run(
         return Err(anyhow!(
             "Failed to resolve some packages for uninstallation."
         ));
+    }
+
+    if recursive {
+        collect_recursive_uninstalls(&mut manifests_to_uninstall, &installed_packages)?;
     }
 
     if manifests_to_uninstall.is_empty() {
@@ -270,4 +275,77 @@ fn resolve_and_add_manifest(
             Err(error_msg)
         }
     }
+}
+
+fn collect_recursive_uninstalls(
+    manifests_to_uninstall: &mut Vec<types::InstallManifest>,
+    installed_packages: &[types::InstallManifest],
+) -> Result<()> {
+    let mut changed = true;
+    while changed {
+        changed = false;
+        let mut new_to_add = Vec::new();
+
+        for manifest in manifests_to_uninstall.iter() {
+            for dep_str in &manifest.installed_dependencies {
+                if let Ok(dep) = pkg::dependencies::parse_dependency_string(dep_str)
+                    && dep.manager == "zoi"
+                {
+                    let dep_req = match pkg::resolve::parse_source_string(dep.package) {
+                        Ok(req) => req,
+                        Err(_) => continue,
+                    };
+
+                    let dep_manifest = installed_packages
+                        .iter()
+                        .find(|m| m.name == dep_req.name && m.sub_package == dep_req.sub_package);
+
+                    if let Some(dm) = dep_manifest {
+                        if !matches!(dm.reason, types::InstallReason::Dependency { .. }) {
+                            continue;
+                        }
+
+                        if manifests_to_uninstall
+                            .iter()
+                            .any(|m| m.name == dm.name && m.sub_package == dm.sub_package)
+                            || new_to_add.iter().any(|m: &&types::InstallManifest| {
+                                m.name == dm.name && m.sub_package == dm.sub_package
+                            })
+                        {
+                            continue;
+                        }
+
+                        let pkg_dir = pkg::local::get_package_dir(
+                            dm.scope,
+                            &dm.registry_handle,
+                            &dm.repo,
+                            &dm.name,
+                        )?;
+                        let dependents = pkg::local::get_dependents(&pkg_dir)?;
+
+                        let all_dependents_will_be_removed = dependents.iter().all(|dep_id| {
+                            manifests_to_uninstall.iter().any(|m| {
+                                let m_id = if let Some(sub) = &m.sub_package {
+                                    format!("{}@{}:{}", m.name, m.version, sub)
+                                } else {
+                                    format!("{}@{}", m.name, m.version)
+                                };
+                                m_id == *dep_id
+                            })
+                        });
+
+                        if all_dependents_will_be_removed {
+                            new_to_add.push(dm);
+                            changed = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        for nm in new_to_add {
+            manifests_to_uninstall.push(nm.clone());
+        }
+    }
+    Ok(())
 }

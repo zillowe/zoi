@@ -90,13 +90,11 @@ fn run_list_installed(
 
     if !db_failed && !packages_from_db.is_empty() {
         for pkg in packages_from_db {
-            if foreign {
-                if let Some(reg) = &pkg.registry_handle {
-                    if active_registries.contains(reg) {
-                        continue;
-                    }
-                } else {
-                }
+            if foreign
+                && let Some(reg) = &pkg.registry_handle
+                && active_registries.contains(reg)
+            {
+                continue;
             }
 
             if let Some(registry_filter) = &registry_filter
