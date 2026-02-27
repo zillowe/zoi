@@ -76,26 +76,10 @@ fn run_list_installed(
 
     if !db_failed && !packages_from_db.is_empty() {
         for pkg in packages_from_db {
-            if let Some(registry_filter) = &registry_filter {
-                let manifest = local::is_package_installed(&pkg.name, None, types::Scope::User)?
-                    .or(local::is_package_installed(
-                        &pkg.name,
-                        None,
-                        types::Scope::System,
-                    )?)
-                    .or(local::is_package_installed(
-                        &pkg.name,
-                        None,
-                        types::Scope::Project,
-                    )?);
-
-                if let Some(m) = manifest {
-                    if m.registry_handle != *registry_filter {
-                        continue;
-                    }
-                } else {
-                    continue;
-                }
+            if let Some(registry_filter) = &registry_filter
+                && pkg.readme.as_deref() != Some(registry_filter)
+            {
+                continue;
             }
 
             if let Some(repo_filter) = &repo_filter {
@@ -112,10 +96,18 @@ fn run_list_installed(
                 continue;
             }
 
+            let package_display = if let Some(sub_marker) = &pkg.alt
+                && sub_marker.starts_with("sub:")
+            {
+                format!("{}:{}", pkg.name, &sub_marker[4..])
+            } else {
+                pkg.name
+            };
+
             let repo_display = pkg.repo.split_once('/').map(|x| x.1).unwrap_or(&pkg.repo);
 
             table.add_row(vec![
-                pkg.name,
+                package_display,
                 pkg.version.unwrap_or_else(|| "N/A".to_string()),
                 repo_display.to_string(),
                 format!("{:?}", pkg.package_type),

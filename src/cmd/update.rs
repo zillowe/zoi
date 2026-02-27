@@ -228,10 +228,22 @@ fn run_update_single_logic(package_name: &str, yes: bool) -> Result<()> {
 
         let handle = registry_handle.as_deref().unwrap_or("local");
         if let Ok(conn) = db::open_connection(handle) {
-            let _ = db::update_package(&conn, &new_pkg);
+            let _ = db::update_package(
+                &conn,
+                &new_pkg,
+                handle,
+                Some(new_pkg.scope),
+                request.sub_package.as_deref(),
+            );
         }
         if let Ok(conn) = db::open_connection("local") {
-            let _ = db::update_package(&conn, &new_pkg);
+            let _ = db::update_package(
+                &conn,
+                &new_pkg,
+                handle,
+                Some(new_pkg.scope),
+                request.sub_package.as_deref(),
+            );
         }
 
         if let Some(hooks) = &new_pkg.hooks {
@@ -531,10 +543,22 @@ fn run_update_all_logic(yes: bool) -> Result<()> {
         }
 
         if let Ok(conn) = db::open_connection(&new_manifest.registry_handle) {
-            let _ = db::update_package(&conn, new_pkg);
+            let _ = db::update_package(
+                &conn,
+                new_pkg,
+                &new_manifest.registry_handle,
+                Some(new_manifest.scope),
+                new_manifest.sub_package.as_deref(),
+            );
         }
         if let Ok(conn) = db::open_connection("local") {
-            let _ = db::update_package(&conn, new_pkg);
+            let _ = db::update_package(
+                &conn,
+                new_pkg,
+                &new_manifest.registry_handle,
+                Some(new_manifest.scope),
+                new_manifest.sub_package.as_deref(),
+            );
         }
 
         if let Some(hooks) = &new_pkg.hooks

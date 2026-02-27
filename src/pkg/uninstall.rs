@@ -106,7 +106,7 @@ fn uninstall_collection(
     }
 
     if let Ok(conn) = db::open_connection("local") {
-        let _ = db::delete_package(&conn, &pkg.name, &pkg.repo);
+        let _ = db::delete_package(&conn, &pkg.name, None, &pkg.repo, Some(scope));
     }
 
     match crate::pkg::telemetry::posthog_capture_event(
@@ -412,7 +412,13 @@ pub fn run(
     }
 
     if let Ok(conn) = db::open_connection("local") {
-        let _ = db::delete_package(&conn, &pkg.name, &pkg.repo);
+        let _ = db::delete_package(
+            &conn,
+            &pkg.name,
+            sub_package_to_uninstall.as_deref(),
+            &pkg.repo,
+            Some(scope),
+        );
     }
 
     println!("Removed manifest for '{}'.", pkg.name);

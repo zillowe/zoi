@@ -23,13 +23,16 @@ fn setup_schema(conn: &Connection) -> Result<()> {
         "CREATE TABLE IF NOT EXISTS packages (
             id INTEGER PRIMARY KEY,
             name TEXT NOT NULL,
+            sub_package TEXT,
             repo TEXT NOT NULL,
             version TEXT,
             description TEXT,
             package_type TEXT,
             tags TEXT,
             license TEXT,
-            UNIQUE(name, repo)
+            registry TEXT,
+            scope TEXT,
+            UNIQUE(name, sub_package, repo, scope)
         )",
         [],
     )?;
@@ -81,30 +84,47 @@ fn setup_schema(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
-pub fn update_package(conn: &Connection, pkg: &types::Package) -> Result<()> {
+pub fn update_package(
+    conn: &Connection,
+    pkg: &types::Package,
+    registry: &str,
+    scope: Option<types::Scope>,
+    sub_package: Option<&str>,
+) -> Result<()> {
     let tags_json = serde_json::to_string(&pkg.tags)?;
     let pkg_type = format!("{:?}", pkg.package_type).to_lowercase();
+    let scope_str = scope.map(|s| format!("{:?}", s).to_lowercase());
 
     conn.execute(
-        "INSERT OR REPLACE INTO packages (name, repo, version, description, package_type, tags, license)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        "INSERT OR REPLACE INTO packages (name, sub_package, repo, version, description, package_type, tags, license, registry, scope)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
         params![
             pkg.name,
+            sub_package,
             pkg.repo,
             pkg.version,
             pkg.description,
             pkg_type,
             tags_json,
             pkg.license,
+            registry,
+            scope_str,
         ],
     )?;
     Ok(())
 }
 
-pub fn delete_package(conn: &Connection, name: &str, repo: &str) -> Result<()> {
+pub fn delete_package(
+    conn: &Connection,
+    name: &str,
+    sub_package: Option<&str>,
+    repo: &str,
+    scope: Option<types::Scope>,
+) -> Result<()> {
+    let scope_str = scope.map(|s| format!("{:?}", s).to_lowercase());
     conn.execute(
-        "DELETE FROM packages WHERE name = ?1 AND repo = ?2",
-        params![name, repo],
+        "DELETE FROM packages WHERE name = ?1 AND (sub_package IS ?2) AND repo = ?3 AND (scope IS ?4 OR scope IS NULL)",
+        params![name, sub_package, repo, scope_str],
     )?;
     Ok(())
 }
@@ -117,7 +137,7 @@ pub fn clear_registry(conn: &Connection) -> Result<()> {
 pub fn search_packages(registry_handle: &str, term: &str) -> Result<Vec<types::Package>> {
     let conn = open_connection(registry_handle)?;
     let mut stmt = conn.prepare(
-        "SELECT name, repo, version, description, package_type, tags, license 
+        "SELECT name, repo, version, description, package_type, tags, license, sub_package 
          FROM packages 
          WHERE id IN (SELECT rowid FROM packages_fts WHERE packages_fts MATCH ?1)
          OR name LIKE ?2",
@@ -165,7 +185,7 @@ pub fn search_packages(registry_handle: &str, term: &str) -> Result<Vec<types::P
 pub fn list_all_packages(registry_handle: &str) -> Result<Vec<types::Package>> {
     let conn = open_connection(registry_handle)?;
     let mut stmt = conn.prepare(
-        "SELECT name, repo, version, description, package_type, tags, license FROM packages ORDER BY name"
+        "SELECT name, repo, version, description, package_type, tags, license, sub_package, scope, registry FROM packages ORDER BY name"
     )?;
 
     let rows = stmt.query_map([], |row| {
@@ -180,7 +200,17 @@ pub fn list_all_packages(registry_handle: &str) -> Result<Vec<types::Package>> {
             _ => types::PackageType::Package,
         };
 
-        Ok(types::Package {
+        let sub_package: Option<String> = row.get(7)?;
+        let scope_raw: Option<String> = row.get(8)?;
+        let registry: Option<String> = row.get(9)?;
+
+        let scope = match scope_raw.as_deref() {
+            Some("system") => types::Scope::System,
+            Some("project") => types::Scope::Project,
+            _ => types::Scope::User,
+        };
+
+        let mut pkg = types::Package {
             name: row.get(0)?,
             repo: row.get(1)?,
             version: row.get(2)?,
@@ -188,13 +218,23 @@ pub fn list_all_packages(registry_handle: &str) -> Result<Vec<types::Package>> {
             package_type,
             tags,
             license: row.get(6)?,
+            scope,
             maintainer: types::Maintainer {
                 name: String::new(),
                 email: String::new(),
                 website: None,
             },
             ..Default::default()
-        })
+        };
+
+        if let Some(sub) = sub_package {
+            pkg.alt = Some(format!("sub:{}", sub));
+        }
+        if let Some(reg) = registry {
+            pkg.readme = Some(reg);
+        }
+
+        Ok(pkg)
     })?;
 
     let mut pkgs = Vec::new();
