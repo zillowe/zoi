@@ -4,5 +4,6 @@ pub mod manifest;
 pub mod plan;
 pub mod post_install;
 pub mod prebuilt;
+pub mod pubgrub;
 pub mod resolver;
 pub mod util;
