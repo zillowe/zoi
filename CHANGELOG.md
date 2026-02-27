@@ -4,6 +4,29 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
+## [Prod-Release-1.6.0] - 2026-02-26
+
+### ♻️ Refactor
+
+- _(symlink)_ Centralize symlink creation logic
+
+### ✨ Features
+
+- _(pgp)_ Add support for builtin PGP keys
+- _(security)_ Implement PGP signature verification for registries
+- _(doctor)_ Add orphaned package detection
+- _(audit)_ Add package operation audit log and history command
+- _(search)_ Add interactive TUI and result sorting
+- _(plugin)_ Introduce Lua-based plugin system
+- _(pkg)_ Expose package directory paths to Lua
+- _(lock)_ Implement advisory file locking
+- _(archive)_ Add support for 7z, RAR, and DEB archive extraction
+- _(pgp)_ Add key validation and status display
+
+### 🛡️ Dependencies
+
+- Update Cargo dependencies
+
 ## [Prod-Release-1.5.0] - 2026-02-22
 
 ### ♻️ Refactor
