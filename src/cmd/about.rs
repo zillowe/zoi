@@ -68,5 +68,8 @@ pub fn run(branch: &str, status: &str, number: &str, commit: &str) {
         }
     }
 
+    println!("\nBy continuing using Zoi, you agree to our Privacy Policy and Terms of Service.");
+    println!("Privacy Policy and Terms of Service can be found on our webiste.");
+
     println!();
 }

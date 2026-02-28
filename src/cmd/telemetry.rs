@@ -20,6 +20,22 @@ pub fn run(cmd: TelemetryCommand) -> Result<()> {
         }
         TelemetryCommand::Enable => {
             let mut cfg = crate::pkg::config::read_user_config()?;
+
+            println!(
+                "{}",
+                "Notice: Enabling telemetry shares anonymous usage data to help improve Zoi."
+                    .dimmed()
+            );
+            println!(
+                "{}",
+                "No personal data or IP addresses are ever collected.".dimmed()
+            );
+            println!(
+                "{} {}",
+                "Full Privacy Policy:".dimmed(),
+                "https://zillowe.qzz.io/legal/privacy".cyan()
+            );
+
             cfg.telemetry_enabled = true;
             crate::pkg::config::write_user_config(&cfg)?;
             println!("{} telemetry enabled", "Success:".green());
