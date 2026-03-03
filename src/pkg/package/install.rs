@@ -307,13 +307,12 @@ pub fn run(
                 .filter_map(|e| e.ok())
             {
                 if entry.file_type().is_file() && entry.file_name().to_string_lossy() == *bin_name {
-                    let target_path = entry.path();
                     let link_path = bin_root.join(bin_name);
 
-                    utils::symlink_file(target_path, &link_path)?;
+                    crate::pkg::shim::create_shim(&link_path)?;
 
                     if pb.is_none() {
-                        println!("Linked binary: {}", bin_name.green());
+                        println!("Created shim for: {}", bin_name.green());
                     }
                     found_bin = true;
                     break;

@@ -149,14 +149,25 @@ fn find_executable(
 
     for scope in scopes_to_check {
         if let Ok(package_dir) = local::get_package_dir(scope, handle, &pkg.repo, &pkg.name) {
+            let binary_filename = if cfg!(target_os = "windows") {
+                format!("{}.exe", pkg.name)
+            } else {
+                pkg.name.clone()
+            };
+
+            if let Some(v) = &pkg.version {
+                let v_dir = package_dir.join(v);
+                if v_dir.exists() {
+                    let bin_path = v_dir.join("bin").join(&binary_filename);
+                    if bin_path.exists() {
+                        return Ok(bin_path);
+                    }
+                }
+            }
+
             let latest_path = package_dir.join("latest");
             if latest_path.exists() {
-                let binary_filename = if cfg!(target_os = "windows") {
-                    format!("{}.exe", pkg.name)
-                } else {
-                    pkg.name.clone()
-                };
-                let bin_path = latest_path.join("bin").join(binary_filename);
+                let bin_path = latest_path.join("bin").join(&binary_filename);
                 if bin_path.exists() {
                     let scope_str = match scope {
                         types::Scope::Project => "project-local",

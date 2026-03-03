@@ -216,6 +216,10 @@ pub fn read_config() -> Result<Config> {
         merged_cfg.offline_mode = system_cfg.offline_mode;
     }
 
+    merged_cfg.versions = system_cfg.versions;
+    merged_cfg.versions.extend(user_cfg.versions);
+    merged_cfg.versions.extend(project_cfg.versions);
+
     merged_cfg.pkg_dirs = system_cfg.pkg_dirs;
     if !system_policy.pkg_dirs_unoverridable {
         merged_cfg.pkg_dirs.extend(user_cfg.pkg_dirs);

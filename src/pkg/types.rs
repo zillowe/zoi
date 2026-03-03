@@ -352,6 +352,8 @@ pub struct Config {
     pub offline_mode: bool,
     #[serde(default)]
     pub pkg_dirs: Vec<String>,
+    #[serde(default)]
+    pub versions: HashMap<String, String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]

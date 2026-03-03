@@ -27,6 +27,7 @@ pub mod repo_install;
 pub mod resolve;
 pub mod rollback;
 pub mod service;
+pub mod shim;
 pub mod sync;
 pub mod sysroot;
 pub mod telemetry;

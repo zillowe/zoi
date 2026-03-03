@@ -297,17 +297,43 @@ pub fn run(
         for bin in bins {
             let symlink_path = bin_root.join(bin);
             if symlink_path.is_symlink() || symlink_path.exists() {
-                println!("Removing symlink from {}...", symlink_path.display());
-                fs::remove_file(&symlink_path)?;
-                println!("{}", "Successfully removed symlink.".green());
+                let other_providers = db::find_provides("local", bin)?;
+                let still_provided = other_providers
+                    .iter()
+                    .any(|(p, _)| p.name != pkg.name || (p.sub_package != manifest.sub_package));
+
+                if !still_provided {
+                    println!(
+                        "Removing shim for {} from {}...",
+                        bin.cyan(),
+                        symlink_path.display()
+                    );
+                    fs::remove_file(&symlink_path)?;
+                } else {
+                    println!(
+                        "Keeping shim for {} as it is still provided by other packages.",
+                        bin.cyan()
+                    );
+                }
             }
         }
     } else if manifest.sub_package.is_none() {
-        let symlink_path = get_bin_root(scope)?.join(&pkg.name);
+        let bin = &pkg.name;
+        let symlink_path = get_bin_root(scope)?.join(bin);
         if symlink_path.is_symlink() || symlink_path.exists() {
-            println!("Removing symlink from {}...", symlink_path.display());
-            fs::remove_file(symlink_path)?;
-            println!("{}", "Successfully removed symlink.".green());
+            let other_providers = db::find_provides("local", bin)?;
+            let still_provided = other_providers
+                .iter()
+                .any(|(p, _)| p.name != pkg.name || (p.sub_package != manifest.sub_package));
+
+            if !still_provided {
+                println!(
+                    "Removing shim for {} from {}...",
+                    bin.cyan(),
+                    symlink_path.display()
+                );
+                fs::remove_file(symlink_path)?;
+            }
         }
     }
 

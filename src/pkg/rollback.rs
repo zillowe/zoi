@@ -5,7 +5,6 @@ use colored::*;
 use semver::Version;
 use std::fs;
 use std::path::PathBuf;
-use walkdir::WalkDir;
 
 pub fn run(package_name: &str, yes: bool) -> Result<()> {
     println!("Attempting to roll back '{}'...", package_name.cyan());
@@ -103,25 +102,11 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
         let bin_root = get_bin_root(scope)?;
         for bin in bins {
             let symlink_path = bin_root.join(bin);
-            if symlink_path.exists() || symlink_path.is_symlink() {
-                fs::remove_file(&symlink_path)?;
-            }
-
-            let mut found_bin = None;
-            for entry in WalkDir::new(&previous_version_dir)
-                .into_iter()
-                .filter_map(|e| e.ok())
-            {
-                if entry.file_type().is_file() && entry.file_name().to_string_lossy() == *bin {
-                    found_bin = Some(entry.path().to_path_buf());
-                    break;
-                }
-            }
-
-            if let Some(target) = found_bin {
-                utils::symlink_file(&target, &symlink_path)?;
-            }
+            crate::pkg::shim::create_shim(&symlink_path)?;
         }
+    } else if prev_manifest.sub_package.is_none() {
+        let symlink_path = get_bin_root(scope)?.join(&pkg.name);
+        crate::pkg::shim::create_shim(&symlink_path)?;
     }
 
     let current_version_dir = package_dir.join(current_version.to_string());
