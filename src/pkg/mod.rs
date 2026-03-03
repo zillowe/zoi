@@ -30,6 +30,7 @@ pub mod service;
 pub mod shim;
 pub mod sync;
 pub mod sysroot;
+pub mod system;
 pub mod telemetry;
 pub mod transaction;
 pub mod types;

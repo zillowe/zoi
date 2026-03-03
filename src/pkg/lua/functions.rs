@@ -966,6 +966,17 @@ pub fn add_package_lifecycle_functions(lua: &Lua) -> Result<(), mlua::Error> {
     })?;
     lua.globals().set("metadata", metadata_fn)?;
 
+    let system_config_fn = lua.create_function(move |lua, config: Table| {
+        if let Ok(sys_table) = lua.globals().get::<Table>("__ZoiSystemConfig") {
+            for pair in config.pairs::<String, Value>() {
+                let (key, value) = pair?;
+                sys_table.set(key, value)?;
+            }
+        }
+        Ok(())
+    })?;
+    lua.globals().set("system_config", system_config_fn)?;
+
     let dependencies_fn = lua.create_function(move |lua, deps_def: Table| {
         if let Ok(deps_table) = lua.globals().get::<Table>("__ZoiPackageDeps") {
             for pair in deps_def.pairs::<String, Value>() {

@@ -1,9 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy, Default)]
 #[serde(rename_all = "lowercase")]
-#[derive(Default)]
 pub enum Scope {
     #[default]
     User,
@@ -11,9 +10,8 @@ pub enum Scope {
     Project,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy, Default)]
 #[serde(rename_all = "lowercase")]
-#[derive(Default)]
 pub enum PackageType {
     #[default]
     Package,
@@ -253,6 +251,7 @@ pub struct Dependencies {
 pub enum InstallReason {
     Direct,
     Dependency { parent: String },
+    Declarative,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -289,6 +288,65 @@ pub struct InstallManifest {
     pub installed_files: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub installed_size: Option<u64>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct FileConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub executable: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<u32>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct UserConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub groups: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shell: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub home: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub password: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct GroupConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gid: Option<u32>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct DeclarativeConfig {
+    pub hostname: Option<String>,
+    pub locale: Option<String>,
+    pub timezone: Option<String>,
+    pub desktop: Option<String>,
+    pub shell: Option<String>,
+    #[serde(default)]
+    pub packages: Vec<String>,
+    #[serde(default)]
+    pub extensions: Vec<String>,
+    #[serde(default)]
+    pub services: Vec<String>,
+    #[serde(default)]
+    pub files: HashMap<String, FileConfig>,
+    #[serde(default)]
+    pub users: HashMap<String, UserConfig>,
+    #[serde(default)]
+    pub groups: HashMap<String, GroupConfig>,
+    #[serde(default)]
+    pub env: HashMap<String, String>,
+    #[serde(default)]
+    pub aliases: HashMap<String, String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
