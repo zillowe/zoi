@@ -98,6 +98,7 @@ impl PluginManager {
             "on_post_extension_add",
             "on_pre_extension_remove",
             "on_post_extension_remove",
+            "on_resolve_shim_version",
         ];
         for hook in hooks {
             let hook_name = hook.to_string();

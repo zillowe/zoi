@@ -423,7 +423,7 @@ pub struct Registry {
     pub authorities: Option<Vec<String>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Default, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
     pub repos: Vec<String>,
     pub package_managers: Option<Vec<String>>,
@@ -440,7 +440,7 @@ pub struct Config {
     pub added_registries: Vec<Registry>,
     #[serde(default)]
     pub git_repos: Vec<String>,
-    #[serde(default)]
+    #[serde(default = "default_rollback_enabled")]
     pub rollback_enabled: bool,
     #[serde(default)]
     pub policy: Policy,
@@ -456,6 +456,34 @@ pub struct Config {
     pub pkg_dirs: Vec<String>,
     #[serde(default)]
     pub versions: HashMap<String, String>,
+}
+
+fn default_rollback_enabled() -> bool {
+    true
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            repos: Vec::new(),
+            package_managers: None,
+            native_package_manager: None,
+            telemetry_enabled: false,
+            audit_log_enabled: false,
+            registry: None,
+            default_registry: None,
+            added_registries: Vec::new(),
+            git_repos: Vec::new(),
+            rollback_enabled: true,
+            policy: Policy::default(),
+            parallel_jobs: None,
+            protect_db: false,
+            max_resolution_depth: None,
+            offline_mode: false,
+            pkg_dirs: Vec::new(),
+            versions: HashMap::new(),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
