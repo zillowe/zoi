@@ -325,18 +325,62 @@ pub struct GroupConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct BootConfig {
+    #[serde(default)]
+    pub loader: Option<String>,
+    #[serde(default)]
+    pub kernel_params: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct HardwareConfig {
+    #[serde(default)]
+    pub drivers: Vec<String>,
+    #[serde(default)]
+    pub microcode: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct NetworkConfig {
+    #[serde(default)]
+    pub manager: Option<String>,
+    #[serde(default)]
+    pub firewall: Option<FirewallConfig>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct FirewallConfig {
+    #[serde(default)]
+    pub enable: bool,
+    #[serde(default)]
+    pub allowed_tcp_ports: Vec<u16>,
+    #[serde(default)]
+    pub allowed_udp_ports: Vec<u16>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct DeclarativeConfig {
+    #[serde(default)]
+    pub imports: Vec<String>,
     pub hostname: Option<String>,
     pub locale: Option<String>,
     pub timezone: Option<String>,
     pub desktop: Option<String>,
     pub shell: Option<String>,
     #[serde(default)]
+    pub boot: Option<BootConfig>,
+    #[serde(default)]
+    pub hardware: Option<HardwareConfig>,
+    #[serde(default)]
+    pub network: Option<NetworkConfig>,
+    #[serde(default)]
     pub packages: Vec<String>,
     #[serde(default)]
     pub extensions: Vec<String>,
     #[serde(default)]
     pub services: Vec<String>,
+    #[serde(default)]
+    pub programs: HashMap<String, serde_json::Value>,
     #[serde(default)]
     pub files: HashMap<String, FileConfig>,
     #[serde(default)]

@@ -84,8 +84,7 @@ pub fn get_system_config_lua_path() -> PathBuf {
     }
 }
 
-pub fn parse_system_config() -> Result<types::DeclarativeConfig> {
-    let path = get_system_config_lua_path();
+pub fn parse_system_config_file(path: &Path) -> Result<types::DeclarativeConfig> {
     if !path.exists() {
         return Err(anyhow!(
             "System configuration file not found at: {}",
@@ -111,20 +110,57 @@ pub fn parse_system_config() -> Result<types::DeclarativeConfig> {
     )
     .map_err(|e| anyhow!("Failed to setup Lua environment: {}", e))?;
 
-    let lua_code = fs::read_to_string(&path)?;
-    lua.load(&lua_code)
-        .exec()
-        .map_err(|e| anyhow!("Failed to execute system config: {}", e))?;
+    let lua_code = fs::read_to_string(path)?;
+    lua.load(&lua_code).exec().map_err(|e| {
+        anyhow!(
+            "Failed to execute system config at {}: {}",
+            path.display(),
+            e
+        )
+    })?;
 
     let final_table: Table = lua
         .globals()
         .get("__ZoiSystemConfig")
         .map_err(|e| anyhow!(e.to_string()))?;
-    let config: types::DeclarativeConfig = lua
+    let mut config: types::DeclarativeConfig = lua
         .from_value(Value::Table(final_table))
         .map_err(|e| anyhow!("Failed to parse system config: {}", e))?;
 
+    for import_path in config.imports.clone() {
+        let abs_import_path = if Path::new(&import_path).is_absolute() {
+            PathBuf::from(import_path)
+        } else {
+            path.parent()
+                .unwrap_or_else(|| Path::new(""))
+                .join(import_path)
+        };
+
+        let imported_config = parse_system_config_file(&abs_import_path)?;
+
+        config.packages.extend(imported_config.packages);
+        config.extensions.extend(imported_config.extensions);
+        config.services.extend(imported_config.services);
+        config.files.extend(imported_config.files);
+        config.users.extend(imported_config.users);
+        config.groups.extend(imported_config.groups);
+        config.env.extend(imported_config.env);
+        config.aliases.extend(imported_config.aliases);
+        config.programs.extend(imported_config.programs);
+    }
+
+    config.packages.sort();
+    config.packages.dedup();
+    config.extensions.sort();
+    config.extensions.dedup();
+    config.services.sort();
+    config.services.dedup();
+
     Ok(config)
+}
+
+pub fn parse_system_config() -> Result<types::DeclarativeConfig> {
+    parse_system_config_file(&get_system_config_lua_path())
 }
 
 pub fn apply(yes: bool, plugin_manager: &crate::pkg::plugin::PluginManager) -> Result<()> {
@@ -155,6 +191,14 @@ pub fn apply(yes: bool, plugin_manager: &crate::pkg::plugin::PluginManager) -> R
 
     let config = parse_system_config()?;
 
+    if let Some(boot) = &config.boot {
+        apply_boot(boot)?;
+    }
+
+    if let Some(hw) = &config.hardware {
+        apply_hardware(hw, yes, plugin_manager)?;
+    }
+
     if let Some(hostname) = &config.hostname {
         apply_hostname(hostname)?;
     }
@@ -164,6 +208,10 @@ pub fn apply(yes: bool, plugin_manager: &crate::pkg::plugin::PluginManager) -> R
     }
     if let Some(timezone) = &config.timezone {
         apply_timezone(timezone)?;
+    }
+
+    if let Some(network) = &config.network {
+        apply_network(network, yes, plugin_manager)?;
     }
 
     if let Some(de) = &config.desktop {
@@ -190,6 +238,10 @@ pub fn apply(yes: bool, plugin_manager: &crate::pkg::plugin::PluginManager) -> R
         apply_extensions(&config.extensions, yes, plugin_manager)?;
     }
 
+    if !config.programs.is_empty() {
+        apply_programs(&config.programs)?;
+    }
+
     if !config.files.is_empty() {
         apply_files(&config.files)?;
     }
@@ -208,6 +260,162 @@ pub fn apply(yes: bool, plugin_manager: &crate::pkg::plugin::PluginManager) -> R
             .bold()
             .green()
     );
+    Ok(())
+}
+
+fn apply_boot(boot: &types::BootConfig) -> Result<()> {
+    println!("\n{}", ":: Synchronizing bootloader...".bold().blue());
+    if !boot.kernel_params.is_empty() {
+        println!(
+            "Setting kernel parameters: {}",
+            boot.kernel_params.join(" ").cyan()
+        );
+        let grub_path = Path::new("/etc/default/grub");
+        if grub_path.exists() {
+            let content = fs::read_to_string(grub_path)?;
+            let mut new_content = String::new();
+            for line in content.lines() {
+                if line.starts_with("GRUB_CMDLINE_LINUX_DEFAULT=") {
+                    new_content.push_str(&format!(
+                        "GRUB_CMDLINE_LINUX_DEFAULT=\"{}\"\n",
+                        boot.kernel_params.join(" ")
+                    ));
+                } else {
+                    new_content.push_str(line);
+                    new_content.push('\n');
+                }
+            }
+            fs::write(grub_path, new_content)?;
+            Command::new("grub-mkconfig")
+                .arg("-o")
+                .arg("/boot/grub/grub.cfg")
+                .status()?;
+        }
+    }
+    Ok(())
+}
+
+fn apply_hardware(
+    hw: &types::HardwareConfig,
+    yes: bool,
+    plugin_manager: &crate::pkg::plugin::PluginManager,
+) -> Result<()> {
+    println!("\n{}", ":: Synchronizing hardware...".bold().blue());
+    let mut pkgs = Vec::new();
+
+    if let Some(microcode) = &hw.microcode {
+        match microcode.to_lowercase().as_str() {
+            "amd" => pkgs.push("native:amd-ucode".to_string()),
+            "intel" => pkgs.push("native:intel-ucode".to_string()),
+            _ => eprintln!("{}: Unknown microcode '{}'", "Warning".yellow(), microcode),
+        }
+    }
+
+    for driver in &hw.drivers {
+        match driver.to_lowercase().as_str() {
+            "nvidia" => pkgs.push("native:nvidia".to_string()),
+            "amdgpu" => {
+                pkgs.push("native:xf86-video-amdgpu".to_string());
+                pkgs.push("native:vulkan-radeon".to_string());
+            }
+            _ => eprintln!("{}: Unknown driver '{}'", "Warning".yellow(), driver),
+        }
+    }
+
+    if !pkgs.is_empty() {
+        let pkgs_ref: Vec<String> = pkgs.iter().map(|s| s.to_string()).collect();
+        apply_packages(&pkgs_ref, yes, plugin_manager)?;
+    }
+    Ok(())
+}
+
+fn apply_network(
+    net: &types::NetworkConfig,
+    yes: bool,
+    plugin_manager: &crate::pkg::plugin::PluginManager,
+) -> Result<()> {
+    println!("\n{}", ":: Synchronizing network...".bold().blue());
+
+    if let Some(manager) = &net.manager {
+        let mut pkgs = Vec::new();
+        if manager.to_lowercase() == "networkmanager" {
+            pkgs.push("native:networkmanager".to_string());
+        }
+        if !pkgs.is_empty() {
+            let pkgs_ref: Vec<String> = pkgs.iter().map(|s| s.to_string()).collect();
+            apply_packages(&pkgs_ref, yes, plugin_manager)?;
+        }
+
+        let svc = if manager.to_lowercase() == "networkmanager" {
+            "NetworkManager"
+        } else {
+            manager
+        };
+        let _ = service::manage_service(svc, service::ServiceAction::Start);
+    }
+
+    if let Some(fw) = &net.firewall
+        && fw.enable
+    {
+        apply_packages(&["native:ufw".to_string()], yes, plugin_manager)?;
+        let _ = service::manage_service("ufw", service::ServiceAction::Start);
+
+        Command::new("ufw").arg("--force").arg("enable").status()?;
+
+        for port in &fw.allowed_tcp_ports {
+            Command::new("ufw")
+                .arg("allow")
+                .arg(format!("{}/tcp", port))
+                .status()?;
+        }
+        for port in &fw.allowed_udp_ports {
+            Command::new("ufw")
+                .arg("allow")
+                .arg(format!("{}/udp", port))
+                .status()?;
+        }
+    }
+
+    Ok(())
+}
+
+fn apply_programs(programs: &HashMap<String, serde_json::Value>) -> Result<()> {
+    println!("\n{}", ":: Synchronizing programs...".bold().blue());
+    let home = get_real_user_home();
+
+    for (prog_name, config) in programs {
+        println!("Configuring program: {}", prog_name.cyan());
+
+        match prog_name.as_str() {
+            "git" => {
+                if let Some(obj) = config.as_object() {
+                    let mut gitconfig = String::new();
+                    if let Some(user_name) = obj.get("userName").and_then(|v| v.as_str()) {
+                        gitconfig.push_str(&format!("[user]\n\tname = {}\n", user_name));
+                    }
+                    if let Some(user_email) = obj.get("userEmail").and_then(|v| v.as_str()) {
+                        gitconfig.push_str(&format!("\temail = {}\n", user_email));
+                    }
+                    if !gitconfig.is_empty() {
+                        let path = home.join(".gitconfig");
+                        fs::write(&path, gitconfig)?;
+                        crate::utils::set_path_owner(
+                            &path,
+                            &std::env::var("SUDO_USER").unwrap_or_default(),
+                            "",
+                        )?;
+                    }
+                }
+            }
+            _ => {
+                eprintln!(
+                    "{}: Zoi does not yet have a built-in abstraction for '{}'.",
+                    "Warning".yellow(),
+                    prog_name
+                );
+            }
+        }
+    }
     Ok(())
 }
 
