@@ -11,6 +11,24 @@ pub fn generate_package_id(registry_handle: &str, repo_path: &str, package_name:
     hex_string[..32].to_string()
 }
 
+/// Generates a unique ID for a package including its version.
+pub fn generate_versioned_package_id(
+    registry_handle: &str,
+    repo_path: &str,
+    package_name: &str,
+    version: &str,
+) -> String {
+    let format_string = format!(
+        "#{}@{}/{}@{}",
+        registry_handle, repo_path, package_name, version
+    );
+    let mut hasher = Sha512::new();
+    hasher.update(format_string.as_bytes());
+    let result = hasher.finalize();
+    let hex_string = hex::encode(result);
+    hex_string[..32].to_string()
+}
+
 /// Creates the directory name for the package in the store.
 /// Format: `{hash}-{name}`
 pub fn get_package_dir_name(package_id: &str, package_name: &str) -> String {

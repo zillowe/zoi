@@ -40,10 +40,24 @@ fn setup_schema(conn: &Connection) -> Result<()> {
             registry TEXT,
             scope TEXT,
             reason TEXT,
+            dependencies TEXT,
             UNIQUE(name, sub_package, repo, scope)
         )",
         [],
     )?;
+
+    let has_deps: bool = conn
+        .query_row(
+            "SELECT count(*) FROM pragma_table_info('packages') WHERE name='dependencies'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0)
+        > 0;
+
+    if !has_deps {
+        let _ = conn.execute("ALTER TABLE packages ADD COLUMN dependencies TEXT", []);
+    }
 
     let column_exists: bool = conn
         .query_row(
@@ -118,6 +132,13 @@ fn setup_schema(conn: &Connection) -> Result<()> {
             "CREATE VIRTUAL TABLE packages_fts USING fts5(name, description, tags, bins, content='packages', content_rowid='id')",
             [],
         );
+
+        let _ = conn.execute(
+            "INSERT INTO packages_fts(rowid, name, description, tags, bins) 
+             SELECT id, name, description, tags, bins FROM packages",
+            [],
+        );
+
         let _ = conn.execute(
             "CREATE TRIGGER packages_ai AFTER INSERT ON packages BEGIN
                 INSERT INTO packages_fts(rowid, name, description, tags, bins) VALUES (new.id, new.name, new.description, new.tags, new.bins);
@@ -153,6 +174,12 @@ fn setup_schema(conn: &Connection) -> Result<()> {
             "CREATE VIRTUAL TABLE package_files_fts USING fts5(path, content='package_files', content_rowid='id')",
             [],
         );
+
+        let _ = conn.execute(
+            "INSERT INTO package_files_fts(rowid, path) SELECT id, path FROM package_files",
+            [],
+        );
+
         let _ = conn.execute(
             "CREATE TRIGGER package_files_ai AFTER INSERT ON package_files BEGIN
                 INSERT INTO package_files_fts(rowid, path) VALUES (new.id, new.path);
@@ -196,9 +223,25 @@ pub fn update_package(
         types::InstallReason::Declarative => "declarative".to_string(),
     });
 
+    let deps_json = if let Some(deps) = &pkg.dependencies {
+        serde_json::to_string(deps).unwrap_or_default()
+    } else {
+        String::new()
+    };
+
     conn.execute(
-        "INSERT OR REPLACE INTO packages (name, sub_package, repo, version, description, package_type, tags, bins, license, registry, scope, reason)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+        "INSERT INTO packages (name, sub_package, repo, version, description, package_type, tags, bins, license, registry, scope, reason, dependencies)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+         ON CONFLICT(name, sub_package, repo, scope) DO UPDATE SET
+            version = excluded.version,
+            description = excluded.description,
+            package_type = excluded.package_type,
+            tags = excluded.tags,
+            bins = excluded.bins,
+            license = excluded.license,
+            registry = excluded.registry,
+            reason = COALESCE(excluded.reason, packages.reason),
+            dependencies = excluded.dependencies",
         params![
             pkg.name,
             sub_package,
@@ -212,9 +255,17 @@ pub fn update_package(
             registry,
             scope_str,
             reason_str,
+            deps_json,
         ],
     )?;
-    Ok(conn.last_insert_rowid())
+
+    let row_id = conn.query_row(
+        "SELECT id FROM packages WHERE name = ?1 AND (sub_package IS ?2) AND repo = ?3 AND (scope IS ?4 OR (scope IS NULL AND ?4 IS NULL))",
+        params![pkg.name, sub_package, pkg.repo, scope_str],
+        |row| row.get(0),
+    )?;
+
+    Ok(row_id)
 }
 
 pub fn index_package_files(conn: &Connection, package_id: i64, files: &[String]) -> Result<()> {
@@ -535,4 +586,25 @@ pub fn get_all_versions(registry_handle: &str, name: &str, repo: &str) -> Result
         versions.push(v);
     }
     Ok(versions)
+}
+
+pub fn get_package_dependencies(
+    registry_handle: &str,
+    name: &str,
+    version: &str,
+    sub_package: Option<&str>,
+    repo: &str,
+) -> Result<Option<String>> {
+    let conn = open_connection(registry_handle)?;
+    let mut stmt = conn.prepare(
+        "SELECT dependencies FROM packages 
+         WHERE name = ?1 AND version = ?2 AND (sub_package IS ?3) AND repo = ?4",
+    )?;
+    let mut rows = stmt.query(params![name, version, sub_package, repo])?;
+    if let Some(row) = rows.next()? {
+        let deps: Option<String> = row.get(0)?;
+        Ok(deps)
+    } else {
+        Ok(None)
+    }
 }

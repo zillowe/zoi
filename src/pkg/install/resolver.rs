@@ -239,6 +239,40 @@ pub fn resolve_dependency_graph(
                     }
                 }
             }
+            let mut direct_ids = HashSet::new();
+            if let Some(root_children) = final_adj.get("$root") {
+                direct_ids = root_children.clone();
+            }
+
+            let mut parent_map = HashMap::new();
+            for (from, to_set) in &final_adj {
+                if from != "$root"
+                    && let Some(parent_node) = final_nodes.get(from)
+                {
+                    let parent_id = format!(
+                        "#{}@{}/{}@{}",
+                        parent_node.registry_handle,
+                        parent_node.pkg.repo,
+                        parent_node.pkg.name,
+                        parent_node.version
+                    );
+                    for to in to_set {
+                        parent_map.entry(to.clone()).or_insert(parent_id.clone());
+                    }
+                }
+            }
+
+            for (pkg_id, node) in final_nodes.iter_mut() {
+                if direct_ids.contains(pkg_id) {
+                    node.reason = InstallReason::Direct;
+                } else {
+                    let parent_id = parent_map
+                        .get(pkg_id)
+                        .cloned()
+                        .unwrap_or_else(|| "unknown".to_string());
+                    node.reason = InstallReason::Dependency { parent: parent_id };
+                }
+            }
         }
         Err(e) => return Err(anyhow!("Dependency resolution failed: {}", e)),
     }

@@ -508,20 +508,24 @@ fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
 
         match output {
             Ok(out) => {
-                if !out.status.success() {
-                    if !quiet {
-                        eprintln!("[cmd] {}", String::from_utf8_lossy(&out.stderr));
-                    }
-                    Ok(String::new())
-                } else {
-                    Ok(String::from_utf8_lossy(&out.stdout).to_string())
+                let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+                let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+                let exit_code =
+                    out.status
+                        .code()
+                        .unwrap_or(if out.status.success() { 0 } else { 1 });
+
+                if !out.status.success() && !quiet {
+                    eprintln!("[cmd] {}", stderr);
                 }
+
+                Ok((stdout, stderr, exit_code))
             }
             Err(e) => {
                 if !quiet {
                     eprintln!("[cmd] Failed to execute command: {}", e);
                 }
-                Ok(String::new())
+                Ok((String::new(), e.to_string(), 1))
             }
         }
     })?;

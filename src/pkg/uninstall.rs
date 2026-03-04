@@ -395,7 +395,10 @@ pub fn run(
             fs::remove_dir_all(&package_dir)?;
         }
     }
-    let parent_id = format!("#{}@{}", manifest.registry_handle, manifest.repo);
+    let parent_id = format!(
+        "#{}@{}/{}@{}",
+        manifest.registry_handle, manifest.repo, manifest.name, manifest.version
+    );
     for dep_str in &manifest.installed_dependencies {
         if let Ok(dep) = dependencies::parse_dependency_string(dep_str)
             && dep.manager == "zoi"

@@ -1,4 +1,4 @@
-use crate::pkg::{db, resolve};
+use crate::pkg::{db, resolve, types};
 use pubgrub::{Dependencies, DependencyProvider, Ranges};
 use rustc_hash::FxHashMap;
 use semver::Version;
@@ -101,18 +101,39 @@ impl DependencyProvider for ZoiDependencyProvider {
             return Ok(Dependencies::Available(self.root_deps.clone()));
         }
 
-        let source = format!("{}", package);
         let version_str = version.to_string();
 
-        let (pkg, _, _, _, _) = resolve::resolve_package_and_version(
-            &format!("{}@{}", source, version_str),
-            self.quiet,
-            self.yes,
-        )?;
+        let dependencies_opt = db::get_package_dependencies(
+            &package.registry,
+            &package.name,
+            &version_str,
+            package.sub_package.as_deref(),
+            &package.repo,
+        )
+        .ok()
+        .flatten();
+
+        let package_deps = if let Some(deps_json) = dependencies_opt
+            && !deps_json.is_empty()
+        {
+            serde_json::from_str::<types::Dependencies>(&deps_json).ok()
+        } else {
+            let source = format!("{}", package);
+            let pkg_res = resolve::resolve_package_and_version(
+                &format!("{}@{}", source, version_str),
+                self.quiet,
+                self.yes,
+            );
+
+            match pkg_res {
+                Ok((pkg, _, _, _, _)) => pkg.dependencies,
+                Err(_) => None,
+            }
+        };
 
         let mut deps = FxHashMap::default();
 
-        if let Some(dependencies) = &pkg.dependencies
+        if let Some(dependencies) = package_deps
             && let Some(runtime) = &dependencies.runtime
         {
             let (req_deps, _, _) = crate::pkg::install::resolver::collect_dependencies_for_group(
@@ -121,15 +142,19 @@ impl DependencyProvider for ZoiDependencyProvider {
                 Some("runtime"),
                 self.yes,
                 true,
-            )?;
+            )
+            .map_err(|e| ZoiSolverError::Dependency(e.to_string()))?;
 
             for dep_str in req_deps {
-                let dep_req = crate::pkg::dependencies::parse_dependency_string(&dep_str)?;
+                let dep_req = crate::pkg::dependencies::parse_dependency_string(&dep_str)
+                    .map_err(|e| ZoiSolverError::Dependency(e.to_string()))?;
 
                 if dep_req.manager == "zoi" {
-                    let req = resolve::parse_source_string(dep_req.package)?;
+                    let req = resolve::parse_source_string(dep_req.package)
+                        .map_err(|e| ZoiSolverError::Dependency(e.to_string()))?;
                     let resolved_dep =
-                        resolve::resolve_source(dep_req.package, self.quiet, self.yes)?;
+                        resolve::resolve_source(dep_req.package, self.quiet, self.yes)
+                            .map_err(|e| ZoiSolverError::Dependency(e.to_string()))?;
 
                     let dep_name = PkgName {
                         name: req.name,

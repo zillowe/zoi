@@ -38,14 +38,13 @@ fn get_machine_key() -> Result<Vec<u8>> {
         #[cfg(windows)]
         {
             fs::write(&key_path, &key)?;
-            // Use icacls to restrict permissions to SYSTEM and Administrators
             let _ = Command::new("icacls")
                 .arg(&key_path)
                 .arg("/inheritance:r")
                 .arg("/grant:r")
-                .arg("*S-1-5-18:(F)") // SYSTEM
+                .arg("*S-1-5-18:(F)")
                 .arg("/grant:r")
-                .arg("*S-1-5-32-544:(F)") // Administrators
+                .arg("*S-1-5-32-544:(F)")
                 .status();
         }
         #[cfg(not(any(unix, windows)))]

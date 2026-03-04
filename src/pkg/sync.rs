@@ -62,33 +62,38 @@ fn refresh_registry_db(
                 pkg.repo = parent.to_string_lossy().to_string().replace('\\', "/");
             }
 
-            if let Ok(conn) = db::open_connection_no_setup(registry_handle)
-                && let Ok(pkg_id) =
-                    db::update_package(&conn, &pkg, registry_handle, None, None, None)
-                && sync_files
-                && let Some(rc) = &repo_config
-                && let Some(pkg_link) = rc.pkg.iter().find(|p| p.link_type == "main")
-                && let Some(files_url_template) = &pkg_link.files
-            {
-                let version = pkg.version.clone().unwrap_or_else(|| "latest".to_string());
-                let files_url = crate::pkg::install::util::resolve_url_placeholders(
-                    files_url_template,
-                    &pkg.name,
-                    &pkg.repo,
-                    &version,
-                    &platform,
-                );
+            if let Ok(conn) = db::open_connection_no_setup(registry_handle) {
+                let pkg_id =
+                    match db::update_package(&conn, &pkg, registry_handle, None, None, None) {
+                        Ok(id) => id,
+                        Err(_) => return,
+                    };
 
-                if let Ok(response) = reqwest::blocking::get(&files_url)
-                    && response.status().is_success()
-                    && let Ok(content) = response.text()
+                if sync_files
+                    && let Some(rc) = &repo_config
+                    && let Some(pkg_link) = rc.pkg.iter().find(|p| p.link_type == "main")
+                    && let Some(files_url_template) = &pkg_link.files
                 {
-                    let file_list: Vec<String> = content
-                        .lines()
-                        .map(|l| l.trim().to_string())
-                        .filter(|l| !l.is_empty())
-                        .collect();
-                    let _ = db::index_package_files(&conn, pkg_id, &file_list);
+                    let version = pkg.version.clone().unwrap_or_else(|| "latest".to_string());
+                    let files_url = crate::pkg::install::util::resolve_url_placeholders(
+                        files_url_template,
+                        &pkg.name,
+                        &pkg.repo,
+                        &version,
+                        &platform,
+                    );
+
+                    if let Ok(response) = reqwest::blocking::get(&files_url)
+                        && response.status().is_success()
+                        && let Ok(content) = response.text()
+                    {
+                        let file_list: Vec<String> = content
+                            .lines()
+                            .map(|l| l.trim().to_string())
+                            .filter(|l| !l.is_empty())
+                            .collect();
+                        let _ = db::index_package_files(&conn, pkg_id, &file_list);
+                    }
                 }
             }
         }

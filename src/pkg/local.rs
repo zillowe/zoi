@@ -243,6 +243,12 @@ pub fn remove_dependent(package_dir: &Path, dependent_id: &str) -> Result<()> {
         let dependent_file = dependents_dir.join(hex::encode(dependent_id));
         if dependent_file.exists() {
             fs::remove_file(dependent_file)?;
+        } else if let Some(pos) = dependent_id.rfind('@') {
+            let legacy_id = &dependent_id[..pos];
+            let legacy_file = dependents_dir.join(hex::encode(legacy_id));
+            if legacy_file.exists() {
+                fs::remove_file(legacy_file)?;
+            }
         }
     }
     Ok(())

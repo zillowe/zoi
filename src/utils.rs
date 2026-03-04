@@ -69,7 +69,13 @@ pub fn symlink_file(target: &Path, link: &Path) -> std::io::Result<()> {
     {
         if std::os::windows::fs::symlink_file(target, link).is_err() {
             if fs::hard_link(target, link).is_err() {
-                fs::copy(target, link)?;
+                let shim_path = link.with_extension("cmd");
+                if shim_path.exists() {
+                    fs::remove_file(&shim_path)?;
+                }
+                let bin_name = link.file_name().unwrap().to_string_lossy();
+                let content = format!("@echo off\nzoi {} %*\n", bin_name);
+                fs::write(&shim_path, content)?;
             }
         }
         Ok(())
