@@ -87,7 +87,6 @@ Zoi is packed with features designed to make package management and environment 
   - `zoi about`: Show application information, credits, and build details.
   - `zoi autoremove`: Remove packages that were installed as dependencies but are no longer needed.
   - `zoi cache`: Manage and populate the local package archive cache.
-  - `zoi check`: Verify that essential third-party tools (like `git`) are installed.
   - `zoi clean`: Clear the cache of downloaded package binaries.
   - `zoi dev`: Enter a development shell for the current project, with environment variables (PATH, LD_LIBRARY_PATH, CPATH, etc.) automatically set up based on dependencies.
   - `zoi downgrade`: Interactively choose and install an older version of a package.
@@ -132,7 +131,7 @@ These options can be used with any command:
 
 - `-y`, `--yes`: Automatically answer "yes" to all confirmation prompts.
 - `-v`, `--version`: Print detailed version information.
-- `-r`, `--root <DIR>`: Operate on a different root directory (sysroot).
+- `--root <DIR>`: Operate on a different root directory (sysroot).
 - `--offline`: Do not attempt to connect to the network.
 - `--pkg-dir <DIR>`: Additional directory to search for `.pkg.tar.zst` archives.
 
@@ -163,12 +162,6 @@ Manage Zoi's local package archive cache.
 - `add <FILES...>`: Add `.pkg.tar.zst` archives to the local cache.
 - `ls`: List all archives currently in the cache.
 - `clear`: Clear the local archive cache.
-
----
-
-### `zoi check`
-
-Checks for essential third-party command-line tools like `git`.
 
 ---
 
