@@ -1,4 +1,4 @@
-use crate::pkg::{audit, install, types, uninstall};
+use crate::pkg::{audit, install, local, types, uninstall};
 use anyhow::{Result, anyhow};
 use chrono::Utc;
 use colored::*;
@@ -145,6 +145,47 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                     manifest.name.cyan(),
                     manifest.version.yellow()
                 );
+
+                let version_dir = match local::get_package_version_dir(
+                    manifest.scope,
+                    &manifest.registry_handle,
+                    &manifest.repo,
+                    &manifest.name,
+                    &manifest.version,
+                ) {
+                    Ok(dir) => dir,
+                    Err(e) => {
+                        eprintln!(
+                            "{} Failed to get version directory for rollback: {}",
+                            "Error:".red().bold(),
+                            e
+                        );
+                        continue;
+                    }
+                };
+
+                let manifest_filename = if let Some(sub) = &manifest.sub_package {
+                    format!("manifest-{}.yaml", sub)
+                } else {
+                    "manifest.yaml".to_string()
+                };
+                let manifest_path = version_dir.join(&manifest_filename);
+
+                if version_dir.exists() && manifest_path.exists() {
+                    println!("Restoring version {} from local store...", manifest.version);
+                    if let Err(e) = local::write_manifest(manifest) {
+                        eprintln!(
+                            "{} Failed to restore manifest for '{}': {}",
+                            "Error:".red().bold(),
+                            manifest.name,
+                            e
+                        );
+                    }
+                    continue;
+                }
+
+                println!("Version not found locally. Re-installing from registry...");
+
                 let source = format!(
                     "#{}@{}/{}@{}",
                     manifest.registry_handle, manifest.repo, manifest.name, manifest.version
@@ -232,6 +273,50 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                         e
                     );
                 }
+
+                let version_dir = match local::get_package_version_dir(
+                    old_manifest.scope,
+                    &old_manifest.registry_handle,
+                    &old_manifest.repo,
+                    &old_manifest.name,
+                    &old_manifest.version,
+                ) {
+                    Ok(dir) => dir,
+                    Err(e) => {
+                        eprintln!(
+                            "{} Failed to get version directory for rollback: {}",
+                            "Error:".red().bold(),
+                            e
+                        );
+                        continue;
+                    }
+                };
+
+                let manifest_filename = if let Some(sub) = &old_manifest.sub_package {
+                    format!("manifest-{}.yaml", sub)
+                } else {
+                    "manifest.yaml".to_string()
+                };
+                let manifest_path = version_dir.join(&manifest_filename);
+
+                if version_dir.exists() && manifest_path.exists() {
+                    println!(
+                        "Restoring version {} from local store...",
+                        old_manifest.version
+                    );
+                    if let Err(e) = local::write_manifest(old_manifest) {
+                        eprintln!(
+                            "{} Failed to restore manifest for '{}': {}",
+                            "Error:".red().bold(),
+                            old_manifest.name,
+                            e
+                        );
+                    }
+                    continue;
+                }
+
+                println!("Version not found locally. Re-installing from registry...");
+
                 let source = format!(
                     "#{}@{}/{}@{}",
                     old_manifest.registry_handle,

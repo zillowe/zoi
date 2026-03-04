@@ -12,7 +12,7 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
     let request = resolve::parse_source_string(package_name)?;
     let sub_package = request.sub_package.clone();
 
-    let resolved_source = resolve::resolve_source(package_name, false)?;
+    let resolved_source = resolve::resolve_source(package_name, false, yes)?;
     let mut pkg = crate::pkg::lua::parser::parse_lua_package(
         resolved_source.path.to_str().unwrap(),
         None,
@@ -23,7 +23,7 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
     }
     let registry_handle = resolved_source.registry_handle;
 
-    let (_manifest, scope) = if let Some(m) =
+    let (current_manifest, scope) = if let Some(m) =
         local::is_package_installed(&pkg.name, sub_package.as_deref(), types::Scope::User)?
     {
         (m, types::Scope::User)
@@ -123,7 +123,7 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
     }
 
     if has_other_manifests {
-        for file_path_str in &prev_manifest.installed_files {
+        for file_path_str in &current_manifest.installed_files {
             let file_path = PathBuf::from(file_path_str);
             if file_path.exists() {
                 if file_path.is_dir() {

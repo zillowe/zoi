@@ -10,7 +10,8 @@ pub fn add(
 ) -> Result<()> {
     println!("Adding extension: {}", ext_name);
 
-    let (pkg, _, _, _, registry_handle) = resolve::resolve_package_and_version(ext_name, false)?;
+    let (pkg, _, _, _, registry_handle) =
+        resolve::resolve_package_and_version(ext_name, false, false)?;
 
     if pkg.package_type != types::PackageType::Extension {
         return Err(anyhow!("'{}' is not an extension package.", ext_name));
@@ -129,7 +130,7 @@ pub fn remove(
 ) -> Result<()> {
     println!("Removing extension: {}", ext_name);
 
-    let (pkg, _, _, _, _) = resolve::resolve_package_and_version(ext_name, false)?;
+    let (pkg, _, _, _, _) = resolve::resolve_package_and_version(ext_name, false, false)?;
 
     let (manifest, scope) = if let Some(m) =
         local::is_package_installed(&pkg.name, None, types::Scope::User)?

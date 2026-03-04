@@ -624,7 +624,15 @@ fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
             };
 
             let out_dir_name = out_name.unwrap_or_else(|| "extracted".to_string());
-            let out_dir = build_dir.join(out_dir_name);
+            let out_dir = build_dir.join(&out_dir_name);
+
+            if !out_dir.starts_with(build_dir) || out_dir == build_dir {
+                return Err(mlua::Error::RuntimeError(format!(
+                    "Invalid output directory: {}. Extraction must be into a subdirectory of the build directory.",
+                    out_dir_name
+                )));
+            }
+
             fs::create_dir_all(&out_dir).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
 
             if !quiet {

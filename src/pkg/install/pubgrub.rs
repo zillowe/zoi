@@ -46,11 +46,21 @@ pub enum ZoiSolverError {
 
 pub struct ZoiDependencyProvider {
     pub root_deps: FxHashMap<PkgName, Ranges<SemVersion>>,
+    pub quiet: bool,
+    pub yes: bool,
 }
 
 impl ZoiDependencyProvider {
-    pub fn new(root_deps: FxHashMap<PkgName, Ranges<SemVersion>>) -> anyhow::Result<Self> {
-        Ok(Self { root_deps })
+    pub fn new(
+        root_deps: FxHashMap<PkgName, Ranges<SemVersion>>,
+        quiet: bool,
+        yes: bool,
+    ) -> Result<Self, anyhow::Error> {
+        Ok(Self {
+            root_deps,
+            quiet,
+            yes,
+        })
     }
 
     fn semver_to_range(&self, _req_str: &str) -> Ranges<SemVersion> {
@@ -94,8 +104,11 @@ impl DependencyProvider for ZoiDependencyProvider {
         let source = format!("{}", package);
         let version_str = version.to_string();
 
-        let (pkg, _, _, _, _) =
-            resolve::resolve_package_and_version(&format!("{}@{}", source, version_str), true)?;
+        let (pkg, _, _, _, _) = resolve::resolve_package_and_version(
+            &format!("{}@{}", source, version_str),
+            self.quiet,
+            self.yes,
+        )?;
 
         let mut deps = FxHashMap::default();
 
@@ -106,7 +119,7 @@ impl DependencyProvider for ZoiDependencyProvider {
                 runtime,
                 package.sub_package.as_deref(),
                 Some("runtime"),
-                true,
+                self.yes,
                 true,
             )?;
 
@@ -115,7 +128,8 @@ impl DependencyProvider for ZoiDependencyProvider {
 
                 if dep_req.manager == "zoi" {
                     let req = resolve::parse_source_string(dep_req.package)?;
-                    let resolved_dep = resolve::resolve_source(dep_req.package, true)?;
+                    let resolved_dep =
+                        resolve::resolve_source(dep_req.package, self.quiet, self.yes)?;
 
                     let dep_name = PkgName {
                         name: req.name,

@@ -1,13 +1,11 @@
 use crate::pkg::{config, pin, types};
 use anyhow::{Result, anyhow};
-use chrono::Utc;
 use colored::*;
 use comfy_table::{Table, presets::UTF8_FULL};
 use dialoguer::{Select, theme::ColorfulTheme};
 use indicatif::{ProgressBar, ProgressStyle};
 use regex::Regex;
 use std::collections::HashMap;
-use std::env;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -492,16 +490,16 @@ fn download_from_url(url: &str) -> Result<ResolvedSource> {
     }
     pb.finish_with_message("Download complete.");
 
-    let content = String::from_utf8(downloaded_bytes)?;
-
-    let temp_path = env::temp_dir().join(format!(
-        "zoi-temp-{}.pkg.lua",
-        Utc::now().timestamp_nanos_opt().unwrap_or(0)
-    ));
-    fs::write(&temp_path, content)?;
+    let mut temp_file = tempfile::Builder::new()
+        .prefix("zoi-temp-")
+        .suffix(".pkg.lua")
+        .tempfile()?;
+    use std::io::Write;
+    temp_file.write_all(&downloaded_bytes)?;
+    let temp_path = temp_file.into_temp_path();
 
     Ok(ResolvedSource {
-        path: temp_path,
+        path: temp_path.to_path_buf(),
         source_type: SourceType::Url,
         repo_name: None,
         registry_handle: Some("local".to_string()),
@@ -766,10 +764,14 @@ fn get_version_for_install(
     get_default_version(pkg, registry_handle)
 }
 
-pub fn resolve_source(source: &str, quiet: bool) -> Result<ResolvedSource> {
+pub fn resolve_source(source: &str, quiet: bool, yes: bool) -> Result<ResolvedSource> {
     let config = config::read_config().unwrap_or_default();
     let max_depth = config.max_resolution_depth.unwrap_or(7);
     let resolved = resolve_source_recursive(source, 0, max_depth, quiet)?;
+
+    if !quiet {
+        crate::utils::confirm_untrusted_source(&resolved.source_type, yes)?;
+    }
 
     if let Ok(request) = parse_source_string(source)
         && !matches!(
@@ -787,6 +789,7 @@ pub fn resolve_source(source: &str, quiet: bool) -> Result<ResolvedSource> {
 pub fn resolve_package_and_version(
     source_str: &str,
     quiet: bool,
+    yes: bool,
 ) -> Result<(
     types::Package,
     String,
@@ -794,11 +797,8 @@ pub fn resolve_package_and_version(
     PathBuf,
     Option<String>,
 )> {
-    let config = config::read_config().unwrap_or_default();
-    let max_depth = config.max_resolution_depth.unwrap_or(7);
-
     let request = parse_source_string(source_str)?;
-    let resolved_source = resolve_source_recursive(source_str, 0, max_depth, quiet)?;
+    let resolved_source = resolve_source(source_str, quiet, yes)?;
     let registry_handle = resolved_source.registry_handle.clone();
     let pkg_lua_path = resolved_source.path.clone();
 
@@ -980,16 +980,18 @@ fn resolve_source_recursive(
 
         let pkg_lua_content = download_content_from_url(&pkg_lua_url)?;
 
-        let temp_path = env::temp_dir().join(format!(
-            "zoi-temp-git-{}.pkg.lua",
-            Utc::now().timestamp_nanos_opt().unwrap_or(0)
-        ));
-        fs::write(&temp_path, pkg_lua_content)?;
+        let mut temp_file = tempfile::Builder::new()
+            .prefix("zoi-temp-git-")
+            .suffix(".pkg.lua")
+            .tempfile()?;
+        use std::io::Write;
+        temp_file.write_all(pkg_lua_content.as_bytes())?;
+        let temp_path = temp_file.into_temp_path();
 
         let repo_name = format!("git:{}", git_source);
 
         return Ok(ResolvedSource {
-            path: temp_path,
+            path: temp_path.to_path_buf(),
             source_type: SourceType::GitRepo(repo_name.clone()),
             repo_name: Some(repo_name),
             registry_handle: None,
@@ -1120,11 +1122,14 @@ fn resolve_source_recursive(
                 }
 
                 let content = response.text()?;
-                let temp_path = env::temp_dir().join(format!(
-                    "zoi-alt-{}.pkg.lua",
-                    Utc::now().timestamp_nanos_opt().unwrap_or(0)
-                ));
-                fs::write(&temp_path, &content)?;
+                let mut temp_file = tempfile::Builder::new()
+                    .prefix("zoi-alt-")
+                    .suffix(".pkg.lua")
+                    .tempfile()?;
+                use std::io::Write;
+                temp_file.write_all(content.as_bytes())?;
+                let temp_path = temp_file.into_temp_path();
+
                 resolve_source_recursive(
                     temp_path.to_str().ok_or_else(|| {
                         anyhow!(

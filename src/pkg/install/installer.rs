@@ -10,11 +10,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 pub fn download_and_cache_archive(
-    node: &InstallNode,
+    _node: &InstallNode,
     details: &plan::PrebuiltDetails,
     pb: Option<&ProgressBar>,
 ) -> Result<PathBuf> {
-    let _pkg = &node.pkg;
     let config = config::read_config()?;
     let signature_policy = config.policy.signature_enforcement.filter(|p| p.enable);
 
@@ -31,17 +30,16 @@ pub fn download_and_cache_archive(
     let sig_filename = format!("{}.sig", archive_filename);
     let cached_sig_path = archive_cache_root.join(&sig_filename);
 
-    if let Some(path) = pkgdir::find_in_pkg_dirs(archive_filename) {
+    let archive_path = if let Some(path) = pkgdir::find_in_pkg_dirs(archive_filename) {
         if pb.is_none() {
             println!("Found archive in pkg-dir: {}", path.display());
         }
-        return Ok(path);
-    }
-
-    if cached_archive_path.exists() {
+        path
+    } else if cached_archive_path.exists() {
         if pb.is_none() {
             println!("Using cached archive: {}", cached_archive_path.display());
         }
+        cached_archive_path.clone()
     } else {
         if crate::pkg::offline::is_offline() {
             return Err(anyhow!(
@@ -66,44 +64,48 @@ pub fn download_and_cache_archive(
             )
         })?;
 
-        if let Some(hash_url) = &details.info.hash_url
-            && let Ok(hash) = util::get_expected_hash(hash_url, Some(archive_filename))
-            && !hash.is_empty()
-            && !util::verify_file_hash(&temp_archive_path, &hash, pb).unwrap_or(false)
-        {
-            return Err(anyhow!("Hash verification failed"));
-        }
+        fs::copy(&temp_archive_path, &cached_archive_path)?;
+        cached_archive_path.clone()
+    };
 
-        if let Some(policy) = &signature_policy {
-            if let Some(pgp_url) = &details.info.pgp_url {
+    if let Some(hash_url) = &details.info.hash_url
+        && let Ok(hash) = util::get_expected_hash(hash_url, Some(archive_filename))
+        && !hash.is_empty()
+        && !util::verify_file_hash(&archive_path, &hash, pb)?
+    {
+        return Err(anyhow!("Hash verification failed"));
+    }
+
+    if let Some(policy) = &signature_policy {
+        if let Some(pgp_url) = &details.info.pgp_url {
+            let sig_path = if cached_sig_path.exists() {
+                cached_sig_path.clone()
+            } else {
+                if crate::pkg::offline::is_offline() {
+                    return Err(anyhow!(
+                        "Signature not found in cache and cannot download: Zoi is in offline mode."
+                    ));
+                }
+                let temp_dir = tempfile::Builder::new().prefix("zoi-sig-dl-").tempdir()?;
                 let temp_sig_path = temp_dir.path().join(&sig_filename);
                 util::download_file_with_progress(pgp_url, &temp_sig_path, pb, None)
                     .map_err(|e| anyhow!("Failed to download signature from {}: {}", pgp_url, e))?;
-
-                println!("Verifying signature...");
-                let trusted_certs = pgp::get_certs_by_name_or_fingerprint(&policy.trusted_keys)?;
-                if pgp::verify_detached_signature_multi_key(
-                    &temp_archive_path,
-                    &temp_sig_path,
-                    trusted_certs,
-                )
-                .is_err()
-                {
-                    return Err(anyhow!("Signature verification failed"));
-                }
-                println!("{}", "Signature verified successfully.".green());
                 fs::copy(&temp_sig_path, &cached_sig_path)?;
-            } else {
-                return Err(anyhow!(
-                    "Signature enforcement is active, but no PGP URL found for package"
-                ));
-            }
-        }
+                cached_sig_path.clone()
+            };
 
-        fs::copy(&temp_archive_path, &cached_archive_path)?;
+            println!("Verifying signature...");
+            let trusted_certs = pgp::get_certs_by_name_or_fingerprint(&policy.trusted_keys)?;
+            pgp::verify_detached_signature_multi_key(&archive_path, &sig_path, trusted_certs)?;
+            println!("{}", "Signature verified successfully.".green());
+        } else {
+            return Err(anyhow!(
+                "Signature enforcement is active, but no PGP URL found for package"
+            ));
+        }
     }
 
-    Ok(cached_archive_path)
+    Ok(archive_path)
 }
 
 pub fn install_node(

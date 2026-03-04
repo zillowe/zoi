@@ -133,7 +133,7 @@ pub fn run(
     let sub_package_to_uninstall = request.sub_package.clone();
 
     let (pkg, _, _, pkg_lua_path, registry_handle) =
-        resolve::resolve_package_and_version(package_name, true)?;
+        resolve::resolve_package_and_version(package_name, true, yes)?;
 
     let (manifest, scope) = if let Some(scope) = scope_override {
         if let Some(m) =

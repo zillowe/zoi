@@ -9,13 +9,18 @@ pub fn get_db_path(registry_handle: &str) -> Result<PathBuf> {
 }
 
 pub fn open_connection(registry_handle: &str) -> Result<Connection> {
+    let conn = open_connection_no_setup(registry_handle)?;
+    setup_schema(&conn)?;
+    Ok(conn)
+}
+
+pub fn open_connection_no_setup(registry_handle: &str) -> Result<Connection> {
     let db_path = get_db_path(registry_handle)?;
     if let Some(parent) = db_path.parent() {
         std::fs::create_dir_all(parent)?;
     }
     let conn = Connection::open(db_path)?;
     conn.busy_timeout(std::time::Duration::from_secs(5))?;
-    setup_schema(&conn)?;
     Ok(conn)
 }
 

@@ -210,7 +210,7 @@ pub fn run(
     cache_only: bool,
     local_only: bool,
 ) -> Result<i32> {
-    let resolved_source = resolve::resolve_source(source, false)?;
+    let resolved_source = resolve::resolve_source(source, false, false)?;
 
     if let Some(repo_name) = &resolved_source.repo_name {
         utils::print_repo_warning(repo_name);

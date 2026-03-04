@@ -34,8 +34,8 @@ fn refresh_registry_db(
         println!("{}", msg);
     }
 
-    let conn = db::open_connection(registry_handle)?;
-    db::clear_registry(&conn)?;
+    let _conn = db::open_connection(registry_handle)?;
+    db::clear_registry(&_conn)?;
 
     let mut pkg_files = Vec::new();
     for entry in WalkDir::new(registry_path)
@@ -62,7 +62,7 @@ fn refresh_registry_db(
                 pkg.repo = parent.to_string_lossy().to_string().replace('\\', "/");
             }
 
-            if let Ok(conn) = db::open_connection(registry_handle)
+            if let Ok(conn) = db::open_connection_no_setup(registry_handle)
                 && let Ok(pkg_id) =
                     db::update_package(&conn, &pkg, registry_handle, None, None, None)
                 && sync_files

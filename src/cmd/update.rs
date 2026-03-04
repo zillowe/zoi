@@ -49,7 +49,7 @@ fn run_update_single_logic(package_name: &str, yes: bool, dry_run: bool) -> Resu
     let request = resolve::parse_source_string(package_name)?;
 
     let (new_pkg, new_version, _, _, registry_handle) =
-        resolve::resolve_package_and_version(package_name, true)?;
+        resolve::resolve_package_and_version(package_name, false, yes)?;
 
     if pin::is_pinned(package_name)? {
         println!(
@@ -139,7 +139,7 @@ fn run_update_single_logic(package_name: &str, yes: bool, dry_run: bool) -> Resu
         yes,
         false,
         None,
-        true,
+        false,
     )?;
 
     let install_plan = install::plan::create_install_plan(&graph.nodes)?;
@@ -306,7 +306,7 @@ fn run_update_all_logic(yes: bool, dry_run: bool) -> Result<()> {
         }
 
         let (new_pkg, new_version, _, _, registry_handle) =
-            match resolve::resolve_package_and_version(&source, true) {
+            match resolve::resolve_package_and_version(&source, true, false) {
                 Ok(result) => result,
                 Err(e) => {
                     upgrade_messages.push(format!(
@@ -417,7 +417,7 @@ fn run_update_all_logic(yes: bool, dry_run: bool) -> Result<()> {
                 yes,
                 false,
                 None,
-                true,
+                false,
             ) {
                 Ok(res) => res,
                 Err(e) => {

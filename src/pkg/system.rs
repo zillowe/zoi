@@ -12,7 +12,11 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 fn get_machine_key() -> Result<Vec<u8>> {
-    let key_path = PathBuf::from("/etc/zoi/machine_key");
+    let key_path = get_system_config_lua_path()
+        .parent()
+        .ok_or_else(|| anyhow!("Invalid system config path"))?
+        .join("machine_key");
+
     if !key_path.exists() {
         if let Some(p) = key_path.parent() {
             fs::create_dir_all(p)?;
@@ -31,7 +35,20 @@ fn get_machine_key() -> Result<Vec<u8>> {
                 .open(&key_path)?;
             file.write_all(&key)?;
         }
-        #[cfg(not(unix))]
+        #[cfg(windows)]
+        {
+            fs::write(&key_path, &key)?;
+            // Use icacls to restrict permissions to SYSTEM and Administrators
+            let _ = Command::new("icacls")
+                .arg(&key_path)
+                .arg("/inheritance:r")
+                .arg("/grant:r")
+                .arg("*S-1-5-18:(F)") // SYSTEM
+                .arg("/grant:r")
+                .arg("*S-1-5-32-544:(F)") // Administrators
+                .status();
+        }
+        #[cfg(not(any(unix, windows)))]
         {
             fs::write(&key_path, &key)?;
         }

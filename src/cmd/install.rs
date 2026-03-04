@@ -125,7 +125,7 @@ pub fn run(
         yes,
         all_optional,
         build_type.as_deref(),
-        true,
+        false,
     )?;
 
     if !dry_run {

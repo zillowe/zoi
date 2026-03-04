@@ -2,6 +2,7 @@ use crate::pkg::{local, lua, types};
 use crate::utils::{self, copy_dir_all};
 use anyhow::{Result, anyhow};
 use colored::*;
+use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -37,7 +38,12 @@ fn get_bin_root(scope: types::Scope) -> Result<PathBuf> {
     }
 }
 
-fn check_and_handle_file_conflicts(source_dir: &Path, dest_dir: &Path, yes: bool) -> Result<()> {
+fn check_and_handle_file_conflicts(
+    source_dir: &Path,
+    dest_dir: &Path,
+    owned_files: &HashSet<String>,
+    yes: bool,
+) -> Result<()> {
     let mut conflicting_files = Vec::new();
 
     for entry in WalkDir::new(source_dir)
@@ -48,7 +54,8 @@ fn check_and_handle_file_conflicts(source_dir: &Path, dest_dir: &Path, yes: bool
         if entry.file_type().is_file() {
             let relative_path = entry.path().strip_prefix(source_dir)?;
             let dest_path = dest_dir.join(relative_path);
-            if dest_path.exists() {
+            if dest_path.exists() && !owned_files.contains(&dest_path.to_string_lossy().to_string())
+            {
                 conflicting_files.push(dest_path);
             }
         }
@@ -234,6 +241,17 @@ pub fn run(
                 continue;
             }
 
+            let mut owned_files = HashSet::new();
+            let sub_opt = if sub.is_empty() {
+                None
+            } else {
+                Some(sub.as_str())
+            };
+            if let Ok(Some(manifest)) = local::is_package_installed(&metadata.name, sub_opt, scope)
+            {
+                owned_files.extend(manifest.installed_files);
+            }
+
             let pkgstore_src = sub_data_dir.join("pkgstore");
             if pkgstore_src.exists() {
                 copy_dir_all(&pkgstore_src, staging_dir.path())?;
@@ -247,7 +265,7 @@ pub fn run(
                     ));
                 }
                 let root_dest = crate::pkg::sysroot::apply_sysroot(PathBuf::from("/"));
-                check_and_handle_file_conflicts(&usrroot_src, &root_dest, yes)?;
+                check_and_handle_file_conflicts(&usrroot_src, &root_dest, &owned_files, yes)?;
                 copy_dir_all(&usrroot_src, &root_dest)?;
                 for entry in WalkDir::new(&usrroot_src)
                     .into_iter()
@@ -264,7 +282,7 @@ pub fn run(
             if usrhome_src.exists() {
                 let home_dest =
                     home::home_dir().ok_or_else(|| anyhow!("Could not find home directory"))?;
-                check_and_handle_file_conflicts(&usrhome_src, &home_dest, yes)?;
+                check_and_handle_file_conflicts(&usrhome_src, &home_dest, &owned_files, yes)?;
                 copy_dir_all(&usrhome_src, &home_dest)?;
                 for entry in WalkDir::new(&usrhome_src)
                     .into_iter()

@@ -134,10 +134,10 @@ pub fn resolve_dependency_graph(
     initial_sources: &[String],
     _scope_override: Option<types::Scope>,
     _force: bool,
-    _yes: bool,
+    yes: bool,
     _all_optional: bool,
     _build_type: Option<&str>,
-    _quiet: bool,
+    quiet: bool,
 ) -> Result<(DependencyGraph, Vec<String>)> {
     println!(":: Resolving dependencies using PubGrub SAT solver...");
 
@@ -154,7 +154,7 @@ pub fn resolve_dependency_graph(
         }
 
         let request = resolve::parse_source_string(source)?;
-        let resolved = resolve::resolve_source(source, true)?;
+        let resolved = resolve::resolve_source(source, quiet, yes)?;
 
         let pkg_name = PkgName {
             name: request.name,
@@ -168,7 +168,7 @@ pub fn resolve_dependency_graph(
         root_deps.insert(pkg_name, Ranges::full());
     }
 
-    let provider = ZoiDependencyProvider::new(root_deps)?;
+    let provider = ZoiDependencyProvider::new(root_deps, quiet, yes)?;
     let root_pkg = PkgName {
         name: "$root".to_string(),
         sub_package: None,
@@ -189,7 +189,11 @@ pub fn resolve_dependency_graph(
 
                 let source = format!("{}", name);
                 let (pkg, version_str, _, pkg_lua_path, handle) =
-                    resolve::resolve_package_and_version(&format!("{}@{}", source, version), true)?;
+                    resolve::resolve_package_and_version(
+                        &format!("{}@{}", source, version),
+                        quiet,
+                        yes,
+                    )?;
 
                 let pkg_id = if let Some(sub) = &name.sub_package {
                     format!("{}@{}:{}", pkg.name, version_str, sub)

@@ -48,7 +48,7 @@ fn print_dependency_group(group: &types::DependencyGroup, indent: usize) {
 
 pub fn run(source: &str, raw: bool) -> Result<()> {
     let source = source.trim();
-    let resolved_source = resolve::resolve_source(source, false)?;
+    let resolved_source = resolve::resolve_source(source, false, false)?;
 
     if raw {
         let content = fs::read_to_string(&resolved_source.path)?;

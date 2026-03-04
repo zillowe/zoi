@@ -25,7 +25,8 @@ pub fn run(package_names: &[String], as_dependency: bool, as_explicit: bool) -> 
         println!("Marking '{}' as {}...", name.blue().bold(), reason_str);
 
         let request = resolve::parse_source_string(name)?;
-        let (pkg, _, _, _, registry_handle) = resolve::resolve_package_and_version(name, true)?;
+        let (pkg, _, _, _, registry_handle) =
+            resolve::resolve_package_and_version(name, true, false)?;
 
         let (manifest, scope) = if let Some(m) = local::is_package_installed(
             &pkg.name,
