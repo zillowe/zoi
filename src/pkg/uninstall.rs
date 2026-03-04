@@ -115,6 +115,7 @@ fn uninstall_collection(
         pkg,
         env!("CARGO_PKG_VERSION"),
         registry_handle.as_deref().unwrap_or("local"),
+        None,
     ) {
         Ok(true) => println!("{} telemetry sent", "Info:".green()),
         Ok(false) => (),
@@ -459,6 +460,7 @@ pub fn run(
         &pkg,
         env!("CARGO_PKG_VERSION"),
         registry_handle.as_deref().unwrap_or("local"),
+        None,
     ) {
         Ok(true) => println!("{} telemetry sent", "Info:".green()),
         Ok(false) => (),

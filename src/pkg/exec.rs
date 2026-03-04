@@ -248,6 +248,7 @@ pub fn run(
             .registry_handle
             .as_deref()
             .unwrap_or("local"),
+        None,
     ) {
         Ok(true) => println!("{} telemetry sent", "Info:".green()),
         Ok(false) => (),

@@ -16,7 +16,26 @@ pub fn run(cmd: TelemetryCommand) -> Result<()> {
             } else {
                 "Disabled".yellow()
             };
-            println!("Telemetry: {}", status);
+            println!("{} telemetry is currently {}.", "::".bold().blue(), status);
+
+            if cfg.telemetry_enabled {
+                let id = crate::pkg::telemetry::get_anonymous_id();
+                println!("Anonymous Client ID: {}", id.cyan());
+                println!(
+                    "\nThank you for helping us improve Zoi! We collect minimal, anonymous data about:"
+                );
+                println!("- {} (OS, Arch, Distro, Shell)", "Environment".bold());
+                println!("- {} (Action, Scope, Reason)", "Operations".bold());
+                println!(
+                    "- {} (Name, Version, Repo, License)",
+                    "Package Metadata".bold()
+                );
+            } else {
+                println!(
+                    "\nTelemetry is anonymous and helps us prioritize features and platforms."
+                );
+                println!("Run 'zoi telemetry enable' to help the project.");
+            }
         }
         TelemetryCommand::Enable => {
             let mut cfg = crate::pkg::config::read_user_config()?;

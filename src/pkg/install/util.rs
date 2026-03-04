@@ -14,12 +14,18 @@ use tempfile::Builder;
 use walkdir::WalkDir;
 use zstd::stream::read::Decoder as ZstdDecoder;
 
-pub fn send_telemetry(event: &str, pkg: &types::Package, registry_handle: &str) {
+pub fn send_telemetry(
+    event: &str,
+    pkg: &types::Package,
+    registry_handle: &str,
+    install_type: Option<&str>,
+) {
     match crate::pkg::telemetry::posthog_capture_event(
         event,
         pkg,
         env!("CARGO_PKG_VERSION"),
         registry_handle,
+        install_type,
     ) {
         Ok(true) => println!("{} telemetry sent", "Info:".green()),
         Ok(false) => (),

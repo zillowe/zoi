@@ -162,7 +162,7 @@ pub fn install_node(
     let sub_package_to_install = request.sub_package;
     let sub_packages_vec = sub_package_to_install.clone().map(|s| vec![s]);
 
-    let installed_files = match action {
+    let (installed_files, install_method) = match action {
         plan::InstallAction::DownloadAndInstall(details) => {
             if let Some(pb) = &step_pb {
                 pb.set_message("Downloading package...");
@@ -172,7 +172,7 @@ pub fn install_node(
                 pb.set_message("Installing package...");
                 pb.set_position(0);
             }
-            crate::pkg::package::install::run(
+            let files = crate::pkg::package::install::run(
                 &archive_path,
                 Some(pkg.scope),
                 &node.registry_handle,
@@ -181,13 +181,14 @@ pub fn install_node(
                 sub_packages_vec,
                 link_bins,
                 step_pb.as_ref().or(main_pb.as_ref()),
-            )?
+            )?;
+            (files, "pre-compiled".to_string())
         }
         plan::InstallAction::InstallFromArchive(archive_path) => {
             if let Some(pb) = &step_pb {
                 pb.set_message("Installing package...");
             }
-            crate::pkg::package::install::run(
+            let files = crate::pkg::package::install::run(
                 archive_path,
                 Some(pkg.scope),
                 &node.registry_handle,
@@ -196,14 +197,15 @@ pub fn install_node(
                 sub_packages_vec,
                 link_bins,
                 step_pb.as_ref().or(main_pb.as_ref()),
-            )?
+            )?;
+            (files, "pre-compiled".to_string())
         }
         plan::InstallAction::BuildAndInstall => {
             if let Some(pb) = &step_pb {
                 pb.set_message("Building package...");
             }
             let pkg_lua_path = Path::new(&node.source);
-            prebuilt::try_build_install(
+            let files = prebuilt::try_build_install(
                 pkg_lua_path,
                 pkg,
                 &node.registry_handle,
@@ -211,7 +213,8 @@ pub fn install_node(
                 yes,
                 sub_package_to_install.clone(),
                 step_pb.as_ref().or(main_pb.as_ref()),
-            )?
+            )?;
+            (files, "source".to_string())
         }
     };
 
@@ -238,7 +241,7 @@ pub fn install_node(
         pkg,
         node.reason.clone(),
         node.dependencies.clone(),
-        Some("prebuilt-archive".to_string()),
+        Some(install_method.clone()),
         installed_files,
         handle,
         &node.chosen_options,
@@ -299,7 +302,7 @@ pub fn install_node(
         pb.finish();
     }
 
-    util::send_telemetry("install", pkg, handle);
+    util::send_telemetry("install", pkg, handle, Some(&install_method));
 
     Ok(manifest)
 }

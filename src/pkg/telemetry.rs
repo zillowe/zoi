@@ -9,16 +9,23 @@ pub struct PackageEvent<'a> {
     pub app_version: &'a str,
     pub os: &'a str,
     pub arch: &'a str,
+    pub distro: Option<String>,
+    pub shell: Option<String>,
     pub package: MinimalPackage<'a>,
     pub package_type: &'a str,
+    pub scope: String,
+    pub reason: String,
+    pub install_type: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
 pub struct MinimalPackage<'a> {
     pub name: &'a str,
+    pub sub_package: Option<&'a String>,
     pub repo: &'a str,
     pub version: &'a str,
     pub description: &'a str,
+    pub license: &'a str,
     pub maintainer: MinimalPerson<'a>,
     pub author: Option<MinimalPerson<'a>>,
     pub registry: &'a str,
@@ -35,6 +42,10 @@ pub struct MinimalPerson<'a> {
 fn get_client_id_path() -> Result<std::path::PathBuf, Box<dyn Error>> {
     let home = home::home_dir().ok_or("Could not find home directory")?;
     Ok(home.join(".zoi").join("telemetry").join("client_id"))
+}
+
+pub fn get_anonymous_id() -> String {
+    ensure_client_id().unwrap_or_else(|_| "unknown".to_string())
 }
 
 fn ensure_client_id() -> Result<String, Box<dyn Error>> {
@@ -65,6 +76,7 @@ pub fn posthog_capture_event(
     pkg: &crate::pkg::types::Package,
     app_version: &str,
     registry_handle: &str,
+    install_type: Option<&str>,
 ) -> Result<bool, Box<dyn Error>> {
     let config = crate::pkg::config::read_config()?;
     if !config.telemetry_enabled {
@@ -77,12 +89,24 @@ pub fn posthog_capture_event(
     let mut parts = platform.split('-');
     let os = parts.next().unwrap_or("unknown");
     let arch = parts.next().unwrap_or("unknown");
+    let distro = crate::utils::get_linux_distribution();
+    let shell = crate::utils::get_current_shell().map(|s| s.to_string());
 
     let package_type_str = match pkg.package_type {
         crate::pkg::types::PackageType::Package => "Package",
         crate::pkg::types::PackageType::Collection => "Collection",
         crate::pkg::types::PackageType::App => "App",
         crate::pkg::types::PackageType::Extension => "Extension",
+    };
+
+    let scope_str = format!("{:?}", pkg.scope).to_lowercase();
+    let reason_str = match &pkg.reason {
+        Some(crate::pkg::types::InstallReason::Direct) => "direct".to_string(),
+        Some(crate::pkg::types::InstallReason::Dependency { parent }) => {
+            format!("dependency:{}", parent)
+        }
+        Some(crate::pkg::types::InstallReason::Declarative) => "declarative".to_string(),
+        None => "unknown".to_string(),
     };
 
     let registry_url = config
@@ -106,11 +130,15 @@ pub fn posthog_capture_event(
         app_version,
         os,
         arch,
+        distro,
+        shell,
         package: MinimalPackage {
             name: &pkg.name,
+            sub_package: pkg.sub_package.as_ref(),
             repo: &pkg.repo,
             version: pkg.version.as_deref().unwrap_or("unknown"),
             description: &pkg.description,
+            license: &pkg.license,
             maintainer: MinimalPerson {
                 name: &pkg.maintainer.name,
                 email: &pkg.maintainer.email,
@@ -125,6 +153,9 @@ pub fn posthog_capture_event(
             registry_url,
         },
         package_type: package_type_str,
+        scope: scope_str,
+        reason: reason_str,
+        install_type: install_type.map(|s| s.to_string()),
     };
 
     let ph_host = option_env!("POSTHOG_API_HOST").unwrap_or("https://eu.i.posthog.com");
