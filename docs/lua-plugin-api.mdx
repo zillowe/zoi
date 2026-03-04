@@ -43,21 +43,49 @@ zoi.register_command({
 
 Hooks allow you to intercept Zoi's core operations. This is useful for auditing, logging, or extending Zoi's behavior.
 
-| Hook                       | Argument   | Trigger Point                                    |
-| :------------------------- | :--------- | :----------------------------------------------- |
-| `on_pre_install`           | `pkg`      | Before a package installation starts.            |
-| `on_post_install`          | `manifest` | After a package is successfully installed.       |
-| `on_pre_uninstall`         | `manifest` | Before a package is removed.                     |
-| `on_post_uninstall`        | `manifest` | After a package is removed.                      |
-| `on_pre_extension_add`     | `pkg`      | Before an extension is applied.                  |
-| `on_post_extension_add`    | `manifest` | After an extension is successfully applied.      |
-| `on_pre_extension_remove`  | `manifest` | Before an extension is reverted.                 |
-| `on_post_extension_remove` | `manifest` | After an extension is reverted.                  |
-| `on_pre_create`            | `pkg`      | Before building/creating an app from a template. |
-| `on_post_create`           | `pkg`      | After the app is successfully created.           |
-| `on_pre_sync`              | None       | Before the package database is updated.          |
-| `on_post_sync`             | None       | After the package database sync is complete.     |
-| `on_rollback`              | None       | When a rollback operation is triggered.          |
+| Hook                       | Argument   | Trigger Point                                                     |
+| :------------------------- | :--------- | :---------------------------------------------------------------- |
+| `on_pre_install`           | `pkg`      | Before a package installation starts.                             |
+| `on_post_install`          | `manifest` | After a package is successfully installed.                        |
+| `on_pre_uninstall`         | `manifest` | Before a package is removed.                                      |
+| `on_post_uninstall`        | `manifest` | After a package is removed.                                       |
+| `on_pre_extension_add`     | `pkg`      | Before an extension is applied.                                   |
+| `on_post_extension_add`    | `manifest` | After an extension is successfully applied.                       |
+| `on_pre_extension_remove`  | `manifest` | Before an extension is reverted.                                  |
+| `on_post_extension_remove` | `manifest` | After an extension is reverted.                                   |
+| `on_pre_create`            | `pkg`      | Before building/creating an app from a template.                  |
+| `on_post_create`           | `pkg`      | After the app is successfully created.                            |
+| `on_pre_sync`              | None       | Before the package database is updated.                           |
+| `on_post_sync`             | None       | After the package database sync is complete.                      |
+| `on_rollback`              | None       | When a rollback operation is triggered.                           |
+| `on_resolve_shim_version`  | `bin_name` | When a Zoi shim is executed. Return a version string to override. |
+
+---
+
+## The Shim Resolution Hook
+
+The `on_resolve_shim_version` hook is special because it allows plugins to influence Zoi's version multiplexing at runtime.
+
+### `zoi.on_resolve_shim_version(callback)`
+
+- **Argument**: `bin_name` (string) - The name of the binary being executed (e.g. `"node"`).
+- **Return**: `string` or `nil` - Return a version string (e.g. `"18.19.0"`) to force that version, or `nil` to continue with standard resolution.
+
+**Example: Automated `.nvmrc` support**
+
+```lua
+zoi.on_resolve_shim_version(function(bin_name)
+    if bin_name == "node" or bin_name == "npm" then
+        local f = io.open(".nvmrc", "r")
+        if f then
+            local version = f:read("*a"):gsub("%s+", "")
+            f:close()
+            return version
+        end
+    end
+    return nil
+end)
+```
 
 ---
 
@@ -132,6 +160,45 @@ Runs a command in the system shell (`bash` on Unix, `pwsh` on Windows). Returns 
 ### `zoi.version`
 
 Returns the current Zoi version string (e.g. `"1.6.0"`).
+
+---
+
+## File System (FS) API
+
+Plugins can interact with the local file system.
+
+- **`zoi.fs.exists(path)`**: Returns `true` if the file or directory exists.
+- **`zoi.fs.read(path)`**: Reads a file's contents and returns it as a string. Returns `nil` on error.
+- **`zoi.fs.write(path, content)`**: Writes a string to a file. Returns `true` on success, `false` on error.
+- **`zoi.fs.list(path)`**: Returns an array of file and directory names within the given path.
+- **`zoi.fs.delete(path)`**: Deletes a file or recursively deletes a directory. Returns `true` on success, `false` on error.
+
+---
+
+## HTTP API
+
+Plugins can make basic HTTP requests.
+
+- **`zoi.http.get(url)`**: Performs a GET request. Returns the response body as a string, or `nil` on error.
+- **`zoi.http.post(url, body)`**: Performs a POST request with the given string body. Returns the response body as a string, or `nil` on error.
+
+---
+
+## JSON API
+
+Utilities for working with JSON data.
+
+- **`zoi.json.parse(json_string)`**: Parses a JSON string into a Lua table. Returns `nil` on error.
+- **`zoi.json.stringify(table)`**: Converts a Lua table into a JSON string. Returns `nil` on error.
+
+---
+
+## Environment API
+
+Access and manipulate environment variables.
+
+- **`zoi.env.get(name)`**: Returns the value of an environment variable as a string, or `nil` if not set.
+- **`zoi.env.set(name, value)`**: Sets an environment variable for the current process.
 
 ---
 

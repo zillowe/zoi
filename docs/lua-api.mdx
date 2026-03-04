@@ -55,6 +55,34 @@ Stages a file or directory to be included in the final package.
 - **Source**: Path relative to `BUILD_DIR`, or use `${pkgluadir}` for files next to the script.
 - **Destination**: Use variables like `${pkgstore}`, `${usrroot}`, or `${usrhome}`.
 
+### `zln(target, link)`
+
+Creates a symbolic link in the package.
+
+- **target**: The destination of the link (e.g. `${pkgstore}/bin/my-app`).
+- **link**: The path of the symlink to create (e.g. `${pkgstore}/bin/my-link`).
+
+### `zchmod(path, mode)`
+
+Sets the permissions of a file or directory in the package.
+
+- **path**: Path to the file or directory (e.g. `${pkgstore}/bin/my-app`).
+- **mode**: Octal permission mode (e.g. `493` for `0755`).
+
+### `zchown(path, owner, group)`
+
+Sets the ownership of a file or directory in the package.
+
+- **path**: Path to the file or directory.
+- **owner**: The owner name or UID.
+- **group**: The group name or GID.
+
+### `zmkdir(path)`
+
+Creates a directory in the package.
+
+- **path**: Path to the directory to create (e.g. `${pkgstore}/share/my-app`).
+
 ### `zrm(path)`
 
 Used in the `uninstall()` function to remove files or directories outside of the package store.

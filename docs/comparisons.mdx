@@ -36,7 +36,7 @@ Devbox and Flox are excellent tools that wrap the **Nix package manager** to pro
 
 - **Scope:** mise and asdf focus primarily on language runtimes and environment variables. They use "plugins" to fetch and manage these versions.
 - **Functionality:** Zoi is a full-featured package manager. It manages not just runtimes, but binaries, libraries, PGP keys, and configuration files. Zoi's `zoi dev`, `zoi env` and `zoi.yaml` provide environment management similar to mise and devbox, but backed by a much more powerful packaging engine.
-- **Native Integration:** mise manages versions by manipulating your `PATH`. Zoi manages them via a versioned store and atomic symlinking, while also ensuring system-level dependencies (like `libssl`) are present via your native package manager. Zoi's `zoi dev` command additionally sets up `LD_LIBRARY_PATH`, `CPATH`, and `PKG_CONFIG_PATH` for a complete C/C++ or Rust development environment.
+- **Native Integration:** mise manages versions by manipulating your `PATH`. Zoi manages them via a versioned store and intelligent shims, allowing automatic version switching based on your current project directory (`zoi.yaml`) or legacy configuration files (like `.nvmrc` via its powerful Lua plugin system) without manual environment changes. Zoi additionally sets up `LD_LIBRARY_PATH`, `CPATH`, and `PKG_CONFIG_PATH` for a complete development environment when using `zoi dev`.
 
 ### Comparison Table: Dev Tools
 

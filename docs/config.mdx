@@ -138,6 +138,18 @@ If `true`, Zoi will not attempt to connect to the network. It will rely entirely
 - **Default:** `false`
 - **Example:** `offline_mode: true`
 
+### `versions`
+
+A map of binary names to their preferred global versions. This is used by Zoi's intelligent shims to resolve which version of a tool to execute when multiple versions are installed and no project-specific version is defined.
+
+- **Type:** `object` (map of `string` to `string`)
+- **Example:**
+  ```yaml
+  versions:
+    node: "20.11.0"
+    python: "3.12.1"
+  ```
+
 ### `pkg_dirs`
 
 A list of additional directories to search for `.pkg.tar.zst` archives during installation.

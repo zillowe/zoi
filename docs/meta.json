@@ -5,6 +5,7 @@
     "examples",
     "config",
     "project-config",
+    "system-config",
     "---Maintainers Guides---",
     "creating-packages",
     "lua-api",

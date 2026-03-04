@@ -27,6 +27,8 @@ Zoi is packed with features designed to make package management and environment 
 
 - **Reverse Search (`zoi provides`):** Instantly find which package provides a specific binary or file path across the entire registry.
 
+- **Version Multiplexing via Intelligent Shims:** Automatically switch between different versions of the same tool (e.g. Node.js 18 vs 20) based on your current project (`zoi.yaml`), global configuration, or legacy files (like `.nvmrc` and `.python-version`) via its extensible Lua plugin system. Replaces static symlinks with intelligent shims that resolve the correct version at runtime.
+
 - **Ephemeral Environments:** Enter a temporary subshell with specific packages available in `PATH` without installing them globally. Perfect for testing tools or running scripts with specific language versions.
 
 - **Dynamic Package Definitions:** Packages are defined using `.pkg.lua` scripts, offering unparalleled flexibility. Use Lua to dynamically determine download URLs, set up build steps, and handle platform-specific logic.
@@ -47,6 +49,8 @@ Zoi is packed with features designed to make package management and environment 
 - **Changing Install Reasons:** Use `zoi mark` to change whether a package is considered an explicit installation or a dependency, enabling granular control over `zoi autoremove`.
 
 - **Project-Level Environments:** Use a `zoi.yaml` file in your project root to define custom commands and development environments. Manage project-specific tasks, tools, packages, and environment variables with `zoi run`, `zoi env`, and `zoi dev`, [learn more](/docs/zds/zoi/project-config).
+
+- **Declarative System Configuration (Arch Linux):** Manage your entire system state via a centralized `/etc/zoi/zoi.lua` file. Define packages, extensions, and services in one place and apply them with `zoi system apply` for a Nix-like reproducible setup on Arch Linux.
 
 - **Repository-Based System:** Zoi uses Git-based repositories to store package definitions. Use the official Zoidberg registry, add community repositories, or create your own private or public repositories with `zoi repo add`.
 
