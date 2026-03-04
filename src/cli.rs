@@ -44,7 +44,6 @@ pub struct Cli {
     yes: bool,
 
     #[arg(
-        short = 'r',
         long = "root",
         help = "Operate on a different root directory",
         global = true,
@@ -113,12 +112,6 @@ enum Commands {
         long_about = "Detects and displays key system details, including the OS, CPU architecture, Linux distribution (if applicable), and available package managers."
     )]
     Info,
-
-    /// Checks for essential third-party command-line tools
-    #[command(
-        long_about = "Verifies that all required dependencies (like git) are installed and available in the system's PATH. This is useful for diagnostics."
-    )]
-    Check,
 
     /// Downloads or updates the package database from the remote repository
     #[command(
@@ -728,7 +721,6 @@ pub fn run() -> anyhow::Result<()> {
                 Ok(())
             }
             Commands::Info => cmd::info::run(BRANCH, STATUS, NUMBER, commit),
-            Commands::Check => cmd::check::run(),
             Commands::Sync {
                 command,
                 verbose,

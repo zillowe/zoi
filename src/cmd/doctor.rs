@@ -184,6 +184,33 @@ pub fn run() -> Result<()> {
         }
     }
 
+    println!("\n{}", "Checking for external tools...".bold());
+    let tool_results = pkg::doctor::check_external_tools();
+    if tool_results.essential_missing.is_empty() && tool_results.recommended_missing.is_empty() {
+        println!(
+            "{}",
+            "All essential and recommended tools are installed.".green()
+        );
+    } else {
+        if !tool_results.essential_missing.is_empty() {
+            issues_found += tool_results.essential_missing.len();
+            println!("{}: Essential tools are missing:", "Error".red().bold());
+            for tool in tool_results.essential_missing {
+                println!("  - {}", tool.red());
+            }
+            println!(
+                "Please install these tools as they are required for Zoi to function correctly."
+            );
+        }
+        if !tool_results.recommended_missing.is_empty() {
+            println!("{}: Recommended tools are missing:", "Note".yellow().bold());
+            for tool in tool_results.recommended_missing {
+                println!("  - {}", tool.yellow());
+            }
+            println!("Zoi will work without these, but some features may be limited.");
+        }
+    }
+
     if issues_found == 0 {
         println!(
             "\n{}",

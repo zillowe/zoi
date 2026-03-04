@@ -236,3 +236,33 @@ pub fn check_orphaned_packages() -> Result<Vec<String>> {
 
     Ok(orphaned)
 }
+
+pub struct ToolCheckResult {
+    pub essential_missing: Vec<String>,
+    pub recommended_missing: Vec<String>,
+}
+
+pub fn check_external_tools() -> ToolCheckResult {
+    let mut essential_missing = Vec::new();
+    let mut recommended_missing = Vec::new();
+
+    let essential = ["git"];
+    let recommended = ["less", "gpg"];
+
+    for tool in essential {
+        if !crate::utils::command_exists(tool) {
+            essential_missing.push(tool.to_string());
+        }
+    }
+
+    for tool in recommended {
+        if !crate::utils::command_exists(tool) {
+            recommended_missing.push(tool.to_string());
+        }
+    }
+
+    ToolCheckResult {
+        essential_missing,
+        recommended_missing,
+    }
+}
