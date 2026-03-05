@@ -164,6 +164,9 @@ enum Commands {
         /// List only package names (internal use for completions)
         #[arg(long, hide = true)]
         names: bool,
+        /// List packages with descriptions for completion
+        #[arg(long, hide = true)]
+        completion: bool,
     },
 
     /// Shows detailed information about a package
@@ -756,7 +759,16 @@ pub fn run() -> anyhow::Result<()> {
                 package_type,
                 foreign,
                 names,
-            } => cmd::list::run(all, registry, repo, package_type, foreign, names),
+                completion,
+            } => cmd::list::run(
+                all,
+                registry,
+                repo,
+                package_type,
+                foreign,
+                names,
+                completion,
+            ),
             Commands::Show { package_name, raw } => cmd::show::run(&package_name, raw),
             Commands::Pin { package, version } => cmd::pin::run(&package, &version),
             Commands::Provides { term } => cmd::provides::run(&term),

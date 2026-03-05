@@ -12,6 +12,7 @@ pub fn run(
     type_filter: Option<String>,
     foreign: bool,
     names_only: bool,
+    completion: bool,
 ) -> Result<()> {
     let package_type = match type_filter.as_deref() {
         Some("package") => Some(types::PackageType::Package),
@@ -22,8 +23,8 @@ pub fn run(
         None => None,
     };
 
-    if names_only {
-        return run_list_names(all, registry_filter, repo_filter, package_type);
+    if names_only || completion {
+        return run_list_names(all, registry_filter, repo_filter, package_type, completion);
     }
 
     if all {
@@ -221,8 +222,9 @@ fn run_list_names(
     registry_filter: Option<String>,
     repo_filter: Option<String>,
     type_filter: Option<types::PackageType>,
+    completion: bool,
 ) -> Result<()> {
-    let mut names = HashSet::new();
+    let mut entries = HashSet::new();
     let config = config::read_config()?;
 
     if all {
@@ -241,14 +243,9 @@ fn run_list_names(
         let default_handle = config.default_registry.as_ref().map(|r| &r.handle);
 
         for handle in registries {
-            if let Ok(pkgs) = crate::pkg::db::list_all_packages(&handle) {
+            if let Ok(pkgs) = crate::pkg::db::get_packages_for_completion(&handle) {
                 let is_default = default_handle == Some(&handle);
                 for pkg in pkgs {
-                    if let Some(type_f) = type_filter
-                        && pkg.package_type != type_f
-                    {
-                        continue;
-                    }
                     if let Some(repo_f) = &repo_filter
                         && !pkg.repo.contains(repo_f)
                     {
@@ -261,12 +258,18 @@ fn run_list_names(
                         format!("#{}@{}/{}", handle, pkg.repo, pkg.name)
                     };
 
-                    names.insert(base_name.clone());
-                    if let Some(subs) = pkg.sub_packages {
-                        for sub in subs {
-                            names.insert(format!("{}:{}", base_name, sub));
-                        }
-                    }
+                    let name_with_sub = if let Some(sub) = &pkg.sub_package {
+                        format!("{}:{}", base_name, sub)
+                    } else {
+                        base_name
+                    };
+
+                    let entry = if completion {
+                        format!("{}:{}", name_with_sub, pkg.description.replace(':', " "))
+                    } else {
+                        name_with_sub
+                    };
+                    entries.insert(entry);
                 }
             }
         }
@@ -283,14 +286,16 @@ fn run_list_names(
             } else {
                 pkg.name
             };
-            names.insert(name);
+
+            let entry = name;
+            entries.insert(entry);
         }
     }
 
-    let mut sorted_names: Vec<_> = names.into_iter().collect();
-    sorted_names.sort();
-    for name in sorted_names {
-        println!("{}", name);
+    let mut sorted_entries: Vec<_> = entries.into_iter().collect();
+    sorted_entries.sort();
+    for entry in sorted_entries {
+        println!("{}", entry);
     }
 
     Ok(())

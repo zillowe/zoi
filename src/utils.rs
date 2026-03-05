@@ -837,11 +837,6 @@ pub fn check_license(license: &str) {
     }
 }
 
-#[derive(serde::Deserialize)]
-struct PackageForCompletion {
-    description: Option<String>,
-}
-
 pub struct PackageCompletion {
     pub display: String,
     pub repo: String,
@@ -849,67 +844,53 @@ pub struct PackageCompletion {
 }
 
 pub fn get_all_packages_for_completion() -> Vec<PackageCompletion> {
-    let db_root = if let Ok(path) = crate::pkg::resolve::get_db_root() {
-        path
+    let mut completions = Vec::new();
+    let config = if let Ok(cfg) = crate::pkg::config::read_config() {
+        cfg
     } else {
-        return Vec::new();
+        return completions;
     };
 
-    let active_repos = if let Ok(config) = crate::pkg::config::read_config() {
-        config.repos
-    } else {
-        return Vec::new();
-    };
-
-    if !db_root.exists() {
-        return Vec::new();
+    let mut registries = Vec::new();
+    if let Some(default) = &config.default_registry {
+        registries.push(default.handle.clone());
+    }
+    for reg in &config.added_registries {
+        registries.push(reg.handle.clone());
     }
 
-    let mut packages = Vec::new();
-    for repo_name in &active_repos {
-        let repo_path = db_root.join(repo_name);
-        if !repo_path.is_dir() {
+    let default_handle = config.default_registry.as_ref().map(|r| &r.handle);
+
+    for handle in registries {
+        if handle.is_empty() {
             continue;
         }
-        for entry in WalkDir::new(&repo_path)
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.file_type().is_dir())
-        {
-            let pkg_name = entry.file_name().to_string_lossy();
-            let pkg_file_path = entry.path().join(format!("{}.pkg.lua", pkg_name));
-
-            if pkg_file_path.is_file() {
-                let pkg_info: anyhow::Result<PackageForCompletion> = (|| -> anyhow::Result<_> {
-                    let pkg = crate::pkg::lua::parser::parse_lua_package(
-                        pkg_file_path.to_str().unwrap(),
-                        None,
-                        true,
-                    )?;
-                    Ok(PackageForCompletion {
-                        description: Some(pkg.description),
-                    })
-                })();
-
-                let description = match pkg_info {
-                    Ok(pi) => pi.description.unwrap_or_default(),
-                    Err(_) => String::new(),
+        if let Ok(entries) = crate::pkg::db::get_packages_for_completion(&handle) {
+            let is_default = default_handle == Some(&handle);
+            for entry in entries {
+                let base_name = if is_default {
+                    format!("@{}/{}", entry.repo, entry.name)
+                } else {
+                    format!("#{}@{}/{}", handle, entry.repo, entry.name)
                 };
 
-                let relative_path = entry.path().strip_prefix(&db_root).unwrap();
-                let full_pkg_id =
-                    format!("@{}", relative_path.to_string_lossy().replace('\\', "/"));
+                let display = if let Some(sub) = entry.sub_package {
+                    format!("{}:{}", base_name, sub)
+                } else {
+                    base_name
+                };
 
-                packages.push(PackageCompletion {
-                    display: full_pkg_id,
-                    repo: repo_name.clone(),
-                    description,
+                completions.push(PackageCompletion {
+                    display,
+                    repo: entry.repo,
+                    description: entry.description,
                 });
             }
         }
     }
-    packages.sort_by(|a, b| a.display.cmp(&b.display));
-    packages
+
+    completions.sort_by(|a, b| a.display.cmp(&b.display));
+    completions
 }
 
 pub fn get_current_shell() -> Option<Shell> {

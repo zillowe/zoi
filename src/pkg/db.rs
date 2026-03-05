@@ -268,6 +268,35 @@ pub fn update_package(
     Ok(row_id)
 }
 
+#[derive(Debug)]
+pub struct CompletionEntry {
+    pub name: String,
+    pub repo: String,
+    pub description: String,
+    pub sub_package: Option<String>,
+}
+
+pub fn get_packages_for_completion(registry_handle: &str) -> Result<Vec<CompletionEntry>> {
+    let conn = open_connection(registry_handle)?;
+    let mut stmt =
+        conn.prepare("SELECT name, repo, description, sub_package FROM packages ORDER BY name")?;
+
+    let rows = stmt.query_map([], |row| {
+        Ok(CompletionEntry {
+            name: row.get(0)?,
+            repo: row.get(1)?,
+            description: row.get(2).unwrap_or_default(),
+            sub_package: row.get(3)?,
+        })
+    })?;
+
+    let mut entries = Vec::new();
+    for row in rows {
+        entries.push(row?);
+    }
+    Ok(entries)
+}
+
 pub fn index_package_files(conn: &Connection, package_id: i64, files: &[String]) -> Result<()> {
     let mut stmt = conn.prepare("INSERT INTO package_files (package_id, path) VALUES (?1, ?2)")?;
     for file in files {

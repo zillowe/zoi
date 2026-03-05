@@ -69,6 +69,13 @@ fn refresh_registry_db(
                         Err(_) => return,
                     };
 
+                if let Some(subs) = &pkg.sub_packages {
+                    for sub in subs {
+                        let _ =
+                            db::update_package(&conn, &pkg, registry_handle, None, Some(sub), None);
+                    }
+                }
+
                 if sync_files
                     && let Some(rc) = &repo_config
                     && let Some(pkg_link) = rc.pkg.iter().find(|p| p.link_type == "main")

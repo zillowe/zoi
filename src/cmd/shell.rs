@@ -117,7 +117,7 @@ _zoi_all_packages() {
 }
 
 _zoi_do_list_all() {
-    zoi list -a --names 2>/dev/null
+    zoi list -a --completion 2>/dev/null
 }
 "#;
             script.push_str(helper);
