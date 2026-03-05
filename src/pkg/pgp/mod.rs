@@ -513,16 +513,25 @@ pub fn sign_detached(data_path: &Path, signature_path: &Path, key_id: &str) -> R
         .to_str()
         .ok_or_else(|| anyhow!("Invalid signature path for signing."))?;
 
-    let output = Command::new("gpg")
-        .arg("--batch")
-        .arg("--yes")
-        .arg("--detach-sign")
+    let mut command = Command::new("gpg");
+    command.arg("--batch").arg("--yes").arg("--detach-sign");
+
+    if let Ok(password) = std::env::var("GPG_PASSWORD") {
+        command
+            .arg("--pinentry-mode")
+            .arg("loopback")
+            .arg("--passphrase")
+            .arg(password);
+    }
+
+    command
         .arg("--local-user")
         .arg(key_id)
         .arg("--output")
         .arg(signature_path_str)
-        .arg(data_path_str)
-        .output()?;
+        .arg(data_path_str);
+
+    let output = command.output()?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

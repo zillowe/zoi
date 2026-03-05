@@ -246,11 +246,11 @@ fn build_for_platform(
                         path = path.replace("${usrroot}", &format!("{}/usrroot", data_prefix));
                         path = path.replace("${usrhome}", &format!("{}/usrhome", data_prefix));
 
-                        let full_path = staging_dir.join(&path);
+                        let _full_path = staging_dir.join(&path);
                         #[cfg(unix)]
                         {
                             use std::os::unix::fs::PermissionsExt;
-                            fs::set_permissions(full_path, fs::Permissions::from_mode(mode))?;
+                            fs::set_permissions(_full_path, fs::Permissions::from_mode(mode))?;
                         }
                         if !quiet {
                             println!("Set permissions {} on '{}'", mode, path);

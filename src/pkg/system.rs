@@ -560,7 +560,16 @@ fn apply_timezone(timezone: &str) -> Result<()> {
         if localtime.exists() {
             fs::remove_file(localtime)?;
         }
-        std::os::unix::fs::symlink(tz_path, localtime)?;
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(tz_path, localtime)?;
+        }
+        #[cfg(not(unix))]
+        {
+            return Err(anyhow!(
+                "Timezone management is only supported on Unix-like systems."
+            ));
+        }
     } else {
         return Err(anyhow!("Timezone '{}' not found.", timezone));
     }
@@ -725,11 +734,11 @@ fn apply_files(files: &HashMap<String, types::FileConfig>) -> Result<()> {
             crate::utils::set_path_owner(&path, owner, group)?;
         }
 
-        if let Some(mode) = file_cfg.mode {
+        if let Some(_mode) = file_cfg.mode {
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
-                fs::set_permissions(&path, fs::Permissions::from_mode(mode))?;
+                fs::set_permissions(&path, fs::Permissions::from_mode(_mode))?;
             }
         }
     }
