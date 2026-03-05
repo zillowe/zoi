@@ -514,7 +514,11 @@ pub fn sign_detached(data_path: &Path, signature_path: &Path, key_id: &str) -> R
         .ok_or_else(|| anyhow!("Invalid signature path for signing."))?;
 
     let mut command = Command::new("gpg");
-    command.arg("--batch").arg("--yes").arg("--detach-sign");
+    command
+        .arg("--batch")
+        .arg("--no-tty")
+        .arg("--yes")
+        .arg("--detach-sign");
 
     if let Ok(password) = std::env::var("GPG_PASSWORD") {
         command
