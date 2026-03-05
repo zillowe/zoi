@@ -56,12 +56,19 @@ fn refresh_registry_db(
             crate::pkg::lua::parser::parse_lua_package(path.to_str().unwrap(), None, true)
         {
             let mut pkg = pkg;
-            if let Ok(rel_path) = path.strip_prefix(registry_path)
+            if pkg.repo.is_empty()
+                && let Ok(rel_path) = path.strip_prefix(registry_path)
                 && let Some(parent) = rel_path.parent()
             {
-                pkg.repo = parent.to_string_lossy().to_string().replace('\\', "/");
+                let mut repo_path = parent.to_string_lossy().to_string().replace('\\', "/");
+                let pkg_name_suffix = format!("/{}", pkg.name);
+                if repo_path.ends_with(&pkg_name_suffix) {
+                    repo_path = repo_path[..repo_path.len() - pkg_name_suffix.len()].to_string();
+                } else if repo_path == pkg.name {
+                    repo_path = String::new();
+                }
+                pkg.repo = repo_path;
             }
-
             if let Ok(conn) = db::open_connection_no_setup(registry_handle) {
                 let pkg_id =
                     match db::update_package(&conn, &pkg, registry_handle, None, None, None) {

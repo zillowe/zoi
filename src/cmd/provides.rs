@@ -50,13 +50,13 @@ pub fn run(term: &str) -> Result<()> {
         ]);
 
     for (pkg, matched_path) in all_results {
-        let repo_display = pkg.repo.split_once('/').map(|x| x.1).unwrap_or(&pkg.repo);
+        let repo_display = &pkg.repo;
         table.add_row(vec![
             Cell::new(pkg.name).fg(comfy_table::Color::Cyan),
             Cell::new(pkg.version.unwrap_or_else(|| "N/A".to_string()))
                 .fg(comfy_table::Color::Yellow),
             Cell::new(matched_path).fg(comfy_table::Color::Green),
-            Cell::new(repo_display).fg(comfy_table::Color::DarkGrey),
+            Cell::new(repo_display.clone()).fg(comfy_table::Color::DarkGrey),
         ]);
     }
 

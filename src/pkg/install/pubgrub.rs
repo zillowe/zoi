@@ -1,5 +1,6 @@
 use crate::pkg::{db, resolve, types};
 use pubgrub::{Dependencies, DependencyProvider, Ranges};
+use rusqlite::params;
 use rustc_hash::FxHashMap;
 use semver::Version;
 use std::fmt::Display;
@@ -69,6 +70,7 @@ impl ZoiDependencyProvider {
 
     pub fn get_versions(&self, package: &PkgName) -> Result<Vec<SemVersion>, ZoiSolverError> {
         let mut all_versions = Vec::new();
+
         if let Ok(version_strings) =
             db::get_all_versions(&package.registry, &package.name, &package.repo)
         {
@@ -79,7 +81,27 @@ impl ZoiDependencyProvider {
             }
         }
 
+        if all_versions.is_empty()
+            && let Ok(conn) = db::open_connection(&package.registry)
+        {
+            let mut stmt = conn
+                .prepare("SELECT version FROM packages WHERE name = ?1")
+                .map_err(|e| ZoiSolverError::Other(e.to_string()))?;
+            let rows = stmt
+                .query_map(params![package.name], |row| row.get::<_, Option<String>>(0))
+                .map_err(|e| ZoiSolverError::Other(e.to_string()))?;
+
+            for v_res in rows {
+                if let Ok(Some(v_str)) = v_res
+                    && let Ok(v) = Version::parse(&v_str)
+                {
+                    all_versions.push(SemVersion(v));
+                }
+            }
+        }
+
         all_versions.sort();
+        all_versions.dedup();
         Ok(all_versions)
     }
 }

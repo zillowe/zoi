@@ -116,8 +116,6 @@ pub fn run(
     let successfully_installed_sources = Mutex::new(Vec::new());
     let installed_manifests = Mutex::new(Vec::new());
 
-    println!("{} Resolving dependencies...", "::".bold().blue());
-
     let (graph, non_zoi_deps) = install::resolver::resolve_dependency_graph(
         &final_sources,
         scope_override,

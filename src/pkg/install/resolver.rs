@@ -85,9 +85,14 @@ impl DependencyGraph {
         let mut in_degree: HashMap<String, usize> =
             self.nodes.keys().map(|id| (id.clone(), 0)).collect();
 
-        for to_set in self.adj.values() {
+        for (from, to_set) in &self.adj {
+            if from == "$root" {
+                continue;
+            }
             for to in to_set {
-                *in_degree.get_mut(to).unwrap() += 1;
+                if let Some(degree) = in_degree.get_mut(to) {
+                    *degree += 1;
+                }
             }
         }
 
@@ -139,7 +144,7 @@ pub fn resolve_dependency_graph(
     _build_type: Option<&str>,
     quiet: bool,
 ) -> Result<(DependencyGraph, Vec<String>)> {
-    println!(":: Resolving dependencies using PubGrub SAT solver...");
+    println!(":: Resolving dependencies...");
 
     let mut non_zoi_deps = Vec::new();
     let mut root_deps = FxHashMap::default();

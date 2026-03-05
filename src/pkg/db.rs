@@ -412,11 +412,25 @@ pub fn find_provides(registry_handle: &str, term: &str) -> Result<Vec<(types::Pa
     })?;
 
     for row in rows {
-        results.push(row?);
+        let (pkg, mut path): (types::Package, String) = row?;
+        if let Some(stripped) = path.strip_prefix("data/pkgstore/") {
+            path = stripped.to_string();
+        } else if let Some(stripped) = path.strip_prefix("data/usrroot/") {
+            path = format!("/{}", stripped);
+        } else if let Some(stripped) = path.strip_prefix("data/usrhome/") {
+            path = format!("~/{}", stripped);
+        }
+
+        results.push((pkg, path));
     }
 
-    results.sort_by(|a, b| a.0.name.cmp(&b.0.name));
-    results.dedup_by(|a, b| a.0.name == b.0.name && a.1 == b.1);
+    results.sort_by(|a, b| {
+        a.0.name
+            .cmp(&b.0.name)
+            .then(a.0.repo.cmp(&b.0.repo))
+            .then(a.1.cmp(&b.1))
+    });
+    results.dedup_by(|a, b| a.0.name == b.0.name && a.0.repo == b.0.repo && a.1 == b.1);
 
     Ok(results)
 }

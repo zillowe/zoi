@@ -773,15 +773,13 @@ pub fn resolve_source(source: &str, quiet: bool, yes: bool) -> Result<ResolvedSo
         crate::utils::confirm_untrusted_source(&resolved.source_type, yes)?;
     }
 
-    if let Ok(request) = parse_source_string(source)
+    if let Ok(_request) = parse_source_string(source)
         && !matches!(
             &resolved.source_type,
             SourceType::LocalFile | SourceType::Url
         )
-        && let Some(repo_name) = &resolved.repo_name
-    {
-        println!("Found package '{}' in repo '{}'", request.name, repo_name);
-    }
+        && let Some(_repo_name) = &resolved.repo_name
+    {}
 
     Ok(resolved)
 }

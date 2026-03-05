@@ -256,7 +256,7 @@ pub fn run(
                 let version = crate::pkg::resolve::get_default_version(&pkg, handle_for_version)
                     .unwrap_or_else(|_| "N/A".to_string());
 
-                let repo_display = pkg.repo.split_once('/').map(|x| x.1).unwrap_or(&pkg.repo);
+                let repo_display = &pkg.repo;
 
                 let tags_display = if pkg.tags.is_empty() {
                     String::from("")
@@ -358,11 +358,11 @@ fn run_file_search(
         ]);
 
     for (pkg, path) in results {
-        let repo_display = pkg.repo.split_once('/').map(|x| x.1).unwrap_or(&pkg.repo);
+        let repo_display = &pkg.repo;
         table.add_row(vec![
             Cell::new(pkg.name).fg(comfy_table::Color::Cyan),
             Cell::new(path).fg(comfy_table::Color::Yellow),
-            Cell::new(repo_display).fg(comfy_table::Color::Green),
+            Cell::new(repo_display.clone()).fg(comfy_table::Color::Green),
         ]);
     }
 

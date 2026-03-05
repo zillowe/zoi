@@ -198,7 +198,18 @@ pub fn get_packages_from_repos(repos: &[String]) -> Result<Vec<super::types::Pac
                 )?;
 
                 if let Ok(repo_subpath) = entry.path().strip_prefix(&db_root) {
-                    pkg.repo = repo_subpath.to_string_lossy().to_string();
+                    let mut repo_path = repo_subpath
+                        .to_string_lossy()
+                        .to_string()
+                        .replace('\\', "/");
+                    let pkg_name_suffix = format!("/{}", pkg.name);
+                    if repo_path.ends_with(&pkg_name_suffix) {
+                        repo_path =
+                            repo_path[..repo_path.len() - pkg_name_suffix.len()].to_string();
+                    } else if repo_path == pkg.name {
+                        repo_path = String::new();
+                    }
+                    pkg.repo = repo_path;
                 }
 
                 available.push(pkg);

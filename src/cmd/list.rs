@@ -129,7 +129,7 @@ fn run_list_installed(
                 pkg.name
             };
 
-            let repo_display = pkg.repo.split_once('/').map(|x| x.1).unwrap_or(&pkg.repo);
+            let repo_display = &pkg.repo;
 
             table.add_row(vec![
                 package_display,
@@ -195,7 +195,7 @@ fn run_list_installed(
                 pkg.name
             };
 
-            let repo_display = pkg.repo.split_once('/').map(|x| x.1).unwrap_or(&pkg.repo);
+            let repo_display = &pkg.repo;
 
             table.add_row(vec![
                 package_display,
