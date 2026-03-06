@@ -4,6 +4,30 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
+## [Prod-Release-1.8.0] - 2026-03-05
+
+### ♻️ Refactor
+
+- _(doctor)_ Integrate external tool checks into doctor command
+- _(pkg)_ Refactor package resolution and installation flow
+
+### ✨ Features
+
+- _(pgp)_ Allow non-interactive GPG signing with passphrase
+- _(completion)_ Provide package descriptions for shell completion
+- _(plugin, config)_ Add shim version hook and configure rollback default
+- _(telemetry)_ Enhance data collection and status output
+- _(pkg)_ Persist and optimize dependency resolution
+- _(system)_ Extend declarative configuration with advanced options
+- _(system)_ Add declarative system configuration
+- _(pkg)_ Implement package shim system
+- _(pkg)_ Add file system build operations to Lua scripts
+
+### 🩹 Bug Fixes
+
+- _(pkg)_ Refine package path handling and dependency resolution
+- PGP
+
 ## [Prod-Release-1.7.0] - 2026-02-27
 
 ### ✨ Features
