@@ -251,17 +251,6 @@ pub fn install_node(
 
     local::write_manifest(&manifest)?;
 
-    if let Ok(conn) = db::open_connection(handle) {
-        let _ = db::update_package(
-            &conn,
-            pkg,
-            handle,
-            Some(pkg.scope),
-            sub_package_to_install.as_deref(),
-            Some(&node.reason),
-        );
-    }
-
     if let Ok(conn) = db::open_connection("local") {
         let _ = db::update_package(
             &conn,

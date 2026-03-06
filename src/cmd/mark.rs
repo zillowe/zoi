@@ -65,16 +65,6 @@ pub fn run(package_names: &[String], as_dependency: bool, as_explicit: bool) -> 
         let handle = registry_handle
             .as_deref()
             .unwrap_or(&manifest.registry_handle);
-        if let Ok(conn) = db::open_connection(handle) {
-            let _ = db::update_package(
-                &conn,
-                &pkg,
-                handle,
-                Some(scope),
-                request.sub_package.as_deref(),
-                Some(&new_reason),
-            );
-        }
         if let Ok(conn) = db::open_connection("local") {
             let _ = db::update_package(
                 &conn,
