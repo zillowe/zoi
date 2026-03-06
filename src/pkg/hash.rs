@@ -21,8 +21,8 @@ pub fn calculate_dir_hash(path: &Path) -> Result<String> {
     paths.sort();
 
     for file_path in paths {
-        let file_content = fs::read(&file_path)?;
-        hasher.update(&file_content);
+        let mut file = fs::File::open(&file_path)?;
+        std::io::copy(&mut file, &mut hasher)?;
     }
 
     Ok(format!("{:x}", hasher.finalize()))

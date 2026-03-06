@@ -1,7 +1,6 @@
 use anyhow::{Result, anyhow};
 use sha2::{Digest, Sha256, Sha512};
 use std::fs::File;
-use std::io::Read;
 
 pub enum HashType {
     Sha512,
@@ -9,34 +8,41 @@ pub enum HashType {
 }
 
 pub fn get_hash(source: &str, hash_type: HashType) -> Result<String> {
-    let bytes: Vec<u8> = if source.starts_with("http://") || source.starts_with("https://") {
+    let mut hasher_sha512 = Sha512::new();
+    let mut hasher_sha256 = Sha256::new();
+
+    if source.starts_with("http://") || source.starts_with("https://") {
         let client = crate::utils::build_blocking_http_client(60)?;
-        let response = client.get(source).send()?;
+        let mut response = client.get(source).send()?;
         if !response.status().is_success() {
             return Err(anyhow!(
                 "Failed to download file from URL: {}",
                 response.status()
             ));
         }
-        response.bytes()?.to_vec()
+        match hash_type {
+            HashType::Sha512 => {
+                std::io::copy(&mut response, &mut hasher_sha512)?;
+            }
+            HashType::Sha256 => {
+                std::io::copy(&mut response, &mut hasher_sha256)?;
+            }
+        }
     } else {
         let mut file = File::open(source)?;
-        let mut buffer = Vec::new();
-        file.read_to_end(&mut buffer)?;
-        buffer
+        match hash_type {
+            HashType::Sha512 => {
+                std::io::copy(&mut file, &mut hasher_sha512)?;
+            }
+            HashType::Sha256 => {
+                std::io::copy(&mut file, &mut hasher_sha256)?;
+            }
+        }
     };
 
     let hash = match hash_type {
-        HashType::Sha512 => {
-            let mut hasher = Sha512::new();
-            hasher.update(&bytes);
-            format!("{:x}", hasher.finalize())
-        }
-        HashType::Sha256 => {
-            let mut hasher = Sha256::new();
-            hasher.update(&bytes);
-            format!("{:x}", hasher.finalize())
-        }
+        HashType::Sha512 => hex::encode(hasher_sha512.finalize()),
+        HashType::Sha256 => hex::encode(hasher_sha256.finalize()),
     };
 
     Ok(hash)

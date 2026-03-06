@@ -349,11 +349,13 @@ fn build_for_platform(
     };
     let output_path = output_base.join(output_filename);
 
-    let file = File::create(&output_path)?;
-    let encoder = ZstdEncoder::new(file, 0)?.auto_finish();
-    let mut tar_builder = TarBuilder::new(encoder);
-    tar_builder.append_dir_all(".", &staging_dir)?;
-    tar_builder.finish()?;
+    {
+        let file = File::create(&output_path)?;
+        let encoder = ZstdEncoder::new(file, 0)?.auto_finish();
+        let mut tar_builder = TarBuilder::new(encoder);
+        tar_builder.append_dir_all(".", &staging_dir)?;
+        tar_builder.finish()?;
+    }
 
     let files_manifest_path = output_path.with_extension("pkg.tar.zst.files");
     fs::write(&files_manifest_path, files_list.join("\n"))?;
