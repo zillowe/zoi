@@ -349,7 +349,7 @@ fn install_zoi_dependency(
         return Ok(());
     }
 
-    let install_plan = match install::plan::create_install_plan(&graph.nodes) {
+    let install_plan = match install::plan::create_install_plan(&graph.nodes, None, false) {
         Ok(plan) => plan,
         Err(e) => {
             return Err(anyhow!(

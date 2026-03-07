@@ -23,10 +23,16 @@ pub enum InstallAction {
 
 pub fn create_install_plan(
     graph: &HashMap<String, InstallNode>,
+    build_type: Option<&str>,
+    build: bool,
 ) -> Result<HashMap<String, InstallAction>> {
     let plan: HashMap<String, InstallAction> = graph
         .par_iter()
         .map(|(id, node)| {
+            if build || (build_type.is_some() && build_type != Some("pre-compiled") && build_type != Some("pre-built")) {
+                return (id.clone(), InstallAction::BuildAndInstall);
+            }
+
             let action = match util::find_prebuilt_info(node) {
                 Ok(Some(info)) => {
                     let (down_size, inst_size) = if let Some(size_url) = &info.size_url {

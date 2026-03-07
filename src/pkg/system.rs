@@ -657,6 +657,7 @@ fn apply_packages(
             None,
             false,
             plugin_manager,
+            false,
         )?;
     } else {
         println!("All packages are already installed.");

@@ -174,7 +174,7 @@ pub fn enter_ephemeral_shell(
         true,
     )?;
 
-    let install_plan = install::plan::create_install_plan(&graph.nodes)?;
+    let install_plan = install::plan::create_install_plan(&graph.nodes, None, false)?;
     let stages = graph.toposort()?;
 
     if !install_plan.is_empty() {

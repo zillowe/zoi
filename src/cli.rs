@@ -269,6 +269,10 @@ enum Commands {
         /// Do not actually perform the installation, just show what would be done
         #[arg(long)]
         dry_run: bool,
+
+        /// Force building from source even if a pre-compiled archive is available in the registry
+        #[arg(long, short = 'b')]
+        build: bool,
     },
 
     /// Uninstalls one or more packages previously installed by Zoi
@@ -815,6 +819,7 @@ pub fn run() -> anyhow::Result<()> {
                 save,
                 r#type,
                 dry_run,
+                build,
             } => cmd::install::run(
                 &sources,
                 repo,
@@ -828,6 +833,7 @@ pub fn run() -> anyhow::Result<()> {
                 r#type,
                 dry_run,
                 &plugin_manager,
+                build,
             ),
             Commands::Uninstall {
                 packages,

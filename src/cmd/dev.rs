@@ -24,7 +24,7 @@ pub fn run(run_cmd: Option<String>) -> Result<()> {
         true,
     )?;
 
-    let install_plan = install::plan::create_install_plan(&graph.nodes)?;
+    let install_plan = install::plan::create_install_plan(&graph.nodes, None, false)?;
     if !install_plan.is_empty() {
         println!(
             "{} Ensuring project dependencies are installed...",

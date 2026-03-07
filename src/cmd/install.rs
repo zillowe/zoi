@@ -21,6 +21,7 @@ pub fn run(
     build_type: Option<String>,
     dry_run: bool,
     plugin_manager: &crate::pkg::plugin::PluginManager,
+    build: bool,
 ) -> Result<()> {
     let mut scope_override = scope.map(|s| match s {
         crate::cli::InstallScope::User => types::Scope::User,
@@ -202,7 +203,8 @@ pub fn run(
     }
 
     println!("{} Checking available disk space...", "::".bold().blue());
-    let install_plan = install::plan::create_install_plan(&graph.nodes)?;
+    let install_plan =
+        install::plan::create_install_plan(&graph.nodes, build_type.as_deref(), build)?;
 
     let mut total_download_size: u64 = 0;
     let mut total_installed_size: u64 = 0;

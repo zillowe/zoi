@@ -211,18 +211,19 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                     }
                 };
 
-                let install_plan = match install::plan::create_install_plan(&graph.nodes) {
-                    Ok(plan) => plan,
-                    Err(e) => {
-                        eprintln!(
-                            "{} Failed to create install plan for rollback of '{}': {}",
-                            "Error:".red().bold(),
-                            manifest.name,
-                            e
-                        );
-                        continue;
-                    }
-                };
+                let install_plan =
+                    match install::plan::create_install_plan(&graph.nodes, None, false) {
+                        Ok(plan) => plan,
+                        Err(e) => {
+                            eprintln!(
+                                "{} Failed to create install plan for rollback of '{}': {}",
+                                "Error:".red().bold(),
+                                manifest.name,
+                                e
+                            );
+                            continue;
+                        }
+                    };
 
                 let stages = match graph.toposort() {
                     Ok(s) => s,
@@ -345,18 +346,19 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                     }
                 };
 
-                let install_plan = match install::plan::create_install_plan(&graph.nodes) {
-                    Ok(plan) => plan,
-                    Err(e) => {
-                        eprintln!(
-                            "{} Failed to create install plan for rollback of '{}': {}",
-                            "Error:".red().bold(),
-                            old_manifest.name,
-                            e
-                        );
-                        continue;
-                    }
-                };
+                let install_plan =
+                    match install::plan::create_install_plan(&graph.nodes, None, false) {
+                        Ok(plan) => plan,
+                        Err(e) => {
+                            eprintln!(
+                                "{} Failed to create install plan for rollback of '{}': {}",
+                                "Error:".red().bold(),
+                                old_manifest.name,
+                                e
+                            );
+                            continue;
+                        }
+                    };
 
                 let stages = match graph.toposort() {
                     Ok(s) => s,

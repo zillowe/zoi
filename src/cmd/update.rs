@@ -142,7 +142,7 @@ fn run_update_single_logic(package_name: &str, yes: bool, dry_run: bool) -> Resu
         false,
     )?;
 
-    let install_plan = install::plan::create_install_plan(&graph.nodes)?;
+    let install_plan = install::plan::create_install_plan(&graph.nodes, None, false)?;
 
     let stages = graph.toposort()?;
     let mut new_manifest_option: Option<types::InstallManifest> = None;
@@ -417,7 +417,7 @@ fn run_update_all_logic(yes: bool, dry_run: bool) -> Result<()> {
                 }
             };
 
-            let install_plan = match install::plan::create_install_plan(&graph.nodes) {
+            let install_plan = match install::plan::create_install_plan(&graph.nodes, None, false) {
                 Ok(plan) => plan,
                 Err(e) => {
                     eprintln!("Error creating install plan for update: {}", e);
