@@ -4,6 +4,22 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
+## [Prod-Release-1.8.3] - 2026-03-07
+
+### ♻️ Refactor
+
+- _(http)_ Centralize HTTP client creation and add user agent
+
+### ✨ Features
+
+- _(install)_ Add --build flag to force source compilation
+- _(install)_ Skip already installed packages during installation
+- _(lua)_ Allow functions to resolve paths relative to BUILD_DIR
+
+### 🩹 Bug Fixes
+
+- _(install)_ Make --repo flag work
+
 ## [Prod-Release-1.8.2] - 2026-03-06
 
 ### ♻️ Refactor
