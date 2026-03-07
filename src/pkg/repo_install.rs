@@ -132,6 +132,7 @@ fn parse_repo_spec(spec: &str) -> Result<(String, String)> {
 
 fn get_repo_file_url(provider: &str, repo_path: &str, file_path: &str) -> Result<String> {
     let branches = ["main", "master"];
+    let client = crate::utils::build_blocking_http_client(30)?;
     for branch in &branches {
         let url = match provider {
             "github" => format!(
@@ -149,7 +150,7 @@ fn get_repo_file_url(provider: &str, repo_path: &str, file_path: &str) -> Result
             _ => return Err(anyhow!("Unknown provider")),
         };
 
-        let res = reqwest::blocking::get(&url);
+        let res = client.get(&url).send();
         if let Ok(response) = res
             && response.status().is_success()
         {

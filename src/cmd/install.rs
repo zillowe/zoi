@@ -56,10 +56,6 @@ pub fn run(
         is_project_install = true;
     }
 
-    if sources_to_process.is_empty() {
-        return Ok(());
-    }
-
     if let Some(repo_spec) = repo {
         if scope_override == Some(types::Scope::Project) {
             return Err(anyhow!(
@@ -89,6 +85,10 @@ pub fn run(
             repo_install_scope,
             plugin_manager,
         )?;
+        return Ok(());
+    }
+
+    if sources_to_process.is_empty() {
         return Ok(());
     }
 
