@@ -63,9 +63,10 @@ pub fn get_conflicts(
 
     if let Some(conflicts_with) = &pkg.conflicts {
         for conflict_pkg_name in conflicts_with {
-            let is_zoi_conflict = installed_packages
-                .iter()
-                .any(|p| &p.name == conflict_pkg_name);
+            let is_zoi_conflict = installed_packages.iter().any(|p| {
+                &p.name == conflict_pkg_name
+                    && (p.name != pkg.name || p.sub_package != pkg.sub_package)
+            });
 
             if is_zoi_conflict {
                 conflict_messages.push(format!(
@@ -84,6 +85,9 @@ pub fn get_conflicts(
     if let Some(bins_provided) = &pkg.bins {
         for bin in bins_provided {
             for installed_pkg in installed_packages {
+                if installed_pkg.name == pkg.name && installed_pkg.sub_package == pkg.sub_package {
+                    continue;
+                }
                 if let Some(installed_bins) = &installed_pkg.bins
                     && installed_bins.contains(bin)
                 {
@@ -99,6 +103,9 @@ pub fn get_conflicts(
     if let Some(provides) = &pkg.provides {
         for p in provides {
             for installed_pkg in installed_packages {
+                if installed_pkg.name == pkg.name && installed_pkg.sub_package == pkg.sub_package {
+                    continue;
+                }
                 if let Some(installed_provides) = &installed_pkg.provides
                     && installed_provides.contains(p)
                 {

@@ -1,4 +1,4 @@
-use crate::pkg::{config, install, lock, transaction, types};
+use crate::pkg::{config, install, lock, resolve, transaction, types};
 use crate::project;
 use anyhow::{Result, anyhow};
 use colored::Colorize;
@@ -116,7 +116,7 @@ pub fn run(
     let successfully_installed_sources = Mutex::new(Vec::new());
     let installed_manifests = Mutex::new(Vec::new());
 
-    let (graph, non_zoi_deps) = install::resolver::resolve_dependency_graph(
+    let (mut graph, non_zoi_deps) = install::resolver::resolve_dependency_graph(
         &final_sources,
         scope_override,
         force,
@@ -125,6 +125,46 @@ pub fn run(
         build_type.as_deref(),
         false,
     )?;
+
+    if !force {
+        let mut to_remove = Vec::new();
+        for (pkg_id, node) in &graph.nodes {
+            let request = resolve::parse_source_string(&node.source)?;
+            if let Some(manifest) = crate::pkg::local::is_package_installed(
+                &node.pkg.name,
+                request.sub_package.as_deref(),
+                scope_override.unwrap_or(node.pkg.scope),
+            )? && manifest.version == node.version
+            {
+                println!(
+                    "{} Package '{}' is already installed at version {}. Skipping.",
+                    "::".bold().green(),
+                    node.pkg.name.cyan(),
+                    node.version.yellow()
+                );
+                to_remove.push(pkg_id.clone());
+            }
+        }
+
+        for pkg_id in to_remove {
+            graph.nodes.remove(&pkg_id);
+            if let Some(children) = graph.adj.remove(&pkg_id)
+                && let Some(root_children) = graph.adj.get_mut("$root")
+            {
+                for child in children {
+                    root_children.insert(child);
+                }
+            }
+            if let Some(root_children) = graph.adj.get_mut("$root") {
+                root_children.remove(&pkg_id);
+            }
+        }
+    }
+
+    if graph.nodes.is_empty() && non_zoi_deps.is_empty() {
+        println!("\nAll requested packages are already installed.");
+        return Ok(());
+    }
 
     if !dry_run {
         for node in graph.nodes.values() {
