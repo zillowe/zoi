@@ -414,7 +414,7 @@ fn add_zmkdir(lua: &Lua) -> Result<(), mlua::Error> {
 
 fn add_verify_hash(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let verify_hash_fn =
-        lua.create_function(move |_, (file_path, hash_str): (String, String)| {
+        lua.create_function(move |lua, (file_path, hash_str): (String, String)| {
             let parts: Vec<&str> = hash_str.splitn(2, '-').collect();
             if parts.len() != 2 {
                 return Err(mlua::Error::RuntimeError(
@@ -424,8 +424,18 @@ fn add_verify_hash(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
             let algo = parts[0];
             let expected_hash = parts[1];
 
-            let mut file = fs::File::open(&file_path)
-                .map_err(|e| mlua::Error::RuntimeError(format!("Failed to open file: {}", e)))?;
+            let p = Path::new(&file_path);
+            let actual_path = if p.exists() {
+                p.to_path_buf()
+            } else if let Ok(build_dir) = lua.globals().get::<String>("BUILD_DIR") {
+                Path::new(&build_dir).join(p)
+            } else {
+                p.to_path_buf()
+            };
+
+            let mut file = fs::File::open(&actual_path).map_err(|e| {
+                mlua::Error::RuntimeError(format!("Failed to open file {:?}: {}", actual_path, e))
+            })?;
 
             let actual_hash = match algo {
                 "md5" => {
@@ -545,7 +555,18 @@ fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
 fn add_fs_util(lua: &Lua) -> Result<(), mlua::Error> {
     let fs_table = lua.create_table()?;
 
-    let exists_fn = lua.create_function(|_, path: String| Ok(Path::new(&path).exists()))?;
+    let exists_fn = lua.create_function(|lua, path: String| {
+        let p = Path::new(&path);
+        if p.exists() {
+            return Ok(true);
+        }
+        if let Ok(build_dir) = lua.globals().get::<String>("BUILD_DIR")
+            && Path::new(&build_dir).join(p).exists()
+        {
+            return Ok(true);
+        }
+        Ok(false)
+    })?;
     fs_table.set("exists", exists_fn)?;
 
     let copy_fn = lua.create_function(|_, (src, dest): (String, String)| {
@@ -766,7 +787,18 @@ fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
 
 fn add_verify_signature(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let verify_sig_fn = lua.create_function(
-        move |_, (file_path, sig_path, key_source): (String, String, String)| {
+        move |lua, (file_path, sig_path, key_source): (String, String, String)| {
+            let resolve_path = |p_str: &str| -> PathBuf {
+                let p = Path::new(p_str);
+                if p.exists() {
+                    p.to_path_buf()
+                } else if let Ok(build_dir) = lua.globals().get::<String>("BUILD_DIR") {
+                    Path::new(&build_dir).join(p)
+                } else {
+                    p.to_path_buf()
+                }
+            };
+
             let key_bytes: Vec<u8> = if key_source.starts_with("http") {
                 let client = utils::build_blocking_http_client(60)
                     .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
@@ -779,40 +811,43 @@ fn add_verify_signature(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                         )));
                     }
                 }
-            } else if Path::new(&key_source).exists() {
-                match fs::read(&key_source) {
-                    Ok(b) => b,
-                    Err(e) => {
-                        return Err(mlua::Error::RuntimeError(format!(
-                            "Failed to read key file: {}",
-                            e
-                        )));
-                    }
-                }
             } else {
-                let pgp_dir = match crate::pkg::pgp::get_pgp_dir() {
-                    Ok(dir) => dir,
-                    Err(e) => {
+                let resolved_key_path = resolve_path(&key_source);
+                if resolved_key_path.exists() {
+                    match fs::read(&resolved_key_path) {
+                        Ok(b) => b,
+                        Err(e) => {
+                            return Err(mlua::Error::RuntimeError(format!(
+                                "Failed to read key file {:?}: {}",
+                                resolved_key_path, e
+                            )));
+                        }
+                    }
+                } else {
+                    let pgp_dir = match crate::pkg::pgp::get_pgp_dir() {
+                        Ok(dir) => dir,
+                        Err(e) => {
+                            return Err(mlua::Error::RuntimeError(format!(
+                                "Failed to get PGP dir: {}",
+                                e
+                            )));
+                        }
+                    };
+                    let key_path = pgp_dir.join(format!("{}.asc", key_source));
+                    if !key_path.exists() {
                         return Err(mlua::Error::RuntimeError(format!(
-                            "Failed to get PGP dir: {}",
-                            e
+                            "Key with name '{}' not found (checked locally and at {:?}).",
+                            key_source, resolved_key_path
                         )));
                     }
-                };
-                let key_path = pgp_dir.join(format!("{}.asc", key_source));
-                if !key_path.exists() {
-                    return Err(mlua::Error::RuntimeError(format!(
-                        "Key with name '{}' not found.",
-                        key_source
-                    )));
-                }
-                match fs::read(&key_path) {
-                    Ok(b) => b,
-                    Err(e) => {
-                        return Err(mlua::Error::RuntimeError(format!(
-                            "Failed to read key file: {}",
-                            e
-                        )));
+                    match fs::read(&key_path) {
+                        Ok(b) => b,
+                        Err(e) => {
+                            return Err(mlua::Error::RuntimeError(format!(
+                                "Failed to read key file {:?}: {}",
+                                key_path, e
+                            )));
+                        }
                     }
                 }
             };
@@ -822,9 +857,12 @@ fn add_verify_signature(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                 Err(e) => return Err(mlua::Error::RuntimeError(format!("Invalid PGP key: {}", e))),
             };
 
+            let final_file_path = resolve_path(&file_path);
+            let final_sig_path = resolve_path(&sig_path);
+
             let result = crate::pkg::pgp::verify_detached_signature(
-                Path::new(&file_path),
-                Path::new(&sig_path),
+                &final_file_path,
+                &final_sig_path,
                 &cert,
             );
 
@@ -844,11 +882,19 @@ fn add_verify_signature(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
 }
 
 fn add_add_pgp_key(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
-    let add_pgp_key_fn = lua.create_function(move |_, (source, name): (String, String)| {
+    let add_pgp_key_fn = lua.create_function(move |lua, (source, name): (String, String)| {
         let result = if source.starts_with("http") {
             crate::pkg::pgp::add_key_from_url(&source, &name)
         } else {
-            crate::pkg::pgp::add_key_from_path(&source, Some(&name))
+            let p = Path::new(&source);
+            let actual_path = if p.exists() {
+                p.to_path_buf()
+            } else if let Ok(build_dir) = lua.globals().get::<String>("BUILD_DIR") {
+                Path::new(&build_dir).join(p)
+            } else {
+                p.to_path_buf()
+            };
+            crate::pkg::pgp::add_key_from_path(actual_path.to_str().unwrap_or(&source), Some(&name))
         };
 
         if let Err(e) = result {
@@ -866,8 +912,19 @@ fn add_add_pgp_key(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
 fn add_archive_util(lua: &Lua) -> Result<(), mlua::Error> {
     let archive_table = lua.create_table()?;
 
-    let list_fn = lua.create_function(|_, path: String| {
-        let file = fs::File::open(&path).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+    let list_fn = lua.create_function(|lua, path: String| {
+        let p = Path::new(&path);
+        let actual_path = if p.exists() {
+            p.to_path_buf()
+        } else if let Ok(build_dir) = lua.globals().get::<String>("BUILD_DIR") {
+            Path::new(&build_dir).join(p)
+        } else {
+            p.to_path_buf()
+        };
+
+        let file = fs::File::open(&actual_path).map_err(|e| {
+            mlua::Error::RuntimeError(format!("Failed to open archive {:?}: {}", actual_path, e))
+        })?;
         let mut files = Vec::new();
 
         if path.ends_with(".zip") {
