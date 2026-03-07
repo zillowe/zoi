@@ -97,7 +97,9 @@ fn refresh_registry_db(
                         &platform,
                     );
 
-                    if let Ok(response) = reqwest::blocking::get(&files_url)
+                    let client = crate::utils::build_blocking_http_client(30).ok();
+                    if let Some(c) = client
+                        && let Ok(response) = c.get(&files_url).send()
                         && response.status().is_success()
                         && let Ok(content) = response.text()
                     {
@@ -549,7 +551,9 @@ fn fetch_repo_yaml_content(url: &str) -> Result<String> {
             _ => continue,
         };
 
-        if let Ok(response) = reqwest::blocking::get(&repo_yaml_url)
+        let client = crate::utils::build_blocking_http_client(30).ok();
+        if let Some(c) = client
+            && let Ok(response) = c.get(&repo_yaml_url).send()
             && response.status().is_success()
         {
             println!("Found repo.yaml at: {}", repo_yaml_url.cyan());

@@ -16,7 +16,8 @@ pub fn install_manual_if_available(
             println!("{}", msg);
         }
 
-        let content = reqwest::blocking::get(url)?.bytes()?;
+        let client = crate::utils::build_blocking_http_client(60)?;
+        let content = client.get(url).send()?.bytes()?;
 
         let version_dir = crate::pkg::local::get_package_version_dir(
             pkg.scope,

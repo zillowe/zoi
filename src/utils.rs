@@ -774,6 +774,7 @@ pub fn build_blocking_http_client(timeout_secs: u64) -> anyhow::Result<reqwest::
         ));
     }
     let client = reqwest::blocking::Client::builder()
+        .user_agent("zoi")
         .timeout(Duration::from_secs(timeout_secs))
         .build()?;
     Ok(client)

@@ -135,7 +135,8 @@ pub fn add_key_from_fingerprint(fingerprint: &str, name: &str) -> Result<()> {
         fingerprint.cyan()
     );
 
-    let response = reqwest::blocking::get(&url)?;
+    let client = crate::utils::build_blocking_http_client(60)?;
+    let response = client.get(&url).send()?;
     if !response.status().is_success() {
         return Err(anyhow!(
             "Failed to fetch key from keyserver (HTTP {}).",
@@ -159,7 +160,8 @@ pub fn add_key_from_url(url: &str, name: &str) -> Result<()> {
         url.cyan()
     );
 
-    let response = reqwest::blocking::get(url)?;
+    let client = crate::utils::build_blocking_http_client(60)?;
+    let response = client.get(url).send()?;
     if !response.status().is_success() {
         return Err(anyhow!(
             "Failed to fetch key from url (HTTP {})",

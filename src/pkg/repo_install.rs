@@ -32,7 +32,9 @@ pub fn run(
     for file_name in &repo_file_names {
         if let Ok(url) = get_repo_file_url(&provider, &repo_path, file_name) {
             println!("Attempting to fetch repo config from: {}", url);
-            if let Ok(content_res) = reqwest::blocking::get(&url)
+            let client = crate::utils::build_blocking_http_client(30).ok();
+            if let Some(c) = client
+                && let Ok(content_res) = c.get(&url).send()
                 && content_res.status().is_success()
             {
                 repo_file_content = Some(content_res.text()?);
@@ -60,7 +62,8 @@ pub fn run(
 
     let source_to_install = if package_source.starts_with("http") {
         println!("Package source is a URL: {}", package_source.cyan());
-        let pkg_content = reqwest::blocking::get(package_source)?.text()?;
+        let client = crate::utils::build_blocking_http_client(30)?;
+        let pkg_content = client.get(package_source).send()?.text()?;
         let temp_path = env::temp_dir().join(format!(
             "zoi-repo-install-{}.pkg.lua",
             chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
@@ -75,7 +78,8 @@ pub fn run(
             package_source.cyan()
         );
         let pkg_url = get_repo_file_url(&provider, &repo_path, package_source)?;
-        let pkg_content = reqwest::blocking::get(&pkg_url)?.text()?;
+        let client = crate::utils::build_blocking_http_client(30)?;
+        let pkg_content = client.get(&pkg_url).send()?.text()?;
         let temp_path = env::temp_dir().join(format!(
             "zoi-repo-install-{}.pkg.lua",
             chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)

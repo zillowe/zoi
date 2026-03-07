@@ -60,8 +60,12 @@ fn add_fetch_util(lua: &Lua) -> Result<(), mlua::Error> {
     let fetch_table = lua.create_table()?;
 
     let fetch_fn = lua.create_function(|_, url: String| -> Result<String, mlua::Error> {
-        let response =
-            reqwest::blocking::get(url).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+        let client = utils::build_blocking_http_client(60)
+            .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+        let response = client
+            .get(url)
+            .send()
+            .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
         let text = response
             .text()
             .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
@@ -83,9 +87,7 @@ struct GitArgs {
 }
 
 fn fetch_json(url: &str) -> Result<serde_json::Value, mlua::Error> {
-    let client = reqwest::blocking::Client::builder()
-        .user_agent("zoi")
-        .build()
+    let client = utils::build_blocking_http_client(60)
         .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
 
     let response = client
@@ -234,7 +236,11 @@ fn add_git_fetch_util(lua: &Lua) -> Result<(), mlua::Error> {
 fn add_file_util(lua: &Lua) -> Result<(), mlua::Error> {
     let file_fn = lua.create_function(
         |_, (url, path): (String, String)| -> Result<(), mlua::Error> {
-            let response = reqwest::blocking::get(url)
+            let client = utils::build_blocking_http_client(60)
+                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+            let response = client
+                .get(url)
+                .send()
                 .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
             let content = response
                 .bytes()
@@ -618,7 +624,11 @@ fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                 }
                 let file_name = source.split('/').next_back().unwrap_or("download.tmp");
                 let temp_path = build_dir.join(file_name);
-                let response = reqwest::blocking::get(&source)
+                let client = utils::build_blocking_http_client(120)
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                let response = client
+                    .get(&source)
+                    .send()
                     .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
                 let content = response
                     .bytes()
@@ -758,7 +768,9 @@ fn add_verify_signature(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let verify_sig_fn = lua.create_function(
         move |_, (file_path, sig_path, key_source): (String, String, String)| {
             let key_bytes: Vec<u8> = if key_source.starts_with("http") {
-                match reqwest::blocking::get(&key_source).and_then(|r| r.bytes()) {
+                let client = utils::build_blocking_http_client(60)
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                match client.get(&key_source).send().and_then(|r| r.bytes()) {
                     Ok(b) => b.to_vec(),
                     Err(e) => {
                         return Err(mlua::Error::RuntimeError(format!(
