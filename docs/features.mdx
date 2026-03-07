@@ -310,7 +310,8 @@ Zoi resolves dependencies, checks for conflicts, and then sequentially downloads
 - `--local`: Install packages to the current project (alias for `--scope=project`).
 - `--global`: Install packages globally for the current user (alias for `--scope=user`).
 - `--save`: Save the package to the project's `zoi.yaml`.
-- `--type <TYPE>`: The type of package to build if building from source.
+- `--type <TYPE>`: The type of package to build if building from source. Specifying a type other than `pre-compiled` or `pre-built` will force a local build.
+- `--build` (alias: `-b`): Force building from source even if a pre-compiled archive is available in the registry.
 - `--dry-run`: Do not actually install, just show what would be done.
 
 ---

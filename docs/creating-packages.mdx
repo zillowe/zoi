@@ -419,6 +419,12 @@ The fastest way to iterate on your `.pkg.lua` file is to use `zoi install` with 
 zoi install /path/to/your-package.pkg.lua
 ```
 
+You can use the `--build` (or `-b`) flag to force a local build even if a pre-compiled version is available in the registry. Additionally, specifying a `--type` other than `pre-compiled` or `pre-built` will also trigger a local build.
+
+```sh
+zoi install --build --type source /path/to/your-package.pkg.lua
+```
+
 ### Step 2: Test Your Package
 
 Once your package seems to be working, run your tests using the `zoi package test` command.
