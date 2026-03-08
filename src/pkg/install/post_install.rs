@@ -16,7 +16,7 @@ pub fn install_manual_if_available(
             println!("{}", msg);
         }
 
-        let client = crate::utils::build_blocking_http_client(60)?;
+        let client = crate::utils::get_http_client()?;
         let content = client.get(url).send()?.bytes()?;
 
         let version_dir = crate::pkg::local::get_package_version_dir(

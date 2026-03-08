@@ -34,8 +34,8 @@ fn refresh_registry_db(
         println!("{}", msg);
     }
 
-    let _conn = db::open_connection(registry_handle)?;
-    db::clear_registry(&_conn)?;
+    let mut conn = db::open_connection(registry_handle)?;
+    db::clear_registry(&conn)?;
 
     let mut pkg_files = Vec::new();
     for entry in WalkDir::new(registry_path)
@@ -51,69 +51,78 @@ fn refresh_registry_db(
     let repo_config = config::read_repo_config(registry_path).ok();
     let platform = utils::get_platform().unwrap_or_default();
 
-    pkg_files.par_iter().for_each(|path| {
-        if let Ok(pkg) =
-            crate::pkg::lua::parser::parse_lua_package(path.to_str().unwrap(), None, true)
-        {
-            let mut pkg = pkg;
-            if pkg.repo.is_empty()
-                && let Ok(rel_path) = path.strip_prefix(registry_path)
-                && let Some(parent) = rel_path.parent()
-            {
-                let mut repo_path = parent.to_string_lossy().to_string().replace('\\', "/");
-                let pkg_name_suffix = format!("/{}", pkg.name);
-                if repo_path.ends_with(&pkg_name_suffix) {
-                    repo_path = repo_path[..repo_path.len() - pkg_name_suffix.len()].to_string();
-                } else if repo_path == pkg.name {
-                    repo_path = String::new();
-                }
-                pkg.repo = repo_path;
-            }
-            if let Ok(conn) = db::open_connection_no_setup(registry_handle) {
-                let pkg_id =
-                    match db::update_package(&conn, &pkg, registry_handle, None, None, None) {
-                        Ok(id) => id,
-                        Err(_) => return,
-                    };
-
-                if let Some(subs) = &pkg.sub_packages {
-                    for sub in subs {
-                        let _ =
-                            db::update_package(&conn, &pkg, registry_handle, None, Some(sub), None);
-                    }
-                }
-
-                if sync_files
-                    && let Some(rc) = &repo_config
-                    && let Some(pkg_link) = rc.pkg.iter().find(|p| p.link_type == "main")
-                    && let Some(files_url_template) = &pkg_link.files
+    let parsed_results: Vec<(types::Package, PathBuf)> = pkg_files
+        .par_iter()
+        .filter_map(|path| {
+            let path_str = path.to_string_lossy();
+            if let Ok(pkg) = crate::pkg::lua::parser::parse_lua_package(&path_str, None, true) {
+                let mut pkg = pkg;
+                if pkg.repo.is_empty()
+                    && let Ok(rel_path) = path.strip_prefix(registry_path)
+                    && let Some(parent) = rel_path.parent()
                 {
-                    let version = pkg.version.clone().unwrap_or_else(|| "latest".to_string());
-                    let files_url = crate::pkg::install::util::resolve_url_placeholders(
-                        files_url_template,
-                        &pkg.name,
-                        &pkg.repo,
-                        &version,
-                        &platform,
-                    );
-
-                    let client = crate::utils::build_blocking_http_client(30).ok();
-                    if let Some(c) = client
-                        && let Ok(response) = c.get(&files_url).send()
-                        && response.status().is_success()
-                        && let Ok(content) = response.text()
-                    {
-                        let file_list: Vec<String> = content
-                            .lines()
-                            .map(|l| l.trim().to_string())
-                            .filter(|l| !l.is_empty())
-                            .collect();
-                        let _ = db::index_package_files(&conn, pkg_id, &file_list);
+                    let mut repo_path = parent.to_string_lossy().to_string().replace('\\', "/");
+                    let pkg_name_suffix = format!("/{}", pkg.name);
+                    if repo_path.ends_with(&pkg_name_suffix) {
+                        repo_path =
+                            repo_path[..repo_path.len() - pkg_name_suffix.len()].to_string();
+                    } else if repo_path == pkg.name {
+                        repo_path = String::new();
                     }
+                    pkg.repo = repo_path;
                 }
+                Some((pkg, path.clone()))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    let tx = conn.transaction()?;
+    let client = if sync_files {
+        crate::utils::get_http_client().ok()
+    } else {
+        None
+    };
+
+    for (pkg, _path) in parsed_results {
+        let pkg_id = db::update_package(&tx, &pkg, registry_handle, None, None, None)?;
+
+        if let Some(subs) = &pkg.sub_packages {
+            for sub in subs {
+                let _ = db::update_package(&tx, &pkg, registry_handle, None, Some(sub), None);
             }
         }
-    });
+
+        if sync_files
+            && let Some(c) = &client
+            && let Some(rc) = &repo_config
+            && let Some(pkg_link) = rc.pkg.iter().find(|p| p.link_type == "main")
+            && let Some(files_url_template) = &pkg_link.files
+        {
+            let version = pkg.version.clone().unwrap_or_else(|| "latest".to_string());
+            let files_url = crate::pkg::install::util::resolve_url_placeholders(
+                files_url_template,
+                &pkg.name,
+                &pkg.repo,
+                &version,
+                &platform,
+            );
+
+            if let Ok(response) = c.get(&files_url).send()
+                && response.status().is_success()
+                && let Ok(content) = response.text()
+            {
+                let file_list: Vec<String> = content
+                    .lines()
+                    .map(|l| l.trim().to_string())
+                    .filter(|l| !l.is_empty())
+                    .collect();
+                let _ = db::index_package_files(&tx, pkg_id, &file_list);
+            }
+        }
+    }
+    tx.commit()?;
 
     Ok(())
 }
@@ -551,7 +560,7 @@ fn fetch_repo_yaml_content(url: &str) -> Result<String> {
             _ => continue,
         };
 
-        let client = crate::utils::build_blocking_http_client(30).ok();
+        let client = crate::utils::get_http_client().ok();
         if let Some(c) = client
             && let Ok(response) = c.get(&repo_yaml_url).send()
             && response.status().is_success()

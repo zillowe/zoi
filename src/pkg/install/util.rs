@@ -181,7 +181,7 @@ pub fn download_file_with_progress(
         internal_pb.as_ref().unwrap()
     };
 
-    let client = crate::utils::build_blocking_http_client(60)?;
+    let client = crate::utils::get_http_client()?;
     let mut attempt = 0u32;
 
     let mut partial_size = 0;
@@ -324,7 +324,7 @@ pub fn get_remote_file_list(url: &str) -> Result<Vec<String>> {
     if crate::pkg::offline::is_offline() {
         return Ok(Vec::new());
     }
-    let client = crate::utils::build_blocking_http_client(10)?;
+    let client = crate::utils::get_http_client()?;
     let resp = client
         .get(url)
         .send()
@@ -543,7 +543,7 @@ pub fn get_expected_hash(hash_url: &str, filename: Option<&str>) -> Result<Strin
     if crate::pkg::offline::is_offline() {
         return Ok(String::new());
     }
-    let client = crate::utils::build_blocking_http_client(10)?;
+    let client = crate::utils::get_http_client()?;
     let resp = client
         .get(hash_url)
         .send()
@@ -581,7 +581,7 @@ pub fn get_expected_size(size_url: &str) -> Result<(u64, u64)> {
     if crate::pkg::offline::is_offline() {
         return Ok((0, 0));
     }
-    let client = crate::utils::build_blocking_http_client(10)?;
+    let client = crate::utils::get_http_client()?;
     let resp = client
         .get(size_url)
         .send()

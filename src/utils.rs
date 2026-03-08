@@ -767,6 +767,30 @@ pub fn get_all_available_package_managers() -> Vec<String> {
     managers
 }
 
+use std::sync::OnceLock;
+
+static HTTP_CLIENT: OnceLock<reqwest::blocking::Client> = OnceLock::new();
+
+pub fn get_http_client() -> anyhow::Result<&'static reqwest::blocking::Client> {
+    if crate::pkg::offline::is_offline() {
+        return Err(anyhow!(
+            "Cannot create HTTP client: Zoi is in offline mode."
+        ));
+    }
+    if let Some(client) = HTTP_CLIENT.get() {
+        return Ok(client);
+    }
+
+    let client = reqwest::blocking::Client::builder()
+        .user_agent("zoi")
+        .timeout(Duration::from_secs(60))
+        .build()
+        .map_err(|e| anyhow!("Failed to build HTTP client: {}", e))?;
+
+    let _ = HTTP_CLIENT.set(client);
+    Ok(HTTP_CLIENT.get().expect("HTTP_CLIENT should be set"))
+}
+
 pub fn build_blocking_http_client(timeout_secs: u64) -> anyhow::Result<reqwest::blocking::Client> {
     if crate::pkg::offline::is_offline() {
         return Err(anyhow!(

@@ -32,7 +32,7 @@ pub fn run(
     for file_name in &repo_file_names {
         if let Ok(url) = get_repo_file_url(&provider, &repo_path, file_name) {
             println!("Attempting to fetch repo config from: {}", url);
-            let client = crate::utils::build_blocking_http_client(30).ok();
+            let client = crate::utils::get_http_client().ok();
             if let Some(c) = client
                 && let Ok(content_res) = c.get(&url).send()
                 && content_res.status().is_success()
@@ -62,7 +62,7 @@ pub fn run(
 
     let source_to_install = if package_source.starts_with("http") {
         println!("Package source is a URL: {}", package_source.cyan());
-        let client = crate::utils::build_blocking_http_client(30)?;
+        let client = crate::utils::get_http_client()?;
         let pkg_content = client.get(package_source).send()?.text()?;
         let temp_path = env::temp_dir().join(format!(
             "zoi-repo-install-{}.pkg.lua",
@@ -78,7 +78,7 @@ pub fn run(
             package_source.cyan()
         );
         let pkg_url = get_repo_file_url(&provider, &repo_path, package_source)?;
-        let client = crate::utils::build_blocking_http_client(30)?;
+        let client = crate::utils::get_http_client()?;
         let pkg_content = client.get(&pkg_url).send()?.text()?;
         let temp_path = env::temp_dir().join(format!(
             "zoi-repo-install-{}.pkg.lua",
@@ -133,7 +133,7 @@ fn parse_repo_spec(spec: &str) -> Result<(String, String)> {
 
 fn get_repo_file_url(provider: &str, repo_path: &str, file_path: &str) -> Result<String> {
     let branches = ["main", "master"];
-    let client = crate::utils::build_blocking_http_client(30)?;
+    let client = crate::utils::get_http_client()?;
     for branch in &branches {
         let url = match provider {
             "github" => format!(

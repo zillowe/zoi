@@ -12,7 +12,7 @@ pub fn get_hash(source: &str, hash_type: HashType) -> Result<String> {
     let mut hasher_sha256 = Sha256::new();
 
     if source.starts_with("http://") || source.starts_with("https://") {
-        let client = crate::utils::build_blocking_http_client(60)?;
+        let client = crate::utils::get_http_client()?;
         let mut response = client.get(source).send()?;
         if !response.status().is_success() {
             return Err(anyhow!(

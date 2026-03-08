@@ -60,8 +60,8 @@ fn add_fetch_util(lua: &Lua) -> Result<(), mlua::Error> {
     let fetch_table = lua.create_table()?;
 
     let fetch_fn = lua.create_function(|_, url: String| -> Result<String, mlua::Error> {
-        let client = utils::build_blocking_http_client(60)
-            .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+        let client =
+            utils::get_http_client().map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
         let response = client
             .get(url)
             .send()
@@ -87,8 +87,7 @@ struct GitArgs {
 }
 
 fn fetch_json(url: &str) -> Result<serde_json::Value, mlua::Error> {
-    let client = utils::build_blocking_http_client(60)
-        .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+    let client = utils::get_http_client().map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
 
     let response = client
         .get(url)
@@ -236,8 +235,8 @@ fn add_git_fetch_util(lua: &Lua) -> Result<(), mlua::Error> {
 fn add_file_util(lua: &Lua) -> Result<(), mlua::Error> {
     let file_fn = lua.create_function(
         |_, (url, path): (String, String)| -> Result<(), mlua::Error> {
-            let client = utils::build_blocking_http_client(60)
-                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+            let client =
+                utils::get_http_client().map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
             let response = client
                 .get(url)
                 .send()
@@ -645,7 +644,7 @@ fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                 }
                 let file_name = source.split('/').next_back().unwrap_or("download.tmp");
                 let temp_path = build_dir.join(file_name);
-                let client = utils::build_blocking_http_client(120)
+                let client = utils::get_http_client()
                     .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
                 let response = client
                     .get(&source)
@@ -800,7 +799,7 @@ fn add_verify_signature(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
             };
 
             let key_bytes: Vec<u8> = if key_source.starts_with("http") {
-                let client = utils::build_blocking_http_client(60)
+                let client = utils::get_http_client()
                     .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
                 match client.get(&key_source).send().and_then(|r| r.bytes()) {
                     Ok(b) => b.to_vec(),

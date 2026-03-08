@@ -135,7 +135,7 @@ pub fn add_key_from_fingerprint(fingerprint: &str, name: &str) -> Result<()> {
         fingerprint.cyan()
     );
 
-    let client = crate::utils::build_blocking_http_client(60)?;
+    let client = crate::utils::get_http_client()?;
     let response = client.get(&url).send()?;
     if !response.status().is_success() {
         return Err(anyhow!(
@@ -160,7 +160,7 @@ pub fn add_key_from_url(url: &str, name: &str) -> Result<()> {
         url.cyan()
     );
 
-    let client = crate::utils::build_blocking_http_client(60)?;
+    let client = crate::utils::get_http_client()?;
     let response = client.get(url).send()?;
     if !response.status().is_success() {
         return Err(anyhow!(

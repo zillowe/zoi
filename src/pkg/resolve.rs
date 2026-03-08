@@ -439,7 +439,7 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
 
 fn download_from_url(url: &str) -> Result<ResolvedSource> {
     println!("Downloading package definition from URL...");
-    let client = crate::utils::build_blocking_http_client(20)?;
+    let client = crate::utils::get_http_client()?;
     let mut attempt = 0u32;
     let mut response = loop {
         attempt += 1;
@@ -509,7 +509,7 @@ fn download_from_url(url: &str) -> Result<ResolvedSource> {
 
 fn download_content_from_url(url: &str) -> Result<String> {
     println!("Downloading from: {}", url.cyan());
-    let client = crate::utils::build_blocking_http_client(20)?;
+    let client = crate::utils::get_http_client()?;
     let mut attempt = 0u32;
     let response = loop {
         attempt += 1;
@@ -556,7 +556,7 @@ fn resolve_version_from_url(url: &str, channel: &str) -> Result<String> {
         channel.cyan(),
         url.cyan()
     );
-    let client = crate::utils::build_blocking_http_client(15)?;
+    let client = crate::utils::get_http_client()?;
     let mut attempt = 0u32;
     let resp = loop {
         attempt += 1;
@@ -659,7 +659,7 @@ pub fn get_default_version(pkg: &types::Package, registry_handle: Option<&str>) 
 
     if let Some(ver) = &pkg.version {
         if ver.starts_with("http") {
-            let client = crate::utils::build_blocking_http_client(15)?;
+            let client = crate::utils::get_http_client()?;
             let mut attempt = 0u32;
             let resp = loop {
                 attempt += 1;
@@ -1086,7 +1086,7 @@ fn resolve_source_recursive(
         let mut alt_resolved_source =
             if alt_source.starts_with("http://") || alt_source.starts_with("https://") {
                 println!("Downloading 'alt' source from: {}", alt_source.cyan());
-                let client = crate::utils::build_blocking_http_client(20)?;
+                let client = crate::utils::get_http_client()?;
                 let mut attempt = 0u32;
                 let response = loop {
                     attempt += 1;
