@@ -113,7 +113,14 @@ You can bake trusted PGP public keys directly into your custom Zoi binary to est
 
 The build system (`build.rs`) will automatically detect these files and embed them as static assets. When the resulting binary is run, it will ensure these keys are present in the user's local Zoi keyring.
 
-These can be set in a `.env` file at the project root (see `.env.example`) or passed directly to the build command.
+## Embedding Global Hooks
+
+Zoi can also embed global transaction hooks directly into the binary. These hooks automate system-wide tasks based on file modifications.
+
+1.  Place your hook definition files (`.hook.yaml`) in the `src/pkg/hooks/builtin/` directory.
+2.  Build Zoi as usual.
+
+The built-in hooks are automatically registered and will run during package transactions if their path triggers match. They can be overridden by placing a hook with the same name in the user's local hooks directory.
 
 ## Generating Completions and Man Pages
 

@@ -115,6 +115,15 @@ Zoi supports baking trusted PGP public keys directly into the binary. Any `.asc`
 
 On startup, Zoi automatically imports these embedded keys into the user's local keyring (`~/.zoi/pgps/`). This is the recommended way to distribute "Root of Trust" keys for custom or internal registries.
 
+## Embedding Global Hooks
+
+Similar to PGP keys, Zoi can embed global transaction hooks directly into the binary. These hooks are YAML files that define system-wide maintenance tasks triggered by file modifications.
+
+1.  Place your hook definition files (`.hook.yaml`) in the `src/pkg/hooks/builtin/` directory.
+2.  Build Zoi as usual.
+
+The build system will automatically embed these hooks. They are loaded on every transaction and can be overridden by users in `~/.zoi/hooks/` if they use the same name.
+
 ## Completions and Man Pages
 
 Zoi provides commands to generate shell completions and man pages. These should be included in the package.
