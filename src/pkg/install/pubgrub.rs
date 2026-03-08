@@ -51,6 +51,78 @@ pub struct ZoiDependencyProvider {
     pub yes: bool,
 }
 
+pub fn semver_to_range(req_str: &str) -> Ranges<SemVersion> {
+    let req_str = req_str.trim_start_matches('@');
+
+    if let Ok(version) = Version::parse(req_str) {
+        return Ranges::singleton(SemVersion(version));
+    }
+
+    if let Ok(req) = semver::VersionReq::parse(req_str) {
+        let mut range = Ranges::full();
+        for comparator in &req.comparators {
+            let v = SemVersion(Version {
+                major: comparator.major,
+                minor: comparator.minor.unwrap_or(0),
+                patch: comparator.patch.unwrap_or(0),
+                pre: comparator.pre.clone(),
+                build: semver::BuildMetadata::EMPTY,
+            });
+
+            let comp_range = match comparator.op {
+                semver::Op::Exact => Ranges::singleton(v),
+                semver::Op::Greater => Ranges::strictly_higher_than(v),
+                semver::Op::GreaterEq => Ranges::higher_than(v),
+                semver::Op::Less => Ranges::strictly_lower_than(v),
+                semver::Op::LessEq => Ranges::lower_than(v),
+                semver::Op::Tilde => {
+                    let next_minor = SemVersion(Version {
+                        major: comparator.major,
+                        minor: comparator.minor.unwrap_or(0) + 1,
+                        patch: 0,
+                        pre: semver::Prerelease::EMPTY,
+                        build: semver::BuildMetadata::EMPTY,
+                    });
+                    Ranges::higher_than(v).intersection(&Ranges::strictly_lower_than(next_minor))
+                }
+                semver::Op::Caret => {
+                    let next_major = if comparator.major > 0 {
+                        SemVersion(Version {
+                            major: comparator.major + 1,
+                            minor: 0,
+                            patch: 0,
+                            pre: semver::Prerelease::EMPTY,
+                            build: semver::BuildMetadata::EMPTY,
+                        })
+                    } else if let Some(minor) = comparator.minor {
+                        SemVersion(Version {
+                            major: 0,
+                            minor: minor + 1,
+                            patch: 0,
+                            pre: semver::Prerelease::EMPTY,
+                            build: semver::BuildMetadata::EMPTY,
+                        })
+                    } else {
+                        SemVersion(Version {
+                            major: 0,
+                            minor: 1,
+                            patch: 0,
+                            pre: semver::Prerelease::EMPTY,
+                            build: semver::BuildMetadata::EMPTY,
+                        })
+                    };
+                    Ranges::higher_than(v).intersection(&Ranges::strictly_lower_than(next_major))
+                }
+                _ => Ranges::full(),
+            };
+            range = range.intersection(&comp_range);
+        }
+        return range;
+    }
+
+    Ranges::full()
+}
+
 impl ZoiDependencyProvider {
     pub fn new(
         root_deps: FxHashMap<PkgName, Ranges<SemVersion>>,
@@ -64,8 +136,8 @@ impl ZoiDependencyProvider {
         })
     }
 
-    fn semver_to_range(&self, _req_str: &str) -> Ranges<SemVersion> {
-        Ranges::full()
+    fn semver_to_range(&self, req_str: &str) -> Ranges<SemVersion> {
+        semver_to_range(req_str)
     }
 
     pub fn get_versions(&self, package: &PkgName) -> Result<Vec<SemVersion>, ZoiSolverError> {

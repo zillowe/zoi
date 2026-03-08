@@ -170,7 +170,13 @@ pub fn resolve_dependency_graph(
                 .unwrap_or_else(|| "zoidberg".to_string()),
         };
 
-        root_deps.insert(pkg_name, Ranges::full());
+        let range = if let Some(v_spec) = &request.version_spec {
+            crate::pkg::install::pubgrub::semver_to_range(v_spec)
+        } else {
+            Ranges::full()
+        };
+
+        root_deps.insert(pkg_name, range);
     }
 
     let provider = ZoiDependencyProvider::new(root_deps, quiet, yes)?;
