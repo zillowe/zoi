@@ -61,7 +61,8 @@ fn uninstall_collection(
 
                 if yes {
                     println!(
-                        "\n--- Uninstalling native dependency: {} ---",
+                        "\n{} Uninstalling native dependency: {}...",
+                        "::".bold().blue(),
                         dep_str.bold()
                     );
                     println!("{}: {}", "Note".yellow(), warning);
@@ -69,7 +70,11 @@ fn uninstall_collection(
                     &format!("{}\n   {}", prompt, warning.dimmed()),
                     false,
                 ) {
-                    println!("\n--- Uninstalling dependency: {} ---", dep_str.bold());
+                    println!(
+                        "\n{} Uninstalling dependency: {}...",
+                        "::".bold().blue(),
+                        dep_str.bold()
+                    );
                 } else {
                     println!(
                         "Skipping uninstallation of native dependency: {}",
@@ -78,7 +83,11 @@ fn uninstall_collection(
                     continue;
                 }
             } else {
-                println!("\n--- Uninstalling zoi dependency: {} ---", dep_str.bold());
+                println!(
+                    "\n{} Uninstalling zoi dependency: {}...",
+                    "::".bold().blue(),
+                    dep_str.bold()
+                );
             }
 
             if let Err(e) = dependencies::uninstall_dependency(dep_str, &move |name| {
@@ -259,7 +268,7 @@ pub fn run(
             if backup_src.exists() {
                 let backup_dest = version_dir
                     .parent()
-                    .unwrap()
+                    .expect("version_dir should have a parent (package_dir)")
                     .join(format!("{}.zoisave", backup_file_rel));
                 if let Some(p) = backup_dest.parent()
                     && let Err(e) = fs::create_dir_all(p)

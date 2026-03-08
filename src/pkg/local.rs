@@ -61,40 +61,52 @@ fn get_db_root() -> Result<PathBuf> {
     Ok(apply_sysroot(home_dir.join(".zoi").join("pkgs").join("db")))
 }
 
+use rayon::prelude::*;
+
 pub fn get_installed_packages() -> Result<Vec<InstallManifest>> {
-    let mut installed = Vec::new();
-    for scope in [Scope::User, Scope::System, Scope::Project] {
-        let store_root = get_store_base_dir(scope)?;
-        if !store_root.exists() {
-            continue;
-        }
-        for entry in fs::read_dir(store_root)? {
-            let entry = entry?;
-            let path = entry.path();
-            if !path.is_dir() {
-                continue;
-            }
-            let latest_path = path.join("latest");
-            if (latest_path.is_symlink() || latest_path.is_dir())
-                && let Ok(entries) = fs::read_dir(&latest_path)
+    let scopes = [Scope::User, Scope::System, Scope::Project];
+
+    let installed: Vec<InstallManifest> = scopes
+        .into_par_iter()
+        .map(|scope| {
+            let mut manifests = Vec::new();
+            if let Ok(store_root) = get_store_base_dir(scope)
+                && store_root.exists()
+                && let Ok(entries) = fs::read_dir(store_root)
             {
-                for entry in entries.filter_map(Result::ok) {
-                    let file_name = entry.file_name().to_string_lossy().to_string();
-                    if file_name.starts_with("manifest") && file_name.ends_with(".yaml") {
-                        let manifest_path = entry.path();
-                        if manifest_path.exists() {
-                            let content = fs::read_to_string(manifest_path)?;
-                            let manifest: InstallManifest = serde_yaml::from_str(&content)?;
-                            installed.push(manifest);
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if !path.is_dir() {
+                        continue;
+                    }
+                    let latest_path = path.join("latest");
+                    if (latest_path.is_symlink() || latest_path.is_dir())
+                        && let Ok(sub_entries) = fs::read_dir(&latest_path)
+                    {
+                        for sub_entry in sub_entries.flatten() {
+                            let file_name = sub_entry.file_name().to_string_lossy().to_string();
+                            if file_name.starts_with("manifest") && file_name.ends_with(".yaml") {
+                                let manifest_path = sub_entry.path();
+                                if manifest_path.exists()
+                                    && let Ok(content) = fs::read_to_string(manifest_path)
+                                    && let Ok(manifest) =
+                                        serde_yaml::from_str::<InstallManifest>(&content)
+                                {
+                                    manifests.push(manifest);
+                                }
+                            }
                         }
                     }
                 }
             }
-        }
-    }
+            manifests
+        })
+        .flatten()
+        .collect();
 
-    installed.sort_by(|a, b| a.name.cmp(&b.name));
-    Ok(installed)
+    let mut sorted_installed = installed;
+    sorted_installed.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(sorted_installed)
 }
 
 #[derive(Debug)]
@@ -191,11 +203,11 @@ pub fn get_packages_from_repos(repos: &[String]) -> Result<Vec<super::types::Pac
             let pkg_file_path = entry.path().join(format!("{}.pkg.lua", pkg_name));
 
             if pkg_file_path.is_file() {
-                let mut pkg: super::types::Package = crate::pkg::lua::parser::parse_lua_package(
-                    pkg_file_path.to_str().unwrap(),
-                    None,
-                    true,
-                )?;
+                let pkg_file_path_str = pkg_file_path.to_str().ok_or_else(|| {
+                    anyhow::anyhow!("Package path contains invalid UTF-8: {:?}", pkg_file_path)
+                })?;
+                let mut pkg: super::types::Package =
+                    crate::pkg::lua::parser::parse_lua_package(pkg_file_path_str, None, true)?;
 
                 if let Ok(repo_subpath) = entry.path().strip_prefix(&db_root) {
                     let mut repo_path = repo_subpath

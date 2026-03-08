@@ -44,7 +44,11 @@ pub fn run(all: bool, package_names: &[String], yes: bool, dry_run: bool) -> Res
 }
 
 fn run_update_single_logic(package_name: &str, yes: bool, dry_run: bool) -> Result<()> {
-    println!("--- Updating package '{}' ---", package_name.blue().bold());
+    println!(
+        "{} Updating package '{}'...",
+        "::".bold().blue(),
+        package_name.cyan().bold()
+    );
 
     let request = resolve::parse_source_string(package_name)?;
 
@@ -149,7 +153,10 @@ fn run_update_single_logic(package_name: &str, yes: bool, dry_run: bool) -> Resu
 
     for stage in stages {
         for pkg_id in stage {
-            let node = graph.nodes.get(&pkg_id).unwrap();
+            let node = graph
+                .nodes
+                .get(&pkg_id)
+                .expect("Package node missing from graph during update");
             if let Some(action) = install_plan.get(&pkg_id) {
                 match install::installer::install_node(node, action, None, None, yes, true) {
                     Ok(m) => {
@@ -277,7 +284,7 @@ fn run_update_all_logic(yes: bool, dry_run: bool) -> Result<()> {
     let mut packages_to_upgrade = Vec::new();
     let mut upgrade_messages = Vec::new();
 
-    println!("\n{}", "--- Checking for Upgrades ---".yellow().bold());
+    println!("\n{} Checking for upgrades...", "::".bold().blue());
     let pb = ProgressBar::new(installed_packages.len() as u64);
     pb.set_style(
         ProgressStyle::default_bar()
@@ -382,7 +389,8 @@ fn run_update_all_logic(yes: bool, dry_run: bool) -> Result<()> {
         .par_iter()
         .for_each(|(source, new_pkg, _registry_handle, old_manifest)| {
             println!(
-                "\n--- Upgrading {} to {} ---",
+                "\n{} Upgrading {} to {}...",
+                "::".bold().blue(),
                 source.cyan(),
                 new_pkg.version.as_deref().unwrap_or("N/A").green()
             );
@@ -396,7 +404,10 @@ fn run_update_all_logic(yes: bool, dry_run: bool) -> Result<()> {
                     source,
                     e
                 );
-                failed_updates.lock().unwrap().push(source.clone());
+                failed_updates
+                    .lock()
+                    .expect("mutex poisoned")
+                    .push(source.clone());
                 return;
             }
 
@@ -412,7 +423,10 @@ fn run_update_all_logic(yes: bool, dry_run: bool) -> Result<()> {
                 Ok(res) => res,
                 Err(e) => {
                     eprintln!("Error resolving dependency graph for update: {}", e);
-                    failed_updates.lock().unwrap().push(source.clone());
+                    failed_updates
+                        .lock()
+                        .expect("mutex poisoned")
+                        .push(source.clone());
                     return;
                 }
             };
@@ -421,7 +435,10 @@ fn run_update_all_logic(yes: bool, dry_run: bool) -> Result<()> {
                 Ok(plan) => plan,
                 Err(e) => {
                     eprintln!("Error creating install plan for update: {}", e);
-                    failed_updates.lock().unwrap().push(source.clone());
+                    failed_updates
+                        .lock()
+                        .expect("mutex poisoned")
+                        .push(source.clone());
                     return;
                 }
             };
@@ -430,7 +447,10 @@ fn run_update_all_logic(yes: bool, dry_run: bool) -> Result<()> {
                 Ok(s) => s,
                 Err(e) => {
                     eprintln!("Error sorting dependency graph for update: {}", e);
-                    failed_updates.lock().unwrap().push(source.clone());
+                    failed_updates
+                        .lock()
+                        .expect("mutex poisoned")
+                        .push(source.clone());
                     return;
                 }
             };
@@ -439,7 +459,10 @@ fn run_update_all_logic(yes: bool, dry_run: bool) -> Result<()> {
 
             for stage in stages {
                 for pkg_id in stage {
-                    let node = graph.nodes.get(&pkg_id).unwrap();
+                    let node = graph
+                        .nodes
+                        .get(&pkg_id)
+                        .expect("Package node missing from graph during update");
                     if let Some(action) = install_plan.get(&pkg_id) {
                         match install::installer::install_node(node, action, None, None, yes, true)
                         {
@@ -450,7 +473,10 @@ fn run_update_all_logic(yes: bool, dry_run: bool) -> Result<()> {
                             }
                             Err(e) => {
                                 eprintln!("Failed to upgrade {}: {}", source, e);
-                                failed_updates.lock().unwrap().push(source.clone());
+                                failed_updates
+                                    .lock()
+                                    .expect("mutex poisoned")
+                                    .push(source.clone());
                                 return;
                             }
                         }
@@ -459,7 +485,7 @@ fn run_update_all_logic(yes: bool, dry_run: bool) -> Result<()> {
             }
 
             if let Some(new_manifest) = new_manifest_option {
-                let _lock = transaction_mutex.lock().unwrap();
+                let _lock = transaction_mutex.lock().expect("mutex poisoned");
                 if let Err(e) = transaction::record_operation(
                     transaction_id,
                     types::TransactionOperation::Upgrade {
@@ -468,9 +494,12 @@ fn run_update_all_logic(yes: bool, dry_run: bool) -> Result<()> {
                     },
                 ) {
                     eprintln!("Error: Failed to record transaction for {}: {}", source, e);
-                    failed_updates.lock().unwrap().push(source.clone());
+                    failed_updates
+                        .lock()
+                        .expect("mutex poisoned")
+                        .push(source.clone());
                 } else {
-                    successful_upgrades.lock().unwrap().push((
+                    successful_upgrades.lock().expect("mutex poisoned").push((
                         old_manifest.clone(),
                         new_manifest.clone(),
                         new_pkg.clone(),
@@ -478,11 +507,14 @@ fn run_update_all_logic(yes: bool, dry_run: bool) -> Result<()> {
                 }
             } else {
                 eprintln!("Failed to get new manifest for {}", source);
-                failed_updates.lock().unwrap().push(source.clone());
+                failed_updates
+                    .lock()
+                    .expect("mutex poisoned")
+                    .push(source.clone());
             }
         });
 
-    let failed = failed_updates.into_inner().unwrap();
+    let failed = failed_updates.into_inner().expect("mutex poisoned");
     if !failed.is_empty() {
         eprintln!("\nError: Some packages failed to upgrade. Rolling back all changes...");
         for pkg in &failed {
@@ -503,7 +535,7 @@ fn run_update_all_logic(yes: bool, dry_run: bool) -> Result<()> {
     transaction::commit(&transaction.id)?;
 
     println!("\n{}", "Success:".green());
-    let successful_upgrades = successful_upgrades.into_inner().unwrap();
+    let successful_upgrades = successful_upgrades.into_inner().expect("mutex poisoned");
     for (old_manifest, new_manifest, new_pkg) in &successful_upgrades {
         if let Some(backup_files) = &old_manifest.backup {
             println!(

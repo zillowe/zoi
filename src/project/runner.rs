@@ -57,7 +57,11 @@ pub fn run(cmd_alias: Option<&str>, args: &[String], config: &config::ProjectCon
             .unwrap_or_default(),
     };
 
-    println!("--- Running command: {} ---", command_to_run.cmd.bold());
+    println!(
+        "{} Running command: {}...",
+        "::".bold().blue(),
+        command_to_run.cmd.bold()
+    );
     let mut full_command = run_cmd;
     if !args.is_empty() {
         full_command.push(' ');

@@ -14,7 +14,12 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
 
     let resolved_source = resolve::resolve_source(package_name, false, yes)?;
     let mut pkg = crate::pkg::lua::parser::parse_lua_package(
-        resolved_source.path.to_str().unwrap(),
+        resolved_source.path.to_str().ok_or_else(|| {
+            anyhow!(
+                "Path contains invalid UTF-8 characters: {:?}",
+                resolved_source.path
+            )
+        })?,
         None,
         false,
     )?;
@@ -62,8 +67,8 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
         return Err(anyhow!("No previous version to roll back to."));
     }
 
-    let current_version = versions.pop().unwrap();
-    let previous_version = versions.pop().unwrap();
+    let current_version = versions.pop().expect("Versions length checked above");
+    let previous_version = versions.pop().expect("Versions length checked above");
 
     println!(
         "Rolling back from version {} to {}",

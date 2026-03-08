@@ -170,7 +170,9 @@ pub fn run(
 
     let platform = utils::get_platform()?;
     let metadata = lua::parser::parse_lua_package_for_platform(
-        pkg_lua_path.to_str().unwrap(),
+        pkg_lua_path
+            .to_str()
+            .ok_or_else(|| anyhow!("Path contains invalid UTF-8 characters: {:?}", pkg_lua_path))?,
         &platform,
         version_override,
         true,

@@ -18,6 +18,16 @@ pub struct Dependency<'a> {
     pub description: Option<&'a str>,
 }
 
+use std::sync::LazyLock;
+
+static DEP_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^(?P<pkg_and_ver>.+?)(?::(?P<desc>[^:].*))?$")
+        .expect("Static DEP_RE regex is valid")
+});
+static VER_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^(?P<pkg>.*?)(?P<ver>@.+|[=><~^].+)?$").expect("Static VER_RE regex is valid")
+});
+
 pub fn parse_dependency_string(dep_str: &str) -> Result<Dependency<'_>> {
     let (manager, rest) = match dep_str.split_once(':') {
         Some((m, r))
@@ -32,23 +42,27 @@ pub fn parse_dependency_string(dep_str: &str) -> Result<Dependency<'_>> {
         return Err(anyhow!("Invalid dependency string: {}", dep_str));
     }
 
-    let re = Regex::new(r"^(?P<pkg_and_ver>.+?)(?::(?P<desc>[^:].*))?$").unwrap();
-    let caps = re
+    let caps = DEP_RE
         .captures(rest)
         .ok_or_else(|| anyhow!("Failed to parse dependency string: {}", rest))?;
 
-    let package_and_version = caps.name("pkg_and_ver").unwrap().as_str();
+    let package_and_version = caps
+        .name("pkg_and_ver")
+        .expect("Regex matched but pkg_and_ver group not found")
+        .as_str();
     let description = caps.name("desc").map(|m| m.as_str());
 
-    let ver_re = Regex::new(r"^(?P<pkg>.*?)(?P<ver>@.+|[=><~^].+)?$").unwrap();
-    let ver_caps = ver_re.captures(package_and_version).ok_or_else(|| {
+    let ver_caps = VER_RE.captures(package_and_version).ok_or_else(|| {
         anyhow!(
             "Failed to parse package and version from: {}",
             package_and_version
         )
     })?;
 
-    let package = ver_caps.name("pkg").unwrap().as_str();
+    let package = ver_caps
+        .name("pkg")
+        .expect("Regex matched but pkg group not found")
+        .as_str();
     let mut version_str = ver_caps.name("ver").map(|m| m.as_str().to_string());
 
     if let Some(v) = &version_str
@@ -93,7 +107,10 @@ pub fn install_dependency(
     m: Option<&MultiProgress>,
 ) -> Result<()> {
     let dep_id = format!("{}:{}", dep.manager, dep.package);
-    if !processed_deps.lock().unwrap().insert(dep_id.clone()) {
+    let mut lock = processed_deps
+        .lock()
+        .map_err(|e| anyhow!("Mutex poisoned: {}", e))?;
+    if !lock.insert(dep_id.clone()) {
         return Ok(());
     }
 
@@ -363,7 +380,10 @@ fn install_zoi_dependency(
     let stages = graph.toposort()?;
     for stage in stages {
         for id in stage {
-            let node = graph.nodes.get(&id).unwrap();
+            let node = graph
+                .nodes
+                .get(&id)
+                .ok_or_else(|| anyhow!("Package not found in graph: {}", id))?;
             let action = install_plan
                 .get(&id)
                 .ok_or_else(|| anyhow!("Could not find install action for {}", id))?;

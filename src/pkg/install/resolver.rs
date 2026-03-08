@@ -108,13 +108,15 @@ impl DependencyGraph {
         while !queue.is_empty() {
             let mut stage = Vec::new();
             for _ in 0..queue.len() {
-                let u = queue.pop_front().unwrap();
+                let u = queue.pop_front().expect("Queue length checked above");
                 stage.push(u.clone());
                 count += 1;
 
                 if let Some(neighbors) = self.adj.get(&u) {
                     for v_id in neighbors {
-                        let degree = in_degree.get_mut(v_id).unwrap();
+                        let degree = in_degree
+                            .get_mut(v_id)
+                            .expect("v_id should exist in in_degree");
                         *degree -= 1;
                         if *degree == 0 {
                             queue.push_back(v_id.clone());

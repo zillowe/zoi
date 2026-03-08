@@ -238,7 +238,12 @@ fn parse_markdown(content: &str) -> Vec<Line<'_>> {
                 }
                 Tag::BlockQuote(_) => {
                     style_stack.push(Style::default().fg(Color::Gray));
-                    current_line.push(Span::styled("> ", *style_stack.last().unwrap()));
+                    current_line.push(Span::styled(
+                        "> ",
+                        *style_stack
+                            .last()
+                            .expect("Style stack should never be empty"),
+                    ));
                 }
                 Tag::CodeBlock(kind) => {
                     let lang = if let pulldown_cmark::CodeBlockKind::Fenced(lang) = kind {
@@ -272,14 +277,28 @@ fn parse_markdown(content: &str) -> Vec<Line<'_>> {
                     }
                 }
                 Tag::Emphasis => {
-                    style_stack.push((*style_stack.last().unwrap()).add_modifier(Modifier::ITALIC));
+                    style_stack.push(
+                        (*style_stack
+                            .last()
+                            .expect("Style stack should never be empty"))
+                        .add_modifier(Modifier::ITALIC),
+                    );
                 }
                 Tag::Strong => {
-                    style_stack.push((*style_stack.last().unwrap()).add_modifier(Modifier::BOLD));
+                    style_stack.push(
+                        (*style_stack
+                            .last()
+                            .expect("Style stack should never be empty"))
+                        .add_modifier(Modifier::BOLD),
+                    );
                 }
                 Tag::Strikethrough => {
-                    style_stack
-                        .push((*style_stack.last().unwrap()).add_modifier(Modifier::CROSSED_OUT));
+                    style_stack.push(
+                        (*style_stack
+                            .last()
+                            .expect("Style stack should never be empty"))
+                        .add_modifier(Modifier::CROSSED_OUT),
+                    );
                 }
                 Tag::Link { dest_url, .. } => {
                     link_url = dest_url.to_string();
@@ -303,8 +322,9 @@ fn parse_markdown(content: &str) -> Vec<Line<'_>> {
                     TagEnd::CodeBlock => {
                         if let Some((mut h, code)) = highlighter.take() {
                             for line in LinesWithEndings::from(&code) {
-                                let ranges: Vec<(SyntectStyle, &str)> =
-                                    h.highlight_line(line, &ss).unwrap();
+                                let ranges: Vec<(SyntectStyle, &str)> = h
+                                    .highlight_line(line, &ss)
+                                    .expect("Syntax highlighting should not fail");
                                 let spans: Vec<Span> = ranges
                                     .into_iter()
                                     .map(|(style, text)| {
@@ -356,7 +376,12 @@ fn parse_markdown(content: &str) -> Vec<Line<'_>> {
                 if let Some((_, code)) = &mut highlighter {
                     code.push_str(&text);
                 } else {
-                    current_line.push(Span::styled(text.to_string(), *style_stack.last().unwrap()));
+                    current_line.push(Span::styled(
+                        text.to_string(),
+                        *style_stack
+                            .last()
+                            .expect("Style stack should never be empty"),
+                    ));
                 }
             }
             CmarkEvent::Code(text) => {

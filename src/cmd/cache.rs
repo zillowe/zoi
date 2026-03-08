@@ -45,13 +45,16 @@ pub fn list() -> Result<()> {
         return Ok(());
     }
 
-    println!("{}", "--- Archives in local cache ---".yellow().bold());
+    println!("{} Archives in local cache:", "::".bold().blue());
     let mut count = 0;
     for entry in fs::read_dir(archive_cache_root)? {
         let entry = entry?;
         let path = entry.path();
         if path.is_file() {
-            let filename = path.file_name().unwrap().to_string_lossy();
+            let filename = path
+                .file_name()
+                .expect("Path from read_dir should have a file name")
+                .to_string_lossy();
             let size = fs::metadata(&path)?.len();
             println!(
                 "  - {:<40} ({})",

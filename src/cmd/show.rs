@@ -1,6 +1,6 @@
 use crate::pkg::{local, resolve, types};
 use crate::utils;
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use colored::*;
 use std::fs;
 
@@ -56,7 +56,12 @@ pub fn run(source: &str, raw: bool) -> Result<()> {
         return Ok(());
     }
     let mut pkg: types::Package = crate::pkg::lua::parser::parse_lua_package(
-        resolved_source.path.to_str().unwrap(),
+        resolved_source.path.to_str().ok_or_else(|| {
+            anyhow!(
+                "Path contains invalid UTF-8 characters: {:?}",
+                resolved_source.path
+            )
+        })?,
         None,
         false,
     )?;

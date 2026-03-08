@@ -100,7 +100,10 @@ fn install_completions(
 
     if shell == Shell::Zsh && scope == SetupScope::User {
         println!("Ensure the directory is in your $fpath. Add this to your .zshrc if it's not:");
-        println!("  fpath=({:?} $fpath)", path.parent().unwrap());
+        println!(
+            "  fpath=({:?} $fpath)",
+            path.parent().expect("Path should have a parent directory")
+        );
     }
 
     Ok(())
@@ -142,7 +145,11 @@ _zoi_all_packages() {
 }
 
 pub fn run(shell: Shell, scope: SetupScope) -> Result<()> {
-    println!("--- Setting up shell: {} ---", shell.to_string().cyan());
+    println!(
+        "{} Setting up shell: {}...",
+        "::".bold().blue(),
+        shell.to_string().cyan()
+    );
 
     let mut cmd = Cli::command();
     install_completions(shell, scope, &mut cmd)?;
@@ -187,8 +194,13 @@ pub fn enter_ephemeral_shell(
         for stage in stages {
             use rayon::prelude::*;
             stage.into_par_iter().try_for_each(|pkg_id| -> Result<()> {
-                let node = graph.nodes.get(&pkg_id).unwrap();
-                let action = install_plan.get(&pkg_id).unwrap();
+                let node = graph
+                    .nodes
+                    .get(&pkg_id)
+                    .expect("Package node missing from graph");
+                let action = install_plan
+                    .get(&pkg_id)
+                    .expect("Install action missing for package");
 
                 install::installer::install_node(node, action, Some(&m), None, true, false)?;
                 Ok(())
@@ -213,7 +225,7 @@ pub fn enter_ephemeral_shell(
                 let entry = entry?;
                 let path = entry.path();
                 if path.is_file() || path.is_symlink() {
-                    let file_name = path.file_name().unwrap();
+                    let file_name = path.file_name().expect("Path should have a file name");
                     let dest = temp_bin_dir.join(file_name);
                     utils::symlink_file(&path, &dest)?;
                 }

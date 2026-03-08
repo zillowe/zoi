@@ -68,7 +68,9 @@ pub fn try_build_install(
         )
     });
 
-    let build_result = build_handle.join().unwrap();
+    let build_result = build_handle
+        .join()
+        .map_err(|_| anyhow!("Build thread panicked"))?;
 
     if let Err(e) = build_result {
         if let Some(p) = pb {
@@ -91,7 +93,10 @@ pub fn try_build_install(
         pkg.version.as_deref().unwrap_or_default(),
         current_platform
     );
-    let archive_path = pkg_lua_path.parent().unwrap().join(archive_filename);
+    let archive_path = pkg_lua_path
+        .parent()
+        .expect("pkg_lua_path should have a parent")
+        .join(archive_filename);
     if !archive_path.exists() {
         return Err(anyhow!(
             "Package archive '{}' was not created after a successful build. This is an unexpected error.",

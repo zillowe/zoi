@@ -69,7 +69,10 @@ pub fn run(
             chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
         ));
         fs::write(&temp_path, pkg_content)?;
-        temp_path.to_str().unwrap().to_string()
+        temp_path
+            .to_str()
+            .ok_or_else(|| anyhow!("Temporary path contains invalid UTF-8"))?
+            .to_string()
     } else if package_source.ends_with(".pkg.lua")
         || (package_source.contains('/') && !package_source.starts_with('@'))
     {
@@ -85,7 +88,10 @@ pub fn run(
             chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
         ));
         fs::write(&temp_path, pkg_content)?;
-        temp_path.to_str().unwrap().to_string()
+        temp_path
+            .to_str()
+            .ok_or_else(|| anyhow!("Temporary path contains invalid UTF-8"))?
+            .to_string()
     } else {
         println!(
             "Package source is a package name: {}",

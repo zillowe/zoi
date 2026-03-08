@@ -36,7 +36,8 @@ pub fn setup(env_alias: Option<&str>, config: &config::ProjectConfig) -> Result<
     };
 
     println!(
-        "\n--- Setting up environment: {} ---",
+        "\n{} Setting up environment: {}...",
+        "::".bold().blue(),
         env_to_setup.name.bold()
     );
 

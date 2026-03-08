@@ -4,9 +4,9 @@ use colored::*;
 
 pub fn run(dry_run: bool) -> Result<()> {
     if dry_run {
-        println!("{}", "--- Cleaning Cache (Dry-run) ---".yellow().bold());
+        println!("{} Cleaning cache (Dry-run)...", "::".bold().yellow());
     } else {
-        println!("{}", "--- Cleaning Cache ---".yellow().bold());
+        println!("{} Cleaning cache...", "::".bold().blue());
     }
     pkg::cache::clear(dry_run)?;
     pkg::cache::clear_archives(dry_run)?;

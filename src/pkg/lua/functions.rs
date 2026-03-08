@@ -258,7 +258,12 @@ fn add_file_util(lua: &Lua) -> Result<(), mlua::Error> {
 fn add_import_util(lua: &Lua, current_path: &Path) -> Result<(), mlua::Error> {
     let current_path_buf = current_path.to_path_buf();
     let import_fn = lua.create_function(move |lua, file_name: String| {
-        let path = current_path_buf.parent().unwrap().join(&file_name);
+        let parent = current_path_buf.parent().ok_or_else(|| {
+            mlua::Error::RuntimeError(
+                "Could not determine parent directory of package file".to_string(),
+            )
+        })?;
+        let path = parent.join(&file_name);
         let content =
             fs::read_to_string(&path).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
 
@@ -295,7 +300,12 @@ fn add_include_util(lua: &Lua, current_path: &Path) -> Result<(), mlua::Error> {
     let current_path_buf = current_path.to_path_buf();
     let include_fn =
         lua.create_function(move |lua, file_name: String| -> Result<(), mlua::Error> {
-            let path = current_path_buf.parent().unwrap().join(file_name);
+            let parent = current_path_buf.parent().ok_or_else(|| {
+                mlua::Error::RuntimeError(
+                    "Could not determine parent directory of package file".to_string(),
+                )
+            })?;
+            let path = parent.join(file_name);
             let code =
                 fs::read_to_string(path).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
             lua.load(&code).exec()?;
@@ -618,7 +628,12 @@ fn add_find_util(lua: &Lua) -> Result<(), mlua::Error> {
             let entry = entry.map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
             if entry.file_name().to_string_lossy() == name {
                 let path = entry.path();
-                let relative_path = path.strip_prefix(Path::new(&build_dir_str)).unwrap();
+                let relative_path = path.strip_prefix(Path::new(&build_dir_str)).map_err(|e| {
+                    mlua::Error::RuntimeError(format!(
+                        "Failed to determine relative path for {:?}: {}",
+                        path, e
+                    ))
+                })?;
                 return Ok(Some(relative_path.to_string_lossy().to_string()));
             }
         }

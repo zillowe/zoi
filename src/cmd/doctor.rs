@@ -3,12 +3,12 @@ use anyhow::Result;
 use colored::*;
 
 pub fn run() -> Result<()> {
-    println!("{}", "--- Running Zoi Doctor ---".yellow().bold());
+    println!("{} Running Zoi doctor...", "::".bold().blue());
     println!("Checking your system for potential issues...");
 
     let mut issues_found = 0;
 
-    println!("\n{}", "Checking for broken symlinks...".bold());
+    println!("\n{} Checking for broken symlinks...", "->".bold().cyan());
     match pkg::doctor::check_broken_symlinks() {
         Ok(broken_links) => {
             if broken_links.is_empty() {
@@ -38,7 +38,7 @@ pub fn run() -> Result<()> {
         }
     }
 
-    println!("\n{}", "Checking PATH configuration...".bold());
+    println!("\n{} Checking PATH configuration...", "->".bold().cyan());
     match pkg::doctor::check_path_configuration() {
         Ok(Some(warning)) => {
             issues_found += 1;
@@ -58,7 +58,10 @@ pub fn run() -> Result<()> {
         }
     }
 
-    println!("\n{}", "Checking for outdated repositories...".bold());
+    println!(
+        "\n{} Checking for outdated repositories...",
+        "->".bold().cyan()
+    );
     match pkg::doctor::check_outdated_repos() {
         Ok(Some(warning)) => {
             issues_found += 1;
@@ -74,7 +77,10 @@ pub fn run() -> Result<()> {
         }
     }
 
-    println!("\n{}", "Checking for duplicate package IDs...".bold());
+    println!(
+        "\n{} Checking for duplicate package IDs...",
+        "->".bold().cyan()
+    );
     match pkg::doctor::check_duplicate_packages() {
         Ok(duplicates) => {
             if duplicates.is_empty() {
@@ -104,7 +110,7 @@ pub fn run() -> Result<()> {
         }
     }
 
-    println!("\n{}", "Checking PGP configurations...".bold());
+    println!("\n{} Checking PGP configurations...", "->".bold().cyan());
     match pkg::doctor::check_pgp_configuration() {
         Ok(missing_keys) => {
             if missing_keys.is_empty() {
@@ -131,7 +137,10 @@ pub fn run() -> Result<()> {
         }
     }
 
-    println!("\n{}", "Validating zoi.pkgs.json integrity...".bold());
+    println!(
+        "\n{} Validating zoi.pkgs.json integrity...",
+        "->".bold().cyan()
+    );
     match pkg::doctor::validate_pkgs_json_integrity() {
         Ok(missing_packages) => {
             if missing_packages.is_empty() {
@@ -156,7 +165,7 @@ pub fn run() -> Result<()> {
         }
     }
 
-    println!("\n{}", "Checking for orphaned packages...".bold());
+    println!("\n{} Checking for orphaned packages...", "->".bold().cyan());
     match pkg::doctor::check_orphaned_packages() {
         Ok(orphaned) => {
             if orphaned.is_empty() {
@@ -184,7 +193,7 @@ pub fn run() -> Result<()> {
         }
     }
 
-    println!("\n{}", "Checking for external tools...".bold());
+    println!("\n{} Checking for external tools...", "->".bold().cyan());
     let tool_results = pkg::doctor::check_external_tools();
     if tool_results.essential_missing.is_empty() && tool_results.recommended_missing.is_empty() {
         println!(

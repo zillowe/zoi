@@ -33,23 +33,35 @@ fn get_bin_root(scope: Scope) -> Result<PathBuf> {
     }
 }
 
+use rayon::prelude::*;
+
 pub fn check_broken_symlinks() -> Result<Vec<PathBuf>> {
-    let mut broken_links = Vec::new();
     let scopes = [Scope::User, Scope::System, Scope::Project];
 
-    for &scope in &scopes {
-        let root = get_bin_root(scope)?;
-        if !root.exists() {
-            continue;
-        }
-        for entry in fs::read_dir(root)? {
-            let entry = entry?;
-            let path = entry.path();
-            if entry.file_type()?.is_symlink() && !path.exists() {
-                broken_links.push(path);
+    let broken_links: Vec<PathBuf> = scopes
+        .into_par_iter()
+        .map(|scope| {
+            let mut links = Vec::new();
+            if let Ok(root) = get_bin_root(scope)
+                && root.exists()
+                && let Ok(entries) = fs::read_dir(root)
+            {
+                for entry in entries.flatten() {
+                    if let Ok(ft) = entry.file_type()
+                        && ft.is_symlink()
+                    {
+                        let path = entry.path();
+                        if !path.exists() {
+                            links.push(path);
+                        }
+                    }
+                }
             }
-        }
-    }
+            links
+        })
+        .flatten()
+        .collect();
+
     Ok(broken_links)
 }
 
@@ -172,67 +184,87 @@ pub fn check_pgp_configuration() -> Result<Vec<String>> {
 
 pub fn validate_pkgs_json_integrity() -> Result<Vec<String>> {
     let recorded_packages = crate::pkg::recorder::get_recorded_packages()?;
-    let mut missing_packages = Vec::new();
 
-    for pkg_record in recorded_packages {
-        let manifest = crate::pkg::local::is_package_installed(
-            &pkg_record.name,
-            pkg_record.sub_package.as_deref(),
-            Scope::User,
-        )?
-        .or(crate::pkg::local::is_package_installed(
-            &pkg_record.name,
-            pkg_record.sub_package.as_deref(),
-            Scope::System,
-        )?)
-        .or(crate::pkg::local::is_package_installed(
-            &pkg_record.name,
-            pkg_record.sub_package.as_deref(),
-            Scope::Project,
-        )?);
+    let missing_packages: Vec<String> = recorded_packages
+        .into_par_iter()
+        .filter_map(|pkg_record| {
+            let manifest = crate::pkg::local::is_package_installed(
+                &pkg_record.name,
+                pkg_record.sub_package.as_deref(),
+                Scope::User,
+            )
+            .ok()
+            .flatten()
+            .or_else(|| {
+                crate::pkg::local::is_package_installed(
+                    &pkg_record.name,
+                    pkg_record.sub_package.as_deref(),
+                    Scope::System,
+                )
+                .ok()
+                .flatten()
+            })
+            .or_else(|| {
+                crate::pkg::local::is_package_installed(
+                    &pkg_record.name,
+                    pkg_record.sub_package.as_deref(),
+                    Scope::Project,
+                )
+                .ok()
+                .flatten()
+            });
 
-        if manifest.is_none() {
-            let name = if let Some(sub) = pkg_record.sub_package {
-                format!("{}:{}", pkg_record.name, sub)
+            if manifest.is_none() {
+                let name = if let Some(sub) = pkg_record.sub_package {
+                    format!("{}:{}", pkg_record.name, sub)
+                } else {
+                    pkg_record.name
+                };
+                Some(name)
             } else {
-                pkg_record.name
-            };
-            missing_packages.push(name);
-        }
-    }
+                None
+            }
+        })
+        .collect();
 
     Ok(missing_packages)
 }
 
 pub fn check_orphaned_packages() -> Result<Vec<String>> {
     let all_installed = crate::pkg::local::get_installed_packages()?;
-    let mut orphaned = Vec::new();
 
-    for package in all_installed {
-        if !matches!(
-            package.reason,
-            crate::pkg::types::InstallReason::Dependency { .. }
-        ) {
-            continue;
-        }
+    let orphaned: Vec<String> = all_installed
+        .into_par_iter()
+        .filter_map(|package| {
+            if !matches!(
+                package.reason,
+                crate::pkg::types::InstallReason::Dependency { .. }
+            ) {
+                return None;
+            }
 
-        let package_dir = crate::pkg::local::get_package_dir(
-            package.scope,
-            &package.registry_handle,
-            &package.repo,
-            &package.name,
-        )?;
-        let dependents = crate::pkg::local::get_dependents(&package_dir)?;
+            let package_dir = crate::pkg::local::get_package_dir(
+                package.scope,
+                &package.registry_handle,
+                &package.repo,
+                &package.name,
+            )
+            .ok()?;
 
-        if dependents.is_empty() {
-            let name = if let Some(sub) = package.sub_package {
-                format!("{}:{}", package.name, sub)
+            let dependents = crate::pkg::local::get_dependents(&package_dir).ok()?;
+
+            if dependents.is_empty() {
+                let name = if let Some(sub) = package.sub_package {
+                    format!("{}:{}", package.name, sub)
+                } else {
+                    package.name
+                };
+                Some(name)
             } else {
-                package.name
-            };
-            orphaned.push(name);
-        }
-    }
+                None
+            }
+        })
+        .collect();
 
     Ok(orphaned)
 }

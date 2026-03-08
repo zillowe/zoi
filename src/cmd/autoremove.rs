@@ -5,11 +5,11 @@ use colored::*;
 pub fn run(yes: bool, dry_run: bool) -> Result<()> {
     if dry_run {
         println!(
-            "{}",
-            "--- Autoremoving Unused Packages (Dry-run) ---".yellow()
+            "{} Autoremoving unused packages (Dry-run)...",
+            "::".bold().yellow()
         );
     } else {
-        println!("{}", "--- Autoremoving Unused Packages ---".yellow());
+        println!("{} Autoremoving unused packages...", "::".bold().blue());
     }
 
     pkg::autoremove::run(yes, dry_run)?;

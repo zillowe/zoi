@@ -217,7 +217,12 @@ pub fn run(
     }
 
     let mut pkg: types::Package = crate::pkg::lua::parser::parse_lua_package(
-        resolved_source.path.to_str().unwrap(),
+        resolved_source.path.to_str().ok_or_else(|| {
+            anyhow!(
+                "Path contains invalid UTF-8 characters: {:?}",
+                resolved_source.path
+            )
+        })?,
         None,
         false,
     )?;
@@ -255,7 +260,11 @@ pub fn run(
         Err(e) => eprintln!("{} telemetry failed: {}", "Warning:".yellow(), e),
     }
 
-    println!("\n--- Executing '{}' ---\n", pkg.name.bold());
+    println!(
+        "\n{} Executing '{}'...\n",
+        "::".bold().blue(),
+        pkg.name.bold()
+    );
 
     let mut cmd = Command::new(&bin_path);
     if !args.is_empty() {

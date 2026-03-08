@@ -24,8 +24,13 @@ fn main() {
                 let _ = m.load_all();
                 m
             }
-            Err(_) => {
-                zoi::pkg::plugin::PluginManager::new().expect("Failed to initialize PluginManager")
+            Err(e) => {
+                eprintln!(
+                    "{}: Failed to initialize PluginManager: {}",
+                    "Error".red().bold(),
+                    e
+                );
+                std::process::exit(1);
             }
         };
 

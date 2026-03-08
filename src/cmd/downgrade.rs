@@ -12,8 +12,9 @@ pub fn run(
     plugin_manager: &crate::pkg::plugin::PluginManager,
 ) -> Result<()> {
     println!(
-        "--- Downgrading package '{}' ---",
-        package_name.blue().bold()
+        "{} Downgrading package '{}'...",
+        "::".bold().blue(),
+        package_name.cyan().bold()
     );
 
     let _request = resolve::parse_source_string(package_name)?;
@@ -107,7 +108,10 @@ pub fn run(
 
     let install_source = format!(
         "{}@{}",
-        package_name.split('@').next().unwrap(),
+        package_name
+            .split('@')
+            .next()
+            .expect("Split always returns at least one element"),
         selected_version
     );
 

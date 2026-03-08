@@ -119,7 +119,9 @@ fn run_list_installed(
                     continue;
                 }
             }
-            if type_filter.is_some() && pkg.package_type != type_filter.unwrap() {
+            if type_filter.is_some()
+                && pkg.package_type != type_filter.expect("type_filter checked to be some above")
+            {
                 continue;
             }
 
@@ -185,7 +187,9 @@ fn run_list_installed(
                     continue;
                 }
             }
-            if type_filter.is_some() && pkg.package_type != type_filter.unwrap() {
+            if type_filter.is_some()
+                && pkg.package_type != type_filter.expect("type_filter checked to be some above")
+            {
                 continue;
             }
 
@@ -336,11 +340,15 @@ fn run_list_all(
             registries.push(reg.handle.clone());
         }
 
-        for handle in registries {
-            if handle.is_empty() {
-                continue;
-            }
-            match crate::pkg::db::list_all_packages(&handle) {
+        use rayon::prelude::*;
+        let results: Vec<Result<Vec<types::Package>>> = registries
+            .into_par_iter()
+            .filter(|h| !h.is_empty())
+            .map(|handle| crate::pkg::db::list_all_packages(&handle))
+            .collect();
+
+        for res in results {
+            match res {
                 Ok(pkgs) => all_available.extend(pkgs),
                 Err(_) => {
                     db_failed = true;
@@ -431,7 +439,9 @@ fn run_list_all(
         .set_header(vec!["Status", "Package", "Version", "Repo", "Type"]);
 
     for pkg in available_pkgs {
-        if type_filter.is_some() && pkg.package_type != type_filter.unwrap() {
+        if type_filter.is_some()
+            && pkg.package_type != type_filter.expect("type_filter checked to be some above")
+        {
             continue;
         }
 

@@ -178,7 +178,9 @@ pub fn download_file_with_progress(
         p.set_style(pb_style);
         p.set_message(format!("Downloading {}", get_filename_from_url(url)));
         internal_pb = Some(p);
-        internal_pb.as_ref().unwrap()
+        internal_pb
+            .as_ref()
+            .expect("internal_pb should be set if not using pb_override")
     };
 
     let client = crate::utils::get_http_client()?;

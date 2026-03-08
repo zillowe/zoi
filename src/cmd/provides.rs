@@ -5,6 +5,8 @@ use comfy_table::{Attribute, Cell, ContentArrangement, Table, presets::UTF8_FULL
 use std::io::{self, Write};
 use std::process::{Command, Stdio};
 
+use rayon::prelude::*;
+
 pub fn run(term: &str) -> Result<()> {
     println!(
         "{} Searching for packages providing '{}'...",
@@ -21,20 +23,21 @@ pub fn run(term: &str) -> Result<()> {
         registries.push(reg.handle.clone());
     }
 
-    let mut all_results = Vec::new();
-    for handle in registries {
-        if let Ok(res) = db::find_provides(&handle, term) {
-            all_results.extend(res);
-        }
-    }
+    let all_results: Vec<(crate::pkg::types::Package, String)> = registries
+        .into_par_iter()
+        .filter_map(|handle| db::find_provides(&handle, term).ok())
+        .flatten()
+        .collect();
 
     if all_results.is_empty() {
         println!(
-            "
-{}",
-            "No packages found providing this item.".yellow()
+            "\n{} No packages found providing this item.",
+            "::".bold().yellow()
         );
-        println!("Hint: Ensure you have run 'zoi sync --files' to index remote file lists.");
+        println!(
+            "   {} Ensure you have run 'zoi sync --files' to index remote file lists.",
+            "Hint:".cyan()
+        );
         return Ok(());
     }
 

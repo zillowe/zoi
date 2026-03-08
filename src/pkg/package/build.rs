@@ -24,7 +24,9 @@ fn build_for_platform(
         .and_then(Path::to_str)
         .ok_or_else(|| anyhow!("Could not get parent directory of package file"))?;
     let pkg_for_meta = pkg::lua::parser::parse_lua_package_for_platform(
-        package_file.to_str().unwrap(),
+        package_file
+            .to_str()
+            .ok_or_else(|| anyhow!("Path contains invalid UTF-8 characters: {:?}", package_file))?,
         platform,
         version_override,
         quiet,
@@ -69,7 +71,11 @@ fn build_for_platform(
         };
 
         if !sub_package.is_empty() && !quiet {
-            println!("--- Building sub-package: {} ---", sub_package.cyan());
+            println!(
+                "{} Building sub-package: {}",
+                "::".bold().blue(),
+                sub_package.cyan()
+            );
         }
 
         let lua = Lua::new();
@@ -96,10 +102,21 @@ fn build_for_platform(
             .set("PKG", pkg_table)
             .map_err(|e| anyhow!(e.to_string()))?;
         lua.globals()
-            .set("BUILD_DIR", build_dir.path().to_str().unwrap())
+            .set(
+                "BUILD_DIR",
+                build_dir
+                    .path()
+                    .to_str()
+                    .expect("build_dir should be valid UTF-8"),
+            )
             .map_err(|e| anyhow!(e.to_string()))?;
         lua.globals()
-            .set("STAGING_DIR", staging_dir.to_str().unwrap())
+            .set(
+                "STAGING_DIR",
+                staging_dir
+                    .to_str()
+                    .expect("staging_dir should be valid UTF-8"),
+            )
             .map_err(|e| anyhow!(e.to_string()))?;
         lua.globals()
             .set("BUILD_TYPE", build_type)
@@ -338,14 +355,21 @@ fn build_for_platform(
 
     fs::copy(
         package_file,
-        staging_dir.join(package_file.file_name().unwrap()),
+        staging_dir.join(
+            package_file
+                .file_name()
+                .expect("package_file should have a name"),
+        ),
     )?;
 
     let output_filename = format!("{}-{}-{}.pkg.tar.zst", pkg_for_meta.name, version, platform);
     let output_base = if let Some(dir) = output_dir {
         dir.to_path_buf()
     } else {
-        package_file.parent().unwrap().to_path_buf()
+        package_file
+            .parent()
+            .expect("package_file should have a parent directory")
+            .to_path_buf()
     };
     let output_path = output_base.join(output_filename);
 
@@ -361,13 +385,20 @@ fn build_for_platform(
     fs::write(&files_manifest_path, files_list.join("\n"))?;
 
     let hash_path = output_path.with_extension("pkg.tar.zst.hash");
-    let hash = pkg::helper::get_hash(output_path.to_str().unwrap(), pkg::helper::HashType::Sha512)?;
+    let output_path_str = output_path
+        .to_str()
+        .ok_or_else(|| anyhow!("Output path contains invalid UTF-8: {:?}", output_path))?;
+    let hash = pkg::helper::get_hash(output_path_str, pkg::helper::HashType::Sha512)?;
     fs::write(
         &hash_path,
         format!(
             "{}  {}\n",
             hash,
-            output_path.file_name().unwrap().to_str().unwrap()
+            output_path
+                .file_name()
+                .expect("output_path should have a name")
+                .to_str()
+                .expect("output_filename should be valid UTF-8")
         ),
     )?;
 
@@ -377,7 +408,7 @@ fn build_for_platform(
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
-        .map(|e| e.metadata().unwrap().len())
+        .map(|e| e.metadata().map(|m| m.len()).unwrap_or(0))
         .sum();
     fs::write(
         &size_path,
@@ -449,7 +480,11 @@ pub fn run(
 
     for platform in &platforms_to_build {
         if !quiet {
-            println!("--- Building for platform: {} ---", platform.cyan());
+            println!(
+                "{} Building for platform: {}",
+                "::".bold().blue(),
+                platform.cyan()
+            );
         }
         if let Err(e) = build_for_platform(
             package_file,

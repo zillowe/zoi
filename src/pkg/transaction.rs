@@ -120,7 +120,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
     let content = fs::read_to_string(&path)?;
     let transaction: types::Transaction = serde_json::from_str(&content)?;
 
-    println!("\n{}", "--- Starting Rollback ---".yellow().bold());
+    println!("\n{} Starting Rollback...", "::".bold().blue());
 
     for operation in transaction.operations.iter().rev() {
         match operation {
@@ -240,7 +240,9 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
 
                 for stage in stages {
                     for id in stage {
-                        let node = graph.nodes.get(&id).unwrap();
+                        let Some(node) = graph.nodes.get(&id) else {
+                            continue;
+                        };
                         if let Some(action) = install_plan.get(&id)
                             && let Err(e) = install::installer::install_node(
                                 node, action, None, None, true, true,
@@ -375,7 +377,9 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
 
                 for stage in stages {
                     for id in stage {
-                        let node = graph.nodes.get(&id).unwrap();
+                        let Some(node) = graph.nodes.get(&id) else {
+                            continue;
+                        };
                         if let Some(action) = install_plan.get(&id)
                             && let Err(e) = install::installer::install_node(
                                 node, action, None, None, true, true,
@@ -394,7 +398,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
         }
     }
 
-    println!("{}", "--- Rollback Complete ---".yellow().bold());
+    println!("{}", ":: Rollback Complete".bold().blue());
     delete_log(transaction_id)?;
     Ok(())
 }
@@ -415,7 +419,7 @@ pub fn get_last_transaction_id() -> Result<Option<String>> {
             let metadata = fs::metadata(&path)?;
             let modified_time = metadata.modified()?;
 
-            if last_modified_time.is_none() || modified_time > last_modified_time.unwrap() {
+            if last_modified_time.is_none_or(|last| modified_time > last) {
                 last_modified_time = Some(modified_time);
                 last_transaction_id = path.file_stem().and_then(|s| s.to_str()).map(String::from);
             }

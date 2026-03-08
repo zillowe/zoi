@@ -120,7 +120,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             let entry = entry?;
             let path = entry.path();
             if path.extension().and_then(|s| s.to_str()) == Some("asc") {
-                let name = path.file_stem().unwrap().to_str().unwrap();
+                let name = path
+                    .file_stem()
+                    .expect("Path should have a file stem")
+                    .to_str()
+                    .expect("Path should be valid UTF-8");
                 let content = std::fs::read(&path)?;
                 writeln!(&mut pgp_file, "    (\"{}\", &{:?}),", name, content)?;
             }
@@ -143,7 +147,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             let entry = entry?;
             let path = entry.path();
             if path.extension().and_then(|s| s.to_str()) == Some("yaml") {
-                let name = path.file_stem().unwrap().to_str().unwrap();
+                let name = path
+                    .file_stem()
+                    .expect("Path should have a file stem")
+                    .to_str()
+                    .expect("Path should be valid UTF-8");
                 let content = std::fs::read_to_string(&path)?;
                 writeln!(&mut hooks_file, "    (\"{}\", {:?}),", name, content)?;
             }

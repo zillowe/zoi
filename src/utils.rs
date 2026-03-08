@@ -73,7 +73,12 @@ pub fn symlink_file(target: &Path, link: &Path) -> std::io::Result<()> {
                 if shim_path.exists() {
                     fs::remove_file(&shim_path)?;
                 }
-                let bin_name = link.file_name().unwrap().to_string_lossy();
+                let bin_name = link
+                    .file_name()
+                    .ok_or_else(|| {
+                        std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid link path")
+                    })?
+                    .to_string_lossy();
                 let content = format!("@echo off\nzoi {} %*\n", bin_name);
                 fs::write(&shim_path, content)?;
             }

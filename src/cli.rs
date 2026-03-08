@@ -651,7 +651,7 @@ pub fn run() -> anyhow::Result<()> {
     let cli = match Cli::from_arg_matches(&matches) {
         Ok(cli) => cli,
         Err(err) => {
-            err.print().unwrap();
+            err.print()?;
             return Err(anyhow::anyhow!("Failed to parse arguments"));
         }
     };
@@ -786,7 +786,7 @@ pub fn run() -> anyhow::Result<()> {
                 if !as_dependency && !as_explicit {
                     let mut cmd = Cli::command();
                     if let Some(subcmd) = cmd.find_subcommand_mut("mark") {
-                        subcmd.print_help().unwrap();
+                        subcmd.print_help()?;
                     }
                     Ok(())
                 } else {
@@ -801,7 +801,7 @@ pub fn run() -> anyhow::Result<()> {
                 if !all && package_names.is_empty() {
                     let mut cmd = Cli::command();
                     if let Some(subcmd) = cmd.find_subcommand_mut("update") {
-                        subcmd.print_help().unwrap();
+                        subcmd.print_help()?;
                     }
                     Ok(())
                 } else {
@@ -916,7 +916,7 @@ pub fn run() -> anyhow::Result<()> {
                 } else {
                     let mut cmd = Cli::command();
                     if let Some(subcmd) = cmd.find_subcommand_mut("shell") {
-                        subcmd.print_help().unwrap();
+                        subcmd.print_help()?;
                     }
                     Ok(())
                 }
@@ -1001,7 +1001,7 @@ pub fn run() -> anyhow::Result<()> {
                     Ok(true) => Ok(()),
                     Ok(false) => {
                         let mut cmd = Cli::command();
-                        cmd.print_help().unwrap();
+                        cmd.print_help()?;
                         println!(
                             "\n{}: '{}' is not a Zoi command.",
                             "Error".red().bold(),
@@ -1032,7 +1032,7 @@ pub fn run() -> anyhow::Result<()> {
             std::process::exit(1);
         }
     } else {
-        cmd.print_help().unwrap();
+        cmd.print_help()?;
     }
     Ok(())
 }

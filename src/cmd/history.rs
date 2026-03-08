@@ -4,7 +4,7 @@ use colored::*;
 use comfy_table::{Cell, Color, ContentArrangement, Table, presets::UTF8_FULL};
 
 pub fn run() -> Result<()> {
-    println!("{}", "--- Zoi Operation History ---".yellow().bold());
+    println!("{} Zoi operation history...", "::".bold().blue());
 
     let history = audit::get_history()?;
 

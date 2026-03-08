@@ -1,5 +1,5 @@
 use crate::pkg::types;
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use std::fs;
 use std::io::Write;
 use tempfile::NamedTempFile;
@@ -28,7 +28,13 @@ pub fn process_lockfile(
         let yaml_content = serde_yaml::to_string(&manifest)?;
         temp_file.write_all(yaml_content.as_bytes())?;
 
-        sources_to_process.push(temp_file.path().to_str().unwrap().to_string());
+        sources_to_process.push(
+            temp_file
+                .path()
+                .to_str()
+                .ok_or_else(|| anyhow!("Temporary file path contains invalid UTF-8"))?
+                .to_string(),
+        );
         temp_files.push(temp_file);
     }
 

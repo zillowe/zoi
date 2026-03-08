@@ -43,6 +43,8 @@ fn print_with_pager(content: &str) -> io::Result<()> {
     Ok(())
 }
 
+use rayon::prelude::*;
+
 pub fn run(
     search_term: String,
     registry_filter: Option<String>,
@@ -56,11 +58,10 @@ pub fn run(
     if !interactive {
         let mode = if files { "files" } else { "packages" };
         println!(
-            "{} Searching for {} matching '{}' {}",
+            "{} Searching for {} matching '{}'...",
             "::".bold().blue(),
             mode.yellow(),
-            search_term.cyan().bold(),
-            "::".bold().blue()
+            search_term.cyan().bold()
         );
     }
 
@@ -92,8 +93,13 @@ pub fn run(
             registries.push(reg.handle.clone());
         }
 
-        for handle in registries {
-            match crate::pkg::db::search_packages(&handle, &search_term) {
+        let results: Vec<Result<Vec<Package>>> = registries
+            .into_par_iter()
+            .map(|handle| crate::pkg::db::search_packages(&handle, &search_term))
+            .collect();
+
+        for res in results {
+            match res {
                 Ok(pkgs) => all_packages.extend(pkgs),
                 Err(_) => {
                     db_failed = true;
@@ -215,7 +221,10 @@ pub fn run(
 
             if matches.is_empty() {
                 if !interactive {
-                    println!("\n{}", "No packages found matching your query.".yellow());
+                    println!(
+                        "\n{} No packages found matching your query.",
+                        "::".bold().yellow()
+                    );
                 }
                 return Ok(());
             }
@@ -405,10 +414,15 @@ fn run_tui_loop(
 ) -> Result<()> {
     loop {
         terminal.draw(|f| {
+            let layout = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Min(0), Constraint::Length(1)])
+                .split(f.area());
+
             let chunks = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([Constraint::Percentage(30), Constraint::Percentage(70)])
-                .split(f.area());
+                .split(layout[0]);
 
             let items: Vec<ListItem> = packages
                 .iter()
@@ -499,6 +513,16 @@ fn run_tui_loop(
 
                 f.render_widget(details_paragraph, chunks[1]);
             }
+
+            let help_text = Line::from(vec![
+                Span::styled(" q", RatatuiStyle::default().add_modifier(Modifier::BOLD)),
+                Span::raw(": quit | "),
+                Span::styled("j/↓", RatatuiStyle::default().add_modifier(Modifier::BOLD)),
+                Span::raw(": down | "),
+                Span::styled("k/↑", RatatuiStyle::default().add_modifier(Modifier::BOLD)),
+                Span::raw(": up"),
+            ]);
+            f.render_widget(Paragraph::new(help_text), layout[1]);
         })?;
 
         if event::poll(std::time::Duration::from_millis(100))?

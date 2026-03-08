@@ -10,7 +10,7 @@ pub fn run(
     tag: Option<String>,
     custom_branch: Option<String>,
 ) -> Result<()> {
-    println!("{}", "--- Upgrading Zoi ---".yellow());
+    println!("{} Upgrading Zoi...", "::".bold().blue());
 
     match pkg::upgrade::run(branch, status, number, force, tag, custom_branch) {
         Ok(()) => {}

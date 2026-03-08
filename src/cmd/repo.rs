@@ -86,10 +86,9 @@ fn run_list_active() -> Result<()> {
         return Ok(());
     }
 
+    println!("{} Active repositories:", "::".bold().blue());
     let mut table = Table::new();
-    table
-        .load_preset(UTF8_FULL)
-        .set_header(vec!["Active Repositories"]);
+    table.load_preset(UTF8_FULL).set_header(vec!["Repository"]);
     for repo in config.repos {
         table.add_row(vec![repo]);
     }
@@ -104,6 +103,7 @@ fn run_list_all() -> Result<()> {
         .collect::<HashSet<_>>();
     let all_repos = config::get_all_repos()?;
 
+    println!("{} All available repositories:", "::".bold().blue());
     let mut table = Table::new();
     table
         .load_preset(UTF8_FULL)
@@ -143,10 +143,12 @@ fn run_list_git_only() -> Result<()> {
         return Ok(());
     }
 
+    println!(
+        "{} Cloned git repositories (~/.zoi/pkgs/git):",
+        "::".bold().blue()
+    );
     let mut table = Table::new();
-    table
-        .load_preset(UTF8_FULL)
-        .set_header(vec!["Cloned Git Repositories (~/.zoi/pkgs/git)"]);
+    table.load_preset(UTF8_FULL).set_header(vec!["Repository"]);
     for repo in repos {
         table.add_row(vec![repo]);
     }

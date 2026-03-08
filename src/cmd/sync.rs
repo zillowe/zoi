@@ -10,7 +10,7 @@ pub fn run(
     no_shell_setup: bool,
     files: bool,
 ) -> Result<()> {
-    println!("{}", "--- Syncing Package Databases ---".yellow().bold());
+    println!("{} Syncing package databases...", "::".bold().blue());
 
     pkg::sync::run(verbose, fallback, no_pm, files)?;
 
@@ -20,10 +20,7 @@ pub fn run(
         return Ok(());
     }
 
-    println!(
-        "\n{}",
-        "--- Setting up shell completions ---".yellow().bold()
-    );
+    println!("\n{} Setting up shell completions...", "::".bold().blue());
     if let Some(shell) = utils::get_current_shell() {
         println!("Detected shell: {}", shell.to_string().cyan());
         crate::cmd::shell::run(shell, crate::cli::SetupScope::User)?;
@@ -72,7 +69,7 @@ pub fn list_registries() -> Result<()> {
     let config = crate::pkg::config::read_config()?;
     let db_root = crate::pkg::resolve::get_db_root()?;
 
-    println!("{}", "--- Configured Registries ---".bold());
+    println!("{} Configured Registries", "::".bold().blue());
 
     if let Some(default) = config.default_registry {
         let handle = &default.handle;

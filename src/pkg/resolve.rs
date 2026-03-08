@@ -38,6 +38,17 @@ pub struct PackageRequest {
     pub version_spec: Option<String>,
 }
 
+use std::sync::LazyLock;
+
+static HANDLE_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^(?:#(?P<handle>[^@]+))?(?P<main_part>.*)$")
+        .expect("Static HANDLE_RE regex is valid")
+});
+static MAIN_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^@?(?P<repo_and_name>[^@]+)(?:@(?P<version>.+))?$")
+        .expect("Static MAIN_RE regex is valid")
+});
+
 pub fn get_db_root() -> Result<PathBuf> {
     let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
     Ok(home_dir.join(".zoi").join("pkgs").join("db"))
@@ -76,20 +87,23 @@ pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
         });
     }
 
-    let re = Regex::new(r"^(?:#(?P<handle>[^@]+))?(?P<main_part>.*)$").unwrap();
-
-    let caps = re
+    let caps = HANDLE_RE
         .captures(source_str)
         .ok_or_else(|| anyhow!("Invalid source string format"))?;
     let handle = caps.name("handle").map(|m| m.as_str().to_string());
-    let main_part = caps.name("main_part").unwrap().as_str();
+    let main_part = caps
+        .name("main_part")
+        .expect("Regex matched but main_part group not found")
+        .as_str();
 
-    let re_main = Regex::new(r"^@?(?P<repo_and_name>[^@]+)(?:@(?P<version>.+))?$").unwrap();
-    let caps_main = re_main
+    let caps_main = MAIN_RE
         .captures(main_part)
         .ok_or_else(|| anyhow!("Invalid source string format"))?;
 
-    let repo_and_name = caps_main.name("repo_and_name").unwrap().as_str();
+    let repo_and_name = caps_main
+        .name("repo_and_name")
+        .expect("Regex matched but repo_and_name group not found")
+        .as_str();
     let version_spec = caps_main.name("version").map(|m| m.as_str().to_string());
 
     let (repo, name_and_sub) = if main_part.starts_with('@') {
@@ -907,7 +921,9 @@ fn resolve_source_recursive(
                 handle
             ));
         }
-        let git_source = handle.strip_prefix("git:").unwrap();
+        let git_source = handle
+            .strip_prefix("git:")
+            .expect("Handle was checked to start with git: above");
         println!(
             "Warning: using remote git repo '{}' not from official Zoi database.",
             git_source.yellow()
@@ -1009,7 +1025,9 @@ fn resolve_source_recursive(
 
         let repo_name = parts[0];
         let nested_path_parts = &parts[1..];
-        let pkg_name = nested_path_parts.last().unwrap();
+        let pkg_name = nested_path_parts
+            .last()
+            .ok_or_else(|| anyhow!("Empty path in git source"))?;
 
         let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
         let mut path = home_dir

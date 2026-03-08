@@ -129,9 +129,10 @@ impl PluginManager {
                 let json_val: serde_json::Value = match value {
                     Value::String(s) => serde_json::Value::String(s.to_str()?.to_string()),
                     Value::Integer(i) => serde_json::Value::Number(i.into()),
-                    Value::Number(n) => {
-                        serde_json::Value::Number(serde_json::Number::from_f64(n).unwrap())
-                    }
+                    Value::Number(n) => serde_json::Value::Number(
+                        serde_json::Number::from_f64(n)
+                            .expect("Number should be finite for JSON conversion"),
+                    ),
                     Value::Boolean(b) => serde_json::Value::Bool(b),
                     _ => {
                         return Err(mlua::Error::RuntimeError(

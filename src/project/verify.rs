@@ -48,7 +48,15 @@ pub fn run() -> Result<()> {
             }
 
             let parts: Vec<&str> = full_id.split('@').collect();
-            let registry_handle = parts[0].strip_prefix('#').unwrap();
+            if parts.len() < 2 {
+                return Err(anyhow!(
+                    "Invalid package ID format in lockfile: {}",
+                    full_id
+                ));
+            }
+            let registry_handle = parts[0].strip_prefix('#').ok_or_else(|| {
+                anyhow!("Invalid registry handle format in lockfile: {}", parts[0])
+            })?;
             let repo_and_name_with_sub = parts[1];
 
             if let Some(last_slash_idx) = repo_and_name_with_sub.rfind('/') {

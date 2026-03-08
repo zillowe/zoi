@@ -21,6 +21,11 @@ pub fn open_connection_no_setup(registry_handle: &str) -> Result<Connection> {
     }
     let conn = Connection::open(db_path)?;
     conn.busy_timeout(std::time::Duration::from_secs(5))?;
+
+    conn.execute("PRAGMA foreign_keys = ON", [])?;
+    conn.execute("PRAGMA journal_mode = WAL", [])?;
+    conn.execute("PRAGMA synchronous = NORMAL", [])?;
+
     Ok(conn)
 }
 

@@ -51,7 +51,13 @@ fn refresh_registry_db(
     let repo_config = config::read_repo_config(registry_path).ok();
     let platform = utils::get_platform().unwrap_or_default();
 
-    let parsed_results: Vec<(types::Package, PathBuf)> = pkg_files
+    let client = if sync_files {
+        crate::utils::get_http_client().ok()
+    } else {
+        None
+    };
+
+    let parsed_results: Vec<(types::Package, PathBuf, Option<Vec<String>>)> = pkg_files
         .par_iter()
         .filter_map(|path| {
             let path_str = path.to_string_lossy();
@@ -71,7 +77,38 @@ fn refresh_registry_db(
                     }
                     pkg.repo = repo_path;
                 }
-                Some((pkg, path.clone()))
+
+                let mut file_list = None;
+                if sync_files
+                    && let Some(c) = &client
+                    && let Some(rc) = &repo_config
+                    && let Some(pkg_link) = rc.pkg.iter().find(|p| p.link_type == "main")
+                    && let Some(files_url_template) = &pkg_link.files
+                {
+                    let version = pkg.version.clone().unwrap_or_else(|| "latest".to_string());
+                    let files_url = crate::pkg::install::util::resolve_url_placeholders(
+                        files_url_template,
+                        &pkg.name,
+                        &pkg.repo,
+                        &version,
+                        &platform,
+                    );
+
+                    if let Ok(response) = c.get(&files_url).send()
+                        && response.status().is_success()
+                        && let Ok(content) = response.text()
+                    {
+                        file_list = Some(
+                            content
+                                .lines()
+                                .map(|l| l.trim().to_string())
+                                .filter(|l| !l.is_empty())
+                                .collect(),
+                        );
+                    }
+                }
+
+                Some((pkg, path.clone(), file_list))
             } else {
                 None
             }
@@ -79,13 +116,8 @@ fn refresh_registry_db(
         .collect();
 
     let tx = conn.transaction()?;
-    let client = if sync_files {
-        crate::utils::get_http_client().ok()
-    } else {
-        None
-    };
 
-    for (pkg, _path) in parsed_results {
+    for (pkg, _path, file_list) in parsed_results {
         let pkg_id = db::update_package(&tx, &pkg, registry_handle, None, None, None)?;
 
         if let Some(subs) = &pkg.sub_packages {
@@ -94,32 +126,8 @@ fn refresh_registry_db(
             }
         }
 
-        if sync_files
-            && let Some(c) = &client
-            && let Some(rc) = &repo_config
-            && let Some(pkg_link) = rc.pkg.iter().find(|p| p.link_type == "main")
-            && let Some(files_url_template) = &pkg_link.files
-        {
-            let version = pkg.version.clone().unwrap_or_else(|| "latest".to_string());
-            let files_url = crate::pkg::install::util::resolve_url_placeholders(
-                files_url_template,
-                &pkg.name,
-                &pkg.repo,
-                &version,
-                &platform,
-            );
-
-            if let Ok(response) = c.get(&files_url).send()
-                && response.status().is_success()
-                && let Ok(content) = response.text()
-            {
-                let file_list: Vec<String> = content
-                    .lines()
-                    .map(|l| l.trim().to_string())
-                    .filter(|l| !l.is_empty())
-                    .collect();
-                let _ = db::index_package_files(&tx, pkg_id, &file_list);
-            }
+        if let Some(list) = file_list {
+            let _ = db::index_package_files(&tx, pkg_id, &list);
         }
     }
     tx.commit()?;
@@ -220,7 +228,10 @@ fn sync_git_repos(verbose: bool) -> Result<()> {
         let entry = entry?;
         let path = entry.path();
         if path.is_dir() && path.join(".git").exists() {
-            let repo_name = path.file_name().unwrap().to_string_lossy();
+            let Some(repo_name_os) = path.file_name() else {
+                continue;
+            };
+            let repo_name = repo_name_os.to_string_lossy();
 
             if !configured_git_repos_names.contains(repo_name.as_ref()) {
                 println!(
@@ -268,7 +279,7 @@ fn run_verbose_at_path(db_url: &str, db_path: &Path) -> Result<()> {
     if db_path.exists() {
         let status = Command::new("git")
             .arg("-C")
-            .arg(db_path.to_str().unwrap())
+            .arg(db_path)
             .arg("pull")
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())

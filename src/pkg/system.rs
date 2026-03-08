@@ -119,7 +119,10 @@ pub fn parse_system_config_file(path: &Path) -> Result<types::DeclarativeConfig>
         &lua,
         &platform,
         None,
-        Some(path.to_str().unwrap()),
+        Some(
+            path.to_str()
+                .ok_or_else(|| anyhow!("Path contains invalid UTF-8 characters: {:?}", path))?,
+        ),
         None,
         None,
         true,
@@ -199,10 +202,8 @@ pub fn apply(yes: bool, plugin_manager: &crate::pkg::plugin::PluginManager) -> R
     }
 
     println!(
-        "{}",
-        "--- Applying Declarative System Configuration ---"
-            .bold()
-            .green()
+        "{} Applying Declarative System Configuration...",
+        "::".bold().blue()
     );
 
     let config = parse_system_config()?;

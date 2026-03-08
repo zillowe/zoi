@@ -1,5 +1,5 @@
 use crate::pkg::install::resolver;
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use colored::*;
 use std::collections::HashSet;
 
@@ -16,26 +16,23 @@ pub fn run(package_names: &[String]) -> Result<()> {
 
     if !non_zoi_deps.is_empty() {
         println!(
-            "
-{}",
-            "External Dependencies (Non-Zoi):".bold().yellow()
+            "\n{} External dependencies (non-Zoi):",
+            "::".bold().yellow()
         );
         for dep in non_zoi_deps {
             println!("  - {}", dep.dimmed());
         }
     }
 
-    println!(
-        "
-{}",
-        "Dependency Tree:".bold().green()
-    );
+    println!("\n{} Dependency tree:", "::".bold().blue());
 
     let mut visited = HashSet::new();
     for source in package_names {
         if let Some(children) = graph.adj.get("$root") {
             for pkg_id in children {
-                let node = graph.nodes.get(pkg_id).unwrap();
+                let Some(node) = graph.nodes.get(pkg_id) else {
+                    continue;
+                };
                 if source.contains(&node.pkg.name) {
                     print_node(&graph, pkg_id, "", true, &mut visited)?;
                 }
@@ -53,7 +50,10 @@ fn print_node(
     is_last: bool,
     visited: &mut HashSet<String>,
 ) -> Result<()> {
-    let node = graph.nodes.get(pkg_id).unwrap();
+    let node = graph
+        .nodes
+        .get(pkg_id)
+        .ok_or_else(|| anyhow!("Package not found in graph: {}", pkg_id))?;
     let is_repeated = visited.contains(pkg_id);
 
     let connector = if is_last { "└── " } else { "├── " };

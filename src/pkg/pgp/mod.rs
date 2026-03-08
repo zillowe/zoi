@@ -225,7 +225,7 @@ pub fn list_keys() -> Result<()> {
         return Ok(());
     }
 
-    println!("{}", "--- Stored PGP Keys ---".yellow().bold());
+    println!("{} Stored PGP Keys", "::".bold().blue());
 
     for key_info in keys {
         println!();
@@ -301,7 +301,8 @@ pub fn search_keys(term: &str) -> Result<()> {
     }
 
     println!(
-        "--- Found {} key(s) matching '{}' ---",
+        "{} Found {} key(s) matching '{}'",
+        "::".bold().blue(),
         found_keys.len(),
         term.blue().bold()
     );
@@ -368,7 +369,11 @@ pub fn get_all_local_keys_info() -> Result<Vec<KeyInfo>> {
             && let Ok(bytes) = fs::read(&path)
             && let Ok(cert) = Cert::from_bytes(&bytes)
         {
-            let name = path.file_stem().unwrap().to_string_lossy().to_string();
+            let name = path
+                .file_stem()
+                .expect("Path should have a file stem")
+                .to_string_lossy()
+                .to_string();
             keys.push(KeyInfo { name, cert });
         }
     }

@@ -51,9 +51,15 @@ pub fn run(
         && let Ok(config) = project::config::load()
     {
         if lockfile_exists {
-            println!("zoi.lock found. Installing from zoi.yaml then verifying...");
+            println!(
+                "{} zoi.lock found. Installing from zoi.yaml then verifying...",
+                "::".bold().blue()
+            );
         } else {
-            println!("Installing project packages from zoi.yaml...");
+            println!(
+                "{} Installing project packages from zoi.yaml...",
+                "::".bold().blue()
+            );
         }
         sources_to_process = config.pkgs.clone();
         if scope_override.is_none() {
@@ -104,7 +110,7 @@ pub fn run(
         rayon::ThreadPoolBuilder::new()
             .num_threads(parallel_jobs)
             .build_global()
-            .unwrap();
+            .ok();
     }
 
     let failed_packages = Mutex::new(Vec::new());
@@ -235,10 +241,9 @@ pub fn run(
     }
 
     println!(
-        "\n{} Packages ({}) {}",
-        "---".bold(),
-        direct_packages.len(),
-        "---".bold()
+        "\n{} Packages ({})",
+        "::".bold().blue(),
+        direct_packages.len()
     );
     let direct_list: Vec<_> = direct_packages
         .iter()
@@ -255,10 +260,9 @@ pub fn run(
 
     if !dependencies.is_empty() || !non_zoi_deps.is_empty() {
         println!(
-            "\n{} Dependencies ({}) {}",
-            "---".bold(),
-            dependencies.len() + non_zoi_deps.len(),
-            "---".bold()
+            "\n{} Dependencies ({})",
+            "::".bold().blue(),
+            dependencies.len() + non_zoi_deps.len()
         );
         let mut dep_list = Vec::new();
         for n in &dependencies {
@@ -320,11 +324,7 @@ pub fn run(
     let transaction_mutex = Mutex::new(());
 
     if !dependencies.is_empty() || !non_zoi_deps.is_empty() {
-        println!(
-            "\n{} Installing dependencies {}",
-            "---".bold(),
-            "---".bold()
-        );
+        println!("\n{} Installing dependencies...", "::".bold().blue());
         let m_deps = MultiProgress::new();
 
         if !non_zoi_deps.is_empty() {
@@ -356,11 +356,16 @@ pub fn run(
 
         for stage in &stages {
             stage.par_iter().for_each(|pkg_id| {
-                let node = graph.nodes.get(pkg_id).unwrap();
+                let node = graph
+                    .nodes
+                    .get(pkg_id)
+                    .expect("Package node missing from graph during installation");
                 if matches!(node.reason, types::InstallReason::Direct) {
                     return;
                 }
-                let action = install_plan.get(pkg_id).unwrap();
+                let action = install_plan
+                    .get(pkg_id)
+                    .expect("Install action missing for package during installation");
 
                 match install::installer::install_node(
                     node,
@@ -371,7 +376,9 @@ pub fn run(
                     true,
                 ) {
                     Ok(manifest) => {
-                        let _lock = transaction_mutex.lock().unwrap();
+                        let _lock = transaction_mutex
+                            .lock()
+                            .expect("Transaction mutex poisoned during installation");
                         let _ = transaction::record_operation(
                             transaction_id,
                             types::TransactionOperation::Install {
@@ -380,7 +387,10 @@ pub fn run(
                         );
                     }
                     Err(e) => {
-                        failed_packages.lock().unwrap().push(node.pkg.name.clone());
+                        failed_packages
+                            .lock()
+                            .expect("Failed packages mutex poisoned")
+                            .push(node.pkg.name.clone());
                         eprintln!("Error installing {}: {}", node.pkg.name, e);
                     }
                 }
@@ -388,10 +398,13 @@ pub fn run(
         }
     }
 
-    println!("\n{} Installing packages {}", "---".bold(), "---".bold());
+    println!("\n{} Installing packages...", "::".bold().blue());
     for stage in &stages {
         for pkg_id in stage {
-            let node = graph.nodes.get(pkg_id).unwrap();
+            let node = graph
+                .nodes
+                .get(pkg_id)
+                .expect("Package node missing from graph during final installation");
             if !matches!(node.reason, types::InstallReason::Direct) {
                 continue;
             }
@@ -402,7 +415,9 @@ pub fn run(
             };
             println!(" @{}:{}", name, node.version);
 
-            let action = install_plan.get(pkg_id).unwrap();
+            let action = install_plan
+                .get(pkg_id)
+                .expect("Install action missing for package during final installation");
             let m_pkg = MultiProgress::new();
 
             match install::installer::install_node(
@@ -414,7 +429,10 @@ pub fn run(
                 true,
             ) {
                 Ok(manifest) => {
-                    installed_manifests.lock().unwrap().push(manifest.clone());
+                    installed_manifests
+                        .lock()
+                        .expect("Installed manifests mutex poisoned")
+                        .push(manifest.clone());
                     let _ = transaction::record_operation(
                         transaction_id,
                         types::TransactionOperation::Install {
@@ -423,20 +441,25 @@ pub fn run(
                     );
                     successfully_installed_sources
                         .lock()
-                        .unwrap()
+                        .expect("Successfully installed sources mutex poisoned")
                         .push(node.source.clone());
                 }
                 Err(e) => {
-                    failed_packages.lock().unwrap().push(node.pkg.name.clone());
+                    failed_packages
+                        .lock()
+                        .expect("Failed packages mutex poisoned")
+                        .push(node.pkg.name.clone());
                     eprintln!("Error: {}", e);
                 }
             }
         }
     }
 
-    let failed = failed_packages.lock().unwrap();
+    let failed = failed_packages
+        .lock()
+        .expect("Failed packages mutex poisoned");
     if !failed.is_empty() {
-        println!("\n{} Rolling back changes...", "---".yellow().bold());
+        println!("\n{} Rolling back changes...", "::".bold().yellow());
         transaction::rollback(&transaction.id)?;
         return Err(anyhow!("Installation failed for: {}", failed.join(", ")));
     }
@@ -453,7 +476,10 @@ pub fn run(
         eprintln!("Warning: Failed to commit transaction: {}", e);
     }
 
-    let installed_manifests_vec = installed_manifests.lock().unwrap().clone();
+    let installed_manifests_vec = installed_manifests
+        .lock()
+        .expect("Installed manifests mutex poisoned during finalization")
+        .clone();
     for manifest in &installed_manifests_vec {
         let pkg_val = plugin_manager
             .lua
@@ -483,7 +509,9 @@ pub fn run(
                 all_configured_regs.push(default_reg);
             }
 
-            let installed_manifests = installed_manifests.into_inner().unwrap();
+            let installed_manifests = installed_manifests
+                .into_inner()
+                .expect("Installed manifests mutex poisoned during lockfile update");
             for manifest in &installed_manifests {
                 let name_with_sub = if let Some(sub) = &manifest.sub_package {
                     format!("{}:{}", manifest.name, sub)
@@ -534,7 +562,9 @@ pub fn run(
                     .map(|deps| {
                         deps.iter()
                             .map(|dep_id| {
-                                let node = graph.nodes.get(dep_id).unwrap();
+                                let node = graph.nodes.get(dep_id).expect(
+                                    "Dependency node missing from graph during lockfile update",
+                                );
                                 if let Some(sub) = &node.pkg.sub_packages {
                                     format!(
                                         "#{}@{}/{}:{}",
@@ -580,7 +610,9 @@ pub fn run(
     }
 
     if save && scope_override == Some(types::Scope::Project) {
-        let successfully_installed = successfully_installed_sources.into_inner().unwrap();
+        let successfully_installed = successfully_installed_sources
+            .into_inner()
+            .expect("Successfully installed sources mutex poisoned during finalization");
         if !successfully_installed.is_empty()
             && let Err(e) = project::config::add_packages_to_config(&successfully_installed)
         {
@@ -599,7 +631,7 @@ pub fn run(
         project::verify::run()?;
     }
 
-    println!("\n{} Done {}", "---".bold(), "---".bold());
+    println!("\n{} Done", "::".bold().blue());
     println!(
         "Installed ({}) packages and ({}) dependencies.",
         direct_packages.len(),

@@ -148,7 +148,8 @@ pub fn run(
         };
 
         println!(
-            "--- Uninstalling package '{}' ---",
+            "{} Uninstalling package '{}'...",
+            "::".bold().blue(),
             source_str.blue().bold()
         );
 
@@ -180,7 +181,7 @@ pub fn run(
 
     if !failed_packages.is_empty() {
         eprintln!("\nError: Uninstallation failed for some packages.");
-        eprintln!("\n{} Rolling back changes...", "---".yellow().bold());
+        eprintln!("\n{} Rolling back changes...", "::".bold().yellow());
         if let Err(e) = transaction::rollback(&transaction.id) {
             eprintln!("\nCRITICAL: Rollback failed: {}", e);
             eprintln!(

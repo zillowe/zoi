@@ -68,12 +68,11 @@ pub fn download_and_cache_archive(
         cached_archive_path.clone()
     };
 
-    if let Some(hash_url) = &details.info.hash_url
-        && let Ok(hash) = util::get_expected_hash(hash_url, Some(archive_filename))
-        && !hash.is_empty()
-        && !util::verify_file_hash(&archive_path, &hash, pb)?
-    {
-        return Err(anyhow!("Hash verification failed"));
+    if let Some(hash_url) = &details.info.hash_url {
+        let hash = util::get_expected_hash(hash_url, Some(archive_filename))?;
+        if !hash.is_empty() && !util::verify_file_hash(&archive_path, &hash, pb)? {
+            return Err(anyhow!("Hash verification failed"));
+        }
     }
 
     if let Some(policy) = &signature_policy {
@@ -164,11 +163,12 @@ pub fn install_node(
 
     let (installed_files, install_method) = match action {
         plan::InstallAction::DownloadAndInstall(details) => {
-            if let Some(pb) = &step_pb {
+            let pb_for_step = step_pb.as_ref().or(main_pb.as_ref());
+            if let Some(pb) = pb_for_step {
                 pb.set_message("Downloading package...");
             }
-            let archive_path = download_and_cache_archive(node, details, step_pb.as_ref())?;
-            if let Some(pb) = &step_pb {
+            let archive_path = download_and_cache_archive(node, details, pb_for_step)?;
+            if let Some(pb) = pb_for_step {
                 pb.set_message("Installing package...");
                 pb.set_position(0);
             }
@@ -180,12 +180,13 @@ pub fn install_node(
                 yes,
                 sub_packages_vec,
                 link_bins,
-                step_pb.as_ref().or(main_pb.as_ref()),
+                pb_for_step,
             )?;
             (files, "pre-compiled".to_string())
         }
         plan::InstallAction::InstallFromArchive(archive_path) => {
-            if let Some(pb) = &step_pb {
+            let pb_for_step = step_pb.as_ref().or(main_pb.as_ref());
+            if let Some(pb) = pb_for_step {
                 pb.set_message("Installing package...");
             }
             let files = crate::pkg::package::install::run(
@@ -196,12 +197,13 @@ pub fn install_node(
                 yes,
                 sub_packages_vec,
                 link_bins,
-                step_pb.as_ref().or(main_pb.as_ref()),
+                pb_for_step,
             )?;
             (files, "pre-compiled".to_string())
         }
         plan::InstallAction::BuildAndInstall => {
-            if let Some(pb) = &step_pb {
+            let pb_for_step = step_pb.as_ref().or(main_pb.as_ref());
+            if let Some(pb) = pb_for_step {
                 pb.set_message("Building package...");
             }
             let pkg_lua_path = Path::new(&node.source);
@@ -212,7 +214,7 @@ pub fn install_node(
                 build_type,
                 yes,
                 sub_package_to_install.clone(),
-                step_pb.as_ref().or(main_pb.as_ref()),
+                pb_for_step,
             )?;
             (files, "source".to_string())
         }

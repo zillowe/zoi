@@ -1,7 +1,7 @@
 use crate::pkg::{install, local, types};
 use crate::project::config as project_config;
 use crate::utils;
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use colored::*;
 use std::collections::HashMap;
 use std::process::Command;
@@ -35,8 +35,13 @@ pub fn run(run_cmd: Option<String>) -> Result<()> {
         for stage in stages {
             use rayon::prelude::*;
             stage.into_par_iter().try_for_each(|pkg_id| -> Result<()> {
-                let node = graph.nodes.get(&pkg_id).unwrap();
-                let action = install_plan.get(&pkg_id).unwrap();
+                let node = graph
+                    .nodes
+                    .get(&pkg_id)
+                    .ok_or_else(|| anyhow!("Package not found in graph: {}", pkg_id))?;
+                let action = install_plan
+                    .get(&pkg_id)
+                    .ok_or_else(|| anyhow!("Install action not found for: {}", pkg_id))?;
                 install::installer::install_node(node, action, Some(&m), None, true, true)?;
                 Ok(())
             })?;

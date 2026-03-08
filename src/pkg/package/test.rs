@@ -13,7 +13,12 @@ pub fn run(args: &cmd::package::build::BuildCommand) -> Result<()> {
     };
 
     let pkg_for_meta = pkg::lua::parser::parse_lua_package_for_platform(
-        args.package_file.to_str().unwrap(),
+        args.package_file.to_str().ok_or_else(|| {
+            anyhow!(
+                "Path contains invalid UTF-8 characters: {:?}",
+                args.package_file
+            )
+        })?,
         &platform,
         None,
         false,
@@ -44,7 +49,11 @@ pub fn run(args: &cmd::package::build::BuildCommand) -> Result<()> {
         };
 
         if !sub_package.is_empty() {
-            println!("--- Testing sub-package: {} ---", sub_package.cyan());
+            println!(
+                "{} Testing sub-package: {}",
+                "::".bold().blue(),
+                sub_package.cyan()
+            );
         }
 
         let lua = Lua::new();
@@ -66,10 +75,21 @@ pub fn run(args: &cmd::package::build::BuildCommand) -> Result<()> {
             .set("PKG", pkg_table)
             .map_err(|e| anyhow!(e.to_string()))?;
         lua.globals()
-            .set("BUILD_DIR", build_dir.path().to_str().unwrap())
+            .set(
+                "BUILD_DIR",
+                build_dir
+                    .path()
+                    .to_str()
+                    .expect("build_dir should be valid UTF-8"),
+            )
             .map_err(|e| anyhow!(e.to_string()))?;
         lua.globals()
-            .set("STAGING_DIR", staging_dir.to_str().unwrap())
+            .set(
+                "STAGING_DIR",
+                staging_dir
+                    .to_str()
+                    .expect("staging_dir should be valid UTF-8"),
+            )
             .map_err(|e| anyhow!(e.to_string()))?;
         lua.globals()
             .set("BUILD_TYPE", args.r#type.as_str())
