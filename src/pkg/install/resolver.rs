@@ -179,7 +179,7 @@ pub fn resolve_dependency_graph(
         root_deps.insert(pkg_name, range);
     }
 
-    let provider = ZoiDependencyProvider::new(root_deps, quiet, yes)?;
+    let provider = ZoiDependencyProvider::new(root_deps, initial_sources.to_vec(), quiet, yes)?;
     let root_pkg = PkgName {
         name: "$root".to_string(),
         sub_package: None,

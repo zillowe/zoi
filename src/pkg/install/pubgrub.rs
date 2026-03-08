@@ -47,6 +47,7 @@ pub enum ZoiSolverError {
 
 pub struct ZoiDependencyProvider {
     pub root_deps: FxHashMap<PkgName, Ranges<SemVersion>>,
+    pub initial_sources: Vec<String>,
     pub quiet: bool,
     pub yes: bool,
 }
@@ -137,11 +138,13 @@ pub fn semver_to_range(req_str: &str) -> Ranges<SemVersion> {
 impl ZoiDependencyProvider {
     pub fn new(
         root_deps: FxHashMap<PkgName, Ranges<SemVersion>>,
+        initial_sources: Vec<String>,
         quiet: bool,
         yes: bool,
     ) -> Result<Self, anyhow::Error> {
         Ok(Self {
             root_deps,
+            initial_sources,
             quiet,
             yes,
         })
@@ -164,6 +167,18 @@ impl ZoiDependencyProvider {
             }
         }
 
+        for source in &self.initial_sources {
+            if let Ok(req) = resolve::parse_source_string(source)
+                && req.name == package.name
+                && let Some(v_spec) = req.version_spec
+            {
+                let v_clean = v_spec.trim_start_matches('@').trim_start_matches('v');
+                if let Ok(v) = Version::parse(v_clean) {
+                    all_versions.push(SemVersion(v));
+                }
+            }
+        }
+
         let source_str = if let Some(sub) = &package.sub_package {
             format!(
                 "#{}@{}/{}:{}",
@@ -176,17 +191,19 @@ impl ZoiDependencyProvider {
         if let Ok(resolved) = resolve::resolve_source(&source_str, true, true) {
             let path_str = resolved.path.to_string_lossy();
             if let Ok(pkg) = crate::pkg::lua::parser::parse_lua_package(&path_str, None, true) {
-                if let Some(v_str) = &pkg.version
-                    && let Ok(v) = Version::parse(v_str)
-                {
-                    all_versions.push(SemVersion(v));
+                if let Some(v_str) = &pkg.version {
+                    let v_clean = v_str.trim_start_matches('v');
+                    if let Ok(v) = Version::parse(v_clean) {
+                        all_versions.push(SemVersion(v));
+                    }
                 }
                 if let Some(versions_map) = &pkg.versions {
                     for channel in versions_map.keys() {
-                        if let Ok(v_str) = resolve::resolve_channel(versions_map, channel)
-                            && let Ok(v) = Version::parse(&v_str)
-                        {
-                            all_versions.push(SemVersion(v));
+                        if let Ok(v_str) = resolve::resolve_channel(versions_map, channel) {
+                            let v_clean = v_str.trim_start_matches('v');
+                            if let Ok(v) = Version::parse(v_clean) {
+                                all_versions.push(SemVersion(v));
+                            }
                         }
                     }
                 }
@@ -204,10 +221,11 @@ impl ZoiDependencyProvider {
                 .map_err(|e| ZoiSolverError::Other(e.to_string()))?;
 
             for v_res in rows {
-                if let Ok(Some(v_str)) = v_res
-                    && let Ok(v) = Version::parse(&v_str)
-                {
-                    all_versions.push(SemVersion(v));
+                if let Ok(Some(v_str)) = v_res {
+                    let v_clean = v_str.trim_start_matches('v');
+                    if let Ok(v) = Version::parse(v_clean) {
+                        all_versions.push(SemVersion(v));
+                    }
                 }
             }
         }
