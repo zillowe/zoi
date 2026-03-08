@@ -35,6 +35,10 @@ pub fn run(
         scope_override = Some(types::Scope::User);
     }
 
+    if save && scope_override.is_none() && std::path::Path::new("zoi.yaml").exists() {
+        scope_override = Some(types::Scope::Project);
+    }
+
     let lockfile_exists = sources.is_empty()
         && repo.is_none()
         && std::path::Path::new("zoi.lock").exists()
@@ -45,7 +49,6 @@ pub fn run(
     if sources.is_empty()
         && repo.is_none()
         && let Ok(config) = project::config::load()
-        && config.config.local
     {
         if lockfile_exists {
             println!("zoi.lock found. Installing from zoi.yaml then verifying...");
@@ -53,7 +56,9 @@ pub fn run(
             println!("Installing project packages from zoi.yaml...");
         }
         sources_to_process = config.pkgs.clone();
-        scope_override = Some(types::Scope::Project);
+        if scope_override.is_none() {
+            scope_override = Some(types::Scope::Project);
+        }
         is_project_install = true;
     }
 

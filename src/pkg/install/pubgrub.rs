@@ -52,7 +52,7 @@ pub struct ZoiDependencyProvider {
 }
 
 pub fn semver_to_range(req_str: &str) -> Ranges<SemVersion> {
-    let req_str = req_str.trim_start_matches('@');
+    let req_str = req_str.trim_start_matches('@').trim_start_matches('v');
 
     if let Ok(version) = Version::parse(req_str) {
         return Ranges::singleton(SemVersion(version));
@@ -86,32 +86,43 @@ pub fn semver_to_range(req_str: &str) -> Ranges<SemVersion> {
                     Ranges::higher_than(v).intersection(&Ranges::strictly_lower_than(next_minor))
                 }
                 semver::Op::Caret => {
-                    let next_major = if comparator.major > 0 {
-                        SemVersion(Version {
+                    let next = if comparator.major > 0 {
+                        Version {
                             major: comparator.major + 1,
                             minor: 0,
                             patch: 0,
                             pre: semver::Prerelease::EMPTY,
                             build: semver::BuildMetadata::EMPTY,
-                        })
+                        }
                     } else if let Some(minor) = comparator.minor {
-                        SemVersion(Version {
-                            major: 0,
-                            minor: minor + 1,
-                            patch: 0,
-                            pre: semver::Prerelease::EMPTY,
-                            build: semver::BuildMetadata::EMPTY,
-                        })
+                        if minor > 0 {
+                            Version {
+                                major: 0,
+                                minor: minor + 1,
+                                patch: 0,
+                                pre: semver::Prerelease::EMPTY,
+                                build: semver::BuildMetadata::EMPTY,
+                            }
+                        } else {
+                            Version {
+                                major: 0,
+                                minor: 0,
+                                patch: comparator.patch.unwrap_or(0) + 1,
+                                pre: semver::Prerelease::EMPTY,
+                                build: semver::BuildMetadata::EMPTY,
+                            }
+                        }
                     } else {
-                        SemVersion(Version {
-                            major: 0,
-                            minor: 1,
+                        Version {
+                            major: 1,
+                            minor: 0,
                             patch: 0,
                             pre: semver::Prerelease::EMPTY,
                             build: semver::BuildMetadata::EMPTY,
-                        })
+                        }
                     };
-                    Ranges::higher_than(v).intersection(&Ranges::strictly_lower_than(next_major))
+                    Ranges::higher_than(v)
+                        .intersection(&Ranges::strictly_lower_than(SemVersion(next)))
                 }
                 _ => Ranges::full(),
             };
@@ -149,6 +160,35 @@ impl ZoiDependencyProvider {
             for v_str in version_strings {
                 if let Ok(v) = Version::parse(&v_str) {
                     all_versions.push(SemVersion(v));
+                }
+            }
+        }
+
+        let source_str = if let Some(sub) = &package.sub_package {
+            format!(
+                "#{}@{}/{}:{}",
+                package.registry, package.repo, package.name, sub
+            )
+        } else {
+            format!("#{}@{}/{}", package.registry, package.repo, package.name)
+        };
+
+        if let Ok(resolved) = resolve::resolve_source(&source_str, true, true) {
+            let path_str = resolved.path.to_string_lossy();
+            if let Ok(pkg) = crate::pkg::lua::parser::parse_lua_package(&path_str, None, true) {
+                if let Some(v_str) = &pkg.version
+                    && let Ok(v) = Version::parse(v_str)
+                {
+                    all_versions.push(SemVersion(v));
+                }
+                if let Some(versions_map) = &pkg.versions {
+                    for channel in versions_map.keys() {
+                        if let Ok(v_str) = resolve::resolve_channel(versions_map, channel)
+                            && let Ok(v) = Version::parse(&v_str)
+                        {
+                            all_versions.push(SemVersion(v));
+                        }
+                    }
                 }
             }
         }

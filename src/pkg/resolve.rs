@@ -550,7 +550,7 @@ fn download_content_from_url(url: &str) -> Result<String> {
     Ok(response.text()?)
 }
 
-fn resolve_version_from_url(url: &str, channel: &str) -> Result<String> {
+pub fn resolve_version_from_url(url: &str, channel: &str) -> Result<String> {
     println!(
         "Resolving version for channel '{}' from {}",
         channel.cyan(),
@@ -603,7 +603,7 @@ fn resolve_version_from_url(url: &str, channel: &str) -> Result<String> {
     ))
 }
 
-fn resolve_channel(versions: &HashMap<String, String>, channel: &str) -> Result<String> {
+pub fn resolve_channel(versions: &HashMap<String, String>, channel: &str) -> Result<String> {
     if let Some(url_or_version) = versions.get(channel) {
         if url_or_version.starts_with("http") {
             resolve_version_from_url(url_or_version, channel)

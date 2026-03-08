@@ -137,7 +137,7 @@ impl DependencyGraph {
 
 pub fn resolve_dependency_graph(
     initial_sources: &[String],
-    _scope_override: Option<types::Scope>,
+    scope_override: Option<types::Scope>,
     _force: bool,
     yes: bool,
     _all_optional: bool,
@@ -205,6 +205,11 @@ pub fn resolve_dependency_graph(
                         quiet,
                         yes,
                     )?;
+
+                let mut pkg = pkg;
+                if let Some(s) = scope_override {
+                    pkg.scope = s;
+                }
 
                 let pkg_id = if let Some(sub) = &name.sub_package {
                     format!("{}@{}:{}", pkg.name, version_str, sub)
