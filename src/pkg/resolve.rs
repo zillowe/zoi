@@ -51,7 +51,9 @@ static MAIN_RE: LazyLock<Regex> = LazyLock::new(|| {
 
 pub fn get_db_root() -> Result<PathBuf> {
     let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(home_dir.join(".zoi").join("pkgs").join("db"))
+    Ok(crate::pkg::sysroot::apply_sysroot(
+        home_dir.join(".zoi").join("pkgs").join("db"),
+    ))
 }
 
 pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {

@@ -30,7 +30,7 @@ pub fn run_shim(bin_name: &str, args: Vec<String>, plugin_manager: &PluginManage
     }
 }
 
-fn resolve_to_installed_bin(bin_name: &str, plugin_manager: &PluginManager) -> Result<PathBuf> {
+pub fn resolve_to_installed_bin(bin_name: &str, plugin_manager: &PluginManager) -> Result<PathBuf> {
     let desired_version = get_desired_version(bin_name, plugin_manager)?;
 
     let providers = db::find_provides("local", bin_name)?;
