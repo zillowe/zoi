@@ -1,5 +1,6 @@
+use crate::pkg::sysroot::apply_sysroot;
 use crate::pkg::{local, types};
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
@@ -58,42 +59,63 @@ pub fn cleanup_service(package_name: &str, scope: types::Scope) -> Result<()> {
             let unit_path = if is_user {
                 let home =
                     home::home_dir().ok_or_else(|| anyhow!("Could not find home directory"))?;
-                home.join(".config/systemd/user")
-                    .join(format!("{}.service", service_name))
+                apply_sysroot(
+                    home.join(".config/systemd/user")
+                        .join(format!("{}.service", service_name)),
+                )
             } else {
-                PathBuf::from(format!("/etc/systemd/system/{}.service", service_name))
+                apply_sysroot(PathBuf::from(format!(
+                    "/etc/systemd/system/{}.service",
+                    service_name
+                )))
             };
             if unit_path.exists() {
                 println!("Removing service unit file: {}", unit_path.display());
-                fs::remove_file(unit_path)?;
-                let mut cmd = Command::new("systemctl");
-                if is_user {
-                    cmd.arg("--user");
+                fs::remove_file(&unit_path).with_context(|| {
+                    format!("Failed to remove unit file: {}", unit_path.display())
+                })?;
+                if std::env::var("ZOI_TEST_SKIP_SERVICE_COMMANDS").is_err() {
+                    let mut cmd = Command::new("systemctl");
+                    if is_user {
+                        cmd.arg("--user");
+                    }
+                    cmd.arg("daemon-reload")
+                        .status()
+                        .context("Failed to run systemctl daemon-reload")?;
                 }
-                cmd.arg("daemon-reload").status()?;
             }
         }
         "macos" => {
             let plist_path = if is_user {
                 let home =
                     home::home_dir().ok_or_else(|| anyhow!("Could not find home directory"))?;
-                home.join("Library/LaunchAgents")
-                    .join(format!("{}.plist", service_name))
+                apply_sysroot(
+                    home.join("Library/LaunchAgents")
+                        .join(format!("{}.plist", service_name)),
+                )
             } else {
-                PathBuf::from(format!("/Library/LaunchDaemons/{}.plist", service_name))
+                apply_sysroot(PathBuf::from(format!(
+                    "/Library/LaunchDaemons/{}.plist",
+                    service_name
+                )))
             };
             if plist_path.exists() {
                 println!("Removing service plist file: {}", plist_path.display());
-                fs::remove_file(plist_path)?;
+                fs::remove_file(&plist_path).with_context(|| {
+                    format!("Failed to remove plist file: {}", plist_path.display())
+                })?;
             }
         }
         "windows" => {
-            if service_exists_windows(&service_name)? {
+            if std::env::var("ZOI_TEST_SKIP_SERVICE_COMMANDS").is_err()
+                && service_exists_windows(&service_name)?
+            {
                 println!("Removing Windows service: {}", service_name);
                 Command::new("sc")
                     .arg("delete")
                     .arg(&service_name)
-                    .status()?;
+                    .status()
+                    .context("Failed to run sc delete")?;
             }
         }
         _ => {}
@@ -110,11 +132,24 @@ fn get_service_status(manifest: &types::InstallManifest) -> Result<String> {
             if manifest.scope != types::Scope::System {
                 cmd.arg("--user");
             }
-            let output = cmd.arg("is-active").arg(&service_name).output()?;
+            if std::env::var("ZOI_TEST_SKIP_SERVICE_COMMANDS").is_ok() {
+                return Ok("inactive".to_string());
+            }
+            let output = cmd
+                .arg("is-active")
+                .arg(&service_name)
+                .output()
+                .context("Failed to run systemctl is-active")?;
             Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
         }
         "macos" => {
-            let output = Command::new("launchctl").arg("list").output()?;
+            if std::env::var("ZOI_TEST_SKIP_SERVICE_COMMANDS").is_ok() {
+                return Ok("inactive".to_string());
+            }
+            let output = Command::new("launchctl")
+                .arg("list")
+                .output()
+                .context("Failed to run launchctl list")?;
             let list = String::from_utf8_lossy(&output.stdout);
             if list.contains(&service_name) {
                 Ok("active".to_string())
@@ -123,10 +158,14 @@ fn get_service_status(manifest: &types::InstallManifest) -> Result<String> {
             }
         }
         "windows" => {
+            if std::env::var("ZOI_TEST_SKIP_SERVICE_COMMANDS").is_ok() {
+                return Ok("inactive".to_string());
+            }
             let output = Command::new("sc")
                 .arg("query")
                 .arg(&service_name)
-                .output()?;
+                .output()
+                .context("Failed to run sc query")?;
             let out = String::from_utf8_lossy(&output.stdout);
             if out.contains("RUNNING") {
                 Ok("active".to_string())
@@ -148,6 +187,10 @@ fn manage_linux_service(
 
     ensure_linux_unit_file(name, service, is_user)?;
 
+    if std::env::var("ZOI_TEST_SKIP_SERVICE_COMMANDS").is_ok() {
+        return Ok(());
+    }
+
     let mut cmd = Command::new("systemctl");
     if is_user {
         cmd.arg("--user");
@@ -168,7 +211,9 @@ fn manage_linux_service(
         }
     }
 
-    let status = cmd.status()?;
+    let status = cmd
+        .status()
+        .with_context(|| format!("Failed to run systemctl for action {:?}", name))?;
     if !status.success() {
         return Err(anyhow!(
             "Failed to {} service '{}'.",
@@ -188,11 +233,15 @@ fn manage_linux_service(
 fn ensure_linux_unit_file(name: &str, service: &types::Service, is_user: bool) -> Result<()> {
     let unit_path = if is_user {
         let home = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory"))?;
-        let path = home.join(".config/systemd/user");
-        fs::create_dir_all(&path)?;
+        let path = apply_sysroot(home.join(".config/systemd/user"));
+        fs::create_dir_all(&path)
+            .with_context(|| format!("Failed to create directory: {}", path.display()))?;
         path.join(format!("{}.service", name))
     } else {
-        PathBuf::from(format!("/etc/systemd/system/{}.service", name))
+        apply_sysroot(PathBuf::from(format!(
+            "/etc/systemd/system/{}.service",
+            name
+        )))
     };
 
     if unit_path.exists() {
@@ -243,13 +292,18 @@ WorkingDirectory=",
     });
     content.push('\n');
 
-    fs::write(&unit_path, content)?;
+    fs::write(&unit_path, content)
+        .with_context(|| format!("Failed to write unit file: {}", unit_path.display()))?;
 
-    let mut cmd = Command::new("systemctl");
-    if is_user {
-        cmd.arg("--user");
+    if std::env::var("ZOI_TEST_SKIP_SERVICE_COMMANDS").is_err() {
+        let mut cmd = Command::new("systemctl");
+        if is_user {
+            cmd.arg("--user");
+        }
+        cmd.arg("daemon-reload")
+            .status()
+            .context("Failed to run systemctl daemon-reload")?;
     }
-    cmd.arg("daemon-reload").status()?;
 
     Ok(())
 }
@@ -263,27 +317,37 @@ fn manage_macos_service(
     let is_user = scope != types::Scope::System;
     let plist_path = ensure_macos_plist(name, service, is_user)?;
 
+    if std::env::var("ZOI_TEST_SKIP_SERVICE_COMMANDS").is_ok() {
+        return Ok(());
+    }
+
     match action {
         ServiceAction::Start => {
             Command::new("launchctl")
                 .arg("bootstrap")
                 .arg(if is_user { "gui" } else { "system" })
                 .arg(plist_path)
-                .status()?;
+                .status()
+                .context("Failed to run launchctl bootstrap")?;
         }
         ServiceAction::Stop => {
             Command::new("launchctl")
                 .arg("bootout")
                 .arg(if is_user { "gui" } else { "system" })
                 .arg(plist_path)
-                .status()?;
+                .status()
+                .context("Failed to run launchctl bootout")?;
         }
         ServiceAction::Restart => {
             manage_macos_service(name, service, ServiceAction::Stop, scope)?;
             manage_macos_service(name, service, ServiceAction::Start, scope)?;
         }
         ServiceAction::Status => {
-            Command::new("launchctl").arg("list").arg(name).status()?;
+            Command::new("launchctl")
+                .arg("list")
+                .arg(name)
+                .status()
+                .context("Failed to run launchctl list")?;
         }
     }
 
@@ -293,11 +357,15 @@ fn manage_macos_service(
 fn ensure_macos_plist(name: &str, service: &types::Service, is_user: bool) -> Result<PathBuf> {
     let plist_path = if is_user {
         let home = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory"))?;
-        let path = home.join("Library/LaunchAgents");
-        fs::create_dir_all(&path)?;
+        let path = apply_sysroot(home.join("Library/LaunchAgents"));
+        fs::create_dir_all(&path)
+            .with_context(|| format!("Failed to create directory: {}", path.display()))?;
         path.join(format!("{}.plist", name))
     } else {
-        PathBuf::from(format!("/Library/LaunchDaemons/{}.plist", name))
+        apply_sysroot(PathBuf::from(format!(
+            "/Library/LaunchDaemons/{}.plist",
+            name
+        )))
     };
 
     if plist_path.exists() {
@@ -390,7 +458,8 @@ fn ensure_macos_plist(name: &str, service: &types::Service, is_user: bool) -> Re
 ",
     );
 
-    fs::write(&plist_path, content)?;
+    fs::write(&plist_path, content)
+        .with_context(|| format!("Failed to write plist file: {}", plist_path.display()))?;
     Ok(plist_path)
 }
 
@@ -400,29 +469,57 @@ fn manage_windows_service(
     action: ServiceAction,
     _scope: types::Scope,
 ) -> Result<()> {
+    if std::env::var("ZOI_TEST_SKIP_SERVICE_COMMANDS").is_ok() {
+        return Ok(());
+    }
+
     match action {
         ServiceAction::Start => {
             if !service_exists_windows(name)? {
                 create_windows_service(name, service)?;
             }
-            Command::new("sc").arg("start").arg(name).status()?;
+            Command::new("sc")
+                .arg("start")
+                .arg(name)
+                .status()
+                .context("Failed to run sc start")?;
         }
         ServiceAction::Stop => {
-            Command::new("sc").arg("stop").arg(name).status()?;
+            Command::new("sc")
+                .arg("stop")
+                .arg(name)
+                .status()
+                .context("Failed to run sc stop")?;
         }
         ServiceAction::Restart => {
-            Command::new("sc").arg("stop").arg(name).status()?;
-            Command::new("sc").arg("start").arg(name).status()?;
+            Command::new("sc")
+                .arg("stop")
+                .arg(name)
+                .status()
+                .context("Failed to run sc stop (restart)")?;
+            Command::new("sc")
+                .arg("start")
+                .arg(name)
+                .status()
+                .context("Failed to run sc start (restart)")?;
         }
         ServiceAction::Status => {
-            Command::new("sc").arg("query").arg(name).status()?;
+            Command::new("sc")
+                .arg("query")
+                .arg(name)
+                .status()
+                .context("Failed to run sc query")?;
         }
     }
     Ok(())
 }
 
 fn service_exists_windows(name: &str) -> Result<bool> {
-    let output = Command::new("sc").arg("query").arg(name).output()?;
+    let output = Command::new("sc")
+        .arg("query")
+        .arg(name)
+        .output()
+        .context("Failed to run sc query (exists check)")?;
     Ok(output.status.success())
 }
 
@@ -436,7 +533,7 @@ fn create_windows_service(name: &str, service: &types::Service) -> Result<()> {
         cmd.arg("start=auto");
     }
 
-    let status = cmd.status()?;
+    let status = cmd.status().context("Failed to run sc create")?;
     if !status.success() {
         return Err(anyhow!("Failed to create Windows service '{}'.", name));
     }
