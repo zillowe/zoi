@@ -16,7 +16,7 @@ pub fn run(branch: &str, status: &str, number: &str, commit: &str) -> Result<()>
         branch
     };
 
-    println!("{} System information...", "::".bold().blue());
+    println!("{} System information", "::".bold().blue());
 
     let platform = utils::get_platform()?;
     let parts: Vec<&str> = platform.split('-').collect();
