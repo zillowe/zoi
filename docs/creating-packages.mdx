@@ -456,6 +456,7 @@ zoi package build --type <build-type> --test /path/to/your-package.pkg.lua
 - `--sub <SUB_PACKAGE...>`: For a split package, build only the specified sub-packages.
 - `--sign <KEY>`: Sign the resulting archive with a PGP key from your Zoi keyring.
 - `--test`: Run the `test()` function before building the archive.
+- `--install-deps`: Automatically install build-time dependencies from other package managers (e.g., Pacman, APT, Cargo) before building.
 
 ### Step 4: Verify the Final Archive
 

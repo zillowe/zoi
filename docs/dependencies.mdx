@@ -145,6 +145,13 @@ Zoi parses version specifiers using standard SemVer requirements (e.g. `>1.2.3`,
 
 When pinning is not supported, Zoi will install the latest version available from the package manager and may print a warning.
 
+### Smart Dependency Detection
+
+Zoi includes intelligence to avoid unnecessary failures when resolving dependencies from external managers:
+
+- **Skip if Missing**: If a dependency specifies an OS-specific manager (like `apt` or `pacman`) that is not available on your current system, Zoi will print a warning and skip that dependency instead of failing the installation. This allows for creating cross-platform `.pkg.lua` files that list requirements for multiple distributions.
+- **Already Installed Check**: Zoi checks if a package is already installed via its respective manager before attempting to run an install command. This speeds up builds and avoids noise from managers like `cargo` or `npm`.
+
 ## Supported managers
 
 Below is a comprehensive list of all supported dependency managers, their target platforms or ecosystems, and an example of how to use them in your `.pkg.lua`.
