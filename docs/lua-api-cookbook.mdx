@@ -126,6 +126,30 @@ function package()
 end
 ```
 
+## Shared Logic with `INCLUDE`
+
+Keep your package definitions DRY (Don't Repeat Yourself) by including external Lua scripts. This is especially useful for large lists of hashes or common build functions.
+
+```lua
+-- shared_build.pkg.lua
+function common_make()
+  cmd("make clean")
+  cmd("make -j" .. (ZOI.parallel_jobs or 2))
+end
+
+-- package.pkg.lua
+INCLUDE("shared_build.pkg.lua")
+
+function package()
+  -- Use function defined in shared_build.pkg.lua
+  common_make()
+  zcp("output/bin", "${pkgstore}/bin")
+end
+```
+
+> [!TIP]
+> Use the `.pkg.lua` extension for included files if you want them to be clearly associated with Zoi packaging, or `.lua` for general utility scripts. Note that `INCLUDE` uses paths relative to the current script.
+
 ## Using Hooks for System Integration
 
 Use hooks to perform actions that `zcp` cannot do, such as updating a system database or reloading a daemon.

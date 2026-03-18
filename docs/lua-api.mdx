@@ -101,6 +101,9 @@ Reads and returns the content of a file located in the same directory as the `.p
 
 Executes another Lua script located in the same directory. Useful for sharing logic between packages.
 
+> [!IMPORTANT]
+> The `file_name` should be a path relative to the current script. You do **not** need to use `${pkgluadir}` here. If the included file is missing or contains errors, the entire package will be skipped during `zoi sync` indexing and won't be available for installation.
+
 ---
 
 ## Declarative Functions
