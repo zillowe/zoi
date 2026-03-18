@@ -153,9 +153,30 @@ pub fn install_dependency(
     }
 
     if let Some(pm_commands) = pm::MANAGERS.get(dep.manager) {
+        let is_available = match dep.manager {
+            "apt" | "apt-get" => utils::command_exists("apt-get") || utils::command_exists("apt"),
+            "dnf" | "yum" => utils::command_exists("dnf") || utils::command_exists("yum"),
+            "xbps" | "xbps-install" => utils::command_exists("xbps-install"),
+            "aur" => utils::command_exists("makepkg") && utils::command_exists("pacman"),
+            _ => utils::command_exists(dep.manager),
+        };
+
+        if !is_available {
+            let msg = format!(
+                "Package manager '{}' not found on this system. Skipping dependency '{}'.",
+                dep.manager, dep.package
+            );
+            if let Some(p) = pb {
+                p.println(format!("{}: {}", "Warning".yellow(), msg));
+            } else {
+                println!("{}: {}", "Warning".yellow(), msg);
+            }
+            return Ok(());
+        }
+
         if let Some(check_cmd_template) = pm_commands.is_installed {
             let check_cmd = check_cmd_template.replace("{package}", dep.package);
-            if utils::run_shell_command(&check_cmd).is_ok() {
+            if utils::run_shell_command_quietly(&check_cmd).is_ok() {
                 if let Some(p) = pb {
                     p.set_message(format!("{} (already installed)", dep.package));
                     p.finish();

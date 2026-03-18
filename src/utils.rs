@@ -204,6 +204,29 @@ pub fn run_shell_command(command_str: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+pub fn run_shell_command_quietly(command_str: &str) -> anyhow::Result<()> {
+    let status = if cfg!(target_os = "windows") {
+        Command::new("pwsh")
+            .arg("-Command")
+            .arg(command_str)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()?
+    } else {
+        Command::new("bash")
+            .arg("-c")
+            .arg(command_str)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()?
+    };
+
+    if !status.success() {
+        return Err(anyhow!("Command failed: {}", command_str));
+    }
+    Ok(())
+}
+
 pub fn command_exists(command: &str) -> bool {
     if cfg!(target_os = "windows") {
         Command::new("where")

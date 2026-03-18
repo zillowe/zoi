@@ -65,6 +65,7 @@ pub fn try_build_install(
             Some(&version_clone),
             sub_packages_vec,
             true,
+            true,
         )
     });
 

@@ -50,18 +50,22 @@
 		"uninstall": "choco uninstall -y {package}"
 	},
 	"composer": {
+		"is_installed": "composer global show {package}",
 		"install": "composer global require {package_with_version}",
 		"uninstall": "composer global remove {package}"
 	},
 	"conda": {
+		"is_installed": "conda list {package}",
 		"install": "conda install -y {package}",
 		"uninstall": "conda uninstall -y {package}"
 	},
 	"dart-pub": {
+		"is_installed": "dart pub global list | grep -q \"^{package} \"",
 		"install": "dart pub global activate {package}",
 		"uninstall": "dart pub global deactivate {package}"
 	},
 	"deno": {
+		"is_installed": "deno list | grep -q \"{package}\"",
 		"install": "deno install -g -A {package}",
 		"uninstall": "deno uninstall {package}"
 	},
@@ -71,47 +75,57 @@
 		"uninstall": "sudo dnf remove -y {package}"
 	},
 	"dotnet": {
+		"is_installed": "dotnet tool list -g | grep -q \"{package}\"",
 		"install": "dotnet tool install -g {package_with_version}",
 		"uninstall": "dotnet tool uninstall -g {package}"
 	},
 	"eopkg": {
+		"is_installed": "eopkg info {package}",
 		"install": "sudo eopkg it -y {package}",
 		"uninstall": "sudo eopkg rm -y {package}"
 	},
 	"flatpak": {
+		"is_installed": "flatpak info {package}",
 		"install": "sudo flatpak install flathub {package} -y",
 		"uninstall": "flatpak uninstall {package} -y"
 	},
 	"gem": {
+		"is_installed": "gem list -i {package}",
 		"install": "gem install {package_with_version}",
 		"uninstall": "gem uninstall {package}"
 	},
 	"go": {
+		"is_installed": "go version {package}",
 		"install": "go install {package_with_version}",
 		"uninstall": "echo \"Go binaries are installed in $GOPATH/bin. Please remove the binary for {package} manually.\""
 	},
 	"guix": {
+		"is_installed": "guix package -I | grep -q \"^{package}\t\"",
 		"install": "guix install {package}",
 		"uninstall": "guix remove {package}"
 	},
 	"jsr": {
+		"is_installed": "ls node_modules/{package}",
 		"install": "npx jsr add {package}",
 		"uninstall": "echo \"JSR does not have a global uninstall. Please remove from the local project.\""
 	},
 	"macports": {
+		"is_installed": "port installed {package}",
 		"install": "sudo port install {package}",
 		"uninstall": "sudo port uninstall {package}"
 	},
 	"mas": {
+		"is_installed": "mas list | grep -q \"{package}\"",
 		"install": "mas install {package}",
 		"uninstall": "mas remove {package}"
 	},
 	"nix": {
+		"is_installed": "nix-env -q {package}",
 		"install": "nix-env -iA nixpkgs.{package}",
 		"uninstall": "nix-env -e {package}"
 	},
 	"npm": {
-		"is_installed": "npm list -g {package}",
+		"is_installed": "npm list -g {package} --depth=0",
 		"install": "npm install -g {package_with_version}",
 		"uninstall": "npm uninstall -g {package}"
 	},
@@ -121,34 +135,42 @@
 		"uninstall": "sudo pacman -Rns --noconfirm {package}"
 	},
 	"paru": {
+		"is_installed": "pacman -Qi {package}",
 		"install": "paru -S --needed --noconfirm {package}",
 		"uninstall": "paru -Rns --noconfirm {package}"
 	},
 	"pikaur": {
+		"is_installed": "pacman -Qi {package}",
 		"install": "pikaur -S --needed --noconfirm {package}",
 		"uninstall": "pikaur -Rns --noconfirm {package}"
 	},
 	"pip": {
+		"is_installed": "pip show {package}",
 		"install": "pip install {package_with_version}",
 		"uninstall": "pip uninstall -y {package}"
 	},
 	"pipx": {
+		"is_installed": "pipx list | grep -q \"package {package} \"",
 		"install": "pipx install {package_with_version}",
 		"uninstall": "pipx uninstall {package}"
 	},
 	"pkg": {
+		"is_installed": "pkg info {package}",
 		"install": "sudo pkg install -y {package}",
 		"uninstall": "sudo pkg delete -y {package}"
 	},
 	"pkg_add": {
+		"is_installed": "pkg_info {package}",
 		"install": "sudo pkg_add -I {package}",
 		"uninstall": "sudo pkg_delete {package}"
 	},
 	"pnpm": {
+		"is_installed": "pnpm list -g {package} --depth=0",
 		"install": "pnpm add -g {package_with_version}",
 		"uninstall": "pnpm remove -g {package}"
 	},
 	"portage": {
+		"is_installed": "qlist -I {package}",
 		"install": "sudo emerge {package}",
 		"uninstall": "sudo emerge --unmerge {package}"
 	},
@@ -158,34 +180,42 @@
 		"uninstall": "scoop uninstall {package}"
 	},
 	"snap": {
+		"is_installed": "snap list {package}",
 		"install": "sudo snap install {package}",
 		"uninstall": "sudo snap remove {package}"
 	},
 	"trizen": {
+		"is_installed": "pacman -Qi {package}",
 		"install": "trizen -S --needed --noconfirm {package}",
 		"uninstall": "trizen -Rns --noconfirm {package}"
 	},
 	"uv": {
+		"is_installed": "uv tool list | grep -q \"^{package} \"",
 		"install": "uv tool install {package}",
 		"uninstall": "echo \"uv does not currently support 'tool uninstall'. Please remove the binary manually.\""
 	},
 	"volta": {
+		"is_installed": "volta list {package}",
 		"install": "volta install {package_with_version}",
 		"uninstall": "echo \"Volta does not have a direct uninstall command. Please remove the binary manually.\""
 	},
 	"winget": {
+		"is_installed": "winget list -q {package}",
 		"install": "winget install {package_with_version} --silent --accept-package-agreements --accept-source-agreements",
 		"uninstall": "winget uninstall {package} --silent"
 	},
 	"yarn": {
+		"is_installed": "yarn global list --pattern {package}",
 		"install": "yarn global add {package_with_version}",
 		"uninstall": "yarn global remove {package}"
 	},
 	"yay": {
+		"is_installed": "pacman -Qi {package}",
 		"install": "yay -S --needed --noconfirm {package}",
 		"uninstall": "yay -Rns --noconfirm {package}"
 	},
 	"zig": {
+		"is_installed": "ls build.zig.zon | xargs grep -q \"{package}\"",
 		"install": "zig fetch --save {package}",
 		"uninstall": "echo \"Zig does not have a global uninstall. Please remove from the local build.zig.zon.\""
 	},
@@ -195,14 +225,17 @@
 		"uninstall": "sudo yum remove -y {package}"
 	},
 	"zypper": {
+		"is_installed": "zypper search -i {package}",
 		"install": "sudo zypper install -y '{package_with_version}'",
 		"uninstall": "sudo zypper remove -y {package}"
 	},
 	"xbps": {
+		"is_installed": "xbps-query -l | grep -q \" {package}-\"",
 		"install": "sudo xbps-install -S {package}",
 		"uninstall": "sudo xbps-remove -R {package}"
 	},
 	"xbps-install": {
+		"is_installed": "xbps-query -l | grep -q \" {package}-\"",
 		"install": "sudo xbps-install -S {package}",
 		"uninstall": "sudo xbps-remove -R {package}"
 	}

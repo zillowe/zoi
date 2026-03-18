@@ -32,6 +32,10 @@ pub struct BuildCommand {
     /// Directory to output the built package to
     #[arg(long, short = 'o')]
     pub output_dir: Option<PathBuf>,
+
+    /// Automatically install build-time dependencies
+    #[arg(long)]
+    pub install_deps: bool,
 }
 
 pub fn run(args: BuildCommand) -> Result<()> {
@@ -50,5 +54,6 @@ pub fn run(args: BuildCommand) -> Result<()> {
         None,
         args.sub,
         false,
+        args.install_deps,
     )
 }

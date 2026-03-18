@@ -18,6 +18,7 @@ fn build_for_platform(
     version_override: Option<&str>,
     sub_packages: Option<&Vec<String>>,
     quiet: bool,
+    install_deps: bool,
 ) -> Result<()> {
     let pkg_lua_dir_str = package_file
         .parent()
@@ -38,6 +39,45 @@ fn build_for_platform(
             build_type,
             pkg_for_meta.types
         ));
+    }
+
+    if install_deps
+        && let Some(deps) = &pkg_for_meta.dependencies
+        && let Some(build_deps) = &deps.build
+    {
+        let group = match build_deps {
+            pkg::types::BuildDependencies::Group(g) => Some(g),
+            pkg::types::BuildDependencies::Typed(t) => t.types.get(build_type),
+        };
+
+        if let Some(g) = group {
+            if !quiet {
+                println!("{} Installing build dependencies...", "::".bold().blue());
+            }
+            let (req_deps, _, _) = pkg::install::resolver::collect_dependencies_for_group(
+                g,
+                None,
+                Some("build"),
+                true,
+                true,
+            )?;
+
+            let processed = std::sync::Mutex::new(std::collections::HashSet::new());
+            let mut installed = Vec::new();
+            for dep_str in req_deps {
+                let dep = pkg::dependencies::parse_dependency_string(&dep_str)?;
+                pkg::dependencies::install_dependency(
+                    &dep,
+                    &pkg_for_meta.name,
+                    pkg_for_meta.scope,
+                    true,
+                    true,
+                    &processed,
+                    &mut installed,
+                    None,
+                )?;
+            }
+        }
     }
 
     let version = if let Some(v) = version_override {
@@ -458,6 +498,7 @@ pub fn run(
     version_override: Option<&str>,
     sub_packages: Option<Vec<String>>,
     quiet: bool,
+    install_deps: bool,
 ) -> Result<()> {
     if !quiet {
         println!("Building package from: {}", package_file.display());
@@ -495,6 +536,7 @@ pub fn run(
             version_override,
             sub_packages.as_ref(),
             quiet,
+            install_deps,
         ) {
             eprintln!(
                 "{}: Failed to build for platform {}: {}",

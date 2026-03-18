@@ -87,6 +87,7 @@ pub fn build(
     build_type: &str,
     platforms: &[String],
     sign_key: Option<String>,
+    install_deps: bool,
 ) -> Result<()> {
     pkg::package::build::run(
         package_file,
@@ -97,6 +98,7 @@ pub fn build(
         None,
         None,
         false,
+        install_deps,
     )
 }
 

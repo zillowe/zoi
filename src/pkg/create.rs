@@ -99,6 +99,7 @@ pub fn run(
         pkg.version.as_deref(),
         None,
         false,
+        false,
     )?;
 
     let archive_filename = format!(
