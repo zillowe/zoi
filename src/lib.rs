@@ -77,7 +77,7 @@ use std::path::Path;
 /// fn main() -> Result<()> {
 ///     let package_file = Path::new("my-package.pkg.lua");
 ///     let platforms = vec!["linux-amd64".to_string()];
-///     build(package_file, "source", &platforms, None)?;
+///     build(package_file, "source", &platforms, None, true)?;
 ///     println!("Package built successfully!");
 ///     Ok(())
 /// }
