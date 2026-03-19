@@ -386,10 +386,14 @@ Build, create, and manage Zoi packages.
   - `--sub <SUB_PACKAGES...>`: For a split package, build only the specified sub-packages.
   - `--test`: Run package tests before building.
   - `--install-deps`: Automatically install build-time dependencies defined in the package before building.
+  - `--version-override <VERSION>`: Override the package version.
+  - `--method <native|docker>`: The build method to use (default: `native`).
+  - `--image <IMAGE>`: The Docker image to use for the build (required for `--method docker`).
 - `test <package_file>`: Run tests for a package. This command accepts the same arguments as `build`.
   - `--type <TYPE>`: (Required) The build type to use for testing.
   - `-p`, `--platform <PLATFORM>`: The platform to test on.
   - `--sub <SUB_PACKAGES...>`: For a split package, test only the specified sub-packages.
+  - `--version-override <VERSION>`: Override the package version for testing.
 - `install <package_file>`: Install a package from a local archive.
   - `--scope <user|system>`: The scope to install the package to (default: `user`).
   - `--sub <SUB_PACKAGES...>`: For a split package, install only the specified sub-packages from the archive.

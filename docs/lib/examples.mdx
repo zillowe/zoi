@@ -32,7 +32,7 @@ fn main() -> Result<()> {
     println!("Building package: {}", package_file.display());
 
     // Call the build function.
-    build(package_file, build_type, &platforms, sign_key)?;
+    build(package_file, build_type, &platforms, sign_key, true, "native", None, None)?;
 
     println!("Package built successfully!");
 
