@@ -499,7 +499,26 @@ pub fn run(
     sub_packages: Option<Vec<String>>,
     quiet: bool,
     install_deps: bool,
+    method: &str,
+    image: Option<&str>,
 ) -> Result<()> {
+    if method == "docker" {
+        let docker_image = image.ok_or_else(|| {
+            anyhow!("An image must be specified when using the 'docker' build method.")
+        })?;
+        return super::docker::run(
+            package_file,
+            build_type,
+            platforms,
+            sign_key,
+            output_dir,
+            version_override,
+            sub_packages,
+            docker_image,
+            install_deps,
+        );
+    }
+
     if !quiet {
         println!("Building package from: {}", package_file.display());
     }

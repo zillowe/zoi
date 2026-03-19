@@ -36,6 +36,18 @@ pub struct BuildCommand {
     /// Automatically install build-time dependencies
     #[arg(long)]
     pub install_deps: bool,
+
+    /// Override the package version
+    #[arg(long)]
+    pub version_override: Option<String>,
+
+    /// Method to use for building ('native' or 'docker')
+    #[arg(long, default_value = "native")]
+    pub method: String,
+
+    /// Docker image to use when method is 'docker'
+    #[arg(long)]
+    pub image: Option<String>,
 }
 
 pub fn run(args: BuildCommand) -> Result<()> {
@@ -51,9 +63,11 @@ pub fn run(args: BuildCommand) -> Result<()> {
         &args.platform,
         args.sign,
         args.output_dir.as_deref(),
-        None,
+        args.version_override.as_deref(),
         args.sub,
         false,
         args.install_deps,
+        &args.method,
+        args.image.as_deref(),
     )
 }

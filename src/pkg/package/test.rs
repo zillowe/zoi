@@ -20,11 +20,15 @@ pub fn run(args: &cmd::package::build::BuildCommand) -> Result<()> {
             )
         })?,
         &platform,
-        None,
+        args.version_override.as_deref(),
         false,
     )?;
 
-    let version = pkg::resolve::get_default_version(&pkg_for_meta, None)?;
+    let version = if let Some(v) = &args.version_override {
+        v.clone()
+    } else {
+        pkg::resolve::get_default_version(&pkg_for_meta, None)?
+    };
 
     let build_dir = tempfile::Builder::new()
         .prefix(&format!("zoi-test-{}-{}", pkg_for_meta.name, platform))

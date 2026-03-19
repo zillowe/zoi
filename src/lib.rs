@@ -77,7 +77,7 @@ use std::path::Path;
 /// fn main() -> Result<()> {
 ///     let package_file = Path::new("my-package.pkg.lua");
 ///     let platforms = vec!["linux-amd64".to_string()];
-///     build(package_file, "source", &platforms, None, true)?;
+///     build(package_file, "source", &platforms, None, true, "native", None, None)?;
 ///     println!("Package built successfully!");
 ///     Ok(())
 /// }
@@ -88,6 +88,9 @@ pub fn build(
     platforms: &[String],
     sign_key: Option<String>,
     install_deps: bool,
+    method: &str,
+    image: Option<&str>,
+    version_override: Option<&str>,
 ) -> Result<()> {
     pkg::package::build::run(
         package_file,
@@ -95,10 +98,12 @@ pub fn build(
         platforms,
         sign_key,
         None,
-        None,
+        version_override,
         None,
         false,
         install_deps,
+        method,
+        image,
     )
 }
 
