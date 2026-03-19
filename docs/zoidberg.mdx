@@ -8,6 +8,51 @@ Zoidberg is the official package registry for Zoi. It is a Git repository that c
 - **Primary:** [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg)
 - **Mirrors:** [GitHub](https://github.com/Zillowe/Zoidberg), [Codeberg](https://codeberg.org/Zillowe/Zoidberg)
 
+## Installing a Package
+
+To use Zoidberg packages, you must first have Zoi installed. Zoidberg is the default registry for Zoi.
+
+### 1. Sync the Registry
+
+Before installing any packages, ensure your local database is up to date:
+
+```sh
+zoi sync
+```
+
+### 2. Install a Package
+
+You can install packages using the `@repo/name` syntax. For example, to install `hello` from the `zillowe` repository:
+
+```sh
+zoi install @zillowe/hello
+```
+
+## Using Mirrors
+
+If you wish to use one of the official Zoidberg mirrors (GitHub or Codeberg), you can change your active registry:
+
+```sh
+# Set to GitHub mirror
+zoi sync set github
+
+# Set to Codeberg mirror
+zoi sync set codeberg
+
+# Revert to default
+zoi sync set default
+```
+
+After changing the mirror, run `zoi sync` to update your local metadata.
+
+## Security & PGP Keys
+
+If you are using an unofficial Zoi binary or wish to manually verify the Zoidberg registry, you should import the maintainer's PGP key:
+
+```sh
+zoi pgp add https://zillowe.pages.dev/keys/zillowez.asc
+```
+
 ## Repository Tiers
 
 Zoidberg organizes packages into tiers. These tiers help to indicate the stability and maintenance status of a package.
