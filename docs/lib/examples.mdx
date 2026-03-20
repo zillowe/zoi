@@ -21,7 +21,7 @@ fn main() -> Result<()> {
     let package_file = Path::new("path/to/your/package.pkg.lua");
 
     // Specify the build type, e.g. "source" or "pre-compiled".
-    let build_type = "source";
+    let build_type = Some("source");
 
     // Specify the target platforms.
     let platforms = vec!["linux-amd64".to_string()];

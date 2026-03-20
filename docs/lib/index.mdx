@@ -55,7 +55,7 @@ This function builds a Zoi package from a `.pkg.lua` definition file for one or 
 ```rust
 pub fn build(
     package_file: &Path,
-    build_type: &str,
+    build_type: Option<&str>,
     platforms: &[String],
     sign_key: Option<String>,
     install_deps: bool,
@@ -67,16 +67,16 @@ pub fn build(
 
 ### Parameters
 
-| Parameter          | Type             | Description                                                                                              |
-| ------------------ | ---------------- | -------------------------------------------------------------------------------------------------------- |
-| `package_file`     | `&Path`          | The path to the `.pkg.lua` file that defines the package.                                                |
-| `build_type`       | `&str`           | The type of package to build (e.g. `"source"`, `"pre-compiled"`). This must be supported by the package. |
-| `platforms`        | `&[String]`      | A slice of platform strings to build for (e.g. `["linux-amd64", "windows-amd64"]`).                      |
-| `sign_key`         | `Option<String>` | An optional PGP key name or fingerprint to sign the resulting package archive.                           |
-| `install_deps`     | `bool`           | Automatically install build-time dependencies before building.                                           |
-| `method`           | `&str`           | The build method to use (`"native"` or `"docker"`).                                                      |
-| `image`            | `Option<&str>`   | The Docker image to use (required if `method` is `"docker"`).                                            |
-| `version_override` | `Option<&str>`   | Optionally override the package version defined in the `.pkg.lua` file.                                  |
+| Parameter          | Type             | Description                                                                                            |
+| ------------------ | ---------------- | ------------------------------------------------------------------------------------------------------ |
+| `package_file`     | `&Path`          | The path to the `.pkg.lua` file that defines the package.                                              |
+| `build_type`       | `Option<&str>`   | The type of package to build (e.g. `"source"`). Defaults to `pre-compiled`, then `source`, if not set. |
+| `platforms`        | `&[String]`      | A slice of platform strings to build for (e.g. `["linux-amd64", "windows-amd64"]`).                    |
+| `sign_key`         | `Option<String>` | An optional PGP key name or fingerprint to sign the resulting package archive.                         |
+| `install_deps`     | `bool`           | Automatically install build-time dependencies before building.                                         |
+| `method`           | `&str`           | The build method to use (`"native"` or `"docker"`).                                                    |
+| `image`            | `Option<&str>`   | The Docker image to use (required if `method` is `"docker"`).                                          |
+| `version_override` | `Option<&str>`   | Optionally override the package version defined in the `.pkg.lua` file.                                |
 
 ---
 
