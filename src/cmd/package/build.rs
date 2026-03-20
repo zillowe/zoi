@@ -9,8 +9,8 @@ pub struct BuildCommand {
     pub package_file: PathBuf,
 
     /// The type of package to build (e.g. 'source', 'pre-compiled').
-    #[arg(long, required = true)]
-    pub r#type: String,
+    #[arg(long)]
+    pub r#type: Option<String>,
 
     /// The platform to build for (e.g. 'linux-amd64', 'windows-arm64', 'all', 'current').
     /// Can be specified multiple times.
@@ -59,7 +59,7 @@ pub fn run(args: BuildCommand) -> Result<()> {
 
     crate::pkg::package::build::run(
         &args.package_file,
-        &args.r#type,
+        args.r#type.as_deref(),
         &args.platform,
         args.sign,
         args.output_dir.as_deref(),

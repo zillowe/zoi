@@ -58,7 +58,7 @@ pub fn try_build_install(
     let build_handle = thread::spawn(move || {
         crate::pkg::package::build::run(
             &pkg_lua_path_clone,
-            &build_type_clone,
+            Some(&build_type_clone),
             std::slice::from_ref(&current_platform_clone),
             None,
             None,

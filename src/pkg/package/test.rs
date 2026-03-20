@@ -30,6 +30,12 @@ pub fn run(args: &cmd::package::build::BuildCommand) -> Result<()> {
         pkg::resolve::get_default_version(&pkg_for_meta, None)?
     };
 
+    let resolved_build_type = crate::pkg::package::build::resolve_build_type(
+        args.r#type.as_deref(),
+        &pkg_for_meta.types,
+        &pkg_for_meta.name,
+    )?;
+
     let build_dir = tempfile::Builder::new()
         .prefix(&format!("zoi-test-{}-{}", pkg_for_meta.name, platform))
         .tempdir()?;
@@ -96,7 +102,7 @@ pub fn run(args: &cmd::package::build::BuildCommand) -> Result<()> {
             )
             .map_err(|e| anyhow!(e.to_string()))?;
         lua.globals()
-            .set("BUILD_TYPE", args.r#type.as_str())
+            .set("BUILD_TYPE", resolved_build_type.as_str())
             .map_err(|e| anyhow!(e.to_string()))?;
 
         let lua_code = std::fs::read_to_string(&args.package_file)?;

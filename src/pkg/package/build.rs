@@ -9,9 +9,40 @@ use tempfile::Builder;
 use walkdir::WalkDir;
 use zstd::stream::write::Encoder as ZstdEncoder;
 
+pub fn resolve_build_type(
+    requested: Option<&str>,
+    supported: &[String],
+    pkg_name: &str,
+) -> Result<String> {
+    if let Some(t) = requested {
+        if !supported.iter().any(|s| s == t) {
+            return Err(anyhow!(
+                "Build type '{}' not supported by package '{}'. Supported types: {:?}",
+                t,
+                pkg_name,
+                supported
+            ));
+        }
+        return Ok(t.to_string());
+    }
+
+    if supported.iter().any(|t| t == "pre-compiled") {
+        Ok("pre-compiled".to_string())
+    } else if supported.iter().any(|t| t == "source") {
+        Ok("source".to_string())
+    } else if let Some(first) = supported.first() {
+        Ok(first.clone())
+    } else {
+        Err(anyhow!(
+            "No build types supported by package '{}'.",
+            pkg_name
+        ))
+    }
+}
+
 fn build_for_platform(
     package_file: &Path,
-    build_type: &str,
+    build_type: Option<&str>,
     platform: &str,
     sign_key: &Option<String>,
     output_dir: Option<&Path>,
@@ -33,13 +64,8 @@ fn build_for_platform(
         quiet,
     )?;
 
-    if !pkg_for_meta.types.iter().any(|t| t == build_type) {
-        return Err(anyhow!(
-            "Build type '{}' not supported by this package. Supported types: {:?}",
-            build_type,
-            pkg_for_meta.types
-        ));
-    }
+    let resolved_build_type =
+        resolve_build_type(build_type, &pkg_for_meta.types, &pkg_for_meta.name)?;
 
     if install_deps
         && let Some(deps) = &pkg_for_meta.dependencies
@@ -47,7 +73,7 @@ fn build_for_platform(
     {
         let group = match build_deps {
             pkg::types::BuildDependencies::Group(g) => Some(g),
-            pkg::types::BuildDependencies::Typed(t) => t.types.get(build_type),
+            pkg::types::BuildDependencies::Typed(t) => t.types.get(&resolved_build_type),
         };
 
         if let Some(g) = group {
@@ -159,7 +185,7 @@ fn build_for_platform(
             )
             .map_err(|e| anyhow!(e.to_string()))?;
         lua.globals()
-            .set("BUILD_TYPE", build_type)
+            .set("BUILD_TYPE", resolved_build_type.as_str())
             .map_err(|e| anyhow!(e.to_string()))?;
 
         let lua_code = fs::read_to_string(package_file)?;
@@ -491,7 +517,7 @@ fn build_for_platform(
 
 pub fn run(
     package_file: &Path,
-    build_type: &str,
+    build_type: Option<&str>,
     platforms: &[String],
     sign_key: Option<String>,
     output_dir: Option<&Path>,

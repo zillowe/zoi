@@ -5,7 +5,7 @@ use std::process::Command;
 
 pub fn run(
     package_file: &Path,
-    build_type: &str,
+    build_type: Option<&str>,
     platforms: &[String],
     sign_key: Option<String>,
     output_dir: Option<&Path>,
@@ -71,9 +71,13 @@ pub fn run(
         "curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash && \
          export PATH=\"$HOME/.local/bin:$PATH\" && \
          zoi sync && \
-         zoi package build {} --type {} --output-dir {}",
-        package_filename, build_type, container_output_dir
+         zoi package build {} --output-dir {}",
+        package_filename, container_output_dir
     );
+
+    if let Some(bt) = build_type {
+        inner_cmd.push_str(&format!(" --type {}", bt));
+    }
 
     for p in platforms {
         inner_cmd.push_str(&format!(" --platform {}", p));

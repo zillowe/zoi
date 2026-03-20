@@ -92,7 +92,7 @@ pub fn run(
 
     package::build::run(
         &pkg_lua_path,
-        "source",
+        Some("source"),
         &[utils::get_platform()?],
         None,
         Some(build_dir.path()),
