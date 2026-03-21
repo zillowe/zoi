@@ -456,7 +456,7 @@ zoi package build --type <build-type> --test /path/to/your-package.pkg.lua
 - `--sub <SUB_PACKAGE...>`: For a split package, build only the specified sub-packages.
 - `--sign <KEY>`: Sign the resulting archive with a PGP key from your Zoi keyring.
 - `--test`: Run the `test()` function before building the archive.
-- `--install-deps`: Automatically install build-time dependencies from other package managers (e.g., Pacman, APT, Cargo) before building.
+- `--install-deps`: Automatically install build-time dependencies from other package managers (e.g. Pacman, APT, Cargo) before building.
 - `--version-override <VERSION>`: Override the package version defined in the `.pkg.lua` file.
 - `--method <native|docker>`: The build method to use. Defaults to `native`. Use `docker` for containerized builds.
 - `--image <IMAGE>`: The Docker image to use for the build (required when `--method docker` is used).

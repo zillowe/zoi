@@ -69,10 +69,10 @@ pub fn run(
 
     let mut inner_cmd = format!(
         "if ! command -v sudo >/dev/null 2>&1 && [ \"$(id -u)\" -eq 0 ]; then \
-            if command -v pacman >/dev/null 2>&1; then pacman -S --noconfirm sudo; \
+            if command -v pacman >/dev/null 2>&1; then pacman -Sy --noconfirm sudo; \
             elif command -v apt-get >/dev/null 2>&1; then apt-get update && apt-get install -y sudo; \
             elif command -v dnf >/dev/null 2>&1; then dnf install -y sudo; \
-            elif command -v apk >/dev/null 2>&1; then apk add sudo; fi; \
+            elif command -v apk >/dev/null 2>&1; then apk add --update sudo; fi; \
          fi && \
          curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash && \
          export PATH=\"$HOME/.local/bin:$PATH\" && \

@@ -17,6 +17,8 @@ Zoi is packed with features designed to make package management and environment 
 
 - **SAT-Powered Dependency Resolution:** Uses the PubGrub algorithm (the same engine powering Cargo and uv) to mathematically solve complex version constraints, automatically handling backtracking and deep version clashing for 100% reliable system upgrades.
 
+- **Decentralized Security Advisories:** Automated vulnerability tracking via `.sec.yaml` files co-located with packages in the registry. Zoi proactively warns you during installation or upgrades if a package has known security issues, requiring explicit confirmation to proceed.
+
 - **Strict Offline Mode:** A global `--offline` flag that guarantees Zoi will not touch the network, relying exclusively on local metadata and archive caches for secure, air-gapped environments.
 
 - **Global Transaction Hooks:** Automate system maintenance tasks (like font cache updates) based on modified file paths. Hooks run once per transaction, preventing redundant script execution.
@@ -85,6 +87,7 @@ Zoi is packed with features designed to make package management and environment 
 
 - **Powerful CLI Tools:** Zoi offers a rich set of commands for package management and inspection:
   - `zoi about`: Show application information, credits, and build details.
+  - `zoi audit`: Scan installed packages for known security vulnerabilities.
   - `zoi autoremove`: Remove packages that were installed as dependencies but are no longer needed.
   - `zoi cache`: Manage and populate the local package archive cache.
   - `zoi clean`: Clear the cache of downloaded package binaries.
@@ -140,6 +143,18 @@ These options can be used with any command:
 ### `zoi about`
 
 Shows detailed application information and credits.
+
+---
+
+### `zoi audit`
+
+Scans installed packages for known security vulnerabilities. It can also be used to inspect all advisories in the registry.
+
+**Options:**
+
+- `-a`, `--all`: List all security advisories in the database, not just for installed packages.
+- `--registry <HANDLE>`: Filter advisories by specific registry handle.
+- `--repo <REPO>`: Filter advisories by specific repository.
 
 ---
 

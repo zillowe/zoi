@@ -70,3 +70,13 @@ Zoidberg organizes packages into tiers. These tiers help to indicate the stabili
 Note: Packages from `community`, `test`, and `archive` may carry higher risk. Zoi prints warnings where appropriate.
 
 For details on how to use and manage repositories, see the [Repositories guide](/docs/zds/zoi/repositories).
+
+## Reporting Security Issues
+
+We take the security of Zoidberg packages seriously. If you discover a vulnerability in a package, please report it by opening a Merge Request with a security advisory file.
+
+1.  **Create an Advisory:** Add a `.sec.yaml` file to the package directory.
+2.  **Use Temporary ID:** Name it `ZSA-YYYY-TEMP.sec.yaml`.
+3.  **Submit MR:** Open a Merge Request on GitLab.
+
+For more details, see the [Security Advisories guide](/docs/zds/zoi/guides/security-advisories).

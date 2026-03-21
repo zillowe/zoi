@@ -91,6 +91,7 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
 - **Repository-Based:** Use official, community, or your own private/public Git-based repositories. Manage multiple registries.
 - **Parallel Registry Sync:** Concurrently sync multiple package registries for significantly faster updates.
 - **Secure & Verifiable:** Verifies package integrity with checksums and authenticity with GPG signatures. Supports Git commit signature verification for entire registries (Chain of Trust) and includes a built-in PGP keyring for out-of-the-box security.
+- **Decentralized Security Advisories:** Automated vulnerability tracking via `.sec.yaml` files co-located with packages. Zoi proactively warns you during installation or upgrades if a package has known security issues.
 - **Compliance & Audit Logging:** Maintain a persistent, tamper-evident audit log of all package operations (install, uninstall, upgrade), viewable via the `zoi history` command.
 - **Enhanced File Conflict Detection:** Prevents packages from accidentally overwriting existing files. Supports pre-download conflict checking via remote metadata to save bandwidth.
 - **Advanced Dependencies:** Supports virtual packages (`provides`) and package replacement (`replaces`).
@@ -102,6 +103,7 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
 - **Local Package Development:** A dedicated `zoi package` command set (`build`, `install`) to streamline creating and testing packages locally.
 - **Advanced CLI Tools:**
   - `zoi search`: Interactive TUI mode with result sorting and rich metadata.
+  - `zoi audit`: Scan installed packages for known security vulnerabilities.
   - `zoi history`: Read the persistent audit trail of past transactions.
   - `zoi doctor`: Proactive system health checks, including orphaned package detection and broken symlink scanning.
   - `zoi man`: Read package manuals in the terminal.
