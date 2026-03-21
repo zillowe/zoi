@@ -212,6 +212,27 @@ pub fn read_config() -> Result<Config> {
         merged_cfg.offline_mode = system_cfg.offline_mode;
     }
 
+    if project_val
+        .get("policy")
+        .and_then(|p| p.get("advisory_enforcement_unoverridable"))
+        .is_some()
+        && !system_policy.advisory_enforcement_unoverridable
+    {
+        merged_cfg.policy.advisory_enforcement_unoverridable =
+            project_cfg.policy.advisory_enforcement_unoverridable;
+    } else if user_val
+        .get("policy")
+        .and_then(|p| p.get("advisory_enforcement_unoverridable"))
+        .is_some()
+        && !system_policy.advisory_enforcement_unoverridable
+    {
+        merged_cfg.policy.advisory_enforcement_unoverridable =
+            user_cfg.policy.advisory_enforcement_unoverridable;
+    } else {
+        merged_cfg.policy.advisory_enforcement_unoverridable =
+            system_cfg.policy.advisory_enforcement_unoverridable;
+    }
+
     merged_cfg.versions = system_cfg.versions;
     merged_cfg.versions.extend(user_cfg.versions);
     merged_cfg.versions.extend(project_cfg.versions);

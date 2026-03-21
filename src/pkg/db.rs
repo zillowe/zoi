@@ -104,6 +104,7 @@ fn setup_schema(conn: &Connection) -> Result<()> {
         "CREATE TABLE IF NOT EXISTS package_advisories (
             id TEXT PRIMARY KEY,
             package TEXT NOT NULL,
+            sub_package TEXT,
             summary TEXT NOT NULL,
             severity TEXT NOT NULL,
             cvss TEXT,
@@ -117,8 +118,24 @@ fn setup_schema(conn: &Connection) -> Result<()> {
         [],
     )?;
 
+    let has_sub_pkg_adv: bool = conn
+        .query_row(
+            "SELECT count(*) FROM pragma_table_info('package_advisories') WHERE name='sub_package'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0)
+        > 0;
+
+    if !has_sub_pkg_adv {
+        let _ = conn.execute(
+            "ALTER TABLE package_advisories ADD COLUMN sub_package TEXT",
+            [],
+        );
+    }
+
     conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_package_advisories_package ON package_advisories(package)",
+        "CREATE INDEX IF NOT EXISTS idx_package_advisories_package ON package_advisories(package, sub_package)",
         [],
     )?;
 
@@ -338,10 +355,11 @@ pub fn update_advisory(
     let severity_str = format!("{:?}", advisory.severity).to_lowercase();
 
     conn.execute(
-        "INSERT INTO package_advisories (id, package, summary, severity, cvss, affected_range, fixed_in, description, references_json, repo, registry)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+        "INSERT INTO package_advisories (id, package, sub_package, summary, severity, cvss, affected_range, fixed_in, description, references_json, repo, registry)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
          ON CONFLICT(id) DO UPDATE SET
             package = excluded.package,
+            sub_package = excluded.sub_package,
             summary = excluded.summary,
             severity = excluded.severity,
             cvss = excluded.cvss,
@@ -354,6 +372,7 @@ pub fn update_advisory(
         params![
             advisory.id,
             advisory.package,
+            advisory.sub_package,
             advisory.summary,
             severity_str,
             advisory.cvss,
@@ -371,11 +390,11 @@ pub fn update_advisory(
 pub fn list_all_advisories(registry_handle: &str) -> Result<Vec<(types::Advisory, String)>> {
     let conn = open_connection(registry_handle)?;
     let mut stmt = conn.prepare(
-        "SELECT id, package, summary, severity, cvss, affected_range, fixed_in, description, references_json, repo FROM package_advisories"
+        "SELECT id, package, sub_package, summary, severity, cvss, affected_range, fixed_in, description, references_json, repo FROM package_advisories"
     )?;
 
     let rows = stmt.query_map([], |row| {
-        let severity_raw: String = row.get(3)?;
+        let severity_raw: String = row.get(4)?;
         let severity = match severity_raw.as_str() {
             "medium" => types::Severity::Medium,
             "high" => types::Severity::High,
@@ -383,22 +402,23 @@ pub fn list_all_advisories(registry_handle: &str) -> Result<Vec<(types::Advisory
             _ => types::Severity::Low,
         };
 
-        let references_raw: String = row.get(8)?;
+        let references_raw: String = row.get(9)?;
         let references: Option<Vec<String>> = serde_json::from_str(&references_raw).ok();
 
         Ok((
             types::Advisory {
                 id: row.get(0)?,
                 package: row.get(1)?,
-                summary: row.get(2)?,
+                sub_package: row.get(2)?,
+                summary: row.get(3)?,
                 severity,
-                cvss: row.get(4)?,
-                affected_range: row.get(5)?,
-                fixed_in: row.get(6)?,
-                description: row.get(7)?,
+                cvss: row.get(5)?,
+                affected_range: row.get(6)?,
+                fixed_in: row.get(7)?,
+                description: row.get(8)?,
                 references,
             },
-            row.get::<_, String>(9)?,
+            row.get::<_, String>(10)?,
         ))
     })?;
 
@@ -412,14 +432,29 @@ pub fn list_all_advisories(registry_handle: &str) -> Result<Vec<(types::Advisory
 pub fn get_advisories_for_package(
     registry_handle: &str,
     package_name: &str,
+    sub_package: Option<&str>,
 ) -> Result<Vec<types::Advisory>> {
     let conn = open_connection(registry_handle)?;
-    let mut stmt = conn.prepare(
-        "SELECT id, package, summary, severity, cvss, affected_range, fixed_in, description, references_json FROM package_advisories WHERE package = ?1"
-    )?;
 
-    let rows = stmt.query_map(params![package_name], |row| {
-        let severity_raw: String = row.get(3)?;
+    let (query, params_vec): (String, Vec<rusqlite::types::Value>) = match sub_package {
+        Some(sub) => (
+            "SELECT id, package, sub_package, summary, severity, cvss, affected_range, fixed_in, description, references_json 
+             FROM package_advisories 
+             WHERE package = ?1 AND (sub_package IS ?2 OR sub_package IS NULL)".to_string(),
+            vec![package_name.to_string().into(), sub.to_string().into()]
+        ),
+        None => (
+            "SELECT id, package, sub_package, summary, severity, cvss, affected_range, fixed_in, description, references_json 
+             FROM package_advisories 
+             WHERE package = ?1 AND sub_package IS NULL".to_string(),
+            vec![package_name.to_string().into()]
+        )
+    };
+
+    let mut stmt = conn.prepare(&query)?;
+
+    let rows = stmt.query_map(rusqlite::params_from_iter(params_vec), |row| {
+        let severity_raw: String = row.get(4)?;
         let severity = match severity_raw.as_str() {
             "medium" => types::Severity::Medium,
             "high" => types::Severity::High,
@@ -427,18 +462,19 @@ pub fn get_advisories_for_package(
             _ => types::Severity::Low,
         };
 
-        let references_raw: String = row.get(8)?;
+        let references_raw: String = row.get(9)?;
         let references: Option<Vec<String>> = serde_json::from_str(&references_raw).ok();
 
         Ok(types::Advisory {
             id: row.get(0)?,
             package: row.get(1)?,
-            summary: row.get(2)?,
+            sub_package: row.get(2)?,
+            summary: row.get(3)?,
             severity,
-            cvss: row.get(4)?,
-            affected_range: row.get(5)?,
-            fixed_in: row.get(6)?,
-            description: row.get(7)?,
+            cvss: row.get(5)?,
+            affected_range: row.get(6)?,
+            fixed_in: row.get(7)?,
+            description: row.get(8)?,
             references,
         })
     })?;

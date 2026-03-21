@@ -27,6 +27,8 @@ impl Display for Severity {
 pub struct Advisory {
     pub id: String,
     pub package: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sub_package: Option<String>,
     pub summary: String,
     pub severity: Severity,
     pub cvss: Option<String>,
@@ -558,6 +560,8 @@ pub struct Policy {
     pub offline_mode_unoverridable: bool,
     #[serde(default, skip_serializing_if = "is_false")]
     pub pkg_dirs_unoverridable: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub advisory_enforcement_unoverridable: bool,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub allowed_licenses: Option<Vec<String>>,

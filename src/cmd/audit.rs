@@ -65,9 +65,18 @@ pub fn run(all: bool, registry_filter: Option<String>, repo_filter: Option<Strin
 
         for manifest in installed {
             for (adv, repo, reg) in &all_advisories {
-                if adv.package == manifest.name
+                let package_match = adv.package == manifest.name
                     && *repo == manifest.repo
-                    && *reg == manifest.registry_handle
+                    && *reg == manifest.registry_handle;
+
+                let sub_package_match = match (&adv.sub_package, &manifest.sub_package) {
+                    (Some(adv_sub), Some(man_sub)) => adv_sub == man_sub,
+                    (None, _) => true,
+                    (Some(_), None) => false,
+                };
+
+                if package_match
+                    && sub_package_match
                     && let Ok(version) = Version::parse(&manifest.version)
                     && let Ok(req) = VersionReq::parse(&adv.affected_range)
                     && req.matches(&version)
@@ -119,9 +128,15 @@ fn print_advisories_table(advisories: Vec<(types::Advisory, String, String)>) ->
                 .add_attribute(Attribute::Bold),
         };
 
+        let package_display = if let Some(sub) = &adv.sub_package {
+            format!("{}:{}", adv.package, sub)
+        } else {
+            adv.package.clone()
+        };
+
         table.add_row(vec![
             Cell::new(adv.id).fg(comfy_table::Color::Cyan),
-            Cell::new(adv.package),
+            Cell::new(package_display),
             severity_cell,
             Cell::new(adv.affected_range),
             Cell::new(adv.fixed_in.unwrap_or_else(|| "N/A".to_string()))
@@ -160,8 +175,14 @@ fn print_vulnerable_table(
                 .add_attribute(Attribute::Bold),
         };
 
+        let package_display = if let Some(sub) = &manifest.sub_package {
+            format!("{}:{}", manifest.name, sub)
+        } else {
+            manifest.name.clone()
+        };
+
         table.add_row(vec![
-            Cell::new(manifest.name).fg(comfy_table::Color::Cyan),
+            Cell::new(package_display).fg(comfy_table::Color::Cyan),
             Cell::new(manifest.version).fg(comfy_table::Color::Red),
             Cell::new(adv.id).fg(comfy_table::Color::DarkGrey),
             severity_cell,

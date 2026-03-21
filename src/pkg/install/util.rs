@@ -154,15 +154,22 @@ pub fn check_for_vulnerabilities(
     let mut all_vulnerabilities = Vec::new();
 
     for node in graph.nodes.values() {
-        if let Ok(advisories) =
-            crate::pkg::db::get_advisories_for_package(&node.registry_handle, &node.pkg.name)
-        {
+        if let Ok(advisories) = crate::pkg::db::get_advisories_for_package(
+            &node.registry_handle,
+            &node.pkg.name,
+            node.sub_package.as_deref(),
+        ) {
             for adv in advisories {
                 if let Ok(version) = Version::parse(&node.version)
                     && let Ok(req) = VersionReq::parse(&adv.affected_range)
                     && req.matches(&version)
                 {
-                    all_vulnerabilities.push((adv, node.version.clone(), node.pkg.name.clone()));
+                    all_vulnerabilities.push((
+                        adv,
+                        node.version.clone(),
+                        node.pkg.name.clone(),
+                        node.sub_package.clone(),
+                    ));
                 }
             }
         }
@@ -170,10 +177,16 @@ pub fn check_for_vulnerabilities(
 
     if !all_vulnerabilities.is_empty() {
         println!("\n{}", "SECURITY WARNING".red().bold());
-        for (adv, version, pkg_name) in &all_vulnerabilities {
+        for (adv, version, pkg_name, sub_pkg) in &all_vulnerabilities {
+            let display_name = if let Some(sub) = sub_pkg {
+                format!("{}:{}", pkg_name, sub)
+            } else {
+                pkg_name.clone()
+            };
+
             println!(
                 "Package {} v{} is known to be vulnerable:",
-                pkg_name.cyan().bold(),
+                display_name.cyan().bold(),
                 version.red()
             );
             println!(
@@ -191,6 +204,13 @@ pub fn check_for_vulnerabilities(
                 println!("Fixed in version: {}", fixed.green());
             }
             println!();
+        }
+
+        let config = crate::pkg::config::read_config()?;
+        if config.policy.advisory_enforcement_unoverridable {
+            return Err(anyhow!(
+                "Installation blocked by system policy due to security vulnerabilities."
+            ));
         }
 
         if !utils::ask_for_confirmation(
