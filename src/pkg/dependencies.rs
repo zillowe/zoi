@@ -210,7 +210,7 @@ pub fn install_dependency(
             dep.package.to_string()
         };
 
-        let install_cmd = pm_commands
+        let mut install_cmd = pm_commands
             .install
             .replace("{package}", dep.package)
             .replace("{package_with_version}", &package_with_version);
@@ -221,6 +221,18 @@ pub fn install_dependency(
                 dep.manager,
                 install_cmd
             ));
+        }
+
+        if pm_commands.sudo_install && !utils::is_admin() {
+            if utils::command_exists("sudo") {
+                install_cmd = format!("sudo {}", install_cmd);
+            } else {
+                eprintln!(
+                    "{}: sudo is required for '{}' but not found. Attempting to run without sudo...",
+                    "Warning".yellow(),
+                    dep.manager
+                );
+            }
         }
 
         if pb.is_none() {
@@ -274,7 +286,20 @@ pub fn uninstall_dependency(dep_str: &str, zoi_uninstaller: &ZoiUninstaller) -> 
     }
 
     if let Some(pm_commands) = pm::MANAGERS.get(dep.manager) {
-        let uninstall_cmd = pm_commands.uninstall.replace("{package}", dep.package);
+        let mut uninstall_cmd = pm_commands.uninstall.replace("{package}", dep.package);
+
+        if pm_commands.sudo_uninstall && !utils::is_admin() {
+            if utils::command_exists("sudo") {
+                uninstall_cmd = format!("sudo {}", uninstall_cmd);
+            } else {
+                eprintln!(
+                    "{}: sudo is required for '{}' but not found. Attempting to run without sudo...",
+                    "Warning".yellow(),
+                    dep.manager
+                );
+            }
+        }
+
         println!("Running uninstall command: {}", uninstall_cmd.italic());
         utils::run_shell_command(&uninstall_cmd)
     } else {

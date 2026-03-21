@@ -1,23 +1,31 @@
 {
 	"apt": {
 		"is_installed": "dpkg-query -W -f='${Status}' {package} | grep -q \"install ok installed\"",
-		"install": "sudo apt-get install -y {package_with_version}",
-		"uninstall": "sudo apt-get remove -y {package}"
+		"install": "apt-get install -y {package_with_version}",
+		"uninstall": "apt-get remove -y {package}",
+		"sudo_install": true,
+		"sudo_uninstall": true
 	},
 	"apt-get": {
 		"is_installed": "dpkg-query -W -f='${Status}' {package} | grep -q \"install ok installed\"",
-		"install": "sudo apt-get install -y {package_with_version}",
-		"uninstall": "sudo apt-get remove -y {package}"
+		"install": "apt-get install -y {package_with_version}",
+		"uninstall": "apt-get remove -y {package}",
+		"sudo_install": true,
+		"sudo_uninstall": true
 	},
 	"apk": {
 		"is_installed": "apk info -e {package}",
-		"install": "sudo apk add {package}",
-		"uninstall": "sudo apk del {package}"
+		"install": "apk add {package}",
+		"uninstall": "apk del {package}",
+		"sudo_install": true,
+		"sudo_uninstall": true
 	},
 	"aur": {
 		"is_installed": "pacman -Qi {package}",
 		"install": "makepkg -si --noconfirm",
-		"uninstall": "sudo pacman -Rns --noconfirm {package}"
+		"uninstall": "pacman -Rns --noconfirm {package}",
+		"sudo_install": false,
+		"sudo_uninstall": true
 	},
 	"brew": {
 		"is_installed": "brew list --formula | grep -q \"^{package}$\"",
@@ -71,8 +79,10 @@
 	},
 	"dnf": {
 		"is_installed": "rpm -q {package}",
-		"install": "sudo dnf install -y {package_with_version}",
-		"uninstall": "sudo dnf remove -y {package}"
+		"install": "dnf install -y {package_with_version}",
+		"uninstall": "dnf remove -y {package}",
+		"sudo_install": true,
+		"sudo_uninstall": true
 	},
 	"dotnet": {
 		"is_installed": "dotnet tool list -g | grep -q \"{package}\"",
@@ -81,13 +91,17 @@
 	},
 	"eopkg": {
 		"is_installed": "eopkg info {package}",
-		"install": "sudo eopkg it -y {package}",
-		"uninstall": "sudo eopkg rm -y {package}"
+		"install": "eopkg it -y {package}",
+		"uninstall": "eopkg rm -y {package}",
+		"sudo_install": true,
+		"sudo_uninstall": true
 	},
 	"flatpak": {
 		"is_installed": "flatpak info {package}",
-		"install": "sudo flatpak install flathub {package} -y",
-		"uninstall": "flatpak uninstall {package} -y"
+		"install": "flatpak install flathub {package} -y",
+		"uninstall": "flatpak uninstall {package} -y",
+		"sudo_install": true,
+		"sudo_uninstall": true
 	},
 	"gem": {
 		"is_installed": "gem list -i {package}",
@@ -111,8 +125,10 @@
 	},
 	"macports": {
 		"is_installed": "port installed {package}",
-		"install": "sudo port install {package}",
-		"uninstall": "sudo port uninstall {package}"
+		"install": "port install {package}",
+		"uninstall": "port uninstall {package}",
+		"sudo_install": true,
+		"sudo_uninstall": true
 	},
 	"mas": {
 		"is_installed": "mas list | grep -q \"{package}\"",
@@ -131,8 +147,10 @@
 	},
 	"pacman": {
 		"is_installed": "pacman -Qi {package}",
-		"install": "sudo pacman -S --noconfirm --needed {package}",
-		"uninstall": "sudo pacman -Rns --noconfirm {package}"
+		"install": "pacman -S --noconfirm --needed {package}",
+		"uninstall": "pacman -Rns --noconfirm {package}",
+		"sudo_install": true,
+		"sudo_uninstall": true
 	},
 	"paru": {
 		"is_installed": "pacman -Qi {package}",
@@ -156,13 +174,17 @@
 	},
 	"pkg": {
 		"is_installed": "pkg info {package}",
-		"install": "sudo pkg install -y {package}",
-		"uninstall": "sudo pkg delete -y {package}"
+		"install": "pkg install -y {package}",
+		"uninstall": "pkg delete -y {package}",
+		"sudo_install": true,
+		"sudo_uninstall": true
 	},
 	"pkg_add": {
 		"is_installed": "pkg_info {package}",
-		"install": "sudo pkg_add -I {package}",
-		"uninstall": "sudo pkg_delete {package}"
+		"install": "pkg_add -I {package}",
+		"uninstall": "pkg_delete {package}",
+		"sudo_install": true,
+		"sudo_uninstall": true
 	},
 	"pnpm": {
 		"is_installed": "pnpm list -g {package} --depth=0",
@@ -171,8 +193,10 @@
 	},
 	"portage": {
 		"is_installed": "qlist -I {package}",
-		"install": "sudo emerge {package}",
-		"uninstall": "sudo emerge --unmerge {package}"
+		"install": "emerge {package}",
+		"uninstall": "emerge --unmerge {package}",
+		"sudo_install": true,
+		"sudo_uninstall": true
 	},
 	"scoop": {
 		"is_installed": "scoop status {package}",
@@ -181,8 +205,10 @@
 	},
 	"snap": {
 		"is_installed": "snap list {package}",
-		"install": "sudo snap install {package}",
-		"uninstall": "sudo snap remove {package}"
+		"install": "snap install {package}",
+		"uninstall": "snap remove {package}",
+		"sudo_install": true,
+		"sudo_uninstall": true
 	},
 	"trizen": {
 		"is_installed": "pacman -Qi {package}",
@@ -221,22 +247,30 @@
 	},
 	"yum": {
 		"is_installed": "rpm -q {package}",
-		"install": "sudo yum install -y {package_with_version}",
-		"uninstall": "sudo yum remove -y {package}"
+		"install": "yum install -y {package_with_version}",
+		"uninstall": "yum remove -y {package}",
+		"sudo_install": true,
+		"sudo_uninstall": true
 	},
 	"zypper": {
 		"is_installed": "zypper search -i {package}",
-		"install": "sudo zypper install -y '{package_with_version}'",
-		"uninstall": "sudo zypper remove -y {package}"
+		"install": "zypper install -y '{package_with_version}'",
+		"uninstall": "zypper remove -y {package}",
+		"sudo_install": true,
+		"sudo_uninstall": true
 	},
 	"xbps": {
 		"is_installed": "xbps-query -l | grep -q \" {package}-\"",
-		"install": "sudo xbps-install -S {package}",
-		"uninstall": "sudo xbps-remove -R {package}"
+		"install": "xbps-install -S {package}",
+		"uninstall": "xbps-remove -R {package}",
+		"sudo_install": true,
+		"sudo_uninstall": true
 	},
 	"xbps-install": {
 		"is_installed": "xbps-query -l | grep -q \" {package}-\"",
-		"install": "sudo xbps-install -S {package}",
-		"uninstall": "sudo xbps-remove -R {package}"
+		"install": "xbps-install -S {package}",
+		"uninstall": "xbps-remove -R {package}",
+		"sudo_install": true,
+		"sudo_uninstall": true
 	}
 }

@@ -68,7 +68,13 @@ pub fn run(
         .to_string_lossy();
 
     let mut inner_cmd = format!(
-        "curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash && \
+        "if ! command -v sudo >/dev/null 2>&1 && [ \"$(id -u)\" -eq 0 ]; then \
+            if command -v pacman >/dev/null 2>&1; then pacman -S --noconfirm sudo; \
+            elif command -v apt-get >/dev/null 2>&1; then apt-get update && apt-get install -y sudo; \
+            elif command -v dnf >/dev/null 2>&1; then dnf install -y sudo; \
+            elif command -v apk >/dev/null 2>&1; then apk add sudo; fi; \
+         fi && \
+         curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash && \
          export PATH=\"$HOME/.local/bin:$PATH\" && \
          zoi sync && \
          zoi package build {} --output-dir {}",

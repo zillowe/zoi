@@ -3,12 +3,15 @@ use std::env;
 use std::error::Error;
 use std::io::Write;
 use std::path::Path;
-
 #[derive(serde::Deserialize)]
 struct ManagerCommands {
     is_installed: Option<String>,
     install: String,
     uninstall: String,
+    #[serde(default)]
+    sudo_install: bool,
+    #[serde(default)]
+    sudo_uninstall: bool,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -79,13 +82,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         };
 
         let value = format!(
-            "ManagerCommands {{ is_installed: {}, install: \"{}\", uninstall: \"{}\" }}",
+            "ManagerCommands {{ is_installed: {}, install: \"{}\", uninstall: \"{}\", sudo_install: {}, sudo_uninstall: {} }}",
             is_installed_val,
             commands.install.replace('\\', "\\\\").replace('"', "\\\""),
             commands
                 .uninstall
                 .replace('\\', "\\\\")
-                .replace('"', "\\\"")
+                .replace('"', "\\\""),
+            commands.sudo_install,
+            commands.sudo_uninstall
         );
         values.push((name.clone(), value));
     }
@@ -96,7 +101,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     writeln!(
         &mut file,
-        "use ::phf;\n\n#[derive(Debug, Clone)]\npub struct ManagerCommands {{\n    pub is_installed: Option<&'static str>,\n    pub install: &'static str,\n    pub uninstall: &'static str,\n}}\n"
+        "use ::phf;\n\n#[derive(Debug, Clone)]\npub struct ManagerCommands {{\n    pub is_installed: Option<&'static str>,\n    pub install: &'static str,\n    pub uninstall: &'static str,\n    pub sudo_install: bool,\n    pub sudo_uninstall: bool,\n}}\n"
     )?;
 
     writeln!(
