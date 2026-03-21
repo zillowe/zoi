@@ -207,6 +207,7 @@ pub fn run(
 
     if !dry_run {
         install::util::check_for_conflicts(&packages_to_install, yes)?;
+        install::util::check_for_vulnerabilities(&graph, yes)?;
 
         let m_for_conflict_check = MultiProgress::new();
         install::util::check_file_conflicts(&graph, yes, &m_for_conflict_check)?;

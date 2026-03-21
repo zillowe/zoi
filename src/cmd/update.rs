@@ -146,6 +146,8 @@ fn run_update_single_logic(package_name: &str, yes: bool, dry_run: bool) -> Resu
         false,
     )?;
 
+    install::util::check_for_vulnerabilities(&graph, yes)?;
+
     let install_plan = install::plan::create_install_plan(&graph.nodes, None, false)?;
 
     let stages = graph.toposort()?;
@@ -430,6 +432,15 @@ fn run_update_all_logic(yes: bool, dry_run: bool) -> Result<()> {
                     return;
                 }
             };
+
+            if let Err(e) = install::util::check_for_vulnerabilities(&graph, yes) {
+                eprintln!("Security check failed for {}: {}", source, e);
+                failed_updates
+                    .lock()
+                    .expect("mutex poisoned")
+                    .push(source.clone());
+                return;
+            }
 
             let install_plan = match install::plan::create_install_plan(&graph.nodes, None, false) {
                 Ok(plan) => plan,

@@ -101,6 +101,28 @@ fn setup_schema(conn: &Connection) -> Result<()> {
     )?;
 
     conn.execute(
+        "CREATE TABLE IF NOT EXISTS package_advisories (
+            id TEXT PRIMARY KEY,
+            package TEXT NOT NULL,
+            summary TEXT NOT NULL,
+            severity TEXT NOT NULL,
+            cvss TEXT,
+            affected_range TEXT NOT NULL,
+            fixed_in TEXT,
+            description TEXT NOT NULL,
+            references_json TEXT,
+            repo TEXT,
+            registry TEXT
+        )",
+        [],
+    )?;
+
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_package_advisories_package ON package_advisories(package)",
+        [],
+    )?;
+
+    conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_package_files_path ON package_files(path)",
         [],
     )?;
@@ -306,6 +328,128 @@ pub fn get_packages_for_completion(registry_handle: &str) -> Result<Vec<Completi
     Ok(entries)
 }
 
+pub fn update_advisory(
+    conn: &Connection,
+    advisory: &types::Advisory,
+    repo: &str,
+    registry: &str,
+) -> Result<()> {
+    let references_json = serde_json::to_string(&advisory.references).unwrap_or_default();
+    let severity_str = format!("{:?}", advisory.severity).to_lowercase();
+
+    conn.execute(
+        "INSERT INTO package_advisories (id, package, summary, severity, cvss, affected_range, fixed_in, description, references_json, repo, registry)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+         ON CONFLICT(id) DO UPDATE SET
+            package = excluded.package,
+            summary = excluded.summary,
+            severity = excluded.severity,
+            cvss = excluded.cvss,
+            affected_range = excluded.affected_range,
+            fixed_in = excluded.fixed_in,
+            description = excluded.description,
+            references_json = excluded.references_json,
+            repo = excluded.repo,
+            registry = excluded.registry",
+        params![
+            advisory.id,
+            advisory.package,
+            advisory.summary,
+            severity_str,
+            advisory.cvss,
+            advisory.affected_range,
+            advisory.fixed_in,
+            advisory.description,
+            references_json,
+            repo,
+            registry,
+        ],
+    )?;
+    Ok(())
+}
+
+pub fn list_all_advisories(registry_handle: &str) -> Result<Vec<(types::Advisory, String)>> {
+    let conn = open_connection(registry_handle)?;
+    let mut stmt = conn.prepare(
+        "SELECT id, package, summary, severity, cvss, affected_range, fixed_in, description, references_json, repo FROM package_advisories"
+    )?;
+
+    let rows = stmt.query_map([], |row| {
+        let severity_raw: String = row.get(3)?;
+        let severity = match severity_raw.as_str() {
+            "medium" => types::Severity::Medium,
+            "high" => types::Severity::High,
+            "critical" => types::Severity::Critical,
+            _ => types::Severity::Low,
+        };
+
+        let references_raw: String = row.get(8)?;
+        let references: Option<Vec<String>> = serde_json::from_str(&references_raw).ok();
+
+        Ok((
+            types::Advisory {
+                id: row.get(0)?,
+                package: row.get(1)?,
+                summary: row.get(2)?,
+                severity,
+                cvss: row.get(4)?,
+                affected_range: row.get(5)?,
+                fixed_in: row.get(6)?,
+                description: row.get(7)?,
+                references,
+            },
+            row.get::<_, String>(9)?,
+        ))
+    })?;
+
+    let mut advisories = Vec::new();
+    for row in rows {
+        advisories.push(row?);
+    }
+    Ok(advisories)
+}
+
+pub fn get_advisories_for_package(
+    registry_handle: &str,
+    package_name: &str,
+) -> Result<Vec<types::Advisory>> {
+    let conn = open_connection(registry_handle)?;
+    let mut stmt = conn.prepare(
+        "SELECT id, package, summary, severity, cvss, affected_range, fixed_in, description, references_json FROM package_advisories WHERE package = ?1"
+    )?;
+
+    let rows = stmt.query_map(params![package_name], |row| {
+        let severity_raw: String = row.get(3)?;
+        let severity = match severity_raw.as_str() {
+            "medium" => types::Severity::Medium,
+            "high" => types::Severity::High,
+            "critical" => types::Severity::Critical,
+            _ => types::Severity::Low,
+        };
+
+        let references_raw: String = row.get(8)?;
+        let references: Option<Vec<String>> = serde_json::from_str(&references_raw).ok();
+
+        Ok(types::Advisory {
+            id: row.get(0)?,
+            package: row.get(1)?,
+            summary: row.get(2)?,
+            severity,
+            cvss: row.get(4)?,
+            affected_range: row.get(5)?,
+            fixed_in: row.get(6)?,
+            description: row.get(7)?,
+            references,
+        })
+    })?;
+
+    let mut advisories = Vec::new();
+    for row in rows {
+        advisories.push(row?);
+    }
+    Ok(advisories)
+}
+
 pub fn index_package_files(conn: &Connection, package_id: i64, files: &[String]) -> Result<()> {
     let mut stmt = conn.prepare("INSERT INTO package_files (package_id, path) VALUES (?1, ?2)")?;
     for file in files {
@@ -331,6 +475,7 @@ pub fn delete_package(
 
 pub fn clear_registry(conn: &Connection) -> Result<()> {
     conn.execute("DELETE FROM packages", [])?;
+    conn.execute("DELETE FROM package_advisories", [])?;
     Ok(())
 }
 

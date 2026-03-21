@@ -4,6 +4,7 @@ use anyhow::{Result, anyhow};
 use colored::*;
 use home;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use semver::{Version, VersionReq};
 use sha2::{Digest, Sha512};
 use std::collections::HashSet;
 use std::fs::File;
@@ -140,6 +141,65 @@ pub fn check_for_conflicts(packages_to_install: &[&types::Package], yes: bool) -
             yes,
         ) {
             return Err(anyhow!("Operation aborted by user due to conflicts."));
+        }
+    }
+
+    Ok(())
+}
+
+pub fn check_for_vulnerabilities(
+    graph: &super::resolver::DependencyGraph,
+    yes: bool,
+) -> Result<()> {
+    let mut all_vulnerabilities = Vec::new();
+
+    for node in graph.nodes.values() {
+        if let Ok(advisories) =
+            crate::pkg::db::get_advisories_for_package(&node.registry_handle, &node.pkg.name)
+        {
+            for adv in advisories {
+                if let Ok(version) = Version::parse(&node.version)
+                    && let Ok(req) = VersionReq::parse(&adv.affected_range)
+                    && req.matches(&version)
+                {
+                    all_vulnerabilities.push((adv, node.version.clone(), node.pkg.name.clone()));
+                }
+            }
+        }
+    }
+
+    if !all_vulnerabilities.is_empty() {
+        println!("\n{}", "SECURITY WARNING".red().bold());
+        for (adv, version, pkg_name) in &all_vulnerabilities {
+            println!(
+                "Package {} v{} is known to be vulnerable:",
+                pkg_name.cyan().bold(),
+                version.red()
+            );
+            println!(
+                "[{}] {} (Severity: {})",
+                adv.id.dimmed(),
+                adv.summary,
+                match adv.severity {
+                    types::Severity::Low => "Low".blue(),
+                    types::Severity::Medium => "Medium".yellow(),
+                    types::Severity::High => "High".red(),
+                    types::Severity::Critical => "Critical".magenta().bold(),
+                }
+            );
+            if let Some(fixed) = &adv.fixed_in {
+                println!("Fixed in version: {}", fixed.green());
+            }
+            println!();
+        }
+
+        if !utils::ask_for_confirmation(
+            "Do you want to continue with the installation anyway?",
+            yes,
+        ) {
+            return Err(anyhow!(
+                "Operation aborted by user due to security vulnerabilities."
+            ));
         }
     }
 

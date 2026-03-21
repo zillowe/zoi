@@ -38,17 +38,25 @@ fn refresh_registry_db(
     db::clear_registry(&conn)?;
 
     let mut pkg_files = Vec::new();
+    let mut sec_files = Vec::new();
     for entry in WalkDir::new(registry_path)
         .into_iter()
         .filter_map(|e| e.ok())
     {
-        if entry.file_type().is_file() && entry.file_name().to_string_lossy().ends_with(".pkg.lua")
-        {
-            pkg_files.push(entry.path().to_path_buf());
+        if entry.file_type().is_file() {
+            let name = entry.file_name().to_string_lossy();
+            if name.ends_with(".pkg.lua") {
+                pkg_files.push(entry.path().to_path_buf());
+            } else if name.ends_with(".sec.yaml") {
+                sec_files.push(entry.path().to_path_buf());
+            }
         }
     }
 
     let repo_config = config::read_repo_config(registry_path).ok();
+    let _advisory_prefix = repo_config
+        .as_ref()
+        .and_then(|rc| rc.advisory_prefix.clone());
     let platform = utils::get_platform().unwrap_or_default();
 
     let client = if sync_files {
@@ -61,8 +69,7 @@ fn refresh_registry_db(
         .par_iter()
         .filter_map(|path| {
             let path_str = path.to_string_lossy();
-            if let Ok(pkg) = crate::pkg::lua::parser::parse_lua_package(&path_str, None, true) {
-                let mut pkg = pkg;
+            if let Ok(mut pkg) = crate::pkg::lua::parser::parse_lua_package(&path_str, None, true) {
                 if pkg.repo.is_empty()
                     && let Ok(rel_path) = path.strip_prefix(registry_path)
                     && let Some(parent) = rel_path.parent()
@@ -115,6 +122,21 @@ fn refresh_registry_db(
         })
         .collect();
 
+    let parsed_advisories: Vec<(types::Advisory, String)> = sec_files
+        .par_iter()
+        .filter_map(|path| {
+            if let Ok(content) = fs::read_to_string(path)
+                && let Ok(advisory) = serde_yaml::from_str::<types::Advisory>(&content)
+                && let Ok(rel_path) = path.strip_prefix(registry_path)
+                && let Some(parent) = rel_path.parent()
+            {
+                let repo_path = parent.to_string_lossy().to_string().replace('\\', "/");
+                return Some((advisory, repo_path));
+            }
+            None
+        })
+        .collect();
+
     let tx = conn.transaction()?;
 
     for (pkg, _path, file_list) in parsed_results {
@@ -130,6 +152,11 @@ fn refresh_registry_db(
             let _ = db::index_package_files(&tx, pkg_id, &list);
         }
     }
+
+    for (advisory, repo) in parsed_advisories {
+        let _ = db::update_advisory(&tx, &advisory, &repo, registry_handle);
+    }
+
     tx.commit()?;
 
     Ok(())
@@ -655,6 +682,13 @@ fn sync_registry(
         }
         sync_pgp_keys_at_path(&target_dir)?;
         refresh_registry_db(&reg.handle, &target_dir, sync_files, m)?;
+
+        if let Ok(repo_config) = config::read_repo_config(&target_dir)
+            && repo_config.advisory_prefix != reg.advisory_prefix
+        {
+            reg.advisory_prefix = repo_config.advisory_prefix;
+            reg_changed = true;
+        }
     }
 
     Ok((reg, reg_changed))

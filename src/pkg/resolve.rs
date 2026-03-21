@@ -50,6 +50,9 @@ static MAIN_RE: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 pub fn get_db_root() -> Result<PathBuf> {
+    if let Ok(path) = std::env::var("ZOI_DB_DIR") {
+        return Ok(PathBuf::from(path));
+    }
     let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
     Ok(crate::pkg::sysroot::apply_sysroot(
         home_dir.join(".zoi").join("pkgs").join("db"),

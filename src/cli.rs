@@ -12,7 +12,7 @@ use std::io::{self};
 // Development, Special, Public or Production
 const BRANCH: &str = "Production";
 const STATUS: &str = "Release";
-const NUMBER: &str = "1.8.8";
+const NUMBER: &str = "1.9.0";
 const PKG_SOURCE_HELP: &str = "Package identifier (e.g. @repo/name, path, or URL)";
 
 /// Zoi - The Universal Package Manager & Environment Setup Tool.
@@ -552,6 +552,19 @@ enum Commands {
     /// Checks for common issues and provides actionable suggestions
     Doctor,
 
+    /// Audit installed or all packages for security vulnerabilities
+    Audit {
+        /// Show all vulnerabilities from the database, not just for installed packages
+        #[arg(short, long)]
+        all: bool,
+        /// Filter by registry handle
+        #[arg(long)]
+        registry: Option<String>,
+        /// Filter by repository
+        #[arg(long)]
+        repo: Option<String>,
+    },
+
     #[command(external_subcommand)]
     External(Vec<String>),
 }
@@ -990,6 +1003,11 @@ pub fn run() -> anyhow::Result<()> {
             Commands::Pgp(args) => cmd::pgp::run(args),
             Commands::Helper(args) => cmd::helper::run(args),
             Commands::Doctor => cmd::doctor::run(),
+            Commands::Audit {
+                all,
+                registry,
+                repo,
+            } => cmd::audit::run(all, registry, repo),
             Commands::External(args) => {
                 let (cmd_name, cmd_args) = if args.is_empty() {
                     return Err(anyhow::anyhow!("No command specified"));

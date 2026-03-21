@@ -1,4 +1,5 @@
 use crate::pkg::config;
+use crate::pkg::resolve::get_db_root;
 use crate::pkg::sysroot::apply_sysroot;
 use crate::pkg::types::{self, InstallManifest, Scope};
 use crate::pkg::utils;
@@ -53,12 +54,6 @@ pub fn get_package_version_dir(
 ) -> Result<PathBuf> {
     let package_dir = get_package_dir(scope, registry_handle, repo_path, package_name)?;
     Ok(package_dir.join(version))
-}
-
-fn get_db_root() -> Result<PathBuf> {
-    let home_dir =
-        home::home_dir().ok_or_else(|| anyhow::anyhow!("Could not find home directory."))?;
-    Ok(apply_sysroot(home_dir.join(".zoi").join("pkgs").join("db")))
 }
 
 use rayon::prelude::*;

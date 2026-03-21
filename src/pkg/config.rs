@@ -1,3 +1,4 @@
+use crate::pkg::resolve::get_db_root;
 use crate::pkg::sysroot::apply_sysroot;
 use crate::pkg::types::{Config, Registry, RepoConfig};
 use anyhow::{Result, anyhow};
@@ -41,11 +42,6 @@ fn get_user_config_path() -> Result<PathBuf> {
 fn get_project_config_path() -> Result<PathBuf> {
     let current_dir = std::env::current_dir()?;
     Ok(current_dir.join(".zoi").join("pkgs").join("config.yaml"))
-}
-
-fn get_db_root() -> Result<PathBuf> {
-    let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(apply_sysroot(home_dir.join(".zoi").join("pkgs").join("db")))
 }
 
 fn get_git_root() -> Result<PathBuf> {
@@ -275,6 +271,7 @@ pub fn read_config() -> Result<Config> {
         merged_cfg.default_registry = Some(Registry {
             handle: String::new(),
             url,
+            advisory_prefix: None,
             authorities: None,
         });
     }
@@ -283,6 +280,7 @@ pub fn read_config() -> Result<Config> {
         merged_cfg.default_registry = Some(Registry {
             handle: "zoidberg".to_string(),
             url: get_default_registry(),
+            advisory_prefix: Some("ZSA".to_string()),
             authorities: Some(get_builtin_authorities()),
         });
     } else if let Some(ref mut reg) = merged_cfg.default_registry
@@ -521,6 +519,7 @@ pub fn set_default_registry(url: &str) -> Result<()> {
     config.default_registry = Some(Registry {
         handle: String::new(),
         url: url.to_string(),
+        advisory_prefix: None,
         authorities: None,
     });
     write_user_config(&config)
@@ -534,6 +533,7 @@ pub fn add_added_registry(url: &str) -> Result<()> {
     config.added_registries.push(Registry {
         handle: String::new(),
         url: url.to_string(),
+        advisory_prefix: None,
         authorities: None,
     });
     write_user_config(&config)

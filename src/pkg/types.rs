@@ -1,5 +1,47 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt::Display;
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum Severity {
+    #[default]
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+impl Display for Severity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Severity::Low => write!(f, "Low"),
+            Severity::Medium => write!(f, "Medium"),
+            Severity::High => write!(f, "High"),
+            Severity::Critical => write!(f, "Critical"),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Advisory {
+    pub id: String,
+    pub package: String,
+    pub summary: String,
+    pub severity: Severity,
+    pub cvss: Option<String>,
+    pub affected_range: String,
+    pub fixed_in: Option<String>,
+    pub description: String,
+    pub references: Option<Vec<String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct AdvisoryRegistry {
+    pub last_id: u32,
+    pub year: u32,
+    pub advisories: HashMap<String, String>,
+}
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy, Default)]
 #[serde(rename_all = "lowercase")]
@@ -420,6 +462,8 @@ pub struct Registry {
     pub handle: String,
     pub url: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub advisory_prefix: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub authorities: Option<Vec<String>>,
 }
 
@@ -660,6 +704,8 @@ pub struct RepoEntry {
 pub struct RepoConfig {
     pub name: String,
     pub description: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub advisory_prefix: Option<String>,
     pub git: Vec<GitLink>,
     #[serde(default)]
     pub pkg: Vec<PkgLink>,
