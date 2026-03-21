@@ -118,6 +118,7 @@ Zoi is packed with features designed to make package management and environment 
     - **Duplicate Package IDs:** Identifies packages with the same name/path across different registries, which can cause ambiguity.
     - **PGP Configuration:** Verifies if trusted PGP keys specified in your configuration are present in the local keyring.
     - **Package Record Integrity:** Validates that all packages recorded in `zoi.pkgs.json` are actually present in the installation store.
+    - **Ghost Dependents:** Scans for broken dependent links where the parent package is missing, offering to prune them.
 
 - **Shell Integration:**
   - `zoi shell`: Automatically configures your shell's PATH for Zoi and installs shell completion scripts for Bash, Zsh, Fish, Elvish and Powershell.
@@ -340,6 +341,7 @@ Lists installed or all available packages.
 **Options:**
 
 - `-a`, `--all`: List all packages from the database, not just installed ones.
+- `-o`, `--outdated`: List only installed packages that have updates available in the registry.
 - `-m`, `--foreign`: List packages not found in any configured registry.
 - `--registry <HANDLE>`: Filter by specific registry handle.
 - `--repo <REPO>`: Filter by repository.
