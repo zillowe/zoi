@@ -10,7 +10,8 @@ pub fn expand_split_packages(package_names: &[String], action: &str) -> Result<V
         let mut was_expanded = false;
 
         if request.sub_package.is_none()
-            && let Ok((pkg, _, _, _, _)) = resolve::resolve_package_and_version(name, true, false)
+            && let Ok((pkg, _, _, _, _, _)) =
+                resolve::resolve_package_and_version(name, true, false)
             && pkg.sub_packages.is_some()
         {
             let mut installed_subs = Vec::new();

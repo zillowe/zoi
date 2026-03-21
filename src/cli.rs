@@ -149,6 +149,9 @@ enum Commands {
         /// List all packages from the database, not just installed ones
         #[arg(short, long)]
         all: bool,
+        /// List only installed packages that have updates available
+        #[arg(short, long)]
+        outdated: bool,
         /// Filter by registry handle (e.g. 'zoidberg')
         #[arg(long)]
         registry: Option<String>,
@@ -771,6 +774,7 @@ pub fn run() -> anyhow::Result<()> {
             }
             Commands::List {
                 all,
+                outdated,
                 registry,
                 repo,
                 package_type,
@@ -779,6 +783,7 @@ pub fn run() -> anyhow::Result<()> {
                 completion,
             } => cmd::list::run(
                 all,
+                outdated,
                 registry,
                 repo,
                 package_type,

@@ -7,6 +7,7 @@ use std::process::{Command, Stdio};
 
 pub fn run(
     all: bool,
+    outdated: bool,
     registry_filter: Option<String>,
     repo_filter: Option<String>,
     type_filter: Option<String>,
@@ -23,6 +24,10 @@ pub fn run(
         None => None,
     };
 
+    if outdated {
+        return run_list_outdated(registry_filter, repo_filter, package_type);
+    }
+
     if names_only || completion {
         return run_list_names(all, registry_filter, repo_filter, package_type, completion);
     }
@@ -35,6 +40,80 @@ pub fn run(
     } else {
         run_list_installed(registry_filter, repo_filter, package_type, foreign)?;
     }
+    Ok(())
+}
+
+fn run_list_outdated(
+    registry_filter: Option<String>,
+    repo_filter: Option<String>,
+    type_filter: Option<types::PackageType>,
+) -> Result<()> {
+    let installed_packages = local::get_installed_packages()?;
+
+    let mut table = Table::new();
+    table
+        .load_preset(UTF8_FULL)
+        .set_header(vec!["Package", "Current", "Latest", "Repo", "Registry"]);
+
+    let mut found_outdated = false;
+
+    for manifest in installed_packages {
+        if let Some(registry_f) = &registry_filter
+            && manifest.registry_handle != *registry_f
+        {
+            continue;
+        }
+
+        if let Some(repo_f) = &repo_filter {
+            let repo_matches = if repo_f.contains('/') {
+                manifest.repo == *repo_f
+            } else {
+                manifest.repo.split('/').any(|part| part == *repo_f)
+            };
+            if !repo_matches {
+                continue;
+            }
+        }
+
+        if let Some(type_f) = type_filter
+            && manifest.package_type != type_f
+        {
+            continue;
+        }
+
+        let source = if let Some(sub) = &manifest.sub_package {
+            format!(
+                "#{}@{}/{}:{}",
+                manifest.registry_handle, manifest.repo, manifest.name, sub
+            )
+        } else {
+            format!(
+                "#{}@{}/{}",
+                manifest.registry_handle, manifest.repo, manifest.name
+            )
+        };
+
+        if let Ok((_, new_version, _, _, _, _)) =
+            crate::pkg::resolve::resolve_package_and_version(&source, true, false)
+            && manifest.version != new_version
+        {
+            table.add_row(vec![
+                manifest.name.clone(),
+                manifest.version.clone(),
+                new_version,
+                manifest.repo.clone(),
+                manifest.registry_handle.clone(),
+            ]);
+            found_outdated = true;
+        }
+    }
+
+    if !found_outdated {
+        println!("No outdated packages found.");
+    } else {
+        print_with_pager(&table.to_string())?;
+    }
+
     Ok(())
 }
 

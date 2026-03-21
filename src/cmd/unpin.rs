@@ -3,7 +3,7 @@ use anyhow::Result;
 use colored::*;
 
 pub fn run(source: &str) -> Result<()> {
-    let (pkg, _, _, _, _) = resolve::resolve_package_and_version(source, false, false)?;
+    let (pkg, _, _, _, _, _) = resolve::resolve_package_and_version(source, false, false)?;
     let mut pinned_packages = pin::get_pinned_packages()?;
 
     let initial_len = pinned_packages.len();

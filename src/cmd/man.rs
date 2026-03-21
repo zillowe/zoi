@@ -40,7 +40,7 @@ impl<'a> App<'a> {
 }
 
 pub fn run(package_name: &str, upstream: bool, raw: bool) -> Result<()> {
-    let (pkg, _version, _, _, registry_handle) =
+    let (pkg, _version, _, _, registry_handle, _) =
         resolve::resolve_package_and_version(package_name, false, false)?;
 
     let fetch_from_upstream = || -> Result<String> {

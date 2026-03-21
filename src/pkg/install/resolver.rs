@@ -68,6 +68,7 @@ pub struct InstallNode {
     pub chosen_options: Vec<String>,
     pub chosen_optionals: Vec<String>,
     pub dependencies: Vec<String>,
+    pub git_sha: Option<String>,
 }
 
 #[derive(Default, Debug)]
@@ -201,7 +202,7 @@ pub fn resolve_dependency_graph(
                 }
 
                 let source = format!("{}", name);
-                let (pkg, version_str, _, pkg_lua_path, handle) =
+                let (pkg, version_str, _, pkg_lua_path, handle, git_sha) =
                     resolve::resolve_package_and_version(
                         &format!("{}@{}", source, version),
                         quiet,
@@ -229,6 +230,7 @@ pub fn resolve_dependency_graph(
                     chosen_options: Vec::new(),
                     chosen_optionals: Vec::new(),
                     dependencies: Vec::new(),
+                    git_sha,
                 };
                 final_nodes.insert(pkg_id, node);
             }

@@ -1,6 +1,6 @@
 use crate::pkg::types::Scope;
 use anyhow::{Result, anyhow};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 use std::time::SystemTime;
@@ -267,6 +267,65 @@ pub fn check_orphaned_packages() -> Result<Vec<String>> {
         .collect();
 
     Ok(orphaned)
+}
+
+pub fn check_ghost_dependents() -> Result<Vec<(PathBuf, String)>> {
+    let scopes = [Scope::User, Scope::System, Scope::Project];
+    let mut ghost_links = Vec::new();
+
+    let all_installed = crate::pkg::local::get_installed_packages()?;
+    let mut installed_ids = HashSet::new();
+    for manifest in all_installed {
+        let full_id = format!(
+            "#{}@{}/{}@{}",
+            manifest.registry_handle, manifest.repo, manifest.name, manifest.version
+        );
+        installed_ids.insert(full_id);
+
+        if let Some(sub) = manifest.sub_package {
+            let full_id_sub = format!(
+                "#{}@{}/{}:{}@{}",
+                manifest.registry_handle, manifest.repo, manifest.name, sub, manifest.version
+            );
+            installed_ids.insert(full_id_sub);
+        }
+    }
+
+    for scope in scopes {
+        if let Ok(store_root) = crate::pkg::local::get_store_base_dir(scope)
+            && store_root.exists()
+        {
+            for entry in fs::read_dir(store_root)? {
+                let path = entry?.path();
+                if path.is_dir() {
+                    let dependents_dir = path.join("dependents");
+                    if dependents_dir.exists() {
+                        for dep_entry in fs::read_dir(dependents_dir)? {
+                            let dep_path = dep_entry?.path();
+                            if dep_path.is_file()
+                                && let Some(file_name) =
+                                    dep_path.file_name().and_then(|s| s.to_str())
+                                && let Ok(decoded) = hex::decode(file_name)
+                                && let Ok(parent_id) = String::from_utf8(decoded)
+                                && !installed_ids.contains(&parent_id)
+                            {
+                                ghost_links.push((dep_path, parent_id));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(ghost_links)
+}
+
+pub fn prune_ghost_dependents(ghost_links: &[(PathBuf, String)]) -> Result<()> {
+    for (path, _) in ghost_links {
+        fs::remove_file(path)?;
+    }
+    Ok(())
 }
 
 pub struct ToolCheckResult {

@@ -109,6 +109,18 @@ pub fn delete_log(transaction_id: &str) -> Result<()> {
     Ok(())
 }
 
+fn has_files_outside_store(manifest: &types::InstallManifest) -> bool {
+    if let Ok(store_base) = local::get_store_base_dir(manifest.scope) {
+        for file in &manifest.installed_files {
+            let p = std::path::Path::new(file);
+            if !p.starts_with(&store_base) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 pub fn rollback(transaction_id: &str) -> Result<()> {
     let path = get_transaction_path(transaction_id)?;
     if !path.exists() {
@@ -171,7 +183,10 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                 };
                 let manifest_path = version_dir.join(&manifest_filename);
 
-                if version_dir.exists() && manifest_path.exists() {
+                if version_dir.exists()
+                    && manifest_path.exists()
+                    && !has_files_outside_store(manifest)
+                {
                     println!("Restoring version {} from local store...", manifest.version);
                     if let Err(e) = local::write_manifest(manifest) {
                         eprintln!(
@@ -184,7 +199,9 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                     continue;
                 }
 
-                println!("Version not found locally. Re-installing from registry...");
+                println!(
+                    "Version not found locally or contains global files. Re-installing from registry..."
+                );
 
                 let source = format!(
                     "#{}@{}/{}@{}",
@@ -302,7 +319,10 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                 };
                 let manifest_path = version_dir.join(&manifest_filename);
 
-                if version_dir.exists() && manifest_path.exists() {
+                if version_dir.exists()
+                    && manifest_path.exists()
+                    && !has_files_outside_store(old_manifest)
+                {
                     println!(
                         "Restoring version {} from local store...",
                         old_manifest.version
@@ -318,7 +338,9 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                     continue;
                 }
 
-                println!("Version not found locally. Re-installing from registry...");
+                println!(
+                    "Version not found locally or contains global files. Re-installing from registry..."
+                );
 
                 let source = format!(
                     "#{}@{}/{}@{}",

@@ -278,7 +278,7 @@ impl DependencyProvider for ZoiDependencyProvider {
             );
 
             match pkg_res {
-                Ok((pkg, _, _, _, _)) => pkg.dependencies,
+                Ok((pkg, _, _, _, _, _)) => pkg.dependencies,
                 Err(_) => None,
             }
         };

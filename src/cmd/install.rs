@@ -557,6 +557,8 @@ pub fn run(
                     format!("{}@{}", manifest.name, manifest.version)
                 };
 
+                let git_sha = graph.nodes.get(&pkg_id).and_then(|n| n.git_sha.clone());
+
                 let dependencies: Vec<String> = graph
                     .adj
                     .get(&pkg_id)
@@ -589,6 +591,7 @@ pub fn run(
                     version: manifest.version.clone(),
                     sub_package: manifest.sub_package.clone(),
                     integrity,
+                    git_sha,
                     dependencies,
                     options_dependencies: manifest.chosen_options.clone(),
                     optionals_dependencies: manifest.chosen_optionals.clone(),

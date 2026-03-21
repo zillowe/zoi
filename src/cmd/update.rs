@@ -52,7 +52,7 @@ fn run_update_single_logic(package_name: &str, yes: bool, dry_run: bool) -> Resu
 
     let request = resolve::parse_source_string(package_name)?;
 
-    let (new_pkg, new_version, _, _, registry_handle) =
+    let (new_pkg, new_version, _, _, registry_handle, _) =
         resolve::resolve_package_and_version(package_name, false, yes)?;
 
     if pin::is_pinned(package_name)? {
@@ -304,7 +304,7 @@ fn run_update_all_logic(yes: bool, dry_run: bool) -> Result<()> {
             continue;
         }
 
-        let (new_pkg, new_version, _, _, registry_handle) =
+        let (new_pkg, new_version, _, _, registry_handle, _) =
             match resolve::resolve_package_and_version(&source, true, false) {
                 Ok(result) => result,
                 Err(e) => {

@@ -193,6 +193,44 @@ pub fn run() -> Result<()> {
         }
     }
 
+    println!("\n{} Checking for ghost dependents...", "->".bold().cyan());
+    match pkg::doctor::check_ghost_dependents() {
+        Ok(ghost_links) => {
+            if ghost_links.is_empty() {
+                println!("{}", "No ghost dependents found.".green());
+            } else {
+                issues_found += ghost_links.len();
+                println!(
+                    "{}: Found {} broken dependent links (ghost parents):",
+                    "Warning".yellow(),
+                    ghost_links.len()
+                );
+                for (_, parent_id) in &ghost_links {
+                    println!("  - parent missing: {}", parent_id.cyan());
+                }
+
+                if crate::utils::ask_for_confirmation(
+                    "\nDo you want to prune these broken links?",
+                    false,
+                ) {
+                    pkg::doctor::prune_ghost_dependents(&ghost_links)?;
+                    println!("{}", "Successfully pruned broken links.".green());
+                    issues_found -= ghost_links.len();
+                } else {
+                    println!("Broken links were NOT pruned.");
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!(
+                "{}: Failed to check for ghost dependents: {}",
+                "Error".red(),
+                e
+            );
+            issues_found += 1;
+        }
+    }
+
     println!("\n{} Checking for external tools...", "->".bold().cyan());
     let tool_results = pkg::doctor::check_external_tools();
     if tool_results.essential_missing.is_empty() && tool_results.recommended_missing.is_empty() {

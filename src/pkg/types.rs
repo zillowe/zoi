@@ -631,6 +631,8 @@ pub struct LockPackageDetail {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sub_package: Option<String>,
     pub integrity: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub git_sha: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub dependencies: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

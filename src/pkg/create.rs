@@ -41,7 +41,8 @@ pub fn run(
     yes: bool,
     plugin_manager: &crate::pkg::plugin::PluginManager,
 ) -> Result<()> {
-    let (pkg, _, _, pkg_lua_path, _) = resolve::resolve_package_and_version(source, false, false)?;
+    let (pkg, _, _, pkg_lua_path, _, _) =
+        resolve::resolve_package_and_version(source, false, false)?;
 
     if pkg.package_type != types::PackageType::App {
         return Err(anyhow!(

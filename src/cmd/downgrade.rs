@@ -18,7 +18,7 @@ pub fn run(
     );
 
     let _request = resolve::parse_source_string(package_name)?;
-    let (pkg, current_version, _, _, registry_handle) =
+    let (pkg, current_version, _, _, registry_handle, _) =
         resolve::resolve_package_and_version(package_name, true, false)?;
 
     let mut versions = HashSet::new();

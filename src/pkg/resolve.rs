@@ -27,6 +27,7 @@ pub struct ResolvedSource {
     pub repo_name: Option<String>,
     pub registry_handle: Option<String>,
     pub sharable_manifest: Option<types::SharableInstallManifest>,
+    pub git_sha: Option<String>,
 }
 
 #[derive(Debug, Default)]
@@ -48,6 +49,13 @@ static MAIN_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^@?(?P<repo_and_name>[^@]+)(?:@(?P<version>.+))?$")
         .expect("Static MAIN_RE regex is valid")
 });
+
+fn get_git_head_sha(repo_path: &Path) -> Option<String> {
+    let repo = git2::Repository::open(repo_path).ok()?;
+    let head = repo.head().ok()?;
+    let target = head.target()?;
+    Some(target.to_string())
+}
 
 pub fn get_db_root() -> Result<PathBuf> {
     if let Ok(path) = std::env::var("ZOI_DB_DIR") {
@@ -405,6 +413,7 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
             repo_name: Some(chosen.repo_name.clone()),
             registry_handle: registry_handle.clone(),
             sharable_manifest: None,
+            git_sha: None,
         })
     } else {
         println!(
@@ -452,6 +461,7 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
             repo_name: Some(chosen.repo_name.clone()),
             registry_handle: registry_handle.clone(),
             sharable_manifest: None,
+            git_sha: None,
         })
     }
 }
@@ -523,6 +533,7 @@ fn download_from_url(url: &str) -> Result<ResolvedSource> {
         repo_name: None,
         registry_handle: Some("local".to_string()),
         sharable_manifest: None,
+        git_sha: None,
     })
 }
 
@@ -813,11 +824,13 @@ pub fn resolve_package_and_version(
     Option<types::SharableInstallManifest>,
     PathBuf,
     Option<String>,
+    Option<String>,
 )> {
     let request = parse_source_string(source_str)?;
     let resolved_source = resolve_source(source_str, quiet, yes)?;
     let registry_handle = resolved_source.registry_handle.clone();
     let pkg_lua_path = resolved_source.path.clone();
+    let git_sha = resolved_source.git_sha.clone();
 
     let pkg_template = crate::pkg::lua::parser::parse_lua_package(
         resolved_source.path.to_str().ok_or_else(|| {
@@ -864,6 +877,7 @@ pub fn resolve_package_and_version(
         resolved_source.sharable_manifest,
         pkg_lua_path,
         registry_handle,
+        git_sha,
     ))
 }
 
@@ -1015,6 +1029,7 @@ fn resolve_source_recursive(
             repo_name: Some(repo_name),
             registry_handle: None,
             sharable_manifest: None,
+            git_sha: None,
         });
     }
 
@@ -1061,12 +1076,20 @@ fn resolve_source_recursive(
             "@git/".yellow(),
             repo_name.yellow()
         );
+        let git_repo_root = home_dir
+            .join(".zoi")
+            .join("pkgs")
+            .join("git")
+            .join(repo_name);
+        let git_sha = get_git_head_sha(&git_repo_root);
+
         ResolvedSource {
             path,
             source_type: SourceType::GitRepo(repo_name.to_string()),
             repo_name: Some(format!("git/{}", repo_name)),
             registry_handle: Some("local".to_string()),
             sharable_manifest: None,
+            git_sha,
         }
     } else if source.starts_with("http://") || source.starts_with("https://") {
         if crate::pkg::offline::is_offline() {
@@ -1087,6 +1110,7 @@ fn resolve_source_recursive(
             repo_name: None,
             registry_handle: Some("local".to_string()),
             sharable_manifest: None,
+            git_sha: None,
         }
     } else {
         find_package_in_db(&request, quiet)?

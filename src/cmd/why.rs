@@ -4,7 +4,8 @@ use colored::*;
 
 pub fn run(package_name: &str) -> Result<()> {
     let request = resolve::parse_source_string(package_name)?;
-    let (pkg_meta, _, _, _, _) = resolve::resolve_package_and_version(package_name, false, false)?;
+    let (pkg_meta, _, _, _, _, _) =
+        resolve::resolve_package_and_version(package_name, false, false)?;
 
     let user_manifest = local::is_package_installed(
         &pkg_meta.name,
