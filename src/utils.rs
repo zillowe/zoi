@@ -517,13 +517,18 @@ pub fn confirm_untrusted_source(source_type: &SourceType, yes: bool) -> anyhow::
 }
 
 pub fn is_platform_compatible(current_platform: &str, allowed_platforms: &[String]) -> bool {
-    let os = match std::env::consts::OS {
+    let os_part = current_platform
+        .split('-')
+        .next()
+        .unwrap_or(current_platform);
+    let os = match os_part {
         "darwin" => "macos",
         other => other,
     };
-    allowed_platforms
-        .iter()
-        .any(|p| p == "all" || p == os || p == current_platform)
+    allowed_platforms.iter().any(|p| {
+        let p_norm = if p == "darwin" { "macos" } else { p };
+        p_norm == "all" || p_norm == os || p_norm == current_platform
+    })
 }
 
 pub fn setup_path(scope: Scope) -> anyhow::Result<()> {

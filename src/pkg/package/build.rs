@@ -64,6 +64,20 @@ fn build_for_platform(
         quiet,
     )?;
 
+    if let Some(allowed_platforms) = &pkg_for_meta.platforms
+        && !utils::is_platform_compatible(platform, allowed_platforms)
+    {
+        if !quiet {
+            println!(
+                "{} Skipping build for platform {}: package only supports {:?}",
+                "::".bold().yellow(),
+                platform.cyan(),
+                allowed_platforms
+            );
+        }
+        return Ok(());
+    }
+
     let resolved_build_type =
         resolve_build_type(build_type, &pkg_for_meta.types, &pkg_for_meta.name)?;
 

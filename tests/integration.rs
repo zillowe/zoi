@@ -32,3 +32,21 @@ fn test_lua_zln_records_operation() {
     assert_eq!(op.get::<String>("target").unwrap(), "target");
     assert_eq!(op.get::<String>("link").unwrap(), "link");
 }
+
+#[test]
+fn test_is_platform_compatible() {
+    use zoi::utils::is_platform_compatible;
+
+    let allowed = vec!["linux".to_string(), "macos".to_string()];
+    assert!(is_platform_compatible("linux-amd64", &allowed));
+    assert!(is_platform_compatible("macos-arm64", &allowed));
+    assert!(is_platform_compatible("darwin-amd64", &allowed)); // Should match macos
+    assert!(!is_platform_compatible("windows-amd64", &allowed));
+
+    let allowed_arch = vec!["linux-arm64".to_string()];
+    assert!(is_platform_compatible("linux-arm64", &allowed_arch));
+    assert!(!is_platform_compatible("linux-amd64", &allowed_arch));
+
+    let allowed_all = vec!["all".to_string()];
+    assert!(is_platform_compatible("any-platform", &allowed_all));
+}

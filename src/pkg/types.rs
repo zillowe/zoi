@@ -136,6 +136,8 @@ pub struct Package {
     pub license: String,
     #[serde(default)]
     pub types: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub platforms: Option<Vec<String>>,
     pub dependencies: Option<Dependencies>,
     #[serde(rename = "type", default)]
     pub package_type: PackageType,
