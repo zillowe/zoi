@@ -531,7 +531,7 @@ function package()
 
   -- Rename a binary based on platform
   if SYSTEM.OS == "macos" then
-    UTILS.FS.move("${pkgstore}/bin/tool", "${pkgstore}/bin/tool-darwin")
+    UTILS.FS.move("${pkgstore}/bin/tool", "${pkgstore}/bin/tool-macos")
   end
 end
 ```
