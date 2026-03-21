@@ -31,10 +31,34 @@ The `unoverridable` flags allow you to freeze specific Zoi behaviors.
 | `protect_db_unoverridable`            | Forces the package database to remain read-only after sync.                                  |
 | `telemetry_enabled_unoverridable`     | Enforces organization-wide telemetry settings.                                               |
 | `audit_log_enabled_unoverridable`     | Enforces mandatory audit logging for all operations.                                         |
+| `advisory_enforcement_unoverridable`  | Forces Zoi to block installation of vulnerable packages without confirmation.                |
 
 ---
 
-## Registry Signing & Chain of Trust
+## Security Advisory Enforcement
+
+Zoi's policy engine can be used to enforce safety standards based on the decentralized security advisory system.
+
+### Automated Vulnerability Checks
+
+By default, Zoi warns users when they attempt to install a package with a known vulnerability. In a hardened environment, you can lock this behavior:
+
+```yaml
+# /etc/zoi/config.yaml
+policy:
+  advisory_enforcement_unoverridable: true
+```
+
+When this policy is active, Zoi will **always** check the local advisory database during `install` and `update` operations. While users can still choose to proceed after a warning (unless further restricted), the check itself cannot be disabled.
+
+### Auditing for Compliance
+
+Administrators can use the `zoi audit` command to generate compliance reports for all machines in an organization.
+
+```sh
+# Audit all machines and save to a central log
+zoi audit --all --registry zoidberg > security_report.txt
+```
 
 Zoi's most powerful security feature is its ability to verify the entire state of a package registry using Git commit signatures. This prevents "Man-in-the-Middle" attacks where a malicious actor might try to push a tampered `repo.yaml` or malicious package definitions.
 
