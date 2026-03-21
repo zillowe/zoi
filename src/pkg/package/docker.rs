@@ -1,6 +1,7 @@
 use anyhow::{Result, anyhow};
 use colored::*;
-use std::path::Path;
+use home;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 pub fn run(
@@ -60,6 +61,33 @@ pub fn run(
         }
     }
 
+    if sign_key.is_some() {
+        let host_gpg_home = std::env::var("GNUPGHOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| {
+                home::home_dir()
+                    .map(|h| h.join(".gnupg"))
+                    .unwrap_or_default()
+            });
+
+        if host_gpg_home.exists() {
+            let container_gpg_home = "/gpg_home";
+            docker_args.push("-v".to_string());
+            docker_args.push(format!(
+                "{}:{}",
+                host_gpg_home.display(),
+                container_gpg_home
+            ));
+            docker_args.push("-e".to_string());
+            docker_args.push(format!("GNUPGHOME={}", container_gpg_home));
+        }
+    }
+
+    if let Ok(password) = std::env::var("GPG_PASSWORD") {
+        docker_args.push("-e".to_string());
+        docker_args.push(format!("GPG_PASSWORD={}", password));
+    }
+
     docker_args.push(image.to_string());
 
     let package_filename = abs_package_file
@@ -69,10 +97,10 @@ pub fn run(
 
     let mut inner_cmd = format!(
         "if ! command -v sudo >/dev/null 2>&1 && [ \"$(id -u)\" -eq 0 ]; then \
-            if command -v pacman >/dev/null 2>&1; then pacman -Sy --noconfirm sudo; \
-            elif command -v apt-get >/dev/null 2>&1; then apt-get update && apt-get install -y sudo; \
-            elif command -v dnf >/dev/null 2>&1; then dnf install -y sudo; \
-            elif command -v apk >/dev/null 2>&1; then apk add --update sudo; fi; \
+            if command -v pacman >/dev/null 2>&1; then pacman -Sy --noconfirm sudo gnupg; \
+            elif command -v apt-get >/dev/null 2>&1; then apt-get update && apt-get install -y sudo gnupg; \
+            elif command -v dnf >/dev/null 2>&1; then dnf install -y sudo gnupg; \
+            elif command -v apk >/dev/null 2>&1; then apk add --update sudo gnupg; fi; \
          fi && \
          curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash && \
          export PATH=\"$HOME/.local/bin:$PATH\" && \
