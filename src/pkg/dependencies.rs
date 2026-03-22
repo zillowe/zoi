@@ -536,13 +536,22 @@ pub fn prompt_for_optionals(
 
     let type_str = dep_type.map(|s| format!("{} ", s)).unwrap_or_default();
 
-    if yes || all_optional {
+    if all_optional {
         println!(
             "{} Installing all optional {}dependencies...",
             "::".bold().blue(),
             type_str
         );
         return Ok(deps.to_vec());
+    }
+
+    if yes {
+        println!(
+            "{} Skipping optional {}dependencies (--yes provided without --all-optional).",
+            "::".bold().yellow(),
+            type_str
+        );
+        return Ok(Vec::new());
     }
 
     let items: Vec<_> = deps

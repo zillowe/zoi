@@ -273,9 +273,7 @@ pub fn apply(yes: bool, plugin_manager: &crate::pkg::plugin::PluginManager) -> R
 
     println!(
         "\n{}",
-        "✅ System configuration applied successfully!"
-            .bold()
-            .green()
+        "System configuration applied successfully!".bold().green()
     );
     Ok(())
 }

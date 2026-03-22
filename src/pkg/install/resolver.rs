@@ -143,7 +143,7 @@ pub fn resolve_dependency_graph(
     scope_override: Option<types::Scope>,
     _force: bool,
     yes: bool,
-    _all_optional: bool,
+    all_optional: bool,
     _build_type: Option<&str>,
     quiet: bool,
 ) -> Result<(DependencyGraph, Vec<String>)> {
@@ -182,7 +182,13 @@ pub fn resolve_dependency_graph(
         root_deps.insert(pkg_name, range);
     }
 
-    let provider = ZoiDependencyProvider::new(root_deps, initial_sources.to_vec(), quiet, yes)?;
+    let provider = ZoiDependencyProvider::new(
+        root_deps,
+        initial_sources.to_vec(),
+        quiet,
+        yes,
+        all_optional,
+    )?;
     let root_pkg = PkgName {
         name: "$root".to_string(),
         sub_package: None,
@@ -220,6 +226,22 @@ pub fn resolve_dependency_graph(
                     format!("{}@{}", pkg.name, version_str)
                 };
 
+                let cache_key = (name.clone(), version.clone());
+                let (chosen_options, chosen_optionals, all_req_deps) = provider
+                    .chosen_cache
+                    .borrow()
+                    .get(&cache_key)
+                    .cloned()
+                    .unwrap_or_default();
+
+                for dep_str in &all_req_deps {
+                    if let Ok(dep_req) = crate::pkg::dependencies::parse_dependency_string(dep_str)
+                        && dep_req.manager != "zoi"
+                    {
+                        non_zoi_deps.push(dep_str.clone());
+                    }
+                }
+
                 let node = InstallNode {
                     pkg: pkg.clone(),
                     version: version_str,
@@ -227,9 +249,9 @@ pub fn resolve_dependency_graph(
                     reason: InstallReason::Direct,
                     source: pkg_lua_path.to_string_lossy().to_string(),
                     registry_handle: handle.unwrap_or_else(|| "zoidberg".to_string()),
-                    chosen_options: Vec::new(),
-                    chosen_optionals: Vec::new(),
-                    dependencies: Vec::new(),
+                    chosen_options,
+                    chosen_optionals,
+                    dependencies: all_req_deps,
                     git_sha,
                 };
                 final_nodes.insert(pkg_id, node);
@@ -292,6 +314,21 @@ pub fn resolve_dependency_graph(
                         .unwrap_or_else(|| "unknown".to_string());
                     node.reason = InstallReason::Dependency { parent: parent_id };
                 }
+
+                let mut resolved_deps = Vec::new();
+                if let Some(children) = final_adj.get(pkg_id) {
+                    for child in children {
+                        resolved_deps.push(format!("zoi:{}", child));
+                    }
+                }
+                for dep_str in &node.dependencies {
+                    if let Ok(dep_req) = crate::pkg::dependencies::parse_dependency_string(dep_str)
+                        && dep_req.manager != "zoi"
+                    {
+                        resolved_deps.push(dep_str.clone());
+                    }
+                }
+                node.dependencies = resolved_deps;
             }
         }
         Err(e) => return Err(anyhow!("Dependency resolution failed: {}", e)),

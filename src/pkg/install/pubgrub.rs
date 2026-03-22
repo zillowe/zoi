@@ -3,6 +3,7 @@ use pubgrub::{Dependencies, DependencyProvider, Ranges};
 use rusqlite::params;
 use rustc_hash::FxHashMap;
 use semver::Version;
+use std::cell::RefCell;
 use std::fmt::Display;
 use thiserror::Error;
 
@@ -50,6 +51,11 @@ pub struct ZoiDependencyProvider {
     pub initial_sources: Vec<String>,
     pub quiet: bool,
     pub yes: bool,
+    pub all_optional: bool,
+    pub deps_cache:
+        RefCell<FxHashMap<(PkgName, SemVersion), FxHashMap<PkgName, Ranges<SemVersion>>>>,
+    pub chosen_cache:
+        RefCell<FxHashMap<(PkgName, SemVersion), (Vec<String>, Vec<String>, Vec<String>)>>,
 }
 
 pub fn semver_to_range(req_str: &str) -> Ranges<SemVersion> {
@@ -141,12 +147,16 @@ impl ZoiDependencyProvider {
         initial_sources: Vec<String>,
         quiet: bool,
         yes: bool,
+        all_optional: bool,
     ) -> Result<Self, anyhow::Error> {
         Ok(Self {
             root_deps,
             initial_sources,
             quiet,
             yes,
+            all_optional,
+            deps_cache: RefCell::new(FxHashMap::default()),
+            chosen_cache: RefCell::new(FxHashMap::default()),
         })
     }
 
@@ -253,6 +263,11 @@ impl DependencyProvider for ZoiDependencyProvider {
             return Ok(Dependencies::Available(self.root_deps.clone()));
         }
 
+        let cache_key = (package.clone(), version.clone());
+        if let Some(cached) = self.deps_cache.borrow().get(&cache_key) {
+            return Ok(Dependencies::Available(cached.clone()));
+        }
+
         let version_str = version.to_string();
 
         let dependencies_opt = db::get_package_dependencies(
@@ -285,17 +300,26 @@ impl DependencyProvider for ZoiDependencyProvider {
 
         let mut deps = FxHashMap::default();
 
+        let mut chosen_opts = Vec::new();
+        let mut chosen_opts_opt = Vec::new();
+        let mut all_req = Vec::new();
+
         if let Some(dependencies) = package_deps
             && let Some(runtime) = &dependencies.runtime
         {
-            let (req_deps, _, _) = crate::pkg::install::resolver::collect_dependencies_for_group(
-                runtime,
-                package.sub_package.as_deref(),
-                Some("runtime"),
-                self.yes,
-                true,
-            )
-            .map_err(|e| ZoiSolverError::Dependency(e.to_string()))?;
+            let (req_deps, co, coo) =
+                crate::pkg::install::resolver::collect_dependencies_for_group(
+                    runtime,
+                    package.sub_package.as_deref(),
+                    Some("runtime"),
+                    self.yes,
+                    self.all_optional,
+                )
+                .map_err(|e| ZoiSolverError::Dependency(e.to_string()))?;
+
+            chosen_opts = co;
+            chosen_opts_opt = coo;
+            all_req = req_deps.clone();
 
             for dep_str in req_deps {
                 let dep_req = crate::pkg::dependencies::parse_dependency_string(&dep_str)
@@ -328,6 +352,12 @@ impl DependencyProvider for ZoiDependencyProvider {
             }
         }
 
+        self.deps_cache
+            .borrow_mut()
+            .insert(cache_key.clone(), deps.clone());
+        self.chosen_cache
+            .borrow_mut()
+            .insert(cache_key, (chosen_opts, chosen_opts_opt, all_req));
         Ok(Dependencies::Available(deps))
     }
 
