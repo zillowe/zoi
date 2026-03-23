@@ -397,6 +397,159 @@ pub fn get_linux_distribution() -> Option<String> {
     get_linux_distribution_info().and_then(|info| info.get("ID").cloned())
 }
 
+pub fn get_desktop_environment() -> Option<String> {
+    if cfg!(target_os = "windows") {
+        return Some("windows".to_string());
+    }
+    if let Ok(de) = std::env::var("XDG_CURRENT_DESKTOP")
+        && !de.is_empty()
+    {
+        return Some(de.to_lowercase());
+    }
+    if let Ok(ds) = std::env::var("DESKTOP_SESSION")
+        && !ds.is_empty()
+    {
+        return Some(ds.to_lowercase());
+    }
+    None
+}
+
+pub fn get_display_server() -> Option<String> {
+    if cfg!(target_os = "windows") {
+        return Some("windows".to_string());
+    }
+    if cfg!(target_os = "macos") {
+        return Some("quartz".to_string());
+    }
+    if let Ok(st) = std::env::var("XDG_SESSION_TYPE")
+        && !st.is_empty()
+    {
+        return Some(st.to_lowercase());
+    }
+    None
+}
+
+pub fn get_kernel_version() -> Option<String> {
+    if cfg!(unix) {
+        let output = Command::new("uname").arg("-r").output().ok()?;
+        if output.status.success() {
+            return Some(String::from_utf8_lossy(&output.stdout).trim().to_string());
+        }
+    } else if cfg!(target_os = "windows") {
+        let output = Command::new("pwsh")
+            .arg("-Command")
+            .arg("(Get-CimInstance Win32_OperatingSystem).Version")
+            .output()
+            .ok()?;
+        if output.status.success() {
+            return Some(String::from_utf8_lossy(&output.stdout).trim().to_string());
+        }
+    }
+    None
+}
+
+pub fn get_distro_version() -> Option<String> {
+    if let Some(info) = get_linux_distribution_info()
+        && let Some(vid) = info.get("VERSION_ID")
+    {
+        return Some(vid.clone());
+    }
+    if cfg!(target_os = "macos") {
+        let output = Command::new("sw_vers")
+            .arg("-productVersion")
+            .output()
+            .ok()?;
+        if output.status.success() {
+            return Some(String::from_utf8_lossy(&output.stdout).trim().to_string());
+        }
+    } else if cfg!(target_os = "windows") {
+        let output = Command::new("pwsh")
+            .arg("-Command")
+            .arg("(Get-CimInstance Win32_OperatingSystem).Version")
+            .output()
+            .ok()?;
+        if output.status.success() {
+            return Some(String::from_utf8_lossy(&output.stdout).trim().to_string());
+        }
+    }
+    None
+}
+
+pub fn get_cpu_info() -> Option<String> {
+    if cfg!(target_os = "linux") {
+        if let Ok(cpuinfo) = fs::read_to_string("/proc/cpuinfo") {
+            for line in cpuinfo.lines() {
+                if line.starts_with("model name")
+                    && let Some((_, model)) = line.split_once(':')
+                {
+                    return Some(model.trim().to_string());
+                }
+            }
+        }
+    } else if cfg!(target_os = "macos") {
+        let output = Command::new("sysctl")
+            .arg("-n")
+            .arg("machdep.cpu.brand_string")
+            .output()
+            .ok()?;
+        if output.status.success() {
+            return Some(String::from_utf8_lossy(&output.stdout).trim().to_string());
+        }
+    } else if cfg!(target_os = "windows") {
+        let output = Command::new("pwsh")
+            .arg("-Command")
+            .arg("(Get-CimInstance Win32_Processor).Name")
+            .output()
+            .ok()?;
+        if output.status.success() {
+            return Some(String::from_utf8_lossy(&output.stdout).trim().to_string());
+        }
+    }
+    None
+}
+
+pub fn get_gpu_info() -> Option<String> {
+    if cfg!(target_os = "linux") {
+        if let Ok(output) = Command::new("lspci").output()
+            && output.status.success()
+        {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                if (line.contains("VGA compatible controller") || line.contains("3D controller"))
+                    && let Some((_, model)) = line.split_once(": ")
+                {
+                    return Some(model.trim().to_string());
+                }
+            }
+        }
+    } else if cfg!(target_os = "macos") {
+        let output = Command::new("system_profiler")
+            .arg("SPDisplaysDataType")
+            .output()
+            .ok()?;
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                if line.trim().starts_with("Chipset Model:")
+                    && let Some((_, model)) = line.split_once(':')
+                {
+                    return Some(model.trim().to_string());
+                }
+            }
+        }
+    } else if cfg!(target_os = "windows") {
+        let output = Command::new("pwsh")
+            .arg("-Command")
+            .arg("(Get-CimInstance Win32_VideoController).Name")
+            .output()
+            .ok()?;
+        if output.status.success() {
+            return Some(String::from_utf8_lossy(&output.stdout).trim().to_string());
+        }
+    }
+    None
+}
+
 pub fn get_native_package_manager() -> Option<String> {
     let os = std::env::consts::OS;
     match os {

@@ -1149,6 +1149,24 @@ pub fn setup_lua_environment(
     if let Some(distro) = utils::get_linux_distribution() {
         system_table.set("DISTRO", distro)?;
     }
+    if let Some(de) = utils::get_desktop_environment() {
+        system_table.set("DE", de)?;
+    }
+    if let Some(server) = utils::get_display_server() {
+        system_table.set("SERVER", server)?;
+    }
+    if let Some(kv) = utils::get_kernel_version() {
+        system_table.set("KERNEL_VER", kv)?;
+    }
+    if let Some(dv) = utils::get_distro_version() {
+        system_table.set("DISTRO_VER", dv)?;
+    }
+    if let Some(cpu) = utils::get_cpu_info() {
+        system_table.set("CPU", cpu)?;
+    }
+    if let Some(gpu) = utils::get_gpu_info() {
+        system_table.set("GPU", gpu)?;
+    }
     if let Some(manager) = utils::get_native_package_manager() {
         system_table.set("MANAGER", manager)?;
     }

@@ -162,7 +162,7 @@ When Zoi executes your script, it provides a rich environment of global variable
 
 | Variable      | Type     | Description                                                                                                         |
 | ------------- | -------- | ------------------------------------------------------------------------------------------------------------------- |
-| `SYSTEM`      | `table`  | Contains system info: `OS` (`linux`, `macos`, `windows`), `ARCH` (`amd64`, `arm64`), `DISTRO`, `MANAGER`.           |
+| `SYSTEM`      | `table`  | Contains system info: `OS`, `ARCH`, `DISTRO`, `DISTRO_VER`, `DE`, `SERVER`, `KERNEL_VER`, `CPU`, `GPU`, `MANAGER`.  |
 | `ZOI`         | `table`  | Contains Zoi-specific info: `VERSION` (the version being built), `PATH.user`, `PATH.system`, and `PKG` (see below). |
 | `ZOI.PKG`     | `table`  | Contains absolute paths: `store`, `template`, `root`, `home`, `lua`.                                                |
 | `PKG`         | `table`  | A read-only table containing all the fields you defined in your `metadata{...}` block.                              |

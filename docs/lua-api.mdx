@@ -24,6 +24,12 @@ These variables are automatically available in your script's scope.
 - `SYSTEM.OS`: The operating system (`linux`, `macos`, `windows`, `freebsd`, `openbsd`).
 - `SYSTEM.ARCH`: The CPU architecture (`amd64`, `arm64`).
 - `SYSTEM.DISTRO`: (Linux only) The distribution ID (e.g. `ubuntu`, `arch`).
+- `SYSTEM.DISTRO_VER`: The version of the distribution (e.g. `22.04`, `14.1`).
+- `SYSTEM.DE`: The detected Desktop Environment (e.g. `kde`, `gnome`, `windows`).
+- `SYSTEM.SERVER`: The display server in use (e.g. `x11`, `wayland`, `quartz`).
+- `SYSTEM.KERNEL_VER`: The kernel version of the operating system.
+- `SYSTEM.CPU`: CPU model information.
+- `SYSTEM.GPU`: GPU model information.
 - `SYSTEM.MANAGER`: The detected native package manager (e.g. `apt`, `pacman`).
 
 ### The `ZOI` Table

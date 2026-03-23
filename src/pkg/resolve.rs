@@ -204,6 +204,13 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
             )
         };
 
+    if !registry_db_path.exists() {
+        return Err(anyhow!(
+            "Registry '{}' is not synced. Please run 'zoi sync' to download the package database.",
+            registry_handle.unwrap_or_else(|| "default".to_string())
+        ));
+    }
+
     let repos_to_search = if let Some(r) = &request.repo {
         vec![r.clone()]
     } else {
