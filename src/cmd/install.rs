@@ -46,26 +46,29 @@ pub fn run(
 
     let mut sources_to_process: Vec<String> = sources.to_vec();
     let mut is_project_install = false;
-    if sources.is_empty()
-        && repo.is_none()
-        && let Ok(config) = project::config::load()
-    {
-        if lockfile_exists {
-            println!(
-                "{} zoi.lock found. Installing from zoi.yaml then verifying...",
-                "::".bold().blue()
-            );
-        } else {
-            println!(
-                "{} Installing project packages from zoi.yaml...",
-                "::".bold().blue()
-            );
+    if sources.is_empty() && repo.is_none() {
+        if std::path::Path::new("zoi.yaml").exists() {
+            if let Ok(config) = project::config::load() {
+                if lockfile_exists {
+                    println!(
+                        "{} zoi.lock found. Installing from zoi.yaml then verifying...",
+                        "::".bold().blue()
+                    );
+                } else {
+                    println!(
+                        "{} Installing project packages from zoi.yaml...",
+                        "::".bold().blue()
+                    );
+                }
+                sources_to_process = config.pkgs.clone();
+                if scope_override.is_none() {
+                    scope_override = Some(types::Scope::Project);
+                }
+                is_project_install = true;
+            }
+        } else if plugin_manager.trigger_project_install_hook()? {
+            return Ok(());
         }
-        sources_to_process = config.pkgs.clone();
-        if scope_override.is_none() {
-            scope_override = Some(types::Scope::Project);
-        }
-        is_project_install = true;
     }
 
     if let Some(repo_spec) = repo {

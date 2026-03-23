@@ -43,22 +43,45 @@ zoi.register_command({
 
 Hooks allow you to intercept Zoi's core operations. This is useful for auditing, logging, or extending Zoi's behavior.
 
-| Hook                       | Argument   | Trigger Point                                                     |
-| :------------------------- | :--------- | :---------------------------------------------------------------- |
-| `on_pre_install`           | `pkg`      | Before a package installation starts.                             |
-| `on_post_install`          | `manifest` | After a package is successfully installed.                        |
-| `on_pre_uninstall`         | `manifest` | Before a package is removed.                                      |
-| `on_post_uninstall`        | `manifest` | After a package is removed.                                       |
-| `on_pre_extension_add`     | `pkg`      | Before an extension is applied.                                   |
-| `on_post_extension_add`    | `manifest` | After an extension is successfully applied.                       |
-| `on_pre_extension_remove`  | `manifest` | Before an extension is reverted.                                  |
-| `on_post_extension_remove` | `manifest` | After an extension is reverted.                                   |
-| `on_pre_create`            | `pkg`      | Before building/creating an app from a template.                  |
-| `on_post_create`           | `pkg`      | After the app is successfully created.                            |
-| `on_pre_sync`              | None       | Before the package database is updated.                           |
-| `on_post_sync`             | None       | After the package database sync is complete.                      |
-| `on_rollback`              | None       | When a rollback operation is triggered.                           |
-| `on_resolve_shim_version`  | `bin_name` | When a Zoi shim is executed. Return a version string to override. |
+| Hook                       | Argument   | Trigger Point                                                                             |
+| :------------------------- | :--------- | :---------------------------------------------------------------------------------------- |
+| `on_pre_install`           | `pkg`      | Before a package installation starts.                                                     |
+| `on_post_install`          | `manifest` | After a package is successfully installed.                                                |
+| `on_pre_uninstall`         | `manifest` | Before a package is removed.                                                              |
+| `on_post_uninstall`        | `manifest` | After a package is removed.                                                               |
+| `on_pre_extension_add`     | `pkg`      | Before an extension is applied.                                                           |
+| `on_post_extension_add`    | `manifest` | After an extension is successfully applied.                                               |
+| `on_pre_extension_remove`  | `manifest` | Before an extension is reverted.                                                          |
+| `on_post_extension_remove` | `manifest` | After an extension is reverted.                                                           |
+| `on_pre_create`            | `pkg`      | Before building/creating an app from a template.                                          |
+| `on_post_create`           | `pkg`      | After the app is successfully created.                                                    |
+| `on_pre_sync`              | None       | Before the package database is updated.                                                   |
+| `on_post_sync`             | None       | After the package database sync is complete.                                              |
+| `on_rollback`              | None       | When a rollback operation is triggered.                                                   |
+| `on_resolve_shim_version`  | `bin_name` | When a Zoi shim is executed. Return a version string to override.                         |
+| `on_project_install`       | None       | Triggered by `zoi install` in an empty project. Return `true` to handle the installation. |
+
+---
+
+## The Project Installation Hook
+
+The `on_project_install` hook allows plugins to provide native support for non-Zoi projects (like NPM, Python, or Ruby).
+
+### `zoi.on_project_install(callback)`
+
+- **Return**: `boolean` - Return `true` if your plugin has handled the installation. Zoi will stop at the first plugin that returns `true`.
+
+**Example: Basic NPM Detection**
+
+```lua
+zoi.on_project_install(function()
+    if zoi.fs.exists("package.json") then
+        zoi.ui.print("NPM project detected, installing...", "cyan")
+        return zoi.sh("npm install") == 0
+    end
+    return false
+end)
+```
 
 ---
 
@@ -172,15 +195,29 @@ Plugins can interact with the local file system.
 - **`zoi.fs.write(path, content)`**: Writes a string to a file. Returns `true` on success, `false` on error.
 - **`zoi.fs.list(path)`**: Returns an array of file and directory names within the given path.
 - **`zoi.fs.delete(path)`**: Deletes a file or recursively deletes a directory. Returns `true` on success, `false` on error.
+- **`zoi.fs.symlink(target, link, is_dir)`**: Creates a symbolic link (or junction on Windows).
+- **`zoi.fs.copy(src, dest)`**: Copies a file or directory recursively.
+
+---
+
+## Archive API
+
+High-performance native extraction utilities.
+
+- **`zoi.archive.extract(source, dest, strip)`**: Extracts an archive (`.zip`, `.tar.gz`, `.tgz`, `.tar.zst`, `.tar.xz`).
+  - `source` (string): Path to the archive.
+  - `dest` (string): Destination directory.
+  - `strip` (int, optional): Number of leading path components to strip from entries.
 
 ---
 
 ## HTTP API
 
-Plugins can make basic HTTP requests.
+Plugins can make basic HTTP requests and downloads.
 
 - **`zoi.http.get(url)`**: Performs a GET request. Returns the response body as a string, or `nil` on error.
 - **`zoi.http.post(url, body)`**: Performs a POST request with the given string body. Returns the response body as a string, or `nil` on error.
+- **`zoi.http.download(url, dest)`**: Downloads a file from a URL to the specified destination. Returns `true` on success.
 
 ---
 

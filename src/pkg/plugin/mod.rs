@@ -7,7 +7,7 @@ use dialoguer::{Confirm, Select, theme::ColorfulTheme};
 use mlua::{Function, Lua, LuaSerdeExt, Table, Value};
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub struct PluginManager {
     pub lua: Lua,
@@ -99,6 +99,7 @@ impl PluginManager {
             "on_pre_extension_remove",
             "on_post_extension_remove",
             "on_resolve_shim_version",
+            "on_project_install",
         ];
         for hook in hooks {
             let hook_name = hook.to_string();
@@ -365,7 +366,175 @@ impl PluginManager {
         fs_table
             .set("delete", fs_delete)
             .map_err(|e| anyhow!(e.to_string()))?;
+
+        let fs_symlink = self
+            .lua
+            .create_function(|_, (target, link, is_dir): (String, String, bool)| {
+                let target_path = PathBuf::from(target);
+                let link_path = PathBuf::from(link);
+                if is_dir {
+                    Ok(crate::utils::symlink_dir(&target_path, &link_path).is_ok())
+                } else {
+                    Ok(crate::utils::symlink_file(&target_path, &link_path).is_ok())
+                }
+            })
+            .map_err(|e| anyhow!(e.to_string()))?;
+        fs_table
+            .set("symlink", fs_symlink)
+            .map_err(|e| anyhow!(e.to_string()))?;
+
+        let fs_copy = self
+            .lua
+            .create_function(|_, (src, dest): (String, String)| {
+                let src_path = Path::new(&src);
+                let dest_path = Path::new(&dest);
+                if src_path.is_dir() {
+                    Ok(crate::utils::copy_dir_all(src_path, dest_path).is_ok())
+                } else {
+                    Ok(fs::copy(src_path, dest_path).is_ok())
+                }
+            })
+            .map_err(|e| anyhow!(e.to_string()))?;
+        fs_table
+            .set("copy", fs_copy)
+            .map_err(|e| anyhow!(e.to_string()))?;
+
         zoi.set("fs", fs_table)
+            .map_err(|e| anyhow!(e.to_string()))?;
+
+        let archive_table = self
+            .lua
+            .create_table()
+            .map_err(|e| anyhow!(e.to_string()))?;
+        let archive_extract = self
+            .lua
+            .create_function(
+                |_, (source, dest, strip): (String, String, Option<usize>)| {
+                    let src_path = Path::new(&source);
+                    let dest_path = Path::new(&dest);
+
+                    if !dest_path.exists() {
+                        let _ = fs::create_dir_all(dest_path);
+                    }
+
+                    let file = fs::File::open(src_path)
+                        .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                    let archive_path_str = source.to_lowercase();
+
+                    let strip_val = strip.unwrap_or(0);
+
+                    fn unpack_with_strip<R: std::io::Read>(
+                        mut archive: tar::Archive<R>,
+                        dest: &Path,
+                        strip: usize,
+                    ) -> Result<(), std::io::Error> {
+                        for entry in archive.entries()? {
+                            let mut entry = entry?;
+                            let path = entry.path()?.to_path_buf();
+                            let mut components = path.components();
+                            for _ in 0..strip {
+                                components.next();
+                            }
+                            let stripped_path = components.as_path();
+                            if stripped_path.as_os_str().is_empty() {
+                                continue;
+                            }
+                            entry.unpack(dest.join(stripped_path))?;
+                        }
+                        Ok(())
+                    }
+
+                    if archive_path_str.ends_with(".zip") {
+                        let mut archive = zip::ZipArchive::new(file)
+                            .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                        if strip_val > 0 {
+                            for i in 0..archive.len() {
+                                let mut file = archive
+                                    .by_index(i)
+                                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                                let path = PathBuf::from(file.name());
+                                let mut components = path.components();
+                                for _ in 0..strip_val {
+                                    components.next();
+                                }
+                                let stripped_path = components.as_path();
+                                if stripped_path.as_os_str().is_empty() {
+                                    continue;
+                                }
+                                let out_path = dest_path.join(stripped_path);
+                                if file.is_dir() {
+                                    fs::create_dir_all(&out_path)
+                                        .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                                } else {
+                                    if let Some(p) = out_path.parent() {
+                                        fs::create_dir_all(p).map_err(|e| {
+                                            mlua::Error::RuntimeError(e.to_string())
+                                        })?;
+                                    }
+                                    let mut outfile = fs::File::create(&out_path)
+                                        .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                                    std::io::copy(&mut file, &mut outfile)
+                                        .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                                }
+                            }
+                        } else {
+                            archive
+                                .extract(dest_path)
+                                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                        }
+                    } else if archive_path_str.ends_with(".tar.gz")
+                        || archive_path_str.ends_with(".tgz")
+                    {
+                        let tar_gz = flate2::read::GzDecoder::new(file);
+                        let archive = tar::Archive::new(tar_gz);
+                        if strip_val > 0 {
+                            unpack_with_strip(archive, dest_path, strip_val)
+                                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                        } else {
+                            let mut archive = archive;
+                            archive
+                                .unpack(dest_path)
+                                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                        }
+                    } else if archive_path_str.ends_with(".tar.zst") {
+                        let tar_zst = zstd::stream::read::Decoder::new(file)
+                            .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                        let archive = tar::Archive::new(tar_zst);
+                        if strip_val > 0 {
+                            unpack_with_strip(archive, dest_path, strip_val)
+                                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                        } else {
+                            let mut archive = archive;
+                            archive
+                                .unpack(dest_path)
+                                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                        }
+                    } else if archive_path_str.ends_with(".tar.xz") {
+                        let tar_xz = xz2::read::XzDecoder::new(file);
+                        let archive = tar::Archive::new(tar_xz);
+                        if strip_val > 0 {
+                            unpack_with_strip(archive, dest_path, strip_val)
+                                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                        } else {
+                            let mut archive = archive;
+                            archive
+                                .unpack(dest_path)
+                                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                        }
+                    } else {
+                        return Err(mlua::Error::RuntimeError(format!(
+                            "Unsupported archive format: {}",
+                            source
+                        )));
+                    }
+                    Ok(true)
+                },
+            )
+            .map_err(|e| anyhow!(e.to_string()))?;
+        archive_table
+            .set("extract", archive_extract)
+            .map_err(|e| anyhow!(e.to_string()))?;
+        zoi.set("archive", archive_table)
             .map_err(|e| anyhow!(e.to_string()))?;
 
         let http_table = self
@@ -387,6 +556,25 @@ impl PluginManager {
             .map_err(|e| anyhow!(e.to_string()))?;
         http_table
             .set("get", http_get)
+            .map_err(|e| anyhow!(e.to_string()))?;
+
+        let http_download = self
+            .lua
+            .create_function(|_, (url, dest): (String, String)| {
+                let mut response = reqwest::blocking::get(&url)
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                if !response.status().is_success() {
+                    return Ok(false);
+                }
+                let mut dest_file =
+                    fs::File::create(dest).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                std::io::copy(&mut response, &mut dest_file)
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                Ok(true)
+            })
+            .map_err(|e| anyhow!(e.to_string()))?;
+        http_table
+            .set("download", http_download)
             .map_err(|e| anyhow!(e.to_string()))?;
 
         let http_post = self
@@ -568,6 +756,25 @@ impl PluginManager {
             }
         }
         Ok(None)
+    }
+
+    pub fn trigger_project_install_hook(&self) -> Result<bool> {
+        let registry: Table = self
+            .lua
+            .globals()
+            .get("__ZOI_HOOKS")
+            .map_err(|e| anyhow!(e.to_string()))?;
+
+        if let Ok(hook_list) = registry.get::<Table>("on_project_install") {
+            for callback in hook_list.sequence_values::<Function>() {
+                let callback = callback.map_err(|e| anyhow!(e.to_string()))?;
+                let handled: bool = callback.call(()).map_err(|e| anyhow!(e.to_string()))?;
+                if handled {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
     }
 
     pub fn run_command(&self, name: &str, args: Vec<String>) -> Result<bool> {
