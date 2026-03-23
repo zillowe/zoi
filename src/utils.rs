@@ -705,8 +705,6 @@ pub fn setup_path(scope: Scope) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    println!("{}", "Ensuring Zoi bin directory is in your PATH...".bold());
-
     #[cfg(unix)]
     {
         use std::fs::{File, OpenOptions};
