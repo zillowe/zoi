@@ -314,9 +314,29 @@ fn build_for_platform(
                         let mut link: String =
                             op.get("link").map_err(|e| anyhow!(e.to_string()))?;
 
-                        target =
-                            target.replace("${pkgstore}", &format!("{}/pkgstore", data_prefix));
-                        link = link.replace("${pkgstore}", &format!("{}/pkgstore", data_prefix));
+                        let pkgstore_prefix = format!("{}/pkgstore", data_prefix);
+
+                        if target.contains("${pkgstore}") && link.contains("${pkgstore}") {
+                            let target_rel = target.replace("${pkgstore}/", "");
+                            let link_rel = link.replace("${pkgstore}/", "");
+
+                            let link_path = Path::new(&link_rel);
+
+                            if let Some(parent) = link_path.parent() {
+                                let mut rel_target = String::new();
+                                for _ in parent.components() {
+                                    rel_target.push_str("../");
+                                }
+                                rel_target.push_str(&target_rel);
+                                target = rel_target;
+                            } else {
+                                target = target_rel;
+                            }
+                        } else {
+                            target = target.replace("${pkgstore}", &pkgstore_prefix);
+                        }
+
+                        link = link.replace("${pkgstore}", &pkgstore_prefix);
                         link = link
                             .replace("${createpkgdir}", &format!("{}/createpkgdir", data_prefix));
                         link = link.replace("${usrroot}", &format!("{}/usrroot", data_prefix));

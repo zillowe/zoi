@@ -661,15 +661,19 @@ fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                 let temp_path = build_dir.join(file_name);
                 let client = utils::get_http_client()
                     .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-                let response = client
+                let mut response = client
                     .get(&source)
                     .send()
                     .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-                let content = response
-                    .bytes()
+                if !response.status().is_success() {
+                    return Err(mlua::Error::RuntimeError(format!("Failed to download {}: {}", source, response.status())));
+                }
+
+                let mut temp_file = fs::File::create(&temp_path)
                     .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-                fs::write(&temp_path, content)
+                std::io::copy(&mut response, &mut temp_file)
                     .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+
                 temp_path
             } else {
                 PathBuf::from(source)
@@ -751,34 +755,37 @@ fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                 while let Some(entry_result) = ar.next_entry() {
                     let mut entry =
                         entry_result.map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-                    let name = String::from_utf8_lossy(entry.header().identifier()).to_string();
+                    let name = String::from_utf8_lossy(entry.header().identifier())
+                        .trim()
+                        .trim_end_matches('/')
+                        .to_string();
                     if name.starts_with("data.tar") {
                         let temp_data_path = build_dir.join(&name);
                         let mut temp_file = fs::File::create(&temp_data_path)
-                            .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to create temp file for {}: {}", name, e)))?;
                         std::io::copy(&mut entry, &mut temp_file)
-                            .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to copy entry data for {}: {}", name, e)))?;
 
                         let data_file = fs::File::open(&temp_data_path)
-                            .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to reopen temp file for {}: {}", name, e)))?;
                         if name.ends_with(".gz") {
                             let mut archive = tar::Archive::new(GzDecoder::new(data_file));
                             archive
                                 .unpack(&out_dir)
-                                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                                .map_err(|e| mlua::Error::RuntimeError(format!("Failed to unpack {}: {}", name, e)))?;
                         } else if name.ends_with(".xz") {
                             let mut archive = tar::Archive::new(XzDecoder::new(data_file));
                             archive
                                 .unpack(&out_dir)
-                                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                                .map_err(|e| mlua::Error::RuntimeError(format!("Failed to unpack {}: {}", name, e)))?;
                         } else if name.ends_with(".zst") {
                             let mut archive = tar::Archive::new(
                                 ZstdDecoder::new(data_file)
-                                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?,
+                                    .map_err(|e| mlua::Error::RuntimeError(format!("Failed to initialize zstd for {}: {}", name, e)))?,
                             );
                             archive
                                 .unpack(&out_dir)
-                                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                                .map_err(|e| mlua::Error::RuntimeError(format!("Failed to unpack {}: {}", name, e)))?;
                         }
                         fs::remove_file(temp_data_path).ok();
                     }
