@@ -171,10 +171,19 @@ pub fn resolve_dependency_graph(
             registry: resolved
                 .registry_handle
                 .unwrap_or_else(|| "zoidberg".to_string()),
+            explicit_source: matches!(
+                resolved.source_type,
+                resolve::SourceType::LocalFile
+                    | resolve::SourceType::Url
+                    | resolve::SourceType::GitRepo(_)
+            )
+            .then(|| source.clone()),
         };
 
-        let range = if let Some(v_spec) = &request.version_spec {
-            crate::pkg::install::pubgrub::semver_to_range(v_spec)
+        let range = if request.version_spec.is_some() {
+            let resolved_version = resolve::resolve_requested_version_spec(source, true, true)?
+                .expect("version spec presence was checked above");
+            crate::pkg::install::pubgrub::semver_to_range(&resolved_version)
         } else {
             Ranges::full()
         };
@@ -194,6 +203,7 @@ pub fn resolve_dependency_graph(
         sub_package: None,
         repo: "".to_string(),
         registry: "".to_string(),
+        explicit_source: None,
     };
     let root_version = SemVersion(Version::new(0, 0, 0));
 
@@ -207,13 +217,12 @@ pub fn resolve_dependency_graph(
                     continue;
                 }
 
-                let source = format!("{}", name);
+                let source = name
+                    .explicit_source
+                    .clone()
+                    .unwrap_or_else(|| format!("{}@{}", name, version));
                 let (pkg, version_str, _, pkg_lua_path, handle, git_sha) =
-                    resolve::resolve_package_and_version(
-                        &format!("{}@{}", source, version),
-                        quiet,
-                        yes,
-                    )?;
+                    resolve::resolve_package_and_version(&source, quiet, yes)?;
 
                 let mut pkg = pkg;
                 if let Some(s) = scope_override {

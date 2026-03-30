@@ -13,10 +13,14 @@ pub struct PkgName {
     pub sub_package: Option<String>,
     pub repo: String,
     pub registry: String,
+    pub explicit_source: Option<String>,
 }
 
 impl Display for PkgName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(source) = &self.explicit_source {
+            return write!(f, "{}", source);
+        }
         if let Some(sub) = &self.sub_package {
             write!(f, "#{}@{}/{}:{}", self.registry, self.repo, self.name, sub)
         } else {
@@ -189,14 +193,16 @@ impl ZoiDependencyProvider {
             }
         }
 
-        let source_str = if let Some(sub) = &package.sub_package {
-            format!(
-                "#{}@{}/{}:{}",
-                package.registry, package.repo, package.name, sub
-            )
-        } else {
-            format!("#{}@{}/{}", package.registry, package.repo, package.name)
-        };
+        let source_str = package.explicit_source.clone().unwrap_or_else(|| {
+            if let Some(sub) = &package.sub_package {
+                format!(
+                    "#{}@{}/{}:{}",
+                    package.registry, package.repo, package.name, sub
+                )
+            } else {
+                format!("#{}@{}/{}", package.registry, package.repo, package.name)
+            }
+        });
 
         if let Ok(resolved) = resolve::resolve_source(&source_str, true, true) {
             let path_str = resolved.path.to_string_lossy();
@@ -285,12 +291,11 @@ impl DependencyProvider for ZoiDependencyProvider {
         {
             serde_json::from_str::<types::Dependencies>(&deps_json).ok()
         } else {
-            let source = format!("{}", package);
-            let pkg_res = resolve::resolve_package_and_version(
-                &format!("{}@{}", source, version_str),
-                self.quiet,
-                self.yes,
-            );
+            let source = package
+                .explicit_source
+                .clone()
+                .unwrap_or_else(|| format!("{}@{}", package, version_str));
+            let pkg_res = resolve::resolve_package_and_version(&source, self.quiet, self.yes);
 
             match pkg_res {
                 Ok((pkg, _, _, _, _, _)) => pkg.dependencies,
@@ -339,10 +344,21 @@ impl DependencyProvider for ZoiDependencyProvider {
                         registry: resolved_dep
                             .registry_handle
                             .unwrap_or_else(|| "zoidberg".to_string()),
+                        explicit_source: matches!(
+                            resolved_dep.source_type,
+                            resolve::SourceType::LocalFile
+                                | resolve::SourceType::Url
+                                | resolve::SourceType::GitRepo(_)
+                        )
+                        .then(|| dep_req.package.to_string()),
                     };
 
-                    let range = if let Some(v_spec) = &req.version_spec {
-                        self.semver_to_range(v_spec)
+                    let range = if req.version_spec.is_some() {
+                        let resolved_version =
+                            resolve::resolve_requested_version_spec(dep_req.package, true, true)
+                                .map_err(|e| ZoiSolverError::Dependency(e.to_string()))?
+                                .expect("version spec presence was checked above");
+                        self.semver_to_range(&resolved_version)
                     } else {
                         Ranges::full()
                     };

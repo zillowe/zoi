@@ -40,6 +40,7 @@ pub struct PackageRequest {
 }
 
 use std::sync::LazyLock;
+use std::sync::Mutex;
 
 static HANDLE_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^(?:#(?P<handle>[^@]+))?(?P<main_part>.*)$")
@@ -49,6 +50,48 @@ static MAIN_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^@?(?P<repo_and_name>[^@]+)(?:@(?P<version>.+))?$")
         .expect("Static MAIN_RE regex is valid")
 });
+static CONFIRMED_UNTRUSTED_SOURCES: LazyLock<Mutex<std::collections::HashSet<String>>> =
+    LazyLock::new(|| Mutex::new(std::collections::HashSet::new()));
+
+fn split_explicit_file_source(source_str: &str) -> Option<(&str, Option<String>, Option<String>)> {
+    let (main_part, version_spec) = if let Some((base, version)) = source_str.rsplit_once('@') {
+        let base_path = if let Some((path, sub)) = base.rsplit_once(':') {
+            if (path.ends_with(".pkg.lua") || path.ends_with(".manifest.yaml"))
+                && !sub.contains('/')
+            {
+                path
+            } else {
+                base
+            }
+        } else {
+            base
+        };
+
+        if base_path.ends_with(".pkg.lua") || base_path.ends_with(".manifest.yaml") {
+            (base, Some(version.to_string()))
+        } else {
+            (source_str, None)
+        }
+    } else {
+        (source_str, None)
+    };
+
+    let (path_part, sub_package) = if let Some((base, sub)) = main_part.rsplit_once(':') {
+        if (base.ends_with(".pkg.lua") || base.ends_with(".manifest.yaml")) && !sub.contains('/') {
+            (base, Some(sub.to_string()))
+        } else {
+            (main_part, None)
+        }
+    } else {
+        (main_part, None)
+    };
+
+    if path_part.ends_with(".pkg.lua") || path_part.ends_with(".manifest.yaml") {
+        Some((path_part, sub_package, version_spec))
+    } else {
+        None
+    }
+}
 
 fn get_git_head_sha(repo_path: &Path) -> Option<String> {
     let repo = git2::Repository::open(repo_path).ok()?;
@@ -68,19 +111,8 @@ pub fn get_db_root() -> Result<PathBuf> {
 }
 
 pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
-    let (path_part, sub_package_from_path) = if let Some((base, sub)) = source_str.rsplit_once(':')
-    {
-        if (base.ends_with(".pkg.lua") || base.ends_with(".manifest.yaml")) && !sub.contains('/') {
-            (base, Some(sub.to_string()))
-        } else {
-            (source_str, None)
-        }
-    } else {
-        (source_str, None)
-    };
-
-    if path_part.contains('/')
-        && (path_part.ends_with(".manifest.yaml") || path_part.ends_with(".pkg.lua"))
+    if let Some((path_part, sub_package_from_path, version_spec)) =
+        split_explicit_file_source(source_str)
     {
         let path = std::path::Path::new(path_part);
         let file_stem = path.file_stem().unwrap_or_default().to_string_lossy();
@@ -96,7 +128,7 @@ pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
             repo: None,
             name,
             sub_package: sub_package_from_path,
-            version_spec: None,
+            version_spec,
         });
     }
 
@@ -801,13 +833,71 @@ fn get_version_for_install(
     get_default_version(pkg, registry_handle)
 }
 
+pub fn resolve_requested_version_spec(
+    source_str: &str,
+    quiet: bool,
+    yes: bool,
+) -> Result<Option<String>> {
+    let request = parse_source_string(source_str)?;
+    let Some(_) = request.version_spec else {
+        return Ok(None);
+    };
+
+    let resolved_source = resolve_source(source_str, quiet, yes)?;
+    let mut pkg = crate::pkg::lua::parser::parse_lua_package(
+        resolved_source.path.to_str().ok_or_else(|| {
+            anyhow!(
+                "Path contains invalid UTF-8 characters: {:?}",
+                resolved_source.path
+            )
+        })?,
+        None,
+        quiet,
+    )?;
+
+    if let Some(repo_name) = resolved_source.repo_name {
+        pkg.repo = repo_name;
+    }
+
+    get_version_for_install(
+        &pkg,
+        &request.version_spec,
+        resolved_source.registry_handle.as_deref(),
+    )
+    .map(Some)
+}
+
 pub fn resolve_source(source: &str, quiet: bool, yes: bool) -> Result<ResolvedSource> {
     let config = config::read_config().unwrap_or_default();
     let max_depth = config.max_resolution_depth.unwrap_or(7);
     let resolved = resolve_source_recursive(source, 0, max_depth, quiet)?;
 
     if !quiet {
-        crate::utils::confirm_untrusted_source(&resolved.source_type, yes)?;
+        let confirmation_key = match &resolved.source_type {
+            SourceType::LocalFile => Some(
+                resolved
+                    .path
+                    .canonicalize()
+                    .unwrap_or_else(|_| resolved.path.clone())
+                    .to_string_lossy()
+                    .to_string(),
+            ),
+            SourceType::Url => Some(source.to_string()),
+            _ => None,
+        };
+
+        let should_confirm = if let Some(key) = confirmation_key {
+            let mut confirmed = CONFIRMED_UNTRUSTED_SOURCES
+                .lock()
+                .map_err(|e| anyhow!("Failed to lock trust confirmation cache: {}", e))?;
+            confirmed.insert(key)
+        } else {
+            true
+        };
+
+        if should_confirm {
+            crate::utils::confirm_untrusted_source(&resolved.source_type, yes)?;
+        }
     }
 
     if let Ok(_request) = parse_source_string(source)
@@ -926,15 +1016,7 @@ fn resolve_source_recursive(
         return Ok(resolved_source);
     }
 
-    let (path_part, _sub_package) = if let Some((base, sub)) = source.rsplit_once(':') {
-        if (base.ends_with(".pkg.lua") || base.ends_with(".manifest.yaml")) && !sub.contains('/') {
-            (base, Some(sub.to_string()))
-        } else {
-            (source, None)
-        }
-    } else {
-        (source, None)
-    };
+    let path_part = split_explicit_file_source(source).map(|(path, _, _)| path);
 
     let request = parse_source_string(source)?;
 
@@ -1106,7 +1188,7 @@ fn resolve_source_recursive(
             ));
         }
         download_from_url(source)?
-    } else if path_part.ends_with(".pkg.lua") {
+    } else if let Some(path_part) = path_part {
         let path = PathBuf::from(path_part);
         if !path.exists() {
             return Err(anyhow!("Local file not found at '{path_part}'"));
