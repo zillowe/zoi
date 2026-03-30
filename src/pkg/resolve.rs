@@ -93,6 +93,10 @@ fn split_explicit_file_source(source_str: &str) -> Option<(&str, Option<String>,
     }
 }
 
+fn download_source_for_explicit_path<'a>(source: &'a str, path_part: Option<&'a str>) -> &'a str {
+    path_part.unwrap_or(source)
+}
+
 fn get_git_head_sha(repo_path: &Path) -> Option<String> {
     let repo = git2::Repository::open(repo_path).ok()?;
     let head = repo.head().ok()?;
@@ -714,7 +718,9 @@ pub fn get_default_version(pkg: &types::Package, registry_handle: Option<&str>) 
         if versions.contains_key("stable") {
             return resolve_channel(versions, "stable");
         }
-        if let Some((channel, _)) = versions.iter().next() {
+        let mut channels: Vec<_> = versions.keys().collect();
+        channels.sort();
+        if let Some(channel) = channels.first() {
             println!(
                 "No 'stable' channel found, using first available channel: '@{}'",
                 channel.cyan()
@@ -886,17 +892,25 @@ pub fn resolve_source(source: &str, quiet: bool, yes: bool) -> Result<ResolvedSo
             _ => None,
         };
 
-        let should_confirm = if let Some(key) = confirmation_key {
+        let confirmation_key = if let Some(key) = confirmation_key {
+            let confirmed = CONFIRMED_UNTRUSTED_SOURCES
+                .lock()
+                .map_err(|e| anyhow!("Failed to lock trust confirmation cache: {}", e))?;
+            if confirmed.contains(&key) {
+                None
+            } else {
+                Some(key)
+            }
+        } else {
+            None
+        };
+
+        if let Some(key) = confirmation_key {
+            crate::utils::confirm_untrusted_source(&resolved.source_type, yes)?;
             let mut confirmed = CONFIRMED_UNTRUSTED_SOURCES
                 .lock()
                 .map_err(|e| anyhow!("Failed to lock trust confirmation cache: {}", e))?;
-            confirmed.insert(key)
-        } else {
-            true
-        };
-
-        if should_confirm {
-            crate::utils::confirm_untrusted_source(&resolved.source_type, yes)?;
+            confirmed.insert(key);
         }
     }
 
@@ -1187,7 +1201,7 @@ fn resolve_source_recursive(
                 source
             ));
         }
-        download_from_url(source)?
+        download_from_url(download_source_for_explicit_path(source, path_part))?
     } else if let Some(path_part) = path_part {
         let path = PathBuf::from(path_part);
         if !path.exists() {
@@ -1287,4 +1301,28 @@ fn resolve_source_recursive(
     }
 
     Ok(resolved_source)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::download_source_for_explicit_path;
+
+    #[test]
+    fn test_download_source_for_explicit_http_channel_uses_base_url() {
+        let source = "http://127.0.0.1:8000/test.pkg.lua@stable";
+        let path_part = Some("http://127.0.0.1:8000/test.pkg.lua");
+        assert_eq!(
+            download_source_for_explicit_path(source, path_part),
+            "http://127.0.0.1:8000/test.pkg.lua"
+        );
+    }
+
+    #[test]
+    fn test_download_source_for_plain_http_source_uses_original() {
+        let source = "http://127.0.0.1:8000/test.pkg.lua";
+        assert_eq!(
+            download_source_for_explicit_path(source, None),
+            "http://127.0.0.1:8000/test.pkg.lua"
+        );
+    }
 }

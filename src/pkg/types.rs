@@ -563,6 +563,8 @@ pub struct Policy {
     #[serde(default, skip_serializing_if = "is_false")]
     pub pkg_dirs_unoverridable: bool,
     #[serde(default, skip_serializing_if = "is_false")]
+    pub parallel_jobs_unoverridable: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
     pub advisory_enforcement_unoverridable: bool,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]

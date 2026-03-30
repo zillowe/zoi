@@ -82,7 +82,12 @@ pub fn parse_dependency_string(dep_str: &str) -> Result<Dependency<'_>> {
         } else {
             v_str.to_string()
         };
-        Some(VersionReq::parse(&req_parse_str)?)
+
+        if manager == "zoi" && VersionReq::parse(&req_parse_str).is_err() {
+            None
+        } else {
+            Some(VersionReq::parse(&req_parse_str)?)
+        }
     } else {
         None
     };

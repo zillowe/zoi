@@ -1,5 +1,7 @@
+use rustc_hash::FxHashMap;
 use semver::Version;
 use zoi::pkg::install::pubgrub;
+use zoi::pkg::install::pubgrub::PkgName;
 
 #[test]
 fn test_semver_to_range_exact() {
@@ -30,4 +32,41 @@ fn test_semver_to_range_comparison() {
     assert!(range.contains(&pubgrub::SemVersion(Version::parse("1.0.0").unwrap())));
     assert!(range.contains(&pubgrub::SemVersion(Version::parse("1.5.0").unwrap())));
     assert!(!range.contains(&pubgrub::SemVersion(Version::parse("2.0.0").unwrap())));
+}
+
+#[test]
+fn test_get_versions_does_not_leak_across_distinct_explicit_sources() {
+    let source_a = format!(
+        "{}/test_assets/source_a/shared.pkg.lua@1.0.0",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let source_b = format!(
+        "{}/test_assets/source_b/shared.pkg.lua@2.0.0",
+        env!("CARGO_MANIFEST_DIR")
+    );
+
+    let provider = pubgrub::ZoiDependencyProvider::new(
+        FxHashMap::default(),
+        vec![source_a.clone(), source_b],
+        true,
+        true,
+        false,
+    )
+    .expect("provider should be created");
+
+    let versions = provider
+        .get_versions(&PkgName {
+            name: "shared".to_string(),
+            sub_package: None,
+            repo: "".to_string(),
+            registry: "local".to_string(),
+            explicit_source: Some(source_a),
+        })
+        .expect("versions should resolve");
+
+    assert_eq!(versions.len(), 1);
+    assert_eq!(
+        versions[0],
+        pubgrub::SemVersion(Version::parse("1.0.0").unwrap())
+    );
 }

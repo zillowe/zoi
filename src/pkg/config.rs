@@ -173,11 +173,9 @@ pub fn read_config() -> Result<Config> {
         merged_cfg.default_registry = system_cfg.default_registry;
     }
 
-    if project_val.get("parallel_jobs").is_some() && !system_policy.telemetry_enabled_unoverridable
-    {
+    if project_val.get("parallel_jobs").is_some() && !system_policy.parallel_jobs_unoverridable {
         merged_cfg.parallel_jobs = project_cfg.parallel_jobs;
-    } else if user_val.get("parallel_jobs").is_some()
-        && !system_policy.telemetry_enabled_unoverridable
+    } else if user_val.get("parallel_jobs").is_some() && !system_policy.parallel_jobs_unoverridable
     {
         merged_cfg.parallel_jobs = user_cfg.parallel_jobs;
     } else {

@@ -168,6 +168,38 @@ impl ZoiDependencyProvider {
         semver_to_range(req_str)
     }
 
+    fn source_matches_package(&self, package: &PkgName, source: &str) -> bool {
+        if let Some(explicit_source) = &package.explicit_source {
+            let explicit_base = explicit_source
+                .rsplit_once('@')
+                .map(|(base, _)| base)
+                .unwrap_or(explicit_source.as_str());
+            let source_base = source
+                .rsplit_once('@')
+                .map(|(base, _)| base)
+                .unwrap_or(source);
+            return explicit_base == source_base;
+        }
+
+        let Ok(req) = resolve::parse_source_string(source) else {
+            return false;
+        };
+
+        if req.name != package.name || req.sub_package != package.sub_package {
+            return false;
+        }
+
+        let Ok(resolved_source) = resolve::resolve_source(source, true, true) else {
+            return false;
+        };
+
+        resolved_source.repo_name.unwrap_or_default() == package.repo
+            && resolved_source
+                .registry_handle
+                .unwrap_or_else(|| "zoidberg".to_string())
+                == package.registry
+    }
+
     pub fn get_versions(&self, package: &PkgName) -> Result<Vec<SemVersion>, ZoiSolverError> {
         let mut all_versions = Vec::new();
 
@@ -182,8 +214,8 @@ impl ZoiDependencyProvider {
         }
 
         for source in &self.initial_sources {
-            if let Ok(req) = resolve::parse_source_string(source)
-                && req.name == package.name
+            if self.source_matches_package(package, source)
+                && let Ok(req) = resolve::parse_source_string(source)
                 && let Some(v_spec) = req.version_spec
             {
                 let v_clean = v_spec.trim_start_matches('@').trim_start_matches('v');
