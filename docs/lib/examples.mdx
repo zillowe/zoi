@@ -5,6 +5,58 @@ description: Practical examples of how to use the Zoi library in your Rust code.
 
 This page provides practical, copy-paste-ready examples for using Zoi's library features.
 
+## Resolving a Package Source
+
+This example resolves a source string before installation. This is useful if you want to inspect the package metadata, chosen version, or source path in your own application.
+
+### Code
+
+```rust
+use zoi::resolve_package;
+use anyhow::Result;
+
+fn main() -> Result<()> {
+    let resolved = resolve_package("@core/hello@stable", true)?;
+
+    println!("Resolved package: {}", resolved.package.name);
+    println!("Resolved version: {}", resolved.version);
+    println!("Source path: {}", resolved.source_path.display());
+
+    Ok(())
+}
+```
+
+## Resolving a Dependency Graph
+
+This example computes the dependency graph for one or more sources without installing anything.
+
+### Code
+
+```rust
+use zoi::{resolve_dependency_graph, DependencyResolutionOptions, Scope};
+use anyhow::Result;
+
+fn main() -> Result<()> {
+    let sources = vec!["@core/hello@stable".to_string()];
+    let options = DependencyResolutionOptions {
+        scope_override: Some(Scope::User),
+        yes: true,
+        quiet: true,
+        ..Default::default()
+    };
+
+    let resolution = resolve_dependency_graph(&sources, &options)?;
+
+    println!("Resolved {} packages", resolution.graph.nodes.len());
+    println!(
+        "Non-Zoi dependencies: {}",
+        resolution.non_zoi_dependencies.len()
+    );
+
+    Ok(())
+}
+```
+
 ## Building a Package
 
 This example demonstrates how to build a package from a `.pkg.lua` file. This will create a distributable package archive (`.pkg.tar.zst`).
@@ -12,7 +64,7 @@ This example demonstrates how to build a package from a `.pkg.lua` file. This wi
 ### Code
 
 ```rust
-use zoi::{build, Scope};
+use zoi::{build_with_options, BuildOptions};
 use std::path::Path;
 use anyhow::Result;
 
@@ -20,19 +72,16 @@ fn main() -> Result<()> {
     // Path to your package definition file.
     let package_file = Path::new("path/to/your/package.pkg.lua");
 
-    // Specify the build type, e.g. "source" or "pre-compiled".
-    let build_type = Some("source");
-
-    // Specify the target platforms.
-    let platforms = vec!["linux-amd64".to_string()];
-
-    // Optionally, provide a PGP key to sign the package.
-    let sign_key = Some("YourPgpKeyNameOrFingerprint".to_string());
+    let options = BuildOptions {
+        build_type: Some("source"),
+        platforms: vec!["linux-amd64".to_string()],
+        sign_key: Some("YourPgpKeyNameOrFingerprint".to_string()),
+        ..Default::default()
+    };
 
     println!("Building package: {}", package_file.display());
 
-    // Call the build function.
-    build(package_file, build_type, &platforms, sign_key, true, "native", None, None)?;
+    build_with_options(package_file, &options)?;
 
     println!("Package built successfully!");
 
@@ -47,7 +96,7 @@ This example shows how to install a package from a local archive file that you h
 ### Code
 
 ```rust
-use zoi::{install_package, Scope};
+use zoi::{install_package_with_options, PackageInstallOptions, Scope};
 use std::path::Path;
 use anyhow::Result;
 
@@ -55,18 +104,47 @@ fn main() -> Result<()> {
     // Path to the package archive.
     let archive_path = Path::new("path/to/your/package-1.0.0-linux-amd64.pkg.tar.zst");
 
-    // Optionally override the installation scope.
-    let scope = Some(Scope::User);
-
-    // Specify the registry handle. Use "local" if it's not from a registry.
-    let registry_handle = "local";
+    let options = PackageInstallOptions {
+        scope_override: Some(Scope::User),
+        registry_handle: "local".to_string(),
+        yes: true,
+        ..Default::default()
+    };
 
     println!("Installing from archive: {}", archive_path.display());
 
-    // Call the install function.
-    let installed_files = install_package(archive_path, scope, registry_handle, true, None)?;
+    let installed_files = install_package_with_options(archive_path, &options)?;
 
     println!("Package installed successfully. {} files were installed.", installed_files.len());
+
+    Ok(())
+}
+```
+
+## Installing From Sources
+
+This example installs from source specs instead of a prebuilt archive. The source can be a registry package name, a local `.pkg.lua` file, or a URL.
+
+### Code
+
+```rust
+use zoi::{install_sources, SourceInstallOptions, Scope};
+use anyhow::Result;
+
+fn main() -> Result<()> {
+    let sources = vec![
+        "@core/hello@stable".to_string(),
+        "./my-package.pkg.lua".to_string(),
+    ];
+
+    let options = SourceInstallOptions {
+        scope_override: Some(Scope::User),
+        yes: true,
+        build: true,
+        ..Default::default()
+    };
+
+    install_sources(&sources, &options)?;
 
     Ok(())
 }

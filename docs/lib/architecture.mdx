@@ -5,6 +5,18 @@ description: Internal details of Zoi's store structure and transaction log forma
 
 This document provides a technical deep-dive into Zoi's internal architecture, focusing on how packages are stored on disk and how Zoi ensures atomic operations through its transaction system. This is intended for library contributors and developers looking to integrate Zoi deeply into their own applications.
 
+## Public Library Surface
+
+For application integrations, prefer the stable wrappers in `src/lib.rs` over calling internal modules directly. The recommended public entry points are:
+
+- `build_with_options`
+- `install_package_with_options`
+- `install_sources`
+- `resolve_package`
+- `resolve_dependency_graph`
+
+The lower-level modules under `pkg::`, `cmd::`, and `project::` remain useful for contributors, but they should be treated as internal implementation details unless they are explicitly re-exported or documented in the library API reference.
+
 ## Zoi Store Structure
 
 Zoi follows a structured, collision-resistant layout for managing package installations. By default, the Zoi home directory is located at `~/.zoi`.

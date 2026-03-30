@@ -29,10 +29,14 @@
 //!
 //! fn main() -> Result<()> {
 //!     let archive_path = Path::new("path/to/your/package-1.0.0-linux-amd64.pkg.tar.zst");
-//!     let scope = Some(Scope::User);
-//!     let registry_handle = "local";
+//!     let options = zoi::PackageInstallOptions {
+//!         scope_override: Some(Scope::User),
+//!         registry_handle: "local".to_string(),
+//!         yes: true,
+//!         ..Default::default()
+//!     };
 //!
-//!     let installed_files = install_package(archive_path, scope, registry_handle, true, None)?;
+//!     let installed_files = install_package_with_options(archive_path, &options)?;
 //!
 //!     println!("Package installed successfully. {} files were installed.", installed_files.len());
 //!
@@ -48,7 +52,183 @@ pub mod utils;
 
 use anyhow::Result;
 pub use pkg::types::{self, Scope};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+#[derive(Debug, Clone)]
+pub struct BuildOptions<'a> {
+    pub build_type: Option<&'a str>,
+    pub platforms: Vec<String>,
+    pub sign_key: Option<String>,
+    pub install_deps: bool,
+    pub method: &'a str,
+    pub image: Option<&'a str>,
+    pub version_override: Option<&'a str>,
+}
+
+impl<'a> Default for BuildOptions<'a> {
+    fn default() -> Self {
+        Self {
+            build_type: None,
+            platforms: vec![utils::get_platform().unwrap_or_else(|_| "linux-amd64".to_string())],
+            sign_key: None,
+            install_deps: true,
+            method: "native",
+            image: None,
+            version_override: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct PackageInstallOptions {
+    pub scope_override: Option<Scope>,
+    pub registry_handle: String,
+    pub yes: bool,
+    pub sub_packages: Option<Vec<String>>,
+    pub link_bins: bool,
+}
+
+impl Default for PackageInstallOptions {
+    fn default() -> Self {
+        Self {
+            scope_override: Some(Scope::User),
+            registry_handle: "local".to_string(),
+            yes: true,
+            sub_packages: None,
+            link_bins: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct SourceInstallOptions {
+    pub repo: Option<String>,
+    pub force: bool,
+    pub all_optional: bool,
+    pub yes: bool,
+    pub scope_override: Option<Scope>,
+    pub save: bool,
+    pub build_type: Option<String>,
+    pub dry_run: bool,
+    pub build: bool,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct DependencyResolutionOptions {
+    pub scope_override: Option<Scope>,
+    pub force: bool,
+    pub yes: bool,
+    pub all_optional: bool,
+    pub build_type: Option<String>,
+    pub quiet: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct ResolvedPackage {
+    pub package: types::Package,
+    pub version: String,
+    pub sharable_manifest: Option<types::SharableInstallManifest>,
+    pub source_path: PathBuf,
+    pub registry_handle: Option<String>,
+    pub git_sha: Option<String>,
+}
+
+#[derive(Debug)]
+pub struct DependencyResolution {
+    pub graph: pkg::install::resolver::DependencyGraph,
+    pub non_zoi_dependencies: Vec<String>,
+}
+
+fn to_install_scope(scope: Scope) -> cli::InstallScope {
+    match scope {
+        Scope::User => cli::InstallScope::User,
+        Scope::System => cli::InstallScope::System,
+        Scope::Project => cli::InstallScope::Project,
+    }
+}
+
+pub fn build_with_options(package_file: &Path, options: &BuildOptions<'_>) -> Result<()> {
+    pkg::package::build::run(
+        package_file,
+        options.build_type,
+        &options.platforms,
+        options.sign_key.clone(),
+        None,
+        options.version_override,
+        None,
+        false,
+        options.install_deps,
+        options.method,
+        options.image,
+    )
+}
+
+pub fn install_package_with_options(
+    package_file: &Path,
+    options: &PackageInstallOptions,
+) -> Result<Vec<String>> {
+    pkg::package::install::run(
+        package_file,
+        options.scope_override,
+        &options.registry_handle,
+        None,
+        options.yes,
+        options.sub_packages.clone(),
+        options.link_bins,
+        None,
+    )
+}
+
+pub fn install_sources(sources: &[String], options: &SourceInstallOptions) -> Result<()> {
+    let plugin_manager = pkg::plugin::PluginManager::new()?;
+    cmd::install::run(
+        sources,
+        options.repo.clone(),
+        options.force,
+        options.all_optional,
+        options.yes,
+        options.scope_override.map(to_install_scope),
+        false,
+        false,
+        options.save,
+        options.build_type.clone(),
+        options.dry_run,
+        &plugin_manager,
+        options.build,
+    )
+}
+
+pub fn resolve_package(source: &str, yes: bool) -> Result<ResolvedPackage> {
+    let (package, version, sharable_manifest, source_path, registry_handle, git_sha) =
+        pkg::resolve::resolve_package_and_version(source, true, yes)?;
+    Ok(ResolvedPackage {
+        package,
+        version,
+        sharable_manifest,
+        source_path,
+        registry_handle,
+        git_sha,
+    })
+}
+
+pub fn resolve_dependency_graph(
+    sources: &[String],
+    options: &DependencyResolutionOptions,
+) -> Result<DependencyResolution> {
+    let (graph, non_zoi_dependencies) = pkg::install::resolver::resolve_dependency_graph(
+        sources,
+        options.scope_override,
+        options.force,
+        options.yes,
+        options.all_optional,
+        options.build_type.as_deref(),
+        options.quiet,
+    )?;
+    Ok(DependencyResolution {
+        graph,
+        non_zoi_dependencies,
+    })
+}
 
 /// Builds a Zoi package from a local `.pkg.lua` file.
 ///
@@ -92,19 +272,16 @@ pub fn build(
     image: Option<&str>,
     version_override: Option<&str>,
 ) -> Result<()> {
-    pkg::package::build::run(
-        package_file,
+    let options = BuildOptions {
         build_type,
-        platforms,
+        platforms: platforms.to_vec(),
         sign_key,
-        None,
-        version_override,
-        None,
-        false,
         install_deps,
         method,
         image,
-    )
+        version_override,
+    };
+    build_with_options(package_file, &options)
 }
 
 /// Installs a Zoi package from a local package archive.
@@ -150,16 +327,14 @@ pub fn install_package(
     yes: bool,
     sub_packages: Option<Vec<String>>,
 ) -> Result<Vec<String>> {
-    pkg::package::install::run(
-        package_file,
+    let options = PackageInstallOptions {
         scope_override,
-        registry_handle,
-        None,
+        registry_handle: registry_handle.to_string(),
         yes,
         sub_packages,
-        true,
-        None,
-    )
+        link_bins: true,
+    };
+    install_package_with_options(package_file, &options)
 }
 
 /// Uninstalls a Zoi package.

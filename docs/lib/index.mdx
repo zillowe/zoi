@@ -28,14 +28,39 @@ These are the primary functions for building and managing packages.
 
 <Cards>
   <Card
+    title="build_with_options"
+    href="#build_with_options-function"
+    description="Builds a Zoi package using a typed options struct."
+  />
+  <Card
     title="build"
     href="#build-function"
-    description="Builds a Zoi package from a local .pkg.lua file."
+    description="Compatibility wrapper for building a Zoi package."
+  />
+  <Card
+    title="install_sources"
+    href="#install_sources-function"
+    description="Installs packages from registry, local file, URL, or git-backed sources."
+  />
+  <Card
+    title="resolve_package"
+    href="#resolve_package-function"
+    description="Resolves a source string into a package, version, and origin metadata."
+  />
+  <Card
+    title="resolve_dependency_graph"
+    href="#resolve_dependency_graph-function"
+    description="Returns the dependency graph for one or more requested sources."
+  />
+  <Card
+    title="install_package_with_options"
+    href="#install_package_with_options-function"
+    description="Installs a local package archive using a typed options struct."
   />
   <Card
     title="install_package"
     href="#install_package-function"
-    description="Installs a Zoi package from a local package archive."
+    description="Compatibility wrapper for installing a local package archive."
   />
   <Card
     title="uninstall_package"
@@ -47,6 +72,39 @@ These are the primary functions for building and managing packages.
 ---
 
 ## `build` function
+
+This is the compatibility wrapper around [`build_with_options`](#build_with_options-function).
+
+---
+
+## `build_with_options` function
+
+This is the recommended build API for new integrations. It accepts a typed `BuildOptions` struct instead of a long positional argument list.
+
+### Signature
+
+```rust
+pub fn build_with_options(
+    package_file: &Path,
+    options: &BuildOptions<'_>,
+) -> Result<()>
+```
+
+### Key Types
+
+```rust
+pub struct BuildOptions<'a> {
+    pub build_type: Option<&'a str>,
+    pub platforms: Vec<String>,
+    pub sign_key: Option<String>,
+    pub install_deps: bool,
+    pub method: &'a str,
+    pub image: Option<&'a str>,
+    pub version_override: Option<&'a str>,
+}
+```
+
+---
 
 This function builds a Zoi package from a `.pkg.lua` definition file for one or more target platforms.
 
@@ -81,6 +139,121 @@ pub fn build(
 ---
 
 ## `install_package` function
+
+This is the compatibility wrapper around [`install_package_with_options`](#install_package_with_options-function).
+
+---
+
+## `install_sources` function
+
+Installs one or more package sources using the same source formats supported by the CLI: registry package names, local `.pkg.lua` files, local manifests, URLs, and other supported direct sources.
+
+### Signature
+
+```rust
+pub fn install_sources(
+    sources: &[String],
+    options: &SourceInstallOptions,
+) -> Result<()>
+```
+
+### Key Types
+
+```rust
+pub struct SourceInstallOptions {
+    pub repo: Option<String>,
+    pub force: bool,
+    pub all_optional: bool,
+    pub yes: bool,
+    pub scope_override: Option<Scope>,
+    pub save: bool,
+    pub build_type: Option<String>,
+    pub dry_run: bool,
+    pub build: bool,
+}
+```
+
+---
+
+## `resolve_package` function
+
+Resolves a single source string into a package plus origin metadata. This is useful for library consumers that want to inspect a package before installing it.
+
+### Signature
+
+```rust
+pub fn resolve_package(source: &str, yes: bool) -> Result<ResolvedPackage>
+```
+
+### Result Type
+
+```rust
+pub struct ResolvedPackage {
+    pub package: types::Package,
+    pub version: String,
+    pub sharable_manifest: Option<types::SharableInstallManifest>,
+    pub source_path: PathBuf,
+    pub registry_handle: Option<String>,
+    pub git_sha: Option<String>,
+}
+```
+
+---
+
+## `resolve_dependency_graph` function
+
+Builds the dependency graph for one or more requested sources without performing installation.
+
+### Signature
+
+```rust
+pub fn resolve_dependency_graph(
+    sources: &[String],
+    options: &DependencyResolutionOptions,
+) -> Result<DependencyResolution>
+```
+
+### Key Types
+
+```rust
+pub struct DependencyResolutionOptions {
+    pub scope_override: Option<Scope>,
+    pub force: bool,
+    pub yes: bool,
+    pub all_optional: bool,
+    pub build_type: Option<String>,
+    pub quiet: bool,
+}
+```
+
+---
+
+## `install_package_with_options` function
+
+This is the recommended archive install API for new integrations. It accepts a typed `PackageInstallOptions` struct.
+
+### Signature
+
+```rust
+pub fn install_package_with_options(
+    package_file: &Path,
+    options: &PackageInstallOptions,
+) -> Result<Vec<String>>
+```
+
+### Key Types
+
+```rust
+pub struct PackageInstallOptions {
+    pub scope_override: Option<Scope>,
+    pub registry_handle: String,
+    pub yes: bool,
+    pub sub_packages: Option<Vec<String>>,
+    pub link_bins: bool,
+}
+```
+
+---
 
 Installs a Zoi package from a local `.pkg.tar.zst` archive file.
 
