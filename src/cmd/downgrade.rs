@@ -135,5 +135,6 @@ Initiating install for {}...",
         false,
         plugin_manager,
         false,
+        false,
     )
 }

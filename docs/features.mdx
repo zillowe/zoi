@@ -288,6 +288,10 @@ List all files owned by a package.
 
 Shows the history of past package operations (install, uninstall, upgrade) from the audit log. Requires `audit_log_enabled: true` in configuration.
 
+**Options:**
+
+- `--verify`: Verify audit log chain integrity instead of printing entries.
+
 ---
 
 ### `zoi helper`
@@ -330,6 +334,7 @@ Zoi resolves dependencies, checks for conflicts, and then sequentially downloads
 - `--save`: Save the package to the project's `zoi.yaml`.
 - `--type <TYPE>`: The type of package to build if building from source. Specifying a type other than `pre-compiled` or `pre-built` will force a local build.
 - `--build` (alias: `-b`): Force building from source even if a pre-compiled archive is available in the registry.
+- `--frozen-lockfile`: Install exactly what is pinned in `zoi.lock` (project scope only, lockfile must already exist, and no lockfile updates are allowed).
 - `--dry-run`: Do not actually install, just show what would be done.
 
 ---

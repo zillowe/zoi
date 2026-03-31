@@ -23,7 +23,7 @@
 //! ## Example: Install a package
 //!
 //! ```no_run
-//! use zoi::{install_package, Scope};
+//! use zoi::{install_package_with_options, Scope};
 //! use std::path::Path;
 //! use anyhow::Result;
 //!
@@ -111,6 +111,7 @@ pub struct SourceInstallOptions {
     pub build_type: Option<String>,
     pub dry_run: bool,
     pub build: bool,
+    pub frozen_lockfile: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -195,6 +196,7 @@ pub fn install_sources(sources: &[String], options: &SourceInstallOptions) -> Re
         options.dry_run,
         &plugin_manager,
         options.build,
+        options.frozen_lockfile,
     )
 }
 

@@ -104,10 +104,13 @@ policy:
 
 ### Log Storage and Viewing
 
-Logs are stored in a structured JSON Lines format at `~/.zoi/audit.jsonl`. Administrators and users can view the history using the `zoi history` command:
+Logs are stored in a structured JSON Lines format at `~/.zoi/audit.json`. Administrators and users can view the history using the `zoi history` command:
 
 ```sh
 zoi history
+
+# Verify log chain integrity
+zoi history --verify
 ```
 
 Each entry includes:

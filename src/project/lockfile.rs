@@ -36,3 +36,23 @@ pub fn write_zoi_lock(lockfile: &types::ZoiLock) -> Result<()> {
     fs::write(path, content)?;
     Ok(())
 }
+
+pub fn sources_from_lock(lockfile: &types::ZoiLock) -> Vec<String> {
+    let mut sources: Vec<String> = lockfile
+        .packages
+        .iter()
+        .map(|(full_id, version)| format!("{}@{}", full_id, version))
+        .collect();
+
+    if sources.is_empty() {
+        for (reg_key, pkgs) in &lockfile.details {
+            for (short_id, detail) in pkgs {
+                sources.push(format!("{}{}@{}", reg_key, short_id, detail.version));
+            }
+        }
+    }
+
+    sources.sort();
+    sources.dedup();
+    sources
+}

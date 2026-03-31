@@ -159,6 +159,14 @@ When this is configured, running `zoi install` (with no arguments) in the projec
 
 Commit `zoi.yaml` and `zoi.lock` to your repository. This ensures that other developers who clone the project can run `zoi install` to get the exact same versions of the dependencies, creating a reproducible and secure environment.
 
+For strict reproducibility, use:
+
+```sh
+zoi install --frozen-lockfile --local
+```
+
+This installs only versions pinned in `zoi.lock` and refuses to update the lockfile during the run.
+
 ## The `zoi.lock` File
 
 The `zoi.lock` file is a JSON file that records the exact versions and integrity hashes of all the packages installed in a project. It's automatically generated and updated when you run `zoi install` in a project with local packages enabled.

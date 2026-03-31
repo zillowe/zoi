@@ -276,6 +276,10 @@ enum Commands {
         /// Force building from source even if a pre-compiled archive is available in the registry
         #[arg(long, short = 'b')]
         build: bool,
+
+        /// Enforce zoi.lock exactly (project install only, no lockfile updates)
+        #[arg(long)]
+        frozen_lockfile: bool,
     },
 
     /// Uninstalls one or more packages previously installed by Zoi
@@ -381,7 +385,11 @@ enum Commands {
     },
 
     /// Shows the history of package operations
-    History,
+    History {
+        /// Verify audit log chain integrity instead of printing history entries
+        #[arg(long)]
+        verify: bool,
+    },
 
     /// Searches for packages by name or description
     #[command(
@@ -838,6 +846,7 @@ pub fn run() -> anyhow::Result<()> {
                 r#type,
                 dry_run,
                 build,
+                frozen_lockfile,
             } => cmd::install::run(
                 &sources,
                 repo,
@@ -852,6 +861,7 @@ pub fn run() -> anyhow::Result<()> {
                 dry_run,
                 &plugin_manager,
                 build,
+                frozen_lockfile,
             ),
             Commands::Uninstall {
                 packages,
@@ -900,7 +910,7 @@ pub fn run() -> anyhow::Result<()> {
             Commands::Why { package_name } => cmd::why::run(&package_name),
             Commands::Owner { path } => cmd::owner::run(&path),
             Commands::Files { package } => cmd::files::run(&package),
-            Commands::History => cmd::history::run(),
+            Commands::History { verify } => cmd::history::run(verify),
             Commands::Search {
                 search_term,
                 registry,

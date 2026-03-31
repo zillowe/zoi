@@ -22,6 +22,7 @@ pub fn run(
     dry_run: bool,
     plugin_manager: &crate::pkg::plugin::PluginManager,
     build: bool,
+    frozen_lockfile: bool,
 ) -> Result<()> {
     let mut scope_override = scope.map(|s| match s {
         crate::cli::InstallScope::User => types::Scope::User,
@@ -39,6 +40,37 @@ pub fn run(
         scope_override = Some(types::Scope::Project);
     }
 
+    if frozen_lockfile {
+        if repo.is_some() || !sources.is_empty() {
+            return Err(anyhow!(
+                "--frozen-lockfile can only be used without explicit sources or --repo."
+            ));
+        }
+        if save {
+            return Err(anyhow!(
+                "--save cannot be used with --frozen-lockfile because the lockfile must remain unchanged."
+            ));
+        }
+        if !std::path::Path::new("zoi.yaml").exists() {
+            return Err(anyhow!(
+                "--frozen-lockfile requires a local zoi.yaml in the current project."
+            ));
+        }
+        if !std::path::Path::new("zoi.lock").exists() {
+            return Err(anyhow!(
+                "--frozen-lockfile requires zoi.lock. Generate it first with a normal project install."
+            ));
+        }
+        if let Some(scope) = scope_override
+            && scope != types::Scope::Project
+        {
+            return Err(anyhow!(
+                "--frozen-lockfile is only supported for project scope installs."
+            ));
+        }
+        scope_override = Some(types::Scope::Project);
+    }
+
     let lockfile_exists = sources.is_empty()
         && repo.is_none()
         && std::path::Path::new("zoi.lock").exists()
@@ -46,7 +78,20 @@ pub fn run(
 
     let mut sources_to_process: Vec<String> = sources.to_vec();
     let mut is_project_install = false;
-    if sources.is_empty() && repo.is_none() {
+    if frozen_lockfile {
+        let lockfile = project::lockfile::read_zoi_lock()?;
+        sources_to_process = project::lockfile::sources_from_lock(&lockfile);
+        if sources_to_process.is_empty() {
+            return Err(anyhow!(
+                "zoi.lock is empty. Cannot continue with --frozen-lockfile."
+            ));
+        }
+        println!(
+            "{} --frozen-lockfile enabled. Installing pinned lockfile sources only...",
+            "::".bold().blue()
+        );
+        is_project_install = true;
+    } else if sources.is_empty() && repo.is_none() {
         if std::path::Path::new("zoi.yaml").exists() {
             if let Ok(config) = project::config::load() {
                 if lockfile_exists {

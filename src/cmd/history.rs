@@ -1,9 +1,25 @@
 use crate::pkg::audit;
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use colored::*;
 use comfy_table::{Cell, Color, ContentArrangement, Table, presets::UTF8_FULL};
 
-pub fn run() -> Result<()> {
+pub fn run(verify: bool) -> Result<()> {
+    if verify {
+        let report = audit::verify_chain()?;
+        if report.valid {
+            println!(
+                "{} {} (entries: {}, chained: {}, legacy: {})",
+                "::".bold().blue(),
+                report.message.green(),
+                report.total_entries,
+                report.hashed_entries,
+                report.legacy_entries
+            );
+            return Ok(());
+        }
+        return Err(anyhow!(report.message));
+    }
+
     println!("{} Zoi operation history...", "::".bold().blue());
 
     let history = audit::get_history()?;
