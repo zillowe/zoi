@@ -147,6 +147,239 @@ pub fn check_for_conflicts(packages_to_install: &[&types::Package], yes: bool) -
     Ok(())
 }
 
+fn package_display(node: &InstallNode) -> String {
+    if let Some(sub) = &node.sub_package {
+        format!("{}:{}", node.pkg.name, sub)
+    } else {
+        node.pkg.name.clone()
+    }
+}
+
+fn package_match_candidates(node: &InstallNode) -> Vec<String> {
+    let mut values = Vec::new();
+    let name = node.pkg.name.to_ascii_lowercase();
+    values.push(name.clone());
+
+    if let Some(sub) = &node.sub_package {
+        let sub = sub.to_ascii_lowercase();
+        values.push(format!("{}:{}", name, sub));
+    }
+
+    if !node.pkg.repo.is_empty() {
+        let repo = node.pkg.repo.to_ascii_lowercase();
+        values.push(format!("@{}/{}", repo, name));
+        if let Some(sub) = &node.sub_package {
+            values.push(format!("@{}/{}:{}", repo, name, sub.to_ascii_lowercase()));
+        }
+        values.push(format!("#{}@{}/{}", node.registry_handle, repo, name));
+        if let Some(sub) = &node.sub_package {
+            values.push(format!(
+                "#{}@{}/{}:{}",
+                node.registry_handle,
+                repo,
+                name,
+                sub.to_ascii_lowercase()
+            ));
+        }
+    }
+
+    values
+}
+
+fn rule_matches_package(rule: &str, node: &InstallNode) -> bool {
+    let normalized_rule = rule.trim().to_ascii_lowercase();
+    if normalized_rule.is_empty() {
+        return false;
+    }
+    package_match_candidates(node)
+        .iter()
+        .any(|candidate| candidate == &normalized_rule)
+}
+
+fn rule_matches_repo(rule: &str, repo: &str) -> bool {
+    let normalized_rule = rule.trim().to_ascii_lowercase();
+    if normalized_rule.is_empty() {
+        return false;
+    }
+    let normalized_repo = repo.to_ascii_lowercase();
+
+    if normalized_rule.contains('/') {
+        normalized_repo == normalized_rule
+    } else {
+        normalized_repo
+            .split('/')
+            .any(|segment| segment == normalized_rule)
+    }
+}
+
+fn license_tokens(license: &str) -> HashSet<String> {
+    license
+        .split(|c: char| !(c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '+'))
+        .filter_map(|raw| {
+            let token = raw.trim().to_ascii_lowercase();
+            if token.is_empty() {
+                return None;
+            }
+            if matches!(token.as_str(), "and" | "or" | "with") {
+                return None;
+            }
+            Some(token)
+        })
+        .collect()
+}
+
+fn license_contains_denied(license: &str, denied: &HashSet<String>) -> bool {
+    if denied.is_empty() || license.trim().is_empty() {
+        return false;
+    }
+    let tokens = license_tokens(license);
+    tokens.iter().any(|token| denied.contains(token))
+}
+
+fn license_matches_allowed(license: &str, allowed: &HashSet<String>) -> bool {
+    if allowed.is_empty() {
+        return true;
+    }
+    if license.trim().is_empty() {
+        return false;
+    }
+
+    if let Ok(expr) = spdx::Expression::parse(license) {
+        return expr.evaluate(|req| match req.license {
+            spdx::LicenseItem::Spdx { id, .. } => allowed.contains(&id.name.to_ascii_lowercase()),
+            spdx::LicenseItem::Other { .. } => false,
+        });
+    }
+
+    let tokens = license_tokens(license);
+    !tokens.is_empty() && tokens.iter().any(|token| allowed.contains(token))
+}
+
+pub fn check_policy_compliance_with_policy(
+    graph: &super::resolver::DependencyGraph,
+    policy: &types::Policy,
+) -> Result<()> {
+    let allowed_packages = policy.allowed_packages.as_ref().map(|rules| {
+        rules
+            .iter()
+            .map(|r| r.trim().to_ascii_lowercase())
+            .filter(|r| !r.is_empty())
+            .collect::<Vec<_>>()
+    });
+    let denied_packages = policy.denied_packages.as_ref().map(|rules| {
+        rules
+            .iter()
+            .map(|r| r.trim().to_ascii_lowercase())
+            .filter(|r| !r.is_empty())
+            .collect::<Vec<_>>()
+    });
+    let allowed_repos = policy.allowed_repos.as_ref().map(|rules| {
+        rules
+            .iter()
+            .map(|r| r.trim().to_ascii_lowercase())
+            .filter(|r| !r.is_empty())
+            .collect::<Vec<_>>()
+    });
+    let denied_repos = policy.denied_repos.as_ref().map(|rules| {
+        rules
+            .iter()
+            .map(|r| r.trim().to_ascii_lowercase())
+            .filter(|r| !r.is_empty())
+            .collect::<Vec<_>>()
+    });
+    let allowed_licenses = policy.allowed_licenses.as_ref().map(|rules| {
+        rules
+            .iter()
+            .map(|r| r.trim().to_ascii_lowercase())
+            .filter(|r| !r.is_empty())
+            .collect::<HashSet<_>>()
+    });
+    let denied_licenses = policy.denied_licenses.as_ref().map(|rules| {
+        rules
+            .iter()
+            .map(|r| r.trim().to_ascii_lowercase())
+            .filter(|r| !r.is_empty())
+            .collect::<HashSet<_>>()
+    });
+
+    let mut violations = Vec::new();
+
+    for node in graph.nodes.values() {
+        let pkg_display = package_display(node);
+
+        if let Some(rules) = &denied_packages
+            && rules.iter().any(|rule| rule_matches_package(rule, node))
+        {
+            violations.push(format!("{} blocked by denied package policy.", pkg_display));
+        }
+
+        if let Some(rules) = &allowed_packages
+            && !rules.is_empty()
+            && !rules.iter().any(|rule| rule_matches_package(rule, node))
+        {
+            violations.push(format!("{} is not in allowed package policy.", pkg_display));
+        }
+
+        if let Some(rules) = &denied_repos
+            && rules
+                .iter()
+                .any(|rule| rule_matches_repo(rule, &node.pkg.repo))
+        {
+            violations.push(format!(
+                "{} blocked by denied repository policy ('{}').",
+                pkg_display, node.pkg.repo
+            ));
+        }
+
+        if let Some(rules) = &allowed_repos
+            && !rules.is_empty()
+            && !rules
+                .iter()
+                .any(|rule| rule_matches_repo(rule, &node.pkg.repo))
+        {
+            violations.push(format!(
+                "{} repository '{}' is not allowed by policy.",
+                pkg_display, node.pkg.repo
+            ));
+        }
+
+        if let Some(rules) = &denied_licenses
+            && license_contains_denied(&node.pkg.license, rules)
+        {
+            violations.push(format!(
+                "{} blocked by denied license policy ('{}').",
+                pkg_display, node.pkg.license
+            ));
+        }
+
+        if let Some(rules) = &allowed_licenses
+            && !license_matches_allowed(&node.pkg.license, rules)
+        {
+            violations.push(format!(
+                "{} license '{}' is not allowed by policy.",
+                pkg_display, node.pkg.license
+            ));
+        }
+    }
+
+    if !violations.is_empty() {
+        println!("\n{}", "POLICY VIOLATION".red().bold());
+        for message in &violations {
+            println!("- {}", message);
+        }
+        return Err(anyhow!(
+            "Installation blocked by security/compliance policy."
+        ));
+    }
+
+    Ok(())
+}
+
+pub fn check_policy_compliance(graph: &super::resolver::DependencyGraph) -> Result<()> {
+    let config = crate::pkg::config::read_config()?;
+    check_policy_compliance_with_policy(graph, &config.policy)
+}
+
 pub fn check_for_vulnerabilities(
     graph: &super::resolver::DependencyGraph,
     yes: bool,

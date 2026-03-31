@@ -130,12 +130,30 @@ Administrators can control package installations based on names, sources, and le
 - `allowed_repos`: Restricts installations to specific tiers (e.g. `core`, `internal`).
 - `denied_repos`: Blocks specific tiers (e.g. `test`, `archive`).
 
+Package rules can be written as:
+
+- `name` (e.g. `hello`)
+- `name:sub_package` (e.g. `linux:headers`)
+- `@repo/name` (e.g. `@core/hello`)
+- `@repo/name:sub_package`
+- `#registry@repo/name` (for explicit registry scoping)
+
+Repo rule matching behavior:
+
+- If a rule contains `/`, it is treated as an exact repo path (e.g. `community/editors`).
+- If a rule does not contain `/`, it matches any repo segment with that name (e.g. `community` matches `community/editors`).
+
 ### License Compliance
 
 Zoi uses [SPDX identifiers](https://spdx.org/licenses/) to verify package licenses during resolution.
 
 - `allowed_licenses`: Useful for ensuring only legally approved software (e.g. `MIT`, `Apache-2.0`) is used.
 - `denied_licenses`: Blocks problematic licenses (e.g. `GPL-3.0-only`, `AGPL-3.0-or-later`).
+
+License matching behavior:
+
+- `allowed_licenses` evaluates SPDX expressions; `MIT OR GPL-3.0-only` is allowed if at least one branch is allowed.
+- `denied_licenses` blocks if a denied SPDX identifier appears in the package expression.
 
 ---
 
