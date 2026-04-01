@@ -40,5 +40,6 @@ pub mod unpin;
 pub mod update;
 pub mod upgrade;
 pub mod utils;
+pub mod ux;
 pub mod version;
 pub mod why;

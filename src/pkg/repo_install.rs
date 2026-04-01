@@ -119,6 +119,9 @@ pub fn run(
         plugin_manager,
         false,
         false,
+        false,
+        false,
+        3,
     )?;
 
     Ok(())

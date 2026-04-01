@@ -35,6 +35,20 @@ Use `--dry-run` to print the generated `.pkg.lua` to stdout without writing a fi
 
 ---
 
+## CLI Migration Notes for Automation
+
+If you are migrating CI scripts or internal tooling to newer Zoi command flows, prefer these flags:
+
+- `zoi install --plan-json`
+- `zoi uninstall --plan-json`
+- `zoi update --plan-json`
+
+These emit a stable `zoi.plan.v1` envelope with command-specific fields, which is safer for automation than scraping human-readable output.
+
+For human troubleshooting in CI logs, pair with `--explain` to print resolver/selection reasons.
+
+---
+
 ## Migration Examples
 
 Let's walk through migrating a simple package from several popular formats.

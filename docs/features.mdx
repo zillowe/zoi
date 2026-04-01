@@ -339,6 +339,9 @@ Zoi resolves dependencies, checks for conflicts, and then sequentially downloads
 - `--type <TYPE>`: The type of package to build if building from source. Specifying a type other than `pre-compiled` or `pre-built` will force a local build.
 - `--build` (alias: `-b`): Force building from source even if a pre-compiled archive is available in the registry.
 - `--frozen-lockfile`: Install exactly what is pinned in `zoi.lock` (project scope only, lockfile must already exist, and no lockfile updates are allowed).
+- `--retry <N>`: Retry failed downloads up to `N` attempts (minimum `1`, default `3`).
+- `--explain`: Print dependency-selection and install-decision explanation.
+- `--plan-json`: Emit machine-readable install plan JSON.
 - `--dry-run`: Do not actually install, just show what would be done.
 
 ---
@@ -665,6 +668,8 @@ Uninstalls one or more packages. To uninstall a sub-package, use the `package:su
 - `--global`: Uninstall packages globally for the current user.
 - `--save`: Remove the package from the project's `zoi.yaml`.
 - `-s`, `--recursive`: Recursively remove dependencies that are no longer needed.
+- `--explain`: Show uninstall reasoning and reverse-dependency impact.
+- `--plan-json`: Emit machine-readable uninstall plan JSON.
 
 ---
 
@@ -683,6 +688,7 @@ Unpin a package, allowing it to be updated.
 (alias: `up`)
 
 Updates one or more packages to their latest versions.
+When using `--all`, Zoi also prints explicit pinned/skipped summaries and advisory deltas for each upgrade candidate.
 
 **Arguments:**
 
@@ -691,6 +697,9 @@ Updates one or more packages to their latest versions.
 **Options:**
 
 - `--all`: Update all installed packages.
+- `--interactive`: Interactively choose a subset of upgrade candidates (requires `--all`).
+- `--explain`: Explain why each package is selected or skipped.
+- `--plan-json`: Emit machine-readable update plan JSON.
 - `--dry-run`: Do not actually perform the update, just show what would be done.
 
 ---

@@ -1,8 +1,10 @@
 use crate::cmd::utils;
+use crate::cmd::ux;
 use crate::pkg::{self, lock, transaction, types};
 use anyhow::{Result, anyhow};
 use colored::*;
 use mlua::LuaSerdeExt;
+use serde_json::json;
 use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
@@ -16,6 +18,8 @@ pub fn run(
     yes: bool,
     recursive: bool,
     plugin_manager: &crate::pkg::plugin::PluginManager,
+    explain: bool,
+    plan_json: bool,
 ) -> Result<()> {
     let mut scope_override = scope.map(|s| match s {
         crate::cli::InstallScope::User => types::Scope::User,
@@ -63,6 +67,12 @@ pub fn run(
 
     if manifests_to_uninstall.is_empty() {
         println!("No packages to uninstall.");
+        ux::print_transaction_summary(&ux::TransactionSummary {
+            command: "uninstall".to_string(),
+            success: 0,
+            failed: 0,
+            skipped: 0,
+        });
         return Ok(());
     }
 
@@ -118,8 +128,140 @@ pub fn run(
         crate::utils::format_bytes(total_size_freed_bytes)
     );
 
+    let removal_ids: std::collections::HashSet<String> = manifests_to_uninstall
+        .iter()
+        .map(removal_identity)
+        .collect();
+    let mut dangerous = Vec::new();
+    let mut impact_json = Vec::new();
+    for manifest in &manifests_to_uninstall {
+        let package_dir = pkg::local::get_package_dir(
+            manifest.scope,
+            &manifest.registry_handle,
+            &manifest.repo,
+            &manifest.name,
+        )?;
+        let external_dependents =
+            collect_external_dependents(&removal_ids, pkg::local::get_dependents(&package_dir)?);
+
+        let source = if let Some(sub) = &manifest.sub_package {
+            format!(
+                "#{}@{}/{}:{}",
+                manifest.registry_handle, manifest.repo, manifest.name, sub
+            )
+        } else {
+            format!(
+                "#{}@{}/{}",
+                manifest.registry_handle, manifest.repo, manifest.name
+            )
+        };
+
+        if !external_dependents.is_empty() {
+            dangerous.push((source.clone(), external_dependents.clone()));
+        }
+        impact_json.push(json!({
+            "source": source,
+            "name": manifest.name,
+            "version": manifest.version,
+            "sub_package": manifest.sub_package,
+            "scope": format!("{:?}", manifest.scope),
+            "registry": manifest.registry_handle,
+            "repo": manifest.repo,
+            "external_dependents": external_dependents,
+            "installed_files": manifest.installed_files.len(),
+        }));
+    }
+
+    let preflight = ux::PreflightSummary::new("Uninstall preflight")
+        .row("Scope override", format!("{:?}", scope_override))
+        .row("Recursive", recursive.to_string())
+        .row("Packages", manifests_to_uninstall.len().to_string())
+        .row("Dangerous removals", dangerous.len().to_string())
+        .row(
+            "Estimated freed size",
+            crate::utils::format_bytes(total_size_freed_bytes),
+        );
+    ux::print_preflight(&preflight);
+
+    if explain {
+        let mut report = ux::ExplainReport::new("Uninstall explanation");
+        for manifest in &manifests_to_uninstall {
+            let source = if let Some(sub) = &manifest.sub_package {
+                format!(
+                    "#{}@{}/{}:{}",
+                    manifest.registry_handle, manifest.repo, manifest.name, sub
+                )
+            } else {
+                format!(
+                    "#{}@{}/{}",
+                    manifest.registry_handle, manifest.repo, manifest.name
+                )
+            };
+            report = report.item(
+                format!("{} [{}]", source, manifest.version),
+                format!("reason={:?}", manifest.reason),
+                Vec::new(),
+            );
+        }
+        if !dangerous.is_empty() {
+            for (source, deps) in &dangerous {
+                report = report.item(
+                    source.clone(),
+                    format!("blocks {} dependent(s)", deps.len()),
+                    deps.iter()
+                        .map(|dep| format!("dependent: {}", dep))
+                        .collect::<Vec<_>>(),
+                );
+            }
+        }
+        ux::print_explain(&report);
+    }
+
+    if plan_json {
+        let plan = json!({
+            "recursive": recursive,
+            "scope_override": format!("{:?}", scope_override),
+            "totals": {
+                "packages": manifests_to_uninstall.len(),
+                "dangerous_removals": dangerous.len(),
+                "freed_bytes": total_size_freed_bytes,
+            },
+            "packages": impact_json,
+        });
+        ux::emit_plan_json_v1("uninstall", plan)?;
+    }
+
+    if !dangerous.is_empty() {
+        println!(
+            "\n{} Removing these packages will break dependents:",
+            "Warning".yellow().bold()
+        );
+        for (source, deps) in &dangerous {
+            println!("  - {}", source.cyan());
+            for dep in deps {
+                println!("    * {}", dep);
+            }
+        }
+        if !crate::utils::ask_for_confirmation("Dangerous removal detected. Continue anyway?", yes)
+        {
+            ux::print_transaction_summary(&ux::TransactionSummary {
+                command: "uninstall".to_string(),
+                success: 0,
+                failed: 0,
+                skipped: manifests_to_uninstall.len(),
+            });
+            return Ok(());
+        }
+    }
+
     if !crate::utils::ask_for_confirmation(":: Proceed with removal?", yes) {
         let _ = lock::release_lock();
+        ux::print_transaction_summary(&ux::TransactionSummary {
+            command: "uninstall".to_string(),
+            success: 0,
+            failed: 0,
+            skipped: manifests_to_uninstall.len(),
+        });
         return Ok(());
     }
 
@@ -191,6 +333,12 @@ pub fn run(
         } else {
             println!("\n{} Rollback successful.", "Success:".green().bold());
         }
+        ux::print_transaction_summary(&ux::TransactionSummary {
+            command: "uninstall".to_string(),
+            success: successfully_uninstalled.len(),
+            failed: failed_packages.len(),
+            skipped: 0,
+        });
         return Err(anyhow!(
             "Uninstallation failed for: {}",
             failed_packages.join(", ")
@@ -219,7 +367,33 @@ pub fn run(
             e
         );
     }
+    ux::print_transaction_summary(&ux::TransactionSummary {
+        command: "uninstall".to_string(),
+        success: successfully_uninstalled.len(),
+        failed: 0,
+        skipped: 0,
+    });
     Ok(())
+}
+
+fn removal_identity(manifest: &types::InstallManifest) -> String {
+    if let Some(sub) = &manifest.sub_package {
+        format!("{}@{}:{}", manifest.name, manifest.version, sub)
+    } else {
+        format!("{}@{}", manifest.name, manifest.version)
+    }
+}
+
+fn collect_external_dependents(
+    removal_ids: &std::collections::HashSet<String>,
+    dependents: Vec<String>,
+) -> Vec<String> {
+    let mut external = dependents
+        .into_iter()
+        .filter(|dep| !removal_ids.contains(dep))
+        .collect::<Vec<_>>();
+    external.sort();
+    external
 }
 
 fn resolve_and_add_manifest(
@@ -349,4 +523,43 @@ fn collect_recursive_uninstalls(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::collect_external_dependents;
+    use std::collections::HashSet;
+
+    #[test]
+    fn dangerous_removal_ignores_dependents_in_same_removal_set() {
+        let mut removal_ids = HashSet::new();
+        removal_ids.insert("foo@1.0.0".to_string());
+
+        let external = collect_external_dependents(
+            &removal_ids,
+            vec![
+                "foo@1.0.0".to_string(),
+                "bar@2.0.0".to_string(),
+                "baz@3.0.0".to_string(),
+            ],
+        );
+
+        assert_eq!(
+            external,
+            vec!["bar@2.0.0".to_string(), "baz@3.0.0".to_string()]
+        );
+    }
+
+    #[test]
+    fn dangerous_removal_dependents_are_sorted_for_stable_output() {
+        let removal_ids = HashSet::new();
+        let external = collect_external_dependents(
+            &removal_ids,
+            vec!["c@1".to_string(), "a@1".to_string(), "b@1".to_string()],
+        );
+        assert_eq!(
+            external,
+            vec!["a@1".to_string(), "b@1".to_string(), "c@1".to_string()]
+        );
+    }
 }

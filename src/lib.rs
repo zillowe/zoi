@@ -197,6 +197,9 @@ pub fn install_sources(sources: &[String], options: &SourceInstallOptions) -> Re
         &plugin_manager,
         options.build,
         options.frozen_lockfile,
+        false,
+        false,
+        3,
     )
 }
 

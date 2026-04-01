@@ -241,6 +241,15 @@ enum Commands {
         /// Do not actually perform the update, just show what would be done
         #[arg(long)]
         dry_run: bool,
+        /// Explain why each selected update is included or skipped
+        #[arg(long)]
+        explain: bool,
+        /// Emit machine-readable update plan JSON
+        #[arg(long)]
+        plan_json: bool,
+        /// Interactively choose which upgradable packages to update (with --all)
+        #[arg(long, requires = "all")]
+        interactive: bool,
     },
 
     /// Installs one or more packages from a name, local file, URL, or git repository
@@ -283,6 +292,18 @@ enum Commands {
         /// Enforce zoi.lock exactly (project install only, no lockfile updates)
         #[arg(long)]
         frozen_lockfile: bool,
+
+        /// Explain dependency selection and install decisions
+        #[arg(long)]
+        explain: bool,
+
+        /// Emit machine-readable install plan JSON
+        #[arg(long)]
+        plan_json: bool,
+
+        /// Retry failed downloads this many times (minimum 1)
+        #[arg(long, default_value_t = 3)]
+        retry: u32,
     },
 
     /// Uninstalls one or more packages previously installed by Zoi
@@ -308,6 +329,14 @@ enum Commands {
         /// Recursively remove dependencies that are no longer needed
         #[arg(short, long)]
         recursive: bool,
+
+        /// Explain uninstall decisions (dependency impact and safety blocks)
+        #[arg(long)]
+        explain: bool,
+
+        /// Emit machine-readable uninstall plan JSON
+        #[arg(long)]
+        plan_json: bool,
     },
 
     /// Execute a command defined in a local zoi.yaml file
@@ -833,6 +862,9 @@ pub fn run() -> anyhow::Result<()> {
                 package_names,
                 all,
                 dry_run,
+                explain,
+                plan_json,
+                interactive,
             } => {
                 if !all && package_names.is_empty() {
                     let mut cmd = Cli::command();
@@ -841,7 +873,16 @@ pub fn run() -> anyhow::Result<()> {
                     }
                     Ok(())
                 } else {
-                    cmd::update::run(all, &package_names, cli.yes, dry_run)
+                    cmd::update::run(
+                        all,
+                        &package_names,
+                        cli.yes,
+                        dry_run,
+                        explain,
+                        plan_json,
+                        interactive,
+                    )
+                    .map_err(|e| cmd::ux::with_failure_hint("update", e))
                 }
             }
             Commands::Install {
@@ -857,6 +898,9 @@ pub fn run() -> anyhow::Result<()> {
                 dry_run,
                 build,
                 frozen_lockfile,
+                explain,
+                plan_json,
+                retry,
             } => cmd::install::run(
                 &sources,
                 repo,
@@ -872,7 +916,11 @@ pub fn run() -> anyhow::Result<()> {
                 &plugin_manager,
                 build,
                 frozen_lockfile,
-            ),
+                explain,
+                plan_json,
+                retry,
+            )
+            .map_err(|e| cmd::ux::with_failure_hint("install", e)),
             Commands::Uninstall {
                 packages,
                 scope,
@@ -880,6 +928,8 @@ pub fn run() -> anyhow::Result<()> {
                 global,
                 save,
                 recursive,
+                explain,
+                plan_json,
             } => cmd::uninstall::run(
                 &packages,
                 scope,
@@ -889,7 +939,10 @@ pub fn run() -> anyhow::Result<()> {
                 cli.yes,
                 recursive,
                 &plugin_manager,
-            ),
+                explain,
+                plan_json,
+            )
+            .map_err(|e| cmd::ux::with_failure_hint("uninstall", e)),
             Commands::Run { cmd_alias, args } => cmd::run::run(cmd_alias, args),
             Commands::Env { env_alias } => cmd::env::run(env_alias),
             Commands::Dev { run } => cmd::dev::run(run),

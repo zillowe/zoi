@@ -10,10 +10,22 @@ use std::collections::HashSet;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU32, Ordering};
 use tar::Archive;
 use tempfile::Builder;
 use walkdir::WalkDir;
 use zstd::stream::read::Decoder as ZstdDecoder;
+
+static DOWNLOAD_RETRY_ATTEMPTS: AtomicU32 = AtomicU32::new(3);
+
+pub fn set_download_retry_attempts(attempts: u32) {
+    let normalized = attempts.max(1);
+    DOWNLOAD_RETRY_ATTEMPTS.store(normalized, Ordering::Relaxed);
+}
+
+fn get_download_retry_attempts() -> u32 {
+    DOWNLOAD_RETRY_ATTEMPTS.load(Ordering::Relaxed).max(1)
+}
 
 pub fn send_telemetry(
     event: &str,
@@ -511,6 +523,7 @@ pub fn download_file_with_progress(
         request = request.header("Range", format!("bytes={}-", partial_size));
     }
 
+    let max_attempts = get_download_retry_attempts();
     let response = loop {
         attempt += 1;
         match request
@@ -520,7 +533,7 @@ pub fn download_file_with_progress(
         {
             Ok(resp) => break resp,
             Err(e) => {
-                if attempt < 3 {
+                if attempt < max_attempts {
                     let msg = format!("Download failed ({}). Retrying...", e);
                     pb.set_message(msg);
                     crate::utils::retry_backoff_sleep(attempt);
@@ -1016,4 +1029,25 @@ pub fn find_prebuilt_info(node: &InstallNode) -> Result<Option<types::PrebuiltIn
     }
 
     Ok(None)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{get_download_retry_attempts, set_download_retry_attempts};
+
+    #[test]
+    fn download_retry_attempts_are_clamped_to_minimum_one() {
+        let previous = get_download_retry_attempts();
+        set_download_retry_attempts(0);
+        assert_eq!(get_download_retry_attempts(), 1);
+        set_download_retry_attempts(previous);
+    }
+
+    #[test]
+    fn download_retry_attempts_accept_positive_values() {
+        let previous = get_download_retry_attempts();
+        set_download_retry_attempts(7);
+        assert_eq!(get_download_retry_attempts(), 7);
+        set_download_retry_attempts(previous);
+    }
 }

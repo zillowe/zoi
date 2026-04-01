@@ -1,3 +1,4 @@
+use crate::cmd::ux;
 use crate::pkg::{config, install, lock, resolve, transaction, types};
 use crate::project;
 use anyhow::{Result, anyhow};
@@ -5,8 +6,10 @@ use colored::Colorize;
 use indicatif::MultiProgress;
 use mlua::LuaSerdeExt;
 use rayon::prelude::*;
+use serde_json::json;
 use std::collections::HashSet;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub fn run(
     sources: &[String],
@@ -23,7 +26,12 @@ pub fn run(
     plugin_manager: &crate::pkg::plugin::PluginManager,
     build: bool,
     frozen_lockfile: bool,
+    explain: bool,
+    plan_json: bool,
+    retry: u32,
 ) -> Result<()> {
+    crate::pkg::install::util::set_download_retry_attempts(retry);
+
     let mut scope_override = scope.map(|s| match s {
         crate::cli::InstallScope::User => types::Scope::User,
         crate::cli::InstallScope::System => types::Scope::System,
@@ -186,6 +194,7 @@ pub fn run(
         false,
     )?;
 
+    let mut skipped_existing_count = 0usize;
     if !force {
         let mut to_remove = Vec::new();
         for (pkg_id, node) in &graph.nodes {
@@ -205,6 +214,7 @@ pub fn run(
                 to_remove.push(pkg_id.clone());
             }
         }
+        skipped_existing_count = to_remove.len();
 
         for pkg_id in to_remove {
             graph.nodes.remove(&pkg_id);
@@ -308,6 +318,35 @@ pub fn run(
         .collect();
     println!(" {}", direct_list.join("  "));
 
+    println!("\n{} Package origins", "::".bold().blue());
+    let mut direct_entries: Vec<_> = graph
+        .nodes
+        .iter()
+        .filter(|(_, node)| matches!(node.reason, types::InstallReason::Direct))
+        .collect();
+    direct_entries.sort_by(|a, b| a.1.pkg.name.cmp(&b.1.pkg.name));
+    for (id, node) in direct_entries {
+        let action_name = match install_plan.get(id) {
+            Some(install::plan::InstallAction::DownloadAndInstall(_)) => "download",
+            Some(install::plan::InstallAction::InstallFromArchive(_)) => "archive",
+            Some(install::plan::InstallAction::BuildAndInstall) => "build",
+            None => "unknown",
+        };
+        let origin = ux::classify_source_origin(&node.source, action_name);
+        let display_name = if let Some(sub) = &node.sub_package {
+            format!("{}:{}", node.pkg.name, sub)
+        } else {
+            node.pkg.name.clone()
+        };
+        println!(
+            "  - {}@{} -> {} ({})",
+            display_name.cyan(),
+            node.version,
+            origin.as_str(),
+            action_name
+        );
+    }
+
     if !dependencies.is_empty() || !non_zoi_deps.is_empty() {
         println!(
             "\n{} Dependencies ({})",
@@ -342,6 +381,107 @@ pub fn run(
         );
     }
 
+    let preflight = ux::PreflightSummary::new("Install preflight")
+        .row(
+            "Scope",
+            format!("{:?}", scope_override.unwrap_or(types::Scope::User)),
+        )
+        .row("Frozen lockfile", frozen_lockfile.to_string())
+        .row("Retry attempts", retry.to_string())
+        .row("Direct packages", direct_packages.len().to_string())
+        .row(
+            "Dependencies",
+            (dependencies.len() + non_zoi_deps.len()).to_string(),
+        )
+        .row(
+            "Download size",
+            crate::utils::format_bytes(total_download_size),
+        )
+        .row(
+            "Installed size",
+            crate::utils::format_bytes(total_installed_size),
+        );
+    ux::print_preflight(&preflight);
+
+    if explain {
+        let mut report = ux::ExplainReport::new("Install explanation");
+        let mut entries: Vec<_> = graph.nodes.iter().collect();
+        entries.sort_by(|a, b| a.1.pkg.name.cmp(&b.1.pkg.name));
+        for (id, node) in entries {
+            let action_name = match install_plan.get(id) {
+                Some(install::plan::InstallAction::DownloadAndInstall(_)) => "download",
+                Some(install::plan::InstallAction::InstallFromArchive(_)) => "archive",
+                Some(install::plan::InstallAction::BuildAndInstall) => "build",
+                None => "unknown",
+            };
+            let reason = match &node.reason {
+                types::InstallReason::Direct => "direct request".to_string(),
+                types::InstallReason::Dependency { parent } => {
+                    format!("dependency of {}", parent)
+                }
+                types::InstallReason::Declarative => "declarative".to_string(),
+            };
+            report = report.item(
+                format!("{}@{}", node.pkg.name, node.version),
+                format!("[{}]", reason),
+                vec![format!(
+                    "via {} ({})",
+                    action_name,
+                    ux::classify_source_origin(&node.source, action_name).as_str()
+                )],
+            );
+        }
+        ux::print_explain(&report);
+    }
+
+    if plan_json {
+        let mut packages = Vec::new();
+        let mut entries: Vec<_> = graph.nodes.iter().collect();
+        entries.sort_by(|a, b| a.1.pkg.name.cmp(&b.1.pkg.name));
+        for (id, node) in entries {
+            let action_name = match install_plan.get(id) {
+                Some(install::plan::InstallAction::DownloadAndInstall(_)) => "download",
+                Some(install::plan::InstallAction::InstallFromArchive(_)) => "archive",
+                Some(install::plan::InstallAction::BuildAndInstall) => "build",
+                None => "unknown",
+            };
+            let reason = match &node.reason {
+                types::InstallReason::Direct => "direct".to_string(),
+                types::InstallReason::Dependency { parent } => format!("dependency:{}", parent),
+                types::InstallReason::Declarative => "declarative".to_string(),
+            };
+            packages.push(json!({
+                "id": id,
+                "name": node.pkg.name,
+                "version": node.version,
+                "sub_package": node.sub_package,
+                "repo": node.pkg.repo,
+                "registry": node.registry_handle,
+                "reason": reason,
+                "action": action_name,
+                "origin": ux::classify_source_origin(&node.source, action_name).as_str(),
+                "source": node.source,
+            }));
+        }
+
+        let plan = json!({
+            "dry_run": dry_run,
+            "frozen_lockfile": frozen_lockfile,
+            "retry_attempts": retry,
+            "scope": format!("{:?}", scope_override.unwrap_or(types::Scope::User)),
+            "totals": {
+                "direct_packages": direct_packages.len(),
+                "dependencies": dependencies.len() + non_zoi_deps.len(),
+                "download_bytes": total_download_size,
+                "installed_bytes": total_installed_size,
+                "skipped_existing": skipped_existing_count,
+            },
+            "packages": packages,
+            "non_zoi_dependencies": non_zoi_deps,
+        });
+        ux::emit_plan_json_v1("install", plan)?;
+    }
+
     if dry_run {
         println!(
             "\n{} Dry-run: installation plan above would be executed.",
@@ -372,6 +512,8 @@ pub fn run(
     let transaction = transaction::begin()?;
     let transaction_id = &transaction.id;
     let transaction_mutex = Mutex::new(());
+    let dependency_installed_count = AtomicUsize::new(0);
+    let mut direct_installed_count = 0usize;
 
     if !dependencies.is_empty() || !non_zoi_deps.is_empty() {
         println!("\n{} Installing dependencies...", "::".bold().blue());
@@ -426,6 +568,7 @@ pub fn run(
                     true,
                 ) {
                     Ok(manifest) => {
+                        dependency_installed_count.fetch_add(1, Ordering::Relaxed);
                         let _lock = transaction_mutex
                             .lock()
                             .expect("Transaction mutex poisoned during installation");
@@ -479,6 +622,7 @@ pub fn run(
                 true,
             ) {
                 Ok(manifest) => {
+                    direct_installed_count += 1;
                     installed_manifests
                         .lock()
                         .expect("Installed manifests mutex poisoned")
@@ -511,6 +655,12 @@ pub fn run(
     if !failed.is_empty() {
         println!("\n{} Rolling back changes...", "::".bold().yellow());
         transaction::rollback(&transaction.id)?;
+        ux::print_transaction_summary(&ux::TransactionSummary {
+            command: "install".to_string(),
+            success: dependency_installed_count.load(Ordering::Relaxed) + direct_installed_count,
+            failed: failed.len(),
+            skipped: skipped_existing_count,
+        });
         return Err(anyhow!("Installation failed for: {}", failed.join(", ")));
     }
 
@@ -690,6 +840,12 @@ pub fn run(
         direct_packages.len(),
         dependencies.len() + non_zoi_deps.len()
     );
+    ux::print_transaction_summary(&ux::TransactionSummary {
+        command: "install".to_string(),
+        success: dependency_installed_count.load(Ordering::Relaxed) + direct_installed_count,
+        failed: 0,
+        skipped: skipped_existing_count,
+    });
 
     Ok(())
 }
