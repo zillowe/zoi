@@ -74,6 +74,7 @@ fn test_install_frozen_lockfile_rejects_explicit_sources() {
         false,
         false,
         3,
+        false,
     )
     .expect_err("frozen lockfile with explicit source must fail");
 
@@ -113,6 +114,7 @@ fn test_install_frozen_lockfile_requires_zoi_lock() {
         false,
         false,
         3,
+        false,
     )
     .expect_err("missing zoi.lock must fail in frozen mode");
 

@@ -29,6 +29,7 @@ pub fn run(
     explain: bool,
     plan_json: bool,
     retry: u32,
+    verbose: bool,
 ) -> Result<()> {
     crate::pkg::install::util::set_download_retry_attempts(retry);
 
@@ -318,33 +319,35 @@ pub fn run(
         .collect();
     println!(" {}", direct_list.join("  "));
 
-    println!("\n{} Package origins", "::".bold().blue());
-    let mut direct_entries: Vec<_> = graph
-        .nodes
-        .iter()
-        .filter(|(_, node)| matches!(node.reason, types::InstallReason::Direct))
-        .collect();
-    direct_entries.sort_by(|a, b| a.1.pkg.name.cmp(&b.1.pkg.name));
-    for (id, node) in direct_entries {
-        let action_name = match install_plan.get(id) {
-            Some(install::plan::InstallAction::DownloadAndInstall(_)) => "download",
-            Some(install::plan::InstallAction::InstallFromArchive(_)) => "archive",
-            Some(install::plan::InstallAction::BuildAndInstall) => "build",
-            None => "unknown",
-        };
-        let origin = ux::classify_source_origin(&node.source, action_name);
-        let display_name = if let Some(sub) = &node.sub_package {
-            format!("{}:{}", node.pkg.name, sub)
-        } else {
-            node.pkg.name.clone()
-        };
-        println!(
-            "  - {}@{} -> {} ({})",
-            display_name.cyan(),
-            node.version,
-            origin.as_str(),
-            action_name
-        );
+    if verbose {
+        println!("\n{} Package origins", "::".bold().blue());
+        let mut direct_entries: Vec<_> = graph
+            .nodes
+            .iter()
+            .filter(|(_, node)| matches!(node.reason, types::InstallReason::Direct))
+            .collect();
+        direct_entries.sort_by(|a, b| a.1.pkg.name.cmp(&b.1.pkg.name));
+        for (id, node) in direct_entries {
+            let action_name = match install_plan.get(id) {
+                Some(install::plan::InstallAction::DownloadAndInstall(_)) => "download",
+                Some(install::plan::InstallAction::InstallFromArchive(_)) => "archive",
+                Some(install::plan::InstallAction::BuildAndInstall) => "build",
+                None => "unknown",
+            };
+            let origin = ux::classify_source_origin(&node.source, action_name);
+            let display_name = if let Some(sub) = &node.sub_package {
+                format!("{}:{}", node.pkg.name, sub)
+            } else {
+                node.pkg.name.clone()
+            };
+            println!(
+                "  - {}@{} -> {} ({})",
+                display_name.cyan(),
+                node.version,
+                origin.as_str(),
+                action_name
+            );
+        }
     }
 
     if !dependencies.is_empty() || !non_zoi_deps.is_empty() {
@@ -381,27 +384,29 @@ pub fn run(
         );
     }
 
-    let preflight = ux::PreflightSummary::new("Install preflight")
-        .row(
-            "Scope",
-            format!("{:?}", scope_override.unwrap_or(types::Scope::User)),
-        )
-        .row("Frozen lockfile", frozen_lockfile.to_string())
-        .row("Retry attempts", retry.to_string())
-        .row("Direct packages", direct_packages.len().to_string())
-        .row(
-            "Dependencies",
-            (dependencies.len() + non_zoi_deps.len()).to_string(),
-        )
-        .row(
-            "Download size",
-            crate::utils::format_bytes(total_download_size),
-        )
-        .row(
-            "Installed size",
-            crate::utils::format_bytes(total_installed_size),
-        );
-    ux::print_preflight(&preflight);
+    if verbose {
+        let preflight = ux::PreflightSummary::new("Install preflight")
+            .row(
+                "Scope",
+                format!("{:?}", scope_override.unwrap_or(types::Scope::User)),
+            )
+            .row("Frozen lockfile", frozen_lockfile.to_string())
+            .row("Retry attempts", retry.to_string())
+            .row("Direct packages", direct_packages.len().to_string())
+            .row(
+                "Dependencies",
+                (dependencies.len() + non_zoi_deps.len()).to_string(),
+            )
+            .row(
+                "Download size",
+                crate::utils::format_bytes(total_download_size),
+            )
+            .row(
+                "Installed size",
+                crate::utils::format_bytes(total_installed_size),
+            );
+        ux::print_preflight(&preflight);
+    }
 
     if explain {
         let mut report = ux::ExplainReport::new("Install explanation");

@@ -304,6 +304,10 @@ enum Commands {
         /// Retry failed downloads this many times (minimum 1)
         #[arg(long, default_value_t = 3)]
         retry: u32,
+
+        /// Show additional install details (package origins, preflight info)
+        #[arg(long, short)]
+        verbose: bool,
     },
 
     /// Uninstalls one or more packages previously installed by Zoi
@@ -901,6 +905,7 @@ pub fn run() -> anyhow::Result<()> {
                 explain,
                 plan_json,
                 retry,
+                verbose,
             } => cmd::install::run(
                 &sources,
                 repo,
@@ -919,6 +924,7 @@ pub fn run() -> anyhow::Result<()> {
                 explain,
                 plan_json,
                 retry,
+                verbose,
             )
             .map_err(|e| cmd::ux::with_failure_hint("install", e)),
             Commands::Uninstall {
