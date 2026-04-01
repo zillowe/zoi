@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
+use std::path::Path;
 use std::path::PathBuf;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -152,6 +153,45 @@ pub fn get_history() -> Result<Vec<AuditEntry>> {
         }
     }
     Ok(entries)
+}
+
+pub fn export_history(export_path: &Path, ndjson: bool) -> Result<usize> {
+    let log_path = get_audit_log_path()?;
+    if !log_path.exists() {
+        return Err(anyhow!(
+            "No history recorded. Audit logging might be disabled."
+        ));
+    }
+
+    let content = fs::read_to_string(log_path)?;
+    let raw_lines: Vec<&str> = content.lines().filter(|l| !l.trim().is_empty()).collect();
+    if raw_lines.is_empty() {
+        return Err(anyhow!(
+            "No history recorded. Audit logging might be disabled."
+        ));
+    }
+
+    if let Some(parent) = export_path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        fs::create_dir_all(parent)?;
+    }
+
+    if ndjson {
+        fs::write(export_path, format!("{}\n", raw_lines.join("\n")))?;
+        return Ok(raw_lines.len());
+    }
+
+    let mut entries = Vec::new();
+    for (index, line) in raw_lines.iter().enumerate() {
+        let parsed: AuditLogLine = serde_json::from_str(line)
+            .map_err(|e| anyhow!("Invalid audit log JSON at line {}: {}", index + 1, e))?;
+        entries.push(parsed);
+    }
+
+    let json = serde_json::to_string_pretty(&entries)?;
+    fs::write(export_path, json)?;
+    Ok(entries.len())
 }
 
 pub fn verify_chain() -> Result<AuditVerification> {

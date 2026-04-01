@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 pub mod build;
+pub mod doctor;
 pub mod install;
 pub mod test;
 
@@ -19,6 +20,8 @@ enum Commands {
     Test(build::BuildCommand),
     /// Install a package from a local archive
     Install(install::InstallCommand),
+    /// Lint and validate a package definition for maintainers
+    Doctor(doctor::DoctorCommand),
 }
 
 pub fn run(args: PackageCommand) -> Result<()> {
@@ -26,5 +29,6 @@ pub fn run(args: PackageCommand) -> Result<()> {
         Commands::Build(cmd) => build::run(cmd),
         Commands::Test(cmd) => test::run(cmd),
         Commands::Install(cmd) => install::run(cmd),
+        Commands::Doctor(cmd) => doctor::run(cmd),
     }
 }

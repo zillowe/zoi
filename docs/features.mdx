@@ -86,6 +86,7 @@ Zoi is packed with features designed to make package management and environment 
 - **Local Package Development:** A dedicated `zoi package` command set streamlines the creation and testing of packages locally:
   - `zoi package build`: Build a distributable package archive (`.pkg.tar.zst`).
   - `zoi package install`: Install a package from a local archive for testing.
+  - `zoi package doctor`: Lint and validate `.pkg.lua` definitions before testing/building.
 
 - **Powerful CLI Tools:** Zoi offers a rich set of commands for package management and inspection:
   - `zoi about`: Show application information, credits, and build details.
@@ -102,6 +103,7 @@ Zoi is packed with features designed to make package management and environment 
   - `zoi list`: List all installed packages, or all available packages from active repositories.
   - `zoi man`: Read package manuals directly in the terminal.
   - `zoi mark`: Change the installation reason of a package (explicit vs dependency).
+  - `zoi migrate scoop`: Convert a Scoop manifest (`.json`) into a Zoi `.pkg.lua`.
   - `zoi owner`: Find which package owns a specific file on the system.
   - `zoi pin`: Lock a package to a specific version to prevent updates.
   - `zoi provides`: Find which package provides a specific command or file.
@@ -291,6 +293,8 @@ Shows the history of past package operations (install, uninstall, upgrade) from 
 **Options:**
 
 - `--verify`: Verify audit log chain integrity instead of printing entries.
+- `--export <PATH>`: Export audit history to a file.
+- `--ndjson`: Export as newline-delimited JSON instead of a JSON array. Requires `--export`.
 
 ---
 
@@ -382,6 +386,26 @@ Modify the installation reason of one or more packages.
 
 ---
 
+### `zoi migrate scoop <input>`
+
+Convert a Scoop package manifest (`.json`/JSON5) into a Zoi `.pkg.lua` package file with broad field coverage.
+
+**Arguments:**
+
+- `<input>`: Path to the Scoop manifest file.
+
+**Options:**
+
+- `-o`, `--output <PATH>`: Output path for generated `.pkg.lua`.
+- `--repo <REPO>`: Value for `metadata.repo` in generated package.
+- `--name <NAME>`: Override output package name.
+- `--version <VERSION>`: Override package version.
+- `--maintainer-name <NAME>`: Maintainer name to set in metadata.
+- `--maintainer-email <EMAIL>`: Maintainer email to set in metadata.
+- `--dry-run`: Print generated `.pkg.lua` instead of writing a file.
+
+---
+
 ### `zoi owner <path>`
 
 (alias: `owns`)
@@ -421,6 +445,9 @@ Build, create, and manage Zoi packages.
 - `install <package_file>`: Install a package from a local archive.
   - `--scope <user|system>`: The scope to install the package to (default: `user`).
   - `--sub <SUB_PACKAGES...>`: For a split package, install only the specified sub-packages from the archive.
+- `doctor <package_file>`: Lint and validate a `.pkg.lua` package definition.
+  - `--platform <PLATFORM>`: Validate as a specific platform (defaults to current).
+  - `--version-override <VERSION>`: Override package version while validating.
 
 ---
 

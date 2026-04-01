@@ -2,8 +2,9 @@ use crate::pkg::audit;
 use anyhow::{Result, anyhow};
 use colored::*;
 use comfy_table::{Cell, Color, ContentArrangement, Table, presets::UTF8_FULL};
+use std::path::PathBuf;
 
-pub fn run(verify: bool) -> Result<()> {
+pub fn run(verify: bool, export: Option<PathBuf>, ndjson: bool) -> Result<()> {
     if verify {
         let report = audit::verify_chain()?;
         if report.valid {
@@ -18,6 +19,19 @@ pub fn run(verify: bool) -> Result<()> {
             return Ok(());
         }
         return Err(anyhow!(report.message));
+    }
+
+    if let Some(path) = export {
+        let total = audit::export_history(&path, ndjson)?;
+        println!(
+            "{} Exported {} audit entr{} to {} (format: {}).",
+            "::".bold().green(),
+            total,
+            if total == 1 { "y" } else { "ies" },
+            path.display().to_string().cyan(),
+            if ndjson { "ndjson" } else { "json" }
+        );
+        return Ok(());
     }
 
     println!("{} Zoi operation history...", "::".bold().blue());

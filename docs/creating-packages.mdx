@@ -428,7 +428,17 @@ You can use the `--build` (or `-b`) flag to force a local build even if a pre-co
 zoi install --build --type source /path/to/your-package.pkg.lua
 ```
 
-### Step 2: Test Your Package
+### Step 2: Run Package Doctor
+
+Before executing builds/tests, lint the package definition:
+
+```sh
+zoi package doctor /path/to/your-package.pkg.lua
+```
+
+`zoi package doctor` validates metadata consistency, dependency string syntax, and common split-package mistakes, and emits warnings for missing lifecycle functions like `test()`.
+
+### Step 3: Test Your Package
 
 Once your package seems to be working, run your tests using the `zoi package test` command.
 
@@ -438,7 +448,7 @@ zoi package test --type <build-type> /path/to/your-package.pkg.lua
 
 This command will execute the `prepare()`, `package()`, and `test()` functions. If `test()` returns `false` or errors, the command will fail.
 
-### Step 3: Build the Distributable Archive
+### Step 4: Build the Distributable Archive
 
 Once your tests are passing, build the final `.pkg.tar.zst` archive.
 
@@ -464,7 +474,7 @@ zoi package build --type <build-type> --test /path/to/your-package.pkg.lua
 - `--method <native|docker>`: The build method to use. Defaults to `native`. Use `docker` for containerized builds.
 - `--image <IMAGE>`: The Docker image to use for the build (required when `--method docker` is used).
 
-### Step 4: Verify the Final Archive
+### Step 5: Verify the Final Archive
 
 Install the built archive to ensure it's correct and installs properly for end-users.
 

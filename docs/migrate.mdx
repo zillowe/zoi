@@ -21,6 +21,20 @@ Most packaging systems split the process into metadata definition, dependency de
 
 ---
 
+## Convert Scoop Manifest to `.pkg.lua`
+
+You can convert a Scoop manifest directly into a Zoi package definition:
+
+```powershell
+zoi migrate scoop ./my-tool.json -o ./my-tool.pkg.lua
+```
+
+This generates a `.pkg.lua` scaffold that maps Scoop fields into Zoi metadata, dependencies, hooks, and lifecycle functions. It includes broad manifest coverage, including architecture overrides, install/uninstall scripts, persist paths, hash/url matrices, and preserves the original manifest in a Lua table for manual refinement.
+
+Use `--dry-run` to print the generated `.pkg.lua` to stdout without writing a file.
+
+---
+
 ## Migration Examples
 
 Let's walk through migrating a simple package from several popular formats.

@@ -12,7 +12,7 @@ use std::io::{self};
 // Development, Special, Public or Production
 const BRANCH: &str = "Production";
 const STATUS: &str = "Release";
-const NUMBER: &str = "1.9.5";
+const NUMBER: &str = "1.10.0";
 const PKG_SOURCE_HELP: &str = "Package identifier (e.g. @repo/name, path, or URL)";
 
 /// Zoi - The Universal Package Manager & Environment Setup Tool.
@@ -142,6 +142,9 @@ enum Commands {
         #[arg(short, long)]
         files: bool,
     },
+
+    /// Migration helpers for converting external manifests to Zoi package files
+    Migrate(cmd::migrate::MigrateCommand),
 
     /// Lists installed or all available packages
     #[command(alias = "ls")]
@@ -387,8 +390,14 @@ enum Commands {
     /// Shows the history of package operations
     History {
         /// Verify audit log chain integrity instead of printing history entries
-        #[arg(long)]
+        #[arg(long, conflicts_with = "export")]
         verify: bool,
+        /// Export audit history to a file (default format: JSON array with chain fields)
+        #[arg(long, value_hint = ValueHint::FilePath, conflicts_with = "verify")]
+        export: Option<std::path::PathBuf>,
+        /// Export in newline-delimited JSON (ndjson) instead of a JSON array
+        #[arg(long, requires = "export")]
+        ndjson: bool,
     },
 
     /// Searches for packages by name or description
@@ -780,6 +789,7 @@ pub fn run() -> anyhow::Result<()> {
                     res
                 }
             }
+            Commands::Migrate(args) => cmd::migrate::run(args),
             Commands::List {
                 all,
                 outdated,
@@ -910,7 +920,11 @@ pub fn run() -> anyhow::Result<()> {
             Commands::Why { package_name } => cmd::why::run(&package_name),
             Commands::Owner { path } => cmd::owner::run(&path),
             Commands::Files { package } => cmd::files::run(&package),
-            Commands::History { verify } => cmd::history::run(verify),
+            Commands::History {
+                verify,
+                export,
+                ndjson,
+            } => cmd::history::run(verify, export, ndjson),
             Commands::Search {
                 search_term,
                 registry,

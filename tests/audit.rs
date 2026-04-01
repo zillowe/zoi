@@ -108,3 +108,68 @@ fn test_audit_hash_chain_verification_and_tamper_detection() {
         }
     }
 }
+
+#[test]
+fn test_audit_export_json_and_ndjson() {
+    let _guard = ENV_LOCK.lock().expect("env lock should be available");
+    let tmp = tempdir().expect("tempdir should be created");
+    let old_home = std::env::var("HOME").ok();
+    unsafe {
+        std::env::set_var("HOME", tmp.path());
+    }
+
+    let cfg = types::Config {
+        audit_log_enabled: true,
+        ..Default::default()
+    };
+    config::write_user_config(&cfg).expect("config should be written");
+
+    let manifest_a = test_manifest("audit-export-a", "1.0.0");
+    let manifest_b = test_manifest("audit-export-b", "1.1.0");
+    audit::log_event(AuditAction::Install, &manifest_a).expect("audit entry A should be logged");
+    audit::log_event(AuditAction::Upgrade, &manifest_b).expect("audit entry B should be logged");
+
+    let json_path = tmp.path().join("exports").join("audit-history.json");
+    let ndjson_path = tmp.path().join("exports").join("audit-history.ndjson");
+
+    let exported_json = audit::export_history(&json_path, false).expect("json export should work");
+    let exported_ndjson =
+        audit::export_history(&ndjson_path, true).expect("ndjson export should work");
+
+    assert_eq!(exported_json, 2);
+    assert_eq!(exported_ndjson, 2);
+
+    let json_content = fs::read_to_string(&json_path).expect("json export file should exist");
+    let parsed_json: serde_json::Value =
+        serde_json::from_str(&json_content).expect("json export should be valid JSON");
+    let arr = parsed_json
+        .as_array()
+        .expect("json export should be an array");
+    assert_eq!(arr.len(), 2);
+    assert!(
+        arr[0].get("hash").is_some(),
+        "json export should include hash field"
+    );
+
+    let ndjson_content = fs::read_to_string(&ndjson_path).expect("ndjson export file should exist");
+    let lines: Vec<&str> = ndjson_content.lines().collect();
+    assert_eq!(lines.len(), 2);
+    for line in lines {
+        let value: serde_json::Value =
+            serde_json::from_str(line).expect("ndjson line should be valid JSON");
+        assert!(
+            value.get("hash").is_some(),
+            "ndjson line should include hash field"
+        );
+    }
+
+    if let Some(old) = old_home {
+        unsafe {
+            std::env::set_var("HOME", old);
+        }
+    } else {
+        unsafe {
+            std::env::remove_var("HOME");
+        }
+    }
+}
