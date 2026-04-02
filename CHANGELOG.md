@@ -4,6 +4,51 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
+## [Prod-Release-1.10.0] - 2026-04-01
+
+### ✨ Features
+
+- _(ux)_ Standardize install/uninstall/update preflight, explain, and bump to 1.10.0
+- _(migrate)_ Convert Scoop manifests to full pkg.lua scaffolds
+- _(install)_ Enforce frozen lockfile and audit chain verification
+- _(lib)_ Enhance public API with typed options and resolution
+- _(config)_ Add parallel jobs unoverridable policy
+
+### 🎯 UX
+
+- _(install)_ Add --verbose flag for package origins and preflight info
+
+### 🔒 Security
+
+- _(policy)_ Enforce allow/deny and license rules
+
+### 🩹 Bug Fixes
+
+- _(resolver)_ Improve local package and channel resolution
+
+## [Prod-Release-1.9.4] - 2026-03-28
+
+### 🎯 UX
+
+- Thingy thing
+
+### 🩹 Bug Fixes
+
+- _(pkg)_ Improve file download and symlink handling
+
+## [Prod-Release-1.9.3] - 2026-03-23
+
+### ⚡ Performance
+
+- _(pkg-resolver)_ Optimize dependency resolution with caching
+
+### ✨ Features
+
+- _(pkg)_ Enhance system info and project handlers
+- _(plugin)_ Add extended Lua plugin APIs and project install hook
+- _(list)_ Add option to show outdated packages
+- _(pkg)_ Add platform filtering for package builds
+
 ## [Prod-Release-1.9.2] - 2026-03-21
 
 ### ✨ Features
