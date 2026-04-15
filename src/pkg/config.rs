@@ -544,6 +544,12 @@ pub fn set_default_registry(url: &str) -> Result<()> {
     write_user_config(&config)
 }
 
+pub fn set_user_default_registry(default_registry: Option<Registry>) -> Result<()> {
+    let mut config = read_config_from_path(&get_user_config_path()?)?;
+    config.default_registry = default_registry;
+    write_user_config(&config)
+}
+
 pub fn add_added_registry(url: &str) -> Result<()> {
     let mut config = read_config_from_path(&get_user_config_path()?)?;
     if config.added_registries.iter().any(|r| r.url == url) {

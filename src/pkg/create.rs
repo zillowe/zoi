@@ -119,7 +119,7 @@ pub fn run(
 
     install_app_from_archive(&archive_path, app_dir)?;
 
-    plugin_manager.trigger_hook("on_post_create", Some(pkg_val))?;
+    plugin_manager.trigger_hook_nonfatal("on_post_create", Some(pkg_val));
 
     println!("\n{}", "App created successfully.".green());
 

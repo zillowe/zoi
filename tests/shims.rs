@@ -1,20 +1,20 @@
 use std::fs;
 use tempfile::tempdir;
 use zoi::pkg::plugin::PluginManager;
-use zoi::pkg::{db, local, shim, sysroot, types};
+use zoi::pkg::{db, local, shim, types};
+
+mod common;
 
 #[test]
 fn test_shim_resolution_logic() {
+    let mut ctx = common::TestContextGuard::acquire();
     let tmp = tempdir().expect("Failed to create temp dir");
     let root = tmp.path().to_path_buf();
 
     let home = root.join("home");
     fs::create_dir_all(&home).unwrap();
-    unsafe {
-        std::env::set_var("HOME", home.clone());
-    }
-
-    sysroot::set_sysroot(root.clone());
+    ctx.set_env_var("HOME", home.clone());
+    ctx.set_sysroot(root.clone());
 
     let bin_name = "hello";
     let pkg_name = "hello-pkg";
@@ -66,14 +66,8 @@ fn test_shim_resolution_logic() {
     println!("Resolved default: {}", resolved.display());
     assert!(resolved.to_string_lossy().contains(v1));
 
-    unsafe {
-        std::env::set_var("ZOI_HELLO_VERSION", v2);
-    }
+    ctx.set_env_var("ZOI_HELLO_VERSION", v2);
     let resolved_v2 = shim::resolve_to_installed_bin(bin_name, &pm).unwrap();
     println!("Resolved v2 override: {}", resolved_v2.display());
     assert!(resolved_v2.to_string_lossy().contains(v2));
-
-    unsafe {
-        std::env::remove_var("ZOI_HELLO_VERSION");
-    }
 }

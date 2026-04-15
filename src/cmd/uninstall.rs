@@ -310,7 +310,7 @@ pub fn run(
                     failed_packages.push(source_str.clone());
                 } else {
                     successfully_uninstalled.push(source_str.clone());
-                    plugin_manager.trigger_hook("on_post_uninstall", Some(pkg_val))?;
+                    plugin_manager.trigger_hook_nonfatal("on_post_uninstall", Some(pkg_val));
                     println!("\n{} Uninstallation complete.", "Success:".green());
                 }
             }

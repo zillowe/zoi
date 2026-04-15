@@ -15,6 +15,22 @@ struct ManagerCommands {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    let build_env_vars = [
+        "ZOI_COMMIT_HASH",
+        "POSTHOG_API_KEY",
+        "POSTHOG_API_HOST",
+        "ZOI_ABOUT_PACKAGER_AUTHOR",
+        "ZOI_ABOUT_PACKAGER_EMAIL",
+        "ZOI_ABOUT_PACKAGER_HOMEPAGE",
+        "ZOI_DEFAULT_REGISTRY",
+    ];
+    for var in build_env_vars {
+        println!("cargo:rerun-if-env-changed={}", var);
+    }
+    for i in 1..10 {
+        println!("cargo:rerun-if-env-changed=ZOI_AUTHORITIES_KEY_{}", i);
+    }
+
     let env_path = if Path::new(".env").exists() {
         Some(".env")
     } else if Path::new(".env.local").exists() {
@@ -30,6 +46,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    if let Ok(val) = env::var("ZOI_COMMIT_HASH") {
+        println!("cargo:rustc-env=ZOI_COMMIT_HASH={}", val);
+    }
     if let Ok(val) = env::var("POSTHOG_API_KEY") {
         println!("cargo:rustc-env=POSTHOG_API_KEY={}", val);
     }
@@ -121,18 +140,23 @@ fn main() -> Result<(), Box<dyn Error>> {
         "pub static BUILTIN_KEYS: &[(&str, &[u8])] = &["
     )?;
     if pgp_builtin_dir.exists() {
+        let mut asc_paths = Vec::new();
         for entry in std::fs::read_dir(pgp_builtin_dir)? {
             let entry = entry?;
             let path = entry.path();
             if path.extension().and_then(|s| s.to_str()) == Some("asc") {
-                let name = path
-                    .file_stem()
-                    .expect("Path should have a file stem")
-                    .to_str()
-                    .expect("Path should be valid UTF-8");
-                let content = std::fs::read(&path)?;
-                writeln!(&mut pgp_file, "    (\"{}\", &{:?}),", name, content)?;
+                asc_paths.push(path);
             }
+        }
+        asc_paths.sort();
+        for path in asc_paths {
+            let name = path
+                .file_stem()
+                .expect("Path should have a file stem")
+                .to_str()
+                .expect("Path should be valid UTF-8");
+            let content = std::fs::read(&path)?;
+            writeln!(&mut pgp_file, "    (\"{}\", &{:?}),", name, content)?;
         }
     }
     writeln!(&mut pgp_file, "];")?;
@@ -148,18 +172,23 @@ fn main() -> Result<(), Box<dyn Error>> {
         "pub static BUILTIN_HOOKS: &[(&str, &str)] = &["
     )?;
     if hooks_builtin_dir.exists() {
+        let mut yaml_paths = Vec::new();
         for entry in std::fs::read_dir(hooks_builtin_dir)? {
             let entry = entry?;
             let path = entry.path();
             if path.extension().and_then(|s| s.to_str()) == Some("yaml") {
-                let name = path
-                    .file_stem()
-                    .expect("Path should have a file stem")
-                    .to_str()
-                    .expect("Path should be valid UTF-8");
-                let content = std::fs::read_to_string(&path)?;
-                writeln!(&mut hooks_file, "    (\"{}\", {:?}),", name, content)?;
+                yaml_paths.push(path);
             }
+        }
+        yaml_paths.sort();
+        for path in yaml_paths {
+            let name = path
+                .file_stem()
+                .expect("Path should have a file stem")
+                .to_str()
+                .expect("Path should be valid UTF-8");
+            let content = std::fs::read_to_string(&path)?;
+            writeln!(&mut hooks_file, "    (\"{}\", {:?}),", name, content)?;
         }
     }
     writeln!(&mut hooks_file, "];")?;

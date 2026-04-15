@@ -690,7 +690,7 @@ pub fn run(
             .lua
             .to_value(manifest)
             .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
-        plugin_manager.trigger_hook("on_post_install", Some(pkg_val))?;
+        plugin_manager.trigger_hook_nonfatal("on_post_install", Some(pkg_val));
     }
 
     let is_any_project_install = scope_override == Some(types::Scope::Project);

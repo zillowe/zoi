@@ -1,8 +1,9 @@
 use std::fs;
-use std::path::PathBuf;
 use tempfile::tempdir;
 use zoi::pkg::resolve;
-use zoi::pkg::{config, sysroot, types};
+use zoi::pkg::{config, types};
+
+mod common;
 
 #[test]
 fn test_parse_source_string_basic() {
@@ -110,16 +111,16 @@ fn test_resolve_package_defaults_deterministically_without_stable() {
 
 #[test]
 fn test_resolve_requested_version_spec_registry_channel_and_exact() {
+    let mut ctx = common::TestContextGuard::acquire();
     let tmp = tempdir().expect("tempdir should be created");
     let root = tmp.path().to_path_buf();
     let home = root.join("home");
     fs::create_dir_all(&home).expect("home should be created");
 
-    unsafe {
-        std::env::set_var("HOME", &home);
-        std::env::set_var("ZOI_DB_DIR", root.join("db"));
-    }
-    sysroot::set_sysroot(root.clone());
+    let db_dir = root.join("db");
+    ctx.set_env_var("HOME", &home);
+    ctx.set_env_var("ZOI_DB_DIR", &db_dir);
+    ctx.set_sysroot(root.clone());
 
     let cfg = types::Config {
         default_registry: Some(types::Registry {
@@ -133,7 +134,7 @@ fn test_resolve_requested_version_spec_registry_channel_and_exact() {
     };
     config::write_user_config(&cfg).expect("config should write");
 
-    let pkg_dir = PathBuf::from(std::env::var("ZOI_DB_DIR").expect("db dir env"))
+    let pkg_dir = db_dir
         .join("testreg")
         .join("core")
         .join("registry-channels");
@@ -165,8 +166,4 @@ fn test_resolve_requested_version_spec_registry_channel_and_exact() {
     let exact = resolve::resolve_requested_version_spec("registry-channels@4.0.0", true, true)
         .expect("exact should resolve");
     assert_eq!(exact, Some("4.0.0".to_string()));
-
-    unsafe {
-        std::env::remove_var("ZOI_DB_DIR");
-    }
 }

@@ -1,16 +1,28 @@
-use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
+use std::path::PathBuf;
+use std::sync::{OnceLock, RwLock};
 
-static SYSROOT: OnceLock<PathBuf> = OnceLock::new();
+fn sysroot_store() -> &'static RwLock<Option<PathBuf>> {
+    static SYSROOT: OnceLock<RwLock<Option<PathBuf>>> = OnceLock::new();
+    SYSROOT.get_or_init(|| RwLock::new(None))
+}
 
-/// Sets the global sysroot path. This should be called once at the start of the program.
+/// Sets or replaces the global sysroot path.
 pub fn set_sysroot(path: PathBuf) {
-    let _ = SYSROOT.set(path);
+    if let Ok(mut guard) = sysroot_store().write() {
+        *guard = Some(path);
+    }
+}
+
+/// Clears the global sysroot path.
+pub fn clear_sysroot() {
+    if let Ok(mut guard) = sysroot_store().write() {
+        *guard = None;
+    }
 }
 
 /// Returns the global sysroot path if it has been set.
-pub fn get_sysroot() -> Option<&'static Path> {
-    SYSROOT.get().map(|p| p.as_path())
+pub fn get_sysroot() -> Option<PathBuf> {
+    sysroot_store().read().ok().and_then(|g| g.clone())
 }
 
 /// Prepends the sysroot to the given path if a sysroot is set.

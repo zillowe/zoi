@@ -1,14 +1,14 @@
 use tempfile::tempdir;
 use zoi::pkg::{db, types};
 
+mod common;
+
 #[test]
 fn test_advisory_indexing_and_query() {
+    let mut ctx = common::TestContextGuard::acquire();
     let dir = tempdir().unwrap();
     let db_dir = dir.path().to_path_buf();
-
-    unsafe {
-        std::env::set_var("ZOI_DB_DIR", &db_dir);
-    }
+    ctx.set_env_var("ZOI_DB_DIR", &db_dir);
 
     let handle = "test-reg";
     let conn = db::open_connection(handle).unwrap();
@@ -33,20 +33,14 @@ fn test_advisory_indexing_and_query() {
     assert_eq!(advisories.len(), 1);
     assert_eq!(advisories[0].id, "ZSA-2026-D0001");
     assert_eq!(advisories[0].severity, types::Severity::Critical);
-
-    unsafe {
-        std::env::remove_var("ZOI_DB_DIR");
-    }
 }
 
 #[test]
 fn test_sub_package_advisory_filtering() {
+    let mut ctx = common::TestContextGuard::acquire();
     let dir = tempdir().unwrap();
     let db_dir = dir.path().to_path_buf();
-
-    unsafe {
-        std::env::set_var("ZOI_DB_DIR", &db_dir);
-    }
+    ctx.set_env_var("ZOI_DB_DIR", &db_dir);
 
     let handle = "test-reg";
     let conn = db::open_connection(handle).unwrap();
@@ -93,10 +87,6 @@ fn test_sub_package_advisory_filtering() {
     let res_headers = db::get_advisories_for_package(handle, "linux", Some("headers")).unwrap();
     assert_eq!(res_headers.len(), 1);
     assert_eq!(res_headers[0].id, "ZSA-2026-C0001");
-
-    unsafe {
-        std::env::remove_var("ZOI_DB_DIR");
-    }
 }
 
 #[test]

@@ -2,8 +2,11 @@ use std::fs;
 use tempfile::tempdir;
 use zoi::project::{config, runner};
 
+mod common;
+
 #[test]
 fn test_project_run_command() {
+    let mut ctx = common::TestContextGuard::acquire();
     let tmp = tempdir().expect("Failed to create temp dir");
     let root = tmp.path().to_path_buf();
 
@@ -15,8 +18,7 @@ commands:
 "#;
     fs::write(root.join("zoi.yaml"), yaml).unwrap();
 
-    let old_dir = std::env::current_dir().unwrap();
-    std::env::set_current_dir(&root).unwrap();
+    ctx.set_current_dir(&root);
 
     let cfg = config::load().unwrap();
     runner::run(Some("build"), &[], &cfg).unwrap();
@@ -25,6 +27,4 @@ commands:
     assert!(out_file.exists());
     let content = fs::read_to_string(out_file).unwrap();
     assert_eq!(content.trim(), "hello");
-
-    std::env::set_current_dir(old_dir).unwrap();
 }

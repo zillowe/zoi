@@ -6,6 +6,8 @@ use zoi::pkg::plugin::PluginManager;
 use zoi::pkg::types::{LockPackageDetail, ZoiLock};
 use zoi::project::lockfile;
 
+mod common;
+
 #[test]
 fn test_sources_from_lock_uses_packages_map() {
     let mut lock = ZoiLock {
@@ -86,9 +88,9 @@ fn test_install_frozen_lockfile_rejects_explicit_sources() {
 
 #[test]
 fn test_install_frozen_lockfile_requires_zoi_lock() {
+    let mut ctx = common::TestContextGuard::acquire();
     let tmp = tempdir().expect("tempdir should be created");
-    let old_dir = std::env::current_dir().expect("cwd should be readable");
-    std::env::set_current_dir(tmp.path()).expect("should enter temp cwd");
+    ctx.set_current_dir(tmp.path());
     std::fs::write(
         tmp.path().join("zoi.yaml"),
         "name: test\npkgs:\n  - hello\n",
@@ -117,8 +119,6 @@ fn test_install_frozen_lockfile_requires_zoi_lock() {
         false,
     )
     .expect_err("missing zoi.lock must fail in frozen mode");
-
-    std::env::set_current_dir(old_dir).expect("should restore cwd");
 
     assert!(
         err.to_string()

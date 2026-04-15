@@ -9,6 +9,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+const PLUGIN_ENV_OVERRIDES_KEY: &str = "__ZOI_ENV_OVERRIDES";
+
 pub struct PluginManager {
     pub lua: Lua,
 }
@@ -84,6 +86,15 @@ impl PluginManager {
                     .map_err(|e| anyhow!(e.to_string()))?,
             )
             .map_err(|e| anyhow!(e.to_string()))?;
+        self.lua
+            .globals()
+            .set(
+                PLUGIN_ENV_OVERRIDES_KEY,
+                self.lua
+                    .create_table()
+                    .map_err(|e| anyhow!(e.to_string()))?,
+            )
+            .map_err(|e| anyhow!(e.to_string()))?;
         let hooks = [
             "on_pre_install",
             "on_post_install",
@@ -130,10 +141,14 @@ impl PluginManager {
                 let json_val: serde_json::Value = match value {
                     Value::String(s) => serde_json::Value::String(s.to_str()?.to_string()),
                     Value::Integer(i) => serde_json::Value::Number(i.into()),
-                    Value::Number(n) => serde_json::Value::Number(
-                        serde_json::Number::from_f64(n)
-                            .expect("Number should be finite for JSON conversion"),
-                    ),
+                    Value::Number(n) => {
+                        let Some(num) = serde_json::Number::from_f64(n) else {
+                            return Err(mlua::Error::RuntimeError(
+                                "Non-finite numbers are not supported for set_data".to_string(),
+                            ));
+                        };
+                        serde_json::Value::Number(num)
+                    }
                     Value::Boolean(b) => serde_json::Value::Bool(b),
                     _ => {
                         return Err(mlua::Error::RuntimeError(
@@ -286,18 +301,29 @@ impl PluginManager {
 
         let shell = self
             .lua
-            .create_function(|_, cmd: String| {
-                let status = if cfg!(target_os = "windows") {
-                    std::process::Command::new("pwsh")
-                        .arg("-Command")
-                        .arg(&cmd)
-                        .status()
+            .create_function(|lua, cmd: String| {
+                let env_overrides: Table = lua
+                    .globals()
+                    .get(PLUGIN_ENV_OVERRIDES_KEY)
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+
+                let mut command = if cfg!(target_os = "windows") {
+                    let mut c = std::process::Command::new("pwsh");
+                    c.arg("-Command").arg(&cmd);
+                    c
                 } else {
-                    std::process::Command::new("bash")
-                        .arg("-c")
-                        .arg(&cmd)
-                        .status()
+                    let mut c = std::process::Command::new("bash");
+                    c.arg("-c").arg(&cmd);
+                    c
                 };
+
+                for pair in env_overrides.pairs::<String, String>() {
+                    let (key, value) =
+                        pair.map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                    command.env(key, value);
+                }
+
+                let status = command.status();
                 match status {
                     Ok(s) => Ok(s.code().unwrap_or(if s.success() { 0 } else { 1 })),
                     Err(e) => Err(mlua::Error::RuntimeError(e.to_string())),
@@ -423,6 +449,37 @@ impl PluginManager {
 
                     let strip_val = strip.unwrap_or(0);
 
+                    fn safe_stripped_relative_path(
+                        path: &Path,
+                        strip: usize,
+                    ) -> Result<Option<PathBuf>, std::io::Error> {
+                        let mut sanitized = PathBuf::new();
+                        let mut has_component = false;
+                        for component in path.components().skip(strip) {
+                            match component {
+                                std::path::Component::Normal(part) => {
+                                    sanitized.push(part);
+                                    has_component = true;
+                                }
+                                std::path::Component::CurDir => {}
+                                _ => {
+                                    return Err(std::io::Error::new(
+                                        std::io::ErrorKind::InvalidInput,
+                                        format!(
+                                            "Archive entry escapes destination: {}",
+                                            path.display()
+                                        ),
+                                    ));
+                                }
+                            }
+                        }
+                        if has_component {
+                            Ok(Some(sanitized))
+                        } else {
+                            Ok(None)
+                        }
+                    }
+
                     fn unpack_with_strip<R: std::io::Read>(
                         mut archive: tar::Archive<R>,
                         dest: &Path,
@@ -431,14 +488,10 @@ impl PluginManager {
                         for entry in archive.entries()? {
                             let mut entry = entry?;
                             let path = entry.path()?.to_path_buf();
-                            let mut components = path.components();
-                            for _ in 0..strip {
-                                components.next();
-                            }
-                            let stripped_path = components.as_path();
-                            if stripped_path.as_os_str().is_empty() {
+                            let Some(stripped_path) = safe_stripped_relative_path(&path, strip)?
+                            else {
                                 continue;
-                            }
+                            };
                             entry.unpack(dest.join(stripped_path))?;
                         }
                         Ok(())
@@ -453,14 +506,12 @@ impl PluginManager {
                                     .by_index(i)
                                     .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
                                 let path = PathBuf::from(file.name());
-                                let mut components = path.components();
-                                for _ in 0..strip_val {
-                                    components.next();
-                                }
-                                let stripped_path = components.as_path();
-                                if stripped_path.as_os_str().is_empty() {
+                                let Some(stripped_path) =
+                                    safe_stripped_relative_path(&path, strip_val)
+                                        .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?
+                                else {
                                     continue;
-                                }
+                                };
                                 let out_path = dest_path.join(stripped_path);
                                 if file.is_dir() {
                                     fs::create_dir_all(&out_path)
@@ -633,7 +684,21 @@ impl PluginManager {
             .map_err(|e| anyhow!(e.to_string()))?;
         let env_get = self
             .lua
-            .create_function(|_, name: String| Ok(std::env::var(name).ok()))
+            .create_function(|lua, name: String| {
+                let env_overrides: Table = lua
+                    .globals()
+                    .get(PLUGIN_ENV_OVERRIDES_KEY)
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+
+                if let Some(value) = env_overrides
+                    .get::<Option<String>>(name.as_str())
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?
+                {
+                    return Ok(Some(value));
+                }
+
+                Ok(std::env::var(name).ok())
+            })
             .map_err(|e| anyhow!(e.to_string()))?;
         env_table
             .set("get", env_get)
@@ -641,8 +706,14 @@ impl PluginManager {
 
         let env_set = self
             .lua
-            .create_function(|_, (name, value): (String, String)| {
-                unsafe { std::env::set_var(name, value) };
+            .create_function(|lua, (name, value): (String, String)| {
+                let env_overrides: Table = lua
+                    .globals()
+                    .get(PLUGIN_ENV_OVERRIDES_KEY)
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                env_overrides
+                    .set(name, value)
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
                 Ok(())
             })
             .map_err(|e| anyhow!(e.to_string()))?;
@@ -696,20 +767,26 @@ impl PluginManager {
         if !plugin_dir.exists() {
             return Ok(());
         }
+        let mut plugin_paths = Vec::new();
         for entry in fs::read_dir(plugin_dir)? {
             let entry = entry?;
             let path = entry.path();
             if path.extension().and_then(|s| s.to_str()) == Some("lua") {
-                let script = fs::read_to_string(&path)?;
-                let script = format!(
-                    "local old_reg = zoi.register_command; zoi.register_command = function(a, b) if type(a) == 'string' then zoi.register_command_simple(a, b) else old_reg(a) end end; {}",
-                    script
-                );
-                self.lua
-                    .load(&script)
-                    .exec()
-                    .map_err(|e| anyhow!("Plugin error in {}: {}", path.display(), e))?;
+                plugin_paths.push(path);
             }
+        }
+        plugin_paths.sort();
+
+        for path in plugin_paths {
+            let script = fs::read_to_string(&path)?;
+            let script = format!(
+                "local old_reg = zoi.register_command; zoi.register_command = function(a, b) if type(a) == 'string' then zoi.register_command_simple(a, b) else old_reg(a) end end; {}",
+                script
+            );
+            self.lua
+                .load(&script)
+                .exec()
+                .map_err(|e| anyhow!("Plugin error in {}: {}", path.display(), e))?;
         }
         Ok(())
     }
@@ -735,6 +812,15 @@ impl PluginManager {
             }
         }
         Ok(())
+    }
+
+    pub fn trigger_hook_nonfatal(&self, hook_name: &str, arg: Option<Value>) {
+        if let Err(error) = self.trigger_hook(hook_name, arg) {
+            eprintln!(
+                "Warning: hook '{}' failed after the operation completed: {}",
+                hook_name, error
+            );
+        }
     }
 
     pub fn trigger_resolve_shim_version(&self, bin_name: &str) -> Result<Option<String>> {

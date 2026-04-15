@@ -1,16 +1,17 @@
 use std::fs;
 use tempfile::tempdir;
-use zoi::pkg::{local, sysroot, transaction, types};
+use zoi::pkg::{local, transaction, types};
+
+mod common;
 
 #[test]
 fn test_transaction_rollback_uninstall() {
+    let mut ctx = common::TestContextGuard::acquire();
     let tmp = tempdir().expect("Failed to create temp dir");
     let root = tmp.path().to_path_buf();
 
-    unsafe {
-        std::env::set_var("HOME", root.clone());
-    }
-    sysroot::set_sysroot(root.clone());
+    ctx.set_env_var("HOME", root.clone());
+    ctx.set_sysroot(root.clone());
 
     let pkg_name = "test-pkg";
     let version = "1.0.0";

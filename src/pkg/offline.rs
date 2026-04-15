@@ -1,13 +1,18 @@
-use std::sync::OnceLock;
+use std::sync::{OnceLock, RwLock};
 
-static OFFLINE_MODE: OnceLock<bool> = OnceLock::new();
+fn offline_mode_store() -> &'static RwLock<bool> {
+    static OFFLINE_MODE: OnceLock<RwLock<bool>> = OnceLock::new();
+    OFFLINE_MODE.get_or_init(|| RwLock::new(false))
+}
 
 /// Sets the global offline mode.
 pub fn set_offline(offline: bool) {
-    let _ = OFFLINE_MODE.set(offline);
+    if let Ok(mut guard) = offline_mode_store().write() {
+        *guard = offline;
+    }
 }
 
 /// Returns true if Zoi is in offline mode.
 pub fn is_offline() -> bool {
-    *OFFLINE_MODE.get().unwrap_or(&false)
+    offline_mode_store().read().map(|g| *g).unwrap_or(false)
 }

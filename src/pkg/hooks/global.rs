@@ -81,9 +81,13 @@ pub fn load_all_hooks() -> Result<Vec<GlobalHook>> {
         if !dir.exists() {
             continue;
         }
+        let mut hook_paths = Vec::new();
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
-            let path = entry.path();
+            hook_paths.push(entry.path());
+        }
+        hook_paths.sort();
+        for path in hook_paths {
             if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("yaml") {
                 let content = fs::read_to_string(&path)?;
                 if let Ok(hook) = serde_yaml::from_str::<GlobalHook>(&content)
@@ -94,6 +98,7 @@ pub fn load_all_hooks() -> Result<Vec<GlobalHook>> {
             }
         }
     }
+    hooks.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(hooks)
 }
 
@@ -130,7 +135,7 @@ pub fn run_global_hooks(when: HookWhen, modified_files: &[String], operation: &s
 
             for file in modified_files {
                 let file_path = Path::new(file);
-                let relative_file = if let Some(root) = sysroot {
+                let relative_file = if let Some(root) = &sysroot {
                     if let Ok(rel) = file_path.strip_prefix(root) {
                         rel
                     } else {

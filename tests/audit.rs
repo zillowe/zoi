@@ -1,12 +1,11 @@
 use chrono::Utc;
 use std::fs;
-use std::sync::Mutex;
 use tempfile::tempdir;
 use zoi::pkg::audit::{self, AuditAction, AuditEntry};
 use zoi::pkg::types::{InstallManifest, InstallReason, PackageType, Scope};
 use zoi::pkg::{config, types};
 
-static ENV_LOCK: Mutex<()> = Mutex::new(());
+mod common;
 
 fn test_manifest(name: &str, version: &str) -> InstallManifest {
     InstallManifest {
@@ -57,12 +56,9 @@ fn test_audit_entry_serialization() {
 
 #[test]
 fn test_audit_hash_chain_verification_and_tamper_detection() {
-    let _guard = ENV_LOCK.lock().expect("env lock should be available");
+    let mut ctx = common::TestContextGuard::acquire();
     let tmp = tempdir().expect("tempdir should be created");
-    let old_home = std::env::var("HOME").ok();
-    unsafe {
-        std::env::set_var("HOME", tmp.path());
-    }
+    ctx.set_env_var("HOME", tmp.path());
 
     let cfg = types::Config {
         audit_log_enabled: true,
@@ -97,26 +93,13 @@ fn test_audit_hash_chain_verification_and_tamper_detection() {
         "unexpected tamper message: {}",
         tamper_report.message
     );
-
-    if let Some(old) = old_home {
-        unsafe {
-            std::env::set_var("HOME", old);
-        }
-    } else {
-        unsafe {
-            std::env::remove_var("HOME");
-        }
-    }
 }
 
 #[test]
 fn test_audit_export_json_and_ndjson() {
-    let _guard = ENV_LOCK.lock().expect("env lock should be available");
+    let mut ctx = common::TestContextGuard::acquire();
     let tmp = tempdir().expect("tempdir should be created");
-    let old_home = std::env::var("HOME").ok();
-    unsafe {
-        std::env::set_var("HOME", tmp.path());
-    }
+    ctx.set_env_var("HOME", tmp.path());
 
     let cfg = types::Config {
         audit_log_enabled: true,
@@ -161,15 +144,5 @@ fn test_audit_export_json_and_ndjson() {
             value.get("hash").is_some(),
             "ndjson line should include hash field"
         );
-    }
-
-    if let Some(old) = old_home {
-        unsafe {
-            std::env::set_var("HOME", old);
-        }
-    } else {
-        unsafe {
-            std::env::remove_var("HOME");
-        }
     }
 }

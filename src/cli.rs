@@ -818,7 +818,7 @@ pub fn run() -> anyhow::Result<()> {
                         no_shell_setup,
                         files,
                     );
-                    plugin_manager.trigger_hook("on_post_sync", None)?;
+                    plugin_manager.trigger_hook_nonfatal("on_post_sync", None);
                     res
                 }
             }

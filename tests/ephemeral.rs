@@ -1,21 +1,22 @@
 use std::fs;
 use tempfile::tempdir;
 use zoi::cmd::shell;
-use zoi::pkg::{config, db, local, plugin, resolve, sysroot, types};
+use zoi::pkg::{config, db, local, plugin, resolve, types};
 use zoi::utils;
+
+mod common;
 
 #[test]
 fn test_ephemeral_environment_path() {
+    let mut ctx = common::TestContextGuard::acquire();
     let tmp = tempdir().expect("Failed to create temp dir");
     let root = tmp.path().to_path_buf();
 
-    sysroot::set_sysroot(root.clone());
+    ctx.set_sysroot(root.clone());
 
     let home = root.join("home");
     fs::create_dir_all(&home).unwrap();
-    unsafe {
-        std::env::set_var("HOME", home.clone());
-    }
+    ctx.set_env_var("HOME", home.clone());
 
     let bin_name = "test-bin";
     let pkg_name = "test-pkg";

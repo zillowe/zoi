@@ -1,14 +1,14 @@
 use tempfile::tempdir;
 use zoi::pkg::{db, types};
 
+mod common;
+
 #[test]
 fn test_find_provides_logic() {
+    let mut ctx = common::TestContextGuard::acquire();
     let dir = tempdir().unwrap();
     let db_dir = dir.path().to_path_buf();
-
-    unsafe {
-        std::env::set_var("ZOI_DB_DIR", &db_dir);
-    }
+    ctx.set_env_var("ZOI_DB_DIR", &db_dir);
 
     let handle = "local";
     let conn = db::open_connection(handle).unwrap();
@@ -29,8 +29,4 @@ fn test_find_provides_logic() {
     let results = db::find_provides(handle, "git").unwrap();
     assert!(!results.is_empty());
     assert_eq!(results[0].0.name, "git");
-
-    unsafe {
-        std::env::remove_var("ZOI_DB_DIR");
-    }
 }

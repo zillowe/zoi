@@ -2,20 +2,20 @@ use std::fs;
 use tempfile::tempdir;
 use zoi::pkg::{db, local, service, sysroot, types};
 
+mod common;
+
 #[test]
 fn test_linux_service_lifecycle() {
+    let mut ctx = common::TestContextGuard::acquire();
     let tmp = tempdir().expect("Failed to create temp dir");
     let root = tmp.path().to_path_buf();
 
     let home = root.join("home");
     fs::create_dir_all(&home).expect("Failed to create home dir");
 
-    unsafe {
-        std::env::set_var("HOME", home.clone());
-        std::env::set_var("ZOI_TEST_SKIP_SERVICE_COMMANDS", "1");
-    }
-
-    sysroot::set_sysroot(root.clone());
+    ctx.set_env_var("HOME", home.clone());
+    ctx.set_env_var("ZOI_TEST_SKIP_SERVICE_COMMANDS", "1");
+    ctx.set_sysroot(root.clone());
 
     let pkg_name = "test-service";
     let version = "1.0.0";
