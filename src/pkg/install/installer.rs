@@ -252,6 +252,7 @@ pub fn install_node(
     )?;
 
     local::write_manifest(&manifest)?;
+    local::persist_package_source(&manifest, Path::new(&node.source))?;
 
     if let Ok(conn) = db::open_connection("local") {
         let _ = db::update_package(

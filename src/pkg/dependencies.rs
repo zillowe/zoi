@@ -375,9 +375,12 @@ fn install_zoi_dependency(
         dep.package.to_string()
     };
     let req = crate::pkg::resolve::parse_source_string(&zoi_dep_name)?;
-    if let Some(manifest) =
-        local::is_package_installed(&req.name.to_lowercase(), req.sub_package.as_deref(), scope)?
-    {
+    let mut manifests = local::find_installed_manifests_matching(&req, scope)?;
+    if let Some(manifest) = if manifests.len() == 1 {
+        Some(manifests.remove(0))
+    } else {
+        None
+    } {
         println!(
             "Zoi package '{}' is already installed (version {}). Skipping.",
             dep.package, manifest.version

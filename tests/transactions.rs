@@ -1,7 +1,8 @@
 use std::fs;
 use tempfile::tempdir;
-use zoi::pkg::transaction;
+use zoi::pkg::resolve;
 use zoi::pkg::types::{InstallManifest, InstallReason, PackageType, Scope, TransactionOperation};
+use zoi::pkg::{local, transaction};
 
 mod common;
 
@@ -28,6 +29,27 @@ fn sample_manifest(name: &str, files: Vec<&str>) -> InstallManifest {
         installed_files: files.into_iter().map(str::to_string).collect(),
         installed_size: None,
     }
+}
+
+fn write_package_source(path: &std::path::Path, name: &str, repo: &str, version: &str) {
+    fs::write(
+        path,
+        format!(
+            r#"metadata({{
+  name = "{name}",
+  repo = "{repo}",
+  version = "{version}",
+  description = "test",
+  maintainer = {{ name = "Zoi", email = "zoi@example.com" }},
+  types = {{ "source" }},
+}})
+
+function uninstall(_args)
+end
+"#
+        ),
+    )
+    .unwrap();
 }
 
 #[test]
@@ -115,4 +137,43 @@ fn test_transaction_begin_writes_log_file() {
     );
     let content = fs::read_to_string(transaction_path).unwrap();
     assert!(content.contains(&transaction.id));
+}
+
+#[test]
+fn test_transaction_rollback_install_uses_exact_subpackage_source() {
+    let mut ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().unwrap();
+    let root = tmp.path().to_path_buf();
+    ctx.set_env_var("HOME", &root);
+    ctx.set_sysroot(root.clone());
+
+    let mut manifest = sample_manifest("test-pkg", vec![]);
+    manifest.repo = "core".to_string();
+    manifest.registry_handle = "local".to_string();
+    manifest.sub_package = Some("cli".to_string());
+
+    local::write_manifest(&manifest).unwrap();
+
+    let pkg_source = root.join("test.pkg.lua");
+    write_package_source(&pkg_source, "test-pkg", "core", "1.0.0");
+    local::persist_package_source(&manifest, &pkg_source).unwrap();
+
+    let transaction = transaction::begin().unwrap();
+    transaction::record_operation(
+        &transaction.id,
+        TransactionOperation::Install {
+            manifest: Box::new(manifest.clone()),
+        },
+    )
+    .unwrap();
+
+    transaction::rollback(&transaction.id).unwrap();
+
+    let request = resolve::parse_source_string("#local@core/test-pkg:cli@1.0.0").unwrap();
+    assert!(
+        local::find_installed_manifests_matching(&request, Scope::User)
+            .unwrap()
+            .is_empty(),
+        "rollback should uninstall the exact installed sub-package"
+    );
 }

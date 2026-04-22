@@ -67,8 +67,6 @@ fn run_update_single_logic(
         package_name.cyan().bold()
     );
 
-    let request = resolve::parse_source_string(package_name)?;
-
     let (new_pkg, new_version, _, _, registry_handle, _) =
         resolve::resolve_package_and_version(package_name, false, yes)?;
 
@@ -80,23 +78,42 @@ fn run_update_single_logic(
         return Ok(());
     }
 
-    let old_manifest = match local::is_package_installed(
-        &new_pkg.name,
-        request.sub_package.as_deref(),
-        types::Scope::User,
-    )?
-    .or(local::is_package_installed(
-        &new_pkg.name,
-        request.sub_package.as_deref(),
-        types::Scope::System,
-    )?) {
-        Some(m) => m,
-        None => {
-            return Err(anyhow!(
-                "Package '{package_name}' is not installed. Use 'zoi install' instead."
-            ));
-        }
+    let installed_source = if let Some(sub) = &new_pkg.sub_package {
+        format!(
+            "#{}@{}/{}:{}",
+            registry_handle.as_deref().unwrap_or("local"),
+            new_pkg.repo,
+            new_pkg.name,
+            sub
+        )
+    } else {
+        format!(
+            "#{}@{}/{}",
+            registry_handle.as_deref().unwrap_or("local"),
+            new_pkg.repo,
+            new_pkg.name
+        )
     };
+    let installed_request = resolve::parse_source_string(&installed_source)?;
+    let mut candidates = Vec::new();
+    candidates.extend(local::find_installed_manifests_matching(
+        &installed_request,
+        types::Scope::User,
+    )?);
+    candidates.extend(local::find_installed_manifests_matching(
+        &installed_request,
+        types::Scope::System,
+    )?);
+
+    let old_manifest =
+        crate::cmd::installed_select::choose_installed_manifest(package_name, &candidates, yes)
+            .map_err(|e| {
+                if candidates.is_empty() {
+                    anyhow!("Package '{package_name}' is not installed. Use 'zoi install' instead.")
+                } else {
+                    e
+                }
+            })?;
 
     println!(
         "Currently installed version: {}",
@@ -363,7 +380,7 @@ fn run_update_single_logic(
                 &new_pkg,
                 handle,
                 Some(new_pkg.scope),
-                request.sub_package.as_deref(),
+                new_pkg.sub_package.as_deref(),
                 Some(&types::InstallReason::Direct),
             );
         }

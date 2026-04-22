@@ -11,41 +11,43 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
 
     let request = resolve::parse_source_string(package_name)?;
     let sub_package = request.sub_package.clone();
-
-    let resolved_source = resolve::resolve_source(package_name, false, yes)?;
-    let mut pkg = crate::pkg::lua::parser::parse_lua_package(
-        resolved_source.path.to_str().ok_or_else(|| {
-            anyhow!(
-                "Path contains invalid UTF-8 characters: {:?}",
-                resolved_source.path
-            )
-        })?,
-        None,
-        false,
-    )?;
-    if let Some(repo_name) = resolved_source.repo_name {
-        pkg.repo = repo_name;
+    let scope_order = [
+        types::Scope::User,
+        types::Scope::System,
+        types::Scope::Project,
+    ];
+    let mut current_manifest = None;
+    let mut scope = None;
+    for candidate_scope in scope_order {
+        let mut matches = local::find_installed_manifests_matching(&request, candidate_scope)?;
+        match matches.len() {
+            0 => continue,
+            1 => {
+                current_manifest = Some(matches.remove(0));
+                scope = Some(candidate_scope);
+                break;
+            }
+            _ => {
+                return Err(anyhow!(
+                    "Package '{}' is ambiguous in {:?} scope. Use an explicit source like '#handle@repo/name[:sub]@version'.",
+                    request.name,
+                    candidate_scope
+                ));
+            }
+        }
     }
-    let registry_handle = resolved_source.registry_handle;
 
-    let (current_manifest, scope) = if let Some(m) =
-        local::is_package_installed(&pkg.name, sub_package.as_deref(), types::Scope::User)?
-    {
-        (m, types::Scope::User)
-    } else if let Some(m) =
-        local::is_package_installed(&pkg.name, sub_package.as_deref(), types::Scope::System)?
-    {
-        (m, types::Scope::System)
-    } else if let Some(m) =
-        local::is_package_installed(&pkg.name, sub_package.as_deref(), types::Scope::Project)?
-    {
-        (m, types::Scope::Project)
-    } else {
+    let Some(current_manifest) = current_manifest else {
         return Err(anyhow!("Package '{}' is not installed.", package_name));
     };
+    let scope = scope.expect("scope should be set when a manifest is found");
 
-    let handle = registry_handle.as_deref().unwrap_or("local");
-    let package_dir = local::get_package_dir(scope, handle, &pkg.repo, &pkg.name)?;
+    let package_dir = local::get_package_dir(
+        scope,
+        &current_manifest.registry_handle,
+        &current_manifest.repo,
+        &current_manifest.name,
+    )?;
 
     let mut versions = Vec::new();
     if let Ok(entries) = fs::read_dir(&package_dir) {
@@ -110,7 +112,7 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
             crate::pkg::shim::create_shim(&symlink_path)?;
         }
     } else if prev_manifest.sub_package.is_none() {
-        let symlink_path = get_bin_root(scope)?.join(&pkg.name);
+        let symlink_path = get_bin_root(scope)?.join(&current_manifest.name);
         crate::pkg::shim::create_shim(&symlink_path)?;
     }
 

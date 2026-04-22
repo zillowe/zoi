@@ -90,46 +90,47 @@ pub fn record_package(
 }
 
 pub fn update_package_reason(
-    package_name: &str,
-    sub_package_name: Option<&str>,
-    scope: types::Scope,
+    manifest: &types::InstallManifest,
     new_reason: types::InstallReason,
 ) -> Result<()> {
-    let mut lockfile = read_lockfile(scope)?;
+    let mut lockfile = read_lockfile(manifest.scope)?;
+    let package_id = crate::pkg::utils::generate_package_id(
+        &manifest.registry_handle,
+        &manifest.repo,
+        &manifest.name,
+    );
+    let package_id = if let Some(sub) = &manifest.sub_package {
+        format!("{}:{}", package_id, sub)
+    } else {
+        package_id
+    };
 
-    let package_to_update = lockfile
-        .packages
-        .values_mut()
-        .find(|p| p.name == package_name && p.sub_package.as_deref() == sub_package_name);
-
-    if let Some(pkg) = package_to_update {
+    if let Some(pkg) = lockfile.packages.get_mut(&package_id) {
         pkg.reason = new_reason;
         lockfile.version = env!("CARGO_PKG_VERSION").to_string();
-        write_lockfile(&lockfile, scope)?;
+        write_lockfile(&lockfile, manifest.scope)?;
         Ok(())
     } else {
-        Err(anyhow!("Package '{}' not found in record.", package_name))
+        Err(anyhow!("Package '{}' not found in record.", manifest.name))
     }
 }
 
-pub fn remove_package_from_record(
-    package_name: &str,
-    sub_package_name: Option<&str>,
-    scope: types::Scope,
-) -> Result<()> {
-    let mut lockfile = read_lockfile(scope)?;
+pub fn remove_package_from_record(manifest: &types::InstallManifest) -> Result<()> {
+    let mut lockfile = read_lockfile(manifest.scope)?;
+    let package_id = crate::pkg::utils::generate_package_id(
+        &manifest.registry_handle,
+        &manifest.repo,
+        &manifest.name,
+    );
+    let package_id = if let Some(sub) = &manifest.sub_package {
+        format!("{}:{}", package_id, sub)
+    } else {
+        package_id
+    };
 
-    let key_to_remove = lockfile
-        .packages
-        .iter()
-        .find(|(_, p)| p.name == package_name && p.sub_package.as_deref() == sub_package_name)
-        .map(|(k, _)| k.clone());
-
-    if let Some(key) = key_to_remove
-        && lockfile.packages.remove(&key).is_some()
-    {
+    if lockfile.packages.remove(&package_id).is_some() {
         lockfile.version = env!("CARGO_PKG_VERSION").to_string();
-        write_lockfile(&lockfile, scope)?;
+        write_lockfile(&lockfile, manifest.scope)?;
     }
 
     Ok(())

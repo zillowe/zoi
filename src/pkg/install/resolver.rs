@@ -313,7 +313,36 @@ pub fn resolve_dependency_graph(
                 }
             }
 
+            let resolved_child_sources: HashMap<String, Vec<String>> = final_adj
+                .iter()
+                .map(|(pkg_id, children)| {
+                    let deps = children
+                        .iter()
+                        .filter_map(|child| {
+                            final_nodes.get(child).map(|child_node| {
+                                format!(
+                                    "zoi:{}",
+                                    crate::pkg::local::package_source_string(
+                                        &child_node.registry_handle,
+                                        &child_node.pkg.repo,
+                                        &child_node.pkg.name,
+                                        child_node.sub_package.as_deref(),
+                                        &child_node.version,
+                                    )
+                                )
+                            })
+                        })
+                        .collect::<Vec<_>>();
+                    (pkg_id.clone(), deps)
+                })
+                .collect();
+
             for (pkg_id, node) in final_nodes.iter_mut() {
+                let child_sources = resolved_child_sources
+                    .get(pkg_id)
+                    .cloned()
+                    .unwrap_or_default();
+
                 if direct_ids.contains(pkg_id) {
                     node.reason = InstallReason::Direct;
                 } else {
@@ -324,12 +353,7 @@ pub fn resolve_dependency_graph(
                     node.reason = InstallReason::Dependency { parent: parent_id };
                 }
 
-                let mut resolved_deps = Vec::new();
-                if let Some(children) = final_adj.get(pkg_id) {
-                    for child in children {
-                        resolved_deps.push(format!("zoi:{}", child));
-                    }
-                }
+                let mut resolved_deps = child_sources;
                 for dep_str in &node.dependencies {
                     if let Ok(dep_req) = crate::pkg::dependencies::parse_dependency_string(dep_str)
                         && dep_req.manager != "zoi"

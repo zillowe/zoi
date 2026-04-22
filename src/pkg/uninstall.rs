@@ -107,7 +107,7 @@ fn uninstall_collection(
         let _ = crate::pkg::service::cleanup_service(&pkg.name, scope);
         fs::remove_dir_all(&package_dir)?;
     }
-    if let Err(e) = recorder::remove_package_from_record(&pkg.name, None, scope) {
+    if let Err(e) = recorder::remove_package_from_record(manifest) {
         eprintln!(
             "{} Failed to remove package from lockfile: {}",
             "Warning:".yellow(),
@@ -134,55 +134,87 @@ fn uninstall_collection(
     Ok(manifest.clone())
 }
 
+fn find_installed_manifest(
+    request: &resolve::PackageRequest,
+    scope_override: Option<types::Scope>,
+) -> anyhow::Result<(types::InstallManifest, types::Scope)> {
+    let scopes = if let Some(scope) = scope_override {
+        vec![scope]
+    } else {
+        vec![
+            types::Scope::Project,
+            types::Scope::User,
+            types::Scope::System,
+        ]
+    };
+
+    for scope in scopes {
+        let mut matches = local::find_installed_manifests_matching(request, scope)?;
+        match matches.len() {
+            0 => continue,
+            1 => return Ok((matches.remove(0), scope)),
+            _ => {
+                return Err(anyhow!(
+                    "Package '{}' is ambiguous in {:?} scope. Use an explicit source like '#handle@repo/name[:sub]@version'.",
+                    request.name,
+                    scope
+                ));
+            }
+        }
+    }
+
+    if scope_override.is_some() {
+        Err(anyhow!(
+            "Package '{}' is not installed in the specified scope.",
+            request.name
+        ))
+    } else {
+        Err(anyhow!(
+            "Package '{}' is not installed by Zoi.",
+            request.name
+        ))
+    }
+}
+
+fn load_installed_package(
+    manifest: &types::InstallManifest,
+    yes: bool,
+) -> anyhow::Result<(types::Package, PathBuf)> {
+    let installed_source_path = local::get_package_source_path(manifest)?;
+    if installed_source_path.exists() {
+        let path = installed_source_path
+            .to_str()
+            .ok_or_else(|| anyhow!("Stored package source path contains invalid UTF-8"))?;
+        let mut pkg =
+            crate::pkg::lua::parser::parse_lua_package(path, Some(&manifest.version), true)?;
+        pkg.repo = manifest.repo.clone();
+        pkg.scope = manifest.scope;
+        pkg.registry_handle = Some(manifest.registry_handle.clone());
+        pkg.sub_package = manifest.sub_package.clone();
+        return Ok((pkg, installed_source_path));
+    }
+
+    let source = local::installed_manifest_source(manifest);
+    let (mut pkg, _, _, pkg_lua_path, _, _) =
+        resolve::resolve_package_and_version(&source, true, yes)?;
+    pkg.scope = manifest.scope;
+    pkg.sub_package = manifest.sub_package.clone();
+    Ok((pkg, pkg_lua_path))
+}
+
 pub fn run(
     package_name: &str,
     scope_override: Option<types::Scope>,
     yes: bool,
 ) -> anyhow::Result<types::InstallManifest> {
     let request = resolve::parse_source_string(package_name)?;
-    let sub_package_to_uninstall = request.sub_package.clone();
-
-    let (pkg, _, _, pkg_lua_path, registry_handle, _) =
-        resolve::resolve_package_and_version(package_name, true, yes)?;
-
-    let (manifest, scope) = if let Some(scope) = scope_override {
-        if let Some(m) =
-            local::is_package_installed(&pkg.name, sub_package_to_uninstall.as_deref(), scope)?
-        {
-            (m, scope)
-        } else {
-            return Err(anyhow::anyhow!(
-                "Package '{}' is not installed in the specified scope.",
-                package_name
-            ));
-        }
-    } else if let Some(m) = local::is_package_installed(
-        &pkg.name,
-        sub_package_to_uninstall.as_deref(),
-        types::Scope::Project,
-    )? {
-        (m, types::Scope::Project)
-    } else if let Some(m) = local::is_package_installed(
-        &pkg.name,
-        sub_package_to_uninstall.as_deref(),
-        types::Scope::User,
-    )? {
-        (m, types::Scope::User)
-    } else if let Some(m) = local::is_package_installed(
-        &pkg.name,
-        sub_package_to_uninstall.as_deref(),
-        types::Scope::System,
-    )? {
-        (m, types::Scope::System)
-    } else {
-        return Err(anyhow::anyhow!(
-            "Package '{}' is not installed by Zoi.",
-            package_name
-        ));
-    };
+    let (manifest, scope) = find_installed_manifest(&request, scope_override)?;
+    let sub_package_to_uninstall = manifest.sub_package.clone();
+    let registry_handle = Some(manifest.registry_handle.clone());
+    let (pkg, pkg_lua_path) = load_installed_package(&manifest, yes)?;
 
     if pkg.package_type == types::PackageType::Collection {
-        return uninstall_collection(&pkg, &manifest, scope, registry_handle, yes);
+        return uninstall_collection(&pkg, &manifest, scope, registry_handle.clone(), yes);
     }
 
     if let Some(hooks) = &pkg.hooks
@@ -191,7 +223,7 @@ pub fn run(
         return Err(anyhow::anyhow!("Pre-remove hook failed: {}", e));
     }
 
-    let handle = registry_handle.as_deref().unwrap_or("local");
+    let handle = manifest.registry_handle.as_str();
     let package_dir = local::get_package_dir(scope, handle, &pkg.repo, &pkg.name)?;
     let version_dir = package_dir.join(&manifest.version);
 
@@ -414,9 +446,9 @@ pub fn run(
             && dep.manager == "zoi"
         {
             let dep_req = resolve::parse_source_string(dep.package)?;
-            if let Ok(Some(dep_manifest)) =
-                local::is_package_installed(&dep_req.name, dep_req.sub_package.as_deref(), scope)
-            {
+            let dep_matches = local::find_installed_manifests_matching(&dep_req, scope)?;
+            if dep_matches.len() == 1 {
+                let dep_manifest = &dep_matches[0];
                 match local::get_package_dir(
                     dep_manifest.scope,
                     &dep_manifest.registry_handle,
@@ -442,9 +474,7 @@ pub fn run(
         }
     }
 
-    if let Err(e) =
-        recorder::remove_package_from_record(&pkg.name, sub_package_to_uninstall.as_deref(), scope)
-    {
+    if let Err(e) = recorder::remove_package_from_record(&manifest) {
         eprintln!(
             "{} Failed to remove package from lockfile: {}",
             "Warning:".yellow(),
@@ -468,7 +498,7 @@ pub fn run(
         "uninstall",
         &pkg,
         env!("CARGO_PKG_VERSION"),
-        registry_handle.as_deref().unwrap_or("local"),
+        &manifest.registry_handle,
         None,
     ) {
         Ok(true) => println!("{} telemetry sent", "Info:".green()),
@@ -479,7 +509,7 @@ pub fn run(
     if let Some(hooks) = &pkg.hooks
         && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PostRemove)
     {
-        return Err(anyhow::anyhow!("Post-remove hook failed: {}", e));
+        eprintln!("{} post-remove hook failed: {}", "Warning:".yellow(), e);
     }
 
     Ok(manifest)

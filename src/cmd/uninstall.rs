@@ -47,9 +47,13 @@ pub fn run(
     let expanded_names = utils::expand_split_packages(package_names, "Uninstalling")?;
 
     for name in &expanded_names {
-        if let Err(e) =
-            resolve_and_add_manifest(name, &installed_packages, &mut manifests_to_uninstall)
-        {
+        if let Err(e) = resolve_and_add_manifest(
+            name,
+            &installed_packages,
+            &mut manifests_to_uninstall,
+            scope_override,
+            yes,
+        ) {
             eprintln!("{}", e);
             failed_resolution = true;
         }
@@ -76,12 +80,20 @@ pub fn run(
         return Ok(());
     }
 
-    manifests_to_uninstall.sort_by(|a, b| a.name.cmp(&b.name));
+    manifests_to_uninstall.sort_by(|a, b| {
+        a.name
+            .cmp(&b.name)
+            .then_with(|| scope_rank(a.scope).cmp(&scope_rank(b.scope)))
+            .then_with(|| a.registry_handle.cmp(&b.registry_handle))
+            .then_with(|| a.repo.cmp(&b.repo))
+            .then_with(|| a.sub_package.cmp(&b.sub_package))
+    });
     manifests_to_uninstall.dedup_by(|a, b| {
         a.name == b.name
             && a.sub_package == b.sub_package
             && a.repo == b.repo
             && a.registry_handle == b.registry_handle
+            && a.scope == b.scope
     });
 
     let mut total_size_freed_bytes: u64 = 0;
@@ -384,6 +396,14 @@ fn removal_identity(manifest: &types::InstallManifest) -> String {
     }
 }
 
+fn scope_rank(scope: types::Scope) -> u8 {
+    match scope {
+        types::Scope::Project => 0,
+        types::Scope::User => 1,
+        types::Scope::System => 2,
+    }
+}
+
 fn collect_external_dependents(
     removal_ids: &std::collections::HashSet<String>,
     dependents: Vec<String>,
@@ -400,6 +420,8 @@ fn resolve_and_add_manifest(
     name: &str,
     installed_packages: &[types::InstallManifest],
     manifests_to_uninstall: &mut Vec<types::InstallManifest>,
+    scope_override: Option<types::Scope>,
+    yes: bool,
 ) -> Result<(), String> {
     let request = match pkg::resolve::parse_source_string(name) {
         Ok(req) => req,
@@ -411,7 +433,8 @@ fn resolve_and_add_manifest(
         .filter(|m| {
             let name_matches = m.name == request.name;
             let sub_matches = m.sub_package == request.sub_package;
-            name_matches && sub_matches
+            let scope_matches = scope_override.is_none_or(|scope| m.scope == scope);
+            name_matches && sub_matches && scope_matches
         })
         .collect();
 
@@ -436,18 +459,24 @@ fn resolve_and_add_manifest(
             Ok(())
         }
         _ => {
-            let mut error_msg = format!(
-                "Error: Ambiguous package name '{}'. It is installed from multiple repositories:\n",
-                name
-            );
-            for manifest in candidates {
-                error_msg.push_str(&format!(
-                    "  - #{}@{}/{}\n",
-                    manifest.registry_handle, manifest.repo, manifest.name
-                ));
+            let owned_candidates = candidates.into_iter().cloned().collect::<Vec<_>>();
+            let chosen = crate::cmd::installed_select::choose_installed_manifest(
+                name,
+                &owned_candidates,
+                yes,
+            )
+            .map_err(|e| format!("Error: {}", e))?;
+
+            if !manifests_to_uninstall.iter().any(|m| {
+                m.name == chosen.name
+                    && m.sub_package == chosen.sub_package
+                    && m.repo == chosen.repo
+                    && m.registry_handle == chosen.registry_handle
+                    && m.scope == chosen.scope
+            }) {
+                manifests_to_uninstall.push(chosen);
             }
-            error_msg.push_str("Please be more specific, e.g. '#handle@repo/name'.");
-            Err(error_msg)
+            Ok(())
         }
     }
 }
@@ -471,11 +500,25 @@ fn collect_recursive_uninstalls(
                         Err(_) => continue,
                     };
 
-                    let dep_manifest = installed_packages
+                    let matching_dep_manifests = installed_packages
                         .iter()
-                        .find(|m| m.name == dep_req.name && m.sub_package == dep_req.sub_package);
+                        .filter(|m| {
+                            m.name == dep_req.name
+                                && m.sub_package == dep_req.sub_package
+                                && dep_req.repo.as_ref().is_none_or(|repo| m.repo == *repo)
+                                && dep_req
+                                    .handle
+                                    .as_ref()
+                                    .is_none_or(|handle| m.registry_handle == *handle)
+                                && dep_req
+                                    .version_spec
+                                    .as_ref()
+                                    .is_none_or(|version| m.version == *version)
+                        })
+                        .collect::<Vec<_>>();
 
-                    if let Some(dm) = dep_manifest {
+                    if matching_dep_manifests.len() == 1 {
+                        let dm = matching_dep_manifests[0];
                         if !matches!(dm.reason, types::InstallReason::Dependency { .. }) {
                             continue;
                         }

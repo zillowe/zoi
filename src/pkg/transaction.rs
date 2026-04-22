@@ -121,6 +121,10 @@ fn has_files_outside_store(manifest: &types::InstallManifest) -> bool {
     false
 }
 
+fn install_source_for_manifest(manifest: &types::InstallManifest) -> String {
+    local::installed_manifest_source(manifest)
+}
+
 pub fn rollback(transaction_id: &str) -> Result<()> {
     let path = get_transaction_path(transaction_id)?;
     if !path.exists() {
@@ -142,7 +146,8 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                     manifest.name.cyan(),
                     manifest.version.yellow()
                 );
-                if let Err(e) = uninstall::run(&manifest.name, Some(manifest.scope), true) {
+                let source = install_source_for_manifest(manifest);
+                if let Err(e) = uninstall::run(&source, Some(manifest.scope), true) {
                     eprintln!(
                         "{} Failed to rollback install of '{}': {}",
                         "Error:".red().bold(),
@@ -203,10 +208,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                     "Version not found locally or contains global files. Re-installing from registry..."
                 );
 
-                let source = format!(
-                    "#{}@{}/{}@{}",
-                    manifest.registry_handle, manifest.repo, manifest.name, manifest.version
-                );
+                let source = install_source_for_manifest(manifest);
                 let (graph, _) = match install::resolver::resolve_dependency_graph(
                     &[source],
                     Some(manifest.scope),
@@ -285,7 +287,8 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                     new_manifest.version.yellow(),
                     old_manifest.version.green()
                 );
-                if let Err(e) = uninstall::run(&new_manifest.name, Some(new_manifest.scope), true) {
+                let source = install_source_for_manifest(new_manifest);
+                if let Err(e) = uninstall::run(&source, Some(new_manifest.scope), true) {
                     eprintln!(
                         "{} Failed to uninstall new version during upgrade-rollback for '{}': {}",
                         "Error:".red().bold(),
@@ -342,13 +345,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                     "Version not found locally or contains global files. Re-installing from registry..."
                 );
 
-                let source = format!(
-                    "#{}@{}/{}@{}",
-                    old_manifest.registry_handle,
-                    old_manifest.repo,
-                    old_manifest.name,
-                    old_manifest.version
-                );
+                let source = install_source_for_manifest(old_manifest);
                 let (graph, _) = match install::resolver::resolve_dependency_graph(
                     std::slice::from_ref(&source),
                     Some(old_manifest.scope),

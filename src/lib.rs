@@ -349,7 +349,9 @@ pub fn install_package(
 ///
 /// # Arguments
 ///
-/// * `package_name`: The name of the package to uninstall.
+/// * `package_name`: The package identifier to uninstall. Use an explicit source
+///   like `#handle@repo/name[:sub]@version` when multiple installed packages
+///   share the same name.
 /// * `scope_override`: Optionally specify the scope to uninstall from. If `None`, Zoi
 ///   will search for the package across all scopes.
 ///

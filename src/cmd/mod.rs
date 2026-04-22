@@ -16,6 +16,7 @@ pub mod helper;
 pub mod history;
 pub mod info;
 pub mod install;
+pub mod installed_select;
 pub mod list;
 pub mod man;
 pub mod mark;

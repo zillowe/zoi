@@ -27,61 +27,67 @@ pub fn run(package_names: &[String], as_dependency: bool, as_explicit: bool) -> 
         let request = resolve::parse_source_string(name)?;
         let (pkg, _, _, _, registry_handle, _) =
             resolve::resolve_package_and_version(name, true, false)?;
-
-        let (manifest, scope) = if let Some(m) = local::is_package_installed(
-            &pkg.name,
-            request.sub_package.as_deref(),
-            types::Scope::User,
-        )? {
-            (m, types::Scope::User)
-        } else if let Some(m) = local::is_package_installed(
-            &pkg.name,
-            request.sub_package.as_deref(),
-            types::Scope::System,
-        )? {
-            (m, types::Scope::System)
-        } else if let Some(m) = local::is_package_installed(
-            &pkg.name,
-            request.sub_package.as_deref(),
-            types::Scope::Project,
-        )? {
-            (m, types::Scope::Project)
+        let installed_source = if let Some(sub) = request.sub_package.as_deref() {
+            format!(
+                "#{}@{}/{}:{}",
+                registry_handle.as_deref().unwrap_or("local"),
+                pkg.repo,
+                pkg.name,
+                sub
+            )
         } else {
-            eprintln!(
-                "{}: Package '{}' is not installed.",
-                "Error".red().bold(),
-                name
-            );
-            continue;
+            format!(
+                "#{}@{}/{}",
+                registry_handle.as_deref().unwrap_or("local"),
+                pkg.repo,
+                pkg.name
+            )
         };
+        let installed_request = resolve::parse_source_string(&installed_source)?;
+        let mut candidates = Vec::new();
+        for scope in [
+            types::Scope::User,
+            types::Scope::System,
+            types::Scope::Project,
+        ] {
+            candidates.extend(local::find_installed_manifests_matching(
+                &installed_request,
+                scope,
+            )?);
+        }
 
-        local::update_manifest_reason(
-            &pkg.name,
-            request.sub_package.as_deref(),
-            scope,
-            new_reason.clone(),
-        )?;
+        let manifest =
+            match crate::cmd::installed_select::choose_installed_manifest(name, &candidates, false)
+            {
+                Ok(manifest) => manifest,
+                Err(e) => {
+                    eprintln!("{}: {}", "Error".red().bold(), e);
+                    continue;
+                }
+            };
+        let scope = manifest.scope;
+
+        local::update_manifest_reason(&manifest, new_reason.clone())?;
 
         let handle = registry_handle
             .as_deref()
             .unwrap_or(&manifest.registry_handle);
+        let mut db_pkg = pkg.clone();
+        db_pkg.repo = manifest.repo.clone();
+        db_pkg.scope = manifest.scope;
+        db_pkg.sub_package = manifest.sub_package.clone();
         if let Ok(conn) = db::open_connection("local") {
             let _ = db::update_package(
                 &conn,
-                &pkg,
+                &db_pkg,
                 handle,
                 Some(scope),
-                request.sub_package.as_deref(),
+                manifest.sub_package.as_deref(),
                 Some(&new_reason),
             );
         }
 
-        let _ = recorder::update_package_reason(
-            &pkg.name,
-            request.sub_package.as_deref(),
-            scope,
-            new_reason.clone(),
-        );
+        let _ = recorder::update_package_reason(&manifest, new_reason.clone());
 
         println!(
             "Successfully marked '{}' as {}.",

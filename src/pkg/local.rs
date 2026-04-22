@@ -1,4 +1,5 @@
 use crate::pkg::config;
+use crate::pkg::resolve::PackageRequest;
 use crate::pkg::resolve::get_db_root;
 use crate::pkg::sysroot::apply_sysroot;
 use crate::pkg::types::{self, InstallManifest, Scope};
@@ -174,6 +175,102 @@ pub fn is_package_installed(
     Ok(None)
 }
 
+pub fn get_installed_manifests_in_scope(scope: Scope) -> Result<Vec<InstallManifest>> {
+    let store_root = get_store_base_dir(scope)?;
+    if !store_root.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut manifests = Vec::new();
+    for entry in fs::read_dir(store_root)? {
+        let entry = entry?;
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+
+        let latest_path = path.join("latest");
+        if !(latest_path.is_symlink() || latest_path.is_dir()) {
+            continue;
+        }
+
+        let Ok(entries) = fs::read_dir(&latest_path) else {
+            continue;
+        };
+
+        for entry in entries.filter_map(Result::ok) {
+            let file_name = entry.file_name().to_string_lossy().to_string();
+            if !file_name.starts_with("manifest") || !file_name.ends_with(".yaml") {
+                continue;
+            }
+
+            let manifest_path = entry.path();
+            if !manifest_path.exists() {
+                continue;
+            }
+
+            let content = fs::read_to_string(manifest_path)?;
+            let manifest: InstallManifest = serde_yaml::from_str(&content)?;
+            manifests.push(manifest);
+        }
+    }
+
+    Ok(manifests)
+}
+
+pub fn find_installed_manifests_matching(
+    request: &PackageRequest,
+    scope: Scope,
+) -> Result<Vec<InstallManifest>> {
+    let manifests = get_installed_manifests_in_scope(scope)?;
+    Ok(manifests
+        .into_iter()
+        .filter(|manifest| {
+            manifest.name == request.name
+                && manifest.sub_package == request.sub_package
+                && request
+                    .handle
+                    .as_ref()
+                    .is_none_or(|handle| manifest.registry_handle == *handle)
+                && request
+                    .repo
+                    .as_ref()
+                    .is_none_or(|repo| manifest.repo == *repo)
+                && request
+                    .version_spec
+                    .as_ref()
+                    .is_none_or(|version| manifest.version == *version)
+        })
+        .collect())
+}
+
+pub fn package_source_string(
+    registry_handle: &str,
+    repo: &str,
+    name: &str,
+    sub_package: Option<&str>,
+    version: &str,
+) -> String {
+    if let Some(sub_package) = sub_package {
+        format!(
+            "#{}@{}/{}:{}@{}",
+            registry_handle, repo, name, sub_package, version
+        )
+    } else {
+        format!("#{}@{}/{}@{}", registry_handle, repo, name, version)
+    }
+}
+
+pub fn installed_manifest_source(manifest: &InstallManifest) -> String {
+    package_source_string(
+        &manifest.registry_handle,
+        &manifest.repo,
+        &manifest.name,
+        manifest.sub_package.as_deref(),
+        &manifest.version,
+    )
+}
+
 pub fn get_packages_from_repos(repos: &[String]) -> Result<Vec<super::types::Package>> {
     let db_root = get_db_root()?;
     if !db_root.exists() {
@@ -323,17 +420,32 @@ pub fn write_manifest(manifest: &InstallManifest) -> Result<()> {
     Ok(())
 }
 
+pub fn get_package_source_path(manifest: &InstallManifest) -> Result<PathBuf> {
+    let version_dir = get_package_version_dir(
+        manifest.scope,
+        &manifest.registry_handle,
+        &manifest.repo,
+        &manifest.name,
+        &manifest.version,
+    )?;
+    Ok(version_dir.join("package.pkg.lua"))
+}
+
+pub fn persist_package_source(manifest: &InstallManifest, source_path: &Path) -> Result<()> {
+    let stored_source_path = get_package_source_path(manifest)?;
+    if let Some(parent) = stored_source_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::copy(source_path, stored_source_path)?;
+    Ok(())
+}
+
 pub fn update_manifest_reason(
-    name: &str,
-    sub_package: Option<&str>,
-    scope: Scope,
+    manifest: &InstallManifest,
     new_reason: types::InstallReason,
 ) -> Result<()> {
-    if let Some(mut manifest) = is_package_installed(name, sub_package, scope)? {
-        manifest.reason = new_reason;
-        write_manifest(&manifest)?;
-        Ok(())
-    } else {
-        Err(anyhow::anyhow!("Package '{}' not installed.", name))
-    }
+    let mut updated_manifest = manifest.clone();
+    updated_manifest.reason = new_reason;
+    write_manifest(&updated_manifest)?;
+    Ok(())
 }
