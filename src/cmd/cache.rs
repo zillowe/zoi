@@ -77,3 +77,29 @@ Total: {} archives",
 
     Ok(())
 }
+
+pub fn add_mirror(url: &str) -> Result<()> {
+    crate::pkg::config::add_cache_mirror(url)?;
+    println!("Added cache mirror '{}'.", url.cyan());
+    Ok(())
+}
+
+pub fn remove_mirror(url: &str) -> Result<()> {
+    crate::pkg::config::remove_cache_mirror(url)?;
+    println!("Removed cache mirror '{}'.", url.cyan());
+    Ok(())
+}
+
+pub fn list_mirrors() -> Result<()> {
+    let config = crate::pkg::config::read_config()?;
+    if config.cache_mirrors.is_empty() {
+        println!("No cache mirrors configured.");
+        return Ok(());
+    }
+
+    println!("{} Configured cache mirrors:", "::".bold().blue());
+    for mirror in config.cache_mirrors {
+        println!("  - {}", mirror.cyan());
+    }
+    Ok(())
+}

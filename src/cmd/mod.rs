@@ -35,6 +35,7 @@ pub mod shell;
 pub mod show;
 pub mod sync;
 pub mod telemetry;
+pub mod transaction;
 pub mod tree;
 pub mod uninstall;
 pub mod unpin;

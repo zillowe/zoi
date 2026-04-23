@@ -7,6 +7,13 @@ use std::fs;
 use std::path::PathBuf;
 use uuid::{Timestamp, Uuid};
 
+#[derive(Debug, Clone)]
+pub struct TransactionMetadata {
+    pub id: String,
+    pub start_time: String,
+    pub operation_count: usize,
+}
+
 fn get_transactions_dir() -> Result<PathBuf> {
     let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
     let dir = home_dir.join(".zoi").join("transactions");
@@ -33,6 +40,18 @@ pub fn begin() -> Result<types::Transaction> {
     let content = serde_json::to_string_pretty(&transaction)?;
     fs::write(path, content)?;
     Ok(transaction)
+}
+
+pub fn read_transaction(transaction_id: &str) -> Result<types::Transaction> {
+    let path = get_transaction_path(transaction_id)?;
+    if !path.exists() {
+        return Err(anyhow!(
+            "Transaction log not found for ID: {}",
+            transaction_id
+        ));
+    }
+    let content = fs::read_to_string(path)?;
+    Ok(serde_json::from_str(&content)?)
 }
 
 pub fn record_operation(
@@ -107,6 +126,33 @@ pub fn delete_log(transaction_id: &str) -> Result<()> {
         fs::remove_file(path)?;
     }
     Ok(())
+}
+
+pub fn list_transactions() -> Result<Vec<TransactionMetadata>> {
+    let dir = get_transactions_dir()?;
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut transactions = Vec::new();
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if !path.is_file() || path.extension().and_then(|s| s.to_str()) != Some("json") {
+            continue;
+        }
+
+        let content = fs::read_to_string(&path)?;
+        let transaction: types::Transaction = serde_json::from_str(&content)?;
+        transactions.push(TransactionMetadata {
+            id: transaction.id,
+            start_time: transaction.start_time,
+            operation_count: transaction.operations.len(),
+        });
+    }
+
+    transactions.sort_by(|a, b| b.start_time.cmp(&a.start_time));
+    Ok(transactions)
 }
 
 fn has_files_outside_store(manifest: &types::InstallManifest) -> bool {

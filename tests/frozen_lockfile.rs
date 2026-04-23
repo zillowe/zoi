@@ -55,6 +55,62 @@ fn test_sources_from_lock_falls_back_to_details_when_packages_empty() {
 }
 
 #[test]
+fn test_locked_packages_preserve_direct_flags_and_metadata() {
+    let mut lock = ZoiLock {
+        version: "1".to_string(),
+        ..Default::default()
+    };
+    lock.packages
+        .insert("#zoidberg@core/app".to_string(), "1.0.0".to_string());
+
+    let mut reg_details = HashMap::new();
+    reg_details.insert(
+        "@core/app".to_string(),
+        LockPackageDetail {
+            version: "1.0.0".to_string(),
+            sub_package: None,
+            integrity: "abc".to_string(),
+            git_sha: Some("deadbeef".to_string()),
+            dependencies: vec!["zoi:#zoidberg@core/lib@2.0.0".to_string()],
+            options_dependencies: vec!["feature-a".to_string()],
+            optionals_dependencies: vec!["feature-b".to_string()],
+        },
+    );
+    reg_details.insert(
+        "@core/lib".to_string(),
+        LockPackageDetail {
+            version: "2.0.0".to_string(),
+            sub_package: None,
+            integrity: "def".to_string(),
+            git_sha: None,
+            dependencies: vec![],
+            options_dependencies: vec![],
+            optionals_dependencies: vec![],
+        },
+    );
+    lock.details.insert("#zoidberg".to_string(), reg_details);
+
+    let locked = lockfile::locked_packages(&lock);
+    assert_eq!(locked.len(), 2);
+
+    let app = locked
+        .iter()
+        .find(|entry| entry.source == "#zoidberg@core/app@1.0.0")
+        .expect("app entry should exist");
+    assert!(app.direct);
+    assert_eq!(app.git_sha.as_deref(), Some("deadbeef"));
+    assert_eq!(app.dependencies, vec!["zoi:#zoidberg@core/lib@2.0.0"]);
+    assert_eq!(app.chosen_options, vec!["feature-a"]);
+    assert_eq!(app.chosen_optionals, vec!["feature-b"]);
+
+    let lib = locked
+        .iter()
+        .find(|entry| entry.source == "#zoidberg@core/lib@2.0.0")
+        .expect("lib entry should exist");
+    assert!(!lib.direct);
+}
+
+#[test]
 fn test_install_frozen_lockfile_rejects_explicit_sources() {
     let plugin_manager = PluginManager::new().expect("plugin manager should initialize");
 

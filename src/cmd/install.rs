@@ -87,14 +87,20 @@ pub fn run(
 
     let mut sources_to_process: Vec<String> = sources.to_vec();
     let mut is_project_install = false;
+    let mut frozen_locked_packages = None;
     if frozen_lockfile {
         let lockfile = project::lockfile::read_zoi_lock()?;
-        sources_to_process = project::lockfile::sources_from_lock(&lockfile);
+        let locked_packages = project::lockfile::locked_packages(&lockfile);
+        sources_to_process = locked_packages
+            .iter()
+            .map(|entry| entry.source.clone())
+            .collect();
         if sources_to_process.is_empty() {
             return Err(anyhow!(
                 "zoi.lock is empty. Cannot continue with --frozen-lockfile."
             ));
         }
+        frozen_locked_packages = Some(locked_packages);
         println!(
             "{} --frozen-lockfile enabled. Installing pinned lockfile sources only...",
             "::".bold().blue()
@@ -185,26 +191,44 @@ pub fn run(
     let successfully_installed_sources = Mutex::new(Vec::new());
     let installed_manifests = Mutex::new(Vec::new());
 
-    let (mut graph, non_zoi_deps) = install::resolver::resolve_dependency_graph(
-        &final_sources,
-        scope_override,
-        force,
-        yes,
-        all_optional,
-        build_type.as_deref(),
-        false,
-    )?;
+    let (mut graph, non_zoi_deps) = if let Some(locked_packages) = frozen_locked_packages.as_ref() {
+        install::resolver::build_graph_from_locked_packages(
+            locked_packages,
+            scope_override,
+            false,
+            yes,
+        )?
+    } else {
+        install::resolver::resolve_dependency_graph(
+            &final_sources,
+            scope_override,
+            force,
+            yes,
+            all_optional,
+            build_type.as_deref(),
+            false,
+        )?
+    };
 
     let mut skipped_existing_count = 0usize;
     if !force {
         let mut to_remove = Vec::new();
         for (pkg_id, node) in &graph.nodes {
-            let request = resolve::parse_source_string(&node.source)?;
-            if let Some(manifest) = crate::pkg::local::is_package_installed(
+            let request_source = crate::pkg::local::package_source_string(
+                &node.registry_handle,
+                &node.pkg.repo,
                 &node.pkg.name,
-                request.sub_package.as_deref(),
+                node.sub_package.as_deref(),
+                &node.version,
+            );
+            let request = resolve::parse_source_string(&request_source)?;
+            let matches = crate::pkg::local::find_installed_manifests_matching(
+                &request,
                 scope_override.unwrap_or(node.pkg.scope),
-            )? && manifest.version == node.version
+            )?;
+            if matches
+                .iter()
+                .any(|manifest| manifest.version == node.version)
             {
                 println!(
                     "{} Package '{}' is already installed at version {}. Skipping.",
@@ -728,7 +752,12 @@ pub fn run(
                     "#{}@{}/{}",
                     manifest.registry_handle, manifest.repo, name_with_sub
                 );
-                lockfile.packages.insert(full_id, manifest.version.clone());
+                if matches!(
+                    manifest.reason,
+                    types::InstallReason::Direct | types::InstallReason::Declarative
+                ) {
+                    lockfile.packages.insert(full_id, manifest.version.clone());
+                }
 
                 if let Some(reg) = all_configured_regs
                     .iter()
@@ -772,20 +801,13 @@ pub fn run(
                                 let node = graph.nodes.get(dep_id).expect(
                                     "Dependency node missing from graph during lockfile update",
                                 );
-                                if let Some(sub) = &node.pkg.sub_packages {
-                                    format!(
-                                        "#{}@{}/{}:{}",
-                                        node.registry_handle,
-                                        node.pkg.repo,
-                                        node.pkg.name,
-                                        sub.join(",")
-                                    )
-                                } else {
-                                    format!(
-                                        "#{}@{}/{}",
-                                        node.registry_handle, node.pkg.repo, node.pkg.name
-                                    )
-                                }
+                                crate::pkg::local::package_source_string(
+                                    &node.registry_handle,
+                                    &node.pkg.repo,
+                                    &node.pkg.name,
+                                    node.sub_package.as_deref(),
+                                    &node.version,
+                                )
                             })
                             .collect()
                     })

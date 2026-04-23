@@ -475,6 +475,27 @@ pub fn get_filename_from_url(url: &str) -> &str {
     url.split('/').next_back().unwrap_or_default()
 }
 
+fn get_text_from_candidate_urls(urls: &[String], resource_name: &str) -> Result<String> {
+    let client = crate::utils::get_http_client()?;
+    let mut last_error = None;
+
+    for candidate_url in urls {
+        match client.get(candidate_url).send() {
+            Ok(response) => match response.text() {
+                Ok(text) => return Ok(text),
+                Err(e) => last_error = Some(format!("{} ({})", candidate_url, e)),
+            },
+            Err(e) => last_error = Some(format!("{} ({})", candidate_url, e)),
+        }
+    }
+
+    Err(anyhow!(
+        "Failed to fetch {} from any configured source: {}",
+        resource_name,
+        last_error.unwrap_or_else(|| "no candidate URLs were attempted".to_string())
+    ))
+}
+
 pub fn download_file_with_progress(
     url: &str,
     dest_path: &Path,
@@ -604,7 +625,14 @@ pub fn verify_file_hash(
 ) -> Result<bool> {
     let mut file = File::open(file_path)?;
     let mut hasher = Sha512::new();
-    std::io::copy(&mut file, &mut hasher)?;
+    let mut buffer = [0; 8192];
+    loop {
+        let bytes_read = file.read(&mut buffer)?;
+        if bytes_read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..bytes_read]);
+    }
     let actual_hash = hex::encode(hasher.finalize());
 
     let expected_clean = expected_hash.trim().to_lowercase();
@@ -652,13 +680,7 @@ pub fn get_remote_file_list(url: &str) -> Result<Vec<String>> {
     if crate::pkg::offline::is_offline() {
         return Ok(Vec::new());
     }
-    let client = crate::utils::get_http_client()?;
-    let resp = client
-        .get(url)
-        .send()
-        .map_err(|e| anyhow!("Failed to fetch files list from {}: {}", url, e))?
-        .text()
-        .map_err(|e| anyhow!("Failed to read files list content from {}: {}", url, e))?;
+    let resp = get_text_from_candidate_urls(&cache::mirror_candidate_urls(url), "files list")?;
 
     Ok(resp
         .lines()
@@ -871,13 +893,7 @@ pub fn get_expected_hash(hash_url: &str, filename: Option<&str>) -> Result<Strin
     if crate::pkg::offline::is_offline() {
         return Ok(String::new());
     }
-    let client = crate::utils::get_http_client()?;
-    let resp = client
-        .get(hash_url)
-        .send()
-        .map_err(|e| anyhow!("Failed to fetch hash file from {}: {}", hash_url, e))?
-        .text()
-        .map_err(|e| anyhow!("Failed to read hash file content from {}: {}", hash_url, e))?;
+    let resp = get_text_from_candidate_urls(&cache::mirror_candidate_urls(hash_url), "hash file")?;
 
     let is_sha512 = |s: &str| s.len() == 128 && s.chars().all(|c| c.is_ascii_hexdigit());
 
@@ -909,13 +925,7 @@ pub fn get_expected_size(size_url: &str) -> Result<(u64, u64)> {
     if crate::pkg::offline::is_offline() {
         return Ok((0, 0));
     }
-    let client = crate::utils::get_http_client()?;
-    let resp = client
-        .get(size_url)
-        .send()
-        .map_err(|e| anyhow!("Failed to fetch size file from {}: {}", size_url, e))?
-        .text()
-        .map_err(|e| anyhow!("Failed to read size file content from {}: {}", size_url, e))?;
+    let resp = get_text_from_candidate_urls(&cache::mirror_candidate_urls(size_url), "size file")?;
 
     let mut download_size = 0;
     let mut installed_size = 0;

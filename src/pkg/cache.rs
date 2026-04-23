@@ -13,6 +13,23 @@ pub fn get_archive_cache_root() -> Result<PathBuf> {
     Ok(cache_root.join("archives"))
 }
 
+pub fn mirror_candidate_urls(url: &str) -> Vec<String> {
+    let mut urls = vec![url.to_string()];
+    let Ok(config) = crate::pkg::config::read_config() else {
+        return urls;
+    };
+
+    let Some(filename) = url.split('/').next_back().filter(|part| !part.is_empty()) else {
+        return urls;
+    };
+
+    for mirror in config.cache_mirrors {
+        urls.push(format!("{}/{}", mirror.trim_end_matches('/'), filename));
+    }
+
+    urls
+}
+
 pub fn clear(dry_run: bool) -> Result<()> {
     let cache_dir = get_cache_root()?;
     if cache_dir.exists() {

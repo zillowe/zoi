@@ -4,38 +4,19 @@ use colored::*;
 
 pub fn run(package_name: &str) -> Result<()> {
     let request = resolve::parse_source_string(package_name)?;
-    let (pkg_meta, _, _, _, _, _) =
-        resolve::resolve_package_and_version(package_name, false, false)?;
-
-    let user_manifest = local::is_package_installed(
-        &pkg_meta.name,
-        request.sub_package.as_deref(),
+    let mut candidates = Vec::new();
+    for scope in [
         types::Scope::User,
-    )?;
-    let system_manifest = local::is_package_installed(
-        &pkg_meta.name,
-        request.sub_package.as_deref(),
         types::Scope::System,
-    )?;
-    let _project_manifest = local::is_package_installed(
-        &pkg_meta.name,
-        request.sub_package.as_deref(),
         types::Scope::Project,
-    )?;
-
-    let manifest = match (user_manifest, system_manifest) {
-        (Some(m), None) => m,
-        (None, Some(m)) => m,
-        (Some(_), Some(_)) => {
-            return Err(anyhow!(
-                "Package '{}' is installed in both user and system scopes. This is an ambiguous state.",
-                package_name
-            ));
-        }
-        (None, None) => {
-            return Err(anyhow!("Package '{}' is not installed.", package_name));
-        }
-    };
+    ] {
+        candidates.extend(local::find_installed_manifests_matching(&request, scope)?);
+    }
+    if candidates.is_empty() {
+        return Err(anyhow!("Package '{}' is not installed.", package_name));
+    }
+    let manifest =
+        crate::cmd::installed_select::choose_installed_manifest(package_name, &candidates, false)?;
 
     let pkg_dir = local::get_package_dir(
         manifest.scope,
@@ -63,18 +44,18 @@ pub fn run(package_name: &str) -> Result<()> {
         if matches!(manifest.reason, types::InstallReason::Dependency { .. }) {
             println!(
                 "Package '{}' is installed as a dependency, but no packages list it as a requirement. It may be an orphan.",
-                package_name.bold()
+                local::installed_manifest_source(&manifest).bold()
             );
         } else {
             println!(
                 "Package '{}' is installed, but its installation reason is unclear.",
-                package_name.bold()
+                local::installed_manifest_source(&manifest).bold()
             );
         }
     } else {
         println!(
             "Package '{}' is installed because {}.",
-            package_name.bold(),
+            local::installed_manifest_source(&manifest).bold(),
             reasons.join(" and ")
         );
     }

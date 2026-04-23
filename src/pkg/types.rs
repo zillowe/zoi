@@ -503,6 +503,8 @@ pub struct Config {
     #[serde(default)]
     pub pkg_dirs: Vec<String>,
     #[serde(default)]
+    pub cache_mirrors: Vec<String>,
+    #[serde(default)]
     pub versions: HashMap<String, String>,
 }
 
@@ -529,6 +531,7 @@ impl Default for Config {
             max_resolution_depth: None,
             offline_mode: false,
             pkg_dirs: Vec::new(),
+            cache_mirrors: Vec::new(),
             versions: HashMap::new(),
         }
     }
@@ -562,6 +565,8 @@ pub struct Policy {
     pub offline_mode_unoverridable: bool,
     #[serde(default, skip_serializing_if = "is_false")]
     pub pkg_dirs_unoverridable: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub cache_mirrors_unoverridable: bool,
     #[serde(default, skip_serializing_if = "is_false")]
     pub parallel_jobs_unoverridable: bool,
     #[serde(default, skip_serializing_if = "is_false")]

@@ -526,6 +526,13 @@ enum Commands {
         command: CacheCommands,
     },
 
+    /// Inspect recorded transactions
+    #[command(alias = "tx")]
+    Transaction {
+        #[command(subcommand)]
+        command: TransactionCommands,
+    },
+
     /// Manage package repositories
     #[command(
         aliases = ["repositories"],
@@ -695,6 +702,45 @@ pub enum CacheCommands {
     /// List all archives currently in the cache
     #[command(alias = "ls")]
     List,
+    /// Manage cache mirrors used for archive downloads
+    Mirror {
+        #[command(subcommand)]
+        command: CacheMirrorCommands,
+    },
+}
+
+#[derive(clap::Subcommand)]
+pub enum CacheMirrorCommands {
+    /// Add a cache mirror base URL
+    Add {
+        /// Mirror base URL
+        url: String,
+    },
+    /// Remove a cache mirror base URL
+    Remove {
+        /// Mirror base URL
+        url: String,
+    },
+    /// List configured cache mirrors
+    #[command(alias = "ls")]
+    List,
+}
+
+#[derive(clap::Subcommand)]
+pub enum TransactionCommands {
+    /// List known transaction logs
+    #[command(alias = "ls")]
+    List,
+    /// Show details for a transaction
+    Show {
+        /// Transaction ID
+        id: String,
+    },
+    /// List modified files for a transaction
+    Files {
+        /// Transaction ID
+        id: String,
+    },
 }
 
 #[derive(clap::ValueEnum, Clone)]
@@ -1038,6 +1084,16 @@ pub fn run() -> anyhow::Result<()> {
                 CacheCommands::Add { files } => cmd::cache::add(&files),
                 CacheCommands::Clear { dry_run } => cmd::cache::clear(dry_run),
                 CacheCommands::List => cmd::cache::list(),
+                CacheCommands::Mirror { command } => match command {
+                    CacheMirrorCommands::Add { url } => cmd::cache::add_mirror(&url),
+                    CacheMirrorCommands::Remove { url } => cmd::cache::remove_mirror(&url),
+                    CacheMirrorCommands::List => cmd::cache::list_mirrors(),
+                },
+            },
+            Commands::Transaction { command } => match command {
+                TransactionCommands::List => cmd::transaction::list(),
+                TransactionCommands::Show { id } => cmd::transaction::show(&id),
+                TransactionCommands::Files { id } => cmd::transaction::files(&id),
             },
             Commands::Repo(args) => cmd::repo::run(args),
             Commands::Telemetry { action } => {

@@ -140,6 +140,41 @@ fn test_transaction_begin_writes_log_file() {
 }
 
 #[test]
+fn test_transaction_read_and_list() {
+    let mut ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().unwrap();
+    ctx.set_env_var("HOME", tmp.path());
+
+    let first = transaction::begin().unwrap();
+    transaction::record_operation(
+        &first.id,
+        TransactionOperation::Install {
+            manifest: Box::new(sample_manifest("alpha", vec!["/tmp/a"])),
+        },
+    )
+    .unwrap();
+
+    let second = transaction::begin().unwrap();
+    transaction::record_operation(
+        &second.id,
+        TransactionOperation::Uninstall {
+            manifest: Box::new(sample_manifest("beta", vec!["/tmp/b"])),
+        },
+    )
+    .unwrap();
+
+    let read_back = transaction::read_transaction(&first.id).unwrap();
+    assert_eq!(read_back.id, first.id);
+    assert_eq!(read_back.operations.len(), 1);
+
+    let listed = transaction::list_transactions().unwrap();
+    assert_eq!(listed.len(), 2);
+    assert!(listed.iter().any(|entry| entry.id == first.id));
+    assert!(listed.iter().any(|entry| entry.id == second.id));
+    assert!(listed.iter().all(|entry| entry.operation_count == 1));
+}
+
+#[test]
 fn test_transaction_rollback_install_uses_exact_subpackage_source() {
     let mut ctx = common::TestContextGuard::acquire();
     let tmp = tempdir().unwrap();

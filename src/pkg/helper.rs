@@ -1,10 +1,23 @@
 use anyhow::{Result, anyhow};
 use sha2::{Digest, Sha256, Sha512};
 use std::fs::File;
+use std::io::Read;
 
 pub enum HashType {
     Sha512,
     Sha256,
+}
+
+fn update_digest_from_reader<R: Read, D: Digest>(reader: &mut R, hasher: &mut D) -> Result<()> {
+    let mut buffer = [0; 8192];
+    loop {
+        let bytes_read = reader.read(&mut buffer)?;
+        if bytes_read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..bytes_read]);
+    }
+    Ok(())
 }
 
 pub fn get_hash(source: &str, hash_type: HashType) -> Result<String> {
@@ -22,20 +35,20 @@ pub fn get_hash(source: &str, hash_type: HashType) -> Result<String> {
         }
         match hash_type {
             HashType::Sha512 => {
-                std::io::copy(&mut response, &mut hasher_sha512)?;
+                update_digest_from_reader(&mut response, &mut hasher_sha512)?;
             }
             HashType::Sha256 => {
-                std::io::copy(&mut response, &mut hasher_sha256)?;
+                update_digest_from_reader(&mut response, &mut hasher_sha256)?;
             }
         }
     } else {
         let mut file = File::open(source)?;
         match hash_type {
             HashType::Sha512 => {
-                std::io::copy(&mut file, &mut hasher_sha512)?;
+                update_digest_from_reader(&mut file, &mut hasher_sha512)?;
             }
             HashType::Sha256 => {
-                std::io::copy(&mut file, &mut hasher_sha256)?;
+                update_digest_from_reader(&mut file, &mut hasher_sha256)?;
             }
         }
     };

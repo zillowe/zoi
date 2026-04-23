@@ -243,6 +243,14 @@ pub fn read_config() -> Result<Config> {
     merged_cfg.pkg_dirs.sort();
     merged_cfg.pkg_dirs.dedup();
 
+    merged_cfg.cache_mirrors = system_cfg.cache_mirrors;
+    if !system_policy.cache_mirrors_unoverridable {
+        merged_cfg.cache_mirrors.extend(user_cfg.cache_mirrors);
+        merged_cfg.cache_mirrors.extend(project_cfg.cache_mirrors);
+    }
+    merged_cfg.cache_mirrors.sort();
+    merged_cfg.cache_mirrors.dedup();
+
     if !system_policy.allow_deny_lists_unoverridable {
         if project_cfg.policy.allowed_licenses.is_some() {
             merged_cfg.policy.allowed_licenses = project_cfg.policy.allowed_licenses;
@@ -531,6 +539,29 @@ pub fn remove_git_repo(repo_name: &str) -> Result<()> {
         target.display()
     );
     Ok(())
+}
+
+pub fn add_cache_mirror(url: &str) -> Result<()> {
+    let mut config = read_config_from_path(&get_user_config_path()?)?;
+    if config.cache_mirrors.iter().any(|existing| existing == url) {
+        return Err(anyhow!("Cache mirror '{}' already exists.", url));
+    }
+    config.cache_mirrors.push(url.to_string());
+    write_user_config(&config)
+}
+
+pub fn remove_cache_mirror(url: &str) -> Result<()> {
+    let mut config = read_config_from_path(&get_user_config_path()?)?;
+    if let Some(pos) = config
+        .cache_mirrors
+        .iter()
+        .position(|existing| existing == url)
+    {
+        config.cache_mirrors.remove(pos);
+        write_user_config(&config)
+    } else {
+        Err(anyhow!("Cache mirror '{}' not found.", url))
+    }
 }
 
 pub fn set_default_registry(url: &str) -> Result<()> {

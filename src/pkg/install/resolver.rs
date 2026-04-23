@@ -4,6 +4,7 @@ use crate::pkg::{
     resolve,
     types::{self, InstallReason, Package},
 };
+use crate::project::lockfile::FrozenLockPackage;
 use anyhow::{Result, anyhow};
 use pubgrub::{DependencyProvider, Ranges, resolve as pubgrub_resolve};
 use rustc_hash::FxHashMap;
@@ -136,6 +137,126 @@ impl DependencyGraph {
 
         Ok(stages)
     }
+}
+
+pub fn build_graph_from_locked_packages(
+    locked_packages: &[FrozenLockPackage],
+    scope_override: Option<types::Scope>,
+    quiet: bool,
+    yes: bool,
+) -> Result<(DependencyGraph, Vec<String>)> {
+    println!(":: Resolving dependencies from zoi.lock...");
+
+    let mut graph = DependencyGraph::new();
+    let mut reverse_deps: HashMap<String, Vec<String>> = HashMap::new();
+
+    for locked in locked_packages {
+        let request = resolve::parse_source_string(&locked.source)?;
+        let (pkg, version_str, _, pkg_lua_path, handle, git_sha) =
+            resolve::resolve_package_and_version(&locked.source, quiet, yes)?;
+
+        let mut pkg = pkg;
+        if let Some(scope) = scope_override {
+            pkg.scope = scope;
+        }
+
+        let pkg_id = if let Some(sub) = &request.sub_package {
+            format!("{}@{}:{}", pkg.name, version_str, sub)
+        } else {
+            format!("{}@{}", pkg.name, version_str)
+        };
+
+        graph.nodes.insert(
+            pkg_id.clone(),
+            InstallNode {
+                pkg,
+                version: version_str,
+                sub_package: request.sub_package.clone(),
+                reason: if locked.direct {
+                    InstallReason::Direct
+                } else {
+                    InstallReason::Dependency {
+                        parent: "unknown".to_string(),
+                    }
+                },
+                source: pkg_lua_path.to_string_lossy().to_string(),
+                registry_handle: handle.unwrap_or_else(|| "zoidberg".to_string()),
+                chosen_options: locked.chosen_options.clone(),
+                chosen_optionals: locked.chosen_optionals.clone(),
+                dependencies: locked.dependencies.clone(),
+                git_sha: locked.git_sha.clone().or(git_sha),
+            },
+        );
+    }
+
+    for (pkg_id, node) in &graph.nodes {
+        let mut children = HashSet::new();
+        for dep_str in &node.dependencies {
+            let dep = dependencies::parse_dependency_string(dep_str)?;
+            if dep.manager != "zoi" {
+                continue;
+            }
+
+            let dep_req = resolve::parse_source_string(dep.package)?;
+            let dep_version = dep.version_str.as_deref().unwrap_or_default();
+            let dep_id = if let Some(sub) = dep_req.sub_package {
+                format!("{}@{}:{}", dep_req.name, dep_version, sub)
+            } else {
+                format!("{}@{}", dep_req.name, dep_version)
+            };
+
+            if graph.nodes.contains_key(&dep_id) {
+                children.insert(dep_id.clone());
+                reverse_deps.entry(dep_id).or_default().push(pkg_id.clone());
+            }
+        }
+        graph.adj.insert(pkg_id.clone(), children);
+    }
+
+    let direct_ids: Vec<String> = graph
+        .nodes
+        .iter()
+        .filter_map(|(pkg_id, node)| {
+            let is_direct =
+                matches!(node.reason, InstallReason::Direct) || !reverse_deps.contains_key(pkg_id);
+            is_direct.then(|| pkg_id.clone())
+        })
+        .collect();
+
+    graph
+        .adj
+        .insert("$root".to_string(), direct_ids.iter().cloned().collect());
+
+    let direct_id_set: HashSet<String> = direct_ids.iter().cloned().collect();
+    let parent_sources: HashMap<String, String> = reverse_deps
+        .iter()
+        .filter_map(|(pkg_id, parents)| {
+            let parent_id = parents.first()?;
+            let parent_node = graph.nodes.get(parent_id)?;
+            Some((
+                pkg_id.clone(),
+                crate::pkg::local::package_source_string(
+                    &parent_node.registry_handle,
+                    &parent_node.pkg.repo,
+                    &parent_node.pkg.name,
+                    parent_node.sub_package.as_deref(),
+                    &parent_node.version,
+                ),
+            ))
+        })
+        .collect();
+
+    for (pkg_id, node) in &mut graph.nodes {
+        if direct_id_set.contains(pkg_id) {
+            node.reason = InstallReason::Direct;
+        } else if let Some(parent_source) = parent_sources.get(pkg_id) {
+            node.reason = InstallReason::Dependency {
+                parent: parent_source.clone(),
+            };
+        }
+    }
+
+    Ok((graph, Vec::new()))
 }
 
 pub fn resolve_dependency_graph(

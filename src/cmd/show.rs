@@ -74,18 +74,42 @@ pub fn run(source: &str, raw: bool) -> Result<()> {
     );
 
     let request = resolve::parse_source_string(source)?;
-
-    let installed_manifest =
-        match local::is_package_installed(&pkg.name, request.sub_package.as_deref(), pkg.scope) {
-            Ok(manifest) => manifest,
-            Err(e) => {
-                eprintln!("Warning: could not check installation status: {}", e);
-                None
-            }
-        };
+    let installed_manifest = match find_installed_manifest(&request) {
+        Ok(manifest) => manifest,
+        Err(e) => {
+            eprintln!("Warning: could not check installation status: {}", e);
+            None
+        }
+    };
 
     print_beautiful(&pkg, installed_manifest.as_ref());
     Ok(())
+}
+
+fn find_installed_manifest(
+    request: &crate::pkg::resolve::PackageRequest,
+) -> Result<Option<types::InstallManifest>> {
+    let mut candidates = Vec::new();
+    for scope in [
+        types::Scope::User,
+        types::Scope::System,
+        types::Scope::Project,
+    ] {
+        candidates.extend(local::find_installed_manifests_matching(request, scope)?);
+    }
+
+    if candidates.is_empty() {
+        return Ok(None);
+    }
+
+    let package_name = if let Some(sub) = &request.sub_package {
+        format!("{}:{}", request.name, sub)
+    } else {
+        request.name.clone()
+    };
+    Ok(Some(
+        crate::cmd::installed_select::choose_installed_manifest(&package_name, &candidates, false)?,
+    ))
 }
 
 fn print_beautiful(

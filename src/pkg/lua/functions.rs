@@ -7,6 +7,7 @@ use sequoia_openpgp::{Cert, parse::Parse};
 use serde::Deserialize;
 use sevenz_rust;
 use sha2::{Digest, Sha256, Sha512};
+use std::io::Read;
 use std::path::PathBuf;
 use std::{fs, path::Path};
 use urlencoding;
@@ -456,16 +457,30 @@ fn add_verify_hash(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                 }
                 "sha256" => {
                     let mut hasher = Sha256::new();
-                    std::io::copy(&mut file, &mut hasher).map_err(|e| {
-                        mlua::Error::RuntimeError(format!("Failed to read file: {}", e))
-                    })?;
+                    let mut buffer = [0; 8192];
+                    loop {
+                        let bytes_read = file.read(&mut buffer).map_err(|e| {
+                            mlua::Error::RuntimeError(format!("Failed to read file: {}", e))
+                        })?;
+                        if bytes_read == 0 {
+                            break;
+                        }
+                        hasher.update(&buffer[..bytes_read]);
+                    }
                     hex::encode(hasher.finalize())
                 }
                 "sha512" => {
                     let mut hasher = Sha512::new();
-                    std::io::copy(&mut file, &mut hasher).map_err(|e| {
-                        mlua::Error::RuntimeError(format!("Failed to read file: {}", e))
-                    })?;
+                    let mut buffer = [0; 8192];
+                    loop {
+                        let bytes_read = file.read(&mut buffer).map_err(|e| {
+                            mlua::Error::RuntimeError(format!("Failed to read file: {}", e))
+                        })?;
+                        if bytes_read == 0 {
+                            break;
+                        }
+                        hasher.update(&buffer[..bytes_read]);
+                    }
                     hex::encode(hasher.finalize())
                 }
                 _ => {

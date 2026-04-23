@@ -50,19 +50,31 @@ pub fn download_and_cache_archive(
         let temp_dir = tempfile::Builder::new().prefix("zoi-dl-").tempdir()?;
         let temp_archive_path = temp_dir.path().join(archive_filename);
 
-        util::download_file_with_progress(
-            &details.info.final_url,
-            &temp_archive_path,
-            pb,
-            Some(details.download_size),
-        )
-        .map_err(|e| {
-            anyhow!(
+        let mut last_error = None;
+        let candidate_urls = cache::mirror_candidate_urls(&details.info.final_url);
+        let mut downloaded = false;
+        for candidate_url in candidate_urls {
+            match util::download_file_with_progress(
+                &candidate_url,
+                &temp_archive_path,
+                pb,
+                Some(details.download_size),
+            ) {
+                Ok(()) => {
+                    downloaded = true;
+                    break;
+                }
+                Err(e) => last_error = Some((candidate_url, e)),
+            }
+        }
+        if !downloaded {
+            let (url, error) = last_error.expect("archive download should produce an error");
+            return Err(anyhow!(
                 "Failed to download package archive from {}: {}",
-                details.info.final_url,
-                e
-            )
-        })?;
+                url,
+                error
+            ));
+        }
 
         fs::copy(&temp_archive_path, &cached_archive_path)?;
         cached_archive_path.clone()
@@ -87,8 +99,31 @@ pub fn download_and_cache_archive(
                 }
                 let temp_dir = tempfile::Builder::new().prefix("zoi-sig-dl-").tempdir()?;
                 let temp_sig_path = temp_dir.path().join(&sig_filename);
-                util::download_file_with_progress(pgp_url, &temp_sig_path, pb, None)
-                    .map_err(|e| anyhow!("Failed to download signature from {}: {}", pgp_url, e))?;
+                let mut last_error = None;
+                let mut downloaded = false;
+                for candidate_url in cache::mirror_candidate_urls(pgp_url) {
+                    match util::download_file_with_progress(
+                        &candidate_url,
+                        &temp_sig_path,
+                        pb,
+                        None,
+                    ) {
+                        Ok(()) => {
+                            downloaded = true;
+                            break;
+                        }
+                        Err(e) => last_error = Some((candidate_url, e)),
+                    }
+                }
+                if !downloaded {
+                    let (url, error) =
+                        last_error.expect("signature download should produce an error");
+                    return Err(anyhow!(
+                        "Failed to download signature from {}: {}",
+                        url,
+                        error
+                    ));
+                }
                 fs::copy(&temp_sig_path, &cached_sig_path)?;
                 cached_sig_path.clone()
             };

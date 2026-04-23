@@ -1,6 +1,7 @@
 use anyhow::{Result, anyhow};
 use sha2::{Digest, Sha512};
 use std::fs;
+use std::io::Read;
 use std::path::Path;
 use walkdir::WalkDir;
 
@@ -22,8 +23,15 @@ pub fn calculate_dir_hash(path: &Path) -> Result<String> {
 
     for file_path in paths {
         let mut file = fs::File::open(&file_path)?;
-        std::io::copy(&mut file, &mut hasher)?;
+        let mut buffer = [0; 8192];
+        loop {
+            let bytes_read = file.read(&mut buffer)?;
+            if bytes_read == 0 {
+                break;
+            }
+            hasher.update(&buffer[..bytes_read]);
+        }
     }
 
-    Ok(format!("{:x}", hasher.finalize()))
+    Ok(hex::encode(hasher.finalize()))
 }

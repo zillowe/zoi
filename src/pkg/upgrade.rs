@@ -104,7 +104,14 @@ fn verify_checksum(file_path: &Path, checksums_content: &str, filename: &str) ->
 
     let mut file = File::open(file_path)?;
     let mut hasher = Sha512::new();
-    io::copy(&mut file, &mut hasher)?;
+    let mut buffer = [0; 8192];
+    loop {
+        let bytes_read = io::Read::read(&mut file, &mut buffer)?;
+        if bytes_read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..bytes_read]);
+    }
     let actual_hash = hex::encode(hasher.finalize());
 
     if actual_hash != expected_hash {
