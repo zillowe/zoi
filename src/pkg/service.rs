@@ -106,17 +106,16 @@ pub fn cleanup_service(package_name: &str, scope: types::Scope) -> Result<()> {
                 })?;
             }
         }
-        "windows" => {
+        "windows"
             if std::env::var("ZOI_TEST_SKIP_SERVICE_COMMANDS").is_err()
-                && service_exists_windows(&service_name)?
-            {
-                println!("Removing Windows service: {}", service_name);
-                Command::new("sc")
-                    .arg("delete")
-                    .arg(&service_name)
-                    .status()
-                    .context("Failed to run sc delete")?;
-            }
+                && service_exists_windows(&service_name)? =>
+        {
+            println!("Removing Windows service: {}", service_name);
+            Command::new("sc")
+                .arg("delete")
+                .arg(&service_name)
+                .status()
+                .context("Failed to run sc delete")?;
         }
         _ => {}
     }

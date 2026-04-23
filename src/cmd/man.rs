@@ -141,28 +141,24 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) 
         terminal.draw(|f| ui(f, &mut app))?;
 
         match event::read()? {
-            Event::Key(key) => {
-                if key.kind == KeyEventKind::Press {
-                    match key.code {
-                        KeyCode::Char('q') => return Ok(()),
-                        KeyCode::Down | KeyCode::Char('j') => {
-                            app.scroll = app.scroll.saturating_add(1);
-                        }
-                        KeyCode::Up | KeyCode::Char('k') => {
-                            app.scroll = app.scroll.saturating_sub(1);
-                        }
-                        KeyCode::PageDown => {
-                            app.scroll = app.scroll.saturating_add(terminal.size()?.height);
-                        }
-                        KeyCode::PageUp => {
-                            app.scroll = app.scroll.saturating_sub(terminal.size()?.height);
-                        }
-                        KeyCode::Home => app.scroll = 0,
-                        KeyCode::End => app.scroll = app.content_height,
-                        _ => {}
-                    }
+            Event::Key(key) if key.kind == KeyEventKind::Press => match key.code {
+                KeyCode::Char('q') => return Ok(()),
+                KeyCode::Down | KeyCode::Char('j') => {
+                    app.scroll = app.scroll.saturating_add(1);
                 }
-            }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    app.scroll = app.scroll.saturating_sub(1);
+                }
+                KeyCode::PageDown => {
+                    app.scroll = app.scroll.saturating_add(terminal.size()?.height);
+                }
+                KeyCode::PageUp => {
+                    app.scroll = app.scroll.saturating_sub(terminal.size()?.height);
+                }
+                KeyCode::Home => app.scroll = 0,
+                KeyCode::End => app.scroll = app.content_height,
+                _ => {}
+            },
             Event::Mouse(mouse) => match mouse.kind {
                 MouseEventKind::ScrollUp => app.scroll = app.scroll.saturating_sub(3),
                 MouseEventKind::ScrollDown => app.scroll = app.scroll.saturating_add(3),
