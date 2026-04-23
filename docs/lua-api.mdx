@@ -21,22 +21,22 @@ These variables are automatically available in your script's scope.
 
 ### The `SYSTEM` Table
 
-- `SYSTEM.OS`: The operating system (`linux`, `macos`, `windows`, `freebsd`, `openbsd`).
-- `SYSTEM.ARCH`: The CPU architecture (`amd64`, `arm64`).
-- `SYSTEM.DISTRO`: (Linux only) The distribution ID (e.g. `ubuntu`, `arch`).
-- `SYSTEM.DISTRO_VER`: The version of the distribution (e.g. `22.04`, `14.1`).
-- `SYSTEM.DE`: The detected Desktop Environment (e.g. `kde`, `gnome`, `windows`).
-- `SYSTEM.SERVER`: The display server in use (e.g. `x11`, `wayland`, `quartz`).
-- `SYSTEM.KERNEL_VER`: The kernel version of the operating system.
-- `SYSTEM.CPU`: CPU model information.
-- `SYSTEM.GPU`: GPU model information.
-- `SYSTEM.MANAGER`: The detected native package manager (e.g. `apt`, `pacman`).
+* `SYSTEM.OS`: The operating system (`linux`, `macos`, `windows`, `freebsd`, `openbsd`).
+* `SYSTEM.ARCH`: The CPU architecture (`amd64`, `arm64`).
+* `SYSTEM.DISTRO`: (Linux only) The distribution ID (e.g. `ubuntu`, `arch`).
+* `SYSTEM.DISTRO_VER`: The version of the distribution (e.g. `22.04`, `14.1`).
+* `SYSTEM.DE`: The detected Desktop Environment (e.g. `kde`, `gnome`, `windows`).
+* `SYSTEM.SERVER`: The display server in use (e.g. `x11`, `wayland`, `quartz`).
+* `SYSTEM.KERNEL_VER`: The kernel version of the operating system.
+* `SYSTEM.CPU`: CPU model information.
+* `SYSTEM.GPU`: GPU model information.
+* `SYSTEM.MANAGER`: The detected native package manager (e.g. `apt`, `pacman`).
 
 ### The `ZOI` Table
 
-- `ZOI.VERSION`: The version of the package being built (resolved from metadata).
-- `ZOI.PATH.user`: Path to Zoi's user directory (`~/.zoi`).
-- `ZOI.PATH.system`: Path to Zoi's system-wide binary directory.
+* `ZOI.VERSION`: The version of the package being built (resolved from metadata).
+* `ZOI.PATH.user`: Path to Zoi's user directory (`~/.zoi`).
+* `ZOI.PATH.system`: Path to Zoi's system-wide binary directory.
 
 #### The `ZOI.PKG` Table
 
@@ -50,7 +50,7 @@ These variables provide absolute paths related to the current package environmen
 | `ZOI.PKG.home`     | `string` | Absolute path to the user's home directory.                     |
 | `ZOI.PKG.lua`      | `string` | Absolute path to the current `pkg.lua` script.                  |
 
----
+***
 
 ## Core Functions
 
@@ -58,36 +58,36 @@ These variables provide absolute paths related to the current package environmen
 
 Stages a file or directory to be included in the final package.
 
-- **Source**: Path relative to `BUILD_DIR`, or use `${pkgluadir}` for files next to the script.
-- **Destination**: Use variables like `${pkgstore}`, `${createpkgdir}`, `${usrroot}`, or `${usrhome}`.
+* **Source**: Path relative to `BUILD_DIR`, or use `${pkgluadir}` for files next to the script.
+* **Destination**: Use variables like `${pkgstore}`, `${createpkgdir}`, `${usrroot}`, or `${usrhome}`.
 
 ### `zln(target, link)`
 
 Creates a symbolic link in the package.
 
-- **target**: The destination of the link (e.g. `${pkgstore}/bin/my-app`).
-- **link**: The path of the symlink to create (e.g. `${pkgstore}/bin/my-link`).
+* **target**: The destination of the link (e.g. `${pkgstore}/bin/my-app`).
+* **link**: The path of the symlink to create (e.g. `${pkgstore}/bin/my-link`).
 
 ### `zchmod(path, mode)`
 
 Sets the permissions of a file or directory in the package.
 
-- **path**: Path to the file or directory (e.g. `${pkgstore}/bin/my-app`).
-- **mode**: Octal permission mode (e.g. `493` for `0755`).
+* **path**: Path to the file or directory (e.g. `${pkgstore}/bin/my-app`).
+* **mode**: Octal permission mode (e.g. `493` for `0755`).
 
 ### `zchown(path, owner, group)`
 
 Sets the ownership of a file or directory in the package.
 
-- **path**: Path to the file or directory.
-- **owner**: The owner name or UID.
-- **group**: The group name or GID.
+* **path**: Path to the file or directory.
+* **owner**: The owner name or UID.
+* **group**: The group name or GID.
 
 ### `zmkdir(path)`
 
 Creates a directory in the package.
 
-- **path**: Path to the directory to create (e.g. `${pkgstore}/share/my-app`).
+* **path**: Path to the directory to create (e.g. `${pkgstore}/share/my-app`).
 
 ### `zrm(path)`
 
@@ -101,16 +101,16 @@ Executes a shell command within the `BUILD_DIR`. Returns the command's standard 
 
 Reads and returns the content of a file located in the same directory as the `.pkg.lua` script.
 
-- If the file ends in `.json`, `.yaml`, or `.toml`, it is automatically parsed into a Lua table.
+* If the file ends in `.json`, `.yaml`, or `.toml`, it is automatically parsed into a Lua table.
 
 ### `INCLUDE(file_name)`
 
 Executes another Lua script located in the same directory. Useful for sharing logic between packages.
 
-> [!IMPORTANT]
+> \[!IMPORTANT]
 > The `file_name` should be a path relative to the current script. You do **not** need to use `${pkgluadir}` here. If the included file is missing or contains errors, the entire package will be skipped during `zoi sync` indexing and won't be available for installation.
 
----
+***
 
 ## Declarative Functions
 
@@ -130,8 +130,8 @@ Defines a list of update messages shown to the user.
 
 **Table Fields:**
 
-- `type`: (enum) `update`, `change`, or `vulnerability`.
-- `message`: (string) The message text.
+* `type`: (enum) `update`, `change`, or `vulnerability`.
+* `message`: (string) The message text.
 
 ### `hooks(table)`
 
@@ -143,14 +143,14 @@ Defines a background service managed by the system.
 
 **Table Fields:**
 
-- `run`: (string) The command to execute.
-- `run_at_load`: (boolean) Start on boot/login.
-- `working_dir`: (string) Directory to run in.
-- `env`: (table) Environment variables.
-- `log_path`: (string) Path for standard output.
-- `error_log_path`: (string) Path for error output.
+* `run`: (string) The command to execute.
+* `run_at_load`: (boolean) Start on boot/login.
+* `working_dir`: (string) Directory to run in.
+* `env`: (table) Environment variables.
+* `log_path`: (string) Path for standard output.
+* `error_log_path`: (string) Path for error output.
 
----
+***
 
 ## Lifecycle Functions
 
@@ -178,26 +178,26 @@ Runs when the package is uninstalled to clean up external state.
 
 **The `args` table contains:**
 
-- `sub`: (string) The name of the sub-package being processed (for split packages).
+* `sub`: (string) The name of the sub-package being processed (for split packages).
 
----
+***
 
 ## Utility Tables (`UTILS`)
 
 ### `UTILS.FETCH`
 
-- `UTILS.FETCH.url(url)`: Fetches the content of a URL as a string.
-- `UTILS.FETCH.<PROVIDER>.LATEST.<TYPE>({ repo, domain, branch })`
-  - **Providers**: `GITHUB`, `GITLAB`, `GITEA`, `FORGEJO`.
-  - **Types**: `tag`, `release`, `commit`.
-  - **Example**: `local tag = UTILS.FETCH.GITHUB.LATEST.release({ repo = "Zillowe/Zoi" })`
+* `UTILS.FETCH.url(url)`: Fetches the content of a URL as a string.
+* `UTILS.FETCH.<PROVIDER>.LATEST.<TYPE>({ repo, domain, branch })`
+  * **Providers**: `GITHUB`, `GITLAB`, `GITEA`, `FORGEJO`.
+  * **Types**: `tag`, `release`, `commit`.
+  * **Example**: `local tag = UTILS.FETCH.GITHUB.LATEST.release({ repo = "Zillowe/Zoi" })`
 
 ### `UTILS.PARSE`
 
-- `UTILS.PARSE.json(string)`: Parses a JSON string into a Lua table.
-- `UTILS.PARSE.yaml(string)`: Parses a YAML string into a Lua table.
-- `UTILS.PARSE.toml(string)`: Parses a TOML string into a Lua table.
-- `UTILS.PARSE.checksumFile(content, filename)`: Extracts a checksum for a specific file from a standard checksum file string.
+* `UTILS.PARSE.json(string)`: Parses a JSON string into a Lua table.
+* `UTILS.PARSE.yaml(string)`: Parses a YAML string into a Lua table.
+* `UTILS.PARSE.toml(string)`: Parses a TOML string into a Lua table.
+* `UTILS.PARSE.checksumFile(content, filename)`: Extracts a checksum for a specific file from a standard checksum file string.
 
 ### `UTILS.FILE(url, path)`
 
@@ -205,27 +205,27 @@ Downloads a file from a URL directly to the specified local path.
 
 ### `UTILS.FS`
 
-- `UTILS.FS.exists(path)`: Returns `true` if the path exists.
-- `UTILS.FS.copy(src, dest)`: Copies a file or directory.
-- `UTILS.FS.move(src, dest)`: Moves (renames) a file or directory.
-- `UTILS.FS.chmod(path, mode)`: Changes file permissions (Unix only).
+* `UTILS.FS.exists(path)`: Returns `true` if the path exists.
+* `UTILS.FS.copy(src, dest)`: Copies a file or directory.
+* `UTILS.FS.move(src, dest)`: Moves (renames) a file or directory.
+* `UTILS.FS.chmod(path, mode)`: Changes file permissions (Unix only).
 
 ### `UTILS.FIND`
 
-- `UTILS.FIND.file(dir, name)`: Recursively searches for a file within a directory inside `BUILD_DIR` and returns its relative path.
+* `UTILS.FIND.file(dir, name)`: Recursively searches for a file within a directory inside `BUILD_DIR` and returns its relative path.
 
 ### `UTILS.ARCHIVE`
 
-- `UTILS.ARCHIVE.list(path)`: Returns a table (list of strings) containing all file paths within an archive (`.zip`, `.tar.*`, `.7z`, `.rar`, `.deb`).
+* `UTILS.ARCHIVE.list(path)`: Returns a table (list of strings) containing all file paths within an archive (`.zip`, `.tar.*`, `.7z`, `.rar`, `.deb`).
 
 ### `UTILS.EXTRACT(source, out_dir)`
 
 Downloads (if URL) and extracts an archive (`.zip`, `.tar.gz`, `.tar.xz`, `.tar.zst`, `.7z`, `.rar`, `.deb`) into `BUILD_DIR/out_dir`.
 
-> [!NOTE]
+> \[!NOTE]
 > Extraction of `.rar` files requires the `unrar` command to be installed on the host system.
 
----
+***
 
 ## Security Functions
 
@@ -233,7 +233,7 @@ Downloads (if URL) and extracts an archive (`.zip`, `.tar.gz`, `.tar.xz`, `.tar.
 
 Verifies a file's integrity. Supported algorithms: `sha512`, `sha256`, `md5`.
 
-- **Example**: `verifyHash(file, "sha256-abc123...")`
+* **Example**: `verifyHash(file, "sha256-abc123...")`
 
 ### `verifySignature(file_path, sig_path, key_name_or_url)`
 

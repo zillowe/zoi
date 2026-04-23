@@ -9,9 +9,9 @@ Zoi includes a decentralized security advisory system designed to keep your syst
 
 Security advisories are defined in `.sec.yaml` files co-located with the `.pkg.lua` files in a registry.
 
-- **Offline Support:** Since advisories are part of the registry, they are available even in air-gapped environments after a `zoi sync`.
-- **Proactive Protection:** Zoi automatically checks for known vulnerabilities during `zoi install` and `zoi update`.
-- **Manual Audits:** Use the `zoi audit` command to scan your installed packages.
+* **Offline Support:** Since advisories are part of the registry, they are available even in air-gapped environments after a `zoi sync`.
+* **Proactive Protection:** Zoi automatically checks for known vulnerabilities during `zoi install` and `zoi update`.
+* **Manual Audits:** Use the `zoi audit` command to scan your installed packages.
 
 ## Auditing Your System
 
@@ -42,11 +42,11 @@ When you attempt to install or upgrade a package to a version known to be vulner
 > **SECURITY WARNING**
 >
 > Package **nodejs v20.5.0** is known to be vulnerable:
-> **[ZSA-2026-0042]** Heap buffer overflow in HTTP/2 parser (Severity: **CRITICAL**)
+> **\[ZSA-2026-0042]** Heap buffer overflow in HTTP/2 parser (Severity: **CRITICAL**)
 >
 > Fixed in version: **20.11.1**
 >
-> **Do you want to continue anyway? [y/N]**
+> **Do you want to continue anyway? \[y/N]**
 
 You must explicitly confirm with `y` to proceed with the installation of a vulnerable package.
 
@@ -56,9 +56,9 @@ We encourage researchers and users to report security issues in Zoi packages.
 
 ### For Official Registry (Zoidberg)
 
-1.  **Prepare the Advisory:** Create a new `.sec.yaml` file in the package's directory. Use `ZSA-YYYY-TEMP.sec.yaml` as a temporary filename.
-2.  **Submit a Merge Request:** Open a Merge Request to the [Zoidberg repository](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg) on GitLab.
-3.  **Automated ID Assignment:** Upon submission, our CI system will automatically assign a unique Zoi Security Advisory (ZSA) ID and rename your file (e.g. `ZSA-2026-D0043.sec.yaml`).
+1. **Prepare the Advisory:** Create a new `.sec.yaml` file in the package's directory. Use `ZSA-YYYY-TEMP.sec.yaml` as a temporary filename.
+2. **Submit a Merge Request:** Open a Merge Request to the [Zoidberg repository](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg) on GitLab.
+3. **Automated ID Assignment:** Upon submission, our CI system will automatically assign a unique Zoi Security Advisory (ZSA) ID and rename your file (e.g. `ZSA-2026-D0043.sec.yaml`).
 
 ### Advisory Schema
 
@@ -82,9 +82,9 @@ references:
 
 ZSA IDs follow the format `[PREFIX]-YYYY-[SeverityChar][Number]`. The severity character is **mandatory** and indicates the impact:
 
-- **A (Low):** Minor issues with low impact (e.g. `ZSA-2026-A0042`).
-- **B (Medium):** Moderate impact, often requiring specific configurations to exploit.
-- **C (High):** Significant impact, potentially leading to data loss or unauthorized access.
-- **D (Critical):** Severe vulnerabilities, such as remote code execution.
+* **A (Low):** Minor issues with low impact (e.g. `ZSA-2026-A0042`).
+* **B (Medium):** Moderate impact, often requiring specific configurations to exploit.
+* **C (High):** Significant impact, potentially leading to data loss or unauthorized access.
+* **D (Critical):** Severe vulnerabilities, such as remote code execution.
 
 Note: The unique number in the ZSA ID is shared across all severity levels for a given year to prevent collisions.

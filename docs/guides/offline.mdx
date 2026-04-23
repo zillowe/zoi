@@ -19,7 +19,7 @@ When this flag is set:
 2. **Local Metadata:** Package version resolution (like `@stable`) will skip remote JSON checks and use the information stored in the local SQLite metadata database.
 3. **No Git Pulls:** `zoi sync` and dependency resolution will assume the local registry is the source of truth and skip `git pull` operations.
 
----
+***
 
 ## Provisioning an Offline System
 
@@ -53,7 +53,7 @@ Alternatively, you can keep your archives in a separate directory and tell Zoi t
 zoi install my-package --pkg-dir /mnt/usb/packages --offline
 ```
 
----
+***
 
 ## Best Practices for Air-gapped Environments
 
@@ -65,8 +65,8 @@ You can bundle an entire Zoi registry (including the Git history and the SQLite 
 
 Regularly manage your local archive cache to save space:
 
-- `zoi cache ls`: List all archives currently available for offline install.
-- `zoi cache clear`: Remove all archives from the local cache.
+* `zoi cache ls`: List all archives currently available for offline install.
+* `zoi cache clear`: Remove all archives from the local cache.
 
 ### Sysroot Bootstrapping
 

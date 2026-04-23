@@ -19,7 +19,7 @@ Most packaging systems split the process into metadata definition, dependency de
 | **Staging/Installation** | `package()` function, `%install` section       | The `package()` function, using `zcp()` to copy files to the staging area.                     |
 | **Testing**              | `check()` function, `%check` section           | The `test()` function, run via `zoi package test`.                                             |
 
----
+***
 
 ## Convert Scoop Manifest to `.pkg.lua`
 
@@ -33,21 +33,21 @@ This generates a `.pkg.lua` scaffold that maps Scoop fields into Zoi metadata, d
 
 Use `--dry-run` to print the generated `.pkg.lua` to stdout without writing a file.
 
----
+***
 
 ## CLI Migration Notes for Automation
 
 If you are migrating CI scripts or internal tooling to newer Zoi command flows, prefer these flags:
 
-- `zoi install --plan-json`
-- `zoi uninstall --plan-json`
-- `zoi update --plan-json`
+* `zoi install --plan-json`
+* `zoi uninstall --plan-json`
+* `zoi update --plan-json`
 
 These emit a stable `zoi.plan.v1` envelope with command-specific fields, which is safer for automation than scraping human-readable output.
 
 For human troubleshooting in CI logs, pair with `--explain` to print resolver/selection reasons.
 
----
+***
 
 ## Migration Examples
 
@@ -134,12 +134,12 @@ end
 
 **Key Mappings:**
 
-- `depends` and `makedepends` map to `runtime` and `build` dependencies, respectively. We use the `native:` prefix to let Zoi use the system's package manager.
-- The `source` URL is constructed dynamically in `prepare()`.
-- The `build()` logic from the `PKGBUILD` is moved into Zoi's `package()` function.
-- Instead of installing to a `$pkgdir`, we use `zcp` to copy files from the build directory to special staging destinations like `${usrroot}`.
+* `depends` and `makedepends` map to `runtime` and `build` dependencies, respectively. We use the `native:` prefix to let Zoi use the system's package manager.
+* The `source` URL is constructed dynamically in `prepare()`.
+* The `build()` logic from the `PKGBUILD` is moved into Zoi's `package()` function.
+* Instead of installing to a `$pkgdir`, we use `zcp` to copy files from the build directory to special staging destinations like `${usrroot}`.
 
----
+***
 
 ### 2. From Debian (`debian/control`)
 
@@ -212,11 +212,11 @@ end
 
 **Key Mappings:**
 
-- `Build-Depends` maps to `dependencies.build`, and `Depends` maps to `dependencies.runtime`.
-- The complex `debian/rules` file, which often uses `debhelper` abstractions, is simplified into direct `cmake` and `make` calls within the `package()` function.
-- Instead of installing into a `debian/` subdirectory, we copy the final artifacts directly with `zcp`.
+* `Build-Depends` maps to `dependencies.build`, and `Depends` maps to `dependencies.runtime`.
+* The complex `debian/rules` file, which often uses `debhelper` abstractions, is simplified into direct `cmake` and `make` calls within the `package()` function.
+* Instead of installing into a `debian/` subdirectory, we copy the final artifacts directly with `zcp`.
 
----
+***
 
 ### 3. From Fedora RPM (`.spec` file)
 
@@ -292,12 +292,12 @@ end
 
 **Key Mappings:**
 
-- `BuildRequires` maps to `dependencies.build`, and `Requires` maps to `dependencies.runtime`.
-- The `%prep` section's `%setup` macro is equivalent to `UTILS.EXTRACT` in `prepare()`.
-- The `%build` and `%install` sections are combined into the `package()` function.
-- Instead of using the `%buildroot` macro, we can install to a temporary directory and then use `zcp` to precisely copy only the needed files to their final destinations in the Zoi store.
+* `BuildRequires` maps to `dependencies.build`, and `Requires` maps to `dependencies.runtime`.
+* The `%prep` section's `%setup` macro is equivalent to `UTILS.EXTRACT` in `prepare()`.
+* The `%build` and `%install` sections are combined into the `package()` function.
+* Instead of using the `%buildroot` macro, we can install to a temporary directory and then use `zcp` to precisely copy only the needed files to their final destinations in the Zoi store.
 
----
+***
 
 ### 4. From Homebrew Formula (`.rb` file)
 
@@ -365,7 +365,7 @@ end
 
 **Key Mappings:**
 
-- `desc`, `homepage`, `url`, and `license` map directly to fields in `metadata`.
-- `depends_on "cmake" => :build` maps to a `build` dependency. Regular `depends_on` maps to a `runtime` dependency.
-- The `install` block's commands are translated into `cmd()` calls in the `package()` function.
-- The `test do...end` block maps directly to Zoi's `test()` function.
+* `desc`, `homepage`, `url`, and `license` map directly to fields in `metadata`.
+* `depends_on "cmake" => :build` maps to a `build` dependency. Regular `depends_on` maps to a `runtime` dependency.
+* The `install` block's commands are translated into `cmd()` calls in the `package()` function.
+* The `test do...end` block maps directly to Zoi's `test()` function.

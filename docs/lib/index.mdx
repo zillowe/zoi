@@ -27,55 +27,30 @@ zoi-rs = "1" # Check crates.io for the latest version
 These are the primary functions for building and managing packages.
 
 <Cards>
-  <Card
-    title="build_with_options"
-    href="#build_with_options-function"
-    description="Builds a Zoi package using a typed options struct."
-  />
-  <Card
-    title="build"
-    href="#build-function"
-    description="Compatibility wrapper for building a Zoi package."
-  />
-  <Card
-    title="install_sources"
-    href="#install_sources-function"
-    description="Installs packages from registry, local file, URL, or git-backed sources."
-  />
-  <Card
-    title="resolve_package"
-    href="#resolve_package-function"
-    description="Resolves a source string into a package, version, and origin metadata."
-  />
-  <Card
-    title="resolve_dependency_graph"
-    href="#resolve_dependency_graph-function"
-    description="Returns the dependency graph for one or more requested sources."
-  />
-  <Card
-    title="install_package_with_options"
-    href="#install_package_with_options-function"
-    description="Installs a local package archive using a typed options struct."
-  />
-  <Card
-    title="install_package"
-    href="#install_package-function"
-    description="Compatibility wrapper for installing a local package archive."
-  />
-  <Card
-    title="uninstall_package"
-    href="#uninstall_package-function"
-    description="Uninstalls a Zoi package."
-  />
+  <Card title="build_with_options" href="#build_with_options-function" description="Builds a Zoi package using a typed options struct." />
+
+  <Card title="build" href="#build-function" description="Compatibility wrapper for building a Zoi package." />
+
+  <Card title="install_sources" href="#install_sources-function" description="Installs packages from registry, local file, URL, or git-backed sources." />
+
+  <Card title="resolve_package" href="#resolve_package-function" description="Resolves a source string into a package, version, and origin metadata." />
+
+  <Card title="resolve_dependency_graph" href="#resolve_dependency_graph-function" description="Returns the dependency graph for one or more requested sources." />
+
+  <Card title="install_package_with_options" href="#install_package_with_options-function" description="Installs a local package archive using a typed options struct." />
+
+  <Card title="install_package" href="#install_package-function" description="Compatibility wrapper for installing a local package archive." />
+
+  <Card title="uninstall_package" href="#uninstall_package-function" description="Uninstalls a Zoi package." />
 </Cards>
 
----
+***
 
 ## `build` function
 
 This is the compatibility wrapper around [`build_with_options`](#build_with_options-function).
 
----
+***
 
 ## `build_with_options` function
 
@@ -104,7 +79,7 @@ pub struct BuildOptions<'a> {
 }
 ```
 
----
+***
 
 This function builds a Zoi package from a `.pkg.lua` definition file for one or more target platforms.
 
@@ -136,13 +111,13 @@ pub fn build(
 | `image`            | `Option<&str>`   | The Docker image to use (required if `method` is `"docker"`).                                          |
 | `version_override` | `Option<&str>`   | Optionally override the package version defined in the `.pkg.lua` file.                                |
 
----
+***
 
 ## `install_package` function
 
 This is the compatibility wrapper around [`install_package_with_options`](#install_package_with_options-function).
 
----
+***
 
 ## `install_sources` function
 
@@ -174,7 +149,9 @@ pub struct SourceInstallOptions {
 }
 ```
 
----
+When `frozen_lockfile` is `true`, `install_sources` follows the exact entries recorded in `zoi.lock` rather than re-resolving the project from `zoi.yaml`. That preserves pinned versions, selected sub-packages, and recorded dependency choices for reproducible project installs.
+
+***
 
 ## `resolve_package` function
 
@@ -199,7 +176,7 @@ pub struct ResolvedPackage {
 }
 ```
 
----
+***
 
 ## `resolve_dependency_graph` function
 
@@ -227,7 +204,7 @@ pub struct DependencyResolutionOptions {
 }
 ```
 
----
+***
 
 ## `install_package_with_options` function
 
@@ -254,7 +231,7 @@ pub struct PackageInstallOptions {
 }
 ```
 
----
+***
 
 Installs a Zoi package from a local `.pkg.tar.zst` archive file.
 
@@ -280,7 +257,7 @@ pub fn install_package(
 | `yes`             | `bool`                | Automatically answer "yes" to any confirmation prompts (e.g. file conflicts).                           |
 | `sub_packages`    | `Option<Vec<String>>` | For split packages, optionally specify which sub-packages to install.                                   |
 
----
+***
 
 ## `uninstall_package` function
 
@@ -297,11 +274,11 @@ pub fn uninstall_package(
 
 ### Parameters
 
-| Parameter        | Type            | Description                                                                                               |
-| ---------------- | --------------- | --------------------------------------------------------------------------------------------------------- |
-| `package_name`   | `&str`          | The name of the package to uninstall.                                                                     |
-| `scope_override` | `Option<Scope>` | Optionally specify the scope to uninstall from. If `None`, Zoi will search for the package in all scopes. |
+| Parameter        | Type            | Description                                                                                                                                                 |
+| ---------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `package_name`   | `&str`          | The package identifier to uninstall. Use an explicit source such as `#handle@repo/name[:sub]@version` when multiple installed packages share the same name. |
+| `scope_override` | `Option<Scope>` | Optionally specify the scope to uninstall from. If `None`, Zoi will search for the package in all scopes.                                                   |
 
----
+***
 
 For complete, runnable examples, please see the [Library Examples page](/docs/zds/zoi/lib/examples).

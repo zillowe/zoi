@@ -7,8 +7,8 @@ Zoi can manage per-project commands and environments using a `zoi.yaml` file pla
 
 ## File location
 
-- Create `zoi.yaml` in the root of your project repository.
-- Commands refer to paths relative to the project root unless you use absolute paths.
+* Create `zoi.yaml` in the root of your project repository.
+* Commands refer to paths relative to the project root unless you use absolute paths.
 
 ## Schema
 
@@ -105,31 +105,31 @@ shell:
 
 ### Field Reference
 
-- `name`: `string` (required)
-- `registries`: `list` of `string` (optional). Additional Git URLs for package registries to search for this project.
-- `config`: `object` (optional)
-  - `local`: `boolean` (default: `false`). If `true`, enables project-local package management.
-- `pkgs`: `list` of strings or objects (optional). A list of packages to be installed locally to the project. Supports version maps (e.g. `- fzf: "0.44.1"`). Requires `config.local: true`.
-- `packages`: `list` of objects (optional). Note: this is for validating tools, not for installing packages. See `pkgs` for installation.
-  - `name`: `string` (label only)
-  - `check`: `string` (command to validate presence/version)
-- `commands`: `list` of objects (optional)
-  - `cmd`: `string` (alias)
-  - `run`: `string` or `map` (command)
-    - If a `string`, it's the command for all platforms.
-    - If a `map`, keys are platforms (`<os>-<arch>`) and values are command strings. A `default` key can be used as a fallback.
-  - `env`: `map` (optional)
-    - Can be a simple `map` of `string: string` for environment variables.
-    - Can be a `map` where the key `platform` contains platform-specific environment variables, and other keys are global.
-- `environments`: `list` of objects (optional)
-  - `name`: `string` (label)
-  - `cmd`: `string` (alias)
-  - `run`: `list of strings` or `map` (commands)
-    - If a `list of strings`, it's the command list for all platforms.
-    - If a `map`, keys are platforms (`<os>-<arch>`) and values are lists of command strings. A `default` key can be used as a fallback.
-  - `env`: `map` (optional) - Same structure as in `commands`.
-- `shell`: `object` (optional)
-  - `env`: `map` (optional) - Environment variables to set when entering `zoi dev`. Same structure as in `commands`.
+* `name`: `string` (required)
+* `registries`: `list` of `string` (optional). Additional Git URLs for package registries to search for this project.
+* `config`: `object` (optional)
+  * `local`: `boolean` (default: `false`). If `true`, enables project-local package management.
+* `pkgs`: `list` of strings or objects (optional). A list of packages to be installed locally to the project. Supports version maps (e.g. `- fzf: "0.44.1"`). Requires `config.local: true`.
+* `packages`: `list` of objects (optional). Note: this is for validating tools, not for installing packages. See `pkgs` for installation.
+  * `name`: `string` (label only)
+  * `check`: `string` (command to validate presence/version)
+* `commands`: `list` of objects (optional)
+  * `cmd`: `string` (alias)
+  * `run`: `string` or `map` (command)
+    * If a `string`, it's the command for all platforms.
+    * If a `map`, keys are platforms (`<os>-<arch>`) and values are command strings. A `default` key can be used as a fallback.
+  * `env`: `map` (optional)
+    * Can be a simple `map` of `string: string` for environment variables.
+    * Can be a `map` where the key `platform` contains platform-specific environment variables, and other keys are global.
+* `environments`: `list` of objects (optional)
+  * `name`: `string` (label)
+  * `cmd`: `string` (alias)
+  * `run`: `list of strings` or `map` (commands)
+    * If a `list of strings`, it's the command list for all platforms.
+    * If a `map`, keys are platforms (`<os>-<arch>`) and values are lists of command strings. A `default` key can be used as a fallback.
+  * `env`: `map` (optional) - Same structure as in `commands`.
+* `shell`: `object` (optional)
+  * `env`: `map` (optional) - Environment variables to set when entering `zoi dev`. Same structure as in `commands`.
 
 Zoi determines the platform from the OS and architecture (e.g. `linux-amd64`, `macos-arm64`, `windows-amd64`).
 
@@ -151,11 +151,11 @@ pkgs:
 
 When this is configured, running `zoi install` (with no arguments) in the project directory will:
 
-1.  Read the `pkgs` list.
-2.  Install the specified packages into a project-local directory. These packages will not affect your global user or system installations.
-3.  Create two files:
-    - `.zoi/pkgs/zoi.pkgs.json`: A detailed manifest of all installed packages, their dependencies, and metadata. This file is intended for local tracking.
-    - `zoi.lock`: A file containing cryptographic hashes of the installed packages in the project root. This file is used to verify the integrity of the packages and should be committed to your repository.
+1. Read the `pkgs` list.
+2. Install the specified packages into a project-local directory. These packages will not affect your global user or system installations.
+3. Create two files:
+   * `.zoi/pkgs/zoi.pkgs.json`: A detailed manifest of all installed packages, their dependencies, and metadata. This file is intended for local tracking.
+   * `zoi.lock`: A file containing cryptographic hashes of the installed packages in the project root. This file is used to verify the integrity of the packages and should be committed to your repository.
 
 Commit `zoi.yaml` and `zoi.lock` to your repository. This ensures that other developers who clone the project can run `zoi install` to get the exact same versions of the dependencies, creating a reproducible and secure environment.
 
@@ -175,10 +175,10 @@ Its primary purpose is to ensure that every developer on a team has the exact sa
 
 ### Lockfile Schema
 
-- `version`: The version of the lockfile format.
-- `registries`: A map of registry handles to their URLs.
-- `packages`: A map of package IDs to their resolved versions.
-- Registry handle keys (e.g. `#zoidberg`): A flattened map containing detailed information about each package, including its version, integrity hash, dependencies, and any chosen optional dependencies.
+* `version`: The version of the lockfile format.
+* `registries`: A map of registry handles to their URLs.
+* `packages`: A map of package IDs to their resolved versions.
+* Registry handle keys (e.g. `#zoidberg`): A flattened map containing detailed information about each package, including its version, integrity hash, dependencies, and any chosen optional dependencies.
 
 Here is a simplified example of a `zoi.lock` file:
 
@@ -206,25 +206,25 @@ Here is a simplified example of a `zoi.lock` file:
 
 ## CLI usage
 
-- Enter a development shell:
+* Enter a development shell:
 
 ```sh
 zoi dev
 ```
 
-- Run a command directly in the dev shell environment and exit:
+* Run a command directly in the dev shell environment and exit:
 
 ```sh
 zoi dev --run "make build"
 ```
 
-- Run a command by alias:
+* Run a command by alias:
 
 ```sh
 zoi run dev
 ```
 
-- To pass arguments to the underlying script, add them after the command alias. Use `--` to separate the arguments from Zoi's own options if needed.
+* To pass arguments to the underlying script, add them after the command alias. Use `--` to separate the arguments from Zoi's own options if needed.
 
 ```sh
 # If 'test' is 'npm test', this runs 'npm test --watch'
@@ -234,19 +234,19 @@ zoi run test -- --watch
 zoi run fmt -- --all
 ```
 
-- Interactively choose a command (no alias provided):
+* Interactively choose a command (no alias provided):
 
 ```sh
 zoi run
 ```
 
-- Set up an environment by alias:
+* Set up an environment by alias:
 
 ```sh
 zoi env web
 ```
 
-- Interactively choose an environment:
+* Interactively choose an environment:
 
 ```sh
 zoi env
@@ -256,8 +256,8 @@ If `zoi.yaml` is missing, Zoi prints an error. If no commands or environments ar
 
 ## Best practices
 
-- Keep `check` commands fast and side-effect free.
-- Prefer explicit toolchain versions in environment steps to ensure reproducibility.
-- Use short, memorable `cmd` aliases.
-- Split long setups into multiple environments (e.g. `deps`, `build`, `lint`).
-- Use the `default` key in platform-specific maps to provide a good fallback experience.
+* Keep `check` commands fast and side-effect free.
+* Prefer explicit toolchain versions in environment steps to ensure reproducibility.
+* Use short, memorable `cmd` aliases.
+* Split long setups into multiple environments (e.g. `deps`, `build`, `lint`).
+* Use the `default` key in platform-specific maps to provide a good fallback experience.

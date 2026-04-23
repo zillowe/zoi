@@ -9,10 +9,10 @@ Integrating Zoi into your CI/CD workflows allows you to consistently provision b
 
 There are two primary ways to use Zoi in a CI/CD environment:
 
-1.  **Direct Installation:** Use the Zoi installer script to install the CLI directly on the runner.
-2.  **Docker Image:** Use the official Zoi CLI Docker image as the base for your CI jobs.
+1. **Direct Installation:** Use the Zoi installer script to install the CLI directly on the runner.
+2. **Docker Image:** Use the official Zoi CLI Docker image as the base for your CI jobs.
 
----
+***
 
 ## GitHub Actions
 
@@ -63,7 +63,7 @@ publish-pkg:
         ~/.zoi/pkgs/bin/zoi package build my-tool.pkg.lua --type source --platform linux-amd64
 ```
 
----
+***
 
 ## GitLab CI/CD
 
@@ -98,7 +98,7 @@ run-tests:
     - zoi env test # Runs the 'test' environment defined in zoi.yaml
 ```
 
----
+***
 
 ## Jenkins
 
@@ -131,7 +131,7 @@ pipeline {
 }
 ```
 
----
+***
 
 ## Caching Zoi Packages
 
@@ -157,11 +157,11 @@ cache:
     - .zoi/pkgs/store/
 ```
 
----
+***
 
 ## Best Practices for CI/CD
 
-1.  **Use `zoi.lock`**: Always commit your `zoi.lock` file to ensure that your CI environment uses the exact same package versions as your local development environment.
-2.  **Headless Mode**: Use the `--yes` flag (or `-y`) with all Zoi commands to prevent the pipeline from hanging on interactive prompts.
-3.  **Specific Platforms**: When building packages with `zoi package build`, explicitly specify the `--platform` to ensure you are creating the correct artifacts for your target users.
-4.  **Local Project Scopes**: For CI jobs that only need tools for the current build, use `--scope project` or `--local` to keep the installation isolated to the project directory.
+1. **Use `zoi.lock`**: Always commit your `zoi.lock` file to ensure that your CI environment uses the exact same package versions as your local development environment.
+2. **Headless Mode**: Use the `--yes` flag (or `-y`) with all Zoi commands to prevent the pipeline from hanging on interactive prompts.
+3. **Specific Platforms**: When building packages with `zoi package build`, explicitly specify the `--platform` to ensure you are creating the correct artifacts for your target users.
+4. **Local Project Scopes**: For CI jobs that only need tools for the current build, use `--scope project` or `--local` to keep the installation isolated to the project directory.

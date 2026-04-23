@@ -9,12 +9,12 @@ Zoi provides a robust policy engine designed for system administrators to enforc
 
 Policies can **only** be defined in the system-level `config.yaml`:
 
-- **Linux/macOS:** `/etc/zoi/config.yaml`
-- **Windows:** `C:\ProgramData\zoi\config.yaml`
+* **Linux/macOS:** `/etc/zoi/config.yaml`
+* **Windows:** `C:\ProgramData\zoi\config.yaml`
 
 Settings defined here are the "source of truth." When a policy field is marked as `unoverridable`, any attempts by a user to change that setting in their `~/.zoi/pkgs/config.yaml` or a project-local config will be ignored.
 
----
+***
 
 ## Locking Down Configurations
 
@@ -33,7 +33,7 @@ The `unoverridable` flags allow you to freeze specific Zoi behaviors.
 | `audit_log_enabled_unoverridable`     | Enforces mandatory audit logging for all operations.                                         |
 | `advisory_enforcement_unoverridable`  | Forces Zoi to block installation of vulnerable packages without confirmation.                |
 
----
+***
 
 ## Security Advisory Enforcement
 
@@ -84,7 +84,7 @@ When `authorities` are defined for a registry:
 
 This ensures that even if the Git server is compromised, Zoi will refuse to process any package definitions that aren't signed by your trusted maintainers.
 
----
+***
 
 ## Audit Logging for Compliance
 
@@ -115,12 +115,12 @@ zoi history --verify
 
 Each entry includes:
 
-- **Timestamp**: Precise date and time of the action.
-- **User**: The system user who performed the action.
-- **Action**: Install, Uninstall, or Upgrade.
-- **Metadata**: Package name, version, repository, and registry origin.
+* **Timestamp**: Precise date and time of the action.
+* **User**: The system user who performed the action.
+* **Action**: Install, Uninstall, or Upgrade.
+* **Metadata**: Package name, version, repository, and registry origin.
 
----
+***
 
 ## Content Filtering (Allow/Deny Lists)
 
@@ -128,37 +128,37 @@ Administrators can control package installations based on names, sources, and le
 
 ### Package and Repo Filtering
 
-- `allowed_packages`: If defined, Zoi will **only** install packages explicitly named in this list.
-- `denied_packages`: A blacklist of packages that are prohibited.
-- `allowed_repos`: Restricts installations to specific tiers (e.g. `core`, `internal`).
-- `denied_repos`: Blocks specific tiers (e.g. `test`, `archive`).
+* `allowed_packages`: If defined, Zoi will **only** install packages explicitly named in this list.
+* `denied_packages`: A blacklist of packages that are prohibited.
+* `allowed_repos`: Restricts installations to specific tiers (e.g. `core`, `internal`).
+* `denied_repos`: Blocks specific tiers (e.g. `test`, `archive`).
 
 Package rules can be written as:
 
-- `name` (e.g. `hello`)
-- `name:sub_package` (e.g. `linux:headers`)
-- `@repo/name` (e.g. `@core/hello`)
-- `@repo/name:sub_package`
-- `#registry@repo/name` (for explicit registry scoping)
+* `name` (e.g. `hello`)
+* `name:sub_package` (e.g. `linux:headers`)
+* `@repo/name` (e.g. `@core/hello`)
+* `@repo/name:sub_package`
+* `#registry@repo/name` (for explicit registry scoping)
 
 Repo rule matching behavior:
 
-- If a rule contains `/`, it is treated as an exact repo path (e.g. `community/editors`).
-- If a rule does not contain `/`, it matches any repo segment with that name (e.g. `community` matches `community/editors`).
+* If a rule contains `/`, it is treated as an exact repo path (e.g. `community/editors`).
+* If a rule does not contain `/`, it matches any repo segment with that name (e.g. `community` matches `community/editors`).
 
 ### License Compliance
 
 Zoi uses [SPDX identifiers](https://spdx.org/licenses/) to verify package licenses during resolution.
 
-- `allowed_licenses`: Useful for ensuring only legally approved software (e.g. `MIT`, `Apache-2.0`) is used.
-- `denied_licenses`: Blocks problematic licenses (e.g. `GPL-3.0-only`, `AGPL-3.0-or-later`).
+* `allowed_licenses`: Useful for ensuring only legally approved software (e.g. `MIT`, `Apache-2.0`) is used.
+* `denied_licenses`: Blocks problematic licenses (e.g. `GPL-3.0-only`, `AGPL-3.0-or-later`).
 
 License matching behavior:
 
-- `allowed_licenses` evaluates SPDX expressions; `MIT OR GPL-3.0-only` is allowed if at least one branch is allowed.
-- `denied_licenses` blocks if a denied SPDX identifier appears in the package expression.
+* `allowed_licenses` evaluates SPDX expressions; `MIT OR GPL-3.0-only` is allowed if at least one branch is allowed.
+* `denied_licenses` blocks if a denied SPDX identifier appears in the package expression.
 
----
+***
 
 ## Mandatory Signature Verification
 
@@ -180,7 +180,7 @@ When `enable` is `true`:
 2. It will verify the signature against the local PGP keyring.
 3. If verification fails or the signature is missing, **installation is aborted**. Zoi will not fall back to building from source.
 
----
+***
 
 ## Enterprise Best Practices
 
@@ -198,7 +198,7 @@ While you can distribute PGP public keys via a Zoi [Extension](/docs/zds/zoi/ext
 
 By placing your organization's `.asc` files in `src/pkg/pgp/builtin/` before building Zoi, you ensure that every client starts with the necessary keys to verify your private registry, without requiring any manual setup.
 
----
+***
 
 ## Example: "Hardened" Configuration
 

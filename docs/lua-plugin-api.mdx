@@ -9,10 +9,10 @@ Plugins are global Lua scripts that allow you to transform Zoi from a tool into 
 
 Plugins are distributed via **Extensions**. When an extension containing a `plugin` change-type is added, the script is saved to the Zoi home directory.
 
-- **Storage Location**: `~/.zoi/plugins/`
-- **Loading**: Every time you run `zoi`, Zoi initializes a Lua VM and executes every `.lua` file in the plugins folder in alphabetical order before processing your command.
+* **Storage Location**: `~/.zoi/plugins/`
+* **Loading**: Every time you run `zoi`, Zoi initializes a Lua VM and executes every `.lua` file in the plugins folder in alphabetical order before processing your command.
 
----
+***
 
 ## Command API
 
@@ -22,9 +22,9 @@ You can register custom subcommands that appear as if they were built into Zoi.
 
 Registers a new command. The function accepts a table with the following fields:
 
-- `name` (string): The subcommand name (e.g. `"audit"`).
-- `description` (string): A short summary shown when `zoi` is run without arguments.
-- `callback` (function): The function to run. It receives one argument: `args` (a list of strings).
+* `name` (string): The subcommand name (e.g. `"audit"`).
+* `description` (string): A short summary shown when `zoi` is run without arguments.
+* `callback` (function): The function to run. It receives one argument: `args` (a list of strings).
 
 ```lua
 zoi.register_command({
@@ -37,7 +37,7 @@ zoi.register_command({
 })
 ```
 
----
+***
 
 ## The Hook System
 
@@ -61,7 +61,7 @@ Hooks allow you to intercept Zoi's core operations. This is useful for auditing,
 | `on_resolve_shim_version`  | `bin_name` | When a Zoi shim is executed. Return a version string to override.                         |
 | `on_project_install`       | None       | Triggered by `zoi install` in an empty project. Return `true` to handle the installation. |
 
----
+***
 
 ## The Project Installation Hook
 
@@ -69,7 +69,7 @@ The `on_project_install` hook allows plugins to provide native support for non-Z
 
 ### `zoi.on_project_install(callback)`
 
-- **Return**: `boolean` - Return `true` if your plugin has handled the installation. Zoi will stop at the first plugin that returns `true`.
+* **Return**: `boolean` - Return `true` if your plugin has handled the installation. Zoi will stop at the first plugin that returns `true`.
 
 **Example: Basic NPM Detection**
 
@@ -83,7 +83,7 @@ zoi.on_project_install(function()
 end)
 ```
 
----
+***
 
 ## The Shim Resolution Hook
 
@@ -91,8 +91,8 @@ The `on_resolve_shim_version` hook is special because it allows plugins to influ
 
 ### `zoi.on_resolve_shim_version(callback)`
 
-- **Argument**: `bin_name` (string) - The name of the binary being executed (e.g. `"node"`).
-- **Return**: `string` or `nil` - Return a version string (e.g. `"18.19.0"`) to force that version, or `nil` to continue with standard resolution.
+* **Argument**: `bin_name` (string) - The name of the binary being executed (e.g. `"node"`).
+* **Return**: `string` or `nil` - Return a version string (e.g. `"18.19.0"`) to force that version, or `nil` to continue with standard resolution.
 
 **Example: Automated `.nvmrc` support**
 
@@ -110,7 +110,7 @@ zoi.on_resolve_shim_version(function(bin_name)
 end)
 ```
 
----
+***
 
 ## Data Inspection API
 
@@ -128,19 +128,19 @@ Fetches the [Package](#package-metadata) metadata for a specific package from th
 
 If you are inside a project with a `zoi.yaml` file, this table is available:
 
-- `zoi.project.name` (string): The project name.
-- `zoi.project.packages` (list): A list of strings representing the packages required by the project.
+* `zoi.project.name` (string): The project name.
+* `zoi.project.packages` (list): A list of strings representing the packages required by the project.
 
----
+***
 
 ## Persistent State
 
 Plugins can save and retrieve data that persists between different Zoi commands. The data is stored in `~/.zoi/plugins/state.json`.
 
-- **`zoi.set_data(key, value)`**: Store a value. Supports strings, numbers, and booleans.
-- **`zoi.get_data(key)`**: Retrieve a value. Returns `nil` if the key doesn't exist.
+* **`zoi.set_data(key, value)`**: Store a value. Supports strings, numbers, and booleans.
+* **`zoi.get_data(key)`**: Retrieve a value. Returns `nil` if the key doesn't exist.
 
----
+***
 
 ## UI & Interaction
 
@@ -150,14 +150,14 @@ Use Zoi's internal UI engine to make your plugins look professional.
 
 Prints text to the terminal.
 
-- **Colors**: `red`, `green`, `yellow`, `blue`, `cyan`, `magenta`, `white`.
+* **Colors**: `red`, `green`, `yellow`, `blue`, `cyan`, `magenta`, `white`.
 
 ### `zoi.ui.table(headers, rows)`
 
 Renders a structured ASCII table.
 
-- `headers`: A list of strings.
-- `rows`: A list of lists (e.g. `{{ "row1-col1", "row1-col2" }, { "row2-col1", "row2-col2" }}`).
+* `headers`: A list of strings.
+* `rows`: A list of lists (e.g. `{{ "row1-col1", "row1-col2" }, { "row2-col1", "row2-col2" }}`).
 
 ### `zoi.ui.confirm(prompt)`
 
@@ -167,7 +167,7 @@ Displays a `y/N` prompt and returns a boolean.
 
 Displays a list of options and returns the **1-based index** of the user's choice.
 
----
+***
 
 ## System & Shell
 
@@ -177,67 +177,67 @@ Runs a command in the system shell (`bash` on Unix, `pwsh` on Windows). Returns 
 
 ### `zoi.system`
 
-- `zoi.system.os`: Returns `"linux"`, `"macos"`, or `"windows"`.
-- `zoi.system.arch`: Returns `"amd64"`, `"arm64"`, etc.
+* `zoi.system.os`: Returns `"linux"`, `"macos"`, or `"windows"`.
+* `zoi.system.arch`: Returns `"amd64"`, `"arm64"`, etc.
 
 ### `zoi.version`
 
 Returns the current Zoi version string (e.g. `"1.6.0"`).
 
----
+***
 
 ## File System (FS) API
 
 Plugins can interact with the local file system.
 
-- **`zoi.fs.exists(path)`**: Returns `true` if the file or directory exists.
-- **`zoi.fs.read(path)`**: Reads a file's contents and returns it as a string. Returns `nil` on error.
-- **`zoi.fs.write(path, content)`**: Writes a string to a file. Returns `true` on success, `false` on error.
-- **`zoi.fs.list(path)`**: Returns an array of file and directory names within the given path.
-- **`zoi.fs.delete(path)`**: Deletes a file or recursively deletes a directory. Returns `true` on success, `false` on error.
-- **`zoi.fs.symlink(target, link, is_dir)`**: Creates a symbolic link (or junction on Windows).
-- **`zoi.fs.copy(src, dest)`**: Copies a file or directory recursively.
+* **`zoi.fs.exists(path)`**: Returns `true` if the file or directory exists.
+* **`zoi.fs.read(path)`**: Reads a file's contents and returns it as a string. Returns `nil` on error.
+* **`zoi.fs.write(path, content)`**: Writes a string to a file. Returns `true` on success, `false` on error.
+* **`zoi.fs.list(path)`**: Returns an array of file and directory names within the given path.
+* **`zoi.fs.delete(path)`**: Deletes a file or recursively deletes a directory. Returns `true` on success, `false` on error.
+* **`zoi.fs.symlink(target, link, is_dir)`**: Creates a symbolic link (or junction on Windows).
+* **`zoi.fs.copy(src, dest)`**: Copies a file or directory recursively.
 
----
+***
 
 ## Archive API
 
 High-performance native extraction utilities.
 
-- **`zoi.archive.extract(source, dest, strip)`**: Extracts an archive (`.zip`, `.tar.gz`, `.tgz`, `.tar.zst`, `.tar.xz`).
-  - `source` (string): Path to the archive.
-  - `dest` (string): Destination directory.
-  - `strip` (int, optional): Number of leading path components to strip from entries.
+* **`zoi.archive.extract(source, dest, strip)`**: Extracts an archive (`.zip`, `.tar.gz`, `.tgz`, `.tar.zst`, `.tar.xz`).
+  * `source` (string): Path to the archive.
+  * `dest` (string): Destination directory.
+  * `strip` (int, optional): Number of leading path components to strip from entries.
 
----
+***
 
 ## HTTP API
 
 Plugins can make basic HTTP requests and downloads.
 
-- **`zoi.http.get(url)`**: Performs a GET request. Returns the response body as a string, or `nil` on error.
-- **`zoi.http.post(url, body)`**: Performs a POST request with the given string body. Returns the response body as a string, or `nil` on error.
-- **`zoi.http.download(url, dest)`**: Downloads a file from a URL to the specified destination. Returns `true` on success.
+* **`zoi.http.get(url)`**: Performs a GET request. Returns the response body as a string, or `nil` on error.
+* **`zoi.http.post(url, body)`**: Performs a POST request with the given string body. Returns the response body as a string, or `nil` on error.
+* **`zoi.http.download(url, dest)`**: Downloads a file from a URL to the specified destination. Returns `true` on success.
 
----
+***
 
 ## JSON API
 
 Utilities for working with JSON data.
 
-- **`zoi.json.parse(json_string)`**: Parses a JSON string into a Lua table. Returns `nil` on error.
-- **`zoi.json.stringify(table)`**: Converts a Lua table into a JSON string. Returns `nil` on error.
+* **`zoi.json.parse(json_string)`**: Parses a JSON string into a Lua table. Returns `nil` on error.
+* **`zoi.json.stringify(table)`**: Converts a Lua table into a JSON string. Returns `nil` on error.
 
----
+***
 
 ## Environment API
 
 Access and manipulate environment variables.
 
-- **`zoi.env.get(name)`**: Returns the value of an environment variable as a string, or `nil` if not set.
-- **`zoi.env.set(name, value)`**: Sets an environment variable for the current process.
+* **`zoi.env.get(name)`**: Returns the value of a plugin session environment variable override, or falls back to the process environment variable value. Returns `nil` if not set.
+* **`zoi.env.set(name, value)`**: Sets a plugin session environment variable override. The override is available to the plugin runtime and commands executed via `zoi.sh`.
 
----
+***
 
 ## Data Structures
 
@@ -245,24 +245,24 @@ Access and manipulate environment variables.
 
 The object passed to `on_pre_install` or returned by `get_package`.
 
-- `name`: Package name.
-- `version`: Version string.
-- `license`: SPDX license identifier.
-- `description`: Summary.
-- `repo`: Source repository name.
-- `tags`: List of tags.
+* `name`: Package name.
+* `version`: Version string.
+* `license`: SPDX license identifier.
+* `description`: Summary.
+* `repo`: Source repository name.
+* `tags`: List of tags.
 
 ### InstallManifest
 
 The object passed to `on_post_install` and `on_pre_uninstall`.
 
-- `name`: Package name.
-- `version`: Installed version.
-- `scope`: `"user"`, `"system"`, or `"project"`.
-- `installed_files`: A list of every file path created by the package.
-- `repo`: The repository it originated from.
+* `name`: Package name.
+* `version`: Installed version.
+* `scope`: `"user"`, `"system"`, or `"project"`.
+* `installed_files`: A list of every file path created by the package.
+* `repo`: The repository it originated from.
 
----
+***
 
 ## Advanced Examples
 

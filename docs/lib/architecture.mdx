@@ -9,11 +9,11 @@ This document provides a technical deep-dive into Zoi's internal architecture, f
 
 For application integrations, prefer the stable wrappers in `src/lib.rs` over calling internal modules directly. The recommended public entry points are:
 
-- `build_with_options`
-- `install_package_with_options`
-- `install_sources`
-- `resolve_package`
-- `resolve_dependency_graph`
+* `build_with_options`
+* `install_package_with_options`
+* `install_sources`
+* `resolve_package`
+* `resolve_dependency_graph`
 
 The lower-level modules under `pkg::`, `cmd::`, and `project::` remain useful for contributors, but they should be treated as internal implementation details unless they are explicitly re-exported or documented in the library API reference.
 
@@ -25,22 +25,22 @@ Zoi follows a structured, collision-resistant layout for managing package instal
 
 All installed packages are stored in the `pkgs/store` directory within the Zoi home:
 
-- **User Scope:** `~/.zoi/pkgs/store/`
-- **System Scope:**
-  - **Linux/macOS:** `/var/lib/zoi/pkgs/store/`
-  - **Windows:** `C:\ProgramData\zoi\pkgs\store`
-- **Project Scope:** `./.zoi/pkgs/store/` (relative to project root)
+* **User Scope:** `~/.zoi/pkgs/store/`
+* **System Scope:**
+  * **Linux/macOS:** `/var/lib/zoi/pkgs/store/`
+  * **Windows:** `C:\ProgramData\zoi\pkgs\store`
+* **Project Scope:** `./.zoi/pkgs/store/` (relative to project root)
 
 ### Package Identification and Hashing
 
 To prevent naming collisions across different registries and repositories, Zoi identifies every package by a unique ID generated from its origin.
 
-1.  **Package ID String:** `#{registry-handle}@{repo-path}/{package-name}`
-    - Example: `#zoidberg@core/linux`
-2.  **Hashing:** The ID string is hashed using **SHA-512**.
-3.  **Directory Name:** Zoi uses the first **32 characters** of the hex-encoded hash, followed by the package name.
-    - Format: `{hash32}-{package-name}`
-    - Example: `8f1a...-linux`
+1. **Package ID String:** `#{registry-handle}@{repo-path}/{package-name}`
+   * Example: `#zoidberg@core/linux`
+2. **Hashing:** The ID string is hashed using **SHA-512**.
+3. **Directory Name:** Zoi uses the first **32 characters** of the hex-encoded hash, followed by the package name.
+   * Format: `{hash32}-{package-name}`
+   * Example: `8f1a...-linux`
 
 ### Directory Layout
 
@@ -69,7 +69,7 @@ Zoi implements simple reference counting using the `dependents/` directory. When
 
 Binaries are not added to the system `PATH` individually. Instead, Zoi maintains a global `bin` directory (`~/.zoi/pkgs/bin`) and creates symlinks to the binaries located inside the specific `{version}/bin/` directories in the store.
 
----
+***
 
 ## Dependency Resolution (SAT Solver)
 
@@ -79,9 +79,9 @@ Zoi uses a Boolean Satisfiability (SAT) solver to resolve dependencies. This ens
 
 Zoi integrates the **PubGrub** algorithm (via the `pubgrub` crate), which is a next-generation version solver also used by `cargo` and `uv`. PubGrub provides:
 
-- **Conflict-Driven Clause Learning (CDCL):** Quickly narrows down the search space for valid solutions.
-- **Human-Readable Errors:** If a set of dependencies is impossible to satisfy, Zoi prints a clear explanation of exactly which constraints are clashing.
-- **Backtracking:** If an initial choice leads to a dead-end, the solver can backtrack and try alternative versions.
+* **Conflict-Driven Clause Learning (CDCL):** Quickly narrows down the search space for valid solutions.
+* **Human-Readable Errors:** If a set of dependencies is impossible to satisfy, Zoi prints a clear explanation of exactly which constraints are clashing.
+* **Backtracking:** If an initial choice leads to a dead-end, the solver can backtrack and try alternative versions.
 
 ### SQLite-Powered Metadata
 
@@ -91,24 +91,24 @@ The solver is fed by a high-performance SQLite database. During a `zoi sync`, Zo
 
 Zoi supports searching for files across all active registries, even for packages that are not installed. This is achieved via:
 
-- **Remote File Metadata:** Registries can host `.files` metadata files for each package.
-- **SQLite Indexing:** When `zoi sync --files` is run, Zoi downloads these file lists and populates a dedicated `package_files` table in the SQLite database.
-- **FTS5 Integration:** The file table uses a Virtual Table with FTS5 indexing, allowing for near-instant searching of millions of file paths using the `zoi search --files` command.
+* **Remote File Metadata:** Registries can host `.files` metadata files for each package.
+* **SQLite Indexing:** When `zoi sync --files` is run, Zoi downloads these file lists and populates a dedicated `package_files` table in the SQLite database.
+* **FTS5 Integration:** The file table uses a Virtual Table with FTS5 indexing, allowing for near-instant searching of millions of file paths using the `zoi search --files` command.
 
----
+***
 
 ## PGP Key Management
 
 Zoi uses a dedicated keyring for package and registry verification, separate from the system's GPG keyring.
 
-- **Key Storage:** `~/.zoi/pgps/`
-- **Format:** Public keys are stored as standard ASCII-armored `.asc` files.
+* **Key Storage:** `~/.zoi/pgps/`
+* **Format:** Public keys are stored as standard ASCII-armored `.asc` files.
 
 ### Built-in Keyring
 
 Zoi features a built-in mechanism for embedding "Root of Trust" keys. During the build process, `build.rs` scans `src/pkg/pgp/builtin/` for `.asc` files and generates a static byte array containing their contents. On startup, Zoi's `ensure_builtin_keys()` function compares these embedded keys against the local store and automatically imports any that are missing or have been updated.
 
----
+***
 
 ## Transaction System
 
@@ -150,12 +150,12 @@ A transaction log records the starting time and a sequential list of operations.
 
 The `operations` array contains one of three objects:
 
-1.  **`install`**: Contains the `InstallManifest` of the newly installed package.
-2.  **`uninstall`**: Contains the `InstallManifest` of the package that was removed.
-3.  **`upgrade`**: Contains both `old_manifest` and `new_manifest`.
+1. **`install`**: Contains the `InstallManifest` of the newly installed package.
+2. **`uninstall`**: Contains the `InstallManifest` of the package that was removed.
+3. **`upgrade`**: Contains both `old_manifest` and `new_manifest`.
 
 ### Atomicity and Rollback
 
-- **Atomic Commits:** When an operation completes successfully, Zoi deletes the transaction log. A missing log indicates a successful "commit."
-- **Automatic Rollback:** If Zoi crashes or encounters an unhandled error, the transaction log remains on disk. On the next invocation (or via `zoi rollback`), Zoi reads the log and reverts operations in **reverse order**.
-- **Manual Rollback:** Users can trigger a rollback of the last successful transaction using `zoi rollback --last-transaction`, which uses the same mechanism but targets the most recently created log.
+* **Atomic Commits:** When an operation completes successfully, Zoi deletes the transaction log. A missing log indicates a successful "commit."
+* **Automatic Rollback:** If Zoi crashes or encounters an unhandled error, the transaction log remains on disk. On the next invocation (or via `zoi rollback`), Zoi reads the log and reverts operations in **reverse order**.
+* **Manual Rollback:** Users can trigger a rollback of the last successful transaction using `zoi rollback --last-transaction`, which uses the same mechanism but targets the most recently created log.

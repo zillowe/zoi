@@ -13,15 +13,15 @@ In a standard package manager, if you install 50 packages that all contain fonts
 2. **Decoupling:** Allowing system administrators to define maintenance logic without modifying individual package definitions.
 3. **Efficiency:** Ensuring system caches (like font caches, desktop databases, or ldconfig) are updated only when necessary.
 
----
+***
 
 ## Hook Definition (`.hook.yaml`)
 
 Hooks are defined using simple YAML files. They can be placed in:
 
-- **System:** `/etc/zoi/hooks/`
-- **User:** `~/.zoi/hooks/`
-- **Extensions:** Distributed via Zoi [Extensions](/docs/zds/zoi/extensions).
+* **System:** `/etc/zoi/hooks/`
+* **User:** `~/.zoi/hooks/`
+* **Extensions:** Distributed via Zoi [Extensions](/docs/zds/zoi/extensions).
 
 ### Example: update-font-cache.hook.yaml
 
@@ -53,15 +53,15 @@ action:
 | `action.when`       | `enum`   | When to run: `PostTransaction` (currently supported).                       |
 | `action.exec`       | `string` | The shell command to execute.                                               |
 
----
+***
 
 ## Builtin Hooks
 
 Zoi ships with several essential builtin hooks for Linux systems:
 
-- **`update-font-cache`**: Runs `fc-cache -fv` when fonts are modified.
-- **`update-desktop-database`**: Runs `update-desktop-database -q` when `.desktop` files are modified.
-- **`ldconfig`**: Runs `ldconfig` when shared libraries (`.so` files) are modified.
+* **`update-font-cache`**: Runs `fc-cache -fv` when fonts are modified.
+* **`update-desktop-database`**: Runs `update-desktop-database -q` when `.desktop` files are modified.
+* **`ldconfig`**: Runs `ldconfig` when shared libraries (`.so` files) are modified.
 
 ## Overriding Hooks
 

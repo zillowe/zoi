@@ -7,9 +7,9 @@ This page explains Zoi's official repositories and mirrors, and how package repo
 
 ## Official package database
 
-- Packages database (Zoidberg)
-  - Primary: [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg.git)
-  - Mirrors: [GitHub](https://github.com/Zillowe/Zoidberg.git), [Codeberg](https://codeberg.org/Zillowe/Zoidberg.git)
+* Packages database (Zoidberg)
+  * Primary: [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg.git)
+  * Mirrors: [GitHub](https://github.com/Zillowe/Zoidberg.git), [Codeberg](https://codeberg.org/Zillowe/Zoidberg.git)
 
 ## Managing the Package Database Registry
 
@@ -39,7 +39,7 @@ zoi sync set https://my-custom-registry.com/Zoidberg.git
 
 ## Repository tiers
 
-Zoi organizes packages into tiers. Use these to decide where a package belongs and to assess stability, example tiers (from [Zoidberg](/docs/zds/zoi/zoidberg).
+Zoi organizes packages into tiers. Use these to decide where a package belongs and to assess stability, example tiers (from [Zoidberg](/docs/zds/zoi/zoidberg)).
 
 | Repository  | Purpose                                                                           |
 | ----------- | --------------------------------------------------------------------------------- |
@@ -106,15 +106,15 @@ This works if the target repository has a `zoi.yaml` file in its root. The `pack
 
 **Provider Prefixes:**
 
-- `gh:` or `github:` for GitHub (this is the default if no prefix is given).
-- `gl:` or `gitlab:` for GitLab.
-- `cb:` or `codeberg:` for Codeberg.
+* `gh:` or `github:` for GitHub (this is the default if no prefix is given).
+* `gl:` or `gitlab:` for GitLab.
+* `cb:` or `codeberg:` for Codeberg.
 
 ## Installing from a specific repository
 
 You can specify which repository or registry to install a package from using special prefixes.
 
-- **From a top-level repository in the default registry:**
+* **From a top-level repository in the default registry:**
 
   This installs `htop` from the `community` repository.
 
@@ -122,7 +122,7 @@ You can specify which repository or registry to install a package from using spe
   zoi install @community/htop
   ```
 
-- **From a specific sub-package:**
+* **From a specific sub-package:**
 
   This installs the `headers` sub-package from the `linux` package in the `core` repository.
 
@@ -130,7 +130,7 @@ You can specify which repository or registry to install a package from using spe
   zoi install @core/linux:headers
   ```
 
-- **From a nested repository path:**
+* **From a nested repository path:**
 
   This is useful for platform-specific packages.
 
@@ -138,7 +138,7 @@ You can specify which repository or registry to install a package from using spe
   zoi install @core/linux/amd64/nvidia-driver
   ```
 
-- **From a specific registry:**
+* **From a specific registry:**
 
   If you have multiple registries configured (see `zoi sync list`), you can target one using its handle. This installs `my-package` from the `my-repo` repository within the `my-registry` registry.
 
@@ -146,7 +146,7 @@ You can specify which repository or registry to install a package from using spe
   zoi install #my-registry@my-repo/my-package
   ```
 
-- **From a custom git repository:**
+* **From a custom git repository:**
 
   Use the `@git/` prefix, followed by the repository name (the directory name in `~/.zoi/pkgs/git/`) and the package name.
 
@@ -155,7 +155,7 @@ You can specify which repository or registry to install a package from using spe
   zoi install @git/my-zoi-repo/path/to/package
   ```
 
-- **From a remote git repository on the fly:**
+* **From a remote git repository on the fly:**
 
   You can install a package directly from a remote git repository that acts as a Zoi registry, without adding it first. This is useful for testing or one-off installations. The repository must contain a `repo.yaml` file.
 
@@ -217,17 +217,17 @@ This establishes a "Chain of Trust" where the registry maintainer signs the enti
 
 The `url`, `pgp`, `hash`, `size`, and `files` fields within a `PkgLink` object can contain the following placeholders, which Zoi will replace at runtime:
 
-- `{name}`: The name of the package.
-- `{version}`: The version of the package.
-- `{os}`: The operating system (e.g. `linux`, `macos`, `windows`).
-- `{arch}`: The CPU architecture (e.g. `amd64`, `arm64`).
-- `{platform}`: The full platform string (e.g. `linux-amd64`).
-- `{repo}`: The name of the sub-repository (e.g. `core`, `main`).
+* `{name}`: The name of the package.
+* `{version}`: The version of the package.
+* `{os}`: The operating system (e.g. `linux`, `macos`, `windows`).
+* `{arch}`: The CPU architecture (e.g. `amd64`, `arm64`).
+* `{platform}`: The full platform string (e.g. `linux-amd64`).
+* `{repo}`: The name of the sub-repository (e.g. `core`, `main`).
 
 Zoi uses a smart URL construction strategy:
 
-- If your `url` template ends with `.pkg.tar.zst`, Zoi uses it exactly as generated. This gives you full control over the file path.
-- If it does not end with `.pkg.tar.zst`, Zoi assumes the URL points to a directory and automatically appends the standard filename format: `{name}-{version}-{platform}.pkg.tar.zst`.
+* If your `url` template ends with `.pkg.tar.zst`, Zoi uses it exactly as generated. This gives you full control over the file path.
+* If it does not end with `.pkg.tar.zst`, Zoi assumes the URL points to a directory and automatically appends the standard filename format: `{name}-{version}-{platform}.pkg.tar.zst`.
 
 ### Example
 
@@ -263,19 +263,19 @@ When Zoi downloads a pre-built package, it optionally looks for accompanying `.h
 
 This file contains the cryptographic hash of the `.pkg.tar.zst` archive.
 
-- **Format:** Zoi supports standard hash file formats (like those generated by `sha512sum`).
-- **Parsing:** Zoi will search the file for a 128-character hex string (for SHA-512) that is associated with the archive's filename. If the file contains only a single hash string, Zoi will use that.
-- **Supported Algorithms:** SHA-512 (recommended), SHA-256, and MD5.
+* **Format:** Zoi supports standard hash file formats (like those generated by `sha512sum`).
+* **Parsing:** Zoi will search the file for a 128-character hex string (for SHA-512) that is associated with the archive's filename. If the file contains only a single hash string, Zoi will use that.
+* **Supported Algorithms:** SHA-512 (recommended), SHA-256, and MD5.
 
 ### The `.size` File
 
 This file provides the download and expected installation sizes to Zoi before the archive is even downloaded. This allows for accurate disk space checks and progress reporting.
 
-- **Format:** A text file containing key-value pairs or a single number.
-- **Fields:**
-  - `down: <bytes>`: The size of the compressed `.pkg.tar.zst` archive.
-  - `install: <bytes>`: The total size the package will occupy on disk after extraction.
-- **Fallback:** If the file contains only a single numeric value, Zoi treats it as the `down` (download) size.
+* **Format:** A text file containing key-value pairs or a single number.
+* **Fields:**
+  * `down: <bytes>`: The size of the compressed `.pkg.tar.zst` archive.
+  * `install: <bytes>`: The total size the package will occupy on disk after extraction.
+* **Fallback:** If the file contains only a single numeric value, Zoi treats it as the `down` (download) size.
 
 **Example `.size` file:**
 
@@ -288,6 +288,6 @@ install: 124114
 
 This file contains a plain-text list of all files contained within the package archive, including their destination paths (relative to the staging structure, e.g. `data/usrroot/usr/bin/hello`).
 
-- **Purpose:** Allows Zoi to perform "Enhanced Conflict Detection" by checking for file overwrites on the local system **before** downloading the actual package binary.
-- **Upgrade Safety:** Zoi automatically ignores conflicts for files that are already owned by the same package during an upgrade.
-- **Format:** One file path per line.
+* **Purpose:** Allows Zoi to perform "Enhanced Conflict Detection" by checking for file overwrites on the local system **before** downloading the actual package binary.
+* **Upgrade Safety:** Zoi automatically ignores conflicts for files that are already owned by the same package during an upgrade.
+* **Format:** One file path per line.

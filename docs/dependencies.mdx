@@ -5,9 +5,9 @@ description: How Zoi installs dependencies from external package managers and th
 
 Zoi can install dependencies via many ecosystem and OS package managers. This page documents:
 
-- How to declare dependencies in `.pkg.lua`
-- All supported managers, their target platforms/ecosystems, and example usage
-- Notes and caveats for specific managers
+* How to declare dependencies in `.pkg.lua`
+* All supported managers, their target platforms/ecosystems, and example usage
+* Notes and caveats for specific managers
 
 ## Declaring dependencies in `.pkg.lua`
 
@@ -17,17 +17,17 @@ Dependencies are specified in the `dependencies` section. Both `runtime` and `bu
 
 Each entry follows the format: `manager:package[:sub-package]` with an optional version and an optional inline description.
 
-- **Format:** `manager:package[:sub-package][@version][:description]`
-  - Note: For `deno` dependencies, use a `-` separator instead of `:` (e.g. `deno:npm-chalk` or `deno:jsr-@std/bytes`).
-- **Virtual Packages:** You can depend on a virtual package name that is satisfied by any package that includes it in its `provides` list.
-- **Sub-packages:** For `zoi` packages that are split, you can specify a sub-package.
-  - Example: `zoi:linux:headers`
-- **Version:** Can be specified with `@<semver>` or a comparator string like `=1.2.3`, `>=2.0.0`, `^1.2`, `~1.2.3`. An optional `v` prefix is supported (e.g. `@v1.2.3`).
-  - Examples: `npm:typescript@5.3.2`, `cargo:bat@v0.24.0`, `apt:curl=7.68.0-1ubuntu2.18`.
-  - For `zoi` packages, you can use a channel name like `zoi:my-pkg@stable`.
-- **Description:** An inline description can be added after the last colon. It must not contain version characters.
-  - Example: `pipx:black:Python formatter CLI`.
-- **Native Packages:** Use `native:<pkg>` to have Zoi automatically select the system's package manager.
+* **Format:** `manager:package[:sub-package][@version][:description]`
+  * Note: For `deno` dependencies, use a `-` separator instead of `:` (e.g. `deno:npm-chalk` or `deno:jsr-@std/bytes`).
+* **Virtual Packages:** You can depend on a virtual package name that is satisfied by any package that includes it in its `provides` list.
+* **Sub-packages:** For `zoi` packages that are split, you can specify a sub-package.
+  * Example: `zoi:linux:headers`
+* **Version:** Can be specified with `@<semver>` or a comparator string like `=1.2.3`, `>=2.0.0`, `^1.2`, `~1.2.3`. An optional `v` prefix is supported (e.g. `@v1.2.3`).
+  * Examples: `npm:typescript@5.3.2`, `cargo:bat@v0.24.0`, `apt:curl=7.68.0-1ubuntu2.18`.
+  * For `zoi` packages, you can use a channel name like `zoi:my-pkg@stable`.
+* **Description:** An inline description can be added after the last colon. It must not contain version characters.
+  * Example: `pipx:black:Python formatter CLI`.
+* **Native Packages:** Use `native:<pkg>` to have Zoi automatically select the system's package manager.
 
 ### Simple Dependency List
 
@@ -98,10 +98,10 @@ dependencies({
 })
 ```
 
-- `required`: A list of dependencies that are always installed.
-- `options`: A list of groups where the user is prompted to choose one or more dependencies.
-- `optional`: A list of dependencies that the user is prompted to install.
-- `sub_packages`: A table where keys are sub-package names and values are dependency groups (`required`, `options`, `optional`). These dependencies are only installed for the specified sub-package.
+* `required`: A list of dependencies that are always installed.
+* `options`: A list of groups where the user is prompted to choose one or more dependencies.
+* `optional`: A list of dependencies that the user is prompted to install.
+* `sub_packages`: A table where keys are sub-package names and values are dependency groups (`required`, `options`, `optional`). These dependencies are only installed for the specified sub-package.
 
 ### Dynamic Versions with Lua
 
@@ -149,8 +149,8 @@ When pinning is not supported, Zoi will install the latest version available fro
 
 Zoi includes intelligence to avoid unnecessary failures when resolving dependencies from external managers:
 
-- **Skip if Missing**: If a dependency specifies an OS-specific manager (like `apt` or `pacman`) that is not available on your current system, Zoi will print a warning and skip that dependency instead of failing the installation. This allows for creating cross-platform `.pkg.lua` files that list requirements for multiple distributions.
-- **Already Installed Check**: Zoi checks if a package is already installed via its respective manager before attempting to run an install command. This speeds up builds and avoids noise from managers like `cargo` or `npm`.
+* **Skip if Missing**: If a dependency specifies an OS-specific manager (like `apt` or `pacman`) that is not available on your current system, Zoi will print a warning and skip that dependency instead of failing the installation. This allows for creating cross-platform `.pkg.lua` files that list requirements for multiple distributions.
+* **Already Installed Check**: Zoi checks if a package is already installed via its respective manager before attempting to run an install command. This speeds up builds and avoids noise from managers like `cargo` or `npm`.
 
 ## Supported managers
 
@@ -208,22 +208,22 @@ Below is a comprehensive list of all supported dependency managers, their target
 
 Notes:
 
-- AUR: `aur:<pkg>` builds from source using `makepkg`; uninstall is done with `pacman`.
-- `native:<pkg>` selects the appropriate system manager based on OS/distro; if none can be detected, Zoi errors.
-- Some managers (e.g. `go`, `jsr`, `volta`, `uv`) do not provide reliable uninstall; Zoi prints a notice and skips.
-- Deno: `deno:npm-chalk` or `deno:jsr-@std/bytes` (the `-` instead of `:` is important).
+* AUR: `aur:<pkg>` builds from source using `makepkg`; uninstall is done with `pacman`.
+* `native:<pkg>` selects the appropriate system manager based on OS/distro; if none can be detected, Zoi errors.
+* Some managers (e.g. `go`, `jsr`, `volta`, `uv`) do not provide reliable uninstall; Zoi prints a notice and skips.
+* Deno: `deno:npm-chalk` or `deno:jsr-@std/bytes` (the `-` instead of `:` is important).
 
 ## Zoi Dependencies and Conflict Checks
 
 When a dependency uses the `zoi:` manager, Zoi resolves the referenced package definition and applies the same conflict checks as for a top-level install:
 
-- If the dependency package declares `bins`, Zoi checks whether any of those binaries are already provided by installed packages.
-- If the dependency package declares `conflicts`, Zoi checks whether any listed packages are installed.
+* If the dependency package declares `bins`, Zoi checks whether any of those binaries are already provided by installed packages.
+* If the dependency package declares `conflicts`, Zoi checks whether any listed packages are installed.
 
 If conflicts are detected, Zoi displays the conflicts and prompts whether to continue before proceeding with installation.
 
 ## Troubleshooting
 
-- Some managers require being present on PATH. Run `zoi info` to see which managers Zoi detects.
-- On macOS, GUI apps use `brew-cask`; App Store apps require `mas` to be signed in.
-- On Arch-based systems, you can choose between helpers (`yay`, `paru`, `pikaur`, `trizen`) or use `aur:` to build with `makepkg`.
+* Some managers require being present on PATH. Run `zoi info` to see which managers Zoi detects.
+* On macOS, GUI apps use `brew-cask`; App Store apps require `mas` to be signed in.
+* On Arch-based systems, you can choose between helpers (`yay`, `paru`, `pikaur`, `trizen`) or use `aur:` to build with `makepkg`.

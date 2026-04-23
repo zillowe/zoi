@@ -26,9 +26,9 @@ cp ~/.zoi/pkgs/zoi.pkgs.json ~/my-backups/zoi-backup.json
 
 To restore your environment on a new machine:
 
-1.  **Install Zoi** on the new system.
-2.  **Sync** the default registries: `zoi sync`.
-3.  **Install from the backup file**:
+1. **Install Zoi** on the new system.
+2. **Sync** the default registries: `zoi sync`.
+3. **Install from the backup file**:
 
 ```sh
 zoi install ~/my-backups/zoi-backup.json
@@ -36,14 +36,14 @@ zoi install ~/my-backups/zoi-backup.json
 
 Zoi will read the manifest, resolve all listed packages, and install them sequentially.
 
----
+***
 
 ## Project-Level Backup (`zoi.lock`)
 
 For individual projects, backup and restore are handled automatically via version control.
 
-1.  **`zoi.yaml`**: Defines your project's dependencies.
-2.  **`zoi.lock`**: (Generated when `config.local` is true) Records the exact integrity hashes and versions of your project's local packages.
+1. **`zoi.yaml`**: Defines your project's dependencies.
+2. **`zoi.lock`**: (Generated when `config.local` is true) Records the exact integrity hashes and versions of your project's local packages.
 
 ### Restoring a Project
 

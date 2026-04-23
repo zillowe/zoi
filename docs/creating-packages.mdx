@@ -11,14 +11,14 @@ A Zoi package is defined by a single `.pkg.lua` file. This file is a Lua script 
 
 A typical `.pkg.lua` file is structured around a few key global functions:
 
-1.  **`metadata{...}`**: **(Required)** A function call that declares all the static information about your package, like its name, version, and description.
-2.  **`dependencies{...}`**: A function call that defines the package's build-time and runtime dependencies.
-3.  **Lifecycle Functions**: A set of functions (`prepare`, `package`, `verify`, `uninstall`) that contain the logic for fetching, building, and installing the software.
-4.  **`service{...}`**: A function call that defines a background service associated with the package.
+1. **`metadata{...}`**: **(Required)** A function call that declares all the static information about your package, like its name, version, and description.
+2. **`dependencies{...}`**: A function call that defines the package's build-time and runtime dependencies.
+3. **Lifecycle Functions**: A set of functions (`prepare`, `package`, `verify`, `uninstall`) that contain the logic for fetching, building, and installing the software.
+4. **`service{...}`**: A function call that defines a background service associated with the package.
 
 Let's look at the core components in detail.
 
----
+***
 
 ## 1. Metadata
 
@@ -76,7 +76,7 @@ This table lists all the available fields you can use inside the `metadata` bloc
 | `installed_size` | `integer` | The expected size of the package after installation (in bytes). Used for disk space checks.                                                |
 | `archive_size`   | `integer` | The size of the pre-compiled archive (in bytes).                                                                                           |
 
----
+***
 
 ## 2. Dependencies
 
@@ -109,7 +109,7 @@ dependencies({
 })
 ```
 
----
+***
 
 ## 3. Lifecycle Functions
 
@@ -124,35 +124,35 @@ These functions define the imperative steps for building your package. Zoi calls
 
 This function runs first. Its main job is to fetch all necessary source code, binaries, or other assets and place them inside the temporary `BUILD_DIR`.
 
-- **Common tasks:** Cloning git repos, downloading release archives, extracting files.
+* **Common tasks:** Cloning git repos, downloading release archives, extracting files.
 
 ### `package()`
 
 This function runs after `prepare()`. It takes the prepared files from the `BUILD_DIR` and copies only the final, distributable files into the `STAGING_DIR`. The contents of the staging directory are what will be included in the final `.pkg.tar.zst` archive.
 
-- **Common tasks:** Running `make install`, copying binaries, libraries, and documentation.
+* **Common tasks:** Running `make install`, copying binaries, libraries, and documentation.
 
 ### `verify()`
 
 This function runs after `package()`. It's a security step where you can verify the integrity and authenticity of the files you downloaded in the `prepare` step.
 
-- **Common tasks:** Checking checksums with `verifyHash()`, verifying PGP signatures with `verifySignature()`.
-- **Return value:** If this function returns `false`, the build process is aborted.
+* **Common tasks:** Checking checksums with `verifyHash()`, verifying PGP signatures with `verifySignature()`.
+* **Return value:** If this function returns `false`, the build process is aborted.
 
 ### `test()`
 
 This optional function runs after a successful `package()` step and is executed by the `zoi package test` command. It allows you to run validation and integration tests against your staged package files.
 
-- **Common tasks:** Running the packaged binary with a `--version` flag, checking for the existence of specific library files, or running a small test script.
-- **Return value:** Should return `true` if all tests pass and `false` otherwise. A failure will cause `zoi package test` to exit with an error.
+* **Common tasks:** Running the packaged binary with a `--version` flag, checking for the existence of specific library files, or running a small test script.
+* **Return value:** Should return `true` if all tests pass and `false` otherwise. A failure will cause `zoi package test` to exit with an error.
 
 ### `uninstall()`
 
 This function is not part of the build process. Its contents are executed when a user runs `zoi uninstall` on the package. It's used for cleanup tasks outside of the main package directory.
 
-- **Common tasks:** Removing user-specific configuration files or system-wide service files.
+* **Common tasks:** Removing user-specific configuration files or system-wide service files.
 
----
+***
 
 ## 4. The Lua Environment
 
@@ -201,10 +201,10 @@ The `zcp(source, destination)` function is used to copy files from your build en
 
 The `source` argument can be:
 
-1.  A path relative to the `BUILD_DIR` (e.g. `"source/my-binary"`).
-2.  An absolute path on the build machine.
-3.  A path relative to your `.pkg.lua` file using the `${pkgluadir}` variable. This is useful for bundling assets that are stored alongside your package definition.
-    - Example: `zcp("${pkgluadir}/my-asset.png", "${pkgstore}/share/my-asset.png")`
+1. A path relative to the `BUILD_DIR` (e.g. `"source/my-binary"`).
+2. An absolute path on the build machine.
+3. A path relative to your `.pkg.lua` file using the `${pkgluadir}` variable. This is useful for bundling assets that are stored alongside your package definition.
+   * Example: `zcp("${pkgluadir}/my-asset.png", "${pkgstore}/share/my-asset.png")`
 
 #### Destination Path
 
@@ -217,7 +217,7 @@ The `destination` argument uses special variables to place files in the correct 
 | `${usrroot}`      | Copies files to the system's root (`/`). **Use with extreme caution.** This requires administrator privileges to install.        |
 | `${usrhome}`      | Copies files to the user's home directory (`~`).                                                                                 |
 
----
+***
 
 ## 5. Package Types
 
@@ -276,7 +276,7 @@ An `extension` is a special package that modifies the user's Zoi configuration. 
   [Extensions](/docs/zds/zoi/extensions) page.
 </Callout>
 
----
+***
 
 ## 6. Split Packages
 
@@ -286,8 +286,8 @@ Zoi supports "split packages," allowing a single `.pkg.lua` to produce multiple,
 
 You use the `sub_packages` and `main_subs` fields in your `metadata`:
 
-- `sub_packages`: A list of all sub-packages that can be built.
-- `main_subs`: A list of the default sub-packages to install when a user installs the base package name.
+* `sub_packages`: A list of all sub-packages that can be built.
+* `main_subs`: A list of the default sub-packages to install when a user installs the base package name.
 
 **Example:**
 
@@ -300,8 +300,8 @@ metadata({
 })
 ```
 
-- `zoi install linux` will install `linux:kernel` and `linux:headers`.
-- `zoi install linux:docs` will install only the documentation.
+* `zoi install linux` will install `linux:kernel` and `linux:headers`.
+* `zoi install linux:docs` will install only the documentation.
 
 ### Lifecycle Functions in Split Packages
 
@@ -323,7 +323,7 @@ end
 
 When building a split package, `zcp` automatically stages files into a sub-package-specific directory (e.g. `data/kernel/...`, `data/headers/...`) within the final archive. This ensures that installing a sub-package only extracts the correct files.
 
----
+***
 
 ## 7. Hooks
 
@@ -335,12 +335,12 @@ The `hooks` block is a top-level function in your `.pkg.lua`, similar to `depend
 
 The following hooks are available, executed at different stages:
 
-- `pre_install`: Before the package's files are installed.
-- `post_install`: After the package's files are installed and binaries are linked.
-- `pre_upgrade`: Before an existing version of the package is upgraded.
-- `post_upgrade`: After the package has been successfully upgraded to a new version.
-- `pre_remove`: Before the package's files are removed.
-- `post_remove`: After the package's files have been removed.
+* `pre_install`: Before the package's files are installed.
+* `post_install`: After the package's files are installed and binaries are linked.
+* `pre_upgrade`: Before an existing version of the package is upgraded.
+* `post_upgrade`: After the package has been successfully upgraded to a new version.
+* `pre_remove`: Before the package's files are removed.
+* `post_remove`: After the package's files have been removed.
 
 ### Hook Definition
 
@@ -369,7 +369,7 @@ hooks({
 })
 ```
 
----
+***
 
 ## 8. Services
 
@@ -402,13 +402,13 @@ service({
 
 Once a package with a service is installed, you can manage it using the `zoi service` command:
 
-- `zoi service start <package>`
-- `zoi service stop <package>`
-- `zoi service restart <package>`
-- `zoi service status <package>`
-- `zoi service list`
+* `zoi service start <package>`
+* `zoi service stop <package>`
+* `zoi service restart <package>`
+* `zoi service status <package>`
+* `zoi service list`
 
----
+***
 
 ## 9. The Packaging Workflow
 
@@ -464,15 +464,15 @@ zoi package build --type <build-type> --test /path/to/your-package.pkg.lua
 
 **`zoi package build` Flags:**
 
-- `--type <TYPE>`: **(Required)** The build type to use (e.g. `source`).
-- `--platform <PLATFORM>`: Build for a specific platform (e.g. `linux-arm64`). Defaults to your current platform.
-- `--sub <SUB_PACKAGE...>`: For a split package, build only the specified sub-packages.
-- `--sign <KEY>`: Sign the resulting archive with a PGP key from your Zoi keyring.
-- `--test`: Run the `test()` function before building the archive.
-- `--install-deps`: Automatically install build-time dependencies from other package managers (e.g. Pacman, APT, Cargo) before building.
-- `--version-override <VERSION>`: Override the package version defined in the `.pkg.lua` file.
-- `--method <native|docker>`: The build method to use. Defaults to `native`. Use `docker` for containerized builds.
-- `--image <IMAGE>`: The Docker image to use for the build (required when `--method docker` is used).
+* `--type <TYPE>`: **(Required)** The build type to use (e.g. `source`).
+* `--platform <PLATFORM>`: Build for a specific platform (e.g. `linux-arm64`). Defaults to your current platform.
+* `--sub <SUB_PACKAGE...>`: For a split package, build only the specified sub-packages.
+* `--sign <KEY>`: Sign the resulting archive with a PGP key from your Zoi keyring.
+* `--test`: Run the `test()` function before building the archive.
+* `--install-deps`: Automatically install build-time dependencies from other package managers (e.g. Pacman, APT, Cargo) before building.
+* `--version-override <VERSION>`: Override the package version defined in the `.pkg.lua` file.
+* `--method <native|docker>`: The build method to use. Defaults to `native`. Use `docker` for containerized builds.
+* `--image <IMAGE>`: The Docker image to use for the build (required when `--method docker` is used).
 
 ### Step 5: Verify the Final Archive
 
@@ -484,16 +484,16 @@ zoi package install /path/to/your-package-1.0.0-linux-amd64.pkg.tar.zst
 
 **`zoi package install` Flags:**
 
-- `--scope <user|system>`: Override the installation scope.
-- `--sub <SUB_PACKAGE...>`: For a split package, install only the specified sub-packages from the archive.
+* `--scope <user|system>`: Override the installation scope.
+* `--sub <SUB_PACKAGE...>`: For a split package, install only the specified sub-packages from the archive.
 
----
+***
 
 ## 9. Full Walkthrough: 'hello' Package
 
 This example demonstrates many of the concepts above by packaging a simple "Hello, World!" program written in Zig.
 
-_For the full source code of this example, see the `hello` package in the [Zoidberg repository](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg/-/tree/main/zillowe/hello)._
+*For the full source code of this example, see the `hello` package in the [Zoidberg repository](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg/-/tree/main/zillowe/hello).*
 
 ### `hello.pkg.lua`
 

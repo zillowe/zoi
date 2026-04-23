@@ -11,52 +11,52 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
 
 ## Features
 
-- **Cross-Platform:** Works seamlessly on Linux, macOS, and Windows.
-- **Dynamic Package Definitions:** Define packages with dynamic Lua scripts (`.pkg.lua`) for maximum flexibility.
-- **Universal Package Support:** Install packages from pre-built binaries, compressed archives, or build them from source.
-- **Extensive Dependency Management:** Integrates with over 40 system and language package managers (`apt`, `brew`, `cargo`, `npm`, `pip`, `go`, `bun`, etc.).
-- **Version Multiplexing via Intelligent Shims:** Automatically switch between different versions of the same tool (e.g. Node.js 18 vs 20) based on your project context (`zoi.yaml`) or legacy configuration files (`.nvmrc`) through its extensible Lua plugin system.
-- **Rich Dependencies:** Define runtime and build dependencies with required, optional, and selectable options.
-- **Project Environments:** Manage project-specific commands and environments using a local `zoi.yaml` file.
-- **Repository-Based:** Use official, community, or your own private/public Git-based repositories. Manage multiple registries.
-- **Secure & Verifiable:** Verifies package integrity with checksums and authenticity with GPG signatures. Includes a built-in PGP key manager and handles configuration file updates safely.
-- **Advanced Dependencies:** Supports virtual packages (`provides`) and package replacement (`replaces`).
-- **Versatile Package Types:** Supports different types of packages:
-  - `Package`: A standard software package.
-  - `Collection`: A meta-package that groups other packages together.
-  - `App`: A template for bootstrapping new projects (`zoi create`).
-  - `Extension`: A package to extend Zoi's own functionality or configuration.
-- **Local Package Development:** A dedicated `zoi package` command set (`build`, `install`, `doctor`) to streamline creating, linting, and testing packages locally.
-- **Advanced CLI Tools:**
-  - `zoi man`: Read package manuals in the terminal.
-  - `zoi audit`: Scan installed packages for known security vulnerabilities.
-  - `zoi why`: Understand why a package is installed.
-  - `zoi rollback`: Revert a package to its previous version or rollback the last transaction.
-  - `zoi pin`: Pin a package to a specific version.
-  - `zoi exec`: Run a package's binary without installing it.
-  - `zoi dev`: Enter a project-specific development shell with all dependencies.
-- **Library Support:** Core functionality is available as a Rust library to be integrated into other applications.
+* **Cross-Platform:** Works seamlessly on Linux, macOS, and Windows.
+* **Dynamic Package Definitions:** Define packages with dynamic Lua scripts (`.pkg.lua`) for maximum flexibility.
+* **Universal Package Support:** Install packages from pre-built binaries, compressed archives, or build them from source.
+* **Extensive Dependency Management:** Integrates with over 40 system and language package managers (`apt`, `brew`, `cargo`, `npm`, `pip`, `go`, `bun`, etc.).
+* **Version Multiplexing via Intelligent Shims:** Automatically switch between different versions of the same tool (e.g. Node.js 18 vs 20) based on your project context (`zoi.yaml`) or legacy configuration files (`.nvmrc`) through its extensible Lua plugin system.
+* **Rich Dependencies:** Define runtime and build dependencies with required, optional, and selectable options.
+* **Project Environments:** Manage project-specific commands and environments using a local `zoi.yaml` file.
+* **Repository-Based:** Use official, community, or your own private/public Git-based repositories. Manage multiple registries.
+* **Secure & Verifiable:** Verifies package integrity with checksums and authenticity with GPG signatures. Includes a built-in PGP key manager and handles configuration file updates safely.
+* **Advanced Dependencies:** Supports virtual packages (`provides`) and package replacement (`replaces`).
+* **Versatile Package Types:** Supports different types of packages:
+  * `Package`: A standard software package.
+  * `Collection`: A meta-package that groups other packages together.
+  * `App`: A template for bootstrapping new projects (`zoi create`).
+  * `Extension`: A package to extend Zoi's own functionality or configuration.
+* **Local Package Development:** A dedicated `zoi package` command set (`build`, `install`, `doctor`) to streamline creating, linting, and testing packages locally.
+* **Advanced CLI Tools:**
+  * `zoi man`: Read package manuals in the terminal.
+  * `zoi audit`: Scan installed packages for known security vulnerabilities.
+  * `zoi why`: Understand why a package is installed.
+  * `zoi rollback`: Revert a package to its previous version or rollback the last transaction.
+  * `zoi pin`: Pin a package to a specific version.
+  * `zoi exec`: Run a package's binary without installing it.
+  * `zoi dev`: Enter a project-specific development shell with all dependencies.
+* **Library Support:** Core functionality is available as a Rust library to be integrated into other applications.
 
 ## Getting Started
 
 Getting started with Zoi is simple. Just follow these three steps:
 
-1.  **Install Zoi:**
-    Choose one of the [installation methods](#installation) below.
+1. **Install Zoi:**
+   Choose one of the [installation methods](#installation) below.
 
-2.  **Sync Repositories:**
-    Before you can install packages, you need to sync the package repositories.
+2. **Sync Repositories:**
+   Before you can install packages, you need to sync the package repositories.
 
-    ```sh
-    zoi sync
-    ```
+   ```sh
+   zoi sync
+   ```
 
-3.  **Install a Package:**
-    Now you can install any package you want. For example, to install `hello`:
+3. **Install a Package:**
+   Now you can install any package you want. For example, to install `hello`:
 
-    ```sh
-    zoi install @zillowe/hello
-    ```
+   ```sh
+   zoi install @zillowe/hello
+   ```
 
 ## Common Workflows
 
@@ -194,64 +194,68 @@ You can install `@zillowe/zoi` from `npm` also.
   <TabsList>
     <TabsTrigger value="npm">
       <FaNpm />
+
       npm
     </TabsTrigger>
+
     <TabsTrigger value="bun">
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width={24}
-        height={24}
-        fill={"currentColor"}
-        viewBox="0 0 24 24"
-      >
-        <path d="m9.34,7.66c-.07.06-.02.18.08.15.85-.33,2.01-1.32,1.52-3.33-.02-.11-.17-.08-.17.02,0,1.21-.51,2.36-1.43,3.16Z"></path>
-        <path d="m11.34,4.51c.63,1.02.78,2.27.41,3.41-.03.09.08.16.14.09.55-.71,1.04-2.12-.41-3.64-.07-.07-.19.04-.14.12h0Z"></path>
-        <path d="m12.04,4.46c.98.69,1.61,1.78,1.73,2.98,0,.05.03.09.07.09.04,0,.08-.02.09-.07.23-.88.1-2.39-1.82-3.17-.1-.04-.17.1-.08.16h0Z"></path>
-        <path d="m7.37,7.26c.91.06,2.38-.37,2.82-2.39.02-.1-.12-.14-.17-.05-.52,1.1-1.48,1.93-2.65,2.28-.09.03-.09.16,0,.16Z"></path>
-        <path d="m19.87,8.36s-.08-.09-.13-.13c-.04-.04-.08-.09-.13-.13-.04-.04-.08-.09-.13-.13-.04-.04-.08-.09-.13-.13-.04-.04-.08-.09-.13-.13-.04-.04-.08-.09-.13-.12h0s0,0,0,0c-.02-.02-.04-.04-.06-.06-.62-.65-1.37-1.23-2.25-1.7-.94-.5-1.65-.94-2.28-1.33-.27-.17-.52-.33-.78-.47-.83-.49-1.49-.79-2.25-.79s-1.52.35-2.41.88c-.29.17-.59.36-.91.55-.58.36-1.23.76-1.99,1.17-2.62,1.42-4.18,3.78-4.18,6.31,0,1.86.84,3.56,2.22,4.88l.1.1.76.76c1.74,1.75,4.42,2.88,7.43,2.88,5.24,0,9.49-3.41,9.49-7.59,0-1.79-.77-3.48-2.13-4.81Zm-8.38,10.76c-4.89,0-8.86-3.13-8.86-6.97,0-2.3,1.44-4.45,3.85-5.75.76-.41,1.44-.83,2.03-1.19.31-.19.61-.38.9-.54.82-.48,1.48-.79,2.09-.79s1.17.25,1.94.71c.23.14.48.3.76.47.61.37,1.35.85,2.31,1.36,2.41,1.3,3.85,3.45,3.85,5.75,0,3.85-3.97,6.97-8.86,6.97Z"></path>
-        <path d="m13.08,13.65h-3.12c-.11,0-.22.04-.29.13-.06.07-.08.16-.07.25.12.5.4.95.79,1.28.31.29.7.47,1.13.51.42-.04.82-.22,1.12-.51.39-.33.67-.78.79-1.28.02-.09,0-.18-.06-.25-.07-.08-.18-.13-.29-.13Zm-1.56,1.87c-.35-.04-.67-.2-.92-.44-.02-.02-.04-.04-.06-.06.26-.33.65-.52,1.07-.53.38.01.74.16,1.01.43-.05.06-.11.12-.17.17-.25.24-.58.4-.92.44Z"></path>
-        <path d="m8.38,10.14c-.77,0-1.4.62-1.4,1.39h0c0,.77.62,1.4,1.39,1.4.77,0,1.4-.62,1.4-1.39,0-.77-.62-1.4-1.39-1.4Zm-.44,1.48c-.29,0-.52-.24-.52-.52h0c0-.29.24-.53.53-.52.29,0,.52.24.52.53,0,.29-.24.52-.53.52Z"></path>
-        <path d="m14.67,10.14c-.77,0-1.4.61-1.41,1.38,0,0,0,0,0,.01,0,.77.62,1.39,1.38,1.39.77,0,1.4-.61,1.41-1.38s-.61-1.4-1.38-1.41Zm-.45,1.48h0c-.29,0-.52-.24-.52-.52h0c0-.29.24-.53.53-.52.29,0,.52.24.52.53,0,.29-.24.52-.53.52Z"></path>
+      <svg xmlns="http://www.w3.org/2000/svg" width={24} height={24} fill={"currentColor"} viewBox="0 0 24 24">
+        <path d="m9.34,7.66c-.07.06-.02.18.08.15.85-.33,2.01-1.32,1.52-3.33-.02-.11-.17-.08-.17.02,0,1.21-.51,2.36-1.43,3.16Z" />
+
+        <path d="m11.34,4.51c.63,1.02.78,2.27.41,3.41-.03.09.08.16.14.09.55-.71,1.04-2.12-.41-3.64-.07-.07-.19.04-.14.12h0Z" />
+
+        <path d="m12.04,4.46c.98.69,1.61,1.78,1.73,2.98,0,.05.03.09.07.09.04,0,.08-.02.09-.07.23-.88.1-2.39-1.82-3.17-.1-.04-.17.1-.08.16h0Z" />
+
+        <path d="m7.37,7.26c.91.06,2.38-.37,2.82-2.39.02-.1-.12-.14-.17-.05-.52,1.1-1.48,1.93-2.65,2.28-.09.03-.09.16,0,.16Z" />
+
+        <path d="m19.87,8.36s-.08-.09-.13-.13c-.04-.04-.08-.09-.13-.13-.04-.04-.08-.09-.13-.13-.04-.04-.08-.09-.13-.13-.04-.04-.08-.09-.13-.13-.04-.04-.08-.09-.13-.12h0s0,0,0,0c-.02-.02-.04-.04-.06-.06-.62-.65-1.37-1.23-2.25-1.7-.94-.5-1.65-.94-2.28-1.33-.27-.17-.52-.33-.78-.47-.83-.49-1.49-.79-2.25-.79s-1.52.35-2.41.88c-.29.17-.59.36-.91.55-.58.36-1.23.76-1.99,1.17-2.62,1.42-4.18,3.78-4.18,6.31,0,1.86.84,3.56,2.22,4.88l.1.1.76.76c1.74,1.75,4.42,2.88,7.43,2.88,5.24,0,9.49-3.41,9.49-7.59,0-1.79-.77-3.48-2.13-4.81Zm-8.38,10.76c-4.89,0-8.86-3.13-8.86-6.97,0-2.3,1.44-4.45,3.85-5.75.76-.41,1.44-.83,2.03-1.19.31-.19.61-.38.9-.54.82-.48,1.48-.79,2.09-.79s1.17.25,1.94.71c.23.14.48.3.76.47.61.37,1.35.85,2.31,1.36,2.41,1.3,3.85,3.45,3.85,5.75,0,3.85-3.97,6.97-8.86,6.97Z" />
+
+        <path d="m13.08,13.65h-3.12c-.11,0-.22.04-.29.13-.06.07-.08.16-.07.25.12.5.4.95.79,1.28.31.29.7.47,1.13.51.42-.04.82-.22,1.12-.51.39-.33.67-.78.79-1.28.02-.09,0-.18-.06-.25-.07-.08-.18-.13-.29-.13Zm-1.56,1.87c-.35-.04-.67-.2-.92-.44-.02-.02-.04-.04-.06-.06.26-.33.65-.52,1.07-.53.38.01.74.16,1.01.43-.05.06-.11.12-.17.17-.25.24-.58.4-.92.44Z" />
+
+        <path d="m8.38,10.14c-.77,0-1.4.62-1.4,1.39h0c0,.77.62,1.4,1.39,1.4.77,0,1.4-.62,1.4-1.39,0-.77-.62-1.4-1.39-1.4Zm-.44,1.48c-.29,0-.52-.24-.52-.52h0c0-.29.24-.53.53-.52.29,0,.52.24.52.53,0,.29-.24.52-.53.52Z" />
+
+        <path d="m14.67,10.14c-.77,0-1.4.61-1.41,1.38,0,0,0,0,0,.01,0,.77.62,1.39,1.38,1.39.77,0,1.4-.61,1.41-1.38s-.61-1.4-1.38-1.41Zm-.45,1.48h0c-.29,0-.52-.24-.52-.52h0c0-.29.24-.53.53-.52.29,0,.52.24.52.53,0,.29-.24.52-.53.52Z" />
       </svg>
+
       bun
     </TabsTrigger>
+
     <TabsTrigger value="pnpm">
       <TbBrandPnpm />
+
       pnpm
     </TabsTrigger>
+
     <TabsTrigger value="yarn">
       <FaYarn />
+
       yarn
     </TabsTrigger>
   </TabsList>
-  <TabsContent value="npm">
 
+  <TabsContent value="npm">
     ```sh
     npx @zillowe/zoi
     ```
-
   </TabsContent>
-  <TabsContent value="bun">
 
+  <TabsContent value="bun">
     ```sh
     bunx @zillowe/zoi
     ```
+  </TabsContent>
 
-</TabsContent>
   <TabsContent value="pnpm">
-
     ```sh
     pnpm dlx @zillowe/zoi
     ```
+  </TabsContent>
 
-</TabsContent>
   <TabsContent value="yarn">
-
     ```sh
     yarn dlx @zillowe/zoi
     ```
-
-</TabsContent>
+  </TabsContent>
 </Tabs>
 
 ### Build from Source
@@ -312,19 +316,19 @@ But some other package managers like `npm`, it installs the dependency if the pa
 
 Here are some common commands to get you started.
 
-- **Install a package:**
+* **Install a package:**
 
   ```sh
   zoi install <package_name>
   ```
 
-- **Uninstall a package:**
+* **Uninstall a package:**
 
   ```sh
   zoi uninstall <package_name>
   ```
 
-- **Update packages:**
+* **Update packages:**
 
   ```sh
   # Update all installed packages
@@ -334,33 +338,33 @@ Here are some common commands to get you started.
   zoi update <package1> <package2>
   ```
 
-- **Search for a package:**
+* **Search for a package:**
 
   ```sh
   zoi search <term>
   ```
 
-- **Show package details:**
+* **Show package details:**
 
   ```sh
   zoi show <package_name>
   ```
 
-- **Run a project command:**
+* **Run a project command:**
 
   ```sh
   # Run a command defined in zoi.yaml
   zoi run <command_alias>
   ```
 
-- **Enter a development shell:**
+* **Enter a development shell:**
 
   ```sh
   # Enter a subshell with project dependencies available
   zoi dev
   ```
 
-- **Add a new repository:**
+* **Add a new repository:**
 
   ```sh
   # Interactively
@@ -373,7 +377,7 @@ Here are some common commands to get you started.
   zoi repo add https://github.com/<user_name>/<repo_name>.git
   ```
 
-- **Update Zoi to the latest version:**
+* **Update Zoi to the latest version:**
 
   ```sh
   zoi upgrade
@@ -395,13 +399,13 @@ New features, enhancements and bug reports are welcome.
 
 Zoi is hosted on multiple forges. The primary locations and mirrors are:
 
-- Zoi Source Code
-  - Primary: [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi)
-  - Mirrors: [GitHub](https://github.com/Zillowe/Zoi), [Codeberg](https://codeberg.org/Zillowe/Zoi)
+* Zoi Source Code
+  * Primary: [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi)
+  * Mirrors: [GitHub](https://github.com/Zillowe/Zoi), [Codeberg](https://codeberg.org/Zillowe/Zoi)
 
-- Packages Database ([Zoidberg](/docs/zds/zoi/zoidberg))
-  - Primary: [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg)
-  - Mirrors: [GitHub](https://github.com/Zillowe/Zoidberg), [Codeberg](https://codeberg.org/Zillowe/Zoidberg)
+* Packages Database ([Zoidberg](/docs/zds/zoi/zoidberg))
+  * Primary: [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg)
+  * Mirrors: [GitHub](https://github.com/Zillowe/Zoidberg), [Codeberg](https://codeberg.org/Zillowe/Zoidberg)
 
 ## FAQ
 
@@ -409,26 +413,32 @@ Zoi is hosted on multiple forges. The primary locations and mirrors are:
   <Accordion title="How do I create my own package for Zoi?">
     You can create a `.pkg.lua` file that defines your package. This file includes metadata like the package name, version, description, and installation instructions. For a complete guide, please visit the [Creating Packages guide](/docs/zds/zoi/creating-packages).
   </Accordion>
+
   <Accordion title="How do I publish a package?">
     To learn how to publish a package to the official repositories or your own, please visit the [Publishing Packages guide](/docs/zds/zoi/publishing-packages).
   </Accordion>
+
   <Accordion title="How do I view a package's manual?">
     If the package maintainer has provided a `man` URL in the package definition, you can run `zoi man <package-name>` to view it in your terminal.
   </Accordion>
+
   <Accordion title="How do I add a new repository?">
     You can add a new repository using the `zoi repo add` command. You can run
     it without arguments for an interactive prompt, or provide the name of the
     repository to add it directly.
   </Accordion>
+
   <Accordion title="What platforms does Zoi support?">
     Zoi is designed to be cross-platform. Mainly supports Linux, macOS and Windows, and amd64 and arm64 architectures.
   </Accordion>
+
   <Accordion title="Can I install packages from other package managers?">
     Yes, Zoi supports installing dependencies from a wide range of other package
     managers like `brew`, `winget`, `scoop`, `npm`, `cargo`, `pip`, and many
     more. These are defined in the `dependencies` section of a packags's
     `.pkg.lua` file.
   </Accordion>
+
   <Accordion title="How do I install a specific version or channel?">
     You can append a version or channel after an '@' in the source string.
     Examples: `zoi install my-app@1.2.3` or use channels defined in
@@ -436,10 +446,12 @@ Zoi is hosted on multiple forges. The primary locations and mirrors are:
     version to prevent updates: `zoi pin my-app VERSION` and later
     `zoi unpin my-app`.
   </Accordion>
+
   <Accordion title="How do I run a tool without installing it?">
     Use `zoi exec <package>`. Zoi will fetch a temporary binary and run it
     without adding it to your PATH or installed set.
   </Accordion>
+
   <Accordion title="What is 'zoi dev' and how does it differ from 'zoi env'?">
     `zoi dev` is used to enter a persistent development subshell. It automatically
     ensures all packages in your `zoi.yaml` are installed locally and sets up
@@ -447,32 +459,40 @@ Zoi is hosted on multiple forges. The primary locations and mirrors are:
     can immediately start compiling or running your code. `zoi env` is more
     focused on running specific setup scripts or one-off environment configurations.
   </Accordion>
+
   <Accordion title="How do I use a custom git package repository?">
     Add it with `zoi repo add https://github.com/you/your-zoi-repo.git`.
     Install packages from it using `@git/<repo-name>/<pkg-name>`.
     List/remove cloned git repos with `zoi repo git ls` and
     `zoi repo git rm <repo-name>`.
   </Accordion>
+
   <Accordion title="Where are binaries installed and how do I fix PATH?">
     Binaries are placed in `~/.zoi/pkgs/store/<name>/bin` and linked into
     `~/.zoi/pkgs/bin`. Zoi attempts to add this to your shell PATH on Unix and user PATH on Windows.
     If commands are not found, run `zoi shell <shell>` to configure your shell, or add `~/.zoi/pkgs/bin` to your PATH manually.
   </Accordion>
+
   <Accordion title="How do I accept all prompts (non-interactive)?">
     Pass `--yes` to installation commands to auto-accept confirmations and optional dependency prompts. To install all optional dependencies without being prompted, use `--all-optional`.
   </Accordion>
+
   <Accordion title="How do I install from a nested repository path?">
     Use the full path in the source, e.g. `@core/linux/amd64/nvidia-driver`.
   </Accordion>
+
   <Accordion title="How do I update Zoi itself?">
     Run `zoi upgrade`. You can use `zoi upgrade --force` to upgrade even if you are on the latest version, and `zoi upgrade --tag <tag>` or `zoi upgrade --branch <branch>` to target a specific release.
   </Accordion>
+
   <Accordion title="How do I rollback a package update?">
-    If an update causes issues, you can revert to the previously installed version using `zoi rollback <package-name>`. Zoi automatically creates a backup before upgrading a package. 
+    If an update causes issues, you can revert to the previously installed version using `zoi rollback <package-name>`. Zoi automatically creates a backup before upgrading a package.
   </Accordion>
+
   <Accordion title="How can I back up and restore my installed packages?">
     Zoi automatically keeps a record of all your installed packages in a JSON file at `~/.zoi/pkgs/zoi.pkgs.json`. You can back up this file. To restore all your packages on a new system, simply run `zoi install /path/to/your/zoi.pkgs.json`.
   </Accordion>
+
   <Accordion title="Does Zoi collect your data?">
     We believe in privacy by design. Zoi does **not** collect any data by
     default. You can choose to opt-in to our anonymous telemetry to help us

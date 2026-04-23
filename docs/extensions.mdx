@@ -11,11 +11,11 @@ Extensions are not "installed" in the traditional sense; they are "added" and "r
 
 Extensions are ideal for:
 
-- **Distributing Repository Sets:** Package a list of official and git-based repositories for a team or project, so everyone can get access with a single command.
-- **Corporate Mirrors:** Point Zoi to a company's internal mirror of the official package database.
-- **Project Starters:** Distribute a standard `zoi.yaml` file for a specific type of project (e.g. Rust library, web service) to bootstrap development environments quickly.
-- **Easy Configuration Sharing:** Simplify the process of setting up a new machine with a standard Zoi configuration.
-- **Distributing PGP Keys:** Share PGP keys for trusted package maintainers to enable signature verification.
+* **Distributing Repository Sets:** Package a list of official and git-based repositories for a team or project, so everyone can get access with a single command.
+* **Corporate Mirrors:** Point Zoi to a company's internal mirror of the official package database.
+* **Project Starters:** Distribute a standard `zoi.yaml` file for a specific type of project (e.g. Rust library, web service) to bootstrap development environments quickly.
+* **Easy Configuration Sharing:** Simplify the process of setting up a new machine with a standard Zoi configuration.
+* **Distributing PGP Keys:** Share PGP keys for trusted package maintainers to enable signature verification.
 
 ## Creating an Extension
 
@@ -54,8 +54,8 @@ metadata({
 
 This is the core of an extension package.
 
-- `type`: The type of extension. Currently, `zoi` is the only supported value.
-- `changes`: A list of configuration changes to apply when the extension is added.
+* `type`: The type of extension. Currently, `zoi` is the only supported value.
+* `changes`: A list of configuration changes to apply when the extension is added.
 
 ### Change Types
 
@@ -65,79 +65,79 @@ Zoi supports several types of changes that can be made by an extension.
 
 Clones a Git repository containing `.pkg.lua` files into Zoi's local package sources.
 
-- **Purpose:** To add a custom, third-party package repository.
-- **`add` Value:** A valid Git repository URL (e.g. `https://github.com/user/my-zoi-repo.git`).
-- **Effect:** Zoi clones the repository into `~/.zoi/pkgs/git/`. Users can then install packages from it using the `@git/<repo-name>/<pkg-name>` syntax.
-- **On Removal:** The cloned repository directory is deleted.
+* **Purpose:** To add a custom, third-party package repository.
+* **`add` Value:** A valid Git repository URL (e.g. `https://github.com/user/my-zoi-repo.git`).
+* **Effect:** Zoi clones the repository into `~/.zoi/pkgs/git/`. Users can then install packages from it using the `@git/<repo-name>/<pkg-name>` syntax.
+* **On Removal:** The cloned repository directory is deleted.
 
 #### `repo-add`
 
 Adds an official Zoi repository tier to the list of active repositories that Zoi searches.
 
-- **Purpose:** To enable official repositories that are not active by default, such as `test`.
-- **`add` Value:** The name of an official repository tier (e.g. `core`, `main`, `community`, `test`, `archive`).
-- **Effect:** The repository name is added to the `repos` list in Zoi's configuration file.
-- **On Removal:** The repository is removed from the active list.
+* **Purpose:** To enable official repositories that are not active by default, such as `test`.
+* **`add` Value:** The name of an official repository tier (e.g. `core`, `main`, `community`, `test`, `archive`).
+* **Effect:** The repository name is added to the `repos` list in Zoi's configuration file.
+* **On Removal:** The repository is removed from the active list.
 
 #### `registry-repo`
 
 Changes the URL of the main package database that Zoi clones and syncs with.
 
-- **Purpose:** To point Zoi to a different central package database, such as a corporate mirror or a personal fork.
-- **`add` Value:** A valid Git repository URL.
-- **Effect:** The registry URL in Zoi's configuration is updated to the new URL.
-- **On Removal:** The registry URL is reverted to the default Zoi package database on GitLab.
+* **Purpose:** To point Zoi to a different central package database, such as a corporate mirror or a personal fork.
+* **`add` Value:** A valid Git repository URL.
+* **Effect:** The registry URL in Zoi's configuration is updated to the new URL.
+* **On Removal:** The previous default registry URL is restored.
 
 #### `registry-add`
 
 Adds an additional package database (registry) for Zoi to sync with.
 
-- **Purpose:** To add supplementary package databases from different sources.
-- **`add` Value:** A valid Git repository URL.
-- **Effect:** The URL is added to the list of `added_registries` in Zoi's configuration. Zoi will sync with this registry on the next `zoi sync`.
-- **On Removal:** The registry is removed from the configuration and its cloned data is deleted.
+* **Purpose:** To add supplementary package databases from different sources.
+* **`add` Value:** A valid Git repository URL.
+* **Effect:** The URL is added to the list of `added_registries` in Zoi's configuration. Zoi will sync with this registry on the next `zoi sync`.
+* **On Removal:** The registry is removed from the configuration and its cloned data is deleted.
 
 #### `project`
 
 Creates a `zoi.yaml` file in the current directory, allowing for sharable project configurations.
 
-- **Purpose:** To distribute a standard `zoi.yaml` project file that can be used to set up a development environment.
-- **`add` Value:** The raw, multi-line string content of the `zoi.yaml` file.
-- **Effect:** A new `zoi.yaml` file is created in the current directory with the content from the `add` field. The command will fail if a `zoi.yaml` file already exists.
-- **On Removal:** The `zoi.yaml` file is deleted.
+* **Purpose:** To distribute a standard `zoi.yaml` project file that can be used to set up a development environment.
+* **`add` Value:** The raw, multi-line string content of the `zoi.yaml` file.
+* **Effect:** A new `zoi.yaml` file is created in the current directory where `zoi extension add` is run. The command will fail if a `zoi.yaml` file already exists there.
+* **On Removal:** The `zoi.yaml` file created during installation is deleted from that original target directory.
 
 #### `pgp`
 
 Adds a PGP key to Zoi's local key store.
 
-- **Purpose:** To add a PGP key for verifying package signatures.
-- **Fields:**
-  - `name`: A string that will be used as the name for the key in Zoi's store.
-  - `key`: A string containing either a URL to the PGP key file (`.asc`) or the key's fingerprint.
-- **Effect:** Zoi downloads or fetches the key and adds it to `~/.zoi/pgps/`.
-- **On Removal:** The PGP key file is deleted from the store.
+* **Purpose:** To add a PGP key for verifying package signatures.
+* **Fields:**
+  * `name`: A string that will be used as the name for the key in Zoi's store.
+  * `key`: A string containing either a URL to the PGP key file (`.asc`) or the key's fingerprint.
+* **Effect:** Zoi downloads or fetches the key and adds it to `~/.zoi/pgps/`.
+* **On Removal:** The PGP key file is deleted from the store.
 
 #### `plugin`
 
 Distributes a Lua script that extends Zoi's core CLI functionality with custom subcommands.
 
-- **Purpose:** To add new logic, workflows, or integrations to Zoi.
-- **Fields:**
-  - `name`: A unique name for the plugin.
-  - `script`: The raw Lua script content.
-- **Effect:** Zoi saves the script to `~/.zoi/plugins/` and loads it on startup. The script can use the `zoi` API to register commands.
-- **On Removal:** The plugin script is deleted.
+* **Purpose:** To add new logic, workflows, or integrations to Zoi.
+* **Fields:**
+  * `name`: A unique name for the plugin.
+  * `script`: The raw Lua script content.
+* **Effect:** Zoi saves the script to `~/.zoi/plugins/` and loads it on startup. The script can use the `zoi` API to register commands.
+* **On Removal:** The plugin script is deleted.
 
 #### `hook`
 
 Distributes a global transaction hook.
 
-- **Purpose:** To perform system-wide maintenance tasks (e.g. updating font caches) automatically when relevant files are modified.
-- **Fields:**
-  - `name`: A unique name for the hook.
-  - `content`: The raw YAML content of the hook definition.
-- **Effect:** Zoi saves the hook to `~/.zoi/hooks/<name>.hook.yaml`. It will be triggered during future transactions based on its path matching logic.
-- **On Removal:** The hook file is deleted.
+* **Purpose:** To perform system-wide maintenance tasks (e.g. updating font caches) automatically when relevant files are modified.
+* **Fields:**
+  * `name`: A unique name for the hook.
+  * `content`: The raw YAML content of the hook definition.
+* **Effect:** Zoi saves the hook to `~/.zoi/hooks/<name>.hook.yaml`. It will be triggered during future transactions based on its path matching logic.
+* **On Removal:** The hook file is deleted.
 
 ## Examples
 
@@ -295,10 +295,10 @@ zoi extension add ./corp-bundle.pkg.lua
 
 When you add an extension, Zoi:
 
-1.  Resolves the package definition.
-2.  Verifies it is a valid `extension` package.
-3.  Applies each of the configuration changes listed in the `changes` block.
-4.  Records a manifest to remember that the extension has been added.
+1. Resolves the package definition.
+2. Verifies it is a valid `extension` package.
+3. Applies each of the configuration changes listed in the `changes` block.
+4. Records a manifest to remember that the extension has been added.
 
 ### Removing an Extension
 
@@ -310,9 +310,9 @@ zoi extension remove corp-bundle
 
 When you remove an extension, Zoi:
 
-1.  Reads the package definition to find the original changes.
-2.  Reverts each change in the **reverse order** they were applied.
-3.  Removes the extension's manifest.
+1. Reads the package definition to find the original changes.
+2. Reverts each change in the **reverse order** they were applied.
+3. Removes the extension's manifest.
 
 This ensures that the configuration is returned to the state it was in before the extension was added.
 

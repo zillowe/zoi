@@ -11,16 +11,16 @@ Zoi uses a hierarchical configuration system, merging settings from up to three 
 
 The files are loaded and merged in the following order of precedence (lower numbers are overridden by higher numbers):
 
-1.  **System:** Global configuration for all users on the machine. This is the only location where a `policy` can be set to enforce settings.
-    - **Linux/macOS:** `/etc/zoi/config.yaml`
-    - **Windows:** `C:\ProgramData\zoi\config.yaml`
+1. **System:** Global configuration for all users on the machine. This is the only location where a `policy` can be set to enforce settings.
+   * **Linux/macOS:** `/etc/zoi/config.yaml`
+   * **Windows:** `C:\ProgramData\zoi\config.yaml`
 
-2.  **User:** User-specific configuration. This is the most common file for users to edit.
-    - **Linux/macOS:** `~/.zoi/pkgs/config.yaml`
-    - **Windows:** `%USERPROFILE%\.zoi\pkgs\config.yaml`
+2. **User:** User-specific configuration. This is the most common file for users to edit.
+   * **Linux/macOS:** `~/.zoi/pkgs/config.yaml`
+   * **Windows:** `%USERPROFILE%\.zoi\pkgs\config.yaml`
 
-3.  **Project:** Project-specific configuration, useful for team-based settings.
-    - **Path:** `./.zoi/pkgs/config.yaml` (relative to the current directory)
+3. **Project:** Project-specific configuration, useful for team-based settings.
+   * **Path:** `./.zoi/pkgs/config.yaml` (relative to the current directory)
 
 Settings from a higher-precedence file will override those from a lower-precedence file, unless a `policy` in the system configuration prevents it.
 
@@ -32,8 +32,8 @@ Here are all the fields available in `config.yaml`.
 
 A list of active repository tiers from the default registry that Zoi will search for packages.
 
-- **Type:** `list` of `string`
-- **Example:**
+* **Type:** `list` of `string`
+* **Example:**
   ```yaml
   repos:
     - core
@@ -45,11 +45,11 @@ A list of active repository tiers from the default registry that Zoi will search
 
 Configures the primary package database (registry) that Zoi syncs with.
 
-- **Type:** `object`
-- **Fields:**
-  - `handle`: (string) A short, unique name for the registry. Zoi will determine this automatically on the first sync if left empty.
-  - `url`: (string) The Git URL of the registry repository.
-- **Example:**
+* **Type:** `object`
+* **Fields:**
+  * `handle`: (string) A short, unique name for the registry. Zoi will determine this automatically on the first sync if left empty.
+  * `url`: (string) The Git URL of the registry repository.
+* **Example:**
   ```yaml
   default_registry:
     handle: zoidberg
@@ -60,9 +60,9 @@ Configures the primary package database (registry) that Zoi syncs with.
 
 A list of supplementary package registries to sync with, in addition to the `default_registry`.
 
-- **Type:** `list` of `object`
-- **Fields:** Same as `default_registry`.
-- **Example:**
+* **Type:** `list` of `object`
+* **Fields:** Same as `default_registry`.
+* **Example:**
   ```yaml
   added_registries:
     - handle: my-corp-registry
@@ -73,8 +73,8 @@ A list of supplementary package registries to sync with, in addition to the `def
 
 A list of raw Git repository URLs that contain Zoi packages. These are cloned into `~/.zoi/pkgs/git/` and can be used for personal or third-party package collections that are not full registries.
 
-- **Type:** `list` of `string`
-- **Example:**
+* **Type:** `list` of `string`
+* **Example:**
   ```yaml
   git_repos:
     - https://github.com/user/my-cool-pkgs.git
@@ -84,66 +84,66 @@ A list of raw Git repository URLs that contain Zoi packages. These are cloned in
 
 Enables or disables Zoi's opt-in anonymous telemetry. See the [Telemetry page](/docs/zds/zoi/telemetry) for more details.
 
-- **Type:** `boolean`
-- **Default:** `false`
-- **Example:** `telemetry_enabled: true`
+* **Type:** `boolean`
+* **Default:** `false`
+* **Example:** `telemetry_enabled: true`
 
 ### `audit_log_enabled`
 
 Enables or disables persistent audit logging of all package operations (install, uninstall, upgrade). Logs are stored in `~/.zoi/audit.json` and can be viewed with `zoi history`.
 
-- **Type:** `boolean`
-- **Default:** `false`
-- **Example:** `audit_log_enabled: true`
+* **Type:** `boolean`
+* **Default:** `false`
+* **Example:** `audit_log_enabled: true`
 
 ### `rollback_enabled`
 
 If `true`, Zoi will keep the previous version of a package when upgrading, allowing for `zoi rollback` to function. If `false`, old versions are deleted immediately.
 
-- **Type:** `boolean`
-- **Default:** `true`
-- **Example:** `rollback_enabled: false`
+* **Type:** `boolean`
+* **Default:** `true`
+* **Example:** `rollback_enabled: false`
 
 ### `parallel_jobs`
 
 The number of parallel jobs to use during package installation. This can speed up the installation of multiple packages or packages with many dependencies.
 
-- **Type:** `integer`
-- **Default:** `3`
-- **Example:** `parallel_jobs: 5`
+* **Type:** `integer`
+* **Default:** `3`
+* **Example:** `parallel_jobs: 5`
 
 ### `protect_db`
 
 If `true`, Zoi will make the package database directory (`~/.zoi/pkgs/db`) read-only after a `zoi sync` operation. Before syncing, it will automatically make it writable. This is a security feature to prevent accidental or malicious modification of package definitions.
 
-- **Type:** `boolean`
-- **Default:** `false`
-- **Example:** `protect_db: true`
+* **Type:** `boolean`
+* **Default:** `false`
+* **Example:** `protect_db: true`
 
 ### `max_resolution_depth`
 
 Configures the maximum recursion depth for package resolution when using the `alt` field in package definitions. This is a safety feature to prevent infinite loops caused by circular references.
 
-- **Type:** `integer`
-- **Default:** `7`
-- **Value of 0:** Disables the limit (infinite recursion allowed).
-- **Behavior when exceeded:** Zoi will prompt the user to either continue or cancel the operation.
-- **Example:** `max_resolution_depth: 10`
+* **Type:** `integer`
+* **Default:** `7`
+* **Value of 0:** Disables the limit (infinite recursion allowed).
+* **Behavior when exceeded:** Zoi will prompt the user to either continue or cancel the operation.
+* **Example:** `max_resolution_depth: 10`
 
 ### `offline_mode`
 
 If `true`, Zoi will not attempt to connect to the network. It will rely entirely on local metadata and archive caches.
 
-- **Type:** `boolean`
-- **Default:** `false`
-- **Example:** `offline_mode: true`
+* **Type:** `boolean`
+* **Default:** `false`
+* **Example:** `offline_mode: true`
 
 ### `versions`
 
 A map of binary names to their preferred global versions. This is used by Zoi's intelligent shims to resolve which version of a tool to execute when multiple versions are installed and no project-specific version is defined.
 
-- **Type:** `object` (map of `string` to `string`)
-- **Example:**
+* **Type:** `object` (map of `string` to `string`)
+* **Example:**
   ```yaml
   versions:
     node: "20.11.0"
@@ -154,22 +154,34 @@ A map of binary names to their preferred global versions. This is used by Zoi's 
 
 A list of additional directories to search for `.pkg.tar.zst` archives during installation.
 
-- **Type:** `list` of `string`
-- **Example:**
+* **Type:** `list` of `string`
+* **Example:**
   ```yaml
   pkg_dirs:
     - /mnt/usb/packages
     - /opt/zoi/archives
   ```
 
+### `cache_mirrors`
+
+A list of base URLs used as fallbacks for archive downloads and archive metadata downloads (`.hash`, `.size`, `.files`). Zoi keeps the original upstream URL first, then tries each configured mirror using the requested filename.
+
+* **Type:** `list` of `string`
+* **Example:**
+  ```yaml
+  cache_mirrors:
+    - https://cache1.example.com/zoi
+    - https://cache2.example.com/zoi
+  ```
+
 ### `policy`
 
 A special object that can only be set in the **system-wide** configuration file (`/etc/zoi/config.yaml`). It allows administrators to lock down certain settings, preventing them from being overridden by user or project configs.
 
-- **Type:** `object`
-- **See:** [The `policy` Object](#the-policy-object) section below for details.
+* **Type:** `object`
+* **See:** [The `policy` Object](#the-policy-object) section below for details.
 
----
+***
 
 ## The `policy` Object
 
@@ -179,40 +191,41 @@ When a policy field is set to `true`, the corresponding configuration from the s
 
 ### Policy Fields
 
-- `repos_unoverridable`: If `true`, the `repos` list is locked.
-- `default_registry_unoverridable`: If `true`, the `default_registry` cannot be changed.
-- `added_registries_unoverridable`: If `true`, the `added_registries` list is locked.
-- `git_repos_unoverridable`: If `true`, the `git_repos` list is locked.
-- `telemetry_enabled_unoverridable`: If `true`, the `telemetry_enabled` setting is locked.
-- `audit_log_enabled_unoverridable`: If `true`, the `audit_log_enabled` setting is locked.
-- `rollback_enabled_unoverridable`: If `true`, the `rollback_enabled` setting is locked.
-- `protect_db_unoverridable`: If `true`, the `protect_db` setting is locked.
-- `parallel_jobs_unoverridable`: If `true`, the `parallel_jobs` setting is locked.
-- `max_resolution_depth_unoverridable`: If `true`, the `max_resolution_depth` setting is locked.
-- `offline_mode_unoverridable`: If `true`, the `offline_mode` setting is locked.
-- `pkg_dirs_unoverridable`: If `true`, the `pkg_dirs` list is locked.
-- `allow_deny_lists_unoverridable`: If `true`, the various allow/deny lists (`allowed_packages`, `denied_licenses`, etc.) are locked.
-- `signature_enforcement_unoverridable`: If `true`, the `signature_enforcement` policy is locked.
+* `repos_unoverridable`: If `true`, the `repos` list is locked.
+* `default_registry_unoverridable`: If `true`, the `default_registry` cannot be changed.
+* `added_registries_unoverridable`: If `true`, the `added_registries` list is locked.
+* `git_repos_unoverridable`: If `true`, the `git_repos` list is locked.
+* `telemetry_enabled_unoverridable`: If `true`, the `telemetry_enabled` setting is locked.
+* `audit_log_enabled_unoverridable`: If `true`, the `audit_log_enabled` setting is locked.
+* `rollback_enabled_unoverridable`: If `true`, the `rollback_enabled` setting is locked.
+* `protect_db_unoverridable`: If `true`, the `protect_db` setting is locked.
+* `parallel_jobs_unoverridable`: If `true`, the `parallel_jobs` setting is locked.
+* `max_resolution_depth_unoverridable`: If `true`, the `max_resolution_depth` setting is locked.
+* `offline_mode_unoverridable`: If `true`, the `offline_mode` setting is locked.
+* `pkg_dirs_unoverridable`: If `true`, the `pkg_dirs` list is locked.
+* `cache_mirrors_unoverridable`: If `true`, the `cache_mirrors` list is locked.
+* `allow_deny_lists_unoverridable`: If `true`, the various allow/deny lists (`allowed_packages`, `denied_licenses`, etc.) are locked.
+* `signature_enforcement_unoverridable`: If `true`, the `signature_enforcement` policy is locked.
 
 ### Allow/Deny Lists
 
 These lists allow administrators to control which packages, repositories, and licenses are permitted on a system. These are lists of strings.
 
-- `allowed_packages`: If set, only packages from this list can be installed.
-- `denied_packages`: Packages from this list cannot be installed.
-- `allowed_repos`: If set, packages can only be installed from repositories in this list.
-- `denied_repos`: Packages from repositories in this list cannot be installed.
-- `allowed_licenses`: If set, only packages with licenses from this list (using valid [SPDX identifiers](https://spdx.org/licenses/)) can be installed.
-- `denied_licenses`: Packages with licenses from this list cannot be installed.
+* `allowed_packages`: If set, only packages from this list can be installed.
+* `denied_packages`: Packages from this list cannot be installed.
+* `allowed_repos`: If set, packages can only be installed from repositories in this list.
+* `denied_repos`: Packages from repositories in this list cannot be installed.
+* `allowed_licenses`: If set, only packages with licenses from this list (using valid [SPDX identifiers](https://spdx.org/licenses/)) can be installed.
+* `denied_licenses`: Packages with licenses from this list cannot be installed.
 
 ### `signature_enforcement`
 
 This object configures mandatory PGP signature verification for all pre-built packages.
 
-- **Type:** `object`
-- **Fields:**
-  - `enable`: (boolean) If `true`, Zoi will _only_ install pre-built packages (`.pkg.tar.zst` archives) that are signed by a trusted PGP key. It will not fall back to building from source.
-  - `trusted_keys`: (list of string) A list of trusted PGP key names or fingerprints. These keys must already be present in the Zoi PGP keyring (see `zoi pgp list`).
+* **Type:** `object`
+* **Fields:**
+  * `enable`: (boolean) If `true`, Zoi will *only* install pre-built packages (`.pkg.tar.zst` archives) that are signed by a trusted PGP key. It will not fall back to building from source.
+  * `trusted_keys`: (list of string) A list of trusted PGP key names or fingerprints. These keys must already be present in the Zoi PGP keyring (see `zoi pgp list`).
 
 ### Example Policy
 

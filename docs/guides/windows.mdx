@@ -9,8 +9,8 @@ Developing packages for Windows requires understanding how Zoi handles shell exe
 
 In a `.pkg.lua` definition, the `cmd()` function behavior depends on the host operating system:
 
-- **Unix (Linux/macOS)**: `cmd()` executes commands via `bash -c`.
-- **Windows**: `cmd()` executes commands via `pwsh -Command` (PowerShell Core).
+* **Unix (Linux/macOS)**: `cmd()` executes commands via `bash -c`.
+* **Windows**: `cmd()` executes commands via `pwsh -Command` (PowerShell Core).
 
 ### Portability Tips
 

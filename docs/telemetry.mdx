@@ -11,31 +11,31 @@ This page aims to be radically transparent about what we collect, why we collect
 
 When you choose to enable telemetry, Zoi sends a secure, anonymous events to an EU PostHog cloud-hosted ([https://eu.i.posthog.com](https://posthog.com)) instance when you perform certain actions. The data we collect is strictly limited to the following fields:
 
-- **Event Type:** The action you performed. This can be one of the following:
-  - `install`: A package was successfully installed.
-  - `uninstall`: A package was uninstalled.
-  - `exec`: A package was executed without being installed via `zoi exec`.
-- **A unique, anonymous client ID:** This is a randomly generated UUID that is not tied to any of your personal information. It allows us to distinguish between usage patterns from many users versus a single power user, which helps in prioritizing features.
-- **Package Details:**
-  - The `name` of the package.
-  - The `sub_package` name (if applicable).
-  - The `version` of the package.
-  - The package's `repo` (the sub-repository path, e.g. `core`, `community/editors`).
-  - The `description` of the package.
-  - The `license` of the package.
-  - The `maintainer` and `author` of the package (name, email, and website, if provided).
-- **Registry Details:**
-  - The `registry` handle (e.g. `zoidberg`, `my-custom-registry`).
-  - The `registry_url` (the git URL of the registry).
-- **The type of package:** This will be one of `Package`, `Collection`, `App`, or `Extension`.
-- **The installation scope:** One of `User`, `System`, or `Project`.
-- **The installation reason:** One of `Direct`, `Dependency`, or `Declarative`.
-- **The installation type:** One of `source` or `pre-compiled`.
-- **Your Environment:**
-  - Your operating system and CPU architecture (e.g. `linux-amd64`, `windows-amd64`).
-  - Your Linux distribution (e.g. `ubuntu`, `arch`).
-  - Your detected shell (e.g. `zsh`, `fish`).
-  - The version of the Zoi application you are using.
+* **Event Type:** The action you performed. This can be one of the following:
+  * `install`: A package was successfully installed.
+  * `uninstall`: A package was uninstalled.
+  * `exec`: A package was executed without being installed via `zoi exec`.
+* **A unique, anonymous client ID:** This is a randomly generated UUID that is not tied to any of your personal information. It allows us to distinguish between usage patterns from many users versus a single power user, which helps in prioritizing features.
+* **Package Details:**
+  * The `name` of the package.
+  * The `sub_package` name (if applicable).
+  * The `version` of the package.
+  * The package's `repo` (the sub-repository path, e.g. `core`, `community/editors`).
+  * The `description` of the package.
+  * The `license` of the package.
+  * The `maintainer` and `author` of the package (name, email, and website, if provided).
+* **Registry Details:**
+  * The `registry` handle (e.g. `zoidberg`, `my-custom-registry`).
+  * The `registry_url` (the git URL of the registry).
+* **The type of package:** This will be one of `Package`, `Collection`, `App`, or `Extension`.
+* **The installation scope:** One of `User`, `System`, or `Project`.
+* **The installation reason:** One of `Direct`, `Dependency`, or `Declarative`.
+* **The installation type:** One of `source` or `pre-compiled`.
+* **Your Environment:**
+  * Your operating system and CPU architecture (e.g. `linux-amd64`, `windows-amd64`).
+  * Your Linux distribution (e.g. `ubuntu`, `arch`).
+  * Your detected shell (e.g. `zsh`, `fish`).
+  * The version of the Zoi application you are using.
 
 **We do not and will never collect any personal or identifying information.** We do not track your IP address, hostname, or any other data that is not explicitly listed above. The code that collects and sends this data is fully open-source and can be reviewed in `src/pkg/telemetry.rs`.
 
@@ -43,10 +43,10 @@ When you choose to enable telemetry, Zoi sends a secure, anonymous events to an 
 
 The data we collect helps us answer important questions that guide the development of Zoi:
 
-- Which packages are the most popular? This helps us focus our maintenance efforts on the tools that matter most to the community.
-- Which operating systems and architectures are most widely used? This informs our decisions about which platforms to prioritize for testing and binary releases.
-- Which custom registries are being used? This helps us understand how the community is extending Zoi.
-- Are there installation errors we need to address? (Note: We only track successful events, not failures.)
+* Which packages are the most popular? This helps us focus our maintenance efforts on the tools that matter most to the community.
+* Which operating systems and architectures are most widely used? This informs our decisions about which platforms to prioritize for testing and binary releases.
+* Which custom registries are being used? This helps us understand how the community is extending Zoi.
+* Are there installation errors we need to address? (Note: We only track successful events, not failures.)
 
 By understanding how Zoi is used, we can make it a better tool for everyone.
 

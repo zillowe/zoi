@@ -26,17 +26,17 @@ Zoi often finds itself compared to modern development environment managers like 
 
 Devbox and Flox are excellent tools that wrap the **Nix package manager** to provide a more user-friendly interface.
 
-- **The Nix Ecosystem:** These tools rely entirely on the Nix ecosystem. If a package or specific version isn't in `nixpkgs`, you must write a Nix derivation to include it.
-- **Zoi's Hybrid Approach:** Zoi is "package manager agnostic." Its unique power lies in its ability to satisfy dependencies using **any** of 40+ supported managers. A Zoi package can simultaneously require a library from APT, a tool from Homebrew, and a language runtime from Cargo.
-- **Isolation:** Nix uses the `/nix/store` with cryptographic hashes. Zoi uses its own versioned store (`~/.zoi/pkgs/store`) but can also interoperate with standard system locations.
+* **The Nix Ecosystem:** These tools rely entirely on the Nix ecosystem. If a package or specific version isn't in `nixpkgs`, you must write a Nix derivation to include it.
+* **Zoi's Hybrid Approach:** Zoi is "package manager agnostic." Its unique power lies in its ability to satisfy dependencies using **any** of 40+ supported managers. A Zoi package can simultaneously require a library from APT, a tool from Homebrew, and a language runtime from Cargo.
+* **Isolation:** Nix uses the `/nix/store` with cryptographic hashes. Zoi uses its own versioned store (`~/.zoi/pkgs/store`) but can also interoperate with standard system locations.
 
 ### Zoi vs. Runtime Managers (mise, asdf)
 
 **mise** (formerly `rtx`) and **asdf** are popular for managing multiple versions of language runtimes (Node.js, Python, Ruby).
 
-- **Scope:** mise and asdf focus primarily on language runtimes and environment variables. They use "plugins" to fetch and manage these versions.
-- **Functionality:** Zoi is a full-featured package manager. It manages not just runtimes, but binaries, libraries, PGP keys, and configuration files. Zoi's `zoi dev`, `zoi env` and `zoi.yaml` provide environment management similar to mise and devbox, but backed by a much more powerful packaging engine.
-- **Native Integration:** mise manages versions by manipulating your `PATH`. Zoi manages them via a versioned store and intelligent shims, allowing automatic version switching based on your current project directory (`zoi.yaml`) or legacy configuration files (like `.nvmrc` via its powerful Lua plugin system) without manual environment changes. Zoi additionally sets up `LD_LIBRARY_PATH`, `CPATH`, and `PKG_CONFIG_PATH` for a complete development environment when using `zoi dev`.
+* **Scope:** mise and asdf focus primarily on language runtimes and environment variables. They use "plugins" to fetch and manage these versions.
+* **Functionality:** Zoi is a full-featured package manager. It manages not just runtimes, but binaries, libraries, PGP keys, and configuration files. Zoi's `zoi dev`, `zoi env` and `zoi.yaml` provide environment management similar to mise and devbox, but backed by a much more powerful packaging engine.
+* **Native Integration:** mise manages versions by manipulating your `PATH`. Zoi manages them via a versioned store and intelligent shims, allowing automatic version switching based on your current project directory (`zoi.yaml`) or legacy configuration files (like `.nvmrc` via its powerful Lua plugin system) without manual environment changes. Zoi additionally sets up `LD_LIBRARY_PATH`, `CPATH`, and `PKG_CONFIG_PATH` for a complete development environment when using `zoi dev`.
 
 ### Comparison Table: Dev Tools
 
@@ -51,8 +51,8 @@ Devbox and Flox are excellent tools that wrap the **Nix package manager** to pro
 
 ## Summary
 
-- **Choose Zoi if:** You work across multiple operating systems and need a unified manager that respects your OS's native tools while providing high-isolation sandboxing. Its ability to manage background services and automatically configure development environments makes it a complete "workspace in a box" solution.
+* **Choose Zoi if:** You work across multiple operating systems and need a unified manager that respects your OS's native tools while providing high-isolation sandboxing. Its ability to manage background services and automatically configure development environments makes it a complete "workspace in a box" solution.
 
-- **Choose Pacman/APT if:** You are happy with your OS's native package manager and primarily need to manage system-wide applications and libraries on a single machine.
+* **Choose Pacman/APT if:** You are happy with your OS's native package manager and primarily need to manage system-wide applications and libraries on a single machine.
 
-- **Choose Nix if:** Your primary goal is maximum reproducibility and reliability. You want to build environments declaratively and are willing to learn the Nix language and its functional concepts.
+* **Choose Nix if:** Your primary goal is maximum reproducibility and reliability. You want to build environments declaratively and are willing to learn the Nix language and its functional concepts.

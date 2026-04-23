@@ -11,65 +11,65 @@ Once your `.pkg.lua` file works locally, it's time to share it with the world! T
 
 The Zoi package database is hosted on GitLab and mirrored on GitHub and Codeberg.
 
-- **GitLab (Primary):** [Zillowe/Zillwen/Zusty/Zoidberg](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg)
-- **GitHub (Mirror):** [Zillowe/Zoidberg](https://github.com/Zillowe/Zoidberg)
-- **Codeberg (Mirror):** [Zillowe/Zoidberg](https://codeberg.org/Zillowe/Zoidberg)
+* **GitLab (Primary):** [Zillowe/Zillwen/Zusty/Zoidberg](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg)
+* **GitHub (Mirror):** [Zillowe/Zoidberg](https://github.com/Zillowe/Zoidberg)
+* **Codeberg (Mirror):** [Zillowe/Zoidberg](https://codeberg.org/Zillowe/Zoidberg)
 
 You can contribute by opening a **Merge Request** to the GitLab repository, or by **opening an issue** to request a new package. The following steps outline the process for creating a Merge Request on GitLab, which is very similar to the process on GitHub.
 
-1.  **Fork the Repository:**
-    Go to the repository's page on GitLab or GitHub and click the "Fork" button to create your own copy.
+1. **Fork the Repository:**
+   Go to the repository's page on GitLab or GitHub and click the "Fork" button to create your own copy.
 
-2.  **Clone Your Fork:**
-    Clone the repository to your local machine.
+2. **Clone Your Fork:**
+   Clone the repository to your local machine.
 
-    ```sh
-    # For GitLab
-    git clone https://gitlab.com/YourUsername/Zoidberg.git
-    cd Zoidberg
-    ```
+   ```sh
+   # For GitLab
+   git clone https://gitlab.com/YourUsername/Zoidberg.git
+   cd Zoidberg
+   ```
 
-3.  **Choose the Right Directory:**
-    As discussed in the [creating packages guide](/docs/zds/zoi/creating-packages), you should almost always add new packages to the `community` directory.
+3. **Choose the Right Directory:**
+   As discussed in the [creating packages guide](/docs/zds/zoi/creating-packages), you should almost always add new packages to the `community` directory.
 
-    You can also create nested directories to better organize packages. For example, you could place a Linux-specific editor in `community/editors/linux/my-editor/my-editor.pkg.lua`. The `repo` field in your package file should then be `community/editors/linux`.
+   You can also create nested directories to better organize packages. For example, you could place a Linux-specific editor in `community/editors/linux/my-editor/my-editor.pkg.lua`. The `repo` field in your package file should then be `community/editors/linux`.
 
-4.  **Add Your Package File:**
-    Copy your `my-package.pkg.lua` file into the `community/my-package/` directory.
+4. **Add Your Package File:**
+   Copy your `my-package.pkg.lua` file into the `community/my-package/` directory.
 
-    ```sh
-    cp /path/to/my-package.pkg.lua community/my-package/
-    ```
+   ```sh
+   cp /path/to/my-package.pkg.lua community/my-package/
+   ```
 
-    For a nested repository, create the directory structure and place your file inside:
+   For a nested repository, create the directory structure and place your file inside:
 
-    ```sh
-    mkdir -p community/editors/linux/my-editor
-    cp /path/to/my-editor.pkg.lua community/editors/linux/my-editor/
-    ```
+   ```sh
+   mkdir -p community/editors/linux/my-editor
+   cp /path/to/my-editor.pkg.lua community/editors/linux/my-editor/
+   ```
 
-5.  **Commit and Push:**
-    Commit your new package file to your forked repository.
+5. **Commit and Push:**
+   Commit your new package file to your forked repository.
 
-    ```sh
-    git add community/my-package/my-package.pkg.lua
-    git commit -m "feat(community): add my-package v1.2.3"
-    git push origin main
-    ```
+   ```sh
+   git add community/my-package/my-package.pkg.lua
+   git commit -m "feat(community): add my-package v1.2.3"
+   git push origin main
+   ```
 
-    For a nested package, your commit might look like this:
+   For a nested package, your commit might look like this:
 
-    ```sh
-    git add community/editors/linux/my-editor/my-editor.pkg.lua
-    git commit -m "feat(community): add my-editor v1.0.0"
-    git push origin main
-    ```
+   ```sh
+   git add community/editors/linux/my-editor/my-editor.pkg.lua
+   git commit -m "feat(community): add my-editor v1.0.0"
+   git push origin main
+   ```
 
-6.  **Open a Merge/Pull Request:**
-    Go to your forked repository on GitLab or GitHub. You should see a button to "Create merge request" or "Create pull request". Click it.
-    - **Title:** Use a conventional commit message like `feat(community): add my-package`.
-    - **Description:** Briefly describe what your package does and link to its official website or source code.
-    - Submit the request.
+6. **Open a Merge/Pull Request:**
+   Go to your forked repository on GitLab or GitHub. You should see a button to "Create merge request" or "Create pull request". Click it.
+   * **Title:** Use a conventional commit message like `feat(community): add my-package`.
+   * **Description:** Briefly describe what your package does and link to its official website or source code.
+   * Submit the request.
 
 A Zoi maintainer will review your submission. They may suggest some changes. Once approved, it will be merged, and your package will be available to everyone after the next `zoi sync`!
 
@@ -79,16 +79,17 @@ While contributing to the official repositories is great for public packages, yo
 
 ### Step 1: Create Your Git Repository
 
-1.  Create a new, empty repository on a service like GitLab or GitHub.
-2.  Add your `*.pkg.lua` files to the root of the repository. The structure is simple: just a flat collection of package files. You can also create nested directories.
+1. Create a new, empty repository on a service like GitLab or GitHub.
 
-    ```
-    my-zoi-repo/
-    ├── my-first-package.pkg.lua
-    └── my-second-package.pkg.lua
-    ```
+2. Add your `*.pkg.lua` files to the root of the repository. The structure is simple: just a flat collection of package files. You can also create nested directories.
 
-3.  Commit and push your files to the remote repository.
+   ```
+   my-zoi-repo/
+   ├── my-first-package.pkg.lua
+   └── my-second-package.pkg.lua
+   ```
+
+3. Commit and push your files to the remote repository.
 
 ### Step 2: Add Your Repository to Zoi
 
@@ -117,25 +118,25 @@ For advanced use cases, such as creating a corporate mirror or a completely sepa
 
 ### Step 1: Set Up the Registry Repository
 
-1.  Create a new git repository.
-2.  Create a `repo.yaml` file in the root of your repository to define its properties. See the [Repositories guide](/docs/zds/zoi/repositories#the-repoyaml-file) for details on the available fields. A minimal example would be:
-    ```yaml
-    name: My Custom Registry
-    description: A collection of my personal packages.
-    repo-git: https://github.com/YourOrg/my-zoi-registry.git
-    ```
-3.  Structure the rest of your repository like the official Zoidberg database, with directories for tiers like `core`, `main`, `community`, etc.
+1. Create a new git repository.
+2. Create a `repo.yaml` file in the root of your repository to define its properties. See the [Repositories guide](/docs/zds/zoi/repositories#the-repoyaml-file) for details on the available fields. A minimal example would be:
+   ```yaml
+   name: My Custom Registry
+   description: A collection of my personal packages.
+   repo-git: https://github.com/YourOrg/my-zoi-registry.git
+   ```
+3. Structure the rest of your repository like the official Zoidberg database, with directories for tiers like `core`, `main`, `community`, etc.
 
-    ```
-    my-zoi-registry/
-    ├── repo.yaml
-    ├── core/
-    │   └── ...
-    ├── main/
-    │   └── ...
-    └── community/
-        └── my-package/my-package.pkg.lua
-    ```
+   ```
+   my-zoi-registry/
+   ├── repo.yaml
+   ├── core/
+   │   └── ...
+   ├── main/
+   │   └── ...
+   └── community/
+       └── my-package/my-package.pkg.lua
+   ```
 
 ### Step 2: Point Zoi to Your Registry
 
@@ -189,9 +190,9 @@ package: "my-awesome-package"
 
 The `package` field can be:
 
-- A package name (e.g. `my-package` or `@my-repo/my-package`). Zoi will resolve this from the official repositories.
-- A relative path to a `.pkg.lua` file in the repository.
-- A full URL to a raw `.pkg.lua` file.
+* A package name (e.g. `my-package` or `@my-repo/my-package`). Zoi will resolve this from the official repositories.
+* A relative path to a `.pkg.lua` file in the repository.
+* A full URL to a raw `.pkg.lua` file.
 
 With this file in place, users can install the package from your repository without adding it first:
 

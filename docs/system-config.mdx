@@ -14,7 +14,7 @@ Zoi provides a powerful way to manage your Arch Linux system state declaratively
 
 The system configuration is defined in a Lua script located at a system-level path:
 
-- **Path:** `/etc/zoi/zoi.lua`
+* **Path:** `/etc/zoi/zoi.lua`
 
 This file uses the `system_config{...}` function to declare the desired state of your system.
 
@@ -149,19 +149,19 @@ sudo zoi system apply
 
 ### What `zoi system apply` does:
 
-1.  **Validates Platform:** Ensures you are running on Arch Linux.
-2.  **Hostname & Localization:** Updates `/etc/hostname`, `/etc/locale.gen`, and `/etc/localtime`.
-3.  **Desktop Environment:** Automatically installs the necessary meta-packages for your chosen DE.
-4.  **Shell:** Changes your default shell via `chsh`.
-5.  **Synchronizes Packages:** Installs missing Zoi and native packages.
-6.  **Synchronizes Extensions:** Adds missing Zoi extensions.
-7.  **File Management:** Creates directories and writes files (supporting raw content, local sources, or remote URLs).
-8.  **Env & Aliases:** Generates a system-wide profile script for your environment variables and aliases.
-9.  **Synchronizes Services:** Ensures systemd services are enabled and started.
+1. **Validates Platform:** Ensures you are running on Arch Linux.
+2. **Hostname & Localization:** Updates `/etc/hostname`, `/etc/locale.gen`, and `/etc/localtime`.
+3. **Desktop Environment:** Automatically installs the necessary meta-packages for your chosen DE.
+4. **Shell:** Changes your default shell via `chsh`.
+5. **Synchronizes Packages:** Installs missing Zoi and native packages.
+6. **Synchronizes Extensions:** Adds missing Zoi extensions.
+7. **File Management:** Creates directories and writes files (supporting raw content, local sources, or remote URLs).
+8. **Env & Aliases:** Generates a system-wide profile script for your environment variables and aliases.
+9. **Synchronizes Services:** Ensures systemd services are enabled and started.
 
 ## Key Benefits
 
-- **Nix-like Reproducibility:** Recreate your entire workstation environment from a single Lua file.
-- **Atomic Operations:** Package installations and extension additions are managed by Zoi's transactional engine.
-- **Dynamic Logic:** Since it's Lua, you can use conditional logic (e.g. install different packages based on the CPU architecture).
-- **Native & Sandboxed Mix:** Seamlessly combine native system tools with Zoi's isolated package store.
+* **Nix-like Reproducibility:** Recreate your entire workstation environment from a single Lua file.
+* **Atomic Operations:** Package installations and extension additions are managed by Zoi's transactional engine.
+* **Dynamic Logic:** Since it's Lua, you can use conditional logic (e.g. install different packages based on the CPU architecture).
+* **Native & Sandboxed Mix:** Seamlessly combine native system tools with Zoi's isolated package store.

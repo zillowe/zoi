@@ -9,17 +9,17 @@ This document provides detailed guidance for packagers on how to build and packa
 
 These are required to compile Zoi from source.
 
-- **Rust Toolchain**: Zoi requires a specific version of the Rust compiler. Refer to `rust-toolchain.toml` for the exact channel and `Cargo.toml` for the Rust version and edition.
-- **C Compiler**: A C compiler like `gcc` or `clang`.
-- **OpenSSL**: Development libraries for OpenSSL (`libssl-dev` or `openssl-devel`).
-- **pkg-config**: The `pkg-config` utility.
-- **liblzma**: Development libraries for lzma (`liblzma-dev`).
-- **Git**: Required to embed the commit hash in the binary.
+* **Rust Toolchain**: Zoi requires a specific version of the Rust compiler. Refer to `rust-toolchain.toml` for the exact channel and `Cargo.toml` for the Rust version and edition.
+* **C Compiler**: A C compiler like `gcc` or `clang`.
+* **OpenSSL**: Development libraries for OpenSSL (`libssl-dev` or `openssl-devel`).
+* **pkg-config**: The `pkg-config` utility.
+* **liblzma**: Development libraries for lzma (`liblzma-dev`).
+* **Git**: Required to embed the commit hash in the binary.
 
 ## Runtime Dependencies
 
-- **Essential**: `git` is required for most of Zoi's functionality.
-- **Optional**: `less` or `more` for viewing manuals and other paged content.
+* **Essential**: `git` is required for most of Zoi's functionality.
+* **Optional**: `less` or `more` for viewing manuals and other paged content.
 
 ## Build Process
 
@@ -54,7 +54,7 @@ sudo make install
 
 The `scripts/` directory contains CI/CD scripts for creating release builds. These scripts automatically embed the git commit hash.
 
-- `scripts/build-release.sh`: Creates a release build for the current platform.
+* `scripts/build-release.sh`: Creates a release build for the current platform.
 
 ### Building the Docker Image Locally
 
@@ -108,8 +108,8 @@ Several aspects of Zoi can be configured at build time by setting environment va
 
 You can bake trusted PGP public keys directly into your custom Zoi binary to establish a "Root of Trust" for your organization.
 
-1.  Place your public key files (`.asc`) in the `src/pkg/pgp/builtin/` directory.
-2.  Build Zoi as usual.
+1. Place your public key files (`.asc`) in the `src/pkg/pgp/builtin/` directory.
+2. Build Zoi as usual.
 
 The build system (`build.rs`) will automatically detect these files and embed them as static assets. When the resulting binary is run, it will ensure these keys are present in the user's local Zoi keyring.
 
@@ -117,8 +117,8 @@ The build system (`build.rs`) will automatically detect these files and embed th
 
 Zoi can also embed global transaction hooks directly into the binary. These hooks automate system-wide tasks based on file modifications.
 
-1.  Place your hook definition files (`.hook.yaml`) in the `src/pkg/hooks/builtin/` directory.
-2.  Build Zoi as usual.
+1. Place your hook definition files (`.hook.yaml`) in the `src/pkg/hooks/builtin/` directory.
+2. Build Zoi as usual.
 
 The built-in hooks are automatically registered and will run during package transactions if their path triggers match. They can be overridden by placing a hook with the same name in the user's local hooks directory.
 
@@ -156,6 +156,6 @@ These files should be installed to the appropriate system location (e.g. `/usr/s
 
 Refer to the `packages/` directory for examples of how Zoi is packaged for other managers:
 
-- **Arch Linux (AUR):** `packages/aur/zoi/PKGBUILD`
-- **Homebrew:** `packages/brew/zoi.rb`
-- **Scoop:** `packages/scoop/zoi.json`
+* **Arch Linux (AUR):** `packages/aur/zoi/PKGBUILD`
+* **Homebrew:** `packages/brew/zoi.rb`
+* **Scoop:** `packages/scoop/zoi.json`

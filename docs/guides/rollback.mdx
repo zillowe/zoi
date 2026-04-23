@@ -9,10 +9,10 @@ Zoi includes a robust rollback system designed to recover from failed installati
 
 Every operation that modifies your Zoi installation (install, uninstall, upgrade) is wrapped in a **transaction**.
 
-1.  **Transaction Begin**: Zoi generates a unique ID and creates a temporary log in `~/.zoi/pkgs/transactions/`.
-2.  **Recording Operations**: Each individual file change, symlink creation, and registry update is recorded in the transaction log.
-3.  **Atomic Commits**: If all steps in the operation succeed, the transaction is marked as committed.
-4.  **Rollback on Failure**: If any step fails, Zoi automatically attempts to revert all changes recorded in the current transaction.
+1. **Transaction Begin**: Zoi generates a unique ID and creates a temporary log in `~/.zoi/pkgs/transactions/`.
+2. **Recording Operations**: Each individual file change, symlink creation, and registry update is recorded in the transaction log.
+3. **Atomic Commits**: If all steps in the operation succeed, the transaction is marked as committed.
+4. **Rollback on Failure**: If any step fails, Zoi automatically attempts to revert all changes recorded in the current transaction.
 
 ### The Last Transaction
 
@@ -22,7 +22,7 @@ You can manually revert the most recent successful operation using the `--last-t
 zoi rollback --last-transaction
 ```
 
----
+***
 
 ## Downgrading to Specific Versions
 
@@ -38,7 +38,7 @@ This command initiates an interactive process:
 
 Use `downgrade` when a simple `rollback` isn't enough, or if you need to jump back multiple versions at once.
 
----
+***
 
 ## Rollback Types
 
@@ -58,9 +58,9 @@ While Zoi strives for reliable recovery, there are inherent limitations, particu
 
 Zoi can install dependencies via over 40 external package managers (APT, Homebrew, Cargo, etc.). However, **Zoi cannot guarantee rollbacks for these native dependencies.**
 
-- **No Snapshotting**: Zoi does not snapshot your entire OS. If `apt install` upgrades a system library, Zoi cannot "undo" that library upgrade.
-- **Dependency Persistence**: If a native package manager is used to fulfill a dependency, Zoi will attempt to uninstall it during a rollback if it was newly added, but it won't revert it to a previous version if it was merely upgraded.
-- **Side Effects**: Scripts run in `post_install` or `pre_upgrade` hooks might perform actions (like starting a service or creating a database) that Zoi doesn't know how to reverse automatically.
+* **No Snapshotting**: Zoi does not snapshot your entire OS. If `apt install` upgrades a system library, Zoi cannot "undo" that library upgrade.
+* **Dependency Persistence**: If a native package manager is used to fulfill a dependency, Zoi will attempt to uninstall it during a rollback if it was newly added, but it won't revert it to a previous version if it was merely upgraded.
+* **Side Effects**: Scripts run in `post_install` or `pre_upgrade` hooks might perform actions (like starting a service or creating a database) that Zoi doesn't know how to reverse automatically.
 
 ### Manual Cleanup
 
