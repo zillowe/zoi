@@ -100,10 +100,10 @@ pub fn run(args: PgpCommand) -> Result<()> {
     match args.command {
         PgpCommands::Add(add_args) => {
             if let Some(path) = add_args.path {
-                pkg::pgp::add_key_from_path(&path, add_args.name.as_deref())?;
+                pkg::pgp::add_key_from_path(&path, add_args.name.as_deref(), false)?;
             } else if let Some(fingerprint) = add_args.fingerprint {
                 if let Some(name) = add_args.name {
-                    pkg::pgp::add_key_from_fingerprint(&fingerprint, &name)?;
+                    pkg::pgp::add_key_from_fingerprint(&fingerprint, &name, false)?;
                 } else {
                     return Err(anyhow!(
                         "A name must be provided when adding a key by fingerprint."
@@ -119,7 +119,7 @@ pub fn run(args: PgpCommand) -> Result<()> {
                         .ok_or(anyhow!("Could not derive name from URL"))?
                         .to_string()
                 };
-                pkg::pgp::add_key_from_url(&url, &name)?;
+                pkg::pgp::add_key_from_url(&url, &name, false)?;
             }
         }
         PgpCommands::Remove(remove_args) => {

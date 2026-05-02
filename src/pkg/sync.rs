@@ -23,15 +23,19 @@ fn refresh_registry_db(
     registry_path: &Path,
     sync_files: bool,
     m: Option<&MultiProgress>,
+    verbose: bool,
+    pb: Option<&ProgressBar>,
 ) -> Result<()> {
-    let msg = format!(
-        "Refreshing metadata database for {}...",
-        registry_handle.cyan()
-    );
-    if let Some(m_ref) = m {
-        let _ = m_ref.println(&msg);
-    } else {
-        println!("{}", msg);
+    if verbose {
+        let msg = format!(
+            "Refreshing metadata database for {}...",
+            registry_handle.cyan()
+        );
+        if let Some(m_ref) = m {
+            let _ = m_ref.println(&msg);
+        } else {
+            println!("{}", msg);
+        }
     }
 
     let mut conn = db::open_connection(registry_handle)?;
@@ -65,9 +69,18 @@ fn refresh_registry_db(
         None
     };
 
+    if let Some(p) = pb {
+        p.set_length(pkg_files.len() as u64);
+        p.set_position(0);
+        p.set_message(format!("Indexing {}", registry_handle.cyan()));
+    }
+
     let parsed_results: Vec<(types::Package, PathBuf, Option<Vec<String>>)> = pkg_files
         .par_iter()
         .filter_map(|path| {
+            if let Some(p) = pb {
+                p.inc(1);
+            }
             let path_str = path.to_string_lossy();
             if let Ok(mut pkg) = crate::pkg::lua::parser::parse_lua_package(&path_str, None, true) {
                 if pkg.repo.is_empty()
@@ -159,15 +172,25 @@ fn refresh_registry_db(
 
     tx.commit()?;
 
+    if let Some(p) = pb {
+        p.finish_and_clear();
+    }
+
     Ok(())
 }
 
-fn verify_registry_signature(repo_path: &Path, authorities: &[String]) -> Result<()> {
+fn verify_registry_signature(
+    repo_path: &Path,
+    authorities: &[String],
+    verbose: bool,
+) -> Result<()> {
     if authorities.is_empty() {
         return Ok(());
     }
 
-    println!("Verifying registry signature...");
+    if verbose {
+        println!("Verifying registry signature...");
+    }
 
     let repo = Repository::open(repo_path)
         .map_err(|e| anyhow!("Failed to open registry repository: {}", e))?;
@@ -199,7 +222,9 @@ fn verify_registry_signature(repo_path: &Path, authorities: &[String]) -> Result
     }
 
     if verified {
-        println!("{}", "Registry signature verified successfully.".green());
+        if verbose {
+            println!("{}", "Registry signature verified successfully.".green());
+        }
         Ok(())
     } else {
         Err(anyhow!(
@@ -235,7 +260,9 @@ fn sync_git_repos(verbose: bool) -> Result<()> {
         return Ok(());
     }
 
-    println!("\n{}", "Syncing external git repositories...".green());
+    if verbose {
+        println!("\n{}", "Syncing external git repositories...".green());
+    }
 
     let config = config::read_config()?;
     let configured_git_repos_names: HashSet<String> = config
@@ -332,40 +359,45 @@ fn run_verbose_at_path(db_url: &str, db_path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn run_non_verbose_at_path(db_url: &str, db_path: &Path, m: Option<&MultiProgress>) -> Result<()> {
+fn run_non_verbose_at_path(
+    db_url: &str,
+    db_path: &Path,
+    m: Option<&MultiProgress>,
+    pb: Option<&ProgressBar>,
+) -> Result<()> {
     let internal_m;
-    let m = if let Some(m_ref) = m {
-        m_ref
+    let m_ref = if let Some(m_ptr) = m {
+        m_ptr
     } else {
         internal_m = MultiProgress::new();
         &internal_m
     };
 
-    let fetch_pb = m.add(ProgressBar::new(0).with_style(
-        ProgressStyle::default_bar()
-            .template(
-                "{spinner:.green} [{elapsed_precise}] Fetching: [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)",
-            )?
-            .progress_chars("#>-"),
-    ));
-    let checkout_pb = m.add(ProgressBar::new(0).with_style(
-        ProgressStyle::default_bar()
-            .template(
-                "{spinner:.green} [{elapsed_precise}] Checkout: [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)",
-            )?
-            .progress_chars("#>-"),
-    ));
+    let fetch_style = ProgressStyle::default_bar()
+        .template(
+            "{spinner:.green} [{elapsed_precise}] {msg:30.cyan} [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)",
+        )?
+        .progress_chars("#>-");
+
+    let pb_internal;
+    let pb_to_use = if let Some(p) = pb {
+        p
+    } else {
+        pb_internal = m_ref.add(ProgressBar::new(0));
+        pb_internal.set_style(fetch_style);
+        &pb_internal
+    };
 
     if db_path.exists() {
         let repo = Repository::open(db_path)?;
         let mut remote = repo.find_remote("origin")?;
 
         let mut cb = RemoteCallbacks::new();
-        let fetch_pb_clone = fetch_pb.clone();
+        let pb_clone = pb_to_use.clone();
         cb.transfer_progress(move |stats| {
             if stats.total_deltas() > 0 {
-                fetch_pb_clone.set_length(stats.total_deltas() as u64);
-                fetch_pb_clone.set_position(stats.indexed_deltas() as u64);
+                pb_clone.set_length(stats.total_deltas() as u64);
+                pb_clone.set_position(stats.indexed_deltas() as u64);
             }
             true
         });
@@ -380,15 +412,14 @@ fn run_non_verbose_at_path(db_url: &str, db_path: &Path, m: Option<&MultiProgres
 
         let mut fo = FetchOptions::new();
         fo.remote_callbacks(cb);
+        pb_to_use.set_message(format!("Fetching {}", db_url.cyan()));
         remote.fetch(&[short_branch_name], Some(&mut fo), None)?;
-        fetch_pb.finish_with_message("Fetched.");
 
         let fetch_head = repo.find_reference("FETCH_HEAD")?;
         let fetch_commit = repo.reference_to_annotated_commit(&fetch_head)?;
         let analysis = repo.merge_analysis(&[&fetch_commit])?;
 
         if analysis.0.is_up_to_date() {
-            checkout_pb.finish_with_message("Already up to date.");
         } else if analysis.0.is_fast_forward() {
             let refname = format!("refs/heads/{}", short_branch_name);
             let mut reference = repo.find_reference(&refname)?;
@@ -396,18 +427,17 @@ fn run_non_verbose_at_path(db_url: &str, db_path: &Path, m: Option<&MultiProgres
             repo.set_head(&refname)?;
 
             let mut checkout_builder = CheckoutBuilder::new();
-            let checkout_pb_clone = checkout_pb.clone();
+            let pb_clone = pb_to_use.clone();
             checkout_builder.force().progress(move |_path, cur, total| {
                 if total > 0 {
-                    checkout_pb_clone.set_length(total as u64);
-                    checkout_pb_clone.set_position(cur as u64);
+                    pb_clone.set_length(total as u64);
+                    pb_clone.set_position(cur as u64);
                 }
             });
 
+            pb_to_use.set_message(format!("Checkout {}", db_url.cyan()));
             repo.checkout_head(Some(&mut checkout_builder))?;
-            checkout_pb.finish_with_message("Checked out.");
         } else {
-            checkout_pb.finish_with_message("Cannot fast-forward.");
             println!(
                 "{}",
                 "Cannot fast-forward. Please run `git pull` manually.".yellow()
@@ -419,12 +449,12 @@ fn run_non_verbose_at_path(db_url: &str, db_path: &Path, m: Option<&MultiProgres
         }
 
         let mut cb = RemoteCallbacks::new();
-        let fetch_pb_clone = fetch_pb.clone();
+        let pb_clone = pb_to_use.clone();
         cb.transfer_progress(move |stats| {
             if stats.total_deltas() > 0 {
-                fetch_pb_clone.set_length(stats.total_deltas() as u64);
+                pb_clone.set_length(stats.total_deltas() as u64);
             }
-            fetch_pb_clone.set_position(stats.indexed_deltas() as u64);
+            pb_clone.set_position(stats.indexed_deltas() as u64);
             true
         });
 
@@ -432,24 +462,21 @@ fn run_non_verbose_at_path(db_url: &str, db_path: &Path, m: Option<&MultiProgres
         fo.remote_callbacks(cb);
 
         let mut checkout_builder = CheckoutBuilder::new();
-        let checkout_pb_clone = checkout_pb.clone();
+        let pb_clone = pb_to_use.clone();
         checkout_builder.progress(move |_path, cur, total| {
             if total > 0 {
-                checkout_pb_clone.set_length(total as u64);
+                pb_clone.set_length(total as u64);
             }
-            checkout_pb_clone.set_position(cur as u64);
+            pb_clone.set_position(cur as u64);
         });
 
+        pb_to_use.set_message(format!("Cloning {}", db_url.cyan()));
         RepoBuilder::new()
             .fetch_options(fo)
             .with_checkout(checkout_builder)
             .clone(db_url, db_path)?;
-
-        fetch_pb.finish_with_message("Fetched.");
-        checkout_pb.finish_with_message("Checked out.");
     }
 
-    m.clear().ok();
     Ok(())
 }
 
@@ -458,6 +485,7 @@ fn try_sync_at_path(
     db_path: &Path,
     verbose: bool,
     m: Option<&MultiProgress>,
+    pb: Option<&ProgressBar>,
 ) -> Result<()> {
     if crate::pkg::offline::is_offline() {
         if db_path.exists() {
@@ -500,32 +528,48 @@ fn try_sync_at_path(
     if verbose {
         run_verbose_at_path(db_url, db_path)
     } else {
-        run_non_verbose_at_path(db_url, db_path, m)
+        run_non_verbose_at_path(db_url, db_path, m, pb)
     }
 }
 
-fn sync_pgp_keys_at_path(db_path: &Path) -> Result<()> {
-    println!("\n{}", "Syncing PGP keys from repository...".green());
+fn sync_pgp_keys_at_path(db_path: &Path, verbose: bool, pb: Option<&ProgressBar>) -> Result<()> {
+    if verbose {
+        println!("\n{}", "Syncing PGP keys from repository...".green());
+    }
     if !db_path.join("repo.yaml").exists() {
-        println!("{}", "repo.yaml not found, skipping PGP key sync.".yellow());
+        if verbose {
+            println!("{}", "repo.yaml not found, skipping PGP key sync.".yellow());
+        }
         return Ok(());
     }
 
     let repo_config = config::read_repo_config(db_path)?;
 
     if repo_config.pgp.is_empty() {
-        println!("No PGP keys defined in repo.yaml.");
+        if verbose {
+            println!("No PGP keys defined in repo.yaml.");
+        }
         return Ok(());
+    }
+
+    if let Some(p) = pb {
+        p.set_length(repo_config.pgp.len() as u64);
+        p.set_position(0);
+        p.set_message(format!("PGP Keys {}", repo_config.name.cyan()));
     }
 
     for key_info in repo_config.pgp {
         let key_source = &key_info.key;
         let key_name = &key_info.name;
 
+        if let Some(p) = pb {
+            p.set_message(format!("PGP Key: {}", key_name));
+        }
+
         let result = if key_source.starts_with("http") {
-            crate::pkg::pgp::add_key_from_url(key_source, key_name)
+            crate::pkg::pgp::add_key_from_url(key_source, key_name, !verbose)
         } else if key_source.len() == 40 && key_source.chars().all(|c| c.is_ascii_hexdigit()) {
-            crate::pkg::pgp::add_key_from_fingerprint(key_source, key_name)
+            crate::pkg::pgp::add_key_from_fingerprint(key_source, key_name, !verbose)
         } else {
             Err(anyhow!(
                 "Invalid key source '{}': must be a URL or a 40-character fingerprint.",
@@ -534,26 +578,46 @@ fn sync_pgp_keys_at_path(db_path: &Path) -> Result<()> {
         };
 
         if let Err(e) = result {
-            eprintln!(
+            let err_msg = format!(
                 "{} Failed to import key '{}': {}",
                 "Warning:".yellow(),
                 key_name,
                 e
             );
+            if let Some(p) = pb {
+                p.println(err_msg);
+            } else {
+                eprintln!("{}", err_msg);
+            }
+        }
+        if let Some(p) = pb {
+            p.inc(1);
         }
     }
 
     Ok(())
 }
 
-fn fetch_handle_by_cloning(url: &str) -> Result<String> {
+fn fetch_handle_by_cloning(url: &str, verbose: bool) -> Result<String> {
     let temp_dir = Builder::new().prefix("zoi-handle-fetch").tempdir()?;
-    println!("Cloning '{}' to fetch handle...", url.cyan());
+    if verbose {
+        println!("Cloning '{}' to fetch handle...", url.cyan());
+    }
     let status = std::process::Command::new("git")
         .arg("clone")
         .arg("--depth=1")
         .arg(url)
         .arg(temp_dir.path())
+        .stdout(if verbose {
+            Stdio::inherit()
+        } else {
+            Stdio::null()
+        })
+        .stderr(if verbose {
+            Stdio::inherit()
+        } else {
+            Stdio::null()
+        })
         .status()?;
 
     if !status.success() {
@@ -614,23 +678,29 @@ fn fetch_repo_yaml_content(url: &str) -> Result<String> {
     ))
 }
 
-fn fetch_handle_for_url(url: &str) -> Result<String> {
-    println!(
-        "Attempting to fetch handle for '{}' directly...",
-        url.cyan()
-    );
+fn fetch_handle_for_url(url: &str, verbose: bool) -> Result<String> {
+    if verbose {
+        println!(
+            "Attempting to fetch handle for '{}' directly...",
+            url.cyan()
+        );
+    }
     match fetch_repo_yaml_content(url) {
         Ok(content) => {
             let repo_config: crate::pkg::types::RepoConfig = serde_yaml::from_str(&content)?;
-            println!("Successfully fetched and parsed repo.yaml.");
+            if verbose {
+                println!("Successfully fetched and parsed repo.yaml.");
+            }
             Ok(repo_config.name)
         }
         Err(e) => {
-            println!(
-                "Direct fetch failed: {}. Falling back to cloning repository...",
-                e.to_string().yellow()
-            );
-            fetch_handle_by_cloning(url)
+            if verbose {
+                println!(
+                    "Direct fetch failed: {}. Falling back to cloning repository...",
+                    e.to_string().yellow()
+                );
+            }
+            fetch_handle_by_cloning(url, verbose)
         }
     }
 }
@@ -643,23 +713,44 @@ fn sync_registry(
     m: Option<&MultiProgress>,
 ) -> Result<(types::Registry, bool)> {
     let mut reg_changed = false;
+
+    let pb = if !verbose && let Some(m_ref) = m {
+        let p = m_ref.add(ProgressBar::new(0));
+        p.set_style(
+            ProgressStyle::default_bar()
+                .template(
+                    "{spinner:.green} [{elapsed_precise}] {msg:30.cyan} [{bar:40.cyan/blue}] {percent}%",
+                )?
+                .progress_chars("#>-"),
+        );
+        p.enable_steady_tick(std::time::Duration::from_millis(120));
+        Some(p)
+    } else {
+        None
+    };
+
     if reg.handle.is_empty() {
-        let handle = fetch_handle_for_url(&reg.url)?;
+        if let Some(p) = &pb {
+            p.set_message(format!("Fetching handle for {}", reg.url.cyan()));
+        }
+        let handle = fetch_handle_for_url(&reg.url, verbose)?;
         reg.handle = handle;
         reg_changed = true;
     }
 
     let target_dir = db_root.join(&reg.handle);
-    if let Err(e) = try_sync_at_path(&reg.url, &target_dir, verbose, m) {
+    if let Err(e) = try_sync_at_path(&reg.url, &target_dir, verbose, m, pb.as_ref()) {
         let msg = format!("Sync with {} failed: {}", reg.url.yellow(), e);
-        if let Some(m_ref) = m {
+        if let Some(p) = &pb {
+            p.abandon_with_message(msg);
+        } else if let Some(m_ref) = m {
             m_ref.println(msg)?;
         } else {
             eprintln!("{}", msg);
         }
     } else {
         if let Some(authorities) = &reg.authorities
-            && let Err(e) = verify_registry_signature(&target_dir, authorities)
+            && let Err(e) = verify_registry_signature(&target_dir, authorities, verbose)
         {
             let msg = format!(
                 "Security: Registry signature check failed for {}: {}",
@@ -674,20 +765,25 @@ fn sync_registry(
             return Err(e);
         }
 
-        let msg = format!("{} with {}", "Sync successful".green(), reg.url.cyan());
-        if let Some(m_ref) = m {
-            m_ref.println(msg)?;
-        } else {
-            println!("{}", msg);
-        }
-        sync_pgp_keys_at_path(&target_dir)?;
-        refresh_registry_db(&reg.handle, &target_dir, sync_files, m)?;
+        sync_pgp_keys_at_path(&target_dir, verbose, pb.as_ref())?;
+        refresh_registry_db(
+            &reg.handle,
+            &target_dir,
+            sync_files,
+            m,
+            verbose,
+            pb.as_ref(),
+        )?;
 
         if let Ok(repo_config) = config::read_repo_config(&target_dir)
             && repo_config.advisory_prefix != reg.advisory_prefix
         {
             reg.advisory_prefix = repo_config.advisory_prefix;
             reg_changed = true;
+        }
+
+        if let Some(p) = pb {
+            p.finish_with_message(format!("Synced {}", reg.handle.cyan()));
         }
     }
 
@@ -699,7 +795,9 @@ pub fn run(verbose: bool, _fallback: bool, no_pm: bool, sync_files: bool) -> Res
     if merged_config.protect_db {
         let db_root = get_db_path()?;
         if db_root.exists() {
-            println!("Making package database writable...");
+            if verbose {
+                println!("Making package database writable...");
+            }
             if let Err(e) = utils::set_path_writable(&db_root) {
                 eprintln!("Warning: could not make db writable: {}", e);
             }
@@ -728,7 +826,7 @@ pub fn run(verbose: bool, _fallback: bool, no_pm: bool, sync_files: bool) -> Res
     }
 
     if !registries_to_sync.is_empty() {
-        println!("Syncing registries...");
+        println!("{} Syncing registries...", "::".bold().blue());
         let m = if verbose {
             None
         } else {
@@ -743,10 +841,6 @@ pub fn run(verbose: bool, _fallback: bool, no_pm: bool, sync_files: bool) -> Res
                 Ok((synced_reg, changed, is_default))
             })
             .collect();
-
-        if let Some(m_ref) = m {
-            m_ref.clear().ok();
-        }
 
         let mut updated_added_registries = Vec::new();
         for res in results {
@@ -764,11 +858,15 @@ pub fn run(verbose: bool, _fallback: bool, no_pm: bool, sync_files: bool) -> Res
     }
 
     if !no_pm {
-        println!("\n{}", "Updating system configuration...".green());
+        if verbose {
+            println!("\n{}", "Updating system configuration...".green());
+        }
         config.native_package_manager = utils::get_native_package_manager();
         config.package_managers = Some(utils::get_all_available_package_managers());
         needs_config_update = true;
-        println!("System configuration updated.");
+        if verbose {
+            println!("System configuration updated.");
+        }
     }
 
     if needs_config_update {
@@ -780,7 +878,9 @@ pub fn run(verbose: bool, _fallback: bool, no_pm: bool, sync_files: bool) -> Res
     if merged_config.protect_db {
         let db_root = get_db_path()?;
         if db_root.exists() {
-            println!("Making package database read-only...");
+            if verbose {
+                println!("Making package database read-only...");
+            }
             if let Err(e) = utils::set_path_read_only(&db_root) {
                 eprintln!("Warning: could not make db read-only: {}", e);
             }

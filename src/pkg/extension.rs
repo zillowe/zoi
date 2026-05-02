@@ -254,9 +254,9 @@ pub fn add(
                 types::ExtensionChange::Pgp { name, key } => {
                     println!("Adding PGP key: {} from {}", name, key);
                     if key.starts_with("http") {
-                        crate::pkg::pgp::add_key_from_url(key, name)?;
+                        crate::pkg::pgp::add_key_from_url(key, name, false)?;
                     } else {
-                        crate::pkg::pgp::add_key_from_fingerprint(key, name)?;
+                        crate::pkg::pgp::add_key_from_fingerprint(key, name, false)?;
                     }
                 }
                 types::ExtensionChange::Plugin { name, script } => {

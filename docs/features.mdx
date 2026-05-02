@@ -622,17 +622,16 @@ If the package is installed more than once across scopes or registries, Zoi will
 
 ### `zoi sync`
 
-(alias: `sy`)
+### `zoi sync`
 
 Downloads or updates the package database from the remote repository.
 
-**Options:**
+**Flags:**
 
-* `-v`, `--verbose`: Show the full git output.
+* `-v`, `--verbose`: Show detailed git output and intermediate sync steps.
 * `--fallback`: Fallback to other mirrors if the default one fails.
-* `--no-pm`: Do not check for installed package managers.
-* `--no-shell-setup`: Do not attempt to set up shell completions after syncing.
-* `-f`, `--files`: Download and index file lists for global search.
+* `--no-pm`: Do not check for installed native package managers.
+* `-f`, `--files`: Download and index file lists for global search (requires server-side support).
 
 **Subcommands:**
 

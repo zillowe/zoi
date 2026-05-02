@@ -1,35 +1,13 @@
 use crate::pkg;
-use crate::utils;
 use anyhow::Result;
 use colored::*;
 
-pub fn run(
-    verbose: bool,
-    fallback: bool,
-    no_pm: bool,
-    no_shell_setup: bool,
-    files: bool,
-) -> Result<()> {
+pub fn run(verbose: bool, fallback: bool, no_pm: bool, files: bool) -> Result<()> {
     println!("{} Syncing package databases...", "::".bold().blue());
 
     pkg::sync::run(verbose, fallback, no_pm, files)?;
 
     println!("{}", "Sync complete.".green());
-
-    if no_shell_setup {
-        return Ok(());
-    }
-
-    println!("\n{} Setting up shell completions...", "::".bold().blue());
-    if let Some(shell) = utils::get_current_shell() {
-        println!("Detected shell: {}", shell.to_string().cyan());
-        crate::cmd::shell::run(shell, crate::cli::SetupScope::User)?;
-    } else {
-        println!(
-            "{}",
-            "Could not detect shell. Skipping auto-completion setup.".yellow()
-        );
-    }
     Ok(())
 }
 

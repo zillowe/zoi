@@ -134,10 +134,6 @@ enum Commands {
         #[arg(long = "no-pm")]
         no_package_managers: bool,
 
-        /// Do not attempt to set up shell completions after syncing
-        #[arg(long)]
-        no_shell_setup: bool,
-
         /// Download and index file lists for global search
         #[arg(short, long)]
         files: bool,
@@ -845,7 +841,6 @@ pub fn run() -> anyhow::Result<()> {
                 verbose,
                 fallback,
                 no_package_managers,
-                no_shell_setup,
                 files,
             } => {
                 if let Some(cmd) = command {
@@ -857,13 +852,7 @@ pub fn run() -> anyhow::Result<()> {
                     }
                 } else {
                     plugin_manager.trigger_hook("on_pre_sync", None)?;
-                    let res = cmd::sync::run(
-                        verbose,
-                        fallback,
-                        no_package_managers,
-                        no_shell_setup,
-                        files,
-                    );
+                    let res = cmd::sync::run(verbose, fallback, no_package_managers, files);
                     plugin_manager.trigger_hook_nonfatal("on_post_sync", None);
                     res
                 }

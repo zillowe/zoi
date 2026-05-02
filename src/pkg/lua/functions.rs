@@ -920,7 +920,7 @@ fn add_verify_signature(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
 fn add_add_pgp_key(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let add_pgp_key_fn = lua.create_function(move |lua, (source, name): (String, String)| {
         let result = if source.starts_with("http") {
-            crate::pkg::pgp::add_key_from_url(&source, &name)
+            crate::pkg::pgp::add_key_from_url(&source, &name, quiet)
         } else {
             let p = Path::new(&source);
             let actual_path = if p.exists() {
@@ -930,7 +930,11 @@ fn add_add_pgp_key(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
             } else {
                 p.to_path_buf()
             };
-            crate::pkg::pgp::add_key_from_path(actual_path.to_str().unwrap_or(&source), Some(&name))
+            crate::pkg::pgp::add_key_from_path(
+                actual_path.to_str().unwrap_or(&source),
+                Some(&name),
+                quiet,
+            )
         };
 
         if let Err(e) = result {

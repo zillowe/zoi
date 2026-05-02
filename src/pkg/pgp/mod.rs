@@ -14,7 +14,7 @@ include!(concat!(env!("OUT_DIR"), "/generated_pgp_keys.rs"));
 
 pub fn ensure_builtin_keys() -> Result<()> {
     for (name, bytes) in BUILTIN_KEYS {
-        if let Err(e) = add_key_from_bytes(bytes, name) {
+        if let Err(e) = add_key_from_bytes(bytes, name, true) {
             eprintln!(
                 "Warning: Failed to ensure builtin PGP key '{}': {}",
                 name, e
@@ -80,7 +80,7 @@ pub fn get_pgp_dir() -> Result<PathBuf> {
     Ok(pgp_dir)
 }
 
-pub fn add_key_from_bytes(key_bytes: &[u8], name: &str) -> Result<()> {
+pub fn add_key_from_bytes(key_bytes: &[u8], name: &str, quiet: bool) -> Result<()> {
     let pgp_dir = get_pgp_dir()?;
     let dest_path = pgp_dir.join(format!("{}.asc", name));
 
@@ -89,23 +89,27 @@ pub fn add_key_from_bytes(key_bytes: &[u8], name: &str) -> Result<()> {
         if existing_bytes == key_bytes {
             return Ok(());
         }
-        println!(
-            "{} A different key with the name '{}' already exists. Overwriting.",
-            "Warning:".yellow(),
-            name
-        );
+        if !quiet {
+            println!(
+                "{} A different key with the name '{}' already exists. Overwriting.",
+                "Warning:".yellow(),
+                name
+            );
+        }
     }
 
     let cert = Cert::from_bytes(key_bytes)?;
     validate_cert(&cert)?;
 
     fs::write(&dest_path, key_bytes)?;
-    println!("Successfully added/updated key '{}'.", name.cyan());
+    if !quiet {
+        println!("Successfully added/updated key '{}'.", name.cyan());
+    }
 
     Ok(())
 }
 
-pub fn add_key_from_path(path: &str, name: Option<&str>) -> Result<()> {
+pub fn add_key_from_path(path: &str, name: Option<&str>, quiet: bool) -> Result<()> {
     let key_path = Path::new(path);
     if !key_path.exists() {
         return Err(anyhow!("Key file not found at: {}", path));
@@ -118,22 +122,28 @@ pub fn add_key_from_path(path: &str, name: Option<&str>) -> Result<()> {
             .unwrap_or("unnamed")
     });
 
-    println!("Validating PGP key file...");
+    if !quiet {
+        println!("Validating PGP key file...");
+    }
     let key_bytes = fs::read(key_path)?;
-    println!("{}", "Key is valid.".green());
+    if !quiet {
+        println!("{}", "Key is valid.".green());
+    }
 
-    add_key_from_bytes(&key_bytes, key_name)
+    add_key_from_bytes(&key_bytes, key_name, quiet)
 }
 
-pub fn add_key_from_fingerprint(fingerprint: &str, name: &str) -> Result<()> {
+pub fn add_key_from_fingerprint(fingerprint: &str, name: &str, quiet: bool) -> Result<()> {
     let url = format!(
         "https://keys.openpgp.org/vks/v1/by-fingerprint/{}",
         fingerprint.to_uppercase()
     );
-    println!(
-        "Fetching key for fingerprint {} from keys.openpgp.org...",
-        fingerprint.cyan()
-    );
+    if !quiet {
+        println!(
+            "Fetching key for fingerprint {} from keys.openpgp.org...",
+            fingerprint.cyan()
+        );
+    }
 
     let client = crate::utils::get_http_client()?;
     let response = client.get(&url).send()?;
@@ -146,19 +156,25 @@ pub fn add_key_from_fingerprint(fingerprint: &str, name: &str) -> Result<()> {
 
     let key_bytes = response.bytes()?.to_vec();
 
-    println!("Validating PGP key...");
+    if !quiet {
+        println!("Validating PGP key...");
+    }
     Cert::from_bytes(&key_bytes)?;
-    println!("{}", "Key is valid.".green());
+    if !quiet {
+        println!("{}", "Key is valid.".green());
+    }
 
-    add_key_from_bytes(&key_bytes, name)
+    add_key_from_bytes(&key_bytes, name, quiet)
 }
 
-pub fn add_key_from_url(url: &str, name: &str) -> Result<()> {
-    println!(
-        "Fetching key for {} from url {}...",
-        name.cyan(),
-        url.cyan()
-    );
+pub fn add_key_from_url(url: &str, name: &str, quiet: bool) -> Result<()> {
+    if !quiet {
+        println!(
+            "Fetching key for {} from url {}...",
+            name.cyan(),
+            url.cyan()
+        );
+    }
 
     let client = crate::utils::get_http_client()?;
     let response = client.get(url).send()?;
@@ -171,11 +187,15 @@ pub fn add_key_from_url(url: &str, name: &str) -> Result<()> {
 
     let key_bytes = response.bytes()?.to_vec();
 
-    println!("Validating PGP key...");
+    if !quiet {
+        println!("Validating PGP key...");
+    }
     Cert::from_bytes(&key_bytes)?;
-    println!("{}", "Key is valid.".green());
+    if !quiet {
+        println!("{}", "Key is valid.".green());
+    }
 
-    add_key_from_bytes(&key_bytes, name)
+    add_key_from_bytes(&key_bytes, name, quiet)
 }
 
 pub fn remove_key_by_name(name: &str) -> Result<()> {
