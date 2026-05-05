@@ -766,14 +766,61 @@ fn sync_registry(
         }
 
         sync_pgp_keys_at_path(&target_dir, verbose, pb.as_ref())?;
-        refresh_registry_db(
-            &reg.handle,
-            &target_dir,
-            sync_files,
-            m,
-            verbose,
-            pb.as_ref(),
-        )?;
+
+        let mut db_downloaded = false;
+        if let Ok(repo_config) = config::read_repo_config(&target_dir)
+            && let Some(db_url_template) = &repo_config.db
+        {
+            let platform = utils::get_platform().unwrap_or_default();
+            let db_url = crate::pkg::install::util::resolve_url_placeholders(
+                db_url_template,
+                "",
+                "",
+                "",
+                &platform,
+            );
+
+            if let Ok(db_path) = db::get_db_path(&reg.handle) {
+                if let Some(p) = pb.as_ref() {
+                    p.set_message("Downloading pre-indexed DB...");
+                } else if verbose {
+                    println!("Downloading pre-indexed DB from {}...", db_url);
+                }
+                if let Some(parent) = db_path.parent() {
+                    let _ = fs::create_dir_all(parent);
+                }
+
+                let temp_db_path = db_path.with_extension("db.tmp");
+                if crate::pkg::install::util::download_file_with_progress(
+                    &db_url,
+                    &temp_db_path,
+                    pb.as_ref(),
+                    None,
+                )
+                .is_ok()
+                {
+                    if fs::rename(&temp_db_path, &db_path).is_ok() {
+                        db_downloaded = true;
+                        if verbose {
+                            println!("Successfully downloaded pre-indexed DB.");
+                        }
+                    }
+                } else {
+                    let _ = fs::remove_file(&temp_db_path);
+                }
+            }
+        }
+
+        if !db_downloaded {
+            refresh_registry_db(
+                &reg.handle,
+                &target_dir,
+                sync_files,
+                m,
+                verbose,
+                pb.as_ref(),
+            )?;
+        }
 
         if let Ok(repo_config) = config::read_repo_config(&target_dir)
             && repo_config.advisory_prefix != reg.advisory_prefix

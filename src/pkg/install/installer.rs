@@ -87,6 +87,24 @@ pub fn download_and_cache_archive(
         }
     }
 
+    let has_authorities = config.default_registry.as_ref().is_some_and(|r| {
+        r.handle == _node.registry_handle && r.authorities.as_ref().is_some_and(|a| !a.is_empty())
+    }) || config.added_registries.iter().any(|r| {
+        r.handle == _node.registry_handle && r.authorities.as_ref().is_some_and(|a| !a.is_empty())
+    });
+
+    if has_authorities && details.info.pgp_url.is_none() {
+        let msg = format!(
+            "Warning: Installing unsigned package '{}' from a registry that claims to be secure.",
+            _node.pkg.name
+        );
+        if let Some(p) = pb {
+            p.println(msg.yellow().to_string());
+        } else {
+            println!("{}", msg.yellow());
+        }
+    }
+
     if let Some(policy) = &signature_policy {
         if let Some(pgp_url) = &details.info.pgp_url {
             let sig_path = if cached_sig_path.exists() {

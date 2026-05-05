@@ -320,6 +320,9 @@ pub fn run(
         let bin_root = get_bin_root(scope)?;
         fs::create_dir_all(&bin_root)?;
 
+        let mut created_shims = Vec::new();
+        let mut link_error = None;
+
         for bin_name in bins {
             let mut found_bin = false;
             for entry in WalkDir::new(&version_dir)
@@ -329,7 +332,11 @@ pub fn run(
                 if entry.file_type().is_file() && entry.file_name().to_string_lossy() == *bin_name {
                     let link_path = bin_root.join(bin_name);
 
-                    crate::pkg::shim::create_shim(&link_path)?;
+                    if let Err(e) = crate::pkg::shim::create_shim(&link_path) {
+                        link_error = Some(e);
+                        break;
+                    }
+                    created_shims.push(link_path);
 
                     if pb.is_none() {
                         println!("Created shim for: {}", bin_name.green());
@@ -338,12 +345,22 @@ pub fn run(
                     break;
                 }
             }
+            if link_error.is_some() {
+                break;
+            }
             if !found_bin && pb.is_none() {
                 eprintln!(
                     "Warning: could not find binary '{}' to link.",
                     bin_name.yellow()
                 );
             }
+        }
+
+        if let Some(e) = link_error {
+            for shim in created_shims {
+                let _ = fs::remove_file(shim);
+            }
+            return Err(anyhow!("Failed to create shims: {}", e));
         }
     }
 

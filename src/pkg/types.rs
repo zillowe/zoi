@@ -725,6 +725,8 @@ pub struct RepoConfig {
     #[serde(default)]
     pub pkg: Vec<PkgLink>,
     #[serde(default)]
+    pub db: Option<String>,
+    #[serde(default)]
     pub pgp: Vec<PgpKey>,
     pub repos: Vec<RepoEntry>,
 }
