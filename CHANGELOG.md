@@ -4,6 +4,20 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
+## [Prod-Release-1.12.0] - 2026-05-07
+
+### ♻️ Refactor
+
+- *(sync)* Refine command output and remove auto shell setup
+
+### ✨ Features
+
+- *(pkg)* Improve installation robustness and registry sync speed
+
+### 🛡️ Dependencies
+
+- Update Cargo dependencies
+
 ## [Prod-Release-1.11.0] - 2026-04-25
 
 ### ✨ Features
@@ -294,7 +308,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### ✨ Features
 
 - *(pkg)* Implement package replacement, provides, and backup
-- *(Lua)* Add support for in package sources
+- *(Lua)* Add support for  in package sources
 - *(pkg)* Refine package management UI
 
 ### 🔒 Security
@@ -927,7 +941,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 
 ### ♻️ Refactor
 
-- *(upgrade)* Use 'no\_' methods for HTTP compression
+- *(upgrade)* Use 'no_' methods for HTTP compression
 
 ## [Prod-Beta-3.2.3] - 2025-07-31
 
