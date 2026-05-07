@@ -10,6 +10,10 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 
 - *(registry)* Revert changes on signature verification failure
 
+### 🩹 Bug Fixes
+
+- *(dependencies)* Isolate mutex guard acquisition
+
 ## [Prod-Release-1.12.0] - 2026-05-07
 
 ### ♻️ Refactor
