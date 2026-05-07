@@ -1,6 +1,6 @@
 pkgbase = zoi-bin
 	pkgdesc = Universal Package Manager & Environment Setup Tool (pre-compiled binary)
-	pkgver = 1.11.0
+	pkgver = 1.12.1
 	pkgrel = 1
 	url = https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi
 	arch = x86_64
@@ -13,13 +13,13 @@ pkgbase = zoi-bin
 	optdepends = less: for viewing files
 	provides = zoi
 	conflicts = zoi
-	source_x86_64 = zoi-linux-amd64.tar.zst::https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/Prod-Release-1.11.0/downloads/zoi-linux-amd64.tar.zst
+	source_x86_64 = zoi-linux-amd64.tar.zst::https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/Prod-Release-1.12.1/downloads/zoi-linux-amd64.tar.zst
 	source_x86_64 = LICENSE::http://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/LICENSE
-	sha512sums_x86_64 = a6f7be25664a8b5258c85baa84155c35ce8e96e89ff72e0a84a48faec62d295ddadd6075c920e51bf24a1edf719f200c3fe2e10af181ca39a83956195cb4848b
+	sha512sums_x86_64 = 9f2130b14bc6a1a5ddd2c5ef90cf79ba8eeaff6c2f932f933ff7886b9902178a49ca7c6a2b90e5f15d92c3046d711208079c3035e257e6c523e5a29d2f2a76d1
 	sha512sums_x86_64 = e2cca3fc757382874694b00e85372aa114ef6f6196d767ba445b4499f170ef6589e3aab60d41615bdc1a74596a1f0f6b148a934b19b69e639de1fddf6dd2b2ea
-	source_aarch64 = zoi-linux-arm64.tar.zst::https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/Prod-Release-1.11.0/downloads/zoi-linux-arm64.tar.zst
+	source_aarch64 = zoi-linux-arm64.tar.zst::https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/Prod-Release-1.12.1/downloads/zoi-linux-arm64.tar.zst
 	source_aarch64 = LICENSE::http://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/LICENSE
-	sha512sums_aarch64 = 99da62d5be42afe39962e08f23f65d0a331f8928005cb3ddadd049fe16c4353d4af9590573d7c155962a655e3cb39cddf5869d9c863cd73be751af2131f49de5
+	sha512sums_aarch64 = 84c7ead6a4554fe0c88886044397eaa2f6bc03d91fc19aa00775bf697508cf3a7f8b3454bca50930fff49400ff13d63cead7a59fb630b719a0f2650365f3e494
 	sha512sums_aarch64 = e2cca3fc757382874694b00e85372aa114ef6f6196d767ba445b4499f170ef6589e3aab60d41615bdc1a74596a1f0f6b148a934b19b69e639de1fddf6dd2b2ea
 
 pkgname = zoi-bin
