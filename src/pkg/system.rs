@@ -553,26 +553,30 @@ fn apply_locale(locale: &str) -> Result<()> {
 
 fn apply_timezone(timezone: &str) -> Result<()> {
     println!("Setting timezone to: {}", timezone.cyan());
-    let tz_path = PathBuf::from("/usr/share/zoneinfo").join(timezone);
-    if tz_path.exists() {
+
+    #[cfg(not(unix))]
+    {
+        let _ = timezone;
+        Err(anyhow!(
+            "Timezone management is only supported on Unix-like systems."
+        ))
+    }
+
+    #[cfg(unix)]
+    {
+        let tz_path = PathBuf::from("/usr/share/zoneinfo").join(timezone);
+        if !tz_path.exists() {
+            return Err(anyhow!("Timezone '{}' not found.", timezone));
+        }
+
         let localtime = Path::new("/etc/localtime");
         if localtime.exists() {
             fs::remove_file(localtime)?;
         }
-        #[cfg(unix)]
-        {
-            std::os::unix::fs::symlink(tz_path, localtime)?;
-        }
-        #[cfg(not(unix))]
-        {
-            return Err(anyhow!(
-                "Timezone management is only supported on Unix-like systems."
-            ));
-        }
-    } else {
-        return Err(anyhow!("Timezone '{}' not found.", timezone));
+
+        std::os::unix::fs::symlink(tz_path, localtime)?;
+        Ok(())
     }
-    Ok(())
 }
 
 fn apply_desktop(
