@@ -5,7 +5,7 @@ use crate::{
 use anyhow::{Result, anyhow};
 use colored::*;
 use git2::{
-    FetchOptions, RemoteCallbacks, Repository,
+    FetchOptions, RemoteCallbacks, Repository, ResetType,
     build::{CheckoutBuilder, RepoBuilder},
 };
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -739,6 +739,15 @@ fn sync_registry(
     }
 
     let target_dir = db_root.join(&reg.handle);
+
+    let pre_sync_head = match Repository::open(&target_dir) {
+        Ok(repo) => match repo.head() {
+            Ok(head) => head.target(),
+            Err(_) => None,
+        },
+        Err(_) => None,
+    };
+
     if let Err(e) = try_sync_at_path(&reg.url, &target_dir, verbose, m, pb.as_ref()) {
         let msg = format!("Sync with {} failed: {}", reg.url.yellow(), e);
         if let Some(p) = &pb {
@@ -752,10 +761,36 @@ fn sync_registry(
         if let Some(authorities) = &reg.authorities
             && let Err(e) = verify_registry_signature(&target_dir, authorities, verbose)
         {
+            let rollback_msg = if let Some(oid) = pre_sync_head {
+                if let Ok(repo) = Repository::open(&target_dir) {
+                    if let Ok(object) = repo.find_object(oid, None) {
+                        let mut checkout = CheckoutBuilder::new();
+                        checkout.force();
+                        if repo
+                            .reset(&object, ResetType::Hard, Some(&mut checkout))
+                            .is_ok()
+                        {
+                            "Rolled back to previous signed commit.".to_string()
+                        } else {
+                            "Failed to rollback. Repository may be in an inconsistent state."
+                                .to_string()
+                        }
+                    } else {
+                        "Could not find previous HEAD object.".to_string()
+                    }
+                } else {
+                    "Could not open repository for rollback.".to_string()
+                }
+            } else {
+                let _ = fs::remove_dir_all(&target_dir);
+                "Removed unsigned clone.".to_string()
+            };
+
             let msg = format!(
-                "Security: Registry signature check failed for {}: {}",
+                "Security: Registry signature check failed for {}: {}. {}",
                 reg.url.red(),
-                e
+                e,
+                rollback_msg.yellow(),
             );
             if let Some(m_ref) = m {
                 m_ref.println(&msg)?;
