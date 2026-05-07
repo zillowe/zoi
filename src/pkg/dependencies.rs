@@ -112,11 +112,13 @@ pub fn install_dependency(
     m: Option<&MultiProgress>,
 ) -> Result<()> {
     let dep_id = format!("{}:{}", dep.manager, dep.package);
-    let mut lock = processed_deps
-        .lock()
-        .map_err(|e| anyhow!("Mutex poisoned: {}", e))?;
-    if !lock.insert(dep_id.clone()) {
-        return Ok(());
+    {
+        let mut lock = processed_deps
+            .lock()
+            .map_err(|e| anyhow!("Mutex poisoned: {}", e))?;
+        if !lock.insert(dep_id.clone()) {
+            return Ok(());
+        }
     }
 
     let pb_style = ProgressStyle::default_bar()
