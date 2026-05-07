@@ -134,7 +134,7 @@ Keep your package definitions DRY (Don't Repeat Yourself) by including external 
 -- shared_build.pkg.lua
 function common_make()
   cmd("make clean")
-  cmd("make -j" .. (ZOI.parallel_jobs or 2))
+  cmd("make -j2")
 end
 
 -- package.pkg.lua

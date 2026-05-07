@@ -137,8 +137,7 @@ A transaction log records the starting time and a sequential list of operations.
           "scope": "user",
           "installed_files": [
             "/home/user/.zoi/pkgs/store/.../1.0.0/bin/hello"
-          ],
-          ...
+          ]
         }
       }
     }
@@ -157,5 +156,5 @@ The `operations` array contains one of three objects:
 ### Atomicity and Rollback
 
 * **Atomic Commits:** When an operation completes successfully, Zoi deletes the transaction log. A missing log indicates a successful "commit."
-* **Automatic Rollback:** If Zoi crashes or encounters an unhandled error, the transaction log remains on disk. On the next invocation (or via `zoi rollback`), Zoi reads the log and reverts operations in **reverse order**.
-* **Manual Rollback:** Users can trigger a rollback of the last successful transaction using `zoi rollback --last-transaction`, which uses the same mechanism but targets the most recently created log.
+* **Failure Rollback:** If an install, uninstall, or update fails after a transaction starts, Zoi reads the current transaction log and reverts recorded operations in **reverse order**.
+* **Manual Transaction Rollback:** Users can trigger a rollback of the newest remaining transaction log using `zoi rollback --last-transaction`.

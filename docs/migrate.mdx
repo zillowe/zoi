@@ -167,16 +167,16 @@ Description: A short description.
 #!/usr/bin/make -f
 
 %:
-	dh $@
+ dh $@
 
 override_dh_auto_configure:
-	dh_auto_configure -- -DCMAKE_BUILD_TYPE=Release
+ dh_auto_configure -- -DCMAKE_BUILD_TYPE=Release
 
 override_dh_auto_build:
-	make
+ make
 
 override_dh_auto_install:
-	make install DESTDIR=debian/my-app
+ make install DESTDIR=debian/my-app
 ```
 
 #### Zoi `.pkg.lua` Equivalent
@@ -197,12 +197,12 @@ dependencies({
   runtime = { required = { "native:libssl3" } }
 })
 
-function prepare() {
+function prepare()
   -- Assuming source is in a parent directory or fetched
   cmd("git clone https://example.com/my-app.git source")
 end
 
-function package() {
+function package()
   cmd("cd source && cmake -B build -DCMAKE_BUILD_TYPE=Release")
   cmd("cd source/build && make")
   -- Copy the final binary to the pkgstore
@@ -271,12 +271,12 @@ dependencies({
   runtime = { required = { "native:openssl-libs" } }
 })
 
-function prepare() {
+function prepare()
   local url = "https://example.com/my-app-" .. PKG.version .. ".tar.gz"
   UTILS.EXTRACT(url, "source")
 end
 
-function package() {
+function package()
   -- The %configure and make steps from %build
   cmd("cd source && ./configure --prefix=/usr")
   cmd("cd source && make")
@@ -345,20 +345,20 @@ dependencies({
   runtime = { required = { "brew:openssl" } }
 })
 
-function prepare() {
+function prepare()
   local url = "https://example.com/my-tool-" .. PKG.version .. ".tar.gz"
   UTILS.EXTRACT(url, "source")
 end
 
-function package() {
-  cmd("cd source && ./configure --prefix=" .. STAGING_DIR .. "/usr")
+function package()
+  cmd("cd source && ./configure --prefix=" .. BUILD_DIR .. "/install_tmp")
   cmd("cd source && make")
   cmd("cd source && make install")
-  zcp("source/my-tool", "${pkgstore}/bin/my-tool")
+  zcp("install_tmp/bin/my-tool", "${pkgstore}/bin/my-tool")
 end
 
-function test() {
-  local output = cmd(STAGING_DIR .. "/${pkgstore}/bin/my-tool --version")
+function test()
+  local output = cmd("install_tmp/bin/my-tool --version")
   return string.find(output, PKG.version)
 end
 ```

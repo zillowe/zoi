@@ -48,9 +48,9 @@ This table lists all the available fields you can use inside the `metadata` bloc
 | ---------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `name`           | `string`  | **Required.** The name of the package.                                                                                                     |
 | `repo`           | `string`  | **Required.** The repository tier where the package belongs (e.g. `core`, `community`).                                                    |
-| `version`        | `string`  | The package version. Can be hardcoded or determined dynamically.                                                                           |
-| `versions`       | `table`   | A map of channels to versions (e.g. `{ stable = "1.2.3", beta = "1.4.0" }`). Used for version resolution if `version` is not set.          |
-| `description`    | `string`  | A short, one-line description of the package.                                                                                              |
+| `version`        | `string`  | The package version. Set either `version` or `versions`. Can be hardcoded or determined dynamically.                                       |
+| `versions`       | `table`   | A map of channels to versions (e.g. `{ stable = "1.2.3", beta = "1.4.0" }`). Required if `version` is not set.                             |
+| `description`    | `string`  | **Required.** A short, one-line description of the package.                                                                                |
 | `website`        | `string`  | The official website of the software.                                                                                                      |
 | `git`            | `string`  | The source code's git repository URL.                                                                                                      |
 | `man`            | `string`  | A URL to the package's manual page (can be a raw markdown or text file).                                                                   |
@@ -62,13 +62,13 @@ This table lists all the available fields you can use inside the `metadata` bloc
 | `provides`       | `list`    | A list of virtual package names this package provides. Other packages can depend on these.                                                 |
 | `replaces`       | `list`    | A list of packages that this package replaces. Zoi will offer to remove them upon installation.                                            |
 | `backup`         | `list`    | A list of configuration files to preserve during upgrades. Zoi will create `.zoinew` and `.zoisave` files for these.                       |
-| `types`          | `list`    | A list of supported build methods (e.g. `source`, `pre-compiled`).                                                                         |
+| `types`          | `list`    | **Required for buildable packages.** A list of supported build methods (e.g. `source`, `pre-compiled`).                                    |
 | `platforms`      | `list`    | A list of supported platforms (e.g. `linux`, `macos`, `windows`, `linux-amd64`). If specified, builds for other platforms will be skipped. |
 | `type`           | `string`  | The type of package. Can be `package` (default), `collection`, `app`, or `extension`. See [Package Types](#5-package-types).               |
 | `scope`          | `string`  | The default installation scope (`user`, `system`, or `project`). Users can override this with CLI flags.                                   |
 | `sub_packages`   | `list`    | A list of sub-package names to define a split package. See [Split Packages](#6-split-packages).                                            |
 | `main_subs`      | `list`    | For a split package, a list of the default sub-packages to install.                                                                        |
-| `updates`        | `list`    | A list of tables providing structured update information (e.g. for security notices).                                                      |
+| `extension`      | `table`   | Extension metadata for `type = "extension"` packages. Usually declared directly in `metadata`.                                             |
 | `alt`            | `string`  | A URL or source string for an alternative package definition to use instead of this one.                                                   |
 | `tags`           | `list`    | A list of keywords to help users find the package via `zoi search`.                                                                        |
 | `readme`         | `string`  | A URL to the package's README file.                                                                                                        |
@@ -165,7 +165,7 @@ When Zoi executes your script, it provides a rich environment of global variable
 | `SYSTEM`      | `table`  | Contains system info: `OS`, `ARCH`, `DISTRO`, `DISTRO_VER`, `DE`, `SERVER`, `KERNEL_VER`, `CPU`, `GPU`, `MANAGER`.  |
 | `ZOI`         | `table`  | Contains Zoi-specific info: `VERSION` (the version being built), `PATH.user`, `PATH.system`, and `PKG` (see below). |
 | `ZOI.PKG`     | `table`  | Contains absolute paths: `store`, `template`, `root`, `home`, `lua`.                                                |
-| `PKG`         | `table`  | A read-only table containing all the fields you defined in your `metadata{...}` block.                              |
+| `PKG`         | `table`  | A table containing all the fields you defined in your `metadata{...}` block.                                       |
 | `BUILD_DIR`   | `string` | The absolute path to the temporary build directory. Use this as the destination for all downloaded and built files. |
 | `STAGING_DIR` | `string` | The absolute path to the staging directory. Use this as the base for all `zcp` operations.                          |
 | `BUILD_TYPE`  | `string` | The build type specified by the user (e.g. `"source"`, `"pre-compiled"`).                                           |
@@ -175,7 +175,7 @@ When Zoi executes your script, it provides a rich environment of global variable
 
 | Function                              | Description                                                                                                                                                                                                                              |
 | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cmd(command)`                        | Executes a shell command within the `BUILD_DIR`.                                                                                                                                                                                         |
+| `cmd(command)`                        | Executes a shell command within the `BUILD_DIR` and returns `stdout`, `stderr`, and `exit_code`.                                                                                                                                          |
 | `zcp(source, dest)`                   | Copies files/directories to the `STAGING_DIR`. The `source` can be a path inside `BUILD_DIR`, an absolute path, or a path relative to the `.pkg.lua` file using `${pkgluadir}`. See [Staging Files with `zcp`](#staging-files-with-zcp). |
 | `zln(target, link)`                   | Creates a symbolic link in the package.                                                                                                                                                                                                  |
 | `zchmod(path, mode)`                  | Sets the permissions of a file or directory in the package.                                                                                                                                                                              |
@@ -371,7 +371,28 @@ hooks({
 
 ***
 
-## 8. Services
+## 8. Update Notices
+
+Use the top-level `updates{...}` block to show structured update notes, important changes, or vulnerability notices to users.
+
+```lua
+updates({
+  {
+    type = "vulnerability",
+    message = "Versions before 1.2.3 are affected by CVE-2026-0001."
+  },
+  {
+    type = "change",
+    message = "Configuration moved from ~/.old-app to ~/.config/my-app."
+  }
+})
+```
+
+Supported `type` values are `update`, `change`, and `vulnerability`.
+
+***
+
+## 9. Services
 
 Zoi can manage background services for your packages using the `service{...}` block. This is ideal for databases, web servers, or any other long-running process.
 
@@ -410,7 +431,7 @@ Once a package with a service is installed, you can manage it using the `zoi ser
 
 ***
 
-## 9. The Packaging Workflow
+## 10. The Packaging Workflow
 
 Follow these steps to develop, build, and test your package.
 
@@ -464,7 +485,7 @@ zoi package build --type <build-type> --test /path/to/your-package.pkg.lua
 
 **`zoi package build` Flags:**
 
-* `--type <TYPE>`: **(Required)** The build type to use (e.g. `source`).
+* `--type <TYPE>`: The build type to use (e.g. `source`). If omitted, Zoi chooses `pre-compiled`, then `source`, then the first listed type.
 * `--platform <PLATFORM>`: Build for a specific platform (e.g. `linux-arm64`). Defaults to your current platform.
 * `--sub <SUB_PACKAGE...>`: For a split package, build only the specified sub-packages.
 * `--sign <KEY>`: Sign the resulting archive with a PGP key from your Zoi keyring.
@@ -486,10 +507,11 @@ zoi package install /path/to/your-package-1.0.0-linux-amd64.pkg.tar.zst
 
 * `--scope <user|system>`: Override the installation scope.
 * `--sub <SUB_PACKAGE...>`: For a split package, install only the specified sub-packages from the archive.
+* `--yes`: Automatically answer yes to prompts.
 
 ***
 
-## 9. Full Walkthrough: 'hello' Package
+## 11. Full Walkthrough: 'hello' Package
 
 This example demonstrates many of the concepts above by packaging a simple "Hello, World!" program written in Zig.
 

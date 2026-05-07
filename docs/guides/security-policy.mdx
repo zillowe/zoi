@@ -49,7 +49,7 @@ policy:
   advisory_enforcement_unoverridable: true
 ```
 
-When this policy is active, Zoi will **always** check the local advisory database during `install` and `update` operations. While users can still choose to proceed after a warning (unless further restricted), the check itself cannot be disabled.
+When this policy is active, Zoi checks the local advisory database during `install` and `update` operations and blocks vulnerable package operations instead of asking whether to continue.
 
 ### Auditing for Compliance
 

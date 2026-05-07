@@ -15,13 +15,12 @@ Dependencies are specified in the `dependencies` section. Both `runtime` and `bu
 
 ### Dependency String Format
 
-Each entry follows the format: `manager:package[:sub-package]` with an optional version and an optional inline description.
+Each entry follows the format `manager:package[@version][:description]`. If the manager prefix is omitted, Zoi treats the dependency as a `zoi` dependency.
 
-* **Format:** `manager:package[:sub-package][@version][:description]`
+* **Format:** `manager:package[@version][:description]`
   * Note: For `deno` dependencies, use a `-` separator instead of `:` (e.g. `deno:npm-chalk` or `deno:jsr-@std/bytes`).
 * **Virtual Packages:** You can depend on a virtual package name that is satisfied by any package that includes it in its `provides` list.
-* **Sub-packages:** For `zoi` packages that are split, you can specify a sub-package.
-  * Example: `zoi:linux:headers`
+* **Split packages:** Use the dependency group's `sub_packages` map to add dependencies that only apply to a specific sub-package. Dependency strings themselves do not have a separate sub-package field.
 * **Version:** Can be specified with `@<semver>` or a comparator string like `=1.2.3`, `>=2.0.0`, `^1.2`, `~1.2.3`. An optional `v` prefix is supported (e.g. `@v1.2.3`).
   * Examples: `npm:typescript@5.3.2`, `cargo:bat@v0.24.0`, `apt:curl=7.68.0-1ubuntu2.18`.
   * For `zoi` packages, you can use a channel name like `zoi:my-pkg@stable`.
@@ -105,12 +104,12 @@ dependencies({
 
 ### Dynamic Versions with Lua
 
-In `.pkg.lua` files, you can use Lua's string concatenation and the global `PKG` table to create dynamic version dependencies. The `PKG` table contains the fields defined in your `package{}` block.
+In `.pkg.lua` files, you can use Lua's string concatenation and the global `PKG` table to create dynamic version dependencies. The `PKG` table contains the fields defined in your `metadata{}` block.
 
 Example with dynamic versions:
 
 ```lua
-package({
+metadata({
   name = "my-app",
   versions = {
     stable = "1.4.3",
@@ -140,7 +139,7 @@ Zoi parses version specifiers using standard SemVer requirements (e.g. `>1.2.3`,
 | `choco`, `cargo`      | ✔️ Yes          | Supports version constraints via a `--version` flag.                                                                                                                   |
 | `npm`, `yarn`, `pnpm` | ✔️ Yes          | Supports SemVer ranges, tags, and exact versions via `pkg@version` syntax.                                                                                             |
 | `brew`                | ❔ Partial      | Pinning is only possible if a formula for the specific version exists (e.g. `node@18`). It does not support arbitrary SemVer ranges for most packages.                 |
-| `go`                  | ❌ No           | Zoi currently installs Go modules using `go install <module>@latest`. Version specifiers are not supported.                                                            |
+| `go`                  | ✔️ Yes          | Uses `go install <module>@<version>` when a version is supplied.                                                                                                       |
 | Most OS Managers      | ❌ No           | `aur`, `pacman`, `yay`, `paru`, `apk`, `xbps`, `eopkg`, `guix`, `portage`, `snap`, `flatpak`, `macports`, and `conda` do not support reliable version pinning via Zoi. |
 
 When pinning is not supported, Zoi will install the latest version available from the package manager and may print a warning.
@@ -210,7 +209,7 @@ Notes:
 
 * AUR: `aur:<pkg>` builds from source using `makepkg`; uninstall is done with `pacman`.
 * `native:<pkg>` selects the appropriate system manager based on OS/distro; if none can be detected, Zoi errors.
-* Some managers (e.g. `go`, `jsr`, `volta`, `uv`) do not provide reliable uninstall; Zoi prints a notice and skips.
+* Some managers (e.g. `go`, `jsr`, `volta`, `uv`, `zig`) do not provide reliable uninstall; Zoi prints a notice and skips.
 * Deno: `deno:npm-chalk` or `deno:jsr-@std/bytes` (the `-` instead of `:` is important).
 
 ## Zoi Dependencies and Conflict Checks

@@ -17,7 +17,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! zoi = { version = "1" } // Replace with the latest version
+//! zoi-rs = "1"
 //! ```
 //!
 //! ## Example: Install a package
@@ -54,14 +54,22 @@ use anyhow::Result;
 pub use pkg::types::{self, Scope};
 use std::path::{Path, PathBuf};
 
+/// Options for building a package from a `.pkg.lua` definition.
 #[derive(Debug, Clone)]
 pub struct BuildOptions<'a> {
+    /// Build type to use, such as `source` or `pre-compiled`.
     pub build_type: Option<&'a str>,
+    /// Target platforms to build for. Use platform strings such as `linux-amd64`.
     pub platforms: Vec<String>,
+    /// Optional PGP key name or fingerprint used to sign the output archive.
     pub sign_key: Option<String>,
+    /// Whether to install build-time dependencies before building.
     pub install_deps: bool,
+    /// Build backend to use. Supported values are `native` and `docker`.
     pub method: &'a str,
+    /// Docker image to use when `method` is `docker`.
     pub image: Option<&'a str>,
+    /// Optional package version override.
     pub version_override: Option<&'a str>,
 }
 
@@ -79,12 +87,18 @@ impl<'a> Default for BuildOptions<'a> {
     }
 }
 
+/// Options for installing a local `.pkg.tar.zst` archive.
 #[derive(Debug, Clone)]
 pub struct PackageInstallOptions {
+    /// Optional installation scope override.
     pub scope_override: Option<Scope>,
+    /// Registry handle to record for the installed package. Use `local` for local archives.
     pub registry_handle: String,
+    /// Automatically answer yes to prompts.
     pub yes: bool,
+    /// Optional split-package names to install from the archive.
     pub sub_packages: Option<Vec<String>>,
+    /// Whether to create binary links for installed package binaries.
     pub link_bins: bool,
 }
 
@@ -100,43 +114,71 @@ impl Default for PackageInstallOptions {
     }
 }
 
+/// Options for installing one or more package source strings.
 #[derive(Debug, Clone, Default)]
 pub struct SourceInstallOptions {
+    /// Optional git repository spec for `zoi install --repo`.
     pub repo: Option<String>,
+    /// Force reinstalling packages that are already installed.
     pub force: bool,
+    /// Accept all optional dependencies.
     pub all_optional: bool,
+    /// Automatically answer yes to prompts.
     pub yes: bool,
+    /// Optional installation scope override.
     pub scope_override: Option<Scope>,
+    /// Save requested packages to the current project's `zoi.yaml`.
     pub save: bool,
+    /// Build type to use when building from source.
     pub build_type: Option<String>,
+    /// Print the install plan without performing the installation.
     pub dry_run: bool,
+    /// Force building from source even when a prebuilt archive is available.
     pub build: bool,
+    /// Enforce the current `zoi.lock` exactly for project installs.
     pub frozen_lockfile: bool,
 }
 
+/// Options for resolving a dependency graph without installing packages.
 #[derive(Debug, Clone, Default)]
 pub struct DependencyResolutionOptions {
+    /// Optional scope to use when resolving dependencies.
     pub scope_override: Option<Scope>,
+    /// Include packages even when they appear to be installed already.
     pub force: bool,
+    /// Automatically answer yes to resolver prompts.
     pub yes: bool,
+    /// Accept all optional dependencies.
     pub all_optional: bool,
+    /// Build type used for selecting typed build dependencies.
     pub build_type: Option<String>,
+    /// Suppress non-essential resolver output.
     pub quiet: bool,
 }
 
+/// Result of resolving a single package source.
 #[derive(Debug, Clone)]
 pub struct ResolvedPackage {
+    /// Parsed package metadata.
     pub package: types::Package,
+    /// Resolved package version.
     pub version: String,
+    /// Portable manifest information suitable for lockfiles.
     pub sharable_manifest: Option<types::SharableInstallManifest>,
+    /// Local path to the resolved package definition.
     pub source_path: PathBuf,
+    /// Registry handle, when the source came from a registry.
     pub registry_handle: Option<String>,
+    /// Git commit SHA, when the source came from a git repository.
     pub git_sha: Option<String>,
 }
 
+/// Dependency graph resolution result.
 #[derive(Debug)]
 pub struct DependencyResolution {
+    /// Resolved Zoi package graph.
     pub graph: pkg::install::resolver::DependencyGraph,
+    /// Dependencies handled by external package managers.
     pub non_zoi_dependencies: Vec<String>,
 }
 

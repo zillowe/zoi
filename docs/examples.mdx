@@ -5,6 +5,14 @@ description: A comprehensive set of examples for creating Zoi packages and proje
 
 This document provides a wide range of examples demonstrating the flexibility and power of Zoi's packaging system. These examples cover everything from basic binaries to complex background services and multi-component packages.
 
+<Callout title="Metadata">
+  Some examples focus on a specific feature and omit repetitive metadata for
+  brevity. A package intended to parse and publish must include the required
+  fields described in [Creating Packages](/docs/zds/zoi/creating-packages),
+  including `name`, `repo`, `description`, `maintainer`, and either `version`
+  or `versions`.
+</Callout>
+
 ## 1. Simple Pre-compiled Binary
 
 The most common use case: downloading a pre-built binary from a release page.
@@ -202,13 +210,17 @@ pkgs:
 # Environment variables for 'zoi dev'
 shell:
   env:
-    DEBUG: "true"
-    DATABASE_URL: "postgres://localhost:5432/mydb"
-    platform:
-      linux-amd64:
-        CC: "gcc"
-      macos-arm64:
-        CC: "clang"
+    default:
+      DEBUG: "true"
+      DATABASE_URL: "postgres://localhost:5432/mydb"
+    linux-amd64:
+      DEBUG: "true"
+      DATABASE_URL: "postgres://localhost:5432/mydb"
+      CC: "gcc"
+    macos-arm64:
+      DEBUG: "true"
+      DATABASE_URL: "postgres://localhost:5432/mydb"
+      CC: "clang"
 
 # Short aliases for common tasks
 commands:
@@ -514,24 +526,26 @@ end
 
 ## 17. Complex File System Logic
 
-Use `UTILS.FS` to perform granular file manipulations within the build or staging directories.
+Use `UTILS.FS` for granular file manipulations on real filesystem paths. For package staging, use `zcp`, `zmkdir`, and related staging helpers.
 
 ```lua
 function package()
   -- Create a nested directory structure manually
-  local target = "${pkgstore}/share/myapp/icons"
-  cmd("mkdir -p " .. target)
+  zmkdir("${pkgstore}/share/myapp/icons")
 
   -- Copy and set permissions
   if UTILS.FS.exists("assets/logo.png") then
-    UTILS.FS.copy("assets/logo.png", target .. "/logo.png")
+    zcp("assets/logo.png", "${pkgstore}/share/myapp/icons/logo.png")
     -- Set to 644 (rw-r--r--)
-    UTILS.FS.chmod(target .. "/logo.png", 420)
+    zchmod("${pkgstore}/share/myapp/icons/logo.png", 420)
   end
 
   -- Rename a binary based on platform
   if SYSTEM.OS == "macos" then
-    UTILS.FS.move("${pkgstore}/bin/tool", "${pkgstore}/bin/tool-macos")
+    UTILS.FS.move(BUILD_DIR .. "/build/bin/tool", BUILD_DIR .. "/build/bin/tool-macos")
+    zcp("build/bin/tool-macos", "${pkgstore}/bin/tool-macos")
+  else
+    zcp("build/bin/tool", "${pkgstore}/bin/tool")
   end
 end
 ```
@@ -544,7 +558,7 @@ Keep your package definitions DRY (Don't Repeat Yourself) by including external 
 -- shared_build.lua
 function common_make()
   cmd("make clean")
-  cmd("make -j" .. (ZOI.parallel_jobs or 2))
+  cmd("make -j2")
 end
 
 -- package.pkg.lua

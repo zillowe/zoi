@@ -10,10 +10,13 @@ Setting up a mirror of the Zoi registry is useful for enterprise environments, o
 The Zoi package database is a standard Git repository. To mirror it:
 
 1. **Clone the Upstream**:
+
    ```sh
    git clone --mirror https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg.git
    ```
+
 2. **Push to your Internal Git Forge**:
+
    ```sh
    cd Zoidberg.git
    git push --mirror https://git.yourcorp.com/zoi/zoidberg.git

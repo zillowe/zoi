@@ -57,14 +57,6 @@ commands:
     env:
       # Simple env vars for all platforms
       API_KEY: "12345"
-      # Platform-specific env vars
-      platform:
-        linux-amd64:
-          ENDPOINT: "https://api.linux.dev"
-        macos-amd64:
-          ENDPOINT: "https://api.mac.dev"
-        default:
-          ENDPOINT: "https://api.dev"
 
 # Optional: Environment setups runnable via `zoi env <alias>`
 environments:
@@ -79,6 +71,8 @@ environments:
         - echo "Building for Windows..."
         - npm run build:win
     env:
+      # Platform-specific environment maps use platform keys directly.
+      # `default` is used when the current platform has no exact match.
       default:
         NODE_ENV: "production"
       windows-amd64:
@@ -95,12 +89,19 @@ shell:
   env:
     # Custom environment variables for the dev shell
     DEBUG: "true"
-    # Platform-specific env vars also supported
-    platform:
-      linux-amd64:
-        CC: "gcc"
-      macos-arm64:
-        CC: "clang"
+```
+
+For platform-specific `env`, use platform keys at the top level:
+
+```yaml
+shell:
+  env:
+    linux-amd64:
+      CC: "gcc"
+    macos-arm64:
+      CC: "clang"
+    default:
+      CC: "cc"
 ```
 
 ### Field Reference
@@ -120,7 +121,7 @@ shell:
     * If a `map`, keys are platforms (`<os>-<arch>`) and values are command strings. A `default` key can be used as a fallback.
   * `env`: `map` (optional)
     * Can be a simple `map` of `string: string` for environment variables.
-    * Can be a `map` where the key `platform` contains platform-specific environment variables, and other keys are global.
+    * Can be a platform map where keys are platform strings such as `linux-amd64`, plus optional `default`, and values are environment-variable maps.
 * `environments`: `list` of objects (optional)
   * `name`: `string` (label)
   * `cmd`: `string` (alias)

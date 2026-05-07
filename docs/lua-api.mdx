@@ -13,7 +13,7 @@ These variables are automatically available in your script's scope.
 | :------------ | :------- | :---------------------------------------------------------------- |
 | `SYSTEM`      | `table`  | Information about the host system.                                |
 | `ZOI`         | `table`  | Information about the Zoi environment.                            |
-| `PKG`         | `table`  | A read-only copy of your `metadata{...}` fields.                  |
+| `PKG`         | `table`  | A table populated from your `metadata{...}` fields.               |
 | `BUILD_DIR`   | `string` | Absolute path to the temporary build directory.                   |
 | `STAGING_DIR` | `string` | Absolute path to the staging directory.                           |
 | `BUILD_TYPE`  | `string` | The user-requested build method (e.g. `"source"`).                |
@@ -95,7 +95,7 @@ Used in the `uninstall()` function to remove files or directories outside of the
 
 ### `cmd(command)`
 
-Executes a shell command within the `BUILD_DIR`. Returns the command's standard output as a string.
+Executes a shell command within the `BUILD_DIR`. Returns three values: standard output, standard error, and exit code.
 
 ### `IMPORT(file_name)`
 

@@ -111,7 +111,7 @@ Zoi is packed with features designed to make package management and environment 
   * `zoi owner`: Find which package owns a specific file on the system.
   * `zoi pin`: Lock a package to a specific version to prevent updates.
   * `zoi provides`: Find which package provides a specific command or file.
-  * `zoi rollback`: Revert a package to its previously installed version or the entire last transaction.
+  * `zoi rollback`: Revert a package to its previously installed version or roll back the newest remaining transaction log.
   * `zoi search`: Searches for packages by name or description.
   * `zoi service`: Manage background services for installed packages.
   * `zoi tree`: Visualize the dependency tree of a package.
@@ -203,19 +203,15 @@ Clears the cache of downloaded package binaries.
 
 ***
 
-### `zoi dev [run]`
+### `zoi dev`
 
 (alias: `develop`)
 
 Enter a development shell for the current project. This command reads `zoi.yaml`, ensures all packages in `pkgs` are installed, and sets up a subshell with `PATH`, `LD_LIBRARY_PATH`, `CPATH`, and `PKG_CONFIG_PATH` pointing to the project's dependencies.
 
-**Arguments:**
-
-* `[run]`: Optional command to run in the dev shell instead of starting an interactive shell.
-
 **Options:**
 
-* `-r`, `--run <COMMAND>`: Alias for the `[run]` argument.
+* `-r`, `--run <COMMAND>`: Run a command in the dev shell instead of starting an interactive shell.
 
 ***
 
@@ -348,6 +344,7 @@ Zoi resolves dependencies, checks for conflicts, and then sequentially downloads
 * `--build` (alias: `-b`): Force building from source even if a pre-compiled archive is available in the registry.
 * `--frozen-lockfile`: Install exactly what is pinned in `zoi.lock` (project scope only, lockfile must already exist, no lockfile updates are allowed, and recorded sub-package/dependency selections are preserved).
 * `--retry <N>`: Retry failed downloads up to `N` attempts (minimum `1`, default `3`).
+* `-v`, `--verbose`: Show additional install details, including package origins and preflight information.
 * `--explain`: Print dependency-selection and install-decision explanation.
 * `--plan-json`: Emit machine-readable install plan JSON.
 * `--dry-run`: Do not actually install, just show what would be done.
@@ -393,7 +390,7 @@ Modify the installation reason of one or more packages.
 **Options:**
 
 * `--as-dependency` (alias: `--asdeps`): Mark packages as dependencies.
-* `--as-explicit` (alias: `--asexplicit`): Mark packages as explicitly installed.
+* `--as-explicit` (alias: `--asexpl`): Mark packages as explicitly installed.
 
 ***
 
@@ -438,7 +435,7 @@ Build, create, and manage Zoi packages.
 **Subcommands:**
 
 * `build <package_file>`: Build a package from a `.pkg.lua` file.
-  * `--type <TYPE>`: (Required) The type of package to build (e.g. 'source', 'pre-compiled').
+  * `--type <TYPE>`: The type of package to build (e.g. `source`, `pre-compiled`). If omitted, Zoi chooses `pre-compiled`, then `source`, then the first listed type.
   * `-p`, `--platform <PLATFORM>`: The platform to build for (default: `current`).
   * `-o`, `--output-dir <DIR>`: Directory to output the built package to.
   * `--sign <KEY>`: Sign the package with the given PGP key.
@@ -449,13 +446,14 @@ Build, create, and manage Zoi packages.
   * `--method <native|docker>`: The build method to use (default: `native`).
   * `--image <IMAGE>`: The Docker image to use for the build (required for `--method docker`).
 * `test <package_file>`: Run tests for a package. This command accepts the same arguments as `build`.
-  * `--type <TYPE>`: (Required) The build type to use for testing.
+  * `--type <TYPE>`: The build type to use for testing. If omitted, Zoi chooses `pre-compiled`, then `source`, then the first listed type.
   * `-p`, `--platform <PLATFORM>`: The platform to test on.
   * `--sub <SUB_PACKAGES...>`: For a split package, test only the specified sub-packages.
   * `--version-override <VERSION>`: Override the package version for testing.
 * `install <package_file>`: Install a package from a local archive.
   * `--scope <user|system>`: The scope to install the package to (default: `user`).
   * `--sub <SUB_PACKAGES...>`: For a split package, install only the specified sub-packages from the archive.
+  * `--yes`: Automatically answer yes to prompts.
 * `doctor <package_file>`: Lint and validate a `.pkg.lua` package definition.
   * `--platform <PLATFORM>`: Validate as a specific platform (defaults to current).
   * `--version-override <VERSION>`: Override package version while validating.
@@ -536,7 +534,7 @@ If multiple installed packages match the same name, Zoi will prompt you to choos
 
 **Options:**
 
-* `--last-transaction`: Rollback the last transaction.
+* `--last-transaction`: Roll back the newest remaining transaction log.
 
 ***
 
@@ -567,6 +565,7 @@ Searches for packages by name or description.
 * `--repo <REPO>`: Filter by repository.
 * `--type <TYPE>`: Filter by package type.
 * `-t`, `--tag <TAGS>`: Filter by tags (comma-separated).
+* `--sort <name|repo|type>`: Sort results by field (default: `name`).
 * `-f`, `--files`: Search for files provided by packages instead of package names.
 * `-i`, `--interactive`: Open results in an interactive TUI.
 
@@ -619,8 +618,6 @@ Shows detailed information about a package.
 If the package is installed more than once across scopes or registries, Zoi will prompt you to choose which installed package status to display.
 
 ***
-
-### `zoi sync`
 
 ### `zoi sync`
 
@@ -757,9 +754,18 @@ Inspect recorded transactions.
 * `show <id>`: Show the ordered operations recorded in a transaction.
 * `files <id>`: List the unique files modified by a transaction.
 
-**Arguments:**
+***
 
-* `<package_name>`: The name of the package to inspect.
+### `zoi system`
+
+Manage declarative system configuration on Arch Linux.
+
+**Subcommands:**
+
+* `apply`: Apply `/etc/zoi/zoi.lua`.
+* `encrypt <phrase>`: Encrypt a phrase for use in `zoi.lua`.
+
+***
 
 ### `zoi doctor`
 

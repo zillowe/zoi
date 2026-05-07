@@ -133,9 +133,11 @@ system_config({
 To avoid storing plaintext passwords in your `/etc/zoi/zoi.lua` file, Zoi provides a built-in encryption mechanism tied to your specific machine.
 
 1. Generate an encrypted string using:
+
    ```sh
    sudo zoi system encrypt "my_secure_password"
    ```
+
 2. Copy the resulting output string into the `password` field of your user configuration.
 3. During `zoi system apply`, Zoi decrypts the string using a securely stored `/etc/zoi/machine_key` and sets the user's password.
 
@@ -147,7 +149,7 @@ Once you have defined your desired state in `/etc/zoi/zoi.lua`, you can apply it
 sudo zoi system apply
 ```
 
-### What `zoi system apply` does:
+### What `zoi system apply` does
 
 1. **Validates Platform:** Ensures you are running on Arch Linux.
 2. **Hostname & Localization:** Updates `/etc/hostname`, `/etc/locale.gen`, and `/etc/localtime`.

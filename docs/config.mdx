@@ -34,6 +34,7 @@ A list of active repository tiers from the default registry that Zoi will search
 
 * **Type:** `list` of `string`
 * **Example:**
+
   ```yaml
   repos:
     - core
@@ -50,6 +51,7 @@ Configures the primary package database (registry) that Zoi syncs with.
   * `handle`: (string) A short, unique name for the registry. Zoi will determine this automatically on the first sync if left empty.
   * `url`: (string) The Git URL of the registry repository.
 * **Example:**
+
   ```yaml
   default_registry:
     handle: zoidberg
@@ -63,6 +65,7 @@ A list of supplementary package registries to sync with, in addition to the `def
 * **Type:** `list` of `object`
 * **Fields:** Same as `default_registry`.
 * **Example:**
+
   ```yaml
   added_registries:
     - handle: my-corp-registry
@@ -75,10 +78,39 @@ A list of raw Git repository URLs that contain Zoi packages. These are cloned in
 
 * **Type:** `list` of `string`
 * **Example:**
+
   ```yaml
   git_repos:
     - https://github.com/user/my-cool-pkgs.git
   ```
+
+### `package_managers`
+
+Restricts the dependency managers Zoi may use when installing non-Zoi dependencies. If unset, Zoi detects available managers.
+
+* **Type:** `list` of `string`
+* **Example:**
+
+  ```yaml
+  package_managers:
+    - native
+    - npm
+    - cargo
+  ```
+
+### `native_package_manager`
+
+Overrides the detected native package manager used by `native:` dependencies.
+
+* **Type:** `string`
+* **Example:** `native_package_manager: pacman`
+
+### `registry`
+
+Legacy shorthand for setting the default registry URL. If `default_registry` is not set, Zoi converts this into `default_registry.url`.
+
+* **Type:** `string`
+* **Example:** `registry: https://github.com/Zillowe/Zoidberg.git`
 
 ### `telemetry_enabled`
 
@@ -144,6 +176,7 @@ A map of binary names to their preferred global versions. This is used by Zoi's 
 
 * **Type:** `object` (map of `string` to `string`)
 * **Example:**
+
   ```yaml
   versions:
     node: "20.11.0"
@@ -156,6 +189,7 @@ A list of additional directories to search for `.pkg.tar.zst` archives during in
 
 * **Type:** `list` of `string`
 * **Example:**
+
   ```yaml
   pkg_dirs:
     - /mnt/usb/packages
@@ -168,6 +202,7 @@ A list of base URLs used as fallbacks for archive downloads and archive metadata
 
 * **Type:** `list` of `string`
 * **Example:**
+
   ```yaml
   cache_mirrors:
     - https://cache1.example.com/zoi
@@ -200,6 +235,7 @@ When a policy field is set to `true`, the corresponding configuration from the s
 * `rollback_enabled_unoverridable`: If `true`, the `rollback_enabled` setting is locked.
 * `protect_db_unoverridable`: If `true`, the `protect_db` setting is locked.
 * `parallel_jobs_unoverridable`: If `true`, the `parallel_jobs` setting is locked.
+* `advisory_enforcement_unoverridable`: If `true`, advisory enforcement policy cannot be overridden by lower-precedence configs.
 * `max_resolution_depth_unoverridable`: If `true`, the `max_resolution_depth` setting is locked.
 * `offline_mode_unoverridable`: If `true`, the `offline_mode` setting is locked.
 * `pkg_dirs_unoverridable`: If `true`, the `pkg_dirs` list is locked.

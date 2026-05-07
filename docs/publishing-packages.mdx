@@ -120,11 +120,13 @@ For advanced use cases, such as creating a corporate mirror or a completely sepa
 
 1. Create a new git repository.
 2. Create a `repo.yaml` file in the root of your repository to define its properties. See the [Repositories guide](/docs/zds/zoi/repositories#the-repoyaml-file) for details on the available fields. A minimal example would be:
+
    ```yaml
    name: My Custom Registry
    description: A collection of my personal packages.
    repo-git: https://github.com/YourOrg/my-zoi-registry.git
    ```
+
 3. Structure the rest of your repository like the official Zoidberg database, with directories for tiers like `core`, `main`, `community`, etc.
 
    ```
@@ -160,7 +162,7 @@ Create a `.pkg.lua` file for your extension:
 
 ```lua
 -- my-registry-ext.pkg.lua
-package({
+metadata({
   name = "my-registry-ext",
   repo = "community",
   type = "extension",

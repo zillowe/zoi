@@ -182,9 +182,10 @@ Here are the fields available in `repo.yaml`:
 | ------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `name`        | `string`            | The name of the repository. This is used as the handle for the registry.                                                                                             |
 | `description` | `string`            | A short description of the repository.                                                                                                                               |
-| `authorities` | `list` of `string`  | (Optional) A list of PGP fingerprints or key names trusted to sign the registry's Git commits. See [Registry Verification](#registry-verification).                  |
+| `advisory_prefix` | `string`        | (Optional) Prefix used for advisory identifiers imported from this registry.                                                                                         |
 | `git`         | `list` of `GitLink` | A list of git repository URLs. The `type` can be `main` for the primary repository or `mirror` for fallbacks.                                                        |
 | `pkg`         | `list` of `PkgLink` | (Optional) A list of URLs for pre-built package registries. Zoi will try to download pre-built packages from here before building from source.                       |
+| `db`          | `string`            | (Optional) URL for registry database metadata.                                                                                                                       |
 | `pgp`         | `list` of `PgpKey`  | (Optional) A list of PGP keys to import for package signature verification. The `key` can be a URL to the key file or a PGP fingerprint.                             |
 | `repos`       | `list` of `Repo`    | A list of the sub-repositories (or tiers) contained within the registry. `type` can be `official`, `community`, etc. `active` determines if it's enabled by default. |
 
