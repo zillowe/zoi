@@ -141,6 +141,28 @@ Getting started with Zoi is simple. Just follow these three steps:
    zoi install @zillowe/hello
    ```
 
+### Zoi Mini
+
+Zoi Mini is a lightweight, zero-sync version of Zoi that allows you to install packages from the official Zoidberg registry without installing the full Zoi suite. It's designed for quick, one-off installations.
+
+#### Quick Start (Zero-Install)
+
+You can install any package from the Zoidberg registry using a single command:
+
+**Linux / macOS :**
+
+```sh
+curl -fsSL https://zillowe.pages.dev/zm.sh | sh -s -- @zillowe/hello
+```
+
+**Windows (amd64):**
+
+```powershell
+powershell -c "irm zillowe.pages.dev/zm.ps1 | iex" -args "@zillowe/hello"
+```
+
+This will download the `zoi-mini` binary to a temporary location, resolve the package metadata dynamically, and perform the installation.
+
 ## 📦 Installation
 
 You can install Zoi using a package manager, an installer script, or by building it from source.
