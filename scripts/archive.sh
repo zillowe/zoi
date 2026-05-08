@@ -72,8 +72,15 @@ echo -e "${CYAN}📦 Starting archival process...${NC}"
 
 for binary_path in "$COMPILED_DIR"/*; do
     filename=$(basename "$binary_path")
-    final_binary_name="zoi"
-    [[ "$filename" == *".exe" ]] && final_binary_name="zoi.exe"
+    
+    if [[ "$filename" == "zoi-mini"* ]]; then
+        binary_base="zoi-mini"
+    else
+        binary_base="zoi"
+    fi
+
+    final_binary_name="$binary_base"
+    [[ "$filename" == *".exe" ]] && final_binary_name="${binary_base}.exe"
 
     TMP_ARCHIVE_DIR=$(mktemp -d)
     cp "$binary_path" "${TMP_ARCHIVE_DIR}/${final_binary_name}"

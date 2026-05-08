@@ -33,6 +33,10 @@ path = "src/lib.rs"
 name = "zoi"
 path = "src/main.rs"
 
+[[bin]]
+name = "zoi-mini"
+path = "src/bin/zoi-mini.rs"
+
 [lints.clippy]
 too_many_arguments = "allow"
 type_complexity = "allow"

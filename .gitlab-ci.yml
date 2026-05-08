@@ -140,7 +140,7 @@ build:linux:
       libssl-dev:arm64 openssl libssl-dev:armhf gcc-mingw-w64-x86-64
       g++-mingw-w64-x86-64 liblzma-dev:arm64
   script:
-    - echo "Building Linux (amd64, arm64) and Windows (amd64) targets..."
+    - echo "Building Zoi and Zoi Mini for Linux (amd64, arm64) and Windows (amd64) targets..."
     - chmod +x ./scripts/build-linux.sh
     - ./scripts/build-linux.sh
   artifacts:
@@ -159,7 +159,7 @@ build:macos:
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
     - source ~/.cargo/env
   script:
-    - echo "Building macOS targets (amd64, arm64)..."
+    - echo "Building Zoi and Zoi Mini for macOS targets (amd64, arm64)..."
     - chmod +x ./scripts/build-macos.sh
     - ./scripts/build-macos.sh
   artifacts:

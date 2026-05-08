@@ -2,15 +2,23 @@
 
 PREFIX="/usr/local"
 SHELL_NAME=""
+WITH_BIN="both"
 
 for arg in "$@"; do
   case $arg in
     --prefix=*)
       PREFIX=$(echo "$arg" | sed 's/--prefix=//')
       ;;
+    --with-bin=*)
+      WITH_BIN=$(echo "$arg" | sed 's/--with-bin=//')
+      if [ "$WITH_BIN" != "zoi" ] && [ "$WITH_BIN" != "zoi-mini" ] && [ "$WITH_BIN" != "both" ]; then
+        echo "Error: --with-bin must be 'zoi', 'zoi-mini', or 'both'."
+        exit 1
+      fi
+      ;;
     *)
       echo "Unknown option: $arg"
-      echo "Usage: ./configure [--prefix=/path/to/install]"
+      echo "Usage: ./configure [--prefix=/path/to/install] [--with-bin=zoi|zoi-mini|both]"
       exit 1
       ;;
   esac
@@ -58,6 +66,9 @@ BINDIR = \$(PREFIX)/bin
 OS_NAME = $OS_NAME
 ARCH_NAME = $ARCH_NAME
 SHELL_NAME = $SHELL_NAME
+
+# Binaries to build
+WITH_BIN = $WITH_BIN
 EOF
 
 echo "Zoi configured successfully:"

@@ -27,25 +27,27 @@ mkdir -p "$OUTPUT_DIR"
 
 for target in "${TARGETS[@]}"; do
   case "$target" in
-    x86_64-apple-darwin)  NAME="zoi-macos-amd64" ;;
-    aarch64-apple-darwin) NAME="zoi-macos-arm64" ;;
-    *)                    NAME="zoi-$target" ;; 
+    x86_64-apple-darwin)  NAME="zoi-macos-amd64"; MINI_NAME="zoi-mini-macos-amd64" ;;
+    aarch64-apple-darwin) NAME="zoi-macos-arm64"; MINI_NAME="zoi-mini-macos-arm64" ;;
+    *)                    NAME="zoi-$target"; MINI_NAME="zoi-mini-$target" ;; 
   esac
   
   echo -e "${CYAN}🔧 Natively building for ${target}...${NC}"
 
   rustup target add "$target"
 
-  if ! ZOI_COMMIT_HASH="$COMMIT" cargo build --bin zoi --target "$target" --release; then
+  if ! ZOI_COMMIT_HASH="$COMMIT" cargo build --bins --target "$target" --release; then
     echo -e "${RED}❌ Build failed for ${target}${NC}"
     exit 1
   fi
   
   SRC_BINARY="target/${target}/release/zoi"
+  MINI_SRC_BINARY="target/${target}/release/zoi-mini"
   
   install -m 755 "$SRC_BINARY" "$OUTPUT_DIR/$NAME"
+  install -m 755 "$MINI_SRC_BINARY" "$OUTPUT_DIR/$MINI_NAME"
   
-  echo -e "${GREEN}✅ Successfully built ${NAME}${NC}\n"
+  echo -e "${GREEN}✅ Successfully built ${NAME} and ${MINI_NAME}${NC}\n"
 done
 
 echo -e "\n${GREEN}🎉 All macOS builds completed successfully!${NC}"

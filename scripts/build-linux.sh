@@ -27,10 +27,10 @@ mkdir -p "$OUTPUT_DIR"
 
 for target in "${TARGETS[@]}"; do
   case "$target" in
-    x86_64-unknown-linux-gnu)  NAME="zoi-linux-amd64" ;;
-    aarch64-unknown-linux-gnu) NAME="zoi-linux-arm64" ;;
-    x86_64-pc-windows-gnu)     NAME="zoi-windows-amd64.exe" ;;
-    *)                         NAME="zoi-$target" ;;
+    x86_64-unknown-linux-gnu)  NAME="zoi-linux-amd64"; MINI_NAME="zoi-mini-linux-amd64" ;;
+    aarch64-unknown-linux-gnu) NAME="zoi-linux-arm64"; MINI_NAME="zoi-mini-linux-arm64" ;;
+    x86_64-pc-windows-gnu)     NAME="zoi-windows-amd64.exe"; MINI_NAME="zoi-mini-windows-amd64.exe" ;;
+    *)                         NAME="zoi-$target"; MINI_NAME="zoi-mini-$target" ;;
   esac
   
   echo -e "${CYAN}🔧 Building for ${target}...${NC}"
@@ -46,19 +46,22 @@ for target in "${TARGETS[@]}"; do
       LINKER_ENV="CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc"
     fi
 
-    if ! env $LINKER_ENV $OPENSSL_ENV ZOI_COMMIT_HASH="$COMMIT" cargo build --bin zoi --target "$target" --release; then
+    if ! env $LINKER_ENV $OPENSSL_ENV ZOI_COMMIT_HASH="$COMMIT" cargo build --bins --target "$target" --release; then
       echo -e "${RED}❌ Build failed for ${target}${NC}"
       exit 1
     fi
   
   SRC_BINARY="target/${target}/release/zoi"
+  MINI_SRC_BINARY="target/${target}/release/zoi-mini"
   if [[ "$target" == *"-windows-"* ]]; then
       SRC_BINARY+=".exe"
+      MINI_SRC_BINARY+=".exe"
   fi
   
   install -m 755 "$SRC_BINARY" "$OUTPUT_DIR/$NAME"
+  install -m 755 "$MINI_SRC_BINARY" "$OUTPUT_DIR/$MINI_NAME"
   
-  echo -e "${GREEN}✅ Successfully built ${NAME}${NC}\n"
+  echo -e "${GREEN}✅ Successfully built ${NAME} and ${MINI_NAME}${NC}\n"
 done
 
 echo -e "\n${GREEN}🎉 All Linux and Windows builds completed successfully!${NC}"
