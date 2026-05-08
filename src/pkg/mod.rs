@@ -15,6 +15,7 @@ pub mod install;
 pub mod local;
 pub mod lock;
 pub mod lua;
+pub mod mini_resolve;
 pub mod offline;
 pub mod package;
 pub mod pgp;

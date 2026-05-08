@@ -56,6 +56,7 @@ pub struct ZoiDependencyProvider {
     pub quiet: bool,
     pub yes: bool,
     pub all_optional: bool,
+    pub mini_index: Option<crate::pkg::mini_resolve::MiniRegistryIndex>,
     pub deps_cache:
         RefCell<FxHashMap<(PkgName, SemVersion), FxHashMap<PkgName, Ranges<SemVersion>>>>,
     pub chosen_cache:
@@ -153,12 +154,19 @@ impl ZoiDependencyProvider {
         yes: bool,
         all_optional: bool,
     ) -> Result<Self, anyhow::Error> {
+        let mini_index = if crate::utils::is_mini_mode() {
+            Some(crate::pkg::mini_resolve::fetch_registry_index()?)
+        } else {
+            None
+        };
+
         Ok(Self {
             root_deps,
             initial_sources,
             quiet,
             yes,
             all_optional,
+            mini_index,
             deps_cache: RefCell::new(FxHashMap::default()),
             chosen_cache: RefCell::new(FxHashMap::default()),
         })
@@ -202,6 +210,13 @@ impl ZoiDependencyProvider {
 
     pub fn get_versions(&self, package: &PkgName) -> Result<Vec<SemVersion>, ZoiSolverError> {
         let mut all_versions = Vec::new();
+
+        if let Some(index) = &self.mini_index
+            && let Some(pkg_info) = index.packages.get(&package.name)
+            && let Ok(v) = Version::parse(pkg_info.version.trim_start_matches('v'))
+        {
+            all_versions.push(SemVersion(v));
+        }
 
         if let Ok(version_strings) =
             db::get_all_versions(&package.registry, &package.name, &package.repo)

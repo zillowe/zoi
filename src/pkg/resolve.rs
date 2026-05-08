@@ -1215,6 +1215,25 @@ fn resolve_source_recursive(
             sharable_manifest: None,
             git_sha: None,
         }
+    } else if crate::utils::is_mini_mode() {
+        let index = crate::pkg::mini_resolve::fetch_registry_index()?;
+        let pkg_index = index.packages.get(&request.name).ok_or_else(|| {
+            anyhow!(
+                "Package '{}' not found in Zoidberg registry index",
+                request.name
+            )
+        })?;
+        let lua_url = crate::pkg::mini_resolve::get_package_lua_url(&pkg_index.repo, &request.name);
+        let mut resolved = download_from_url(&lua_url)?;
+        resolved.repo_name = Some(pkg_index.repo.clone());
+        resolved.registry_handle = Some("zoidberg".to_string());
+
+        resolved.source_type = if pkg_index.repo_type == "official" {
+            SourceType::OfficialRepo
+        } else {
+            SourceType::UntrustedRepo(pkg_index.repo.clone())
+        };
+        resolved
     } else {
         find_package_in_db(&request, quiet)?
     };

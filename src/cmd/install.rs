@@ -285,6 +285,10 @@ pub fn run(
     direct_packages.sort_by(|a, b| a.pkg.name.cmp(&b.pkg.name));
     dependencies.sort_by(|a, b| a.pkg.name.cmp(&b.pkg.name));
 
+    for node in graph.nodes.values() {
+        crate::utils::print_repo_warning(&node.pkg.repo);
+    }
+
     println!("{} Looking for conflicts...", "::".bold().blue());
     let packages_to_install: Vec<&types::Package> = graph.nodes.values().map(|n| &n.pkg).collect();
 

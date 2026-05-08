@@ -235,6 +235,10 @@ pub fn command_exists(command: &str) -> bool {
     }
 }
 
+pub fn is_mini_mode() -> bool {
+    std::env::var("ZOI_MINI_MODE").is_ok_and(|v| v == "1")
+}
+
 pub fn ask_for_confirmation(prompt: &str, yes: bool) -> bool {
     if yes {
         return true;
@@ -597,6 +601,33 @@ pub fn get_native_package_manager() -> Option<String> {
 }
 
 pub fn print_repo_warning(repo_name: &str) {
+    if is_mini_mode() {
+        if let Ok(index) = crate::pkg::mini_resolve::fetch_registry_index()
+            && let Some(pkg_info) = index.packages.values().find(|p| p.repo == repo_name)
+        {
+            let warning_message = match pkg_info.repo_type.as_str() {
+                "unofficial" => {
+                    Some("This package is from an unofficial repository and is not trusted.")
+                }
+                "community" => {
+                    Some("This package is from a community repository. Use with caution.")
+                }
+                "test" => Some(
+                    "This package is from a testing repository and may not function correctly.",
+                ),
+                "archive" => {
+                    Some("This package is from an archive repository and is no longer maintained.")
+                }
+                _ => None,
+            };
+
+            if let Some(message) = warning_message {
+                println!("\n{}: {}", "NOTE".yellow().bold(), message.yellow());
+            }
+        }
+        return;
+    }
+
     if let Ok(db_path) = crate::pkg::resolve::get_db_root()
         && let Ok(repo_config) = crate::pkg::config::read_repo_config(&db_path)
     {
