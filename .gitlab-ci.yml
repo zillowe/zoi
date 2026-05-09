@@ -5,6 +5,7 @@ include:
 
 variables:
   DS_ENFORCE_NEW_ANALYZER: "true"
+  CARGO_INCREMENTAL: "0"
 
 stages:
   - test
@@ -12,18 +13,6 @@ stages:
   - package
   - release
   - release-package
-
-.cargo_cache:
-  variables:
-    CARGO_HOME: $CI_PROJECT_DIR/.cargo
-  cache:
-    key:
-      files:
-        - Cargo.lock
-      prefix: $CI_COMMIT_REF_SLUG
-    paths:
-      - .cargo/
-      - target/
 
 .rust_setup:
   image: rust:latest
@@ -33,14 +22,11 @@ stages:
 format:
   stage: test
   extends:
-    - .cargo_cache
     - .rust_setup
   before_script:
     - rustup component add rustfmt
   script:
     - cargo fmt -- --check
-  cache:
-    policy: pull
   rules:
     - if: $CI_COMMIT_TAG
       when: never
@@ -66,7 +52,6 @@ format:
 lint:
   stage: test
   extends:
-    - .cargo_cache
     - .rust_setup
   variables:
     RUSTFLAGS: "-Dwarnings"
@@ -99,7 +84,6 @@ lint:
 test:
   stage: test
   extends:
-    - .cargo_cache
     - .rust_setup
   variables:
     RUSTFLAGS: "-Dwarnings"
@@ -140,7 +124,8 @@ build:linux:
       libssl-dev:arm64 openssl libssl-dev:armhf gcc-mingw-w64-x86-64
       g++-mingw-w64-x86-64 liblzma-dev:arm64
   script:
-    - echo "Building Zoi and Zoi Mini for Linux (amd64, arm64) and Windows (amd64) targets..."
+    - echo "Building Zoi and Zoi Mini for Linux (amd64, arm64) and Windows
+      (amd64) targets..."
     - chmod +x ./scripts/build-linux.sh
     - ./scripts/build-linux.sh
   artifacts:
