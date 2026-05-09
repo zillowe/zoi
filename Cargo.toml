@@ -43,7 +43,7 @@ strip = true
 lto = "fat"
 codegen-units = 1
 panic = "abort"
-opt-level = "z"
+opt-level = 3
 
 [profile.release.package."*"]
 opt-level = "z"
