@@ -194,6 +194,7 @@ generate_notes:
   artifacts:
     paths:
       - notes.md
+    expire_in: 3 days
   rules:
     - if: $CI_COMMIT_TAG
 
