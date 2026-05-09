@@ -1,6 +1,6 @@
 [package]
 name = "zoi-rs"
-version = "1.12.1"
+version = "1.13.0"
 edition = "2024"
 rust-version = "1.88.0"
 description = "Universal Package Manager & Environment Setup Tool"
@@ -12,6 +12,7 @@ keywords = ["cli", "package-manager", "dev-tools", "universal", "environment"]
 categories = ["command-line-utilities", "development-tools"]
 readme = "README.md"
 build = "build.rs"
+default-run = "zoi"
 exclude = [
   "packages/*",
   ".github",
@@ -42,12 +43,9 @@ strip = true
 lto = "fat"
 codegen-units = 1
 panic = "abort"
-opt-level = 3
-
-[profile.release.package."*"]
 opt-level = "z"
 
-[profile.release.bin.zoi-mini]
+[profile.release.package."*"]
 opt-level = "z"
 
 [lints.clippy]

@@ -56,6 +56,8 @@
 - [Features](#-features)
 - [Special Thanks](#-special-thanks)
 - [Getting Started](#-getting-started)
+  - [Zoi Mini](#zoi-mini)
+    - [Quick Start (Zero-Install)](#quick-start-zero-install)
 - [Installation](#-installation)
   - [Package Managers](#package-managers)
     - [Scripts](#-scripts)
