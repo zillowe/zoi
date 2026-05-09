@@ -594,8 +594,6 @@ pub fn get_native_package_manager() -> Option<String> {
                 None
             }
         }
-        "freebsd" => Some("pkg".to_string()),
-        "openbsd" => Some("pkg_add".to_string()),
         _ => None,
     }
 }
@@ -917,8 +915,6 @@ pub fn get_platform() -> anyhow::Result<String> {
         "linux" => "linux",
         "macos" | "darwin" => "macos",
         "windows" => "windows",
-        "freebsd" => "freebsd",
-        "openbsd" => "openbsd",
         unsupported_os => return Err(anyhow!("Unsupported operating system: {}", unsupported_os)),
     };
 

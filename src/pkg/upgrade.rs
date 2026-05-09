@@ -129,8 +129,6 @@ fn get_platform_info() -> Result<(&'static str, &'static str)> {
         "linux" => "linux",
         "macos" | "darwin" => "macos",
         "windows" => "windows",
-        // "freebsd" => "freebsd",
-        // "openbsd" => "openbsd",
         _ => return Err(anyhow!("Unsupported OS: {}", env::consts::OS)),
     };
     let arch = match env::consts::ARCH {

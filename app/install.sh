@@ -47,8 +47,6 @@ arch=""
 case "$(uname -s)" in
     Linux*)  os="linux" ;;
     Darwin*) os="macos" ;;
-    # FreeBSD*) os="freebsd" ;;
-    # OpenBSD*) os="openbsd" ;;
     *)       error "Unsupported OS: $(uname -s)" ;;
 esac
 case "$(uname -m)" in
