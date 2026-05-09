@@ -28,7 +28,7 @@ struct MiniCli {
 enum MiniCommands {
     /// Installs a package from Zoidberg registry
     Install {
-        /// Package identifier (e.g. hello, @core/hello)
+        /// Package identifier (e.g. hello, @zillowe/hello)
         package: String,
     },
     /// Updates an existing installed package

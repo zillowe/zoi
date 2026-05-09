@@ -37,6 +37,19 @@ path = "src/main.rs"
 name = "zoi-mini"
 path = "src/bin/zoi-mini.rs"
 
+[profile.release]
+strip = true
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+opt-level = 3
+
+[profile.release.package."*"]
+opt-level = "z"
+
+[profile.release.bin.zoi-mini]
+opt-level = "z"
+
 [lints.clippy]
 too_many_arguments = "allow"
 type_complexity = "allow"

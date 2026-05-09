@@ -22,8 +22,6 @@ RUN echo "ZOI_AUTHORITIES_KEY_2=${ZOI_AUTHORITIES_KEY_2}" >> .env
 
 COPY Cargo.toml Cargo.lock ./
 
-COPY .cargo ./.cargo
-
 COPY build.rs ./
 
 COPY src ./src
