@@ -30,10 +30,14 @@ Zoi can be built in several ways, depending on the packaging requirements.
 The standard Rust build process. The release profile is optimized for size and performance (see `Cargo.toml`).
 
 ```sh
-cargo build --release
+# Build zoi in release mode
+cargo build --bin zoi --release
+
+# Build zoi-mini in release mode
+cargo build --bin zoi-mini --release
 ```
 
-This produces the `zoi` binary in `target/release/`.
+This produces the `zoi` and `zoi-mini` binaries in `target/release/`.
 
 ### Using the Makefile
 
@@ -41,9 +45,10 @@ The provided `Makefile` simplifies the build and installation process.
 
 ```sh
 # Configure installation paths (creates config.mk)
-./configure
+# You can also specify which binaries to build: --with-bin=zoi|zoi-mini|both (default: both)
+./configure --prefix=/usr/local --with-bin=both
 
-# Build the release binary
+# Build the release binaries
 make build
 
 # Install to configured location

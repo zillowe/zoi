@@ -37,9 +37,12 @@ This is the standard way to build Rust projects. The build process can be influe
 ```sh
 # Build zoi in release mode
 cargo build --bin zoi --release
+
+# Build zoi-mini in release mode
+cargo build --bin zoi-mini --release
 ```
 
-This will produce the `zoi` binary in `target/release/`.
+This will produce the `zoi` and `zoi-mini` binaries in `target/release/`.
 
 ### Using the Makefile
 
@@ -47,12 +50,13 @@ The project provides a `Makefile` for convenience, which simplifies building and
 
 ```sh
 # Configure build paths (creates config.mk)
-./configure
+# You can also specify which binaries to build: --with-bin=zoi|zoi-mini|both (default: both)
+./configure --prefix=/usr/local --with-bin=both
 
-# Build zoi in release mode
+# Build zoi and zoi-mini in release mode
 make build
 
-# Install the binary to the configured location
+# Install the binaries to the configured location
 sudo make install
 ```
 
@@ -119,8 +123,8 @@ On startup, Zoi automatically imports these embedded keys into the user's local 
 
 Similar to PGP keys, Zoi can embed global transaction hooks directly into the binary. These hooks are YAML files that define system-wide maintenance tasks triggered by file modifications.
 
-1.  Place your hook definition files (`.hook.yaml`) in the `src/pkg/hooks/builtin/` directory.
-2.  Build Zoi as usual.
+1. Place your hook definition files (`.hook.yaml`) in the `src/pkg/hooks/builtin/` directory.
+2. Build Zoi as usual.
 
 The build system will automatically embed these hooks. They are loaded on every transaction and can be overridden by users in `~/.zoi/hooks/` if they use the same name.
 
@@ -143,12 +147,14 @@ Zoi provides commands to generate shell completions and man pages. These should 
 
 - **Man Pages:**
   The man pages can be generated using the `generate-manual` command. This will create a `manuals/` directory containing man pages for `zoi` and all of its subcommands.
+
   ```sh
   ./target/release/zoi generate-manual
   # This creates a `manuals/` directory with `zoi.1`, `zoi-install.1`, etc.
   OUT_DIR=dist/man/ ./target/release/zoi generate-manual
   # This creates `zoi.1`, `zoi-install.1`, etc. in `dist/man/`
   ```
+
   These files should be installed to the appropriate man page directory (e.g. `/usr/share/man/man1`).
 
 ## Existing Packaging Files
