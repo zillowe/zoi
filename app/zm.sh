@@ -23,14 +23,14 @@ PUBLIC_KEY_URL="https://zillowe.pages.dev/keys/zillowe-main.asc"
 os=""
 arch=""
 case "$(uname -s)" in
-    Linux*)  os="linux" ;;
-    Darwin*) os="macos" ;;
-    *)       error "Unsupported OS: $(uname -s)" ;;
+Linux*) os="linux" ;;
+Darwin*) os="macos" ;;
+*) error "Unsupported OS: $(uname -s)" ;;
 esac
 case "$(uname -m)" in
-    x86_64|amd64) arch="amd64" ;;
-    arm64|aarch64) arch="arm64" ;;
-    *)          error "Unsupported Arch: $(uname -m)" ;;
+x86_64 | amd64) arch="amd64" ;;
+arm64 | aarch64) arch="arm64" ;;
+*) error "Unsupported Arch: $(uname -m)" ;;
 esac
 
 info "Fetching the latest release tag from GitLab API..."
@@ -108,10 +108,10 @@ chmod +x "$TEMP_BIN"
 cmd="install"
 if [ $# -gt 0 ]; then
     case "$1" in
-        install|i|update|up|uninstall|un|list|ls)
-            cmd="$1"
-            shift
-            ;;
+    install | i | update | up | uninstall | un | list | ls)
+        cmd="$1"
+        shift
+        ;;
     esac
 fi
 

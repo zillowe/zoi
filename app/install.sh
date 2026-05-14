@@ -45,14 +45,14 @@ info "Latest tag found: ${LATEST_TAG}"
 os=""
 arch=""
 case "$(uname -s)" in
-    Linux*)  os="linux" ;;
-    Darwin*) os="macos" ;;
-    *)       error "Unsupported OS: $(uname -s)" ;;
+Linux*) os="linux" ;;
+Darwin*) os="macos" ;;
+*) error "Unsupported OS: $(uname -s)" ;;
 esac
 case "$(uname -m)" in
-    x86_64|amd64) arch="amd64" ;;
-    arm64|aarch64) arch="arm64" ;;
-    *)          error "Unsupported Arch: $(uname -m)" ;;
+x86_64 | amd64) arch="amd64" ;;
+arm64 | aarch64) arch="arm64" ;;
+*) error "Unsupported Arch: $(uname -m)" ;;
 esac
 
 INSTALL_DIR="${HOME}/.local/bin"
@@ -138,7 +138,6 @@ else
     error "GPG signature verification failed! The downloaded file may be corrupt or tampered with."
 fi
 
-
 if [ -f "$INSTALL_PATH" ]; then
     info "Removing existing binary at ${INSTALL_PATH}..."
     rm "$INSTALL_PATH" || warn "Failed to remove existing binary, proceeding with caution."
@@ -171,25 +170,25 @@ if command -v bash >/dev/null 2>&1; then
     info "  -> Bash"
     BASH_COMPLETION_DIR="${HOME}/.local/share/bash-completion/completions"
     mkdir -p "$BASH_COMPLETION_DIR"
-    "$INSTALL_PATH" generate-completions bash > "${BASH_COMPLETION_DIR}/zoi"
+    "$INSTALL_PATH" generate-completions bash >"${BASH_COMPLETION_DIR}/zoi"
 fi
 if command -v zsh >/dev/null 2>&1; then
     info "  -> Zsh"
     ZSH_COMPLETION_DIR="${ZDOTDIR:-$HOME}/.zsh/completions"
     mkdir -p "$ZSH_COMPLETION_DIR"
-    "$INSTALL_PATH" generate-completions zsh > "${ZSH_COMPLETION_DIR}/_zoi"
+    "$INSTALL_PATH" generate-completions zsh >"${ZSH_COMPLETION_DIR}/_zoi"
 fi
 if command -v fish >/dev/null 2>&1; then
     info "  -> Fish"
     FISH_COMPLETION_DIR="${HOME}/.config/fish/completions"
     mkdir -p "$FISH_COMPLETION_DIR"
-    "$INSTALL_PATH" generate-completions fish > "${FISH_COMPLETION_DIR}/zoi.fish"
+    "$INSTALL_PATH" generate-completions fish >"${FISH_COMPLETION_DIR}/zoi.fish"
 fi
 if command -v elvish >/dev/null 2>&1; then
     info "  -> Elvish"
     ELVISH_COMPLETION_DIR="${HOME}/.config/elvish/completions"
     mkdir -p "$ELVISH_COMPLETION_DIR"
-    "$INSTALL_PATH" generate-completions elvish > "${ELVISH_COMPLETION_DIR}/zoi.elv"
+    "$INSTALL_PATH" generate-completions elvish >"${ELVISH_COMPLETION_DIR}/zoi.elv"
 fi
 info "Completion scripts installed for detected shells."
 warn "You may need to restart your shell for them to take effect."
@@ -210,19 +209,19 @@ if [[ ":$PATH:" != *":${INSTALL_DIR}:"* ]]; then
         if [ -f "$HOME/.bash_profile" ]; then
             PROFILE_FILE="$HOME/.bash_profile"
         elif [ -f "$HOME/.zprofile" ]; then
-             PROFILE_FILE="$HOME/.zprofile"
+            PROFILE_FILE="$HOME/.zprofile"
         fi
     fi
 
     if [ -n "$PROFILE_FILE" ] && [ -f "$PROFILE_FILE" ]; then
         info "Detected profile file: $PROFILE_FILE"
-        EXPORT_LINE="export PATH=\"\$PATH:${INSTALL_DIR}\"" 
+        EXPORT_LINE="export PATH=\"\$PATH:${INSTALL_DIR}\""
         if ! grep -qF -- "$EXPORT_LINE" "$PROFILE_FILE"; then
             info "Adding PATH update to $PROFILE_FILE..."
-            [[ $(tail -c1 "$PROFILE_FILE") ]] && echo "" >> "$PROFILE_FILE"
-            echo "" >> "$PROFILE_FILE" 
-            echo "$COMMENT_LINE" >> "$PROFILE_FILE"
-            echo "$EXPORT_LINE" >> "$PROFILE_FILE"
+            [[ $(tail -c1 "$PROFILE_FILE") ]] && echo "" >>"$PROFILE_FILE"
+            echo "" >>"$PROFILE_FILE"
+            echo "$COMMENT_LINE" >>"$PROFILE_FILE"
+            echo "$EXPORT_LINE" >>"$PROFILE_FILE"
             info "Successfully updated profile. Please run 'source ${PROFILE_FILE}' or restart your shell."
         else
             info "PATH update line already exists in ${PROFILE_FILE}."

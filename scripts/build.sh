@@ -5,7 +5,7 @@ set -e
 CYAN='\033[0;36m'
 GREEN='\033[0;32m'
 RED='\033[0;31m'
-NC='\033[0m' 
+NC='\033[0m'
 
 OUTPUT_DIR="./scripts/compiled"
 BINARY_NAME="zoi"

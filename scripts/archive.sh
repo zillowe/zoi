@@ -16,8 +16,7 @@ GITLAB_PROJECT_PATH="Zillowe/Zillwen/Zusty/Zoi"
 PUBLIC_KEY_URL="https://zillowe.pages.dev/keys/zillowe-main.asc"
 
 function check_command() {
-    if ! command -v "$1" &> /dev/null;
- then
+    if ! command -v "$1" &>/dev/null; then
         echo -e "${RED}Error: '$1' command is not found.${NC}"
         echo -e "${YELLOW}Please install it and ensure it's in your PATH.${NC}"
         exit 1
@@ -52,7 +51,7 @@ echo -e "${CYAN}Fetching the latest release tag from GitLab API...${NC}"
 if [ -n "${CI_PROJECT_ID:-}" ]; then
     PROJECT_IDENTIFIER="$CI_PROJECT_ID"
 else
-    PROJECT_IDENTIFIER="${GITLAB_PROJECT_PATH//\/\%2F}"
+    PROJECT_IDENTIFIER="${GITLAB_PROJECT_PATH//\/\%2F/}"
 fi
 
 LATEST_TAG=""
@@ -72,7 +71,7 @@ echo -e "${CYAN}📦 Starting archival process...${NC}"
 
 for binary_path in "$COMPILED_DIR"/*; do
     filename=$(basename "$binary_path")
-    
+
     if [[ "$filename" == "zoi-mini"* ]]; then
         binary_base="zoi-mini"
     else
@@ -88,7 +87,7 @@ for binary_path in "$COMPILED_DIR"/*; do
     archive_basename=${filename%.exe}
 
     echo -e "${CYAN}  -> Archiving ${filename}...${NC}"
-    
+
     if [[ "$filename" == *"windows"* ]]; then
         (cd "$TMP_ARCHIVE_DIR" && 7z a -tzip -mx=9 "${archive_basename}.zip" "$final_binary_name" >/dev/null)
         mv "${TMP_ARCHIVE_DIR}/${archive_basename}.zip" "${ARCHIVE_DIR}/"
@@ -105,16 +104,16 @@ done
 
 echo -e "${CYAN}🔐 Generating sha512 checksums...${NC}"
 (
-  cd "$ARCHIVE_DIR" || exit 1
-  find . -maxdepth 1 -type f -not -name "checksums.txt" -not -name "*.asc" -exec sha512sum {} +
-) > "$CHECKSUM_FILE"
+    cd "$ARCHIVE_DIR" || exit 1
+    find . -maxdepth 1 -type f -not -name "checksums.txt" -not -name "*.asc" -exec sha512sum {} +
+) >"$CHECKSUM_FILE"
 
 if [ -n "${CI_COMMIT_TAG:-}" ]; then
     echo -e "${CYAN}🔐 Generating checksum for source archive ${CI_COMMIT_TAG}...${NC}"
     SOURCE_ARCHIVE_URL="https://gitlab.com/${GITLAB_PROJECT_PATH}/-/archive/${CI_COMMIT_TAG}/Zoi-${CI_COMMIT_TAG}.tar.gz"
     SOURCE_ARCHIVE_FILE=$(mktemp)
     if curl --fail -sL -o "$SOURCE_ARCHIVE_FILE" "$SOURCE_ARCHIVE_URL"; then
-        sha512sum "$SOURCE_ARCHIVE_FILE" | sed "s|$(basename "$SOURCE_ARCHIVE_FILE")|Zoi-${CI_COMMIT_TAG}.tar.gz|" >> "$CHECKSUM_FILE"
+        sha512sum "$SOURCE_ARCHIVE_FILE" | sed "s|$(basename "$SOURCE_ARCHIVE_FILE")|Zoi-${CI_COMMIT_TAG}.tar.gz|" >>"$CHECKSUM_FILE"
     else
         echo -e "${YELLOW}Could not download source archive. Skipping its checksum.${NC}"
     fi
@@ -123,16 +122,16 @@ fi
 
 echo -e "${CYAN}🔐 Generating sha256 checksums...${NC}"
 (
-  cd "$ARCHIVE_DIR" || exit 1
-  find . -maxdepth 1 -type f -not -name "checksums-sha256.txt" -not -name "*.asc" -exec sha256sum {} +
-) > "$CHECKSUM_SHA256_FILE"
+    cd "$ARCHIVE_DIR" || exit 1
+    find . -maxdepth 1 -type f -not -name "checksums-sha256.txt" -not -name "*.asc" -exec sha256sum {} +
+) >"$CHECKSUM_SHA256_FILE"
 
 if [ -n "${CI_COMMIT_TAG:-}" ]; then
     echo -e "${CYAN}🔐 Generating sha256 checksum for source archive ${CI_COMMIT_TAG}...${NC}"
     SOURCE_ARCHIVE_URL="https://gitlab.com/${GITLAB_PROJECT_PATH}/-/archive/${CI_COMMIT_TAG}/Zoi-${CI_COMMIT_TAG}.tar.gz"
     SOURCE_ARCHIVE_FILE=$(mktemp)
     if curl --fail -sL -o "$SOURCE_ARCHIVE_FILE" "$SOURCE_ARCHIVE_URL"; then
-        sha256sum "$SOURCE_ARCHIVE_FILE" | sed "s|$(basename "$SOURCE_ARCHIVE_FILE")|Zoi-${CI_COMMIT_TAG}.tar.gz|" >> "$CHECKSUM_SHA256_FILE"
+        sha256sum "$SOURCE_ARCHIVE_FILE" | sed "s|$(basename "$SOURCE_ARCHIVE_FILE")|Zoi-${CI_COMMIT_TAG}.tar.gz|" >>"$CHECKSUM_SHA256_FILE"
     else
         echo -e "${YELLOW}Could not download source archive. Skipping its checksum.${NC}"
     fi
