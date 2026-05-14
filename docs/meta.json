@@ -6,6 +6,7 @@
     "config",
     "project-config",
     "system-config",
+    "guides",
     "---Maintainers Guides---",
     "creating-packages",
     "lua-api",
@@ -19,11 +20,8 @@
     "dependencies",
     "repositories",
     "extensions",
-    "...",
+    "lib",
     "telemetry",
-    "---Guides---",
-    "guides",
-    "---Zoi Library---",
-    "lib"
+    "..."
   ]
 }
