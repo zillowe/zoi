@@ -3,29 +3,29 @@
 class Zoi < Formula
   desc "Universal Package Manager & Environment Setup Tool"
   homepage "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi"
-  version "1.12.1"
+  version "1.13.0"
   license "Apache-2.0"
 
   on_macos do
     if Hardware::CPU.arm?
       url "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/Prod-Release-#{version}/downloads/zoi-macos-arm64.tar.zst"
-      sha256 "337957d6f9e7239f862412a8f9f9d5b803800683a9ad0f1d308c4743bbf3f835"
+      sha256 "ee03cf6972edaa66ef4b85887d8139aabbcc3d1d3a5c77942e5de0f09970399a"
     end
 
     if Hardware::CPU.intel?
       url "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/Prod-Release-#{version}/downloads/zoi-macos-amd64.tar.zst"
-      sha256 "ae6d3aa2ba0d41e5d98f0beffff7857ee72aee45d96e3d3c5ec1df2dd28817be"
+      sha256 "9777089395c298c91251b231c9d3983505feb2c71956bea70aa098eafc44353a"
     end
 
     on_linux do
       if Hardware::CPU.intel? and Hardware::CPU.is_64_bit?
         url "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/Prod-Release-#{version}/downloads/zoi-linux-amd64.tar.zst"
-        sha256 "3ed46071fd244243f00739c0e5c7d0a8b329c12e74601b70f02c9e1eee1aa610"
+        sha256 "fbf33efc384488fca1d48f1da037be67cd4e1f9d88046f47b2ee7dfb65a562ef"
       end
 
       if Hardware::CPU.arm? and Hardware::CPU.is_64_bit?
         url "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases/Prod-Release-#{version}/downloads/zoi-linux-arm64.tar.zst"
-        sha256 "e42c9e46000e92739bad3dbd72feaba04848f8b013f17ae26944446b610c1275"
+        sha256 "25c13e60bcef0fcbd678b0c2591948e7325628e4b2589fe3bf32a64dbe5d79d7"
       end
     end
 
