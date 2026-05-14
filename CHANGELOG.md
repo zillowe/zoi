@@ -4,6 +4,30 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
+## [Prod-Release-1.13.0] - 2026-05-14
+
+### ♻️ Refactor
+
+- *(timezone)* Isolate Unix-specific timezone management
+
+### ✨ Features
+
+- *(mini)* Enhance Zoi Mini with aliases, shim support, and caching
+- *(mini)* Add minimal package manager
+- *(zoi-mini)* Add platform-specific app entrypoint scripts
+
+### 🛠️ Build
+
+- Revert release opt-level to 3
+- Consolidate release profiles and optimize binary size
+- Remove FreeBSD and OpenBSD support
+- Make build script builds and install all project binaries
+- *(build-system)* Add zoi-mini binary and integrate into build
+
+### 🧪 Testing
+
+- *(pkg)* Add tests for package resolution and mini-resolver
+
 ## [Prod-Release-1.12.1] - 2026-05-07
 
 ### 🔒 Security
