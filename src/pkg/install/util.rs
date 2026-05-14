@@ -980,9 +980,15 @@ pub fn find_prebuilt_info(node: &InstallNode) -> Result<Option<types::PrebuiltIn
     let pkg = &node.pkg;
     let platform = crate::utils::get_platform()?;
 
-    let db_path = crate::pkg::resolve::get_db_root()?;
-    let repo_db_path = db_path.join(&node.registry_handle);
-    if let Ok(repo_config) = crate::pkg::config::read_repo_config(&repo_db_path) {
+    let repo_config = if crate::utils::is_mini_mode() && node.registry_handle == "zoidberg" {
+        crate::pkg::mini_resolve::fetch_registry_config().ok()
+    } else {
+        let db_path = crate::pkg::resolve::get_db_root()?;
+        let repo_db_path = db_path.join(&node.registry_handle);
+        crate::pkg::config::read_repo_config(&repo_db_path).ok()
+    };
+
+    if let Some(repo_config) = repo_config {
         let mut pkg_links_to_try = Vec::new();
         if let Some(main_pkg) = repo_config.pkg.iter().find(|p| p.link_type == "main") {
             pkg_links_to_try.push(main_pkg.clone());

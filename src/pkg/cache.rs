@@ -13,6 +13,11 @@ pub fn get_archive_cache_root() -> Result<PathBuf> {
     Ok(cache_root.join("archives"))
 }
 
+pub fn get_pkgdef_cache_root() -> Result<PathBuf> {
+    let cache_root = get_cache_root()?;
+    Ok(cache_root.join("pkgdefs"))
+}
+
 pub fn mirror_candidate_urls(url: &str) -> Vec<String> {
     let mut urls = vec![url.to_string()];
     let Ok(config) = crate::pkg::config::read_config() else {

@@ -1,10 +1,11 @@
-use crate::pkg::{config, pin, types};
+use crate::pkg::{cache, config, pin, types};
 use anyhow::{Result, anyhow};
 use colored::*;
 use comfy_table::{Table, presets::UTF8_FULL};
 use dialoguer::{Select, theme::ColorfulTheme};
 use indicatif::{ProgressBar, ProgressStyle};
 use regex::Regex;
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::fs;
 use std::io::Read;
@@ -510,6 +511,25 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
 }
 
 fn download_from_url(url: &str) -> Result<ResolvedSource> {
+    let cache_dir = cache::get_pkgdef_cache_root()?;
+    fs::create_dir_all(&cache_dir)?;
+
+    let mut hasher = Sha256::new();
+    hasher.update(url.as_bytes());
+    let hash = hex::encode(hasher.finalize());
+    let cache_path = cache_dir.join(format!("{}.pkg.lua", hash));
+
+    if cache_path.exists() {
+        return Ok(ResolvedSource {
+            path: cache_path,
+            source_type: SourceType::Url,
+            repo_name: None,
+            registry_handle: Some("local".to_string()),
+            sharable_manifest: None,
+            git_sha: None,
+        });
+    }
+
     println!("Downloading package definition from URL...");
     let client = crate::utils::get_http_client()?;
     let mut attempt = 0u32;
@@ -562,16 +582,10 @@ fn download_from_url(url: &str) -> Result<ResolvedSource> {
     }
     pb.finish_with_message("Download complete.");
 
-    let mut temp_file = tempfile::Builder::new()
-        .prefix("zoi-temp-")
-        .suffix(".pkg.lua")
-        .tempfile()?;
-    use std::io::Write;
-    temp_file.write_all(&downloaded_bytes)?;
-    let temp_path = temp_file.into_temp_path();
+    fs::write(&cache_path, &downloaded_bytes)?;
 
     Ok(ResolvedSource {
-        path: temp_path.to_path_buf(),
+        path: cache_path,
         source_type: SourceType::Url,
         repo_name: None,
         registry_handle: Some("local".to_string()),
@@ -1116,18 +1130,20 @@ fn resolve_source_recursive(
 
         let pkg_lua_content = download_content_from_url(&pkg_lua_url)?;
 
-        let mut temp_file = tempfile::Builder::new()
-            .prefix("zoi-temp-git-")
-            .suffix(".pkg.lua")
-            .tempfile()?;
-        use std::io::Write;
-        temp_file.write_all(pkg_lua_content.as_bytes())?;
-        let temp_path = temp_file.into_temp_path();
+        let cache_dir = cache::get_pkgdef_cache_root()?;
+        fs::create_dir_all(&cache_dir)?;
+
+        let mut hasher = Sha256::new();
+        hasher.update(pkg_lua_url.as_bytes());
+        let hash = hex::encode(hasher.finalize());
+        let cache_path = cache_dir.join(format!("{}.pkg.lua", hash));
+
+        fs::write(&cache_path, pkg_lua_content.as_bytes())?;
 
         let repo_name = format!("git:{}", git_source);
 
         return Ok(ResolvedSource {
-            path: temp_path.to_path_buf(),
+            path: cache_path,
             source_type: SourceType::GitRepo(repo_name.clone()),
             repo_name: Some(repo_name),
             registry_handle: None,
@@ -1217,21 +1233,34 @@ fn resolve_source_recursive(
         }
     } else if crate::utils::is_mini_mode() {
         let index = crate::pkg::mini_resolve::fetch_registry_index()?;
-        let pkg_index = index.packages.get(&request.name).ok_or_else(|| {
-            anyhow!(
-                "Package '{}' not found in Zoidberg registry index",
-                request.name
-            )
-        })?;
-        let lua_url = crate::pkg::mini_resolve::get_package_lua_url(&pkg_index.repo, &request.name);
+
+        let (repo, repo_type) = if let Some(r) = &request.repo {
+            let r_type = index
+                .packages
+                .get(&request.name)
+                .filter(|p| &p.repo == r)
+                .map(|p| p.repo_type.clone())
+                .unwrap_or_else(|| "unofficial".to_string());
+            (r.clone(), r_type)
+        } else {
+            let pkg_info = index.packages.get(&request.name).ok_or_else(|| {
+                anyhow!(
+                    "Package '{}' not found in Zoidberg registry index",
+                    request.name
+                )
+            })?;
+            (pkg_info.repo.clone(), pkg_info.repo_type.clone())
+        };
+
+        let lua_url = crate::pkg::mini_resolve::get_package_lua_url(&repo, &request.name);
         let mut resolved = download_from_url(&lua_url)?;
-        resolved.repo_name = Some(pkg_index.repo.clone());
+        resolved.repo_name = Some(repo.clone());
         resolved.registry_handle = Some("zoidberg".to_string());
 
-        resolved.source_type = if pkg_index.repo_type == "official" {
+        resolved.source_type = if repo_type == "official" {
             SourceType::OfficialRepo
         } else {
-            SourceType::UntrustedRepo(pkg_index.repo.clone())
+            SourceType::UntrustedRepo(repo)
         };
         resolved
     } else {
@@ -1289,19 +1318,22 @@ fn resolve_source_recursive(
                 }
 
                 let content = response.text()?;
-                let mut temp_file = tempfile::Builder::new()
-                    .prefix("zoi-alt-")
-                    .suffix(".pkg.lua")
-                    .tempfile()?;
-                use std::io::Write;
-                temp_file.write_all(content.as_bytes())?;
-                let temp_path = temp_file.into_temp_path();
+
+                let cache_dir = cache::get_pkgdef_cache_root()?;
+                fs::create_dir_all(&cache_dir)?;
+
+                let mut hasher = Sha256::new();
+                hasher.update(alt_source.as_bytes());
+                let hash = hex::encode(hasher.finalize());
+                let cache_path = cache_dir.join(format!("{}.pkg.lua", hash));
+
+                fs::write(&cache_path, content.as_bytes())?;
 
                 resolve_source_recursive(
-                    temp_path.to_str().ok_or_else(|| {
+                    cache_path.to_str().ok_or_else(|| {
                         anyhow!(
-                            "Temporary path contains invalid UTF-8 characters: {:?}",
-                            temp_path
+                            "Cache path contains invalid UTF-8 characters: {:?}",
+                            cache_path
                         )
                     })?,
                     depth + 1,

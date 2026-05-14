@@ -113,6 +113,7 @@ Zoi is a universal package manager and environment setup tool, designed to simpl
   - `zoi rollback`: Revert a package to its previous version or rollback the entire last transaction.
   - `zoi pin`: Pin a package to a specific version.
   - `zoi exec`: Run a package's binary without installing it.
+- **Zoi Mini:** A lightweight, zero-sync version for quick, one-off installations via `zm.sh` or `zm.ps1`. Supports `install`, `update`, `uninstall`, and `list` commands.
 - **Library Support:** Core functionality is available as a Rust library to be integrated into other applications.
 
 ## 💓 Special Thanks
@@ -145,7 +146,7 @@ Getting started with Zoi is simple. Just follow these three steps:
 
 ### Zoi Mini
 
-Zoi Mini is a lightweight, zero-sync version of Zoi that allows you to install packages from the official Zoidberg registry without installing the full Zoi suite. It's designed for quick, one-off installations.
+Zoi Mini is a lightweight, zero-sync version of Zoi that allows you to install packages from the official Zoidberg registry without installing the full Zoi suite. It's designed for quick, one-off installations and supports basic management commands: `install`, `update`, `uninstall`, and `list`.
 
 #### Quick Start (Zero-Install)
 
@@ -154,13 +155,13 @@ You can install any package from the Zoidberg registry using a single command:
 **Linux / macOS :**
 
 ```sh
-curl -fsSL https://zillowe.pages.dev/zm.sh | sh -s -- @zillowe/hello
+curl -fsSL https://zillowe.pages.dev/zm.sh | sh -s -- i @zillowe/hello
 ```
 
 **Windows (amd64):**
 
 ```powershell
-powershell -c "irm zillowe.pages.dev/zm.ps1 | iex" -args "@zillowe/hello"
+powershell -c "irm zillowe.pages.dev/zm.ps1 | iex" -args "i @zillowe/hello"
 ```
 
 This will download the `zoi-mini` binary to a temporary location, resolve the package metadata dynamically, and perform the installation.

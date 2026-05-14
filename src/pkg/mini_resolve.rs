@@ -18,8 +18,21 @@ pub struct MiniPackageIndex {
     pub repo_type: String,
     pub version: String,
     pub description: String,
+    #[serde(default, deserialize_with = "deserialize_sub_packages")]
     pub sub_packages: Option<Vec<String>>,
     pub vuln: Option<Vec<MiniVulnerability>>,
+}
+
+fn deserialize_sub_packages<'de, D>(deserializer: D) -> Result<Option<Vec<String>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let v: serde_json::Value = serde::Deserialize::deserialize(deserializer)?;
+    if v.is_array() {
+        Ok(serde_json::from_value(v).ok())
+    } else {
+        Ok(None)
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -41,6 +54,23 @@ pub fn fetch_registry_index() -> Result<MiniRegistryIndex> {
 
     let index: MiniRegistryIndex = response.json()?;
     Ok(index)
+}
+
+pub fn fetch_registry_config() -> Result<super::types::RepoConfig> {
+    let url = "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg/-/raw/main/repo.yaml";
+    let client = crate::utils::get_http_client()?;
+    let response = client.get(url).send()?;
+
+    if !response.status().is_success() {
+        return Err(anyhow!(
+            "Failed to fetch repo.yaml from Zoidberg registry: {}",
+            response.status()
+        ));
+    }
+
+    let content = response.text()?;
+    let config: super::types::RepoConfig = serde_yaml::from_str(&content)?;
+    Ok(config)
 }
 
 pub fn check_vulnerabilities(

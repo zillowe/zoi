@@ -655,6 +655,10 @@ pub fn print_repo_warning(repo_name: &str) {
 }
 
 pub fn confirm_untrusted_source(source_type: &SourceType, yes: bool) -> anyhow::Result<()> {
+    if is_mini_mode() {
+        return Ok(());
+    }
+
     if source_type == &SourceType::OfficialRepo {
         return Ok(());
     }

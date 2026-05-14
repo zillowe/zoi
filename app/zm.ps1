@@ -1,5 +1,5 @@
 # zm.ps1 - Zero-install Zoi Mini script for Windows
-# Usage: powershell -c "irm zillowe.pages.dev/zm.ps1 | iex" -args "<package>"
+# Usage: powershell -c "irm zillowe.pages.dev/zm.ps1 | iex" -args "i <package>"
 
 $GitLabProjectId = "71087662"
 $GitLabProjectPath = "Zillowe/Zillwen/Zusty/Zoi"
@@ -21,5 +21,20 @@ $TempBin = "$env:TEMP\zoi-mini.exe"
 Write-Host "[INFO] Downloading from: $BinUrl" -ForegroundColor Cyan
 Invoke-WebRequest -Uri $BinUrl -OutFile $TempBin -UseBasicParsing
 
-Write-Host "[INFO] Executing Zoi Mini..." -ForegroundColor Cyan
-& $TempBin install $args
+$cmd = "install"
+$cmdArgs = $args
+if ($args.Count -gt 0) {
+    switch ($args[0]) {
+        { $_ -in @("install", "i", "update", "up", "uninstall", "un", "list", "ls") } {
+            $cmd = $args[0]
+            if ($args.Count -gt 1) {
+                $cmdArgs = $args[1..($args.Count - 1)]
+            } else {
+                $cmdArgs = @()
+            }
+        }
+    }
+}
+
+Write-Host "[INFO] Executing Zoi Mini $cmd..." -ForegroundColor Cyan
+& $TempBin $cmd $cmdArgs

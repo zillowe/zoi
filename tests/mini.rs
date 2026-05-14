@@ -14,6 +14,25 @@ fn test_parse_mini_registry_index() {
     assert_eq!(hello.version, "4.0.0");
     assert_eq!(hello.vuln.as_ref().unwrap().len(), 1);
     assert_eq!(hello.vuln.as_ref().unwrap()[0].id, "ZSA-2026-D0042");
+
+    assert!(index.packages.contains_key("collision"));
+    assert_eq!(index.packages["collision"].repo, "extra");
+}
+
+#[test]
+fn test_parse_mini_registry_config() {
+    let path = "test_assets/repo.yaml";
+    let content = fs::read_to_string(path).unwrap();
+    let config: zoi::pkg::types::RepoConfig = serde_yaml::from_str(&content).unwrap();
+
+    assert_eq!(config.name, "Zoidberg");
+    assert!(config.repos.iter().any(|r| r.name == "core" && r.active));
+    assert!(
+        config
+            .repos
+            .iter()
+            .any(|r| r.name == "zillowe" && !r.active)
+    );
 }
 
 #[test]

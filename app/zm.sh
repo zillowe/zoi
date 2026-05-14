@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # zm.sh - Zero-install Zoi Mini script
-# Usage: curl -fsSL https://zillowe.pages.dev/zm.sh | sh -s -- <package>
+# Usage: curl -fsSL https://zillowe.pages.dev/zm.sh | sh -s -- i <package>
 
 set -euo pipefail
 
@@ -43,5 +43,15 @@ info "Downloading from: ${BIN_URL}"
 curl --fail --location --progress-bar --output "$TEMP_BIN" "$BIN_URL"
 chmod +x "$TEMP_BIN"
 
-info "Executing Zoi Mini..."
-"$TEMP_BIN" install "$@"
+cmd="install"
+if [ $# -gt 0 ]; then
+    case "$1" in
+        install|i|update|up|uninstall|un|list|ls)
+            cmd="$1"
+            shift
+            ;;
+    esac
+fi
+
+info "Executing Zoi Mini ${cmd}..."
+"$TEMP_BIN" "$cmd" "$@"
