@@ -65,10 +65,7 @@ fn main() -> Result<()> {
         && !program_name.contains("target")
     {
         let plugin_manager = match zoi::pkg::plugin::PluginManager::new() {
-            Ok(m) => {
-                let _ = m.load_all();
-                m
-            }
+            Ok(m) => m,
             Err(e) => {
                 eprintln!(
                     "{}: Failed to initialize PluginManager: {}",
