@@ -1,6 +1,8 @@
 use std::fs;
 use tempfile::tempdir;
-use zoi::pkg::hooks::global::{GlobalHook, HookWhen, load_all_hooks};
+use zoi::pkg::hooks::global::{
+    GlobalHook, HookTrigger, HookWhen, load_all_hooks, trigger_matches_modified_files,
+};
 
 mod common;
 
@@ -11,6 +13,8 @@ name: test-hook
 description: A test hook
 platforms: ["linux"]
 trigger:
+  dirs:
+    - "usr/share/icons"
   paths:
     - "usr/share/fonts/**"
   operation: ["install"]
@@ -21,6 +25,7 @@ action:
 
     let hook: GlobalHook = serde_yaml::from_str(hook_yaml).unwrap();
     assert_eq!(hook.name, "test-hook");
+    assert_eq!(hook.trigger.dirs[0], "usr/share/icons");
     assert_eq!(hook.trigger.paths[0], "usr/share/fonts/**");
     assert_eq!(hook.action.when, HookWhen::PostTransaction);
 }
@@ -43,6 +48,66 @@ action:
 
     let loaded: GlobalHook = serde_yaml::from_str(&fs::read_to_string(hook_path).unwrap()).unwrap();
     assert_eq!(loaded.name, "dynamic-hook");
+}
+
+#[test]
+fn test_hook_dir_trigger_matches_descendants_once_per_transaction_input() {
+    let trigger = HookTrigger {
+        paths: Vec::new(),
+        dirs: vec!["usr/share/icons".to_string()],
+        operation: Vec::new(),
+    };
+    let modified_files = vec![
+        "usr/share/icons/hicolor/48x48/apps/example.png".to_string(),
+        "usr/share/icons/hicolor/index.theme".to_string(),
+    ];
+
+    assert!(trigger_matches_modified_files(&trigger, &modified_files));
+}
+
+#[test]
+fn test_hook_dir_trigger_does_not_match_similar_prefix() {
+    let trigger = HookTrigger {
+        paths: Vec::new(),
+        dirs: vec!["usr/share/icons".to_string()],
+        operation: Vec::new(),
+    };
+    let modified_files = vec!["usr/share/icons-extra/example.png".to_string()];
+
+    assert!(!trigger_matches_modified_files(&trigger, &modified_files));
+}
+
+#[test]
+fn test_hook_trigger_matches_sysroot_relative_dir() {
+    let ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("tempdir should be created");
+    let root = tmp.path().to_path_buf();
+    ctx.set_sysroot(root.clone());
+
+    let trigger = HookTrigger {
+        paths: Vec::new(),
+        dirs: vec!["usr/share/icons".to_string()],
+        operation: Vec::new(),
+    };
+    let modified_files = vec![
+        root.join("usr/share/icons/hicolor/index.theme")
+            .to_string_lossy()
+            .to_string(),
+    ];
+
+    assert!(trigger_matches_modified_files(&trigger, &modified_files));
+}
+
+#[test]
+fn test_hook_path_trigger_still_matches_globs() {
+    let trigger = HookTrigger {
+        paths: vec!["usr/share/fonts/**".to_string()],
+        dirs: Vec::new(),
+        operation: Vec::new(),
+    };
+    let modified_files = vec!["usr/share/fonts/TTF/example.ttf".to_string()];
+
+    assert!(trigger_matches_modified_files(&trigger, &modified_files));
 }
 
 #[test]

@@ -23,22 +23,27 @@ Hooks are defined using simple YAML files. They can be placed in:
 * **User:** `~/.zoi/hooks/`
 * **Extensions:** Distributed via Zoi [Extensions](/docs/zds/zoi/extensions).
 
-### Example: update-font-cache.hook.yaml
+### Example: update-icon-cache.hook.yaml
 
 ```yaml
-name: update-font-cache
-description: Rebuilds system font cache when fonts are installed or removed.
+name: update-icon-cache
+description: Rebuilds GTK icon caches when icon themes are installed or removed.
 platforms: ["linux"]
 trigger:
-  # Trigger if any files are modified in these directories
-  paths:
-    - "usr/share/fonts/**"
-    - "usr/local/share/fonts/**"
+  # Trigger if any package touches files below these directories
+  dirs:
+    - "usr/share/icons"
+    - "usr/local/share/icons"
   # Only trigger for these operations
   operation: ["install", "upgrade", "remove"]
 action:
   when: PostTransaction
-  exec: fc-cache -fv
+  exec: |
+    if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+      for dir in /usr/share/icons/* /usr/local/share/icons/*; do
+        [ -d "$dir" ] && [ -f "$dir/index.theme" ] && gtk-update-icon-cache -q -t -f "$dir"
+      done
+    fi
 ```
 
 ### Schema Reference
@@ -48,10 +53,13 @@ action:
 | `name`              | `string` | A unique name for the hook.                                                 |
 | `description`       | `string` | A short summary of what the hook does.                                      |
 | `platforms`         | `list`   | (Optional) List of supported platforms (e.g. `["linux"]`).                  |
+| `trigger.dirs`      | `list`   | A list of directory paths. If any modified file is inside one of these directories, the hook triggers. |
 | `trigger.paths`     | `list`   | A list of glob patterns. If any modified file matches, the hook triggers.   |
 | `trigger.operation` | `list`   | (Optional) Restrict to specific operations: `install`, `upgrade`, `remove`. |
 | `action.when`       | `enum`   | When to run: `PostTransaction` (currently supported).                       |
 | `action.exec`       | `string` | The shell command to execute.                                               |
+
+`trigger.dirs` is preferred for directory-wide maintenance triggers such as icon themes. `trigger.paths` remains useful when a hook should only match specific filenames or extensions, such as `usr/share/applications/*.desktop`.
 
 ***
 
@@ -59,6 +67,7 @@ action:
 
 Zoi ships with several essential builtin hooks for Linux systems:
 
+* **`update-icon-cache`**: Runs `gtk-update-icon-cache` once when files under icon theme directories are modified.
 * **`update-font-cache`**: Runs `fc-cache -fv` when fonts are modified.
 * **`update-desktop-database`**: Runs `update-desktop-database -q` when `.desktop` files are modified.
 * **`ldconfig`**: Runs `ldconfig` when shared libraries (`.so` files) are modified.

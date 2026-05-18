@@ -1,0 +1,16 @@
+name: update-icon-cache
+description: Rebuilds GTK icon caches when icon themes are installed or removed.
+platforms: ["linux"]
+trigger:
+  dirs:
+    - "usr/share/icons"
+    - "usr/local/share/icons"
+  operation: ["install", "upgrade", "remove"]
+action:
+  when: PostTransaction
+  exec: |
+    if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+      for dir in /usr/share/icons/* /usr/local/share/icons/*; do
+        [ -d "$dir" ] && [ -f "$dir/index.theme" ] && gtk-update-icon-cache -q -t -f "$dir"
+      done
+    fi

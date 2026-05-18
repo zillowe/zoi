@@ -22,7 +22,10 @@ pub struct GlobalHook {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct HookTrigger {
+    #[serde(default)]
     pub paths: Vec<String>,
+    #[serde(default)]
+    pub dirs: Vec<String>,
     #[serde(default)]
     pub operation: Vec<String>,
 }
@@ -102,6 +105,73 @@ pub fn load_all_hooks() -> Result<Vec<GlobalHook>> {
     Ok(hooks)
 }
 
+fn normalized_relative_path(file: &str, sysroot: Option<&Path>) -> String {
+    let file_path = Path::new(file);
+    let relative_file = if let Some(root) = sysroot {
+        file_path.strip_prefix(root).unwrap_or(file_path)
+    } else if file_path.is_absolute() {
+        let mut components = file_path.components();
+        components.next();
+        components.as_path()
+    } else {
+        file_path
+    };
+
+    relative_file
+        .to_string_lossy()
+        .replace('\\', "/")
+        .trim_start_matches("./")
+        .trim_start_matches('/')
+        .to_string()
+}
+
+fn normalized_hook_path(path: &str) -> String {
+    path.replace('\\', "/")
+        .trim_start_matches("./")
+        .trim_start_matches('/')
+        .trim_end_matches('/')
+        .to_string()
+}
+
+fn matches_trigger_dir(dir: &str, modified_file: &str) -> bool {
+    let dir = normalized_hook_path(dir);
+    !dir.is_empty()
+        && (modified_file == dir
+            || modified_file
+                .strip_prefix(&dir)
+                .is_some_and(|suffix| suffix.starts_with('/')))
+}
+
+pub fn trigger_matches_modified_files(trigger: &HookTrigger, modified_files: &[String]) -> bool {
+    let sysroot = sysroot::get_sysroot();
+
+    for file in modified_files {
+        let relative_file = normalized_relative_path(file, sysroot.as_deref());
+
+        for dir in &trigger.dirs {
+            if matches_trigger_dir(dir, &relative_file) {
+                return true;
+            }
+        }
+
+        for path_pattern in &trigger.paths {
+            let pattern = match Pattern::new(path_pattern) {
+                Ok(p) => p,
+                Err(_) => continue,
+            };
+
+            if pattern.matches_path(Path::new(&relative_file))
+                || pattern.matches(&relative_file)
+                || pattern.matches(file)
+            {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
 pub fn run_global_hooks(when: HookWhen, modified_files: &[String], operation: &str) -> Result<()> {
     let all_hooks = load_all_hooks()?;
     let mut triggered_hooks = HashSet::new();
@@ -124,43 +194,9 @@ pub fn run_global_hooks(when: HookWhen, modified_files: &[String], operation: &s
             continue;
         }
 
-        let mut matched = false;
-        let sysroot = sysroot::get_sysroot();
-
-        for path_pattern in &hook.trigger.paths {
-            let pattern = match Pattern::new(path_pattern) {
-                Ok(p) => p,
-                Err(_) => continue,
-            };
-
-            for file in modified_files {
-                let file_path = Path::new(file);
-                let relative_file = if let Some(root) = &sysroot {
-                    if let Ok(rel) = file_path.strip_prefix(root) {
-                        rel
-                    } else {
-                        file_path
-                    }
-                } else if file_path.is_absolute() {
-                    let mut components = file_path.components();
-                    components.next();
-                    components.as_path()
-                } else {
-                    file_path
-                };
-
-                if pattern.matches_path(relative_file) || pattern.matches(file) {
-                    matched = true;
-                    break;
-                }
-            }
-            if matched {
-                break;
-            }
-        }
-
-        if matched {
-            triggered_hooks.insert(hook.name.clone());
+        if trigger_matches_modified_files(&hook.trigger, modified_files)
+            && triggered_hooks.insert(hook.name.clone())
+        {
             println!(
                 "{} Running global hook: {} ({})",
                 "::".blue().bold(),
