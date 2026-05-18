@@ -313,12 +313,16 @@ impl DependencyProvider for ZoiDependencyProvider {
         version: &Self::V,
     ) -> Result<Dependencies<Self::P, Self::VS, Self::M>, Self::Err> {
         if package.name == "$root" {
-            return Ok(Dependencies::Available(self.root_deps.clone()));
+            return Ok(Dependencies::Available(
+                pubgrub::DependencyConstraints::from_iter(self.root_deps.clone()),
+            ));
         }
 
         let cache_key = (package.clone(), version.clone());
         if let Some(cached) = self.deps_cache.borrow().get(&cache_key) {
-            return Ok(Dependencies::Available(cached.clone()));
+            return Ok(Dependencies::Available(
+                pubgrub::DependencyConstraints::from_iter(cached.clone()),
+            ));
         }
 
         let version_str = version.to_string();
@@ -421,7 +425,9 @@ impl DependencyProvider for ZoiDependencyProvider {
         self.chosen_cache
             .borrow_mut()
             .insert(cache_key, (chosen_opts, chosen_opts_opt, all_req));
-        Ok(Dependencies::Available(deps))
+        Ok(Dependencies::Available(
+            pubgrub::DependencyConstraints::from_iter(deps),
+        ))
     }
 
     fn choose_version(

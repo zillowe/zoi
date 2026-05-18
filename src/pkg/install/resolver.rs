@@ -333,7 +333,7 @@ pub fn resolve_dependency_graph(
 
     match pubgrub_resolve::<ZoiDependencyProvider>(&provider, root_pkg, root_version) {
         Ok(solution) => {
-            for (name, version) in &solution {
+            for (name, version) in solution.iter() {
                 if name.name == "$root" {
                     continue;
                 }
@@ -387,7 +387,7 @@ pub fn resolve_dependency_graph(
                 final_nodes.insert(pkg_id, node);
             }
 
-            for (name, version) in &solution {
+            for (name, version) in solution.iter() {
                 let from_id = if name.name == "$root" {
                     "$root".to_string()
                 } else if let Some(sub) = &name.sub_package {
@@ -399,8 +399,8 @@ pub fn resolve_dependency_graph(
                 if let Ok(pubgrub::Dependencies::Available(deps)) =
                     provider.get_dependencies(name, version)
                 {
-                    for dep_name in deps.keys() {
-                        if let Some(dep_version) = solution.get(dep_name) {
+                    for (dep_name, _) in deps {
+                        if let Some(dep_version) = solution.get(&dep_name) {
                             let to_id = if let Some(sub) = &dep_name.sub_package {
                                 format!("{}@{}:{}", dep_name.name, dep_version, sub)
                             } else {
