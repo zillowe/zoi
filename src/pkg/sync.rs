@@ -404,7 +404,7 @@ fn run_non_verbose_at_path(
 
         let head_symref = repo.find_reference("refs/remotes/origin/HEAD")?;
         let remote_default_ref = head_symref
-            .symbolic_target()
+            .symbolic_target()?
             .ok_or_else(|| anyhow!("Remote HEAD is not a symbolic ref"))?;
         let short_branch_name = remote_default_ref
             .strip_prefix("refs/remotes/origin/")
@@ -509,7 +509,7 @@ fn try_sync_at_path(
     if db_path.exists()
         && let Ok(repo) = Repository::open(db_path)
         && let Ok(remote) = repo.find_remote("origin")
-        && let Some(remote_url) = remote.url()
+        && let Ok(remote_url) = remote.url()
         && remote_url != db_url
     {
         let msg = format!(
