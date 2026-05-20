@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "zoidberg": {
+    "name": "Zoidberg",
+    "description": "Test registry",
+    "git": "https://github.com/Zillowe/Zoidberg",
+    "branch": "main"
+  }
+}
