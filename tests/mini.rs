@@ -3,7 +3,7 @@ use zoi::pkg::mini_resolve::{MiniPackageIndex, MiniRegistryIndex, check_vulnerab
 
 #[test]
 fn test_parse_mini_registry_index() {
-    let path = "test_assets/packages.json";
+    let path = "tests/assets/packages.json";
     let content = fs::read_to_string(path).unwrap();
     let index: MiniRegistryIndex = serde_json::from_str(&content).unwrap();
 
@@ -21,7 +21,7 @@ fn test_parse_mini_registry_index() {
 
 #[test]
 fn test_parse_mini_registry_config() {
-    let path = "test_assets/repo.yaml";
+    let path = "tests/assets/repo.yaml";
     let content = fs::read_to_string(path).unwrap();
     let config: zoi::pkg::types::RepoConfig = serde_yaml::from_str(&content).unwrap();
 

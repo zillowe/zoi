@@ -5,7 +5,7 @@ use zoi::pkg::package::doctor;
 #[test]
 fn package_doctor_accepts_valid_minimal_file() {
     let report = doctor::run(
-        std::path::Path::new("test_assets/test.pkg.lua"),
+        std::path::Path::new("tests/assets/test.pkg.lua"),
         Some("linux-amd64"),
         None,
     )

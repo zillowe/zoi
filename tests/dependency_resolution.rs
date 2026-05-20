@@ -37,11 +37,11 @@ fn test_semver_to_range_comparison() {
 #[test]
 fn test_get_versions_does_not_leak_across_distinct_explicit_sources() {
     let source_a = format!(
-        "{}/test_assets/source_a/shared.pkg.lua@1.0.0",
+        "{}/tests/assets/source_a/shared.pkg.lua@1.0.0",
         env!("CARGO_MANIFEST_DIR")
     );
     let source_b = format!(
-        "{}/test_assets/source_b/shared.pkg.lua@2.0.0",
+        "{}/tests/assets/source_b/shared.pkg.lua@2.0.0",
         env!("CARGO_MANIFEST_DIR")
     );
 

@@ -6,7 +6,7 @@ mod common;
 
 fn test_pkg_source() -> String {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("test_assets")
+        .join("tests/assets")
         .join("test.pkg.lua")
         .to_string_lossy()
         .to_string()
@@ -14,7 +14,7 @@ fn test_pkg_source() -> String {
 
 fn test_channels_source() -> String {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("test_assets")
+        .join("tests/assets")
         .join("test_channels.pkg.lua")
         .to_string_lossy()
         .to_string()
@@ -88,7 +88,7 @@ fn resolves_dependency_graph_for_versioned_local_pkg_lua_source() {
     assert_eq!(
         node.source,
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("test_assets")
+            .join("tests/assets")
             .join("test.pkg.lua")
             .to_string_lossy()
             .to_string()
