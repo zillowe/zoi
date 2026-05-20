@@ -88,13 +88,13 @@ pub fn construct_raw_url(git_url: &str, branch: &str, file_path: &str) -> Result
 }
 
 pub fn fetch_registry_index(registry: &RegistryInfo) -> Result<RegistryIndex> {
-    let url = construct_raw_url(&registry.git, &registry.branch, "package.json")?;
+    let url = construct_raw_url(&registry.git, &registry.branch, "packages.json")?;
     let client = utils::get_http_client()?;
     let response = client.get(url).send()?;
 
     if !response.status().is_success() {
         return Err(anyhow!(
-            "Failed to fetch package.json from registry {}: {}",
+            "Failed to fetch packages.json from registry {}: {}",
             registry.name,
             response.status()
         ));
@@ -148,11 +148,23 @@ pub fn resolve_purl(purl_str: &str) -> Result<ResolvedPurl> {
         ));
     }
 
-    let registry_handle = purl
+    let namespace = purl
         .namespace()
         .ok_or_else(|| anyhow!("PURL missing registry handle in namespace"))?;
+    let mut ns_parts = namespace.split('/');
+    let registry_handle = ns_parts
+        .next()
+        .ok_or_else(|| anyhow!("PURL missing registry handle"))?;
     let package_path = purl.name();
     let version = purl.version().unwrap_or("latest");
+
+    let remaining_ns: Vec<&str> = ns_parts.collect();
+    if remaining_ns.is_empty() {
+        return Err(anyhow!(
+            "PURL missing repository path. Expected format: pkg:zoi/[registry-handle]/[repo]/[package]"
+        ));
+    }
+    let expected_repo = remaining_ns.join("/");
 
     let central_db = fetch_central_db()?;
     let registry = central_db.get(registry_handle).ok_or_else(|| {
@@ -163,13 +175,28 @@ pub fn resolve_purl(purl_str: &str) -> Result<ResolvedPurl> {
     })?;
 
     let index = fetch_registry_index(registry)?;
-    let package_info = index.packages.get(package_path).ok_or_else(|| {
-        anyhow!(
-            "Package '{}' not found in registry '{}'",
-            package_path,
-            registry_handle
-        )
-    })?;
+
+    let full_path = format!("{}/{}", expected_repo, package_path);
+    let package_info = if let Some(info) = index.packages.get(&full_path) {
+        info
+    } else {
+        let info = index.packages.get(package_path).ok_or_else(|| {
+            anyhow!(
+                "Package '{}' not found in registry '{}'",
+                package_path,
+                registry_handle
+            )
+        })?;
+        if expected_repo != info.repo {
+            return Err(anyhow!(
+                "Repository mismatch in PURL. Package '{}' is in repository '{}', but PURL specified '{}'",
+                package_path,
+                info.repo,
+                expected_repo
+            ));
+        }
+        info
+    };
 
     let resolved_version = if version == "latest" {
         package_info.version.clone()
@@ -203,12 +230,12 @@ pub fn fetch_and_store_purl_package(purl_str: &str) -> Result<String> {
 
     let ident = if resolved.package_info.repo.is_empty() {
         format!(
-            "@{}/{}@{}",
+            "#{}@{}@{}",
             resolved.registry_handle, resolved.package_path, resolved.version
         )
     } else {
         format!(
-            "@{}/{}/{}@{}",
+            "#{}@{}/{}@{}",
             resolved.registry_handle,
             resolved.package_info.repo,
             resolved.package_path,

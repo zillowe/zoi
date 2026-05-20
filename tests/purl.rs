@@ -8,7 +8,7 @@ fn test_cli_install_purl_flag() {
             "--",
             "install",
             "--purl",
-            "pkg:zoi/mock_registry/mock_repo/mock_pkg@1.0.0",
+            "pkg:zoi/zoidberg/main/athas@0.6.0",
         ])
         .output()
         .expect("failed to execute process");
@@ -17,9 +17,8 @@ fn test_cli_install_purl_flag() {
     let stderr = String::from_utf8_lossy(&output.stderr);
 
     assert!(
-        stdout.contains("Fetching PURL package")
-            || stderr.contains("Failed to fetch central Zoi registry database"),
-        "Expected output indicating PURL fetch attempt. stdout: {}\nstderr: {}",
+        stdout.contains("Proceed with installation? [y/N]") || stdout.contains("athas"),
+        "Expected output to show installation details or prompt. stdout: {}\nstderr: {}",
         stdout,
         stderr
     );
@@ -33,7 +32,7 @@ fn test_cli_show_purl_flag() {
             "--",
             "show",
             "--purl",
-            "pkg:zoi/mock_registry/mock_repo/mock_pkg@1.0.0",
+            "pkg:zoi/zoidberg/zillowe/hello@4.0.0",
         ])
         .output()
         .expect("failed to execute process");
@@ -42,10 +41,58 @@ fn test_cli_show_purl_flag() {
     let stderr = String::from_utf8_lossy(&output.stderr);
 
     assert!(
-        stdout.contains("Fetching PURL package")
-            || stderr.contains("Failed to fetch central Zoi registry database"),
-        "Expected output indicating PURL fetch attempt. stdout: {}\nstderr: {}",
+        output.status.success(),
+        "Command failed: stdout: {}\nstderr: {}",
         stdout,
+        stderr
+    );
+    assert!(
+        stdout.contains("athas 0.6.0"),
+        "Expected package name and version in output: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_cli_purl_missing_repo() {
+    let output = Command::new("cargo")
+        .args([
+            "run",
+            "--",
+            "show",
+            "--purl",
+            "pkg:zoi/zoidberg/hello@4.0.0",
+        ])
+        .output()
+        .expect("failed to execute process");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!output.status.success(), "Expected command to fail");
+    assert!(
+        stderr.contains("PURL missing repository path"),
+        "Expected error message for missing repo. stderr: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_cli_purl_repo_mismatch() {
+    let output = Command::new("cargo")
+        .args([
+            "run",
+            "--",
+            "show",
+            "--purl",
+            "pkg:zoi/zoidberg/asadasd/hello@4.0.0",
+        ])
+        .output()
+        .expect("failed to execute process");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!output.status.success(), "Expected command to fail");
+    assert!(
+        stderr.contains("Repository mismatch in PURL"),
+        "Expected error message for repo mismatch. stderr: {}",
         stderr
     );
 }
