@@ -38,8 +38,14 @@ pub struct Advisory {
     pub references: Option<Vec<String>>,
 }
 
+fn default_version() -> String {
+    "1".to_string()
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct AdvisoryRegistry {
+    #[serde(default = "default_version")]
+    pub version: String,
     pub last_id: u32,
     pub year: u32,
     pub advisories: HashMap<String, String>,
@@ -717,6 +723,8 @@ pub struct RepoEntry {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RepoConfig {
+    #[serde(default = "default_version")]
+    pub version: String,
     pub name: String,
     pub description: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]

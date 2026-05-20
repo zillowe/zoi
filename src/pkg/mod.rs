@@ -23,6 +23,7 @@ pub mod pin;
 pub mod pkgdir;
 pub mod plugin;
 pub mod pm;
+pub mod purl;
 pub mod recorder;
 pub mod repo_install;
 pub mod resolve;

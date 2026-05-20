@@ -666,6 +666,7 @@ fn apply_packages(
             false,
             3,
             false,
+            false,
         )?;
     } else {
         println!("All packages are already installed.");
