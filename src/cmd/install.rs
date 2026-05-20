@@ -30,6 +30,7 @@ pub fn run(
     plan_json: bool,
     retry: u32,
     verbose: bool,
+    purl: bool,
 ) -> Result<()> {
     crate::pkg::install::util::set_download_retry_attempts(retry);
 
@@ -165,6 +166,20 @@ pub fn run(
 
     if sources_to_process.is_empty() {
         return Ok(());
+    }
+
+    if purl {
+        let mut resolved_purls = Vec::new();
+        for source in &sources_to_process {
+            println!(
+                "{} Fetching PURL package '{}'...",
+                "::".bold().blue(),
+                source
+            );
+            let ident = crate::pkg::purl::fetch_and_store_purl_package(source)?;
+            resolved_purls.push(ident);
+        }
+        sources_to_process = resolved_purls;
     }
 
     let config = config::read_config().unwrap_or_default();

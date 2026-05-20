@@ -46,8 +46,17 @@ fn print_dependency_group(group: &types::DependencyGroup, indent: usize) {
     }
 }
 
-pub fn run(source: &str, raw: bool) -> Result<()> {
-    let source = source.trim();
+pub fn run(source: &str, raw: bool, purl: bool) -> Result<()> {
+    let mut source_str = source.trim().to_string();
+    if purl {
+        println!(
+            "{} Fetching PURL package '{}'...",
+            "::".bold().blue(),
+            source_str
+        );
+        source_str = crate::pkg::purl::fetch_and_store_purl_package(&source_str)?;
+    }
+    let source = source_str.as_str();
     let resolved_source = resolve::resolve_source(source, false, false)?;
 
     if raw {

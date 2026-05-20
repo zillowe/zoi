@@ -178,6 +178,9 @@ enum Commands {
         /// Display the raw, unformatted package file
         #[arg(long)]
         raw: bool,
+        /// Use PURL (Package URL) specification for resolving package
+        #[arg(long)]
+        purl: bool,
     },
 
     /// Pin a package to a specific version
@@ -304,6 +307,10 @@ enum Commands {
         /// Show additional install details (package origins, preflight info)
         #[arg(long, short)]
         verbose: bool,
+
+        /// Use PURL (Package URL) specification for resolving packages
+        #[arg(long)]
+        purl: bool,
     },
 
     /// Uninstalls one or more packages previously installed by Zoi
@@ -877,7 +884,11 @@ pub fn run() -> anyhow::Result<()> {
                 names,
                 completion,
             ),
-            Commands::Show { package_name, raw } => cmd::show::run(&package_name, raw),
+            Commands::Show {
+                package_name,
+                raw,
+                purl,
+            } => cmd::show::run(&package_name, raw, purl),
             Commands::Pin { package, version } => cmd::pin::run(&package, &version),
             Commands::Provides { term } => cmd::provides::run(&term),
             Commands::Tree { packages } => cmd::tree::run(&packages),
@@ -941,6 +952,7 @@ pub fn run() -> anyhow::Result<()> {
                 plan_json,
                 retry,
                 verbose,
+                purl,
             } => cmd::install::run(
                 &sources,
                 repo,
@@ -960,6 +972,7 @@ pub fn run() -> anyhow::Result<()> {
                 plan_json,
                 retry,
                 verbose,
+                purl,
             )
             .map_err(|e| cmd::ux::with_failure_hint("install", e)),
             Commands::Uninstall {

@@ -11,6 +11,10 @@ pub struct HelperCommand {
 pub enum HelperCommands {
     /// Get a hash of a local file or a file from a URL
     GetHash(GetHashCommand),
+
+    /// Validate a Zoi specification file (e.g. registries.json, repo.yaml, advisories.json)
+    #[command(alias = "val")]
+    Validate(ValidateCommand),
 }
 
 #[derive(Parser, Debug)]
@@ -22,6 +26,13 @@ pub struct GetHashCommand {
     /// The hash algorithm to use
     #[arg(long, value_enum, default_value = "sha512")]
     pub hash: HashAlgorithm,
+}
+
+#[derive(Parser, Debug)]
+pub struct ValidateCommand {
+    /// The local file path to validate
+    #[arg(required = true)]
+    pub file: std::path::PathBuf,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug, Copy)]
@@ -41,5 +52,6 @@ pub fn run(args: HelperCommand) -> Result<()> {
             println!("{}", hash);
             Ok(())
         }
+        HelperCommands::Validate(cmd) => crate::pkg::helper::validate::run(&cmd.file),
     }
 }
