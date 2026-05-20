@@ -2408,6 +2408,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
+ "unicase",
 ]
 
 [[package]]
@@ -2430,6 +2431,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67eabc2ef2a60eb7faa00097bd1ffdb5bd28e62bf39990626a582201b7a754e5"
 dependencies = [
  "siphasher",
+ "unicase",
 ]
 
 [[package]]
@@ -2554,6 +2556,20 @@ checksum = "7c3a14896dfa883796f1cb410461aef38810ea05f2b2c33c5aded3649095fdad"
 dependencies = [
  "bitflags 2.11.1",
  "memchr",
+ "unicase",
+]
+
+[[package]]
+name = "purl"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60ebe4262ae91ddd28c8721111a0a6e9e58860e211fc92116c4bb85c98fd96ad"
+dependencies = [
+ "hex",
+ "percent-encoding",
+ "phf 0.11.3",
+ "smartstring",
+ "thiserror 2.0.18",
  "unicase",
 ]
 
@@ -3383,6 +3399,17 @@ name = "smallvec"
 version = "1.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
+
+[[package]]
+name = "smartstring"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3fb72c633efbaa2dd666986505016c32c3044395ceaf881518399d2f4127ee29"
+dependencies = [
+ "autocfg",
+ "static_assertions",
+ "version_check",
+]
 
 [[package]]
 name = "socket2"
@@ -4915,6 +4942,7 @@ dependencies = [
  "phf_codegen 0.13.1",
  "pubgrub",
  "pulldown-cmark",
+ "purl",
  "ratatui",
  "rayon",
  "regex",
