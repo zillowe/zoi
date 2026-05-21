@@ -8,6 +8,7 @@ Zoi is packed with features designed to make package management and environment 
 ## Core Features
 
 * **Cross-Platform:** Works natively on Linux, macOS, and Windows, supporting `amd64` and `arm64` architectures. Write one package definition and let Zoi handle the platform differences.
+  * **macOS Integration:** Automatically handles macOS `.app` bundles, stripping Gatekeeper quarantine flags and symlinking them to `~/Applications` or `/Applications`.
 
 * **Sysroot Support (`--root`):** Operates on a different root directory, allowing you to bootstrap entire OS images, containers, or embedded systems from the outside.
 

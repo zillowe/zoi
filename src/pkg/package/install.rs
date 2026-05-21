@@ -364,6 +364,63 @@ pub fn run(
         }
     }
 
+    #[cfg(target_os = "macos")]
+    {
+        let applications_dir = match scope {
+            types::Scope::System => PathBuf::from("/Applications"),
+            types::Scope::User => {
+                let home_dir =
+                    home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
+                home_dir.join("Applications")
+            }
+            types::Scope::Project => std::env::current_dir()?.join("Applications"),
+        };
+
+        let mut app_bundles = Vec::new();
+        for entry in WalkDir::new(&version_dir)
+            .max_depth(2)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            if entry.file_type().is_dir() && entry.file_name().to_string_lossy().ends_with(".app") {
+                app_bundles.push(entry.path().to_path_buf());
+            }
+        }
+
+        if !app_bundles.is_empty() {
+            fs::create_dir_all(&applications_dir)?;
+            for app_path in app_bundles {
+                if crate::utils::command_exists("xattr") {
+                    let _ = std::process::Command::new("xattr")
+                        .arg("-r")
+                        .arg("-d")
+                        .arg("com.apple.quarantine")
+                        .arg(&app_path)
+                        .status();
+                }
+
+                let app_name = app_path.file_name().unwrap();
+                let symlink_path = applications_dir.join(app_name);
+
+                if symlink_path.exists() {
+                    let _ = fs::remove_file(&symlink_path);
+                    let _ = fs::remove_dir_all(&symlink_path);
+                }
+
+                if std::os::unix::fs::symlink(&app_path, &symlink_path).is_ok() {
+                    installed_files.push(symlink_path.to_string_lossy().to_string());
+                    if pb.is_none() {
+                        println!(
+                            "Linked {} to {}",
+                            app_name.to_string_lossy().green(),
+                            applications_dir.display()
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     if let Some(p) = pb {
         p.set_position(100);
     } else {
