@@ -47,7 +47,7 @@ fn test_cli_show_purl_flag() {
         stderr
     );
     assert!(
-        stdout.contains("athas 0.6.0"),
+        stdout.contains("hello 4.0.0"),
         "Expected package name and version in output: {}",
         stdout
     );
