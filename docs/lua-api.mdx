@@ -220,7 +220,9 @@ Downloads a file from a URL directly to the specified local path.
 
 ### `UTILS.EXTRACT(source, out_dir)`
 
-Downloads (if URL) and extracts an archive (`.zip`, `.tar.gz`, `.tar.xz`, `.tar.zst`, `.7z`, `.rar`, `.deb`) into `BUILD_DIR/out_dir`.
+Downloads (if URL) and extracts an archive (`.zip`, `.tar.gz`, `.tar.xz`, `.tar.zst`, `.7z`, `.rar`, `.deb`, `.dmg`, `.pkg`) into `BUILD_DIR/out_dir`.
+
+> Extraction of `.dmg` and `.pkg` files is only supported when running on macOS.
 
 > \[!NOTE]
 > Extraction of `.rar` files requires the `unrar` command to be installed on the host system.

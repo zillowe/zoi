@@ -185,7 +185,7 @@ When Zoi executes your script, it provides a rich environment of global variable
 | `verifyHash(file, "algo-hash")`       | Verifies a file's checksum (e.g. `"sha512-..."`). Supported algos: sha512, sha256, md5.                                                                                                                                                  |
 | `verifySignature(file, sig, key)`     | Verifies a PGP signature.                                                                                                                                                                                                                |
 | `addPgpKey(url_or_path, name)`        | Adds a PGP key to Zoi's keyring for verification.                                                                                                                                                                                        |
-| `UTILS.EXTRACT(url_or_path, out_dir)` | Downloads and extracts a `.zip`, `.tar.*`, `.7z`, `.rar`, or `.deb` archive.                                                                                                                                                             |
+| `UTILS.EXTRACT(url_or_path, out_dir)` | Downloads and extracts a `.zip`, `.tar.*`, `.7z`, `.rar`, `.deb`, `.dmg`, or `.pkg` archive.                                                                                                                                                             |
 
 | `UTILS.FETCH.url(url)` | Fetches a URL's content as a string. |
 | `UTILS.FETCH.GITHUB.LATEST.release{...}` | Fetches the latest release tag from a GitHub repository. |

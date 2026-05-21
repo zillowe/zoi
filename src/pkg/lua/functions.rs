@@ -747,6 +747,68 @@ fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
             } else if archive_path_str.ends_with(".7z") {
                 sevenz_rust::decompress_file(&archive_file, &out_dir)
                     .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+            } else if archive_path_str.ends_with(".dmg") {
+                if !cfg!(target_os = "macos") {
+                    return Err(mlua::Error::RuntimeError(
+                        "Extracting .dmg files is only supported on macOS.".to_string(),
+                    ));
+                }
+                let output = std::process::Command::new("hdiutil")
+                    .arg("attach")
+                    .arg("-nobrowse")
+                    .arg("-readonly")
+                    .arg(&archive_file)
+                    .output()
+                    .map_err(|e| mlua::Error::RuntimeError(format!("Failed to execute hdiutil: {}", e)))?;
+                if !output.status.success() {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    return Err(mlua::Error::RuntimeError(format!("hdiutil failed: {}", stderr)));
+                }
+                let output_str = String::from_utf8_lossy(&output.stdout);
+                let mut mount_point = None;
+                for line in output_str.lines() {
+                    if line.contains("/Volumes/")
+                        && let Some(idx) = line.find("/Volumes/") {
+                            mount_point = Some(line[idx..].trim().to_string());
+                            break;
+                        }
+                }
+                let mount_point = mount_point.ok_or_else(|| {
+                    mlua::Error::RuntimeError("Failed to parse mount point from hdiutil output.".to_string())
+                })?;
+                let mount_path = std::path::Path::new(&mount_point);
+                if let Err(e) = crate::utils::copy_dir_all(mount_path, &out_dir) {
+                    let _ = std::process::Command::new("hdiutil").arg("detach").arg(&mount_point).status();
+                    return Err(mlua::Error::RuntimeError(format!("Failed to copy contents from dmg: {}", e)));
+                }
+                let detach_status = std::process::Command::new("hdiutil")
+                    .arg("detach")
+                    .arg(&mount_point)
+                    .status()
+                    .map_err(|e| mlua::Error::RuntimeError(format!("Failed to execute hdiutil detach: {}", e)))?;
+                if !detach_status.success() {
+                    eprintln!("Warning: failed to detach dmg volume at {}", mount_point);
+                }
+            } else if archive_path_str.ends_with(".pkg") {
+                if !cfg!(target_os = "macos") {
+                    return Err(mlua::Error::RuntimeError(
+                        "Extracting .pkg files natively is only supported on macOS.".to_string(),
+                    ));
+                }
+                let temp_extract_dir = out_dir.join(".pkg_extract_tmp");
+                let status = std::process::Command::new("pkgutil")
+                    .arg("--expand-full")
+                    .arg(&archive_file)
+                    .arg(&temp_extract_dir)
+                    .status()
+                    .map_err(|e| mlua::Error::RuntimeError(format!("Failed to execute pkgutil: {}", e)))?;
+                if !status.success() {
+                    return Err(mlua::Error::RuntimeError("pkgutil failed to expand the package.".to_string()));
+                }
+                crate::utils::copy_dir_all(&temp_extract_dir, &out_dir)
+                    .map_err(|e| mlua::Error::RuntimeError(format!("Failed to copy pkg contents: {}", e)))?;
+                let _ = fs::remove_dir_all(&temp_extract_dir);
+
             } else if archive_path_str.ends_with(".rar") {
                 if crate::utils::command_exists("unrar") {
                     let status = std::process::Command::new("unrar")
