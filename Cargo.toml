@@ -13,17 +13,16 @@ categories = ["command-line-utilities", "development-tools"]
 readme = "README.md"
 build = "build.rs"
 default-run = "zoi"
-exclude = [
-  "packages/*",
-  ".github",
-  ".gitlab",
-  "app/*",
-  "docs/*",
-  "scripts/*",
-  ".gitlab-ci.yml",
-  "CONTRIBUTING.md",
-  "zoi.yaml",
-  "AGENTS.md",
+include = [
+  "Cargo.toml",
+  "Cargo.lock",
+  "build.rs",
+  "README.md",
+  "LICENSE",
+  "CHANGELOG.md",
+  "rust-toolchain.toml",
+  "src/**",
+  "tests/**",
 ]
 
 [lib]
