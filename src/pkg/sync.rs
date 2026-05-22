@@ -359,6 +359,38 @@ fn run_verbose_at_path(db_url: &str, db_path: &Path) -> Result<()> {
     Ok(())
 }
 
+fn run_quiet_git_at_path(db_url: &str, db_path: &Path) -> Result<()> {
+    if db_path.exists() {
+        let output = Command::new("git")
+            .arg("-C")
+            .arg(db_path)
+            .arg("pull")
+            .output()?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(anyhow!(
+                "Failed to pull changes from the remote repository. {}",
+                stderr.trim()
+            ));
+        }
+    } else {
+        let output = Command::new("git")
+            .arg("clone")
+            .arg("--quiet")
+            .arg(db_url)
+            .arg(db_path)
+            .output()?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(anyhow!(
+                "Failed to clone the package repository. {}",
+                stderr.trim()
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn run_non_verbose_at_path(
     db_url: &str,
     db_path: &Path,
@@ -528,7 +560,24 @@ fn try_sync_at_path(
     if verbose {
         run_verbose_at_path(db_url, db_path)
     } else {
-        run_non_verbose_at_path(db_url, db_path, m, pb)
+        match run_non_verbose_at_path(db_url, db_path, m, pb) {
+            Ok(()) => Ok(()),
+            Err(libgit_error) => {
+                let msg = format!(
+                    "Git progress sync failed for {}: {}. Retrying with system git...",
+                    db_url.yellow(),
+                    libgit_error
+                );
+                if let Some(p) = pb {
+                    p.println(msg);
+                } else if let Some(m_ref) = m {
+                    m_ref.println(msg)?;
+                } else {
+                    eprintln!("{}", msg);
+                }
+                run_quiet_git_at_path(db_url, db_path)
+            }
+        }
     }
 }
 
@@ -757,6 +806,7 @@ fn sync_registry(
         } else {
             eprintln!("{}", msg);
         }
+        return Err(e);
     } else {
         if let Some(authorities) = &reg.authorities
             && let Err(e) = verify_registry_signature(&target_dir, authorities, verbose)
