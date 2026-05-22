@@ -10,7 +10,7 @@ Zoi has several dependencies that need to be installed for building from source 
 
 These are required to compile Zoi from source.
 
-- **Rust**: Current minimum version is `1.88.0` 2024 edition from the stable channel (see [`rust-toolchan.toml`](./rust-toolchain.toml) for the channel and [`Cargo.toml`](./Cargo.toml) for the Rust version and edition).
+- **Rust**: Current minimum version is `1.88.0` 2024 edition from the stable channel (see [`rust-toolchain.toml`](./rust-toolchain.toml) for the channel and [`Cargo.toml`](./Cargo.toml) for the Rust version and edition).
 - **C Compiler**: A C compiler like `gcc` is required. Packages like `build-essential` (Debian/Ubuntu) or `base-devel` (Arch Linux) usually provide this.
 - **OpenSSL**: The development libraries for OpenSSL are required. This is usually `libssl-dev` (Debian/Ubuntu) or `openssl-devel` (Fedora/CentOS).
 - **pkg-config**: The `pkg-config` utility is needed to locate libraries.
@@ -64,7 +64,7 @@ sudo make install
 
 The `scripts/` directory contains scripts for creating release builds for different platforms. These are used in our CI/CD pipeline.
 
-- `scripts/build-linux.sh`: Builds for Linux (and64, arm64) and cross-compiles for Windows (amd64).
+- `scripts/build-linux.sh`: Builds for Linux (amd64, arm64) and cross-compiles for Windows (amd64).
 - `scripts/build-macos.sh`: Builds for macOS (amd64, arm64).
 - `scripts/build-release.sh` & `build-release.ps1`: Helper scripts for creating a single release build on the current platform.
 
@@ -83,6 +83,7 @@ docker build \
   --build-arg POSTHOG_API_KEY="your_key" \
   --build-arg POSTHOG_API_HOST="your_host" \
   --build-arg ZOI_DEFAULT_REGISTRY="https://my-registry.com/repo.git" \
+  --build-arg ZOI_AUTHORITIES_KEY_1="trusted_fingerprint" \
   -t zoi .
 ```
 
@@ -115,7 +116,7 @@ Zoi uses a few environment variables at build time.
 
 ## Built-in PGP Keyring
 
-Zoi supports baking trusted PGP public keys directly into the binary. Any `.asc` file placed in the `src/pkg/pgp/builtin/` directory will be embedded at build time.
+Zoi supports baking trusted PGP public keys directly into the binary. Any `.asc` file placed in the `src/builtin/pgp/` directory will be embedded at build time.
 
 On startup, Zoi automatically imports these embedded keys into the user's local keyring (`~/.zoi/pgps/`). This is the recommended way to distribute "Root of Trust" keys for custom or internal registries.
 
@@ -123,7 +124,7 @@ On startup, Zoi automatically imports these embedded keys into the user's local 
 
 Similar to PGP keys, Zoi can embed global transaction hooks directly into the binary. These hooks are YAML files that define system-wide maintenance tasks triggered by file modifications.
 
-1. Place your hook definition files (`.hook.yaml`) in the `src/pkg/hooks/builtin/` directory.
+1. Place your hook definition files (`.hook.yaml`) in the `src/builtin/hooks/` directory.
 2. Build Zoi as usual.
 
 The build system will automatically embed these hooks. They are loaded on every transaction and can be overridden by users in `~/.zoi/hooks/` if they use the same name.

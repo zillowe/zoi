@@ -196,7 +196,7 @@ In enterprise environments, raw Git sources (`@git/`) are a security risk as the
 
 While you can distribute PGP public keys via a Zoi [Extension](/docs/zds/zoi/extensions), the most secure way to establish a Root of Trust is by **embedding keys into the binary**.
 
-By placing your organization's `.asc` files in `src/pkg/pgp/builtin/` before building Zoi, you ensure that every client starts with the necessary keys to verify your private registry, without requiring any manual setup.
+By placing your organization's `.asc` files in `src/builtin/pgp/` before building Zoi, you ensure that every client starts with the necessary keys to verify your private registry, without requiring any manual setup.
 
 ***
 
