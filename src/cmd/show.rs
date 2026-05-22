@@ -8,7 +8,7 @@ fn print_dependency_group(group: &types::DependencyGroup, indent: usize) {
     let prefix = " ".repeat(indent * 2);
     let mut count = 0;
 
-    let required = group.get_required_simple();
+    let required = group.required();
     if !required.is_empty() {
         for dep in required {
             println!("{}- {} (required)", prefix, dep);
@@ -16,7 +16,7 @@ fn print_dependency_group(group: &types::DependencyGroup, indent: usize) {
         }
     }
 
-    let options = group.get_required_options();
+    let options = group.options();
     if !options.is_empty() {
         for opt_group in options {
             println!(
@@ -33,7 +33,7 @@ fn print_dependency_group(group: &types::DependencyGroup, indent: usize) {
         }
     }
 
-    let optional = group.get_optional();
+    let optional = group.optional();
     if !optional.is_empty() {
         for dep in optional {
             println!("{}- {} (optional)", prefix, dep);
