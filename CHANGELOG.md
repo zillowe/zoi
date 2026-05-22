@@ -4,6 +4,45 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
+## [Prod-Release-1.14.0] - 2026-05-22
+
+### ✨ Features
+
+- *(pkg)* Add macOS .dmg/.pkg extraction and .app handling
+- *(purl)* Enforce repository path in PURL resolution
+- *(cli)* Add PURL support and new validate command
+- *(pkg/purl)* Add PURL package management and validation
+- *(hooks)* Add directory-based triggers for global hooks
+
+### 🎨 Styling
+
+- *(sh)* Format shell scripts
+
+### 🔒 Security
+
+- *(mini)* Disable plugin loading to prevent untrusted code execution
+- *(zoi-mini)* Implement checksum and GPG signature verification for zm scripts
+
+### 🛠️ Build
+
+- *(pubgrub)* Update integration for 0.4.0
+
+### 🛡️ Dependencies
+
+- *(cargo)* Add purl dependency
+- Update Cargo dependencies
+
+### 🧪 Testing
+
+- Add tests for helper command
+- *(assets)* Add package and advisory test data
+
+### 🩹 Bug Fixes
+
+- Correct purl test expected package output
+- Correct tests path
+- *(sync)* Resolve git2 API breaking changes
+
 ## [Prod-Release-1.13.0] - 2026-05-14
 
 ### ♻️ Refactor
