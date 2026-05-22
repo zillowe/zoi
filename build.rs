@@ -1,8 +1,9 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::env;
 use std::error::Error;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
 #[derive(serde::Deserialize)]
 struct ManagerCommands {
     is_installed: Option<String>,
@@ -14,20 +15,111 @@ struct ManagerCommands {
     sudo_uninstall: bool,
 }
 
+const BUILD_ENV_VARS: &[&str] = &[
+    "ZOI_COMMIT_HASH",
+    "POSTHOG_API_KEY",
+    "POSTHOG_API_HOST",
+    "ZOI_ABOUT_PACKAGER_AUTHOR",
+    "ZOI_ABOUT_PACKAGER_EMAIL",
+    "ZOI_ABOUT_PACKAGER_HOMEPAGE",
+    "ZOI_DEFAULT_REGISTRY",
+];
+const DEFAULT_REGISTRY: &str = "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg.git";
+const AUTHORITIES_KEY_RANGE: std::ops::Range<usize> = 1..10;
+
+fn forward_env_var(var: &str) {
+    if let Ok(val) = env::var(var) {
+        println!("cargo:rustc-env={var}={val}");
+    }
+}
+
+fn escaped_string_literal(value: &str) -> String {
+    format!("{value:?}")
+}
+
+fn read_sorted_paths(dir: &Path, extension: &str) -> Result<Vec<PathBuf>, Box<dyn Error>> {
+    let mut paths = Vec::new();
+
+    if dir.exists() {
+        for entry in std::fs::read_dir(dir)? {
+            let path = entry?.path();
+            if path.extension().and_then(|s| s.to_str()) == Some(extension) {
+                paths.push(path);
+            }
+        }
+    }
+
+    paths.sort();
+    Ok(paths)
+}
+
+fn file_stem(path: &Path) -> Result<&str, Box<dyn Error>> {
+    path.file_stem()
+        .and_then(|stem| stem.to_str())
+        .ok_or_else(|| format!("path has no valid UTF-8 file stem: {}", path.display()).into())
+}
+
+fn write_builtin_bytes(
+    out_dir: &Path,
+    input_dir: &Path,
+    output_file: &str,
+    static_name: &str,
+    extension: &str,
+) -> Result<(), Box<dyn Error>> {
+    println!("cargo:rerun-if-changed={}", input_dir.display());
+
+    let dest_path = out_dir.join(output_file);
+    let mut file = std::fs::File::create(dest_path)?;
+
+    writeln!(&mut file, "pub static {static_name}: &[(&str, &[u8])] = &[")?;
+    for path in read_sorted_paths(input_dir, extension)? {
+        let name = file_stem(&path)?;
+        let content = std::fs::read(&path)?;
+        writeln!(
+            &mut file,
+            "    ({}, &{:?}),",
+            escaped_string_literal(name),
+            content
+        )?;
+    }
+    writeln!(&mut file, "];")?;
+
+    Ok(())
+}
+
+fn write_builtin_strings(
+    out_dir: &Path,
+    input_dir: &Path,
+    output_file: &str,
+    static_name: &str,
+    extension: &str,
+) -> Result<(), Box<dyn Error>> {
+    println!("cargo:rerun-if-changed={}", input_dir.display());
+
+    let dest_path = out_dir.join(output_file);
+    let mut file = std::fs::File::create(dest_path)?;
+
+    writeln!(&mut file, "pub static {static_name}: &[(&str, &str)] = &[")?;
+    for path in read_sorted_paths(input_dir, extension)? {
+        let name = file_stem(&path)?;
+        let content = std::fs::read_to_string(&path)?;
+        writeln!(
+            &mut file,
+            "    ({}, {}),",
+            escaped_string_literal(name),
+            escaped_string_literal(&content)
+        )?;
+    }
+    writeln!(&mut file, "];")?;
+
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    let build_env_vars = [
-        "ZOI_COMMIT_HASH",
-        "POSTHOG_API_KEY",
-        "POSTHOG_API_HOST",
-        "ZOI_ABOUT_PACKAGER_AUTHOR",
-        "ZOI_ABOUT_PACKAGER_EMAIL",
-        "ZOI_ABOUT_PACKAGER_HOMEPAGE",
-        "ZOI_DEFAULT_REGISTRY",
-    ];
-    for var in build_env_vars {
+    for var in BUILD_ENV_VARS {
         println!("cargo:rerun-if-env-changed={}", var);
     }
-    for i in 1..10 {
+    for i in AUTHORITIES_KEY_RANGE {
         println!("cargo:rerun-if-env-changed=ZOI_AUTHORITIES_KEY_{}", i);
     }
 
@@ -46,30 +138,19 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    if let Ok(val) = env::var("ZOI_COMMIT_HASH") {
-        println!("cargo:rustc-env=ZOI_COMMIT_HASH={}", val);
+    for var in BUILD_ENV_VARS
+        .iter()
+        .copied()
+        .filter(|var| *var != "ZOI_DEFAULT_REGISTRY")
+    {
+        forward_env_var(var);
     }
-    if let Ok(val) = env::var("POSTHOG_API_KEY") {
-        println!("cargo:rustc-env=POSTHOG_API_KEY={}", val);
-    }
-    if let Ok(val) = env::var("POSTHOG_API_HOST") {
-        println!("cargo:rustc-env=POSTHOG_API_HOST={}", val);
-    }
-    if let Ok(val) = env::var("ZOI_ABOUT_PACKAGER_AUTHOR") {
-        println!("cargo:rustc-env=ZOI_ABOUT_PACKAGER_AUTHOR={}", val);
-    }
-    if let Ok(val) = env::var("ZOI_ABOUT_PACKAGER_EMAIL") {
-        println!("cargo:rustc-env=ZOI_ABOUT_PACKAGER_EMAIL={}", val);
-    }
-    if let Ok(val) = env::var("ZOI_ABOUT_PACKAGER_HOMEPAGE") {
-        println!("cargo:rustc-env=ZOI_ABOUT_PACKAGER_HOMEPAGE={}", val);
-    }
-    let zoi_registry = env::var("ZOI_DEFAULT_REGISTRY")
-        .unwrap_or_else(|_| "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg.git".to_string());
+
+    let zoi_registry = env::var("ZOI_DEFAULT_REGISTRY").unwrap_or_else(|_| DEFAULT_REGISTRY.into());
     println!("cargo:rustc-env=ZOI_DEFAULT_REGISTRY={}", zoi_registry);
 
     let mut authorities = Vec::new();
-    for i in 1..10 {
+    for i in AUTHORITIES_KEY_RANGE {
         if let Ok(val) = env::var(format!("ZOI_AUTHORITIES_KEY_{}", i))
             && !val.is_empty()
         {
@@ -85,33 +166,31 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed={}", managers_json_path.display());
 
     let out_dir = env::var("OUT_DIR")?;
-    let dest_path = Path::new(&out_dir).join("generated_managers.rs");
+    let out_dir = PathBuf::from(out_dir);
+    let dest_path = out_dir.join("generated_managers.rs");
     let mut file = std::fs::File::create(dest_path)?;
 
     let json_str = std::fs::read_to_string(managers_json_path)?;
-    let managers: HashMap<String, ManagerCommands> = serde_json::from_str(&json_str)?;
+    let managers: BTreeMap<String, ManagerCommands> = serde_json::from_str(&json_str)?;
 
     let mut map = phf_codegen::Map::new();
-    let mut values = Vec::new();
+    let mut values = Vec::with_capacity(managers.len());
 
     for (name, commands) in &managers {
         let is_installed_val = match &commands.is_installed {
-            Some(s) => format!("Some(\"{}\")", s.replace('\\', "\\\\").replace('"', "\\\"")),
+            Some(s) => format!("Some({})", escaped_string_literal(s)),
             None => "None".to_string(),
         };
 
         let value = format!(
-            "ManagerCommands {{ is_installed: {}, install: \"{}\", uninstall: \"{}\", sudo_install: {}, sudo_uninstall: {} }}",
+            "ManagerCommands {{ is_installed: {}, install: {}, uninstall: {}, sudo_install: {}, sudo_uninstall: {} }}",
             is_installed_val,
-            commands.install.replace('\\', "\\\\").replace('"', "\\\""),
-            commands
-                .uninstall
-                .replace('\\', "\\\\")
-                .replace('"', "\\\""),
+            escaped_string_literal(&commands.install),
+            escaped_string_literal(&commands.uninstall),
             commands.sudo_install,
             commands.sudo_uninstall
         );
-        values.push((name.clone(), value));
+        values.push((name.as_str(), value));
     }
 
     for (name, value) in &values {
@@ -129,69 +208,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         map.build()
     )?;
 
-    let pgp_builtin_dir = Path::new("src/pkg/pgp/builtin");
-    println!("cargo:rerun-if-changed={}", pgp_builtin_dir.display());
-
-    let pgp_dest_path = Path::new(&out_dir).join("generated_pgp_keys.rs");
-    let mut pgp_file = std::fs::File::create(pgp_dest_path)?;
-
-    writeln!(
-        &mut pgp_file,
-        "pub static BUILTIN_KEYS: &[(&str, &[u8])] = &["
+    write_builtin_bytes(
+        &out_dir,
+        Path::new("src/builtin/pgp"),
+        "generated_pgp_keys.rs",
+        "BUILTIN_KEYS",
+        "asc",
     )?;
-    if pgp_builtin_dir.exists() {
-        let mut asc_paths = Vec::new();
-        for entry in std::fs::read_dir(pgp_builtin_dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) == Some("asc") {
-                asc_paths.push(path);
-            }
-        }
-        asc_paths.sort();
-        for path in asc_paths {
-            let name = path
-                .file_stem()
-                .expect("Path should have a file stem")
-                .to_str()
-                .expect("Path should be valid UTF-8");
-            let content = std::fs::read(&path)?;
-            writeln!(&mut pgp_file, "    (\"{}\", &{:?}),", name, content)?;
-        }
-    }
-    writeln!(&mut pgp_file, "];")?;
-
-    let hooks_builtin_dir = Path::new("src/pkg/hooks/builtin");
-    println!("cargo:rerun-if-changed={}", hooks_builtin_dir.display());
-
-    let hooks_dest_path = Path::new(&out_dir).join("generated_builtin_hooks.rs");
-    let mut hooks_file = std::fs::File::create(hooks_dest_path)?;
-
-    writeln!(
-        &mut hooks_file,
-        "pub static BUILTIN_HOOKS: &[(&str, &str)] = &["
+    write_builtin_strings(
+        &out_dir,
+        Path::new("src/builtin/hooks"),
+        "generated_builtin_hooks.rs",
+        "BUILTIN_HOOKS",
+        "yaml",
     )?;
-    if hooks_builtin_dir.exists() {
-        let mut yaml_paths = Vec::new();
-        for entry in std::fs::read_dir(hooks_builtin_dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) == Some("yaml") {
-                yaml_paths.push(path);
-            }
-        }
-        yaml_paths.sort();
-        for path in yaml_paths {
-            let name = path
-                .file_stem()
-                .expect("Path should have a file stem")
-                .to_str()
-                .expect("Path should be valid UTF-8");
-            let content = std::fs::read_to_string(&path)?;
-            writeln!(&mut hooks_file, "    (\"{}\", {:?}),", name, content)?;
-        }
-    }
-    writeln!(&mut hooks_file, "];")?;
 
     Ok(())
 }
