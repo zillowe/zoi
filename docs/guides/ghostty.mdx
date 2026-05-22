@@ -1,0 +1,229 @@
+---
+title: Packaging Ghostty
+description: A real-world guide to packaging Ghostty with Zoi, including native dependencies, Zig builds, and split packages.
+---
+
+This guide walks through packaging [Ghostty](https://ghostty.org/) as a Zoi package. Ghostty is a good real-world example because it is not just a single downloaded binary: it has native Linux desktop dependencies, Zig build tooling, generated resources, shell integration files, terminfo files, manuals, desktop files, icons, and optional Nautilus integration.
+
+The example is based on the shape used by the existing Arch Linux and Nix packaging:
+
+* fetch the Ghostty release tarball from GitHub
+* install native build and runtime dependencies with `native:`
+* run Ghostty's Zig cache bootstrap script
+* build with `zig build`
+* split the package into main, shell integration, terminfo, and Nautilus pieces
+
+<Callout title="Linux-focused guide" type="warn">
+  This is a Linux source-build guide. Ghostty packaging differs across
+  platforms, and the exact native dependency names can vary by distribution.
+  Treat this as a strong starting point for a maintained registry package, not
+  as a universal package definition for every operating system.
+</Callout>
+
+## Package Shape
+
+Ghostty maps naturally to a split package:
+
+| Sub-package | Purpose |
+| ----------- | ------- |
+| `ghostty:main` | The terminal binary, desktop files, icons, manuals, and main resources. |
+| `ghostty:shell-integration` | Shell integration scripts that can also be installed on remote machines. |
+| `ghostty:terminfo` | Terminfo entries, useful on hosts accessed over SSH. |
+| `ghostty:nautilus` | Optional GNOME Files integration. |
+
+Installing `ghostty` should install the main terminal plus shell integration and terminfo by default, while leaving Nautilus integration optional.
+
+## `ghostty.pkg.lua`
+
+```lua
+local version = "1.3.1"
+local archive = "ghostty-" .. version .. ".tar.gz"
+local src_dir = "ghostty-" .. version
+local url = "https://github.com/ghostty-org/ghostty/archive/v" .. version .. "/" .. archive
+
+metadata({
+  name = "ghostty",
+  repo = "community",
+  version = version,
+  description = "Fast, native, feature-rich terminal emulator",
+  website = "https://ghostty.org/",
+  git = "https://github.com/ghostty-org/ghostty",
+  maintainer = { name = "Your Name", email = "you@example.com" },
+  author = { name = "Ghostty Project", website = "https://ghostty.org/" },
+  license = "MIT",
+  bins = { "ghostty" },
+  types = { "source" },
+  platforms = { "linux" },
+  sub_packages = {
+    "main",
+    "shell-integration",
+    "terminfo",
+    "nautilus"
+  },
+  main_subs = {
+    "main",
+    "shell-integration",
+    "terminfo"
+  },
+  tags = { "terminal", "gtk", "zig", "desktop" }
+})
+
+dependencies({
+  build = {
+    types = {
+      source = {
+        required = {
+          "native:zig",
+          "native:blueprint-compiler",
+          "native:pandoc",
+          "native:pkg-config"
+        }
+      }
+    }
+  },
+  runtime = {
+    required = {
+      "native:bzip2",
+      "native:fontconfig",
+      "native:freetype2",
+      "native:glib2",
+      "native:gtk4",
+      "native:gtk4-layer-shell",
+      "native:harfbuzz",
+      "native:libadwaita",
+      "native:libpng",
+      "native:libx11",
+      "native:oniguruma",
+      "native:pixman",
+      "native:wayland",
+      "native:zlib"
+    },
+    sub_packages = {
+      nautilus = {
+        required = { "native:nautilus-python" }
+      }
+    }
+  }
+})
+
+function prepare()
+  UTILS.FILE(url, archive)
+  UTILS.EXTRACT(archive, "src")
+
+  -- Ghostty vendors Zig dependencies through a Zig global cache.
+  cmd("cd src/" .. src_dir .. " && ZIG_GLOBAL_CACHE_DIR=" .. BUILD_DIR .. "/zig-global-cache ./nix/build-support/fetch-zig-cache.sh")
+
+  -- Build into an install tree inside BUILD_DIR, then copy selected outputs in package().
+  cmd("cd src/" .. src_dir .. " && DESTDIR=" .. BUILD_DIR .. "/install zig build " ..
+    "--summary all " ..
+    "--prefix /usr " ..
+    "--system " .. BUILD_DIR .. "/zig-global-cache/p " ..
+    "-Doptimize=ReleaseFast " ..
+    "-Dgtk-x11=true " ..
+    "-Dcpu=baseline " ..
+    "-Dpie=true " ..
+    "-Demit-docs " ..
+    "-Dversion-string=" .. PKG.version .. "-zoi " ..
+    "--build-id=sha1")
+end
+
+function verify()
+  -- Replace this with the current release hash when maintaining the package.
+  -- return verifyHash(archive, "sha256-...")
+  return true
+end
+
+function package(args)
+  local sub = args.sub or "main"
+  local root = "install/usr"
+
+  if sub == "main" then
+    zcp(root .. "/bin", "${pkgstore}/bin")
+    zcp(root .. "/share/applications", "${pkgstore}/share/applications")
+    zcp(root .. "/share/dbus-1", "${pkgstore}/share/dbus-1")
+    zcp(root .. "/share/glib-2.0", "${pkgstore}/share/glib-2.0")
+    zcp(root .. "/share/icons", "${pkgstore}/share/icons")
+    zcp(root .. "/share/man", "${pkgstore}/share/man")
+
+    -- Copy the main Ghostty resources, but keep shell integration split out.
+    -- This avoids file ownership conflicts with ghostty:shell-integration.
+    cmd("rm -rf main-ghostty-share && mkdir -p main-ghostty-share")
+    cmd("cp -a " .. root .. "/share/ghostty/. main-ghostty-share/")
+    cmd("rm -rf main-ghostty-share/shell-integration")
+    zcp("main-ghostty-share", "${pkgstore}/share/ghostty")
+
+    zcp("src/" .. src_dir .. "/LICENSE", "${pkgstore}/share/licenses/ghostty/LICENSE")
+  elseif sub == "shell-integration" then
+    zcp(root .. "/share/ghostty/shell-integration", "${pkgstore}/share/ghostty/shell-integration")
+  elseif sub == "terminfo" then
+    zcp(root .. "/share/terminfo", "${pkgstore}/share/terminfo")
+  elseif sub == "nautilus" then
+    zcp(root .. "/share/nautilus-python", "${pkgstore}/share/nautilus-python")
+  end
+end
+
+function test(args)
+  local sub = args.sub or "main"
+
+  if sub == "main" then
+    local _, _, code = cmd(STAGING_DIR .. "/data/main/pkgstore/bin/ghostty --version")
+    return code == 0
+  end
+
+  return true
+end
+```
+
+## Why This Works
+
+The package builds Ghostty once in `prepare()`, then copies different install-tree paths depending on `args.sub`. For split packages, Zoi stages each sub-package under its own data prefix, so the main package test uses:
+
+```lua
+STAGING_DIR .. "/data/main/pkgstore/bin/ghostty"
+```
+
+The shell integration and terminfo outputs are separate because they are useful independently. For example, a server you SSH into may only need `ghostty:terminfo`, not the full terminal emulator.
+
+## Build and Validate
+
+Validate the package:
+
+```sh
+zoi package doctor ./ghostty.pkg.lua --platform linux-amd64
+```
+
+Run package tests:
+
+```sh
+zoi package test ./ghostty.pkg.lua --platform linux-amd64
+```
+
+Build distributable archives:
+
+```sh
+zoi package build ./ghostty.pkg.lua --platform linux-amd64 --test
+```
+
+Install only the main terminal:
+
+```sh
+zoi package install ./ghostty-1.3.1-linux-amd64.pkg.tar.zst --sub main
+```
+
+Install the default sub-packages from the package definition:
+
+```sh
+zoi install ./ghostty.pkg.lua
+```
+
+## Maintainer Notes
+
+When turning this into a registry package:
+
+* replace the placeholder `verify()` with the real release hash
+* confirm native package names for each supported distro
+* add or remove copied resource paths based on the current Ghostty install tree
+* consider a separate pre-compiled package once trusted release archives are available
+* keep Nautilus integration optional because it pulls in GNOME-specific dependencies
+
+For package fields and lifecycle details, see [Creating Packages](/docs/zds/zoi/creating-packages).
