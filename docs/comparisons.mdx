@@ -1,58 +1,172 @@
 ---
 title: Comparisons
-description: How Zoi compares to other popular package managers like Pacman, APT, and Nix.
+description: When to use Zoi, and how it compares to Nix, Homebrew, APT, Pacman, mise, asdf, Devbox, and Flox.
 ---
 
-Zoi is a standalone, universal package manager with its own package format (`.pkg.lua`), build system, and local package repository. A key feature is its ability to integrate with and leverage existing system (like APT, Pacman) and language-specific (like Cargo, NPM) package managers for dependency resolution. This hybrid approach allows it to manage its own sandboxed packages while co-existing with the native tooling of an operating system.
+Zoi is a universal package manager and environment setup tool. It has its own package format (`.pkg.lua`), a versioned package store, project environments, rollback support, registry security features, and integration with many native and language package managers.
 
-This page compares Zoi to some other popular package managers.
+The short version:
 
-| Feature                   | Zoi                                                                                                                                                                                                         | Pacman (Arch Linux)                                              | APT (Debian/Ubuntu)                                  | Nix                                                                                              |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| **Type**                  | Universal / Hybrid                                                                                                                                                                                          | OS-specific (Arch Linux)                                         | OS-specific (Debian-based)                           | Universal                                                                                        |
-| **Package Definition**    | `.pkg.lua` (Lua script)                                                                                                                                                                                     | `PKGBUILD` (Shell script)                                        | `debian/` directory                                  | `.nix` expression                                                                                |
-| **Dependency Management** | Manages its own sandboxed packages. Can also install dependencies via other system/language managers. Supports **Smart Provider Selection** for conflict resolution.                                        | System-wide, managed by Pacman.                                  | System-wide, managed by APT.                         | Purely functional. Dependencies are stored in `/nix/store` with unique hashes.                   |
-| **Package Isolation**     | High. Packages are installed into versioned directories. Bins are symlinked. Supports **Sysroot (`--root`)** for isolated OS image builds.                                                                  | Low. Files are installed into system-wide locations like `/usr`. | Low. Files are installed into system-wide locations. | Very High. Packages are isolated in the Nix store. Environments are built from these components. |
-| **Reproducibility**       | Medium. Zoi packages are versioned, but dependencies from other managers can change. Includes `zoi.lock` for project-local consistency.                                                                     | Medium. Depends on the state of Arch repositories.               | Medium. Depends on the state of APT repositories.    | Very High. Builds are bit-for-bit reproducible.                                                  |
-| **Configuration**         | Declarative (`.pkg.lua`) and imperative scripting. Supports enterprise **Policy Enforcement** and **Native Service Management**.                                                                            | Declarative (`PKGBUILD`).                                        | Declarative (`debian/control`).                      | Purely functional and declarative (`.nix` files).                                                |
-| **Cross-platform**        | Yes (Linux, macOS, Windows).                                                                                                                                                                                | No (Arch Linux only).                                            | No (Debian-based Linux only).                        | Yes (Linux, macOS).                                                                              |
-| **Key Idea**              | Provide a self-contained, sandboxed package management system that is cross-platform and can integrate with other package managers. Scalable via **SQLite caching** and powered by a robust **SAT solver**. | Simplicity and user-centrism for a specific rolling-release OS.  | Robustness and stability for a stable-release OS.    | Purely functional package management for reproducible, declarative, and reliable systems.        |
+* Use **Zoi** when you want one cross-platform workflow for installing tools, defining project environments, packaging software, and mixing Zoi-managed packages with native dependencies.
+* Use **Nix** when maximum reproducibility and fully isolated functional builds are the top priority.
+* Use **Homebrew, APT, Pacman, Scoop, or Winget** when you only need the normal package manager for one operating system.
+* Use **mise or asdf** when you mainly need runtime version switching for languages.
+* Use **Devbox or Flox** when you want a friendlier workflow on top of Nix.
 
-## Modern Dev Environment Tools
+## What Zoi Is
 
-Zoi often finds itself compared to modern development environment managers like **Devbox**, **Flox**, and **mise**. While they share the goal of consistent project environments, their architectural philosophies differ significantly.
+Zoi is not only a wrapper around existing package managers. Zoi can install its own packages into a versioned store, create shims, manage project-local environments, resolve package graphs, run package tests, track files, audit advisories, roll back Zoi-native packages, and build packages from Lua definitions.
 
-### Zoi vs. Nix-based Wrappers (Devbox, Flox)
+Zoi also does not pretend native package managers do not exist. A `.pkg.lua` package can depend on `native:openssl`, `cargo:ripgrep`, `npm:typescript`, `brew:cmake`, `scoop:git`, or many other managers. That makes Zoi useful for real machines where some dependencies should come from the host platform.
 
-Devbox and Flox are excellent tools that wrap the **Nix package manager** to provide a more user-friendly interface.
+## What Zoi Is Not
 
-* **The Nix Ecosystem:** These tools rely entirely on the Nix ecosystem. If a package or specific version isn't in `nixpkgs`, you must write a Nix derivation to include it.
-* **Zoi's Hybrid Approach:** Zoi is "package manager agnostic." Its unique power lies in its ability to satisfy dependencies using **any** of 40+ supported managers. A Zoi package can simultaneously require a library from APT, a tool from Homebrew, and a language runtime from Cargo.
-* **Isolation:** Nix uses the `/nix/store` with cryptographic hashes. Zoi uses its own versioned store (`~/.zoi/pkgs/store`) but can also interoperate with standard system locations.
+Zoi is not a full operating system distribution, and it does not snapshot your entire machine. When Zoi asks APT, Homebrew, Cargo, NPM, or another external manager to install a dependency, that external manager still owns its own state.
 
-### Zoi vs. Runtime Managers (mise, asdf)
+Zoi is also not as purely reproducible as Nix. Zoi improves reproducibility with `zoi.lock`, package hashes, registry metadata, PGP verification, and project-local installs, but external package managers can still change independently.
 
-**mise** (formerly `rtx`) and **asdf** are popular for managing multiple versions of language runtimes (Node.js, Python, Ruby).
+## Main Comparison
 
-* **Scope:** mise and asdf focus primarily on language runtimes and environment variables. They use "plugins" to fetch and manage these versions.
-* **Functionality:** Zoi is a full-featured package manager. It manages not just runtimes, but binaries, libraries, PGP keys, and configuration files. Zoi's `zoi dev`, `zoi env` and `zoi.yaml` provide environment management similar to mise and devbox, but backed by a much more powerful packaging engine.
-* **Native Integration:** mise manages versions by manipulating your `PATH`. Zoi manages them via a versioned store and intelligent shims, allowing automatic version switching based on your current project directory (`zoi.yaml`) or legacy configuration files (like `.nvmrc` via its powerful Lua plugin system) without manual environment changes. Zoi additionally sets up `LD_LIBRARY_PATH`, `CPATH`, and `PKG_CONFIG_PATH` for a complete development environment when using `zoi dev`.
+| Question | Zoi | Nix | Homebrew / APT / Pacman / Scoop / Winget | mise / asdf | Devbox / Flox |
+| -------- | --- | --- | ---------------------------------------- | ----------- | ------------- |
+| Cross-platform CLI workflow | Yes: Linux, macOS, Windows | Mostly Linux/macOS | Usually one OS family | Mostly Linux/macOS | Mostly Linux/macOS |
+| Own package format | `.pkg.lua` | `.nix` | Manager-specific formats | Plugin definitions | Nix-based config |
+| Package store | Zoi versioned store | Content-addressed Nix store | System/user manager locations | Tool/plugin locations | Nix store |
+| Project environments | `zoi.yaml`, `zoi dev`, `zoi run`, `zoi env` | Shells and flakes | Not usually the main model | Runtime-focused | Yes |
+| Runtime version switching | Intelligent shims and plugins | Through Nix profiles/shells | Limited or manager-specific | Core feature | Through Nix |
+| Native dependency integration | First-class via `native:` and manager prefixes | Usually avoided or isolated | Native by definition | Limited | Usually via Nix |
+| Package authoring | Lua package scripts | Nix expressions | Different per manager | Plugins | Nix packages/config |
+| Rollback | Zoi-native packages and transaction logs | Strong Nix generations | Manager-specific | Limited | Nix-backed |
+| Security model | Hashes, PGP, advisories, registry authorities, policy | Hash-addressed store, signatures depending on setup | Manager-specific | Plugin/source trust | Nix-backed |
+| Best fit | Cross-platform tools, project envs, scriptable packages, hybrid deps | Maximum reproducibility | Normal OS package management | Language/runtime versions | Nix environments with easier UX |
 
-### Comparison Table: Dev Tools
+## Zoi vs. Nix
 
-| Feature                | Zoi                            | Devbox / Flox               | mise / asdf                     |
-| :--------------------- | :----------------------------- | :-------------------------- | :------------------------------ |
-| **Engine**             | Zoi (Rust + Lua + PubGrub SAT) | Nix                         | Tool-specific plugins           |
-| **Package Source**     | Multi-manager (Hybrid)         | Nixpkgs only                | Plugin repositories             |
-| **Reproducibility**    | High (Lockfiles + PGP)         | Very High (Pure Nix)        | Medium (Version pinning)        |
-| **Native Integration** | Deep (APT, Brew, etc.)         | None (Isolated Nix)         | Minimal (PATH based)            |
-| **Configuration**      | `zoi.yaml` / `.pkg.lua`        | `devbox.json` / `flox.toml` | `.mise.toml` / `.tool-versions` |
-| **Cross-platform**     | Linux, macOS, Windows          | Linux, macOS (WSL req)      | Linux, macOS                    |
+Nix is the stronger choice if your main requirement is fully reproducible builds and environments. Its store model and functional package language are designed around reproducibility from the ground up.
+
+Zoi is the stronger choice if you want a packaging system that is easier to script with familiar Lua, works across Linux, macOS, and Windows, and can cooperate with existing package managers. A Zoi package can combine a Zoi-managed binary with dependencies from APT on Ubuntu, Homebrew on macOS, Scoop on Windows, Cargo for Rust tools, or NPM for JavaScript tools.
+
+Tradeoff:
+
+* Nix gives stronger isolation and reproducibility.
+* Zoi gives a more hybrid, host-aware workflow and a package format that is closer to traditional scripting.
+
+Choose Nix when you want the environment to be independent from the host. Choose Zoi when the host package manager is part of the intended setup.
+
+## Zoi vs. Homebrew, APT, Pacman, Scoop, and Winget
+
+Native package managers are excellent at managing software for their own platform. If all you need is `apt install`, `brew install`, `pacman -S`, `scoop install`, or `winget install`, use the native manager directly.
+
+Zoi becomes useful when you need a workflow that crosses those platforms:
+
+* one package definition can branch on `SYSTEM.OS` and `SYSTEM.ARCH`
+* one project can define tools in `zoi.yaml`
+* one command can install Zoi packages plus native dependencies
+* one package can expose metadata, tests, rollback behavior, services, and security advisories
+* one registry format can be mirrored or self-hosted
+
+Zoi does not replace the native manager in every case. It can call the native manager when that is the right source for a dependency.
+
+## Zoi vs. mise and asdf
+
+mise and asdf are focused on language runtime and tool version management. They are a good fit when you mainly need to switch between Node.js, Python, Ruby, Go, or similar runtimes per project.
+
+Zoi is broader. It can manage runtimes, but it also manages packages, package definitions, package tests, binary archives, services, security advisories, project commands, rollback, and registries.
+
+Tradeoff:
+
+* mise and asdf are simpler for runtime-only workflows.
+* Zoi is better when runtimes are only one part of a larger environment.
+
+If your project only needs `node 20` and `python 3.12`, a runtime manager may be enough. If your project also needs native libraries, custom tools, services, package metadata, and a reusable package format, Zoi is a better fit.
+
+## Zoi vs. Devbox and Flox
+
+Devbox and Flox provide friendlier workflows on top of Nix. They are good options when you want Nix-powered environments without interacting with raw Nix as much.
+
+Zoi takes a different path. It does not use Nix as its engine. Its engine is Zoi's own package resolver, store, registry model, and Lua package format. That means Zoi packages can be written as scripts and can intentionally use host-native package managers.
+
+Tradeoff:
+
+* Devbox and Flox inherit Nix's reproducibility and package ecosystem.
+* Zoi gives more direct control over package scripting and native dependency integration.
+
+## Zoi vs. Docker
+
+Docker is for containers. It is excellent when you want a process to run in an isolated filesystem image.
+
+Zoi is for provisioning tools and environments on a machine or inside a project. It can be used in CI, containers, workstations, and sysroots, but it does not require every workflow to become a container.
+
+Use Docker when the deployment unit is a container. Use Zoi when the developer or system environment itself needs managed tools.
+
+## Where Zoi Fits Best
+
+Zoi is a good fit for:
+
+* developers working across Linux, macOS, and Windows
+* projects that need a checked-in `zoi.yaml` and `zoi.lock`
+* package authors who want a Lua-based package format
+* teams that need internal registries or mirrors
+* environments where package advisories, PGP verification, policy, audit history, and rollback matter
+* workflows that need both isolated Zoi packages and host-native dependencies
+
+Zoi is probably not the best first choice for:
+
+* systems that require Nix-level reproducibility
+* users who only need one operating system's default package manager
+* projects that only need runtime version switching
+* environments where arbitrary package scripts are not allowed unless a strict registry and signature policy is enforced
+
+## Reproducibility Expectations
+
+Zoi's reproducibility depends on what kind of dependency is being installed.
+
+| Dependency kind | Reproducibility expectation |
+| --------------- | --------------------------- |
+| Zoi package with lockfile and archive hash | High |
+| Zoi package built from source | Depends on package definition and upstream source stability |
+| Native package through `apt`, `brew`, `pacman`, `scoop`, etc. | Depends on that manager's repositories |
+| Language package through `npm`, `cargo`, `pip`, etc. | Depends on that ecosystem and version constraints |
+| Project install with `--frozen-lockfile` | Highest Zoi project mode |
+
+For strict project installs, commit `zoi.yaml` and `zoi.lock`, then use:
+
+```sh
+zoi install --local --frozen-lockfile
+```
+
+## Security Expectations
+
+Zoi has multiple security features, but they are strongest when used together:
+
+* package archive hashes
+* PGP signature verification
+* built-in or imported PGP keys
+* registry commit authorities
+* decentralized `.sec.yaml` advisories
+* `zoi audit`
+* policy controls in system configuration
+* offline mode and mirrored registries
+
+The important trust question is: who controls the registry and package definitions you are installing from?
+
+For personal use, the official [Zoidberg](/docs/zds/zoi/zoidberg) registry may be enough. For teams or companies, prefer an internal mirror, trusted PGP keys, registry authorities, and policy enforcement. See [Security Policy](/docs/zds/zoi/guides/security-policy) and [Security Advisories](/docs/zds/zoi/guides/security-advisories).
+
+## Decision Guide
+
+| If you need... | Use... |
+| -------------- | ------ |
+| Maximum reproducibility and isolation | Nix |
+| A package manager for one OS | That OS package manager |
+| Runtime switching only | mise or asdf |
+| Nix environments with simpler UX | Devbox or Flox |
+| Cross-platform package scripts and project environments | Zoi |
+| Native dependencies plus isolated custom packages | Zoi |
+| Internal registries with package metadata, advisories, and policy | Zoi |
+| Containerized deployment | Docker |
 
 ## Summary
 
-* **Choose Zoi if:** You work across multiple operating systems and need a unified manager that respects your OS's native tools while providing high-isolation sandboxing. Its ability to manage background services and automatically configure development environments makes it a complete "workspace in a box" solution.
+Zoi is best understood as a hybrid package manager and environment tool. It gives you a Zoi-native store and package format, but it can still cooperate with the package managers already present on the host.
 
-* **Choose Pacman/APT if:** You are happy with your OS's native package manager and primarily need to manage system-wide applications and libraries on a single machine.
-
-* **Choose Nix if:** Your primary goal is maximum reproducibility and reliability. You want to build environments declaratively and are willing to learn the Nix language and its functional concepts.
+That hybrid design is the point. Zoi is not trying to beat Nix at pure reproducibility, or beat APT and Pacman at managing their own distributions, or beat mise at being only a runtime manager. Zoi is for the middle ground: cross-platform packages, project environments, native dependency integration, and a package format that is practical to write and review.

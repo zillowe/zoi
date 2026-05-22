@@ -1,0 +1,256 @@
+---
+title: Quick Start
+description: Install Zoi, sync the registry, install packages, and set up a project environment.
+---
+
+This guide gets you from a fresh machine to a working Zoi setup. It covers the normal user path first, then the project and package-author paths.
+
+## 1. Install Zoi
+
+Choose the installer for your platform.
+
+### Linux / macOS
+
+```sh
+curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash
+```
+
+### Windows
+
+```powershell
+powershell -c "irm zillowe.pages.dev/scripts/zoi/install.ps1|iex"
+```
+
+## 2. Set Up Your Shell
+
+Zoi links package binaries into `~/.zoi/pkgs/bin`. If commands installed by Zoi are not found, configure your shell:
+
+```sh
+zoi shell zsh
+```
+
+Use your shell name: `bash`, `zsh`, `fish`, `elvish`, or `powershell`.
+
+## 3. Sync the Package Registry
+
+Zoi uses Git-backed package registries. Sync once before installing packages:
+
+```sh
+zoi sync
+```
+
+This downloads package definitions from [Zoidberg](/docs/zds/zoi/zoidberg), builds the local package index, and imports registry metadata.
+
+## 4. Find and Install a Package
+
+Search:
+
+```sh
+zoi search hello
+```
+
+Show package details:
+
+```sh
+zoi show @zillowe/hello
+```
+
+Install:
+
+```sh
+zoi install @zillowe/hello
+```
+
+Run the installed command:
+
+```sh
+hello
+```
+
+## 5. Use Zoi Without Installing a Package
+
+For one-off commands, use `zoi exec`:
+
+```sh
+zoi exec @zillowe/hello
+```
+
+This is useful for trying a tool before adding it to your installed package set.
+
+## 6. Update Safely
+
+Preview updates first:
+
+```sh
+zoi update --all --dry-run
+```
+
+Apply updates:
+
+```sh
+zoi update --all
+```
+
+If an update causes problems, roll back:
+
+```sh
+zoi rollback <package>
+```
+
+For a failed or interrupted transaction:
+
+```sh
+zoi rollback --last-transaction
+```
+
+## 7. Create a Project Environment
+
+Create `zoi.yaml` in your project root:
+
+```yaml
+name: my-project
+config:
+  local: true
+pkgs:
+  - eza
+  - fzf
+commands:
+  - cmd: build
+    run: make build
+  - cmd: test
+    run: make test
+shell:
+  env:
+    default:
+      DEBUG: "true"
+```
+
+Install project-local packages:
+
+```sh
+zoi install --local
+```
+
+Enter the development shell:
+
+```sh
+zoi dev
+```
+
+Run project commands:
+
+```sh
+zoi run build
+zoi run test
+```
+
+Commit both `zoi.yaml` and `zoi.lock` so other machines can reproduce the same environment.
+
+For strict reproducibility in CI:
+
+```sh
+zoi install --local --frozen-lockfile --yes
+```
+
+## 8. Install From a Specific Source
+
+Zoi source strings let you choose where a package comes from.
+
+| Source | Example |
+| ------ | ------- |
+| Default active repos | `zoi install hello` |
+| Specific repo | `zoi install @zillowe/hello` |
+| Specific registry | `zoi install #zoidberg@zillowe/hello` |
+| Specific version | `zoi install @zillowe/hello@1.0.0` |
+| Sub-package | `zoi install @core/linux:headers` |
+| Local package file | `zoi install ./my-tool.pkg.lua` |
+| Git repository | `zoi install --repo Zillowe/Hello` |
+
+For more source formats, see [Repositories & Registries](/docs/zds/zoi/repositories).
+
+## 9. Understand What Zoi Installs
+
+Zoi has two kinds of dependencies:
+
+* **Zoi packages:** Packages installed into Zoi's own versioned store.
+* **External dependencies:** Dependencies installed through native or language package managers such as `apt`, `brew`, `scoop`, `cargo`, `npm`, `pip`, or `go`.
+
+Use `native:<name>` in package definitions when the host operating system should choose the correct native package manager.
+
+For the full dependency format, see [Dependencies & Supported Package Managers](/docs/zds/zoi/dependencies).
+
+## 10. Create Your First Package
+
+A minimal `.pkg.lua` package looks like this:
+
+```lua
+metadata({
+  name = "my-cli",
+  repo = "community",
+  version = "1.0.0",
+  description = "My command line tool",
+  maintainer = { name = "Your Name", email = "you@example.com" },
+  license = "MIT",
+  bins = { "my-cli" },
+  types = { "pre-compiled" }
+})
+
+function prepare()
+  UTILS.EXTRACT("https://example.com/my-cli-1.0.0-linux-amd64.tar.gz", "src")
+end
+
+function package()
+  zcp("src/my-cli", "${pkgstore}/bin/my-cli")
+end
+
+function test()
+  local _, _, code = cmd(STAGING_DIR .. "/data/pkgstore/bin/my-cli --version")
+  return code == 0
+end
+```
+
+Validate it:
+
+```sh
+zoi package doctor ./my-cli.pkg.lua
+```
+
+Test it:
+
+```sh
+zoi package test ./my-cli.pkg.lua
+```
+
+Build it:
+
+```sh
+zoi package build ./my-cli.pkg.lua --test
+```
+
+For the complete packaging guide, see [Creating Packages](/docs/zds/zoi/creating-packages).
+
+## 11. Troubleshooting
+
+Run:
+
+```sh
+zoi doctor
+```
+
+Common fixes:
+
+| Problem | Fix |
+| ------- | --- |
+| Installed commands are not found | Run `zoi shell <shell>` or add `~/.zoi/pkgs/bin` to `PATH`. |
+| Package cannot be found | Run `zoi sync`, then check active repos with `zoi repo list`. |
+| You need a mirror | Use `zoi sync set github`, `zoi sync set codeberg`, or a custom registry URL. |
+| You need offline installs | Pre-populate archives with `zoi cache add` or use `--pkg-dir` with `--offline`. |
+| You need to know why something is installed | Run `zoi why <package>`. |
+| You need to know which package owns a file | Run `zoi owner <path>`. |
+
+## Next Steps
+
+* Read [Features & Usage](/docs/zds/zoi/features) for the full command reference.
+* Read [Project Configuration](/docs/zds/zoi/project-config) for `zoi.yaml`.
+* Read [Creating Packages](/docs/zds/zoi/creating-packages) to write packages.
+* Read [Comparisons](/docs/zds/zoi/comparisons) to understand when Zoi is the right tool.
