@@ -152,17 +152,17 @@ fn validate_dependency_group(
     package: &types::Package,
     report: &mut DoctorReport,
 ) {
-    for dep in group.get_required_simple() {
-        validate_dependency_string(&dep, context, "required", report);
+    for dep in group.required() {
+        validate_dependency_string(dep, context, "required", report);
     }
 
-    for option in group.get_required_options() {
-        for dep in option.depends {
-            validate_dependency_string(&dep, context, &format!("options.{}", option.name), report);
+    for option in group.options() {
+        for dep in &option.depends {
+            validate_dependency_string(dep, context, &format!("options.{}", option.name), report);
         }
     }
 
-    for dep in group.get_optional() {
+    for dep in group.optional() {
         validate_dependency_string(dep, context, "optional", report);
     }
 
