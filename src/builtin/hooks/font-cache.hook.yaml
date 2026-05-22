@@ -1,0 +1,11 @@
+name: update-font-cache
+description: Rebuilds system font cache when fonts are installed or removed.
+platforms: ["linux"]
+trigger:
+  paths:
+    - "usr/share/fonts/**"
+    - "usr/local/share/fonts/**"
+  operation: ["install", "upgrade", "remove"]
+action:
+  when: PostTransaction
+  exec: fc-cache -fv
