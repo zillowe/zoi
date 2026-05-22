@@ -242,6 +242,27 @@ pub enum DependencyGroup {
 }
 
 impl DependencyGroup {
+    pub(crate) fn required(&self) -> &[String] {
+        match self {
+            DependencyGroup::Simple(deps) => deps.as_slice(),
+            DependencyGroup::Complex(group) => group.required.as_slice(),
+        }
+    }
+
+    pub(crate) fn options(&self) -> &[DependencyOptionGroup] {
+        match self {
+            DependencyGroup::Simple(_) => &[],
+            DependencyGroup::Complex(group) => group.options.as_slice(),
+        }
+    }
+
+    pub(crate) fn optional(&self) -> &[String] {
+        match self {
+            DependencyGroup::Simple(_) => &[],
+            DependencyGroup::Complex(group) => group.optional.as_slice(),
+        }
+    }
+
     pub fn get_required_simple(&self) -> Vec<String> {
         match self {
             DependencyGroup::Simple(deps) => deps.clone(),
