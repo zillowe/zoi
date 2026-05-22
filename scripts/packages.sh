@@ -32,6 +32,7 @@ SHA256_LINUX_ARM64=$(get_sha256 "zoi-linux-arm64.tar.zst")
 SHA256_WINDOWS_AMD64=$(get_sha256 "zoi-windows-amd64.zip")
 
 TMP_PACKAGES=$(mktemp -d)
+chmod 755 "$TMP_PACKAGES"
 cp -r packages/* "$TMP_PACKAGES/"
 
 find "$TMP_PACKAGES" -type f -exec sed -i \
