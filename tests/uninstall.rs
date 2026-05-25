@@ -212,7 +212,7 @@ fn test_cmd_uninstall_respects_scope_override_when_names_overlap() {
         false,
         true,
         false,
-        &plugin_manager,
+        Some(&plugin_manager),
         false,
         false,
     )

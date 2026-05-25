@@ -167,7 +167,7 @@ pub fn run(shell: Shell, scope: SetupScope) -> Result<()> {
 pub fn enter_ephemeral_shell(
     package_sources: &[String],
     run_cmd: Option<String>,
-    _plugin_manager: &plugin::PluginManager,
+    _plugin_manager: Option<&plugin::PluginManager>,
 ) -> Result<()> {
     println!("{} Resolving ephemeral environment...", "::".bold().blue());
 

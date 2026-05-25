@@ -42,34 +42,39 @@ pub struct MiniRegistryIndex {
 
 pub fn fetch_registry_index() -> Result<MiniRegistryIndex> {
     let url = "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg/-/raw/main/packages.json";
-    let client = crate::utils::get_http_client()?;
-    let response = client.get(url).send()?;
 
-    if !response.status().is_success() {
-        return Err(anyhow!(
-            "Failed to fetch packages.json from Zoidberg registry: {}",
-            response.status()
-        ));
-    }
+    let trusted_keys = crate::pkg::config::get_builtin_authorities();
+    let data = if !trusted_keys.is_empty() {
+        crate::pkg::config::verify_remote_file(url, &trusted_keys)?
+    } else {
+        let client = crate::utils::get_http_client()?;
+        let resp = client.get(url).send()?;
+        if !resp.status().is_success() {
+            return Err(anyhow!("Failed to fetch packages.json: {}", resp.status()));
+        }
+        resp.bytes()?.to_vec()
+    };
 
-    let index: MiniRegistryIndex = response.json()?;
+    let index: MiniRegistryIndex = serde_json::from_slice(&data)?;
     Ok(index)
 }
 
 pub fn fetch_registry_config() -> Result<super::types::RepoConfig> {
     let url = "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg/-/raw/main/repo.yaml";
-    let client = crate::utils::get_http_client()?;
-    let response = client.get(url).send()?;
 
-    if !response.status().is_success() {
-        return Err(anyhow!(
-            "Failed to fetch repo.yaml from Zoidberg registry: {}",
-            response.status()
-        ));
-    }
+    let trusted_keys = crate::pkg::config::get_builtin_authorities();
+    let data = if !trusted_keys.is_empty() {
+        crate::pkg::config::verify_remote_file(url, &trusted_keys)?
+    } else {
+        let client = crate::utils::get_http_client()?;
+        let resp = client.get(url).send()?;
+        if !resp.status().is_success() {
+            return Err(anyhow!("Failed to fetch repo.yaml: {}", resp.status()));
+        }
+        resp.bytes()?.to_vec()
+    };
 
-    let content = response.text()?;
-    let config: super::types::RepoConfig = serde_yaml::from_str(&content)?;
+    let config: super::types::RepoConfig = serde_yaml::from_slice(&data)?;
     Ok(config)
 }
 

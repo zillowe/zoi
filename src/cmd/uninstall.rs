@@ -17,7 +17,7 @@ pub fn run(
     save: bool,
     yes: bool,
     recursive: bool,
-    plugin_manager: &crate::pkg::plugin::PluginManager,
+    plugin_manager: Option<&crate::pkg::plugin::PluginManager>,
     explain: bool,
     plan_json: bool,
 ) -> Result<()> {
@@ -283,11 +283,15 @@ pub fn run(
     let mut successfully_uninstalled = Vec::new();
 
     for manifest in &manifests_to_uninstall {
-        let pkg_val = plugin_manager
-            .lua
-            .to_value(manifest)
-            .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
-        plugin_manager.trigger_hook("on_pre_uninstall", Some(pkg_val.clone()))?;
+        let mut pkg_val = None;
+        if let Some(pm) = plugin_manager {
+            let v = pm
+                .lua
+                .to_value(manifest)
+                .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
+            pm.trigger_hook("on_pre_uninstall", Some(v.clone()))?;
+            pkg_val = Some(v);
+        }
 
         let source_str = if let Some(sub) = &manifest.sub_package {
             format!(
@@ -322,7 +326,9 @@ pub fn run(
                     failed_packages.push(source_str.clone());
                 } else {
                     successfully_uninstalled.push(source_str.clone());
-                    plugin_manager.trigger_hook_nonfatal("on_post_uninstall", Some(pkg_val));
+                    if let (Some(pm), Some(v)) = (plugin_manager, pkg_val) {
+                        pm.trigger_hook_nonfatal("on_post_uninstall", Some(v));
+                    }
                     println!("\n{} Uninstallation complete.", "Success:".green());
                 }
             }

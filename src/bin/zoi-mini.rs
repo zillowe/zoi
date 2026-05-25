@@ -64,20 +64,7 @@ fn main() -> Result<()> {
         && !program_name.starts_with("zoi-")
         && !program_name.contains("target")
     {
-        let plugin_manager = match zoi::pkg::plugin::PluginManager::new() {
-            Ok(m) => m,
-            Err(e) => {
-                eprintln!(
-                    "{}: Failed to initialize PluginManager: {}",
-                    "Error".red().bold(),
-                    e
-                );
-                std::process::exit(1);
-            }
-        };
-
-        if let Err(e) = zoi::pkg::shim::run_shim(program_name, args[1..].to_vec(), &plugin_manager)
-        {
+        if let Err(e) = zoi::pkg::shim::run_shim(program_name, args[1..].to_vec(), None) {
             eprintln!("{}: {}", "Shim Error".red().bold(), e);
             std::process::exit(1);
         }

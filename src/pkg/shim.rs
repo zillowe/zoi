@@ -9,7 +9,11 @@ use walkdir::WalkDir;
 
 use crate::pkg::plugin::PluginManager;
 
-pub fn run_shim(bin_name: &str, args: Vec<String>, plugin_manager: &PluginManager) -> Result<()> {
+pub fn run_shim(
+    bin_name: &str,
+    args: Vec<String>,
+    plugin_manager: Option<&PluginManager>,
+) -> Result<()> {
     let bin_path = resolve_to_installed_bin(bin_name, plugin_manager)?;
 
     let mut cmd = Command::new(bin_path);
@@ -30,7 +34,10 @@ pub fn run_shim(bin_name: &str, args: Vec<String>, plugin_manager: &PluginManage
     }
 }
 
-pub fn resolve_to_installed_bin(bin_name: &str, plugin_manager: &PluginManager) -> Result<PathBuf> {
+pub fn resolve_to_installed_bin(
+    bin_name: &str,
+    plugin_manager: Option<&PluginManager>,
+) -> Result<PathBuf> {
     let desired_version = get_desired_version(bin_name, plugin_manager)?;
 
     let providers = db::find_provides("local", bin_name)?;
@@ -92,13 +99,18 @@ pub fn resolve_to_installed_bin(bin_name: &str, plugin_manager: &PluginManager) 
     ))
 }
 
-fn get_desired_version(bin_name: &str, plugin_manager: &PluginManager) -> Result<Option<String>> {
+fn get_desired_version(
+    bin_name: &str,
+    plugin_manager: Option<&PluginManager>,
+) -> Result<Option<String>> {
     let env_var_name = format!("ZOI_{}_VERSION", bin_name.to_uppercase().replace('-', "_"));
     if let Ok(v) = env::var(&env_var_name) {
         return Ok(Some(v));
     }
 
-    if let Ok(Some(v)) = plugin_manager.trigger_resolve_shim_version(bin_name) {
+    if let Some(pm) = plugin_manager
+        && let Ok(Some(v)) = pm.trigger_resolve_shim_version(bin_name)
+    {
         return Ok(Some(v));
     }
 

@@ -21,7 +21,7 @@ fn main() {
     {
         let plugin_manager = match zoi::pkg::plugin::PluginManager::new() {
             Ok(m) => {
-                let _ = m.load_all();
+                let _ = m.load_all(false); // Shims usually run non-interactively
                 m
             }
             Err(e) => {
@@ -34,7 +34,8 @@ fn main() {
             }
         };
 
-        if let Err(e) = zoi::pkg::shim::run_shim(program_name, args[1..].to_vec(), &plugin_manager)
+        if let Err(e) =
+            zoi::pkg::shim::run_shim(program_name, args[1..].to_vec(), Some(&plugin_manager))
         {
             eprintln!("{}: {}", "Shim Error".red().bold(), e);
             std::process::exit(1);

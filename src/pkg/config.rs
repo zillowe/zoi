@@ -372,6 +372,27 @@ pub fn write_user_config(config: &Config) -> Result<()> {
     Ok(())
 }
 
+pub fn verify_remote_file(url: &str, trusted_keys: &[String]) -> Result<Vec<u8>> {
+    let client = crate::utils::get_http_client()?;
+
+    let data = client.get(url).send()?.bytes()?;
+    let sig_url = format!("{}.sig", url);
+    let sig = client.get(&sig_url).send()?.bytes()?;
+
+    let trusted_certs = crate::pkg::pgp::get_certs_by_name_or_fingerprint(trusted_keys)?;
+
+    let temp_dir = tempfile::Builder::new().prefix("zoi-verify-").tempdir()?;
+    let data_path = temp_dir.path().join("data");
+    let sig_path = temp_dir.path().join("sig");
+
+    fs::write(&data_path, &data)?;
+    fs::write(&sig_path, &sig)?;
+
+    crate::pkg::pgp::verify_detached_signature_multi_key(&data_path, &sig_path, trusted_certs)?;
+
+    Ok(data.to_vec())
+}
+
 pub fn add_repo(repo_name: &str) -> Result<()> {
     let mut config = read_config_from_path(&get_user_config_path()?)?;
     let lower_repo_name = repo_name.to_lowercase();
