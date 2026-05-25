@@ -59,8 +59,6 @@ Zoi is packed with features designed to make package management and environment 
 
 * **Project-Level Environments:** Use a `zoi.yaml` file in your project root to define custom commands and development environments. Manage project-specific tasks, tools, packages, and environment variables with `zoi run`, `zoi env`, and `zoi dev`, [learn more](/docs/zds/zoi/project-config).
 
-* **Declarative System Configuration (Arch Linux):** Manage your entire system state via a centralized `/etc/zoi/zoi.lua` file. Define packages, extensions, and services in one place and apply them with `zoi system apply` for a Nix-like reproducible setup on Arch Linux.
-
 * **Repository-Based System:** Zoi uses Git-based repositories to store package definitions. Use the official Zoidberg registry, add community repositories, or create your own private or public repositories with `zoi repo add`.
 
 * **Secure and Verifiable:** Ensure the integrity and authenticity of your packages:
@@ -756,17 +754,6 @@ Inspect recorded transactions.
 * `list` (alias: `ls`): List available transaction logs with their start time and operation count.
 * `show <id>`: Show the ordered operations recorded in a transaction.
 * `files <id>`: List the unique files modified by a transaction.
-
-***
-
-### `zoi system`
-
-Manage declarative system configuration on Arch Linux.
-
-**Subcommands:**
-
-* `apply`: Apply `/etc/zoi/zoi.lua`.
-* `encrypt <phrase>`: Encrypt a phrase for use in `zoi.lua`.
 
 ***
 

@@ -574,12 +574,6 @@ enum Commands {
     #[command(alias = "ext")]
     Extension(ExtensionCommand),
 
-    /// Manage declarative system configuration (Arch Linux only)
-    System {
-        #[command(subcommand)]
-        command: SystemCommands,
-    },
-
     /// Rollback a package to the previously installed version
     Rollback {
         #[arg(value_name = "PACKAGE", required_unless_present = "last_transaction", help = PKG_SOURCE_HELP)]
@@ -651,17 +645,6 @@ pub enum ExtensionCommands {
         /// The name of the extension to remove
         #[arg(required = true)]
         name: String,
-    },
-}
-
-#[derive(clap::Subcommand, Debug)]
-pub enum SystemCommands {
-    /// Apply the declarative system configuration from /etc/zoi/zoi.lua
-    Apply,
-    /// Encrypt a phrase (e.g. password) for use in zoi.lua
-    Encrypt {
-        /// The phrase to encrypt
-        phrase: String,
     },
 }
 
@@ -1116,18 +1099,6 @@ pub fn run() -> anyhow::Result<()> {
                 cmd::downgrade::run(&package, cli.yes, &plugin_manager)
             }
             Commands::Extension(args) => cmd::extension::run(args, cli.yes, &plugin_manager),
-            Commands::System { command } => match command {
-                SystemCommands::Apply => crate::pkg::system::apply(cli.yes, &plugin_manager),
-                SystemCommands::Encrypt { phrase } => {
-                    match crate::pkg::system::encrypt_password(&phrase) {
-                        Ok(enc) => {
-                            println!("Encrypted value (safe for zoi.lua):\n{}", enc);
-                            Ok(())
-                        }
-                        Err(e) => Err(e),
-                    }
-                }
-            },
             Commands::Rollback {
                 package,
                 last_transaction,
