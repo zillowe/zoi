@@ -64,3 +64,33 @@ fn test_cache_mirror_config_roundtrip_and_candidates() {
     let cfg = config::read_config().expect("config should read after removal");
     assert_eq!(cfg.cache_mirrors, vec![second.to_string()]);
 }
+
+#[test]
+fn test_remote_policy_merging() {
+    let ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("tempdir should be created");
+    let root = tmp.path().to_path_buf();
+    ctx.set_sysroot(root.clone());
+
+    let policy_dir = if cfg!(windows) {
+        root.join("ProgramData/zoi")
+    } else {
+        root.join("etc/zoi")
+    };
+    std::fs::create_dir_all(&policy_dir).unwrap();
+
+    let remote_policy_yaml = r#"
+denied_packages:
+  - evil-pkg
+allow_deny_lists_unoverridable: true
+"#;
+    std::fs::write(policy_dir.join("policy.cache.yaml"), remote_policy_yaml).unwrap();
+
+    let cfg = config::read_config().expect("config should read with remote policy");
+
+    assert!(cfg.policy.allow_deny_lists_unoverridable);
+    assert_eq!(
+        cfg.policy.denied_packages.unwrap(),
+        vec!["evil-pkg".to_string()]
+    );
+}
