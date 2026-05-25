@@ -1,3 +1,4 @@
+use sha2::Digest;
 use std::fs;
 use tempfile::tempdir;
 use zoi::pkg::plugin;
@@ -229,8 +230,21 @@ end)
     )
     .unwrap();
 
+    let mut trusted = std::collections::HashMap::new();
+    for file in &["a-first.lua", "z-last.lua"] {
+        let content = fs::read_to_string(plugin_dir.join(file)).unwrap();
+        let mut hasher = sha2::Sha256::new();
+        sha2::Digest::update(&mut hasher, content.as_bytes());
+        trusted.insert(file.to_string(), hex::encode(hasher.finalize()));
+    }
+    fs::write(
+        plugin_dir.join("trusted_hashes.json"),
+        serde_json::to_string(&trusted).unwrap(),
+    )
+    .unwrap();
+
     let pm = plugin::PluginManager::new().unwrap();
-    pm.load_all().unwrap();
+    pm.load_all(true).unwrap();
 
     let handled = pm.trigger_project_install_hook().unwrap();
     assert!(

@@ -13,7 +13,7 @@ pub struct CreateCommand {
 pub fn run(
     args: CreateCommand,
     yes: bool,
-    plugin_manager: &crate::pkg::plugin::PluginManager,
+    plugin_manager: Option<&crate::pkg::plugin::PluginManager>,
 ) -> Result<()> {
     pkg::create::run(&args.source, args.app_name, yes, plugin_manager)
 }

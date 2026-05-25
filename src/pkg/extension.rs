@@ -135,7 +135,7 @@ fn revert_extension_change(
 pub fn add(
     ext_name: &str,
     yes: bool,
-    plugin_manager: &crate::pkg::plugin::PluginManager,
+    plugin_manager: Option<&crate::pkg::plugin::PluginManager>,
 ) -> Result<()> {
     println!("Adding extension: {}", ext_name);
 
@@ -146,11 +146,15 @@ pub fn add(
         return Err(anyhow!("'{}' is not an extension package.", ext_name));
     }
 
-    let pkg_val = plugin_manager
-        .lua
-        .to_value(&pkg)
-        .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
-    plugin_manager.trigger_hook("on_pre_extension_add", Some(pkg_val))?;
+    let mut pkg_val = None;
+    if let Some(pm) = plugin_manager {
+        let v = pm
+            .lua
+            .to_value(&pkg)
+            .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
+        pm.trigger_hook("on_pre_extension_add", Some(v.clone()))?;
+        pkg_val = Some(v);
+    }
 
     let extension_info = if let Some(extension_info) = pkg.extension {
         extension_info
@@ -302,11 +306,9 @@ pub fn add(
         return Err(error);
     }
 
-    let manifest_val = plugin_manager
-        .lua
-        .to_value(&manifest)
-        .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
-    plugin_manager.trigger_hook_nonfatal("on_post_extension_add", Some(manifest_val));
+    if let (Some(pm), Some(v)) = (plugin_manager, pkg_val) {
+        pm.trigger_hook_nonfatal("on_post_extension_add", Some(v));
+    }
 
     println!("Successfully added extension '{}'.", ext_name);
 
@@ -316,7 +318,7 @@ pub fn add(
 pub fn remove(
     ext_name: &str,
     yes: bool,
-    plugin_manager: &crate::pkg::plugin::PluginManager,
+    plugin_manager: Option<&crate::pkg::plugin::PluginManager>,
 ) -> Result<()> {
     println!("Removing extension: {}", ext_name);
 
@@ -332,11 +334,15 @@ pub fn remove(
         return Err(anyhow!("Extension '{}' is not installed.", ext_name));
     };
 
-    let manifest_val = plugin_manager
-        .lua
-        .to_value(&manifest)
-        .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
-    plugin_manager.trigger_hook("on_pre_extension_remove", Some(manifest_val.clone()))?;
+    let mut manifest_val = None;
+    if let Some(pm) = plugin_manager {
+        let v = pm
+            .lua
+            .to_value(&manifest)
+            .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
+        pm.trigger_hook("on_pre_extension_remove", Some(v.clone()))?;
+        manifest_val = Some(v);
+    }
 
     if manifest.package_type != types::PackageType::Extension {
         return Err(anyhow!("'{}' is not an extension package.", ext_name));
@@ -435,7 +441,9 @@ pub fn remove(
         fs::remove_dir_all(&package_dir)?;
     }
 
-    plugin_manager.trigger_hook_nonfatal("on_post_extension_remove", Some(manifest_val));
+    if let (Some(pm), Some(v)) = (plugin_manager, manifest_val) {
+        pm.trigger_hook_nonfatal("on_post_extension_remove", Some(v));
+    }
 
     println!("Successfully removed extension '{}'.", ext_name);
 

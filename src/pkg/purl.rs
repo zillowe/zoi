@@ -47,17 +47,23 @@ pub struct RegistryIndex {
 pub fn fetch_central_db() -> Result<HashMap<String, RegistryInfo>> {
     let url = std::env::var("ZOI_PURL_DB_URL")
         .unwrap_or_else(|_| "https://zillowe.pages.dev/zoi/registries.json".to_string());
-    let client = utils::get_http_client()?;
-    let response = client.get(&url).send()?;
 
-    if !response.status().is_success() {
-        return Err(anyhow!(
-            "Failed to fetch central Zoi registry database: {}",
-            response.status()
-        ));
-    }
+    let trusted_keys = crate::pkg::config::get_builtin_authorities();
+    let data = if !trusted_keys.is_empty() {
+        crate::pkg::config::verify_remote_file(&url, &trusted_keys)?
+    } else {
+        let client = utils::get_http_client()?;
+        let response = client.get(&url).send()?;
+        if !response.status().is_success() {
+            return Err(anyhow!(
+                "Failed to fetch central Zoi registry database: {}",
+                response.status()
+            ));
+        }
+        response.bytes()?.to_vec()
+    };
 
-    let spec: CentralDbSpec = response.json()?;
+    let spec: CentralDbSpec = serde_json::from_slice(&data)?;
     Ok(spec.registries)
 }
 
@@ -89,18 +95,24 @@ pub fn construct_raw_url(git_url: &str, branch: &str, file_path: &str) -> Result
 
 pub fn fetch_registry_index(registry: &RegistryInfo) -> Result<RegistryIndex> {
     let url = construct_raw_url(&registry.git, &registry.branch, "packages.json")?;
-    let client = utils::get_http_client()?;
-    let response = client.get(url).send()?;
 
-    if !response.status().is_success() {
-        return Err(anyhow!(
-            "Failed to fetch packages.json from registry {}: {}",
-            registry.name,
-            response.status()
-        ));
-    }
+    let trusted_keys = crate::pkg::config::get_builtin_authorities();
+    let data = if !trusted_keys.is_empty() {
+        crate::pkg::config::verify_remote_file(&url, &trusted_keys)?
+    } else {
+        let client = utils::get_http_client()?;
+        let response = client.get(url).send()?;
+        if !response.status().is_success() {
+            return Err(anyhow!(
+                "Failed to fetch packages.json from registry {}: {}",
+                registry.name,
+                response.status()
+            ));
+        }
+        response.bytes()?.to_vec()
+    };
 
-    Ok(response.json()?)
+    Ok(serde_json::from_slice(&data)?)
 }
 
 pub fn fetch_package_lua(registry: &RegistryInfo, repo: &str, name: &str) -> Result<String> {

@@ -23,7 +23,7 @@ pub fn run(
     save: bool,
     build_type: Option<String>,
     dry_run: bool,
-    plugin_manager: &crate::pkg::plugin::PluginManager,
+    plugin_manager: Option<&crate::pkg::plugin::PluginManager>,
     build: bool,
     frozen_lockfile: bool,
     explain: bool,
@@ -127,7 +127,9 @@ pub fn run(
                 }
                 is_project_install = true;
             }
-        } else if plugin_manager.trigger_project_install_hook()? {
+        } else if let Some(pm) = plugin_manager
+            && pm.trigger_project_install_hook()?
+        {
             return Ok(());
         }
     }
@@ -278,11 +280,13 @@ pub fn run(
 
     if !dry_run {
         for node in graph.nodes.values() {
-            let pkg_val = plugin_manager
-                .lua
-                .to_value(&node.pkg)
-                .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
-            plugin_manager.trigger_hook("on_pre_install", Some(pkg_val))?;
+            if let Some(pm) = plugin_manager {
+                let pkg_val = pm
+                    .lua
+                    .to_value(&node.pkg)
+                    .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
+                pm.trigger_hook("on_pre_install", Some(pkg_val))?;
+            }
         }
     }
 
@@ -729,11 +733,13 @@ pub fn run(
         .expect("Installed manifests mutex poisoned during finalization")
         .clone();
     for manifest in &installed_manifests_vec {
-        let pkg_val = plugin_manager
-            .lua
-            .to_value(manifest)
-            .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
-        plugin_manager.trigger_hook_nonfatal("on_post_install", Some(pkg_val));
+        if let Some(pm) = plugin_manager {
+            let pkg_val = pm
+                .lua
+                .to_value(manifest)
+                .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
+            pm.trigger_hook_nonfatal("on_post_install", Some(pkg_val));
+        }
     }
 
     let is_any_project_install = scope_override == Some(types::Scope::Project);

@@ -9,7 +9,7 @@ use std::fs;
 pub fn run(
     package_name: &str,
     yes: bool,
-    plugin_manager: &crate::pkg::plugin::PluginManager,
+    plugin_manager: Option<&crate::pkg::plugin::PluginManager>,
 ) -> Result<()> {
     println!(
         "{} Downgrading package '{}'...",

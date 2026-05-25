@@ -763,7 +763,7 @@ impl PluginManager {
         Ok(())
     }
 
-    pub fn load_all(&self) -> Result<()> {
+    pub fn load_all(&self, yes: bool) -> Result<()> {
         let plugin_dir = get_plugin_dir()?;
         if !plugin_dir.exists() {
             return Ok(());
@@ -807,21 +807,30 @@ impl PluginManager {
             };
 
             if !is_trusted {
-                println!(
-                    "\n{}: Untrusted plugin detected: {}",
-                    "SECURITY WARNING".yellow().bold(),
-                    plugin_name.cyan()
-                );
-                println!("Plugins can execute arbitrary commands and modify your system.");
-                if crate::utils::ask_for_confirmation(
-                    "Do you trust this plugin and want to execute it?",
-                    false,
-                ) {
-                    trusted.insert(plugin_name, hash);
-                    trusted_changed = true;
-                } else {
-                    println!("Skipping untrusted plugin: {}", plugin_name);
+                if yes {
+                    println!(
+                        "\n{}: Skipping untrusted plugin: {}. Run Zoi interactively to trust it.",
+                        "Warning".yellow().bold(),
+                        plugin_name.cyan()
+                    );
                     continue;
+                } else {
+                    println!(
+                        "\n{}: Untrusted plugin detected: {}",
+                        "SECURITY WARNING".yellow().bold(),
+                        plugin_name.cyan()
+                    );
+                    println!("Plugins can execute arbitrary commands and modify your system.");
+                    if crate::utils::ask_for_confirmation(
+                        "Do you trust this plugin and want to execute it?",
+                        false,
+                    ) {
+                        trusted.insert(plugin_name.clone(), hash);
+                        trusted_changed = true;
+                    } else {
+                        println!("Skipping untrusted plugin: {}", plugin_name);
+                        continue;
+                    }
                 }
             }
 

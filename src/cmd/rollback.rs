@@ -5,7 +5,7 @@ use anyhow::{Result, anyhow};
 pub fn run(
     package_name: &str,
     yes: bool,
-    plugin_manager: &crate::pkg::plugin::PluginManager,
+    plugin_manager: Option<&crate::pkg::plugin::PluginManager>,
 ) -> Result<()> {
     let request = pkg::resolve::parse_source_string(package_name)?;
     let mut candidates = Vec::new();
@@ -24,13 +24,15 @@ pub fn run(
     let chosen =
         crate::cmd::installed_select::choose_installed_manifest(package_name, &candidates, yes)?;
 
-    plugin_manager.trigger_hook("on_rollback", None)?;
+    if let Some(pm) = plugin_manager {
+        pm.trigger_hook("on_rollback", None)?;
+    }
     pkg::rollback::run(&pkg::local::installed_manifest_source(&chosen), yes)
 }
 
 pub fn run_transaction_rollback(
     yes: bool,
-    plugin_manager: &crate::pkg::plugin::PluginManager,
+    plugin_manager: Option<&crate::pkg::plugin::PluginManager>,
 ) -> Result<()> {
     if !utils::ask_for_confirmation(
         "This will roll back the last recorded transaction. Are you sure?",
@@ -43,7 +45,9 @@ pub fn run_transaction_rollback(
     match transaction::get_last_transaction_id()? {
         Some(id) => {
             println!("Rolling back transaction {}...", id);
-            plugin_manager.trigger_hook("on_rollback", None)?;
+            if let Some(pm) = plugin_manager {
+                pm.trigger_hook("on_rollback", None)?;
+            }
             transaction::rollback(&id)
         }
         None => {

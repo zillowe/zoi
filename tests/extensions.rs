@@ -35,7 +35,7 @@ metadata({
     let pkg_lua_path = root.join("test-ext.pkg.lua");
     fs::write(&pkg_lua_path, pkg_lua_content).unwrap();
 
-    extension::add(pkg_lua_path.to_str().unwrap(), true, &pm).unwrap();
+    extension::add(pkg_lua_path.to_str().unwrap(), true, Some(&pm)).unwrap();
 
     let plugin_path = root.join(".zoi/plugins/my-plugin.lua");
     let hook_path = root.join(".zoi/hooks/my-hook.hook.yaml");
@@ -43,7 +43,7 @@ metadata({
     assert!(plugin_path.exists(), "Plugin file should be created");
     assert!(hook_path.exists(), "Hook file should be created");
 
-    extension::remove(pkg_lua_path.to_str().unwrap(), true, &pm).unwrap();
+    extension::remove(pkg_lua_path.to_str().unwrap(), true, Some(&pm)).unwrap();
 
     assert!(!plugin_path.exists(), "Plugin file should be removed");
     assert!(!hook_path.exists(), "Hook file should be removed");
@@ -89,7 +89,7 @@ metadata({
     let pkg_lua_path = root.join("registry-ext.pkg.lua");
     fs::write(&pkg_lua_path, pkg_lua_content).unwrap();
 
-    extension::add(pkg_lua_path.to_str().unwrap(), true, &pm).unwrap();
+    extension::add(pkg_lua_path.to_str().unwrap(), true, Some(&pm)).unwrap();
     let active_registry = config::read_user_config()
         .unwrap()
         .default_registry
@@ -97,7 +97,7 @@ metadata({
         .url;
     assert_eq!(active_registry, "https://example.com/override.git");
 
-    extension::remove(pkg_lua_path.to_str().unwrap(), true, &pm).unwrap();
+    extension::remove(pkg_lua_path.to_str().unwrap(), true, Some(&pm)).unwrap();
     let restored_registry = config::read_user_config()
         .unwrap()
         .default_registry
@@ -150,7 +150,7 @@ metadata({
     let pkg_lua_path = root.join("broken-registry-ext.pkg.lua");
     fs::write(&pkg_lua_path, pkg_lua_content).unwrap();
 
-    let result = extension::add(pkg_lua_path.to_str().unwrap(), true, &pm);
+    let result = extension::add(pkg_lua_path.to_str().unwrap(), true, Some(&pm));
     assert!(
         result.is_err(),
         "extension add should fail after the registry change"
@@ -203,7 +203,7 @@ metadata({
     let pkg_lua_path = root.join("broken-plugin-ext.pkg.lua");
     fs::write(&pkg_lua_path, pkg_lua_content).unwrap();
 
-    let result = extension::add(pkg_lua_path.to_str().unwrap(), true, &pm);
+    let result = extension::add(pkg_lua_path.to_str().unwrap(), true, Some(&pm));
     assert!(
         result.is_err(),
         "extension add should fail after creating the plugin"
@@ -249,13 +249,13 @@ metadata({
     fs::write(&pkg_lua_path, pkg_lua_content).unwrap();
 
     ctx.set_current_dir(&install_dir);
-    extension::add(pkg_lua_path.to_str().unwrap(), true, &pm).unwrap();
+    extension::add(pkg_lua_path.to_str().unwrap(), true, Some(&pm)).unwrap();
     assert!(install_dir.join("zoi.yaml").exists());
 
     fs::write(other_dir.join("zoi.yaml"), "name: keep-me\n").unwrap();
     ctx.set_current_dir(&other_dir);
 
-    extension::remove(pkg_lua_path.to_str().unwrap(), true, &pm).unwrap();
+    extension::remove(pkg_lua_path.to_str().unwrap(), true, Some(&pm)).unwrap();
 
     assert!(
         !install_dir.join("zoi.yaml").exists(),
@@ -299,7 +299,7 @@ metadata({
     )
     .unwrap();
 
-    extension::add(pkg_lua_path.to_str().unwrap(), true, &pm).unwrap();
+    extension::add(pkg_lua_path.to_str().unwrap(), true, Some(&pm)).unwrap();
     assert!(root.join(".zoi/plugins/original-plugin.lua").exists());
 
     fs::write(
@@ -323,7 +323,7 @@ metadata({
     )
     .unwrap();
 
-    extension::remove(pkg_lua_path.to_str().unwrap(), true, &pm).unwrap();
+    extension::remove(pkg_lua_path.to_str().unwrap(), true, Some(&pm)).unwrap();
     assert!(
         !root.join(".zoi/plugins/original-plugin.lua").exists(),
         "remove should revert the installed extension metadata, not the current source metadata"
@@ -376,9 +376,9 @@ metadata({
     )
     .unwrap();
 
-    extension::add(pkg_lua_path.to_str().unwrap(), true, &pm).unwrap();
+    extension::add(pkg_lua_path.to_str().unwrap(), true, Some(&pm)).unwrap();
     assert!(root.join(".zoi/plugins/hook-plugin.lua").exists());
 
-    extension::remove(pkg_lua_path.to_str().unwrap(), true, &pm).unwrap();
+    extension::remove(pkg_lua_path.to_str().unwrap(), true, Some(&pm)).unwrap();
     assert!(!root.join(".zoi/plugins/hook-plugin.lua").exists());
 }

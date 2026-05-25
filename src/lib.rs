@@ -223,7 +223,16 @@ pub fn install_package_with_options(
 }
 
 pub fn install_sources(sources: &[String], options: &SourceInstallOptions) -> Result<()> {
-    let plugin_manager = pkg::plugin::PluginManager::new()?;
+    let plugin_manager = if crate::utils::is_mini_mode() {
+        None
+    } else {
+        let pm = pkg::plugin::PluginManager::new()?;
+        let _ = pm.load_all(options.yes);
+        Some(pm)
+    };
+
+    let pm_ptr = plugin_manager.as_ref();
+
     cmd::install::run(
         sources,
         options.repo.clone(),
@@ -236,7 +245,7 @@ pub fn install_sources(sources: &[String], options: &SourceInstallOptions) -> Re
         options.save,
         options.build_type.clone(),
         options.dry_run,
-        &plugin_manager,
+        pm_ptr,
         options.build,
         options.frozen_lockfile,
         false,

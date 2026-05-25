@@ -783,7 +783,7 @@ pub fn run() -> anyhow::Result<()> {
     }
 
     let plugin_manager = crate::pkg::plugin::PluginManager::new()?;
-    if let Err(e) = plugin_manager.load_all() {
+    if let Err(e) = plugin_manager.load_all(cli.yes) {
         eprintln!("{}: Failed to load plugins: {}", "Warning".yellow(), e);
     }
 
@@ -948,7 +948,7 @@ pub fn run() -> anyhow::Result<()> {
                 save,
                 r#type,
                 dry_run,
-                &plugin_manager,
+                Some(&plugin_manager),
                 build,
                 frozen_lockfile,
                 explain,
@@ -975,7 +975,7 @@ pub fn run() -> anyhow::Result<()> {
                 save,
                 cli.yes,
                 recursive,
-                &plugin_manager,
+                Some(&plugin_manager),
                 explain,
                 plan_json,
             )
@@ -1042,7 +1042,7 @@ pub fn run() -> anyhow::Result<()> {
                 run,
             } => {
                 if !packages.is_empty() {
-                    cmd::shell::enter_ephemeral_shell(&packages, run, &plugin_manager)
+                    cmd::shell::enter_ephemeral_shell(&packages, run, Some(&plugin_manager))
                 } else if let Some(s) = shell {
                     cmd::shell::run(s, scope)
                 } else {
@@ -1093,20 +1093,20 @@ pub fn run() -> anyhow::Result<()> {
             Commands::Create { source, app_name } => cmd::create::run(
                 cmd::create::CreateCommand { source, app_name },
                 cli.yes,
-                &plugin_manager,
+                Some(&plugin_manager),
             ),
             Commands::Downgrade { package } => {
-                cmd::downgrade::run(&package, cli.yes, &plugin_manager)
+                cmd::downgrade::run(&package, cli.yes, Some(&plugin_manager))
             }
-            Commands::Extension(args) => cmd::extension::run(args, cli.yes, &plugin_manager),
+            Commands::Extension(args) => cmd::extension::run(args, cli.yes, Some(&plugin_manager)),
             Commands::Rollback {
                 package,
                 last_transaction,
             } => {
                 if last_transaction {
-                    cmd::rollback::run_transaction_rollback(cli.yes, &plugin_manager)
+                    cmd::rollback::run_transaction_rollback(cli.yes, Some(&plugin_manager))
                 } else if let Some(pkg) = package {
-                    cmd::rollback::run(&pkg, cli.yes, &plugin_manager)
+                    cmd::rollback::run(&pkg, cli.yes, Some(&plugin_manager))
                 } else {
                     Ok(())
                 }

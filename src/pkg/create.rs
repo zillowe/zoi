@@ -39,7 +39,7 @@ pub fn run(
     source: &str,
     app_name: Option<String>,
     yes: bool,
-    plugin_manager: &crate::pkg::plugin::PluginManager,
+    plugin_manager: Option<&crate::pkg::plugin::PluginManager>,
 ) -> Result<()> {
     let (pkg, _, _, pkg_lua_path, _, _) =
         resolve::resolve_package_and_version(source, false, false)?;
@@ -51,11 +51,15 @@ pub fn run(
         ));
     }
 
-    let pkg_val = plugin_manager
-        .lua
-        .to_value(&pkg)
-        .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
-    plugin_manager.trigger_hook("on_pre_create", Some(pkg_val.clone()))?;
+    let mut pkg_val = None;
+    if let Some(pm) = plugin_manager {
+        let v = pm
+            .lua
+            .to_value(&pkg)
+            .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
+        pm.trigger_hook("on_pre_create", Some(v.clone()))?;
+        pkg_val = Some(v);
+    }
 
     let dest_name = app_name.unwrap_or_else(|| pkg.name.clone());
     let app_dir = Path::new(&dest_name);
@@ -119,7 +123,9 @@ pub fn run(
 
     install_app_from_archive(&archive_path, app_dir)?;
 
-    plugin_manager.trigger_hook_nonfatal("on_post_create", Some(pkg_val));
+    if let (Some(pm), Some(v)) = (plugin_manager, pkg_val) {
+        pm.trigger_hook_nonfatal("on_post_create", Some(v));
+    }
 
     println!("\n{}", "App created successfully.".green());
 
