@@ -511,23 +511,55 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
 }
 
 fn download_from_url(url: &str) -> Result<ResolvedSource> {
+    let (base_url, expected_hash) = if let Some((base, hash_part)) = url.split_once('#') {
+        if hash_part.starts_with("sha256-")
+            || hash_part.starts_with("sha512-")
+            || hash_part.starts_with("md5-")
+        {
+            (base, Some(hash_part))
+        } else {
+            (url, None)
+        }
+    } else {
+        (url, None)
+    };
+
     let cache_dir = cache::get_pkgdef_cache_root()?;
     fs::create_dir_all(&cache_dir)?;
 
     let mut hasher = Sha256::new();
-    hasher.update(url.as_bytes());
-    let hash = hex::encode(hasher.finalize());
-    let cache_path = cache_dir.join(format!("{}.pkg.lua", hash));
+    hasher.update(base_url.as_bytes());
+    let url_hash = hex::encode(hasher.finalize());
+    let cache_path = cache_dir.join(format!("{}.pkg.lua", url_hash));
 
     if cache_path.exists() {
-        return Ok(ResolvedSource {
-            path: cache_path,
-            source_type: SourceType::Url,
-            repo_name: None,
-            registry_handle: Some("local".to_string()),
-            sharable_manifest: None,
-            git_sha: None,
-        });
+        if let Some(hash) = expected_hash {
+            let mut file = fs::File::open(&cache_path)?;
+            let mut content = Vec::new();
+            file.read_to_end(&mut content)?;
+            if verify_content_hash(&content, hash)? {
+                return Ok(ResolvedSource {
+                    path: cache_path,
+                    source_type: SourceType::Url,
+                    repo_name: None,
+                    registry_handle: Some("local".to_string()),
+                    sharable_manifest: None,
+                    git_sha: None,
+                });
+            } else {
+                println!("Cached definition hash mismatch, re-downloading...");
+                fs::remove_file(&cache_path)?;
+            }
+        } else {
+            return Ok(ResolvedSource {
+                path: cache_path,
+                source_type: SourceType::Url,
+                repo_name: None,
+                registry_handle: Some("local".to_string()),
+                sharable_manifest: None,
+                git_sha: None,
+            });
+        }
     }
 
     println!("Downloading package definition from URL...");
@@ -535,7 +567,7 @@ fn download_from_url(url: &str) -> Result<ResolvedSource> {
     let mut attempt = 0u32;
     let mut response = loop {
         attempt += 1;
-        match client.get(url).send() {
+        match client.get(base_url).send() {
             Ok(resp) => break resp,
             Err(e) => {
                 if attempt < 3 {
@@ -560,7 +592,7 @@ fn download_from_url(url: &str) -> Result<ResolvedSource> {
         return Err(anyhow!(
             "Failed to download file (HTTP {}): {}",
             response.status(),
-            url
+            base_url
         ));
     }
 
@@ -582,6 +614,15 @@ fn download_from_url(url: &str) -> Result<ResolvedSource> {
     }
     pb.finish_with_message("Download complete.");
 
+    if let Some(hash) = expected_hash {
+        if !verify_content_hash(&downloaded_bytes, hash)? {
+            return Err(anyhow!(
+                "Integrity verification failed for remote package definition."
+            ));
+        }
+        println!("{} Integrity verified.", "::".green());
+    }
+
     fs::write(&cache_path, &downloaded_bytes)?;
 
     Ok(ResolvedSource {
@@ -592,6 +633,30 @@ fn download_from_url(url: &str) -> Result<ResolvedSource> {
         sharable_manifest: None,
         git_sha: None,
     })
+}
+
+fn verify_content_hash(content: &[u8], hash_spec: &str) -> Result<bool> {
+    let (algo, expected_hex) = hash_spec
+        .split_once('-')
+        .ok_or_else(|| anyhow!("Invalid hash format"))?;
+    let actual_hex = match algo {
+        "sha256" => {
+            let mut hasher = Sha256::new();
+            hasher.update(content);
+            hex::encode(hasher.finalize())
+        }
+        "sha512" => {
+            let mut hasher = sha2::Sha512::new();
+            hasher.update(content);
+            hex::encode(hasher.finalize())
+        }
+        "md5" => {
+            format!("{:x}", md5::compute(content))
+        }
+        _ => return Err(anyhow!("Unsupported hash algorithm: {}", algo)),
+    };
+
+    Ok(actual_hex.eq_ignore_ascii_case(expected_hex))
 }
 
 fn download_content_from_url(url: &str) -> Result<String> {
@@ -1281,7 +1346,7 @@ fn resolve_source_recursive(
     if let Some(alt_source) = pkg_for_alt_check.alt {
         println!("Found 'alt' source. Resolving from: {}", alt_source.cyan());
 
-        let mut alt_resolved_source =
+        let alt_resolved_source =
             if alt_source.starts_with("http://") || alt_source.starts_with("https://") {
                 println!("Downloading 'alt' source from: {}", alt_source.cyan());
                 let client = crate::utils::get_http_client()?;
@@ -1343,10 +1408,6 @@ fn resolve_source_recursive(
             } else {
                 resolve_source_recursive(&alt_source, depth + 1, max_depth, quiet)?
             };
-
-        if resolved_source.source_type == SourceType::OfficialRepo {
-            alt_resolved_source.source_type = SourceType::OfficialRepo;
-        }
 
         return Ok(alt_resolved_source);
     }

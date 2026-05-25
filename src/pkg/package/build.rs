@@ -279,6 +279,13 @@ fn build_for_platform(
                         destination =
                             destination.replace("${usrhome}", &format!("{}/usrhome", data_prefix));
 
+                        if !utils::is_safe_path(&staging_dir, Path::new(&destination)) {
+                            return Err(anyhow!(
+                                "Path traversal detected in zcp destination: {}",
+                                destination
+                            ));
+                        }
+
                         let dest_path = staging_dir.join(&destination);
 
                         if let Some(parent) = dest_path.parent() {
@@ -342,6 +349,45 @@ fn build_for_platform(
                         link = link.replace("${usrroot}", &format!("{}/usrroot", data_prefix));
                         link = link.replace("${usrhome}", &format!("{}/usrhome", data_prefix));
 
+                        if !utils::is_safe_path(&staging_dir, Path::new(&link)) {
+                            return Err(anyhow!("Path traversal detected in zln link: {}", link));
+                        }
+
+                        let target_path = Path::new(&target);
+                        if target_path.is_absolute() {
+                            let permitted_roots = [
+                                "/bin",
+                                "/sbin",
+                                "/usr/bin",
+                                "/usr/sbin",
+                                "/lib",
+                                "/lib64",
+                                "/usr/lib",
+                                "/usr/lib64",
+                                "/etc",
+                                "/var",
+                                "/opt",
+                                "/usr/share",
+                            ];
+                            let is_permitted =
+                                permitted_roots.iter().any(|p| target_path.starts_with(p));
+                            if !is_permitted && !utils::is_safe_path(&staging_dir, target_path) {
+                                return Err(anyhow!(
+                                    "Untrusted absolute symlink target: {}",
+                                    target
+                                ));
+                            }
+                        } else {
+                            let link_dir = Path::new(&link).parent().unwrap_or(Path::new(""));
+                            if !utils::is_safe_path(&staging_dir, &link_dir.join(target_path)) {
+                                return Err(anyhow!(
+                                    "Relative symlink target '{}' escapes staging area via '{}'",
+                                    target,
+                                    link
+                                ));
+                            }
+                        }
+
                         let link_path = staging_dir.join(&link);
                         if let Some(parent) = link_path.parent() {
                             fs::create_dir_all(parent)?;
@@ -362,6 +408,13 @@ fn build_for_platform(
                             .replace("${createpkgdir}", &format!("{}/createpkgdir", data_prefix));
                         path = path.replace("${usrroot}", &format!("{}/usrroot", data_prefix));
                         path = path.replace("${usrhome}", &format!("{}/usrhome", data_prefix));
+
+                        if !utils::is_safe_path(&staging_dir, Path::new(&path)) {
+                            return Err(anyhow!(
+                                "Path traversal detected in zchmod path: {}",
+                                path
+                            ));
+                        }
 
                         let _full_path = staging_dir.join(&path);
                         #[cfg(unix)]
@@ -385,6 +438,13 @@ fn build_for_platform(
                         path = path.replace("${usrroot}", &format!("{}/usrroot", data_prefix));
                         path = path.replace("${usrhome}", &format!("{}/usrhome", data_prefix));
 
+                        if !utils::is_safe_path(&staging_dir, Path::new(&path)) {
+                            return Err(anyhow!(
+                                "Path traversal detected in zchown path: {}",
+                                path
+                            ));
+                        }
+
                         let full_path = staging_dir.join(&path);
                         utils::set_path_owner(&full_path, &owner, &group)?;
                         if !quiet {
@@ -400,6 +460,13 @@ fn build_for_platform(
                             .replace("${createpkgdir}", &format!("{}/createpkgdir", data_prefix));
                         path = path.replace("${usrroot}", &format!("{}/usrroot", data_prefix));
                         path = path.replace("${usrhome}", &format!("{}/usrhome", data_prefix));
+
+                        if !utils::is_safe_path(&staging_dir, Path::new(&path)) {
+                            return Err(anyhow!(
+                                "Path traversal detected in zmkdir path: {}",
+                                path
+                            ));
+                        }
 
                         let full_path = staging_dir.join(&path);
                         fs::create_dir_all(full_path)?;

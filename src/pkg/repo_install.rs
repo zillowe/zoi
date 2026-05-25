@@ -1,3 +1,4 @@
+use crate::pkg::resolve::SourceType;
 use crate::pkg::types;
 use anyhow::{Result, anyhow};
 use colored::*;
@@ -24,6 +25,8 @@ pub fn run(
     );
 
     let (provider, repo_path) = parse_repo_spec(repo_spec)?;
+
+    crate::utils::confirm_untrusted_source(&SourceType::GitRepo(repo_spec.to_string()), yes)?;
 
     let repo_file_names = ["zoi.yaml"];
     let mut repo_file_content: Option<String> = None;
