@@ -4,7 +4,8 @@ use anyhow::{Result, anyhow};
 use colored::*;
 use glob::Pattern;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use sha2::{Digest, Sha256};
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -172,6 +173,44 @@ pub fn trigger_matches_modified_files(trigger: &HookTrigger, modified_files: &[S
     false
 }
 
+fn is_hook_trusted(hook: &GlobalHook) -> Result<bool> {
+    let mut hasher = Sha256::new();
+    hasher.update(hook.action.exec.as_bytes());
+    let hash = hex::encode(hasher.finalize());
+
+    let trusted_path = get_user_hooks_dir()?.join("trusted_hashes.json");
+    let mut trusted: HashMap<String, String> = if trusted_path.exists() {
+        let content = fs::read_to_string(&trusted_path)?;
+        serde_json::from_str(&content).unwrap_or_default()
+    } else {
+        HashMap::new()
+    };
+
+    if let Some(known_hash) = trusted.get(&hook.name)
+        && known_hash == &hash
+    {
+        return Ok(true);
+    }
+
+    println!(
+        "\n{}: Untrusted global hook detected: {}",
+        "SECURITY WARNING".yellow().bold(),
+        hook.name.cyan()
+    );
+    println!("Description: {}", hook.description);
+    println!("Execution: {}", hook.action.exec.dimmed());
+    println!("Hooks can execute arbitrary commands with your user's permissions.");
+
+    if crate::utils::ask_for_confirmation("Do you trust this hook and want to execute it?", false) {
+        trusted.insert(hook.name.clone(), hash);
+        let content = serde_json::to_string_pretty(&trusted)?;
+        fs::write(trusted_path, content)?;
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
 pub fn run_global_hooks(when: HookWhen, modified_files: &[String], operation: &str) -> Result<()> {
     let all_hooks = load_all_hooks()?;
     let mut triggered_hooks = HashSet::new();
@@ -197,6 +236,12 @@ pub fn run_global_hooks(when: HookWhen, modified_files: &[String], operation: &s
         if trigger_matches_modified_files(&hook.trigger, modified_files)
             && triggered_hooks.insert(hook.name.clone())
         {
+            let is_builtin = BUILTIN_HOOKS.iter().any(|(name, _)| name == &hook.name);
+            if !is_builtin && !is_hook_trusted(&hook)? {
+                println!("Skipping untrusted hook: {}", hook.name);
+                continue;
+            }
+
             println!(
                 "{} Running global hook: {} ({})",
                 "::".blue().bold(),

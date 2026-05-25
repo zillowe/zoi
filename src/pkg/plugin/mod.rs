@@ -5,6 +5,7 @@ use colored::*;
 use comfy_table::{Table as ComfyTable, presets::UTF8_FULL};
 use dialoguer::{Confirm, Select, theme::ColorfulTheme};
 use mlua::{Function, Lua, LuaSerdeExt, Table, Value};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -777,17 +778,68 @@ impl PluginManager {
         }
         plugin_paths.sort();
 
+        let trusted_path = get_plugin_dir()?.join("trusted_hashes.json");
+        let mut trusted: HashMap<String, String> = if trusted_path.exists() {
+            let content = fs::read_to_string(&trusted_path)?;
+            serde_json::from_str(&content).unwrap_or_default()
+        } else {
+            HashMap::new()
+        };
+        let mut trusted_changed = false;
+
         for path in plugin_paths {
             let script = fs::read_to_string(&path)?;
-            let script = format!(
+
+            let mut hasher = Sha256::new();
+            hasher.update(script.as_bytes());
+            let hash = hex::encode(hasher.finalize());
+
+            let plugin_name = path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
+
+            let is_trusted = if let Some(known_hash) = trusted.get(&plugin_name) {
+                known_hash == &hash
+            } else {
+                false
+            };
+
+            if !is_trusted {
+                println!(
+                    "\n{}: Untrusted plugin detected: {}",
+                    "SECURITY WARNING".yellow().bold(),
+                    plugin_name.cyan()
+                );
+                println!("Plugins can execute arbitrary commands and modify your system.");
+                if crate::utils::ask_for_confirmation(
+                    "Do you trust this plugin and want to execute it?",
+                    false,
+                ) {
+                    trusted.insert(plugin_name, hash);
+                    trusted_changed = true;
+                } else {
+                    println!("Skipping untrusted plugin: {}", plugin_name);
+                    continue;
+                }
+            }
+
+            let script_wrapper = format!(
                 "local old_reg = zoi.register_command; zoi.register_command = function(a, b) if type(a) == 'string' then zoi.register_command_simple(a, b) else old_reg(a) end end; {}",
                 script
             );
             self.lua
-                .load(&script)
+                .load(&script_wrapper)
                 .exec()
                 .map_err(|e| anyhow!("Plugin error in {}: {}", path.display(), e))?;
         }
+
+        if trusted_changed {
+            let content = serde_json::to_string_pretty(&trusted)?;
+            fs::write(trusted_path, content)?;
+        }
+
         Ok(())
     }
 

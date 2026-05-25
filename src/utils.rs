@@ -56,6 +56,35 @@ pub fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+/// Checks if a path is safe to use within a base directory.
+/// Prevents path traversal by ensuring the resolved path stays within the base.
+pub fn is_safe_path(base: &Path, path: &Path) -> bool {
+    let base = base.canonicalize().unwrap_or_else(|_| base.to_path_buf());
+
+    let joined = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        base.join(path)
+    };
+
+    let mut normalized = PathBuf::new();
+    for component in joined.components() {
+        match component {
+            std::path::Component::Prefix(_) => normalized.push(component),
+            std::path::Component::RootDir => normalized.push(component),
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                if !normalized.pop() {
+                    return false;
+                }
+            }
+            std::path::Component::Normal(p) => normalized.push(p),
+        }
+    }
+
+    normalized.starts_with(&base)
+}
+
 pub fn symlink_file(target: &Path, link: &Path) -> std::io::Result<()> {
     if link.exists() || link.is_symlink() {
         fs::remove_file(link)?;
@@ -671,7 +700,8 @@ pub fn confirm_untrusted_source(source_type: &SourceType, yes: bool) -> anyhow::
             )
         }
         SourceType::LocalFile => "You are installing from a local file.".to_string(),
-        SourceType::Url => "You are installing from a remote URL.".to_string(),
+        SourceType::Url => "You are installing from a remote URL. This script will be executed with your user's permissions, which could lead to remote code execution if the source is malicious.".to_string(),
+        SourceType::GitRepo(repo) => format!("You are installing from an external git repository '{}'. This script will be executed with your user's permissions.", repo),
         _ => return Ok(()),
     };
 
