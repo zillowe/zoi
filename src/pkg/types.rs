@@ -498,6 +498,13 @@ pub struct Registry {
     pub authorities: Option<Vec<String>>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
+pub struct RemotePolicyConfig {
+    pub url: String,
+    pub signature_url: String,
+    pub trusted_keys: Vec<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
     pub repos: Vec<String>,
@@ -519,6 +526,8 @@ pub struct Config {
     pub rollback_enabled: bool,
     #[serde(default)]
     pub policy: Policy,
+    #[serde(default)]
+    pub remote_policy: Option<RemotePolicyConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parallel_jobs: Option<usize>,
     #[serde(default)]
@@ -553,6 +562,7 @@ impl Default for Config {
             git_repos: Vec::new(),
             rollback_enabled: true,
             policy: Policy::default(),
+            remote_policy: None,
             parallel_jobs: None,
             protect_db: false,
             max_resolution_depth: None,

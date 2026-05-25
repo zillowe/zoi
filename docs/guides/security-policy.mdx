@@ -182,6 +182,37 @@ When `enable` is `true`:
 
 ***
 
+## Centralized Policy Distribution
+
+Large organizations can manage their security policy from a central server. This allows administrators to update allowed/denied lists and enforcement flags for all users simultaneously.
+
+### Configuration
+
+To enable remote policy distribution, add the `remote_policy` block to the system-level `/etc/zoi/config.yaml`:
+
+```yaml
+remote_policy:
+  url: "https://config.mycorp.internal/zoi/policy.yaml"
+  signature_url: "https://config.mycorp.internal/zoi/policy.yaml.sig"
+  trusted_keys:
+    - "MyCorp-Security-Authority"
+```
+
+### Verification & Caching
+
+1. **Synchronization**: Zoi fetches the remote policy every time `zoi sync` is run.
+2. **Signature Check**: The downloaded YAML is verified against the PGP signature using the `trusted_keys`. If verification fails, the sync is aborted.
+3. **Offline Persistence**: Once verified, the policy is cached locally (e.g. in `/etc/zoi/policy.cache.yaml`). This ensures rules are enforced even without a network connection.
+
+### How Rules are Merged
+
+The remote policy follows the same schema as the standard `policy` object. Rules are merged with the local system policy:
+
+* **Flags**: If either the local or remote policy sets an `unoverridable` flag to `true`, it is enforced.
+* **Lists**: Allowed and denied lists (licenses, packages, repos) from the remote policy are combined with the local system rules.
+
+***
+
 ## Enterprise Best Practices
 
 ### 1. Centralized Mirroring

@@ -1005,6 +1005,8 @@ pub fn run(verbose: bool, _fallback: bool, no_pm: bool, sync_files: bool) -> Res
         config::write_user_config(&config)?;
     }
 
+    let _ = config::sync_remote_policy();
+
     sync_git_repos(verbose)?;
 
     if merged_config.protect_db {
