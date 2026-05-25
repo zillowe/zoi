@@ -69,7 +69,7 @@ This table lists all the available fields you can use inside the `metadata` bloc
 | `sub_packages`   | `list`    | A list of sub-package names to define a split package. See [Split Packages](#6-split-packages).                                            |
 | `main_subs`      | `list`    | For a split package, a list of the default sub-packages to install.                                                                        |
 | `extension`      | `table`   | Extension metadata for `type = "extension"` packages. Usually declared directly in `metadata`.                                             |
-| `alt`            | `string`  | A URL or source string for an alternative package definition to use instead of this one. **Note:** If using a remote URL, you should append a hash fragment (e.g., `#sha256-...`) for security verification. |
+| `alt`            | `string`  | A URL or source string for an alternative package definition to use instead of this one. **Note:** If using a remote URL, you should append a hash fragment (e.g. `#sha256-...`) for security verification. |
 | `tags`           | `list`    | A list of keywords to help users find the package via `zoi search`.                                                                        |
 | `readme`         | `string`  | A URL to the package's README file.                                                                                                        |
 | `rollback`       | `boolean` | If `false`, disables rollback for this specific package even if enabled globally.                                                          |

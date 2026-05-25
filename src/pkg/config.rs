@@ -51,6 +51,16 @@ fn get_git_root() -> Result<PathBuf> {
     ))
 }
 
+fn get_remote_policy_cache_path() -> Result<PathBuf> {
+    if cfg!(target_os = "windows") {
+        Ok(apply_sysroot(PathBuf::from(
+            "C:\\ProgramData\\zoi\\policy.cache.yaml",
+        )))
+    } else {
+        Ok(apply_sysroot(PathBuf::from("/etc/zoi/policy.cache.yaml")))
+    }
+}
+
 fn read_yaml_value(path: &Path) -> Result<Value> {
     if !path.exists() {
         return Ok(Value::Null);
@@ -72,9 +82,17 @@ pub fn read_config() -> Result<Config> {
     let user_val = read_yaml_value(&get_user_config_path()?)?;
     let project_val = read_yaml_value(&get_project_config_path()?)?;
 
-    let system_cfg: Config = serde_yaml::from_value(system_val.clone()).unwrap_or_default();
+    let mut system_cfg: Config = serde_yaml::from_value(system_val.clone()).unwrap_or_default();
     let user_cfg: Config = serde_yaml::from_value(user_val.clone()).unwrap_or_default();
     let project_cfg: Config = serde_yaml::from_value(project_val.clone()).unwrap_or_default();
+
+    if let Ok(cache_path) = get_remote_policy_cache_path()
+        && cache_path.exists()
+        && let Ok(cache_content) = fs::read_to_string(&cache_path)
+        && let Ok(remote_policy) = serde_yaml::from_str::<crate::pkg::types::Policy>(&cache_content)
+    {
+        merge_policies(&mut system_cfg.policy, &remote_policy);
+    }
 
     let system_policy = system_cfg.policy.clone();
     let mut merged_cfg = Config {
@@ -124,6 +142,8 @@ pub fn read_config() -> Result<Config> {
         .registry
         .or(user_cfg.registry)
         .or(system_cfg.registry);
+
+    merged_cfg.remote_policy = system_cfg.remote_policy;
 
     if project_val.get("telemetry_enabled").is_some()
         && !system_policy.telemetry_enabled_unoverridable
@@ -633,4 +653,147 @@ pub fn read_repo_config(db_path: &Path) -> Result<RepoConfig> {
 
 pub fn read_user_config() -> Result<Config> {
     read_config_from_path(&get_user_config_path()?)
+}
+
+pub fn sync_remote_policy() -> Result<()> {
+    let config = read_config()?;
+    let Some(remote_cfg) = &config.remote_policy else {
+        return Ok(());
+    };
+
+    println!("{} Syncing remote security policy...", "::".bold().blue());
+
+    if crate::pkg::offline::is_offline() {
+        return Err(anyhow!("Cannot sync remote policy in offline mode."));
+    }
+
+    let client = crate::utils::get_http_client()?;
+
+    let policy_content = client.get(&remote_cfg.url).send()?.text()?;
+    let sig_content = client.get(&remote_cfg.signature_url).send()?.bytes()?;
+
+    let trusted_certs =
+        crate::pkg::pgp::get_certs_by_name_or_fingerprint(&remote_cfg.trusted_keys)?;
+
+    let temp_dir = tempfile::Builder::new().prefix("zoi-policy-").tempdir()?;
+    let temp_policy_path = temp_dir.path().join("policy.yaml");
+    let temp_sig_path = temp_dir.path().join("policy.yaml.sig");
+
+    fs::write(&temp_policy_path, &policy_content)?;
+    fs::write(&temp_sig_path, &sig_content)?;
+
+    crate::pkg::pgp::verify_detached_signature_multi_key(
+        &temp_policy_path,
+        &temp_sig_path,
+        trusted_certs,
+    )?;
+
+    let cache_path = get_remote_policy_cache_path()?;
+    if let Some(parent) = cache_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(cache_path, policy_content)?;
+
+    println!(
+        "{}",
+        "Remote policy verified and cached successfully.".green()
+    );
+    Ok(())
+}
+
+fn merge_policies(base: &mut crate::pkg::types::Policy, remote: &crate::pkg::types::Policy) {
+    if remote.repos_unoverridable {
+        base.repos_unoverridable = true;
+    }
+    if remote.telemetry_enabled_unoverridable {
+        base.telemetry_enabled_unoverridable = true;
+    }
+    if remote.audit_log_enabled_unoverridable {
+        base.audit_log_enabled_unoverridable = true;
+    }
+    if remote.rollback_enabled_unoverridable {
+        base.rollback_enabled_unoverridable = true;
+    }
+    if remote.default_registry_unoverridable {
+        base.default_registry_unoverridable = true;
+    }
+    if remote.added_registries_unoverridable {
+        base.added_registries_unoverridable = true;
+    }
+    if remote.git_repos_unoverridable {
+        base.git_repos_unoverridable = true;
+    }
+    if remote.allow_deny_lists_unoverridable {
+        base.allow_deny_lists_unoverridable = true;
+    }
+    if remote.signature_enforcement_unoverridable {
+        base.signature_enforcement_unoverridable = true;
+    }
+    if remote.protect_db_unoverridable {
+        base.protect_db_unoverridable = true;
+    }
+    if remote.max_resolution_depth_unoverridable {
+        base.max_resolution_depth_unoverridable = true;
+    }
+    if remote.offline_mode_unoverridable {
+        base.offline_mode_unoverridable = true;
+    }
+    if remote.pkg_dirs_unoverridable {
+        base.pkg_dirs_unoverridable = true;
+    }
+    if remote.cache_mirrors_unoverridable {
+        base.cache_mirrors_unoverridable = true;
+    }
+    if remote.parallel_jobs_unoverridable {
+        base.parallel_jobs_unoverridable = true;
+    }
+    if remote.advisory_enforcement_unoverridable {
+        base.advisory_enforcement_unoverridable = true;
+    }
+
+    if let Some(allowed) = &remote.allowed_licenses {
+        base.allowed_licenses
+            .get_or_insert_with(Vec::new)
+            .extend(allowed.clone());
+    }
+    if let Some(denied) = &remote.denied_licenses {
+        base.denied_licenses
+            .get_or_insert_with(Vec::new)
+            .extend(denied.clone());
+    }
+    if let Some(allowed) = &remote.allowed_packages {
+        base.allowed_packages
+            .get_or_insert_with(Vec::new)
+            .extend(allowed.clone());
+    }
+    if let Some(denied) = &remote.denied_packages {
+        base.denied_packages
+            .get_or_insert_with(Vec::new)
+            .extend(denied.clone());
+    }
+    if let Some(allowed) = &remote.allowed_repos {
+        base.allowed_repos
+            .get_or_insert_with(Vec::new)
+            .extend(allowed.clone());
+    }
+    if let Some(denied) = &remote.denied_repos {
+        base.denied_repos
+            .get_or_insert_with(Vec::new)
+            .extend(denied.clone());
+    }
+
+    if let Some(remote_sig) = &remote.signature_enforcement {
+        if let Some(ref mut base_sig) = base.signature_enforcement {
+            if remote_sig.enable {
+                base_sig.enable = true;
+            }
+            base_sig
+                .trusted_keys
+                .extend(remote_sig.trusted_keys.clone());
+            base_sig.trusted_keys.sort();
+            base_sig.trusted_keys.dedup();
+        } else {
+            base.signature_enforcement = Some(remote_sig.clone());
+        }
+    }
 }
