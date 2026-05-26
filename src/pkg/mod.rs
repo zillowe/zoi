@@ -25,6 +25,7 @@ pub mod plugin;
 pub mod pm;
 pub mod purl;
 pub mod recorder;
+pub mod registry;
 pub mod repo_install;
 pub mod resolve;
 pub mod rollback;

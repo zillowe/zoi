@@ -13,6 +13,7 @@
     "lua-plugin-api",
     "lua-api-cookbook",
     "publishing-packages",
+    "registry",
     "zoidberg",
     "migrate",
     "packaging",

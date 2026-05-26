@@ -555,6 +555,10 @@ enum Commands {
         command: TransactionCommands,
     },
 
+    /// Manage and author Zoi registries
+    #[command(alias = "reg")]
+    Registry(cmd::registry::RegistryCommand),
+
     /// Manage package repositories
     #[command(
         aliases = ["repositories"],
@@ -1107,6 +1111,7 @@ pub fn run() -> anyhow::Result<()> {
                 TransactionCommands::Files { id } => cmd::transaction::files(&id),
             },
             Commands::Repo(args) => cmd::repo::run(args),
+            Commands::Registry(args) => cmd::registry::run(args),
             Commands::Telemetry { action } => {
                 use cmd::telemetry::{TelemetryCommand, run};
                 let cmd = match action {
