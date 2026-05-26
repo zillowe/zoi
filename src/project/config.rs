@@ -101,6 +101,10 @@ pub struct CommandSpec {
     pub run: PlatformOrString,
     #[serde(default)]
     pub env: PlatformOrEnvMap,
+    #[serde(default)]
+    pub depends_on: Option<Vec<String>>,
+    #[serde(default)]
+    pub cache_files: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, Clone)]

@@ -1,7 +1,7 @@
 use crate::cli::{Cli, SetupScope};
 use crate::pkg::{install, local, plugin, types};
 use crate::utils;
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use clap::CommandFactory;
 use clap_complete::{Shell, generate};
 use colored::*;
@@ -161,6 +161,53 @@ pub fn run(shell: Shell, scope: SetupScope) -> Result<()> {
         SetupScope::System => types::Scope::System,
     };
     utils::setup_path(scope_to_pass)?;
+    Ok(())
+}
+
+pub fn print_hook(shell: Shell) -> Result<()> {
+    match shell {
+        Shell::Bash => {
+            println!(
+                r#"
+_zoi_hook() {{
+  local previous_exit_status=$?;
+  eval "$(zoi env --export-shell bash)";
+  return $previous_exit_status;
+}};
+if [[ ";${{PROMPT_COMMAND[*]:-}};" != *";_zoi_hook;"* ]]; then
+  if [[ "$(declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]]; then
+    PROMPT_COMMAND=(_zoi_hook "${{PROMPT_COMMAND[@]}}")
+  else
+    PROMPT_COMMAND="_zoi_hook${{PROMPT_COMMAND:+;$PROMPT_COMMAND}}"
+  fi
+fi
+"#
+            );
+        }
+        Shell::Zsh => {
+            println!(
+                r#"
+_zoi_hook() {{
+  eval "$(zoi env --export-shell zsh)";
+}};
+typeset -ag precmd_functions;
+if [[ -z "${{precmd_functions[(r)_zoi_hook]}}" ]]; then
+  precmd_functions+=(_zoi_hook);
+fi
+"#
+            );
+        }
+        Shell::Fish => {
+            println!(
+                r#"
+function _zoi_hook --on-variable PWD
+  zoi env --export-shell fish | source
+end
+"#
+            );
+        }
+        _ => return Err(anyhow!("Shell hook not supported for {:?}", shell)),
+    }
     Ok(())
 }
 

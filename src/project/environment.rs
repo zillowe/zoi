@@ -1,8 +1,10 @@
 use super::{config, executor};
 use crate::utils;
 use anyhow::{Result, anyhow};
+use clap_complete::Shell;
 use colored::*;
 use dialoguer::{Select, theme::ColorfulTheme};
+use std::collections::HashMap;
 use std::io::{self, Write};
 use std::process::Stdio;
 
@@ -100,5 +102,68 @@ fn check_packages(config: &config::ProjectConfig) -> Result<()> {
     if !all_ok {
         return Err(anyhow!("One or more required packages are missing."));
     }
+    Ok(())
+}
+
+pub fn export_shell(
+    env_alias: Option<&str>,
+    config: &config::ProjectConfig,
+    shell: Shell,
+) -> Result<()> {
+    let platform = utils::get_platform()?;
+    let mut env_vars = HashMap::new();
+
+    if let Some(alias) = env_alias {
+        let env_spec = config
+            .environments
+            .iter()
+            .find(|e| e.cmd == alias)
+            .ok_or_else(|| anyhow!("Environment '{alias}' not found"))?;
+
+        let extra_env = match &env_spec.env {
+            config::PlatformOrEnvMap::EnvMap(m) => m.clone(),
+            config::PlatformOrEnvMap::Platform(p) => p
+                .get(&platform)
+                .or_else(|| p.get("default"))
+                .cloned()
+                .unwrap_or_default(),
+        };
+        env_vars.extend(extra_env);
+    }
+
+    if config.config.local {
+        let bin_dir = std::env::current_dir()?
+            .join(".zoi")
+            .join("pkgs")
+            .join("bin");
+        if bin_dir.exists() {
+            let mut path = bin_dir.to_string_lossy().to_string();
+            if let Ok(old_path) = std::env::var("PATH") {
+                path = format!(
+                    "{}{}{}",
+                    path,
+                    if cfg!(windows) { ";" } else { ":" },
+                    old_path
+                );
+            }
+            env_vars.insert("PATH".to_string(), path);
+        }
+    }
+
+    for (k, v) in env_vars {
+        match shell {
+            Shell::Bash | Shell::Zsh => {
+                println!("export {}=\"{}\"", k, v);
+            }
+            Shell::Fish => {
+                println!("set -gx {} \"{}\"", k, v);
+            }
+            Shell::PowerShell => {
+                println!("$env:{} = \"{}\"", k, v);
+            }
+            _ => {}
+        }
+    }
+
     Ok(())
 }

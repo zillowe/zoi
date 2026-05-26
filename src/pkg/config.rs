@@ -4,7 +4,7 @@ use crate::pkg::types::{Config, Registry, RepoConfig};
 use anyhow::{Result, anyhow};
 use colored::*;
 use serde_yaml::Value;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -691,6 +691,12 @@ pub fn read_repo_config(db_path: &Path) -> Result<RepoConfig> {
 
 pub fn read_user_config() -> Result<Config> {
     read_config_from_path(&get_user_config_path()?)
+}
+
+pub fn update_global_versions(versions: HashMap<String, String>) -> Result<()> {
+    let mut config = read_user_config()?;
+    config.versions.extend(versions);
+    write_user_config(&config)
 }
 
 pub fn sync_remote_policy() -> Result<()> {

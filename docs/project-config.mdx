@@ -45,6 +45,13 @@ commands:
   # Simple command
   - cmd: test
     run: npm test
+    # Feature: Task dependencies (DAG)
+    depends_on: ["build"]
+
+  - cmd: build
+    run: npm run build
+    # Feature: File-based caching
+    cache_files: ["src/**", "package-lock.json"]
 
   # Platform-specific command with environment variables
   - cmd: dev
@@ -122,6 +129,8 @@ shell:
   * `env`: `map` (optional)
     * Can be a simple `map` of `string: string` for environment variables.
     * Can be a platform map where keys are platform strings such as `linux-amd64`, plus optional `default`, and values are environment-variable maps.
+  * `depends_on`: `list` of `string` (optional). List of other command aliases that must run successfully before this command.
+  * `cache_files`: `list` of `string` (optional). List of file glob patterns. The command will be skipped if the hashes of these files haven't changed since the last successful run.
 * `environments`: `list` of objects (optional)
   * `name`: `string` (label)
   * `cmd`: `string` (alias)

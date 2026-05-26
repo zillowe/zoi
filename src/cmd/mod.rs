@@ -41,6 +41,7 @@ pub mod uninstall;
 pub mod unpin;
 pub mod update;
 pub mod upgrade;
+pub mod use_cmd;
 pub mod utils;
 pub mod ux;
 pub mod version;

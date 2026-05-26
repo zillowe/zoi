@@ -41,6 +41,47 @@ pub fn resolve_to_installed_bin(
     let desired_version = get_desired_version(bin_name, plugin_manager)?;
 
     let providers = db::find_provides("local", bin_name)?;
+
+    if let Some(version) = &desired_version {
+        for (pkg, _) in &providers {
+            if let Some(path) = search_store_for_version(&pkg.name, version, bin_name)? {
+                return Ok(path);
+            }
+        }
+
+        if crate::utils::ask_for_confirmation(
+            &format!(
+                "Binary '{}' v{} is required but not installed. Install it now?",
+                bin_name, version
+            ),
+            false,
+        ) {
+            let install_spec = format!("{}@{}", bin_name, version);
+            let scope = if std::path::Path::new("zoi.yaml").exists() {
+                Some(crate::pkg::types::Scope::Project)
+            } else {
+                Some(crate::pkg::types::Scope::User)
+            };
+
+            let options = crate::SourceInstallOptions {
+                scope_override: scope,
+                yes: true,
+                ..Default::default()
+            };
+
+            if let Err(e) = crate::install_sources(&[install_spec], &options) {
+                return Err(anyhow!("Failed to auto-install '{}': {}", bin_name, e));
+            }
+
+            let providers = db::find_provides("local", bin_name)?;
+            for (pkg, _) in &providers {
+                if let Some(path) = search_store_for_version(&pkg.name, version, bin_name)? {
+                    return Ok(path);
+                }
+            }
+        }
+    }
+
     if providers.is_empty() {
         return Err(anyhow!(
             "No installed package provides binary '{}'. Run 'zoi provides {}' to find providers.",
@@ -99,6 +140,30 @@ pub fn resolve_to_installed_bin(
     ))
 }
 
+fn find_tool_versions_version(bin_name: &str) -> Result<Option<String>> {
+    let mut current_dir = env::current_dir()?;
+    loop {
+        let tool_versions_path = current_dir.join(".tool-versions");
+        if tool_versions_path.exists() {
+            let content = fs::read_to_string(&tool_versions_path)?;
+            for line in content.lines() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with('#') {
+                    continue;
+                }
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 2 && parts[0] == bin_name {
+                    return Ok(Some(parts[1].to_string()));
+                }
+            }
+        }
+        if !current_dir.pop() {
+            break;
+        }
+    }
+    Ok(None)
+}
+
 fn get_desired_version(
     bin_name: &str,
     plugin_manager: Option<&PluginManager>,
@@ -130,6 +195,10 @@ fn get_desired_version(
                 }
             }
         }
+    }
+
+    if let Ok(Some(v)) = find_tool_versions_version(bin_name) {
+        return Ok(Some(v));
     }
 
     let cfg = config::read_config()?;
