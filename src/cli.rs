@@ -10,9 +10,9 @@ use colored::Colorize;
 use std::io::{self};
 
 // Development, Special, Public or Production
-const BRANCH: &str = "Production";
+const BRANCH: &str = "Development";
 const STATUS: &str = "Release";
-const NUMBER: &str = "1.15.0";
+const NUMBER: &str = "1.16.0";
 const PKG_SOURCE_HELP: &str = "Package identifier (e.g. @repo/name, path, or URL)";
 
 /// Zoi - The Universal Package Manager & Environment Setup Tool.
@@ -252,7 +252,7 @@ enum Commands {
     },
 
     /// Installs one or more packages from a name, local file, URL, or git repository
-    #[command(alias = "i")]
+    #[command(aliases = ["i", "in", "add"])]
     Install {
         #[arg(value_name = "SOURCES", value_hint = ValueHint::FilePath, help = PKG_SOURCE_HELP)]
         sources: Vec<String>,
