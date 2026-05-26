@@ -1,18 +1,18 @@
-FROM rust:1.90.0-slim-trixie AS builder
+FROM archlinux:latest AS builder
 
 # These are used by build.rs to embed telemetry configuration.
 # You can override them during the build process, e.g.:
 # docker build --build-arg POSTHOG_API_KEY="your_key"
-ARG POSTHOG_API_KEY="phc_abcdefg"
-ARG POSTHOG_API_HOST="https://eu.i.posthog.com"
-ARG ZOI_DEFAULT_REGISTRY="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg.git"
-ARG ZOI_AUTHORITIES_KEY_1="842293159C4B03357C8328D3A75793A3E674252E"
+ARG POSTHOG_API_KEY=""
+ARG POSTHOG_API_HOST=""
+ARG ZOI_DEFAULT_REGISTRY=""
+ARG ZOI_AUTHORITIES_KEY_1=""
 ARG ZOI_AUTHORITIES_KEY_2=""
 ARG ZOI_ABOUT_PACKAGER_AUTHOR=""
 ARG ZOI_ABOUT_PACKAGER_EMAIL=""
 ARG ZOI_ABOUT_PACKAGER_HOMEPAGE=""
 
-RUN apt-get update && apt-get install -y build-essential pkg-config libssl-dev git && rm -rf /var/lib/apt/lists/*
+RUN pacman -Syu --noconfirm --needed base-devel pkgconf openssl git rust
 
 # Set the working directory.
 WORKDIR /usr/src/app
@@ -36,9 +36,9 @@ COPY src ./src
 
 RUN cargo build --bin zoi --release
 
-FROM debian:trixie-slim
+FROM archlinux:base
 
-RUN apt-get update && apt-get install -y git ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN pacman -Syu --noconfirm --needed git ca-certificates less gnupg && pacman -Scc --noconfirm
 
 COPY --from=builder /usr/src/app/target/release/zoi /usr/local/bin/zoi
 
