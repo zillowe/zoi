@@ -26,6 +26,7 @@ pub mod package;
 pub mod pgp;
 pub mod pin;
 pub mod provides;
+pub mod registry;
 pub mod repo;
 pub mod rollback;
 pub mod run;
