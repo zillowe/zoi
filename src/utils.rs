@@ -1,6 +1,7 @@
 use crate::pkg::resolve::SourceType;
 use anyhow::anyhow;
 use colored::*;
+use crossterm::tty::IsTty;
 use std::fmt::Display;
 use std::fs;
 use std::io::{Write, stdin, stdout};
@@ -272,6 +273,11 @@ pub fn ask_for_confirmation(prompt: &str, yes: bool) -> bool {
     if yes {
         return true;
     }
+
+    if std::env::var("ZOI_TEST").is_ok() || !stdin().is_tty() {
+        return false;
+    }
+
     print!("{} [y/N]: ", prompt.yellow());
     let _ = stdout().flush();
     let mut input = String::new();

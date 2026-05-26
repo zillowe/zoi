@@ -27,7 +27,8 @@ impl TestContextGuard {
             .lock()
             .expect("test context lock should not be poisoned");
         let previous_sysroot = sysroot::get_sysroot();
-        Self {
+
+        let mut guard = Self {
             _lock: lock,
             previous_env: Vec::new(),
             captured_keys: HashSet::new(),
@@ -35,7 +36,10 @@ impl TestContextGuard {
             previous_sysroot,
             previous_offline: offline::is_offline(),
             previous_pkg_dirs: pkgdir::get_pkg_dirs(),
-        }
+        };
+
+        guard.set_env_var("ZOI_TEST", "1");
+        guard
     }
 
     pub fn set_env_var(&mut self, key: &str, value: impl AsRef<OsStr>) {

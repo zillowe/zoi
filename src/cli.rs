@@ -313,6 +313,18 @@ enum Commands {
         purl: bool,
     },
 
+    /// Add a tool to the current project or global configuration and install it
+    #[command(alias = "u")]
+    Use {
+        /// Package(s) to use (e.g. node@20)
+        #[arg(value_name = "PACKAGES", required = true, help = PKG_SOURCE_HELP)]
+        packages: Vec<String>,
+
+        /// Add to global configuration instead of project
+        #[arg(short, long)]
+        global: bool,
+    },
+
     /// Uninstalls one or more packages previously installed by Zoi
     #[command(
         aliases = ["un", "rm", "remove"],
@@ -364,6 +376,10 @@ enum Commands {
     Env {
         /// The alias of the environment to set up
         env_alias: Option<String>,
+
+        /// Export environment variables for the current shell
+        #[arg(long, value_enum, hide = true)]
+        export_shell: Option<Shell>,
     },
 
     /// Enter a development shell for the current project
@@ -473,12 +489,15 @@ enum Commands {
 
     /// Set up shell completions or enter an ephemeral environment with specific packages
     #[command(
-        long_about = "If a shell is provided, it installs completion scripts. If packages are provided via --package/-p, it enters a temporary subshell with those packages available in PATH."
+        long_about = "If a shell is provided, it installs completion scripts. If 'hook' is provided, it outputs shell-specific hook scripts for auto-activation. If packages are provided via --package/-p, it enters a temporary subshell with those packages available in PATH."
     )]
     Shell {
-        /// The shell to set up completions for
+        /// The shell to set up completions or hooks for
         #[arg(value_enum)]
         shell: Option<Shell>,
+        /// Generate a shell hook for automatic environment activation
+        #[arg(long)]
+        hook: bool,
         /// The scope to apply the setup to (user or system-wide)
         #[arg(long, value_enum, default_value = "user")]
         scope: SetupScope,
@@ -958,6 +977,7 @@ pub fn run() -> anyhow::Result<()> {
                 purl,
             )
             .map_err(|e| cmd::ux::with_failure_hint("install", e)),
+            Commands::Use { packages, global } => cmd::use_cmd::run(packages, global),
             Commands::Uninstall {
                 packages,
                 scope,
@@ -981,7 +1001,10 @@ pub fn run() -> anyhow::Result<()> {
             )
             .map_err(|e| cmd::ux::with_failure_hint("uninstall", e)),
             Commands::Run { cmd_alias, args } => cmd::run::run(cmd_alias, args),
-            Commands::Env { env_alias } => cmd::env::run(env_alias),
+            Commands::Env {
+                env_alias,
+                export_shell,
+            } => cmd::env::run(env_alias, export_shell),
             Commands::Dev { run } => cmd::dev::run(run),
             Commands::Upgrade { force, tag, branch } => {
                 match cmd::upgrade::run(BRANCH, STATUS, NUMBER, force, tag, branch) {
@@ -1037,11 +1060,14 @@ pub fn run() -> anyhow::Result<()> {
             Commands::Service(args) => cmd::service::run(args),
             Commands::Shell {
                 shell,
+                hook,
                 scope,
                 packages,
                 run,
             } => {
-                if !packages.is_empty() {
+                if hook {
+                    cmd::shell::print_hook(shell.unwrap_or(Shell::Bash))
+                } else if !packages.is_empty() {
                     cmd::shell::enter_ephemeral_shell(&packages, run, Some(&plugin_manager))
                 } else if let Some(s) = shell {
                     cmd::shell::run(s, scope)

@@ -21,7 +21,7 @@ fn main() {
     {
         let plugin_manager = match zoi::pkg::plugin::PluginManager::new() {
             Ok(m) => {
-                let _ = m.load_all(false); // Shims usually run non-interactively
+                let _ = m.load_all(false);
                 m
             }
             Err(e) => {

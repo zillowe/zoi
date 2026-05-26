@@ -247,6 +247,10 @@ Manage and set up project environments from a local `zoi.yaml` file.
 
 * `[env_alias]`: The alias of the environment to set up. If not provided, an interactive prompt is shown.
 
+**Options:**
+
+* `--export-shell <shell>`: (Hidden) Outputs environment variable exports for evaluation by a shell hook.
+
 ***
 
 ### `zoi exec <SOURCE> [ARGS]...`
@@ -590,14 +594,15 @@ Manage background services for installed packages. This command uses the native 
 
 ### `zoi shell [shell]`
 
-Installs completion scripts for a given shell and setup PATH for Zoi. If packages are provided, it enters an ephemeral environment.
+Installs completion scripts for a given shell and setup PATH for Zoi. If `--hook` is provided, it outputs shell-specific hook scripts for automatic environment activation (direnv-style). If packages are provided, it enters an ephemeral environment.
 
 **Arguments:**
 
-* `[shell]`: The shell to install completions for (`bash`, `zsh`, `fish`, `elvish`, `powershell`).
+* `[shell]`: The shell name (`bash`, `zsh`, `fish`, `elvish`, `powershell`).
 
 **Options:**
 
+* `--hook`: Generate a shell hook script to be evaluated by your shell configuration (e.g. `eval "$(zoi shell --hook bash)"`).
 * `-p`, `--package <PACKAGE>`: Package(s) to include in the ephemeral environment.
 * `-r`, `--run <COMMAND>`: Run a command in the ephemeral environment and exit.
 * `--scope <user|system>`: The scope to apply the shell setup to (default: `user`).
@@ -712,6 +717,23 @@ When using `--all`, Zoi also prints explicit pinned/skipped summaries and adviso
 * `--explain`: Explain why each package is selected or skipped.
 * `--plan-json`: Emit machine-readable update plan JSON.
 * `--dry-run`: Do not actually perform the update, just show what would be done.
+
+***
+
+### `zoi use <PACKAGES>...`
+
+(alias: `u`)
+
+Adds a tool to the current project or global configuration and installs it in one step.
+
+**Arguments:**
+
+* `<PACKAGES>...`: Package identifiers (e.g. `node@20`).
+
+**Options:**
+
+* `-g`, `--global`: Add to global configuration (user `versions` map) instead of the local project (`zoi.yaml`).
+* `-y`, `--yes`: Automatically answer yes to prompts (including JIT installation prompts).
 
 ***
 

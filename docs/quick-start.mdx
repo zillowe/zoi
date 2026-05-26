@@ -23,10 +23,23 @@ powershell -c "irm zillowe.pages.dev/scripts/zoi/install.ps1|iex"
 
 ## 2. Set Up Your Shell
 
-Zoi links package binaries into `~/.zoi/pkgs/bin`. If commands installed by Zoi are not found, configure your shell:
+Zoi links package binaries into `~/.zoi/pkgs/bin`. If commands installed by Zoi are not found, configure your shell completions and PATH:
 
 ```sh
 zoi shell zsh
+```
+
+For **automatic environment activation** when you `cd` into a project (direnv-style), add the Zoi hook to your shell profile:
+
+```sh
+# For Bash, add to ~/.bashrc:
+eval "$(zoi shell --hook bash)"
+
+# For Zsh, add to ~/.zshrc:
+eval "$(zoi shell --hook zsh)"
+
+# For Fish, add to ~/.config/fish/config.fish:
+zoi shell --hook fish | source
 ```
 
 Use your shell name: `bash`, `zsh`, `fish`, `elvish`, or `powershell`.
