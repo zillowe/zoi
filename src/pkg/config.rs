@@ -375,9 +375,26 @@ pub fn write_user_config(config: &Config) -> Result<()> {
 pub fn verify_remote_file(url: &str, trusted_keys: &[String]) -> Result<Vec<u8>> {
     let client = crate::utils::get_http_client()?;
 
-    let data = client.get(url).send()?.bytes()?;
+    let response = client.get(url).send()?;
+    if !response.status().is_success() {
+        return Err(anyhow!(
+            "Failed to fetch remote file '{}': {}",
+            url,
+            response.status()
+        ));
+    }
+    let data = response.bytes()?;
+
     let sig_url = format!("{}.sig", url);
-    let sig = client.get(&sig_url).send()?.bytes()?;
+    let sig_response = client.get(&sig_url).send()?;
+    if !sig_response.status().is_success() {
+        return Err(anyhow!(
+            "Failed to fetch signature for '{}': {}",
+            url,
+            sig_response.status()
+        ));
+    }
+    let sig = sig_response.bytes()?;
 
     let trusted_certs = crate::pkg::pgp::get_certs_by_name_or_fingerprint(trusted_keys)?;
 

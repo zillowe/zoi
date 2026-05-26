@@ -95,24 +95,18 @@ pub fn construct_raw_url(git_url: &str, branch: &str, file_path: &str) -> Result
 
 pub fn fetch_registry_index(registry: &RegistryInfo) -> Result<RegistryIndex> {
     let url = construct_raw_url(&registry.git, &registry.branch, "packages.json")?;
+    let client = utils::get_http_client()?;
+    let response = client.get(url).send()?;
 
-    let trusted_keys = crate::pkg::config::get_builtin_authorities();
-    let data = if !trusted_keys.is_empty() {
-        crate::pkg::config::verify_remote_file(&url, &trusted_keys)?
-    } else {
-        let client = utils::get_http_client()?;
-        let response = client.get(url).send()?;
-        if !response.status().is_success() {
-            return Err(anyhow!(
-                "Failed to fetch packages.json from registry {}: {}",
-                registry.name,
-                response.status()
-            ));
-        }
-        response.bytes()?.to_vec()
-    };
+    if !response.status().is_success() {
+        return Err(anyhow!(
+            "Failed to fetch packages.json from registry {}: {}",
+            registry.name,
+            response.status()
+        ));
+    }
 
-    Ok(serde_json::from_slice(&data)?)
+    Ok(response.json()?)
 }
 
 pub fn fetch_package_lua(registry: &RegistryInfo, repo: &str, name: &str) -> Result<String> {
