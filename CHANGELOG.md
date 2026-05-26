@@ -4,6 +4,43 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
+## [Prod-Release-1.15.0] - 2026-05-26
+
+### ♻️ Refactor
+
+- *(remote)* Refactor remote registry fetching and enhance error handling
+- *(core)* Make PluginManager optional and add remote verification
+- *(build)* Refactor build script and reorganize builtin asset paths
+
+### ✨ Features
+
+- *(policy)* Implement centralized security policy distribution
+- *(show)* Update show commannd
+- *(deps)* Add slice accessors for dependency groups
+- *(hooks)* Add builtin system hooks for caches and ldconfig
+- *(sync)* Add system git fallback for package sync
+
+### 🔒 Security
+
+- Harden system against untrusted code and path traversal
+
+### 🔧 Configuration
+
+- *(pgp)* Include built-in PGP keys
+- *(cargo)* Refine crate package exclusion
+
+### 🧪 Testing
+
+- Add tests for policy merging and path validation
+
+### 🧹 Cleanup
+
+- *(system-config)* Remove declarative system configuration feature
+
+### 🩹 Bug Fixes
+
+- *(scripts)* Resolve makepkg permission error for temporary directory
+
 ## [Prod-Release-1.14.0] - 2026-05-22
 
 ### ✨ Features
