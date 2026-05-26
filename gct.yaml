@@ -1,0 +1,6 @@
+name: "Zoi"
+provider: Google AI Studio
+model: gemini-3.1-flash-lite
+commits:
+  guides:
+    - ./etc/Commits.md

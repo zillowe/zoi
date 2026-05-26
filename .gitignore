@@ -10,9 +10,5 @@ packages/js/dist
 dist/*
 .zoi/
 
-# Added by GCT
-gct.yaml
-/.gct/
-
 # Added by cargo
 /target
