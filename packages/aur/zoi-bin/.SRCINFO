@@ -1,5 +1,5 @@
 pkgbase = zoi-bin
-	pkgdesc = Universal Package Manager & Environment Setup Tool (pre-compiled binary)
+	pkgdesc = Advanced Package Manager & Environment Orchestrator (pre-compiled binary)
 	pkgver = __VERSION__
 	pkgrel = 1
 	url = https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi

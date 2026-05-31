@@ -1,5 +1,5 @@
 pkgbase = zoi
-	pkgdesc = Universal Package Manager & Environment Setup Tool
+	pkgdesc = Advanced Package Manager & Environment Orchestrator
 	pkgver = __VERSION__
 	pkgrel = 1
 	url = https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi

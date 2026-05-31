@@ -1,6 +1,6 @@
 {
   "name": "@zillowe/zoi",
-  "description": "Universal Package Manager & Environment Setup Tool",
+  "description": "Advanced Package Manager & Environment Orchestrator",
   "version": "0.2.2",
   "main": "./dist/index.js",
   "bin": {

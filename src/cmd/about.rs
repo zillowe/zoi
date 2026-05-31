@@ -1,7 +1,7 @@
 use crate::utils;
 use colored::*;
 
-const DESCRIPTION: &str = "Zoi - Universal Package Manager & Environment Setup Tool.\n  Part of the Zillowe Development Suite (ZDS)";
+const DESCRIPTION: &str = "Zoi - Advanced Package Manager & Environment Orchestrator.\n  Part of the Zillowe Development Suite (ZDS)";
 const AUTHOR: &str = "Zusty < Zillowe Foundation";
 const HOMEPAGE: &str = "https://zillowe.qzz.io/zds/zoi";
 const DOCS: &str = "https://zillowe.qzz.io/docs/zds/zoi";

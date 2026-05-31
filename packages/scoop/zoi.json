@@ -1,6 +1,6 @@
 {
 	"version": "__VERSION__",
-	"description": "Universal Package Manager & Environment Setup Tool",
+	"description": "Advanced Package Manager & Environment Orchestrator",
 	"homepage": "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi",
 	"license": "Apache-2.0",
 	"architecture": {
