@@ -1,4 +1,4 @@
-//! # Zoi: The Universal Package Manager & Environment Setup Tool
+//! # Zoi: The Advanced Package Manager & Environment Orchestrator
 //!
 //! This crate provides the core functionality of Zoi as a library, allowing other
 //! Rust applications to leverage its package management and environment setup

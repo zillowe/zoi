@@ -1,7 +1,7 @@
 # Maintainer: ZilloweZ <zillowez@gmail.com>
 
 class Zoi < Formula
-  desc "Universal Package Manager & Environment Setup Tool"
+  desc "Advanced Package Manager & Environment Orchestrator"
   homepage "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi"
   version "__VERSION__"
   license "Apache-2.0"

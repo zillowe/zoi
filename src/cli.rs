@@ -15,7 +15,7 @@ const STATUS: &str = "Release";
 const NUMBER: &str = "1.16.0";
 const PKG_SOURCE_HELP: &str = "Package identifier (e.g. @repo/name, path, or URL)";
 
-/// Zoi - The Universal Package Manager & Environment Setup Tool.
+/// Zoi - The Advanced Package Manager & Environment Orchestrator.
 ///
 /// Part of the Zillowe Development Suite (ZDS), Zoi is designed to streamline
 /// your development workflow by managing tools and project environments.

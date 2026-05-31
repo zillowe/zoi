@@ -1,6 +1,6 @@
 <div align="center">
     <img width="320" hspace="10" alt="Zoi Banner" src="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/images/zoi-banner.svg"/>
-    <p><strong>Universal Package Manager & Environment Setup Tool</strong></p>
+    <p><strong>Advanced Package Manager & Environment Orchestrator</strong></p>
 </div>
 <hr/>
 <br/>
@@ -80,7 +80,7 @@
 
 </details>
 
-Zoi is a universal package manager and environment setup tool, designed to simplify package management and environment configuration across multiple operating systems.
+Zoi is an advanced package manager and environment orchestrator, designed to simplify package management and environment configuration across multiple operating systems.
 
 ## ✨ Features
 
