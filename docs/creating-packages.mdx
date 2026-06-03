@@ -459,7 +459,17 @@ zoi package doctor /path/to/your-package.pkg.lua
 
 `zoi package doctor` validates metadata consistency, dependency string syntax, and common split-package mistakes, and emits warnings for missing lifecycle functions like `test()`.
 
-### Step 3: Test Your Package
+### Step 3: LSP Support
+
+To get rich autocomplete, type checking, and hover documentation for Zoi's Lua API in your editor (e.g. VS Code with `sumneko.lua`), initialize LSP support in your workspace:
+
+```sh
+zoi package init-lsp
+```
+
+This command creates a `.luarc.json` file in your directory and installs EmmyLua type definitions to `~/.zoi/lsp/`.
+
+### Step 4: Test Your Package
 
 Once your package seems to be working, run your tests using the `zoi package test` command.
 

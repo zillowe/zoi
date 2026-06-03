@@ -1,0 +1,183 @@
+---
+title: Registry Maintenance
+description: A comprehensive guide to creating, authoring, and maintaining Zoi package registries.
+---
+
+Zoi registries are the backbone of the ecosystem, providing the package definitions (`.pkg.lua`) and security advisories (`.sec.yaml`) that Zoi uses to resolve and install software. This guide covers the specialized `zoi registry` (alias `reg`) command suite designed for registry maintainers.
+
+## Core Commands
+
+The `zoi registry` suite simplifies the tedious tasks of scaffolding packages, managing vulnerability IDs, and generating the JSON metadata indexes required by Zoi clients.
+
+### `zoi registry init [path]`
+
+Initializes a new, empty Zoi registry. It scaffolds the foundational directory structure, configuration files, and LSP support.
+
+* **Scaffolds:** `repo.yaml`, `packages.json`, `advisories.json`.
+* **Directories:** `core`, `main`, `community`, `test`, `archive`, `zillowe`.
+* **LSP Support:** Automatically runs `zoi package init-lsp` to set up `.luarc.json` and EmmyLua type definitions.
+
+```sh
+zoi registry init ./my-new-registry
+```
+
+### `zoi registry add-package [name] [--repo <tier>]`
+
+(alias: `add-pkg`)
+
+Creates a new package scaffold. If arguments are omitted, it will prompt you interactively.
+
+* **Args:** `[name]` (package name), `--repo <tier>` (e.g. `community`, `main`).
+* **Creates:** A directory for the package and a minimal, commented `.pkg.lua` file.
+
+```sh
+# Explicit
+zoi registry add-pkg my-tool --repo community
+
+# Interactive
+zoi registry add-pkg
+```
+
+### `zoi registry add-advisory <package-name>`
+
+(alias: `sec`)
+
+Interactively creates a new security advisory for a package.
+
+* **Creates:** A `[PREFIX]-[YEAR]-TEMP.sec.yaml` file. The `TEMP` placeholder is replaced with a permanent ID during metadata generation.
+* **Fields:** Summary, Severity, Affected Range, Fixed Version, Description, and Reference URL.
+
+```sh
+zoi registry add-advisory my-tool
+```
+
+### `zoi registry generate-metadata`
+
+(alias: `gen-meta`)
+
+Scans the entire registry to generate the optimized JSON index files used by Zoi clients.
+
+* **`packages.json`:** Updated with metadata from every `.pkg.lua` file. This index allows Zoi to resolve packages without cloning the entire history.
+* **`advisories.json`:** Updated with all security advisories.
+* **ID Assignment:** Automatically assigns permanent chronological IDs (e.g. `ZSA-2026-D0042`) to any `TEMP` advisory files.
+
+```sh
+zoi registry generate-metadata
+```
+
+### `zoi registry check`
+
+(alias: `lint`, `audit`)
+
+Performs a comprehensive sanity check on the registry.
+
+* **Lints:** Every `.pkg.lua` file is checked for metadata consistency and valid dependency syntax.
+* **Integrity:** Ensures all referenced repository tiers exist and the `repo.yaml` is valid.
+
+```sh
+zoi registry check
+```
+
+---
+
+## Registry Structure
+
+A standard Zoi registry follows a tiered layout:
+
+```text
+my-registry/
+├── repo.yaml           # Registry configuration and tier definitions
+├── packages.json       # Generated package index (v1)
+├── advisories.json     # Generated advisory index (v1)
+├── .luarc.json         # LSP configuration for maintainers
+├── core/               # Essential, high-stability packages
+│   └── hello/
+│       └── hello.pkg.lua
+├── community/          # User-contributed packages
+│   └── my-tool/
+│       ├── my-tool.pkg.lua
+│       └── ZSA-2026-D0001.sec.yaml
+└── ...
+```
+
+---
+
+## Maintenance Workflow
+
+Maintainers typically follow this workflow when adding or updating software:
+
+### 1. Initialize or Clone
+
+If starting fresh, use `zoi reg init`. If contributing to an existing registry, clone it and ensure your editor supports the local `.luarc.json` for autocomplete.
+
+### 2. Scaffold the Package
+
+Use `zoi reg add-pkg` to create the directory and initial script.
+
+```sh
+zoi reg add-pkg fzf --repo community
+```
+
+### 3. Author the Build Logic
+
+Edit the generated `community/fzf/fzf.pkg.lua`. Use Zoi's [Lua API](/docs/zds/zoi/lua-api) and [Cookbook](/docs/zds/zoi/lua-api-cookbook) for common patterns.
+
+### 4. Validate Locally
+
+Run the maintainer linting and local tests:
+
+```sh
+zoi package doctor community/fzf/fzf.pkg.lua
+zoi package test community/fzf/fzf.pkg.lua
+```
+
+### 5. (Optional) Document Vulnerabilities
+
+If a package version is known to be insecure, add an advisory:
+
+```sh
+zoi reg sec fzf
+```
+
+### 6. Audit the Registry
+
+Ensure your changes haven't broken the registry structure or metadata consistency.
+
+```sh
+zoi reg check
+```
+
+### 7. Generate Metadata & Commit
+
+Update the JSON indexes so Zoi clients can see your new package.
+
+```sh
+zoi reg gen-meta
+git add .
+git commit -m "feat(community): add fzf v0.44.1"
+git push
+```
+
+---
+
+## Advanced Configuration
+
+### The `repo.yaml` File
+
+This file defines how Zoi treats the registry. You can configure:
+
+* **`advisory_prefix`**: The prefix for your vulnerability IDs (e.g. `MYCORP-SEC`).
+* **`pkg` mirrors**: Locations for pre-built `.pkg.tar.zst` archives.
+* **`authorities`**: PGP fingerprints that must sign commits for the registry to be trusted.
+
+See the [Repositories Specification](/docs/zds/zoi/repositories#the-repoyaml-file) for a full field reference.
+
+### LSP & EmmyLua
+
+When you initialize a registry, Zoi provides a `zoi.lua` meta-file (installed to `~/.zoi/lsp/`) and a `.luarc.json`. This enables:
+
+* **Autocomplete** for all global Zoi variables (`SYSTEM`, `PKG`, `UTILS`).
+* **Hover Docs** for Zoi functions (`zcp`, `cmd`, `addPgpKey`).
+* **Type Checking** for metadata and dependency tables.
+
+If your workspace isn't showing suggestions, run `zoi package init-lsp` in the registry root.
