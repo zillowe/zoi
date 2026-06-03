@@ -89,11 +89,11 @@ The image is tagged with both the specific release version (e.g. `zoi:Prod-Relea
 
 ```sh
 # Pull the latest Zoi CLI image
-docker pull registry.gitlab.com/Zillowe/Zillwen/Zusty/Zoi/zoi:latest
+docker pull registry.gitlab.com/zillowe/zillwen/zusty/zoi/zoi:latest
 
 # Example usage in a GitLab CI/CD job
 my-job:
-  image: registry.gitlab.com/Zillowe/Zillwen/Zusty/Zoi/zoi:latest
+  image: registry.gitlab.com/zillowe/zillwen/zusty/zoi/zoi:latest
   script:
     - zoi package build my-package.pkg.lua --type source --platform linux-amd64
 ```

@@ -515,14 +515,14 @@ zoi package install /path/to/your-package-1.0.0-linux-amd64.pkg.tar.zst
 
 This example demonstrates many of the concepts above by packaging a simple "Hello, World!" program written in Zig.
 
-*For the full source code of this example, see the `hello` package in the [Zoidberg repository](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg/-/tree/main/zillowe/hello).*
+*For the full source code of this example, see the `hello` package in the [Zoidberg repository](https://gitlab.com/zillowe/zillwen/zusty/zoidberg/-/tree/main/zillowe/hello).*
 
 ### `hello.pkg.lua`
 
 ```lua
 -- 1. Helper variables
-local repo_owner = "Zillowe"
-local repo_name = "Hello"
+local repo_owner = "zillowe"
+local repo_name = "hello"
 local version = ZOI.VERSION or "3.0.0"
 local git_url = "https://github.com/" .. repo_owner .. "/" .. repo_name .. ".git"
 local release_base_url = "https://github.com/" .. repo_owner .. "/" .. repo_name .. "/releases/download/v" .. version
@@ -533,9 +533,9 @@ metadata({
   repo = "zillowe",
   version = version,
   description = "Hello World",
-  website = "https://github.com/Zillowe/Hello",
+  website = "https://github.com/zillowe/hello",
   git = git_url,
-  man = "https://raw.githubusercontent.com/Zillowe/Hello/refs/heads/main/app/man.md",
+  man = "https://raw.githubusercontent.com/zillowe/hello/refs/heads/main/app/man.md",
   maintainer = { name = "Zillowe", email = "contact@zillowe.org" },
   license = "Apache-2.0",
   bins = { "hello" },

@@ -6,7 +6,7 @@ pkgver=__VERSION__
 pkgrel=1
 pkgdesc="Advanced Package Manager & Environment Orchestrator (pre-compiled binary)"
 arch=('x86_64' 'aarch64')
-url="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi"
+url="https://gitlab.com/zillowe/zillwen/zusty/zoi"
 license=('Apache-2.0')
 provides=("${pkgname%-bin}")
 conflicts=("${pkgname%-bin}")
@@ -17,7 +17,7 @@ optdepends=(
   'fish: for fish shell completion'
   'less: for viewing files'
 )
-_license_url='http://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/LICENSE'
+_license_url='https://gitlab.com/zillowe/zillwen/zusty/zoi/-/raw/main/LICENSE'
 
 source_x86_64=("${pkgname%-bin}-linux-amd64.tar.zst::$url/-/releases/Prod-Release-$pkgver/downloads/${pkgname%-bin}-linux-amd64.tar.zst"
   "LICENSE::$_license_url")

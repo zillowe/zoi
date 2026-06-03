@@ -18,8 +18,8 @@ pub fn set_registry(url_or_keyword: &str) -> Result<()> {
             url_storage = pkg::config::get_default_registry();
             &url_storage
         }
-        "gitlab" => "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg.git",
-        "github" => "https://github.com/Zillowe/Zoidberg.git",
+        "gitlab" => "https://gitlab.com/zillowe/zillwen/zusty/zoidberg.git",
+        "github" => "https://github.com/zillowe/zoidberg.git",
         "codeberg" => "https://codeberg.org/Zillowe/Zoidberg.git",
         _ => url_or_keyword,
     };

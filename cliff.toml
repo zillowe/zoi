@@ -74,8 +74,8 @@ commit_parsers = [
     { message = ".*", group = "💼 Other" },
 ]
 link_parsers = [
-    { pattern = "#([0-9]+)", href = "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/$1", text = "#$1" },
-    { pattern = "!([0-9]+)", href = "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/merge_requests/$1", text = "!$1" },
+    { pattern = "#([0-9]+)", href = "https://gitlab.com/zillowe/zillwen/zusty/zoi/-/issues/$1", text = "#$1" },
+    { pattern = "!([0-9]+)", href = "https://gitlab.com/zillowe/zillwen/zusty/zoi/-/merge_requests/$1", text = "!$1" },
 ]
 filter_commits = false
 sort_commits = "newest"

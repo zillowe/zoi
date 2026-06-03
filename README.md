@@ -1,25 +1,25 @@
 <div align="center">
-    <img width="320" hspace="10" alt="Zoi Banner" src="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/raw/main/app/images/zoi-banner.svg"/>
+    <img width="320" hspace="10" alt="Zoi Banner" src="https://gitlab.com/zillowe/zillwen/zusty/zoi/-/raw/main/app/images/zoi-banner.svg"/>
     <p><strong>Advanced Package Manager & Environment Orchestrator</strong></p>
 </div>
 <hr/>
 <br/>
 
 <div align="center">
-  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/releases">
+  <a href="https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases">
     <img alt="GitLab Latest Release" src="https://img.shields.io/gitlab/v/release/71087662?sort=date&display_name=release&style=flat&logo=gitlab&logoColor=%23fff&label=Release&labelColor=%235452f1&color=%23282696"/>
   </a>
-  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/pipelines">
-    <img alt="GitLab Pipeline Status" src="https://img.shields.io/gitlab/pipeline-status/Zillowe%2FZillwen%2FZusty%2FZoi?style=flat&logo=gitlab&logoColor=%23fff&label=Pipeline&labelColor=%235452f1"/>
+  <a href="https://gitlab.com/zillowe/zillwen/zusty/zoi/-/pipelines">
+    <img alt="GitLab Pipeline Status" src="https://img.shields.io/gitlab/pipeline-status/zillowe%2Fzillwen%2Fzusty%2Fzoi?style=flat&logo=gitlab&logoColor=%23fff&label=Pipeline&labelColor=%235452f1"/>
   </a>
   <br/>
   <a href="https://aur.archlinux.org/packages/zoi-bin">
     <img alt="AUR Version" src="https://img.shields.io/aur/version/zoi-bin?style=flat&logo=archlinux&logoColor=%23ffff&label=AUR&labelColor=5452f1&color=282696"/>
   </a>
-  <a href="https://github.com/Zillowe/homebrew-tap">
+  <a href="https://github.com/zillowe/homebrew-tap">
     <img alt="Homebrew Version" src="https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fraw.githubusercontent.com%2FZillowe%2Fhomebrew-tap%2Frefs%2Fheads%2Fmain%2Fzoi.rb&search=version%5Cs%2B%22(%5B%5E%22%5D%2B)%22&replace=v%241&style=flat&logo=homebrew&logoColor=%23ffff&label=Homebrew&labelColor=%235452f1&color=%23282696">
   </a>
-  <a href="https://github.com/Zillowe/scoop">
+  <a href="https://github.com/zillowe/scoop">
     <img alt="Scoop Version" src="https://img.shields.io/scoop/v/zoi?bucket=https%3A%2F%2Fgithub.com%2FZillowe%2Fscoop&style=flat&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPCFET0NUWVBFIHN2ZyBQVUJMSUMgIi0vL1czQy8vRFREIFNWRyAxLjEvL0VOIiAiaHR0cDovL3d3dy53My5vcmcvR3JhcGhpY3MvU1ZHLzEuMS9EVEQvc3ZnMTEuZHRkIj4NCjwhLS0gVXBsb2FkZWQgdG86IFNWRyBSZXBvLCB3d3cuc3ZncmVwby5jb20sIFRyYW5zZm9ybWVkIGJ5OiBTVkcgUmVwbyBNaXhlciBUb29scyAtLT4KPHN2ZyB3aWR0aD0iODAwcHgiIGhlaWdodD0iODAwcHgiIHZpZXdCb3g9IjAgMCAyNCAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiBmaWxsPSIjZmZmZmZmIj4KDTxnIGlkPSJTVkdSZXBvX2JnQ2FycmllciIgc3Ryb2tlLXdpZHRoPSIwIi8%2BCg08ZyBpZD0iU1ZHUmVwb190cmFjZXJDYXJyaWVyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KDTxnIGlkPSJTVkdSZXBvX2ljb25DYXJyaWVyIj4gPHRpdGxlPm1pY3Jvc29mdDwvdGl0bGU%2BIDxyZWN0IHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgZmlsbD0ibm9uZSIvPiA8cGF0aCBkPSJNMiwzaDl2OUgyVjNtOSwxOUgyVjEzaDl2OU0yMSwzdjlIMTJWM2g5bTAsMTlIMTJWMTNoOVoiLz4gPC9nPgoNPC9zdmc%2B&logoColor=%23ffff&label=Scoop&labelColor=%235452f1&color=%23282696"/>
   </a>
   <br/>
@@ -37,9 +37,9 @@
   <a href="./CONTRIBUTING.md"><strong>Contributing</strong></a> •
   <a href="./CHANGELOG.md"><strong>Changelog</strong></a>
   <br/>
-  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Bug%20Report"><strong>Report a Bug</strong></a> •
-  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Feature%20Request"><strong>Request a Feature</strong></a> •
-  <a href="https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Enhancement%20Request"><strong>Request an Enhancement</strong></a>
+  <a href="https://gitlab.com/zillowe/zillwen/zusty/zoi/-/issues/new?issuable_template=Bug%20Report"><strong>Report a Bug</strong></a> •
+  <a href="https://gitlab.com/zillowe/zillwen/zusty/zoi/-/issues/new?issuable_template=Feature%20Request"><strong>Request a Feature</strong></a> •
+  <a href="https://gitlab.com/zillowe/zillwen/zusty/zoi/-/issues/new?issuable_template=Enhancement%20Request"><strong>Request an Enhancement</strong></a>
   <br/>
   <a href="./CODE_OF_CONDUCT.md"><strong>Code of Conduct</strong></a> •
   <a href="./PACKAGING.md"><strong>Packaging</strong></a> •
@@ -242,7 +242,7 @@ Install Zoi on Windows.
 Install Zoi using Scoop:
 
 ```powershell
-scoop bucket add zillowe https://github.com/Zillowe/scoop.git
+scoop bucket add zillowe https://github.com/zillowe/scoop.git
 scoop install zoi
 ```
 
@@ -410,16 +410,16 @@ New features, enhancements and bug reports are welcome.
 Zoi is hosted on multiple forges. The primary locations and mirrors are:
 
 - Zoi Source Code (this repo)
-  - Primary: [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi)
-  - Mirrors: [GitHub](https://github.com/Zillowe/Zoi), [Codeberg](https://codeberg.org/Zillowe/Zoi)
+  - Primary: [GitLab](https://gitlab.com/zillowe/zillwen/zusty/zoi)
+  - Mirrors: [GitHub](https://github.com/zillowe/zoi), [Codeberg](https://codeberg.org/Zillowe/Zoi)
 
 - Packages Database ([Zoidberg](https://zillowe.qzz.io/docs/zds/zoi/zoidberg))
-  - Primary: [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg)
-  - Mirrors: [GitHub](https://github.com/Zillowe/Zoidberg), [Codeberg](https://codeberg.org/Zillowe/Zoidberg)
+  - Primary: [GitLab](https://gitlab.com/zillowe/zillwen/zusty/zoidberg)
+  - Mirrors: [GitHub](https://github.com/zillowe/zoidberg), [Codeberg](https://codeberg.org/Zillowe/Zoidberg)
 
 ### Repository tiers
 
-Repository tiers for [Zoidberg](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg), Zoi's official packages repo.
+Repository tiers for [Zoidberg](https://gitlab.com/zillowe/zillwen/zusty/zoidberg), Zoi's official packages repo.
 
 - Core: Essential packages, libraries and very common/maintained packages.
 - Main: Packages that don't fit in Core but are essential for most people.

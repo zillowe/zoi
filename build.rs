@@ -24,7 +24,7 @@ const BUILD_ENV_VARS: &[&str] = &[
     "ZOI_ABOUT_PACKAGER_HOMEPAGE",
     "ZOI_DEFAULT_REGISTRY",
 ];
-const DEFAULT_REGISTRY: &str = "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg.git";
+const DEFAULT_REGISTRY: &str = "https://gitlab.com/zillowe/zillwen/zusty/zoidberg.git";
 const AUTHORITIES_KEY_RANGE: std::ops::Range<usize> = 1..10;
 
 fn forward_env_var(var: &str) {

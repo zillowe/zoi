@@ -28,16 +28,16 @@ We welcome contributions in many forms, including bug reports, feature requests,
 
 You can use two of our [mirrors](/README.md#-repositories-mirrors) for contributions.
 
-- [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi) (Main & Preferred)
-- [GitHub](https://github.com/Zillowe/Zoi) (Issues and PRs are mirrored to GitLab)
+- [GitLab](https://gitlab.com/zillowe/zillwen/zusty/zoi) (Main & Preferred)
+- [GitHub](https://github.com/zillowe/zoi) (Issues and PRs are mirrored to GitLab)
 
 ### Reporting Bugs or Requesting Features
 
-If you find a bug or have an idea for a new feature, please check our [**issue tracker**](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues) to see if it has already been reported. If not, feel free to open a new issue.
+If you find a bug or have an idea for a new feature, please check our [**issue tracker**](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/issues) to see if it has already been reported. If not, feel free to open a new issue.
 
-- [Report a Bug](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Bug%20Report)
-- [Request a Feature](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Feature%20Request)
-- [Request an Enhancement](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new?issuable_template=Enhancement%20Request)
+- [Report a Bug](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/issues/new?issuable_template=Bug%20Report)
+- [Request a Feature](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/issues/new?issuable_template=Feature%20Request)
+- [Request an Enhancement](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/issues/new?issuable_template=Enhancement%20Request)
 
 (Same on GitHub)
 
@@ -45,15 +45,17 @@ If you find a bug or have an idea for a new feature, please check our [**issue t
 
 If you'd like to contribute code, please follow these steps:
 
-1.  **Fork the repository** on [GitLab](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi).
-2.  **Clone your fork** to your local machine.
-3.  **Create a new branch** for your changes.
+1. **Fork the repository** on [GitLab](https://gitlab.com/zillowe/zillwen/zusty/zoi).
+2. **Clone your fork** to your local machine.
+3. **Create a new branch** for your changes.
+
     ```sh
     git checkout -b my-feature-branch
     ```
-4.  **Make your changes** and commit them with a clear and descriptive message.
-5.  **Push your changes** to your fork.
-6.  **Open a merge request** to the `main` branch of the original repository.
+
+4. **Make your changes** and commit them with a clear and descriptive message.
+5. **Push your changes** to your fork.
+6. **Open a merge request** to the `main` branch of the original repository.
 
 ## Development
 
@@ -68,11 +70,14 @@ To get started with developing Zoi, you'll need to set up your local environment
 
 Because Zoi is used to manage its own development, you must first build and install it manually using `make` (Or you can install [pre-compiled binaries](/README.md#-installation) instead):
 
-1.  **Configure the build:**
+1. **Configure the build:**
+
     ```sh
     ./configure
     ```
-2.  **Build and install:**
+
+2. **Build and install:**
+
     ```sh
     make build
     sudo make install
@@ -92,30 +97,32 @@ For quick development or testing, you can pull and use the official Zoi CLI Dock
 
 ```sh
 # Pull the latest Zoi CLI image
-docker pull registry.gitlab.com/Zillowe/Zillwen/Zusty/Zoi/zoi:latest
+docker pull registry.gitlab.com/zillowe/zillwen/zusty/zoi/zoi:latest
 
 # Run a Zoi command using the image
-docker run --rm registry.gitlab.com/Zillowe/Zillwen/Zusty/Zoi/zoi:latest zoi --version
+docker run --rm registry.gitlab.com/zillowe/zillwen/zusty/zoi/zoi:latest zoi --version
 ```
 
 #### Building the Docker Image Locally
 
 If you need to build the Docker image locally (e.g. for custom configurations or testing changes to the `Dockerfile`), you can do so:
 
-1.  **Build the image:**
+1. **Build the image:**
     The following command builds the final, lightweight Docker image containing the `zoi` binary.
 
     ```sh
     docker build -t zoi .
     ```
 
-2.  **Extract the binary:**
+2. **Extract the binary:**
     If you want to get the compiled `zoi` binary from the image to use on your host system, run these commands:
+
     ```sh
     docker create --name zoi-container zoi
     docker cp zoi-container:/usr/local/bin/zoi ./zoi
     docker rm zoi-container
     ```
+
     You will now have a `zoi` executable in your current directory.
 
 ### Development Workflow with Zoi
@@ -200,6 +207,7 @@ Here are the most common commands defined in `zoi.yaml`:
   ```
 
 - **`lines`**: Counts the lines of code in the project using `cloc`.
+
   ```sh
   zoi run lines
   ```
@@ -208,7 +216,7 @@ Here are the most common commands defined in `zoi.yaml`:
 
 Please write clear and descriptive commit messages. A good commit message should explain the "what" and "why" of your changes.
 
-We mostly use [ZFGM Commits](https://zillowe.qzz.io/docs/methods/zfgm/commits) when creating our commit messages, to use it with [GCT](https://gitlab.com/Zillowe/Zillwen/Zusty/GCT) follow [GCT Docs](https://zillowe.qzz.io/docs/zds/gct).
+We mostly use [ZFGM Commits](https://zillowe.qzz.io/docs/methods/zfgm/commits) when creating our commit messages, to use it with [GCT](https://gitlab.com/zillowe/zillwen/zusty/gct) follow [GCT Docs](https://zillowe.qzz.io/docs/zds/gct).
 
 ## Code of Conduct
 
