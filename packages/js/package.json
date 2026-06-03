@@ -9,9 +9,9 @@
   "files": [
     "dist"
   ],
-  "homepage": "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi",
+  "homepage": "https://gitlab.com/zillowe/zillwen/zusty/zoi",
   "bugs": {
-    "url": "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues",
+    "url": "https://gitlab.com/zillowe/zillwen/zusty/zoi/-/issues",
     "email": "zillowez@gmail.com"
   },
   "publishConfig": {

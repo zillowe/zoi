@@ -14,10 +14,10 @@ The Security Policy can be found online at [zillowe.qzz.io/docs/book/guidelines/
 | ----------------------------------------------------------------------------------------- | --------- |
 | [AUR `zoi`](https://aur.archlinux.org/packages/zoi)                                       | ✔️        |
 | [AUR `zoi-bin`](https://aur.archlinux.org/packages/zoi-bin)                               | ✔️        |
-| [Homebrew](https://github.com/Zillowe/homebrew-tap)                                       | ✔️        |
-| [Scoop](https://github.com/Zillowe/scoop)                                                 | ✔️        |
+| [Homebrew](https://github.com/zillowe/homebrew-tap)                                       | ✔️        |
+| [Scoop](https://github.com/zillowe/scoop)                                                 | ✔️        |
 | [Crates.io `zoi-rs`](https://crates.io/crates/zoi-rs)                                     | ✔️        |
-| [Docker Image (GitLab)](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/container_registry)  | ✔️        |
+| [Docker Image (GitLab)](https://gitlab.com/zillowe/zillwen/zusty/zoi/container_registry)  | ✔️        |
 | [Fedora `zoi-rs`](https://github.com/terrapkg/packages/tree/frawhide/anda/langs/rust/zoi) | ❌        |
 | [NPM `@zillowe/zoi`](https://www.npmjs.com/package/@zillowe/zoi)                          | ❌        |
 
@@ -46,7 +46,7 @@ zoi upgrade
 If you discover a security vulnerability, please follow these steps:
 
 1. **DO NOT** disclose the vulnerability publicly.
-2. Send a detailed report to: [GitLab Issues\*](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues/new), [GitHub Security Advisory](https://github.com/Zillowe/Zoi/security/advisories/new) or email\*: [contact@zillowe.qzz.io](mailto:contact@zillowe.qzz.io).
+2. Send a detailed report to: [GitLab Issues\*](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/issues/new), [GitHub Security Advisory](https://github.com/zillowe/zoi/security/advisories/new) or email\*: [contact@zillowe.qzz.io](mailto:contact@zillowe.qzz.io).
 3. Include in your report:
    - A description of the vulnerability
    - Steps to reproduce the issue

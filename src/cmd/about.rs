@@ -5,7 +5,7 @@ const DESCRIPTION: &str = "Zoi - Advanced Package Manager & Environment Orchestr
 const AUTHOR: &str = "Zusty < Zillowe Foundation";
 const HOMEPAGE: &str = "https://zillowe.qzz.io/zds/zoi";
 const DOCS: &str = "https://zillowe.qzz.io/docs/zds/zoi";
-const GITREPO: &str = "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi";
+const GITREPO: &str = "https://gitlab.com/zillowe/zillwen/zusty/zoi";
 const EMAIL: &str = "contact@zillowe.qzz.io";
 const LICENSE: &str = "Apache 2.0";
 

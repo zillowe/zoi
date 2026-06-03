@@ -5,7 +5,7 @@ handle: zoidberg
 advisory_prefix: ZSA
 git:
   - type: main
-    url: https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg.git
+    url: https://gitlab.com/zillowe/zillwen/zusty/zoidberg.git
 repos:
   - name: core
     type: official

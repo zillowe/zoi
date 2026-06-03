@@ -41,7 +41,7 @@ pub struct MiniRegistryIndex {
 }
 
 pub fn fetch_registry_index() -> Result<MiniRegistryIndex> {
-    let url = "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg/-/raw/main/packages.json";
+    let url = "https://gitlab.com/zillowe/zillwen/zusty/zoidberg/-/raw/main/packages.json";
     let client = crate::utils::get_http_client()?;
     let response = client.get(url).send()?;
 
@@ -57,7 +57,7 @@ pub fn fetch_registry_index() -> Result<MiniRegistryIndex> {
 }
 
 pub fn fetch_registry_config() -> Result<super::types::RepoConfig> {
-    let url = "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg/-/raw/main/repo.yaml";
+    let url = "https://gitlab.com/zillowe/zillwen/zusty/zoidberg/-/raw/main/repo.yaml";
     let client = crate::utils::get_http_client()?;
     let response = client.get(url).send()?;
 
@@ -125,7 +125,7 @@ pub fn check_vulnerabilities(
 
 pub fn get_package_lua_url(repo: &str, name: &str) -> String {
     format!(
-        "https://gitlab.com/Zillowe/Zillwen/Zusty/Zoidberg/-/raw/main/{}/{}/{}.pkg.lua",
+        "https://gitlab.com/zillowe/zillwen/zusty/zoidberg/-/raw/main/{}/{}/{}.pkg.lua",
         repo, name, name
     )
 }

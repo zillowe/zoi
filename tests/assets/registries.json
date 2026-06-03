@@ -3,7 +3,7 @@
   "zoidberg": {
     "name": "Zoidberg",
     "description": "Test registry",
-    "git": "https://github.com/Zillowe/Zoidberg",
+    "git": "https://github.com/zillowe/zoidberg",
     "branch": "main"
   }
 }

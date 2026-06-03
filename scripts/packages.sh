@@ -88,7 +88,7 @@ fi
 cd ..
 
 echo "--- Homebrew ---"
-git clone "ssh://git@github.com/Zillowe/homebrew-tap" brew_zoi
+git clone "ssh://git@github.com/zillowe/homebrew-tap" brew_zoi
 cp "$TMP_PACKAGES/brew/zoi.rb" brew_zoi/
 cd brew_zoi
 if [[ -n $(git status --porcelain) ]]; then
@@ -99,7 +99,7 @@ fi
 cd ..
 
 echo "--- Scoop ---"
-git clone "ssh://git@github.com/Zillowe/scoop.git" scoop_zoi
+git clone "ssh://git@github.com/zillowe/scoop.git" scoop_zoi
 cp "$TMP_PACKAGES/scoop/zoi.json" scoop_zoi/bucket/
 cd scoop_zoi
 if [[ -n $(git status --porcelain) ]]; then

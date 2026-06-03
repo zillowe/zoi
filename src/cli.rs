@@ -1019,7 +1019,7 @@ pub fn run() -> anyhow::Result<()> {
                                 .green()
                         );
                         println!(
-                            "\n{}: https://github.com/Zillowe/Zoi/blob/main/CHANGELOG.md",
+                            "\n{}: https://github.com/zillowe/zoi/blob/main/CHANGELOG.md",
                             "Changelog".cyan().bold()
                         );
                         println!(
