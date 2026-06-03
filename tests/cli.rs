@@ -21,5 +21,5 @@ fn test_cli_help() {
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("Universal Package Manager"));
+    assert!(stdout.contains("Advanced Package Manager"));
 }
