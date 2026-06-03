@@ -1,8 +1,8 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-
 pub mod build;
 pub mod doctor;
+pub mod init_lsp;
 pub mod install;
 pub mod test;
 
@@ -22,6 +22,8 @@ enum Commands {
     Install(install::InstallCommand),
     /// Lint and validate a package definition for maintainers
     Doctor(doctor::DoctorCommand),
+    /// Initialize LSP support for .pkg.lua files
+    InitLsp(init_lsp::InitLspCommand),
 }
 
 pub fn run(args: PackageCommand) -> Result<()> {
@@ -30,5 +32,6 @@ pub fn run(args: PackageCommand) -> Result<()> {
         Commands::Test(cmd) => test::run(cmd),
         Commands::Install(cmd) => install::run(cmd),
         Commands::Doctor(cmd) => doctor::run(cmd),
+        Commands::InitLsp(cmd) => init_lsp::run(cmd),
     }
 }

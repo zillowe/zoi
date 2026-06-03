@@ -1,3 +1,4 @@
+use crate::pkg::package::init_lsp;
 use crate::pkg::types;
 use anyhow::{Result, anyhow};
 use chrono::Datelike;
@@ -23,6 +24,12 @@ pub fn init(path: &Path) -> Result<()> {
             fs::create_dir_all(&dir_path)?;
         }
     }
+
+    init_lsp::setup_lsp_workspace(path)?;
+    println!(
+        "{} LSP support initialized. Created .luarc.json and type definitions.",
+        "::".bold().green()
+    );
 
     let repo_yaml_path = path.join("repo.yaml");
     if !repo_yaml_path.exists() {
