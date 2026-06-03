@@ -193,7 +193,7 @@ generate_notes:
     - curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash
     - export PATH="$HOME/.zoi/pkgs/bin:$PATH"
     - zoi sync
-    - zoi install @zillowe/gct
+    - zoi install @zillowe/gct --yes
   script:
     - PREVIOUS_TAG=$(git describe --tags --abbrev=0 $CI_COMMIT_TAG^ 2>/dev/null || git rev-list --max-parents=0 HEAD)
     - gct ai log -c "$PREVIOUS_TAG" "$CI_COMMIT_TAG" > notes.md
