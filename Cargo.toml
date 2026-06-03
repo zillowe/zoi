@@ -1,6 +1,6 @@
 [package]
 name = "zoi-rs"
-version = "1.16.1"
+version = "1.17.0-dev"
 edition = "2024"
 rust-version = "1.92.0"
 description = "Advanced Package Manager & Environment Orchestrator"
