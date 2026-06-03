@@ -189,7 +189,7 @@ generate_notes:
     GIT_DEPTH: 0
     GCT_API_KEY: $GCT_API_KEY_GOOGLE
   before_script:
-    - apt-get update -y && apt-get install -y curl git
+    - apt-get update -y && apt-get install -y curl git tar zstd grep sed gnupg coreutils
     - curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash
     - export PATH="$HOME/.zoi/pkgs/bin:$PATH"
     - zoi sync
