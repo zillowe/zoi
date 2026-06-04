@@ -338,7 +338,7 @@ pub fn check_external_tools() -> ToolCheckResult {
     let mut recommended_missing = Vec::new();
 
     let essential = ["git"];
-    let recommended = ["less", "gpg"];
+    let recommended = ["gpg"];
 
     for tool in essential {
         if !crate::utils::command_exists(tool) {

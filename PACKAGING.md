@@ -23,8 +23,6 @@ These are required for Zoi to run correctly after installation.
 
 - **Essential:**
   - `git`: Required for interacting with git repositories (e.g. cloning packages, syncing the database).
-- **Optional:**
-  - `less`: Used for viewing files within Zoi, for example when showing a package's manual.
 
 ## Build Process
 
@@ -91,7 +89,7 @@ docker build \
 
 For CI/CD pipelines or environments where you need a pre-built Zoi CLI, an official Docker image is available on the GitLab Container Registry. This image contains the `zoi` binary and its runtime dependencies, making it suitable for tasks like building Zoi packages.
 
-The image is tagged with both the specific release version (e.g. `zoi:Prod-Release-1.2.2`) and `zoi:latest`.
+The image is tagged with both the specific release version (e.g. `zoi:Prod-Release-1.16.1`) and `zoi:latest`.
 
 ```sh
 # Pull the latest Zoi CLI image

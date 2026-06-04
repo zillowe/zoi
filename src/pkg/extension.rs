@@ -139,7 +139,7 @@ pub fn add(
 ) -> Result<()> {
     println!("Adding extension: {}", ext_name);
 
-    let (pkg, _, _, _, registry_handle, _) =
+    let (pkg, _, _, pkg_lua_path, registry_handle, _) =
         resolve::resolve_package_and_version(ext_name, false, yes)?;
 
     if pkg.package_type != types::PackageType::Extension {
@@ -221,6 +221,7 @@ pub fn add(
     let add_result = (|| -> Result<()> {
         if extension_state_requires_persistence(&extension_state) {
             local::write_manifest(&manifest)?;
+            local::persist_package_source(&manifest, &pkg_lua_path)?;
             wrote_manifest = true;
             write_extension_state(&manifest, &extension_state)?;
         }
@@ -280,6 +281,7 @@ pub fn add(
         }
         if !wrote_manifest {
             local::write_manifest(&manifest)?;
+            local::persist_package_source(&manifest, &pkg_lua_path)?;
             wrote_manifest = true;
         }
         Ok(())
@@ -322,17 +324,23 @@ pub fn remove(
 ) -> Result<()> {
     println!("Removing extension: {}", ext_name);
 
-    let (pkg, _, _, _, _, _) = resolve::resolve_package_and_version(ext_name, false, yes)?;
+    let request = resolve::parse_source_string(ext_name)?;
+    let mut candidates = Vec::new();
+    for scope in [
+        types::Scope::Project,
+        types::Scope::User,
+        types::Scope::System,
+    ] {
+        candidates.extend(local::find_installed_manifests_matching(&request, scope)?);
+    }
 
-    let (manifest, scope) = if let Some(m) =
-        local::is_package_installed(&pkg.name, None, types::Scope::User)?
-    {
-        (m, types::Scope::User)
-    } else if let Some(m) = local::is_package_installed(&pkg.name, None, types::Scope::System)? {
-        (m, types::Scope::System)
-    } else {
+    if candidates.is_empty() {
         return Err(anyhow!("Extension '{}' is not installed.", ext_name));
-    };
+    }
+
+    let manifest =
+        crate::cmd::installed_select::choose_installed_manifest(ext_name, &candidates, yes)?;
+    let scope = manifest.scope;
 
     let mut manifest_val = None;
     if let Some(pm) = plugin_manager {
@@ -347,6 +355,18 @@ pub fn remove(
     if manifest.package_type != types::PackageType::Extension {
         return Err(anyhow!("'{}' is not an extension package.", ext_name));
     }
+
+    let installed_source_path = local::get_package_source_path(&manifest)?;
+    let pkg = if installed_source_path.exists() {
+        let path = installed_source_path
+            .to_str()
+            .ok_or_else(|| anyhow!("Stored package source path contains invalid UTF-8"))?;
+        crate::pkg::lua::parser::parse_lua_package(path, Some(&manifest.version), true)?
+    } else {
+        let source = local::installed_manifest_source(&manifest);
+        let (pkg, _, _, _, _, _) = resolve::resolve_package_and_version(&source, true, yes)?;
+        pkg
+    };
 
     let extension_state = read_extension_state(&manifest)?;
     let extension_info = extension_state
