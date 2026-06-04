@@ -173,7 +173,7 @@ enum Commands {
 
     /// Shows detailed information about a package
     Show {
-        #[arg(help = PKG_SOURCE_HELP)]
+        #[arg(value_name = "ALL_PACKAGES", help = PKG_SOURCE_HELP)]
         package_name: String,
         /// Display the raw, unformatted package file
         #[arg(long)]
@@ -185,7 +185,7 @@ enum Commands {
 
     /// Pin a package to a specific version
     Pin {
-        #[arg(help = PKG_SOURCE_HELP)]
+        #[arg(value_name = "INST_PACKAGES", help = PKG_SOURCE_HELP)]
         package: String,
         /// The version to pin the package to
         version: String,
@@ -199,13 +199,13 @@ enum Commands {
 
     /// Visualize the dependency tree of a package
     Tree {
-        #[arg(value_name = "PACKAGES", required = true, help = PKG_SOURCE_HELP)]
+        #[arg(value_name = "ALL_PACKAGES", required = true, help = PKG_SOURCE_HELP)]
         packages: Vec<String>,
     },
 
     /// Unpin a package, allowing it to be updated
     Unpin {
-        #[arg(help = PKG_SOURCE_HELP)]
+        #[arg(value_name = "INST_PACKAGES", help = PKG_SOURCE_HELP)]
         package: String,
     },
 
@@ -215,7 +215,7 @@ enum Commands {
         long_about = "Changes whether a package is considered explicitly installed or a dependency. Explicit packages are not removed by 'autoremove', while dependencies are if no other package requires them."
     )]
     Mark {
-        #[arg(value_name = "PACKAGES", required = true, help = PKG_SOURCE_HELP)]
+        #[arg(value_name = "INST_PACKAGES", required = true, help = PKG_SOURCE_HELP)]
         packages: Vec<String>,
 
         /// Mark packages as dependencies
@@ -230,7 +230,7 @@ enum Commands {
     /// Updates one or more packages to their latest versions
     #[command(alias = "up")]
     Update {
-        #[arg(value_name = "PACKAGES", help = PKG_SOURCE_HELP)]
+        #[arg(value_name = "INST_PACKAGES", help = PKG_SOURCE_HELP)]
         package_names: Vec<String>,
 
         /// Update all installed packages
@@ -254,7 +254,7 @@ enum Commands {
     /// Installs one or more packages from a name, local file, URL, or git repository
     #[command(aliases = ["i", "in", "add"])]
     Install {
-        #[arg(value_name = "SOURCES", value_hint = ValueHint::FilePath, help = PKG_SOURCE_HELP)]
+        #[arg(value_name = "ALL_SOURCES", value_hint = ValueHint::FilePath, help = PKG_SOURCE_HELP)]
         sources: Vec<String>,
         /// Install from a git repository (e.g. 'Zillowe/Hello', 'gl:Zillowe/Hello')
         #[arg(long, value_name = "REPO", conflicts_with = "sources")]
@@ -317,7 +317,7 @@ enum Commands {
     #[command(alias = "u")]
     Use {
         /// Package(s) to use (e.g. node@20)
-        #[arg(value_name = "PACKAGES", required = true, help = PKG_SOURCE_HELP)]
+        #[arg(value_name = "ALL_PACKAGES", required = true, help = PKG_SOURCE_HELP)]
         packages: Vec<String>,
 
         /// Add to global configuration instead of project
@@ -331,7 +331,7 @@ enum Commands {
         long_about = "Removes one or more packages' files from the Zoi store and deletes their symlinks from the bin directory. This command will fail if a package was not installed by Zoi."
     )]
     Uninstall {
-        #[arg(value_name = "PACKAGES", required = true, help = PKG_SOURCE_HELP)]
+        #[arg(value_name = "INST_PACKAGES", required = true, help = PKG_SOURCE_HELP)]
         packages: Vec<String>,
         /// The scope to uninstall the package from
         #[arg(long, value_enum, conflicts_with_all = &["local", "global"])]
@@ -421,7 +421,7 @@ enum Commands {
 
     /// Explains why a package is installed
     Why {
-        #[arg(help = PKG_SOURCE_HELP)]
+        #[arg(value_name = "INST_PACKAGES", help = PKG_SOURCE_HELP)]
         package_name: String,
     },
 
@@ -435,7 +435,7 @@ enum Commands {
 
     /// List all files owned by a package
     Files {
-        #[arg(help = PKG_SOURCE_HELP)]
+        #[arg(value_name = "INST_PACKAGES", help = PKG_SOURCE_HELP)]
         package: String,
     },
 
@@ -502,7 +502,7 @@ enum Commands {
         #[arg(long, value_enum, default_value = "user")]
         scope: SetupScope,
         /// Packages to include in the ephemeral environment
-        #[arg(short, long = "package", value_name = "PACKAGE")]
+        #[arg(short, long = "package", value_name = "ALL_PACKAGES")]
         packages: Vec<String>,
         /// Command to run in the ephemeral environment instead of an interactive shell
         #[arg(short, long)]
@@ -515,7 +515,7 @@ enum Commands {
         long_about = "Downloads a binary to a temporary cache and executes it in a shell. All arguments after the package name are passed as arguments to the shell command."
     )]
     Exec {
-        #[arg(value_name = "SOURCE", value_hint = ValueHint::FilePath, help = PKG_SOURCE_HELP)]
+        #[arg(value_name = "ALL_SOURCES", value_hint = ValueHint::FilePath, help = PKG_SOURCE_HELP)]
         source: String,
 
         /// Force execution from a fresh download, bypassing any cache.
@@ -577,7 +577,7 @@ enum Commands {
 
     /// Create an application using a package template
     Create {
-        #[arg(help = PKG_SOURCE_HELP)]
+        #[arg(value_name = "ALL_SOURCES", help = PKG_SOURCE_HELP)]
         source: String,
         /// The application name to substitute into template commands
         app_name: Option<String>,
@@ -589,7 +589,7 @@ enum Commands {
         long_about = "Interactively choose and install an older version of a package from the local store or archive cache. This is useful if a recent update has introduced bugs or compatibility issues."
     )]
     Downgrade {
-        #[arg(help = PKG_SOURCE_HELP)]
+        #[arg(value_name = "INST_PACKAGES", help = PKG_SOURCE_HELP)]
         package: String,
     },
 
@@ -599,7 +599,7 @@ enum Commands {
 
     /// Rollback a package to the previously installed version
     Rollback {
-        #[arg(value_name = "PACKAGE", required_unless_present = "last_transaction", help = PKG_SOURCE_HELP)]
+        #[arg(value_name = "INST_PACKAGES", required_unless_present = "last_transaction", help = PKG_SOURCE_HELP)]
         package: Option<String>,
 
         /// Rollback the last transaction
@@ -609,7 +609,7 @@ enum Commands {
 
     /// Shows a package's manual
     Man {
-        #[arg(help = PKG_SOURCE_HELP)]
+        #[arg(value_name = "ALL_PACKAGES", help = PKG_SOURCE_HELP)]
         package_name: String,
         /// Always look at the upstream manual even if it's downloaded
         #[arg(long)]

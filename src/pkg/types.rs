@@ -117,6 +117,28 @@ pub struct Service {
     pub error_log_path: Option<String>,
 }
 
+impl InstallManifest {
+    pub fn into_package(self) -> Package {
+        Package {
+            name: self.name,
+            repo: self.repo,
+            version: Some(self.version),
+            sub_package: self.sub_package,
+            package_type: self.package_type,
+            registry_handle: Some(self.registry_handle),
+            scope: self.scope,
+            bins: self.bins,
+            conflicts: self.conflicts,
+            replaces: self.replaces,
+            provides: self.provides,
+            backup: self.backup,
+            service: self.service,
+            installed_size: self.installed_size,
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[allow(dead_code)]
 pub struct Package {

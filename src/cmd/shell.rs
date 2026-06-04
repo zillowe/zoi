@@ -116,18 +116,27 @@ fn post_process_completions(shell: Shell, mut script: String) -> String {
 _zoi_all_packages() {
     local -a packages
     packages=(${(f)"$(_zoi_do_list_all)"})
-    _describe -t packages 'synced packages' packages
+    _describe -t packages 'available packages' packages
+}
+
+_zoi_installed_packages() {
+    local -a packages
+    packages=(${(f)"$(_zoi_do_list_installed)"})
+    _describe -t packages 'installed packages' packages
 }
 
 _zoi_do_list_all() {
     zoi list -a --completion 2>/dev/null
 }
+
+_zoi_do_list_installed() {
+    zoi list --completion 2>/dev/null
+}
 "#;
             script.push_str(helper);
-            script = script.replace("':SOURCES: '", "':package:(_zoi_all_packages)'");
-            script = script.replace("':PACKAGES: '", "':package:(_zoi_all_packages)'");
-            script = script.replace("':PACKAGE: '", "':package:(_zoi_all_packages)'");
-            script = script.replace("':package_name: '", "':package:(_zoi_all_packages)'");
+            script = script.replace("':ALL_SOURCES: '", "':package:(_zoi_all_packages)'");
+            script = script.replace("':ALL_PACKAGES: '", "':package:(_zoi_all_packages)'");
+            script = script.replace("':INST_PACKAGES: '", "':package:(_zoi_installed_packages)'");
         }
         Shell::Bash => {
             let helper = r#"
