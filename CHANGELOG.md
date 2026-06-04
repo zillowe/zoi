@@ -4,6 +4,24 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
+## [Prod-Release-1.17.0] - 2026-06-04
+
+### ♻️ Refactor
+
+- Improve CLI UI and package extension management
+- *(audit)* Transition audit log to structured JSON format
+- *(cmd)* Remove pager implementation
+
+### ✨ Features
+
+- *(shell)* Improve tab completion with context-aware package lists and descriptions
+- *(pkg)* Implement just-in-time privilege escalation
+
+### 🩹 Bug Fixes
+
+- *(cmd)* Make uninstall scope consistent with install and clean up UI
+- *(hooks)* Resolve builtin security warning and fix loading precedence
+
 ## [Prod-Release-1.16.0] - 2026-06-03
 
 ### ✨ Features
