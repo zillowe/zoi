@@ -612,7 +612,7 @@ function uninstall()
   -- Remove a package-specific cache directory in the user's home
   zrm("${usrhome}/.cache/myapp")
 
-  -- Remove a system-wide log directory (requires root)
+  -- Remove a system-wide log directory (Zoi handles sudo escalation automatically)
   if SYSTEM.OS == "linux" then
     zrm("/var/log/myapp")
   end

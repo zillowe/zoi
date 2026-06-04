@@ -357,7 +357,6 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
         adv_registry.last_id = 0;
     }
 
-    // Assign IDs to TEMP files
     for entry in WalkDir::new(registry_root)
         .into_iter()
         .filter_map(|e| e.ok())

@@ -214,7 +214,7 @@ The `destination` argument uses special variables to place files in the correct 
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | `${pkgstore}`     | The main directory for the package's files in the Zoi store. This is where most files should go (e.g. `${pkgstore}/bin/my-cli`). |
 | `${createpkgdir}` | For `app` type packages, this is the root of the project template.                                                               |
-| `${usrroot}`      | Copies files to the system's root (`/`). **Use with extreme caution.** This requires administrator privileges to install.        |
+| `${usrroot}`      | Copies files to the system's root (`/`). **Use with caution.** Zoi will automatically prompt for `sudo` privileges if required to write to these paths. |
 | `${usrhome}`      | Copies files to the user's home directory (`~`).                                                                                 |
 
 ***

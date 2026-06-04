@@ -214,98 +214,135 @@ pub fn install_node(
     let sub_package_to_install = request.sub_package;
     let sub_packages_vec = sub_package_to_install.clone().map(|s| vec![s]);
 
-    let (installed_files, install_method) = match action {
+    let (archive_path, install_method) = match action {
         plan::InstallAction::DownloadAndInstall(details) => {
             let pb_for_step = step_pb.as_ref().or(main_pb.as_ref());
             if let Some(pb) = pb_for_step {
                 pb.set_message("Downloading package...");
             }
             let archive_path = download_and_cache_archive(node, details, pb_for_step)?;
-            if let Some(pb) = pb_for_step {
-                pb.set_message("Installing package...");
-                pb.set_position(0);
-            }
-            let files = crate::pkg::package::install::run(
-                &archive_path,
-                Some(pkg.scope),
-                &node.registry_handle,
-                Some(&node.version),
-                yes,
-                sub_packages_vec,
-                link_bins,
-                pb_for_step,
-            )?;
-            (files, "pre-compiled".to_string())
+            (archive_path, "pre-compiled".to_string())
         }
         plan::InstallAction::InstallFromArchive(archive_path) => {
-            let pb_for_step = step_pb.as_ref().or(main_pb.as_ref());
-            if let Some(pb) = pb_for_step {
-                pb.set_message("Installing package...");
-            }
-            let files = crate::pkg::package::install::run(
-                archive_path,
-                Some(pkg.scope),
-                &node.registry_handle,
-                Some(&node.version),
-                yes,
-                sub_packages_vec,
-                link_bins,
-                pb_for_step,
-            )?;
-            (files, "pre-compiled".to_string())
+            (archive_path.clone(), "pre-compiled".to_string())
         }
         plan::InstallAction::BuildAndInstall => {
             let pb_for_step = step_pb.as_ref().or(main_pb.as_ref());
-            if let Some(pb) = pb_for_step {
-                pb.set_message("Building package...");
-            }
             let pkg_lua_path = Path::new(&node.source);
-            let files = prebuilt::try_build_install(
-                pkg_lua_path,
-                pkg,
-                &node.registry_handle,
-                build_type,
-                yes,
-                sub_package_to_install.clone(),
-                pb_for_step,
-            )?;
-            (files, "source".to_string())
+            let archive_path = prebuilt::build_archive(pkg_lua_path, pkg, build_type, pb_for_step)?;
+            (archive_path, "source".to_string())
         }
     };
 
-    if let types::InstallReason::Dependency { ref parent } = node.reason {
-        let package_dir = local::get_package_dir(pkg.scope, handle, &pkg.repo, &pkg.name)?;
-        local::add_dependent(&package_dir, parent)?;
-    }
+    let needs_escalation = pkg.scope == types::Scope::System && !crate::utils::is_admin();
 
-    if let Err(e) =
-        post_install::install_manual_if_available(pkg, version, handle, step_pb.as_ref())
-    {
-        let msg = format!(
-            "Warning: failed to install manual for '{}': {}",
-            pkg.name, e
-        );
-        if let Some(p) = &step_pb {
-            p.println(msg);
-        } else {
-            eprintln!("{}", msg);
+    let manifest = if needs_escalation {
+        if let Some(pb) = step_pb.as_ref().or(main_pb.as_ref()) {
+            pb.set_message("Waiting for sudo privileges to install system package...");
         }
+
+        let node_json = serde_json::to_string(node)?;
+        let mut temp_file = tempfile::NamedTempFile::new()?;
+        use std::io::Write;
+        temp_file.write_all(node_json.as_bytes())?;
+        let temp_path = temp_file.path();
+
+        let mut cmd = std::process::Command::new("sudo");
+        cmd.arg(std::env::current_exe()?);
+        cmd.arg("helper").arg("elevate-install-node");
+        cmd.arg("--node-json").arg(temp_path);
+        cmd.arg("--archive").arg(&archive_path);
+        cmd.arg("--install-method").arg(&install_method);
+        if yes {
+            cmd.arg("--yes");
+        }
+        if link_bins {
+            cmd.arg("--link-bins");
+        }
+
+        let status = cmd
+            .status()
+            .map_err(|e| anyhow!("Failed to spawn sudo: {}", e))?;
+        if !status.success() {
+            return Err(anyhow!("Escalated installation failed."));
+        }
+
+        let version_dir = local::get_package_version_dir(
+            pkg.scope,
+            &node.registry_handle,
+            &pkg.repo,
+            &pkg.name,
+            &node.version,
+        )?;
+        let manifest_filename = if let Some(sub) = &node.sub_package {
+            format!("manifest-{}.yaml", sub)
+        } else {
+            "manifest.yaml".to_string()
+        };
+        let manifest_path = version_dir.join(manifest_filename);
+        let content = std::fs::read_to_string(&manifest_path)?;
+        let manifest: types::InstallManifest = serde_yaml::from_str(&content)?;
+
+        manifest
+    } else {
+        if let Some(pb) = step_pb.as_ref().or(main_pb.as_ref()) {
+            pb.set_message("Installing package...");
+            pb.set_position(0);
+        }
+
+        let installed_files = crate::pkg::package::install::run(
+            &archive_path,
+            Some(pkg.scope),
+            &node.registry_handle,
+            Some(&node.version),
+            yes,
+            sub_packages_vec,
+            link_bins,
+            step_pb.as_ref().or(main_pb.as_ref()),
+        )?;
+
+        if let types::InstallReason::Dependency { ref parent } = node.reason {
+            let package_dir = local::get_package_dir(pkg.scope, handle, &pkg.repo, &pkg.name)?;
+            local::add_dependent(&package_dir, parent)?;
+        }
+
+        if let Err(e) =
+            post_install::install_manual_if_available(pkg, version, handle, step_pb.as_ref())
+        {
+            let msg = format!(
+                "Warning: failed to install manual for '{}': {}",
+                pkg.name, e
+            );
+            if let Some(p) = &step_pb {
+                p.println(msg);
+            } else if let Some(p) = &main_pb {
+                p.println(msg);
+            } else {
+                eprintln!("{}", msg);
+            }
+        }
+
+        let manifest = manifest::create_manifest(
+            pkg,
+            node.reason.clone(),
+            node.dependencies.clone(),
+            Some(install_method.clone()),
+            installed_files,
+            handle,
+            &node.chosen_options,
+            &node.chosen_optionals,
+            sub_package_to_install.clone(),
+        )?;
+
+        local::write_manifest(&manifest)?;
+        local::persist_package_source(&manifest, Path::new(&node.source))?;
+
+        manifest
+    };
+
+    if let plan::InstallAction::BuildAndInstall = action {
+        let _ = fs::remove_file(&archive_path);
     }
-
-    let manifest = manifest::create_manifest(
-        pkg,
-        node.reason.clone(),
-        node.dependencies.clone(),
-        Some(install_method.clone()),
-        installed_files,
-        handle,
-        &node.chosen_options,
-        &node.chosen_optionals,
-        sub_package_to_install.clone(),
-    )?;
-
-    local::write_manifest(&manifest)?;
-    local::persist_package_source(&manifest, Path::new(&node.source))?;
 
     if let Ok(conn) = db::open_connection("local") {
         let _ = db::update_package(

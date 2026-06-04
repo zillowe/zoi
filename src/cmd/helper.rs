@@ -15,6 +15,43 @@ pub enum HelperCommands {
     /// Validate a Zoi specification file (e.g. registries.json, repo.yaml, advisories.json)
     #[command(alias = "val")]
     Validate(ValidateCommand),
+
+    /// Internal: Perform escalated installation of a package node (requires root)
+    #[command(hide = true)]
+    ElevateInstallNode(ElevateInstallNodeCommand),
+
+    /// Internal: Perform escalated uninstallation of a package (requires root)
+    #[command(hide = true)]
+    ElevateUninstall(ElevateUninstallCommand),
+}
+
+#[derive(Parser, Debug)]
+pub struct ElevateInstallNodeCommand {
+    /// Path to the JSON file containing the serialized InstallNode
+    #[arg(long)]
+    pub node_json: std::path::PathBuf,
+    /// Path to the package archive (.pkg.tar.zst)
+    #[arg(long)]
+    pub archive: std::path::PathBuf,
+    /// The install method used (e.g. "source", "pre-compiled")
+    #[arg(long)]
+    pub install_method: String,
+    /// Automatically answer yes to prompts
+    #[arg(long)]
+    pub yes: bool,
+    /// Whether to create shims for binaries
+    #[arg(long)]
+    pub link_bins: bool,
+}
+
+#[derive(Parser, Debug)]
+pub struct ElevateUninstallCommand {
+    /// Path to the JSON file containing the serialized InstallManifest
+    #[arg(long)]
+    pub manifest_json: std::path::PathBuf,
+    /// Automatically answer yes to prompts
+    #[arg(long)]
+    pub yes: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -53,5 +90,7 @@ pub fn run(args: HelperCommand) -> Result<()> {
             Ok(())
         }
         HelperCommands::Validate(cmd) => crate::pkg::helper::validate::run(&cmd.file),
+        HelperCommands::ElevateInstallNode(cmd) => crate::pkg::helper::elevate_install_node(&cmd),
+        HelperCommands::ElevateUninstall(cmd) => crate::pkg::helper::elevate_uninstall(&cmd),
     }
 }

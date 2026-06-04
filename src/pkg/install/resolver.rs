@@ -9,6 +9,7 @@ use anyhow::{Result, anyhow};
 use pubgrub::{DependencyProvider, Ranges, resolve as pubgrub_resolve};
 use rustc_hash::FxHashMap;
 use semver::Version;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 
 pub fn collect_dependencies_for_group(
@@ -58,7 +59,7 @@ pub fn collect_dependencies_for_group(
     Ok((deps, chosen_options, chosen_optionals))
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InstallNode {
     pub pkg: Package,
     pub version: String,
