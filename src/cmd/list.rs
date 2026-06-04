@@ -2,8 +2,6 @@ use crate::pkg::{config, local, types};
 use anyhow::{Result, anyhow};
 use comfy_table::{Table, presets::UTF8_FULL};
 use std::collections::HashSet;
-use std::io::{self, Write};
-use std::process::{Command, Stdio};
 
 pub fn run(
     all: bool,
@@ -111,34 +109,9 @@ fn run_list_outdated(
     if !found_outdated {
         println!("No outdated packages found.");
     } else {
-        print_with_pager(&table.to_string())?;
+        println!("{}", table);
     }
 
-    Ok(())
-}
-
-fn print_with_pager(content: &str) -> io::Result<()> {
-    let pager = if crate::utils::command_exists("less") {
-        "less"
-    } else if crate::utils::command_exists("more") {
-        "more"
-    } else {
-        print!("{}", content);
-        return Ok(());
-    };
-
-    let mut command = Command::new(pager);
-    if pager == "less" {
-        command.arg("-R");
-    }
-
-    let mut child = command.stdin(Stdio::piped()).spawn()?;
-
-    if let Some(mut stdin) = child.stdin.take() {
-        let _ = stdin.write_all(content.as_bytes());
-    }
-
-    child.wait()?;
     Ok(())
 }
 
@@ -294,7 +267,7 @@ fn run_list_installed(
     if !found_packages {
         println!("No installed packages match your criteria.");
     } else {
-        print_with_pager(&table.to_string())?;
+        println!("{}", table);
     }
 
     Ok(())
@@ -589,6 +562,6 @@ fn run_list_all(
         }
     }
 
-    print_with_pager(&table.to_string())?;
+    println!("{}", table);
     Ok(())
 }
