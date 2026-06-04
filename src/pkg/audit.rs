@@ -197,7 +197,7 @@ pub fn export_history(export_path: &Path, ndjson: bool) -> Result<usize> {
         }
         fs::write(export_path, content)?;
     } else {
-        let json = serde_json::to_string_pretty(&log)?;
+        let json = serde_json::to_string_pretty(&log.entries)?;
         fs::write(export_path, json)?;
     }
 
