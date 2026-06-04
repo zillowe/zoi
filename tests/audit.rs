@@ -79,12 +79,11 @@ fn test_audit_hash_chain_verification_and_tamper_detection() {
 
     let log_path = tmp.path().join(".zoi").join("audit.json");
     let content = fs::read_to_string(&log_path).expect("audit log should exist");
-    let mut lines: Vec<String> = content.lines().map(|l| l.to_string()).collect();
-    let mut tampered: serde_json::Value =
-        serde_json::from_str(&lines[0]).expect("first audit line should be valid JSON");
-    tampered["package_name"] = serde_json::Value::String("tampered-package".to_string());
-    lines[0] = serde_json::to_string(&tampered).expect("tampered line should serialize");
-    fs::write(&log_path, format!("{}\n", lines.join("\n"))).expect("tampered log should write");
+    let mut log: audit::AuditLog =
+        serde_json::from_str(&content).expect("audit log should be valid JSON");
+    log.entries[0].entry.package_name = "tampered-package".to_string();
+    fs::write(&log_path, serde_json::to_string_pretty(&log).unwrap())
+        .expect("tampered log should write");
 
     let tamper_report = audit::verify_chain().expect("tampered chain should still parse");
     assert!(!tamper_report.valid);
