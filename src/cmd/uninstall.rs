@@ -29,7 +29,7 @@ pub fn run(
 
     if local {
         scope_override = Some(types::Scope::Project);
-    } else if global {
+    } else if global || scope_override.is_none() {
         scope_override = Some(types::Scope::User);
     }
 
@@ -185,7 +185,12 @@ pub fn run(
     }
 
     let preflight = ux::PreflightSummary::new("Uninstall preflight")
-        .row("Scope override", format!("{:?}", scope_override))
+        .row(
+            "Scope override",
+            scope_override
+                .map(|s| format!("{:?}", s))
+                .unwrap_or_else(|| "None".to_string()),
+        )
         .row("Recursive", recursive.to_string())
         .row("Packages", manifests_to_uninstall.len().to_string())
         .row("Dangerous removals", dangerous.len().to_string())
