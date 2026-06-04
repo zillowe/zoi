@@ -4,6 +4,23 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
+## [Prod-Release-1.16.0] - 2026-06-03
+
+### ✨ Features
+
+- *(lsp)* Add Lua language server support for package definitions
+- *(registry)* Add registry management commands
+- Add Zoi use command and project task runner enhancements
+
+### 🛠️ Build
+
+- *(docker)* Migrate base image to Arch Linux
+
+### 🩹 Bug Fixes
+
+- Correct cli test
+- *(sync)* Enable HTTPS and vendored-openssl features for git2
+
 ## [Prod-Release-1.15.0] - 2026-05-26
 
 ### ♻️ Refactor
