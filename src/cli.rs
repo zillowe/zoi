@@ -767,7 +767,7 @@ pub fn run() -> anyhow::Result<()> {
         .placeholder(styling::AnsiColor::Cyan.on_default());
 
     let commit: &str = option_env!("ZOI_COMMIT_HASH").unwrap_or("dev");
-    let mut cmd = Cli::command().styles(styles);
+    let mut cmd = Cli::command().styles(styles.clone());
     let matches = cmd.clone().get_matches();
     let cli = match Cli::from_arg_matches(&matches) {
         Ok(cli) => cli,
@@ -1166,27 +1166,34 @@ pub fn run() -> anyhow::Result<()> {
                 match plugin_manager.run_command(cmd_name, cmd_args) {
                     Ok(true) => Ok(()),
                     Ok(false) => {
-                        let mut cmd = Cli::command();
-                        cmd.print_help()?;
-                        println!(
-                            "\n{}: '{}' is not a Zoi command.",
-                            "Error".red().bold(),
-                            cmd_name
-                        );
+                        let mut shadow_cmd = Cli::command().styles(styles);
+                        shadow_cmd = shadow_cmd.allow_external_subcommands(false);
+
+                        let err = shadow_cmd
+                            .clone()
+                            .try_get_matches_from(std::env::args())
+                            .err()
+                            .unwrap_or_else(|| {
+                                shadow_cmd.error(
+                                    clap::error::ErrorKind::InvalidSubcommand,
+                                    format!("unrecognized subcommand '{}'", cmd_name),
+                                )
+                            });
 
                         let plugin_cmds = plugin_manager.list_commands()?;
                         if !plugin_cmds.is_empty() {
-                            println!("\n{}:", "Available Plugin Commands".cyan().bold());
+                            eprintln!("{}:", "Available Plugin Commands".cyan().bold());
                             for (pcmd, pdesc) in plugin_cmds {
                                 if pdesc.is_empty() {
-                                    println!("  {}", pcmd);
+                                    eprintln!("  {}", pcmd);
                                 } else {
-                                    println!("  {:<12} {}", pcmd, pdesc.dimmed());
+                                    eprintln!("  {:<12} {}", pcmd, pdesc.dimmed());
                                 }
                             }
+                            eprintln!();
                         }
 
-                        std::process::exit(1);
+                        err.exit();
                     }
                     Err(e) => Err(e),
                 }

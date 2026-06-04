@@ -38,7 +38,7 @@ RUN cargo build --bin zoi --release
 
 FROM archlinux:base
 
-RUN pacman -Syu --noconfirm --needed git ca-certificates less gnupg && pacman -Scc --noconfirm
+RUN pacman -Syu --noconfirm --needed git ca-certificates gnupg && pacman -Scc --noconfirm
 
 COPY --from=builder /usr/src/app/target/release/zoi /usr/local/bin/zoi
 
