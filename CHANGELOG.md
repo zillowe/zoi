@@ -19,6 +19,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 
 ### 🩹 Bug Fixes
 
+- *(audit)* Correct history export format and fix test tampering logic
 - *(cmd)* Make uninstall scope consistent with install and clean up UI
 - *(hooks)* Resolve builtin security warning and fix loading precedence
 
