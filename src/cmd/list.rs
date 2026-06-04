@@ -307,7 +307,7 @@ fn run_list_names(
     type_filter: Option<types::PackageType>,
     completion: bool,
 ) -> Result<()> {
-    let mut entries = HashSet::new();
+    let mut entries = Vec::new();
     let config = config::read_config()?;
 
     if all {
@@ -352,32 +352,55 @@ fn run_list_names(
                     } else {
                         name_with_sub
                     };
-                    entries.insert(entry);
+                    entries.push(entry);
                 }
             }
         }
     } else {
-        let installed = local::get_installed_packages_with_type()?;
+        let installed = if completion {
+            crate::pkg::db::list_all_packages("local")?
+        } else {
+            local::get_installed_packages()
+                .map(|v| v.into_iter().map(|m| m.into_package()).collect())?
+        };
+
         for pkg in installed {
             if let Some(type_f) = type_filter
                 && pkg.package_type != type_f
             {
                 continue;
             }
+
+            if let Some(registry_f) = &registry_filter
+                && pkg.registry_handle.as_ref() != Some(registry_f)
+            {
+                continue;
+            }
+
+            if let Some(repo_f) = &repo_filter
+                && pkg.repo != *repo_f
+            {
+                continue;
+            }
+
             let name = if let Some(sub) = pkg.sub_package {
                 format!("{}:{}", pkg.name, sub)
             } else {
                 pkg.name
             };
 
-            let entry = name;
-            entries.insert(entry);
+            let entry = if completion {
+                format!("{}:{}", name, pkg.description.replace(':', " "))
+            } else {
+                name
+            };
+            entries.push(entry);
         }
     }
 
-    let mut sorted_entries: Vec<_> = entries.into_iter().collect();
-    sorted_entries.sort();
-    for entry in sorted_entries {
+    entries.sort();
+    entries.dedup();
+    for entry in entries {
         println!("{}", entry);
     }
 
