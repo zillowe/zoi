@@ -512,7 +512,9 @@ pub struct Transaction {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Registry {
+    #[serde(default)]
     pub handle: String,
+    #[serde(default)]
     pub url: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub advisory_prefix: Option<String>,
@@ -522,21 +524,27 @@ pub struct Registry {
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
 pub struct RemotePolicyConfig {
+    #[serde(default)]
     pub url: String,
+    #[serde(default)]
     pub signature_url: String,
+    #[serde(default)]
     pub trusted_keys: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
+    #[serde(default)]
     pub repos: Vec<String>,
+    #[serde(default)]
     pub package_managers: Option<Vec<String>>,
+    #[serde(default)]
     pub native_package_manager: Option<String>,
     #[serde(default)]
     pub telemetry_enabled: bool,
     #[serde(default)]
     pub audit_log_enabled: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub registry: Option<String>,
     #[serde(default)]
     pub default_registry: Option<Registry>,
@@ -550,7 +558,7 @@ pub struct Config {
     pub policy: Policy,
     #[serde(default)]
     pub remote_policy: Option<RemotePolicyConfig>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parallel_jobs: Option<usize>,
     #[serde(default)]
     pub protect_db: bool,

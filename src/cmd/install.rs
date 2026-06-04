@@ -599,13 +599,13 @@ pub fn run(
         }
 
         for stage in &stages {
-            stage.par_iter().for_each(|pkg_id| {
+            stage.par_iter().try_for_each(|pkg_id| -> Result<()> {
                 let node = graph
                     .nodes
                     .get(pkg_id)
                     .expect("Package node missing from graph during installation");
                 if matches!(node.reason, types::InstallReason::Direct) {
-                    return;
+                    return Ok(());
                 }
                 let action = install_plan
                     .get(pkg_id)
@@ -624,12 +624,15 @@ pub fn run(
                         let _lock = transaction_mutex
                             .lock()
                             .expect("Transaction mutex poisoned during installation");
-                        let _ = transaction::record_operation(
+                        if let Err(e) = transaction::record_operation(
                             transaction_id,
                             types::TransactionOperation::Install {
                                 manifest: Box::new(manifest),
                             },
-                        );
+                        ) {
+                            eprintln!("Failed to record transaction operation: {}", e);
+                            return Err(anyhow!("Transaction recording failed: {}", e));
+                        }
                     }
                     Err(e) => {
                         failed_packages
@@ -639,7 +642,8 @@ pub fn run(
                         eprintln!("Error installing {}: {}", node.pkg.name, e);
                     }
                 }
-            });
+                Ok(())
+            })?;
         }
     }
 
@@ -679,12 +683,12 @@ pub fn run(
                         .lock()
                         .expect("Installed manifests mutex poisoned")
                         .push(manifest.clone());
-                    let _ = transaction::record_operation(
+                    transaction::record_operation(
                         transaction_id,
                         types::TransactionOperation::Install {
                             manifest: Box::new(manifest),
                         },
-                    );
+                    )?;
                     successfully_installed_sources
                         .lock()
                         .expect("Successfully installed sources mutex poisoned")

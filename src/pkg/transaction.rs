@@ -60,13 +60,16 @@ pub fn record_operation(
 ) -> Result<()> {
     match &operation {
         types::TransactionOperation::Install { manifest } => {
-            let _ = audit::log_event(audit::AuditAction::Install, manifest);
+            audit::log_event(audit::AuditAction::Install, manifest)?;
         }
         types::TransactionOperation::Uninstall { manifest } => {
-            let _ = audit::log_event(audit::AuditAction::Uninstall, manifest);
+            audit::log_event(audit::AuditAction::Uninstall, manifest)?;
         }
-        types::TransactionOperation::Upgrade { new_manifest, .. } => {
-            let _ = audit::log_event(audit::AuditAction::Upgrade, new_manifest);
+        types::TransactionOperation::Upgrade {
+            old_manifest: _,
+            new_manifest,
+        } => {
+            audit::log_event(audit::AuditAction::Upgrade, new_manifest)?;
         }
     }
 
