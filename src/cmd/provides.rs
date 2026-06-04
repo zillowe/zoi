@@ -2,8 +2,6 @@ use crate::pkg::{config, db};
 use anyhow::Result;
 use colored::Colorize;
 use comfy_table::{Attribute, Cell, ContentArrangement, Table, presets::UTF8_FULL};
-use std::io::{self, Write};
-use std::process::{Command, Stdio};
 
 use rayon::prelude::*;
 
@@ -63,32 +61,7 @@ pub fn run(term: &str) -> Result<()> {
         ]);
     }
 
-    print_with_pager(&table.to_string())?;
+    println!("{}", table);
 
-    Ok(())
-}
-
-fn print_with_pager(content: &str) -> io::Result<()> {
-    let pager = if crate::utils::command_exists("less") {
-        "less"
-    } else if crate::utils::command_exists("more") {
-        "more"
-    } else {
-        print!("{}", content);
-        return Ok(());
-    };
-
-    let mut command = Command::new(pager);
-    if pager == "less" {
-        command.arg("-R");
-    }
-
-    let mut child = command.stdin(Stdio::piped()).spawn()?;
-
-    if let Some(mut stdin) = child.stdin.take() {
-        let _ = stdin.write_all(content.as_bytes());
-    }
-
-    child.wait()?;
     Ok(())
 }

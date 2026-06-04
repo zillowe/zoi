@@ -15,33 +15,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Wrap},
 };
-use std::io::{self, Write};
-use std::process::{Command, Stdio};
-
-fn print_with_pager(content: &str) -> io::Result<()> {
-    let pager = if crate::utils::command_exists("less") {
-        "less"
-    } else if crate::utils::command_exists("more") {
-        "more"
-    } else {
-        print!("{}", content);
-        return Ok(());
-    };
-
-    let mut command = Command::new(pager);
-    if pager == "less" {
-        command.arg("-R");
-    }
-
-    let mut child = command.stdin(Stdio::piped()).spawn()?;
-
-    if let Some(mut stdin) = child.stdin.take() {
-        let _ = stdin.write_all(content.as_bytes());
-    }
-
-    child.wait()?;
-    Ok(())
-}
+use std::io::{self};
 
 use rayon::prelude::*;
 
@@ -289,7 +263,7 @@ pub fn run(
                 ]);
             }
 
-            print_with_pager(&table.to_string())?;
+            println!("{}", table);
         }
         Err(e) => {
             return Err(e);
@@ -375,7 +349,7 @@ fn run_file_search(
         ]);
     }
 
-    print_with_pager(&table.to_string())?;
+    println!("{}", table);
     Ok(())
 }
 
