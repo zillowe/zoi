@@ -157,4 +157,5 @@ The `operations` array contains one of three objects:
 
 * **Atomic Commits:** When an operation completes successfully, Zoi deletes the transaction log. A missing log indicates a successful "commit."
 * **Failure Rollback:** If an install, uninstall, or update fails after a transaction starts, Zoi reads the current transaction log and reverts recorded operations in **reverse order**.
+* **Just-in-Time Escalation:** For system-wide operations, Zoi maintains user-space atomicity by building/resolving first, and only escalating to root via a helper subcommand for the final destructive phase.
 * **Manual Transaction Rollback:** Users can trigger a rollback of the newest remaining transaction log using `zoi rollback --last-transaction`.

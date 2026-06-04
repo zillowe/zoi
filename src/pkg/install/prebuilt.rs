@@ -2,18 +2,16 @@ use crate::pkg::types;
 use crate::utils;
 use anyhow::{Result, anyhow};
 use colored::*;
-use std::fs;
 use std::thread;
 
-pub fn try_build_install(
+use std::path::PathBuf;
+
+pub fn build_archive(
     pkg_lua_path: &std::path::Path,
     pkg: &types::Package,
-    registry_handle: &str,
     build_type_override: Option<&str>,
-    yes: bool,
-    sub_package_to_install: Option<String>,
     pb: Option<&indicatif::ProgressBar>,
-) -> Result<Vec<String>> {
+) -> Result<PathBuf> {
     let build_type = if let Some(t) = build_type_override {
         if !pkg.types.contains(&t.to_string()) {
             return Err(anyhow!(
@@ -41,7 +39,6 @@ pub fn try_build_install(
             pkg.name
         )
     })?;
-    let sub_packages_vec = sub_package_to_install.clone().map(|s| vec![s]);
 
     if let Some(p) = pb {
         p.set_message("Building package...");
@@ -63,7 +60,7 @@ pub fn try_build_install(
             None,
             None,
             Some(&version_clone),
-            sub_packages_vec,
+            None,
             true,
             true,
             "native",
@@ -85,17 +82,7 @@ pub fn try_build_install(
         ));
     }
 
-    if let Some(p) = pb {
-        p.set_message("Installing built package...");
-        p.set_position(50);
-    }
-
-    let archive_filename = format!(
-        "{}-{}-{}.pkg.tar.zst",
-        pkg.name,
-        pkg.version.as_deref().unwrap_or_default(),
-        current_platform
-    );
+    let archive_filename = format!("{}-{}-{}.pkg.tar.zst", pkg.name, version, current_platform);
     let archive_path = pkg_lua_path
         .parent()
         .expect("pkg_lua_path should have a parent")
@@ -107,27 +94,11 @@ pub fn try_build_install(
         ));
     }
 
-    let sub_packages_vec_install = sub_package_to_install.map(|s| vec![s]);
-
-    let installed_files = crate::pkg::package::install::run(
-        &archive_path,
-        Some(pkg.scope),
-        registry_handle,
-        Some(version),
-        yes,
-        sub_packages_vec_install,
-        true,
-        pb,
-    )
-    .map_err(|e| anyhow!("Failed to install built package archive: {}", e))?;
-
-    let _ = fs::remove_file(&archive_path);
-
     if let Some(p) = pb {
         p.set_position(100);
     } else {
         println!("Finished building {}.", pkg.name.cyan());
     }
 
-    Ok(installed_files)
+    Ok(archive_path)
 }

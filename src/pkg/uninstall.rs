@@ -217,12 +217,6 @@ pub fn run(
         return uninstall_collection(&pkg, &manifest, scope, registry_handle.clone(), yes);
     }
 
-    if let Some(hooks) = &pkg.hooks
-        && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PreRemove)
-    {
-        return Err(anyhow::anyhow!("Pre-remove hook failed: {}", e));
-    }
-
     let handle = manifest.registry_handle.as_str();
     let package_dir = local::get_package_dir(scope, handle, &pkg.repo, &pkg.name)?;
     let version_dir = package_dir.join(&manifest.version);
@@ -236,108 +230,166 @@ pub fn run(
         ));
     }
 
-    let lua = Lua::new();
-    crate::pkg::lua::functions::setup_lua_environment(
-        &lua,
-        &utils::get_platform()?,
-        Some(&manifest.version),
-        pkg_lua_path.to_str(),
-        None,
-        sub_package_to_uninstall.as_deref(),
-        true,
-    )
-    .map_err(|e| anyhow!(e.to_string()))?;
-    let lua_code = fs::read_to_string(pkg_lua_path)?;
-    lua.load(&lua_code)
-        .exec()
+    let needs_escalation = scope == types::Scope::System && !crate::utils::is_admin();
+
+    if needs_escalation {
+        println!(
+            "{} Escalating to root to remove system package...",
+            "::".bold().blue()
+        );
+        let manifest_json = serde_json::to_string(&manifest)?;
+        let mut temp_file = tempfile::NamedTempFile::new()?;
+        use std::io::Write;
+        temp_file.write_all(manifest_json.as_bytes())?;
+        let temp_path = temp_file.path();
+
+        let mut cmd = std::process::Command::new("sudo");
+        cmd.arg(std::env::current_exe()?);
+        cmd.arg("helper").arg("elevate-uninstall");
+        cmd.arg("--manifest-json").arg(temp_path);
+        if yes {
+            cmd.arg("--yes");
+        }
+
+        let status = cmd
+            .status()
+            .map_err(|e| anyhow::anyhow!("Failed to spawn sudo: {}", e))?;
+        if !status.success() {
+            return Err(anyhow::anyhow!("Escalated uninstallation failed."));
+        }
+    } else {
+        if let Some(hooks) = &pkg.hooks
+            && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PreRemove)
+        {
+            return Err(anyhow::anyhow!("Pre-remove hook failed: {}", e));
+        }
+
+        let lua = Lua::new();
+        crate::pkg::lua::functions::setup_lua_environment(
+            &lua,
+            &utils::get_platform()?,
+            Some(&manifest.version),
+            pkg_lua_path.to_str(),
+            None,
+            sub_package_to_uninstall.as_deref(),
+            true,
+        )
         .map_err(|e| anyhow!(e.to_string()))?;
-
-    if let Ok(uninstall_fn) = lua.globals().get::<mlua::Function>("uninstall") {
-        println!("Running uninstall() script...");
-        uninstall_fn
-            .call::<()>(())
+        let lua_code = fs::read_to_string(pkg_lua_path)?;
+        lua.load(&lua_code)
+            .exec()
             .map_err(|e| anyhow!(e.to_string()))?;
-    }
 
-    if let Ok(uninstall_ops) = lua.globals().get::<mlua::Table>("__ZoiUninstallOperations") {
-        for op in uninstall_ops.sequence_values::<mlua::Table>() {
-            let op = op.map_err(|e| anyhow!(e.to_string()))?;
-            if let Ok(op_type) = op.get::<String>("op")
-                && op_type == "zrm"
-            {
-                let mut path_to_remove: String =
-                    op.get("path").map_err(|e| anyhow!(e.to_string()))?;
+        if let Ok(uninstall_fn) = lua.globals().get::<mlua::Function>("uninstall") {
+            println!("Running uninstall() script...");
+            uninstall_fn
+                .call::<()>(())
+                .map_err(|e| anyhow!(e.to_string()))?;
+        }
 
-                path_to_remove =
-                    path_to_remove.replace("${pkgstore}", &version_dir.to_string_lossy());
+        if let Ok(uninstall_ops) = lua.globals().get::<mlua::Table>("__ZoiUninstallOperations") {
+            for op in uninstall_ops.sequence_values::<mlua::Table>() {
+                let op = op.map_err(|e| anyhow!(e.to_string()))?;
+                if let Ok(op_type) = op.get::<String>("op")
+                    && op_type == "zrm"
+                {
+                    let mut path_to_remove: String =
+                        op.get("path").map_err(|e| anyhow!(e.to_string()))?;
 
-                if let Some(home_dir) = home::home_dir() {
                     path_to_remove =
-                        path_to_remove.replace("${usrhome}", &home_dir.to_string_lossy());
-                }
-                path_to_remove = path_to_remove.replace(
-                    "${usrroot}",
-                    &crate::pkg::sysroot::apply_sysroot(PathBuf::from("/")).to_string_lossy(),
-                );
+                        path_to_remove.replace("${pkgstore}", &version_dir.to_string_lossy());
 
-                let path = std::path::PathBuf::from(path_to_remove);
-                if path.exists() {
-                    println!("Removing {}...", path.display());
-                    if path.is_dir() {
-                        fs::remove_dir_all(path)?;
-                    } else {
-                        fs::remove_file(path)?;
+                    if let Some(home_dir) = home::home_dir() {
+                        path_to_remove =
+                            path_to_remove.replace("${usrhome}", &home_dir.to_string_lossy());
+                    }
+                    path_to_remove = path_to_remove.replace(
+                        "${usrroot}",
+                        &crate::pkg::sysroot::apply_sysroot(PathBuf::from("/")).to_string_lossy(),
+                    );
+
+                    let path = std::path::PathBuf::from(path_to_remove);
+                    if path.exists() {
+                        println!("Removing {}...", path.display());
+                        if path.is_dir() {
+                            fs::remove_dir_all(path)?;
+                        } else {
+                            fs::remove_file(path)?;
+                        }
                     }
                 }
             }
         }
-    }
 
-    if let Some(backup_files) = &manifest.backup {
-        println!("Saving configuration files...");
-        for backup_file_rel in backup_files {
-            let backup_src = version_dir.join(backup_file_rel);
-            if backup_src.exists() {
-                let backup_dest = version_dir
-                    .parent()
-                    .expect("version_dir should have a parent (package_dir)")
-                    .join(format!("{}.zoisave", backup_file_rel));
-                if let Some(p) = backup_dest.parent()
-                    && let Err(e) = fs::create_dir_all(p)
-                {
-                    eprintln!(
-                        "Warning: could not create backup directory {}: {}",
-                        p.display(),
-                        e
+        if let Some(backup_files) = &manifest.backup {
+            println!("Saving configuration files...");
+            for backup_file_rel in backup_files {
+                let backup_src = version_dir.join(backup_file_rel);
+                if backup_src.exists() {
+                    let backup_dest = version_dir
+                        .parent()
+                        .expect("version_dir should have a parent (package_dir)")
+                        .join(format!("{}.zoisave", backup_file_rel));
+                    if let Some(p) = backup_dest.parent()
+                        && let Err(e) = fs::create_dir_all(p)
+                    {
+                        eprintln!(
+                            "Warning: could not create backup directory {}: {}",
+                            p.display(),
+                            e
+                        );
+                        continue;
+                    }
+                    println!(
+                        "Saving {} to {}",
+                        backup_src.display(),
+                        backup_dest.display()
                     );
-                    continue;
-                }
-                println!(
-                    "Saving {} to {}",
-                    backup_src.display(),
-                    backup_dest.display()
-                );
-                if let Err(e) = fs::rename(&backup_src, &backup_dest) {
-                    eprintln!("Warning: failed to save {}: {}", backup_src.display(), e);
+                    if let Err(e) = fs::rename(&backup_src, &backup_dest) {
+                        eprintln!("Warning: failed to save {}: {}", backup_src.display(), e);
+                    }
                 }
             }
         }
-    }
 
-    println!(
-        "Uninstalling '{}'...",
-        if let Some(sub) = &manifest.sub_package {
-            format!("{}:{}", pkg.name, sub)
-        } else {
-            pkg.name.clone()
-        }
-        .bold()
-    );
+        println!(
+            "Uninstalling '{}'...",
+            if let Some(sub) = &manifest.sub_package {
+                format!("{}:{}", pkg.name, sub)
+            } else {
+                pkg.name.clone()
+            }
+            .bold()
+        );
 
-    if let Some(bins) = &manifest.bins {
-        let bin_root = get_bin_root(scope)?;
-        for bin in bins {
-            let symlink_path = bin_root.join(bin);
+        if let Some(bins) = &manifest.bins {
+            let bin_root = get_bin_root(scope)?;
+            for bin in bins {
+                let symlink_path = bin_root.join(bin);
+                if symlink_path.is_symlink() || symlink_path.exists() {
+                    let other_providers = db::find_provides("local", bin)?;
+                    let still_provided = other_providers.iter().any(|(p, _)| {
+                        p.name != pkg.name || (p.sub_package != manifest.sub_package)
+                    });
+
+                    if !still_provided {
+                        println!(
+                            "Removing shim for {} from {}...",
+                            bin.cyan(),
+                            symlink_path.display()
+                        );
+                        fs::remove_file(&symlink_path)?;
+                    } else {
+                        println!(
+                            "Keeping shim for {} as it is still provided by other packages.",
+                            bin.cyan()
+                        );
+                    }
+                }
+            }
+        } else if manifest.sub_package.is_none() {
+            let bin = &pkg.name;
+            let symlink_path = get_bin_root(scope)?.join(bin);
             if symlink_path.is_symlink() || symlink_path.exists() {
                 let other_providers = db::find_provides("local", bin)?;
                 let still_provided = other_providers
@@ -350,127 +402,111 @@ pub fn run(
                         bin.cyan(),
                         symlink_path.display()
                     );
-                    fs::remove_file(&symlink_path)?;
+                    fs::remove_file(symlink_path)?;
+                }
+            }
+        }
+
+        for file_path_str in &manifest.installed_files {
+            let file_path = PathBuf::from(file_path_str);
+            if file_path.exists() {
+                if file_path.is_dir() {
+                    let _ = fs::remove_dir_all(&file_path);
                 } else {
-                    println!(
-                        "Keeping shim for {} as it is still provided by other packages.",
-                        bin.cyan()
-                    );
+                    let _ = fs::remove_file(&file_path);
                 }
             }
         }
-    } else if manifest.sub_package.is_none() {
-        let bin = &pkg.name;
-        let symlink_path = get_bin_root(scope)?.join(bin);
-        if symlink_path.is_symlink() || symlink_path.exists() {
-            let other_providers = db::find_provides("local", bin)?;
-            let still_provided = other_providers
-                .iter()
-                .any(|(p, _)| p.name != pkg.name || (p.sub_package != manifest.sub_package));
 
-            if !still_provided {
+        let manifest_filename = if let Some(sub) = &manifest.sub_package {
+            format!("manifest-{}.yaml", sub)
+        } else {
+            "manifest.yaml".to_string()
+        };
+        let manifest_path = version_dir.join(manifest_filename);
+        if manifest_path.exists() {
+            fs::remove_file(manifest_path)?;
+        }
+
+        if version_dir.exists() {
+            let mut has_other_manifests = false;
+            if let Ok(entries) = fs::read_dir(&version_dir) {
+                for entry in entries.flatten() {
+                    let name = entry.file_name().to_string_lossy().to_string();
+                    if name.starts_with("manifest") && name.ends_with(".yaml") {
+                        has_other_manifests = true;
+                        break;
+                    }
+                }
+            }
+            if !has_other_manifests {
                 println!(
-                    "Removing shim for {} from {}...",
-                    bin.cyan(),
-                    symlink_path.display()
+                    "Removing empty version directory: {}",
+                    version_dir.display()
                 );
-                fs::remove_file(symlink_path)?;
+                fs::remove_dir_all(&version_dir)?;
             }
         }
-    }
 
-    for file_path_str in &manifest.installed_files {
-        let file_path = PathBuf::from(file_path_str);
-        if file_path.exists() {
-            if file_path.is_dir() {
-                let _ = fs::remove_dir_all(&file_path);
-            } else {
-                let _ = fs::remove_file(&file_path);
-            }
-        }
-    }
-
-    let manifest_filename = if let Some(sub) = &manifest.sub_package {
-        format!("manifest-{}.yaml", sub)
-    } else {
-        "manifest.yaml".to_string()
-    };
-    let manifest_path = version_dir.join(manifest_filename);
-    if manifest_path.exists() {
-        fs::remove_file(manifest_path)?;
-    }
-
-    if version_dir.exists() {
-        let mut has_other_manifests = false;
-        if let Ok(entries) = fs::read_dir(&version_dir) {
-            for entry in entries.flatten() {
-                let name = entry.file_name().to_string_lossy().to_string();
-                if name.starts_with("manifest") && name.ends_with(".yaml") {
-                    has_other_manifests = true;
-                    break;
+        if package_dir.exists() {
+            let _ = crate::pkg::service::cleanup_service(&pkg.name, scope);
+            let mut has_other_versions = false;
+            if let Ok(entries) = fs::read_dir(&package_dir) {
+                for entry in entries.flatten() {
+                    let name = entry.file_name().to_string_lossy().to_string();
+                    if name != "latest" && name != "dependents" {
+                        has_other_versions = true;
+                        break;
+                    }
                 }
             }
-        }
-        if !has_other_manifests {
-            println!(
-                "Removing empty version directory: {}",
-                version_dir.display()
-            );
-            fs::remove_dir_all(&version_dir)?;
-        }
-    }
-
-    if package_dir.exists() {
-        let _ = crate::pkg::service::cleanup_service(&pkg.name, scope);
-        let mut has_other_versions = false;
-        if let Ok(entries) = fs::read_dir(&package_dir) {
-            for entry in entries.flatten() {
-                let name = entry.file_name().to_string_lossy().to_string();
-                if name != "latest" && name != "dependents" {
-                    has_other_versions = true;
-                    break;
-                }
+            if !has_other_versions {
+                println!("Removing package store: {}", package_dir.display());
+                fs::remove_dir_all(&package_dir)?;
             }
         }
-        if !has_other_versions {
-            println!("Removing package store: {}", package_dir.display());
-            fs::remove_dir_all(&package_dir)?;
-        }
-    }
-    let parent_id = format!(
-        "#{}@{}/{}@{}",
-        manifest.registry_handle, manifest.repo, manifest.name, manifest.version
-    );
-    for dep_str in &manifest.installed_dependencies {
-        if let Ok(dep) = dependencies::parse_dependency_string(dep_str)
-            && dep.manager == "zoi"
-        {
-            let dep_req = resolve::parse_source_string(dep.package)?;
-            let dep_matches = local::find_installed_manifests_matching(&dep_req, scope)?;
-            if dep_matches.len() == 1 {
-                let dep_manifest = &dep_matches[0];
-                match local::get_package_dir(
-                    dep_manifest.scope,
-                    &dep_manifest.registry_handle,
-                    &dep_manifest.repo,
-                    &dep_manifest.name,
-                ) {
-                    Ok(dep_pkg_dir) => {
-                        if let Err(e) = local::remove_dependent(&dep_pkg_dir, &parent_id) {
+
+        let parent_id = format!(
+            "#{}@{}/{}@{}",
+            manifest.registry_handle, manifest.repo, manifest.name, manifest.version
+        );
+        for dep_str in &manifest.installed_dependencies {
+            if let Ok(dep) = dependencies::parse_dependency_string(dep_str)
+                && dep.manager == "zoi"
+            {
+                let dep_req = resolve::parse_source_string(dep.package)?;
+                let dep_matches = local::find_installed_manifests_matching(&dep_req, scope)?;
+                if dep_matches.len() == 1 {
+                    let dep_manifest = &dep_matches[0];
+                    match local::get_package_dir(
+                        dep_manifest.scope,
+                        &dep_manifest.registry_handle,
+                        &dep_manifest.repo,
+                        &dep_manifest.name,
+                    ) {
+                        Ok(dep_pkg_dir) => {
+                            if let Err(e) = local::remove_dependent(&dep_pkg_dir, &parent_id) {
+                                eprintln!(
+                                    "Warning: failed to remove dependent link for {}: {}",
+                                    dep.package, e
+                                );
+                            }
+                        }
+                        Err(e) => {
                             eprintln!(
-                                "Warning: failed to remove dependent link for {}: {}",
+                                "Warning: failed to get package dir for {}: {}",
                                 dep.package, e
                             );
                         }
                     }
-                    Err(e) => {
-                        eprintln!(
-                            "Warning: failed to get package dir for {}: {}",
-                            dep.package, e
-                        );
-                    }
                 }
             }
+        }
+
+        if let Some(hooks) = &pkg.hooks
+            && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PostRemove)
+        {
+            eprintln!("{} post-remove hook failed: {}", "Warning:".yellow(), e);
         }
     }
 
@@ -504,12 +540,6 @@ pub fn run(
         Ok(true) => println!("{} telemetry sent", "Info:".green()),
         Ok(false) => (),
         Err(e) => eprintln!("{} telemetry failed: {}", "Warning:".yellow(), e),
-    }
-
-    if let Some(hooks) = &pkg.hooks
-        && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PostRemove)
-    {
-        eprintln!("{} post-remove hook failed: {}", "Warning:".yellow(), e);
     }
 
     Ok(manifest)

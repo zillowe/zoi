@@ -1,7 +1,220 @@
+use crate::pkg::{
+    install::{manifest, post_install, resolver::InstallNode},
+    local, types,
+};
 use anyhow::{Result, anyhow};
+use mlua::{Function, Lua, Table};
 use sha2::{Digest, Sha256, Sha512};
 use std::fs::File;
 use std::io::Read;
+use std::path::{Path, PathBuf};
+
+pub fn elevate_install_node(cmd: &crate::cmd::helper::ElevateInstallNodeCommand) -> Result<()> {
+    let content = std::fs::read_to_string(&cmd.node_json)?;
+    let node: InstallNode = serde_json::from_str(&content)?;
+
+    let pkg = &node.pkg;
+    let handle = &node.registry_handle;
+    let sub_packages_vec = node.sub_package.clone().map(|s| vec![s]);
+
+    let installed_files = crate::pkg::package::install::run(
+        &cmd.archive,
+        Some(pkg.scope),
+        handle,
+        Some(&node.version),
+        cmd.yes,
+        sub_packages_vec,
+        cmd.link_bins,
+        None,
+    )?;
+
+    if let types::InstallReason::Dependency { ref parent } = node.reason {
+        let package_dir = local::get_package_dir(pkg.scope, handle, &pkg.repo, &pkg.name)?;
+        local::add_dependent(&package_dir, parent)?;
+    }
+
+    let _ = post_install::install_manual_if_available(pkg, &node.version, handle, None);
+
+    let manifest = manifest::create_manifest(
+        pkg,
+        node.reason.clone(),
+        node.dependencies.clone(),
+        Some(cmd.install_method.clone()),
+        installed_files,
+        handle,
+        &node.chosen_options,
+        &node.chosen_optionals,
+        node.sub_package.clone(),
+    )?;
+
+    local::write_manifest(&manifest)?;
+    local::persist_package_source(&manifest, Path::new(&node.source))?;
+
+    Ok(())
+}
+
+pub fn elevate_uninstall(cmd: &crate::cmd::helper::ElevateUninstallCommand) -> Result<()> {
+    let content = std::fs::read_to_string(&cmd.manifest_json)?;
+    let manifest: types::InstallManifest = serde_json::from_str(&content)?;
+
+    let handle = &manifest.registry_handle;
+    let scope = manifest.scope;
+    let package_dir = local::get_package_dir(scope, handle, &manifest.repo, &manifest.name)?;
+    let version_dir = package_dir.join(&manifest.version);
+
+    let pkg_lua_path = local::get_package_source_path(&manifest)?;
+    let mut pkg_opt = None;
+    if pkg_lua_path.exists()
+        && let Ok(p) = crate::pkg::lua::parser::parse_lua_package(
+            pkg_lua_path.to_str().unwrap(),
+            Some(&manifest.version),
+            true,
+        )
+    {
+        pkg_opt = Some(p);
+    }
+
+    if let Some(pkg) = &pkg_opt
+        && let Some(hooks) = &pkg.hooks
+    {
+        let _ = crate::pkg::hooks::run_hooks(hooks, crate::pkg::hooks::HookType::PreRemove);
+    }
+
+    if pkg_lua_path.exists() {
+        let lua = Lua::new();
+        if crate::pkg::lua::functions::setup_lua_environment(
+            &lua,
+            &crate::utils::get_platform()?,
+            Some(&manifest.version),
+            pkg_lua_path.to_str(),
+            None,
+            manifest.sub_package.as_deref(),
+            true,
+        )
+        .is_ok()
+        {
+            let lua_code = std::fs::read_to_string(&pkg_lua_path)?;
+            if lua.load(&lua_code).exec().is_ok() {
+                if let Ok(uninstall_fn) = lua.globals().get::<Function>("uninstall") {
+                    let _ = uninstall_fn.call::<()>(());
+                }
+
+                if let Ok(uninstall_ops) = lua.globals().get::<Table>("__ZoiUninstallOperations") {
+                    for op in uninstall_ops.sequence_values::<Table>() {
+                        if let Ok(op) = op
+                            && let Ok(op_type) = op.get::<String>("op")
+                            && op_type == "zrm"
+                        {
+                            let mut path_to_remove: String = op.get("path").unwrap_or_default();
+                            path_to_remove = path_to_remove
+                                .replace("${pkgstore}", &version_dir.to_string_lossy());
+                            if let Some(home_dir) = home::home_dir() {
+                                path_to_remove = path_to_remove
+                                    .replace("${usrhome}", &home_dir.to_string_lossy());
+                            }
+                            path_to_remove = path_to_remove.replace(
+                                "${usrroot}",
+                                &crate::pkg::sysroot::apply_sysroot(PathBuf::from("/"))
+                                    .to_string_lossy(),
+                            );
+
+                            let path = std::path::PathBuf::from(path_to_remove);
+                            if path.exists() {
+                                if path.is_dir() {
+                                    let _ = std::fs::remove_dir_all(path);
+                                } else {
+                                    let _ = std::fs::remove_file(path);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(bins) = &manifest.bins {
+        let bin_root = if cfg!(target_os = "windows") {
+            Path::new("C:\\ProgramData\\zoi\\pkgs\\bin").to_path_buf()
+        } else {
+            Path::new("/usr/local/bin").to_path_buf()
+        };
+
+        for bin in bins {
+            let symlink_path = bin_root.join(bin);
+            if symlink_path.is_symlink() || symlink_path.exists() {
+                let _ = std::fs::remove_file(&symlink_path);
+            }
+        }
+    }
+
+    for file_path_str in &manifest.installed_files {
+        let file_path = Path::new(file_path_str);
+        if file_path.exists() {
+            if file_path.is_dir() {
+                let _ = std::fs::remove_dir_all(file_path);
+            } else {
+                let _ = std::fs::remove_file(file_path);
+            }
+        }
+    }
+
+    let manifest_filename = if let Some(sub) = &manifest.sub_package {
+        format!("manifest-{}.yaml", sub)
+    } else {
+        "manifest.yaml".to_string()
+    };
+    let manifest_path = version_dir.join(manifest_filename);
+    if manifest_path.exists() {
+        std::fs::remove_file(manifest_path)?;
+    }
+
+    if version_dir.exists() && std::fs::read_dir(&version_dir)?.next().is_none() {
+        std::fs::remove_dir_all(version_dir)?;
+    }
+
+    if package_dir.exists() {
+        let _ = crate::pkg::service::cleanup_service(&manifest.name, scope);
+        if let Ok(mut entries) = std::fs::read_dir(&package_dir)
+            && entries.next().is_none()
+        {
+            std::fs::remove_dir_all(package_dir)?;
+        }
+    }
+
+    let parent_id = format!(
+        "#{}@{}/{}@{}",
+        manifest.registry_handle, manifest.repo, manifest.name, manifest.version
+    );
+    for dep_str in &manifest.installed_dependencies {
+        if let Ok(dep) = crate::pkg::dependencies::parse_dependency_string(dep_str)
+            && dep.manager == "zoi"
+        {
+            let dep_req = crate::pkg::resolve::parse_source_string(dep.package)?;
+            let dep_matches =
+                crate::pkg::local::find_installed_manifests_matching(&dep_req, scope)?;
+            if dep_matches.len() == 1 {
+                let dep_manifest = &dep_matches[0];
+                if let Ok(dep_pkg_dir) = crate::pkg::local::get_package_dir(
+                    dep_manifest.scope,
+                    &dep_manifest.registry_handle,
+                    &dep_manifest.repo,
+                    &dep_manifest.name,
+                ) {
+                    let _ = crate::pkg::local::remove_dependent(&dep_pkg_dir, &parent_id);
+                }
+            }
+        }
+    }
+
+    if let Some(pkg) = &pkg_opt
+        && let Some(hooks) = &pkg.hooks
+    {
+        let _ = crate::pkg::hooks::run_hooks(hooks, crate::pkg::hooks::HookType::PostRemove);
+    }
+
+    Ok(())
+}
 
 pub enum HashType {
     Sha512,

@@ -64,7 +64,7 @@ fn print_node(
         node.pkg.name.cyan().bold().to_string()
     };
 
-    let version_display = format!("v{}", node.version.green());
+    let version_display = format!("v{}", node.version);
     let repeated_mark = if is_repeated {
         " (*)".dimmed()
     } else {
