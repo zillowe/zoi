@@ -165,3 +165,65 @@ action:\n  when: PostTransaction\n  exec: echo m\n",
         ]
     );
 }
+
+#[test]
+fn test_hook_loading_precedence_and_builtin_flag() {
+    let mut ctx = common::TestContextGuard::acquire();
+    let tmp = tempdir().expect("tempdir should be created");
+    let root = tmp.path().to_path_buf();
+    let home = root.join("home");
+    fs::create_dir_all(&home).expect("home dir should be created");
+
+    ctx.set_env_var("HOME", &home);
+    ctx.set_sysroot(root.clone());
+
+    let user_hooks_dir = home.join(".zoi").join("hooks");
+    let system_hooks_dir = root.join("etc").join("zoi").join("hooks");
+    fs::create_dir_all(&user_hooks_dir).expect("user hooks dir should be created");
+    fs::create_dir_all(&system_hooks_dir).expect("system hooks dir should be created");
+
+    let hooks = load_all_hooks().expect("hooks should load");
+    let font_cache_hook = hooks.iter().find(|h| h.name == "update-font-cache");
+    assert!(
+        font_cache_hook.is_some(),
+        "builtin font-cache hook should be present"
+    );
+    assert!(
+        font_cache_hook.unwrap().is_builtin,
+        "builtin hook should have is_builtin = true"
+    );
+
+    fs::write(
+        system_hooks_dir.join("font-cache-override.hook.yaml"),
+        "name: update-font-cache\ndescription: system-override\ntrigger:\n  paths: [\"*\"]\naction:\n  when: PostTransaction\n  exec: echo system\n",
+    )
+    .expect("system hook override should write");
+
+    let hooks = load_all_hooks().expect("hooks should load");
+    let font_cache_hook = hooks
+        .iter()
+        .find(|h| h.name == "update-font-cache")
+        .unwrap();
+    assert_eq!(font_cache_hook.description, "system-override");
+    assert!(
+        !font_cache_hook.is_builtin,
+        "overridden hook should NOT be marked as builtin"
+    );
+
+    fs::write(
+        user_hooks_dir.join("font-cache-user-override.hook.yaml"),
+        "name: update-font-cache\ndescription: user-override\ntrigger:\n  paths: [\"*\"]\naction:\n  when: PostTransaction\n  exec: echo user\n",
+    )
+    .expect("user hook override should write");
+
+    let hooks = load_all_hooks().expect("hooks should load");
+    let font_cache_hook = hooks
+        .iter()
+        .find(|h| h.name == "update-font-cache")
+        .unwrap();
+    assert_eq!(font_cache_hook.description, "user-override");
+    assert!(
+        !font_cache_hook.is_builtin,
+        "user overridden hook should NOT be marked as builtin"
+    );
+}

@@ -19,6 +19,8 @@ pub struct GlobalHook {
     pub platforms: Option<Vec<String>>,
     pub trigger: HookTrigger,
     pub action: HookAction,
+    #[serde(skip)]
+    pub is_builtin: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -65,11 +67,12 @@ pub fn get_system_hooks_dir() -> Result<PathBuf> {
 }
 
 pub fn load_all_hooks() -> Result<Vec<GlobalHook>> {
-    let mut hooks = Vec::new();
+    let mut hook_map = HashMap::new();
 
     for (name, content) in BUILTIN_HOOKS {
-        if let Ok(hook) = serde_yaml::from_str::<GlobalHook>(content) {
-            hooks.push(hook);
+        if let Ok(mut hook) = serde_yaml::from_str::<GlobalHook>(content) {
+            hook.is_builtin = true;
+            hook_map.insert(hook.name.clone(), hook);
         } else {
             eprintln!(
                 "{}: Failed to parse builtin hook '{}'.",
@@ -94,14 +97,14 @@ pub fn load_all_hooks() -> Result<Vec<GlobalHook>> {
         for path in hook_paths {
             if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("yaml") {
                 let content = fs::read_to_string(&path)?;
-                if let Ok(hook) = serde_yaml::from_str::<GlobalHook>(&content)
-                    && !hooks.iter().any(|h| h.name == hook.name)
-                {
-                    hooks.push(hook);
+                if let Ok(hook) = serde_yaml::from_str::<GlobalHook>(&content) {
+                    hook_map.insert(hook.name.clone(), hook);
                 }
             }
         }
     }
+
+    let mut hooks: Vec<GlobalHook> = hook_map.into_values().collect();
     hooks.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(hooks)
 }
@@ -236,8 +239,7 @@ pub fn run_global_hooks(when: HookWhen, modified_files: &[String], operation: &s
         if trigger_matches_modified_files(&hook.trigger, modified_files)
             && triggered_hooks.insert(hook.name.clone())
         {
-            let is_builtin = BUILTIN_HOOKS.iter().any(|(name, _)| name == &hook.name);
-            if !is_builtin && !is_hook_trusted(&hook)? {
+            if !hook.is_builtin && !is_hook_trusted(&hook)? {
                 println!("Skipping untrusted hook: {}", hook.name);
                 continue;
             }
