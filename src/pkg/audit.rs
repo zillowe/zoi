@@ -3,8 +3,7 @@ use anyhow::{Result, anyhow};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::fs::{self, OpenOptions};
-use std::io::Write;
+use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -28,14 +27,20 @@ pub struct AuditEntry {
     pub registry: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct AuditLog {
+    pub version: String,
+    pub entries: Vec<AuditLogLine>,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
-struct AuditLogLine {
+pub struct AuditLogLine {
     #[serde(flatten)]
-    entry: AuditEntry,
+    pub entry: AuditEntry,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    prev_hash: Option<String>,
+    pub prev_hash: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    hash: Option<String>,
+    pub hash: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -81,23 +86,54 @@ fn calculate_entry_hash(entry: &AuditEntry, prev_hash: Option<&str>) -> Result<S
     Ok(hex::encode(hasher.finalize()))
 }
 
-fn get_last_hashed_entry(log_path: &PathBuf) -> Result<Option<AuditLogLine>> {
-    if !log_path.exists() {
-        return Ok(None);
+fn read_audit_log() -> Result<AuditLog> {
+    let path = get_audit_log_path()?;
+    if !path.exists() {
+        return Ok(AuditLog {
+            version: env!("CARGO_PKG_VERSION").to_string(),
+            entries: Vec::new(),
+        });
     }
 
-    let content = fs::read_to_string(log_path)?;
-    for line in content.lines().rev() {
-        if line.trim().is_empty() {
-            continue;
-        }
-        let parsed: AuditLogLine = serde_json::from_str(line)?;
-        if parsed.hash.is_some() {
-            return Ok(Some(parsed));
+    let content = fs::read_to_string(&path)?;
+    if content.trim().is_empty() {
+        return Ok(AuditLog {
+            version: env!("CARGO_PKG_VERSION").to_string(),
+            entries: Vec::new(),
+        });
+    }
+
+    if let Ok(log) = serde_json::from_str::<AuditLog>(&content) {
+        return Ok(log);
+    }
+
+    let mut entries = Vec::new();
+    for line in content.lines() {
+        if !line.trim().is_empty()
+            && let Ok(parsed) = serde_json::from_str::<AuditLogLine>(line)
+        {
+            entries.push(parsed);
         }
     }
 
-    Ok(None)
+    if !entries.is_empty() {
+        return Ok(AuditLog {
+            version: env!("CARGO_PKG_VERSION").to_string(),
+            entries,
+        });
+    }
+
+    Ok(AuditLog {
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        entries: Vec::new(),
+    })
+}
+
+fn write_audit_log(log: &AuditLog) -> Result<()> {
+    let path = get_audit_log_path()?;
+    let content = serde_json::to_string_pretty(log)?;
+    fs::write(path, content)?;
+    Ok(())
 }
 
 pub fn log_event(action: AuditAction, manifest: &types::InstallManifest) -> Result<()> {
@@ -105,6 +141,9 @@ pub fn log_event(action: AuditAction, manifest: &types::InstallManifest) -> Resu
     if !config.audit_log_enabled {
         return Ok(());
     }
+
+    let mut log = read_audit_log()?;
+    let prev_hash = log.entries.last().and_then(|l| l.hash.clone());
 
     let user = get_username();
     let entry = AuditEntry {
@@ -119,53 +158,26 @@ pub fn log_event(action: AuditAction, manifest: &types::InstallManifest) -> Resu
         registry: manifest.registry_handle.clone(),
     };
 
-    let log_path = get_audit_log_path()?;
-    let prev_hash = get_last_hashed_entry(&log_path)?.and_then(|line| line.hash);
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(log_path)?;
-
     let hash = Some(calculate_entry_hash(&entry, prev_hash.as_deref())?);
-    let line = AuditLogLine {
+    log.entries.push(AuditLogLine {
         entry,
         prev_hash,
         hash,
-    };
-    let json = serde_json::to_string(&line)?;
-    writeln!(file, "{}", json)?;
+    });
+    log.version = env!("CARGO_PKG_VERSION").to_string();
 
+    write_audit_log(&log)?;
     Ok(())
 }
 
 pub fn get_history() -> Result<Vec<AuditEntry>> {
-    let log_path = get_audit_log_path()?;
-    if !log_path.exists() {
-        return Ok(Vec::new());
-    }
-
-    let content = fs::read_to_string(log_path)?;
-    let mut entries = Vec::new();
-    for line in content.lines() {
-        if !line.trim().is_empty() {
-            let parsed: AuditLogLine = serde_json::from_str(line)?;
-            entries.push(parsed.entry);
-        }
-    }
-    Ok(entries)
+    let log = read_audit_log()?;
+    Ok(log.entries.into_iter().map(|l| l.entry).collect())
 }
 
 pub fn export_history(export_path: &Path, ndjson: bool) -> Result<usize> {
-    let log_path = get_audit_log_path()?;
-    if !log_path.exists() {
-        return Err(anyhow!(
-            "No history recorded. Audit logging might be disabled."
-        ));
-    }
-
-    let content = fs::read_to_string(log_path)?;
-    let raw_lines: Vec<&str> = content.lines().filter(|l| !l.trim().is_empty()).collect();
-    if raw_lines.is_empty() {
+    let log = read_audit_log()?;
+    if log.entries.is_empty() {
         return Err(anyhow!(
             "No history recorded. Audit logging might be disabled."
         ));
@@ -178,49 +190,30 @@ pub fn export_history(export_path: &Path, ndjson: bool) -> Result<usize> {
     }
 
     if ndjson {
-        fs::write(export_path, format!("{}\n", raw_lines.join("\n")))?;
-        return Ok(raw_lines.len());
+        let mut content = String::new();
+        for entry in &log.entries {
+            content.push_str(&serde_json::to_string(entry)?);
+            content.push('\n');
+        }
+        fs::write(export_path, content)?;
+    } else {
+        let json = serde_json::to_string_pretty(&log)?;
+        fs::write(export_path, json)?;
     }
 
-    let mut entries = Vec::new();
-    for (index, line) in raw_lines.iter().enumerate() {
-        let parsed: AuditLogLine = serde_json::from_str(line)
-            .map_err(|e| anyhow!("Invalid audit log JSON at line {}: {}", index + 1, e))?;
-        entries.push(parsed);
-    }
-
-    let json = serde_json::to_string_pretty(&entries)?;
-    fs::write(export_path, json)?;
-    Ok(entries.len())
+    Ok(log.entries.len())
 }
 
 pub fn verify_chain() -> Result<AuditVerification> {
-    let log_path = get_audit_log_path()?;
-    if !log_path.exists() {
-        return Ok(AuditVerification {
-            valid: true,
-            total_entries: 0,
-            hashed_entries: 0,
-            legacy_entries: 0,
-            message: "No audit history found.".to_string(),
-        });
-    }
-
-    let content = fs::read_to_string(log_path)?;
+    let log = read_audit_log()?;
     let mut total_entries = 0usize;
     let mut hashed_entries = 0usize;
     let mut legacy_entries = 0usize;
     let mut previous_hash: Option<String> = None;
     let mut seen_hashed = false;
 
-    for (index, line) in content.lines().enumerate() {
-        if line.trim().is_empty() {
-            continue;
-        }
+    for (index, parsed) in log.entries.iter().enumerate() {
         total_entries += 1;
-
-        let parsed: AuditLogLine = serde_json::from_str(line)
-            .map_err(|e| anyhow!("Invalid audit log JSON at line {}: {}", index + 1, e))?;
 
         if let Some(stored_hash) = parsed.hash.as_deref() {
             seen_hashed = true;
@@ -233,7 +226,7 @@ pub fn verify_chain() -> Result<AuditVerification> {
                     hashed_entries,
                     legacy_entries,
                     message: format!(
-                        "Audit hash chain is broken at line {} (prev_hash mismatch).",
+                        "Audit hash chain is broken at entry {} (prev_hash mismatch).",
                         index + 1
                     ),
                 });
@@ -247,7 +240,7 @@ pub fn verify_chain() -> Result<AuditVerification> {
                     hashed_entries,
                     legacy_entries,
                     message: format!(
-                        "Audit hash mismatch at line {} (entry appears modified).",
+                        "Audit hash mismatch at entry {} (entry appears modified).",
                         index + 1
                     ),
                 });
@@ -263,7 +256,7 @@ pub fn verify_chain() -> Result<AuditVerification> {
                     hashed_entries,
                     legacy_entries,
                     message: format!(
-                        "Legacy audit entry detected after chained entries at line {}.",
+                        "Legacy audit entry detected after chained entries at entry {}.",
                         index + 1
                     ),
                 });
@@ -271,7 +264,9 @@ pub fn verify_chain() -> Result<AuditVerification> {
         }
     }
 
-    let message = if hashed_entries == 0 && legacy_entries > 0 {
+    let message = if total_entries == 0 {
+        "No audit history found.".to_string()
+    } else if hashed_entries == 0 && legacy_entries > 0 {
         "Audit log is valid but uses legacy non-chained entries.".to_string()
     } else {
         "Audit hash chain is valid.".to_string()
