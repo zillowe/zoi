@@ -433,7 +433,7 @@ fn run_update_all_logic(
     let mut up_to_date_sources = Vec::new();
     let mut packages_to_upgrade: Vec<UpdateCandidate> = Vec::new();
 
-    println!("\n{} Checking for upgrades...", "::".bold().blue());
+    println!("{} Checking for upgrades...", "::".bold().blue());
     let pb = ProgressBar::new(installed_packages.len() as u64);
     pb.set_style(
         ProgressStyle::default_bar()
