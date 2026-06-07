@@ -64,14 +64,15 @@ pub fn elevate_uninstall(cmd: &crate::cmd::helper::ElevateUninstallCommand) -> R
 
     let pkg_lua_path = local::get_package_source_path(&manifest)?;
     let mut pkg_opt = None;
-    if pkg_lua_path.exists()
-        && let Ok(p) = crate::pkg::lua::parser::parse_lua_package(
-            pkg_lua_path.to_str().unwrap(),
-            Some(&manifest.version),
-            true,
-        )
-    {
-        pkg_opt = Some(p);
+    if pkg_lua_path.exists() {
+        let path_str = pkg_lua_path
+            .to_str()
+            .ok_or_else(|| anyhow!("Package path contains invalid UTF-8"))?;
+        if let Ok(p) =
+            crate::pkg::lua::parser::parse_lua_package(path_str, Some(&manifest.version), true)
+        {
+            pkg_opt = Some(p);
+        }
     }
 
     if let Some(pkg) = &pkg_opt

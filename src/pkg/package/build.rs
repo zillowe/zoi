@@ -187,7 +187,7 @@ fn build_for_platform(
                 build_dir
                     .path()
                     .to_str()
-                    .expect("build_dir should be valid UTF-8"),
+                    .ok_or_else(|| anyhow!("build_dir path contains invalid UTF-8"))?,
             )
             .map_err(|e| anyhow!(e.to_string()))?;
         lua.globals()
@@ -195,7 +195,7 @@ fn build_for_platform(
                 "STAGING_DIR",
                 staging_dir
                     .to_str()
-                    .expect("staging_dir should be valid UTF-8"),
+                    .ok_or_else(|| anyhow!("staging_dir path contains invalid UTF-8"))?,
             )
             .map_err(|e| anyhow!(e.to_string()))?;
         lua.globals()
@@ -483,14 +483,30 @@ fn build_for_platform(
             if !quiet {
                 println!("Running verify()...");
             }
-            let verification_passed: bool = verify_fn.call::<bool>(args.clone()).map_err(|e| {
-                anyhow!(
-                    "The 'verify' function in '{}' failed for sub-package '{}':\n{}",
-                    package_file.display(),
-                    sub_package,
-                    e
-                )
-            })?;
+            let verification_passed: bool = match verify_fn.call::<mlua::Value>(args.clone()) {
+                Ok(mlua::Value::Boolean(b)) => b,
+                Ok(mlua::Value::Nil) => {
+                    return Err(anyhow!(
+                        "The 'verify' function in '{}' returned nil. It must explicitly return a boolean (true or false).\nHint: Did you forget to add 'return' before your verification function (e.g. return verifyHash(...))?",
+                        package_file.display()
+                    ));
+                }
+                Ok(v) => {
+                    return Err(anyhow!(
+                        "The 'verify' function in '{}' returned a non-boolean value of type {:?}. It must return true or false.",
+                        package_file.display(),
+                        v.type_name()
+                    ));
+                }
+                Err(e) => {
+                    return Err(anyhow!(
+                        "The 'verify' function in '{}' failed for sub-package '{}':\n{}",
+                        package_file.display(),
+                        sub_package,
+                        e
+                    ));
+                }
+            };
             if !verification_passed {
                 if !utils::ask_for_confirmation(
                     "Package verification failed. This package may be unsafe. Continue?",
@@ -525,7 +541,7 @@ fn build_for_platform(
         staging_dir.join(
             package_file
                 .file_name()
-                .expect("package_file should have a name"),
+                .ok_or_else(|| anyhow!("package_file should have a name"))?,
         ),
     )?;
 
@@ -535,7 +551,7 @@ fn build_for_platform(
     } else {
         package_file
             .parent()
-            .expect("package_file should have a parent directory")
+            .ok_or_else(|| anyhow!("package_file should have a parent directory"))?
             .to_path_buf()
     };
     let output_path = output_base.join(output_filename);
@@ -563,9 +579,9 @@ fn build_for_platform(
             hash,
             output_path
                 .file_name()
-                .expect("output_path should have a name")
+                .ok_or_else(|| anyhow!("output_path should have a name"))?
                 .to_str()
-                .expect("output_filename should be valid UTF-8")
+                .ok_or_else(|| anyhow!("output_filename should be valid UTF-8"))?
         ),
     )?;
 

@@ -90,7 +90,7 @@ pub fn run(args: &cmd::package::build::BuildCommand) -> Result<()> {
                 build_dir
                     .path()
                     .to_str()
-                    .expect("build_dir should be valid UTF-8"),
+                    .ok_or_else(|| anyhow!("build_dir path contains invalid UTF-8"))?,
             )
             .map_err(|e| anyhow!(e.to_string()))?;
         lua.globals()
@@ -98,7 +98,7 @@ pub fn run(args: &cmd::package::build::BuildCommand) -> Result<()> {
                 "STAGING_DIR",
                 staging_dir
                     .to_str()
-                    .expect("staging_dir should be valid UTF-8"),
+                    .ok_or_else(|| anyhow!("staging_dir path contains invalid UTF-8"))?,
             )
             .map_err(|e| anyhow!(e.to_string()))?;
         lua.globals()
@@ -133,9 +133,23 @@ pub fn run(args: &cmd::package::build::BuildCommand) -> Result<()> {
 
         if let Ok(test_fn) = lua.globals().get::<mlua::Function>("test") {
             println!("Running test()...");
-            let success: bool = test_fn
-                .call::<bool>(lua_args.clone())
-                .map_err(|e| anyhow!(e.to_string()))?;
+            let success: bool = match test_fn.call::<mlua::Value>(lua_args.clone()) {
+                Ok(mlua::Value::Boolean(b)) => b,
+                Ok(mlua::Value::Nil) => {
+                    return Err(anyhow!(
+                        "The 'test' function in '{}' returned nil. It must explicitly return a boolean (true or false).",
+                        args.package_file.display()
+                    ));
+                }
+                Ok(v) => {
+                    return Err(anyhow!(
+                        "The 'test' function in '{}' returned a non-boolean value of type {:?}. It must return true or false.",
+                        args.package_file.display(),
+                        v.type_name()
+                    ));
+                }
+                Err(e) => return Err(anyhow!(e.to_string())),
+            };
             if !success {
                 return Err(anyhow!(
                     "Package tests failed for sub-package '{}'.",
