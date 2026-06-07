@@ -346,7 +346,6 @@ pub struct Dependencies {
 pub enum InstallReason {
     Direct,
     Dependency { parent: String },
-    Declarative,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -451,41 +450,6 @@ pub struct FirewallConfig {
     pub allowed_tcp_ports: Vec<u16>,
     #[serde(default)]
     pub allowed_udp_ports: Vec<u16>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
-pub struct DeclarativeConfig {
-    #[serde(default)]
-    pub imports: Vec<String>,
-    pub hostname: Option<String>,
-    pub locale: Option<String>,
-    pub timezone: Option<String>,
-    pub desktop: Option<String>,
-    pub shell: Option<String>,
-    #[serde(default)]
-    pub boot: Option<BootConfig>,
-    #[serde(default)]
-    pub hardware: Option<HardwareConfig>,
-    #[serde(default)]
-    pub network: Option<NetworkConfig>,
-    #[serde(default)]
-    pub packages: Vec<String>,
-    #[serde(default)]
-    pub extensions: Vec<String>,
-    #[serde(default)]
-    pub services: Vec<String>,
-    #[serde(default)]
-    pub programs: HashMap<String, serde_json::Value>,
-    #[serde(default)]
-    pub files: HashMap<String, FileConfig>,
-    #[serde(default)]
-    pub users: HashMap<String, UserConfig>,
-    #[serde(default)]
-    pub groups: HashMap<String, GroupConfig>,
-    #[serde(default)]
-    pub env: HashMap<String, String>,
-    #[serde(default)]
-    pub aliases: HashMap<String, String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

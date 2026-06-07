@@ -471,7 +471,6 @@ pub fn run(
                 types::InstallReason::Dependency { parent } => {
                     format!("dependency of {}", parent)
                 }
-                types::InstallReason::Declarative => "declarative".to_string(),
             };
             report = report.item(
                 format!("{}@{}", node.pkg.name, node.version),
@@ -500,7 +499,6 @@ pub fn run(
             let reason = match &node.reason {
                 types::InstallReason::Direct => "direct".to_string(),
                 types::InstallReason::Dependency { parent } => format!("dependency:{}", parent),
-                types::InstallReason::Declarative => "declarative".to_string(),
             };
             packages.push(json!({
                 "id": id,
@@ -781,10 +779,7 @@ pub fn run(
                     "#{}@{}/{}",
                     manifest.registry_handle, manifest.repo, name_with_sub
                 );
-                if matches!(
-                    manifest.reason,
-                    types::InstallReason::Direct | types::InstallReason::Declarative
-                ) {
+                if matches!(manifest.reason, types::InstallReason::Direct) {
                     lockfile.packages.insert(full_id, manifest.version.clone());
                 }
 

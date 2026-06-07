@@ -268,7 +268,6 @@ pub fn update_package(
     let reason_str = reason.map(|r| match r {
         types::InstallReason::Direct => "direct".to_string(),
         types::InstallReason::Dependency { parent } => format!("dependency:{}", parent),
-        types::InstallReason::Declarative => "declarative".to_string(),
     });
 
     let deps_json = if let Some(deps) = &pkg.dependencies {
@@ -758,8 +757,6 @@ pub fn list_all_packages(registry_handle: &str) -> Result<Vec<types::Package>> {
         let reason = reason_raw.map(|r| {
             if r == "direct" {
                 types::InstallReason::Direct
-            } else if r == "declarative" {
-                types::InstallReason::Declarative
             } else if let Some(parent) = r.strip_prefix("dependency:") {
                 types::InstallReason::Dependency {
                     parent: parent.to_string(),
