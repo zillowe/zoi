@@ -138,14 +138,26 @@ fn group_tasks_into_stages(
     }
 
     for alias in resolved_tasks {
-        let cmd_spec = config.commands.iter().find(|c| c.cmd == *alias).unwrap();
+        let cmd_spec = config
+            .commands
+            .iter()
+            .find(|c| c.cmd == *alias)
+            .ok_or_else(|| {
+                anyhow!(
+                    "Command spec for '{}' disappeared during task grouping",
+                    alias
+                )
+            })?;
         if let Some(deps) = &cmd_spec.depends_on {
             for dep in deps {
                 if resolved_tasks.contains(dep) {
                     adj.entry(dep.clone())
                         .or_insert_with(Vec::new)
                         .push(alias.clone());
-                    *in_degree.get_mut(alias).unwrap() += 1;
+                    let degree = in_degree
+                        .get_mut(alias)
+                        .ok_or_else(|| anyhow!("Task '{}' missing from in_degree map", alias))?;
+                    *degree += 1;
                 }
             }
         }
@@ -163,7 +175,9 @@ fn group_tasks_into_stages(
         for task in &current_stage {
             if let Some(neighbors) = adj.get(task) {
                 for neighbor in neighbors {
-                    let degree = in_degree.get_mut(neighbor).unwrap();
+                    let degree = in_degree.get_mut(neighbor).ok_or_else(|| {
+                        anyhow!("Neighbor task '{}' missing from in_degree map", neighbor)
+                    })?;
                     *degree -= 1;
                     if *degree == 0 {
                         next_stage.push(neighbor.clone());

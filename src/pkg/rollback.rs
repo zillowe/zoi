@@ -40,7 +40,7 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
     let Some(current_manifest) = current_manifest else {
         return Err(anyhow!("Package '{}' is not installed.", package_name));
     };
-    let scope = scope.expect("scope should be set when a manifest is found");
+    let scope = scope.ok_or_else(|| anyhow!("scope should be set when a manifest is found"))?;
 
     let package_dir = local::get_package_dir(
         scope,
@@ -57,9 +57,9 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
                 && let Some(version_str) = path.file_name().and_then(|s| s.to_str())
                 && version_str != "latest"
                 && version_str != "dependents"
-                && let Ok(version) = Version::parse(version_str)
+                && Version::parse(version_str).is_ok()
             {
-                versions.push(version);
+                versions.push(version_str.to_string());
             }
         }
     }
@@ -69,8 +69,12 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
         return Err(anyhow!("No previous version to roll back to."));
     }
 
-    let current_version = versions.pop().expect("Versions length checked above");
-    let previous_version = versions.pop().expect("Versions length checked above");
+    let current_version = versions
+        .pop()
+        .ok_or_else(|| anyhow!("Failed to get current version from list"))?;
+    let previous_version = versions
+        .pop()
+        .ok_or_else(|| anyhow!("Failed to get previous version from list"))?;
 
     println!(
         "Rolling back from version {} to {}",
@@ -83,7 +87,7 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
         return Ok(());
     }
 
-    let previous_version_dir = package_dir.join(previous_version.to_string());
+    let previous_version_dir = package_dir.join(&previous_version);
 
     let manifest_filename = if let Some(sub) = &sub_package {
         format!("manifest-{}.yaml", sub)
@@ -116,7 +120,7 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
         crate::pkg::shim::create_shim(&symlink_path)?;
     }
 
-    let current_version_dir = package_dir.join(current_version.to_string());
+    let current_version_dir = package_dir.join(&current_version);
     let mut has_other_manifests = false;
     if let Ok(entries) = fs::read_dir(&current_version_dir) {
         for entry in entries.flatten() {

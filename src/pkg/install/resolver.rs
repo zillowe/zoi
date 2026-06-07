@@ -111,7 +111,9 @@ impl DependencyGraph {
         while !queue.is_empty() {
             let mut stage = Vec::new();
             for _ in 0..queue.len() {
-                let u = queue.pop_front().expect("Queue length checked above");
+                let u = queue
+                    .pop_front()
+                    .ok_or_else(|| anyhow!("Queue length inconsistency in toposort"))?;
                 stage.push(u.clone());
                 count += 1;
 
@@ -119,7 +121,7 @@ impl DependencyGraph {
                     for v_id in neighbors {
                         let degree = in_degree
                             .get_mut(v_id)
-                            .expect("v_id should exist in in_degree");
+                            .ok_or_else(|| anyhow!("v_id '{}' missing from in_degree", v_id))?;
                         *degree -= 1;
                         if *degree == 0 {
                             queue.push_back(v_id.clone());
@@ -304,7 +306,7 @@ pub fn resolve_dependency_graph(
 
         let range = if request.version_spec.is_some() {
             let resolved_version = resolve::resolve_requested_version_spec(source, true, true)?
-                .expect("version spec presence was checked above");
+                .ok_or_else(|| anyhow!("version spec missing despite check for '{}'", source))?;
             crate::pkg::install::pubgrub::semver_to_range(&resolved_version)
         } else {
             Ranges::full()

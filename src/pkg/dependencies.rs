@@ -48,7 +48,12 @@ pub fn parse_dependency_string(dep_str: &str) -> Result<Dependency<'_>> {
 
     let package_and_version = caps
         .name("pkg_and_ver")
-        .expect("Regex matched but pkg_and_ver group not found")
+        .ok_or_else(|| {
+            anyhow!(
+                "Regex matched but pkg_and_ver group not found in '{}'",
+                rest
+            )
+        })?
         .as_str();
     let description = caps.name("desc").map(|m| m.as_str());
 
@@ -61,7 +66,12 @@ pub fn parse_dependency_string(dep_str: &str) -> Result<Dependency<'_>> {
 
     let package = ver_caps
         .name("pkg")
-        .expect("Regex matched but pkg group not found")
+        .ok_or_else(|| {
+            anyhow!(
+                "Regex matched but pkg group not found in '{}'",
+                package_and_version
+            )
+        })?
         .as_str();
     let mut version_str = ver_caps.name("ver").map(|m| m.as_str().to_string());
 

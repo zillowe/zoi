@@ -111,7 +111,7 @@ pub fn run(
         package_name
             .split('@')
             .next()
-            .expect("Split always returns at least one element"),
+            .ok_or_else(|| anyhow!("Invalid package name: '{}'", package_name))?,
         selected_version
     );
 

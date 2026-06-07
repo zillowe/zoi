@@ -186,7 +186,9 @@ fn run_list_installed(
                 }
             }
             if type_filter.is_some()
-                && pkg.package_type != type_filter.expect("type_filter checked to be some above")
+                && pkg.package_type
+                    != type_filter
+                        .ok_or_else(|| anyhow!("type_filter missing despite being set"))?
             {
                 continue;
             }
@@ -255,7 +257,9 @@ fn run_list_installed(
                 }
             }
             if type_filter.is_some()
-                && pkg.package_type != type_filter.expect("type_filter checked to be some above")
+                && pkg.package_type
+                    != type_filter
+                        .ok_or_else(|| anyhow!("type_filter missing despite being set"))?
             {
                 continue;
             }
@@ -537,7 +541,8 @@ fn run_list_all(
 
     for pkg in available_pkgs {
         if type_filter.is_some()
-            && pkg.package_type != type_filter.expect("type_filter checked to be some above")
+            && pkg.package_type
+                != type_filter.ok_or_else(|| anyhow!("type_filter missing despite being set"))?
         {
             continue;
         }

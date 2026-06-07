@@ -143,16 +143,26 @@ pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
     let handle = caps.name("handle").map(|m| m.as_str().to_string());
     let main_part = caps
         .name("main_part")
-        .expect("Regex matched but main_part group not found")
+        .ok_or_else(|| {
+            anyhow!(
+                "Regex matched but main_part group not found in '{}'",
+                source_str
+            )
+        })?
         .as_str();
 
     let caps_main = MAIN_RE
         .captures(main_part)
-        .ok_or_else(|| anyhow!("Invalid source string format"))?;
+        .ok_or_else(|| anyhow!("Invalid source string format in '{}'", main_part))?;
 
     let repo_and_name = caps_main
         .name("repo_and_name")
-        .expect("Regex matched but repo_and_name group not found")
+        .ok_or_else(|| {
+            anyhow!(
+                "Regex matched but repo_and_name group not found in '{}'",
+                main_part
+            )
+        })?
         .as_str();
     let version_spec = caps_main.name("version").map(|m| m.as_str().to_string());
 
@@ -1124,7 +1134,7 @@ fn resolve_source_recursive(
         }
         let git_source = handle
             .strip_prefix("git:")
-            .expect("Handle was checked to start with git: above");
+            .ok_or_else(|| anyhow!("Handle '{}' unexpectedly missing 'git:' prefix", handle))?;
         println!(
             "Warning: using remote git repo '{}' not from official Zoi database.",
             git_source.yellow()

@@ -328,7 +328,7 @@ pub fn run(
                 if backup_src.exists() {
                     let backup_dest = version_dir
                         .parent()
-                        .expect("version_dir should have a parent (package_dir)")
+                        .ok_or_else(|| anyhow!("version_dir should have a parent (package_dir)"))?
                         .join(format!("{}.zoisave", backup_file_rel));
                     if let Some(p) = backup_dest.parent()
                         && let Err(e) = fs::create_dir_all(p)

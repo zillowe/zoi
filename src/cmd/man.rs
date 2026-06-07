@@ -28,14 +28,14 @@ struct App<'a> {
 }
 
 impl<'a> App<'a> {
-    fn new(content: &'a str) -> Self {
-        let lines = parse_markdown(content);
+    fn try_new(content: &'a str) -> Result<Self> {
+        let lines = parse_markdown(content)?;
         let content_height = lines.len() as u16;
-        Self {
+        Ok(Self {
             lines,
             scroll: 0,
             content_height,
-        }
+        })
     }
 }
 
@@ -118,7 +118,7 @@ pub fn run(package_name: &str, upstream: bool, raw: bool) -> Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let app = App::new(&content);
+    let app = App::try_new(&content)?;
     let res = run_app(&mut terminal, app);
 
     disable_raw_mode()?;
@@ -197,7 +197,7 @@ fn ui(f: &mut Frame, app: &mut App) {
     );
 }
 
-fn parse_markdown(content: &str) -> Vec<Line<'_>> {
+fn parse_markdown(content: &str) -> Result<Vec<Line<'_>>> {
     let mut options = Options::empty();
     options.insert(Options::ENABLE_STRIKETHROUGH);
     let parser = Parser::new_ext(content, options);
@@ -238,7 +238,7 @@ fn parse_markdown(content: &str) -> Vec<Line<'_>> {
                         "> ",
                         *style_stack
                             .last()
-                            .expect("Style stack should never be empty"),
+                            .ok_or_else(|| anyhow!("Style stack should never be empty"))?,
                     ));
                 }
                 Tag::CodeBlock(kind) => {
@@ -276,7 +276,7 @@ fn parse_markdown(content: &str) -> Vec<Line<'_>> {
                     style_stack.push(
                         (*style_stack
                             .last()
-                            .expect("Style stack should never be empty"))
+                            .ok_or_else(|| anyhow!("Style stack should never be empty"))?)
                         .add_modifier(Modifier::ITALIC),
                     );
                 }
@@ -284,7 +284,7 @@ fn parse_markdown(content: &str) -> Vec<Line<'_>> {
                     style_stack.push(
                         (*style_stack
                             .last()
-                            .expect("Style stack should never be empty"))
+                            .ok_or_else(|| anyhow!("Style stack should never be empty"))?)
                         .add_modifier(Modifier::BOLD),
                     );
                 }
@@ -292,7 +292,7 @@ fn parse_markdown(content: &str) -> Vec<Line<'_>> {
                     style_stack.push(
                         (*style_stack
                             .last()
-                            .expect("Style stack should never be empty"))
+                            .ok_or_else(|| anyhow!("Style stack should never be empty"))?)
                         .add_modifier(Modifier::CROSSED_OUT),
                     );
                 }
@@ -320,7 +320,7 @@ fn parse_markdown(content: &str) -> Vec<Line<'_>> {
                             for line in LinesWithEndings::from(&code) {
                                 let ranges: Vec<(SyntectStyle, &str)> = h
                                     .highlight_line(line, &ss)
-                                    .expect("Syntax highlighting should not fail");
+                                    .map_err(|e| anyhow!("Syntax highlighting failed: {}", e))?;
                                 let spans: Vec<Span> = ranges
                                     .into_iter()
                                     .map(|(style, text)| {
@@ -376,7 +376,7 @@ fn parse_markdown(content: &str) -> Vec<Line<'_>> {
                         text.to_string(),
                         *style_stack
                             .last()
-                            .expect("Style stack should never be empty"),
+                            .ok_or_else(|| anyhow!("Style stack should never be empty"))?,
                     ));
                 }
             }
@@ -402,5 +402,5 @@ fn parse_markdown(content: &str) -> Vec<Line<'_>> {
         lines.push(Line::from(std::mem::take(&mut current_line)));
     }
 
-    lines
+    Ok(lines)
 }

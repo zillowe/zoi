@@ -6,15 +6,14 @@ use clap::CommandFactory;
 use clap_complete::{Shell, generate};
 use colored::*;
 use std::fs;
-use std::io::{Error, ErrorKind, Write};
+use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
 
-fn get_completion_path(shell: Shell, scope: SetupScope) -> Result<PathBuf, Error> {
+fn get_completion_path(shell: Shell, scope: SetupScope) -> Result<PathBuf> {
     if scope == SetupScope::System {
         if !utils::is_admin() {
-            return Err(Error::new(
-                ErrorKind::PermissionDenied,
+            return Err(anyhow!(
                 "System-wide installation requires root privileges. Please run with sudo or as an administrator.",
             ));
         }
@@ -24,15 +23,13 @@ fn get_completion_path(shell: Shell, scope: SetupScope) -> Result<PathBuf, Error
             Shell::Fish => PathBuf::from("/usr/share/fish/vendor_completions.d/zoi.fish"),
             Shell::Zsh => PathBuf::from("/usr/share/zsh/site-functions/_zoi"),
             _ => {
-                return Err(Error::new(
-                    ErrorKind::InvalidInput,
+                return Err(anyhow!(
                     "System-wide completion installation not supported for this shell.",
                 ));
             }
         })
     } else {
-        let home = dirs::home_dir()
-            .ok_or_else(|| Error::new(ErrorKind::NotFound, "Home directory not found"))?;
+        let home = dirs::home_dir().ok_or_else(|| anyhow!("Home directory not found"))?;
         Ok(match shell {
             Shell::Bash => home.join(".local/share/bash-completion/completions/zoi"),
             Shell::Zsh => home.join(".zsh/completions/_zoi"),
@@ -46,8 +43,7 @@ fn get_completion_path(shell: Shell, scope: SetupScope) -> Result<PathBuf, Error
                 }
             }
             _ => {
-                return Err(Error::new(
-                    ErrorKind::InvalidInput,
+                return Err(anyhow!(
                     "User-level completion installation not supported for this shell.",
                 ));
             }
@@ -55,14 +51,9 @@ fn get_completion_path(shell: Shell, scope: SetupScope) -> Result<PathBuf, Error
     }
 }
 
-fn install_completions(
-    shell: Shell,
-    scope: SetupScope,
-    cmd: &mut clap::Command,
-) -> Result<(), Error> {
+fn install_completions(shell: Shell, scope: SetupScope, cmd: &mut clap::Command) -> Result<()> {
     if cfg!(windows) && scope == SetupScope::System {
-        return Err(Error::new(
-            ErrorKind::Unsupported,
+        return Err(anyhow!(
             "System-wide shell setup is not supported on Windows.",
         ));
     }
@@ -102,7 +93,8 @@ fn install_completions(
         println!("Ensure the directory is in your $fpath. Add this to your .zshrc if it's not:");
         println!(
             "  fpath=({:?} $fpath)",
-            path.parent().expect("Path should have a parent directory")
+            path.parent()
+                .ok_or_else(|| anyhow!("Path should have a parent directory: {:?}", path))?
         );
     }
 
@@ -253,10 +245,10 @@ pub fn enter_ephemeral_shell(
                 let node = graph
                     .nodes
                     .get(&pkg_id)
-                    .expect("Package node missing from graph");
+                    .ok_or_else(|| anyhow!("Package node missing from graph for '{}'", pkg_id))?;
                 let action = install_plan
                     .get(&pkg_id)
-                    .expect("Install action missing for package");
+                    .ok_or_else(|| anyhow!("Install action missing for package '{}'", pkg_id))?;
 
                 install::installer::install_node(node, action, Some(&m), None, true, false)?;
                 Ok(())
@@ -281,7 +273,9 @@ pub fn enter_ephemeral_shell(
                 let entry = entry?;
                 let path = entry.path();
                 if path.is_file() || path.is_symlink() {
-                    let file_name = path.file_name().expect("Path should have a file name");
+                    let file_name = path
+                        .file_name()
+                        .ok_or_else(|| anyhow!("Path has no file name: {:?}", path))?;
                     let dest = temp_bin_dir.join(file_name);
                     utils::symlink_file(&path, &dest)?;
                 }
