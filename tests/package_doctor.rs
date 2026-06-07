@@ -4,12 +4,12 @@ use zoi::pkg::package::doctor;
 
 #[test]
 fn package_doctor_accepts_valid_minimal_file() {
-    let report = doctor::run(
-        std::path::Path::new("tests/assets/test.pkg.lua"),
-        Some("linux-amd64"),
-        None,
-    )
-    .expect("doctor should parse minimal test package");
+    let tmp = tempdir().expect("tempdir should be created");
+    let pkg_path = tmp.path().join("test.pkg.lua");
+    fs::copy("tests/assets/test.pkg.lua", &pkg_path).expect("failed to copy test asset");
+
+    let report = doctor::run(&pkg_path, Some("linux-amd64"), None)
+        .expect("doctor should parse minimal test package");
 
     assert!(
         report.errors.is_empty(),
