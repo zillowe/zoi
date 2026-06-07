@@ -17,7 +17,7 @@ pub fn init(path: &Path) -> Result<()> {
 
     fs::create_dir_all(path)?;
 
-    let dirs = ["core", "main", "community", "test", "archive", "zillowe"];
+    let dirs = ["core", "main", "community", "test", "archive"];
     for dir in &dirs {
         let dir_path = path.join(dir);
         if !dir_path.exists() {
@@ -39,7 +39,7 @@ pub fn init(path: &Path) -> Result<()> {
 name: "My-Registry"
 description: "A custom Zoi package registry"
 handle: "my-registry"
-advisory_prefix: "ZSA" # Prefix for security advisories, e.g. ZSA-2026-A0001
+advisory_prefix: "RSA" # Prefix for security advisories, e.g. RSA-2026-A0001
 
 # Git mirrors for this registry
 # For more info: https://zillowe.qzz.io/docs/zds/zoi/guides/mirroring
@@ -73,9 +73,6 @@ repos:
     active: false
   - name: archive
     type: archive
-    active: false
-  - name: zillowe
-    type: official
     active: false
 "#;
         fs::write(repo_yaml_path, content)?;
