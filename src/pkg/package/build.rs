@@ -50,6 +50,7 @@ fn build_for_platform(
     sub_packages: Option<&Vec<String>>,
     quiet: bool,
     install_deps: bool,
+    fakeroot: bool,
 ) -> Result<()> {
     let pkg_lua_dir_str = package_file
         .parent()
@@ -560,7 +561,41 @@ fn build_for_platform(
         let file = File::create(&output_path)?;
         let encoder = ZstdEncoder::new(file, 0)?.auto_finish();
         let mut tar_builder = TarBuilder::new(encoder);
-        tar_builder.append_dir_all(".", &staging_dir)?;
+
+        if fakeroot {
+            if !quiet {
+                println!(
+                    "{} Applying fakeroot (UID/GID 0) to archive...",
+                    "::".bold().blue()
+                );
+            }
+            for entry in WalkDir::new(&staging_dir).min_depth(1) {
+                let entry = entry?;
+                let path = entry.path();
+                let rel_path = path.strip_prefix(&staging_dir)?;
+
+                let mut header = tar::Header::new_gnu();
+                let metadata = fs::symlink_metadata(path)?;
+
+                header.set_metadata(&metadata);
+                header.set_uid(0);
+                header.set_gid(0);
+                header.set_username("root")?;
+                header.set_groupname("root")?;
+
+                if metadata.is_dir() {
+                    tar_builder.append_data(&mut header, rel_path, std::io::empty())?;
+                } else if metadata.is_symlink() {
+                    let target = fs::read_link(path)?;
+                    tar_builder.append_link(&mut header, rel_path, target)?;
+                } else {
+                    let mut file = File::open(path)?;
+                    tar_builder.append_data(&mut header, rel_path, &mut file)?;
+                }
+            }
+        } else {
+            tar_builder.append_dir_all(".", &staging_dir)?;
+        }
         tar_builder.finish()?;
     }
 
@@ -644,6 +679,7 @@ pub fn run(
     install_deps: bool,
     method: &str,
     image: Option<&str>,
+    fakeroot: bool,
 ) -> Result<()> {
     if method == "docker" {
         let docker_image = image.ok_or_else(|| {
@@ -659,6 +695,7 @@ pub fn run(
             sub_packages,
             docker_image,
             install_deps,
+            fakeroot,
         );
     }
 
@@ -699,6 +736,7 @@ pub fn run(
             sub_packages.as_ref(),
             quiet,
             install_deps,
+            fakeroot,
         ) {
             eprintln!(
                 "{}: Failed to build for platform {}: {}",
