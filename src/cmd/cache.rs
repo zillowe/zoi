@@ -53,7 +53,7 @@ pub fn list() -> Result<()> {
         if path.is_file() {
             let filename = path
                 .file_name()
-                .expect("Path from read_dir should have a file name")
+                .ok_or_else(|| anyhow!("Path from read_dir has no file name: {:?}", path))?
                 .to_string_lossy();
             let size = fs::metadata(&path)?.len();
             println!(

@@ -408,7 +408,12 @@ impl DependencyProvider for ZoiDependencyProvider {
                         let resolved_version =
                             resolve::resolve_requested_version_spec(dep_req.package, true, true)
                                 .map_err(|e| ZoiSolverError::Dependency(e.to_string()))?
-                                .expect("version spec presence was checked above");
+                                .ok_or_else(|| {
+                                    ZoiSolverError::Dependency(format!(
+                                        "version spec missing for '{}'",
+                                        dep_req.package
+                                    ))
+                                })?;
                         self.semver_to_range(&resolved_version)
                     } else {
                         Ranges::full()

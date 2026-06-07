@@ -391,7 +391,7 @@ pub fn get_all_local_keys_info() -> Result<Vec<KeyInfo>> {
         {
             let name = path
                 .file_stem()
-                .expect("Path should have a file stem")
+                .ok_or_else(|| anyhow!("Path should have a file stem: {:?}", path))?
                 .to_string_lossy()
                 .to_string();
             keys.push(KeyInfo { name, cert });

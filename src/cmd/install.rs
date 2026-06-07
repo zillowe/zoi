@@ -603,16 +603,21 @@ pub fn run(
 
         for stage in &stages {
             stage.par_iter().try_for_each(|pkg_id| -> Result<()> {
-                let node = graph
-                    .nodes
-                    .get(pkg_id)
-                    .expect("Package node missing from graph during installation");
+                let node = graph.nodes.get(pkg_id).ok_or_else(|| {
+                    anyhow!(
+                        "Package node '{}' missing from graph during installation",
+                        pkg_id
+                    )
+                })?;
                 if matches!(node.reason, types::InstallReason::Direct) {
                     return Ok(());
                 }
-                let action = install_plan
-                    .get(pkg_id)
-                    .expect("Install action missing for package during installation");
+                let action = install_plan.get(pkg_id).ok_or_else(|| {
+                    anyhow!(
+                        "Install action missing for package '{}' during installation",
+                        pkg_id
+                    )
+                })?;
 
                 match install::installer::install_node(
                     node,
@@ -624,9 +629,9 @@ pub fn run(
                 ) {
                     Ok(manifest) => {
                         dependency_installed_count.fetch_add(1, Ordering::Relaxed);
-                        let _lock = transaction_mutex
-                            .lock()
-                            .expect("Transaction mutex poisoned during installation");
+                        let _lock = transaction_mutex.lock().map_err(|e| {
+                            anyhow!("Transaction mutex poisoned during installation: {}", e)
+                        })?;
                         if let Err(e) = transaction::record_operation(
                             transaction_id,
                             types::TransactionOperation::Install {
@@ -640,7 +645,9 @@ pub fn run(
                     Err(e) => {
                         failed_packages
                             .lock()
-                            .expect("Failed packages mutex poisoned")
+                            .map_err(|e| {
+                                anyhow!("Failed packages mutex poisoned during installation: {}", e)
+                            })?
                             .push(node.pkg.name.clone());
                         eprintln!("Error installing {}: {}", node.pkg.name, e);
                     }
@@ -653,10 +660,12 @@ pub fn run(
     println!("\n{} Installing packages...", "::".bold().blue());
     for stage in &stages {
         for pkg_id in stage {
-            let node = graph
-                .nodes
-                .get(pkg_id)
-                .expect("Package node missing from graph during final installation");
+            let node = graph.nodes.get(pkg_id).ok_or_else(|| {
+                anyhow!(
+                    "Package node '{}' missing from graph during final installation",
+                    pkg_id
+                )
+            })?;
             if !matches!(node.reason, types::InstallReason::Direct) {
                 continue;
             }
@@ -667,9 +676,12 @@ pub fn run(
             };
             println!(" @{}:{}", name, node.version);
 
-            let action = install_plan
-                .get(pkg_id)
-                .expect("Install action missing for package during final installation");
+            let action = install_plan.get(pkg_id).ok_or_else(|| {
+                anyhow!(
+                    "Install action missing for package '{}' during final installation",
+                    pkg_id
+                )
+            })?;
             let m_pkg = MultiProgress::new();
 
             match install::installer::install_node(
@@ -684,7 +696,7 @@ pub fn run(
                     direct_installed_count += 1;
                     installed_manifests
                         .lock()
-                        .expect("Installed manifests mutex poisoned")
+                        .map_err(|e| anyhow!("Installed manifests mutex poisoned: {}", e))?
                         .push(manifest.clone());
                     transaction::record_operation(
                         transaction_id,
@@ -694,13 +706,15 @@ pub fn run(
                     )?;
                     successfully_installed_sources
                         .lock()
-                        .expect("Successfully installed sources mutex poisoned")
+                        .map_err(|e| {
+                            anyhow!("Successfully installed sources mutex poisoned: {}", e)
+                        })?
                         .push(node.source.clone());
                 }
                 Err(e) => {
                     failed_packages
                         .lock()
-                        .expect("Failed packages mutex poisoned")
+                        .map_err(|e| anyhow!("Failed packages mutex poisoned: {}", e))?
                         .push(node.pkg.name.clone());
                     eprintln!("Error: {}", e);
                 }
@@ -710,7 +724,7 @@ pub fn run(
 
     let failed = failed_packages
         .lock()
-        .expect("Failed packages mutex poisoned");
+        .map_err(|e| anyhow!("Failed packages mutex poisoned during finalization: {}", e))?;
     if !failed.is_empty() {
         println!("\n{} Rolling back changes...", "::".bold().yellow());
         transaction::rollback(&transaction.id)?;
@@ -737,7 +751,12 @@ pub fn run(
 
     let installed_manifests_vec = installed_manifests
         .lock()
-        .expect("Installed manifests mutex poisoned during finalization")
+        .map_err(|e| {
+            anyhow!(
+                "Installed manifests mutex poisoned during finalization: {}",
+                e
+            )
+        })?
         .clone();
     for manifest in &installed_manifests_vec {
         if let Some(pm) = plugin_manager {
@@ -770,9 +789,12 @@ pub fn run(
                 all_configured_regs.push(default_reg);
             }
 
-            let installed_manifests = installed_manifests
-                .into_inner()
-                .expect("Installed manifests mutex poisoned during lockfile update");
+            let installed_manifests = installed_manifests.into_inner().map_err(|e| {
+                anyhow!(
+                    "Installed manifests mutex poisoned during lockfile update: {}",
+                    e
+                )
+            })?;
             for manifest in &installed_manifests {
                 let name_with_sub = if let Some(sub) = &manifest.sub_package {
                     format!("{}:{}", manifest.name, sub)
@@ -827,19 +849,22 @@ pub fn run(
                     .map(|deps| {
                         deps.iter()
                             .map(|dep_id| {
-                                let node = graph.nodes.get(dep_id).expect(
-                                    "Dependency node missing from graph during lockfile update",
-                                );
-                                crate::pkg::local::package_source_string(
+                                let node = graph.nodes.get(dep_id).ok_or_else(|| {
+                                    anyhow!(
+                                        "Dependency node missing from graph during lockfile update"
+                                    )
+                                })?;
+                                Ok(crate::pkg::local::package_source_string(
                                     &node.registry_handle,
                                     &node.pkg.repo,
                                     &node.pkg.name,
                                     node.sub_package.as_deref(),
                                     &node.version,
-                                )
+                                ))
                             })
-                            .collect()
+                            .collect::<Result<Vec<String>>>()
                     })
+                    .transpose()?
                     .unwrap_or_default();
 
                 let detail = types::LockPackageDetail {
@@ -869,9 +894,12 @@ pub fn run(
     }
 
     if save && scope_override == Some(types::Scope::Project) {
-        let successfully_installed = successfully_installed_sources
-            .into_inner()
-            .expect("Successfully installed sources mutex poisoned during finalization");
+        let successfully_installed = successfully_installed_sources.into_inner().map_err(|e| {
+            anyhow!(
+                "Successfully installed sources mutex poisoned during finalization: {}",
+                e
+            )
+        })?;
         if !successfully_installed.is_empty()
             && let Err(e) = project::config::add_packages_to_config(&successfully_installed)
         {

@@ -474,7 +474,9 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
                     .unwrap_or_else(|| "unknown".to_string());
 
                 let mut vulns = Vec::new();
-                let pkg_dir = path.parent().unwrap();
+                let pkg_dir = path
+                    .parent()
+                    .ok_or_else(|| anyhow!("Package path has no parent directory"))?;
                 if let Ok(sec_entries) = fs::read_dir(pkg_dir) {
                     for sec_entry in sec_entries.flatten() {
                         if sec_entry

@@ -68,7 +68,8 @@ pub fn download_and_cache_archive(
             }
         }
         if !downloaded {
-            let (url, error) = last_error.expect("archive download should produce an error");
+            let (url, error) = last_error
+                .ok_or_else(|| anyhow!("archive download failed but no error recorded"))?;
             return Err(anyhow!(
                 "Failed to download package archive from {}: {}",
                 url,
@@ -134,8 +135,9 @@ pub fn download_and_cache_archive(
                     }
                 }
                 if !downloaded {
-                    let (url, error) =
-                        last_error.expect("signature download should produce an error");
+                    let (url, error) = last_error.ok_or_else(|| {
+                        anyhow!("signature download failed but no error recorded")
+                    })?;
                     return Err(anyhow!(
                         "Failed to download signature from {}: {}",
                         url,

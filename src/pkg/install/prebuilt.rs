@@ -85,7 +85,7 @@ pub fn build_archive(
     let archive_filename = format!("{}-{}-{}.pkg.tar.zst", pkg.name, version, current_platform);
     let archive_path = pkg_lua_path
         .parent()
-        .expect("pkg_lua_path should have a parent")
+        .ok_or_else(|| anyhow!("pkg_lua_path should have a parent: {:?}", pkg_lua_path))?
         .join(archive_filename);
     if !archive_path.exists() {
         return Err(anyhow!(

@@ -1028,7 +1028,9 @@ pub fn get_http_client() -> anyhow::Result<&'static reqwest::blocking::Client> {
         .map_err(|e| anyhow!("Failed to build HTTP client: {}", e))?;
 
     let _ = HTTP_CLIENT.set(client);
-    Ok(HTTP_CLIENT.get().expect("HTTP_CLIENT should be set"))
+    HTTP_CLIENT
+        .get()
+        .ok_or_else(|| anyhow!("HTTP_CLIENT should be set but was missing"))
 }
 
 pub fn build_blocking_http_client(timeout_secs: u64) -> anyhow::Result<reqwest::blocking::Client> {

@@ -526,7 +526,7 @@ pub fn download_file_with_progress(
         internal_pb = Some(p);
         internal_pb
             .as_ref()
-            .expect("internal_pb should be set if not using pb_override")
+            .ok_or_else(|| anyhow!("internal_pb should be set if not using pb_override"))?
     };
 
     let client = crate::utils::get_http_client()?;

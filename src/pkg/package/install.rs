@@ -399,7 +399,9 @@ pub fn run(
                         .status();
                 }
 
-                let app_name = app_path.file_name().unwrap();
+                let app_name = app_path
+                    .file_name()
+                    .ok_or_else(|| anyhow!("App path has no filename: {:?}", app_path))?;
                 let symlink_path = applications_dir.join(app_name);
 
                 if symlink_path.exists() {

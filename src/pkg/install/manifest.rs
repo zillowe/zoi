@@ -1,5 +1,5 @@
 use crate::pkg::types;
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 
 pub fn create_manifest(
     pkg: &types::Package,
@@ -14,7 +14,12 @@ pub fn create_manifest(
 ) -> Result<types::InstallManifest> {
     Ok(types::InstallManifest {
         name: pkg.name.clone(),
-        version: pkg.version.clone().expect("Version should be resolved"),
+        version: pkg.version.clone().ok_or_else(|| {
+            anyhow!(
+                "Version should be resolved but was missing for package '{}'",
+                pkg.name
+            )
+        })?,
         sub_package,
         repo: pkg.repo.clone(),
         registry_handle: registry_handle.to_string(),

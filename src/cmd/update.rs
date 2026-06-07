@@ -274,10 +274,9 @@ fn run_update_single_logic(
 
     for stage in stages {
         for pkg_id in stage {
-            let node = graph
-                .nodes
-                .get(&pkg_id)
-                .expect("Package node missing from graph during update");
+            let node = graph.nodes.get(&pkg_id).ok_or_else(|| {
+                anyhow!("Package node '{}' missing from graph during update", pkg_id)
+            })?;
             if let Some(action) = install_plan.get(&pkg_id) {
                 match install::installer::install_node(node, action, None, None, yes, true) {
                     Ok(m) => {
@@ -709,155 +708,153 @@ fn run_update_all_logic(
     let failed_updates = Mutex::new(Vec::new());
     let successful_upgrades = Mutex::new(Vec::new());
 
-    packages_to_upgrade.par_iter().for_each(|candidate| {
-        println!(
-            "\n{} Upgrading {} to {}...",
-            "::".bold().blue(),
-            candidate.source.cyan(),
-            candidate.new_version.green()
-        );
-
-        if let Some(hooks) = &candidate.new_pkg.hooks
-            && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PreUpgrade)
-        {
-            eprintln!(
-                "{}: Pre-upgrade hook failed for '{}': {}",
-                "Error".red().bold(),
-                candidate.source,
-                e
+    packages_to_upgrade
+        .par_iter()
+        .try_for_each(|candidate| -> Result<()> {
+            println!(
+                "\n{} Upgrading {} to {}...",
+                "::".bold().blue(),
+                candidate.source.cyan(),
+                candidate.new_version.green()
             );
-            failed_updates
-                .lock()
-                .expect("mutex poisoned")
-                .push(candidate.source.clone());
-            return;
-        }
 
-        let (graph, _) = match install::resolver::resolve_dependency_graph(
-            std::slice::from_ref(&candidate.source),
-            Some(candidate.old_manifest.scope),
-            true,
-            yes,
-            false,
-            None,
-            false,
-        ) {
-            Ok(res) => res,
-            Err(e) => {
-                eprintln!("Error resolving dependency graph for update: {}", e);
+            if let Some(hooks) = &candidate.new_pkg.hooks {
+                hooks::run_hooks(hooks, hooks::HookType::PreUpgrade)?;
+            }
+
+            let (graph, _) = match install::resolver::resolve_dependency_graph(
+                std::slice::from_ref(&candidate.source),
+                Some(candidate.old_manifest.scope),
+                true,
+                yes,
+                false,
+                None,
+                false,
+            ) {
+                Ok(res) => res,
+                Err(e) => {
+                    eprintln!("Error resolving dependency graph for update: {}", e);
+                    failed_updates
+                        .lock()
+                        .map_err(|e| anyhow!("mutex poisoned: {}", e))?
+                        .push(candidate.source.clone());
+                    return Ok(());
+                }
+            };
+
+            if let Err(e) = install::util::check_policy_compliance(&graph) {
+                eprintln!("Policy check failed for {}: {}", candidate.source, e);
                 failed_updates
                     .lock()
-                    .expect("mutex poisoned")
+                    .map_err(|e| anyhow!("mutex poisoned: {}", e))?
                     .push(candidate.source.clone());
-                return;
+                return Ok(());
             }
-        };
 
-        if let Err(e) = install::util::check_policy_compliance(&graph) {
-            eprintln!("Policy check failed for {}: {}", candidate.source, e);
-            failed_updates
-                .lock()
-                .expect("mutex poisoned")
-                .push(candidate.source.clone());
-            return;
-        }
-
-        if let Err(e) = install::util::check_for_vulnerabilities(&graph, yes) {
-            eprintln!("Security check failed for {}: {}", candidate.source, e);
-            failed_updates
-                .lock()
-                .expect("mutex poisoned")
-                .push(candidate.source.clone());
-            return;
-        }
-
-        let install_plan = match install::plan::create_install_plan(&graph.nodes, None, false) {
-            Ok(plan) => plan,
-            Err(e) => {
-                eprintln!("Error creating install plan for update: {}", e);
+            if let Err(e) = install::util::check_for_vulnerabilities(&graph, yes) {
+                eprintln!("Security check failed for {}: {}", candidate.source, e);
                 failed_updates
                     .lock()
-                    .expect("mutex poisoned")
+                    .map_err(|e| anyhow!("mutex poisoned: {}", e))?
                     .push(candidate.source.clone());
-                return;
+                return Ok(());
             }
-        };
 
-        let stages = match graph.toposort() {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!("Error sorting dependency graph for update: {}", e);
-                failed_updates
-                    .lock()
-                    .expect("mutex poisoned")
-                    .push(candidate.source.clone());
-                return;
-            }
-        };
+            let install_plan = match install::plan::create_install_plan(&graph.nodes, None, false) {
+                Ok(plan) => plan,
+                Err(e) => {
+                    eprintln!("Error creating install plan for update: {}", e);
+                    failed_updates
+                        .lock()
+                        .map_err(|e| anyhow!("mutex poisoned: {}", e))?
+                        .push(candidate.source.clone());
+                    return Ok(());
+                }
+            };
 
-        let mut new_manifest_option: Option<types::InstallManifest> = None;
-        for stage in stages {
-            for pkg_id in stage {
-                let node = graph
-                    .nodes
-                    .get(&pkg_id)
-                    .expect("Package node missing from graph during update");
-                if let Some(action) = install_plan.get(&pkg_id) {
-                    match install::installer::install_node(node, action, None, None, yes, true) {
-                        Ok(m) => {
-                            if m.name == candidate.new_pkg.name
-                                && m.sub_package == candidate.old_manifest.sub_package
-                            {
-                                new_manifest_option = Some(m);
+            let stages = match graph.toposort() {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("Error sorting dependency graph for update: {}", e);
+                    failed_updates
+                        .lock()
+                        .map_err(|e| anyhow!("mutex poisoned: {}", e))?
+                        .push(candidate.source.clone());
+                    return Ok(());
+                }
+            };
+
+            let mut new_manifest_option: Option<types::InstallManifest> = None;
+            for stage in stages {
+                for pkg_id in stage {
+                    let node = graph.nodes.get(&pkg_id).ok_or_else(|| {
+                        anyhow!("Package node '{}' missing from graph during update", pkg_id)
+                    })?;
+                    if let Some(action) = install_plan.get(&pkg_id) {
+                        match install::installer::install_node(node, action, None, None, yes, true)
+                        {
+                            Ok(m) => {
+                                if m.name == candidate.new_pkg.name
+                                    && m.sub_package == candidate.old_manifest.sub_package
+                                {
+                                    new_manifest_option = Some(m);
+                                }
                             }
-                        }
-                        Err(e) => {
-                            eprintln!("Failed to upgrade {}: {}", candidate.source, e);
-                            failed_updates
-                                .lock()
-                                .expect("mutex poisoned")
-                                .push(candidate.source.clone());
-                            return;
+                            Err(e) => {
+                                eprintln!("Failed to upgrade {}: {}", candidate.source, e);
+                                failed_updates
+                                    .lock()
+                                    .map_err(|e| anyhow!("mutex poisoned: {}", e))?
+                                    .push(candidate.source.clone());
+                                return Ok(());
+                            }
                         }
                     }
                 }
             }
-        }
 
-        if let Some(new_manifest) = new_manifest_option {
-            let _lock = transaction_mutex.lock().expect("mutex poisoned");
-            if let Err(e) = transaction::record_operation(
-                transaction_id,
-                types::TransactionOperation::Upgrade {
-                    old_manifest: Box::new(candidate.old_manifest.clone()),
-                    new_manifest: Box::new(new_manifest.clone()),
-                },
-            ) {
-                eprintln!(
-                    "Error: Failed to record transaction for {}: {}",
-                    candidate.source, e
-                );
+            if let Some(new_manifest) = new_manifest_option {
+                let _lock = transaction_mutex
+                    .lock()
+                    .map_err(|e| anyhow!("mutex poisoned: {}", e))?;
+                if let Err(e) = transaction::record_operation(
+                    transaction_id,
+                    types::TransactionOperation::Upgrade {
+                        old_manifest: Box::new(candidate.old_manifest.clone()),
+                        new_manifest: Box::new(new_manifest.clone()),
+                    },
+                ) {
+                    eprintln!(
+                        "Error: Failed to record transaction for {}: {}",
+                        candidate.source, e
+                    );
+                    failed_updates
+                        .lock()
+                        .map_err(|e| anyhow!("mutex poisoned: {}", e))?
+                        .push(candidate.source.clone());
+                } else {
+                    successful_upgrades
+                        .lock()
+                        .map_err(|e| anyhow!("mutex poisoned: {}", e))?
+                        .push((
+                            candidate.old_manifest.clone(),
+                            new_manifest.clone(),
+                            candidate.new_pkg.clone(),
+                        ));
+                }
+            } else {
+                eprintln!("Failed to get new manifest for {}", candidate.source);
                 failed_updates
                     .lock()
-                    .expect("mutex poisoned")
+                    .map_err(|e| anyhow!("mutex poisoned: {}", e))?
                     .push(candidate.source.clone());
-            } else {
-                successful_upgrades.lock().expect("mutex poisoned").push((
-                    candidate.old_manifest.clone(),
-                    new_manifest.clone(),
-                    candidate.new_pkg.clone(),
-                ));
             }
-        } else {
-            eprintln!("Failed to get new manifest for {}", candidate.source);
-            failed_updates
-                .lock()
-                .expect("mutex poisoned")
-                .push(candidate.source.clone());
-        }
-    });
+            Ok(())
+        })?;
 
-    let failed = failed_updates.into_inner().expect("mutex poisoned");
+    let failed = failed_updates
+        .into_inner()
+        .map_err(|e| anyhow!("mutex poisoned: {}", e))?;
     if !failed.is_empty() {
         eprintln!("\nError: Some packages failed to upgrade. Rolling back all changes...");
         for pkg in &failed {
@@ -883,7 +880,9 @@ fn run_update_all_logic(
     transaction::commit(&transaction.id)?;
 
     println!("\n{}", "Success:".green());
-    let successful_upgrades = successful_upgrades.into_inner().expect("mutex poisoned");
+    let successful_upgrades = successful_upgrades
+        .into_inner()
+        .map_err(|e| anyhow!("mutex poisoned: {}", e))?;
     for (old_manifest, new_manifest, new_pkg) in &successful_upgrades {
         if let Some(backup_files) = &old_manifest.backup {
             println!(
