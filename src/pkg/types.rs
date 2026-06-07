@@ -384,74 +384,6 @@ pub struct InstallManifest {
     pub installed_size: Option<u64>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
-pub struct FileConfig {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub content: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub source: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub executable: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub owner: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub group: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub mode: Option<u32>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
-pub struct UserConfig {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub groups: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub shell: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub home: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub password: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
-pub struct GroupConfig {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub gid: Option<u32>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
-pub struct BootConfig {
-    #[serde(default)]
-    pub loader: Option<String>,
-    #[serde(default)]
-    pub kernel_params: Vec<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
-pub struct HardwareConfig {
-    #[serde(default)]
-    pub drivers: Vec<String>,
-    #[serde(default)]
-    pub microcode: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
-pub struct NetworkConfig {
-    #[serde(default)]
-    pub manager: Option<String>,
-    #[serde(default)]
-    pub firewall: Option<FirewallConfig>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
-pub struct FirewallConfig {
-    #[serde(default)]
-    pub enable: bool,
-    #[serde(default)]
-    pub allowed_tcp_ports: Vec<u16>,
-    #[serde(default)]
-    pub allowed_udp_ports: Vec<u16>,
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum TransactionOperation {
@@ -645,11 +577,6 @@ pub struct SharableInstallManifest {
     pub chosen_options: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub chosen_optionals: Vec<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ZoiLockOld {
-    pub packages: HashMap<String, String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]

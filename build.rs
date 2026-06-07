@@ -117,10 +117,10 @@ fn write_builtin_strings(
 
 fn main() -> Result<(), Box<dyn Error>> {
     for var in BUILD_ENV_VARS {
-        println!("cargo:rerun-if-env-changed={}", var);
+        println!("cargo:rerun-if-env-changed={var}");
     }
     for i in AUTHORITIES_KEY_RANGE {
-        println!("cargo:rerun-if-env-changed=ZOI_AUTHORITIES_KEY_{}", i);
+        println!("cargo:rerun-if-env-changed=ZOI_AUTHORITIES_KEY_{i}");
     }
 
     let env_path = if Path::new(".env").exists() {
@@ -132,9 +132,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     if let Some(path) = env_path {
-        println!("cargo:rerun-if-changed={}", path);
+        println!("cargo:rerun-if-changed={path}");
         if dotenvy::from_filename(path).is_err() {
-            println!("cargo:warning=failed to load env file: {}", path);
+            println!("cargo:warning=failed to load env file: {path}");
         }
     }
 
@@ -147,11 +147,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let zoi_registry = env::var("ZOI_DEFAULT_REGISTRY").unwrap_or_else(|_| DEFAULT_REGISTRY.into());
-    println!("cargo:rustc-env=ZOI_DEFAULT_REGISTRY={}", zoi_registry);
+    println!("cargo:rustc-env=ZOI_DEFAULT_REGISTRY={zoi_registry}");
 
     let mut authorities = Vec::new();
     for i in AUTHORITIES_KEY_RANGE {
-        if let Ok(val) = env::var(format!("ZOI_AUTHORITIES_KEY_{}", i))
+        if let Ok(val) = env::var(format!("ZOI_AUTHORITIES_KEY_{i}"))
             && !val.is_empty()
         {
             authorities.push(val);

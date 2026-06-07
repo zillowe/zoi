@@ -260,6 +260,11 @@ fn run_update_single_logic(
     )?;
 
     install::util::check_policy_compliance(&graph)?;
+    for node in graph.nodes.values() {
+        if !install::util::display_updates(&node.pkg, yes)? {
+            return Err(anyhow!("Update aborted by user."));
+        }
+    }
     install::util::check_for_vulnerabilities(&graph, yes)?;
 
     let install_plan = install::plan::create_install_plan(&graph.nodes, None, false)?;
@@ -532,6 +537,9 @@ fn run_update_all_logic(
                 candidate.new_version.green(),
                 advisory_suffix
             );
+
+            // Show updates for this package without prompting
+            let _ = install::util::display_updates(&candidate.new_pkg, true);
         }
     }
 
