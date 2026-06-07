@@ -537,7 +537,6 @@ fn run_update_all_logic(
                 advisory_suffix
             );
 
-            // Show updates for this package without prompting
             let _ = install::util::display_updates(&candidate.new_pkg, true);
         }
     }

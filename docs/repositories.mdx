@@ -224,6 +224,7 @@ The `url`, `pgp`, `hash`, `size`, and `files` fields within a `PkgLink` object c
 
 * `{name}`: The name of the package.
 * `{version}`: The version of the package.
+* `{id}`: A flattened unique identifier (repo path + name with slashes replaced by dots, e.g. `core.editors.vim`). Recommended for GitLab Generic Package Registry.
 * `{os}`: The operating system (e.g. `linux`, `macos`, `windows`).
 * `{arch}`: The CPU architecture (e.g. `amd64`, `arm64`).
 * `{platform}`: The full platform string (e.g. `linux-amd64`).

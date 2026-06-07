@@ -163,5 +163,12 @@ cache:
 
 1. **Use `zoi.lock`**: Always commit your `zoi.lock` file to ensure that your CI environment uses the exact same package versions as your local development environment.
 2. **Headless Mode**: Use the `--yes` flag (or `-y`) with all Zoi commands to prevent the pipeline from hanging on interactive prompts.
-3. **Specific Platforms**: When building packages with `zoi package build`, explicitly specify the `--platform` to ensure you are creating the correct artifacts for your target users.
-4. **Local Project Scopes**: For CI jobs that only need tools for the current build, use `--scope project` or `--local` to keep the installation isolated to the project directory.
+3. **Robust Metadata Extraction**: When you need to extract package information (like name, version, or repo) in your scripts, use `zoi package inspect --json <file>`. This is much more reliable than using `grep` or `sed` on raw Lua files.
+
+   ```bash
+   # Example: Get package name using jq
+   PKG_NAME=$(zoi package inspect --json my-pkg.pkg.lua | jq -r '.name')
+   ```
+
+4. **Specific Platforms**: When building packages with `zoi package build`, explicitly specify the `--platform` to ensure you are creating the correct artifacts for your target users.
+5. **Local Project Scopes**: For CI jobs that only need tools for the current build, use `--scope project` or `--local` to keep the installation isolated to the project directory.

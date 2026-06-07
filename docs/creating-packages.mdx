@@ -137,14 +137,14 @@ This function runs after `prepare()`. It takes the prepared files from the `BUIL
 This function runs after `package()`. It's a security step where you can verify the integrity and authenticity of the files you downloaded in the `prepare` step.
 
 * **Common tasks:** Checking checksums with `verifyHash()`, verifying PGP signatures with `verifySignature()`.
-* **Return value:** If this function returns `false`, the build process is aborted.
+* **Return value:** Must explicitly return a boolean (`true` or `false`). If this function returns `false` or `nil`, the build process is aborted.
 
 ### `test()`
 
 This optional function runs after a successful `package()` step and is executed by the `zoi package test` command. It allows you to run validation and integration tests against your staged package files.
 
 * **Common tasks:** Running the packaged binary with a `--version` flag, checking for the existence of specific library files, or running a small test script.
-* **Return value:** Should return `true` if all tests pass and `false` otherwise. A failure will cause `zoi package test` to exit with an error.
+* **Return value:** Must explicitly return a boolean (`true` or `false`). If this function returns `false` or `nil`, the test process is aborted.
 
 ### `uninstall()`
 
@@ -457,9 +457,19 @@ Before executing builds/tests, lint the package definition:
 zoi package doctor /path/to/your-package.pkg.lua
 ```
 
-`zoi package doctor` validates metadata consistency, dependency string syntax, and common split-package mistakes, and emits warnings for missing lifecycle functions like `test()`.
+`zoi package doctor` validates metadata consistency, dependency string syntax, and common split-package mistakes. It also performs **path-repo consistency** checks, ensuring that the `repo` field in your metadata matches the file's physical location within a Zoi registry.
 
-### Step 3: LSP Support
+### Step 3: Inspect Resolved Metadata
+
+To see how Zoi resolves your Lua script into a static package structure, use `inspect`:
+
+```sh
+zoi package inspect --json /path/to/your-package.pkg.lua
+```
+
+This is particularly useful for debugging platform-specific logic or dynamic versioning. The `--json` flag provides a clean, machine-readable representation of the package.
+
+### Step 4: LSP Support
 
 To get rich autocomplete, type checking, and hover documentation for Zoi's Lua API in your editor (e.g. VS Code with `sumneko.lua`), initialize LSP support in your workspace:
 
@@ -469,7 +479,7 @@ zoi package init-lsp
 
 This command creates a `.luarc.json` file in your directory and installs EmmyLua type definitions to `~/.zoi/lsp/`.
 
-### Step 4: Test Your Package
+### Step 5: Test Your Package
 
 Once your package seems to be working, run your tests using the `zoi package test` command.
 
@@ -479,7 +489,7 @@ zoi package test --type <build-type> /path/to/your-package.pkg.lua
 
 This command will execute the `prepare()`, `package()`, and `test()` functions. If `test()` returns `false` or errors, the command will fail.
 
-### Step 4: Build the Distributable Archive
+### Step 6: Build the Distributable Archive
 
 Once your tests are passing, build the final `.pkg.tar.zst` archive.
 
@@ -505,7 +515,7 @@ zoi package build --type <build-type> --test /path/to/your-package.pkg.lua
 * `--method <native|docker>`: The build method to use. Defaults to `native`. Use `docker` for containerized builds.
 * `--image <IMAGE>`: The Docker image to use for the build (required when `--method docker` is used).
 
-### Step 5: Verify the Final Archive
+### Step 7: Verify the Final Archive
 
 Install the built archive to ensure it's correct and installs properly for end-users.
 
