@@ -313,6 +313,11 @@ pub fn run(
 
     if !dry_run {
         install::util::check_for_conflicts(&packages_to_install, yes)?;
+        for pkg in &packages_to_install {
+            if !install::util::display_updates(pkg, yes)? {
+                return Err(anyhow!("Installation aborted by user."));
+            }
+        }
         install::util::check_policy_compliance(&graph)?;
         install::util::check_for_vulnerabilities(&graph, yes)?;
 

@@ -1,4 +1,4 @@
-use crate::pkg::{local, types};
+use crate::pkg::types;
 use anyhow::Result;
 
 pub fn create_manifest(
@@ -34,29 +34,4 @@ pub fn create_manifest(
         installed_files,
         installed_size: pkg.installed_size,
     })
-}
-
-pub fn write_manifest(
-    pkg: &types::Package,
-    reason: types::InstallReason,
-    installed_dependencies: Vec<String>,
-    install_method: Option<String>,
-    installed_files: Vec<String>,
-    registry_handle: &str,
-    chosen_options: &[String],
-    chosen_optionals: &[String],
-    sub_package: Option<String>,
-) -> Result<()> {
-    let manifest = create_manifest(
-        pkg,
-        reason,
-        installed_dependencies,
-        install_method,
-        installed_files,
-        registry_handle,
-        chosen_options,
-        chosen_optionals,
-        sub_package,
-    )?;
-    local::write_manifest(&manifest)
 }
