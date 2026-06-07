@@ -65,6 +65,7 @@ pub fn build_archive(
             true,
             "native",
             None,
+            false,
         )
     });
 

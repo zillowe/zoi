@@ -71,6 +71,8 @@ pub struct BuildOptions<'a> {
     pub image: Option<&'a str>,
     /// Optional package version override.
     pub version_override: Option<&'a str>,
+    /// Whether to force root ownership (UID/GID 0) in the built archive.
+    pub fakeroot: bool,
 }
 
 impl<'a> Default for BuildOptions<'a> {
@@ -83,6 +85,7 @@ impl<'a> Default for BuildOptions<'a> {
             method: "native",
             image: None,
             version_override: None,
+            fakeroot: false,
         }
     }
 }
@@ -203,6 +206,7 @@ pub fn build_with_options(package_file: &Path, options: &BuildOptions<'_>) -> Re
         options.install_deps,
         options.method,
         options.image,
+        options.fakeroot,
     )
 }
 
@@ -338,6 +342,7 @@ pub fn build(
         method,
         image,
         version_override,
+        fakeroot: false,
     };
     build_with_options(package_file, &options)
 }

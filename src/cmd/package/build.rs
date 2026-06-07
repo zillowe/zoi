@@ -48,6 +48,10 @@ pub struct BuildCommand {
     /// Docker image to use when method is 'docker'
     #[arg(long)]
     pub image: Option<String>,
+
+    /// Force root ownership (UID/GID 0) in the built archive
+    #[arg(long)]
+    pub fakeroot: bool,
 }
 
 pub fn run(args: BuildCommand) -> Result<()> {
@@ -69,5 +73,6 @@ pub fn run(args: BuildCommand) -> Result<()> {
         args.install_deps,
         &args.method,
         args.image.as_deref(),
+        args.fakeroot,
     )
 }

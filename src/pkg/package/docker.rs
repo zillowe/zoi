@@ -14,6 +14,7 @@ pub fn run(
     sub_packages: Option<Vec<String>>,
     image: &str,
     install_deps: bool,
+    fakeroot: bool,
 ) -> Result<()> {
     println!("{} Building package using Docker...", "::".bold().blue());
     println!("Image: {}", image.cyan());
@@ -133,6 +134,10 @@ pub fn run(
 
     if install_deps {
         inner_cmd.push_str(" --install-deps");
+    }
+
+    if fakeroot {
+        inner_cmd.push_str(" --fakeroot");
     }
 
     docker_args.push("bash".to_string());

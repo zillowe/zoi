@@ -514,6 +514,7 @@ zoi package build --type <build-type> --test /path/to/your-package.pkg.lua
 * `--version-override <VERSION>`: Override the package version defined in the `.pkg.lua` file.
 * `--method <native|docker>`: The build method to use. Defaults to `native`. Use `docker` for containerized builds.
 * `--image <IMAGE>`: The Docker image to use for the build (required when `--method docker` is used).
+* `--fakeroot`: Force root ownership (UID/GID 0) in the built archive. Useful for official registry packages.
 
 ### Step 7: Verify the Final Archive
 

@@ -454,11 +454,13 @@ Build, create, and manage Zoi packages.
   * `--version-override <VERSION>`: Override the package version.
   * `--method <native|docker>`: The build method to use (default: `native`).
   * `--image <IMAGE>`: The Docker image to use for the build (required for `--method docker`).
+  * `--fakeroot`: Force root ownership (UID/GID 0) in the built archive.
 * `test <package_file>`: Run tests for a package. This command accepts the same arguments as `build`.
   * `--type <TYPE>`: The build type to use for testing. If omitted, Zoi chooses `pre-compiled`, then `source`, then the first listed type.
   * `-p`, `--platform <PLATFORM>`: The platform to test on.
   * `--sub <SUB_PACKAGES...>`: For a split package, test only the specified sub-packages.
   * `--version-override <VERSION>`: Override the package version for testing.
+  * `--fakeroot`: Use fakeroot for the test build.
 * `install <package_file>`: Install a package from a local archive.
   * `--scope <user|system>`: The scope to install the package to (default: `user`).
   * `--sub <SUB_PACKAGES...>`: For a split package, install only the specified sub-packages from the archive.
