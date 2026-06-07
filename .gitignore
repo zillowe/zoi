@@ -1,14 +1,24 @@
+# etc
 etc
+.zoi/
+dist/*
+
+# binaries
 scripts/compiled
 scripts/archived
 scripts/release
 scripts/release-all
+
+# config
 config.mk
+config.just
+
+# env
 .env
+
+# javascript
 packages/js/node_modules
 packages/js/dist
-dist/*
-.zoi/
 
 # Added by cargo
 /target
