@@ -105,7 +105,6 @@ pub fn posthog_capture_event(
         Some(crate::pkg::types::InstallReason::Dependency { parent }) => {
             format!("dependency:{}", parent)
         }
-        Some(crate::pkg::types::InstallReason::Declarative) => "declarative".to_string(),
         None => "unknown".to_string(),
     };
 
