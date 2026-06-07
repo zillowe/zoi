@@ -4,6 +4,32 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
+## [Prod-Release-1.18.0] - 2026-06-07
+
+### ♻️ Refactor
+
+- Replace expect with proper error handling
+- *(pkg)* Improve robustness of Lua integration
+- *(registry)* Remove official registry-specific naming from init command
+
+### ✨ Features
+
+- *(package)* Add --fakeroot option to force root ownership
+- *(package)* Add inspect command and refactor Lua API modules
+- *(pkg)* Re-add and integrate display_updates for important package notices
+
+### 🎯 UX
+
+- Remove newline at start of update all cmd
+
+### 🛠️ Build
+
+- *(config)* Add Justfile for project management and update configure script
+
+### 🧹 Cleanup
+
+- *(pkg)* Remove unused Declarative install reason
+
 ## [Prod-Release-1.17.0] - 2026-06-04
 
 ### ♻️ Refactor
