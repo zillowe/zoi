@@ -968,11 +968,18 @@ pub fn resolve_url_placeholders(
         platform.split('-').nth(1).unwrap_or_default(),
     );
 
+    let id = if repo.is_empty() {
+        pkg_name.to_string()
+    } else {
+        format!("{}.{}", repo.replace('/', "."), pkg_name)
+    };
+
     url.replace("{os}", os)
         .replace("{arch}", arch)
         .replace("{version}", version)
         .replace("{repo}", repo)
         .replace("{name}", pkg_name)
+        .replace("{id}", &id)
         .replace("{platform}", platform)
 }
 
