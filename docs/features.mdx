@@ -92,6 +92,7 @@ Zoi is packed with features designed to make package management and environment 
   * `zoi package build`: Build a distributable package archive (`.pkg.tar.zst`).
   * `zoi package install`: Install a package from a local archive for testing.
   * `zoi package doctor`: Lint and validate `.pkg.lua` definitions before testing/building.
+  * `zoi package inspect`: Parse a package definition and output resolved metadata (supports JSON).
   * `zoi package init-lsp`: Initialize LSP support with EmmyLua type definitions and `.luarc.json`.
 
 * **Powerful CLI Tools:** Zoi offers a rich set of commands for package management and inspection:
@@ -462,9 +463,14 @@ Build, create, and manage Zoi packages.
   * `--scope <user|system>`: The scope to install the package to (default: `user`).
   * `--sub <SUB_PACKAGES...>`: For a split package, install only the specified sub-packages from the archive.
   * `--yes`: Automatically answer yes to prompts.
-* `doctor <package_file>`: Lint and validate a `.pkg.lua` package definition.
+* `doctor <package_file>`: Lint and validate a `.pkg.lua` package definition. Performs consistency checks, including verifying that the metadata `repo` field matches the file's location in the registry.
   * `--platform <PLATFORM>`: Validate as a specific platform (defaults to current).
   * `--version-override <VERSION>`: Override package version while validating.
+* `inspect <package_file>`: Parse a package definition and output its fully resolved metadata.
+  * `--json`: Output as pretty-printed JSON (ideal for CI/CD and automation).
+  * `--platform <PLATFORM>`: Resolve metadata for a specific platform.
+  * `--version-override <VERSION>`: Override package version while inspecting.
+* `init-lsp`: Initialize LSP support with EmmyLua type definitions and `.luarc.json`.
 
 ***
 

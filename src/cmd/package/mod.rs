@@ -3,6 +3,7 @@ use clap::{Parser, Subcommand};
 pub mod build;
 pub mod doctor;
 pub mod init_lsp;
+pub mod inspect;
 pub mod install;
 pub mod test;
 
@@ -24,6 +25,8 @@ enum Commands {
     Doctor(doctor::DoctorCommand),
     /// Initialize LSP support for .pkg.lua files
     InitLsp(init_lsp::InitLspCommand),
+    /// Inspect a package definition and output metadata
+    Inspect(inspect::InspectCommand),
 }
 
 pub fn run(args: PackageCommand) -> Result<()> {
@@ -33,5 +36,6 @@ pub fn run(args: PackageCommand) -> Result<()> {
         Commands::Install(cmd) => install::run(cmd),
         Commands::Doctor(cmd) => doctor::run(cmd),
         Commands::InitLsp(cmd) => init_lsp::run(cmd),
+        Commands::Inspect(cmd) => inspect::run(cmd),
     }
 }

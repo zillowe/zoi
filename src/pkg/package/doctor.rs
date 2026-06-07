@@ -143,6 +143,8 @@ pub fn run(
     let lua_code = std::fs::read_to_string(package_file)?;
     validate_lua_functions(&lua_code, &mut report);
 
+    validate_path_consistency(package_file, &package, &mut report);
+
     Ok(report)
 }
 
@@ -227,5 +229,51 @@ fn validate_lua_functions(lua_code: &str, report: &mut DoctorReport) {
         report.warnings.push(
             "No test() function detected. Add package tests for maintainability.".to_string(),
         );
+    }
+}
+
+fn validate_path_consistency(
+    package_file: &Path,
+    package: &types::Package,
+    report: &mut DoctorReport,
+) {
+    let abs_path = match std::fs::canonicalize(package_file) {
+        Ok(p) => p,
+        Err(_) => return,
+    };
+
+    let mut current = abs_path.parent();
+    let mut registry_root = None;
+    while let Some(path) = current {
+        if path.join("repo.yaml").exists() {
+            registry_root = Some(path.to_path_buf());
+            break;
+        }
+        current = path.parent();
+    }
+
+    if let Some(root) = registry_root
+        && let Ok(rel_path) = abs_path.strip_prefix(&root)
+    {
+        let rel_dir = rel_path.parent().unwrap_or(Path::new(""));
+        let rel_dir_str = rel_dir.to_string_lossy().replace("\\", "/");
+
+        let mut parts: Vec<&str> = rel_dir_str.split('/').collect();
+        if !parts.is_empty() {
+            parts.pop();
+        }
+        let expected_repo = parts.join("/");
+
+        if !expected_repo.is_empty() && package.repo != expected_repo {
+            report.errors.push(format!(
+                    "Path-Repo mismatch: metadata.repo is '{}' but file is located in registry tier '{}'.",
+                    package.repo, expected_repo
+                ));
+        } else if expected_repo.is_empty() && !package.repo.is_empty() {
+            report.errors.push(format!(
+                    "Path-Repo mismatch: metadata.repo is '{}' but file is located at the registry root.",
+                    package.repo
+                ));
+        }
     }
 }
