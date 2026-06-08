@@ -23,10 +23,25 @@ pub fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                 let temp_path = build_dir.join(file_name);
                 let client = utils::get_http_client()
                     .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-                let mut response = client
-                    .get(&source)
-                    .send()
-                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                let mut attempt = 0u32;
+                let mut response = loop {
+                    attempt += 1;
+                    match client.get(&source).send() {
+                        Ok(resp) => break resp,
+                        Err(e) => {
+                            if attempt < 3 {
+                                if !quiet {
+                                    eprintln!("Download failed ({}). Retrying...", e);
+                                }
+                                crate::utils::retry_backoff_sleep(attempt);
+                                continue;
+                            } else {
+                                return Err(mlua::Error::RuntimeError(e.to_string()));
+                            }
+                        }
+                    }
+                };
+
                 if !response.status().is_success() {
                     return Err(mlua::Error::RuntimeError(format!("Failed to download {}: {}", source, response.status())));
                 }
