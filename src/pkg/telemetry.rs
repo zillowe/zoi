@@ -165,6 +165,7 @@ pub fn posthog_capture_event(
 
     let client = reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(4))
+        .use_rustls_tls()
         .build()?;
     #[derive(Serialize)]
     struct PosthogEvent<'a> {
