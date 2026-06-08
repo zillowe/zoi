@@ -1,0 +1,39 @@
+#!/usr/bin/env zsm
+
+# :: name: zoi
+# :: version: latest
+# :: url: zillowe.pages.dev/zoi/install.zsm
+# :: description: Installer for Zoi
+# :: require bin: gpg, tar, zstd
+# :: perm net: gitlab.com, zillowe.pages.dev
+# :: perm fs: /tmp, ~/.local/bin
+
+GITLAB_PROJECT_ID="71087662"
+GITLAB_PROJECT_PATH="Zillowe/Zillwen/Zusty/Zoi"
+BIN_NAME="zoi"
+
+OS = system.os()
+ARCH = system.arch_mapped()
+
+echo("[INFO] Fetching latest release tag...")
+LATEST_TAG = web.get_json_field("https://gitlab.com/api/v4/projects/${GITLAB_PROJECT_ID}/releases", "tag_name")
+
+echo("[INFO] Latest tag found: ${LATEST_TAG}")
+
+REPO_BASE_URL="https://gitlab.com/${GITLAB_PROJECT_PATH}/-/releases/${LATEST_TAG}/downloads"
+TARGET_ARCHIVE="zoi-${OS}-${ARCH}.tar.zst"
+DOWNLOAD_URL="${REPO_BASE_URL}/${TARGET_ARCHIVE}"
+
+echo("[INFO] Downloading Zoi...")
+web.download("${DOWNLOAD_URL}", "/tmp/${TARGET_ARCHIVE}")
+
+echo("[INFO] Extracting and Installing...")
+run zstd -dc "/tmp/${TARGET_ARCHIVE}" | run tar -xf - -C "/tmp"
+
+fs.move("/tmp/zoi", "~/.local/bin/zoi")
+
+fs.chmod("~/.local/bin/zoi", "755")
+
+echo("")
+echo("[INFO] Zoi installed successfully to ~/.local/bin/zoi")
+echo("[INFO] Run 'zoi --version' to verify.")
