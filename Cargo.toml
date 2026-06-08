@@ -41,7 +41,7 @@ path = "src/bin/zoi-mini.rs"
 strip = true
 lto = "fat"
 codegen-units = 1
-panic = "abort"
+# panic = "abort"
 opt-level = 3
 
 [profile.release.package."*"]
