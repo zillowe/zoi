@@ -9,10 +9,22 @@ pub fn add_file_util(lua: &Lua) -> Result<(), mlua::Error> {
         |_, (url, path): (String, String)| -> Result<(), mlua::Error> {
             let client =
                 utils::get_http_client().map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-            let response = client
-                .get(url)
-                .send()
-                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+            let mut attempt = 0u32;
+            let response = loop {
+                attempt += 1;
+                match client.get(&url).send() {
+                    Ok(resp) => break resp,
+                    Err(e) => {
+                        if attempt < 3 {
+                            eprintln!("Download failed ({}). Retrying...", e);
+                            crate::utils::retry_backoff_sleep(attempt);
+                            continue;
+                        } else {
+                            return Err(mlua::Error::RuntimeError(e.to_string()));
+                        }
+                    }
+                }
+            };
             let content = response
                 .bytes()
                 .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
