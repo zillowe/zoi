@@ -31,6 +31,7 @@ fn get_latest_tag(branch_prefix: &str) -> Result<String> {
     );
     let client = reqwest::blocking::Client::builder()
         .user_agent("Zoi-Upgrader")
+        .use_rustls_tls()
         .build()?;
     let releases: Vec<GitLabRelease> = client.get(&api_url).send()?.json()?;
 

@@ -1024,6 +1024,7 @@ pub fn get_http_client() -> anyhow::Result<&'static reqwest::blocking::Client> {
     let client = reqwest::blocking::Client::builder()
         .user_agent("zoi")
         .timeout(Duration::from_secs(60))
+        .use_rustls_tls()
         .build()
         .map_err(|e| anyhow!("Failed to build HTTP client: {}", e))?;
 
@@ -1042,6 +1043,7 @@ pub fn build_blocking_http_client(timeout_secs: u64) -> anyhow::Result<reqwest::
     let client = reqwest::blocking::Client::builder()
         .user_agent("zoi")
         .timeout(Duration::from_secs(timeout_secs))
+        .use_rustls_tls()
         .build()?;
     Ok(client)
 }

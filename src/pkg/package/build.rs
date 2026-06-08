@@ -3,7 +3,7 @@ use anyhow::{Result, anyhow};
 use colored::*;
 use mlua::{Lua, LuaSerdeExt, Table};
 use std::fs::{self, File};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tar::Builder as TarBuilder;
 use tempfile::Builder;
 use walkdir::WalkDir;
@@ -599,10 +599,10 @@ fn build_for_platform(
         tar_builder.finish()?;
     }
 
-    let files_manifest_path = output_path.with_extension("pkg.tar.zst.files");
+    let files_manifest_path = PathBuf::from(format!("{}.files", output_path.display()));
     fs::write(&files_manifest_path, files_list.join("\n"))?;
 
-    let hash_path = output_path.with_extension("pkg.tar.zst.hash");
+    let hash_path = PathBuf::from(format!("{}.hash", output_path.display()));
     let output_path_str = output_path
         .to_str()
         .ok_or_else(|| anyhow!("Output path contains invalid UTF-8: {:?}", output_path))?;
@@ -620,7 +620,7 @@ fn build_for_platform(
         ),
     )?;
 
-    let size_path = output_path.with_extension("pkg.tar.zst.size");
+    let size_path = PathBuf::from(format!("{}.size", output_path.display()));
     let compressed_size = fs::metadata(&output_path)?.len();
     let uncompressed_size: u64 = WalkDir::new(&staging_dir)
         .into_iter()
@@ -647,7 +647,7 @@ fn build_for_platform(
         if !quiet {
             println!("Signing package with key '{}'...", key_id.cyan());
         }
-        let signature_path = output_path.with_extension("pkg.tar.zst.sig");
+        let signature_path = PathBuf::from(format!("{}.sig", output_path.display()));
         if signature_path.exists() {
             fs::remove_file(&signature_path)?;
         }
