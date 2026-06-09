@@ -14,6 +14,8 @@ The Security Policy can be found online at [zillowe.qzz.io/docs/book/guidelines/
 | ----------------------------------------------------------------------------------------- | --------- |
 | [AUR `zoi`](https://aur.archlinux.org/packages/zoi)                                       | ✔️        |
 | [AUR `zoi-bin`](https://aur.archlinux.org/packages/zoi-bin)                               | ✔️        |
+| [Debian / Ubuntu (`.deb`)](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases)       | ✔️        |
+| [Fedora / RHEL (`.rpm`)](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases)         | ✔️        |
 | [Homebrew](https://github.com/zillowe/homebrew-tap)                                       | ✔️        |
 | [Scoop](https://github.com/zillowe/scoop)                                                 | ✔️        |
 | [Crates.io `zoi-rs`](https://crates.io/crates/zoi-rs)                                     | ✔️        |

@@ -69,6 +69,18 @@ fi
 
 echo -e "${CYAN}📦 Starting archival process...${NC}"
 
+if [ -d "$COMPILED_DIR/packages" ]; then
+    echo -e "${CYAN}  -> Processing .deb and .rpm packages...${NC}"
+    for pkg_path in "$COMPILED_DIR/packages"/*; do
+        if [ -f "$pkg_path" ]; then
+            pkg_filename=$(basename "$pkg_path")
+            echo -e "${CYAN}     -> Copying and signing ${pkg_filename}...${NC}"
+            cp "$pkg_path" "$ARCHIVE_DIR/"
+            sign_file "$ARCHIVE_DIR/$pkg_filename"
+        fi
+    done
+fi
+
 for binary_path in "$COMPILED_DIR"/*; do
     filename=$(basename "$binary_path")
 

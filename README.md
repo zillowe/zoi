@@ -214,7 +214,31 @@ cd zoi-bin
 makepkg -si
 ```
 
-##### Fedora
+##### Debian / Ubuntu (.deb)
+
+Download the `.deb` package for your architecture from the [latest release](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases) and install it using `apt` or `dpkg`:
+
+```sh
+# Using apt (recommended, handles dependencies)
+sudo apt install ./zoi-*.deb
+
+# Using dpkg
+sudo dpkg -i zoi-*.deb
+```
+
+##### Fedora / RHEL (.rpm)
+
+Download the `.rpm` package for your architecture from the [latest release](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases) and install it using `dnf` or `rpm`:
+
+```sh
+# Using dnf (recommended)
+sudo dnf install ./zoi-*.rpm
+
+# Using rpm
+sudo rpm -i zoi-*.rpm
+```
+
+##### Fedora (Terra)
 
 Install `zoi-rs` on Fedora from [Terra](https://terra.fyralabs.com) repo (not maintained by us so updates can be late, uses [Crates.io](#cratesio) version):
 

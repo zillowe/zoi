@@ -123,11 +123,23 @@ build:linux:
       gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libssl-dev pkg-config
       libssl-dev:arm64 openssl libssl-dev:armhf gcc-mingw-w64-x86-64
       g++-mingw-w64-x86-64 liblzma-dev:arm64
+    - cargo install cargo-deb cargo-generate-rpm
   script:
     - echo "Building Zoi and Zoi Mini for Linux (amd64, arm64) and Windows
       (amd64) targets..."
     - chmod +x ./scripts/build-linux.sh
     - ./scripts/build-linux.sh
+    - |
+      echo "Generating .deb and .rpm packages..."
+      cargo deb -p zoi --target x86_64-unknown-linux-gnu --no-build
+      cargo generate-rpm -p zoi --target x86_64-unknown-linux-gnu
+      cargo deb -p zoi --target aarch64-unknown-linux-gnu --no-build
+      cargo generate-rpm -p zoi --target aarch64-unknown-linux-gnu
+      mkdir -p ./scripts/release/packages
+      mv target/x86_64-unknown-linux-gnu/debian/*.deb ./scripts/release/packages/
+      mv target/x86_64-unknown-linux-gnu/generate-rpm/*.rpm ./scripts/release/packages/
+      mv target/aarch64-unknown-linux-gnu/debian/*.deb ./scripts/release/packages/
+      mv target/aarch64-unknown-linux-gnu/generate-rpm/*.rpm ./scripts/release/packages/
   artifacts:
     paths:
       - ./scripts/release/
