@@ -68,6 +68,32 @@ The `scripts/` directory contains scripts for creating release builds for differ
 
 These scripts embed the current git commit hash into the binary via the `ZOI_COMMIT_HASH` environment variable.
 
+### Building .deb and .rpm Packages
+
+Zoi supports generating `.deb` and `.rpm` packages for Linux distributions using `cargo-deb` and `cargo-generate-rpm`.
+
+#### Debian/Ubuntu (.deb)
+
+To build a `.deb` package, ensure `cargo-deb` is installed:
+
+```sh
+cargo install cargo-deb
+cargo deb -p zoi
+```
+
+The resulting package will be located in `target/debian/`.
+
+#### Fedora/RHEL (.rpm)
+
+To build an `.rpm` package, ensure `cargo-generate-rpm` is installed:
+
+```sh
+cargo install cargo-generate-rpm
+cargo generate-rpm -p zoi
+```
+
+The resulting package will be located in `target/generate-rpm/`.
+
 ### Building the Docker Image Locally
 
 A `Dockerfile` is provided to build Zoi in a containerized environment. This is useful for creating reproducible builds or for custom image configurations.

@@ -60,6 +60,32 @@ The `scripts/` directory contains CI/CD scripts for creating release builds. The
 
 * `scripts/build-release.sh`: Creates a release build for the current platform.
 
+### Building .deb and .rpm Packages
+
+Zoi supports generating `.deb` and `.rpm` packages for Linux distributions using `cargo-deb` and `cargo-generate-rpm`.
+
+#### Debian/Ubuntu (.deb)
+
+To build a `.deb` package, ensure `cargo-deb` is installed:
+
+```sh
+cargo install cargo-deb
+cargo deb -p zoi
+```
+
+The resulting package will be located in `target/debian/`.
+
+#### Fedora/RHEL (.rpm)
+
+To build an `.rpm` package, ensure `cargo-generate-rpm` is installed:
+
+```sh
+cargo install cargo-generate-rpm
+cargo generate-rpm -p zoi
+```
+
+The resulting package will be located in `target/generate-rpm/`.
+
 ### Building the Docker Image Locally
 
 A `Dockerfile` is provided for reproducible, containerized builds. You can pass build arguments to customize the embedded configuration.
