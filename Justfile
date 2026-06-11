@@ -3,13 +3,13 @@ set shell := ["bash", "-c"]
 set dotenv-load
 set dotenv-filename := "config.just"
 
-PREFIX := env_var_or_default("PREFIX", "/usr/local")
-OS_NAME := env_var_or_default("OS_NAME", shell("uname -s | tr '[:upper:]' '[:lower:]'"))
-ARCH_NAME := env_var_or_default("ARCH_NAME", shell("uname -m"))
-SHELL_NAME := env_var_or_default("SHELL_NAME", shell("basename $SHELL"))
-WITH_BIN := env_var_or_default("WITH_BIN", "both")
+PREFIX := env("PREFIX", "/usr/local")
+OS_NAME := env("OS_NAME", shell("uname -s | tr '[:upper:]' '[:lower:]'"))
+ARCH_NAME := env("ARCH_NAME", shell("uname -m"))
+SHELL_NAME := env("SHELL_NAME", shell("basename $SHELL"))
+WITH_BIN := env("WITH_BIN", "both")
 
-BINDIR := env_var_or_default("BINDIR", PREFIX + "/bin")
+BINDIR := env("BINDIR", PREFIX + "/bin")
 NAME := "zoi"
 
 MINI_NAME := "zoi-mini"
@@ -32,11 +32,11 @@ build:
     @echo "Building Zoi targets: {{ WITH_BIN }} in release mode (commit: {{ COMMIT_HASH }})..."
     @export ZOI_COMMIT_HASH={{ COMMIT_HASH }}; \
     if [ "{{ WITH_BIN }}" = "zoi" ]; then \
-    	cargo build --bin zoi --release; \
+        cargo build --bin zoi --release; \
     elif [ "{{ WITH_BIN }}" = "zoi-mini" ]; then \
-    	cargo build --bin zoi-mini --release; \
+        cargo build --bin zoi-mini --release; \
     else \
-    	cargo build --bin zoi --bin zoi-mini --release; \
+        cargo build --bin zoi --bin zoi-mini --release; \
     fi
     @echo "Build complete for {{ OS_NAME }} ({{ ARCH_NAME }})."
 
@@ -45,20 +45,20 @@ install:
     @echo "Installing requested binaries to {{ BINDIR }}..."
     @mkdir -p "{{ BINDIR }}"
     @if [ "{{ WITH_BIN }}" != "zoi-mini" ]; then \
-    	if [ "{{ IS_WINDOWS }}" = "1" ]; then \
-    		cp -f "{{ SRC_BIN }}" "{{ BINDIR }}/{{ NAME }}.exe"; \
-    	else \
-    		install -m 755 "{{ SRC_BIN }}" "{{ BINDIR }}/{{ NAME }}"; \
-    	fi; \
-    	echo "Zoi installed successfully to {{ BINDIR }}/{{ NAME }}{{ EXE_EXT }}"; \
+        if [ "{{ IS_WINDOWS }}" = "1" ]; then \
+            cp -f "{{ SRC_BIN }}" "{{ BINDIR }}/{{ NAME }}.exe"; \
+        else \
+            install -m 755 "{{ SRC_BIN }}" "{{ BINDIR }}/{{ NAME }}"; \
+        fi; \
+        echo "Zoi installed successfully to {{ BINDIR }}/{{ NAME }}{{ EXE_EXT }}"; \
     fi
     @if [ "{{ WITH_BIN }}" != "zoi" ]; then \
-    	if [ "{{ IS_WINDOWS }}" = "1" ]; then \
-    		cp -f "{{ MINI_SRC_BIN }}" "{{ BINDIR }}/{{ MINI_NAME }}.exe"; \
-    	else \
-    		install -m 755 "{{ MINI_SRC_BIN }}" "{{ BINDIR }}/{{ MINI_NAME }}"; \
-    	fi; \
-    	echo "Zoi Mini installed successfully to {{ BINDIR }}/{{ MINI_NAME }}{{ EXE_EXT }}"; \
+        if [ "{{ IS_WINDOWS }}" = "1" ]; then \
+            cp -f "{{ MINI_SRC_BIN }}" "{{ BINDIR }}/{{ MINI_NAME }}.exe"; \
+        else \
+            install -m 755 "{{ MINI_SRC_BIN }}" "{{ BINDIR }}/{{ MINI_NAME }}"; \
+        fi; \
+        echo "Zoi Mini installed successfully to {{ BINDIR }}/{{ MINI_NAME }}{{ EXE_EXT }}"; \
     fi
     @echo "Make sure '{{ BINDIR }}' is in your PATH."
 
