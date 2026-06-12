@@ -538,6 +538,10 @@ enum Commands {
         #[arg(long)]
         local: bool,
 
+        /// Show additional execution details (caching, downloading, etc.)
+        #[arg(long, short)]
+        verbose: bool,
+
         /// Arguments to pass to the executed command
         #[arg(value_name = "ARGS")]
         args: Vec<String>,
@@ -1070,8 +1074,9 @@ pub fn run() -> anyhow::Result<()> {
                 upstream,
                 cache,
                 local,
+                verbose,
                 args,
-            } => match cmd::exec::run(source, args, upstream, cache, local) {
+            } => match cmd::exec::run(source, args, upstream, cache, local, verbose) {
                 Ok(0) => Ok(()),
                 Ok(exit_code) => Err(anyhow::anyhow!("process exited with code {}", exit_code)),
                 Err(e) => Err(e),

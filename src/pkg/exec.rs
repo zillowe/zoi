@@ -2,6 +2,7 @@ use crate::pkg::{cache, local, resolve, types};
 use crate::utils;
 use anyhow::{Result, anyhow};
 use colored::*;
+use indicatif::ProgressBar;
 use std::fs;
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -9,7 +10,7 @@ use std::process::Command;
 use tar::Archive;
 use zstd::stream::read::Decoder as ZstdDecoder;
 
-fn ensure_binary_is_cached(pkg: &types::Package, upstream: bool) -> Result<PathBuf> {
+fn ensure_binary_is_cached(pkg: &types::Package, upstream: bool, verbose: bool) -> Result<PathBuf> {
     let cache_dir = cache::get_cache_root()?;
     let binary_filename = if cfg!(target_os = "windows") {
         format!("{}.exe", pkg.name)
@@ -23,7 +24,9 @@ fn ensure_binary_is_cached(pkg: &types::Package, upstream: bool) -> Result<PathB
     }
 
     if bin_path.exists() {
-        println!("Using cached binary for '{}'.", pkg.name.cyan());
+        if verbose {
+            println!("Using cached binary for '{}'.", pkg.name.cyan());
+        }
         return Ok(bin_path);
     }
 
@@ -33,10 +36,12 @@ fn ensure_binary_is_cached(pkg: &types::Package, upstream: bool) -> Result<PathB
         ));
     }
 
-    println!(
-        "No cached binary found for '{}'. Downloading pre-built package...",
-        pkg.name.cyan()
-    );
+    if verbose {
+        println!(
+            "No cached binary found for '{}'. Downloading pre-built package...",
+            pkg.name.cyan()
+        );
+    }
     fs::create_dir_all(&cache_dir)?;
 
     let db_path = resolve::get_db_root()?;
@@ -76,18 +81,26 @@ fn ensure_binary_is_cached(pkg: &types::Package, upstream: bool) -> Result<PathB
             let archive_filename = format!("{}.pkg.tar.zst", pkg.name);
             let final_url = format!("{}/{}", url_dir.trim_end_matches('/'), archive_filename);
 
-            println!(
-                "Attempting to download pre-built package from: {}",
-                final_url.cyan()
-            );
+            if verbose {
+                println!(
+                    "Attempting to download pre-built package from: {}",
+                    final_url.cyan()
+                );
+            }
 
             let temp_dir = tempfile::Builder::new().prefix("zoi-exec-dl-").tempdir()?;
             let temp_archive_path = temp_dir.path().join(&archive_filename);
 
+            let pb = if verbose {
+                None
+            } else {
+                Some(ProgressBar::hidden())
+            };
+
             if crate::pkg::install::util::download_file_with_progress(
                 &final_url,
                 &temp_archive_path,
-                None,
+                pb.as_ref(),
                 None,
             )
             .is_ok()
@@ -113,7 +126,9 @@ fn ensure_binary_is_cached(pkg: &types::Package, upstream: bool) -> Result<PathB
                                 fs::Permissions::from_mode(0o755),
                             )?;
                         }
-                        println!("Binary cached successfully.");
+                        if verbose {
+                            println!("Binary cached successfully.");
+                        }
                         return Ok(final_bin_path);
                     }
                 }
@@ -130,11 +145,12 @@ fn find_executable(
     cache_only: bool,
     local_only: bool,
     registry_handle: Option<&str>,
+    verbose: bool,
 ) -> Result<PathBuf> {
     let handle = registry_handle.unwrap_or("local");
 
     if upstream {
-        return ensure_binary_is_cached(pkg, true);
+        return ensure_binary_is_cached(pkg, true, verbose);
     }
 
     let scopes_to_check = if local_only {
@@ -174,7 +190,9 @@ fn find_executable(
                         types::Scope::User => "user",
                         types::Scope::System => "system",
                     };
-                    println!("Using {} binary for '{}'.", scope_str, pkg.name.cyan());
+                    if verbose {
+                        println!("Using {} binary for '{}'.", scope_str, pkg.name.cyan());
+                    }
                     return Ok(bin_path);
                 }
             }
@@ -194,13 +212,15 @@ fn find_executable(
         };
         let bin_path = cache_dir.join(&binary_filename);
         if bin_path.exists() {
-            println!("Using cached binary for '{}'.", pkg.name.cyan());
+            if verbose {
+                println!("Using cached binary for '{}'.", pkg.name.cyan());
+            }
             return Ok(bin_path);
         }
         return Err(anyhow!("No cached binary found."));
     }
 
-    ensure_binary_is_cached(pkg, false)
+    ensure_binary_is_cached(pkg, false, verbose)
 }
 
 pub fn run(
@@ -209,10 +229,13 @@ pub fn run(
     upstream: bool,
     cache_only: bool,
     local_only: bool,
+    verbose: bool,
 ) -> Result<i32> {
     let resolved_source = resolve::resolve_source(source, false, false)?;
 
-    if let Some(repo_name) = &resolved_source.repo_name {
+    if let Some(repo_name) = &resolved_source.repo_name
+        && verbose
+    {
         utils::print_repo_warning(repo_name);
     }
 
@@ -243,6 +266,7 @@ pub fn run(
         cache_only,
         local_only,
         resolved_source.registry_handle.as_deref(),
+        verbose,
     )?;
 
     match crate::pkg::telemetry::posthog_capture_event(
@@ -255,23 +279,35 @@ pub fn run(
             .unwrap_or("local"),
         None,
     ) {
-        Ok(true) => println!("{} telemetry sent", "Info:".green()),
+        Ok(true) => {
+            if verbose {
+                println!("{} telemetry sent", "Info:".green());
+            }
+        }
         Ok(false) => (),
-        Err(e) => eprintln!("{} telemetry failed: {}", "Warning:".yellow(), e),
+        Err(e) => {
+            if verbose {
+                eprintln!("{} telemetry failed: {}", "Warning:".yellow(), e);
+            }
+        }
     }
 
-    println!(
-        "{} Executing '{}'...\n",
-        "::".bold().blue(),
-        pkg.name.bold()
-    );
+    if verbose {
+        println!(
+            "{} Executing '{}'...\n",
+            "::".bold().blue(),
+            pkg.name.bold()
+        );
+    }
 
     let mut cmd = Command::new(&bin_path);
     if !args.is_empty() {
         cmd.args(&args);
     }
 
-    println!("> \"{}\" {}", bin_path.display(), args.join(" "));
+    if verbose {
+        println!("> \"{}\" {}", bin_path.display(), args.join(" "));
+    }
 
     let status = cmd.status()?;
 

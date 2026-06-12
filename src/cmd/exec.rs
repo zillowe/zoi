@@ -7,6 +7,7 @@ pub fn run(
     upstream: bool,
     cache: bool,
     local: bool,
+    verbose: bool,
 ) -> Result<i32> {
-    pkg::exec::run(&source, args, upstream, cache, local)
+    pkg::exec::run(&source, args, upstream, cache, local, verbose)
 }
