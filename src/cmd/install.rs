@@ -208,24 +208,25 @@ pub fn run(
     let successfully_installed_sources = Mutex::new(Vec::new());
     let installed_manifests = Mutex::new(Vec::new());
 
-    let (mut graph, non_zoi_deps) = if let Some(locked_packages) = frozen_locked_packages.as_ref() {
-        install::resolver::build_graph_from_locked_packages(
-            locked_packages,
-            scope_override,
-            false,
-            yes,
-        )?
-    } else {
-        install::resolver::resolve_dependency_graph(
-            &final_sources,
-            scope_override,
-            force,
-            yes,
-            all_optional,
-            build_type.as_deref(),
-            false,
-        )?
-    };
+    let (mut graph, mut non_zoi_deps) =
+        if let Some(locked_packages) = frozen_locked_packages.as_ref() {
+            install::resolver::build_graph_from_locked_packages(
+                locked_packages,
+                scope_override,
+                false,
+                yes,
+            )?
+        } else {
+            install::resolver::resolve_dependency_graph(
+                &final_sources,
+                scope_override,
+                force,
+                yes,
+                all_optional,
+                build_type.as_deref(),
+                false,
+            )?
+        };
 
     let mut skipped_existing_count = 0usize;
     if !force {
@@ -271,6 +272,25 @@ pub fn run(
                 root_children.remove(&pkg_id);
             }
         }
+
+        let mut valid_non_zoi_deps = std::collections::HashSet::new();
+        for source in &sources_to_process {
+            if let Ok(dep) = crate::pkg::dependencies::parse_dependency_string(source)
+                && dep.manager != "zoi"
+            {
+                valid_non_zoi_deps.insert(source.clone());
+            }
+        }
+        for node in graph.nodes.values() {
+            for dep in &node.dependencies {
+                if let Ok(dep_req) = crate::pkg::dependencies::parse_dependency_string(dep)
+                    && dep_req.manager != "zoi"
+                {
+                    valid_non_zoi_deps.insert(dep.clone());
+                }
+            }
+        }
+        non_zoi_deps.retain(|dep| valid_non_zoi_deps.contains(dep));
     }
 
     if graph.nodes.is_empty() && non_zoi_deps.is_empty() {
