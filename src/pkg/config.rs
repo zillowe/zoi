@@ -524,6 +524,7 @@ pub fn clone_git_repo(url: &str) -> Result<()> {
     println!("Cloning '{}' into {}...", url.cyan(), target.display());
     let status = std::process::Command::new("git")
         .arg("clone")
+        .arg("--depth=1")
         .arg(url)
         .arg(&target)
         .status()?;

@@ -346,6 +346,7 @@ fn run_verbose_at_path(db_url: &str, db_path: &Path) -> Result<()> {
     } else {
         let status = Command::new("git")
             .arg("clone")
+            .arg("--depth=1")
             .arg("--progress")
             .arg(db_url)
             .arg(db_path)
@@ -376,6 +377,7 @@ fn run_quiet_git_at_path(db_url: &str, db_path: &Path) -> Result<()> {
     } else {
         let output = Command::new("git")
             .arg("clone")
+            .arg("--depth=1")
             .arg("--quiet")
             .arg(db_url)
             .arg(db_path)
