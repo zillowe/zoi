@@ -1,0 +1,73 @@
+---
+title: Packaging Fonts
+description: A guide on how to package and install fonts cross-platform with Zoi.
+---
+
+Packaging fonts requires careful handling of installation paths, as different operating systems store fonts in different locations. Additionally, Zoi supports both system-wide and user-specific font installations.
+
+## Recommended Path Strategy
+
+When packaging a font, you should dynamically determine the destination directory based on `SYSTEM.OS` and `PKG.scope`.
+
+### Example Helper Function
+
+Include a helper function like this in your `.pkg.lua` to ensure portability:
+
+```lua
+local function get_font_dir()
+    if SYSTEM.OS == "linux" then
+        -- Linux: TTF subfolder is common for system-wide, .local/share for user
+        return (PKG.scope == "system") and "${usrroot}/usr/share/fonts/TTF" or "${usrhome}/.local/share/fonts"
+    elseif SYSTEM.OS == "macos" then
+        -- macOS: /Library/Fonts for system, ~/Library/Fonts for user
+        return (PKG.scope == "system") and "${usrroot}/Library/Fonts" or "${usrhome}/Library/Fonts"
+    elseif SYSTEM.OS == "windows" then
+        -- Windows: C:\Windows\Fonts for system, %APPDATA% for user
+        return (PKG.scope == "system") and "${usrroot}/Windows/Fonts"
+            or "${usrhome}/AppData/Local/Microsoft/Windows/Fonts"
+    end
+    -- Fallback to the package store
+    return "${pkgstore}/share/fonts"
+end
+```
+
+## Implementation Example: `zeno` Font
+
+Here is how a real font package (`@zillowe/zeno`) uses this strategy to stage multiple `.ttf` files:
+
+```lua
+function package()
+    local font_dir = get_font_dir()
+    local fonts = {
+        "ZenoMonoCode.ttf",
+        "ZenoMonoNerd.ttf",
+        -- ... other font files
+    }
+
+    for _, font in ipairs(fonts) do
+        -- Stage each font to the dynamically resolved directory
+        zcp("source/dist/" .. font, font_dir .. "/" .. font)
+    end
+
+    -- Also handle the license file portably
+    zcp("source/LICENSE", get_license_dir() .. "/LICENSE")
+end
+```
+
+## Updating Font Caches (Linux)
+
+On Linux, simply copying font files is often not enough for applications to recognize them immediately. You should use Zoi's built-in **Transaction Hooks** to trigger `fc-cache`.
+
+Zoi includes a built-in hook called `update-font-cache` that automatically runs `fc-cache -fv` whenever files are modified under `usr/share/fonts/` or `usr/local/share/fonts/`.
+
+<Callout title="Automatic Integration">
+  If you stage your fonts to `${usrroot}/usr/share/fonts/...`, Zoi will
+  automatically rebuild the font cache at the end of the transaction. No
+  manual script is needed in your `.pkg.lua`.
+</Callout>
+
+## Best Practices
+
+1. **Prefer TTF/OTF:** Use TrueType or OpenType formats for maximum compatibility across all three major platforms.
+2. **Scope Awareness:** Always respect `PKG.scope`. System-wide fonts require `sudo`, which Zoi handles via Just-in-Time escalation, but user-scoped fonts are often preferred for dev environments.
+3. **License Staging:** Always include the font's license (e.g. SIL Open Font License) in a standard location like `/usr/share/licenses/` on Linux.
