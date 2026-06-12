@@ -23,6 +23,7 @@ const PKG_SOURCE_HELP: &str = "Package identifier (e.g. @repo/name, path, or URL
 #[command(name = "zoi", author, about, long_about = None, disable_version_flag = true,
     trailing_var_arg = true,
     color = ColorChoice::Auto,
+    arg_required_else_help = true,
 )]
 pub struct Cli {
     #[command(subcommand)]
@@ -212,7 +213,8 @@ enum Commands {
     /// Modify the installation reason of a package
     #[command(
         alias = "m",
-        long_about = "Changes whether a package is considered explicitly installed or a dependency. Explicit packages are not removed by 'autoremove', while dependencies are if no other package requires them."
+        long_about = "Changes whether a package is considered explicitly installed or a dependency. Explicit packages are not removed by 'autoremove', while dependencies are if no other package requires them.",
+        group(clap::ArgGroup::new("mode").required(true).args(["as_dependency", "as_explicit"]))
     )]
     Mark {
         #[arg(value_name = "INST_PACKAGES", required = true, help = PKG_SOURCE_HELP)]
@@ -228,7 +230,11 @@ enum Commands {
     },
 
     /// Updates one or more packages to their latest versions
-    #[command(alias = "up")]
+    #[command(
+        alias = "up",
+        arg_required_else_help = true,
+        group(clap::ArgGroup::new("target").required(true).args(["package_names", "all"]))
+    )]
     Update {
         #[arg(value_name = "INST_PACKAGES", help = PKG_SOURCE_HELP)]
         package_names: Vec<String>,
@@ -489,7 +495,9 @@ enum Commands {
 
     /// Set up shell completions or enter an ephemeral environment with specific packages
     #[command(
-        long_about = "If a shell is provided, it installs completion scripts. If 'hook' is provided, it outputs shell-specific hook scripts for auto-activation. If packages are provided via --package/-p, it enters a temporary subshell with those packages available in PATH."
+        long_about = "If a shell is provided, it installs completion scripts. If 'hook' is provided, it outputs shell-specific hook scripts for auto-activation. If packages are provided via --package/-p, it enters a temporary subshell with those packages available in PATH.",
+        arg_required_else_help = true,
+        group(clap::ArgGroup::new("shell_action").required(true).args(["shell", "hook", "packages"]))
     )]
     Shell {
         /// The shell to set up completions or hooks for
@@ -767,7 +775,7 @@ pub fn run() -> anyhow::Result<()> {
         .placeholder(styling::AnsiColor::Cyan.on_default());
 
     let commit: &str = option_env!("ZOI_COMMIT_HASH").unwrap_or("dev");
-    let mut cmd = Cli::command().styles(styles.clone());
+    let cmd = Cli::command().styles(styles.clone());
     let matches = cmd.clone().get_matches();
     let cli = match Cli::from_arg_matches(&matches) {
         Ok(cli) => cli,
@@ -903,17 +911,7 @@ pub fn run() -> anyhow::Result<()> {
                 packages,
                 as_dependency,
                 as_explicit,
-            } => {
-                if !as_dependency && !as_explicit {
-                    let mut cmd = Cli::command();
-                    if let Some(subcmd) = cmd.find_subcommand_mut("mark") {
-                        subcmd.print_help()?;
-                    }
-                    Ok(())
-                } else {
-                    cmd::mark::run(&packages, as_dependency, as_explicit)
-                }
-            }
+            } => cmd::mark::run(&packages, as_dependency, as_explicit),
             Commands::Update {
                 package_names,
                 all,
@@ -921,26 +919,16 @@ pub fn run() -> anyhow::Result<()> {
                 explain,
                 plan_json,
                 interactive,
-            } => {
-                if !all && package_names.is_empty() {
-                    let mut cmd = Cli::command();
-                    if let Some(subcmd) = cmd.find_subcommand_mut("update") {
-                        subcmd.print_help()?;
-                    }
-                    Ok(())
-                } else {
-                    cmd::update::run(
-                        all,
-                        &package_names,
-                        cli.yes,
-                        dry_run,
-                        explain,
-                        plan_json,
-                        interactive,
-                    )
-                    .map_err(|e| cmd::ux::with_failure_hint("update", e))
-                }
-            }
+            } => cmd::update::run(
+                all,
+                &package_names,
+                cli.yes,
+                dry_run,
+                explain,
+                plan_json,
+                interactive,
+            )
+            .map_err(|e| cmd::ux::with_failure_hint("update", e)),
             Commands::Install {
                 sources,
                 repo,
@@ -1073,14 +1061,8 @@ pub fn run() -> anyhow::Result<()> {
                     cmd::shell::print_hook(shell.unwrap_or(Shell::Bash))
                 } else if !packages.is_empty() {
                     cmd::shell::enter_ephemeral_shell(&packages, run, Some(&plugin_manager))
-                } else if let Some(s) = shell {
-                    cmd::shell::run(s, scope)
                 } else {
-                    let mut cmd = Cli::command();
-                    if let Some(subcmd) = cmd.find_subcommand_mut("shell") {
-                        subcmd.print_help()?;
-                    }
-                    Ok(())
+                    cmd::shell::run(shell.unwrap_or(Shell::Bash), scope)
                 }
             }
             Commands::Exec {
@@ -1204,8 +1186,6 @@ pub fn run() -> anyhow::Result<()> {
             eprintln!("Error: {}", e);
             std::process::exit(1);
         }
-    } else {
-        cmd.print_help()?;
     }
     Ok(())
 }

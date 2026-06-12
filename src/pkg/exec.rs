@@ -261,7 +261,7 @@ pub fn run(
     }
 
     println!(
-        "\n{} Executing '{}'...\n",
+        "{} Executing '{}'...\n",
         "::".bold().blue(),
         pkg.name.bold()
     );
