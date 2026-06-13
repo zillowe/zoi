@@ -17,7 +17,7 @@ warn() {
 }
 
 GITLAB_PROJECT_ID="71087662"
-GITLAB_PROJECT_PATH="Zillowe/Zillwen/Zusty/Zoi"
+GITLAB_PROJECT_PATH="zillowe/zillwen/zusty/zoi"
 PUBLIC_KEY_URL="https://zillowe.pages.dev/keys/zillowe-main.asc"
 
 os=""

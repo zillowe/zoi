@@ -12,7 +12,7 @@ COMPILED_DIR="./scripts/release"
 ARCHIVE_DIR="./scripts/archived"
 CHECKSUM_FILE="${ARCHIVE_DIR}/checksums.txt"
 CHECKSUM_SHA256_FILE="${ARCHIVE_DIR}/checksums-256.txt"
-GITLAB_PROJECT_PATH="Zillowe/Zillwen/Zusty/Zoi"
+GITLAB_PROJECT_PATH="zillowe/zillwen/zusty/zoi"
 PUBLIC_KEY_URL="https://zillowe.pages.dev/keys/zillowe-main.asc"
 
 function check_command() {

@@ -2,8 +2,8 @@
 # https://git-cliff.org/docs/configuration
 
 [remote.gitlab]
-owner = "Zillowe/Zillwen/Zusty"
-repo = "Zoi"
+owner = "zillowe/zillwen/zusty"
+repo = "zoi"
 
 [changelog]
 header = """
