@@ -56,8 +56,8 @@ ignored = ["openssl", "phf"]
 
 [package.metadata.deb]
 name = "zoi"
-maintainer = "Zillowe Team <contact@zillowe.qzz.io>"
-copyright = "2024 Zillowe"
+maintainer = "Zillowe Foundation <contact@zillowe.qzz.io>"
+copyright = "2026 Zillowe"
 license-file = ["LICENSE", "4"]
 depends = "$auto, git"
 section = "utils"
@@ -65,7 +65,6 @@ priority = "optional"
 assets = [
   { source = "target/release/zoi", dest = "/usr/bin/zoi", mode = "755" },
   { source = "README.md", dest = "/usr/share/doc/zoi/README.md", mode = "644" },
-  { source = "LICENSE", dest = "/usr/share/doc/zoi/copyright", mode = "644" },
 ]
 
 [package.metadata.generate-rpm]
