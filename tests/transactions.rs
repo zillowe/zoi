@@ -10,6 +10,7 @@ fn sample_manifest(name: &str, files: Vec<&str>) -> InstallManifest {
     InstallManifest {
         name: name.to_string(),
         version: "1.0.0".to_string(),
+        revision: "1".to_string(),
         sub_package: None,
         repo: "test".to_string(),
         registry_handle: "local".to_string(),

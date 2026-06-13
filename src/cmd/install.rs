@@ -386,7 +386,12 @@ pub fn run(
             } else {
                 n.pkg.name.clone()
             };
-            format!("@{}:{}", name, n.version).cyan().to_string()
+            let version_display = if n.revision != "1" {
+                format!("{}-{}", n.version, n.revision)
+            } else {
+                n.version.clone()
+            };
+            format!("@{}:{}", name, version_display).cyan().to_string()
         })
         .collect();
     println!(" {}", direct_list.join("  "));
@@ -412,10 +417,15 @@ pub fn run(
             } else {
                 node.pkg.name.clone()
             };
+            let version_display = if node.revision != "1" {
+                format!("{}-{}", node.version, node.revision)
+            } else {
+                node.version.clone()
+            };
             println!(
                 "  - {}@{} -> {} ({})",
                 display_name.cyan(),
-                node.version,
+                version_display,
                 origin.as_str(),
                 action_name
             );
@@ -435,7 +445,16 @@ pub fn run(
             } else {
                 n.pkg.name.clone()
             };
-            dep_list.push(format!("zoi: @{}:{}", name, n.version).dimmed().to_string());
+            let version_display = if n.revision != "1" {
+                format!("{}-{}", n.version, n.revision)
+            } else {
+                n.version.clone()
+            };
+            dep_list.push(
+                format!("zoi: @{}:{}", name, version_display)
+                    .dimmed()
+                    .to_string(),
+            );
         }
         for d in &non_zoi_deps {
             dep_list.push(d.dimmed().to_string());
@@ -497,8 +516,13 @@ pub fn run(
                     format!("dependency of {}", parent)
                 }
             };
+            let version_display = if node.revision != "1" {
+                format!("{} (rev {})", node.version, node.revision)
+            } else {
+                node.version.clone()
+            };
             report = report.item(
-                format!("{}@{}", node.pkg.name, node.version),
+                format!("{}@{}", node.pkg.name, version_display),
                 format!("[{}]", reason),
                 vec![format!(
                     "via {} ({})",
@@ -529,6 +553,7 @@ pub fn run(
                 "id": id,
                 "name": node.pkg.name,
                 "version": node.version,
+                "revision": node.revision,
                 "sub_package": node.sub_package,
                 "repo": node.pkg.repo,
                 "registry": node.registry_handle,
@@ -694,7 +719,12 @@ pub fn run(
             } else {
                 node.pkg.name.clone()
             };
-            println!(" @{}:{}", name, node.version);
+            let version_display = if node.revision != "1" {
+                format!("{}-{}", node.version, node.revision)
+            } else {
+                node.version.clone()
+            };
+            println!(" @{}:{}", name, version_display);
 
             let action = install_plan.get(pkg_id).ok_or_else(|| {
                 anyhow!(
@@ -889,6 +919,7 @@ pub fn run(
 
                 let detail = types::LockPackageDetail {
                     version: manifest.version.clone(),
+                    revision: manifest.revision.clone(),
                     sub_package: manifest.sub_package.clone(),
                     integrity,
                     git_sha,

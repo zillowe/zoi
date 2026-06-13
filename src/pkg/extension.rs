@@ -197,6 +197,7 @@ pub fn add(
     let manifest = types::InstallManifest {
         name: pkg.name.clone(),
         version: pkg.version.clone().unwrap_or_default(),
+        revision: pkg.revision.clone(),
         sub_package: None,
         repo: pkg.repo.clone(),
         registry_handle: registry_handle.unwrap_or_default(),

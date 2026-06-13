@@ -34,6 +34,7 @@ ZOI = {}
 ---@field name string Required. The name of the package.
 ---@field repo string Required. The repository tier (e.g., "core", "community").
 ---@field version string? The package version.
+---@field revision string? The package revision (defaults to "1").
 ---@field versions table<string, string>? A map of channels to versions (e.g., { stable = "1.2.3" }).
 ---@field description string Required. A short description of the package.
 ---@field website string? The official website URL.

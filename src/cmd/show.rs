@@ -125,10 +125,20 @@ fn print_beautiful(
     pkg: &crate::pkg::types::Package,
     installed_manifest: Option<&types::InstallManifest>,
 ) {
+    let version_display = if pkg.revision != "1" {
+        format!(
+            "{}-{}",
+            pkg.version.as_deref().unwrap_or("N/A"),
+            pkg.revision
+        )
+    } else {
+        pkg.version.clone().unwrap_or_else(|| "N/A".to_string())
+    };
+
     println!(
         "{} {} - {}",
         pkg.name.bold().green(),
-        pkg.version.as_deref().unwrap_or_default().dimmed(),
+        version_display.dimmed(),
         pkg.repo
     );
     if let Some(website) = &pkg.website {
@@ -152,11 +162,18 @@ fn print_beautiful(
         } else {
             "Installed".to_string()
         };
+
+        let installed_version_display = if manifest.revision != "1" {
+            format!("{}-{}", manifest.version, manifest.revision)
+        } else {
+            manifest.version.clone()
+        };
+
         println!(
             "{}: {} ({})",
             "Status".bold(),
             status_text.green(),
-            manifest.version
+            installed_version_display
         );
     } else {
         println!("{}: {}", "Status".bold(), "Not Installed".red());

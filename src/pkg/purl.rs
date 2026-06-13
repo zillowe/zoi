@@ -10,6 +10,10 @@ fn default_version() -> String {
     "1".to_string()
 }
 
+fn default_revision() -> String {
+    "1".to_string()
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CentralDbSpec {
     #[serde(default = "default_version")]
@@ -31,6 +35,8 @@ pub struct PurlPackageIndex {
     pub repo: String,
     pub repo_type: String,
     pub version: String,
+    #[serde(default = "default_revision")]
+    pub revision: String,
     pub description: String,
     pub dependencies: Option<Vec<String>>,
     pub sub_packages: Option<serde_json::Value>,

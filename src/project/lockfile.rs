@@ -41,6 +41,7 @@ pub fn write_zoi_lock(lockfile: &types::ZoiLock) -> Result<()> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FrozenLockPackage {
     pub source: String,
+    pub revision: String,
     pub direct: bool,
     pub chosen_options: Vec<String>,
     pub chosen_optionals: Vec<String>,
@@ -70,6 +71,7 @@ pub fn locked_packages(lockfile: &types::ZoiLock) -> Vec<FrozenLockPackage> {
             );
             packages.push(FrozenLockPackage {
                 source: format!("{}@{}", base_id, detail.version),
+                revision: detail.revision.clone(),
                 direct: direct_ids.is_empty() || direct_ids.contains(&base_id),
                 chosen_options: detail.options_dependencies.clone(),
                 chosen_optionals: detail.optionals_dependencies.clone(),
@@ -86,6 +88,7 @@ pub fn locked_packages(lockfile: &types::ZoiLock) -> Vec<FrozenLockPackage> {
                 .iter()
                 .map(|(full_id, version)| FrozenLockPackage {
                     source: format!("{}@{}", full_id, version),
+                    revision: "1".to_string(),
                     direct: true,
                     chosen_options: Vec::new(),
                     chosen_optionals: Vec::new(),

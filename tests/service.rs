@@ -48,6 +48,7 @@ fn test_linux_service_lifecycle() {
     let manifest = types::InstallManifest {
         name: pkg_name.to_string(),
         version: version.to_string(),
+        revision: "1".to_string(),
         sub_package: None,
         repo: repo.to_string(),
         registry_handle: handle.to_string(),

@@ -12,11 +12,17 @@ pub struct MiniVulnerability {
     pub summary: String,
 }
 
+fn default_revision() -> String {
+    "1".to_string()
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MiniPackageIndex {
     pub repo: String,
     pub repo_type: String,
     pub version: String,
+    #[serde(default = "default_revision")]
+    pub revision: String,
     pub description: String,
     #[serde(default, deserialize_with = "deserialize_sub_packages")]
     pub sub_packages: Option<Vec<String>>,

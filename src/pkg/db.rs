@@ -50,10 +50,24 @@ fn setup_schema(conn: &Connection) -> Result<()> {
             scope TEXT,
             reason TEXT,
             dependencies TEXT,
+            revision TEXT,
             UNIQUE(name, sub_package, repo, scope)
         )",
         [],
     )?;
+
+    let has_revision: bool = conn
+        .query_row(
+            "SELECT count(*) FROM pragma_table_info('packages') WHERE name='revision'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0)
+        > 0;
+
+    if !has_revision {
+        let _ = conn.execute("ALTER TABLE packages ADD COLUMN revision TEXT", []);
+    }
 
     let has_deps: bool = conn
         .query_row(
@@ -277,8 +291,8 @@ pub fn update_package(
     };
 
     conn.execute(
-        "INSERT INTO packages (name, sub_package, repo, version, description, package_type, tags, bins, license, registry, scope, reason, dependencies)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+        "INSERT INTO packages (name, sub_package, repo, version, description, package_type, tags, bins, license, registry, scope, reason, dependencies, revision)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
          ON CONFLICT(name, sub_package, repo, scope) DO UPDATE SET
             version = excluded.version,
             description = excluded.description,
@@ -288,7 +302,8 @@ pub fn update_package(
             license = excluded.license,
             registry = excluded.registry,
             reason = COALESCE(excluded.reason, packages.reason),
-            dependencies = excluded.dependencies",
+            dependencies = excluded.dependencies,
+            revision = excluded.revision",
         params![
             pkg.name,
             sub_package,
@@ -303,6 +318,7 @@ pub fn update_package(
             scope_str,
             reason_str,
             deps_json,
+            pkg.revision,
         ],
     )?;
 
@@ -518,7 +534,7 @@ pub fn find_provides(registry_handle: &str, term: &str) -> Result<Vec<(types::Pa
     let conn = open_connection(registry_handle)?;
 
     let mut stmt = conn.prepare(
-        "SELECT name, repo, version, description, package_type, tags, bins, license, sub_package 
+        "SELECT name, repo, version, description, package_type, tags, bins, license, sub_package, revision 
          FROM packages 
          WHERE name = ?1 OR bins LIKE ?2",
     )?;
@@ -530,6 +546,7 @@ pub fn find_provides(registry_handle: &str, term: &str) -> Result<Vec<(types::Pa
         let bins_raw: String = row.get(6)?;
         let bins: Vec<String> = serde_json::from_str(&bins_raw).unwrap_or_default();
         let type_raw: String = row.get(4)?;
+        let revision: String = row.get(9).unwrap_or_else(|_| "1".to_string());
 
         let package_type = match type_raw.as_str() {
             "collection" => types::PackageType::Collection,
@@ -542,6 +559,7 @@ pub fn find_provides(registry_handle: &str, term: &str) -> Result<Vec<(types::Pa
             name: row.get(0)?,
             repo: row.get(1)?,
             version: row.get(2)?,
+            revision,
             description: row.get(3)?,
             package_type,
             tags,
@@ -560,7 +578,7 @@ pub fn find_provides(registry_handle: &str, term: &str) -> Result<Vec<(types::Pa
     }
 
     let mut stmt = conn.prepare(
-        "SELECT p.name, p.repo, p.version, p.description, p.package_type, p.tags, p.bins, p.license, p.sub_package, pf.path 
+        "SELECT p.name, p.repo, p.version, p.description, p.package_type, p.tags, p.bins, p.license, p.sub_package, pf.path, p.revision 
          FROM packages p
          JOIN package_files pf ON p.id = pf.package_id
          WHERE pf.path LIKE ?1 OR pf.path LIKE ?2",
@@ -575,6 +593,7 @@ pub fn find_provides(registry_handle: &str, term: &str) -> Result<Vec<(types::Pa
         let bins_raw: String = row.get(6)?;
         let bins: Vec<String> = serde_json::from_str(&bins_raw).unwrap_or_default();
         let type_raw: String = row.get(4)?;
+        let revision: String = row.get(10).unwrap_or_else(|_| "1".to_string());
 
         let package_type = match type_raw.as_str() {
             "collection" => types::PackageType::Collection,
@@ -587,6 +606,7 @@ pub fn find_provides(registry_handle: &str, term: &str) -> Result<Vec<(types::Pa
             name: row.get(0)?,
             repo: row.get(1)?,
             version: row.get(2)?,
+            revision,
             description: row.get(3)?,
             package_type,
             tags,
@@ -627,7 +647,7 @@ pub fn find_provides(registry_handle: &str, term: &str) -> Result<Vec<(types::Pa
 pub fn search_packages(registry_handle: &str, term: &str) -> Result<Vec<types::Package>> {
     let conn = open_connection(registry_handle)?;
     let mut stmt = conn.prepare(
-        "SELECT name, repo, version, description, package_type, tags, license, sub_package 
+        "SELECT name, repo, version, description, package_type, tags, license, sub_package, revision 
          FROM packages 
          WHERE id IN (SELECT rowid FROM packages_fts WHERE packages_fts MATCH ?1)
          OR name LIKE ?2",
@@ -640,6 +660,7 @@ pub fn search_packages(registry_handle: &str, term: &str) -> Result<Vec<types::P
         let tags_raw: String = row.get(5)?;
         let tags: Vec<String> = serde_json::from_str(&tags_raw).unwrap_or_default();
         let type_raw: String = row.get(4)?;
+        let revision: String = row.get(8).unwrap_or_else(|_| "1".to_string());
 
         let package_type = match type_raw.as_str() {
             "collection" => types::PackageType::Collection,
@@ -652,6 +673,7 @@ pub fn search_packages(registry_handle: &str, term: &str) -> Result<Vec<types::P
             name: row.get(0)?,
             repo: row.get(1)?,
             version: row.get(2)?,
+            revision,
             description: row.get(3)?,
             package_type,
             tags,
@@ -676,7 +698,7 @@ pub fn search_packages(registry_handle: &str, term: &str) -> Result<Vec<types::P
 pub fn search_files(registry_handle: &str, term: &str) -> Result<Vec<(types::Package, String)>> {
     let conn = open_connection(registry_handle)?;
     let mut stmt = conn.prepare(
-        "SELECT p.name, p.repo, p.version, p.description, p.package_type, p.tags, p.license, p.sub_package, pf.path 
+        "SELECT p.name, p.repo, p.version, p.description, p.package_type, p.tags, p.license, p.sub_package, pf.path, p.revision 
          FROM packages p
          JOIN package_files pf ON p.id = pf.package_id
          WHERE pf.id IN (SELECT rowid FROM package_files_fts WHERE package_files_fts MATCH ?1)
@@ -690,6 +712,7 @@ pub fn search_files(registry_handle: &str, term: &str) -> Result<Vec<(types::Pac
         let tags_raw: String = row.get(5)?;
         let tags: Vec<String> = serde_json::from_str(&tags_raw).unwrap_or_default();
         let type_raw: String = row.get(4)?;
+        let revision: String = row.get(9).unwrap_or_else(|_| "1".to_string());
 
         let package_type = match type_raw.as_str() {
             "collection" => types::PackageType::Collection,
@@ -702,6 +725,7 @@ pub fn search_files(registry_handle: &str, term: &str) -> Result<Vec<(types::Pac
             name: row.get(0)?,
             repo: row.get(1)?,
             version: row.get(2)?,
+            revision,
             description: row.get(3)?,
             package_type,
             tags,
@@ -728,7 +752,7 @@ pub fn search_files(registry_handle: &str, term: &str) -> Result<Vec<(types::Pac
 pub fn list_all_packages(registry_handle: &str) -> Result<Vec<types::Package>> {
     let conn = open_connection(registry_handle)?;
     let mut stmt = conn.prepare(
-        "SELECT name, repo, version, description, package_type, tags, license, sub_package, scope, registry, reason FROM packages ORDER BY name"
+        "SELECT name, repo, version, description, package_type, tags, license, sub_package, scope, registry, reason, revision FROM packages ORDER BY name"
     )?;
 
     let rows = stmt.query_map([], |row| {
@@ -747,6 +771,7 @@ pub fn list_all_packages(registry_handle: &str) -> Result<Vec<types::Package>> {
         let scope_raw: Option<String> = row.get(8)?;
         let registry: Option<String> = row.get(9)?;
         let reason_raw: Option<String> = row.get(10)?;
+        let revision: String = row.get(11).unwrap_or_else(|_| "1".to_string());
 
         let scope = match scope_raw.as_deref() {
             Some("system") => types::Scope::System,
@@ -770,6 +795,7 @@ pub fn list_all_packages(registry_handle: &str) -> Result<Vec<types::Package>> {
             name: row.get(0)?,
             repo: row.get(1)?,
             version: row.get(2)?,
+            revision,
             description: row.get(3)?,
             package_type,
             tags,

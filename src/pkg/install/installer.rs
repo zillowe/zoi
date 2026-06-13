@@ -188,7 +188,12 @@ pub fn install_node(
             } else {
                 pkg.name.clone()
             };
-            pb.set_message(format!("zoi: @{}:{}", name, version));
+            let version_display = if node.revision != "1" {
+                format!("{}-{}", version, node.revision)
+            } else {
+                version.clone()
+            };
+            pb.set_message(format!("zoi: @{}:{}", name, version_display));
             Some(pb)
         } else {
             None

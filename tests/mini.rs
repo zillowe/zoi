@@ -41,6 +41,7 @@ fn test_mini_vulnerability_check() {
         repo: "zillowe".to_string(),
         repo_type: "official".to_string(),
         version: "4.0.0".to_string(),
+        revision: "1".to_string(),
         description: "test".to_string(),
         sub_packages: None,
         vuln: Some(vec![zoi::pkg::mini_resolve::MiniVulnerability {

@@ -63,6 +63,7 @@ pub fn collect_dependencies_for_group(
 pub struct InstallNode {
     pub pkg: Package,
     pub version: String,
+    pub revision: String,
     pub sub_package: Option<String>,
     pub reason: InstallReason,
     pub source: String,
@@ -174,6 +175,7 @@ pub fn build_graph_from_locked_packages(
             InstallNode {
                 pkg,
                 version: version_str,
+                revision: locked.revision.clone(),
                 sub_package: request.sub_package.clone(),
                 reason: if locked.direct {
                     InstallReason::Direct
@@ -378,6 +380,7 @@ pub fn resolve_dependency_graph(
                 let node = InstallNode {
                     pkg: pkg.clone(),
                     version: version_str,
+                    revision: pkg.revision.clone(),
                     sub_package: name.sub_package.clone(),
                     reason: InstallReason::Direct,
                     source: pkg_lua_path.to_string_lossy().to_string(),

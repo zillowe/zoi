@@ -20,6 +20,7 @@ pub fn create_manifest(
                 pkg.name
             )
         })?,
+        revision: pkg.revision.clone(),
         sub_package,
         repo: pkg.repo.clone(),
         registry_handle: registry_handle.to_string(),

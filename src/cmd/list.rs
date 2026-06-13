@@ -98,14 +98,26 @@ fn run_list_outdated(
             )
         };
 
-        if let Ok((_, new_version, _, _, _, _)) =
+        if let Ok((pkg, new_version, _, _, _, _)) =
             crate::pkg::resolve::resolve_package_and_version(&source, true, false)
-            && manifest.version != new_version
+            && (manifest.version != new_version || manifest.revision != pkg.revision)
         {
+            let current_display = if manifest.revision != "1" {
+                format!("{}-{}", manifest.version, manifest.revision)
+            } else {
+                manifest.version.clone()
+            };
+
+            let latest_display = if pkg.revision != "1" {
+                format!("{}-{}", new_version, pkg.revision)
+            } else {
+                new_version
+            };
+
             table.add_row(vec![
                 Cell::new(manifest.name.clone()).fg(Color::Cyan),
-                Cell::new(manifest.version.clone()).fg(Color::Yellow),
-                Cell::new(new_version).fg(Color::Green),
+                Cell::new(current_display).fg(Color::Yellow),
+                Cell::new(latest_display).fg(Color::Green),
                 Cell::new(manifest.repo.clone()).fg(Color::DarkGrey),
                 Cell::new(manifest.registry_handle.clone()).fg(Color::DarkGrey),
             ]);
@@ -199,11 +211,21 @@ fn run_list_installed(
                 pkg.name
             };
 
+            let version_display = if pkg.revision != "1" {
+                format!(
+                    "{}-{}",
+                    pkg.version.as_deref().unwrap_or("N/A"),
+                    pkg.revision
+                )
+            } else {
+                pkg.version.unwrap_or_else(|| "N/A".to_string())
+            };
+
             let repo_display = &pkg.repo;
 
             table.add_row(vec![
                 Cell::new(package_display).fg(Color::Cyan),
-                Cell::new(pkg.version.unwrap_or_else(|| "N/A".to_string())).fg(Color::Yellow),
+                Cell::new(version_display).fg(Color::Yellow),
                 Cell::new(repo_display.to_string()).fg(Color::Green),
                 Cell::new(pkg.registry_handle.unwrap_or_else(|| "none".to_string()))
                     .fg(Color::DarkGrey),
@@ -270,11 +292,17 @@ fn run_list_installed(
                 pkg.name
             };
 
+            let version_display = if m.revision != "1" {
+                format!("{}-{}", pkg.version, m.revision)
+            } else {
+                pkg.version
+            };
+
             let repo_display = &pkg.repo;
 
             table.add_row(vec![
                 Cell::new(package_display).fg(Color::Cyan),
-                Cell::new(pkg.version).fg(Color::Yellow),
+                Cell::new(version_display).fg(Color::Yellow),
                 Cell::new(repo_display.to_string()).fg(Color::Green),
                 Cell::new(m.registry_handle).fg(Color::DarkGrey),
                 Cell::new(format!("{:?}", pkg.package_type)).fg(Color::DarkGrey),
@@ -549,6 +577,13 @@ fn run_list_all(
 
         let version = crate::pkg::resolve::get_default_version(&pkg, handle_for_version)
             .unwrap_or_else(|_| "N/A".to_string());
+
+        let version_display = if pkg.revision != "1" {
+            format!("{}-{}", version, pkg.revision)
+        } else {
+            version.clone()
+        };
+
         let repo_display = pkg.repo.split_once('/').map(|x| x.1).unwrap_or(&pkg.repo);
 
         let full_name = if let Some(sub) = &pkg.sub_package {
@@ -568,7 +603,7 @@ fn run_list_all(
                 table.add_row(vec![
                     Cell::new(status_str).fg(status_color),
                     Cell::new(full_name_sub).fg(Color::Cyan),
-                    Cell::new(version.clone()).fg(Color::Yellow),
+                    Cell::new(version_display.clone()).fg(Color::Yellow),
                     Cell::new(repo_display.to_string()).fg(Color::Green),
                     Cell::new(format!("{:?}", pkg.package_type)).fg(Color::DarkGrey),
                 ]);
@@ -582,7 +617,7 @@ fn run_list_all(
             table.add_row(vec![
                 Cell::new(status_str).fg(status_color),
                 Cell::new(full_name).fg(Color::Cyan),
-                Cell::new(version).fg(Color::Yellow),
+                Cell::new(version_display).fg(Color::Yellow),
                 Cell::new(repo_display.to_string()).fg(Color::Green),
                 Cell::new(format!("{:?}", pkg.package_type)).fg(Color::DarkGrey),
             ]);

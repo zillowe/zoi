@@ -85,6 +85,7 @@ end
     let manifest = types::InstallManifest {
         name: pkg_name.to_string(),
         version: version.to_string(),
+        revision: "1".to_string(),
         sub_package: None,
         repo: "core".to_string(),
         registry_handle: handle.to_string(),
