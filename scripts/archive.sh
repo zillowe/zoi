@@ -82,6 +82,7 @@ if [ -d "$COMPILED_DIR/packages" ]; then
 fi
 
 for binary_path in "$COMPILED_DIR"/*; do
+    [ -f "$binary_path" ] || continue
     filename=$(basename "$binary_path")
 
     if [[ "$filename" == "zoi-mini"* ]]; then
