@@ -78,7 +78,7 @@ To build a `.deb` package, ensure `cargo-deb` is installed:
 
 ```sh
 cargo install cargo-deb
-cargo deb -p zoi
+cargo deb -p zoi-rs
 ```
 
 The resulting package will be located in `target/debian/`.
@@ -89,7 +89,7 @@ To build an `.rpm` package, ensure `cargo-generate-rpm` is installed:
 
 ```sh
 cargo install cargo-generate-rpm
-cargo generate-rpm -p zoi
+cargo generate-rpm -p zoi-rs
 ```
 
 The resulting package will be located in `target/generate-rpm/`.

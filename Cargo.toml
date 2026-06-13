@@ -63,23 +63,18 @@ depends = "$auto, git"
 section = "utils"
 priority = "optional"
 assets = [
-  ["target/release/zoi", "/usr/bin/zoi", "755"],
-  ["README.md", "/usr/share/doc/zoi/README.md", "644"],
-  ["LICENSE", "/usr/share/doc/zoi/copyright", "644"],
+  { source = "target/release/zoi", dest = "/usr/bin/zoi", mode = "755" },
+  { source = "README.md", dest = "/usr/share/doc/zoi/README.md", mode = "644" },
+  { source = "LICENSE", dest = "/usr/share/doc/zoi/copyright", mode = "644" },
 ]
 
-[package.metadata.rpm]
-package = "zoi"
-
-[package.metadata.rpm.cargo]
-buildflags = ["--release", "--bin", "zoi"]
-
-[package.metadata.rpm.targets]
-zoi = { path = "/usr/bin/zoi" }
-
-[package.metadata.rpm.files]
-"README.md" = { path = "/usr/share/doc/zoi/README.md", mode = "644" }
-"LICENSE" = { path = "/usr/share/licenses/zoi/LICENSE", mode = "644" }
+[package.metadata.generate-rpm]
+name = "zoi"
+assets = [
+  { source = "target/release/zoi", dest = "/usr/bin/zoi", mode = "755" },
+  { source = "README.md", dest = "/usr/share/doc/zoi/README.md", mode = "644", doc = true },
+  { source = "LICENSE", dest = "/usr/share/licenses/zoi/LICENSE", mode = "644", doc = true },
+]
 
 [dependencies]
 anyhow = "1.0.102"
