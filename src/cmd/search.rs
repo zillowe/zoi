@@ -239,6 +239,12 @@ pub fn run(
                 let version = crate::pkg::resolve::get_default_version(&pkg, handle_for_version)
                     .unwrap_or_else(|_| "N/A".to_string());
 
+                let version_display = if pkg.revision != "1" {
+                    format!("{}-{}", version, pkg.revision)
+                } else {
+                    version.clone()
+                };
+
                 let repo_display = &pkg.repo;
 
                 let tags_display = if pkg.tags.is_empty() {
@@ -255,7 +261,7 @@ pub fn run(
 
                 table.add_row(vec![
                     Cell::new(pkg.name).fg(comfy_table::Color::Cyan),
-                    Cell::new(version).fg(comfy_table::Color::Yellow),
+                    Cell::new(version_display).fg(comfy_table::Color::Yellow),
                     Cell::new(repo_display).fg(comfy_table::Color::Green),
                     Cell::new(pkg.license),
                     Cell::new(tags_display).fg(comfy_table::Color::DarkGrey),
@@ -424,6 +430,12 @@ fn run_tui_loop(
                 let version = crate::pkg::resolve::get_default_version(pkg, handle_for_version)
                     .unwrap_or_else(|_| "N/A".to_string());
 
+                let version_display = if pkg.revision != "1" {
+                    format!("{}-{}", version, pkg.revision)
+                } else {
+                    version
+                };
+
                 let details = vec![
                     Line::from(vec![
                         Span::styled(
@@ -440,7 +452,10 @@ fn run_tui_loop(
                             "Version: ",
                             RatatuiStyle::default().add_modifier(Modifier::BOLD),
                         ),
-                        Span::styled(version, RatatuiStyle::default().fg(RatatuiColor::Yellow)),
+                        Span::styled(
+                            version_display,
+                            RatatuiStyle::default().fg(RatatuiColor::Yellow),
+                        ),
                     ]),
                     Line::from(vec![
                         Span::styled(

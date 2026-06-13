@@ -119,9 +119,18 @@ fn run_update_single_logic(
         "Currently installed version: {}",
         old_manifest.version.yellow()
     );
+    if old_manifest.revision != "1" || new_pkg.revision != "1" {
+        println!(
+            "Currently installed revision: {}",
+            old_manifest.revision.yellow()
+        );
+    }
     println!("Available version: {}", new_version.green());
+    if old_manifest.revision != "1" || new_pkg.revision != "1" {
+        println!("Available revision: {}", new_pkg.revision.green());
+    }
 
-    if old_manifest.version == new_version {
+    if old_manifest.version == new_version && old_manifest.revision == new_pkg.revision {
         println!("\nPackage is already up to date.");
         ux::print_transaction_summary(&ux::TransactionSummary {
             command: "update".to_string(),
@@ -479,7 +488,7 @@ fn run_update_all_logic(
                 }
             };
 
-        if manifest.version == new_version {
+        if manifest.version == new_version && manifest.revision == new_pkg.revision {
             up_to_date_sources.push(source.clone());
             pb.inc(1);
             continue;
@@ -529,11 +538,27 @@ fn run_update_all_logic(
             } else {
                 String::new()
             };
+
+            let old_display = if candidate.old_manifest.revision != "1" {
+                format!(
+                    "{}-{}",
+                    candidate.old_manifest.version, candidate.old_manifest.revision
+                )
+            } else {
+                candidate.old_manifest.version.clone()
+            };
+
+            let new_display = if candidate.new_pkg.revision != "1" {
+                format!("{}-{}", candidate.new_version, candidate.new_pkg.revision)
+            } else {
+                candidate.new_version.clone()
+            };
+
             println!(
                 "  - {}: {} -> {}{}",
                 candidate.source.cyan(),
-                candidate.old_manifest.version.yellow(),
-                candidate.new_version.green(),
+                old_display.yellow(),
+                new_display.green(),
                 advisory_suffix
             );
 

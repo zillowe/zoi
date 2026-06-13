@@ -27,6 +27,7 @@ fn graph_with_package(
                 ..Default::default()
             },
             version: "1.0.0".to_string(),
+            revision: "1".to_string(),
             sub_package: sub_package_owned,
             reason: InstallReason::Direct,
             source: "test.pkg.lua".to_string(),

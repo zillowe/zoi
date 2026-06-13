@@ -40,6 +40,7 @@ fn test_sources_from_lock_falls_back_to_details_when_packages_empty() {
         "@core/hello".to_string(),
         LockPackageDetail {
             version: "2.0.0".to_string(),
+            revision: "1".to_string(),
             sub_package: None,
             integrity: "abc".to_string(),
             git_sha: None,
@@ -68,6 +69,7 @@ fn test_locked_packages_preserve_direct_flags_and_metadata() {
         "@core/app".to_string(),
         LockPackageDetail {
             version: "1.0.0".to_string(),
+            revision: "1".to_string(),
             sub_package: None,
             integrity: "abc".to_string(),
             git_sha: Some("deadbeef".to_string()),
@@ -80,6 +82,7 @@ fn test_locked_packages_preserve_direct_flags_and_metadata() {
         "@core/lib".to_string(),
         LockPackageDetail {
             version: "2.0.0".to_string(),
+            revision: "1".to_string(),
             sub_package: None,
             integrity: "def".to_string(),
             git_sha: None,

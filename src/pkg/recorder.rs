@@ -70,6 +70,7 @@ pub fn record_package(
             .as_ref()
             .cloned()
             .ok_or_else(|| anyhow!("Missing version"))?,
+        revision: pkg.revision.clone(),
         date: Utc::now().to_rfc3339(),
         reason: reason.clone(),
         scope: pkg.scope,

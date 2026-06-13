@@ -11,6 +11,7 @@ fn test_manifest(name: &str, version: &str) -> InstallManifest {
     InstallManifest {
         name: name.to_string(),
         version: version.to_string(),
+        revision: "1".to_string(),
         sub_package: None,
         repo: "community".to_string(),
         registry_handle: "zoidberg".to_string(),

@@ -42,6 +42,10 @@ fn default_version() -> String {
     "1".to_string()
 }
 
+fn default_revision() -> String {
+    "1".to_string()
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct AdvisoryRegistry {
     #[serde(default = "default_version")]
@@ -145,6 +149,8 @@ pub struct Package {
     pub name: String,
     pub repo: String,
     pub version: Option<String>,
+    #[serde(default = "default_revision")]
+    pub revision: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sub_packages: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -372,6 +378,8 @@ pub struct SandboxConfig {
 pub struct InstallManifest {
     pub name: String,
     pub version: String,
+    #[serde(default = "default_revision")]
+    pub revision: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sub_package: Option<String>,
     pub repo: String,
@@ -428,7 +436,7 @@ pub struct Transaction {
     pub operations: Vec<TransactionOperation>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
 pub struct Registry {
     #[serde(default)]
     pub handle: String,
@@ -615,6 +623,8 @@ pub struct ZoiLock {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LockPackageDetail {
     pub version: String,
+    #[serde(default = "default_revision")]
+    pub revision: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sub_package: Option<String>,
     pub integrity: String,
@@ -642,6 +652,8 @@ pub struct LockfilePackage {
     pub repo: String,
     pub registry: String,
     pub version: String,
+    #[serde(default = "default_revision")]
+    pub revision: String,
     pub date: String,
     pub reason: InstallReason,
     pub scope: Scope,

@@ -11,6 +11,7 @@ fn sample_manifest(name: &str, repo: &str) -> types::InstallManifest {
     types::InstallManifest {
         name: name.to_string(),
         version: "1.0.0".to_string(),
+        revision: "1".to_string(),
         sub_package: None,
         repo: repo.to_string(),
         registry_handle: "local".to_string(),

@@ -49,6 +49,7 @@ This table lists all the available fields you can use inside the `metadata` bloc
 | `name`           | `string`  | **Required.** The name of the package.                                                                                                     |
 | `repo`           | `string`  | **Required.** The repository tier where the package belongs (e.g. `core`, `community`).                                                    |
 | `version`        | `string`  | The package version. Set either `version` or `versions`. Can be hardcoded or determined dynamically.                                       |
+| `revision`       | `string`  | The package revision (defaults to `"1"`). Increment this to trigger an update when the package definition changes but the upstream version remains the same. |
 | `versions`       | `table`   | A map of channels to versions (e.g. `{ stable = "1.2.3", beta = "1.4.0" }`). Required if `version` is not set.                             |
 | `description`    | `string`  | **Required.** A short, one-line description of the package.                                                                                |
 | `website`        | `string`  | The official website of the software.                                                                                                      |
