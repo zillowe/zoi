@@ -103,6 +103,7 @@ Zoi is packed with features designed to make package management and environment 
   * `zoi autoremove`: Remove packages that were installed as dependencies but are no longer needed.
   * `zoi cache`: Manage and populate the local package archive cache.
   * `zoi clean`: Clear the cache of downloaded package binaries.
+  * `zoi clone`: Clone the git repository of a package to a local directory.
   * `zoi dev`: Enter a development shell for the current project, with environment variables (PATH, LD\_LIBRARY\_PATH, CPATH, etc.) automatically set up based on dependencies.
   * `zoi downgrade`: Interactively choose and install an older version of a package.
   * `zoi exec`: Download and run a package's binary in a temporary cache without a full installation.
@@ -207,6 +208,17 @@ Clears the cache of downloaded package binaries.
 **Options:**
 
 * `--dry-run`: Do not actually clear the cache, just show what would be done.
+
+***
+
+### `zoi clone <package> [location]`
+
+Clones the git repository of a package to a local directory. If no location is specified, it clones into a directory named after the package. Use `.` as the location to clone into the current directory.
+
+**Arguments:**
+
+* `<package>`: Package name, `@repo/name`, local `.pkg.lua` path, or URL.
+* `[location]`: The directory to clone the repository into.
 
 ***
 

@@ -554,6 +554,16 @@ enum Commands {
         dry_run: bool,
     },
 
+    /// Clones the git repository of a package
+    Clone {
+        /// The package identifier (e.g. @repo/name, path, or URL)
+        #[arg(value_name = "ALL_PACKAGES", required = true, help = PKG_SOURCE_HELP)]
+        package: String,
+        /// The location to clone the repository to
+        #[arg(value_name = "LOCATION")]
+        location: Option<String>,
+    },
+
     /// Manage Zoi's local cache
     Cache {
         #[command(subcommand)]
@@ -1082,6 +1092,7 @@ pub fn run() -> anyhow::Result<()> {
                 Err(e) => Err(e),
             },
             Commands::Clean { dry_run } => cmd::clean::run(dry_run),
+            Commands::Clone { package, location } => cmd::clone::run(&package, location, cli.yes),
             Commands::Cache { command } => match command {
                 CacheCommands::Add { files } => cmd::cache::add(&files),
                 CacheCommands::Clear { dry_run } => cmd::cache::clear(dry_run),

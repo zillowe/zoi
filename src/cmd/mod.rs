@@ -3,6 +3,7 @@ pub mod audit;
 pub mod autoremove;
 pub mod cache;
 pub mod clean;
+pub mod clone;
 pub mod create;
 pub mod dev;
 pub mod doctor;
