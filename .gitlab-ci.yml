@@ -131,10 +131,10 @@ build:linux:
     - ./scripts/build-linux.sh
     - |
       echo "Generating .deb and .rpm packages..."
-      cargo deb -p zoi --target x86_64-unknown-linux-gnu --no-build
-      cargo generate-rpm -p zoi --target x86_64-unknown-linux-gnu
-      cargo deb -p zoi --target aarch64-unknown-linux-gnu --no-build
-      cargo generate-rpm -p zoi --target aarch64-unknown-linux-gnu
+      cargo deb -p zoi-rs --target x86_64-unknown-linux-gnu --no-build
+      cargo generate-rpm -p zoi-rs --target x86_64-unknown-linux-gnu
+      cargo deb -p zoi-rs --target aarch64-unknown-linux-gnu --no-build
+      cargo generate-rpm -p zoi-rs --target aarch64-unknown-linux-gnu
       mkdir -p ./scripts/release/packages
       mv target/x86_64-unknown-linux-gnu/debian/*.deb ./scripts/release/packages/
       mv target/x86_64-unknown-linux-gnu/generate-rpm/*.rpm ./scripts/release/packages/
