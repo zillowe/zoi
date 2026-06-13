@@ -29,6 +29,7 @@ pub mod registry;
 pub mod repo_install;
 pub mod resolve;
 pub mod rollback;
+pub mod sandbox;
 pub mod service;
 pub mod shim;
 pub mod sync;

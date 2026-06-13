@@ -16,6 +16,52 @@ pub fn run_shim(
 ) -> Result<()> {
     let bin_path = resolve_to_installed_bin(bin_name, plugin_manager)?;
 
+    #[cfg(target_os = "linux")]
+    {
+        let mut current = bin_path.parent();
+        let mut manifest: Option<crate::pkg::types::InstallManifest> = None;
+        let mut pkg_version_dir = None;
+
+        while let Some(path) = current {
+            let mut manifest_path = None;
+            if let Ok(entries) = fs::read_dir(path) {
+                for entry in entries.flatten() {
+                    let name = entry.file_name().to_string_lossy().to_string();
+                    if name.starts_with("manifest") && name.ends_with(".yaml") {
+                        manifest_path = Some(entry.path());
+                        break;
+                    }
+                }
+            }
+
+            if let Some(mp) = manifest_path
+                && let Ok(content) = fs::read_to_string(mp)
+                && let Ok(m) = serde_yaml::from_str::<crate::pkg::types::InstallManifest>(&content)
+            {
+                manifest = Some(m);
+                pkg_version_dir = Some(path.to_path_buf());
+                break;
+            }
+            current = path.parent();
+        }
+
+        if let Some(m) = manifest
+            && let Some(sandbox) = m.sandbox
+            && sandbox.enabled
+            && let Some(version_dir) = pkg_version_dir
+        {
+            let mut cmd =
+                crate::pkg::sandbox::wrap_command(&bin_path, &args, &sandbox, &version_dir)?;
+            use std::os::unix::process::CommandExt;
+            let err = cmd.exec();
+            return Err(anyhow!(
+                "Failed to execute sandboxed binary '{}': {}",
+                bin_name,
+                err
+            ));
+        }
+    }
+
     let mut cmd = Command::new(bin_path);
     cmd.args(args);
 

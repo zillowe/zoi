@@ -75,6 +75,7 @@ This table lists all the available fields you can use inside the `metadata` bloc
 | `rollback`       | `boolean` | If `false`, disables rollback for this specific package even if enabled globally.                                                          |
 | `installed_size` | `integer` | The expected size of the package after installation (in bytes). Used for disk space checks.                                                |
 | `archive_size`   | `integer` | The size of the pre-compiled archive (in bytes).                                                                                           |
+| `sandbox`        | `table`   | Configuration for Linux-native Bubblewrap isolation. See the [Sandboxing Apps](/docs/zds/zoi/guides/sandboxing) guide.                     |
 
 ***
 

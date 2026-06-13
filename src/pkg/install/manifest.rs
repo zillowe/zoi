@@ -38,5 +38,6 @@ pub fn create_manifest(
         service: pkg.service.clone(),
         installed_files,
         installed_size: pkg.installed_size,
+        sandbox: pkg.sandbox.clone(),
     })
 }

@@ -29,6 +29,7 @@ fn test_manifest(name: &str, version: &str) -> InstallManifest {
         service: None,
         installed_files: vec![],
         installed_size: None,
+        sandbox: None,
     }
 }
 

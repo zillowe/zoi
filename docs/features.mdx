@@ -24,6 +24,8 @@ Zoi is packed with features designed to make package management and environment 
 
 * **Strict Offline Mode:** A global `--offline` flag that guarantees Zoi will not touch the network, relying exclusively on local metadata and archive caches for secure, air-gapped environments.
 
+* **Native Linux Sandboxing:** Run packages in a secure, "default-deny" isolated environment using Bubblewrap. Package maintainers explicitly define network, system, and file access permissions, protecting your host system from malicious or buggy software.
+
 * **Reproducible Project Installs (`--frozen-lockfile`):** Rebuild a project environment from `zoi.lock` without re-resolving versions, sub-packages, or recorded dependency choices.
 
 * **Global Transaction Hooks:** Automate system maintenance tasks (like font cache updates) based on modified file paths. Hooks run once per transaction, preventing redundant script execution.

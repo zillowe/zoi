@@ -215,6 +215,7 @@ pub fn add(
         service: None,
         installed_files: vec![],
         installed_size: pkg.installed_size,
+        sandbox: None,
     };
     let mut wrote_manifest = false;
     let mut applied_changes = Vec::new();
