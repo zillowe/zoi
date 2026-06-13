@@ -4,7 +4,7 @@
 $ErrorActionPreference = "Stop"
 
 $GitLabProjectId = "71087662"
-$GitLabProjectPath = "Zillowe/Zillwen/Zusty/Zoi"
+$GitLabProjectPath = "zillowe/zillwen/zusty/zoi"
 $PublicKeyUrl = "https://zillowe.pages.dev/keys/zillowe-main.asc"
 
 function Write-Info { param($Message) Write-Host "[INFO] $Message" -ForegroundColor Cyan }

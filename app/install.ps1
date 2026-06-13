@@ -6,7 +6,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$GitLabProjectPath = "Zillowe/Zillwen/Zusty/Zoi"
+$GitLabProjectPath = "zillowe/zillwen/zusty/zoi"
 $GitLabProjectId = "71087662"
 $InstallDir = Join-Path $env:USERPROFILE ".zoi\bin"
 $BinName = "zoi.exe"

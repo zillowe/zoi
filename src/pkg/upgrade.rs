@@ -15,7 +15,7 @@ use tempfile::Builder;
 use zip::ZipArchive;
 use zstd::stream::read::Decoder as ZstdDecoder;
 
-const GITLAB_PROJECT_PATH: &str = "Zillowe/Zillwen/Zusty/Zoi";
+const GITLAB_PROJECT_PATH: &str = "zillowe/zillwen/zusty/zoi";
 const GITLAB_PROJECT_ID: &str = "71087662";
 
 #[derive(Debug, Deserialize)]
