@@ -4,6 +4,29 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
+## [Prod-Release-1.18.4] - 2026-06-13
+
+### ✨ Features
+
+- *(pkg)* Add 'revision' support
+- *(cli)* Add clone command to clone package's git repository
+- *(sandbox)* Implement native Linux sandboxing with Bubblewrap
+- *(cli)* Add verbose flag to 'exec' for execution details
+- *(install)* Optimize git clone operations and refine non-zoi dependency resolution
+
+### 🔧 Configuration
+
+- *(build)* Update Justfile to use env
+- *(build)* Update installation instructions in configure script
+
+### 🛠️ Build
+
+- Add deb and rpm package support
+
+### 🩹 Bug Fixes
+
+- *(cli)* Resolve missing command output colors
+
 ## [Prod-Release-1.18.3] - 2026-06-08
 
 ### 🩹 Bug Fixes
