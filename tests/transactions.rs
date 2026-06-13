@@ -28,6 +28,7 @@ fn sample_manifest(name: &str, files: Vec<&str>) -> InstallManifest {
         service: None,
         installed_files: files.into_iter().map(str::to_string).collect(),
         installed_size: None,
+        sandbox: None,
     }
 }
 

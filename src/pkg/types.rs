@@ -205,6 +205,8 @@ pub struct Package {
     pub installed_size: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub archive_size: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sandbox: Option<SandboxConfig>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -348,6 +350,24 @@ pub enum InstallReason {
     Dependency { parent: String },
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
+pub struct SandboxConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub network: bool,
+    #[serde(default)]
+    pub system: bool,
+    #[serde(default)]
+    pub cwd: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub read: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub write: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub env: Vec<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct InstallManifest {
     pub name: String,
@@ -382,6 +402,8 @@ pub struct InstallManifest {
     pub installed_files: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub installed_size: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sandbox: Option<SandboxConfig>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

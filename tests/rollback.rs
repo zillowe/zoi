@@ -44,6 +44,7 @@ fn test_transaction_rollback_uninstall() {
         service: None,
         installed_files: vec![],
         installed_size: None,
+        sandbox: None,
     };
 
     let manifest_path = version_dir.join("manifest.yaml");
@@ -95,6 +96,7 @@ fn test_package_rollback_requires_explicit_source_for_ambiguous_name_matches() {
         service: None,
         installed_files: vec![],
         installed_size: None,
+        sandbox: None,
     };
 
     let mut extra_manifest = base_manifest.clone();

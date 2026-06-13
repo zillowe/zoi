@@ -66,6 +66,7 @@ fn test_linux_service_lifecycle() {
         service: Some(service_config.clone()),
         installed_files: vec![],
         installed_size: None,
+        sandbox: None,
     };
 
     let manifest_path = version_path.join("manifest.yaml");

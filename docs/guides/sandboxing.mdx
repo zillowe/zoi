@@ -1,0 +1,174 @@
+---
+title: Packaging Sandboxed Apps
+description: A guide to packaging securely isolated applications using Zoi's Bubblewrap sandbox integration, using Firefox as an example.
+---
+
+Zoi provides native, "default-deny" sandboxing for Linux using [Bubblewrap (`bwrap`)](https://github.com/containers/bubblewrap). Unlike traditional package managers that grant binaries full access to your filesystem, Zoi allows package maintainers to strictly define exactly what an application can see and do.
+
+This guide walks through creating a sandboxed package, using **Firefox** as a real-world example of a complex GUI application.
+
+## The Sandboxing Model
+
+When a Zoi package enables the sandbox (`sandbox.enabled = true`), Zoi intercepts its execution and runs it within an unprivileged container.
+
+By default, the sandbox is **completely empty**:
+
+* **No Network:** The network namespace is unshared.
+* **No Host Files:** The root filesystem (`/`) is an empty `tmpfs`. The host's `/usr`, `/lib`, and `/etc` are hidden.
+* **No User Data:** `/home`, `/tmp`, and `/var` are empty `tmpfs` mounts.
+* **Only the Package:** The *only* directory mounted by default is the package's own store directory (read-only).
+
+To make an application functional, you must explicitly opt-in to the resources it needs.
+
+## Example: Sandboxing Firefox
+
+Firefox is a complex application. It needs network access, access to X11/Wayland for the display, access to PulseAudio/PipeWire for sound, and access to a specific directory in the user's home folder (`~/.mozilla`) to save profiles.
+
+Here is how you translate those requirements into a Zoi `.pkg.lua` definition.
+
+```lua
+local version = "151.0.4"
+local archive = "firefox-" .. version .. ".source.tar.xz"
+local url = "https://archive.mozilla.org/pub/firefox/releases/" .. version .. "/source/" .. archive
+
+metadata({
+  name = "firefox",
+  repo = "main",
+  version = version,
+  description = "Fast, Private & Safe Web Browser",
+  website = "https://www.mozilla.org/firefox/",
+  license = "MPL-2.0",
+  bins = { "firefox" },
+  types = { "source" },
+  platforms = { "linux" },
+  
+  -- The core of the security isolation:
+  sandbox = {
+    enabled = true,
+    
+    -- Firefox needs the internet
+    network = true,
+    
+    -- Firefox is a dynamic GUI app. It needs access to the host's 
+    -- GTK, glibc, X11, Wayland, and font libraries.
+    system = true,
+    
+    -- It does not need access to the terminal's working directory
+    cwd = false,
+    
+    -- Firefox needs to READ specific host configurations (like fonts and icons)
+    read = {
+      "~/.config/fontconfig",
+      "~/.icons",
+      "~/.local/share/icons"
+    },
+    
+    -- Firefox needs to WRITE to specific locations to function
+    write = {
+      -- Its profile data
+      "~/.mozilla",
+      "~/.cache/mozilla",
+      
+      -- X11, Wayland, and D-Bus sockets in /run/user/1000/
+      -- (Note: In a true production package, you'd use shell hooks to resolve XDG_RUNTIME_DIR)
+      "/run/user", 
+      
+      -- /tmp is needed for IPC
+      "/tmp",
+      
+      -- Downloads folder
+      "~/Downloads"
+    }
+  }
+})
+
+dependencies({
+  build = {
+    types = {
+      source = {
+        required = {
+          "native:rust", "native:clang", "native:nodejs", 
+          "native:python", "native:llvm", "native:lld",
+          -- ... other build dependencies ...
+        }
+      }
+    }
+  },
+  runtime = {
+    required = {
+      "native:gtk3", "native:dbus", "native:glibc", "native:libx11",
+      "native:alsa-lib", "native:ffmpeg"
+      -- ... other runtime libraries ...
+    }
+  }
+})
+
+function prepare()
+  -- Fetch and extract source
+  UTILS.FILE(url, archive)
+  UTILS.EXTRACT(archive, "src")
+end
+
+function package()
+  -- Simplified build logic:
+  cmd("cd src/firefox-" .. version .. " && ./mach build")
+  cmd("cd src/firefox-" .. version .. " && ./mach install DESTDIR=" .. STAGING_DIR .. "/usr")
+  
+  -- Stage binary to pkgstore
+  zcp(STAGING_DIR .. "/usr/bin/firefox", "${pkgstore}/bin/firefox")
+  zcp(STAGING_DIR .. "/usr/lib/firefox", "${pkgstore}/lib/firefox")
+end
+```
+
+## How It Works
+
+When a user runs `firefox` (or when it's launched from a desktop shortcut created by Zoi), the Zoi shim reads the `sandbox` block from the package's local manifest.
+
+Instead of running `firefox` directly, Zoi executes:
+
+```bash
+bwrap \
+  --unshare-all --new-session \
+  --share-net \               # Because network = true
+  --tmpfs / \                 # Start with an empty root
+  --ro-bind /usr /usr \       # Because system = true (brings in host libraries)
+  --ro-bind /lib /lib \
+  --ro-bind /etc/resolv.conf /etc/resolv.conf \
+  --dev /dev --proc /proc \
+  --tmpfs /var --tmpfs /run \
+  --ro-bind /home/user/.zoi/pkgs/store/123...-firefox/151.0.4 \ # The package itself
+  --bind /home/user/.mozilla /home/user/.mozilla \              # Profile write access
+  --bind /home/user/Downloads /home/user/Downloads \            # Downloads write access
+  --clearenv \
+  --setenv PATH ... \
+  -- /home/user/.zoi/pkgs/store/.../bin/firefox
+```
+
+If Firefox is compromised by a malicious website, the attacker **cannot**:
+
+* Read your `~/.ssh/id_rsa` keys.
+* Read your `~/Documents`.
+* See other running processes.
+* Modify the host operating system.
+
+They are strictly confined to `~/.mozilla` and `~/Downloads`.
+
+## Sandbox Fields
+
+| Field | Description |
+|---|---|
+| `enabled` | `boolean`. Activates Bubblewrap execution for this package on Linux. |
+| `network` | `boolean`. If `false`, the network namespace is unshared (no internet). |
+| `system` | `boolean`. If `true`, read-only mounts `/usr`, `/lib`, `/bin`, `/sbin`, `/etc/ssl`, and basic DNS configs, and mounts `/dev` and `/proc`. Required for dynamically linked apps. |
+| `cwd` | `boolean`. If `true`, the current terminal working directory is mounted read-write. |
+| `read` | `string[]`. A list of paths to mount read-only. Supports `~/` expansion. |
+| `write` | `string[]`. A list of paths to mount read-write. Zoi will attempt to create the parent directories on the host if they don't exist. Supports `~/` expansion. |
+| `env` | `string[]`. A list of host environment variables to pass through to the sandbox. (Note: If `system = true`, common GUI/Display variables are passed automatically). |
+
+## Testing Your Sandbox
+
+You can test the sandbox configuration locally by using `zoi exec` with the `--verbose` flag, which will print the exact `bwrap` command being generated:
+
+```bash
+zoi exec --verbose ./firefox.pkg.lua
+```

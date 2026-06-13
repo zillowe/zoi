@@ -300,14 +300,44 @@ pub fn run(
         );
     }
 
-    let mut cmd = Command::new(&bin_path);
-    if !args.is_empty() {
-        cmd.args(&args);
-    }
+    #[cfg(target_os = "linux")]
+    let mut cmd = if let Some(sandbox) = &pkg.sandbox
+        && sandbox.enabled
+    {
+        if verbose {
+            println!("{} Sandboxing is enabled.", "::".bold().yellow());
+        }
+        let pkg_store_path = bin_path
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new(""));
+        let bwrap_cmd =
+            crate::pkg::sandbox::wrap_command(&bin_path, &args, sandbox, pkg_store_path)?;
+        if verbose {
+            println!("> \"bwrap\" {:?}", bwrap_cmd.get_args().collect::<Vec<_>>());
+        }
+        bwrap_cmd
+    } else {
+        let mut c = Command::new(&bin_path);
+        if !args.is_empty() {
+            c.args(&args);
+        }
+        if verbose {
+            println!("> \"{}\" {}", bin_path.display(), args.join(" "));
+        }
+        c
+    };
 
-    if verbose {
-        println!("> \"{}\" {}", bin_path.display(), args.join(" "));
-    }
+    #[cfg(not(target_os = "linux"))]
+    let mut cmd = {
+        let mut c = Command::new(&bin_path);
+        if !args.is_empty() {
+            c.args(&args);
+        }
+        if verbose {
+            println!("> \"{}\" {}", bin_path.display(), args.join(" "));
+        }
+        c
+    };
 
     let status = cmd.status()?;
 
