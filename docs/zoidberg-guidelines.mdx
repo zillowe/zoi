@@ -1,0 +1,115 @@
+---
+title: Zoidberg Packaging Guidelines
+description: Official standards and policies for packages in the Zoidberg registry.
+---
+
+This document defines the official packaging guidelines for **Zoidberg**, the primary Zoi package registry. These standards ensure that Zoi remains a high-quality, secure, and consistent ecosystem for developers across Linux, macOS, and Windows.
+
+Packages submitted to the `core`, `main`, and `extra` tiers must adhere strictly to these guidelines.
+
+## 1. Inclusion Policy
+
+The Zoidberg registry is dedicated to high-quality software that enhances the developer and system environment.
+
+### 1.1. Open Source Requirement
+
+Software in the official tiers must be licensed under an [OSI-approved open-source license](https://opensource.org/licenses). Proprietary or "source-available" software may be considered for the `community` or `extra` tiers but must clearly state its restrictions.
+
+### 1.2. Functional Independence
+
+A package must be functional on its own or through its declared dependencies. It must not require un-redistributable or non-free external binary blobs to perform its core task.
+
+### 1.3. Malicious or Encumbered Content
+
+Packages containing malware, spyware, or offensive content are strictly prohibited. We also avoid software that is primarily intended for circumventing copyright protections or other patent-encumbered formats that cannot be freely distributed.
+
+## 2. Source vs. Pre-compiled
+
+Zoidberg follows a **Pragmatic Hybrid** model.
+
+### 2.1. Preference for Source Builds
+
+Building from source is strongly preferred. It provides maximum transparency, allows for platform-specific optimizations (like `SYSTEM.ARCH` branching), and ensures dependencies are correctly linked against the host system.
+
+### 2.2. Pre-compiled Binary Rules
+
+Pre-compiled binaries are allowed for ecosystems where source builds are impractical for end-users (e.g. massive Rust tools or complex Windows applications). If using pre-compiled archives:
+
+* **Verification:** You MUST use `verifyHash()` with a strong algorithm (SHA-256 or SHA-512) and are encouraged to use `verifySignature()` with author PGP keys.
+* **Static vs. Dynamic:** Prefer statically linked binaries for `pre-compiled` types to maximize portability.
+
+## 3. Naming Standards
+
+### 3.1. General Naming
+
+* **Lowercase:** All package names must be lowercase.
+* **Character Set:** Use only ASCII alphanumeric characters and the hyphen (`-`).
+* **Separators:** Use hyphens to separate words (e.g. `ripgrep`, `my-cool-tool`). Avoid underscores or periods.
+
+### 3.2. Sub-packages
+
+Utilize Zoi's `sub_packages` feature to keep the main installation lean. Standard sub-package names include:
+
+* `:headers` (or `:devel`): For C/C++ development headers and static libs.
+* `:docs`: For manuals, examples, and heavy documentation.
+* `:lib`: For shared libraries if the binary is separate.
+
+## 4. Versioning & Revisions
+
+### 4.1. `PKG.version`
+
+The `version` field must match the upstream version verbatim. If upstream uses a `v` prefix, strip it for consistency.
+
+### 4.2. `PKG.revision`
+
+The `revision` field (defaulting to `"1"`) tracks downstream packaging changes for the same upstream version.
+
+* **Increment** if you fix a bug in the `.pkg.lua` script or update a dependency.
+* **Reset** to `"1"` whenever the upstream `version` is bumped.
+
+### 4.3. Pre-releases
+
+Follow SemVer patterns for pre-releases (e.g. `1.0.0-rc1`).
+
+## 5. Dependency Management
+
+### 5.1. The Hybrid Model
+
+Zoidberg packages should leverage the most appropriate manager for the task:
+
+* **`zoi:`**: For other Zoi-native tools or components.
+* **`native:`**: For core system libraries (like `openssl` or `glibc`) where the host's package manager is the safest source.
+* **`npm:`, `cargo:`, `pip:`**: For language-specific tools that should remain isolated or versioned within their ecosystem.
+
+### 5.2. No Vendoring
+
+Manually bundling or "vendoring" external libraries inside your package is strictly prohibited. If your software requires a library, it must be declared as a dependency. This ensures that security patches to the library apply system-wide.
+
+## 6. Metadata & Legal
+
+### 6.1. License Declaration
+
+The `license` field in `metadata` must contain a valid [SPDX license identifier](https://spdx.org/licenses/).
+
+### 6.2. License Staging
+
+Every package MUST stage its full license text to the package store.
+
+```lua
+function package()
+  -- Standard location for license files
+  zcp("LICENSE", "${pkgstore}/LICENSE")
+end
+```
+
+### 6.3. Maintainer Attribution
+
+You must provide a valid `maintainer` block with a name and email. This is the primary contact for package updates or security issues.
+
+## 7. Quality Control
+
+Before submitting a Merge Request:
+
+1. **Linter:** Run `zoi package doctor` on your script. It must pass without errors.
+2. **Test:** Implement a `test()` function that verifies the binary runs (e.g. `myapp --version`).
+3. **Cross-Platform:** If possible, verify your package on at least one other OS or architecture.
