@@ -26,7 +26,7 @@ fn get_transaction_path(id: &str) -> Result<PathBuf> {
 }
 
 pub fn begin() -> Result<types::Transaction> {
-    let transaction = types::Transaction {
+    Ok(types::Transaction {
         id: Uuid::new_v7(Timestamp::from_unix(
             uuid::NoContext,
             Utc::now().timestamp_millis() as u64,
@@ -35,11 +35,7 @@ pub fn begin() -> Result<types::Transaction> {
         .to_string(),
         start_time: Utc::now().to_rfc3339(),
         operations: Vec::new(),
-    };
-    let path = get_transaction_path(&transaction.id)?;
-    let content = serde_json::to_string_pretty(&transaction)?;
-    fs::write(path, content)?;
-    Ok(transaction)
+    })
 }
 
 pub fn read_transaction(transaction_id: &str) -> Result<types::Transaction> {
@@ -55,7 +51,7 @@ pub fn read_transaction(transaction_id: &str) -> Result<types::Transaction> {
 }
 
 pub fn record_operation(
-    transaction_id: &str,
+    transaction: &mut types::Transaction,
     operation: types::TransactionOperation,
 ) -> Result<()> {
     match &operation {
@@ -73,12 +69,11 @@ pub fn record_operation(
         }
     }
 
-    let path = get_transaction_path(transaction_id)?;
-    let content = fs::read_to_string(&path)?;
-    let mut transaction: types::Transaction = serde_json::from_str(&content)?;
     transaction.operations.push(operation);
-    let new_content = serde_json::to_string_pretty(&transaction)?;
-    fs::write(path, new_content)?;
+
+    let path = get_transaction_path(&transaction.id)?;
+    let content = serde_json::to_string_pretty(&transaction)?;
+    fs::write(path, content)?;
     Ok(())
 }
 
@@ -174,13 +169,45 @@ fn install_source_for_manifest(manifest: &types::InstallManifest) -> String {
     local::installed_manifest_source(manifest)
 }
 
+fn restore_shims(manifest: &types::InstallManifest) -> Result<()> {
+    if let Some(bins) = &manifest.bins {
+        let bin_root = match manifest.scope {
+            types::Scope::User => {
+                let home =
+                    home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
+                crate::pkg::sysroot::apply_sysroot(home.join(".zoi/pkgs/bin"))
+            }
+            types::Scope::System => {
+                if cfg!(target_os = "windows") {
+                    crate::pkg::sysroot::apply_sysroot(PathBuf::from(
+                        "C:\\ProgramData\\zoi\\pkgs\\bin",
+                    ))
+                } else {
+                    crate::pkg::sysroot::apply_sysroot(PathBuf::from("/usr/local/bin"))
+                }
+            }
+            types::Scope::Project => {
+                let current_dir = std::env::current_dir()?;
+                current_dir.join(".zoi").join("pkgs").join("bin")
+            }
+        };
+
+        if !bin_root.exists() {
+            fs::create_dir_all(&bin_root)?;
+        }
+
+        for bin in bins {
+            let shim_path = bin_root.join(bin);
+            crate::pkg::shim::create_shim(&shim_path)?;
+        }
+    }
+    Ok(())
+}
+
 pub fn rollback(transaction_id: &str) -> Result<()> {
     let path = get_transaction_path(transaction_id)?;
     if !path.exists() {
-        return Err(anyhow!(
-            "Transaction log not found for ID: {}",
-            transaction_id
-        ));
+        return Ok(());
     }
     let content = fs::read_to_string(&path)?;
     let transaction: types::Transaction = serde_json::from_str(&content)?;
@@ -250,6 +277,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                             e
                         );
                     }
+                    let _ = restore_shims(manifest);
                     continue;
                 }
 
@@ -387,6 +415,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                             e
                         );
                     }
+                    let _ = restore_shims(old_manifest);
                     continue;
                 }
 

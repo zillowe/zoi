@@ -5,10 +5,12 @@ use anyhow::{Result, anyhow};
 use clap::CommandFactory;
 use clap_complete::{Shell, generate};
 use colored::*;
+use std::collections::HashSet;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::Mutex;
 
 fn get_completion_path(shell: Shell, scope: SetupScope) -> Result<PathBuf> {
     if scope == SetupScope::System {
@@ -219,6 +221,11 @@ pub fn enter_ephemeral_shell(
 ) -> Result<()> {
     println!("{} Resolving ephemeral environment...", "::".bold().blue());
 
+    let installed_before: HashSet<String> = local::get_installed_packages()?
+        .into_iter()
+        .map(|m| local::installed_manifest_source(&m))
+        .collect();
+
     let (graph, _non_zoi_deps) = install::resolver::resolve_dependency_graph(
         package_sources,
         None,
@@ -232,6 +239,8 @@ pub fn enter_ephemeral_shell(
     let install_plan = install::plan::create_install_plan(&graph.nodes, None, false)?;
     let stages = graph.toposort()?;
 
+    let mut session_installed = Vec::new();
+
     if !install_plan.is_empty() {
         println!(
             "{} Preparing {} ephemeral dependencies...",
@@ -239,6 +248,8 @@ pub fn enter_ephemeral_shell(
             install_plan.len()
         );
         let m = indicatif::MultiProgress::new();
+        let session_installed_mutex = Mutex::new(Vec::new());
+
         for stage in stages {
             use rayon::prelude::*;
             stage.into_par_iter().try_for_each(|pkg_id| -> Result<()> {
@@ -250,10 +261,15 @@ pub fn enter_ephemeral_shell(
                     .get(&pkg_id)
                     .ok_or_else(|| anyhow!("Install action missing for package '{}'", pkg_id))?;
 
-                install::installer::install_node(node, action, Some(&m), None, true, false)?;
+                let manifest =
+                    install::installer::install_node(node, action, Some(&m), None, true, false)?;
+
+                let mut session_lock = session_installed_mutex.lock().unwrap();
+                session_lock.push(manifest);
                 Ok(())
             })?;
         }
+        session_installed = session_installed_mutex.into_inner().unwrap();
     }
 
     let temp_dir = tempfile::Builder::new().prefix("zoi-shell-").tempdir()?;
@@ -293,24 +309,18 @@ pub fn enter_ephemeral_shell(
         );
     }
 
-    if let Some(cmd_str) = run_cmd {
+    let package_list = package_sources.join(",");
+
+    let mut shell_command = if let Some(cmd_str) = run_cmd {
         println!("{} Running: {}", "::".bold().blue(), cmd_str.cyan());
-        let mut child = if cfg!(windows) {
-            Command::new("pwsh")
-                .arg("-Command")
-                .arg(&cmd_str)
-                .env("PATH", new_path)
-                .spawn()?
+        if cfg!(windows) {
+            let mut c = Command::new("pwsh");
+            c.arg("-Command").arg(&cmd_str);
+            c
         } else {
-            Command::new("bash")
-                .arg("-c")
-                .arg(&cmd_str)
-                .env("PATH", new_path)
-                .spawn()?
-        };
-        let status = child.wait()?;
-        if !status.success() {
-            std::process::exit(status.code().unwrap_or(1));
+            let mut c = Command::new("bash");
+            c.arg("-c").arg(&cmd_str);
+            c
         }
     } else {
         let shell_bin = std::env::var("SHELL").unwrap_or_else(|_| {
@@ -326,13 +336,34 @@ pub fn enter_ephemeral_shell(
             "::".bold().green()
         );
 
-        let mut child = Command::new(&shell_bin)
-            .env("PATH", new_path)
-            .env("ZOI_SHELL", "ephemeral")
-            .spawn()?;
+        Command::new(&shell_bin)
+    };
 
-        let _ = child.wait()?;
-        println!("{} Exited ephemeral shell.", "::".bold().blue());
+    shell_command
+        .env("PATH", new_path)
+        .env("ZOI_SHELL", "ephemeral")
+        .env("IN_ZOI_SHELL", "ephemeral")
+        .env("ZOI_SHELL_PACKAGES", package_list);
+
+    let status = shell_command.status()?;
+
+    if !session_installed.is_empty() {
+        println!("{} Cleaning up ephemeral packages...", "::".bold().blue());
+        for manifest in session_installed {
+            let ident = local::installed_manifest_source(&manifest);
+            if !installed_before.contains(&ident)
+                && let Err(e) = crate::pkg::uninstall::run(&ident, Some(manifest.scope), true)
+            {
+                eprintln!(
+                    "Warning: failed to cleanup ephemeral package {}: {}",
+                    ident, e
+                );
+            }
+        }
+    }
+
+    if !status.success() {
+        std::process::exit(status.code().unwrap_or(1));
     }
 
     Ok(())

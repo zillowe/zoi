@@ -161,6 +161,9 @@ pub fn export_shell(
             Shell::PowerShell => {
                 println!("$env:{} = \"{}\"", k, v);
             }
+            Shell::Elvish => {
+                println!("set E:{} = \"{}\"", k, v);
+            }
             _ => {}
         }
     }

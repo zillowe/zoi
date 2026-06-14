@@ -51,7 +51,7 @@ fn setup_schema(conn: &Connection) -> Result<()> {
             reason TEXT,
             dependencies TEXT,
             revision TEXT,
-            UNIQUE(name, sub_package, repo, scope)
+            UNIQUE(name, sub_package, repo, scope, registry)
         )",
         [],
     )?;
@@ -293,14 +293,13 @@ pub fn update_package(
     conn.execute(
         "INSERT INTO packages (name, sub_package, repo, version, description, package_type, tags, bins, license, registry, scope, reason, dependencies, revision)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
-         ON CONFLICT(name, sub_package, repo, scope) DO UPDATE SET
+         ON CONFLICT(name, sub_package, repo, scope, registry) DO UPDATE SET
             version = excluded.version,
             description = excluded.description,
             package_type = excluded.package_type,
             tags = excluded.tags,
             bins = excluded.bins,
             license = excluded.license,
-            registry = excluded.registry,
             reason = COALESCE(excluded.reason, packages.reason),
             dependencies = excluded.dependencies,
             revision = excluded.revision",
@@ -323,8 +322,8 @@ pub fn update_package(
     )?;
 
     let row_id = conn.query_row(
-        "SELECT id FROM packages WHERE name = ?1 AND (sub_package IS ?2) AND repo = ?3 AND (scope IS ?4 OR (scope IS NULL AND ?4 IS NULL))",
-        params![pkg.name, sub_package, pkg.repo, scope_str],
+        "SELECT id FROM packages WHERE name = ?1 AND (sub_package IS ?2) AND repo = ?3 AND (scope IS ?4 OR (scope IS NULL AND ?4 IS NULL)) AND (registry IS ?5)",
+        params![pkg.name, sub_package, pkg.repo, scope_str, registry],
         |row| row.get(0),
     )?;
 
