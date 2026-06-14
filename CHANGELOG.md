@@ -14,6 +14,10 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 - *(cli)* Add verbose flag to 'exec' for execution details
 - *(install)* Optimize git clone operations and refine non-zoi dependency resolution
 
+### 🎨 Styling
+
+- Update gitlab repo naming
+
 ### 🔧 Configuration
 
 - *(build)* Update Justfile to use env
