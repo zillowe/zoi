@@ -12,7 +12,7 @@ use std::io::{self};
 // Development, Special, Public or Production
 const BRANCH: &str = "Production";
 const STATUS: &str = "Release";
-const NUMBER: &str = "1.18.3";
+const NUMBER: &str = "1.18.5";
 const PKG_SOURCE_HELP: &str = "Package identifier (e.g. @repo/name, path, or URL)";
 
 /// Zoi - The Advanced Package Manager & Environment Orchestrator.
@@ -497,10 +497,10 @@ enum Commands {
     #[command(
         long_about = "If a shell is provided, it installs completion scripts. If 'hook' is provided, it outputs shell-specific hook scripts for auto-activation. If packages are provided via --package/-p, it enters a temporary subshell with those packages available in PATH.",
         arg_required_else_help = true,
-        group(clap::ArgGroup::new("shell_action").required(true).args(["shell", "hook", "packages"]))
+        group(clap::ArgGroup::new("shell_action").required(true).args(["shell", "hook", "packages"]).multiple(true))
     )]
     Shell {
-        /// The shell to set up completions or hooks for
+        /// The shell to set up completions for
         #[arg(value_enum)]
         shell: Option<Shell>,
         /// Generate a shell hook for automatic environment activation
@@ -1071,12 +1071,15 @@ pub fn run() -> anyhow::Result<()> {
                 packages,
                 run,
             } => {
+                let target_shell = shell
+                    .or_else(utils::get_current_shell)
+                    .unwrap_or(Shell::Bash);
                 if hook {
-                    cmd::shell::print_hook(shell.unwrap_or(Shell::Bash))
+                    cmd::shell::print_hook(target_shell)
                 } else if !packages.is_empty() {
                     cmd::shell::enter_ephemeral_shell(&packages, run, Some(&plugin_manager))
                 } else {
-                    cmd::shell::run(shell.unwrap_or(Shell::Bash), scope)
+                    cmd::shell::run(target_shell, scope)
                 }
             }
             Commands::Exec {

@@ -1,6 +1,6 @@
 use crate::pkg::lua::api;
 use crate::utils;
-use mlua::{Lua, LuaSerdeExt};
+use mlua::Lua;
 
 pub fn setup_lua_environment(
     lua: &Lua,
@@ -107,27 +107,6 @@ pub fn setup_lua_environment(
 
     let utils_table = lua.create_table()?;
     lua.globals().set("UTILS", utils_table)?;
-
-    let _source = file_path.unwrap_or("").to_string();
-    let _name = file_path.unwrap_or("unknown").to_string();
-    let add_pgp_key_fn = lua.create_function(move |lua, args: mlua::MultiValue| {
-        if args.len() < 2 {
-            return Err(mlua::Error::RuntimeError(
-                "addPgpKey requires (url_or_path, name)".to_string(),
-            ));
-        }
-        let key_source: String = lua.from_value(args[0].clone())?;
-        let key_name: String = lua.from_value(args[1].clone())?;
-        if key_source.starts_with("http://") || key_source.starts_with("https://") {
-            crate::pkg::pgp::add_key_from_url(&key_source, &key_name, quiet)
-                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-        } else {
-            crate::pkg::pgp::add_key_from_path(&key_source, Some(&key_name), quiet)
-                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-        }
-        Ok(())
-    })?;
-    lua.globals().set("addPgpKey", add_pgp_key_fn)?;
 
     api::http::add_fetch_util(lua)?;
     api::parse::add_parse_util(lua)?;

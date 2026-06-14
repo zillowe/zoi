@@ -1076,8 +1076,8 @@ pub fn check_license(license: &str) {
         return;
     }
 
-    if license.eq_ignore_ascii_case("Unkown") {
-        println!("{}", "Warning: Package license is unkown.".red());
+    if license.eq_ignore_ascii_case("Unknown") {
+        println!("{}", "Warning: Package license is unknown.".red());
         return;
     }
 

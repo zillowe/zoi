@@ -282,7 +282,7 @@ pub fn run(
         return Ok(());
     }
 
-    let transaction = transaction::begin()?;
+    let mut transaction = transaction::begin()?;
 
     let mut failed_packages = Vec::new();
     let mut successfully_uninstalled = Vec::new();
@@ -319,7 +319,7 @@ pub fn run(
         match pkg::uninstall::run(&source_str, scope_override, yes) {
             Ok(uninstalled_manifest) => {
                 if let Err(e) = transaction::record_operation(
-                    &transaction.id,
+                    &mut transaction,
                     types::TransactionOperation::Uninstall {
                         manifest: Box::new(uninstalled_manifest),
                     },
