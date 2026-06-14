@@ -515,6 +515,9 @@ enum Commands {
         /// Command to run in the ephemeral environment instead of an interactive shell
         #[arg(short, long)]
         run: Option<String>,
+        /// Show additional details (resolution, installation progress, etc.)
+        #[arg(long, short)]
+        verbose: bool,
     },
 
     /// Download and execute a binary package without installing it
@@ -1070,6 +1073,7 @@ pub fn run() -> anyhow::Result<()> {
                 scope,
                 packages,
                 run,
+                verbose,
             } => {
                 let target_shell = shell
                     .or_else(utils::get_current_shell)
@@ -1077,7 +1081,12 @@ pub fn run() -> anyhow::Result<()> {
                 if hook {
                     cmd::shell::print_hook(target_shell)
                 } else if !packages.is_empty() {
-                    cmd::shell::enter_ephemeral_shell(&packages, run, Some(&plugin_manager))
+                    cmd::shell::enter_ephemeral_shell(
+                        &packages,
+                        run,
+                        verbose,
+                        Some(&plugin_manager),
+                    )
                 } else {
                     cmd::shell::run(target_shell, scope)
                 }

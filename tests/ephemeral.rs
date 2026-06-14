@@ -136,7 +136,7 @@ end
     let pm = plugin::PluginManager::new().unwrap();
 
     let run_cmd = format!("{} > {}", bin_name, root.join("out.txt").display());
-    shell::enter_ephemeral_shell(&[pkg_name.to_string()], Some(run_cmd), Some(&pm)).unwrap();
+    shell::enter_ephemeral_shell(&[pkg_name.to_string()], Some(run_cmd), false, Some(&pm)).unwrap();
 
     let out_file = root.join("out.txt");
     assert!(

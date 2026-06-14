@@ -217,9 +217,12 @@ end
 pub fn enter_ephemeral_shell(
     package_sources: &[String],
     run_cmd: Option<String>,
+    verbose: bool,
     _plugin_manager: Option<&plugin::PluginManager>,
 ) -> Result<()> {
-    println!("{} Resolving ephemeral environment...", "::".bold().blue());
+    if verbose {
+        println!("{} Resolving ephemeral environment...", "::".bold().blue());
+    }
 
     let installed_before: HashSet<String> = local::get_installed_packages()?
         .into_iter()
@@ -233,7 +236,7 @@ pub fn enter_ephemeral_shell(
         true,
         true,
         None,
-        true,
+        !verbose,
     )?;
 
     let install_plan = install::plan::create_install_plan(&graph.nodes, None, false)?;
@@ -242,12 +245,17 @@ pub fn enter_ephemeral_shell(
     let mut session_installed = Vec::new();
 
     if !install_plan.is_empty() {
-        println!(
-            "{} Preparing {} ephemeral dependencies...",
-            "::".bold().blue(),
-            install_plan.len()
-        );
+        if verbose {
+            println!(
+                "{} Preparing {} ephemeral dependencies...",
+                "::".bold().blue(),
+                install_plan.len()
+            );
+        }
         let m = indicatif::MultiProgress::new();
+        if !verbose {
+            m.set_draw_target(indicatif::ProgressDrawTarget::hidden());
+        }
         let session_installed_mutex = Mutex::new(Vec::new());
 
         for stage in stages {
@@ -312,7 +320,9 @@ pub fn enter_ephemeral_shell(
     let package_list = package_sources.join(",");
 
     let mut shell_command = if let Some(cmd_str) = run_cmd {
-        println!("{} Running: {}", "::".bold().blue(), cmd_str.cyan());
+        if verbose {
+            println!("{} Running: {}", "::".bold().blue(), cmd_str.cyan());
+        }
         if cfg!(windows) {
             let mut c = Command::new("pwsh");
             c.arg("-Command").arg(&cmd_str);
@@ -331,10 +341,12 @@ pub fn enter_ephemeral_shell(
             }
         });
 
-        println!(
-            "{} Entering ephemeral shell (type 'exit' to leave)...",
-            "::".bold().green()
-        );
+        if verbose {
+            println!(
+                "{} Entering ephemeral shell (type 'exit' to leave)...",
+                "::".bold().green()
+            );
+        }
 
         Command::new(&shell_bin)
     };
@@ -348,7 +360,9 @@ pub fn enter_ephemeral_shell(
     let status = shell_command.status()?;
 
     if !session_installed.is_empty() {
-        println!("{} Cleaning up ephemeral packages...", "::".bold().blue());
+        if verbose {
+            println!("{} Cleaning up ephemeral packages...", "::".bold().blue());
+        }
         for manifest in session_installed {
             let ident = local::installed_manifest_source(&manifest);
             if !installed_before.contains(&ident)
