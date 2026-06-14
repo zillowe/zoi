@@ -149,7 +149,9 @@ pub fn build_graph_from_locked_packages(
     quiet: bool,
     yes: bool,
 ) -> Result<(DependencyGraph, Vec<String>)> {
-    println!(":: Resolving dependencies from zoi.lock...");
+    if !quiet {
+        println!(":: Resolving dependencies from zoi.lock...");
+    }
 
     let mut graph = DependencyGraph::new();
     let mut reverse_deps: HashMap<String, Vec<String>> = HashMap::new();
@@ -273,7 +275,9 @@ pub fn resolve_dependency_graph(
     _build_type: Option<&str>,
     quiet: bool,
 ) -> Result<(DependencyGraph, Vec<String>)> {
-    println!(":: Resolving dependencies...");
+    if !quiet {
+        println!(":: Resolving dependencies...");
+    }
 
     let mut non_zoi_deps = Vec::new();
     let mut root_deps = FxHashMap::default();

@@ -118,7 +118,7 @@ fn test_uninstall_uses_stored_package_source_over_registry_drift() {
         Some("${usrhome}/db-hit"),
     );
 
-    uninstall::run("test-pkg", Some(types::Scope::User), true).unwrap();
+    uninstall::run("test-pkg", Some(types::Scope::User), true, false).unwrap();
 
     assert!(
         !stored_hit.exists(),
@@ -141,7 +141,7 @@ fn test_uninstall_requires_explicit_source_for_ambiguous_name_matches() {
     local::write_manifest(&sample_manifest("shared", "core")).unwrap();
     local::write_manifest(&sample_manifest("shared", "extra")).unwrap();
 
-    let err = uninstall::run("shared", Some(types::Scope::User), true).unwrap_err();
+    let err = uninstall::run("shared", Some(types::Scope::User), true, false).unwrap_err();
     assert!(err.to_string().contains("ambiguous"));
 }
 
@@ -166,7 +166,13 @@ fn test_uninstall_explicit_source_removes_only_matching_install() {
     write_package_source(&extra_source, "shared", "extra", "1.0.0", None);
     local::persist_package_source(&extra_manifest, &extra_source).unwrap();
 
-    uninstall::run("#local@extra/shared@1.0.0", Some(types::Scope::User), true).unwrap();
+    uninstall::run(
+        "#local@extra/shared@1.0.0",
+        Some(types::Scope::User),
+        true,
+        false,
+    )
+    .unwrap();
 
     let core_request = resolve::parse_source_string("#local@core/shared@1.0.0").unwrap();
     let extra_request = resolve::parse_source_string("#local@extra/shared@1.0.0").unwrap();
