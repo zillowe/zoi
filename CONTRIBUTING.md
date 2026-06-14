@@ -80,6 +80,8 @@ Because Zoi is used to manage its own development, you must first build and inst
 
     ```sh
     make build
+    # Or for a debug build:
+    # make dev
     sudo make install
     # (optional) Install CLI completions and setup Zoi's PATH
     make setup
@@ -198,6 +200,22 @@ Here are the most common commands defined in `zoi.yaml`:
 
   ```sh
   zoi run build
+  ```
+
+- **`build` (Just/Make)**: Builds a release version of Zoi.
+
+  ```sh
+  just build
+  # or
+  make build
+  ```
+
+- **`dev` (Just/Make)**: Builds a dev version of Zoi.
+
+  ```sh
+  just dev
+  # or
+  make dev
   ```
 
 - **`install`**: Performs a clean build and installs the latest version of Zoi, including shell completions. This is useful for testing your changes in a live environment.

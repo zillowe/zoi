@@ -15,8 +15,11 @@ endif
 
 ifeq ($(OS_NAME),windows)
     IS_WINDOWS := 1
+    EXE_EXT := .exe
     SRC_BIN = target/release/$(NAME).exe
     MINI_SRC_BIN = target/release/$(MINI_NAME).exe
+    DEBUG_SRC_BIN = target/debug/$(NAME).exe
+    MINI_DEBUG_SRC_BIN = target/debug/$(MINI_NAME).exe
 endif
 
 .PHONY: all build install uninstall clean setup help
@@ -32,6 +35,34 @@ else ifeq ($(WITH_BIN),zoi-mini)
 	@ZOI_COMMIT_HASH=$(COMMIT_HASH) cargo build --bin zoi-mini --release
 else
 	@ZOI_COMMIT_HASH=$(COMMIT_HASH) cargo build --bin zoi --bin zoi-mini --release
+endif
+	@echo "Build complete for $(OS_NAME) ($(ARCH_NAME))."
+
+dev:
+	@echo "Building Zoi targets: $(WITH_BIN) in debug mode (commit: $(COMMIT_HASH))..."
+ifeq ($(WITH_BIN),zoi)
+	@ZOI_COMMIT_HASH=$(COMMIT_HASH) cargo build --bin zoi
+else ifeq ($(WITH_BIN),zoi-mini)
+	@ZOI_COMMIT_HASH=$(COMMIT_HASH) cargo build --bin zoi-mini
+else
+	@ZOI_COMMIT_HASH=$(COMMIT_HASH) cargo build --bin zoi --bin zoi-mini
+endif
+	@mkdir -p "$(DEV_BINDIR)"
+ifneq ($(WITH_BIN),zoi-mini)
+ifeq ($(IS_WINDOWS),1)
+	@copy /Y "$(DEBUG_SRC_BIN)" "$(DEV_BINDIR)\$(NAME).exe"
+else
+	@install -m 755 "$(DEBUG_SRC_BIN)" "$(DEV_BINDIR)/$(NAME)"
+endif
+	@echo "Zoi (debug) copied to $(DEV_BINDIR)/$(NAME)$(EXE_EXT)"
+endif
+ifneq ($(WITH_BIN),zoi)
+ifeq ($(IS_WINDOWS),1)
+	@copy /Y "$(MINI_DEBUG_SRC_BIN)" "$(DEV_BINDIR)\$(MINI_NAME).exe"
+else
+	@install -m 755 "$(MINI_DEBUG_SRC_BIN)" "$(DEV_BINDIR)/$(MINI_NAME)"
+endif
+	@echo "Zoi Mini (debug) copied to $(DEV_BINDIR)/$(MINI_NAME)$(EXE_EXT)"
 endif
 	@echo "Build complete for $(OS_NAME) ($(ARCH_NAME))."
 
@@ -95,6 +126,7 @@ setup:
 help:
 	@echo "make 		alias to 'make all'"
 	@echo "make build 	build zoi in release mode"
+	@echo "make dev 	build zoi in debug mode"
 	@echo "make install 	install Zoi binary to PREFIX or default user's bin location"
 	@echo "make setup 	install shell completion and setup Zoi's package PATH"
 	@echo "make uninstall 	uninstall Zoi binary"
