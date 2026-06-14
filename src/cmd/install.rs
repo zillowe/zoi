@@ -609,9 +609,8 @@ pub fn run(
     }
 
     let stages = graph.toposort()?;
-    let transaction = transaction::begin()?;
-    let transaction_id = &transaction.id;
-    let transaction_mutex = Mutex::new(());
+    let transaction = Mutex::new(transaction::begin()?);
+    let transaction_id = transaction.lock().unwrap().id.clone();
     let dependency_installed_count = AtomicUsize::new(0);
     let mut direct_installed_count = 0usize;
 
@@ -674,11 +673,11 @@ pub fn run(
                 ) {
                     Ok(manifest) => {
                         dependency_installed_count.fetch_add(1, Ordering::Relaxed);
-                        let _lock = transaction_mutex.lock().map_err(|e| {
+                        let mut tx_lock = transaction.lock().map_err(|e| {
                             anyhow!("Transaction mutex poisoned during installation: {}", e)
                         })?;
                         if let Err(e) = transaction::record_operation(
-                            transaction_id,
+                            &mut tx_lock,
                             types::TransactionOperation::Install {
                                 manifest: Box::new(manifest),
                             },
@@ -748,8 +747,9 @@ pub fn run(
                         .lock()
                         .map_err(|e| anyhow!("Installed manifests mutex poisoned: {}", e))?
                         .push(manifest.clone());
+                    let mut tx_lock = transaction.lock().unwrap();
                     transaction::record_operation(
-                        transaction_id,
+                        &mut tx_lock,
                         types::TransactionOperation::Install {
                             manifest: Box::new(manifest),
                         },
@@ -777,7 +777,7 @@ pub fn run(
         .map_err(|e| anyhow!("Failed packages mutex poisoned during finalization: {}", e))?;
     if !failed.is_empty() {
         println!("\n{} Rolling back changes...", "::".bold().yellow());
-        transaction::rollback(&transaction.id)?;
+        transaction::rollback(&transaction_id)?;
         ux::print_transaction_summary(&ux::TransactionSummary {
             command: "install".to_string(),
             success: dependency_installed_count.load(Ordering::Relaxed) + direct_installed_count,
@@ -787,7 +787,7 @@ pub fn run(
         return Err(anyhow!("Installation failed for: {}", failed.join(", ")));
     }
 
-    if let Ok(modified_files) = transaction::get_modified_files(&transaction.id) {
+    if let Ok(modified_files) = transaction::get_modified_files(&transaction_id) {
         let _ = crate::pkg::hooks::global::run_global_hooks(
             crate::pkg::hooks::global::HookWhen::PostTransaction,
             &modified_files,
@@ -795,7 +795,7 @@ pub fn run(
         );
     }
 
-    if let Err(e) = transaction::commit(&transaction.id) {
+    if let Err(e) = transaction::commit(&transaction_id) {
         eprintln!("Warning: Failed to commit transaction: {}", e);
     }
 

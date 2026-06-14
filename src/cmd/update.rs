@@ -252,7 +252,7 @@ fn run_update_single_logic(
         return Ok(());
     }
 
-    let transaction = transaction::begin()?;
+    let mut transaction = transaction::begin()?;
 
     if let Some(hooks) = &new_pkg.hooks {
         hooks::run_hooks(hooks, hooks::HookType::PreUpgrade)?;
@@ -311,7 +311,7 @@ fn run_update_single_logic(
 
     if let Some(new_manifest) = new_manifest_option {
         if let Err(e) = transaction::record_operation(
-            &transaction.id,
+            &mut transaction,
             types::TransactionOperation::Upgrade {
                 old_manifest: Box::new(old_manifest.clone()),
                 new_manifest: Box::new(new_manifest.clone()),
@@ -726,9 +726,8 @@ fn run_update_all_logic(
         return Ok(());
     }
 
-    let transaction = transaction::begin()?;
-    let transaction_id = &transaction.id;
-    let transaction_mutex = Mutex::new(());
+    let transaction = Mutex::new(transaction::begin()?);
+    let transaction_id = transaction.lock().unwrap().id.clone();
     let failed_updates = Mutex::new(Vec::new());
     let successful_upgrades = Mutex::new(Vec::new());
 
@@ -838,11 +837,11 @@ fn run_update_all_logic(
             }
 
             if let Some(new_manifest) = new_manifest_option {
-                let _lock = transaction_mutex
+                let mut tx_lock = transaction
                     .lock()
                     .map_err(|e| anyhow!("mutex poisoned: {}", e))?;
                 if let Err(e) = transaction::record_operation(
-                    transaction_id,
+                    &mut tx_lock,
                     types::TransactionOperation::Upgrade {
                         old_manifest: Box::new(candidate.old_manifest.clone()),
                         new_manifest: Box::new(new_manifest.clone()),
@@ -884,7 +883,7 @@ fn run_update_all_logic(
         for pkg in &failed {
             eprintln!("  - {}", pkg);
         }
-        transaction::rollback(&transaction.id)?;
+        transaction::rollback(&transaction_id)?;
         ux::print_transaction_summary(&ux::TransactionSummary {
             command: "update".to_string(),
             success: 0,
@@ -894,14 +893,14 @@ fn run_update_all_logic(
         return Err(anyhow!("Update failed for some packages."));
     }
 
-    if let Ok(modified_files) = transaction::get_modified_files(&transaction.id) {
+    if let Ok(modified_files) = transaction::get_modified_files(&transaction_id) {
         let _ = crate::pkg::hooks::global::run_global_hooks(
             crate::pkg::hooks::global::HookWhen::PostTransaction,
             &modified_files,
             "upgrade",
         );
     }
-    transaction::commit(&transaction.id)?;
+    transaction::commit(&transaction_id)?;
 
     println!("\n{}", "Success:".green());
     let successful_upgrades = successful_upgrades

@@ -1,4 +1,5 @@
 use crate::utils;
+use colored::*;
 use mlua::{self, Lua, Table};
 use std::path::{Path, PathBuf};
 
@@ -16,6 +17,9 @@ pub fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
             let build_dir = Path::new(&build_dir_str);
 
             let archive_file = if source.starts_with("http") {
+                if source.starts_with("http://") && !quiet {
+                    println!("{}: downloading over insecure HTTP: {}", "Warning:".yellow(), source);
+                }
                 if !quiet {
                     println!("Downloading: {}", source);
                 }

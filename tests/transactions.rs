@@ -60,15 +60,20 @@ fn test_transaction_lifecycle() {
     let tmp = tempdir().unwrap();
     ctx.set_env_var("HOME", tmp.path());
 
-    let transaction = transaction::begin().unwrap();
+    let mut transaction = transaction::begin().unwrap();
     let id = transaction.id.clone();
     let transaction_path = tmp
         .path()
         .join(".zoi/transactions")
         .join(format!("{}.json", id));
 
+    assert!(
+        !transaction_path.exists(),
+        "transaction log should not exist before first operation"
+    );
+
     transaction::record_operation(
-        &id,
+        &mut transaction,
         TransactionOperation::Install {
             manifest: Box::new(sample_manifest("test-pkg", vec!["/tmp/zoi-test-file"])),
         },
@@ -77,7 +82,7 @@ fn test_transaction_lifecycle() {
 
     assert!(
         transaction_path.exists(),
-        "transaction log should exist before commit"
+        "transaction log should exist after first operation"
     );
 
     let modified = transaction::get_modified_files(&id).unwrap();
@@ -97,11 +102,11 @@ fn test_transaction_get_modified_files_deduplicates_upgrade_paths() {
     let tmp = tempdir().unwrap();
     ctx.set_env_var("HOME", tmp.path());
 
-    let transaction = transaction::begin().unwrap();
+    let mut transaction = transaction::begin().unwrap();
     let id = transaction.id.clone();
 
     transaction::record_operation(
-        &id,
+        &mut transaction,
         TransactionOperation::Upgrade {
             old_manifest: Box::new(sample_manifest("test-pkg", vec!["/tmp/shared", "/tmp/old"])),
             new_manifest: Box::new(sample_manifest("test-pkg", vec!["/tmp/shared", "/tmp/new"])),
@@ -122,7 +127,7 @@ fn test_transaction_get_modified_files_deduplicates_upgrade_paths() {
 }
 
 #[test]
-fn test_transaction_begin_writes_log_file() {
+fn test_transaction_begin_does_not_write_log_file() {
     let mut ctx = common::TestContextGuard::acquire();
     let tmp = tempdir().unwrap();
     ctx.set_env_var("HOME", tmp.path());
@@ -134,11 +139,9 @@ fn test_transaction_begin_writes_log_file() {
         .join(format!("{}.json", transaction.id));
 
     assert!(
-        transaction_path.exists(),
-        "begin should create a transaction log"
+        !transaction_path.exists(),
+        "begin should not create a transaction log on disk"
     );
-    let content = fs::read_to_string(transaction_path).unwrap();
-    assert!(content.contains(&transaction.id));
 }
 
 #[test]
@@ -147,18 +150,18 @@ fn test_transaction_read_and_list() {
     let tmp = tempdir().unwrap();
     ctx.set_env_var("HOME", tmp.path());
 
-    let first = transaction::begin().unwrap();
+    let mut first = transaction::begin().unwrap();
     transaction::record_operation(
-        &first.id,
+        &mut first,
         TransactionOperation::Install {
             manifest: Box::new(sample_manifest("alpha", vec!["/tmp/a"])),
         },
     )
     .unwrap();
 
-    let second = transaction::begin().unwrap();
+    let mut second = transaction::begin().unwrap();
     transaction::record_operation(
-        &second.id,
+        &mut second,
         TransactionOperation::Uninstall {
             manifest: Box::new(sample_manifest("beta", vec!["/tmp/b"])),
         },
@@ -195,16 +198,17 @@ fn test_transaction_rollback_install_uses_exact_subpackage_source() {
     write_package_source(&pkg_source, "test-pkg", "core", "1.0.0");
     local::persist_package_source(&manifest, &pkg_source).unwrap();
 
-    let transaction = transaction::begin().unwrap();
+    let mut transaction = transaction::begin().unwrap();
+    let id = transaction.id.clone();
     transaction::record_operation(
-        &transaction.id,
+        &mut transaction,
         TransactionOperation::Install {
             manifest: Box::new(manifest.clone()),
         },
     )
     .unwrap();
 
-    transaction::rollback(&transaction.id).unwrap();
+    transaction::rollback(&id).unwrap();
 
     let request = resolve::parse_source_string("#local@core/test-pkg:cli@1.0.0").unwrap();
     assert!(

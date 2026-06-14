@@ -344,7 +344,7 @@ Displays detected operating system and architecture information.
 
 ### `zoi install [SOURCES]...`
 
-(alias: `i`)
+(aliases: `i`, `in`, `add`)
 
 Installs one or more packages. For split packages, you can specify a sub-package using the `package:sub-package` syntax. If you specify a base package, Zoi will install the `main_subs` defined in the package.
 
@@ -407,6 +407,8 @@ Shows a package's manual.
 ***
 
 ### `zoi mark <PACKAGES>...`
+
+(alias: `m`)
 
 Modify the installation reason of one or more packages.
 
@@ -652,6 +654,8 @@ If the package is installed more than once across scopes or registries, Zoi will
 
 ### `zoi sync`
 
+(alias: `sy`)
+
 Downloads or updates the package database from the remote repository.
 
 **Flags:**
@@ -793,6 +797,8 @@ If multiple installed packages match the same name, Zoi will prompt you to choos
 ***
 
 ### `zoi transaction`
+
+(alias: `tx`)
 
 Inspect recorded transactions.
 

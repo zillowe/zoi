@@ -51,16 +51,17 @@ fn test_transaction_rollback_uninstall() {
     let manifest_path = version_dir.join("manifest.yaml");
     fs::write(&manifest_path, serde_yaml::to_string(&manifest).unwrap()).unwrap();
 
-    let trans = transaction::begin().unwrap();
+    let mut trans = transaction::begin().unwrap();
+    let id = trans.id.clone();
     transaction::record_operation(
-        &trans.id,
+        &mut trans,
         types::TransactionOperation::Uninstall {
             manifest: Box::new(manifest),
         },
     )
     .unwrap();
 
-    transaction::rollback(&trans.id).unwrap();
+    transaction::rollback(&id).unwrap();
 
     let installed = local::is_package_installed(pkg_name, None, types::Scope::User).unwrap();
     assert!(installed.is_some());
