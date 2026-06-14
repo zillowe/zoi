@@ -39,15 +39,22 @@ fn uninstall_collection(
     scope: types::Scope,
     registry_handle: Option<String>,
     yes: bool,
+    quiet: bool,
 ) -> anyhow::Result<types::InstallManifest> {
-    println!("Uninstalling collection '{}'...", pkg.name.bold());
+    if !quiet {
+        println!("Uninstalling collection '{}'...", pkg.name.bold());
+    }
 
     let dependencies_to_uninstall = &manifest.installed_dependencies;
 
     if dependencies_to_uninstall.is_empty() {
-        println!("Collection has no dependencies to uninstall.");
+        if !quiet {
+            println!("Collection has no dependencies to uninstall.");
+        }
     } else {
-        println!("Uninstalling dependencies of the collection...");
+        if !quiet {
+            println!("Uninstalling dependencies of the collection...");
+        }
         for dep_str in dependencies_to_uninstall {
             let dep = dependencies::parse_dependency_string(dep_str)?;
 
@@ -60,39 +67,48 @@ fn uninstall_collection(
                 let warning = "Warning: Zoi cannot track if other non-Zoi applications depend on this package.";
 
                 if yes {
-                    println!(
-                        "\n{} Uninstalling native dependency: {}...",
-                        "::".bold().blue(),
-                        dep_str.bold()
-                    );
-                    println!("{}: {}", "Note".yellow(), warning);
+                    if !quiet {
+                        println!(
+                            "\n{} Uninstalling native dependency: {}...",
+                            "::".bold().blue(),
+                            dep_str.bold()
+                        );
+                        println!("{}: {}", "Note".yellow(), warning);
+                    }
                 } else if utils::ask_for_confirmation(
                     &format!("{}\n   {}", prompt, warning.dimmed()),
                     false,
                 ) {
-                    println!(
-                        "\n{} Uninstalling dependency: {}...",
-                        "::".bold().blue(),
-                        dep_str.bold()
-                    );
+                    if !quiet {
+                        println!(
+                            "\n{} Uninstalling dependency: {}...",
+                            "::".bold().blue(),
+                            dep_str.bold()
+                        );
+                    }
                 } else {
-                    println!(
-                        "Skipping uninstallation of native dependency: {}",
-                        dep.package.yellow()
-                    );
+                    if !quiet {
+                        println!(
+                            "Skipping uninstallation of native dependency: {}",
+                            dep.package.yellow()
+                        );
+                    }
                     continue;
                 }
             } else {
-                println!(
-                    "\n{} Uninstalling zoi dependency: {}...",
-                    "::".bold().blue(),
-                    dep_str.bold()
-                );
+                if !quiet {
+                    println!(
+                        "\n{} Uninstalling zoi dependency: {}...",
+                        "::".bold().blue(),
+                        dep_str.bold()
+                    );
+                }
             }
 
             if let Err(e) = dependencies::uninstall_dependency(dep_str, &move |name| {
-                run(name, Some(scope), yes).map(|_| ())
-            }) {
+                run(name, Some(scope), yes, quiet).map(|_| ())
+            }) && !quiet
+            {
                 eprintln!(
                     "Warning: Could not uninstall dependency '{}': {}",
                     dep_str, e
@@ -107,7 +123,9 @@ fn uninstall_collection(
         let _ = crate::pkg::service::cleanup_service(&pkg.name, scope);
         fs::remove_dir_all(&package_dir)?;
     }
-    if let Err(e) = recorder::remove_package_from_record(manifest) {
+    if let Err(e) = recorder::remove_package_from_record(manifest)
+        && !quiet
+    {
         eprintln!(
             "{} Failed to remove package from lockfile: {}",
             "Warning:".yellow(),
@@ -126,9 +144,17 @@ fn uninstall_collection(
         registry_handle.as_deref().unwrap_or("local"),
         None,
     ) {
-        Ok(true) => println!("{} telemetry sent", "Info:".green()),
+        Ok(true) => {
+            if !quiet {
+                println!("{} telemetry sent", "Info:".green());
+            }
+        }
         Ok(false) => (),
-        Err(e) => eprintln!("{} telemetry failed: {}", "Warning:".yellow(), e),
+        Err(e) => {
+            if !quiet {
+                eprintln!("{} telemetry failed: {}", "Warning:".yellow(), e);
+            }
+        }
     }
 
     Ok(manifest.clone())
@@ -206,6 +232,7 @@ pub fn run(
     package_name: &str,
     scope_override: Option<types::Scope>,
     yes: bool,
+    quiet: bool,
 ) -> anyhow::Result<types::InstallManifest> {
     let request = resolve::parse_source_string(package_name)?;
     let (manifest, scope) = find_installed_manifest(&request, scope_override)?;
@@ -214,7 +241,7 @@ pub fn run(
     let (pkg, pkg_lua_path) = load_installed_package(&manifest, yes)?;
 
     if pkg.package_type == types::PackageType::Collection {
-        return uninstall_collection(&pkg, &manifest, scope, registry_handle.clone(), yes);
+        return uninstall_collection(&pkg, &manifest, scope, registry_handle.clone(), yes, quiet);
     }
 
     let handle = manifest.registry_handle.as_str();
@@ -233,10 +260,12 @@ pub fn run(
     let needs_escalation = scope == types::Scope::System && !crate::utils::is_admin();
 
     if needs_escalation {
-        println!(
-            "{} Escalating to root to remove system package...",
-            "::".bold().blue()
-        );
+        if !quiet {
+            println!(
+                "{} Escalating to root to remove system package...",
+                "::".bold().blue()
+            );
+        }
         let manifest_json = serde_json::to_string(&manifest)?;
         let mut temp_file = tempfile::NamedTempFile::new()?;
         use std::io::Write;
@@ -281,7 +310,9 @@ pub fn run(
             .map_err(|e| anyhow!(e.to_string()))?;
 
         if let Ok(uninstall_fn) = lua.globals().get::<mlua::Function>("uninstall") {
-            println!("Running uninstall() script...");
+            if !quiet {
+                println!("Running uninstall() script...");
+            }
             uninstall_fn
                 .call::<()>(())
                 .map_err(|e| anyhow!(e.to_string()))?;
@@ -310,7 +341,9 @@ pub fn run(
 
                     let path = std::path::PathBuf::from(path_to_remove);
                     if path.exists() {
-                        println!("Removing {}...", path.display());
+                        if !quiet {
+                            println!("Removing {}...", path.display());
+                        }
                         if path.is_dir() {
                             fs::remove_dir_all(path)?;
                         } else {
@@ -322,7 +355,9 @@ pub fn run(
         }
 
         if let Some(backup_files) = &manifest.backup {
-            println!("Saving configuration files...");
+            if !quiet {
+                println!("Saving configuration files...");
+            }
             for backup_file_rel in backup_files {
                 let backup_src = version_dir.join(backup_file_rel);
                 if backup_src.exists() {
@@ -333,34 +368,42 @@ pub fn run(
                     if let Some(p) = backup_dest.parent()
                         && let Err(e) = fs::create_dir_all(p)
                     {
-                        eprintln!(
-                            "Warning: could not create backup directory {}: {}",
-                            p.display(),
-                            e
-                        );
+                        if !quiet {
+                            eprintln!(
+                                "Warning: could not create backup directory {}: {}",
+                                p.display(),
+                                e
+                            );
+                        }
                         continue;
                     }
-                    println!(
-                        "Saving {} to {}",
-                        backup_src.display(),
-                        backup_dest.display()
-                    );
-                    if let Err(e) = fs::rename(&backup_src, &backup_dest) {
+                    if !quiet {
+                        println!(
+                            "Saving {} to {}",
+                            backup_src.display(),
+                            backup_dest.display()
+                        );
+                    }
+                    if let Err(e) = fs::rename(&backup_src, &backup_dest)
+                        && !quiet
+                    {
                         eprintln!("Warning: failed to save {}: {}", backup_src.display(), e);
                     }
                 }
             }
         }
 
-        println!(
-            "Uninstalling '{}'...",
-            if let Some(sub) = &manifest.sub_package {
-                format!("{}:{}", pkg.name, sub)
-            } else {
-                pkg.name.clone()
-            }
-            .bold()
-        );
+        if !quiet {
+            println!(
+                "Uninstalling '{}'...",
+                if let Some(sub) = &manifest.sub_package {
+                    format!("{}:{}", pkg.name, sub)
+                } else {
+                    pkg.name.clone()
+                }
+                .bold()
+            );
+        }
 
         if let Some(bins) = &manifest.bins {
             let bin_root = get_bin_root(scope)?;
@@ -373,17 +416,21 @@ pub fn run(
                     });
 
                     if !still_provided {
-                        println!(
-                            "Removing shim for {} from {}...",
-                            bin.cyan(),
-                            symlink_path.display()
-                        );
+                        if !quiet {
+                            println!(
+                                "Removing shim for {} from {}...",
+                                bin.cyan(),
+                                symlink_path.display()
+                            );
+                        }
                         fs::remove_file(&symlink_path)?;
                     } else {
-                        println!(
-                            "Keeping shim for {} as it is still provided by other packages.",
-                            bin.cyan()
-                        );
+                        if !quiet {
+                            println!(
+                                "Keeping shim for {} as it is still provided by other packages.",
+                                bin.cyan()
+                            );
+                        }
                     }
                 }
             }
@@ -397,11 +444,13 @@ pub fn run(
                     .any(|(p, _)| p.name != pkg.name || (p.sub_package != manifest.sub_package));
 
                 if !still_provided {
-                    println!(
-                        "Removing shim for {} from {}...",
-                        bin.cyan(),
-                        symlink_path.display()
-                    );
+                    if !quiet {
+                        println!(
+                            "Removing shim for {} from {}...",
+                            bin.cyan(),
+                            symlink_path.display()
+                        );
+                    }
                     fs::remove_file(symlink_path)?;
                 }
             }
@@ -440,10 +489,12 @@ pub fn run(
                 }
             }
             if !has_other_manifests {
-                println!(
-                    "Removing empty version directory: {}",
-                    version_dir.display()
-                );
+                if !quiet {
+                    println!(
+                        "Removing empty version directory: {}",
+                        version_dir.display()
+                    );
+                }
                 fs::remove_dir_all(&version_dir)?;
             }
         }
@@ -461,7 +512,9 @@ pub fn run(
                 }
             }
             if !has_other_versions {
-                println!("Removing package store: {}", package_dir.display());
+                if !quiet {
+                    println!("Removing package store: {}", package_dir.display());
+                }
                 fs::remove_dir_all(&package_dir)?;
             }
         }
@@ -485,7 +538,9 @@ pub fn run(
                         &dep_manifest.name,
                     ) {
                         Ok(dep_pkg_dir) => {
-                            if let Err(e) = local::remove_dependent(&dep_pkg_dir, &parent_id) {
+                            if let Err(e) = local::remove_dependent(&dep_pkg_dir, &parent_id)
+                                && !quiet
+                            {
                                 eprintln!(
                                     "Warning: failed to remove dependent link for {}: {}",
                                     dep.package, e
@@ -493,10 +548,12 @@ pub fn run(
                             }
                         }
                         Err(e) => {
-                            eprintln!(
-                                "Warning: failed to get package dir for {}: {}",
-                                dep.package, e
-                            );
+                            if !quiet {
+                                eprintln!(
+                                    "Warning: failed to get package dir for {}: {}",
+                                    dep.package, e
+                                );
+                            }
                         }
                     }
                 }
@@ -505,12 +562,15 @@ pub fn run(
 
         if let Some(hooks) = &pkg.hooks
             && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PostRemove)
+            && !quiet
         {
             eprintln!("{} post-remove hook failed: {}", "Warning:".yellow(), e);
         }
     }
 
-    if let Err(e) = recorder::remove_package_from_record(&manifest) {
+    if let Err(e) = recorder::remove_package_from_record(&manifest)
+        && !quiet
+    {
         eprintln!(
             "{} Failed to remove package from lockfile: {}",
             "Warning:".yellow(),
@@ -528,7 +588,9 @@ pub fn run(
         );
     }
 
-    println!("Removed manifest for '{}'.", pkg.name);
+    if !quiet {
+        println!("Removed manifest for '{}'.", pkg.name);
+    }
 
     match crate::pkg::telemetry::posthog_capture_event(
         "uninstall",
@@ -537,9 +599,17 @@ pub fn run(
         &manifest.registry_handle,
         None,
     ) {
-        Ok(true) => println!("{} telemetry sent", "Info:".green()),
+        Ok(true) => {
+            if !quiet {
+                println!("{} telemetry sent", "Info:".green());
+            }
+        }
         Ok(false) => (),
-        Err(e) => eprintln!("{} telemetry failed: {}", "Warning:".yellow(), e),
+        Err(e) => {
+            if !quiet {
+                eprintln!("{} telemetry failed: {}", "Warning:".yellow(), e);
+            }
+        }
     }
 
     Ok(manifest)

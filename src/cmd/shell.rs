@@ -366,7 +366,8 @@ pub fn enter_ephemeral_shell(
         for manifest in session_installed {
             let ident = local::installed_manifest_source(&manifest);
             if !installed_before.contains(&ident)
-                && let Err(e) = crate::pkg::uninstall::run(&ident, Some(manifest.scope), true)
+                && let Err(e) =
+                    crate::pkg::uninstall::run(&ident, Some(manifest.scope), true, !verbose)
             {
                 eprintln!(
                     "Warning: failed to cleanup ephemeral package {}: {}",

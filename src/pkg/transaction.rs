@@ -223,7 +223,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                     manifest.version.yellow()
                 );
                 let source = install_source_for_manifest(manifest);
-                if let Err(e) = uninstall::run(&source, Some(manifest.scope), true) {
+                if let Err(e) = uninstall::run(&source, Some(manifest.scope), true, false) {
                     eprintln!(
                         "{} Failed to rollback install of '{}': {}",
                         "Error:".red().bold(),
@@ -365,7 +365,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                     old_manifest.version.green()
                 );
                 let source = install_source_for_manifest(new_manifest);
-                if let Err(e) = uninstall::run(&source, Some(new_manifest.scope), true) {
+                if let Err(e) = uninstall::run(&source, Some(new_manifest.scope), true, false) {
                     eprintln!(
                         "{} Failed to uninstall new version during upgrade-rollback for '{}': {}",
                         "Error:".red().bold(),
