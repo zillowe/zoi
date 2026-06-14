@@ -10,6 +10,8 @@ SHELL_NAME := env("SHELL_NAME", shell("basename $SHELL"))
 WITH_BIN := env("WITH_BIN", "both")
 
 BINDIR := env("BINDIR", PREFIX + "/bin")
+DEBUGDIR := env("DEBUGDIR", "dist")
+DEV_BINDIR := DEBUGDIR + "/bin"
 NAME := "zoi"
 
 MINI_NAME := "zoi-mini"
@@ -18,6 +20,8 @@ IS_WINDOWS := if OS_NAME == "windows" { "1" } else { "0" }
 EXE_EXT := if IS_WINDOWS == "1" { ".exe" } else { "" }
 SRC_BIN := "target/release/" + NAME + EXE_EXT
 MINI_SRC_BIN := "target/release/" + MINI_NAME + EXE_EXT
+DEBUG_SRC_BIN := "target/debug/" + NAME + EXE_EXT
+MINI_DEBUG_SRC_BIN := "target/debug/" + MINI_NAME + EXE_EXT
 
 [private]
 _is_configured := if path_exists("config.just") == "true" { "true" } else { "false" }
@@ -37,6 +41,28 @@ build:
         cargo build --bin zoi-mini --release; \
     else \
         cargo build --bin zoi --bin zoi-mini --release; \
+    fi
+    @echo "Build complete for {{ OS_NAME }} ({{ ARCH_NAME }})."
+
+dev:
+    @if [ "{{ _is_configured }}" != "true" ]; then echo "Error: Project not configured. Run 'just configure' first."; exit 1; fi
+    @echo "Building Zoi targets: {{ WITH_BIN }} in debug mode (commit: {{ COMMIT_HASH }})..."
+    @export ZOI_COMMIT_HASH={{ COMMIT_HASH }}; \
+    if [ "{{ WITH_BIN }}" = "zoi" ]; then \
+        cargo build --bin zoi; \
+    elif [ "{{ WITH_BIN }}" = "zoi-mini" ]; then \
+        cargo build --bin zoi-mini; \
+    else \
+        cargo build --bin zoi --bin zoi-mini; \
+    fi
+    @mkdir -p "{{ DEV_BINDIR }}"
+    @if [ "{{ WITH_BIN }}" != "zoi-mini" ]; then \
+        cp -f "{{ DEBUG_SRC_BIN }}" "{{ DEV_BINDIR }}/{{ NAME }}{{ EXE_EXT }}"; \
+        echo "Zoi (debug) copied to {{ DEV_BINDIR }}/{{ NAME }}{{ EXE_EXT }}"; \
+    fi
+    @if [ "{{ WITH_BIN }}" != "zoi" ]; then \
+        cp -f "{{ MINI_DEBUG_SRC_BIN }}" "{{ DEV_BINDIR }}/{{ MINI_NAME }}{{ EXE_EXT }}"; \
+        echo "Zoi Mini (debug) copied to {{ DEV_BINDIR }}/{{ MINI_NAME }}{{ EXE_EXT }}"; \
     fi
     @echo "Build complete for {{ OS_NAME }} ({{ ARCH_NAME }})."
 

@@ -1,6 +1,7 @@
 #!/bin/sh
 
 PREFIX="/usr/local"
+DEBUGDIR="dist"
 SHELL_NAME=""
 WITH_BIN="both"
 
@@ -8,6 +9,9 @@ for arg in "$@"; do
   case $arg in
   --prefix=*)
     PREFIX=$(echo "$arg" | sed 's/--prefix=//')
+    ;;
+  --debug-dir=*)
+    DEBUGDIR=$(echo "$arg" | sed 's/--debug-dir=//')
     ;;
   --with-bin=*)
     WITH_BIN=$(echo "$arg" | sed 's/--with-bin=//')
@@ -18,7 +22,7 @@ for arg in "$@"; do
     ;;
   *)
     echo "Unknown option: $arg"
-    echo "Usage: ./configure [--prefix=/path/to/install] [--with-bin=zoi|zoi-mini|both]"
+    echo "Usage: ./configure [--prefix=/path/to/install] [--debug-dir=dist] [--with-bin=zoi|zoi-mini|both]"
     exit 1
     ;;
   esac
@@ -60,6 +64,9 @@ PREFIX = $PREFIX
 # Directory for executables (derived from PREFIX)
 BINDIR = \$(PREFIX)/bin
 
+# Directory for debug builds
+DEBUGDIR = $DEBUGDIR
+
 # Detected OS, Architecture, and Shell
 OS_NAME = $OS_NAME
 ARCH_NAME = $ARCH_NAME
@@ -78,6 +85,9 @@ PREFIX=$PREFIX
 # Directory for executables (derived from PREFIX)
 BINDIR=$PREFIX/bin
 
+# Directory for debug builds
+DEBUGDIR=$DEBUGDIR
+
 # Detected OS, Architecture, and Shell
 OS_NAME=$OS_NAME
 ARCH_NAME=$ARCH_NAME
@@ -90,6 +100,7 @@ EOF
 echo "Zoi configured successfully:"
 echo "  Installation prefix:  $PREFIX"
 echo "  Binary directory:     \$PREFIX/bin"
+echo "  Debug directory:      $DEBUGDIR"
 echo "  Operating System:     $OS_NAME"
 echo "  Architecture:         $ARCH_NAME"
 echo "  Detected Shell:       $SHELL_NAME"
