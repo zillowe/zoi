@@ -547,7 +547,7 @@ fn try_sync_at_path(
         && remote_url != db_url
     {
         let msg = format!(
-            "Registry URL has changed from {}. Removing old database and re-cloning from {}.",
+            "Registry URL has changed from {}. Updating origin to {}.",
             remote_url.yellow(),
             db_url.cyan()
         );
@@ -556,7 +556,7 @@ fn try_sync_at_path(
         } else {
             println!("{}", msg);
         }
-        fs::remove_dir_all(db_path)?;
+        repo.remote_set_url("origin", db_url)?;
     }
 
     if verbose {
@@ -761,6 +761,7 @@ fn sync_registry(
     db_root: &Path,
     verbose: bool,
     sync_files: bool,
+    fallback: bool,
     m: Option<&MultiProgress>,
 ) -> Result<(types::Registry, bool)> {
     let mut reg_changed = false;
@@ -791,6 +792,19 @@ fn sync_registry(
 
     let target_dir = db_root.join(&reg.handle);
 
+    let mut candidate_urls = vec![reg.url.clone()];
+
+    if fallback
+        && target_dir.exists()
+        && let Ok(repo_config) = config::read_repo_config(&target_dir)
+    {
+        for git_link in repo_config.git.iter().filter(|g| g.link_type == "mirror") {
+            if git_link.url != reg.url && !candidate_urls.contains(&git_link.url) {
+                candidate_urls.push(git_link.url.clone());
+            }
+        }
+    }
+
     let pre_sync_head = match Repository::open(&target_dir) {
         Ok(repo) => match repo.head() {
             Ok(head) => head.target(),
@@ -799,14 +813,34 @@ fn sync_registry(
         Err(_) => None,
     };
 
-    if let Err(e) = try_sync_at_path(&reg.url, &target_dir, verbose, m, pb.as_ref()) {
-        let msg = format!("Sync with {} failed: {}", reg.url.yellow(), e);
-        if let Some(p) = &pb {
-            p.abandon_with_message(msg);
-        } else if let Some(m_ref) = m {
-            m_ref.println(msg)?;
+    let mut sync_success = false;
+    let mut last_error = None;
+
+    for url in candidate_urls {
+        if let Err(e) = try_sync_at_path(&url, &target_dir, verbose, m, pb.as_ref()) {
+            let msg = format!("Sync with {} failed: {}", url.yellow(), e);
+            if let Some(p) = &pb {
+                p.println(&msg);
+            } else if let Some(m_ref) = m {
+                let _ = m_ref.println(&msg);
+            } else {
+                eprintln!("{}", msg);
+            }
+            last_error = Some(e);
         } else {
-            eprintln!("{}", msg);
+            if url != reg.url {
+                reg.url = url;
+                reg_changed = true;
+            }
+            sync_success = true;
+            break;
+        }
+    }
+
+    if !sync_success {
+        let e = last_error.unwrap_or_else(|| anyhow!("All sync candidates failed."));
+        if let Some(p) = &pb {
+            p.abandon_with_message("Sync failed.".red().to_string());
         }
         return Err(e);
     } else {
@@ -924,7 +958,7 @@ fn sync_registry(
     Ok((reg, reg_changed))
 }
 
-pub fn run(verbose: bool, _fallback: bool, no_pm: bool, sync_files: bool) -> Result<()> {
+pub fn run(verbose: bool, fallback: bool, no_pm: bool, sync_files: bool) -> Result<()> {
     let merged_config = config::read_config()?;
     if merged_config.protect_db {
         let db_root = get_db_path()?;
@@ -971,7 +1005,7 @@ pub fn run(verbose: bool, _fallback: bool, no_pm: bool, sync_files: bool) -> Res
             .into_par_iter()
             .map(|(reg, is_default)| {
                 let (synced_reg, changed) =
-                    sync_registry(reg, &db_root, verbose, sync_files, m.as_ref())?;
+                    sync_registry(reg, &db_root, verbose, sync_files, fallback, m.as_ref())?;
                 Ok((synced_reg, changed, is_default))
             })
             .collect();

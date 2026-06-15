@@ -14,6 +14,10 @@ fn test_hash_verification() {
         helper::get_hash(file_path.to_str().unwrap(), helper::HashType::Sha512).unwrap();
     assert_eq!(calculated, second_run);
     assert_eq!(calculated.len(), 128);
+
+    let calculated_sha256 =
+        helper::get_hash(file_path.to_str().unwrap(), helper::HashType::Sha256).unwrap();
+    assert_eq!(calculated_sha256.len(), 64);
 }
 
 #[test]

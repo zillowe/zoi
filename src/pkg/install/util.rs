@@ -5,7 +5,6 @@ use colored::*;
 use home;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use semver::{Version, VersionReq};
-use sha2::{Digest, Sha512};
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -623,19 +622,18 @@ pub fn verify_file_hash(
     expected_hash: &str,
     pb: Option<&ProgressBar>,
 ) -> Result<bool> {
-    let mut file = File::open(file_path)?;
-    let mut hasher = Sha512::new();
-    let mut buffer = [0; 8192];
-    loop {
-        let bytes_read = file.read(&mut buffer)?;
-        if bytes_read == 0 {
-            break;
-        }
-        hasher.update(&buffer[..bytes_read]);
-    }
-    let actual_hash = hex::encode(hasher.finalize());
-
     let expected_clean = expected_hash.trim().to_lowercase();
+    let algo = match crate::pkg::hash::HashAlgorithm::from_len(expected_clean.len()) {
+        Some(a) => a,
+        None => {
+            return Err(anyhow!(
+                "Unsupported hash length: {}. Expected 128 (SHA-512), 64 (SHA-256), or 32 (MD5).",
+                expected_clean.len()
+            ));
+        }
+    };
+
+    let actual_hash = crate::pkg::hash::calculate_file_hash(file_path, algo)?;
     let actual_clean = actual_hash.trim().to_lowercase();
 
     let result = actual_clean == expected_clean;
@@ -659,13 +657,6 @@ pub fn verify_file_hash(
             expected_clean.len(),
             actual_clean.len()
         ));
-
-        if expected_clean.len() != 128 || actual_clean.len() != 128 {
-            msg.push_str(&format!(
-                "\n  {} One of the hashes is not 128 characters long (SHA-512 requirement).",
-                "Note:".bold().yellow()
-            ));
-        }
 
         if let Some(p) = pb {
             p.println(msg);
@@ -895,13 +886,16 @@ pub fn get_expected_hash(hash_url: &str, filename: Option<&str>) -> Result<Strin
     }
     let resp = get_text_from_candidate_urls(&cache::mirror_candidate_urls(hash_url), "hash file")?;
 
-    let is_sha512 = |s: &str| s.len() == 128 && s.chars().all(|c| c.is_ascii_hexdigit());
+    let is_valid_hash = |s: &str| {
+        let len = s.len();
+        (len == 128 || len == 64 || len == 32) && s.chars().all(|c| c.is_ascii_hexdigit())
+    };
 
     if let Some(target_file) = filename {
         for line in resp.lines() {
             if line.contains(target_file) {
                 let parts: Vec<&str> = line.split_whitespace().collect();
-                if let Some(hash) = parts.iter().find(|&&p| is_sha512(p)) {
+                if let Some(hash) = parts.iter().find(|&&p| is_valid_hash(p)) {
                     return Ok(hash.to_string());
                 }
             }
@@ -909,7 +903,7 @@ pub fn get_expected_hash(hash_url: &str, filename: Option<&str>) -> Result<Strin
     }
 
     for word in resp.split_whitespace() {
-        if is_sha512(word) {
+        if is_valid_hash(word) {
             return Ok(word.to_string());
         }
     }
