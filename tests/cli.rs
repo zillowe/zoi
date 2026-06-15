@@ -1,25 +1,53 @@
-use std::process::Command;
+use clap::CommandFactory;
+use zoi::cli::Cli;
 
 #[test]
-fn test_cli_version() {
-    let output = Command::new("cargo")
-        .args(["run", "--", "--version"])
-        .output()
-        .expect("failed to execute process");
-
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("Zoi version information"));
+fn test_cli_parsing_version() {
+    let mut cmd = Cli::command();
+    let matches = cmd
+        .try_get_matches_from_mut(vec!["zoi", "--version"])
+        .expect("Parsing --version failed");
+    assert!(matches.get_flag("version_flag"));
 }
 
 #[test]
-fn test_cli_help() {
-    let output = Command::new("cargo")
-        .args(["run", "--", "--help"])
-        .output()
-        .expect("failed to execute process");
+fn test_cli_parsing_help() {
+    let mut cmd = Cli::command();
+    let err = cmd
+        .try_get_matches_from_mut(vec!["zoi", "--help"])
+        .unwrap_err();
+    assert_eq!(err.kind(), clap::error::ErrorKind::DisplayHelp);
+    let help_text = err.to_string();
+    assert!(help_text.contains("Advanced Package Manager"));
+}
 
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("Advanced Package Manager"));
+#[test]
+fn test_cli_parsing_install_flags() {
+    let mut cmd = Cli::command();
+    let matches = cmd
+        .try_get_matches_from_mut(vec![
+            "zoi",
+            "install",
+            "--local",
+            "--frozen-lockfile",
+            "--yes",
+        ])
+        .expect("Parsing install flags failed");
+
+    let (subcommand, sub_matches) = matches.subcommand().unwrap();
+    assert_eq!(subcommand, "install");
+
+    assert!(sub_matches.get_flag("local"));
+    assert!(sub_matches.get_flag("frozen_lockfile"));
+
+    assert!(matches.get_flag("yes"));
+}
+
+#[test]
+fn test_cli_parsing_conflicting_flags() {
+    let mut cmd = Cli::command();
+    let err = cmd
+        .try_get_matches_from_mut(vec!["zoi", "install", "--local", "--global"])
+        .unwrap_err();
+    assert_eq!(err.kind(), clap::error::ErrorKind::ArgumentConflict);
 }

@@ -172,20 +172,6 @@
 		"install": "pipx install {package_with_version}",
 		"uninstall": "pipx uninstall {package}"
 	},
-	"pkg": {
-		"is_installed": "pkg info {package}",
-		"install": "pkg install -y {package}",
-		"uninstall": "pkg delete -y {package}",
-		"sudo_install": true,
-		"sudo_uninstall": true
-	},
-	"pkg_add": {
-		"is_installed": "pkg_info {package}",
-		"install": "pkg_add -I {package}",
-		"uninstall": "pkg_delete {package}",
-		"sudo_install": true,
-		"sudo_uninstall": true
-	},
 	"pnpm": {
 		"is_installed": "pnpm list -g {package} --depth=0",
 		"install": "pnpm add -g {package_with_version}",

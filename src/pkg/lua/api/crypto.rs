@@ -1,13 +1,9 @@
-use std::io::Read;
-
 use crate::utils;
 use mlua::{self, Lua, Value};
 use std::path::{Path, PathBuf};
 
 use colored::Colorize;
-use md5;
 use sequoia_openpgp::{Cert, parse::Parse};
-use sha2::{Digest, Sha256, Sha512};
 use std::fs;
 pub fn add_verify_hash(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let verify_hash_fn = lua.create_function(move |lua, args: mlua::MultiValue| {
@@ -49,50 +45,22 @@ pub fn add_verify_hash(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
             p.to_path_buf()
         };
 
-        let mut file = fs::File::open(&actual_path).map_err(|e| {
-            mlua::Error::RuntimeError(format!("Failed to open file {:?}: {}", actual_path, e))
-        })?;
-
-        let actual_hash = match algo {
-            "md5" => {
-                let mut hasher = md5::Context::new();
-                std::io::copy(&mut file, &mut hasher).map_err(|e| {
-                    mlua::Error::RuntimeError(format!("Failed to read file: {}", e))
-                })?;
-                format!("{:x}", hasher.finalize())
-            }
-            "sha256" => {
-                let mut hasher = Sha256::new();
-                let mut buffer = [0; 8192];
-                loop {
-                    let bytes_read = file.read(&mut buffer).map_err(|e| {
-                        mlua::Error::RuntimeError(format!("Failed to read file: {}", e))
-                    })?;
-                    if bytes_read == 0 {
-                        break;
-                    }
-                    hasher.update(&buffer[..bytes_read]);
-                }
-                hex::encode(hasher.finalize())
-            }
-            "sha512" => {
-                let mut hasher = Sha512::new();
-                let mut buffer = [0; 8192];
-                loop {
-                    let bytes_read = file.read(&mut buffer).map_err(|e| {
-                        mlua::Error::RuntimeError(format!("Failed to read file: {}", e))
-                    })?;
-                    if bytes_read == 0 {
-                        break;
-                    }
-                    hasher.update(&buffer[..bytes_read]);
-                }
-                hex::encode(hasher.finalize())
-            }
-            _ => {
+        let hash_algo = match crate::pkg::hash::HashAlgorithm::from_name(algo) {
+            Some(a) => a,
+            None => {
                 return Err(mlua::Error::RuntimeError(format!(
                     "Unsupported hash algorithm: {}",
                     algo
+                )));
+            }
+        };
+
+        let actual_hash = match crate::pkg::hash::calculate_file_hash(&actual_path, hash_algo) {
+            Ok(h) => h,
+            Err(e) => {
+                return Err(mlua::Error::RuntimeError(format!(
+                    "Failed to calculate hash: {}",
+                    e
                 )));
             }
         };
