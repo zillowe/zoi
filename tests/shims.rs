@@ -64,10 +64,12 @@ fn test_shim_resolution_logic() {
 
     let resolved = shim::resolve_to_installed_bin(bin_name, Some(&pm)).unwrap();
     println!("Resolved default: {}", resolved.display());
-    assert!(resolved.to_string_lossy().contains(v1));
+    let canonical_resolved = resolved.canonicalize().unwrap_or(resolved.clone());
+    assert!(canonical_resolved.to_string_lossy().contains(v1));
 
     ctx.set_env_var("ZOI_HELLO_VERSION", v2);
     let resolved_v2 = shim::resolve_to_installed_bin(bin_name, Some(&pm)).unwrap();
     println!("Resolved v2 override: {}", resolved_v2.display());
-    assert!(resolved_v2.to_string_lossy().contains(v2));
+    let canonical_v2 = resolved_v2.canonicalize().unwrap_or(resolved_v2.clone());
+    assert!(canonical_v2.to_string_lossy().contains(v2));
 }
