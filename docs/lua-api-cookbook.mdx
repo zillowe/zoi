@@ -66,6 +66,36 @@ metadata({
 })
 ```
 
+## Cloning Specific Git Tags or Revisions
+
+When building from source, you often need to clone a specific version of a repository rather than the default `main` or `master` branch. Since Zoi executes standard shell commands via the `cmd()` function, you can pass standard Git arguments.
+
+### Cloning a Specific Tag
+
+To clone a specific tag efficiently (without downloading the entire git history), use the `--branch` and `--depth 1` flags:
+
+```lua
+function prepare()
+    -- Clone a specific tag (e.g., v1.2.3) based on the package version
+    local tag = "v" .. PKG.version
+    cmd("git clone --depth 1 --branch " .. tag .. " " .. PKG.git .. " source")
+end
+```
+
+### Checking out a Specific Commit Revision
+
+Git's `clone --branch` flag does not support specific commit hashes. To build from an exact commit revision, you must clone the repository first and then check out the commit:
+
+```lua
+local commit_hash = "a1b2c3d4e5f6g7h8i9j0"
+
+function prepare()
+    -- Clone the repository and checkout the specific commit
+    cmd("git clone " .. PKG.git .. " source")
+    cmd("cd source && git checkout " .. commit_hash)
+end
+```
+
 ## Advanced Verification
 
 When a project provides a central `checksums.txt` file, you can use `UTILS.PARSE.checksumFile` to extract the relevant hash for your specific platform archive.

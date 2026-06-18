@@ -977,15 +977,18 @@ pub fn resolve_url_placeholders(
         .replace("{platform}", platform)
 }
 
-pub fn find_prebuilt_info(node: &InstallNode) -> Result<Option<types::PrebuiltInfo>> {
-    let pkg = &node.pkg;
+pub fn find_prebuilt_info_for_package(
+    pkg: &types::Package,
+    registry_handle: &str,
+    version: &str,
+) -> Result<Option<types::PrebuiltInfo>> {
     let platform = crate::utils::get_platform()?;
 
-    let repo_config = if crate::utils::is_mini_mode() && node.registry_handle == "zoidberg" {
+    let repo_config = if crate::utils::is_mini_mode() && registry_handle == "zoidberg" {
         crate::pkg::mini_resolve::fetch_registry_config().ok()
     } else {
         let db_path = crate::pkg::resolve::get_db_root()?;
-        let repo_db_path = db_path.join(&node.registry_handle);
+        let repo_db_path = db_path.join(registry_handle);
         crate::pkg::config::read_repo_config(&repo_db_path).ok()
     };
 
@@ -1003,18 +1006,12 @@ pub fn find_prebuilt_info(node: &InstallNode) -> Result<Option<types::PrebuiltIn
         );
 
         if let Some(pkg_link) = pkg_links_to_try.into_iter().next() {
-            let final_url_base = resolve_url_placeholders(
-                &pkg_link.url,
-                &pkg.name,
-                &pkg.repo,
-                &node.version,
-                &platform,
-            );
+            let final_url_base =
+                resolve_url_placeholders(&pkg_link.url, &pkg.name, &pkg.repo, version, &platform);
             let final_url = if final_url_base.ends_with(".pkg.tar.zst") {
                 final_url_base
             } else {
-                let archive_filename =
-                    format!("{}-{}-{}.pkg.tar.zst", pkg.name, &node.version, platform);
+                let archive_filename = format!("{}-{}-{}.pkg.tar.zst", pkg.name, version, platform);
                 format!(
                     "{}/{}",
                     final_url_base.trim_end_matches('/'),
@@ -1022,18 +1019,22 @@ pub fn find_prebuilt_info(node: &InstallNode) -> Result<Option<types::PrebuiltIn
                 )
             };
 
-            let pgp_url = pkg_link.pgp.as_ref().map(|url| {
-                resolve_url_placeholders(url, &pkg.name, &pkg.repo, &node.version, &platform)
-            });
-            let hash_url = pkg_link.hash.as_ref().map(|url| {
-                resolve_url_placeholders(url, &pkg.name, &pkg.repo, &node.version, &platform)
-            });
-            let size_url = pkg_link.size.as_ref().map(|url| {
-                resolve_url_placeholders(url, &pkg.name, &pkg.repo, &node.version, &platform)
-            });
-            let files_url = pkg_link.files.as_ref().map(|url| {
-                resolve_url_placeholders(url, &pkg.name, &pkg.repo, &node.version, &platform)
-            });
+            let pgp_url = pkg_link
+                .pgp
+                .as_ref()
+                .map(|url| resolve_url_placeholders(url, &pkg.name, &pkg.repo, version, &platform));
+            let hash_url = pkg_link
+                .hash
+                .as_ref()
+                .map(|url| resolve_url_placeholders(url, &pkg.name, &pkg.repo, version, &platform));
+            let size_url = pkg_link
+                .size
+                .as_ref()
+                .map(|url| resolve_url_placeholders(url, &pkg.name, &pkg.repo, version, &platform));
+            let files_url = pkg_link
+                .files
+                .as_ref()
+                .map(|url| resolve_url_placeholders(url, &pkg.name, &pkg.repo, version, &platform));
 
             return Ok(Some(types::PrebuiltInfo {
                 final_url,
@@ -1046,6 +1047,36 @@ pub fn find_prebuilt_info(node: &InstallNode) -> Result<Option<types::PrebuiltIn
     }
 
     Ok(None)
+}
+
+pub fn find_prebuilt_info(node: &InstallNode) -> Result<Option<types::PrebuiltInfo>> {
+    find_prebuilt_info_for_package(&node.pkg, &node.registry_handle, &node.version)
+}
+
+pub fn get_package_sizes(pkg: &types::Package, registry_handle: &str, version: &str) -> (u64, u64) {
+    let download_size = pkg.archive_size.unwrap_or(0);
+    let installed_size = pkg.installed_size.unwrap_or(0);
+
+    match find_prebuilt_info_for_package(pkg, registry_handle, version) {
+        Ok(Some(info)) => {
+            if let Some(size_url) = &info.size_url {
+                if crate::pkg::offline::is_offline() {
+                    (download_size, installed_size)
+                } else {
+                    get_expected_size(size_url).unwrap_or_else(|e| {
+                        eprintln!(
+                            "Warning: could not fetch size for {}: {}. Falling back to metadata.",
+                            pkg.name, e
+                        );
+                        (download_size, installed_size)
+                    })
+                }
+            } else {
+                (download_size, installed_size)
+            }
+        }
+        _ => (download_size, installed_size),
+    }
 }
 
 #[cfg(test)]
