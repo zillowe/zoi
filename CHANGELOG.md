@@ -4,6 +4,28 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
+## [Prod-Release-1.18.6] - 2026-06-18
+
+### ♻️ Refactor
+
+- *(hash)* Implement multi-algorithm support and improve sync robustness
+
+### ✨ Features
+
+- *(api)* Add filesystem and patch utility functions
+- *(pkg)* Add quiet mode to uninstall process
+- *(shell)* Add verbose flag to ephemeral shell
+
+### 🛠️ Build
+
+- *(ci)* Refactor CI/CD pipeline and build scripts
+- Add debug build support to Justfile and Makefile
+
+### 🩹 Bug Fixes
+
+- *(update)* Accurately display download and net sizes
+- *(purl)* Implement local resolution support and bypass PGP verification in tests
+
 ## [Prod-Release-1.18.4] - 2026-06-13
 
 ### ✨ Features
