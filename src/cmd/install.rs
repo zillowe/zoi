@@ -709,6 +709,17 @@ pub fn run(
             if let Some(node) = graph.nodes.get(pkg_id)
                 && matches!(node.reason, types::InstallReason::Direct)
             {
+                direct_package_ids.push(pkg_id.clone());
+            }
+        }
+    }
+
+    for stage in &stages {
+        let mut stage_direct_ids = Vec::new();
+        for pkg_id in stage {
+            if let Some(node) = graph.nodes.get(pkg_id)
+                && matches!(node.reason, types::InstallReason::Direct)
+            {
                 let name = if let Some(sub) = &node.sub_package {
                     format!("{}:{}", node.pkg.name, sub)
                 } else {
@@ -720,71 +731,79 @@ pub fn run(
                     node.version.clone()
                 };
                 println!(" @{}:{}", name, version_display);
-                direct_package_ids.push(pkg_id.clone());
+                stage_direct_ids.push(pkg_id.clone());
             }
         }
+
+        if stage_direct_ids.is_empty() {
+            continue;
+        }
+
+        let res = stage_direct_ids
+            .par_iter()
+            .try_for_each(|pkg_id| -> Result<()> {
+                let node = graph.nodes.get(pkg_id).ok_or_else(|| {
+                    anyhow!(
+                        "Package node '{}' missing from graph during final installation",
+                        pkg_id
+                    )
+                })?;
+
+                let action = install_plan.get(pkg_id).ok_or_else(|| {
+                    anyhow!(
+                        "Install action missing for package '{}' during final installation",
+                        pkg_id
+                    )
+                })?;
+
+                match install::installer::install_node(
+                    node,
+                    action,
+                    Some(&m_pkg),
+                    build_type.as_deref(),
+                    yes,
+                    true,
+                ) {
+                    Ok(manifest) => {
+                        installed_manifests
+                            .lock()
+                            .map_err(|e| anyhow!("Installed manifests mutex poisoned: {}", e))?
+                            .push(manifest.clone());
+                        let mut tx_lock = transaction.lock().map_err(|e| {
+                            anyhow!(
+                                "Transaction mutex poisoned during direct package installation: {}",
+                                e
+                            )
+                        })?;
+                        transaction::record_operation(
+                            &mut tx_lock,
+                            types::TransactionOperation::Install {
+                                manifest: Box::new(manifest),
+                            },
+                        )?;
+                        successfully_installed_sources
+                            .lock()
+                            .map_err(|e| {
+                                anyhow!("Successfully installed sources mutex poisoned: {}", e)
+                            })?
+                            .push(node.source.clone());
+                        Ok(())
+                    }
+                    Err(e) => {
+                        failed_packages
+                            .lock()
+                            .map_err(|e| anyhow!("Failed packages mutex poisoned: {}", e))?
+                            .push(node.pkg.name.clone());
+                        eprintln!("Error installing {}: {}", node.pkg.name, e);
+                        Err(e)
+                    }
+                }
+            });
+
+        if res.is_err() {
+            break;
+        }
     }
-
-    direct_package_ids
-        .par_iter()
-        .try_for_each(|pkg_id| -> Result<()> {
-            let node = graph.nodes.get(pkg_id).ok_or_else(|| {
-                anyhow!(
-                    "Package node '{}' missing from graph during final installation",
-                    pkg_id
-                )
-            })?;
-
-            let action = install_plan.get(pkg_id).ok_or_else(|| {
-                anyhow!(
-                    "Install action missing for package '{}' during final installation",
-                    pkg_id
-                )
-            })?;
-
-            match install::installer::install_node(
-                node,
-                action,
-                Some(&m_pkg),
-                build_type.as_deref(),
-                yes,
-                true,
-            ) {
-                Ok(manifest) => {
-                    installed_manifests
-                        .lock()
-                        .map_err(|e| anyhow!("Installed manifests mutex poisoned: {}", e))?
-                        .push(manifest.clone());
-                    let mut tx_lock = transaction.lock().map_err(|e| {
-                        anyhow!(
-                            "Transaction mutex poisoned during direct package installation: {}",
-                            e
-                        )
-                    })?;
-                    transaction::record_operation(
-                        &mut tx_lock,
-                        types::TransactionOperation::Install {
-                            manifest: Box::new(manifest),
-                        },
-                    )?;
-                    successfully_installed_sources
-                        .lock()
-                        .map_err(|e| {
-                            anyhow!("Successfully installed sources mutex poisoned: {}", e)
-                        })?
-                        .push(node.source.clone());
-                    Ok(())
-                }
-                Err(e) => {
-                    failed_packages
-                        .lock()
-                        .map_err(|e| anyhow!("Failed packages mutex poisoned: {}", e))?
-                        .push(node.pkg.name.clone());
-                    eprintln!("Error installing {}: {}", node.pkg.name, e);
-                    Err(e)
-                }
-            }
-        })?;
 
     let direct_installed_count: usize = direct_package_ids.len();
 

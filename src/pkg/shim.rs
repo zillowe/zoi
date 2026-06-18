@@ -311,12 +311,6 @@ fn search_store_for_version(
                         }
                     }
                 }
-
-                if latest_dir.exists()
-                    && let Some(p) = find_bin_in_dir(&latest_dir, bin_name)
-                {
-                    return Ok(Some(p));
-                }
             }
         }
     }
