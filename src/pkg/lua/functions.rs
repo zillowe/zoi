@@ -113,6 +113,9 @@ pub fn setup_lua_environment(
     api::http::add_git_fetch_util(lua)?;
     api::fs::add_file_util(lua)?;
     api::fs::add_zcp(lua)?;
+    api::fs::add_zlicense(lua)?;
+    api::fs::add_zdoc(lua)?;
+    api::fs::add_zsed(lua, quiet)?;
     api::fs::add_zln(lua)?;
     api::fs::add_zchmod(lua)?;
     api::fs::add_zchown(lua)?;
@@ -120,6 +123,7 @@ pub fn setup_lua_environment(
     api::crypto::add_verify_hash(lua, quiet)?;
     api::fs::add_zrm(lua)?;
     api::system::add_cmd_util(lua, quiet)?;
+    api::system::add_zpatch(lua, quiet)?;
     api::fs::add_fs_util(lua)?;
     api::fs::add_find_util(lua)?;
     api::archive::add_archive_util(lua)?;

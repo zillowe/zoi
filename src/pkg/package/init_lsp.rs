@@ -46,7 +46,7 @@ fn generate_luarc_json(lsp_dir: &Path) -> Result<String> {
             "globals": [
                 "SYSTEM", "ZOI", "PKG", "BUILD_DIR", "STAGING_DIR", "BUILD_TYPE", "SUBPKG",
                 "metadata", "dependencies", "updates", "hooks", "service", "prepare", "package",
-                "verify", "test", "uninstall", "cmd", "zcp", "zln", "zchmod", "zchown", "zmkdir",
+                "verify", "test", "uninstall", "cmd", "zcp", "zlicense", "zdoc", "zsed", "zpatch", "zln", "zchmod", "zchown", "zmkdir",
                 "zrm", "IMPORT", "INCLUDE", "verifyHash", "verifySignature", "addPgpKey", "UTILS"
             ]
         }

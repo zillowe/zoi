@@ -171,6 +171,25 @@ function cmd(command) end
 ---@param destination string Destination using ${pkgstore}, ${usrroot}, etc.
 function zcp(source, destination) end
 
+--- Copies a license file to the package store (${pkgstore}/LICENSE).
+---@param source string Path relative to BUILD_DIR or ${pkgluadir}.
+function zlicense(source) end
+
+--- Copies a documentation file to the package store (${pkgstore}/doc/{filename}).
+---@param source string Path relative to BUILD_DIR or ${pkgluadir}.
+function zdoc(source) end
+
+--- Performs a regular expression replacement on a file within the build directory.
+---@param pattern string The regex pattern to match.
+---@param replacement string The string to replace the matched pattern.
+---@param file string The path to the file relative to BUILD_DIR.
+function zsed(pattern, replacement, file) end
+
+--- Applies a patch file to the build directory using the 'patch' command.
+---@param patch_file string The path to the patch file relative to BUILD_DIR.
+---@param strip integer? The number of leading path components to strip (default is 1).
+function zpatch(patch_file, strip) end
+
 --- Creates a symbolic link in the package.
 ---@param target string
 ---@param link string

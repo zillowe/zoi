@@ -47,3 +47,44 @@ pub fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     lua.globals().set("cmd", cmd_fn)?;
     Ok(())
 }
+
+pub fn add_zpatch(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
+    let zpatch_fn =
+        lua.create_function(move |lua, (patch_file, strip): (String, Option<u32>)| {
+            let build_dir: String = lua.globals().get("BUILD_DIR")?;
+            let strip_level = strip.unwrap_or(1);
+
+            if !quiet {
+                println!("Applying patch: {}", patch_file);
+            }
+
+            let output = std::process::Command::new("patch")
+                .arg(format!("-p{}", strip_level))
+                .arg("-i")
+                .arg(&patch_file)
+                .current_dir(&build_dir)
+                .output();
+
+            match output {
+                Ok(out) => {
+                    if !out.status.success() {
+                        let stderr = String::from_utf8_lossy(&out.stderr);
+                        return Err(mlua::Error::RuntimeError(format!(
+                            "patch failed: {}",
+                            stderr
+                        )));
+                    }
+                    if !quiet {
+                        println!("Successfully applied patch {}", patch_file);
+                    }
+                    Ok(())
+                }
+                Err(e) => Err(mlua::Error::RuntimeError(format!(
+                    "Failed to execute patch command: {}",
+                    e
+                ))),
+            }
+        })?;
+    lua.globals().set("zpatch", zpatch_fn)?;
+    Ok(())
+}
