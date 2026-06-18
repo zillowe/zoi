@@ -60,6 +60,63 @@ pub fn add_zcp(lua: &Lua) -> Result<(), mlua::Error> {
     Ok(())
 }
 
+pub fn add_zlicense(lua: &Lua) -> Result<(), mlua::Error> {
+    let zlicense_fn = lua.create_function(|lua, source: String| {
+        let destination = "${pkgstore}/LICENSE".to_string();
+        let zcp: mlua::Function = lua.globals().get("zcp")?;
+        zcp.call::<()>((source, destination))?;
+        Ok(())
+    })?;
+    lua.globals().set("zlicense", zlicense_fn)?;
+    Ok(())
+}
+
+pub fn add_zdoc(lua: &Lua) -> Result<(), mlua::Error> {
+    let zdoc_fn = lua.create_function(|lua, source: String| {
+        let filename = Path::new(&source)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .ok_or_else(|| mlua::Error::RuntimeError("Invalid source path".to_string()))?;
+        let destination = format!("${{pkgstore}}/doc/{}", filename);
+        let zcp: mlua::Function = lua.globals().get("zcp")?;
+        zcp.call::<()>((source, destination))?;
+        Ok(())
+    })?;
+    lua.globals().set("zdoc", zdoc_fn)?;
+    Ok(())
+}
+
+pub fn add_zsed(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
+    let zsed_fn = lua.create_function(
+        move |lua, (pattern, replacement, file): (String, String, String)| {
+            let build_dir_str: String = lua.globals().get("BUILD_DIR")?;
+            let path = Path::new(&build_dir_str).join(&file);
+
+            let content = std::fs::read_to_string(&path).map_err(|e| {
+                mlua::Error::RuntimeError(format!("Failed to read {}: {}", file, e))
+            })?;
+
+            let re = regex::Regex::new(&pattern).map_err(|e| {
+                mlua::Error::RuntimeError(format!("Invalid regex '{}': {}", pattern, e))
+            })?;
+
+            let new_content = re.replace_all(&content, replacement.as_str());
+
+            std::fs::write(&path, new_content.as_bytes()).map_err(|e| {
+                mlua::Error::RuntimeError(format!("Failed to write {}: {}", file, e))
+            })?;
+
+            if !quiet {
+                println!("Applied sed replacement to {}", file);
+            }
+
+            Ok(())
+        },
+    )?;
+    lua.globals().set("zsed", zsed_fn)?;
+    Ok(())
+}
+
 pub fn add_zln(lua: &Lua) -> Result<(), mlua::Error> {
     let zln_fn = lua.create_function(|lua, (target, link): (String, String)| {
         let ops_table: Table = match lua.globals().get("__ZoiBuildOperations") {

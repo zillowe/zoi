@@ -20,6 +20,40 @@ fn test_lua_zcp_records_operation() {
 }
 
 #[test]
+fn test_lua_zlicense_records_zcp_operation() {
+    let lua = Lua::new();
+    functions::setup_lua_environment(&lua, "linux-amd64", None, None, None, None, true).unwrap();
+
+    lua.load(r#"zlicense("LICENSE.txt")"#).exec().unwrap();
+
+    let ops: Table = lua.globals().get("__ZoiBuildOperations").unwrap();
+    let op: Table = ops.get(1).unwrap();
+    assert_eq!(op.get::<String>("op").unwrap(), "zcp");
+    assert_eq!(op.get::<String>("source").unwrap(), "LICENSE.txt");
+    assert_eq!(
+        op.get::<String>("destination").unwrap(),
+        "${pkgstore}/LICENSE"
+    );
+}
+
+#[test]
+fn test_lua_zdoc_records_zcp_operation() {
+    let lua = Lua::new();
+    functions::setup_lua_environment(&lua, "linux-amd64", None, None, None, None, true).unwrap();
+
+    lua.load(r#"zdoc("docs/README.md")"#).exec().unwrap();
+
+    let ops: Table = lua.globals().get("__ZoiBuildOperations").unwrap();
+    let op: Table = ops.get(1).unwrap();
+    assert_eq!(op.get::<String>("op").unwrap(), "zcp");
+    assert_eq!(op.get::<String>("source").unwrap(), "docs/README.md");
+    assert_eq!(
+        op.get::<String>("destination").unwrap(),
+        "${pkgstore}/doc/README.md"
+    );
+}
+
+#[test]
 fn test_lua_zln_records_operation() {
     let lua = Lua::new();
     functions::setup_lua_environment(&lua, "linux-amd64", None, None, None, None, true).unwrap();
