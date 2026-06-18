@@ -4,7 +4,7 @@ use crate::pkg::{config, db, hooks, install, local, pin, resolve, transaction, t
 use anyhow::{Result, anyhow};
 use colored::*;
 use dialoguer::{MultiSelect, theme::ColorfulTheme};
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use semver::Version;
 use serde_json::json;
@@ -487,6 +487,12 @@ fn run_update_all_logic(
             match resolve::resolve_package_and_version(&source, true, false) {
                 Ok(result) => result,
                 Err(e) => {
+                    eprintln!(
+                        "{}: Failed to resolve '{}': {}",
+                        "Warning".yellow(),
+                        source,
+                        e
+                    );
                     skipped_sources.push(format!("{} ({})", source, e));
                     pb.inc(1);
                     continue;
@@ -735,6 +741,8 @@ fn run_update_all_logic(
     let failed_updates = Mutex::new(Vec::new());
     let successful_upgrades = Mutex::new(Vec::new());
 
+    let m = MultiProgress::new();
+
     packages_to_upgrade
         .par_iter()
         .try_for_each(|candidate| -> Result<()> {
@@ -760,7 +768,12 @@ fn run_update_all_logic(
             ) {
                 Ok(res) => res,
                 Err(e) => {
-                    eprintln!("Error resolving dependency graph for update: {}", e);
+                    eprintln!(
+                        "{}: Failed to resolve dependencies for '{}': {}",
+                        "Error".red().bold(),
+                        candidate.source,
+                        e
+                    );
                     failed_updates
                         .lock()
                         .map_err(|e| anyhow!("mutex poisoned: {}", e))?
@@ -770,7 +783,12 @@ fn run_update_all_logic(
             };
 
             if let Err(e) = install::util::check_policy_compliance(&graph) {
-                eprintln!("Policy check failed for {}: {}", candidate.source, e);
+                eprintln!(
+                    "{}: Policy check failed for '{}': {}",
+                    "Error".red().bold(),
+                    candidate.source,
+                    e
+                );
                 failed_updates
                     .lock()
                     .map_err(|e| anyhow!("mutex poisoned: {}", e))?
@@ -779,7 +797,12 @@ fn run_update_all_logic(
             }
 
             if let Err(e) = install::util::check_for_vulnerabilities(&graph, yes) {
-                eprintln!("Security check failed for {}: {}", candidate.source, e);
+                eprintln!(
+                    "{}: Security check failed for '{}': {}",
+                    "Error".red().bold(),
+                    candidate.source,
+                    e
+                );
                 failed_updates
                     .lock()
                     .map_err(|e| anyhow!("mutex poisoned: {}", e))?
@@ -790,7 +813,12 @@ fn run_update_all_logic(
             let install_plan = match install::plan::create_install_plan(&graph.nodes, None, false) {
                 Ok(plan) => plan,
                 Err(e) => {
-                    eprintln!("Error creating install plan for update: {}", e);
+                    eprintln!(
+                        "{}: Failed to create install plan for '{}': {}",
+                        "Error".red().bold(),
+                        candidate.source,
+                        e
+                    );
                     failed_updates
                         .lock()
                         .map_err(|e| anyhow!("mutex poisoned: {}", e))?
@@ -802,7 +830,12 @@ fn run_update_all_logic(
             let stages = match graph.toposort() {
                 Ok(s) => s,
                 Err(e) => {
-                    eprintln!("Error sorting dependency graph for update: {}", e);
+                    eprintln!(
+                        "{}: Failed to sort dependency graph for '{}': {}",
+                        "Error".red().bold(),
+                        candidate.source,
+                        e
+                    );
                     failed_updates
                         .lock()
                         .map_err(|e| anyhow!("mutex poisoned: {}", e))?
@@ -818,8 +851,14 @@ fn run_update_all_logic(
                         anyhow!("Package node '{}' missing from graph during update", pkg_id)
                     })?;
                     if let Some(action) = install_plan.get(&pkg_id) {
-                        match install::installer::install_node(node, action, None, None, yes, true)
-                        {
+                        match install::installer::install_node(
+                            node,
+                            action,
+                            Some(&m),
+                            None,
+                            yes,
+                            true,
+                        ) {
                             Ok(m) => {
                                 if m.name == candidate.new_pkg.name
                                     && m.sub_package == candidate.old_manifest.sub_package
@@ -828,7 +867,12 @@ fn run_update_all_logic(
                                 }
                             }
                             Err(e) => {
-                                eprintln!("Failed to upgrade {}: {}", candidate.source, e);
+                                eprintln!(
+                                    "{}: Failed to upgrade '{}': {}",
+                                    "Error".red().bold(),
+                                    candidate.source,
+                                    e
+                                );
                                 failed_updates
                                     .lock()
                                     .map_err(|e| anyhow!("mutex poisoned: {}", e))?
