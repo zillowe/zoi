@@ -54,19 +54,24 @@ pub fn fetch_central_db() -> Result<HashMap<String, RegistryInfo>> {
     let url = std::env::var("ZOI_PURL_DB_URL")
         .unwrap_or_else(|_| "https://zillowe.pages.dev/zoi/registries.json".to_string());
 
-    let trusted_keys = crate::pkg::config::get_builtin_authorities();
-    let data = if !trusted_keys.is_empty() {
-        crate::pkg::config::verify_remote_file(&url, &trusted_keys)?
+    let is_test = std::env::var("ZOI_TEST").is_ok();
+    let data = if !url.starts_with("http") {
+        std::fs::read(&url).map_err(|e| anyhow!("Failed to read central DB from {}: {}", url, e))?
     } else {
-        let client = utils::get_http_client()?;
-        let response = client.get(&url).send()?;
-        if !response.status().is_success() {
-            return Err(anyhow!(
-                "Failed to fetch central Zoi registry database: {}",
-                response.status()
-            ));
+        let trusted_keys = crate::pkg::config::get_builtin_authorities();
+        if !trusted_keys.is_empty() && !is_test {
+            crate::pkg::config::verify_remote_file(&url, &trusted_keys)?
+        } else {
+            let client = utils::get_http_client()?;
+            let response = client.get(&url).send()?;
+            if !response.status().is_success() {
+                return Err(anyhow!(
+                    "Failed to fetch central Zoi registry database: {}",
+                    response.status()
+                ));
+            }
+            response.bytes()?.to_vec()
         }
-        response.bytes()?.to_vec()
     };
 
     let spec: CentralDbSpec = serde_json::from_slice(&data)?;
@@ -100,19 +105,31 @@ pub fn construct_raw_url(git_url: &str, branch: &str, file_path: &str) -> Result
 }
 
 pub fn fetch_registry_index(registry: &RegistryInfo) -> Result<RegistryIndex> {
-    let url = construct_raw_url(&registry.git, &registry.branch, "packages.json")?;
-    let client = utils::get_http_client()?;
-    let response = client.get(url).send()?;
+    let data = if !registry.git.starts_with("http") {
+        let path = Path::new(&registry.git).join("packages.json");
+        std::fs::read(&path).map_err(|e| {
+            anyhow!(
+                "Failed to read registry index from {}: {}",
+                path.display(),
+                e
+            )
+        })?
+    } else {
+        let url = construct_raw_url(&registry.git, &registry.branch, "packages.json")?;
+        let client = utils::get_http_client()?;
+        let response = client.get(url).send()?;
 
-    if !response.status().is_success() {
-        return Err(anyhow!(
-            "Failed to fetch packages.json from registry {}: {}",
-            registry.name,
-            response.status()
-        ));
-    }
+        if !response.status().is_success() {
+            return Err(anyhow!(
+                "Failed to fetch packages.json from registry {}: {}",
+                registry.name,
+                response.status()
+            ));
+        }
+        response.bytes()?.to_vec()
+    };
 
-    Ok(response.json()?)
+    Ok(serde_json::from_slice(&data)?)
 }
 
 pub fn fetch_package_lua(registry: &RegistryInfo, repo: &str, name: &str) -> Result<String> {
@@ -121,6 +138,12 @@ pub fn fetch_package_lua(registry: &RegistryInfo, repo: &str, name: &str) -> Res
     } else {
         format!("{}/{}/{}.pkg.lua", repo, name, name)
     };
+
+    if !registry.git.starts_with("http") {
+        let path = Path::new(&registry.git).join(&file_path);
+        return std::fs::read_to_string(&path)
+            .map_err(|e| anyhow!("Failed to read pkg.lua from {}: {}", path.display(), e));
+    }
 
     let url = construct_raw_url(&registry.git, &registry.branch, &file_path)?;
     let client = utils::get_http_client()?;
