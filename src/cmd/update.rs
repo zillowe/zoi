@@ -141,9 +141,12 @@ fn run_update_single_logic(
         return Ok(());
     }
 
-    let download_size = new_pkg.archive_size.unwrap_or(0);
+    let (download_size, new_installed_size) = install::util::get_package_sizes(
+        &new_pkg,
+        registry_handle.as_deref().unwrap_or("local"),
+        &new_version,
+    );
     let old_installed_size = old_manifest.installed_size.unwrap_or(0);
-    let new_installed_size = new_pkg.installed_size.unwrap_or(0);
     let installed_size_diff = new_installed_size as i64 - old_installed_size as i64;
 
     println!();
@@ -438,6 +441,8 @@ fn run_update_all_logic(
         old_manifest: types::InstallManifest,
         old_advisories: usize,
         new_advisories: usize,
+        download_size: u64,
+        new_installed_size: u64,
     }
 
     let installed_packages = local::get_installed_packages()?;
@@ -503,6 +508,9 @@ fn run_update_all_logic(
         )
         .unwrap_or((0, 0));
 
+        let (download_size, new_installed_size) =
+            install::util::get_package_sizes(&new_pkg, &manifest.registry_handle, &new_version);
+
         packages_to_upgrade.push(UpdateCandidate {
             source,
             new_pkg,
@@ -510,6 +518,8 @@ fn run_update_all_logic(
             old_manifest: manifest,
             old_advisories: old_adv,
             new_advisories: new_adv,
+            download_size,
+            new_installed_size,
         });
         pb.inc(1);
     }
@@ -632,16 +642,10 @@ fn run_update_all_logic(
         packages_to_upgrade = filtered;
     }
 
-    let total_download_size: u64 = packages_to_upgrade
-        .iter()
-        .map(|c| c.new_pkg.archive_size.unwrap_or(0))
-        .sum();
+    let total_download_size: u64 = packages_to_upgrade.iter().map(|c| c.download_size).sum();
     let total_installed_size_diff: i64 = packages_to_upgrade
         .iter()
-        .map(|c| {
-            c.new_pkg.installed_size.unwrap_or(0) as i64
-                - c.old_manifest.installed_size.unwrap_or(0) as i64
-        })
+        .map(|c| c.new_installed_size as i64 - c.old_manifest.installed_size.unwrap_or(0) as i64)
         .sum();
 
     let preflight = ux::PreflightSummary::new("Update preflight")
@@ -669,8 +673,8 @@ fn run_update_all_logic(
                     "sub_package": c.old_manifest.sub_package,
                     "from_version": c.old_manifest.version,
                     "to_version": c.new_version,
-                    "download_bytes": c.new_pkg.archive_size.unwrap_or(0),
-                    "net_size_bytes": c.new_pkg.installed_size.unwrap_or(0) as i64 - c.old_manifest.installed_size.unwrap_or(0) as i64,
+                    "download_bytes": c.download_size,
+                    "net_size_bytes": c.new_installed_size as i64 - c.old_manifest.installed_size.unwrap_or(0) as i64,
                     "advisories_old": c.old_advisories,
                     "advisories_new": c.new_advisories,
                 })
