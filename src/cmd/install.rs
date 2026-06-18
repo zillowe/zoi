@@ -612,7 +612,6 @@ pub fn run(
     let transaction = Mutex::new(transaction::begin()?);
     let transaction_id = transaction.lock().unwrap().id.clone();
     let dependency_installed_count = AtomicUsize::new(0);
-    let mut direct_installed_count = 0usize;
 
     if !dependencies.is_empty() || !non_zoi_deps.is_empty() {
         println!("\n{} Installing dependencies...", "::".bold().blue());
@@ -702,28 +701,39 @@ pub fn run(
     }
 
     println!("\n{} Installing packages...", "::".bold().blue());
+    let m_pkg = MultiProgress::new();
+
+    let mut direct_package_ids = Vec::new();
     for stage in &stages {
         for pkg_id in stage {
+            if let Some(node) = graph.nodes.get(pkg_id)
+                && matches!(node.reason, types::InstallReason::Direct)
+            {
+                let name = if let Some(sub) = &node.sub_package {
+                    format!("{}:{}", node.pkg.name, sub)
+                } else {
+                    node.pkg.name.clone()
+                };
+                let version_display = if node.revision != "1" {
+                    format!("{}-{}", node.version, node.revision)
+                } else {
+                    node.version.clone()
+                };
+                println!(" @{}:{}", name, version_display);
+                direct_package_ids.push(pkg_id.clone());
+            }
+        }
+    }
+
+    direct_package_ids
+        .par_iter()
+        .try_for_each(|pkg_id| -> Result<()> {
             let node = graph.nodes.get(pkg_id).ok_or_else(|| {
                 anyhow!(
                     "Package node '{}' missing from graph during final installation",
                     pkg_id
                 )
             })?;
-            if !matches!(node.reason, types::InstallReason::Direct) {
-                continue;
-            }
-            let name = if let Some(sub) = &node.sub_package {
-                format!("{}:{}", node.pkg.name, sub)
-            } else {
-                node.pkg.name.clone()
-            };
-            let version_display = if node.revision != "1" {
-                format!("{}-{}", node.version, node.revision)
-            } else {
-                node.version.clone()
-            };
-            println!(" @{}:{}", name, version_display);
 
             let action = install_plan.get(pkg_id).ok_or_else(|| {
                 anyhow!(
@@ -731,7 +741,6 @@ pub fn run(
                     pkg_id
                 )
             })?;
-            let m_pkg = MultiProgress::new();
 
             match install::installer::install_node(
                 node,
@@ -742,12 +751,16 @@ pub fn run(
                 true,
             ) {
                 Ok(manifest) => {
-                    direct_installed_count += 1;
                     installed_manifests
                         .lock()
                         .map_err(|e| anyhow!("Installed manifests mutex poisoned: {}", e))?
                         .push(manifest.clone());
-                    let mut tx_lock = transaction.lock().unwrap();
+                    let mut tx_lock = transaction.lock().map_err(|e| {
+                        anyhow!(
+                            "Transaction mutex poisoned during direct package installation: {}",
+                            e
+                        )
+                    })?;
                     transaction::record_operation(
                         &mut tx_lock,
                         types::TransactionOperation::Install {
@@ -760,17 +773,20 @@ pub fn run(
                             anyhow!("Successfully installed sources mutex poisoned: {}", e)
                         })?
                         .push(node.source.clone());
+                    Ok(())
                 }
                 Err(e) => {
                     failed_packages
                         .lock()
                         .map_err(|e| anyhow!("Failed packages mutex poisoned: {}", e))?
                         .push(node.pkg.name.clone());
-                    eprintln!("Error: {}", e);
+                    eprintln!("Error installing {}: {}", node.pkg.name, e);
+                    Err(e)
                 }
             }
-        }
-    }
+        })?;
+
+    let direct_installed_count: usize = direct_package_ids.len();
 
     let failed = failed_packages
         .lock()

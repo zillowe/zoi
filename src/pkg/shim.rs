@@ -145,6 +145,11 @@ pub fn resolve_to_installed_bin(
     }
 
     let (pkg, _) = &providers[0];
+
+    if let Some(path) = search_store_for_version(&pkg.name, "latest", bin_name)? {
+        return Ok(path);
+    }
+
     let version = pkg
         .version
         .as_deref()
@@ -276,22 +281,41 @@ fn search_store_for_version(
             if let Some(dir_name) = path.file_name().and_then(|s| s.to_str())
                 && dir_name.ends_with(&format!("-{}", pkg_name))
             {
-                let version_dir = path.join(version);
-                if version_dir.exists()
-                    && let Some(p) = find_bin_in_dir(&version_dir, bin_name)
+                let latest_dir = path.join("latest");
+                if latest_dir.exists()
+                    && (version == "latest" || version.is_empty())
+                    && let Some(p) = find_bin_in_dir(&latest_dir, bin_name)
                 {
                     return Ok(Some(p));
                 }
 
-                for v_entry in fs::read_dir(&path)? {
-                    let v_entry = v_entry?;
-                    let v_name = v_entry.file_name().to_string_lossy().to_string();
-                    if v_name.starts_with(version) && v_name != "latest" && v_name != "dependents" {
-                        let v_dir = path.join(v_name);
-                        if let Some(p) = find_bin_in_dir(&v_dir, bin_name) {
-                            return Ok(Some(p));
+                if version != "latest" && !version.is_empty() {
+                    let version_dir = path.join(version);
+                    if version_dir.exists()
+                        && let Some(p) = find_bin_in_dir(&version_dir, bin_name)
+                    {
+                        return Ok(Some(p));
+                    }
+
+                    for v_entry in fs::read_dir(&path)? {
+                        let v_entry = v_entry?;
+                        let v_name = v_entry.file_name().to_string_lossy().to_string();
+                        if v_name.starts_with(version)
+                            && v_name != "latest"
+                            && v_name != "dependents"
+                        {
+                            let v_dir = path.join(v_name);
+                            if let Some(p) = find_bin_in_dir(&v_dir, bin_name) {
+                                return Ok(Some(p));
+                            }
                         }
                     }
+                }
+
+                if latest_dir.exists()
+                    && let Some(p) = find_bin_in_dir(&latest_dir, bin_name)
+                {
+                    return Ok(Some(p));
                 }
             }
         }
