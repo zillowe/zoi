@@ -3,5 +3,8 @@
   "extends": [
     "config:recommended",
     ":gitSignOff"
+  ],
+  "enabledManagers": [
+    "cargo"
   ]
 }
