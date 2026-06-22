@@ -96,11 +96,11 @@ junction = "2.0.0"
 md5 = "0.8.0"
 mlua = { version = "0.11.6", features = ["luau", "serde"] }
 nix = { version = "0.31.3", features = ["user", "fs"] }
-openssl = { version = "0.10.80", features = ["vendored"] }
-pulldown-cmark = { version = "0.13.3", default-features = false }
-ratatui = { version = "0.30.1", features = ["crossterm"] }
+openssl = { version = "0.10.81", features = ["vendored"] }
+pulldown-cmark = { version = "0.13.4", default-features = false }
+ratatui = { version = "0.30.2", features = ["crossterm"] }
 rayon = "1.12.0"
-regex = "1.12.3"
+regex = "1.12.4"
 reqwest = { version = "0.13.4", default-features = false, features = [
   "blocking",
   "json",
@@ -119,9 +119,9 @@ spdx = "0.13.4"
 syntect = "5.3.0"
 tar = "0.4.46"
 tempfile = "3.27.0"
-toml = "1.0.3"
+toml = "1.1.2"
 urlencoding = "2.1.3"
-uuid = { version = "1.23.2", features = ["v7"] }
+uuid = { version = "1.23.3", features = ["v7"] }
 walkdir = "2.5.0"
 winapi = { version = "0.3.9", features = ["securitybaseapi", "winnt"] }
 xz2 = "0.1.7"
@@ -129,7 +129,7 @@ zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
 zstd = "0.13.3"
 ar = "0.9.0"
 sevenz-rust = "0.6.1"
-phf = "0.13.1"
+phf = "0.14.0"
 rusqlite = { version = "0.40.1", features = ["bundled"] }
 glob = "0.3.3"
 pubgrub = "0.4.0"
@@ -140,8 +140,8 @@ purl = "0.1.6"
 
 [build-dependencies]
 dotenvy = "0.15.7"
-phf = { version = "0.13.1", features = ["macros"] }
-phf_codegen = "0.13.1"
+phf = { version = "0.14.0", features = ["macros"] }
+phf_codegen = "0.14.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
