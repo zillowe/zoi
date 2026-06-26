@@ -1,0 +1,72 @@
+use crate::resolver::InstallNode;
+use crate::util;
+use anyhow::Result;
+use rayon::prelude::*;
+use std::collections::HashMap;
+use zoi_core::types;
+
+use std::path::PathBuf;
+
+#[derive(Clone)]
+pub struct PrebuiltDetails {
+    pub info: types::PrebuiltInfo,
+    pub download_size: u64,
+    pub installed_size: u64,
+}
+
+#[derive(Clone)]
+pub enum InstallAction {
+    DownloadAndInstall(PrebuiltDetails),
+    InstallFromArchive(PathBuf),
+    BuildAndInstall,
+}
+
+pub fn create_install_plan(
+    graph: &HashMap<String, InstallNode>,
+    build_type: Option<&str>,
+    build: bool,
+) -> Result<HashMap<String, InstallAction>> {
+    let plan: HashMap<String, InstallAction> = graph
+        .par_iter()
+        .map(|(id, node)| {
+            if build || (build_type.is_some() && build_type != Some("pre-compiled") && build_type != Some("pre-built")) {
+                return (id.clone(), InstallAction::BuildAndInstall);
+            }
+
+            let action = match util::find_prebuilt_info(node) {
+                Ok(Some(info)) => {
+                    let (down_size, inst_size) = if let Some(size_url) = &info.size_url {
+                        if zoi_core::offline::is_offline() {
+                            (node.pkg.archive_size.unwrap_or(0), node.pkg.installed_size.unwrap_or(0))
+                        } else {
+                            util::get_expected_size(size_url).unwrap_or_else(|e| {
+                                eprintln!(
+                                    "Warning: could not fetch size for {}: {}. Falling back to metadata.",
+                                    node.pkg.name,
+                                    e
+                                );
+                                (node.pkg.archive_size.unwrap_or(0), node.pkg.installed_size.unwrap_or(0))
+                            })
+                        }
+                    } else {
+                        (node.pkg.archive_size.unwrap_or(0), node.pkg.installed_size.unwrap_or(0))
+                    };
+
+                    InstallAction::DownloadAndInstall(PrebuiltDetails {
+                        info,
+                        download_size: down_size,
+                        installed_size: inst_size,
+                    })
+                }
+                Ok(None) => InstallAction::BuildAndInstall,
+                Err(e) => {
+                    eprintln!("Error finding prebuilt info for {}: {}. Assuming build.", node.pkg.name, e);
+                    InstallAction::BuildAndInstall
+                }
+            };
+            (id.clone(), action)
+        })
+        .collect();
+
+    Ok(plan)
+}

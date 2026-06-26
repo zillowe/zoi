@@ -1,0 +1,1021 @@
+use crate::cmd::ux;
+use crate::pkg::{config, install, lock, resolve, transaction, types};
+use anyhow::{Result, anyhow};
+use colored::Colorize;
+use indicatif::MultiProgress;
+use mlua::LuaSerdeExt;
+use rayon::prelude::*;
+use serde_json::json;
+use std::collections::HashSet;
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use zoi_project as project;
+
+pub fn run(
+    sources: &[String],
+    repo: Option<String>,
+    force: bool,
+    all_optional: bool,
+    yes: bool,
+    scope: Option<crate::cli::InstallScope>,
+    local: bool,
+    global: bool,
+    save: bool,
+    build_type: Option<String>,
+    dry_run: bool,
+    plugin_manager: Option<&crate::pkg::plugin::PluginManager>,
+    build: bool,
+    frozen_lockfile: bool,
+    explain: bool,
+    plan_json: bool,
+    retry: u32,
+    verbose: bool,
+    purl: bool,
+) -> Result<()> {
+    crate::pkg::install::util::set_download_retry_attempts(retry);
+
+    let mut scope_override = scope.map(|s| match s {
+        crate::cli::InstallScope::User => types::Scope::User,
+        crate::cli::InstallScope::System => types::Scope::System,
+        crate::cli::InstallScope::Project => types::Scope::Project,
+    });
+
+    if local {
+        scope_override = Some(types::Scope::Project);
+    } else if global {
+        scope_override = Some(types::Scope::User);
+    }
+
+    if save && scope_override.is_none() && std::path::Path::new("zoi.yaml").exists() {
+        scope_override = Some(types::Scope::Project);
+    }
+
+    if frozen_lockfile {
+        if repo.is_some() || !sources.is_empty() {
+            return Err(anyhow!(
+                "--frozen-lockfile can only be used without explicit sources or --repo."
+            ));
+        }
+        if save {
+            return Err(anyhow!(
+                "--save cannot be used with --frozen-lockfile because the lockfile must remain unchanged."
+            ));
+        }
+        if !std::path::Path::new("zoi.yaml").exists() {
+            return Err(anyhow!(
+                "--frozen-lockfile requires a local zoi.yaml in the current project."
+            ));
+        }
+        if !std::path::Path::new("zoi.lock").exists() {
+            return Err(anyhow!(
+                "--frozen-lockfile requires zoi.lock. Generate it first with a normal project install."
+            ));
+        }
+        if let Some(scope) = scope_override
+            && scope != types::Scope::Project
+        {
+            return Err(anyhow!(
+                "--frozen-lockfile is only supported for project scope installs."
+            ));
+        }
+        scope_override = Some(types::Scope::Project);
+    }
+
+    let lockfile_exists = sources.is_empty()
+        && repo.is_none()
+        && std::path::Path::new("zoi.lock").exists()
+        && std::path::Path::new("zoi.yaml").exists();
+
+    let mut sources_to_process: Vec<String> = sources.to_vec();
+    let mut is_project_install = false;
+    let mut frozen_locked_packages = None;
+    if frozen_lockfile {
+        let lockfile = project::lockfile::read_zoi_lock()?;
+        let locked_packages = project::lockfile::locked_packages(&lockfile);
+        sources_to_process = locked_packages
+            .iter()
+            .map(|entry| entry.source.clone())
+            .collect();
+        if sources_to_process.is_empty() {
+            return Err(anyhow!(
+                "zoi.lock is empty. Cannot continue with --frozen-lockfile."
+            ));
+        }
+        frozen_locked_packages = Some(locked_packages);
+        println!(
+            "{} --frozen-lockfile enabled. Installing pinned lockfile sources only...",
+            "::".bold().blue()
+        );
+        is_project_install = true;
+    } else if sources.is_empty() && repo.is_none() {
+        if std::path::Path::new("zoi.yaml").exists() {
+            if let Ok(config) = project::config::load() {
+                if lockfile_exists {
+                    println!(
+                        "{} zoi.lock found. Installing from zoi.yaml then verifying...",
+                        "::".bold().blue()
+                    );
+                } else {
+                    println!(
+                        "{} Installing project packages from zoi.yaml...",
+                        "::".bold().blue()
+                    );
+                }
+                sources_to_process = config.pkgs.clone();
+                if scope_override.is_none() {
+                    scope_override = Some(types::Scope::Project);
+                }
+                is_project_install = true;
+            }
+        } else if let Some(pm) = plugin_manager
+            && pm.trigger_project_install_hook()?
+        {
+            return Ok(());
+        }
+    }
+
+    if let Some(repo_spec) = repo {
+        if scope_override == Some(types::Scope::Project) {
+            return Err(anyhow!(
+                "Installing from a repository to a project scope is not supported."
+            ));
+        }
+        let repo_install_scope = scope_override.map(|s| match s {
+            types::Scope::User => crate::cli::SetupScope::User,
+            types::Scope::System => crate::cli::SetupScope::System,
+            types::Scope::Project => unreachable!(),
+        });
+
+        if dry_run {
+            println!(
+                "{} Dry-run: would install from repository '{}'",
+                "::".bold().yellow(),
+                repo_spec
+            );
+            return Ok(());
+        }
+
+        crate::pkg::repo_install::run(
+            &repo_spec,
+            force,
+            all_optional,
+            yes,
+            repo_install_scope,
+            plugin_manager,
+        )?;
+        return Ok(());
+    }
+
+    if sources_to_process.is_empty() {
+        return Ok(());
+    }
+
+    if purl {
+        let mut resolved_purls = Vec::new();
+        for source in &sources_to_process {
+            println!(
+                "{} Fetching PURL package '{}'...",
+                "::".bold().blue(),
+                source
+            );
+            let ident = crate::pkg::purl::fetch_and_store_purl_package(source)?;
+            resolved_purls.push(ident);
+        }
+        sources_to_process = resolved_purls;
+    }
+
+    let config = config::read_config().unwrap_or_default();
+    let parallel_jobs = config.parallel_jobs.unwrap_or(3);
+    if parallel_jobs > 0 {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(parallel_jobs)
+            .build_global()
+            .ok();
+    }
+
+    let failed_packages = Mutex::new(Vec::new());
+    let mut temp_files = Vec::new();
+    let mut final_sources = Vec::new();
+
+    for source in &sources_to_process {
+        if source.ends_with("zoi.pkgs.json") {
+            install::lockfile::process_lockfile(source, &mut final_sources, &mut temp_files)?;
+        } else {
+            final_sources.push(source.to_string());
+        }
+    }
+
+    let successfully_installed_sources = Mutex::new(Vec::new());
+    let installed_manifests = Mutex::new(Vec::new());
+
+    let (mut graph, mut non_zoi_deps) =
+        if let Some(locked_packages) = frozen_locked_packages.as_ref() {
+            install::resolver::build_graph_from_locked_packages(
+                locked_packages,
+                scope_override,
+                false,
+                yes,
+            )?
+        } else {
+            install::resolver::resolve_dependency_graph(
+                &final_sources,
+                scope_override,
+                force,
+                yes,
+                all_optional,
+                build_type.as_deref(),
+                false,
+            )?
+        };
+
+    let mut skipped_existing_count = 0usize;
+    if !force {
+        let mut to_remove = Vec::new();
+        for (pkg_id, node) in &graph.nodes {
+            let request_source = crate::pkg::local::package_source_string(
+                &node.registry_handle,
+                &node.pkg.repo,
+                &node.pkg.name,
+                node.sub_package.as_deref(),
+                &node.version,
+            );
+            let request = resolve::parse_source_string(&request_source)?;
+            let matches = crate::pkg::local::find_installed_manifests_matching(
+                &request,
+                scope_override.unwrap_or(node.pkg.scope),
+            )?;
+            if matches
+                .iter()
+                .any(|manifest| manifest.version == node.version)
+            {
+                println!(
+                    "{} Package '{}' is already installed at version {}. Skipping.",
+                    "::".bold().green(),
+                    node.pkg.name.cyan(),
+                    node.version.yellow()
+                );
+                to_remove.push(pkg_id.clone());
+            }
+        }
+        skipped_existing_count = to_remove.len();
+
+        for pkg_id in to_remove {
+            graph.nodes.remove(&pkg_id);
+            if let Some(children) = graph.adj.remove(&pkg_id)
+                && let Some(root_children) = graph.adj.get_mut("$root")
+            {
+                for child in children {
+                    root_children.insert(child);
+                }
+            }
+            if let Some(root_children) = graph.adj.get_mut("$root") {
+                root_children.remove(&pkg_id);
+            }
+        }
+
+        let mut valid_non_zoi_deps = std::collections::HashSet::new();
+        for source in &sources_to_process {
+            if let Ok(dep) = crate::pkg::dependencies::parse_dependency_string(source)
+                && dep.manager != "zoi"
+            {
+                valid_non_zoi_deps.insert(source.clone());
+            }
+        }
+        for node in graph.nodes.values() {
+            for dep in &node.dependencies {
+                if let Ok(dep_req) = crate::pkg::dependencies::parse_dependency_string(dep)
+                    && dep_req.manager != "zoi"
+                {
+                    valid_non_zoi_deps.insert(dep.clone());
+                }
+            }
+        }
+        non_zoi_deps.retain(|dep| valid_non_zoi_deps.contains(dep));
+    }
+
+    if graph.nodes.is_empty() && non_zoi_deps.is_empty() {
+        println!("\nAll requested packages are already installed.");
+        return Ok(());
+    }
+
+    if !dry_run {
+        for node in graph.nodes.values() {
+            if let Some(pm) = plugin_manager {
+                let pkg_val = pm
+                    .lua
+                    .to_value(&node.pkg)
+                    .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
+                pm.trigger_hook("on_pre_install", Some(pkg_val))?;
+            }
+        }
+    }
+
+    let mut direct_packages = Vec::new();
+    let mut dependencies = Vec::new();
+
+    for node in graph.nodes.values() {
+        if matches!(node.reason, types::InstallReason::Direct) {
+            direct_packages.push(node);
+        } else {
+            dependencies.push(node);
+        }
+    }
+
+    direct_packages.sort_by(|a, b| a.pkg.name.cmp(&b.pkg.name));
+    dependencies.sort_by(|a, b| a.pkg.name.cmp(&b.pkg.name));
+
+    for node in graph.nodes.values() {
+        crate::utils::print_repo_warning(&node.pkg.repo);
+    }
+
+    println!("{} Looking for conflicts...", "::".bold().blue());
+    let packages_to_install: Vec<&types::Package> = graph.nodes.values().map(|n| &n.pkg).collect();
+
+    if !dry_run {
+        install::util::check_for_conflicts(&packages_to_install, yes)?;
+        for pkg in &packages_to_install {
+            if !install::util::display_updates(pkg, yes)? {
+                return Err(anyhow!("Installation aborted by user."));
+            }
+        }
+        install::util::check_policy_compliance(&graph)?;
+        install::util::check_for_vulnerabilities(&graph, yes)?;
+
+        let m_for_conflict_check = MultiProgress::new();
+        install::util::check_file_conflicts(&graph, yes, &m_for_conflict_check)?;
+        let _ = m_for_conflict_check.clear();
+    }
+
+    println!("{} Checking available disk space...", "::".bold().blue());
+    let install_plan =
+        install::plan::create_install_plan(&graph.nodes, build_type.as_deref(), build)?;
+
+    let mut total_download_size: u64 = 0;
+    let mut total_installed_size: u64 = 0;
+    let mut unique_downloads = HashSet::new();
+
+    for (id, node) in &graph.nodes {
+        match install_plan.get(id) {
+            Some(install::plan::InstallAction::DownloadAndInstall(details)) => {
+                if unique_downloads.insert(details.info.final_url.clone()) {
+                    total_download_size += details.download_size;
+                }
+                total_installed_size += if details.installed_size > 0 {
+                    details.installed_size
+                } else {
+                    node.pkg.installed_size.unwrap_or(0)
+                };
+            }
+            Some(install::plan::InstallAction::BuildAndInstall) => {
+                total_installed_size += node.pkg.installed_size.unwrap_or(0);
+            }
+            _ => {}
+        }
+    }
+
+    println!(
+        "\n{} Packages ({})",
+        "::".bold().blue(),
+        direct_packages.len()
+    );
+    let direct_list: Vec<_> = direct_packages
+        .iter()
+        .map(|n| {
+            let name = if let Some(sub) = &n.sub_package {
+                format!("{}:{}", n.pkg.name, sub)
+            } else {
+                n.pkg.name.clone()
+            };
+            let version_display = if n.revision != "1" {
+                format!("{}-{}", n.version, n.revision)
+            } else {
+                n.version.clone()
+            };
+            format!("@{}:{}", name, version_display).cyan().to_string()
+        })
+        .collect();
+    println!(" {}", direct_list.join("  "));
+
+    if verbose {
+        println!("\n{} Package origins", "::".bold().blue());
+        let mut direct_entries: Vec<_> = graph
+            .nodes
+            .iter()
+            .filter(|(_, node)| matches!(node.reason, types::InstallReason::Direct))
+            .collect();
+        direct_entries.sort_by(|a, b| a.1.pkg.name.cmp(&b.1.pkg.name));
+        for (id, node) in direct_entries {
+            let action_name = match install_plan.get(id) {
+                Some(install::plan::InstallAction::DownloadAndInstall(_)) => "download",
+                Some(install::plan::InstallAction::InstallFromArchive(_)) => "archive",
+                Some(install::plan::InstallAction::BuildAndInstall) => "build",
+                None => "unknown",
+            };
+            let origin = ux::classify_source_origin(&node.source, action_name);
+            let display_name = if let Some(sub) = &node.sub_package {
+                format!("{}:{}", node.pkg.name, sub)
+            } else {
+                node.pkg.name.clone()
+            };
+            let version_display = if node.revision != "1" {
+                format!("{}-{}", node.version, node.revision)
+            } else {
+                node.version.clone()
+            };
+            println!(
+                "  - {}@{} -> {} ({})",
+                display_name.cyan(),
+                version_display,
+                origin.as_str(),
+                action_name
+            );
+        }
+    }
+
+    if !dependencies.is_empty() || !non_zoi_deps.is_empty() {
+        println!(
+            "\n{} Dependencies ({})",
+            "::".bold().blue(),
+            dependencies.len() + non_zoi_deps.len()
+        );
+        let mut dep_list = Vec::new();
+        for n in &dependencies {
+            let name = if let Some(sub) = &n.sub_package {
+                format!("{}:{}", n.pkg.name, sub)
+            } else {
+                n.pkg.name.clone()
+            };
+            let version_display = if n.revision != "1" {
+                format!("{}-{}", n.version, n.revision)
+            } else {
+                n.version.clone()
+            };
+            dep_list.push(
+                format!("zoi: @{}:{}", name, version_display)
+                    .dimmed()
+                    .to_string(),
+            );
+        }
+        for d in &non_zoi_deps {
+            dep_list.push(d.dimmed().to_string());
+        }
+        println!(" {}", dep_list.join("  "));
+    }
+
+    if total_download_size > 0 {
+        println!(
+            "\nTotal Download Size:  {}",
+            crate::pkg::utils::format_bytes(total_download_size)
+        );
+    }
+    if total_installed_size > 0 {
+        println!(
+            "Total Installed Size: {}",
+            crate::pkg::utils::format_bytes(total_installed_size)
+        );
+    }
+
+    if verbose {
+        let preflight = ux::PreflightSummary::new("Install preflight")
+            .row(
+                "Scope",
+                format!("{:?}", scope_override.unwrap_or(types::Scope::User)),
+            )
+            .row("Frozen lockfile", frozen_lockfile.to_string())
+            .row("Retry attempts", retry.to_string())
+            .row("Direct packages", direct_packages.len().to_string())
+            .row(
+                "Dependencies",
+                (dependencies.len() + non_zoi_deps.len()).to_string(),
+            )
+            .row(
+                "Download size",
+                crate::pkg::utils::format_bytes(total_download_size),
+            )
+            .row(
+                "Installed size",
+                crate::pkg::utils::format_bytes(total_installed_size),
+            );
+        ux::print_preflight(&preflight);
+    }
+
+    if explain {
+        let mut report = ux::ExplainReport::new("Install explanation");
+        let mut entries: Vec<_> = graph.nodes.iter().collect();
+        entries.sort_by(|a, b| a.1.pkg.name.cmp(&b.1.pkg.name));
+        for (id, node) in entries {
+            let action_name = match install_plan.get(id) {
+                Some(install::plan::InstallAction::DownloadAndInstall(_)) => "download",
+                Some(install::plan::InstallAction::InstallFromArchive(_)) => "archive",
+                Some(install::plan::InstallAction::BuildAndInstall) => "build",
+                None => "unknown",
+            };
+            let reason = match &node.reason {
+                types::InstallReason::Direct => "direct request".to_string(),
+                types::InstallReason::Dependency { parent } => {
+                    format!("dependency of {}", parent)
+                }
+            };
+            let version_display = if node.revision != "1" {
+                format!("{} (rev {})", node.version, node.revision)
+            } else {
+                node.version.clone()
+            };
+            report = report.item(
+                format!("{}@{}", node.pkg.name, version_display),
+                format!("[{}]", reason),
+                vec![format!(
+                    "via {} ({})",
+                    action_name,
+                    ux::classify_source_origin(&node.source, action_name).as_str()
+                )],
+            );
+        }
+        ux::print_explain(&report);
+    }
+
+    if plan_json {
+        let mut packages = Vec::new();
+        let mut entries: Vec<_> = graph.nodes.iter().collect();
+        entries.sort_by(|a, b| a.1.pkg.name.cmp(&b.1.pkg.name));
+        for (id, node) in entries {
+            let action_name = match install_plan.get(id) {
+                Some(install::plan::InstallAction::DownloadAndInstall(_)) => "download",
+                Some(install::plan::InstallAction::InstallFromArchive(_)) => "archive",
+                Some(install::plan::InstallAction::BuildAndInstall) => "build",
+                None => "unknown",
+            };
+            let reason = match &node.reason {
+                types::InstallReason::Direct => "direct".to_string(),
+                types::InstallReason::Dependency { parent } => format!("dependency:{}", parent),
+            };
+            packages.push(json!({
+                "id": id,
+                "name": node.pkg.name,
+                "version": node.version,
+                "revision": node.revision,
+                "sub_package": node.sub_package,
+                "repo": node.pkg.repo,
+                "registry": node.registry_handle,
+                "reason": reason,
+                "action": action_name,
+                "origin": ux::classify_source_origin(&node.source, action_name).as_str(),
+                "source": node.source,
+            }));
+        }
+
+        let plan = json!({
+            "dry_run": dry_run,
+            "frozen_lockfile": frozen_lockfile,
+            "retry_attempts": retry,
+            "scope": format!("{:?}", scope_override.unwrap_or(types::Scope::User)),
+            "totals": {
+                "direct_packages": direct_packages.len(),
+                "dependencies": dependencies.len() + non_zoi_deps.len(),
+                "download_bytes": total_download_size,
+                "installed_bytes": total_installed_size,
+                "skipped_existing": skipped_existing_count,
+            },
+            "packages": packages,
+            "non_zoi_dependencies": non_zoi_deps,
+        });
+        ux::emit_plan_json_v1("install", plan)?;
+    }
+
+    if dry_run {
+        println!(
+            "\n{} Dry-run: installation plan above would be executed.",
+            "::".bold().yellow()
+        );
+        return Ok(());
+    }
+
+    let install_path = crate::pkg::local::get_store_base_dir(scope_override.unwrap_or_default())?;
+    std::fs::create_dir_all(&install_path)?;
+
+    let available_space = fs2::available_space(&install_path).unwrap_or(u64::MAX);
+
+    if total_installed_size > available_space {
+        return Err(anyhow!(
+            "Not enough disk space. Required: {}, Available: {}",
+            crate::pkg::utils::format_bytes(total_installed_size),
+            crate::pkg::utils::format_bytes(available_space)
+        ));
+    }
+
+    if !crate::utils::ask_for_confirmation("\nProceed with installation?", yes) {
+        let _ = lock::release_lock();
+        return Ok(());
+    }
+
+    let stages = graph.toposort()?;
+    let transaction = Mutex::new(transaction::begin()?);
+    let transaction_id = transaction.lock().unwrap().id.clone();
+    let dependency_installed_count = AtomicUsize::new(0);
+
+    if !dependencies.is_empty() || !non_zoi_deps.is_empty() {
+        println!("\n{} Installing dependencies...", "::".bold().blue());
+        let m_deps = MultiProgress::new();
+
+        if !non_zoi_deps.is_empty() {
+            let processed_deps = Mutex::new(HashSet::new());
+            let mut installed_deps_ext = Vec::new();
+            for dep_str in &non_zoi_deps {
+                let dep = match crate::pkg::dependencies::parse_dependency_string(dep_str) {
+                    Ok(d) => d,
+                    Err(e) => {
+                        eprintln!("Error parsing dependency {}: {}", dep_str, e);
+                        continue;
+                    }
+                };
+
+                if let Err(e) = crate::pkg::install::dep_install::install_dependency(
+                    &dep,
+                    "direct",
+                    scope_override.unwrap_or_default(),
+                    yes,
+                    all_optional,
+                    &processed_deps,
+                    &mut installed_deps_ext,
+                    Some(&m_deps),
+                ) {
+                    eprintln!("Failed to install dependency {}: {}", dep_str, e);
+                }
+            }
+        }
+
+        for stage in &stages {
+            stage.par_iter().try_for_each(|pkg_id| -> Result<()> {
+                let node = graph.nodes.get(pkg_id).ok_or_else(|| {
+                    anyhow!(
+                        "Package node '{}' missing from graph during installation",
+                        pkg_id
+                    )
+                })?;
+                if matches!(node.reason, types::InstallReason::Direct) {
+                    return Ok(());
+                }
+                let action = install_plan.get(pkg_id).ok_or_else(|| {
+                    anyhow!(
+                        "Install action missing for package '{}' during installation",
+                        pkg_id
+                    )
+                })?;
+
+                match install::installer::install_node(
+                    node,
+                    action,
+                    Some(&m_deps),
+                    build_type.as_deref(),
+                    yes,
+                    true,
+                ) {
+                    Ok(manifest) => {
+                        dependency_installed_count.fetch_add(1, Ordering::Relaxed);
+                        let mut tx_lock = transaction.lock().map_err(|e| {
+                            anyhow!("Transaction mutex poisoned during installation: {}", e)
+                        })?;
+                        if let Err(e) = transaction::record_operation(
+                            &mut tx_lock,
+                            types::TransactionOperation::Install {
+                                manifest: Box::new(manifest),
+                            },
+                        ) {
+                            eprintln!("Failed to record transaction operation: {}", e);
+                            return Err(anyhow!("Transaction recording failed: {}", e));
+                        }
+                    }
+                    Err(e) => {
+                        failed_packages
+                            .lock()
+                            .map_err(|e| {
+                                anyhow!("Failed packages mutex poisoned during installation: {}", e)
+                            })?
+                            .push(node.pkg.name.clone());
+                        eprintln!("Error installing {}: {}", node.pkg.name, e);
+                    }
+                }
+                Ok(())
+            })?;
+        }
+    }
+
+    println!("\n{} Installing packages...", "::".bold().blue());
+    let m_pkg = MultiProgress::new();
+
+    let mut direct_package_ids = Vec::new();
+    for stage in &stages {
+        for pkg_id in stage {
+            if let Some(node) = graph.nodes.get(pkg_id)
+                && matches!(node.reason, types::InstallReason::Direct)
+            {
+                direct_package_ids.push(pkg_id.clone());
+            }
+        }
+    }
+
+    for stage in &stages {
+        let mut stage_direct_ids = Vec::new();
+        for pkg_id in stage {
+            if let Some(node) = graph.nodes.get(pkg_id)
+                && matches!(node.reason, types::InstallReason::Direct)
+            {
+                let name = if let Some(sub) = &node.sub_package {
+                    format!("{}:{}", node.pkg.name, sub)
+                } else {
+                    node.pkg.name.clone()
+                };
+                let version_display = if node.revision != "1" {
+                    format!("{}-{}", node.version, node.revision)
+                } else {
+                    node.version.clone()
+                };
+                println!(" @{}:{}", name, version_display);
+                stage_direct_ids.push(pkg_id.clone());
+            }
+        }
+
+        if stage_direct_ids.is_empty() {
+            continue;
+        }
+
+        let res = stage_direct_ids
+            .par_iter()
+            .try_for_each(|pkg_id| -> Result<()> {
+                let node = graph.nodes.get(pkg_id).ok_or_else(|| {
+                    anyhow!(
+                        "Package node '{}' missing from graph during final installation",
+                        pkg_id
+                    )
+                })?;
+
+                let action = install_plan.get(pkg_id).ok_or_else(|| {
+                    anyhow!(
+                        "Install action missing for package '{}' during final installation",
+                        pkg_id
+                    )
+                })?;
+
+                match install::installer::install_node(
+                    node,
+                    action,
+                    Some(&m_pkg),
+                    build_type.as_deref(),
+                    yes,
+                    true,
+                ) {
+                    Ok(manifest) => {
+                        installed_manifests
+                            .lock()
+                            .map_err(|e| anyhow!("Installed manifests mutex poisoned: {}", e))?
+                            .push(manifest.clone());
+                        let mut tx_lock = transaction.lock().map_err(|e| {
+                            anyhow!(
+                                "Transaction mutex poisoned during direct package installation: {}",
+                                e
+                            )
+                        })?;
+                        transaction::record_operation(
+                            &mut tx_lock,
+                            types::TransactionOperation::Install {
+                                manifest: Box::new(manifest),
+                            },
+                        )?;
+                        successfully_installed_sources
+                            .lock()
+                            .map_err(|e| {
+                                anyhow!("Successfully installed sources mutex poisoned: {}", e)
+                            })?
+                            .push(node.source.clone());
+                        Ok(())
+                    }
+                    Err(e) => {
+                        failed_packages
+                            .lock()
+                            .map_err(|e| anyhow!("Failed packages mutex poisoned: {}", e))?
+                            .push(node.pkg.name.clone());
+                        eprintln!("Error installing {}: {}", node.pkg.name, e);
+                        Err(e)
+                    }
+                }
+            });
+
+        if res.is_err() {
+            break;
+        }
+    }
+
+    let direct_installed_count: usize = direct_package_ids.len();
+
+    let failed = failed_packages
+        .lock()
+        .map_err(|e| anyhow!("Failed packages mutex poisoned during finalization: {}", e))?;
+    if !failed.is_empty() {
+        println!("\n{} Rolling back changes...", "::".bold().yellow());
+        transaction::rollback(&transaction_id)?;
+        ux::print_transaction_summary(&ux::TransactionSummary {
+            command: "install".to_string(),
+            success: dependency_installed_count.load(Ordering::Relaxed) + direct_installed_count,
+            failed: failed.len(),
+            skipped: skipped_existing_count,
+        });
+        return Err(anyhow!("Installation failed for: {}", failed.join(", ")));
+    }
+
+    if let Ok(modified_files) = transaction::get_modified_files(&transaction_id) {
+        let _ = crate::pkg::hooks::global::run_global_hooks(
+            crate::pkg::hooks::global::HookWhen::PostTransaction,
+            &modified_files,
+            "install",
+        );
+    }
+
+    if let Err(e) = transaction::commit(&transaction_id) {
+        eprintln!("Warning: Failed to commit transaction: {}", e);
+    }
+
+    let installed_manifests_vec = installed_manifests
+        .lock()
+        .map_err(|e| {
+            anyhow!(
+                "Installed manifests mutex poisoned during finalization: {}",
+                e
+            )
+        })?
+        .clone();
+    for manifest in &installed_manifests_vec {
+        if let Some(pm) = plugin_manager {
+            let pkg_val = pm
+                .lua
+                .to_value(manifest)
+                .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
+            pm.trigger_hook_nonfatal("on_post_install", Some(pkg_val));
+        }
+    }
+
+    let is_any_project_install = scope_override == Some(types::Scope::Project);
+
+    if is_any_project_install {
+        if is_project_install && lockfile_exists {
+        } else {
+            println!("\nUpdating zoi.lock...");
+            let mut lockfile =
+                project::lockfile::read_zoi_lock().unwrap_or_else(|_| types::ZoiLock {
+                    version: "1".to_string(),
+                    ..Default::default()
+                });
+
+            lockfile.packages.clear();
+            lockfile.details.clear();
+
+            let all_regs_config = crate::pkg::config::read_config().unwrap_or_default();
+            let mut all_configured_regs = all_regs_config.added_registries;
+            if let Some(default_reg) = all_regs_config.default_registry {
+                all_configured_regs.push(default_reg);
+            }
+
+            let installed_manifests = installed_manifests.into_inner().map_err(|e| {
+                anyhow!(
+                    "Installed manifests mutex poisoned during lockfile update: {}",
+                    e
+                )
+            })?;
+            for manifest in &installed_manifests {
+                let name_with_sub = if let Some(sub) = &manifest.sub_package {
+                    format!("{}:{}", manifest.name, sub)
+                } else {
+                    manifest.name.clone()
+                };
+
+                let full_id = format!(
+                    "#{}@{}/{}",
+                    manifest.registry_handle, manifest.repo, name_with_sub
+                );
+                if matches!(manifest.reason, types::InstallReason::Direct) {
+                    lockfile.packages.insert(full_id, manifest.version.clone());
+                }
+
+                if let Some(reg) = all_configured_regs
+                    .iter()
+                    .find(|r| r.handle == manifest.registry_handle)
+                {
+                    lockfile
+                        .registries
+                        .insert(reg.handle.clone(), reg.url.clone());
+                }
+
+                let package_dir = crate::pkg::local::get_package_dir(
+                    types::Scope::Project,
+                    &manifest.registry_handle,
+                    &manifest.repo,
+                    &manifest.name,
+                )?;
+                let latest_dir = package_dir.join("latest");
+                let integrity =
+                    crate::pkg::hash::calculate_dir_hash(&latest_dir).unwrap_or_else(|e| {
+                        eprintln!(
+                            "Warning: could not calculate integrity for {}: {}",
+                            manifest.name, e
+                        );
+                        String::new()
+                    });
+
+                let pkg_id = if let Some(sub) = &manifest.sub_package {
+                    format!("{}@{}:{}", manifest.name, manifest.version, sub)
+                } else {
+                    format!("{}@{}", manifest.name, manifest.version)
+                };
+
+                let git_sha = graph.nodes.get(&pkg_id).and_then(|n| n.git_sha.clone());
+
+                let dependencies: Vec<String> = graph
+                    .adj
+                    .get(&pkg_id)
+                    .map(|deps| {
+                        deps.iter()
+                            .map(|dep_id| {
+                                let node = graph.nodes.get(dep_id).ok_or_else(|| {
+                                    anyhow!(
+                                        "Dependency node missing from graph during lockfile update"
+                                    )
+                                })?;
+                                Ok(crate::pkg::local::package_source_string(
+                                    &node.registry_handle,
+                                    &node.pkg.repo,
+                                    &node.pkg.name,
+                                    node.sub_package.as_deref(),
+                                    &node.version,
+                                ))
+                            })
+                            .collect::<Result<Vec<String>>>()
+                    })
+                    .transpose()?
+                    .unwrap_or_default();
+
+                let detail = types::LockPackageDetail {
+                    version: manifest.version.clone(),
+                    revision: manifest.revision.clone(),
+                    sub_package: manifest.sub_package.clone(),
+                    integrity,
+                    git_sha,
+                    dependencies,
+                    options_dependencies: manifest.chosen_options.clone(),
+                    optionals_dependencies: manifest.chosen_optionals.clone(),
+                };
+
+                let registry_key = format!("#{}", manifest.registry_handle);
+                let short_id = format!("@{}/{}", manifest.repo, name_with_sub);
+
+                lockfile
+                    .details
+                    .entry(registry_key)
+                    .or_default()
+                    .insert(short_id, detail);
+            }
+
+            if let Err(e) = project::lockfile::write_zoi_lock(&lockfile) {
+                eprintln!("Warning: Failed to write zoi.lock file: {}", e);
+            }
+        }
+    }
+
+    if save && scope_override == Some(types::Scope::Project) {
+        let successfully_installed = successfully_installed_sources.into_inner().map_err(|e| {
+            anyhow!(
+                "Successfully installed sources mutex poisoned during finalization: {}",
+                e
+            )
+        })?;
+        if !successfully_installed.is_empty()
+            && let Err(e) = project::config::add_packages_to_config(&successfully_installed)
+        {
+            eprintln!(
+                "{}: Failed to save packages to zoi.yaml: {}",
+                "Warning".yellow().bold(),
+                e
+            );
+        }
+    }
+
+    println!("\n{} Installation complete!", "Success:".green().bold());
+
+    if is_project_install && lockfile_exists {
+        println!();
+        crate::project::verify::run()?;
+    }
+
+    println!("\n{} Done", "::".bold().blue());
+    println!(
+        "Installed ({}) packages and ({}) dependencies.",
+        direct_packages.len(),
+        dependencies.len() + non_zoi_deps.len()
+    );
+    ux::print_transaction_summary(&ux::TransactionSummary {
+        command: "install".to_string(),
+        success: dependency_installed_count.load(Ordering::Relaxed) + direct_installed_count,
+        failed: 0,
+        skipped: skipped_existing_count,
+    });
+
+    Ok(())
+}

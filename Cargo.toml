@@ -1,81 +1,41 @@
-[package]
-name = "zoi-rs"
+[workspace]
+resolver = "3"
+members = [
+    "crates/core",
+    "crates/cli",
+    "crates/mini",
+    "crates/purl",
+    "crates/resolver",
+    "crates/lua",
+    "crates/hooks",
+    "crates/sandbox",
+    "crates/telemetry",
+    "crates/project",
+    "crates/db",
+    "crates/audit",
+    "crates/pm",
+    "crates/dependencies",
+    "crates/install",
+    "crates/package",
+    "crates/sync",
+    "crates/uninstall",
+    "crates/transaction",
+    "crates/plugins",
+]
+default-members = ["crates/cli"]
+
+[workspace.package]
 version = "1.19.0-dev"
 edition = "2024"
 rust-version = "1.92.0"
-description = "Advanced Package Manager & Environment Orchestrator"
 license = "Apache-2.0"
 repository = "https://gitlab.com/zillowe/zillwen/zusty/zoi"
 homepage = "https://zillowe.qzz.io/zds/zoi"
 documentation = "https://docs.rs/zoi-rs/latest/zoi"
 keywords = ["cli", "package-manager", "dev-tools", "universal", "environment"]
 categories = ["command-line-utilities", "development-tools"]
-readme = "README.md"
-build = "build.rs"
-default-run = "zoi"
-include = [
-  "Cargo.toml",
-  "Cargo.lock",
-  "build.rs",
-  "README.md",
-  "LICENSE",
-  "CHANGELOG.md",
-  "rust-toolchain.toml",
-  "src/**",
-  "tests/**",
-]
 
-[lib]
-name = "zoi"
-path = "src/lib.rs"
-
-[[bin]]
-name = "zoi"
-path = "src/main.rs"
-
-[[bin]]
-name = "zoi-mini"
-path = "src/bin/zoi-mini.rs"
-
-[profile.release]
-strip = true
-lto = "thin"
-codegen-units = 16
-# panic = "abort"
-opt-level = 3
-
-[profile.release.package."*"]
-opt-level = "z"
-
-[lints.clippy]
-too_many_arguments = "allow"
-type_complexity = "allow"
-
-[package.metadata.cargo-machete]
-ignored = ["openssl", "phf"]
-
-[package.metadata.deb]
-name = "zoi"
-maintainer = "Zillowe Foundation <contact@zillowe.qzz.io>"
-copyright = "2026 Zillowe"
-license-file = ["LICENSE", "4"]
-depends = "$auto, git"
-section = "utils"
-priority = "optional"
-assets = [
-  { source = "target/release/zoi", dest = "/usr/bin/zoi", mode = "755" },
-  { source = "README.md", dest = "/usr/share/doc/zoi/README.md", mode = "644" },
-]
-
-[package.metadata.generate-rpm]
-name = "zoi"
-assets = [
-  { source = "target/release/zoi", dest = "/usr/bin/zoi", mode = "755" },
-  { source = "README.md", dest = "/usr/share/doc/zoi/README.md", mode = "644", doc = true },
-  { source = "LICENSE", dest = "/usr/share/licenses/zoi/LICENSE", mode = "644", doc = true },
-]
-
-[dependencies]
+[workspace.dependencies]
 anyhow = "1.0.102"
 chrono = { version = "0.4.45", features = ["serde"] }
 clap = { version = "4.6.1", features = ["derive", "color"] }
@@ -101,16 +61,10 @@ pulldown-cmark = { version = "0.13.4", default-features = false }
 ratatui = { version = "0.30.2", features = ["crossterm"] }
 rayon = "1.12.0"
 regex = "1.12.4"
-reqwest = { version = "0.13.4", default-features = false, features = [
-  "blocking",
-  "json",
-  "rustls",
-] }
+reqwest = { version = "0.13.4", default-features = false, features = ["blocking", "json", "rustls"] }
 self_update = "0.44.0"
 semver = "1.0.28"
-sequoia-openpgp = { version = "2.3.0", default-features = false, features = [
-  "crypto-openssl",
-] }
+sequoia-openpgp = { version = "2.3.0", default-features = false, features = ["crypto-openssl"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
 serde_yaml = "0.9.34"
@@ -137,13 +91,32 @@ thiserror = "2.0.18"
 rustc-hash = "2.1.2"
 json5 = "1.3.1"
 purl = "0.1.6"
-
-[build-dependencies]
 dotenvy = "0.15.7"
-phf = { version = "0.14.0", features = ["macros"] }
 phf_codegen = "0.14.0"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
 
-[target.'cfg(windows)'.dependencies]
-winreg = "0.56.0"
+zoi-core = { path = "crates/core", version = "1.19.0-dev" }
+zoi-hooks = { path = "crates/hooks", version = "1.19.0-dev" }
+zoi-lua = { path = "crates/lua", version = "1.19.0-dev" }
+zoi-purl = { path = "crates/purl", version = "1.19.0-dev" }
+zoi-resolver = { path = "crates/resolver", version = "1.19.0-dev" }
+zoi-sandbox = { path = "crates/sandbox", version = "1.19.0-dev" }
+zoi-telemetry = { path = "crates/telemetry", version = "1.19.0-dev" }
+zoi-project = { path = "crates/project", version = "1.19.0-dev" }
+zoi-cli = { path = "crates/cli", version = "1.19.0-dev" }
+zoi-db = { path = "crates/db", version = "1.19.0-dev" }
+zoi-audit = { path = "crates/audit", version = "1.19.0-dev" }
+zoi-pm = { path = "crates/pm", version = "1.19.0-dev" }
+zoi-deps = { path = "crates/dependencies", version = "1.19.0-dev" }
+zoi-install = { path = "crates/install", version = "1.19.0-dev" }
+zoi-package = { path = "crates/package", version = "1.19.0-dev" }
+zoi-sync = { path = "crates/sync", version = "1.19.0-dev" }
+zoi-uninstall = { path = "crates/uninstall", version = "1.19.0-dev" }
+zoi-transaction = { path = "crates/transaction", version = "1.19.0-dev" }
+zoi-plugins = { path = "crates/plugins", version = "1.19.0-dev" }
+
+[workspace.lints.clippy]
+too_many_arguments = "allow"
+type_complexity = "allow"
+
+[workspace.dependencies.winreg]
+version = "0.56.0"
