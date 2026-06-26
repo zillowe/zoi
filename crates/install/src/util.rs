@@ -15,6 +15,7 @@ use walkdir::WalkDir;
 use zoi_core::cache;
 use zoi_core::types;
 use zoi_core::utils;
+use zoi_db as db;
 use zstd::stream::read::Decoder as ZstdDecoder;
 
 static DOWNLOAD_RETRY_ATTEMPTS: AtomicU32 = AtomicU32::new(3);
@@ -1056,6 +1057,16 @@ pub fn find_prebuilt_info(node: &InstallNode) -> Result<Option<types::PrebuiltIn
 pub fn get_package_sizes(pkg: &types::Package, registry_handle: &str, version: &str) -> (u64, u64) {
     let download_size = pkg.archive_size.unwrap_or(0);
     let installed_size = pkg.installed_size.unwrap_or(0);
+
+    if download_size > 0 && installed_size > 0 {
+        return (download_size, installed_size);
+    }
+
+    if let Ok(Some((db_down, db_inst))) =
+        db::get_package_sizes_from_db(registry_handle, &pkg.name, pkg.sub_package.as_deref())
+    {
+        return (db_down, db_inst);
+    }
 
     match find_prebuilt_info_for_package(pkg, registry_handle, version) {
         Ok(Some(info)) => {

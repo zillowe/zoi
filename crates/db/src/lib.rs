@@ -52,6 +52,8 @@ fn setup_schema(conn: &Connection) -> Result<()> {
             reason TEXT,
             dependencies TEXT,
             revision TEXT,
+            archive_size INTEGER,
+            installed_size INTEGER,
             UNIQUE(name, sub_package, repo, scope, registry)
         )",
         [],
@@ -94,6 +96,20 @@ fn setup_schema(conn: &Connection) -> Result<()> {
 
     if !column_exists {
         let _ = conn.execute("ALTER TABLE packages ADD COLUMN bins TEXT", []);
+    }
+
+    let has_archive_size: bool = conn
+        .query_row(
+            "SELECT count(*) FROM pragma_table_info('packages') WHERE name='archive_size'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0)
+        > 0;
+
+    if !has_archive_size {
+        let _ = conn.execute("ALTER TABLE packages ADD COLUMN archive_size INTEGER", []);
+        let _ = conn.execute("ALTER TABLE packages ADD COLUMN installed_size INTEGER", []);
     }
 
     conn.execute(
@@ -329,6 +345,56 @@ pub fn update_package(
     )?;
 
     Ok(row_id)
+}
+
+pub fn get_package_id(
+    conn: &Connection,
+    name: &str,
+    sub_package: Option<&str>,
+    repo: &str,
+    registry: &str,
+) -> Result<i64> {
+    let id = conn.query_row(
+        "SELECT id FROM packages WHERE name = ?1 AND (sub_package IS ?2) AND repo = ?3 AND registry = ?4",
+        params![name, sub_package, repo, registry],
+        |row| row.get(0),
+    )?;
+    Ok(id)
+}
+
+pub fn set_package_sizes(
+    conn: &Connection,
+    package_id: i64,
+    archive_size: u64,
+    installed_size: u64,
+) -> Result<()> {
+    conn.execute(
+        "UPDATE packages SET archive_size = ?1, installed_size = ?2 WHERE id = ?3",
+        params![archive_size as i64, installed_size as i64, package_id],
+    )?;
+    Ok(())
+}
+
+pub fn get_package_sizes_from_db(
+    registry_handle: &str,
+    name: &str,
+    sub_package: Option<&str>,
+) -> Result<Option<(u64, u64)>> {
+    let conn = open_connection(registry_handle)?;
+    let mut stmt = conn.prepare(
+        "SELECT archive_size, installed_size FROM packages WHERE name = ?1 AND (sub_package IS ?2) AND archive_size IS NOT NULL LIMIT 1",
+    )?;
+    let mut rows = stmt.query(params![name, sub_package])?;
+    if let Some(row) = rows.next()? {
+        let archive: Option<i64> = row.get(0)?;
+        let installed: Option<i64> = row.get(1)?;
+        match (archive, installed) {
+            (Some(a), Some(i)) => Ok(Some((a as u64, i as u64))),
+            _ => Ok(None),
+        }
+    } else {
+        Ok(None)
+    }
 }
 
 #[derive(Debug)]
