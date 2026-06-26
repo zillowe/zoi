@@ -12,7 +12,7 @@ use std::io::{self};
 // Development, Special, Public or Production
 const BRANCH: &str = "Public";
 const STATUS: &str = "Release";
-const NUMBER: &str = "1.19.5";
+const NUMBER: &str = "1.19.6";
 const PKG_SOURCE_HELP: &str = "Package identifier (e.g. @repo/name, path, or URL)";
 
 /// Zoi - The Advanced Package Manager & Environment Orchestrator.
