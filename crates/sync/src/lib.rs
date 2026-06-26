@@ -63,7 +63,13 @@ fn refresh_registry_db(
         .and_then(|rc| rc.advisory_prefix.clone());
     let platform = core_utils::get_platform().unwrap_or_default();
 
-    let client = if sync_files {
+    let has_size_tpl = repo_config
+        .as_ref()
+        .and_then(|rc| rc.pkg.iter().find(|p| p.link_type == "main"))
+        .and_then(|p| p.size.as_ref())
+        .is_some();
+
+    let client = if sync_files || has_size_tpl {
         core_utils::get_http_client().ok()
     } else {
         None
@@ -75,7 +81,12 @@ fn refresh_registry_db(
         p.set_message(format!("Indexing {}", registry_handle.cyan()));
     }
 
-    let parsed_results: Vec<(types::Package, PathBuf, Option<Vec<String>>)> = pkg_files
+    let parsed_results: Vec<(
+        types::Package,
+        PathBuf,
+        Option<Vec<String>>,
+        Option<(u64, u64)>,
+    )> = pkg_files
         .par_iter()
         .filter_map(|path| {
             if let Some(p) = pb {
@@ -128,7 +139,45 @@ fn refresh_registry_db(
                     }
                 }
 
-                Some((pkg, path.clone(), file_list))
+                let mut size_info = None;
+                if let Some(c) = &client
+                    && let Some(rc) = &repo_config
+                    && let Some(pkg_link) = rc.pkg.iter().find(|p| p.link_type == "main")
+                    && let Some(size_url_template) = &pkg_link.size
+                {
+                    let version = pkg.version.clone().unwrap_or_else(|| "latest".to_string());
+                    let size_url = install_util::resolve_url_placeholders(
+                        size_url_template,
+                        &pkg.name,
+                        &pkg.repo,
+                        &version,
+                        &platform,
+                    );
+
+                    if let Ok(response) = c.get(&size_url).send()
+                        && response.status().is_success()
+                        && let Ok(content) = response.text()
+                    {
+                        let mut download_size = 0u64;
+                        let mut installed_size = 0u64;
+                        for line in content.lines() {
+                            if let Some((key, val)) = line.split_once(':')
+                                && let Ok(num) = val.trim().parse::<u64>()
+                            {
+                                match key.trim() {
+                                    "down" => download_size = num,
+                                    "install" => installed_size = num,
+                                    _ => {}
+                                }
+                            }
+                        }
+                        if download_size > 0 || installed_size > 0 {
+                            size_info = Some((download_size, installed_size));
+                        }
+                    }
+                }
+
+                Some((pkg, path.clone(), file_list, size_info))
             } else {
                 None
             }
@@ -152,8 +201,12 @@ fn refresh_registry_db(
 
     let tx = conn.transaction()?;
 
-    for (pkg, _path, file_list) in parsed_results {
+    for (pkg, _path, file_list, size_info) in parsed_results {
         let pkg_id = db::update_package(&tx, &pkg, registry_handle, None, None, None)?;
+
+        if let Some((down_size, install_size)) = size_info {
+            let _ = db::set_package_sizes(&tx, pkg_id, down_size, install_size);
+        }
 
         if let Some(subs) = &pkg.sub_packages {
             for sub in subs {
@@ -164,6 +217,11 @@ fn refresh_registry_db(
                         "Warning: failed to sync sub-package '{}:{}': {}",
                         pkg.name, sub, e
                     );
+                } else if let Some((down_size, install_size)) = &size_info
+                    && let Ok(sub_id) =
+                        db::get_package_id(&tx, &pkg.name, Some(sub), &pkg.repo, registry_handle)
+                {
+                    let _ = db::set_package_sizes(&tx, sub_id, *down_size, *install_size);
                 }
             }
         }
