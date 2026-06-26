@@ -23,6 +23,7 @@ This is useful if you want to use a mirror or a completely different package dat
 | `zoi sync list`                 | Displays the current configured registries.                                                  |
 | `zoi sync add <url>`            | Adds a new registry to be synced.                                                            |
 | `zoi sync remove <handle>`      | Removes a configured registry by its handle.                                                 |
+| `zoi sync --force`              | Rebuilds all registry databases from scratch by removing existing caches and re-cloning.     |
 
 ### Examples
 
@@ -35,6 +36,9 @@ zoi sync set github
 
 # Set the registry to a custom URL
 zoi sync set https://my-custom-registry.com/zoidberg.git
+
+# Force a full re-sync from scratch (preserves installed packages)
+zoi sync --force
 ```
 
 ### Registry Maintenance

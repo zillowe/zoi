@@ -138,6 +138,10 @@ enum Commands {
         /// Download and index file lists for global search
         #[arg(short, long)]
         files: bool,
+
+        /// Force re-sync by removing existing databases and re-cloning from scratch
+        #[arg(long)]
+        force: bool,
     },
 
     /// Migration helpers for converting external manifests to Zoi package files
@@ -880,6 +884,7 @@ pub fn run() -> anyhow::Result<()> {
                 fallback,
                 no_package_managers,
                 files,
+                force,
             } => {
                 if let Some(cmd) = command {
                     match cmd {
@@ -890,7 +895,7 @@ pub fn run() -> anyhow::Result<()> {
                     }
                 } else {
                     plugin_manager.trigger_hook("on_pre_sync", None)?;
-                    let res = cmd::sync::run(verbose, fallback, no_package_managers, files);
+                    let res = cmd::sync::run(verbose, fallback, no_package_managers, files, force);
                     plugin_manager.trigger_hook_nonfatal("on_post_sync", None);
                     res
                 }
