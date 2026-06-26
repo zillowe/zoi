@@ -9,7 +9,6 @@ use zoi_core::{cache, config, pgp, pkgdir, recorder, types};
 use zoi_db as db;
 use zoi_hooks as hooks;
 use zoi_resolver::local;
-use zoi_resolver::resolve;
 
 pub fn download_and_cache_archive(
     _node: &InstallNode,
@@ -219,8 +218,7 @@ pub fn install_node(
         hooks::run_hooks(hooks, hooks::HookType::PreInstall)?;
     }
 
-    let request = resolve::parse_source_string(&node.source)?;
-    let sub_package_to_install = request.sub_package;
+    let sub_package_to_install = node.sub_package.clone();
     let sub_packages_vec = sub_package_to_install.clone().map(|s| vec![s]);
 
     let (archive_path, install_method) = match action {

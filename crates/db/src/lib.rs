@@ -536,11 +536,51 @@ pub fn find_provides(registry_handle: &str, term: &str) -> Result<Vec<(types::Pa
     let mut stmt = conn.prepare(
         "SELECT name, repo, version, description, package_type, tags, bins, license, sub_package, revision 
          FROM packages 
-         WHERE name = ?1 OR bins LIKE ?2",
+         WHERE name = ?1",
     )?;
 
-    let bins_like_query = format!("%\"{}\"%", term);
-    let rows = stmt.query_map(params![term, bins_like_query], |row| {
+    let rows = stmt.query_map(params![term], |row| {
+        let tags_raw: String = row.get(5)?;
+        let tags: Vec<String> = serde_json::from_str(&tags_raw).unwrap_or_default();
+        let type_raw: String = row.get(4)?;
+        let revision: String = row.get(9).unwrap_or_else(|_| "1".to_string());
+
+        let package_type = match type_raw.as_str() {
+            "collection" => types::PackageType::Collection,
+            "app" => types::PackageType::App,
+            "extension" => types::PackageType::Extension,
+            _ => types::PackageType::Package,
+        };
+
+        Ok(types::Package {
+            name: row.get(0)?,
+            repo: row.get(1)?,
+            version: row.get(2)?,
+            revision,
+            description: row.get(3)?,
+            package_type,
+            tags,
+            bins: None,
+            license: row.get(7)?,
+            sub_package: row.get(8)?,
+            maintainer: types::Maintainer::default(),
+            ..Default::default()
+        })
+    })?;
+
+    let mut results = Vec::new();
+    for row in rows {
+        let pkg = row?;
+        results.push((pkg, format!("bin/{}", term)));
+    }
+
+    let mut stmt = conn.prepare(
+        "SELECT name, repo, version, description, package_type, tags, bins, license, sub_package, revision 
+         FROM packages 
+         WHERE bins IS NOT NULL",
+    )?;
+
+    let rows = stmt.query_map([], |row| {
         let tags_raw: String = row.get(5)?;
         let tags: Vec<String> = serde_json::from_str(&tags_raw).unwrap_or_default();
         let bins_raw: String = row.get(6)?;
@@ -571,10 +611,15 @@ pub fn find_provides(registry_handle: &str, term: &str) -> Result<Vec<(types::Pa
         })
     })?;
 
-    let mut results = Vec::new();
     for row in rows {
         let pkg = row?;
-        results.push((pkg, format!("bin/{}", term)));
+        if let Some(bins) = &pkg.bins {
+            for bin in bins {
+                if bin == term {
+                    results.push((pkg.clone(), format!("bin/{}", bin)));
+                }
+            }
+        }
     }
 
     let mut stmt = conn.prepare(
@@ -697,56 +742,79 @@ pub fn search_packages(registry_handle: &str, term: &str) -> Result<Vec<types::P
 
 pub fn search_files(registry_handle: &str, term: &str) -> Result<Vec<(types::Package, String)>> {
     let conn = open_connection(registry_handle)?;
-    let mut stmt = conn.prepare(
-        "SELECT p.name, p.repo, p.version, p.description, p.package_type, p.tags, p.license, p.sub_package, pf.path, p.revision 
-         FROM packages p
-         JOIN package_files pf ON p.id = pf.package_id
-         WHERE pf.id IN (SELECT rowid FROM package_files_fts WHERE package_files_fts MATCH ?1)
-         OR pf.path LIKE ?2",
-    )?;
-
-    let search_query = format!("*{}*", term.replace('/', " "));
     let like_query = format!("%{}%", term);
 
-    let rows = stmt.query_map(params![search_query, like_query], |row| {
-        let tags_raw: String = row.get(5)?;
-        let tags: Vec<String> = serde_json::from_str(&tags_raw).unwrap_or_default();
-        let type_raw: String = row.get(4)?;
-        let revision: String = row.get(9).unwrap_or_else(|_| "1".to_string());
+    let has_fts = conn
+        .prepare("SELECT 1 FROM package_files_fts LIMIT 0")
+        .is_ok();
 
-        let package_type = match type_raw.as_str() {
-            "collection" => types::PackageType::Collection,
-            "app" => types::PackageType::App,
-            "extension" => types::PackageType::Extension,
-            _ => types::PackageType::Package,
-        };
-
-        let pkg = types::Package {
-            name: row.get(0)?,
-            repo: row.get(1)?,
-            version: row.get(2)?,
-            revision,
-            description: row.get(3)?,
-            package_type,
-            tags,
-            license: row.get(6)?,
-            sub_package: row.get(7)?,
-            maintainer: types::Maintainer {
-                name: String::new(),
-                email: String::new(),
-                website: None,
-            },
-            ..Default::default()
-        };
-        let path: String = row.get(8)?;
-        Ok((pkg, path))
-    })?;
-
-    let mut results = Vec::new();
-    for row in rows {
-        results.push(row?);
+    macro_rules! map_file_row {
+        ($row:expr) => {{
+            let tags_raw: String = $row.get(5)?;
+            let tags: Vec<String> = serde_json::from_str(&tags_raw).unwrap_or_default();
+            let type_raw: String = $row.get(4)?;
+            let revision: String = $row.get(9).unwrap_or_else(|_| "1".to_string());
+            let package_type = match type_raw.as_str() {
+                "collection" => types::PackageType::Collection,
+                "app" => types::PackageType::App,
+                "extension" => types::PackageType::Extension,
+                _ => types::PackageType::Package,
+            };
+            let pkg = types::Package {
+                name: $row.get(0)?,
+                repo: $row.get(1)?,
+                version: $row.get(2)?,
+                revision,
+                description: $row.get(3)?,
+                package_type,
+                tags,
+                license: $row.get(6)?,
+                sub_package: $row.get(7)?,
+                maintainer: types::Maintainer {
+                    name: String::new(),
+                    email: String::new(),
+                    website: None,
+                },
+                ..Default::default()
+            };
+            let path: String = $row.get(8)?;
+            Ok::<_, rusqlite::Error>((pkg, path))
+        }};
     }
-    Ok(results)
+
+    if has_fts {
+        let search_query = term
+            .replace('/', " ")
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join("* ");
+        let mut stmt = conn.prepare(
+            "SELECT p.name, p.repo, p.version, p.description, p.package_type, p.tags, p.license, p.sub_package, pf.path, p.revision
+             FROM packages p
+             JOIN package_files pf ON p.id = pf.package_id
+             WHERE pf.id IN (SELECT rowid FROM package_files_fts WHERE package_files_fts MATCH ?1)
+             OR pf.path LIKE ?2",
+        )?;
+        let rows = stmt.query_map(params![search_query, like_query], |row| map_file_row!(row))?;
+        let mut results = Vec::new();
+        for row in rows {
+            results.push(row?);
+        }
+        Ok(results)
+    } else {
+        let mut stmt = conn.prepare(
+            "SELECT p.name, p.repo, p.version, p.description, p.package_type, p.tags, p.license, p.sub_package, pf.path, p.revision
+             FROM packages p
+             JOIN package_files pf ON p.id = pf.package_id
+             WHERE pf.path LIKE ?1",
+        )?;
+        let rows = stmt.query_map(params![like_query], |row| map_file_row!(row))?;
+        let mut results = Vec::new();
+        for row in rows {
+            results.push(row?);
+        }
+        Ok(results)
+    }
 }
 
 pub fn list_all_packages(registry_handle: &str) -> Result<Vec<types::Package>> {

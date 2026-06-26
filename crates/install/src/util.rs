@@ -691,17 +691,11 @@ pub fn check_file_conflicts(
     let installed_packages = zoi_resolver::local::get_installed_packages()?;
 
     for node in graph.nodes.values() {
-        let request = match zoi_resolver::resolve::parse_source_string(&node.source) {
-            Ok(req) => req,
-            Err(_) => continue,
-        };
+        let sub_package_to_check = node.sub_package.as_deref();
 
         let owned_files: HashSet<String> = installed_packages
             .iter()
-            .find(|p| {
-                p.name == node.pkg.name
-                    && p.sub_package.as_deref() == request.sub_package.as_deref()
-            })
+            .find(|p| p.name == node.pkg.name && p.sub_package.as_deref() == sub_package_to_check)
             .map(|p| p.installed_files.iter().cloned().collect())
             .unwrap_or_default();
 
@@ -716,8 +710,7 @@ pub fn check_file_conflicts(
             }
 
             if let Some(list) = file_list {
-                let conflicts =
-                    get_conflicts_from_list(list, &node.pkg, request.sub_package.as_deref())?;
+                let conflicts = get_conflicts_from_list(list, &node.pkg, sub_package_to_check)?;
                 conflicts_for_this_pkg.extend(conflicts);
             } else {
                 let archive_filename = info.final_url.split('/').next_back().unwrap_or_default();
@@ -731,7 +724,7 @@ pub fn check_file_conflicts(
                     && let Ok(conflicts) = get_file_conflicts_from_archive(
                         &archive_path,
                         &node.pkg,
-                        request.sub_package.as_deref(),
+                        sub_package_to_check,
                     )
                 {
                     conflicts_for_this_pkg.extend(conflicts);
@@ -1021,10 +1014,15 @@ pub fn find_prebuilt_info_for_package(
                 )
             };
 
-            let pgp_url = pkg_link
-                .pgp
-                .as_ref()
-                .map(|url| resolve_url_placeholders(url, &pkg.name, &pkg.repo, version, &platform));
+            let pgp_url = Some(
+                pkg_link
+                    .pgp
+                    .as_ref()
+                    .map(|url| {
+                        resolve_url_placeholders(url, &pkg.name, &pkg.repo, version, &platform)
+                    })
+                    .unwrap_or_else(|| format!("{final_url}.sig")),
+            );
             let hash_url = pkg_link
                 .hash
                 .as_ref()

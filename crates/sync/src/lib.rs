@@ -157,7 +157,14 @@ fn refresh_registry_db(
 
         if let Some(subs) = &pkg.sub_packages {
             for sub in subs {
-                let _ = db::update_package(&tx, &pkg, registry_handle, None, Some(sub), None);
+                if let Err(e) =
+                    db::update_package(&tx, &pkg, registry_handle, None, Some(sub), None)
+                {
+                    eprintln!(
+                        "Warning: failed to sync sub-package '{}:{}': {}",
+                        pkg.name, sub, e
+                    );
+                }
             }
         }
 
