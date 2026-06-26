@@ -2,10 +2,17 @@ use crate::pkg;
 use anyhow::Result;
 use colored::*;
 
-pub fn run(verbose: bool, fallback: bool, no_pm: bool, files: bool) -> Result<()> {
+pub fn run(verbose: bool, fallback: bool, no_pm: bool, files: bool, force: bool) -> Result<()> {
     println!("{} Syncing package databases...", "::".bold().blue());
 
-    pkg::sync::run(verbose, fallback, no_pm, files)?;
+    if force {
+        println!(
+            "{} Force sync enabled, removing existing databases...",
+            "::".bold().yellow()
+        );
+    }
+
+    pkg::sync::run(verbose, fallback, no_pm, files, force)?;
 
     println!("{}", "Sync complete.".green());
     Ok(())

@@ -960,12 +960,24 @@ fn sync_registry(
     Ok((reg, reg_changed))
 }
 
-pub fn run(verbose: bool, fallback: bool, no_pm: bool, sync_files: bool) -> Result<()> {
+pub fn run(
+    verbose: bool,
+    fallback: bool,
+    no_pm: bool,
+    sync_files: bool,
+    force: bool,
+) -> Result<()> {
     let merged_config = config::read_config()?;
-    if merged_config.protect_db {
+    if force {
+        println!(
+            "{} Force sync: removing existing databases and re-syncing from scratch...",
+            "::".bold().yellow()
+        );
+    }
+    if merged_config.protect_db || force {
         let db_root = get_db_path()?;
         if db_root.exists() {
-            if verbose {
+            if verbose || force {
                 println!("Making package database writable...");
             }
             if let Err(e) = core_utils::set_path_writable(&db_root) {
@@ -993,6 +1005,25 @@ pub fn run(verbose: bool, fallback: bool, no_pm: bool, sync_files: bool) -> Resu
 
     for reg in &config.added_registries {
         registries_to_sync.push((reg.clone(), false));
+    }
+
+    if force {
+        for (reg, _) in &registries_to_sync {
+            let db_file = db_root.join(format!("{}.db", reg.handle));
+            if db_file.exists() {
+                if verbose {
+                    println!("Removing database: {}", db_file.display());
+                }
+                std::fs::remove_file(&db_file)?;
+            }
+            let clone_dir = db_root.join(&reg.handle);
+            if clone_dir.exists() {
+                if verbose {
+                    println!("Removing clone directory: {}", clone_dir.display());
+                }
+                std::fs::remove_dir_all(&clone_dir)?;
+            }
+        }
     }
 
     if !registries_to_sync.is_empty() {
