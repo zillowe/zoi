@@ -10,6 +10,9 @@ homepage.workspace = true
 [lib]
 name = "zoi_transaction"
 
+[lints]
+workspace = true
+
 [dependencies]
 anyhow.workspace = true
 chrono.workspace = true

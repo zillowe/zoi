@@ -11,6 +11,9 @@ homepage.workspace = true
 name = "zoi-mini"
 path = "src/main.rs"
 
+[lints]
+workspace = true
+
 [dependencies]
 anyhow.workspace = true
 clap = { workspace = true, features = ["derive"] }

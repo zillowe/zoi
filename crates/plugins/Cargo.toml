@@ -10,6 +10,9 @@ homepage.workspace = true
 [lib]
 name = "zoi_plugins"
 
+[lints]
+workspace = true
+
 [dependencies]
 anyhow.workspace = true
 colored.workspace = true
