@@ -10,6 +10,9 @@ homepage.workspace = true
 [lib]
 name = "zoi_lua"
 
+[lints]
+workspace = true
+
 [dependencies]
 zoi-core.workspace = true
 anyhow.workspace = true

@@ -7,9 +7,45 @@ license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 
+[package.metadata.cargo-machete]
+ignored = [
+    "colored",
+    "comfy-table",
+    "dialoguer",
+    "fs2",
+    "git2",
+    "glob",
+    "home",
+    "indicatif",
+    "md5",
+    "rayon",
+    "regex",
+    "rusqlite",
+    "serde",
+    "walkdir",
+    "zoi-core",
+    "zoi-db",
+    "zoi-deps",
+    "zoi-hooks",
+    "zoi-install",
+    "zoi-lua",
+    "zoi-package",
+    "zoi-plugins",
+    "zoi-project",
+    "zoi-purl",
+    "zoi-resolver",
+    "zoi-sandbox",
+    "zoi-telemetry",
+    "zoi-transaction",
+    "zoi-uninstall",
+]
+
 [lib]
 name = "zoi_tests"
 path = "src/lib.rs"
+
+[lints]
+workspace = true
 
 [dependencies]
 anyhow.workspace = true
@@ -41,7 +77,7 @@ zstd.workspace = true
 rusqlite.workspace = true
 rustc-hash.workspace = true
 
-zoi = { path = "../cli", package = "zoi-cli" }
+zoi = { path = "../zoi-rs", package = "zoi-rs" }
 zoi-core.workspace = true
 zoi-db.workspace = true
 zoi-deps.workspace = true

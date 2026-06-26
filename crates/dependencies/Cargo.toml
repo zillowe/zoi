@@ -7,6 +7,9 @@ license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 
+[package.metadata.cargo-machete]
+ignored = ["phf", "phf_codegen", "serde", "serde_json"]
+
 [lib]
 name = "zoi_deps"
 

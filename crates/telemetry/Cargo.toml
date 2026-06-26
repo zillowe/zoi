@@ -10,6 +10,9 @@ homepage.workspace = true
 [lib]
 name = "zoi_telemetry"
 
+[lints]
+workspace = true
+
 [dependencies]
 chrono.workspace = true
 home.workspace = true

@@ -24,7 +24,6 @@ colored.workspace = true
 zoi-cli.workspace = true
 zoi-deps.workspace = true
 zoi-core.workspace = true
-zoi-project.workspace = true
 zoi-uninstall.workspace = true
 zoi-install.workspace = true
 zoi-resolver.workspace = true

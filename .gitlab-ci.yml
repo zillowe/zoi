@@ -41,7 +41,6 @@ format:
         - "Cargo.toml"
         - "Cargo.lock"
         - "crates/**/*"
-        - "build.rs"
         - ".cargo/**/*"
         - "test_assets/**/*"
     - if: $CI_COMMIT_BRANCH

@@ -7,6 +7,9 @@ license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 
+[package.metadata.cargo-machete]
+ignored = ["dotenvy"]
+
 [lib]
 name = "zoi_cli"
 
@@ -68,4 +71,3 @@ zoi-plugins.workspace = true
 [target.'cfg(windows)'.dependencies]
 winapi = { workspace = true, features = ["securitybaseapi", "winnt"] }
 winreg.workspace = true
-
