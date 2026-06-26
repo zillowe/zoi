@@ -18,7 +18,7 @@ for TARGET in "${TARGETS[@]}"; do
   cp "target/${TARGET}/release/zoi" "crates/zoi-rs/target/${TARGET}/release/zoi"
 
   pushd crates/zoi-rs >/dev/null
-  cargo deb --target "$TARGET" --no-build
+  cargo deb --target "$TARGET" --no-build --no-strip
   popd >/dev/null
 
   mv target/"$TARGET"/debian/*.deb "$OUTPUT_DIR/"
