@@ -14,7 +14,13 @@ TARGETS=("x86_64-unknown-linux-gnu" "aarch64-unknown-linux-gnu")
 
 for TARGET in "${TARGETS[@]}"; do
   echo -e "${CYAN}📦 Generating DEB package for ${TARGET}...${NC}"
-  cargo deb -p zoi-rs --target "$TARGET" --no-build
+  mkdir -p "crates/zoi-rs/target/${TARGET}/release"
+  cp "target/${TARGET}/release/zoi" "crates/zoi-rs/target/${TARGET}/release/zoi"
+
+  pushd crates/zoi-rs >/dev/null
+  cargo deb --target "$TARGET" --no-build
+  popd >/dev/null
+
   mv target/"$TARGET"/debian/*.deb "$OUTPUT_DIR/"
 done
 

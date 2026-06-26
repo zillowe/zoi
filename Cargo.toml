@@ -27,7 +27,7 @@ members = [
 default-members = ["crates/zoi-rs", "crates/mini"]
 
 [workspace.package]
-version = "1.19.1-pub"
+version = "1.19.2-pub"
 edition = "2024"
 rust-version = "1.92.0"
 description = "Advanced Package Manager & Environment Orchestrator"
