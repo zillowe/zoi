@@ -22,8 +22,9 @@ members = [
     "crates/transaction",
     "crates/plugins",
     "crates/tests",
+    "crates/zoi-rs",
 ]
-default-members = ["crates/cli"]
+default-members = ["crates/zoi-rs"]
 
 [workspace.package]
 version = "1.19.0-dev"
@@ -114,6 +115,7 @@ zoi-sync = { path = "crates/sync", version = "1.19.0-dev" }
 zoi-uninstall = { path = "crates/uninstall", version = "1.19.0-dev" }
 zoi-transaction = { path = "crates/transaction", version = "1.19.0-dev" }
 zoi-plugins = { path = "crates/plugins", version = "1.19.0-dev" }
+zoi-rs = { path = "crates/zoi-rs", version = "1.19.0-dev" }
 
 [workspace.lints.clippy]
 too_many_arguments = "allow"

@@ -37,12 +37,32 @@ fn main() {
             } else {
                 zoi_cli::pkg::types::Scope::User
             };
-            let options = zoi_cli::SourceInstallOptions {
+            let _options = zoi_cli::SourceInstallOptions {
                 scope_override: Some(scope),
                 yes: true,
                 ..Default::default()
             };
-            zoi_cli::install_sources(&[spec], &options)
+            zoi_cli::cmd::install::run(
+                &[spec],
+                None,
+                false,
+                false,
+                true,
+                Some(zoi_cli::cli::InstallScope::User),
+                false,
+                false,
+                false,
+                None,
+                false,
+                Some(&plugin_manager),
+                false,
+                false,
+                false,
+                false,
+                3,
+                false,
+                false,
+            )
         };
 
         if let Err(e) = zoi_cli::pkg::shim::run_shim(
@@ -57,6 +77,7 @@ fn main() {
         return;
     }
 
+    // Default Zoi CLI execution
     if let Err(e) = zoi_cli::cli::run() {
         eprintln!("{}: {}", "Error".red().bold(), e);
         std::process::exit(1);

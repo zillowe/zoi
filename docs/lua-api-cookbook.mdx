@@ -76,7 +76,7 @@ To clone a specific tag efficiently (without downloading the entire git history)
 
 ```lua
 function prepare()
-    -- Clone a specific tag (e.g., v1.2.3) based on the package version
+    -- Clone a specific tag (e.g. v1.2.3) based on the package version
     local tag = "v" .. PKG.version
     cmd("git clone --depth 1 --branch " .. tag .. " " .. PKG.git .. " source")
 end

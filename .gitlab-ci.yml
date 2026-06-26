@@ -40,8 +40,7 @@ format:
       changes: &code_changes
         - "Cargo.toml"
         - "Cargo.lock"
-        - "src/**/*"
-        - "tests/**/*"
+        - "crates/**/*"
         - "build.rs"
         - ".cargo/**/*"
         - "test_assets/**/*"

@@ -1,5 +1,5 @@
 [package]
-name = "zoi-mini"
+name = "zoi-rs"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -7,15 +7,26 @@ license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 
+[lib]
+name = "zoi"
+path = "src/lib.rs"
+
 [[bin]]
-name = "zoi-mini"
+name = "zoi"
 path = "src/main.rs"
+
+[lints]
+workspace = true
 
 [dependencies]
 anyhow.workspace = true
-clap = { workspace = true, features = ["derive"] }
 colored.workspace = true
-semver.workspace = true
 zoi-cli.workspace = true
+zoi-deps.workspace = true
 zoi-core.workspace = true
+zoi-project.workspace = true
+zoi-uninstall.workspace = true
+zoi-install.workspace = true
 zoi-resolver.workspace = true
+zoi-package.workspace = true
+zoi-plugins.workspace = true

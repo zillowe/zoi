@@ -4597,6 +4597,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0592e1c9d151f854e6fd382574c3a0855250e1d9b2f99d9281c6e6391af352f1"
 
 [[package]]
+name = "winreg"
+version = "0.56.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d6f32a0ff4a9f6f01231eb2059cc85479330739333e0e58cadf03b6af2cca10"
+dependencies = [
+ "cfg-if",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "wit-bindgen"
 version = "0.57.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4820,6 +4830,8 @@ dependencies = [
  "syntect",
  "tempfile",
  "walkdir",
+ "winapi",
+ "winreg",
  "zoi-audit",
  "zoi-core",
  "zoi-db",
@@ -5104,6 +5116,23 @@ dependencies = [
  "walkdir",
  "zoi-core",
  "zoi-lua",
+]
+
+[[package]]
+name = "zoi-rs"
+version = "1.19.0-dev"
+dependencies = [
+ "anyhow",
+ "colored",
+ "zoi-cli",
+ "zoi-core",
+ "zoi-deps",
+ "zoi-install",
+ "zoi-package",
+ "zoi-plugins",
+ "zoi-project",
+ "zoi-resolver",
+ "zoi-uninstall",
 ]
 
 [[package]]

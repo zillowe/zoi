@@ -74,6 +74,8 @@ fn main() -> Result<()> {
     }
 
     let cli = MiniCli::parse();
+    // SAFETY: We are setting this variable at the very start of main, before any
+    // background threads are spawned, which is safe on Unix-like systems.
     unsafe { std::env::set_var("ZOI_MINI_MODE", "1") };
 
     let result = match cli.command {
