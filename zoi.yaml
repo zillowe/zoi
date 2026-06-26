@@ -12,7 +12,7 @@ commands:
   - cmd: "fmt"
     run: "cargo fmt --all"
   - cmd: "lint"
-    run: "cargo clippy --all-targets --fix --allow-dirty --allow-staged"
+    run: "cargo clippy --workspace --all-targets --all-features --fix --allow-dirty --allow-staged -- -D warnings"
   - cmd: "check"
     run: "cargo check"
   - cmd: "test"

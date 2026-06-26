@@ -16,7 +16,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 """
 body = """
 {% if version %}\
-    ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+    ## [{{ version | replace_regex(from="^([A-Za-z]+)-", to="${1}. ") | replace_regex(from="-([0-9.]+)$", to=" ${1}") | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
 {% else %}\
     ## [unreleased]
 {% endif %}\

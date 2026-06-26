@@ -62,13 +62,13 @@ fn test_shim_resolution_logic() {
     );
     assert!(!providers.is_empty(), "Should find providers in DB");
 
-    let resolved = shim::resolve_to_installed_bin(bin_name, Some(&pm)).unwrap();
+    let resolved = shim::resolve_to_installed_bin(bin_name, Some(&pm), None).unwrap();
     println!("Resolved default: {}", resolved.display());
     let canonical_resolved = resolved.canonicalize().unwrap_or(resolved.clone());
     assert!(canonical_resolved.to_string_lossy().contains(v1));
 
     ctx.set_env_var("ZOI_HELLO_VERSION", v2);
-    let resolved_v2 = shim::resolve_to_installed_bin(bin_name, Some(&pm)).unwrap();
+    let resolved_v2 = shim::resolve_to_installed_bin(bin_name, Some(&pm), None).unwrap();
     println!("Resolved v2 override: {}", resolved_v2.display());
     let canonical_v2 = resolved_v2.canonicalize().unwrap_or(resolved_v2.clone());
     assert!(canonical_v2.to_string_lossy().contains(v2));

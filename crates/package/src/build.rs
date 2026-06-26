@@ -95,7 +95,7 @@ fn collect_deps_from_group_no_prompt(group: &types::DependencyGroup, deps: &mut 
                 }
             }
             if let Some(sub_deps_map) = &g.sub_packages {
-                for (_sub_name, sub_group) in sub_deps_map {
+                for sub_group in sub_deps_map.values() {
                     collect_deps_from_group_no_prompt(sub_group, deps);
                 }
             }

@@ -51,32 +51,31 @@ pub fn build_archive(
 
     if let Some(dep_strings) = zoi_package::build::get_build_dependencies(
         pkg_lua_path,
-        Some(&build_type),
+        Some(build_type),
         &current_platform,
         Some(version),
         true,
-    )? {
-        if !dep_strings.is_empty() {
-            if let Some(p) = pb {
-                p.set_message("Installing build dependencies...");
-            } else {
-                println!("Installing build dependencies...");
-            }
-            let processed = std::sync::Mutex::new(std::collections::HashSet::new());
-            let mut installed = Vec::new();
-            for dep_str in dep_strings {
-                let dep = dependencies::parse_dependency_string(&dep_str)?;
-                dep_install::install_dependency(
-                    &dep,
-                    &pkg.name,
-                    pkg.scope,
-                    true,
-                    true,
-                    &processed,
-                    &mut installed,
-                    None,
-                )?;
-            }
+    )? && !dep_strings.is_empty()
+    {
+        if let Some(p) = pb {
+            p.set_message("Installing build dependencies...");
+        } else {
+            println!("Installing build dependencies...");
+        }
+        let processed = std::sync::Mutex::new(std::collections::HashSet::new());
+        let mut installed = Vec::new();
+        for dep_str in dep_strings {
+            let dep = dependencies::parse_dependency_string(&dep_str)?;
+            dep_install::install_dependency(
+                &dep,
+                &pkg.name,
+                pkg.scope,
+                true,
+                true,
+                &processed,
+                &mut installed,
+                None,
+            )?;
         }
     }
 

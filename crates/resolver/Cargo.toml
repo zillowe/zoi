@@ -26,6 +26,7 @@ indicatif.workspace = true
 md5.workspace = true
 rayon.workspace = true
 regex.workspace = true
+semver.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true

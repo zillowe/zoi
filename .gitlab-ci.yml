@@ -56,7 +56,7 @@ lint:
     - *base_apt
     - rustup component add clippy
   script:
-    - cargo clippy --all-targets --all-features
+    - cargo clippy --workspace --all-targets --all-features
   rules:
     - if: $CI_COMMIT_TAG
       when: never
@@ -289,7 +289,7 @@ build-docker-image:
     - docker push $CI_REGISTRY_IMAGE/zoi:$CI_COMMIT_TAG
     - docker push $CI_REGISTRY_IMAGE/zoi:latest
   rules:
-    - if: $CI_COMMIT_TAG
+    - if: "$CI_COMMIT_TAG =~ /^Prod-Release-/"
   needs:
     - create_release
 

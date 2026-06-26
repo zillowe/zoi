@@ -53,8 +53,8 @@ pub mod resolve {
 pub mod mini_resolve {
     pub use zoi_core::types::MiniVulnerability;
     pub use zoi_resolver::mini_resolve::{
-        MiniPackageIndex, MiniRegistryIndex, fetch_registry_config, fetch_registry_index,
-        get_package_lua_url,
+        MiniPackageIndex, MiniRegistryIndex, check_vulnerabilities, fetch_registry_config,
+        fetch_registry_index, get_package_lua_url,
     };
 }
 pub use zoi_sandbox as sandbox;

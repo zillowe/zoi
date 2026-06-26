@@ -9,7 +9,6 @@ use zoi_core::{recorder, sysroot, types, utils as core_utils};
 use zoi_db as db;
 use zoi_deps as dependencies;
 use zoi_hooks as hooks;
-use zoi_lua;
 use zoi_resolver::{local, resolve};
 use zoi_telemetry as telemetry;
 
@@ -230,10 +229,9 @@ fn uninstall_collection(
         env!("CARGO_PKG_VERSION"),
         registry_handle.as_deref().unwrap_or("local"),
         None,
-    ) {
-        if !quiet {
-            println!("{} telemetry sent", "Info:".green());
-        }
+    ) && !quiet
+    {
+        println!("{} telemetry sent", "Info:".green());
     }
 
     Ok(manifest.clone())
@@ -676,10 +674,9 @@ pub fn run(
         env!("CARGO_PKG_VERSION"),
         &manifest.registry_handle,
         None,
-    ) {
-        if !quiet {
-            println!("{} telemetry sent", "Info:".green());
-        }
+    ) && !quiet
+    {
+        println!("{} telemetry sent", "Info:".green());
     }
 
     Ok(manifest)

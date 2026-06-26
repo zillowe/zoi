@@ -701,15 +701,12 @@ pub fn check_license(license: &str) {
     if license.eq_ignore_ascii_case("Proprietary") || license.eq_ignore_ascii_case("Unknown") {
         return;
     }
-    match spdx::Expression::parse(license) {
-        Ok(expr) => {
-            if !expr.evaluate(|req| match req.license {
-                spdx::LicenseItem::Spdx { id, .. } => id.is_osi_approved(),
-                spdx::LicenseItem::Other { .. } => false,
-            }) {}
-        }
-        Err(_) => {}
-    }
+    if let Ok(expr) = spdx::Expression::parse(license)
+        && !expr.evaluate(|req| match req.license {
+            spdx::LicenseItem::Spdx { id, .. } => id.is_osi_approved(),
+            spdx::LicenseItem::Other { .. } => false,
+        })
+    {}
 }
 
 pub fn confirm_untrusted_source(

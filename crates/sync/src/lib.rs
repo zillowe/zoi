@@ -6,7 +6,6 @@ use git2::{
 };
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
-use serde_yaml;
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};

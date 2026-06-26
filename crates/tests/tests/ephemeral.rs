@@ -113,7 +113,7 @@ end
     .unwrap();
 
     let latest_path = pkg_path.join("latest");
-    utils::symlink_dir(&version_dir, &latest_path).unwrap();
+    utils::symlink_file(&version_dir, &latest_path).unwrap();
 
     let conn = db::open_connection(handle).unwrap();
     let pkg_meta = types::Package {
