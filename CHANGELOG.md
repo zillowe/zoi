@@ -4,7 +4,37 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
+## [Pub. Release 1.19.0] - 2026-06-26
 
+### ♻️ Refactor
+
+- Transition to workspace-based CI and linting
+- *(ci)* Update crate metadata and release process
+- Inherit workspace lints in crate configuration
+- *(build)* Unify workspace linting and crate structure
+- Move Zoi into crates
+- *(cli)* Improve installation progress and binary resolution
+
+### ✨ Features
+
+- *(install)* Implement stage-based sequential package installation
+
+### 🏗️ Structure
+
+- Add zoi-rs crate and refactor project structure
+- *(tests)* Move integration tests to dedicated crate
+
+### 🔧 Configuration
+
+- *(renovate)* Enable Cargo manager only
+
+### 🛠️ Build
+
+- Add Renovate support
+
+### 🛡️ Dependencies
+
+- Update Cargo dependencies
 ## [Prod. Release 1.18.6] - 2026-06-18
 
 ### ♻️ Refactor
