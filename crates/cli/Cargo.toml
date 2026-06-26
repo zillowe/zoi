@@ -10,10 +10,6 @@ homepage.workspace = true
 [lib]
 name = "zoi_cli"
 
-[[bin]]
-name = "zoi"
-path = "src/main.rs"
-
 [build-dependencies]
 dotenvy.workspace = true
 
@@ -68,3 +64,8 @@ zoi-sync.workspace = true
 zoi-uninstall.workspace = true
 zoi-transaction.workspace = true
 zoi-plugins.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+winapi = { workspace = true, features = ["securitybaseapi", "winnt"] }
+winreg.workspace = true
+

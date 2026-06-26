@@ -23,9 +23,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-env=ZOI_DEFAULT_REGISTRY={zoi_registry}");
 
     let mut authorities = Vec::new();
-    if let Ok(val) = env::var("ZOI_BUILTIN_AUTHORITIES") {
-        authorities.push(val);
-    }
     for i in 1..=9 {
         let key = format!("ZOI_AUTHORITIES_KEY_{i}");
         if let Ok(val) = env::var(&key) {

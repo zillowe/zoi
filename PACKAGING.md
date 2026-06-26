@@ -78,7 +78,7 @@ To build a `.deb` package, ensure `cargo-deb` is installed:
 
 ```sh
 cargo install cargo-deb
-cargo deb -p zoi-rs
+cargo deb -p zoi-cli
 ```
 
 The resulting package will be located in `target/debian/`.
@@ -89,7 +89,7 @@ To build an `.rpm` package, ensure `cargo-generate-rpm` is installed:
 
 ```sh
 cargo install cargo-generate-rpm
-cargo generate-rpm -p zoi-rs
+cargo generate-rpm -p zoi-cli
 ```
 
 The resulting package will be located in `target/generate-rpm/`.
@@ -140,7 +140,7 @@ Zoi uses a few environment variables at build time.
 
 ## Built-in PGP Keyring
 
-Zoi supports baking trusted PGP public keys directly into the binary. Any `.asc` file placed in the `src/builtin/pgp/` directory will be embedded at build time.
+Zoi supports baking trusted PGP public keys directly into the binary. Any `.asc` file placed in the `crates/core/src/builtin/pgp/` directory will be embedded at build time.
 
 On startup, Zoi automatically imports these embedded keys into the user's local keyring (`~/.zoi/pgps/`). This is the recommended way to distribute "Root of Trust" keys for custom or internal registries.
 
@@ -148,7 +148,7 @@ On startup, Zoi automatically imports these embedded keys into the user's local 
 
 Similar to PGP keys, Zoi can embed global transaction hooks directly into the binary. These hooks are YAML files that define system-wide maintenance tasks triggered by file modifications.
 
-1. Place your hook definition files (`.hook.yaml`) in the `src/builtin/hooks/` directory.
+1. Place your hook definition files (`.hook.yaml`) in the `crates/core/src/builtin/hooks/` directory.
 2. Build Zoi as usual.
 
 The build system will automatically embed these hooks. They are loaded on every transaction and can be overridden by users in `~/.zoi/hooks/` if they use the same name.

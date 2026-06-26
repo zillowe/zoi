@@ -30,9 +30,7 @@ RUN { \
 
 COPY Cargo.toml Cargo.lock ./
 
-COPY build.rs ./
-
-COPY src ./src
+COPY crates ./crates
 
 RUN cargo build --bin zoi --release
 
