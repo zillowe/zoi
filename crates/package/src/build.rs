@@ -469,6 +469,7 @@ fn build_for_platform(
                             ));
                         }
 
+                        #[cfg(unix)]
                         let full_path = staging_dir.join(&path);
                         #[cfg(unix)]
                         utils::set_path_owner(&full_path, &owner, &group)?;

@@ -34,11 +34,13 @@ zoi-plugins.workspace = true
 [package.metadata.deb]
 name = "zoi"
 maintainer = "Zillowe Foundation <contact@zillowe.qzz.io>"
-copyright = "2026 Zillowe"
+copyright = "2026 Zillowe Foundation"
 license-file = ["../../LICENSE", "4"]
 depends = "$auto, git"
 section = "utils"
 priority = "optional"
+shlibdeps = false
+strip = false
 assets = [
   { source = "target/release/zoi", dest = "/usr/bin/zoi", mode = "755" },
   { source = "../../README.md", dest = "/usr/share/doc/zoi/README.md", mode = "644" },

@@ -104,10 +104,7 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
     }
 
     let latest_symlink_path = package_dir.join("latest");
-    if latest_symlink_path.exists() {
-        fs::remove_file(&latest_symlink_path)?;
-    }
-    std::os::unix::fs::symlink(&previous_version_dir, &latest_symlink_path)?;
+    zoi_core::utils::symlink_dir(&previous_version_dir, &latest_symlink_path)?;
 
     let content = fs::read_to_string(&prev_manifest_path)?;
     let prev_manifest: types::InstallManifest = serde_yaml::from_str(&content)?;
