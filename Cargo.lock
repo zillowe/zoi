@@ -5147,6 +5147,56 @@ dependencies = [
 ]
 
 [[package]]
+name = "zoi-tests"
+version = "1.19.0-dev"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "colored",
+ "comfy-table",
+ "dialoguer",
+ "flate2",
+ "fs2",
+ "git2",
+ "glob",
+ "hex",
+ "home",
+ "indicatif",
+ "md5",
+ "mlua",
+ "rayon",
+ "regex",
+ "rusqlite",
+ "rustc-hash",
+ "semver",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "tar",
+ "tempfile",
+ "walkdir",
+ "zip",
+ "zoi-cli",
+ "zoi-core",
+ "zoi-db",
+ "zoi-deps",
+ "zoi-hooks",
+ "zoi-install",
+ "zoi-lua",
+ "zoi-package",
+ "zoi-plugins",
+ "zoi-project",
+ "zoi-purl",
+ "zoi-resolver",
+ "zoi-sandbox",
+ "zoi-telemetry",
+ "zoi-transaction",
+ "zoi-uninstall",
+ "zstd",
+]
+
+[[package]]
 name = "zoi-transaction"
 version = "1.19.0-dev"
 dependencies = [
