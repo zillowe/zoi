@@ -25,10 +25,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut authorities = Vec::new();
     for i in 1..=9 {
         let key = format!("ZOI_AUTHORITIES_KEY_{i}");
-        if let Ok(val) = env::var(&key) {
-            if !val.is_empty() {
-                authorities.push(val);
-            }
+        if let Ok(val) = env::var(&key)
+            && !val.is_empty()
+        {
+            authorities.push(val);
         }
     }
     println!(
@@ -47,19 +47,19 @@ fn generate_pgp_keys(dest_path: &Path) {
     let pgp_dir = PathBuf::from("src/builtin/pgp");
     let mut output = String::from("pub static BUILTIN_KEYS: &[(&str, &[u8])] = &[\n");
 
-    if pgp_dir.exists() {
-        if let Ok(entries) = fs::read_dir(&pgp_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.extension().is_some_and(|ext| ext == "asc") {
-                    if let Ok(data) = fs::read(&path) {
-                        let name = path
-                            .file_stem()
-                            .and_then(|s| s.to_str())
-                            .unwrap_or("unknown");
-                        output.push_str(&format!("    (\"{}\", &{:?}),\n", name, data));
-                    }
-                }
+    if pgp_dir.exists()
+        && let Ok(entries) = fs::read_dir(&pgp_dir)
+    {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().is_some_and(|ext| ext == "asc")
+                && let Ok(data) = fs::read(&path)
+            {
+                let name = path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("unknown");
+                output.push_str(&format!("    (\"{}\", &{:?}),\n", name, data));
             }
         }
     }
