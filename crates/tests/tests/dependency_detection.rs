@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::sync::Mutex;
-use zoi::pkg::dependencies::{install_dependency, parse_dependency_string};
+use zoi::pkg::dependencies::parse_dependency_string;
+use zoi::pkg::install::dep_install::install_dependency;
 use zoi::pkg::types::Scope;
 
 #[test]

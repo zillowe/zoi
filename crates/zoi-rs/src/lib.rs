@@ -48,7 +48,7 @@ pub use zoi_cli::cli;
 pub use zoi_cli::cmd;
 pub use zoi_cli::pkg;
 pub use zoi_cli::project;
-pub use zoi_cli::utils;
+pub use zoi_core::utils;
 
 use anyhow::Result;
 use colored::Colorize;

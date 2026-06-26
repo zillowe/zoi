@@ -4,7 +4,8 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
-## [Prod-Release-1.18.6] - 2026-06-18
+
+## [Prod. Release 1.18.6] - 2026-06-18
 
 ### ♻️ Refactor
 
@@ -25,8 +26,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 
 - *(update)* Accurately display download and net sizes
 - *(purl)* Implement local resolution support and bypass PGP verification in tests
-
-## [Prod-Release-1.18.4] - 2026-06-13
+## [Prod. Release 1.18.4] - 2026-06-13
 
 ### ✨ Features
 
@@ -52,26 +52,22 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🩹 Bug Fixes
 
 - *(cli)* Resolve missing command output colors
-
-## [Prod-Release-1.18.3] - 2026-06-08
+## [Prod. Release 1.18.3] - 2026-06-08
 
 ### 🩹 Bug Fixes
 
 - *(lua)* Add retry mechanism for file downloads
-
-## [Prod-Release-1.18.2] - 2026-06-08
+## [Prod. Release 1.18.2] - 2026-06-08
 
 ### 🛡️ Dependencies
 
 - Update Cargo dependencies
-
-## [Prod-Release-1.18.1] - 2026-06-08
+## [Prod. Release 1.18.1] - 2026-06-08
 
 ### 🩹 Bug Fixes
 
 - *(package)* Resolve Docker panics and metadata file extensions
-
-## [Prod-Release-1.18.0] - 2026-06-07
+## [Prod. Release 1.18.0] - 2026-06-07
 
 ### ♻️ Refactor
 
@@ -96,8 +92,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🧹 Cleanup
 
 - *(pkg)* Remove unused Declarative install reason
-
-## [Prod-Release-1.17.0] - 2026-06-04
+## [Prod. Release 1.17.0] - 2026-06-04
 
 ### ♻️ Refactor
 
@@ -115,8 +110,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 - *(audit)* Correct history export format and fix test tampering logic
 - *(cmd)* Make uninstall scope consistent with install and clean up UI
 - *(hooks)* Resolve builtin security warning and fix loading precedence
-
-## [Prod-Release-1.16.0] - 2026-06-03
+## [Prod. Release 1.16.0] - 2026-06-03
 
 ### ✨ Features
 
@@ -132,8 +126,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 
 - Correct cli test
 - *(sync)* Enable HTTPS and vendored-openssl features for git2
-
-## [Prod-Release-1.15.0] - 2026-05-26
+## [Prod. Release 1.15.0] - 2026-05-26
 
 ### ♻️ Refactor
 
@@ -169,8 +162,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🩹 Bug Fixes
 
 - *(scripts)* Resolve makepkg permission error for temporary directory
-
-## [Prod-Release-1.14.0] - 2026-05-22
+## [Prod. Release 1.14.0] - 2026-05-22
 
 ### ✨ Features
 
@@ -208,8 +200,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 - Correct purl test expected package output
 - Correct tests path
 - *(sync)* Resolve git2 API breaking changes
-
-## [Prod-Release-1.13.0] - 2026-05-14
+## [Prod. Release 1.13.0] - 2026-05-14
 
 ### ♻️ Refactor
 
@@ -232,8 +223,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🧪 Testing
 
 - *(pkg)* Add tests for package resolution and mini-resolver
-
-## [Prod-Release-1.12.1] - 2026-05-07
+## [Prod. Release 1.12.1] - 2026-05-07
 
 ### 🔒 Security
 
@@ -242,8 +232,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🩹 Bug Fixes
 
 - *(dependencies)* Isolate mutex guard acquisition
-
-## [Prod-Release-1.12.0] - 2026-05-07
+## [Prod. Release 1.12.0] - 2026-05-07
 
 ### ♻️ Refactor
 
@@ -256,8 +245,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🛡️ Dependencies
 
 - Update Cargo dependencies
-
-## [Prod-Release-1.11.0] - 2026-04-25
+## [Prod. Release 1.11.0] - 2026-04-25
 
 ### ✨ Features
 
@@ -271,8 +259,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🩹 Bug Fixes
 
 - *(pkg)* Harden extension lifecycle and runtime state
-
-## [Prod-Release-1.10.0] - 2026-04-02
+## [Prod. Release 1.10.0] - 2026-04-02
 
 ### ✨ Features
 
@@ -293,8 +280,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🩹 Bug Fixes
 
 - *(resolver)* Improve local package and channel resolution
-
-## [Prod-Release-1.9.4] - 2026-03-28
+## [Prod. Release 1.9.4] - 2026-03-28
 
 ### 🎯 UX
 
@@ -303,8 +289,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🩹 Bug Fixes
 
 - *(pkg)* Improve file download and symlink handling
-
-## [Prod-Release-1.9.3] - 2026-03-23
+## [Prod. Release 1.9.3] - 2026-03-23
 
 ### ⚡ Performance
 
@@ -316,38 +301,32 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 - *(plugin)* Add extended Lua plugin APIs and project install hook
 - *(list)* Add option to show outdated packages
 - *(pkg)* Add platform filtering for package builds
-
-## [Prod-Release-1.9.2] - 2026-03-21
+## [Prod. Release 1.9.2] - 2026-03-21
 
 ### ✨ Features
 
 - *(docker)* Enable GPG signing for Docker builds
-
-## [Prod-Release-1.9.1] - 2026-03-21
+## [Prod. Release 1.9.1] - 2026-03-21
 
 ### ✨ Features
 
 - *(security)* Implement sub-package advisories and enforcement policy
-
-## [Prod-Release-1.9.0] - 2026-03-21
+## [Prod. Release 1.9.0] - 2026-03-21
 
 ### 🔒 Security
 
 - *(audit)* Add security auditing command and vulnerability checks
-
-## [Prod-Release-1.8.8] - 2026-03-21
+## [Prod. Release 1.8.8] - 2026-03-21
 
 ### ✨ Features
 
 - *(pm)* Add dynamic sudo handling for package managers
-
-## [Prod-Release-1.8.7] - 2026-03-20
+## [Prod. Release 1.8.7] - 2026-03-20
 
 ### ✨ Features
 
 - *(build)* Make build type optional
-
-## [Prod-Release-1.8.6] - 2026-03-19
+## [Prod. Release 1.8.6] - 2026-03-19
 
 ### ✨ Features
 
@@ -356,8 +335,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🩹 Bug Fixes
 
 - Bug from tests
-
-## [Prod-Release-1.8.5] - 2026-03-18
+## [Prod. Release 1.8.5] - 2026-03-18
 
 ### ✨ Features
 
@@ -367,8 +345,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 
 - *(service)* Improve service management testability
 - *(pkg)* Add comprehensive test suite for package modules
-
-## [Prod-Release-1.8.4] - 2026-03-08
+## [Prod. Release 1.8.4] - 2026-03-08
 
 ### ♻️ Refactor
 
@@ -383,8 +360,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🩹 Bug Fixes
 
 - *(pkg)* Correct dependency version ranges and install scope
-
-## [Prod-Release-1.8.3] - 2026-03-07
+## [Prod. Release 1.8.3] - 2026-03-07
 
 ### ♻️ Refactor
 
@@ -399,20 +375,17 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🩹 Bug Fixes
 
 - *(install)* Make --repo flag work
-
-## [Prod-Release-1.8.2] - 2026-03-06
+## [Prod. Release 1.8.2] - 2026-03-06
 
 ### ♻️ Refactor
 
 - *(db)* Consolidate package updates to local database
-
-## [Prod-Release-1.8.1] - 2026-03-06
+## [Prod. Release 1.8.1] - 2026-03-06
 
 ### ⚡ Performance
 
 - *(hashing)* Stream data directly to hashers
-
-## [Prod-Release-1.8.0] - 2026-03-05
+## [Prod. Release 1.8.0] - 2026-03-05
 
 ### ♻️ Refactor
 
@@ -435,8 +408,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 
 - *(pkg)* Refine package path handling and dependency resolution
 - PGP
-
-## [Prod-Release-1.7.0] - 2026-02-27
+## [Prod. Release 1.7.0] - 2026-02-27
 
 ### ✨ Features
 
@@ -468,8 +440,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🔧 Configuration
 
 - Add configurable offline mode and package directories
-
-## [Prod-Release-1.6.0] - 2026-02-26
+## [Prod. Release 1.6.0] - 2026-02-26
 
 ### ♻️ Refactor
 
@@ -491,8 +462,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🛡️ Dependencies
 
 - Update Cargo dependencies
-
-## [Prod-Release-1.5.0] - 2026-02-22
+## [Prod. Release 1.5.0] - 2026-02-22
 
 ### ♻️ Refactor
 
@@ -520,8 +490,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🩹 Bug Fixes
 
 - *(sync)* Dynamically determine remote default branch
-
-## [Prod-Release-1.4.0] - 2025-11-11
+## [Prod. Release 1.4.0] - 2025-11-11
 
 ### ♻️ Refactor
 
@@ -535,14 +504,12 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### ✨ Features
 
 - *(pkg)* Enhance package resolution and parsing
-
-## [Prod-Release-1.3.1] - 2025-10-31
+## [Prod. Release 1.3.1] - 2025-10-31
 
 ### ✨ Features
 
 - *(pkg)* Add support for typed build dependencies
-
-## [Prod-Release-1.3.0] - 2025-10-29
+## [Prod. Release 1.3.0] - 2025-10-29
 
 ### ✨ Features
 
@@ -553,15 +520,13 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🔒 Security
 
 - Closes #26 Docker image vulnerability
-
-## [Prod-Release-1.2.2] - 2025-10-27
+## [Prod. Release 1.2.2] - 2025-10-27
 
 ### ✨ Features
 
 - *(pkg)* Add 'output_dir' flag to 'cmd'
 - Remove 'build_date' from 'manifest.yaml' in 'pkg.tar.zst'
-
-## [Prod-Release-1.2.1] - 2025-10-26
+## [Prod. Release 1.2.1] - 2025-10-26
 
 ### ✨ Features
 
@@ -572,8 +537,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🩹 Bug Fixes
 
 - *(upgrade)* Retain temporary directory for fallback upgrade
-
-## [Prod-Release-1.2.0] - 2025-10-25
+## [Prod. Release 1.2.0] - 2025-10-25
 
 ### ✨ Features
 
@@ -589,8 +553,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🧹 Cleanup
 
 - *(build)* Remove redundant completion and man page binaries
-
-## [Prod-Release-1.1.1] - 2025-10-22
+## [Prod. Release 1.1.1] - 2025-10-22
 
 ### ✨ Features
 
@@ -599,15 +562,13 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🩹 Bug Fixes
 
 - *(uninstall)* Resolve path placeholders
-
-## [Prod-Release-1.1.0] - 2025-10-21
+## [Prod. Release 1.1.0] - 2025-10-21
 
 ### ✨ Features
 
 - *(install)* Add option to specify package build type
 - *(registry)* Enable extensions to manage registries
-
-## [Prod-Release-1.0.0] - 2025-10-21
+## [Prod. Release 1.0.0] - 2025-10-21
 
 ### ♻️ Refactor
 
@@ -749,26 +710,22 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 - *(update)* Correct package resolution for update command
 - *(path)* Correct PATH verification for custom definitions
 - *(pkg)* Prevent resolution of nested packages
-
-## [Prod-Beta-5.0.5] - 2025-09-09
+## [Prod. Beta 5.0.5] - 2025-09-09
 
 ### ➡️ Migrations
 
 - *(pkg)* Use Lua for package definitions
-
-## [Prod-Beta-5.0.4] - 2025-09-09
+## [Prod. Beta 5.0.4] - 2025-09-09
 
 ### ✨ Features
 
 - *(package)* Add custom file staging and installation
-
-## [Prod-Beta-5.0.3] - 2025-09-09
+## [Prod. Beta 5.0.3] - 2025-09-09
 
 ### ✨ Features
 
 - *(package)* Add Docker build support for source packages
-
-## [Prod-Beta-5.0.0] - 2025-09-09
+## [Prod. Beta 5.0.0] - 2025-09-09
 
 ### ♻️ Refactor
 
@@ -852,8 +809,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 
 - *(build)* Correct checksum mismatch error message formatting
 - *(windows)* Initialize colored crate output
-
-## [Prod-Beta-4.3.7] - 2025-08-20
+## [Prod. Beta 4.3.7] - 2025-08-20
 
 ### ♻️ Refactor
 
@@ -868,8 +824,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🧹 Cleanup
 
 - *(pkg)* Remove external command conflict check
-
-## [Prod-Beta-4.3.6] - 2025-08-19
+## [Prod. Beta 4.3.6] - 2025-08-19
 
 ### ♻️ Refactor
 
@@ -883,8 +838,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### ➡️ Migrations
 
 - *(sbom)* Migrate package recording to CycloneDX SBOM
-
-## [Prod-Beta-4.3.5] - 2025-08-18
+## [Prod. Beta 4.3.5] - 2025-08-18
 
 ### ✨ Features
 
@@ -894,20 +848,17 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🎯 UX
 
 - *(path)* Enhance PATH warning for better user guidance
-
-## [Prod-Beta-4.3.4] - 2025-08-18
+## [Prod. Beta 4.3.4] - 2025-08-18
 
 ### ✨ Features
 
 - *(install)* Add package recording and lockfile installation
-
-## [Prod-Beta-4.3.3] - 2025-08-17
+## [Prod. Beta 4.3.3] - 2025-08-17
 
 ### ✨ Features
 
 - *(pkg)* Add sharable install manifests
-
-## [Prod-Beta-4.3.2] - 2025-08-17
+## [Prod. Beta 4.3.2] - 2025-08-17
 
 ### ♻️ Refactor
 
@@ -918,8 +869,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 
 - *(service)* Add Docker Compose support
 - *(about)* Include documentation URL in output
-
-## [Prod-Beta-4.3.1] - 2025-08-16
+## [Prod. Beta 4.3.1] - 2025-08-16
 
 ### ♻️ Refactor
 
@@ -936,8 +886,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🛠️ Build
 
 - Add dedicated lint command
-
-## [Prod-Beta-4.3.0] - 2025-08-15
+## [Prod. Beta 4.3.0] - 2025-08-15
 
 ### ♻️ Refactor
 
@@ -962,20 +911,17 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 
 - *(ci)* Fixing CI add bash
 - *(pkg)* Conditionally compile symlink calls for Unix
-
-## [Prod-Beta-4.2.3] - 2025-08-13
+## [Prod. Beta 4.2.3] - 2025-08-13
 
 ### ✨ Features
 
 - *(pkg)* Resolve package versions from Git release tags
-
-## [Prod-Beta-4.2.2] - 2025-08-13
+## [Prod. Beta 4.2.2] - 2025-08-13
 
 ### ✨ Features
 
 - *(upgrade)* Add full and force options
-
-## [Prod-Beta-4.2.1] - 2025-08-13
+## [Prod. Beta 4.2.1] - 2025-08-13
 
 ### 🎯 UX
 
@@ -984,8 +930,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🩹 Bug Fixes
 
 - *(dependencies)* Fix parsing for package names starting with '@'
-
-## [Prod-Beta-4.2.0] - 2025-08-12
+## [Prod. Beta 4.2.0] - 2025-08-12
 
 ### ♻️ Refactor
 
@@ -1000,14 +945,12 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🏗️ Structure
 
 - *(core)* Rename package and restructure as library
-
-## [Prod-Beta-4.1.3] - 2025-08-12
+## [Prod. Beta 4.1.3] - 2025-08-12
 
 ### 🛠️ Build
 
 - *(pkg)* Enhance dependency resolution robustness
-
-## [Prod-Beta-4.1.2] - 2025-08-11
+## [Prod. Beta 4.1.2] - 2025-08-11
 
 ### ✨ Features
 
@@ -1018,15 +961,13 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🔧 Configuration
 
 - *(pkg-config)* Define Zoi package configuration schema
-
-## [Prod-Beta-4.1.1] - 2025-08-11
+## [Prod. Beta 4.1.1] - 2025-08-11
 
 ### ✨ Features
 
 - *(create)* Add pre-creation check for existing app directory
 - *(cmd)* Add 'create' command for application packages
-
-## [Prod-Beta-4.1.0] - 2025-08-11
+## [Prod. Beta 4.1.0] - 2025-08-11
 
 ### ✨ Features
 
@@ -1035,34 +976,29 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🛡️ Dependencies
 
 - Update
-
-## [Prod-Beta-4.0.4] - 2025-08-09
+## [Prod. Beta 4.0.4] - 2025-08-09
 
 ### ✨ Features
 
 - *(pkg)* Add script and Volta package manager support
 - *(deps)* Add support for dependency versioning
-
-## [Prod-Beta-4.0.3] - 2025-08-09
+## [Prod. Beta 4.0.3] - 2025-08-09
 
 ### ♻️ Refactor
 
 - *(cli)* Enhance input parsing and error handling
-
-## [Prod-Beta-4.0.2] - 2025-08-09
+## [Prod. Beta 4.0.2] - 2025-08-09
 
 ### ✨ Features
 
 - *(pkg)* Add readme field to package type
 - *(telemetry)* Include package version
-
-## [Prod-Beta-4.0.1] - 2025-08-09
+## [Prod. Beta 4.0.1] - 2025-08-09
 
 ### 🛠️ Build
 
 - *(build)* Use dotenvy for environment variable loading
-
-## [Prod-Beta-4.0.0] - 2025-08-09
+## [Prod. Beta 4.0.0] - 2025-08-09
 
 ### ✨ Features
 
@@ -1081,14 +1017,12 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🛡️ Dependencies
 
 - *(cargo)* Update and clean up dependencies
-
-## [Prod-Beta-3.8.2] - 2025-08-08
+## [Prod. Beta 3.8.2] - 2025-08-08
 
 ### ✨ Features
 
 - Add support for windows-arm64 binaries
-
-## [Prod-Beta-3.8.0] - 2025-08-08
+## [Prod. Beta 3.8.0] - 2025-08-08
 
 ### ♻️ Refactor
 
@@ -1103,14 +1037,12 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🎯 UX
 
 - *(dependencies)* Enhance dependency output format
-
-## [Prod-Beta-3.7.2] - 2025-08-07
+## [Prod. Beta 3.7.2] - 2025-08-07
 
 ### 🛠️ Build
 
 - *(upgrade)* Adjust patch upgrade strategy for archives
-
-## [Prod-Beta-3.6.0] - 2025-08-07
+## [Prod. Beta 3.6.0] - 2025-08-07
 
 ### ♻️ Refactor
 
@@ -1119,8 +1051,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### ✨ Features
 
 - *(security)* Add GPG key fingerprint support
-
-## [Prod-Beta-3.5.0] - 2025-08-06
+## [Prod. Beta 3.5.0] - 2025-08-06
 
 ### ♻️ Refactor
 
@@ -1129,72 +1060,61 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 ### 🔒 Security
 
 - *(pkg)* Implement GPG signature verification for package artifacts
-
-## [Prod-Beta-3.4.2] - 2025-08-06
+## [Prod. Beta 3.4.2] - 2025-08-06
 
 ### ✨ Features
 
 - *(pkg)* Add pre-installation conflict detection
 - *(pkg)* Improve dependency handling and uninstallation
-
-## [Prod-Beta-3.4.1] - 2025-08-05
+## [Prod. Beta 3.4.1] - 2025-08-05
 
 ### 🩹 Bug Fixes
 
 - *(upgrade)* Standardize version parsing for releases
-
-## [Prod-Beta-3.4.0] - 2025-08-05
+## [Prod. Beta 3.4.0] - 2025-08-05
 
 ### ✨ Features
 
 - Enhance package management and CLI command capabilities
 - *(install)* Enable multi-package installation
 - *(sync)* Add external Git repository synchronization
-
-## [Prod-Beta-3.3.2] - 2025-08-04
+## [Prod. Beta 3.3.2] - 2025-08-04
 
 ### 🩹 Bug Fixes
 
 - *(patch)* Refine binary patch handling
-
-## [Prod-Beta-3.3.1] - 2025-08-03
+## [Prod. Beta 3.3.1] - 2025-08-03
 
 ### ✨ Features
 
 - *(pkg)* Enhance package installation and resolution
-
-## [Prod-Beta-3.3.0] - 2025-08-03
+## [Prod. Beta 3.3.0] - 2025-08-03
 
 ### ✨ Features
 
 - *(repo)* Allow adding git repos as package sources
 - Add optional dependency resolution and CLI aliases
-
-## [Prod-Beta-3.2.7] - 2025-08-02
+## [Prod. Beta 3.2.7] - 2025-08-02
 
 ### ✨ Features
 
 - *(pkg)* Add MacPorts and Conda package manager support
-
-## [Prod-Beta-3.2.5] - 2025-07-31
+## [Prod. Beta 3.2.5] - 2025-07-31
 
 ### ♻️ Refactor
 
 - *(upgrade)* Use 'no_' methods for HTTP compression
-
-## [Prod-Beta-3.2.3] - 2025-07-31
+## [Prod. Beta 3.2.3] - 2025-07-31
 
 ### ✨ Features
 
 - *(upgrade)* Display download progress for patches
-
-## [Prod-Beta-3.2.2] - 2025-07-31
+## [Prod. Beta 3.2.2] - 2025-07-31
 
 ### ✨ Features
 
 - *(pkg)* Add support for more dependency managers
-
-## [Prod-Beta-3.2.0] - 2025-07-30
+## [Prod. Beta 3.2.0] - 2025-07-30
 
 ### ✨ Features
 

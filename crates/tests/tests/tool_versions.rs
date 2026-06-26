@@ -28,7 +28,7 @@ fn test_shim_resolves_version_from_tool_versions() {
     };
     zoi::pkg::db::update_package(&conn, &pkg, "local", None, None, None).unwrap();
 
-    let res = shim::resolve_to_installed_bin("node", Some(&pm));
+    let res = shim::resolve_to_installed_bin("node", Some(&pm), None);
 
     match res {
         Err(e) => {
@@ -63,7 +63,7 @@ fn test_tool_versions_traversal() {
     };
     zoi::pkg::db::update_package(&conn, &pkg, "local", None, None, None).unwrap();
 
-    let res = shim::resolve_to_installed_bin("node", Some(&pm));
+    let res = shim::resolve_to_installed_bin("node", Some(&pm), None);
 
     match res {
         Err(e) => {
