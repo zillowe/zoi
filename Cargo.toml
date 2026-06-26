@@ -30,6 +30,7 @@ default-members = ["crates/zoi-rs"]
 version = "1.19.0-dev"
 edition = "2024"
 rust-version = "1.92.0"
+description = "Advanced Package Manager & Environment Orchestrator"
 license = "Apache-2.0"
 repository = "https://gitlab.com/zillowe/zillwen/zusty/zoi"
 homepage = "https://zillowe.qzz.io/zds/zoi"
