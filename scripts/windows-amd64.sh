@@ -20,7 +20,7 @@ rustup target add "$TARGET"
 
 export CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc
 
-if ! ZOI_COMMIT_HASH="$COMMIT" cargo build --bins --target "$TARGET" --release; then
+if ! ZOI_COMMIT_HASH="$COMMIT" cargo build -p zoi-rs -p zoi-mini --target "$TARGET" --release; then
   echo -e "${RED}❌ Build failed for ${TARGET}${NC}"
   exit 1
 fi

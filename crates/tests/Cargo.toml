@@ -92,8 +92,10 @@ zoi-plugins.workspace = true
 zoi-project.workspace = true
 zoi-purl.workspace = true
 zoi-resolver.workspace = true
-zoi-sandbox.workspace = true
 zoi-telemetry.workspace = true
 zoi-transaction.workspace = true
 zoi-uninstall.workspace = true
 clap_complete.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+zoi-sandbox.workspace = true

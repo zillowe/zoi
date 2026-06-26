@@ -22,6 +22,7 @@ pub use zoi_hooks as hooks;
 pub use zoi_lua as lua;
 pub use zoi_purl as purl;
 pub use zoi_resolver as resolve;
+#[cfg(target_os = "linux")]
 pub use zoi_sandbox as sandbox;
 pub use zoi_telemetry as telemetry;
 

@@ -22,7 +22,7 @@ export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
 export PKG_CONFIG_ALLOW_CROSS=1
 export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
 
-if ! ZOI_COMMIT_HASH="$COMMIT" cargo build --bins --target "$TARGET" --release; then
+if ! ZOI_COMMIT_HASH="$COMMIT" cargo build -p zoi-rs -p zoi-mini --target "$TARGET" --release; then
   echo -e "${RED}❌ Build failed for ${TARGET}${NC}"
   exit 1
 fi

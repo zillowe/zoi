@@ -57,6 +57,7 @@ pub mod mini_resolve {
         fetch_registry_index, get_package_lua_url,
     };
 }
+#[cfg(target_os = "linux")]
 pub use zoi_sandbox as sandbox;
 pub use zoi_transaction::rollback;
 pub mod shim {

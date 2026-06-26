@@ -22,7 +22,6 @@ zoi-hooks.workspace = true
 zoi-package.workspace = true
 zoi-plugins.workspace = true
 zoi-lua.workspace = true
-zoi-sandbox.workspace = true
 zoi-project.workspace = true
 zoi-resolver.workspace = true
 zoi-telemetry.workspace = true
@@ -46,3 +45,6 @@ spdx.workspace = true
 reqwest.workspace = true
 serde_yaml.workspace = true
 mlua.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+zoi-sandbox.workspace = true

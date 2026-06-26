@@ -10,6 +10,7 @@ use zoi_db as db;
 use zoi_plugins::PluginManager;
 use zoi_project as project;
 use zoi_resolver::{local, resolve};
+#[cfg(target_os = "linux")]
 use zoi_sandbox as sandbox;
 
 pub fn run_shim(

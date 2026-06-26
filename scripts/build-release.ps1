@@ -20,7 +20,7 @@ Write-Host "Building Zoi release binaries for Windows..." -ForegroundColor Cyan
 Write-Host "Commit: $commit" -ForegroundColor Cyan
 
 $env:ZOI_COMMIT_HASH = $commit
-cargo build --bins --release
+cargo build -p zoi-rs -p zoi-mini --release
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Cargo build failed" -ForegroundColor Red
