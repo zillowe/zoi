@@ -1,0 +1,450 @@
+use crate::resolve::{PackageRequest, get_db_root};
+use anyhow::Result;
+use std::fs;
+use std::path::{Path, PathBuf};
+use walkdir::WalkDir;
+use zoi_core::config;
+use zoi_core::sysroot::apply_sysroot;
+use zoi_core::types::{self, InstallManifest, Scope};
+use zoi_core::utils;
+
+pub fn get_store_base_dir(scope: Scope) -> Result<PathBuf> {
+    match scope {
+        Scope::User => {
+            let home_dir = home::home_dir()
+                .ok_or_else(|| anyhow::anyhow!("Could not find home directory."))?;
+            Ok(apply_sysroot(
+                home_dir.join(".zoi").join("pkgs").join("store"),
+            ))
+        }
+        Scope::System => {
+            if cfg!(target_os = "windows") {
+                Ok(apply_sysroot(PathBuf::from(
+                    "C:\\ProgramData\\zoi\\pkgs\\store",
+                )))
+            } else {
+                Ok(apply_sysroot(PathBuf::from("/var/lib/zoi/pkgs/store")))
+            }
+        }
+        Scope::Project => {
+            let current_dir = std::env::current_dir()?;
+            Ok(current_dir.join(".zoi").join("pkgs").join("store"))
+        }
+    }
+}
+
+pub fn get_package_dir(
+    scope: Scope,
+    registry_handle: &str,
+    repo_path: &str,
+    package_name: &str,
+) -> Result<PathBuf> {
+    let base_dir = get_store_base_dir(scope)?;
+    let package_id = utils::generate_package_id(registry_handle, repo_path, package_name);
+    let package_dir_name = utils::get_package_dir_name(&package_id, package_name);
+    Ok(base_dir.join(package_dir_name))
+}
+
+pub fn get_package_version_dir(
+    scope: Scope,
+    registry_handle: &str,
+    repo_path: &str,
+    package_name: &str,
+    version: &str,
+) -> Result<PathBuf> {
+    let package_dir = get_package_dir(scope, registry_handle, repo_path, package_name)?;
+    Ok(package_dir.join(version))
+}
+
+use rayon::prelude::*;
+
+pub fn get_installed_packages() -> Result<Vec<InstallManifest>> {
+    let scopes = [Scope::User, Scope::System, Scope::Project];
+
+    let installed: Vec<InstallManifest> = scopes
+        .into_par_iter()
+        .map(|scope| {
+            let mut manifests = Vec::new();
+            if let Ok(store_root) = get_store_base_dir(scope)
+                && store_root.exists()
+                && let Ok(entries) = fs::read_dir(store_root)
+            {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if !path.is_dir() {
+                        continue;
+                    }
+                    let latest_path = path.join("latest");
+                    if (latest_path.is_symlink() || latest_path.is_dir())
+                        && let Ok(sub_entries) = fs::read_dir(&latest_path)
+                    {
+                        for sub_entry in sub_entries.flatten() {
+                            let file_name = sub_entry.file_name().to_string_lossy().to_string();
+                            if file_name.starts_with("manifest") && file_name.ends_with(".yaml") {
+                                let manifest_path = sub_entry.path();
+                                if manifest_path.exists()
+                                    && let Ok(content) = fs::read_to_string(manifest_path)
+                                    && let Ok(manifest) =
+                                        serde_yaml::from_str::<InstallManifest>(&content)
+                                {
+                                    manifests.push(manifest);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            manifests
+        })
+        .flatten()
+        .collect();
+
+    let mut sorted_installed = installed;
+    sorted_installed.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(sorted_installed)
+}
+
+#[derive(Debug)]
+pub struct InstalledPackage {
+    pub name: String,
+    pub sub_package: Option<String>,
+    pub version: String,
+    pub repo: String,
+    pub package_type: zoi_core::types::PackageType,
+}
+
+pub fn get_installed_packages_with_type() -> Result<Vec<InstalledPackage>> {
+    let manifests = get_installed_packages()?;
+    Ok(manifests
+        .into_iter()
+        .map(|m| InstalledPackage {
+            name: m.name,
+            sub_package: m.sub_package,
+            version: m.version,
+            repo: m.repo,
+            package_type: m.package_type,
+        })
+        .collect())
+}
+
+pub fn is_package_installed(
+    package_name: &str,
+    sub_package_name: Option<&str>,
+    scope: Scope,
+) -> Result<Option<InstallManifest>> {
+    let store_root = get_store_base_dir(scope)?;
+    if !store_root.exists() {
+        return Ok(None);
+    }
+
+    for entry in fs::read_dir(store_root)? {
+        let entry = entry?;
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+
+        if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+            let parts: Vec<&str> = file_name.splitn(2, '-').collect();
+            if parts.len() == 2 && parts[1] == package_name && parts[0].len() == 32 {
+                let latest_path = path.join("latest");
+                if (latest_path.is_symlink() || latest_path.is_dir())
+                    && let Ok(entries) = fs::read_dir(&latest_path)
+                {
+                    for entry in entries.filter_map(Result::ok) {
+                        let file_name = entry.file_name().to_string_lossy().to_string();
+                        if file_name.starts_with("manifest") && file_name.ends_with(".yaml") {
+                            let manifest_path = entry.path();
+                            if manifest_path.exists() {
+                                let content = fs::read_to_string(manifest_path)?;
+                                let manifest: InstallManifest = serde_yaml::from_str(&content)?;
+                                if manifest.name == package_name
+                                    && manifest.sub_package.as_deref() == sub_package_name
+                                {
+                                    return Ok(Some(manifest));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+pub fn get_installed_manifests_in_scope(scope: Scope) -> Result<Vec<InstallManifest>> {
+    let store_root = get_store_base_dir(scope)?;
+    if !store_root.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut manifests = Vec::new();
+    for entry in fs::read_dir(store_root)? {
+        let entry = entry?;
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+
+        let latest_path = path.join("latest");
+        if !(latest_path.is_symlink() || latest_path.is_dir()) {
+            continue;
+        }
+
+        let Ok(entries) = fs::read_dir(&latest_path) else {
+            continue;
+        };
+
+        for entry in entries.filter_map(Result::ok) {
+            let file_name = entry.file_name().to_string_lossy().to_string();
+            if !file_name.starts_with("manifest") || !file_name.ends_with(".yaml") {
+                continue;
+            }
+
+            let manifest_path = entry.path();
+            if !manifest_path.exists() {
+                continue;
+            }
+
+            let content = fs::read_to_string(manifest_path)?;
+            let manifest: InstallManifest = serde_yaml::from_str(&content)?;
+            manifests.push(manifest);
+        }
+    }
+
+    Ok(manifests)
+}
+
+pub fn find_installed_manifests_matching(
+    request: &PackageRequest,
+    scope: Scope,
+) -> Result<Vec<InstallManifest>> {
+    let manifests = get_installed_manifests_in_scope(scope)?;
+    Ok(manifests
+        .into_iter()
+        .filter(|manifest| {
+            manifest.name == request.name
+                && manifest.sub_package == request.sub_package
+                && request
+                    .handle
+                    .as_ref()
+                    .is_none_or(|handle| manifest.registry_handle == *handle)
+                && request
+                    .repo
+                    .as_ref()
+                    .is_none_or(|repo| manifest.repo == *repo)
+                && request
+                    .version_spec
+                    .as_ref()
+                    .is_none_or(|version| manifest.version == *version)
+        })
+        .collect())
+}
+
+pub fn package_source_string(
+    registry_handle: &str,
+    repo: &str,
+    name: &str,
+    sub_package: Option<&str>,
+    version: &str,
+) -> String {
+    if let Some(sub_package) = sub_package {
+        format!(
+            "#{}@{}/{}:{}@{}",
+            registry_handle, repo, name, sub_package, version
+        )
+    } else {
+        format!("#{}@{}/{}@{}", registry_handle, repo, name, version)
+    }
+}
+
+pub fn installed_manifest_source(manifest: &InstallManifest) -> String {
+    package_source_string(
+        &manifest.registry_handle,
+        &manifest.repo,
+        &manifest.name,
+        manifest.sub_package.as_deref(),
+        &manifest.version,
+    )
+}
+
+pub fn get_packages_from_repos(repos: &[String]) -> Result<Vec<zoi_core::types::Package>> {
+    let db_root = get_db_root()?;
+    if !db_root.exists() {
+        return Err(anyhow::anyhow!(
+            "Package database not found. Please run 'zoi sync' first."
+        ));
+    }
+
+    let mut available = Vec::new();
+
+    for repo_name in repos {
+        let repo_path = db_root.join(repo_name);
+        if !repo_path.exists() {
+            continue;
+        }
+        for entry in WalkDir::new(repo_path).into_iter().filter_map(Result::ok) {
+            if !entry.file_type().is_dir() {
+                continue;
+            }
+
+            let pkg_name = entry.file_name().to_string_lossy();
+            let pkg_file_path = entry.path().join(format!("{}.pkg.lua", pkg_name));
+
+            if pkg_file_path.is_file() {
+                let pkg_file_path_str = pkg_file_path.to_str().ok_or_else(|| {
+                    anyhow::anyhow!("Package path contains invalid UTF-8: {:?}", pkg_file_path)
+                })?;
+                let mut pkg: zoi_core::types::Package =
+                    zoi_lua::parser::parse_lua_package(pkg_file_path_str, None, true)?;
+
+                if let Ok(repo_subpath) = entry.path().strip_prefix(&db_root) {
+                    let mut repo_path = repo_subpath
+                        .to_string_lossy()
+                        .to_string()
+                        .replace('\\', "/");
+                    let pkg_name_suffix = format!("/{}", pkg.name);
+                    if repo_path.ends_with(&pkg_name_suffix) {
+                        repo_path =
+                            repo_path[..repo_path.len() - pkg_name_suffix.len()].to_string();
+                    } else if repo_path == pkg.name {
+                        repo_path = String::new();
+                    }
+                    pkg.repo = repo_path;
+                }
+
+                available.push(pkg);
+            }
+        }
+    }
+
+    available.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(available)
+}
+
+pub fn get_all_available_packages() -> Result<Vec<zoi_core::types::Package>> {
+    let config = config::read_config()?;
+    if let Some(handle) = config
+        .default_registry
+        .as_ref()
+        .map(|r| &r.handle)
+        .filter(|h| !h.is_empty())
+    {
+        let repos_with_handle: Vec<String> = config
+            .repos
+            .iter()
+            .map(|repo| format!("{}/{}", handle, repo))
+            .collect();
+        get_packages_from_repos(&repos_with_handle)
+    } else {
+        Ok(Vec::new())
+    }
+}
+
+pub fn add_dependent(package_dir: &Path, dependent_id: &str) -> Result<()> {
+    let dependents_dir = package_dir.join("dependents");
+    fs::create_dir_all(&dependents_dir)?;
+    let dependent_file = dependents_dir.join(hex::encode(dependent_id));
+    fs::write(dependent_file, "")?;
+    Ok(())
+}
+
+pub fn remove_dependent(package_dir: &Path, dependent_id: &str) -> Result<()> {
+    let dependents_dir = package_dir.join("dependents");
+    if dependents_dir.exists() {
+        let dependent_file = dependents_dir.join(hex::encode(dependent_id));
+        if dependent_file.exists() {
+            fs::remove_file(dependent_file)?;
+        } else if let Some(pos) = dependent_id.rfind('@') {
+            let legacy_id = &dependent_id[..pos];
+            let legacy_file = dependents_dir.join(hex::encode(legacy_id));
+            if legacy_file.exists() {
+                fs::remove_file(legacy_file)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+pub fn get_dependents(package_dir: &Path) -> Result<Vec<String>> {
+    let dependents_dir = package_dir.join("dependents");
+    let mut dependents = Vec::new();
+    if dependents_dir.exists() {
+        for entry in fs::read_dir(dependents_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_file()
+                && let Some(file_name) = path.file_name().and_then(|s| s.to_str())
+                && let Ok(decoded) = hex::decode(file_name)
+                && let Ok(dependent_id) = String::from_utf8(decoded)
+            {
+                dependents.push(dependent_id);
+            }
+        }
+    }
+    Ok(dependents)
+}
+
+pub fn write_manifest(manifest: &InstallManifest) -> Result<()> {
+    let version_dir = get_package_version_dir(
+        manifest.scope,
+        &manifest.registry_handle,
+        &manifest.repo,
+        &manifest.name,
+        &manifest.version,
+    )?;
+    fs::create_dir_all(&version_dir)?;
+
+    let manifest_filename = if let Some(sub) = &manifest.sub_package {
+        format!("manifest-{}.yaml", sub)
+    } else {
+        "manifest.yaml".to_string()
+    };
+    let manifest_path = version_dir.join(manifest_filename);
+
+    let content = serde_yaml::to_string(&manifest)?;
+    fs::write(manifest_path, content)?;
+
+    let package_dir = get_package_dir(
+        manifest.scope,
+        &manifest.registry_handle,
+        &manifest.repo,
+        &manifest.name,
+    )?;
+    let latest_symlink_path = package_dir.join("latest");
+    zoi_core::utils::symlink_dir(&version_dir, &latest_symlink_path)?;
+
+    Ok(())
+}
+
+pub fn get_package_source_path(manifest: &InstallManifest) -> Result<PathBuf> {
+    let version_dir = get_package_version_dir(
+        manifest.scope,
+        &manifest.registry_handle,
+        &manifest.repo,
+        &manifest.name,
+        &manifest.version,
+    )?;
+    Ok(version_dir.join("package.pkg.lua"))
+}
+
+pub fn persist_package_source(manifest: &InstallManifest, source_path: &Path) -> Result<()> {
+    let stored_source_path = get_package_source_path(manifest)?;
+    if let Some(parent) = stored_source_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::copy(source_path, stored_source_path)?;
+    Ok(())
+}
+
+pub fn update_manifest_reason(
+    manifest: &InstallManifest,
+    new_reason: types::InstallReason,
+) -> Result<()> {
+    let mut updated_manifest = manifest.clone();
+    updated_manifest.reason = new_reason;
+    write_manifest(&updated_manifest)?;
+    Ok(())
+}

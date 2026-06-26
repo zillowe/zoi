@@ -1,0 +1,40 @@
+[package]
+name = "zoi-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+name = "zoi_core"
+
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+clap_complete.workspace = true
+colored.workspace = true
+regex.workspace = true
+semver.workspace = true
+crossterm.workspace = true
+dirs.workspace = true
+fs2.workspace = true
+nix.workspace = true
+hex.workspace = true
+home.workspace = true
+indicatif.workspace = true
+md5.workspace = true
+reqwest.workspace = true
+self_update.workspace = true
+sequoia-openpgp.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+spdx.workspace = true
+serde_yaml.workspace = true
+sha2.workspace = true
+tar.workspace = true
+tempfile.workspace = true
+walkdir.workspace = true
+zip.workspace = true
+zstd.workspace = true

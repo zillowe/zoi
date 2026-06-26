@@ -1,0 +1,47 @@
+[package]
+name = "zoi-install"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+name = "zoi_install"
+
+[lints]
+workspace = true
+
+[dependencies]
+zoi-core.workspace = true
+zoi-db.workspace = true
+zoi-deps.workspace = true
+zoi-hooks.workspace = true
+zoi-package.workspace = true
+zoi-plugins.workspace = true
+zoi-lua.workspace = true
+zoi-sandbox.workspace = true
+zoi-project.workspace = true
+zoi-resolver.workspace = true
+zoi-telemetry.workspace = true
+anyhow.workspace = true
+colored.workspace = true
+home.workspace = true
+indicatif.workspace = true
+pubgrub.workspace = true
+rayon.workspace = true
+rusqlite.workspace = true
+rustc-hash.workspace = true
+semver.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tar.workspace = true
+tempfile.workspace = true
+thiserror.workspace = true
+walkdir.workspace = true
+zstd.workspace = true
+spdx.workspace = true
+reqwest.workspace = true
+serde_yaml.workspace = true
+mlua.workspace = true
