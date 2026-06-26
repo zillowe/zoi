@@ -470,6 +470,7 @@ fn build_for_platform(
                         }
 
                         let full_path = staging_dir.join(&path);
+                        #[cfg(unix)]
                         utils::set_path_owner(&full_path, &owner, &group)?;
                         if !quiet {
                             println!("Set ownership {}:{} on '{}'", owner, group, path);

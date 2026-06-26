@@ -40,14 +40,14 @@ depends = "$auto, git"
 section = "utils"
 priority = "optional"
 assets = [
-  { source = "../../target/release/zoi", dest = "/usr/bin/zoi", mode = "755" },
+  { source = "target/release/zoi", dest = "/usr/bin/zoi", mode = "755" },
   { source = "../../README.md", dest = "/usr/share/doc/zoi/README.md", mode = "644" },
 ]
 
 [package.metadata.generate-rpm]
 name = "zoi"
 assets = [
-  { source = "../../target/release/zoi", dest = "/usr/bin/zoi", mode = "755" },
+  { source = "target/release/zoi", dest = "/usr/bin/zoi", mode = "755" },
   { source = "../../README.md", dest = "/usr/share/doc/zoi/README.md", mode = "644", doc = true },
   { source = "../../LICENSE", dest = "/usr/share/licenses/zoi/LICENSE", mode = "644", doc = true },
 ]

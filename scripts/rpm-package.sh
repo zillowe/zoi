@@ -14,7 +14,13 @@ TARGETS=("x86_64-unknown-linux-gnu" "aarch64-unknown-linux-gnu")
 
 for TARGET in "${TARGETS[@]}"; do
   echo -e "${CYAN}📦 Generating RPM package for ${TARGET}...${NC}"
-  cargo generate-rpm -p zoi-rs --target "$TARGET"
+  mkdir -p "crates/zoi-rs/target/release"
+  cp "target/${TARGET}/release/zoi" "crates/zoi-rs/target/release/zoi"
+
+  pushd crates/zoi-rs >/dev/null
+  cargo generate-rpm --target "$TARGET"
+  popd >/dev/null
+
   mv target/"$TARGET"/generate-rpm/*.rpm "$OUTPUT_DIR/"
 done
 
