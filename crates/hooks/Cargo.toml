@@ -1,0 +1,30 @@
+[package]
+name = "zoi-hooks"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+name = "zoi_hooks"
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow.workspace = true
+colored.workspace = true
+glob.workspace = true
+hex.workspace = true
+home.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+sha2.workspace = true
+zoi-core.workspace = true
+
+[build-dependencies]
+serde.workspace = true
+serde_json.workspace = true

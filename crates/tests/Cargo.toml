@@ -1,0 +1,95 @@
+[package]
+name = "zoi-tests"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[package.metadata.cargo-machete]
+ignored = [
+    "colored",
+    "comfy-table",
+    "dialoguer",
+    "fs2",
+    "git2",
+    "glob",
+    "home",
+    "indicatif",
+    "md5",
+    "rayon",
+    "regex",
+    "rusqlite",
+    "serde",
+    "walkdir",
+    "zoi-core",
+    "zoi-db",
+    "zoi-deps",
+    "zoi-hooks",
+    "zoi-install",
+    "zoi-lua",
+    "zoi-package",
+    "zoi-plugins",
+    "zoi-project",
+    "zoi-purl",
+    "zoi-resolver",
+    "zoi-sandbox",
+    "zoi-telemetry",
+    "zoi-transaction",
+    "zoi-uninstall",
+]
+
+[lib]
+name = "zoi_tests"
+path = "src/lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+clap = { workspace = true, features = ["derive"] }
+colored.workspace = true
+comfy-table.workspace = true
+dialoguer.workspace = true
+flate2.workspace = true
+fs2.workspace = true
+git2.workspace = true
+glob.workspace = true
+hex.workspace = true
+home.workspace = true
+indicatif.workspace = true
+md5.workspace = true
+mlua.workspace = true
+rayon.workspace = true
+regex.workspace = true
+semver.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+tar.workspace = true
+tempfile.workspace = true
+walkdir.workspace = true
+zip.workspace = true
+zstd.workspace = true
+rusqlite.workspace = true
+rustc-hash.workspace = true
+
+zoi = { path = "../zoi-rs", package = "zoi-rs" }
+zoi-core.workspace = true
+zoi-db.workspace = true
+zoi-deps.workspace = true
+zoi-hooks.workspace = true
+zoi-install.workspace = true
+zoi-lua.workspace = true
+zoi-package.workspace = true
+zoi-plugins.workspace = true
+zoi-project.workspace = true
+zoi-purl.workspace = true
+zoi-resolver.workspace = true
+zoi-sandbox.workspace = true
+zoi-telemetry.workspace = true
+zoi-transaction.workspace = true
+zoi-uninstall.workspace = true

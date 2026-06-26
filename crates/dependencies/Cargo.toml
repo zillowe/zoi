@@ -1,0 +1,29 @@
+[package]
+name = "zoi-deps"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[package.metadata.cargo-machete]
+ignored = ["phf", "phf_codegen", "serde", "serde_json"]
+
+[lib]
+name = "zoi_deps"
+
+[lints]
+workspace = true
+
+[dependencies]
+zoi-core.workspace = true
+anyhow.workspace = true
+colored.workspace = true
+dialoguer.workspace = true
+phf.workspace = true
+
+[build-dependencies]
+serde.workspace = true
+serde_json.workspace = true
+phf_codegen.workspace = true

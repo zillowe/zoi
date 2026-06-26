@@ -1,0 +1,29 @@
+[package]
+name = "zoi-sync"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+name = "zoi_sync"
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow.workspace = true
+colored.workspace = true
+git2.workspace = true
+home.workspace = true
+indicatif.workspace = true
+rayon.workspace = true
+serde_yaml.workspace = true
+tempfile.workspace = true
+walkdir.workspace = true
+zoi-core.workspace = true
+zoi-db.workspace = true
+zoi-install.workspace = true
+zoi-lua.workspace = true

@@ -1,0 +1,22 @@
+[package]
+name = "zoi-telemetry"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+name = "zoi_telemetry"
+
+[lints]
+workspace = true
+
+[dependencies]
+chrono.workspace = true
+home.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+uuid.workspace = true
+zoi-core.workspace = true

@@ -1,0 +1,74 @@
+use anyhow::{Result, anyhow};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+pub use zoi_core::types::MiniVulnerability;
+
+fn default_revision() -> String {
+    "1".to_string()
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MiniPackageIndex {
+    pub repo: String,
+    pub repo_type: String,
+    pub version: String,
+    #[serde(default = "default_revision")]
+    pub revision: String,
+    pub description: String,
+    #[serde(default, deserialize_with = "deserialize_sub_packages")]
+    pub sub_packages: Option<Vec<String>>,
+    pub vuln: Option<Vec<MiniVulnerability>>,
+}
+
+fn deserialize_sub_packages<'de, D>(deserializer: D) -> Result<Option<Vec<String>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let v: serde_json::Value = serde::Deserialize::deserialize(deserializer)?;
+    if v.is_array() {
+        Ok(serde_json::from_value(v).ok())
+    } else {
+        Ok(None)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MiniRegistryIndex {
+    pub packages: HashMap<String, MiniPackageIndex>,
+}
+
+pub fn fetch_registry_index() -> Result<MiniRegistryIndex> {
+    let url = "https://gitlab.com/zillowe/zillwen/zusty/zoidberg/-/raw/main/packages.json";
+    let client = zoi_core::utils::get_http_client()?;
+    let response = client.get(url).send()?;
+    if !response.status().is_success() {
+        return Err(anyhow!(
+            "Failed to fetch packages.json from Zoidberg registry: {}",
+            response.status()
+        ));
+    }
+    let index: MiniRegistryIndex = response.json()?;
+    Ok(index)
+}
+
+pub fn fetch_registry_config() -> Result<zoi_core::types::RepoConfig> {
+    let url = "https://gitlab.com/zillowe/zillwen/zusty/zoidberg/-/raw/main/repo.yaml";
+    let client = zoi_core::utils::get_http_client()?;
+    let response = client.get(url).send()?;
+    if !response.status().is_success() {
+        return Err(anyhow!(
+            "Failed to fetch repo.yaml from Zoidberg registry: {}",
+            response.status()
+        ));
+    }
+    let content = response.text()?;
+    let config: zoi_core::types::RepoConfig = serde_yaml::from_str(&content)?;
+    Ok(config)
+}
+
+pub fn get_package_lua_url(repo: &str, name: &str) -> String {
+    format!(
+        "https://gitlab.com/zillowe/zillwen/zusty/zoidberg/-/raw/main/{}/{}/{}.pkg.lua",
+        repo, name, name
+    )
+}

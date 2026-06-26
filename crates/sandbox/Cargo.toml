@@ -1,0 +1,19 @@
+[package]
+name = "zoi-sandbox"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+name = "zoi_sandbox"
+
+[lints]
+workspace = true
+
+[dependencies]
+zoi-core.workspace = true
+anyhow.workspace = true
+home.workspace = true

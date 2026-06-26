@@ -11,7 +11,7 @@ This document provides guidelines for the AI assistant when working on the Zoi p
 
 1.  **Analyze and Plan:** Before making any changes, thoroughly analyze the user's request and the relevant codebase. Formulate a clear plan of action.
 2.  **Implement:** Write or modify the code according to the plan.
-3.  **Verify with Build & Tests:** After every single code change, run `cargo check` to check for compilation errors. Additionally, always update existing tests or add new test files in `/tests/` to verify the behavioral correctness of your changes. Ensure the project remains in a buildable and verifiable state. Do not proceed if the build or tests are broken.
+3.  **Verify with Build & Tests:** After every single code change, run `cargo check` to check for compilation errors. Additionally, always update existing tests or add new test files in `crates/tests/tests/` to verify the behavioral correctness of your changes. Ensure the project remains in a buildable and verifiable state. Do not proceed if the build or tests are broken.
 4.  **Update Documentation:** After implementing and verifying a feature or change, update the relevant documentation to reflect the new state of the codebase.
 
 ## Documentation Guidelines
@@ -26,7 +26,7 @@ Maintaining up-to-date and consistent documentation is crucial for the Zoi proje
 ### When to Update Docs
 
 - **User-Facing Changes:** Any change that affects how a user interacts with Zoi (e.g. new commands, changed command behavior, new features) requires an update to the documentation in the `/docs/` directory.
-- **Library API Changes:** Any change to the public library API requires an update to the documentation in the `/docs/lib/` directory. This includes updating any relevant doc comments in `src/lib.rs` for `docs.rs`.
+- **Library API Changes:** Any change to the public library API requires an update to the documentation in the `/docs/lib/` directory. This includes updating any relevant doc comments in `crates/zoi-rs/src/lib.rs` for `docs.rs`.
 - **Read First:** Before updating any documentation, read the entire docs directory (`/docs/`) to understand the existing structure, style, and conventions.
 - **Create New Files:** If the new documentation doesn't fit into an existing file, create a new `.md` file in the appropriate directory.
 
