@@ -1,7 +1,10 @@
 # etc
 etc
 .zoi/
-dist/*
+dist/
+.gct/
+.agents/
+skills-lock.json
 
 # binaries
 scripts/compiled
