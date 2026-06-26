@@ -21,6 +21,7 @@ members = [
     "crates/uninstall",
     "crates/transaction",
     "crates/plugins",
+    "crates/tests",
 ]
 default-members = ["crates/cli"]
 
