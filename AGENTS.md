@@ -26,7 +26,7 @@ Maintaining up-to-date and consistent documentation is crucial for the Zoi proje
 ### When to Update Docs
 
 - **User-Facing Changes:** Any change that affects how a user interacts with Zoi (e.g. new commands, changed command behavior, new features) requires an update to the documentation in the `/docs/` directory.
-- **Library API Changes:** Any change to the public library API requires an update to the documentation in the `/docs/lib/` directory. This includes updating any relevant doc comments in `src/lib.rs` for `docs.rs`.
+- **Library API Changes:** Any change to the public library API requires an update to the documentation in the `/docs/lib/` directory. This includes updating any relevant doc comments in `crates/zoi-rs/src/lib.rs` for `docs.rs`.
 - **Read First:** Before updating any documentation, read the entire docs directory (`/docs/`) to understand the existing structure, style, and conventions.
 - **Create New Files:** If the new documentation doesn't fit into an existing file, create a new `.md` file in the appropriate directory.
 
