@@ -175,6 +175,9 @@ package:deb:
     - build:linux-amd64
     - build:linux-arm64
   before_script:
+    - dpkg --add-architecture arm64
+    - apt-get update -yq
+    - apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libssl-dev:arm64 liblzma-dev:arm64
     - cargo install cargo-deb
   script:
     - chmod +x ./scripts/deb-package.sh
@@ -193,6 +196,9 @@ package:rpm:
     - build:linux-amd64
     - build:linux-arm64
   before_script:
+    - dpkg --add-architecture arm64
+    - apt-get update -yq
+    - apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libssl-dev:arm64 liblzma-dev:arm64
     - cargo install cargo-generate-rpm
   script:
     - chmod +x ./scripts/rpm-package.sh

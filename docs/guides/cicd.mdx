@@ -57,10 +57,12 @@ publish-pkg:
   steps:
     - uses: actions/checkout@v4
     - name: Install Zoi
-      run: curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash
-    - name: Build Package
       run: |
-        ~/.zoi/pkgs/bin/zoi package build my-tool.pkg.lua --type source --platform linux-amd64
+	curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash
+	echo "$HOME/.zoi/pkgs/bin" >> $GITHUB_PATH
+
+    - name: Build Package
+      run: zoi package build my-tool.pkg.lua --type source --platform linux-amd64
 ```
 
 ***
