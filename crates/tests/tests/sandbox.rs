@@ -1,3 +1,4 @@
+#![cfg(target_os = "linux")]
 use anyhow::Result;
 use std::path::Path;
 use zoi::pkg::types::SandboxConfig;

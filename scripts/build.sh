@@ -20,7 +20,7 @@ COMMIT=$(git rev-parse --short=10 HEAD 2>/dev/null || echo "dev")
 echo -e "${CYAN}Building Zoi for $(uname -s)...${NC}"
 echo -e "${CYAN}Commit: $COMMIT${NC}"
 
-if ZOI_COMMIT_HASH="$COMMIT" cargo build --bins; then
+if ZOI_COMMIT_HASH="$COMMIT" cargo build -p zoi-rs -p zoi-mini; then
     echo -e "${GREEN}Cargo build successful.${NC}"
 
     echo -e "${CYAN}Copying binaries to $OUTPUT_DIR...${NC}"

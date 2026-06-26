@@ -9,6 +9,7 @@ use tar::Archive;
 use zoi_core::{cache, config, types, utils};
 use zoi_lua;
 use zoi_resolver::{local, resolve};
+#[cfg(target_os = "linux")]
 use zoi_sandbox as sandbox;
 use zoi_telemetry as telemetry;
 use zstd::stream::read::Decoder as ZstdDecoder;
