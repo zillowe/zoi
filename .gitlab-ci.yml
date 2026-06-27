@@ -41,8 +41,6 @@ format:
         - "Cargo.toml"
         - "Cargo.lock"
         - "crates/**/*"
-        - ".cargo/**/*"
-        - "test_assets/**/*"
     - if: $CI_COMMIT_BRANCH
       changes: *code_changes
 
