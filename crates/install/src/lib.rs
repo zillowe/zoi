@@ -1,6 +1,5 @@
 pub mod create;
 pub mod dep_install;
-pub mod exec;
 pub mod installer;
 pub mod lockfile;
 pub mod manifest;

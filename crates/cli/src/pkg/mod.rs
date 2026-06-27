@@ -31,9 +31,6 @@ pub mod repo_install;
 pub mod create {
     pub use zoi_install::create::*;
 }
-pub mod exec {
-    pub use zoi_install::exec::*;
-}
 pub mod service {
     pub use zoi_install::service::*;
 }

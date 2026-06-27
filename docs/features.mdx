@@ -275,18 +275,17 @@ Manage and set up project environments from a local `zoi.yaml` file.
 
 (alias: `x`)
 
-Download and execute a binary package without installing it.
+Resolve a package and its dependencies into an ephemeral environment, then run the specified binary directly. Uses `bwrap` for sandboxed packages. Cleans up ephemeral packages after execution.
 
 **Arguments:**
 
 * `<SOURCE>`: Package name, local path, or URL to execute.
-* `[ARGS]...`: Arguments to pass to the executed command.
+* `[ARGS]...`: Arguments to pass to the executed binary.
 
 **Options:**
 
-* `--upstream`: Force execution from a fresh download, bypassing any cache.
-* `--cache`: Force execution from the cache, failing if the package is not cached.
-* `--local`: Force execution from the local project installation.
+* `--bin <NAME>`: Specific binary to run (required if the package provides multiple binaries).
+* `-v`, `--verbose`: Show execution details (resolution, installation, sandboxing).
 
 ***
 

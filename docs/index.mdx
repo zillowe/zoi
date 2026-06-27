@@ -517,8 +517,10 @@ Zoi is hosted on multiple forges. The primary locations and mirrors are:
   </Accordion>
 
   <Accordion title="How do I run a tool without installing it?">
-    Use `zoi exec <package>`. Zoi will fetch a temporary binary and run it
-    without adding it to your PATH or installed set.
+    Use `zoi exec <package>`. Zoi resolves the package and its dependencies
+    into an ephemeral environment and runs the binary directly. Use `--bin`
+    to specify which binary for multi-binary packages. Sandboxed packages
+    are automatically wrapped with `bwrap`.
   </Accordion>
 
   <Accordion title="What is 'zoi dev' and how does it differ from 'zoi env'?">

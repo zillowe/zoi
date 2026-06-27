@@ -92,9 +92,10 @@ For one-off commands, use `zoi exec`:
 
 ```sh
 zoi exec @zillowe/hello
+zoi exec @zillowe/hello -- --version
 ```
 
-This is useful for trying a tool before adding it to your installed package set.
+This resolves dependencies into an ephemeral environment and runs the binary directly. Use `--bin <name>` for packages providing multiple binaries. Sandboxed packages are automatically wrapped with `bwrap`. Useful for trying a tool before adding it to your installed package set.
 
 ## 6. Update Safely
 

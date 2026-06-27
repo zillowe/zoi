@@ -524,32 +524,24 @@ enum Commands {
         verbose: bool,
     },
 
-    /// Download and execute a binary package without installing it
+    /// Execute a package binary directly with its dependencies resolved
     #[command(
         alias = "x",
-        long_about = "Downloads a binary to a temporary cache and executes it in a shell. All arguments after the package name are passed as arguments to the shell command."
+        long_about = "Resolves a package and its dependencies, installs them if needed, then runs the requested binary directly. By default runs the first binary the package provides. Uses bwrap for sandboxed packages."
     )]
     Exec {
         #[arg(value_name = "ALL_SOURCES", value_hint = ValueHint::FilePath, help = PKG_SOURCE_HELP)]
         source: String,
 
-        /// Force execution from a fresh download, bypassing any cache.
+        /// Specific binary to run (required if package provides multiple binaries)
         #[arg(long)]
-        upstream: bool,
+        bin: Option<String>,
 
-        /// Force execution from the cache, failing if the package is not cached.
-        #[arg(long)]
-        cache: bool,
-
-        /// Force execution from the local project installation.
-        #[arg(long)]
-        local: bool,
-
-        /// Show additional execution details (caching, downloading, etc.)
+        /// Show additional execution details
         #[arg(long, short)]
         verbose: bool,
 
-        /// Arguments to pass to the executed command
+        /// Arguments to pass to the executed binary
         #[arg(value_name = "ARGS")]
         args: Vec<String>,
     },
@@ -1098,16 +1090,10 @@ pub fn run() -> anyhow::Result<()> {
             }
             Commands::Exec {
                 source,
-                upstream,
-                cache,
-                local,
+                bin,
                 verbose,
                 args,
-            } => match cmd::exec::run(source, args, upstream, cache, local, verbose) {
-                Ok(0) => Ok(()),
-                Ok(exit_code) => Err(anyhow::anyhow!("process exited with code {}", exit_code)),
-                Err(e) => Err(e),
-            },
+            } => cmd::exec::run(source, bin, args, verbose),
             Commands::Clean { dry_run } => cmd::clean::run(dry_run),
             Commands::Clone { package, location } => cmd::clone::run(&package, location, cli.yes),
             Commands::Cache { command } => match command {

@@ -279,7 +279,7 @@ This file contains the cryptographic hash of the `.pkg.tar.zst` archive.
 
 ### The `.size` File
 
-This file provides the download and expected installation sizes to Zoi before the archive is even downloaded. This allows for accurate disk space checks and progress reporting.
+This file provides the download and expected installation sizes to Zoi before the archive is even downloaded. This allows for accurate disk space checks and progress reporting. During `zoi sync`, Zoi automatically downloads `.size` files when available and caches them locally, so size display does not require a network request.
 
 * **Format:** A text file containing key-value pairs or a single number.
 * **Fields:**
