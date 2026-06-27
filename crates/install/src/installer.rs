@@ -169,6 +169,7 @@ pub fn install_node(
     m: Option<&MultiProgress>,
     build_type: Option<&str>,
     yes: bool,
+    record: bool,
     link_bins: bool,
 ) -> Result<types::InstallManifest> {
     let pkg = &node.pkg;
@@ -341,8 +342,10 @@ pub fn install_node(
             sub_package_to_install.clone(),
         )?;
 
-        local::write_manifest(&manifest)?;
-        local::persist_package_source(&manifest, Path::new(&node.source))?;
+        if record {
+            local::write_manifest(&manifest)?;
+            local::persist_package_source(&manifest, Path::new(&node.source))?;
+        }
 
         manifest
     };
@@ -351,30 +354,32 @@ pub fn install_node(
         let _ = fs::remove_file(&archive_path);
     }
 
-    if let Ok(conn) = db::open_connection("local") {
-        let _ = db::update_package(
-            &conn,
-            pkg,
-            handle,
-            Some(pkg.scope),
-            sub_package_to_install.as_deref(),
-            Some(&node.reason),
-        );
-    }
+    if record {
+        if let Ok(conn) = db::open_connection("local") {
+            let _ = db::update_package(
+                &conn,
+                pkg,
+                handle,
+                Some(pkg.scope),
+                sub_package_to_install.as_deref(),
+                Some(&node.reason),
+            );
+        }
 
-    if let Err(e) = recorder::record_package(
-        pkg,
-        &node.reason,
-        &node.dependencies,
-        handle,
-        &node.chosen_options,
-        &node.chosen_optionals,
-        sub_package_to_install.clone(),
-    ) {
-        eprintln!(
-            "Warning: failed to record package installation for '{}': {}",
-            pkg.name, e
-        );
+        if let Err(e) = recorder::record_package(
+            pkg,
+            &node.reason,
+            &node.dependencies,
+            handle,
+            &node.chosen_options,
+            &node.chosen_optionals,
+            sub_package_to_install.clone(),
+        ) {
+            eprintln!(
+                "Warning: failed to record package installation for '{}': {}",
+                pkg.name, e
+            );
+        }
     }
 
     if let Some(hooks) = &pkg.hooks {

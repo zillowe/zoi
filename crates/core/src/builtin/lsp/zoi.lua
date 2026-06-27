@@ -30,6 +30,9 @@ ZOI = {}
 ---@field email string? Author email.
 ---@field website string? Author website.
 
+---@class CiConfig
+---@field tags table<string, string>? Runner tags per OS (e.g., { linux = "saas-linux-medium-amd64" }).
+
 ---@class PkgMetadata
 ---@field name string Required. The name of the package.
 ---@field repo string Required. The repository tier (e.g., "core", "community").
@@ -49,7 +52,8 @@ ZOI = {}
 ---@field replaces string[]? List of packages this one replaces.
 ---@field backup string[]? List of config files to preserve during upgrades.
 ---@field types string[] Required. Supported build methods (e.g., "source", "pre-compiled").
----@field platforms string[]? Supported platforms (e.g., "linux", "macos", "windows").
+---@field platforms string[]? Supported platforms (e.g., "linux", "macos", "windows", "ci:windows-amd64:linux" for cross-build).
+---@field ci CiConfig? CI runner configuration for build pipelines.
 ---@field type "package"|"collection"|"app"|"extension"? The type of package.
 ---@field scope "user"|"system"|"project"? Default installation scope.
 ---@field sub_packages string[]? List of sub-package names.

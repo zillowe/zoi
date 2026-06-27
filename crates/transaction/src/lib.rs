@@ -351,7 +351,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                         };
                         if let Some(action) = install_plan.get(&id)
                             && let Err(e) = install::installer::install_node(
-                                node, action, None, None, true, true,
+                                node, action, None, None, true, true, true,
                             )
                         {
                             eprintln!(
@@ -489,7 +489,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                         };
                         if let Some(action) = install_plan.get(&id)
                             && let Err(e) = install::installer::install_node(
-                                node, action, None, None, true, true,
+                                node, action, None, None, true, true, true,
                             )
                         {
                             eprintln!(
