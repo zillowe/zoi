@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
 use purl::GenericPurl;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 use zoi_core::types::MiniVulnerability;
 
@@ -46,7 +46,7 @@ pub struct PurlPackageIndex {
 pub struct RegistryIndex {
     #[serde(default = "default_version")]
     pub version: String,
-    pub packages: HashMap<String, PurlPackageIndex>,
+    pub packages: BTreeMap<String, PurlPackageIndex>,
 }
 
 pub fn fetch_central_db() -> Result<HashMap<String, RegistryInfo>> {
