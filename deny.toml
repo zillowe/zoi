@@ -35,6 +35,7 @@ confidence-threshold = 0.8
 exceptions = []
 
 [[licenses.clarify]]
+crate = "ring"
 expression = "ISC AND (Apache-2.0 OR ISC) AND Apache-2.0 AND MIT AND BSD-3-Clause AND (Apache-2.0 OR ISC OR MIT) AND (Apache-2.0 OR ISC OR MIT-0)"
 license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
 
