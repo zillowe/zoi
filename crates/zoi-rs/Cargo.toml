@@ -7,6 +7,7 @@ license.workspace = true
 description.workspace = true
 repository.workspace = true
 homepage.workspace = true
+default-run = "zoi"
 
 [lib]
 name = "zoi"

@@ -34,7 +34,10 @@ pub enum RegistryCommands {
     #[command(alias = "sec")]
     AddAdvisory {
         /// Package name to add an advisory for
-        package: String,
+        package: Option<String>,
+        /// Repository tier (e.g. community, main)
+        #[arg(long, short)]
+        repo: Option<String>,
     },
 }
 
@@ -49,8 +52,8 @@ pub fn run(args: RegistryCommand) -> Result<()> {
         RegistryCommands::AddPackage { name, repo } => {
             crate::pkg::registry::add_package(registry_root, name.as_deref(), repo.as_deref())
         }
-        RegistryCommands::AddAdvisory { package } => {
-            crate::pkg::registry::add_advisory(registry_root, &package)
+        RegistryCommands::AddAdvisory { package, repo } => {
+            crate::pkg::registry::add_advisory(registry_root, package.as_deref(), repo.as_deref())
         }
     }
 }

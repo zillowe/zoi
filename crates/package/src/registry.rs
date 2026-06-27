@@ -222,32 +222,67 @@ end
     Ok(())
 }
 
-pub fn add_advisory(registry_root: &Path, package_name: &str) -> Result<()> {
+pub fn add_advisory(
+    registry_root: &Path,
+    package_name: Option<&str>,
+    repo: Option<&str>,
+) -> Result<()> {
     if !registry_root.join("repo.yaml").exists() {
         return Err(anyhow!(
             "Not a Zoi registry (missing repo.yaml). Run 'zoi reg init' first."
         ));
     }
 
-    let mut pkg_dir = None;
-    for entry in WalkDir::new(registry_root)
-        .into_iter()
-        .filter_map(|e| e.ok())
-    {
-        if entry.file_type().is_dir()
-            && entry.file_name().to_string_lossy() == package_name
-            && entry
-                .path()
-                .join(format!("{}.pkg.lua", package_name))
-                .exists()
-        {
-            pkg_dir = Some(entry.path().to_path_buf());
-            break;
-        }
-    }
+    use std::io::{Write, stdin, stdout};
+    let get_input = |prompt: &str| -> String {
+        print!("{}: ", prompt);
+        let _ = stdout().flush();
+        let mut input = String::new();
+        let _ = stdin().read_line(&mut input);
+        input.trim().to_string()
+    };
 
-    let pkg_dir =
-        pkg_dir.ok_or_else(|| anyhow!("Package '{}' not found in registry.", package_name))?;
+    let package_name = match package_name {
+        Some(n) => n.to_string(),
+        None => get_input("Package name"),
+    };
+
+    let package_name_str = package_name.as_str();
+
+    let pkg_dir = if let Some(r) = repo {
+        let dir = registry_root.join(r).join(package_name_str);
+        if !dir.join(format!("{}.pkg.lua", package_name_str)).exists() {
+            return Err(anyhow!(
+                "Package '{}' not found in repo '{}'.",
+                package_name_str,
+                r
+            ));
+        }
+        dir
+    } else {
+        let mut found = None;
+        for entry in WalkDir::new(registry_root)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            if entry.file_type().is_dir()
+                && entry.file_name().to_string_lossy() == package_name_str
+                && entry
+                    .path()
+                    .join(format!("{}.pkg.lua", package_name_str))
+                    .exists()
+            {
+                found = Some(entry.path().to_path_buf());
+                break;
+            }
+        }
+        found.ok_or_else(|| {
+            anyhow!(
+                "Package '{}' not found in registry. Try specifying --repo.",
+                package_name_str
+            )
+        })?
+    };
 
     let repo_config_str = fs::read_to_string(registry_root.join("repo.yaml"))?;
     let repo_config: types::RepoConfig = serde_yaml::from_str(&repo_config_str)?;
@@ -267,20 +302,11 @@ pub fn add_advisory(registry_root: &Path, package_name: &str) -> Result<()> {
     println!(
         "{} Adding security advisory for package: {}",
         "::".bold().blue(),
-        package_name.cyan()
+        package_name_str.cyan()
     );
     println!(
         "For detailed documentation, visit: https://zillowe.qzz.io/docs/zds/zoi/guides/security-advisories\n"
     );
-
-    use std::io::{Write, stdin, stdout};
-    let get_input = |prompt: &str| -> String {
-        print!("{}: ", prompt);
-        let _ = stdout().flush();
-        let mut input = String::new();
-        let _ = stdin().read_line(&mut input);
-        input.trim().to_string()
-    };
 
     let summary = get_input("Summary (short description)");
     let severity = get_input("Severity (low, medium, high, critical)");
@@ -306,7 +332,7 @@ references:
 "#,
         prefix = prefix,
         year = current_year,
-        package_name = package_name,
+        package_name = package_name_str,
         summary = summary,
         severity = severity,
         affected_range = affected_range,
