@@ -3,6 +3,7 @@ use anyhow::{Result, anyhow};
 use colored::*;
 use std::collections::HashSet;
 use std::fs;
+use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Mutex;
 
@@ -55,8 +56,15 @@ pub fn run(source: String, bin: Option<String>, args: Vec<String>, verbose: bool
                     .get(&pkg_id)
                     .ok_or_else(|| anyhow!("Install action missing for package '{}'", pkg_id))?;
 
-                let manifest =
-                    install::installer::install_node(node, action, Some(&m), None, true, false)?;
+                let manifest = install::installer::install_node(
+                    node,
+                    action,
+                    Some(&m),
+                    None,
+                    true,
+                    false,
+                    false,
+                )?;
 
                 let mut session_lock = session_installed_mutex.lock().unwrap();
                 session_lock.push(manifest);
@@ -198,15 +206,34 @@ pub fn run(source: String, bin: Option<String>, args: Vec<String>, verbose: bool
             println!("{} Cleaning up ephemeral packages...", "::".bold().blue());
         }
         for manifest in session_installed {
-            let ident = local::installed_manifest_source(&manifest);
-            if !installed_before.contains(&ident)
-                && let Err(e) =
-                    crate::pkg::uninstall::run(&ident, Some(manifest.scope), true, !verbose)
+            let ident = crate::pkg::local::installed_manifest_source(&manifest);
+            if installed_before.contains(&ident) {
+                continue;
+            }
+            let version_dir = match get_version_dir_from_manifest(&manifest) {
+                Ok(d) => d,
+                Err(e) => {
+                    eprintln!("Warning: failed to resolve path for {}: {}", ident, e);
+                    continue;
+                }
+            };
+            if version_dir.exists()
+                && let Err(e) = fs::remove_dir_all(&version_dir)
             {
                 eprintln!(
                     "Warning: failed to cleanup ephemeral package {}: {}",
                     ident, e
                 );
+            }
+            let package_dir = version_dir.parent().unwrap().to_path_buf();
+            if let Ok(mut entries) = fs::read_dir(&package_dir) {
+                let has_other_entries = entries.any(|e| {
+                    e.as_ref()
+                        .is_ok_and(|e| e.file_name() != "latest" && e.file_name() != "dependents")
+                });
+                if !has_other_entries {
+                    let _ = fs::remove_dir_all(&package_dir);
+                }
             }
         }
     }
@@ -216,4 +243,14 @@ pub fn run(source: String, bin: Option<String>, args: Vec<String>, verbose: bool
     }
 
     Ok(())
+}
+
+fn get_version_dir_from_manifest(manifest: &zoi_core::types::InstallManifest) -> Result<PathBuf> {
+    crate::pkg::local::get_package_version_dir(
+        manifest.scope,
+        &manifest.registry_handle,
+        &manifest.repo,
+        &manifest.name,
+        &manifest.version,
+    )
 }

@@ -669,6 +669,7 @@ pub fn run(
                     build_type.as_deref(),
                     yes,
                     true,
+                    true,
                 ) {
                     Ok(manifest) => {
                         dependency_installed_count.fetch_add(1, Ordering::Relaxed);
@@ -762,6 +763,7 @@ pub fn run(
                     Some(&m_pkg),
                     build_type.as_deref(),
                     yes,
+                    true,
                     true,
                 ) {
                     Ok(manifest) => {

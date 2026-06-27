@@ -689,8 +689,13 @@ pub fn is_platform_compatible(current_platform: &str, allowed_platforms: &[Strin
         other => other,
     };
     allowed_platforms.iter().any(|p| {
-        let p_norm = if p == "darwin" { "macos" } else { p };
-        p_norm == "all" || p_norm == os || p_norm == current_platform
+        if let Some(rest) = p.strip_prefix("ci:") {
+            let target = rest.split(':').next().unwrap_or("");
+            target == current_platform || target == os
+        } else {
+            let p_norm = if p == "darwin" { "macos" } else { p };
+            p_norm == "all" || p_norm == os || p_norm == current_platform
+        }
     })
 }
 

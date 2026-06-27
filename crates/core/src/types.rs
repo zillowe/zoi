@@ -181,6 +181,8 @@ pub struct Package {
     pub types: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub platforms: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ci: Option<CiConfig>,
     pub dependencies: Option<Dependencies>,
     #[serde(rename = "type", default)]
     pub package_type: PackageType,
@@ -381,6 +383,12 @@ pub struct SandboxConfig {
     pub write: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub env: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct CiConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tags: Option<HashMap<String, String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
