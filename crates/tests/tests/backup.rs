@@ -23,7 +23,7 @@ fn test_zoinew_upgrade_logic() {
             let extension = new_config_path
                 .extension()
                 .and_then(|s| s.to_str())
-                .unwrap_or("");
+                .unwrap_or_default();
             let zoinew_path = new_config_path.with_extension(format!("{}.zoinew", extension));
             fs::rename(&new_config_path, &zoinew_path).unwrap();
         }

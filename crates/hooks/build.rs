@@ -28,7 +28,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     writeln!(&mut file, "pub static BUILTIN_HOOKS: &[(&str, &str)] = &[")?;
     for path in read_sorted_paths(&hooks_dir, "yaml")? {
-        let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+        let name = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or_default();
         let content = std::fs::read_to_string(&path)?;
         writeln!(&mut file, "    ({:?}, {:?}),", name, content)?;
     }

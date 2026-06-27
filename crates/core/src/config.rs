@@ -16,7 +16,7 @@ pub fn get_default_registry() -> String {
 }
 
 pub fn get_builtin_authorities() -> Vec<String> {
-    let auth_str = option_env!("ZOI_BUILTIN_AUTHORITIES").unwrap_or("");
+    let auth_str = option_env!("ZOI_BUILTIN_AUTHORITIES").unwrap_or_default();
     if auth_str.is_empty() {
         Vec::new()
     } else {

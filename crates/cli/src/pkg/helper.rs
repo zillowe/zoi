@@ -286,7 +286,10 @@ pub mod validate {
         }
 
         let content = std::fs::read_to_string(file)?;
-        let file_name = file.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        let file_name = file
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or_default();
 
         println!("{} Validating {}...", "::".bold().blue(), file.display());
 
