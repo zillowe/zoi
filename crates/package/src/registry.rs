@@ -491,7 +491,7 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
                 repo_parts.pop();
                 let repo_path = repo_parts.join("/");
 
-                let major_repo = repo_path.split('/').next().unwrap_or("");
+                let major_repo = repo_path.split('/').next().unwrap_or_default();
                 let repo_type = repo_types
                     .get(major_repo)
                     .cloned()

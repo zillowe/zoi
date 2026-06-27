@@ -59,7 +59,7 @@ fn main() -> Result<()> {
     let program_name = std::path::Path::new(&args[0])
         .file_name()
         .and_then(|s| s.to_str())
-        .unwrap_or("");
+        .unwrap_or_default();
 
     if !program_name.is_empty()
         && program_name != "zoi-mini"

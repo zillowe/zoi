@@ -1807,6 +1807,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "libyaml-rs"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e126dda6f34391ab7b444f9922055facc83c07a910da3eb16f1e4d9c45dc777"
+
+[[package]]
 name = "libz-sys"
 version = "1.1.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3269,19 +3275,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_yaml"
-version = "0.9.34+deprecated"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a8b1a1a2ebf674015cc02edccce75287f1a0130d394307b36743c2f5d504b47"
-dependencies = [
- "indexmap",
- "itoa",
- "ryu",
- "serde",
- "unsafe-libyaml",
-]
-
-[[package]]
 name = "sevenz-rust"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3614,7 +3607,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
@@ -4028,12 +4021,6 @@ name = "unit-prefix"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81e544489bf3d8ef66c953931f56617f423cd4b5494be343d9b9d3dda037b9a3"
-
-[[package]]
-name = "unsafe-libyaml"
-version = "0.2.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "673aac59facbab8a9007c7f6108d11f63b603f7cabff99fabf650fea5c32b861"
 
 [[package]]
 name = "untrusted"
@@ -4653,6 +4640,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "yaml_serde"
+version = "0.10.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08c7c1b1a6a7c8a6b2741a6c21a4f8918e51899b111cfa08d1288202656e3975"
+dependencies = [
+ "indexmap",
+ "itoa",
+ "libyaml-rs",
+ "ryu",
+ "serde",
+]
+
+[[package]]
 name = "yoke"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4824,7 +4824,6 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
- "serde_yaml",
  "sha2 0.11.0",
  "spdx",
  "syntect",
@@ -4832,6 +4831,7 @@ dependencies = [
  "walkdir",
  "winapi",
  "winreg",
+ "yaml_serde",
  "zoi-audit",
  "zoi-core",
  "zoi-db",
@@ -4875,12 +4875,12 @@ dependencies = [
  "sequoia-openpgp",
  "serde",
  "serde_json",
- "serde_yaml",
  "sha2 0.11.0",
  "spdx",
  "tar",
  "tempfile",
  "walkdir",
+ "yaml_serde",
  "zip",
  "zstd",
 ]
@@ -4921,8 +4921,8 @@ dependencies = [
  "home",
  "serde",
  "serde_json",
- "serde_yaml",
  "sha2 0.11.0",
+ "yaml_serde",
  "zoi-core",
 ]
 
@@ -4943,12 +4943,12 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
- "serde_yaml",
  "spdx",
  "tar",
  "tempfile",
  "thiserror 2.0.18",
  "walkdir",
+ "yaml_serde",
  "zoi-core",
  "zoi-db",
  "zoi-deps",
@@ -4977,13 +4977,13 @@ dependencies = [
  "sequoia-openpgp",
  "serde",
  "serde_json",
- "serde_yaml",
  "sevenz-rust",
  "tar",
  "toml",
  "urlencoding",
  "walkdir",
  "xz2",
+ "yaml_serde",
  "zip",
  "zoi-core",
  "zstd",
@@ -5015,10 +5015,10 @@ dependencies = [
  "rayon",
  "regex",
  "serde_json",
- "serde_yaml",
  "tar",
  "tempfile",
  "walkdir",
+ "yaml_serde",
  "zoi-core",
  "zoi-deps",
  "zoi-lua",
@@ -5042,10 +5042,10 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "serde_yaml",
  "sha2 0.11.0",
  "tar",
  "xz2",
+ "yaml_serde",
  "zip",
  "zoi-core",
  "zoi-hooks",
@@ -5078,8 +5078,8 @@ dependencies = [
  "rayon",
  "serde",
  "serde_json",
- "serde_yaml",
  "sha2 0.11.0",
+ "yaml_serde",
  "zoi-core",
  "zoi-resolver",
 ]
@@ -5113,9 +5113,9 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
- "serde_yaml",
  "sha2 0.11.0",
  "walkdir",
+ "yaml_serde",
  "zoi-core",
  "zoi-lua",
 ]
@@ -5155,9 +5155,9 @@ dependencies = [
  "home",
  "indicatif",
  "rayon",
- "serde_yaml",
  "tempfile",
  "walkdir",
+ "yaml_serde",
  "zoi-core",
  "zoi-db",
  "zoi-install",
@@ -5203,11 +5203,11 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
- "serde_yaml",
  "sha2 0.11.0",
  "tar",
  "tempfile",
  "walkdir",
+ "yaml_serde",
  "zip",
  "zoi-core",
  "zoi-db",
@@ -5238,8 +5238,8 @@ dependencies = [
  "home",
  "semver",
  "serde_json",
- "serde_yaml",
  "uuid",
+ "yaml_serde",
  "zoi-audit",
  "zoi-core",
  "zoi-install",

@@ -346,7 +346,7 @@ fn parse_bin_value(value: Option<&Value>) -> Vec<BinMapping> {
         Value::Array(items) => {
             let all_strings = items.iter().all(|v| v.is_string());
             if all_strings && items.len() >= 2 {
-                let src = items[0].as_str().unwrap_or("").trim().to_string();
+                let src = items[0].as_str().unwrap_or_default().trim().to_string();
                 if !src.is_empty() {
                     let alias = items[1]
                         .as_str()

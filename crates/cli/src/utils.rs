@@ -346,7 +346,7 @@ pub fn setup_path(scope: Scope) -> anyhow::Result<()> {
             (path, cmd)
         } else if shell_name.contains("fish") {
             let path = home.join(".config/fish/config.fish");
-            let cmd = format!("\n# Added by Zoi\nset -gx PATH \"{}\" $PATH\n", zoi_bin_str);
+            let cmd = format!("\n# Added by Zoi\nfish_add_path \"{}\"\n", zoi_bin_str);
             (path, cmd)
         } else if shell_name.contains("elvish") {
             let path = home.join(".config/elvish/rc.elv");
