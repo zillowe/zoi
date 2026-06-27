@@ -426,7 +426,7 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
         }
     }
 
-    let mut advisories_map = HashMap::new();
+    let mut advisories_map = std::collections::BTreeMap::new();
     let mut max_id = adv_registry.last_id;
 
     for entry in WalkDir::new(registry_root)
@@ -466,7 +466,7 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
         serde_json::to_string_pretty(&adv_registry)?,
     )?;
 
-    let mut packages_map = HashMap::new();
+    let mut packages_map = std::collections::BTreeMap::new();
     let repo_types: HashMap<String, String> = repo_config
         .repos
         .iter()

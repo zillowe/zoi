@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::Display;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy, Default)]
@@ -61,7 +61,7 @@ pub struct AdvisoryRegistry {
     pub version: String,
     pub last_id: u32,
     pub year: u32,
-    pub advisories: HashMap<String, String>,
+    pub advisories: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy, Default)]
