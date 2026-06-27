@@ -608,6 +608,8 @@ pub fn find_provides(registry_handle: &str, term: &str) -> Result<Vec<(types::Pa
     let rows = stmt.query_map(params![term], |row| {
         let tags_raw: String = row.get(5)?;
         let tags: Vec<String> = serde_json::from_str(&tags_raw).unwrap_or_default();
+        let bins_raw: String = row.get::<_, String>(6).unwrap_or_default();
+        let bins: Vec<String> = serde_json::from_str(&bins_raw).unwrap_or_default();
         let type_raw: String = row.get(4)?;
         let revision: String = row.get(9).unwrap_or_else(|_| "1".to_string());
 
@@ -618,26 +620,35 @@ pub fn find_provides(registry_handle: &str, term: &str) -> Result<Vec<(types::Pa
             _ => types::PackageType::Package,
         };
 
-        Ok(types::Package {
-            name: row.get(0)?,
-            repo: row.get(1)?,
-            version: row.get(2)?,
-            revision,
-            description: row.get(3)?,
-            package_type,
-            tags,
-            bins: None,
-            license: row.get(7)?,
-            sub_package: row.get(8)?,
-            maintainer: types::Maintainer::default(),
-            ..Default::default()
-        })
+        Ok((
+            types::Package {
+                name: row.get(0)?,
+                repo: row.get(1)?,
+                version: row.get(2)?,
+                revision,
+                description: row.get(3)?,
+                package_type,
+                tags,
+                bins: Some(bins.clone()),
+                license: row.get(7)?,
+                sub_package: row.get(8)?,
+                maintainer: types::Maintainer::default(),
+                ..Default::default()
+            },
+            bins,
+        ))
     })?;
 
     let mut results = Vec::new();
     for row in rows {
-        let pkg = row?;
-        results.push((pkg, format!("bin/{}", term)));
+        let (pkg, bins) = row?;
+        if !bins.is_empty() {
+            for bin in &bins {
+                results.push((pkg.clone(), format!("bin/{}", bin)));
+            }
+        } else {
+            results.push((pkg, format!("bin/{}", term)));
+        }
     }
 
     let mut stmt = conn.prepare(
@@ -681,7 +692,7 @@ pub fn find_provides(registry_handle: &str, term: &str) -> Result<Vec<(types::Pa
         let pkg = row?;
         if let Some(bins) = &pkg.bins {
             for bin in bins {
-                if bin == term {
+                if bin == term || bin.contains(term) {
                     results.push((pkg.clone(), format!("bin/{}", bin)));
                 }
             }
