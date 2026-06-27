@@ -62,7 +62,11 @@ pub fn symlink_dir(target: &Path, link: &Path) -> std::io::Result<()> {
     }
     #[cfg(windows)]
     {
-        std::os::windows::fs::symlink_dir(target, link)?;
+        if std::os::windows::fs::symlink_dir(target, link).is_err() {
+            if junction::create(target, link).is_err() {
+                copy_dir_all(target, link)?;
+            }
+        }
     }
     Ok(())
 }
@@ -537,7 +541,12 @@ pub fn symlink_file(target: &Path, link: &Path) -> std::io::Result<()> {
     }
     #[cfg(windows)]
     {
-        std::os::windows::fs::symlink_file(target, link)
+        if std::os::windows::fs::symlink_file(target, link).is_err() {
+            if fs::hard_link(target, link).is_err() {
+                fs::copy(target, link)?;
+            }
+        }
+        Ok(())
     }
 }
 
