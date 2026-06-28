@@ -634,6 +634,9 @@ enum Commands {
         /// Print the manual to the terminal raw
         #[arg(long)]
         raw: bool,
+        /// Do not use the TUI, use the system pager instead
+        #[arg(long)]
+        no_tui: bool,
     },
 
     /// Build, create, and manage Zoi packages
@@ -1142,7 +1145,8 @@ pub fn run() -> anyhow::Result<()> {
                 package_name,
                 upstream,
                 raw,
-            } => cmd::man::run(&package_name, upstream, raw),
+                no_tui,
+            } => cmd::man::run(&package_name, upstream, raw, no_tui),
             Commands::Package(args) => cmd::package::run(args),
             Commands::Pgp(args) => cmd::pgp::run(args),
             Commands::Helper(args) => cmd::helper::run(args),

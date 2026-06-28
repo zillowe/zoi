@@ -1,4 +1,7 @@
-use crate::pkg::{local, resolve};
+use crate::pkg::{
+    db, local, resolve,
+    types::{self, ManSpec},
+};
 use anyhow::{Result, anyhow};
 use crossterm::{
     event::{
@@ -10,106 +13,86 @@ use crossterm::{
 use pulldown_cmark::{Event as CmarkEvent, HeadingLevel, Options, Parser, Tag, TagEnd};
 use ratatui::{
     prelude::*,
-    widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap},
+    widgets::{
+        Block, Borders, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState,
+        Wrap,
+    },
 };
+use std::collections::BTreeMap;
 use std::fs;
 use std::io;
+use std::path::Path;
 use syntect::{
     easy::HighlightLines,
     highlighting::{Style as SyntectStyle, ThemeSet},
     parsing::SyntaxSet,
     util::LinesWithEndings,
 };
+use walkdir::WalkDir;
 
 struct App<'a> {
-    lines: Vec<Line<'a>>,
+    pages: Vec<(String, Vec<Line<'a>>)>,
+    current_page: usize,
     scroll: u16,
     content_height: u16,
 }
 
 impl<'a> App<'a> {
-    fn try_new(content: &'a str) -> Result<Self> {
-        let lines = parse_markdown(content)?;
-        let content_height = lines.len() as u16;
+    fn try_new(pages: BTreeMap<String, String>) -> Result<Self> {
+        let mut parsed_pages = Vec::new();
+        for (name, content) in pages {
+            let lines = parse_markdown(&content)?;
+            parsed_pages.push((name, lines));
+        }
+
+        if parsed_pages.is_empty() {
+            return Err(anyhow!("No manual pages found."));
+        }
+
+        let content_height = parsed_pages[0].1.len() as u16;
         Ok(Self {
-            lines,
+            pages: parsed_pages,
+            current_page: 0,
             scroll: 0,
             content_height,
         })
     }
 }
 
-pub fn run(package_name: &str, upstream: bool, raw: bool) -> Result<()> {
-    let (pkg, _version, _, _, registry_handle, _) =
-        resolve::resolve_package_and_version(package_name, false, false)?;
+pub fn run(package_name: &str, upstream: bool, raw: bool, no_tui: bool) -> Result<()> {
+    let (pkg, registry_handle) = resolve_package_for_man(package_name)?;
 
-    let fetch_from_upstream = || -> Result<String> {
-        if let Some(url) = pkg.man.as_ref() {
-            if !raw {
-                println!("Fetching manual from {}...", url);
-            }
-            Ok(reqwest::blocking::get(url)?.text()?)
-        } else {
-            Err(anyhow!(
-                "Package '{}' does not have a manual URL.",
-                package_name
-            ))
-        }
-    };
+    let pages = gather_manual_pages(&pkg, &registry_handle, upstream, raw)?;
 
-    let content = if upstream {
-        fetch_from_upstream()?
-    } else {
-        let handle = registry_handle.as_deref().unwrap_or("local");
-        let scopes_to_check = [
-            crate::pkg::types::Scope::Project,
-            crate::pkg::types::Scope::User,
-            crate::pkg::types::Scope::System,
-        ];
-        let mut found_manual = None;
-
-        for scope in scopes_to_check {
-            if let Ok(package_dir) = local::get_package_dir(scope, handle, &pkg.repo, &pkg.name) {
-                let latest_dir = package_dir.join("latest");
-                if !latest_dir.exists() {
-                    continue;
-                }
-
-                let man_md_path = latest_dir.join("man.md");
-                let man_txt_path = latest_dir.join("man.txt");
-
-                if man_md_path.exists() {
-                    if !raw {
-                        println!(
-                            "Displaying locally installed manual (Markdown) from {:?} scope...",
-                            scope
-                        );
-                    }
-                    found_manual = Some(fs::read_to_string(man_md_path)?);
-                    break;
-                } else if man_txt_path.exists() {
-                    if !raw {
-                        println!(
-                            "Displaying locally installed manual (text) from {:?} scope...",
-                            scope
-                        );
-                    }
-                    found_manual = Some(fs::read_to_string(man_txt_path)?);
-                    break;
-                }
-            }
-        }
-
-        if let Some(manual_content) = found_manual {
-            manual_content
-        } else {
-            fetch_from_upstream()?
-        }
-    };
+    if pages.is_empty() {
+        return Err(anyhow!(
+            "Package '{}' does not have any manual pages.",
+            pkg.name
+        ));
+    }
 
     if raw {
-        print!("{}", content);
+        let multi = pages.len() > 1;
+        for (name, content) in pages {
+            if multi {
+                println!("--- {} ---", name);
+            }
+            println!("{}", content);
+        }
         return Ok(());
+    }
+
+    if no_tui {
+        let mut full_content = String::new();
+        let multi = pages.len() > 1;
+        for (name, content) in pages {
+            if multi {
+                full_content.push_str(&format!("--- {} ---\n\n", name));
+            }
+            full_content.push_str(&content);
+            full_content.push('\n');
+        }
+        return run_pager(&full_content);
     }
 
     enable_raw_mode()?;
@@ -118,7 +101,7 @@ pub fn run(package_name: &str, upstream: bool, raw: bool) -> Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let app = App::try_new(&content)?;
+    let app = App::try_new(pages)?;
     let res = run_app(&mut terminal, app);
 
     disable_raw_mode()?;
@@ -136,13 +119,225 @@ pub fn run(package_name: &str, upstream: bool, raw: bool) -> Result<()> {
     Ok(())
 }
 
+fn run_pager(content: &str) -> Result<()> {
+    let pager = std::env::var("PAGER").ok();
+
+    if let Some(p) = pager
+        && spawn_pager(&p, content).is_ok()
+    {
+        return Ok(());
+    }
+
+    if spawn_pager("less", content).is_ok() {
+        return Ok(());
+    }
+
+    if spawn_pager("more", content).is_ok() {
+        return Ok(());
+    }
+
+    println!("{}", content);
+    Ok(())
+}
+
+fn spawn_pager(pager: &str, content: &str) -> Result<()> {
+    let mut child = std::process::Command::new(pager)
+        .stdin(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| anyhow!("Failed to spawn pager '{}': {}", pager, e))?;
+
+    let mut stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| anyhow!("Failed to open stdin for pager"))?;
+
+    use std::io::Write;
+    stdin.write_all(content.as_bytes())?;
+    drop(stdin);
+
+    child.wait()?;
+    Ok(())
+}
+
+fn resolve_package_for_man(term: &str) -> Result<(types::Package, Option<String>)> {
+    if let Ok((pkg, _, _, _, registry_handle, _)) =
+        resolve::resolve_package_and_version(term, false, false)
+    {
+        return Ok((pkg, registry_handle));
+    }
+
+    let config = crate::pkg::config::read_config()?;
+    let mut registries = Vec::new();
+    if let Some(default) = &config.default_registry {
+        registries.push(default.handle.clone());
+    }
+    for reg in &config.added_registries {
+        registries.push(reg.handle.clone());
+    }
+
+    for handle in registries {
+        if let Ok(results) = db::find_provides(&handle, term)
+            && !results.is_empty()
+        {
+            return Ok((results[0].0.clone(), Some(handle)));
+        }
+    }
+
+    Err(anyhow!(
+        "Could not find package or binary named '{}'.",
+        term
+    ))
+}
+
+fn gather_manual_pages(
+    pkg: &types::Package,
+    registry_handle: &Option<String>,
+    upstream: bool,
+    raw: bool,
+) -> Result<BTreeMap<String, String>> {
+    let mut pages = BTreeMap::new();
+
+    if !upstream {
+        let handle = registry_handle.as_deref().unwrap_or("local");
+        let scopes_to_check = [
+            types::Scope::Project,
+            types::Scope::User,
+            types::Scope::System,
+        ];
+
+        for scope in scopes_to_check {
+            if let Ok(package_dir) = local::get_package_dir(scope, handle, &pkg.repo, &pkg.name) {
+                let latest_dir = package_dir.join("latest");
+                if latest_dir.exists() {
+                    let local_pages = find_local_man_pages(&latest_dir)?;
+                    if !local_pages.is_empty() {
+                        if !raw {
+                            println!(
+                                "Displaying locally installed manual from {:?} scope...",
+                                scope
+                            );
+                        }
+                        pages.extend(local_pages);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    if pages.is_empty()
+        && let Some(man_spec) = &pkg.man
+    {
+        if !raw {
+            println!("Fetching manual from upstream...");
+        }
+        match man_spec {
+            ManSpec::Single(url) => {
+                pages.insert("main".to_string(), fetch_url(url)?);
+            }
+            ManSpec::Multiple(urls) => {
+                for (i, url) in urls.iter().enumerate() {
+                    pages.insert(format!("page{}", i + 1), fetch_url(url)?);
+                }
+            }
+            ManSpec::Map(map) => {
+                for (name, url) in map {
+                    pages.insert(name.clone(), fetch_url(url)?);
+                }
+            }
+        }
+    }
+
+    Ok(pages)
+}
+
+fn find_local_man_pages(latest_dir: &Path) -> Result<BTreeMap<String, String>> {
+    let mut pages = BTreeMap::new();
+
+    let md_path = latest_dir.join("man.md");
+    let txt_path = latest_dir.join("man.txt");
+
+    if md_path.exists() {
+        pages.insert("main".to_string(), fs::read_to_string(md_path)?);
+        return Ok(pages);
+    }
+
+    if txt_path.exists() {
+        pages.insert("main".to_string(), fs::read_to_string(txt_path)?);
+        return Ok(pages);
+    }
+
+    let share_man = latest_dir.join("share").join("man");
+    if share_man.exists() {
+        for entry in WalkDir::new(share_man) {
+            let entry = entry?;
+            if entry.file_type().is_file() {
+                let path = entry.path();
+                let name = path.file_name().unwrap().to_string_lossy().to_string();
+                let content = fs::read_to_string(path)?;
+                if name.ends_with(".md") {
+                    pages.insert(name, content);
+                } else if content.starts_with('.') {
+                    pages.insert(name, parse_roff(&content));
+                } else {
+                    pages.insert(name, content);
+                }
+            }
+        }
+    }
+
+    Ok(pages)
+}
+
+fn fetch_url(url: &str) -> Result<String> {
+    Ok(reqwest::blocking::get(url)?.text()?)
+}
+
+fn parse_roff(content: &str) -> String {
+    let mut md = String::new();
+    for line in content.lines() {
+        let line = line.trim();
+        if line.starts_with(".TH") {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() > 1 {
+                md.push_str(&format!("# {}\n\n", parts[1]));
+            }
+        } else if line.starts_with(".SH") {
+            let title = line.trim_start_matches(".SH").trim();
+            md.push_str(&format!("## {}\n\n", title));
+        } else if line.starts_with(".SS") {
+            let title = line.trim_start_matches(".SS").trim();
+            md.push_str(&format!("### {}\n\n", title));
+        } else if line.starts_with(".PP") || line.starts_with(".P") || line.starts_with(".LP") {
+            md.push_str("\n\n");
+        } else if line.starts_with(".B ") {
+            md.push_str(&format!("**{}**", line.trim_start_matches(".B ").trim()));
+        } else if line.starts_with(".I ") {
+            md.push_str(&format!("*{}*", line.trim_start_matches(".I ").trim()));
+        } else if line.starts_with(".BR ") {
+            let parts: Vec<&str> = line.split_whitespace().skip(1).collect();
+            if !parts.is_empty() {
+                md.push_str(&format!("**{}**", parts[0]));
+                for p in parts.iter().skip(1) {
+                    md.push_str(p);
+                }
+            }
+        } else if line.starts_with('.') {
+        } else {
+            md.push_str(line);
+            md.push('\n');
+        }
+    }
+    md
+}
+
 fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) -> io::Result<()> {
     loop {
         terminal.draw(|f| ui(f, &mut app))?;
 
         match event::read()? {
             Event::Key(key) if key.kind == KeyEventKind::Press => match key.code {
-                KeyCode::Char('q') => return Ok(()),
+                KeyCode::Char('q') | KeyCode::Esc => return Ok(()),
                 KeyCode::Down | KeyCode::Char('j') => {
                     app.scroll = app.scroll.saturating_add(1);
                 }
@@ -157,6 +352,20 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) 
                 }
                 KeyCode::Home => app.scroll = 0,
                 KeyCode::End => app.scroll = app.content_height,
+                KeyCode::Tab => {
+                    app.current_page = (app.current_page + 1) % app.pages.len();
+                    app.scroll = 0;
+                    app.content_height = app.pages[app.current_page].1.len() as u16;
+                }
+                KeyCode::BackTab => {
+                    app.current_page = if app.current_page == 0 {
+                        app.pages.len() - 1
+                    } else {
+                        app.current_page - 1
+                    };
+                    app.scroll = 0;
+                    app.content_height = app.pages[app.current_page].1.len() as u16;
+                }
                 _ => {}
             },
             Event::Mouse(mouse) => match mouse.kind {
@@ -171,14 +380,54 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) 
 
 fn ui(f: &mut Frame, app: &mut App) {
     let size = f.area();
-    let text = Text::from(app.lines.clone());
+
+    let has_sidebar = app.pages.len() > 1;
+    let main_area = if has_sidebar {
+        let chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(20), Constraint::Percentage(80)])
+            .split(size);
+
+        let items: Vec<ListItem> = app
+            .pages
+            .iter()
+            .enumerate()
+            .map(|(i, (name, _))| {
+                let style = if i == app.current_page {
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default()
+                };
+                ListItem::new(name.as_str()).style(style)
+            })
+            .collect();
+
+        let list = List::new(items)
+            .block(Block::default().borders(Borders::ALL).title("Pages"))
+            .highlight_style(Style::default().add_modifier(Modifier::BOLD))
+            .highlight_symbol("> ");
+
+        f.render_widget(list, chunks[0]);
+        chunks[1]
+    } else {
+        size
+    };
+
+    let (name, lines) = &app.pages[app.current_page];
+    let text = Text::from(lines.clone());
 
     let paragraph = Paragraph::new(text)
-        .block(Block::default().borders(Borders::ALL).title("Manual"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(format!("Manual: {}", name)),
+        )
         .wrap(Wrap { trim: true })
         .scroll((app.scroll, 0));
 
-    f.render_widget(paragraph, size);
+    f.render_widget(paragraph, main_area);
 
     let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
         .begin_symbol(Some("↑"))
@@ -189,7 +438,7 @@ fn ui(f: &mut Frame, app: &mut App) {
 
     f.render_stateful_widget(
         scrollbar,
-        size.inner(Margin {
+        main_area.inner(Margin {
             vertical: 1,
             horizontal: 0,
         }),
@@ -197,7 +446,7 @@ fn ui(f: &mut Frame, app: &mut App) {
     );
 }
 
-fn parse_markdown(content: &str) -> Result<Vec<Line<'_>>> {
+fn parse_markdown(content: &str) -> Result<Vec<Line<'static>>> {
     let mut options = Options::empty();
     options.insert(Options::ENABLE_STRIKETHROUGH);
     let parser = Parser::new_ext(content, options);
@@ -321,7 +570,7 @@ fn parse_markdown(content: &str) -> Result<Vec<Line<'_>>> {
                                 let ranges: Vec<(SyntectStyle, &str)> = h
                                     .highlight_line(line, &ss)
                                     .map_err(|e| anyhow!("Syntax highlighting failed: {}", e))?;
-                                let spans: Vec<Span> = ranges
+                                let spans: Vec<Span<'static>> = ranges
                                     .into_iter()
                                     .map(|(style, text)| {
                                         Span::styled(

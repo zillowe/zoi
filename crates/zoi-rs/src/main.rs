@@ -77,7 +77,6 @@ fn main() {
         return;
     }
 
-    // Default Zoi CLI execution
     if let Err(e) = zoi_cli::cli::run() {
         eprintln!("{}: {}", "Error".red().bold(), e);
         std::process::exit(1);
