@@ -64,6 +64,7 @@ pub fn run(source: String, bin: Option<String>, args: Vec<String>, verbose: bool
                     true,
                     false,
                     false,
+                    verbose,
                 )?;
 
                 let mut session_lock = session_installed_mutex.lock().unwrap();

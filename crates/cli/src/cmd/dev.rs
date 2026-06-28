@@ -41,7 +41,16 @@ pub fn run(run_cmd: Option<String>) -> Result<()> {
                 let action = install_plan
                     .get(&pkg_id)
                     .ok_or_else(|| anyhow!("Install action not found for: {}", pkg_id))?;
-                install::installer::install_node(node, action, Some(&m), None, true, true, true)?;
+                install::installer::install_node(
+                    node,
+                    action,
+                    Some(&m),
+                    None,
+                    true,
+                    true,
+                    true,
+                    false,
+                )?;
                 Ok(())
             })?;
         }

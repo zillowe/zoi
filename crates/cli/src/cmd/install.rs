@@ -670,6 +670,7 @@ pub fn run(
                     yes,
                     true,
                     true,
+                    verbose,
                 ) {
                     Ok(manifest) => {
                         dependency_installed_count.fetch_add(1, Ordering::Relaxed);
@@ -765,6 +766,7 @@ pub fn run(
                     yes,
                     true,
                     true,
+                    verbose,
                 ) {
                     Ok(manifest) => {
                         installed_manifests
