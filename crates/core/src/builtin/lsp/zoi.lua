@@ -148,6 +148,10 @@ function service(svc) end
 ---@param args { sub: string? }?
 function prepare(args) end
 
+--- Lifecycle: Optional compilation step in BUILD_DIR (between prepare and package).
+---@param args { sub: string? }?
+function build(args) end
+
 --- Lifecycle: Compile and stage files into STAGING_DIR.
 ---@param args { sub: string? }?
 function package(args) end

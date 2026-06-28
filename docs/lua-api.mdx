@@ -191,9 +191,13 @@ Zoi calls these functions in a specific order during the build and installation 
 
 Runs first to fetch source code or binaries into `BUILD_DIR`.
 
+### `build(args)`
+
+Optional function that runs after `prepare` and before `package`. Use it for compilation steps in `BUILD_DIR` — this keeps `prepare` for fetching and `package` for staging.
+
 ### `package(args)`
 
-Runs after `prepare` to compile and stage files into `STAGING_DIR`.
+Runs after `build` (or `prepare` if no `build` is defined) to compile and stage files into `STAGING_DIR`.
 
 ### `verify(args)`
 

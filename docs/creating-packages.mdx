@@ -13,7 +13,7 @@ A typical `.pkg.lua` file is structured around a few key global functions:
 
 1. **`metadata{...}`**: **(Required)** A function call that declares all the static information about your package, like its name, version, and description.
 2. **`dependencies{...}`**: A function call that defines the package's build-time and runtime dependencies.
-3. **Lifecycle Functions**: A set of functions (`prepare`, `package`, `verify`, `uninstall`) that contain the logic for fetching, building, and installing the software.
+3. **Lifecycle Functions**: A set of functions (`prepare`, `build`, `package`, `verify`, `uninstall`) that contain the logic for fetching, building, and installing the software.
 4. **`service{...}`**: A function call that defines a background service associated with the package.
 
 Let's look at the core components in detail.
@@ -116,7 +116,7 @@ dependencies({
 
 ## 3. Lifecycle Functions
 
-These functions define the imperative steps for building your package. Zoi calls them in a specific order: `prepare` -> `package` -> `verify`.
+These functions define the imperative steps for building your package. Zoi calls them in a specific order: `prepare` -> `build` -> `package` -> `verify`.
 
 <Callout title="API Reference">
   For a full list of available helper functions and global variables, see the
@@ -129,9 +129,15 @@ This function runs first. Its main job is to fetch all necessary source code, bi
 
 - **Common tasks:** Cloning git repos, downloading release archives, extracting files.
 
+### `build()`
+
+This optional function runs after `prepare()` and before `package()`. Its purpose is to compile source code into binaries within `BUILD_DIR`. Pre-compiled type packages typically skip this step and go straight to `package()`.
+
+- **Common tasks:** Running compilers, build systems (e.g. `make`, `cargo build`, `go build`), and other build steps.
+
 ### `package()`
 
-This function runs after `prepare()`. It takes the prepared files from the `BUILD_DIR` and copies only the final, distributable files into the `STAGING_DIR`. The contents of the staging directory are what will be included in the final `.pkg.tar.zst` archive.
+This function runs after `build()` (or `prepare()` if no `build()` is defined). It takes the prepared files from the `BUILD_DIR` and copies only the final, distributable files into the `STAGING_DIR`. The contents of the staging directory are what will be included in the final `.pkg.tar.zst` archive.
 
 - **Common tasks:** Running `make install`, copying binaries, libraries, and documentation.
 
@@ -311,7 +317,7 @@ metadata({
 
 ### Lifecycle Functions in Split Packages
 
-The `prepare`, `package`, `verify`, and `uninstall` functions receive a table containing the name of the sub-package being processed.
+The `prepare`, `build`, `package`, `verify`, and `uninstall` functions receive a table containing the name of the sub-package being processed.
 
 ```lua
 function package(args)
@@ -528,7 +534,7 @@ Once your package seems to be working, run your tests using the `zoi package tes
 zoi package test --type <build-type> /path/to/your-package.pkg.lua
 ```
 
-This command will execute the `prepare()`, `package()`, and `test()` functions. If `test()` returns `false` or errors, the command will fail.
+This command will execute the `prepare()`, `build()`, `package()`, and `test()` functions. If `test()` returns `false` or errors, the command will fail.
 
 ### Step 6: Build the Distributable Archive
 
