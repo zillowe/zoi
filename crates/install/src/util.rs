@@ -3,11 +3,13 @@ use anyhow::{Result, anyhow};
 use colored::*;
 use home;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use rayon::prelude::*;
 use semver::{Version, VersionReq};
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicU32, Ordering};
 use tar::Archive;
 use tempfile::Builder;
@@ -688,10 +690,11 @@ pub fn check_file_conflicts(
     yes: bool,
     m: &MultiProgress,
 ) -> Result<()> {
-    let mut all_conflicts = HashSet::new();
     let installed_packages = zoi_resolver::local::get_installed_packages()?;
+    let all_conflicts = Mutex::new(HashSet::new());
 
-    for node in graph.nodes.values() {
+    let nodes: Vec<&InstallNode> = graph.nodes.values().collect();
+    nodes.par_iter().try_for_each(|node| {
         let sub_package_to_check = node.sub_package.as_deref();
 
         let owned_files: HashSet<String> = installed_packages
@@ -703,21 +706,30 @@ pub fn check_file_conflicts(
         let mut conflicts_for_this_pkg = Vec::new();
 
         if let Ok(Some(info)) = find_prebuilt_info(node) {
-            let mut file_list = None;
-            if let Some(files_url) = &info.files_url
-                && let Ok(list) = get_remote_file_list(files_url)
-            {
-                file_list = Some(list);
-            }
+            let file_list = db::get_package_files_from_db(
+                &node.registry_handle,
+                &node.pkg.name,
+                node.sub_package.as_deref(),
+                &node.pkg.repo,
+            )
+            .unwrap_or(None)
+            .or_else(|| {
+                info.files_url
+                    .as_ref()
+                    .and_then(|files_url| get_remote_file_list(files_url).ok())
+            });
 
             if let Some(list) = file_list {
-                let conflicts = get_conflicts_from_list(list, &node.pkg, sub_package_to_check)?;
-                conflicts_for_this_pkg.extend(conflicts);
+                if let Ok(conflicts) =
+                    get_conflicts_from_list(list, &node.pkg, sub_package_to_check)
+                {
+                    conflicts_for_this_pkg.extend(conflicts);
+                }
             } else {
                 let archive_filename = info.final_url.split('/').next_back().unwrap_or_default();
                 let archive_cache_root = match cache::get_archive_cache_root() {
                     Ok(path) => path,
-                    Err(_) => continue,
+                    Err(_) => return Ok(()),
                 };
                 let archive_path = archive_cache_root.join(archive_filename);
 
@@ -735,17 +747,20 @@ pub fn check_file_conflicts(
 
         for conflict in conflicts_for_this_pkg {
             if !owned_files.contains(&conflict) {
-                all_conflicts.insert(format!(
+                all_conflicts.lock().unwrap().insert(format!(
                     "File '{}' from package '{}' already exists on filesystem.",
                     conflict, node.pkg.name
                 ));
             }
         }
-    }
 
-    if !all_conflicts.is_empty() {
+        Ok::<(), anyhow::Error>(())
+    })?;
+
+    let conflicts = all_conflicts.into_inner().unwrap();
+    if !conflicts.is_empty() {
         m.println(format!("\n{}", "File Conflict Detected:".red().bold()))?;
-        for msg in &all_conflicts {
+        for msg in &conflicts {
             m.println(format!("- {}", msg))?;
         }
         if !utils::ask_for_confirmation(

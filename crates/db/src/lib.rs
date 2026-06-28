@@ -112,6 +112,19 @@ fn setup_schema(conn: &Connection) -> Result<()> {
         let _ = conn.execute("ALTER TABLE packages ADD COLUMN installed_size INTEGER", []);
     }
 
+    let has_archive_hash: bool = conn
+        .query_row(
+            "SELECT count(*) FROM pragma_table_info('packages') WHERE name='archive_hash'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0)
+        > 0;
+
+    if !has_archive_hash {
+        let _ = conn.execute("ALTER TABLE packages ADD COLUMN archive_hash TEXT", []);
+    }
+
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_packages_name ON packages(name)",
         [],
@@ -375,6 +388,34 @@ pub fn set_package_sizes(
     Ok(())
 }
 
+pub fn set_package_hash(conn: &Connection, package_id: i64, hash: &str) -> Result<()> {
+    conn.execute(
+        "UPDATE packages SET archive_hash = ?1 WHERE id = ?2",
+        params![hash, package_id],
+    )?;
+    Ok(())
+}
+
+pub fn get_package_hash_from_db(
+    registry_handle: &str,
+    name: &str,
+    sub_package: Option<&str>,
+    repo: &str,
+) -> Result<Option<String>> {
+    let conn = open_connection(registry_handle)?;
+    let Ok(pkg_id) = get_package_id(&conn, name, sub_package, repo, registry_handle) else {
+        return Ok(None);
+    };
+    let hash: Option<String> = conn
+        .query_row(
+            "SELECT archive_hash FROM packages WHERE id = ?1 AND archive_hash IS NOT NULL",
+            params![pkg_id],
+            |row| row.get(0),
+        )
+        .ok();
+    Ok(hash)
+}
+
 pub fn get_package_sizes_from_db(
     registry_handle: &str,
     name: &str,
@@ -394,6 +435,29 @@ pub fn get_package_sizes_from_db(
         }
     } else {
         Ok(None)
+    }
+}
+
+pub fn get_package_files_from_db(
+    registry_handle: &str,
+    name: &str,
+    sub_package: Option<&str>,
+    repo: &str,
+) -> Result<Option<Vec<String>>> {
+    let conn = open_connection(registry_handle)?;
+    let Ok(pkg_id) = get_package_id(&conn, name, sub_package, repo, registry_handle) else {
+        return Ok(None);
+    };
+    let mut stmt = conn.prepare("SELECT path FROM package_files WHERE package_id = ?1")?;
+    let rows = stmt.query_map(params![pkg_id], |row| row.get(0))?;
+    let mut files = Vec::new();
+    for row in rows {
+        files.push(row?);
+    }
+    if files.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(files))
     }
 }
 

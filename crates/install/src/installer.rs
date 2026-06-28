@@ -83,8 +83,19 @@ pub fn download_and_cache_archive(
     };
 
     if let Some(hash_url) = &details.info.hash_url {
-        let hash = util::get_expected_hash(hash_url, Some(archive_filename))?;
-        if !hash.is_empty() && !util::verify_file_hash(&archive_path, &hash, pb)? {
+        let hash = db::get_package_hash_from_db(
+            &_node.registry_handle,
+            &_node.pkg.name,
+            _node.sub_package.as_deref(),
+            &_node.pkg.repo,
+        )
+        .unwrap_or(None)
+        .filter(|h| !h.is_empty())
+        .or_else(|| util::get_expected_hash(hash_url, Some(archive_filename)).ok());
+
+        if let Some(ref hash) = hash
+            && !util::verify_file_hash(&archive_path, hash, pb)?
+        {
             return Err(anyhow!("Hash verification failed"));
         }
     }
