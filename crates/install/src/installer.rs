@@ -14,6 +14,7 @@ pub fn download_and_cache_archive(
     _node: &InstallNode,
     details: &plan::PrebuiltDetails,
     pb: Option<&ProgressBar>,
+    verbose: bool,
 ) -> Result<PathBuf> {
     let config = config::read_config()?;
     let signature_policy = config.policy.signature_enforcement.filter(|p| p.enable);
@@ -165,10 +166,14 @@ pub fn download_and_cache_archive(
                 cached_sig_path.clone()
             };
 
-            println!("Verifying signature...");
+            if verbose {
+                println!("Verifying signature...");
+            }
             let trusted_certs = pgp::get_certs_by_name_or_fingerprint(identifiers)?;
             pgp::verify_detached_signature_multi_key(&archive_path, &sig_path, trusted_certs)?;
-            println!("{}", "Signature verified successfully.".green());
+            if verbose {
+                println!("{}", "Signature verified successfully.".green());
+            }
         }
     } else if has_authorities {
         let msg = format!(
@@ -198,6 +203,7 @@ pub fn install_node(
     yes: bool,
     record: bool,
     link_bins: bool,
+    verbose: bool,
 ) -> Result<types::InstallManifest> {
     let pkg = &node.pkg;
     let version = &node.version;
@@ -255,7 +261,7 @@ pub fn install_node(
             if let Some(pb) = pb_for_step {
                 pb.set_message("Downloading package...");
             }
-            let archive_path = download_and_cache_archive(node, details, pb_for_step)?;
+            let archive_path = download_and_cache_archive(node, details, pb_for_step, verbose)?;
             (archive_path, "pre-compiled".to_string())
         }
         plan::InstallAction::InstallFromArchive(archive_path) => {

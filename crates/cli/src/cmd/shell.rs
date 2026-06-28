@@ -277,6 +277,7 @@ pub fn enter_ephemeral_shell(
                     true,
                     false,
                     false,
+                    verbose,
                 )?;
 
                 let mut session_lock = session_installed_mutex.lock().unwrap();

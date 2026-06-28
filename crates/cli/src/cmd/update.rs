@@ -293,7 +293,9 @@ fn run_update_single_logic(
                 anyhow!("Package node '{}' missing from graph during update", pkg_id)
             })?;
             if let Some(action) = install_plan.get(&pkg_id) {
-                match install::installer::install_node(node, action, None, None, yes, true, true) {
+                match install::installer::install_node(
+                    node, action, None, None, yes, true, true, false,
+                ) {
                     Ok(m) => {
                         if m.name == new_pkg.name {
                             new_manifest_option = Some(m);
@@ -862,6 +864,7 @@ fn run_update_all_logic(
                             yes,
                             true,
                             true,
+                            false,
                         ) {
                             Ok(m) => {
                                 if m.name == candidate.new_pkg.name

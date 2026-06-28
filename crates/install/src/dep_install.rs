@@ -315,7 +315,7 @@ fn install_zoi_dependency(
             let action = install_plan
                 .get(&id)
                 .ok_or_else(|| anyhow!("Could not find install action for {}", id))?;
-            crate::installer::install_node(node, action, m, None, yes, true, true)?;
+            crate::installer::install_node(node, action, m, None, yes, true, true, false)?;
         }
     }
 
