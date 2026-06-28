@@ -48,8 +48,11 @@ pub fn download_and_cache_archive(
                 archive_filename
             ));
         }
-        let temp_dir = tempfile::Builder::new().prefix("zoi-dl-").tempdir()?;
-        let temp_archive_path = temp_dir.path().join(archive_filename);
+        let part_path = archive_cache_root.join(format!("{}.part", archive_filename));
+
+        if part_path.exists() && pb.is_none() {
+            println!("Resuming partial download: {}", part_path.display());
+        }
 
         let mut last_error = None;
         let candidate_urls = cache::mirror_candidate_urls(&details.info.final_url);
@@ -57,7 +60,7 @@ pub fn download_and_cache_archive(
         for candidate_url in candidate_urls {
             match util::download_file_with_progress(
                 &candidate_url,
-                &temp_archive_path,
+                &part_path,
                 pb,
                 Some(details.download_size),
             ) {
@@ -78,7 +81,7 @@ pub fn download_and_cache_archive(
             ));
         }
 
-        fs::copy(&temp_archive_path, &cached_archive_path)?;
+        fs::rename(&part_path, &cached_archive_path)?;
         cached_archive_path.clone()
     };
 
