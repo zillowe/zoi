@@ -1,0 +1,111 @@
+---
+title: Package Manuals
+description: How to view and provide manual pages for Zoi packages.
+---
+
+Zoi provides a built-in `man` command to view manuals for Zoi-managed packages. It supports Markdown, ROFF (traditional man pages), and plain text formats.
+
+## Viewing Manuals
+
+To view the manual for a package or a command it provides, use:
+
+```sh
+zoi man <package_or_binary>
+```
+
+Zoi will automatically resolve the binary name to its providing package and display the relevant manual pages.
+
+### TUI Navigation
+
+By default, `zoi man` opens an interactive TUI (Terminal User Interface). If a package provides multiple manual pages (e.g. for different binaries or sections), you can navigate between them using the sidebar.
+
+- **Up/Down / j/k**: Scroll content
+- **Tab / Shift+Tab**: Switch between manual pages
+- **q / Esc**: Exit the manual viewer
+
+### Using a Pager
+
+If you prefer to use your system's default pager (like `less` or `more`) instead of the TUI, use the `--no-tui` flag:
+
+```sh
+zoi man <package_name> --no-tui
+```
+
+This will concatenate all manual pages and pipe them to your `$PAGER`.
+
+### Raw Output
+
+To print the manual content directly to your terminal without any paging or interactive interface, use the `--raw` flag:
+
+```sh
+zoi man <package_name> --raw
+```
+
+---
+
+## Providing Manuals in Packages
+
+Package authors can provide manuals in several ways within their `.pkg.lua` definitions.
+
+### 1. Remote Manuals (Metadata)
+
+You can specify remote URLs for manual pages in the `metadata` block. Zoi supports single URLs, lists of URLs, or a map for named pages.
+
+```lua
+metadata({
+  -- Single manual page
+  man = "https://example.com/man.md",
+
+  -- Multiple manual pages (auto-named)
+  man = {
+    "https://example.com/main.md",
+    "https://example.com/extra.md"
+  },
+
+  -- Multiple manual pages with custom names
+  man = {
+    main = "https://example.com/main.md",
+    config = "https://example.com/config.md"
+  }
+})
+```
+
+Zoi will download these pages upon installation or when requested with the `--upstream` flag.
+
+### 2. Local Manual Files
+
+During the `package()` step, you can stage manual files to specific locations in the package store. Zoi searches for manuals in the following order:
+
+1. `${pkgstore}/man.md`
+2. `${pkgstore}/man.txt`
+3. `${pkgstore}/share/man/` (ROFF, Markdown, or Text files)
+
+#### Example: Staging a ROFF Page
+
+```lua
+function package()
+  -- Stage a traditional ROFF man page
+  zcp("doc/mytool.1", "${pkgstore}/share/man/man1/mytool.1")
+end
+```
+
+#### Example: Staging a Markdown Page
+
+```lua
+function package()
+  -- Stage a Markdown manual
+  zcp("docs/manual.md", "${pkgstore}/man.md")
+end
+```
+
+### ROFF Parsing
+
+Zoi includes a cross-platform ROFF-to-Markdown parser. This allows traditional man pages to be rendered with syntax highlighting and styling in Zoi's TUI, even on systems without `man-db` or `groff` installed (like Windows).
+
+---
+
+## Troubleshooting
+
+- **"No manual pages found"**: Ensure the package maintainer has provided a `man` URL or staged files in the store.
+- **Upstream Manuals**: If the local manual is missing or you want the latest version, use `zoi man <pkg> --upstream`.
+- **Formatting Issues**: While Zoi's ROFF parser handles common macros, complex man pages might display better with `--raw` if you have a local `man` command.

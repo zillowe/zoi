@@ -152,6 +152,14 @@ impl InstallManifest {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum ManSpec {
+    Single(String),
+    Multiple(Vec<String>),
+    Map(BTreeMap<String, String>),
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[allow(dead_code)]
 pub struct Package {
@@ -170,7 +178,7 @@ pub struct Package {
     #[serde(default)]
     pub readme: Option<String>,
     #[serde(default)]
-    pub man: Option<String>,
+    pub man: Option<ManSpec>,
     #[serde(default)]
     pub git: String,
     pub maintainer: Maintainer,
