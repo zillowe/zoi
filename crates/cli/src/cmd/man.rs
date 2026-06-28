@@ -159,7 +159,7 @@ fn spawn_pager(pager: &str, content: &str) -> Result<()> {
     Ok(())
 }
 
-fn resolve_package_for_man(term: &str) -> Result<(types::Package, Option<String>)> {
+pub fn resolve_package_for_man(term: &str) -> Result<(types::Package, Option<String>)> {
     if let Ok((pkg, _, _, _, registry_handle, _)) =
         resolve::resolve_package_and_version(term, false, false)
     {
@@ -189,7 +189,7 @@ fn resolve_package_for_man(term: &str) -> Result<(types::Package, Option<String>
     ))
 }
 
-fn gather_manual_pages(
+pub fn gather_manual_pages(
     pkg: &types::Package,
     registry_handle: &Option<String>,
     upstream: bool,
@@ -293,7 +293,7 @@ fn fetch_url(url: &str) -> Result<String> {
     Ok(reqwest::blocking::get(url)?.text()?)
 }
 
-fn parse_roff(content: &str) -> String {
+pub fn parse_roff(content: &str) -> String {
     let mut md = String::new();
     for line in content.lines() {
         let line = line.trim();
