@@ -100,26 +100,28 @@ pub fn download_and_cache_archive(
         }
     }
 
-    let has_authorities = config.default_registry.as_ref().is_some_and(|r| {
-        r.handle == _node.registry_handle && r.authorities.as_ref().is_some_and(|a| !a.is_empty())
-    }) || config.added_registries.iter().any(|r| {
-        r.handle == _node.registry_handle && r.authorities.as_ref().is_some_and(|a| !a.is_empty())
-    });
+    let authorities = config
+        .default_registry
+        .as_ref()
+        .filter(|r| r.handle == _node.registry_handle)
+        .and_then(|r| r.authorities.as_ref())
+        .or_else(|| {
+            config
+                .added_registries
+                .iter()
+                .find(|r| r.handle == _node.registry_handle)
+                .and_then(|r| r.authorities.as_ref())
+        });
+    let has_authorities = authorities.is_some_and(|a| !a.is_empty());
+    let pgp_identifiers: Option<Vec<String>> = signature_policy
+        .as_ref()
+        .map(|p| p.trusted_keys.clone())
+        .or_else(|| authorities.cloned());
 
-    if has_authorities && details.info.pgp_url.is_none() {
-        let msg = format!(
-            "Warning: Installing unsigned package '{}' from a registry that claims to be secure.",
-            _node.pkg.name
-        );
-        if let Some(p) = pb {
-            p.println(msg.yellow().to_string());
-        } else {
-            println!("{}", msg.yellow());
-        }
-    }
-
-    if let Some(policy) = &signature_policy {
-        if let Some(pgp_url) = &details.info.pgp_url {
+    if let Some(pgp_url) = &details.info.pgp_url {
+        if let Some(ref identifiers) = pgp_identifiers
+            && !identifiers.is_empty()
+        {
             let sig_path = if cached_sig_path.exists() {
                 cached_sig_path.clone()
             } else {
@@ -161,10 +163,21 @@ pub fn download_and_cache_archive(
             };
 
             println!("Verifying signature...");
-            let trusted_certs = pgp::get_certs_by_name_or_fingerprint(&policy.trusted_keys)?;
+            let trusted_certs = pgp::get_certs_by_name_or_fingerprint(identifiers)?;
             pgp::verify_detached_signature_multi_key(&archive_path, &sig_path, trusted_certs)?;
             println!("{}", "Signature verified successfully.".green());
+        }
+    } else if has_authorities {
+        let msg = format!(
+            "Warning: Installing unsigned package '{}' from a registry that claims to be secure.",
+            _node.pkg.name
+        );
+        if let Some(p) = pb {
+            p.println(msg.yellow().to_string());
         } else {
+            println!("{}", msg.yellow());
+        }
+        if signature_policy.is_some() {
             return Err(anyhow!(
                 "Signature enforcement is active, but no PGP URL found for package"
             ));
