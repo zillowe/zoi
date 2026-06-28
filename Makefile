@@ -30,22 +30,22 @@ all: build install setup
 build:
 	@echo "Building Zoi targets: $(WITH_BIN) in release mode (commit: $(COMMIT_HASH))..."
 ifeq ($(WITH_BIN),zoi)
-	@ZOI_COMMIT_HASH=$(COMMIT_HASH) cargo build --bin zoi --release
+	@set -a; . .env 2>/dev/null; ZOI_COMMIT_HASH=$(COMMIT_HASH) cargo build --bin zoi --release
 else ifeq ($(WITH_BIN),zoi-mini)
-	@ZOI_COMMIT_HASH=$(COMMIT_HASH) cargo build --bin zoi-mini --release
+	@set -a; . .env 2>/dev/null; ZOI_COMMIT_HASH=$(COMMIT_HASH) cargo build --bin zoi-mini --release
 else
-	@ZOI_COMMIT_HASH=$(COMMIT_HASH) cargo build --bin zoi --bin zoi-mini --release
+	@set -a; . .env 2>/dev/null; ZOI_COMMIT_HASH=$(COMMIT_HASH) cargo build --bin zoi --bin zoi-mini --release
 endif
 	@echo "Build complete for $(OS_NAME) ($(ARCH_NAME))."
 
 dev:
 	@echo "Building Zoi targets: $(WITH_BIN) in debug mode (commit: $(COMMIT_HASH))..."
 ifeq ($(WITH_BIN),zoi)
-	@ZOI_COMMIT_HASH=$(COMMIT_HASH) cargo build --bin zoi
+	@set -a; . .env 2>/dev/null; ZOI_COMMIT_HASH=$(COMMIT_HASH) cargo build --bin zoi
 else ifeq ($(WITH_BIN),zoi-mini)
-	@ZOI_COMMIT_HASH=$(COMMIT_HASH) cargo build --bin zoi-mini
+	@set -a; . .env 2>/dev/null; ZOI_COMMIT_HASH=$(COMMIT_HASH) cargo build --bin zoi-mini
 else
-	@ZOI_COMMIT_HASH=$(COMMIT_HASH) cargo build --bin zoi --bin zoi-mini
+	@set -a; . .env 2>/dev/null; ZOI_COMMIT_HASH=$(COMMIT_HASH) cargo build --bin zoi --bin zoi-mini
 endif
 	@mkdir -p "$(DEV_BINDIR)"
 ifneq ($(WITH_BIN),zoi-mini)
