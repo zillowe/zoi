@@ -51,7 +51,7 @@ Configures the primary package database (registry) that Zoi syncs with.
   - `handle`: (string) A short, unique name for the registry. Zoi will determine this automatically on the first sync if left empty.
   - `url`: (string) The Git URL of the registry repository.
   - `advisory_prefix`: (string, optional) The prefix for security advisory IDs from this registry (e.g. `ZSA` for Zoidberg Security Advisories).
-  - `authorities`: (list of string, optional) PGP key identifiers trusted as authorities for package signatures from this registry.
+  - `authorities`: (list of string, optional) PGP key identifiers trusted as authorities for this registry. Used to verify both registry git commit signatures and pre-built package archive signatures.
 - **Example:**
 
   ```yaml
@@ -284,11 +284,11 @@ These lists allow administrators to control which packages, repositories, and li
 
 ### `signature_enforcement`
 
-This object configures mandatory PGP signature verification for all pre-built packages.
+By default, Zoi automatically verifies PGP signatures on pre-built packages when the registry defines `authorities` and the package provides a `.sig` file. The `signature_enforcement` policy configures a stricter mandatory mode for environments that require signatures on **all** packages.
 
 - **Type:** `object`
 - **Fields:**
-  - `enable`: (boolean) If `true`, Zoi will _only_ install pre-built packages (`.pkg.tar.zst` archives) that are signed by a trusted PGP key. It will not fall back to building from source.
+  - `enable`: (boolean) If `true`, Zoi will _only_ install pre-built packages (`.pkg.tar.zst` archives) that are signed by a trusted PGP key. It will fail on unsigned packages and will not fall back to building from source.
   - `trusted_keys`: (list of string) A list of trusted PGP key names or fingerprints. These keys must already be present in the Zoi PGP keyring (see `zoi pgp list`).
 
 ### Example Policy
