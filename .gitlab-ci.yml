@@ -84,7 +84,7 @@ deny:
   extends: .rust_setup
   before_script:
     - *base_apt
-    - cargo install cargo-deny
+    - cd /tmp && cargo install cargo-deny --locked
   script:
     - cargo deny check
   rules:
@@ -281,7 +281,7 @@ license-report:
   stage: package
   image: rust:latest
   before_script:
-    - cargo install --locked --features cli cargo-about
+    - cd /tmp && cargo install cargo-about --locked --features cli
   script:
     - cargo about generate about.hbs > license.html
   artifacts:
