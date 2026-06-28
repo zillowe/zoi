@@ -255,6 +255,20 @@ fn build_for_platform(
             })?;
         }
 
+        if let Ok(build_fn) = lua.globals().get::<mlua::Function>("build") {
+            if !quiet {
+                println!("Running build()...");
+            }
+            build_fn.call::<()>(args.clone()).map_err(|e| {
+                anyhow!(
+                    "The 'build' function in '{}' failed for sub-package '{}':\n{}",
+                    package_file.display(),
+                    sub_package,
+                    e
+                )
+            })?;
+        }
+
         if let Ok(package_fn) = lua.globals().get::<mlua::Function>("package") {
             if !quiet {
                 println!("Running package()...");
