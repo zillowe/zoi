@@ -13,15 +13,15 @@ In a standard package manager, if you install 50 packages that all contain fonts
 2. **Decoupling:** Allowing system administrators to define maintenance logic without modifying individual package definitions.
 3. **Efficiency:** Ensuring system caches (like font caches, desktop databases, or ldconfig) are updated only when necessary.
 
-***
+---
 
 ## Hook Definition (`.hook.yaml`)
 
 Hooks are defined using simple YAML files. They can be placed in:
 
-* **System:** `/etc/zoi/hooks/`
-* **User:** `~/.zoi/hooks/`
-* **Extensions:** Distributed via Zoi [Extensions](/docs/zds/zoi/extensions).
+- **System:** `/etc/zoi/hooks/`
+- **User:** `~/.zoi/hooks/`
+- **Extensions:** Distributed via Zoi [Extensions](/docs/zds/zoi/extensions).
 
 ### Example: update-icon-cache.hook.yaml
 
@@ -48,29 +48,29 @@ action:
 
 ### Schema Reference
 
-| Field               | Type     | Description                                                                 |
-| :------------------ | :------- | :-------------------------------------------------------------------------- |
-| `name`              | `string` | A unique name for the hook.                                                 |
-| `description`       | `string` | A short summary of what the hook does.                                      |
-| `platforms`         | `list`   | (Optional) List of supported platforms (e.g. `["linux"]`).                  |
+| Field               | Type     | Description                                                                                            |
+| :------------------ | :------- | :----------------------------------------------------------------------------------------------------- |
+| `name`              | `string` | A unique name for the hook.                                                                            |
+| `description`       | `string` | A short summary of what the hook does.                                                                 |
+| `platforms`         | `list`   | (Optional) List of supported platforms (e.g. `["linux"]`).                                             |
 | `trigger.dirs`      | `list`   | A list of directory paths. If any modified file is inside one of these directories, the hook triggers. |
-| `trigger.paths`     | `list`   | A list of glob patterns. If any modified file matches, the hook triggers.   |
-| `trigger.operation` | `list`   | (Optional) Restrict to specific operations: `install`, `upgrade`, `remove`. |
-| `action.when`       | `enum`   | When to run: `PostTransaction` (currently supported).                       |
-| `action.exec`       | `string` | The shell command to execute.                                               |
+| `trigger.paths`     | `list`   | A list of glob patterns. If any modified file matches, the hook triggers.                              |
+| `trigger.operation` | `list`   | (Optional) Restrict to specific operations: `install`, `upgrade`, `remove`.                            |
+| `action.when`       | `enum`   | When to run: `PostTransaction` (currently supported).                                                  |
+| `action.exec`       | `string` | The shell command to execute.                                                                          |
 
 `trigger.dirs` is preferred for directory-wide maintenance triggers such as icon themes. `trigger.paths` remains useful when a hook should only match specific filenames or extensions, such as `usr/share/applications/*.desktop`.
 
-***
+---
 
 ## Builtin Hooks
 
 Zoi ships with several essential builtin hooks for Linux systems:
 
-* **`update-icon-cache`**: Runs `gtk-update-icon-cache` once when files under icon theme directories are modified.
-* **`update-font-cache`**: Runs `fc-cache -fv` when fonts are modified.
-* **`update-desktop-database`**: Runs `update-desktop-database -q` when `.desktop` files are modified.
-* **`ldconfig`**: Runs `ldconfig` when shared libraries (`.so` files) are modified.
+- **`update-icon-cache`**: Runs `gtk-update-icon-cache` once when files under icon theme directories are modified.
+- **`update-font-cache`**: Runs `fc-cache -fv` when fonts are modified.
+- **`update-desktop-database`**: Runs `update-desktop-database -q` when `.desktop` files are modified.
+- **`ldconfig`**: Runs `ldconfig` when shared libraries (`.so` files) are modified.
 
 ## Overriding Hooks
 

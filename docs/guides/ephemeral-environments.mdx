@@ -19,7 +19,7 @@ This command will:
 2. **Install** any packages that are not already in your Zoi store.
 3. **Create** a temporary directory with symlinks to all the binaries.
 4. **Spawn** a new subshell with this temporary directory added to your `PATH`.
-5. **Clean up** by uninstalling any packages that were added *specifically* for this session when you exit the shell.
+5. **Clean up** by uninstalling any packages that were added _specifically_ for this session when you exit the shell.
 
 ### Running a Single Command
 
@@ -35,8 +35,8 @@ zoi shell -p node@20 --run "node --version"
 
 When you are inside a Zoi ephemeral shell, Zoi sets several environment variables that you can use to customize your prompt or scripts:
 
-* **`IN_ZOI_SHELL`**: Always set to `ephemeral`.
-* **`ZOI_SHELL_PACKAGES`**: A comma-separated list of the packages requested for the session.
+- **`IN_ZOI_SHELL`**: Always set to `ephemeral`.
+- **`ZOI_SHELL_PACKAGES`**: A comma-separated list of the packages requested for the session.
 
 ### Integration with Starship
 
@@ -71,8 +71,8 @@ fi
 
 Zoi is designed to keep your system clean. When you exit an ephemeral shell (via `exit` or `Ctrl-D`):
 
-* The temporary directory containing the binary shims is deleted.
-* **Newly added packages** (those that weren't already installed globally or in another project) are automatically uninstalled from the Zoi store.
-* Packages that were already present in your store are **preserved**, so your global tools are never accidentally removed.
+- The temporary directory containing the binary shims is deleted.
+- **Newly added packages** (those that weren't already installed globally or in another project) are automatically uninstalled from the Zoi store.
+- Packages that were already present in your store are **preserved**, so your global tools are never accidentally removed.
 
 This makes `zoi shell -p` the perfect way to test new tools or run scripts with different language versions without permanently cluttering your machine.

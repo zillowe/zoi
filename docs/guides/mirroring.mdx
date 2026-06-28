@@ -35,9 +35,9 @@ Your binary server should follow a predictable structure. A common pattern is:
 
 For each archive, you should generate `.hash`, `.size`, and `.files` metadata:
 
-* **`.hash`**: A SHA-512 hash of the archive.
-* **`.size`**: A text file containing `down: <compressed_size>` and `install: <uncompressed_size>`.
-* **`.files`**: A plain text list of all files inside the archive (relative to the store root).
+- **`.hash`**: A SHA-512 hash of the archive.
+- **`.size`**: A text file containing `down: <compressed_size>` and `install: <uncompressed_size>`.
+- **`.files`**: A plain text list of all files inside the archive (relative to the store root).
 
 Zoi's `zoi package build` command generates these files automatically alongside the archive.
 

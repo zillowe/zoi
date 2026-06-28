@@ -49,9 +49,9 @@ If you'd like to contribute code, please follow these steps:
 2. **Clone your fork** to your local machine.
 3. **Create a new branch** for your changes.
 
-    ```sh
-    git checkout -b my-feature-branch
-    ```
+   ```sh
+   git checkout -b my-feature-branch
+   ```
 
 4. **Make your changes** and commit them with a clear and descriptive message.
 5. **Push your changes** to your fork.
@@ -72,20 +72,20 @@ Because Zoi is used to manage its own development, you must first build and inst
 
 1. **Configure the build:**
 
-    ```sh
-    ./configure
-    ```
+   ```sh
+   ./configure
+   ```
 
 2. **Build and install:**
 
-    ```sh
-    make build
-    # Or for a debug build:
-    # make dev
-    sudo make install
-    # (optional) Install CLI completions and setup Zoi's PATH
-    make setup
-    ```
+   ```sh
+   make build
+   # Or for a debug build:
+   # make dev
+   sudo make install
+   # (optional) Install CLI completions and setup Zoi's PATH
+   make setup
+   ```
 
 Once you have a working `zoi` command, you can use it for all other development tasks.
 
@@ -110,22 +110,22 @@ docker run --rm registry.gitlab.com/zillowe/zillwen/zusty/zoi/zoi:latest zoi --v
 If you need to build the Docker image locally (e.g. for custom configurations or testing changes to the `Dockerfile`), you can do so:
 
 1. **Build the image:**
-    The following command builds the final, lightweight Docker image containing the `zoi` binary.
+   The following command builds the final, lightweight Docker image containing the `zoi` binary.
 
-    ```sh
-    docker build -t zoi .
-    ```
+   ```sh
+   docker build -t zoi .
+   ```
 
 2. **Extract the binary:**
-    If you want to get the compiled `zoi` binary from the image to use on your host system, run these commands:
+   If you want to get the compiled `zoi` binary from the image to use on your host system, run these commands:
 
-    ```sh
-    docker create --name zoi-container zoi
-    docker cp zoi-container:/usr/local/bin/zoi ./zoi
-    docker rm zoi-container
-    ```
+   ```sh
+   docker create --name zoi-container zoi
+   docker cp zoi-container:/usr/local/bin/zoi ./zoi
+   docker rm zoi-container
+   ```
 
-    You will now have a `zoi` executable in your current directory.
+   You will now have a `zoi` executable in your current directory.
 
 ### Development Workflow with Zoi
 

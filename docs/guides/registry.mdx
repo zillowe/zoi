@@ -13,9 +13,9 @@ The `zoi registry` suite simplifies the tedious tasks of scaffolding packages, m
 
 Initializes a new, empty Zoi registry. It scaffolds the foundational directory structure, configuration files, and LSP support.
 
-* **Scaffolds:** `repo.yaml`, `packages.json`, `advisories.json`.
-* **Directories:** `core`, `main`, `community`, `test`, `archive`.
-* **LSP Support:** Automatically runs `zoi package init-lsp` to set up `.luarc.json` and EmmyLua type definitions.
+- **Scaffolds:** `repo.yaml`, `packages.json`, `advisories.json`.
+- **Directories:** `core`, `main`, `community`, `test`, `archive`.
+- **LSP Support:** Automatically runs `zoi package init-lsp` to set up `.luarc.json` and EmmyLua type definitions.
 
 ```sh
 zoi registry init ./my-new-registry
@@ -27,8 +27,8 @@ zoi registry init ./my-new-registry
 
 Creates a new package scaffold. If arguments are omitted, it will prompt you interactively.
 
-* **Args:** `[name]` (package name), `--repo <tier>` (e.g. `community`, `main`).
-* **Creates:** A directory for the package and a minimal, commented `.pkg.lua` file.
+- **Args:** `[name]` (package name), `--repo <tier>` (e.g. `community`, `main`).
+- **Creates:** A directory for the package and a minimal, commented `.pkg.lua` file.
 
 ```sh
 # Explicit
@@ -44,8 +44,8 @@ zoi registry add-pkg
 
 Interactively creates a new security advisory for a package.
 
-* **Creates:** A `[PREFIX]-[YEAR]-TEMP.sec.yaml` file. The `TEMP` placeholder is replaced with a permanent ID during metadata generation.
-* **Fields:** Summary, Severity, Affected Range, Fixed Version, Description, and Reference URL.
+- **Creates:** A `[PREFIX]-[YEAR]-TEMP.sec.yaml` file. The `TEMP` placeholder is replaced with a permanent ID during metadata generation.
+- **Fields:** Summary, Severity, Affected Range, Fixed Version, Description, and Reference URL.
 
 ```sh
 zoi registry add-advisory my-tool
@@ -57,9 +57,9 @@ zoi registry add-advisory my-tool
 
 Scans the entire registry to generate the optimized JSON index files used by Zoi clients.
 
-* **`packages.json`:** Updated with metadata from every `.pkg.lua` file. This index allows Zoi to resolve packages without cloning the entire history.
-* **`advisories.json`:** Updated with all security advisories.
-* **ID Assignment:** Automatically assigns permanent chronological IDs (e.g. `ZSA-2026-D0042`) to any `TEMP` advisory files.
+- **`packages.json`:** Updated with metadata from every `.pkg.lua` file. This index allows Zoi to resolve packages without cloning the entire history.
+- **`advisories.json`:** Updated with all security advisories.
+- **ID Assignment:** Automatically assigns permanent chronological IDs (e.g. `ZSA-2026-D0042`) to any `TEMP` advisory files.
 
 ```sh
 zoi registry generate-metadata
@@ -71,8 +71,8 @@ zoi registry generate-metadata
 
 Performs a comprehensive sanity check on the registry.
 
-* **Lints:** Every `.pkg.lua` file is checked for metadata consistency and valid dependency syntax.
-* **Integrity:** Ensures all referenced repository tiers exist and the `repo.yaml` is valid.
+- **Lints:** Every `.pkg.lua` file is checked for metadata consistency and valid dependency syntax.
+- **Integrity:** Ensures all referenced repository tiers exist and the `repo.yaml` is valid.
 
 ```sh
 zoi registry check
@@ -166,9 +166,9 @@ git push
 
 This file defines how Zoi treats the registry. You can configure:
 
-* **`advisory_prefix`**: The prefix for your vulnerability IDs (e.g. `MYCORP-SEC`).
-* **`pkg` mirrors**: Locations for pre-built `.pkg.tar.zst` archives.
-* **`authorities`**: PGP fingerprints that must sign commits for the registry to be trusted.
+- **`advisory_prefix`**: The prefix for your vulnerability IDs (e.g. `MYCORP-SEC`).
+- **`pkg` mirrors**: Locations for pre-built `.pkg.tar.zst` archives.
+- **`authorities`**: PGP fingerprints that must sign commits for the registry to be trusted.
 
 See the [Repositories Specification](/docs/zds/zoi/repositories#the-repoyaml-file) for a full field reference.
 
@@ -176,8 +176,8 @@ See the [Repositories Specification](/docs/zds/zoi/repositories#the-repoyaml-fil
 
 When you initialize a registry, Zoi provides a `zoi.lua` meta-file (installed to `~/.zoi/lsp/`) and a `.luarc.json`. This enables:
 
-* **Autocomplete** for all global Zoi variables (`SYSTEM`, `PKG`, `UTILS`).
-* **Hover Docs** for Zoi functions (`zcp`, `cmd`, `addPgpKey`).
-* **Type Checking** for metadata and dependency tables.
+- **Autocomplete** for all global Zoi variables (`SYSTEM`, `PKG`, `UTILS`).
+- **Hover Docs** for Zoi functions (`zcp`, `cmd`, `addPgpKey`).
+- **Type Checking** for metadata and dependency tables.
 
 If your workspace isn't showing suggestions, run `zoi package init-lsp` in the registry root.

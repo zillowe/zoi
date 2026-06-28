@@ -16,34 +16,34 @@ Zoi is an advanced package manager and environment orchestrator, designed to sim
 
 ## Features
 
-* **Cross-Platform:** Works seamlessly on Linux, macOS, and Windows.
-* **Just-in-Time Privilege Escalation:** Automatically prompts for `sudo` only when system-wide operations are required, keeping your environment and caches cleanly in user-space.
-* **Dynamic Package Definitions:** Define packages with dynamic Lua scripts (`.pkg.lua`) for maximum flexibility.
-* **Universal Package Support:** Install packages from pre-built binaries, compressed archives, or build them from source.
-* **Extensive Dependency Management:** Integrates with over 40 system and language package managers (`apt`, `brew`, `cargo`, `npm`, `pip`, `go`, `bun`, etc.).
-* **Version Multiplexing via Intelligent Shims:** Automatically switch between different versions of the same tool (e.g. Node.js 18 vs 20) based on your project context (`zoi.yaml`) or legacy configuration files (`.nvmrc`) through its extensible Lua plugin system.
-* **Rich Dependencies:** Define runtime and build dependencies with required, optional, and selectable options.
-* **Project Environments:** Manage project-specific commands and environments using a local `zoi.yaml` file.
-* **Repository-Based:** Use official, community, or your own private/public Git-based repositories. Manage multiple registries.
-* **Secure & Verifiable:** Verifies package integrity with checksums and authenticity with GPG signatures. Includes a built-in PGP key manager and handles configuration file updates safely.
-* **Advanced Dependencies:** Supports virtual packages (`provides`) and package replacement (`replaces`).
-* **Versatile Package Types:** Supports different types of packages:
-  * `Package`: A standard software package.
-  * `Collection`: A meta-package that groups other packages together.
-  * `App`: A template for bootstrapping new projects (`zoi create`).
-  * `Extension`: A package to extend Zoi's own functionality or configuration.
-* **Local Package Development:** A dedicated `zoi package` command set (`build`, `install`, `doctor`, `init-lsp`) to streamline creating, linting, and testing packages locally.
-* **Advanced CLI Tools:**
-  * `zoi man`: Read package manuals in the terminal.
-  * `zoi audit`: Scan installed packages for known security vulnerabilities.
-  * `zoi clone`: Clone a package's git repository.
-  * `zoi why`: Understand why a package is installed.
-  * `zoi rollback`: Revert a package to its previous version or roll back the newest remaining transaction log.
-  * `zoi pin`: Pin a package to a specific version.
-  * `zoi exec`: Run a package's binary without installing it.
-  * `zoi dev`: Enter a project-specific development shell with all dependencies.
-* **Zoi Mini:** A lightweight, zero-sync version for quick, one-off installations via `zm.sh` or `zm.ps1`.
-* **Library Support:** Core functionality is available as a Rust library to be integrated into other applications.
+- **Cross-Platform:** Works seamlessly on Linux, macOS, and Windows.
+- **Just-in-Time Privilege Escalation:** Automatically prompts for `sudo` only when system-wide operations are required, keeping your environment and caches cleanly in user-space.
+- **Dynamic Package Definitions:** Define packages with dynamic Lua scripts (`.pkg.lua`) for maximum flexibility.
+- **Universal Package Support:** Install packages from pre-built binaries, compressed archives, or build them from source.
+- **Extensive Dependency Management:** Integrates with over 40 system and language package managers (`apt`, `brew`, `cargo`, `npm`, `pip`, `go`, `bun`, etc.).
+- **Version Multiplexing via Intelligent Shims:** Automatically switch between different versions of the same tool (e.g. Node.js 18 vs 20) based on your project context (`zoi.yaml`) or legacy configuration files (`.nvmrc`) through its extensible Lua plugin system.
+- **Rich Dependencies:** Define runtime and build dependencies with required, optional, and selectable options.
+- **Project Environments:** Manage project-specific commands and environments using a local `zoi.yaml` file.
+- **Repository-Based:** Use official, community, or your own private/public Git-based repositories. Manage multiple registries.
+- **Secure & Verifiable:** Verifies package integrity with checksums and authenticity with GPG signatures. Includes a built-in PGP key manager and handles configuration file updates safely.
+- **Advanced Dependencies:** Supports virtual packages (`provides`) and package replacement (`replaces`).
+- **Versatile Package Types:** Supports different types of packages:
+  - `Package`: A standard software package.
+  - `Collection`: A meta-package that groups other packages together.
+  - `App`: A template for bootstrapping new projects (`zoi create`).
+  - `Extension`: A package to extend Zoi's own functionality or configuration.
+- **Local Package Development:** A dedicated `zoi package` command set (`build`, `install`, `doctor`, `init-lsp`) to streamline creating, linting, and testing packages locally.
+- **Advanced CLI Tools:**
+  - `zoi man`: Read package manuals in the terminal.
+  - `zoi audit`: Scan installed packages for known security vulnerabilities.
+  - `zoi clone`: Clone a package's git repository.
+  - `zoi why`: Understand why a package is installed.
+  - `zoi rollback`: Revert a package to its previous version or roll back the newest remaining transaction log.
+  - `zoi pin`: Pin a package to a specific version.
+  - `zoi exec`: Run a package's binary without installing it.
+  - `zoi dev`: Enter a project-specific development shell with all dependencies.
+- **Zoi Mini:** A lightweight, zero-sync version for quick, one-off installations via `zm.sh` or `zm.ps1`.
+- **Library Support:** Core functionality is available as a Rust library to be integrated into other applications.
 
 ## Getting Started
 
@@ -300,25 +300,14 @@ You can install `@zillowe/zoi` from `npm` also.
 
       yarn
     </TabsTrigger>
+
   </TabsList>
 
-  <TabsContent value="npm">
-    ```sh
-    npx @zillowe/zoi
-    ```
-  </TabsContent>
+<TabsContent value="npm">```sh npx @zillowe/zoi ```</TabsContent>
 
-  <TabsContent value="bun">
-    ```sh
-    bunx @zillowe/zoi
-    ```
-  </TabsContent>
+<TabsContent value="bun">```sh bunx @zillowe/zoi ```</TabsContent>
 
-  <TabsContent value="pnpm">
-    ```sh
-    pnpm dlx @zillowe/zoi
-    ```
-  </TabsContent>
+<TabsContent value="pnpm">```sh pnpm dlx @zillowe/zoi ```</TabsContent>
 
   <TabsContent value="yarn">
     ```sh
@@ -385,19 +374,19 @@ But some other package managers like `npm`, it installs the dependency if the pa
 
 Here are some common commands to get you started.
 
-* **Install a package:**
+- **Install a package:**
 
   ```sh
   zoi install <package_name>
   ```
 
-* **Uninstall a package:**
+- **Uninstall a package:**
 
   ```sh
   zoi uninstall <package_name>
   ```
 
-* **Update packages:**
+- **Update packages:**
 
   ```sh
   # Update all installed packages
@@ -407,33 +396,33 @@ Here are some common commands to get you started.
   zoi update <package1> <package2>
   ```
 
-* **Search for a package:**
+- **Search for a package:**
 
   ```sh
   zoi search <term>
   ```
 
-* **Show package details:**
+- **Show package details:**
 
   ```sh
   zoi show <package_name>
   ```
 
-* **Run a project command:**
+- **Run a project command:**
 
   ```sh
   # Run a command defined in zoi.yaml
   zoi run <command_alias>
   ```
 
-* **Enter a development shell:**
+- **Enter a development shell:**
 
   ```sh
   # Enter a subshell with project dependencies available
   zoi dev
   ```
 
-* **Add a new repository:**
+- **Add a new repository:**
 
   ```sh
   # Interactively
@@ -446,7 +435,7 @@ Here are some common commands to get you started.
   zoi repo add https://github.com/<user_name>/<repo_name>.git
   ```
 
-* **Update Zoi to the latest version:**
+- **Update Zoi to the latest version:**
 
   ```sh
   zoi upgrade
@@ -468,13 +457,13 @@ New features, enhancements and bug reports are welcome.
 
 Zoi is hosted on multiple forges. The primary locations and mirrors are:
 
-* Zoi Source Code
-  * Primary: [GitLab](https://gitlab.com/zillowe/zillwen/zusty/zoi)
-  * Mirrors: [GitHub](https://github.com/zillowe/zoi), [Codeberg](https://codeberg.org/Zillowe/Zoi)
+- Zoi Source Code
+  - Primary: [GitLab](https://gitlab.com/zillowe/zillwen/zusty/zoi)
+  - Mirrors: [GitHub](https://github.com/zillowe/zoi), [Codeberg](https://codeberg.org/Zillowe/Zoi)
 
-* Packages Database ([Zoidberg](/docs/zds/zoi/zoidberg))
-  * Primary: [GitLab](https://gitlab.com/zillowe/zillwen/zusty/zoidberg)
-  * Mirrors: [GitHub](https://github.com/zillowe/zoidberg), [Codeberg](https://codeberg.org/Zillowe/Zoidberg)
+- Packages Database ([Zoidberg](/docs/zds/zoi/zoidberg))
+  - Primary: [GitLab](https://gitlab.com/zillowe/zillwen/zusty/zoidberg)
+  - Mirrors: [GitHub](https://github.com/zillowe/zoidberg), [Codeberg](https://codeberg.org/Zillowe/Zoidberg)
 
 ## FAQ
 
@@ -483,38 +472,40 @@ Zoi is hosted on multiple forges. The primary locations and mirrors are:
     You can create a `.pkg.lua` file that defines your package. This file includes metadata like the package name, version, description, and installation instructions. For a complete guide, please visit the [Creating Packages guide](/docs/zds/zoi/creating-packages).
   </Accordion>
 
-  <Accordion title="How do I publish a package?">
-    To learn how to publish a package to the official repositories or your own, please visit the [Publishing Packages guide](/docs/zds/zoi/publishing-packages).
-  </Accordion>
+<Accordion title="How do I publish a package?">
+  To learn how to publish a package to the official repositories or your own,
+  please visit the [Publishing Packages
+  guide](/docs/zds/zoi/publishing-packages).
+</Accordion>
 
   <Accordion title="How do I view a package's manual?">
     If the package maintainer has provided a `man` URL in the package definition, you can run `zoi man <package-name>` to view it in your terminal.
   </Accordion>
 
-  <Accordion title="How do I add a new repository?">
-    You can add a new repository using the `zoi repo add` command. You can run
-    it without arguments for an interactive prompt, or provide the name of the
-    repository to add it directly.
-  </Accordion>
+<Accordion title="How do I add a new repository?">
+  You can add a new repository using the `zoi repo add` command. You can run it
+  without arguments for an interactive prompt, or provide the name of the
+  repository to add it directly.
+</Accordion>
 
-  <Accordion title="What platforms does Zoi support?">
-    Zoi is designed to be cross-platform. Mainly supports Linux, macOS and Windows, and amd64 and arm64 architectures.
-  </Accordion>
+<Accordion title="What platforms does Zoi support?">
+  Zoi is designed to be cross-platform. Mainly supports Linux, macOS and
+  Windows, and amd64 and arm64 architectures.
+</Accordion>
 
-  <Accordion title="Can I install packages from other package managers?">
-    Yes, Zoi supports installing dependencies from a wide range of other package
-    managers like `brew`, `winget`, `scoop`, `npm`, `cargo`, `pip`, and many
-    more. These are defined in the `dependencies` section of a packags's
-    `.pkg.lua` file.
-  </Accordion>
+<Accordion title="Can I install packages from other package managers?">
+  Yes, Zoi supports installing dependencies from a wide range of other package
+  managers like `brew`, `winget`, `scoop`, `npm`, `cargo`, `pip`, and many more.
+  These are defined in the `dependencies` section of a packags's `.pkg.lua`
+  file.
+</Accordion>
 
-  <Accordion title="How do I install a specific version or channel?">
-    You can append a version or channel after an '@' in the source string.
-    Examples: `zoi install my-app@1.2.3` or use channels defined in
-    `versions` like `my-app@stable`. You can also pin a resolved
-    version to prevent updates: `zoi pin my-app VERSION` and later
-    `zoi unpin my-app`.
-  </Accordion>
+<Accordion title="How do I install a specific version or channel?">
+  You can append a version or channel after an '@' in the source string.
+  Examples: `zoi install my-app@1.2.3` or use channels defined in `versions`
+  like `my-app@stable`. You can also pin a resolved version to prevent updates:
+  `zoi pin my-app VERSION` and later `zoi unpin my-app`.
+</Accordion>
 
   <Accordion title="How do I run a tool without installing it?">
     Use `zoi exec <package>`. Zoi resolves the package and its dependencies
@@ -523,13 +514,13 @@ Zoi is hosted on multiple forges. The primary locations and mirrors are:
     are automatically wrapped with `bwrap`.
   </Accordion>
 
-  <Accordion title="What is 'zoi dev' and how does it differ from 'zoi env'?">
-    `zoi dev` is used to enter a persistent development subshell. It automatically
-    ensures all packages in your `zoi.yaml` are installed locally and sets up
-    environment variables like `PATH`, `LD_LIBRARY_PATH`, and `CPATH` so you
-    can immediately start compiling or running your code. `zoi env` is more
-    focused on running specific setup scripts or one-off environment configurations.
-  </Accordion>
+<Accordion title="What is 'zoi dev' and how does it differ from 'zoi env'?">
+  `zoi dev` is used to enter a persistent development subshell. It automatically
+  ensures all packages in your `zoi.yaml` are installed locally and sets up
+  environment variables like `PATH`, `LD_LIBRARY_PATH`, and `CPATH` so you can
+  immediately start compiling or running your code. `zoi env` is more focused on
+  running specific setup scripts or one-off environment configurations.
+</Accordion>
 
   <Accordion title="How do I use a custom git package repository?">
     Add it with `zoi repo add https://github.com/you/your-zoi-repo.git`.
@@ -544,13 +535,15 @@ Zoi is hosted on multiple forges. The primary locations and mirrors are:
     If commands are not found, run `zoi shell <shell>` to configure your shell, or add `~/.zoi/pkgs/bin` to your PATH manually.
   </Accordion>
 
-  <Accordion title="How do I accept all prompts (non-interactive)?">
-    Pass `--yes` to installation commands to auto-accept confirmations and optional dependency prompts. To install all optional dependencies without being prompted, use `--all-optional`.
-  </Accordion>
+<Accordion title="How do I accept all prompts (non-interactive)?">
+  Pass `--yes` to installation commands to auto-accept confirmations and
+  optional dependency prompts. To install all optional dependencies without
+  being prompted, use `--all-optional`.
+</Accordion>
 
-  <Accordion title="How do I install from a nested repository path?">
-    Use the full path in the source, e.g. `@core/linux/amd64/nvidia-driver`.
-  </Accordion>
+<Accordion title="How do I install from a nested repository path?">
+  Use the full path in the source, e.g. `@core/linux/amd64/nvidia-driver`.
+</Accordion>
 
   <Accordion title="How do I update Zoi itself?">
     Run `zoi upgrade`. You can use `zoi upgrade --force` to upgrade even if you are on the latest version, and `zoi upgrade --tag <tag>` or `zoi upgrade --branch <branch>` to target a specific release.
@@ -560,9 +553,12 @@ Zoi is hosted on multiple forges. The primary locations and mirrors are:
     If an update causes issues, you can revert to the previously installed version using `zoi rollback <package-name>`. Zoi automatically creates a backup before upgrading a package.
   </Accordion>
 
-  <Accordion title="How can I back up and restore my installed packages?">
-    Zoi automatically keeps a record of all your installed packages in a JSON file at `~/.zoi/pkgs/zoi.pkgs.json`. You can back up this file. To restore all your packages on a new system, simply run `zoi install /path/to/your/zoi.pkgs.json`.
-  </Accordion>
+<Accordion title="How can I back up and restore my installed packages?">
+  Zoi automatically keeps a record of all your installed packages in a JSON file
+  at `~/.zoi/pkgs/zoi.pkgs.json`. You can back up this file. To restore all your
+  packages on a new system, simply run `zoi install
+  /path/to/your/zoi.pkgs.json`.
+</Accordion>
 
   <Accordion title="Does Zoi collect your data?">
     We believe in privacy by design. Zoi does **not** collect any data by

@@ -9,16 +9,16 @@ This document provides detailed guidance for packagers on how to build and packa
 
 These are required to compile Zoi from source.
 
-* **Rust Toolchain**: Zoi requires a specific version of the Rust compiler. Refer to `rust-toolchain.toml` for the exact channel and `Cargo.toml` for the Rust version and edition.
-* **C Compiler**: A C compiler like `gcc` or `clang`.
-* **OpenSSL**: Development libraries for OpenSSL (`libssl-dev` or `openssl-devel`).
-* **pkg-config**: The `pkg-config` utility.
-* **liblzma**: Development libraries for lzma (`liblzma-dev`).
-* **Git**: Required to embed the commit hash in the binary.
+- **Rust Toolchain**: Zoi requires a specific version of the Rust compiler. Refer to `rust-toolchain.toml` for the exact channel and `Cargo.toml` for the Rust version and edition.
+- **C Compiler**: A C compiler like `gcc` or `clang`.
+- **OpenSSL**: Development libraries for OpenSSL (`libssl-dev` or `openssl-devel`).
+- **pkg-config**: The `pkg-config` utility.
+- **liblzma**: Development libraries for lzma (`liblzma-dev`).
+- **Git**: Required to embed the commit hash in the binary.
 
 ## Runtime Dependencies
 
-* **Essential**: `git` is required for most of Zoi's functionality.
+- **Essential**: `git` is required for most of Zoi's functionality.
 
 ## Build Process
 
@@ -58,7 +58,7 @@ sudo make install
 
 The `scripts/` directory contains CI/CD scripts for creating release builds. These scripts automatically embed the git commit hash.
 
-* `scripts/build-release.sh`: Creates a release build for the current platform.
+- `scripts/build-release.sh`: Creates a release build for the current platform.
 
 ### Building .deb and .rpm Packages
 
@@ -190,6 +190,6 @@ These files should be installed to the appropriate system location (e.g. `/usr/s
 
 Refer to the `packages/` directory for examples of how Zoi is packaged for other managers:
 
-* **Arch Linux (AUR):** `packages/aur/zoi/PKGBUILD`
-* **Homebrew:** `packages/brew/zoi.rb`
-* **Scoop:** `packages/scoop/zoi.json`
+- **Arch Linux (AUR):** `packages/aur/zoi/PKGBUILD`
+- **Homebrew:** `packages/brew/zoi.rb`
+- **Scoop:** `packages/scoop/zoi.json`

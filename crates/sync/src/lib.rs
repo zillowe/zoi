@@ -21,7 +21,6 @@ use zoi_lua::parser as lua_parser;
 fn refresh_registry_db(
     registry_handle: &str,
     registry_path: &Path,
-    _sync_files: bool,
     m: Option<&MultiProgress>,
     verbose: bool,
     pb: Option<&ProgressBar>,
@@ -872,7 +871,6 @@ fn sync_registry(
     mut reg: types::Registry,
     db_root: &Path,
     verbose: bool,
-    sync_files: bool,
     fallback: bool,
     m: Option<&MultiProgress>,
 ) -> Result<(types::Registry, bool)> {
@@ -1040,14 +1038,7 @@ fn sync_registry(
         }
 
         if !db_downloaded {
-            refresh_registry_db(
-                &reg.handle,
-                &target_dir,
-                sync_files,
-                m,
-                verbose,
-                pb.as_ref(),
-            )?;
+            refresh_registry_db(&reg.handle, &target_dir, m, verbose, pb.as_ref())?;
         }
 
         if let Ok(repo_config) = config::read_repo_config(&target_dir)
@@ -1065,13 +1056,7 @@ fn sync_registry(
     Ok((reg, reg_changed))
 }
 
-pub fn run(
-    verbose: bool,
-    fallback: bool,
-    no_pm: bool,
-    sync_files: bool,
-    force: bool,
-) -> Result<()> {
+pub fn run(verbose: bool, fallback: bool, no_pm: bool, force: bool) -> Result<()> {
     let merged_config = config::read_config()?;
     if force {
         println!(
@@ -1143,7 +1128,7 @@ pub fn run(
             .into_par_iter()
             .map(|(reg, is_default)| {
                 let (synced_reg, changed) =
-                    sync_registry(reg, &db_root, verbose, sync_files, fallback, m.as_ref())?;
+                    sync_registry(reg, &db_root, verbose, fallback, m.as_ref())?;
                 Ok((synced_reg, changed, is_default))
             })
             .collect();

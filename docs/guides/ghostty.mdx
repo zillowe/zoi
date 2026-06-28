@@ -7,11 +7,11 @@ This guide walks through packaging [Ghostty](https://ghostty.org/) as a Zoi pack
 
 The example is based on the shape used by the existing Arch Linux and Nix packaging:
 
-* fetch the Ghostty release tarball from GitHub
-* install native build and runtime dependencies with `native:`
-* run Ghostty's Zig cache bootstrap script
-* build with `zig build`
-* split the package into main, shell integration, terminfo, and Nautilus pieces
+- fetch the Ghostty release tarball from GitHub
+- install native build and runtime dependencies with `native:`
+- run Ghostty's Zig cache bootstrap script
+- build with `zig build`
+- split the package into main, shell integration, terminfo, and Nautilus pieces
 
 <Callout title="Linux-focused guide" type="warn">
   This is a Linux source-build guide. Ghostty packaging differs across
@@ -24,12 +24,12 @@ The example is based on the shape used by the existing Arch Linux and Nix packag
 
 Ghostty maps naturally to a split package:
 
-| Sub-package | Purpose |
-| ----------- | ------- |
-| `ghostty:main` | The terminal binary, desktop files, icons, manuals, and main resources. |
+| Sub-package                 | Purpose                                                                  |
+| --------------------------- | ------------------------------------------------------------------------ |
+| `ghostty:main`              | The terminal binary, desktop files, icons, manuals, and main resources.  |
 | `ghostty:shell-integration` | Shell integration scripts that can also be installed on remote machines. |
-| `ghostty:terminfo` | Terminfo entries, useful on hosts accessed over SSH. |
-| `ghostty:nautilus` | Optional GNOME Files integration. |
+| `ghostty:terminfo`          | Terminfo entries, useful on hosts accessed over SSH.                     |
+| `ghostty:nautilus`          | Optional GNOME Files integration.                                        |
 
 Installing `ghostty` should install the main terminal plus shell integration and terminfo by default, while leaving Nautilus integration optional.
 
@@ -220,10 +220,10 @@ zoi install ./ghostty.pkg.lua
 
 When turning this into a registry package:
 
-* replace the placeholder `verify()` with the real release hash
-* confirm native package names for each supported distro
-* add or remove copied resource paths based on the current Ghostty install tree
-* consider a separate pre-compiled package once trusted release archives are available
-* keep Nautilus integration optional because it pulls in GNOME-specific dependencies
+- replace the placeholder `verify()` with the real release hash
+- confirm native package names for each supported distro
+- add or remove copied resource paths based on the current Ghostty install tree
+- consider a separate pre-compiled package once trusted release archives are available
+- keep Nautilus integration optional because it pulls in GNOME-specific dependencies
 
 For package fields and lifecycle details, see [Creating Packages](/docs/zds/zoi/creating-packages).
