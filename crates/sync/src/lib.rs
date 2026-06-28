@@ -21,7 +21,7 @@ use zoi_lua::parser as lua_parser;
 fn refresh_registry_db(
     registry_handle: &str,
     registry_path: &Path,
-    sync_files: bool,
+    _sync_files: bool,
     m: Option<&MultiProgress>,
     verbose: bool,
     pb: Option<&ProgressBar>,
@@ -69,7 +69,13 @@ fn refresh_registry_db(
         .and_then(|p| p.size.as_ref())
         .is_some();
 
-    let client = if sync_files || has_size_tpl {
+    let has_files_tpl = repo_config
+        .as_ref()
+        .and_then(|rc| rc.pkg.iter().find(|p| p.link_type == "main"))
+        .and_then(|p| p.files.as_ref())
+        .is_some();
+
+    let client = if has_size_tpl || has_files_tpl {
         core_utils::get_http_client().ok()
     } else {
         None
@@ -86,6 +92,7 @@ fn refresh_registry_db(
         PathBuf,
         Option<Vec<String>>,
         Option<(u64, u64)>,
+        Option<String>,
     )> = pkg_files
         .par_iter()
         .filter_map(|path| {
@@ -110,8 +117,7 @@ fn refresh_registry_db(
                 }
 
                 let mut file_list = None;
-                if sync_files
-                    && let Some(c) = &client
+                if let Some(c) = &client
                     && let Some(rc) = &repo_config
                     && let Some(pkg_link) = rc.pkg.iter().find(|p| p.link_type == "main")
                     && let Some(files_url_template) = &pkg_link.files
@@ -177,7 +183,40 @@ fn refresh_registry_db(
                     }
                 }
 
-                Some((pkg, path.clone(), file_list, size_info))
+                let mut hash_info = None;
+                if let Some(c) = &client
+                    && let Some(rc) = &repo_config
+                    && let Some(pkg_link) = rc.pkg.iter().find(|p| p.link_type == "main")
+                    && let Some(hash_url_template) = &pkg_link.hash
+                {
+                    let version = pkg.version.clone().unwrap_or_else(|| "latest".to_string());
+                    let hash_url = install_util::resolve_url_placeholders(
+                        hash_url_template,
+                        &pkg.name,
+                        &pkg.repo,
+                        &version,
+                        &platform,
+                    );
+
+                    if let Ok(response) = c.get(&hash_url).send()
+                        && response.status().is_success()
+                        && let Ok(content) = response.text()
+                    {
+                        let is_valid_hash = |s: &str| {
+                            let len = s.len();
+                            (len == 128 || len == 64 || len == 32)
+                                && s.chars().all(|c| c.is_ascii_hexdigit())
+                        };
+                        for word in content.split_whitespace() {
+                            if is_valid_hash(word) {
+                                hash_info = Some(word.to_string());
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                Some((pkg, path.clone(), file_list, size_info, hash_info))
             } else {
                 None
             }
@@ -201,11 +240,15 @@ fn refresh_registry_db(
 
     let tx = conn.transaction()?;
 
-    for (pkg, _path, file_list, size_info) in parsed_results {
+    for (pkg, _path, file_list, size_info, hash_info) in parsed_results {
         let pkg_id = db::update_package(&tx, &pkg, registry_handle, None, None, None)?;
 
         if let Some((down_size, install_size)) = size_info {
             let _ = db::set_package_sizes(&tx, pkg_id, down_size, install_size);
+        }
+
+        if let Some(hash) = &hash_info {
+            let _ = db::set_package_hash(&tx, pkg_id, hash);
         }
 
         if let Some(subs) = &pkg.sub_packages {
@@ -217,11 +260,15 @@ fn refresh_registry_db(
                         "Warning: failed to sync sub-package '{}:{}': {}",
                         pkg.name, sub, e
                     );
-                } else if let Some((down_size, install_size)) = &size_info
-                    && let Ok(sub_id) =
-                        db::get_package_id(&tx, &pkg.name, Some(sub), &pkg.repo, registry_handle)
+                } else if let Ok(sub_id) =
+                    db::get_package_id(&tx, &pkg.name, Some(sub), &pkg.repo, registry_handle)
                 {
-                    let _ = db::set_package_sizes(&tx, sub_id, *down_size, *install_size);
+                    if let Some((down_size, install_size)) = &size_info {
+                        let _ = db::set_package_sizes(&tx, sub_id, *down_size, *install_size);
+                    }
+                    if let Some(hash) = &hash_info {
+                        let _ = db::set_package_hash(&tx, sub_id, hash);
+                    }
                 }
             }
         }

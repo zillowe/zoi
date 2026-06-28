@@ -17,6 +17,8 @@ commands:
     run: "cargo check"
   - cmd: "test"
     run: "cargo test --all-features"
+  - cmd: "speed"
+    run: "hyperfine '~/.local/bin/zoi install @zillowe/zoko --dry-run' './dist/bin/zoi install @zillowe/zoko --dry-run'"
 
 environments:
   - name: "Prepare"

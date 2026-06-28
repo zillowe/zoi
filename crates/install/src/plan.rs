@@ -29,28 +29,18 @@ pub fn create_install_plan(
     let plan: HashMap<String, InstallAction> = graph
         .par_iter()
         .map(|(id, node)| {
-            if build || (build_type.is_some() && build_type != Some("pre-compiled") && build_type != Some("pre-built")) {
+            if build
+                || (build_type.is_some()
+                    && build_type != Some("pre-compiled")
+                    && build_type != Some("pre-built"))
+            {
                 return (id.clone(), InstallAction::BuildAndInstall);
             }
 
             let action = match util::find_prebuilt_info(node) {
                 Ok(Some(info)) => {
-                    let (down_size, inst_size) = if let Some(size_url) = &info.size_url {
-                        if zoi_core::offline::is_offline() {
-                            (node.pkg.archive_size.unwrap_or(0), node.pkg.installed_size.unwrap_or(0))
-                        } else {
-                            util::get_expected_size(size_url).unwrap_or_else(|e| {
-                                eprintln!(
-                                    "Warning: could not fetch size for {}: {}. Falling back to metadata.",
-                                    node.pkg.name,
-                                    e
-                                );
-                                (node.pkg.archive_size.unwrap_or(0), node.pkg.installed_size.unwrap_or(0))
-                            })
-                        }
-                    } else {
-                        (node.pkg.archive_size.unwrap_or(0), node.pkg.installed_size.unwrap_or(0))
-                    };
+                    let (down_size, inst_size) =
+                        util::get_package_sizes(&node.pkg, &node.registry_handle, &node.version);
 
                     InstallAction::DownloadAndInstall(PrebuiltDetails {
                         info,
@@ -60,7 +50,10 @@ pub fn create_install_plan(
                 }
                 Ok(None) => InstallAction::BuildAndInstall,
                 Err(e) => {
-                    eprintln!("Error finding prebuilt info for {}: {}. Assuming build.", node.pkg.name, e);
+                    eprintln!(
+                        "Error finding prebuilt info for {}: {}. Assuming build.",
+                        node.pkg.name, e
+                    );
                     InstallAction::BuildAndInstall
                 }
             };
