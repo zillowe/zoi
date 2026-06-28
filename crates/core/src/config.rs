@@ -334,7 +334,7 @@ pub fn read_config() -> Result<Config> {
         });
     } else if let Some(ref mut reg) = merged_cfg.default_registry
         && reg.url == get_default_registry()
-        && reg.authorities.is_none()
+        && reg.authorities.as_ref().is_none_or(|a| a.is_empty())
     {
         let builtin = get_builtin_authorities();
         if !builtin.is_empty() {

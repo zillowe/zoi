@@ -453,6 +453,10 @@ pub struct Transaction {
     pub operations: Vec<TransactionOperation>,
 }
 
+fn skip_authorities(a: &Option<Vec<String>>) -> bool {
+    a.as_ref().is_none_or(|v| v.is_empty())
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
 pub struct Registry {
     #[serde(default)]
@@ -461,7 +465,7 @@ pub struct Registry {
     pub url: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub advisory_prefix: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "skip_authorities")]
     pub authorities: Option<Vec<String>>,
 }
 

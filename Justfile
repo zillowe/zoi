@@ -34,7 +34,7 @@ all: build install setup
 build:
     @if [ "{{ _is_configured }}" != "true" ]; then echo "Error: Project not configured. Run 'just configure' first."; exit 1; fi
     @echo "Building Zoi targets: {{ WITH_BIN }} in release mode (commit: {{ COMMIT_HASH }})..."
-    @export ZOI_COMMIT_HASH={{ COMMIT_HASH }}; \
+    @set -a; source .env 2>/dev/null; export ZOI_COMMIT_HASH={{ COMMIT_HASH }}; \
     if [ "{{ WITH_BIN }}" = "zoi" ]; then \
         cargo build --bin zoi --release; \
     elif [ "{{ WITH_BIN }}" = "zoi-mini" ]; then \
@@ -47,7 +47,7 @@ build:
 dev:
     @if [ "{{ _is_configured }}" != "true" ]; then echo "Error: Project not configured. Run 'just configure' first."; exit 1; fi
     @echo "Building Zoi targets: {{ WITH_BIN }} in debug mode (commit: {{ COMMIT_HASH }})..."
-    @export ZOI_COMMIT_HASH={{ COMMIT_HASH }}; \
+    @set -a; source .env 2>/dev/null; export ZOI_COMMIT_HASH={{ COMMIT_HASH }}; \
     if [ "{{ WITH_BIN }}" = "zoi" ]; then \
         cargo build --bin zoi; \
     elif [ "{{ WITH_BIN }}" = "zoi-mini" ]; then \
