@@ -13,10 +13,10 @@ When a Zoi package enables the sandbox (`sandbox.enabled = true`), Zoi intercept
 
 By default, the sandbox is **completely empty**:
 
-* **No Network:** The network namespace is unshared.
-* **No Host Files:** The root filesystem (`/`) is an empty `tmpfs`. The host's `/usr`, `/lib`, and `/etc` are hidden.
-* **No User Data:** `/home`, `/tmp`, and `/var` are empty `tmpfs` mounts.
-* **Only the Package:** The *only* directory mounted by default is the package's own store directory (read-only).
+- **No Network:** The network namespace is unshared.
+- **No Host Files:** The root filesystem (`/`) is an empty `tmpfs`. The host's `/usr`, `/lib`, and `/etc` are hidden.
+- **No User Data:** `/home`, `/tmp`, and `/var` are empty `tmpfs` mounts.
+- **Only the Package:** The _only_ directory mounted by default is the package's own store directory (read-only).
 
 To make an application functional, you must explicitly opt-in to the resources it needs.
 
@@ -41,41 +41,41 @@ metadata({
   bins = { "firefox" },
   types = { "source" },
   platforms = { "linux" },
-  
+
   -- The core of the security isolation:
   sandbox = {
     enabled = true,
-    
+
     -- Firefox needs the internet
     network = true,
-    
-    -- Firefox is a dynamic GUI app. It needs access to the host's 
+
+    -- Firefox is a dynamic GUI app. It needs access to the host's
     -- GTK, glibc, X11, Wayland, and font libraries.
     system = true,
-    
+
     -- It does not need access to the terminal's working directory
     cwd = false,
-    
+
     -- Firefox needs to READ specific host configurations (like fonts and icons)
     read = {
       "~/.config/fontconfig",
       "~/.icons",
       "~/.local/share/icons"
     },
-    
+
     -- Firefox needs to WRITE to specific locations to function
     write = {
       -- Its profile data
       "~/.mozilla",
       "~/.cache/mozilla",
-      
+
       -- X11, Wayland, and D-Bus sockets in /run/user/1000/
       -- (Note: In a true production package, you'd use shell hooks to resolve XDG_RUNTIME_DIR)
-      "/run/user", 
-      
+      "/run/user",
+
       -- /tmp is needed for IPC
       "/tmp",
-      
+
       -- Downloads folder
       "~/Downloads"
     }
@@ -87,7 +87,7 @@ dependencies({
     types = {
       source = {
         required = {
-          "native:rust", "native:clang", "native:nodejs", 
+          "native:rust", "native:clang", "native:nodejs",
           "native:python", "native:llvm", "native:lld",
           -- ... other build dependencies ...
         }
@@ -113,7 +113,7 @@ function package()
   -- Simplified build logic:
   cmd("cd src/firefox-" .. version .. " && ./mach build")
   cmd("cd src/firefox-" .. version .. " && ./mach install DESTDIR=" .. STAGING_DIR .. "/usr")
-  
+
   -- Stage binary to pkgstore
   zcp(STAGING_DIR .. "/usr/bin/firefox", "${pkgstore}/bin/firefox")
   zcp(STAGING_DIR .. "/usr/lib/firefox", "${pkgstore}/lib/firefox")
@@ -146,24 +146,24 @@ bwrap \
 
 If Firefox is compromised by a malicious website, the attacker **cannot**:
 
-* Read your `~/.ssh/id_rsa` keys.
-* Read your `~/Documents`.
-* See other running processes.
-* Modify the host operating system.
+- Read your `~/.ssh/id_rsa` keys.
+- Read your `~/Documents`.
+- See other running processes.
+- Modify the host operating system.
 
 They are strictly confined to `~/.mozilla` and `~/Downloads`.
 
 ## Sandbox Fields
 
-| Field | Description |
-|---|---|
-| `enabled` | `boolean`. Activates Bubblewrap execution for this package on Linux. |
-| `network` | `boolean`. If `false`, the network namespace is unshared (no internet). |
-| `system` | `boolean`. If `true`, read-only mounts `/usr`, `/lib`, `/bin`, `/sbin`, `/etc/ssl`, and basic DNS configs, and mounts `/dev` and `/proc`. Required for dynamically linked apps. |
-| `cwd` | `boolean`. If `true`, the current terminal working directory is mounted read-write. |
-| `read` | `string[]`. A list of paths to mount read-only. Supports `~/` expansion. |
-| `write` | `string[]`. A list of paths to mount read-write. Zoi will attempt to create the parent directories on the host if they don't exist. Supports `~/` expansion. |
-| `env` | `string[]`. A list of host environment variables to pass through to the sandbox. (Note: If `system = true`, common GUI/Display variables are passed automatically). |
+| Field     | Description                                                                                                                                                                     |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `enabled` | `boolean`. Activates Bubblewrap execution for this package on Linux.                                                                                                            |
+| `network` | `boolean`. If `false`, the network namespace is unshared (no internet).                                                                                                         |
+| `system`  | `boolean`. If `true`, read-only mounts `/usr`, `/lib`, `/bin`, `/sbin`, `/etc/ssl`, and basic DNS configs, and mounts `/dev` and `/proc`. Required for dynamically linked apps. |
+| `cwd`     | `boolean`. If `true`, the current terminal working directory is mounted read-write.                                                                                             |
+| `read`    | `string[]`. A list of paths to mount read-only. Supports `~/` expansion.                                                                                                        |
+| `write`   | `string[]`. A list of paths to mount read-write. Zoi will attempt to create the parent directories on the host if they don't exist. Supports `~/` expansion.                    |
+| `env`     | `string[]`. A list of host environment variables to pass through to the sandbox. (Note: If `system = true`, common GUI/Display variables are passed automatically).             |
 
 ## Testing Your Sandbox
 

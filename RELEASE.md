@@ -26,7 +26,7 @@ We operate on a cyclical release model with four main release branches, each ser
 
 The promotion of code from one release branch to another follows this sequence:
 
-1.  **Development**: All new code is initially considered part of the `Development` release branch.
-2.  **Public Testing**: Periodically, a version from `Development` is promoted to the `Public` release branch to create a pre-release for wider testing.
-3.  **Production Release**: After a version has been stabilized in the `Public` branch, it is promoted to the `Production` branch for the official release. In some cases, a `Development` version can be promoted directly to `Production` if a public testing phase is not required.
-4.  **Special Builds**: When needed, specific features can be released to the `Special` branch for isolated testing.
+1. **Development**: All new code is initially considered part of the `Development` release branch.
+2. **Public Testing**: Periodically, a version from `Development` is promoted to the `Public` release branch to create a pre-release for wider testing.
+3. **Production Release**: After a version has been stabilized in the `Public` branch, it is promoted to the `Production` branch for the official release. In some cases, a `Development` version can be promoted directly to `Production` if a public testing phase is not required.
+4. **Special Builds**: When needed, specific features can be released to the `Special` branch for isolated testing.

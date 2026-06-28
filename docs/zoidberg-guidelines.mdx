@@ -35,24 +35,24 @@ Building from source is strongly preferred. It provides maximum transparency, al
 
 Pre-compiled binaries are allowed for ecosystems where source builds are impractical for end-users (e.g. massive Rust tools or complex Windows applications). If using pre-compiled archives:
 
-* **Verification:** You MUST use `verifyHash()` with a strong algorithm (SHA-256 or SHA-512) and are encouraged to use `verifySignature()` with author PGP keys.
-* **Static vs. Dynamic:** Prefer statically linked binaries for `pre-compiled` types to maximize portability.
+- **Verification:** You MUST use `verifyHash()` with a strong algorithm (SHA-256 or SHA-512) and are encouraged to use `verifySignature()` with author PGP keys.
+- **Static vs. Dynamic:** Prefer statically linked binaries for `pre-compiled` types to maximize portability.
 
 ## 3. Naming Standards
 
 ### 3.1. General Naming
 
-* **Lowercase:** All package names must be lowercase.
-* **Character Set:** Use only ASCII alphanumeric characters and the hyphen (`-`).
-* **Separators:** Use hyphens to separate words (e.g. `ripgrep`, `my-cool-tool`). Avoid underscores or periods.
+- **Lowercase:** All package names must be lowercase.
+- **Character Set:** Use only ASCII alphanumeric characters and the hyphen (`-`).
+- **Separators:** Use hyphens to separate words (e.g. `ripgrep`, `my-cool-tool`). Avoid underscores or periods.
 
 ### 3.2. Sub-packages
 
 Utilize Zoi's `sub_packages` feature to keep the main installation lean. Standard sub-package names include:
 
-* `:headers` (or `:devel`): For C/C++ development headers and static libs.
-* `:docs`: For manuals, examples, and heavy documentation.
-* `:lib`: For shared libraries if the binary is separate.
+- `:headers` (or `:devel`): For C/C++ development headers and static libs.
+- `:docs`: For manuals, examples, and heavy documentation.
+- `:lib`: For shared libraries if the binary is separate.
 
 ## 4. Versioning & Revisions
 
@@ -64,8 +64,8 @@ The `version` field must match the upstream version verbatim. If upstream uses a
 
 The `revision` field (defaulting to `"1"`) tracks downstream packaging changes for the same upstream version.
 
-* **Increment** if you fix a bug in the `.pkg.lua` script or update a dependency.
-* **Reset** to `"1"` whenever the upstream `version` is bumped.
+- **Increment** if you fix a bug in the `.pkg.lua` script or update a dependency.
+- **Reset** to `"1"` whenever the upstream `version` is bumped.
 
 ### 4.3. Pre-releases
 
@@ -77,9 +77,9 @@ Follow SemVer patterns for pre-releases (e.g. `1.0.0-rc1`).
 
 Zoidberg packages should leverage the most appropriate manager for the task:
 
-* **`zoi:`**: For other Zoi-native tools or components.
-* **`native:`**: For core system libraries (like `openssl` or `glibc`) where the host's package manager is the safest source.
-* **`npm:`, `cargo:`, `pip:`**: For language-specific tools that should remain isolated or versioned within their ecosystem.
+- **`zoi:`**: For other Zoi-native tools or components.
+- **`native:`**: For core system libraries (like `openssl` or `glibc`) where the host's package manager is the safest source.
+- **`npm:`, `cargo:`, `pip:`**: For language-specific tools that should remain isolated or versioned within their ecosystem.
 
 ### 5.2. No Vendoring
 

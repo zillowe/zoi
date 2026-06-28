@@ -44,39 +44,40 @@ metadata({
 
 This table lists all the available fields you can use inside the `metadata` block.
 
-| Field            | Type      | Description                                                                                                                                                                                                 |
-| ---------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`           | `string`  | **Required.** The name of the package.                                                                                                                                                                      |
-| `repo`           | `string`  | **Required.** The repository tier where the package belongs (e.g. `core`, `community`).                                                                                                                     |
-| `version`        | `string`  | The package version. Set either `version` or `versions`. Can be hardcoded or determined dynamically.                                                                                                        |
-| `revision`       | `string`  | The package revision (defaults to `"1"`). Increment this to trigger an update when the package definition changes but the upstream version remains the same.                                                |
-| `versions`       | `table`   | A map of channels to versions (e.g. `{ stable = "1.2.3", beta = "1.4.0" }`). Required if `version` is not set.                                                                                              |
-| `description`    | `string`  | **Required.** A short, one-line description of the package.                                                                                                                                                 |
-| `website`        | `string`  | The official website of the software.                                                                                                                                                                       |
-| `git`            | `string`  | The source code's git repository URL.                                                                                                                                                                       |
-| `man`            | `string`  | A URL to the package's manual page (can be a raw markdown or text file).                                                                                                                                    |
-| `maintainer`     | `table`   | **Required.** A table with `name`, `email`, and optionally `website` of the package maintainer.                                                                                                             |
-| `author`         | `table`   | A table with `name`, `email`, and `website` of the original software author.                                                                                                                                |
-| `license`        | `string`  | The [SPDX license identifier](https://spdx.org/licenses/) for the software (e.g. `MIT`, `GPL-3.0-or-later`).                                                                                                |
-| `bins`           | `list`    | A list of binary names the package provides. Zoi will create symlinks for these in a directory on the user's `PATH`.                                                                                        |
-| `conflicts`      | `list`    | A list of other package names that this package conflicts with.                                                                                                                                             |
-| `provides`       | `list`    | A list of virtual package names this package provides. Other packages can depend on these.                                                                                                                  |
-| `replaces`       | `list`    | A list of packages that this package replaces. Zoi will offer to remove them upon installation.                                                                                                             |
-| `backup`         | `list`    | A list of configuration files to preserve during upgrades. Zoi will create `.zoinew` and `.zoisave` files for these.                                                                                        |
-| `types`          | `list`    | **Required for buildable packages.** A list of supported build methods (e.g. `source`, `pre-compiled`).                                                                                                     |
-| `platforms`      | `list`    | A list of supported platforms (e.g. `linux`, `macos`, `windows`, `linux-amd64`). If specified, builds for other platforms will be skipped.                                                                  |
-| `type`           | `string`  | The type of package. Can be `package` (default), `collection`, `app`, or `extension`. See [Package Types](#5-package-types).                                                                                |
-| `scope`          | `string`  | The default installation scope (`user`, `system`, or `project`). Users can override this with CLI flags.                                                                                                    |
-| `sub_packages`   | `list`    | A list of sub-package names to define a split package. See [Split Packages](#6-split-packages).                                                                                                             |
-| `main_subs`      | `list`    | For a split package, a list of the default sub-packages to install.                                                                                                                                         |
-| `extension`      | `table`   | Extension metadata for `type = "extension"` packages. Usually declared directly in `metadata`.                                                                                                              |
-| `alt`            | `string`  | A URL or source string for an alternative package definition to use instead of this one. **Note:** If using a remote URL, you should append a hash fragment (e.g. `#sha256-...`) for security verification. |
-| `tags`           | `list`    | A list of keywords to help users find the package via `zoi search`.                                                                                                                                         |
-| `readme`         | `string`  | A URL to the package's README file.                                                                                                                                                                         |
-| `rollback`       | `boolean` | If `false`, disables rollback for this specific package even if enabled globally.                                                                                                                           |
-| `installed_size` | `integer` | The expected size of the package after installation (in bytes). Used for disk space checks.                                                                                                                 |
-| `archive_size`   | `integer` | The size of the pre-compiled archive (in bytes).                                                                                                                                                            |
-| `sandbox`        | `table`   | Configuration for Linux-native Bubblewrap isolation. See the [Sandboxing Apps](/docs/zds/zoi/guides/sandboxing) guide.                                                                                      |
+| Field            | Type      | Description                                                                                                                                                                                                                                 |
+| ---------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`           | `string`  | **Required.** The name of the package.                                                                                                                                                                                                      |
+| `repo`           | `string`  | **Required.** The repository tier where the package belongs (e.g. `core`, `community`).                                                                                                                                                     |
+| `version`        | `string`  | The package version. Set either `version` or `versions`. Can be hardcoded or determined dynamically.                                                                                                                                        |
+| `revision`       | `string`  | The package revision (defaults to `"1"`). Increment this to trigger an update when the package definition changes but the upstream version remains the same.                                                                                |
+| `versions`       | `table`   | A map of channels to versions (e.g. `{ stable = "1.2.3", beta = "1.4.0" }`). Required if `version` is not set.                                                                                                                              |
+| `description`    | `string`  | **Required.** A short, one-line description of the package.                                                                                                                                                                                 |
+| `website`        | `string`  | The official website of the software.                                                                                                                                                                                                       |
+| `git`            | `string`  | The source code's git repository URL.                                                                                                                                                                                                       |
+| `man`            | `string`  | A URL to the package's manual page (can be a raw markdown or text file).                                                                                                                                                                    |
+| `maintainer`     | `table`   | **Required.** A table with `name`, `email`, and optionally `website` of the package maintainer.                                                                                                                                             |
+| `author`         | `table`   | A table with `name`, `email`, and `website` of the original software author.                                                                                                                                                                |
+| `license`        | `string`  | The [SPDX license identifier](https://spdx.org/licenses/) for the software (e.g. `MIT`, `GPL-3.0-or-later`).                                                                                                                                |
+| `bins`           | `list`    | A list of binary names the package provides. Zoi will create symlinks for these in a directory on the user's `PATH`.                                                                                                                        |
+| `conflicts`      | `list`    | A list of other package names that this package conflicts with.                                                                                                                                                                             |
+| `provides`       | `list`    | A list of virtual package names this package provides. Other packages can depend on these.                                                                                                                                                  |
+| `replaces`       | `list`    | A list of packages that this package replaces. Zoi will offer to remove them upon installation.                                                                                                                                             |
+| `backup`         | `list`    | A list of configuration files to preserve during upgrades. Zoi will create `.zoinew` and `.zoisave` files for these.                                                                                                                        |
+| `types`          | `list`    | **Required for buildable packages.** A list of supported build methods (e.g. `source`, `pre-compiled`).                                                                                                                                     |
+| `platforms`      | `list`    | A list of supported platforms (e.g. `linux`, `macos`, `windows`, `linux-amd64`). If specified, builds for other platforms will be skipped. Use `ci:<target>:<build>` (e.g. `ci:windows-amd64:linux`) for cross-compilation in CI pipelines. |
+| `ci`             | `table`   | CI runner configuration for build pipelines. See [CI Runner Support](#ci-runner-support) below.                                                                                                                                             |
+| `type`           | `string`  | The type of package. Can be `package` (default), `collection`, `app`, or `extension`. See [Package Types](#5-package-types).                                                                                                                |
+| `scope`          | `string`  | The default installation scope (`user`, `system`, or `project`). Users can override this with CLI flags.                                                                                                                                    |
+| `sub_packages`   | `list`    | A list of sub-package names to define a split package. See [Split Packages](#6-split-packages).                                                                                                                                             |
+| `main_subs`      | `list`    | For a split package, a list of the default sub-packages to install.                                                                                                                                                                         |
+| `extension`      | `table`   | Extension metadata for `type = "extension"` packages. Usually declared directly in `metadata`.                                                                                                                                              |
+| `alt`            | `string`  | A URL or source string for an alternative package definition to use instead of this one. **Note:** If using a remote URL, you should append a hash fragment (e.g. `#sha256-...`) for security verification.                                 |
+| `tags`           | `list`    | A list of keywords to help users find the package via `zoi search`.                                                                                                                                                                         |
+| `readme`         | `string`  | A URL to the package's README file.                                                                                                                                                                                                         |
+| `rollback`       | `boolean` | If `false`, disables rollback for this specific package even if enabled globally.                                                                                                                                                           |
+| `installed_size` | `integer` | The expected size of the package after installation (in bytes). Used for disk space checks.                                                                                                                                                 |
+| `archive_size`   | `integer` | The size of the pre-compiled archive (in bytes).                                                                                                                                                                                            |
+| `sandbox`        | `table`   | Configuration for Linux-native Bubblewrap isolation. See the [Sandboxing Apps](/docs/zds/zoi/guides/sandboxing) guide.                                                                                                                      |
 
 ---
 
@@ -436,7 +437,42 @@ Once a package with a service is installed, you can manage it using the `zoi ser
 
 ---
 
-## 10. The Packaging Workflow
+## 10. CI Runner Support
+
+Zoi supports building packages in CI/CD pipelines. The `ci` metadata field configures runner requirements for each platform.
+
+### CI Configuration
+
+```lua
+metadata({
+  name = "my-tool",
+  -- ...
+  platforms = { "linux-amd64", "ci:windows-amd64:linux" },
+  ci = {
+    tags = {
+      linux = "saas-linux-medium-amd64",
+      macos = "saas-macos-medium-amd64",
+    }
+  }
+})
+```
+
+### Fields
+
+| Field  | Type    | Description                                                                         |
+| ------ | ------- | ----------------------------------------------------------------------------------- |
+| `tags` | `table` | A map of OS names to CI runner tags (e.g. `{ linux = "saas-linux-medium-amd64" }`). |
+
+### Cross-Compilation with `ci:` Platform Prefix
+
+The `ci:<target>:<build>` platform prefix tells Zoi that a package should be built on `<build>` platform and produce artifacts for `<target>` platform.
+
+- `ci:windows-amd64:linux` — Build for Windows AMD64 on a Linux runner.
+- `ci:linux-amd64:macos` — Build for Linux AMD64 on a macOS runner.
+
+---
+
+## 11. The Packaging Workflow
 
 Follow these steps to develop, build, and test your package.
 
@@ -537,7 +573,7 @@ zoi package install /path/to/your-package-1.0.0-linux-amd64.pkg.tar.zst
 
 ---
 
-## 11. Full Walkthrough: 'hello' Package
+## 12. Full Walkthrough: 'hello' Package
 
 This example demonstrates many of the concepts above by packaging a simple "Hello, World!" program written in Zig.
 

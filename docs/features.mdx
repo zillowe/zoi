@@ -7,140 +7,140 @@ Zoi is packed with features designed to make package management and environment 
 
 ## Core Features
 
-* **Cross-Platform:** Works natively on Linux, macOS, and Windows, supporting `amd64` and `arm64` architectures. Write one package definition and let Zoi handle the platform differences.
-  * **macOS Integration:** Automatically handles macOS `.app` bundles, stripping Gatekeeper quarantine flags and symlinking them to `~/Applications` or `/Applications`.
+- **Cross-Platform:** Works natively on Linux, macOS, and Windows, supporting `amd64` and `arm64` architectures. Write one package definition and let Zoi handle the platform differences.
+  - **macOS Integration:** Automatically handles macOS `.app` bundles, stripping Gatekeeper quarantine flags and symlinking them to `~/Applications` or `/Applications`.
 
-* **Just-in-Time Privilege Escalation:** Automatically prompts for `sudo` password only when system-wide operations (like extracting to `/var/lib/zoi` or linking to `/usr/local/bin`) are required. This ensures your local package database and caches remain in your user-space, avoiding the need to run the entire CLI as root.
+- **Just-in-Time Privilege Escalation:** Automatically prompts for `sudo` password only when system-wide operations (like extracting to `/var/lib/zoi` or linking to `/usr/local/bin`) are required. This ensures your local package database and caches remain in your user-space, avoiding the need to run the entire CLI as root.
 
-* **Sysroot Support (`--root`):** Operates on a different root directory, allowing you to bootstrap entire OS images, containers, or embedded systems from the outside.
+- **Sysroot Support (`--root`):** Operates on a different root directory, allowing you to bootstrap entire OS images, containers, or embedded systems from the outside.
 
-* **Metadata Caching:** Uses an optimized SQLite database with FTS5 indexing for near-instant search and listing of thousands of packages, ensuring performance scales to enterprise levels.
+- **Metadata Caching:** Uses an optimized SQLite database with FTS5 indexing for near-instant search and listing of thousands of packages, ensuring performance scales to enterprise levels.
 
-* **Dependency Tree Visualization (`zoi tree`):** View the exact Directed Acyclic Graph (DAG) resolved by the SAT solver, showing exactly why specific versions were chosen.
+- **Dependency Tree Visualization (`zoi tree`):** View the exact Directed Acyclic Graph (DAG) resolved by the SAT solver, showing exactly why specific versions were chosen.
 
-* **SAT-Powered Dependency Resolution:** Uses the PubGrub algorithm (the same engine powering Cargo and uv) to mathematically solve complex version constraints, automatically handling backtracking and deep version clashing for 100% reliable system upgrades.
+- **SAT-Powered Dependency Resolution:** Uses the PubGrub algorithm (the same engine powering Cargo and uv) to mathematically solve complex version constraints, automatically handling backtracking and deep version clashing for 100% reliable system upgrades.
 
-* **Decentralized Security Advisories:** Automated vulnerability tracking via `.sec.yaml` files co-located with packages in the registry. Zoi proactively warns you during installation or upgrades if a package has known security issues, requiring explicit confirmation to proceed.
+- **Decentralized Security Advisories:** Automated vulnerability tracking via `.sec.yaml` files co-located with packages in the registry. Zoi proactively warns you during installation or upgrades if a package has known security issues, requiring explicit confirmation to proceed.
 
-* **Strict Offline Mode:** A global `--offline` flag that guarantees Zoi will not touch the network, relying exclusively on local metadata and archive caches for secure, air-gapped environments.
+- **Strict Offline Mode:** A global `--offline` flag that guarantees Zoi will not touch the network, relying exclusively on local metadata and archive caches for secure, air-gapped environments.
 
-* **Native Linux Sandboxing:** Run packages in a secure, "default-deny" isolated environment using Bubblewrap. Package maintainers explicitly define network, system, and file access permissions, protecting your host system from malicious or buggy software.
+- **Native Linux Sandboxing:** Run packages in a secure, "default-deny" isolated environment using Bubblewrap. Package maintainers explicitly define network, system, and file access permissions, protecting your host system from malicious or buggy software.
 
-* **Reproducible Project Installs (`--frozen-lockfile`):** Rebuild a project environment from `zoi.lock` without re-resolving versions, sub-packages, or recorded dependency choices.
+- **Reproducible Project Installs (`--frozen-lockfile`):** Rebuild a project environment from `zoi.lock` without re-resolving versions, sub-packages, or recorded dependency choices.
 
-* **Global Transaction Hooks:** Automate system maintenance tasks (like font cache updates) based on modified file paths. Hooks run once per transaction, preventing redundant script execution.
+- **Global Transaction Hooks:** Automate system maintenance tasks (like font cache updates) based on modified file paths. Hooks run once per transaction, preventing redundant script execution.
 
-* **Transaction Inspection:** Inspect recorded package operations and touched files with `zoi transaction list`, `zoi transaction show`, and `zoi transaction files`.
+- **Transaction Inspection:** Inspect recorded package operations and touched files with `zoi transaction list`, `zoi transaction show`, and `zoi transaction files`.
 
-* **Development Shells (`zoi dev`):** Enter a subshell where all project dependencies are locally installed and environment variables like `LD_LIBRARY_PATH`, `CPATH`, and `PKG_CONFIG_PATH` are automatically configured for seamless development.
+- **Development Shells (`zoi dev`):** Enter a subshell where all project dependencies are locally installed and environment variables like `LD_LIBRARY_PATH`, `CPATH`, and `PKG_CONFIG_PATH` are automatically configured for seamless development.
 
-* **Service Management (`zoi service`):** Define background processes in `.pkg.lua` and manage them via Zoi using your system's native manager (`systemd`, `launchd`, or `sc.exe`).
+- **Service Management (`zoi service`):** Define background processes in `.pkg.lua` and manage them via Zoi using your system's native manager (`systemd`, `launchd`, or `sc.exe`).
 
-* **Reverse Search (`zoi provides`):** Instantly find which package provides a specific binary or file path across the entire registry.
+- **Reverse Search (`zoi provides`):** Instantly find which package provides a specific binary or file path across the entire registry.
 
-* **Version Multiplexing via Intelligent Shims:** Automatically switch between different versions of the same tool (e.g. Node.js 18 vs 20) based on your current project (`zoi.yaml`), global configuration, or legacy files (like `.nvmrc` and `.python-version`) via its extensible Lua plugin system. Replaces static symlinks with intelligent shims that resolve the correct version at runtime.
+- **Version Multiplexing via Intelligent Shims:** Automatically switch between different versions of the same tool (e.g. Node.js 18 vs 20) based on your current project (`zoi.yaml`), global configuration, or legacy files (like `.nvmrc` and `.python-version`) via its extensible Lua plugin system. Replaces static symlinks with intelligent shims that resolve the correct version at runtime.
 
-* **Generic Project Handlers via Plugins:** Extend `zoi install` to support any ecosystem (NPM, Pip, etc.) by implementing simple Lua hooks that detect project files and manage dependencies using native high-performance APIs.
+- **Generic Project Handlers via Plugins:** Extend `zoi install` to support any ecosystem (NPM, Pip, etc.) by implementing simple Lua hooks that detect project files and manage dependencies using native high-performance APIs.
 
-* **Ephemeral Environments:** Enter a temporary subshell with specific packages available in `PATH` without installing them globally. Perfect for testing tools or running scripts with specific language versions.
+- **Ephemeral Environments:** Enter a temporary subshell with specific packages available in `PATH` without installing them globally. Perfect for testing tools or running scripts with specific language versions.
 
-* **Dynamic Package Definitions:** Packages are defined using `.pkg.lua` scripts, offering unparalleled flexibility. Use Lua to dynamically determine download URLs, set up build steps, and handle platform-specific logic.
+- **Dynamic Package Definitions:** Packages are defined using `.pkg.lua` scripts, offering unparalleled flexibility. Use Lua to dynamically determine download URLs, set up build steps, and handle platform-specific logic.
 
-* **Universal Package Support:** Install software from any source:
-  * Pre-compiled binaries
-  * Compressed archives (`.tar.gz`, `.zip`, `.tar.xz`, etc.)
-  * Build from source code
-  * Local archive search directories (`--pkg-dir`)
+- **Universal Package Support:** Install software from any source:
+  - Pre-compiled binaries
+  - Compressed archives (`.tar.gz`, `.zip`, `.tar.xz`, etc.)
+  - Build from source code
+  - Local archive search directories (`--pkg-dir`)
 
-* **Extensive Dependency Management:** Zoi integrates with over 40 external package managers. You can define dependencies from `apt`, `brew`, `cargo`, `npm`, `pip`, `go`, `zig`, and many more, and Zoi will install them using the native manager, [learn more](/docs/zds/zoi/dependencies).
+- **Extensive Dependency Management:** Zoi integrates with over 40 external package managers. You can define dependencies from `apt`, `brew`, `cargo`, `npm`, `pip`, `go`, `zig`, and many more, and Zoi will install them using the native manager, [learn more](/docs/zds/zoi/dependencies).
 
-* **Rich Dependencies:** Go beyond simple lists. Define `runtime` and `build` dependencies with:
-  * `required`: Dependencies that are always installed.
-  * `optional`: Dependencies that the user is prompted to install.
-  * `options`: Groups of dependencies where the user can select one or more.
+- **Rich Dependencies:** Go beyond simple lists. Define `runtime` and `build` dependencies with:
+  - `required`: Dependencies that are always installed.
+  - `optional`: Dependencies that the user is prompted to install.
+  - `options`: Groups of dependencies where the user can select one or more.
 
-* **Changing Install Reasons:** Use `zoi mark` to change whether a package is considered an explicit installation or a dependency, enabling granular control over `zoi autoremove`.
+- **Changing Install Reasons:** Use `zoi mark` to change whether a package is considered an explicit installation or a dependency, enabling granular control over `zoi autoremove`.
 
-* **Project-Level Environments:** Use a `zoi.yaml` file in your project root to define custom commands and development environments. Manage project-specific tasks, tools, packages, and environment variables with `zoi run`, `zoi env`, and `zoi dev`, [learn more](/docs/zds/zoi/project-config).
+- **Project-Level Environments:** Use a `zoi.yaml` file in your project root to define custom commands and development environments. Manage project-specific tasks, tools, packages, and environment variables with `zoi run`, `zoi env`, and `zoi dev`, [learn more](/docs/zds/zoi/project-config).
 
-* **Repository-Based System:** Zoi uses Git-based repositories to store package definitions. Use the official Zoidberg registry, add community repositories, or create your own private or public repositories with `zoi repo add`.
+- **Repository-Based System:** Zoi uses Git-based repositories to store package definitions. Use the official Zoidberg registry, add community repositories, or create your own private or public repositories with `zoi repo add`.
 
-* **Secure and Verifiable:** Ensure the integrity and authenticity of your packages:
-  * **Checksums:** Verify downloads against `SHA512`, `SHA256`, or `MD5` hashes.
-    * **GPG Signatures:** Verify package archives against maintainer PGP keys. Manage keys easily with the `zoi pgp` command set.
-    * **Built-in Keyring:** Supports baking trusted public keys directly into the Zoi binary for out-of-the-box registry verification.
-    * **Enhanced File Conflict Detection:** Prevents packages from accidentally overwriting existing files. Supports checking conflicts via remote metadata **before** downloading the package and automatically handles safe upgrades by ignoring existing files owned by the same package.
-    * **Configuration File Handling:** Automatically handles updates to configuration files, creating `.zoinew` files for new versions and `.zoisave` files for user-modified configurations upon removal.
+- **Secure and Verifiable:** Ensure the integrity and authenticity of your packages:
+  - **Checksums:** Verify downloads against `SHA512`, `SHA256`, or `MD5` hashes.
+    - **GPG Signatures:** Verify package archives against maintainer PGP keys. Manage keys easily with the `zoi pgp` command set.
+    - **Built-in Keyring:** Supports baking trusted public keys directly into the Zoi binary for out-of-the-box registry verification.
+    - **Enhanced File Conflict Detection:** Prevents packages from accidentally overwriting existing files. Supports checking conflicts via remote metadata **before** downloading the package and automatically handles safe upgrades by ignoring existing files owned by the same package.
+    - **Configuration File Handling:** Automatically handles updates to configuration files, creating `.zoinew` files for new versions and `.zoisave` files for user-modified configurations upon removal.
 
 ## Advanced Capabilities
 
-* **Virtual Packages (`provides`):** Declare that a package provides a certain feature or virtual package, allowing other packages to depend on it.
+- **Virtual Packages (`provides`):** Declare that a package provides a certain feature or virtual package, allowing other packages to depend on it.
 
-* **Package Replacement (`replaces`):** Explicitly declare that a package replaces another, prompting for the removal of the old package upon installation.
+- **Package Replacement (`replaces`):** Explicitly declare that a package replaces another, prompting for the removal of the old package upon installation.
 
-* **Smart Provider Selection:** When multiple packages provide the same virtual dependency (e.g. `mariadb` and `mysql` both providing `sql-server`), Zoi presents an interactive comparison table showing licenses, sizes, and descriptions, allowing you to choose the best provider for your needs.
+- **Smart Provider Selection:** When multiple packages provide the same virtual dependency (e.g. `mariadb` and `mysql` both providing `sql-server`), Zoi presents an interactive comparison table showing licenses, sizes, and descriptions, allowing you to choose the best provider for your needs.
 
-* **Versatile Package Types:** Zoi supports more than just standard applications:
-  * `Package`: A standard software package.
-  * `Collection`: A metapackage that groups other packages together.
-  * `App`: A template for bootstrapping new projects (`zoi create`).
-  * `Extension`: A package that modifies Zoi's own configuration.
+- **Versatile Package Types:** Zoi supports more than just standard applications:
+  - `Package`: A standard software package.
+  - `Collection`: A metapackage that groups other packages together.
+  - `App`: A template for bootstrapping new projects (`zoi create`).
+  - `Extension`: A package that modifies Zoi's own configuration.
 
-* **Package Testing:** An integrated testing framework (`zoi package test`) allows authors to define and run tests for their packages directly from the `.pkg.lua` file, ensuring package quality and correctness before publishing.
+- **Package Testing:** An integrated testing framework (`zoi package test`) allows authors to define and run tests for their packages directly from the `.pkg.lua` file, ensuring package quality and correctness before publishing.
 
-* **Split Packages:** Define a package that can be split into multiple, independently installable sub-packages. This is perfect for large projects like the Linux kernel, where you can separate the kernel, headers, and docs. Zoi manages these components granularly; uninstalling or rolling back one sub-package will not interfere with other installed components from the same base project.
+- **Split Packages:** Define a package that can be split into multiple, independently installable sub-packages. This is perfect for large projects like the Linux kernel, where you can separate the kernel, headers, and docs. Zoi manages these components granularly; uninstalling or rolling back one sub-package will not interfere with other installed components from the same base project.
 
-* **Local Package Development:** A dedicated `zoi package` command set streamlines the creation and testing of packages locally:
-  * `zoi package build`: Build a distributable package archive (`.pkg.tar.zst`).
-  * `zoi package install`: Install a package from a local archive for testing.
-  * `zoi package doctor`: Lint and validate `.pkg.lua` definitions before testing/building.
-  * `zoi package inspect`: Parse a package definition and output resolved metadata (supports JSON).
-  * `zoi package init-lsp`: Initialize LSP support with EmmyLua type definitions and `.luarc.json`.
+- **Local Package Development:** A dedicated `zoi package` command set streamlines the creation and testing of packages locally:
+  - `zoi package build`: Build a distributable package archive (`.pkg.tar.zst`).
+  - `zoi package install`: Install a package from a local archive for testing.
+  - `zoi package doctor`: Lint and validate `.pkg.lua` definitions before testing/building.
+  - `zoi package inspect`: Parse a package definition and output resolved metadata (supports JSON).
+  - `zoi package init-lsp`: Initialize LSP support with EmmyLua type definitions and `.luarc.json`.
 
-* **Powerful CLI Tools:** Zoi offers a rich set of commands for package management and inspection:
-  * `zoi about`: Show application information, credits, and build details.
-  * `zoi audit`: Scan installed packages for known security vulnerabilities.
-  * `zoi autoremove`: Remove packages that were installed as dependencies but are no longer needed.
-  * `zoi cache`: Manage and populate the local package archive cache.
-  * `zoi clean`: Clear the cache of downloaded package binaries.
-  * `zoi clone`: Clone the git repository of a package to a local directory.
-  * `zoi dev`: Enter a development shell for the current project, with environment variables (PATH, LD\_LIBRARY\_PATH, CPATH, etc.) automatically set up based on dependencies.
-  * `zoi downgrade`: Interactively choose and install an older version of a package.
-  * `zoi exec`: Download and run a package's binary in a temporary cache without a full installation.
-  * `zoi files`: List all files owned by an installed package.
-  * `zoi history`: View the audit log of past package operations (install, uninstall, upgrade).
-  * `zoi info`: Display detected system information, including OS, architecture, and available package managers.
-  * `zoi list`: List all installed packages, or all available packages from active repositories.
-  * `zoi man`: Read package manuals directly in the terminal.
-  * `zoi mark`: Change the installation reason of a package (explicit vs dependency).
-  * `zoi migrate scoop`: Convert a Scoop manifest (`.json`) into a Zoi `.pkg.lua`.
-  * `zoi owner`: Find which package owns a specific file on the system.
-  * `zoi pin`: Lock a package to a specific version to prevent updates.
-  * `zoi provides`: Find which package provides a specific command or file.
-  * `zoi rollback`: Revert a package to its previously installed version or roll back the newest remaining transaction log.
-  * `zoi search`: Searches for packages by name or description.
-  * `zoi service`: Manage background services for installed packages.
-  * `zoi tree`: Visualize the dependency tree of a package.
-  * `zoi transaction`: Inspect recorded transactions and the files they changed.
-  * `zoi unpin`: Unpin a package, allowing it to be updated again.
-  * `zoi version`: Print concise version and build information.
-  * `zoi why`: Understand why a specific package is installed (e.g. as a dependency).
-  * `zoi doctor`: Checks for common issues with your Zoi installation and provides actionable suggestions. It performs the following checks:
-    * **Broken Symlinks:** Scans for broken symbolic links in Zoi's binary directories.
-    * **PATH Configuration:** Verifies that the Zoi binary directory is included in your system's `PATH`.
-    * **Outdated Repositories:** Checks if your local package database has been synced recently.
-    * **Orphaned Packages:** Identifies packages installed as dependencies that are no longer needed by any other package.
-    * **Duplicate Package IDs:** Identifies packages with the same name/path across different registries, which can cause ambiguity.
-    * **PGP Configuration:** Verifies if trusted PGP keys specified in your configuration are present in the local keyring.
-    * **Package Record Integrity:** Validates that all packages recorded in `zoi.pkgs.json` are actually present in the installation store.
-    * **Ghost Dependents:** Scans for broken dependent links where the parent package is missing, offering to prune them.
+- **Powerful CLI Tools:** Zoi offers a rich set of commands for package management and inspection:
+  - `zoi about`: Show application information, credits, and build details.
+  - `zoi audit`: Scan installed packages for known security vulnerabilities.
+  - `zoi autoremove`: Remove packages that were installed as dependencies but are no longer needed.
+  - `zoi cache`: Manage and populate the local package archive cache.
+  - `zoi clean`: Clear the cache of downloaded package binaries.
+  - `zoi clone`: Clone the git repository of a package to a local directory.
+  - `zoi dev`: Enter a development shell for the current project, with environment variables (PATH, LD_LIBRARY_PATH, CPATH, etc.) automatically set up based on dependencies.
+  - `zoi downgrade`: Interactively choose and install an older version of a package.
+  - `zoi exec`: Download and run a package's binary in a temporary cache without a full installation.
+  - `zoi files`: List all files owned by an installed package.
+  - `zoi history`: View the audit log of past package operations (install, uninstall, upgrade).
+  - `zoi info`: Display detected system information, including OS, architecture, and available package managers.
+  - `zoi list`: List all installed packages, or all available packages from active repositories.
+  - `zoi man`: Read package manuals directly in the terminal.
+  - `zoi mark`: Change the installation reason of a package (explicit vs dependency).
+  - `zoi migrate scoop`: Convert a Scoop manifest (`.json`) into a Zoi `.pkg.lua`.
+  - `zoi owner`: Find which package owns a specific file on the system.
+  - `zoi pin`: Lock a package to a specific version to prevent updates.
+  - `zoi provides`: Find which package provides a specific command or file.
+  - `zoi rollback`: Revert a package to its previously installed version or roll back the newest remaining transaction log.
+  - `zoi search`: Searches for packages by name or description.
+  - `zoi service`: Manage background services for installed packages.
+  - `zoi tree`: Visualize the dependency tree of a package.
+  - `zoi transaction`: Inspect recorded transactions and the files they changed.
+  - `zoi unpin`: Unpin a package, allowing it to be updated again.
+  - `zoi version`: Print concise version and build information.
+  - `zoi why`: Understand why a specific package is installed (e.g. as a dependency).
+  - `zoi doctor`: Checks for common issues with your Zoi installation and provides actionable suggestions. It performs the following checks:
+    - **Broken Symlinks:** Scans for broken symbolic links in Zoi's binary directories.
+    - **PATH Configuration:** Verifies that the Zoi binary directory is included in your system's `PATH`.
+    - **Outdated Repositories:** Checks if your local package database has been synced recently.
+    - **Orphaned Packages:** Identifies packages installed as dependencies that are no longer needed by any other package.
+    - **Duplicate Package IDs:** Identifies packages with the same name/path across different registries, which can cause ambiguity.
+    - **PGP Configuration:** Verifies if trusted PGP keys specified in your configuration are present in the local keyring.
+    - **Package Record Integrity:** Validates that all packages recorded in `zoi.pkgs.json` are actually present in the installation store.
+    - **Ghost Dependents:** Scans for broken dependent links where the parent package is missing, offering to prune them.
 
-* **Shell Integration:**
-  * `zoi shell`: Automatically configures your shell's PATH for Zoi and installs shell completion scripts for Bash, Zsh, Fish, Elvish and Powershell.
+- **Shell Integration:**
+  - `zoi shell`: Automatically configures your shell's PATH for Zoi and installs shell completion scripts for Bash, Zsh, Fish, Elvish and Powershell.
 
-* **Library Support:** Use `zoi` as a Rust library in your own applications to programmatically manage packages. The `zoi-rs` crate is available on [crates.io](https://crates.io/crates/zoi-rs), [learn more](/docs/zds/zoi/lib).
+- **Library Support:** Use `zoi` as a Rust library in your own applications to programmatically manage packages. The `zoi-rs` crate is available on [crates.io](https://crates.io/crates/zoi-rs), [learn more](/docs/zds/zoi/lib).
 
-* **Zoi Mini (Lightweight Service):** A minimal version of Zoi that operates without a local database, resolving package metadata and vulnerabilities on the fly from the Zoidberg registry. Perfect for one-liner installations via `zm.sh` or `zm.ps1`. Supports `install`, `update`, `uninstall`, and `list` commands with aliases (`i`, `up`, `un`, `ls`).
+- **Zoi Mini (Lightweight Service):** A minimal version of Zoi that operates without a local database, resolving package metadata and vulnerabilities on the fly from the Zoidberg registry. Perfect for one-liner installations via `zm.sh` or `zm.ps1`. Supports `install`, `update`, `uninstall`, and `list` commands with aliases (`i`, `up`, `un`, `ls`).
 
 ## Command Reference
 
@@ -150,19 +150,19 @@ This section provides a detailed reference for all of Zoi's commands.
 
 These options can be used with any command:
 
-* `-y`, `--yes`: Automatically answer "yes" to all confirmation prompts.
-* `-v`, `--version`: Print detailed version information.
-* `--root <DIR>`: Operate on a different root directory (sysroot).
-* `--offline`: Do not attempt to connect to the network.
-* `--pkg-dir <DIR>`: Additional directory to search for `.pkg.tar.zst` archives.
+- `-y`, `--yes`: Automatically answer "yes" to all confirmation prompts.
+- `-v`, `--version`: Print detailed version information.
+- `--root <DIR>`: Operate on a different root directory (sysroot).
+- `--offline`: Do not attempt to connect to the network.
+- `--pkg-dir <DIR>`: Additional directory to search for `.pkg.tar.zst` archives.
 
-***
+---
 
 ### `zoi about`
 
 Shows detailed application information and credits.
 
-***
+---
 
 ### `zoi audit`
 
@@ -170,11 +170,11 @@ Scans installed packages for known security vulnerabilities. It can also be used
 
 **Options:**
 
-* `-a`, `--all`: List all security advisories in the database, not just for installed packages.
-* `--registry <HANDLE>`: Filter advisories by specific registry handle.
-* `--repo <REPO>`: Filter advisories by specific repository.
+- `-a`, `--all`: List all security advisories in the database, not just for installed packages.
+- `--registry <HANDLE>`: Filter advisories by specific registry handle.
+- `--repo <REPO>`: Filter advisories by specific repository.
 
-***
+---
 
 ### `zoi autoremove`
 
@@ -182,9 +182,9 @@ Removes packages that were installed as dependencies but are no longer needed.
 
 **Options:**
 
-* `--dry-run`: Do not actually remove packages, just show what would be done.
+- `--dry-run`: Do not actually remove packages, just show what would be done.
 
-***
+---
 
 ### `zoi cache`
 
@@ -192,14 +192,14 @@ Manage Zoi's local package archive cache.
 
 **Subcommands:**
 
-* `add <FILES...>`: Add `.pkg.tar.zst` archives to the local cache.
-* `ls`: List all archives currently in the cache.
-* `mirror add <URL>`: Add a binary/cache mirror base URL.
-* `mirror remove <URL>`: Remove a configured binary/cache mirror.
-* `mirror ls`: List configured binary/cache mirrors.
-* `clear`: Clear the local archive cache.
+- `add <FILES...>`: Add `.pkg.tar.zst` archives to the local cache.
+- `ls`: List all archives currently in the cache.
+- `mirror add <URL>`: Add a binary/cache mirror base URL.
+- `mirror remove <URL>`: Remove a configured binary/cache mirror.
+- `mirror ls`: List configured binary/cache mirrors.
+- `clear`: Clear the local archive cache.
 
-***
+---
 
 ### `zoi clean`
 
@@ -207,9 +207,9 @@ Clears the cache of downloaded package binaries.
 
 **Options:**
 
-* `--dry-run`: Do not actually clear the cache, just show what would be done.
+- `--dry-run`: Do not actually clear the cache, just show what would be done.
 
-***
+---
 
 ### `zoi clone <package> [location]`
 
@@ -217,10 +217,10 @@ Clones the git repository of a package to a local directory. If no location is s
 
 **Arguments:**
 
-* `<package>`: Package name, `@repo/name`, local `.pkg.lua` path, or URL.
-* `[location]`: The directory to clone the repository into.
+- `<package>`: Package name, `@repo/name`, local `.pkg.lua` path, or URL.
+- `[location]`: The directory to clone the repository into.
 
-***
+---
 
 ### `zoi dev`
 
@@ -230,9 +230,9 @@ Enter a development shell for the current project. This command reads `zoi.yaml`
 
 **Options:**
 
-* `-r`, `--run <COMMAND>`: Run a command in the dev shell instead of starting an interactive shell.
+- `-r`, `--run <COMMAND>`: Run a command in the dev shell instead of starting an interactive shell.
 
-***
+---
 
 ### `zoi downgrade <package>`
 
@@ -242,9 +242,9 @@ Interactively choose and install an older version of a package from the local st
 
 **Arguments:**
 
-* `<package>`: The name of the package to downgrade.
+- `<package>`: The name of the package to downgrade.
 
-***
+---
 
 ### `zoi create <source> [app_name]`
 
@@ -252,10 +252,10 @@ Create an application using a package template.
 
 **Arguments:**
 
-* `<source>`: Package name, `@repo/name`, local `.pkg.lua` path, or URL.
-* `[app_name]`: The application name to substitute into template commands.
+- `<source>`: Package name, `@repo/name`, local `.pkg.lua` path, or URL.
+- `[app_name]`: The application name to substitute into template commands.
 
-***
+---
 
 ### `zoi env [env_alias]`
 
@@ -263,13 +263,13 @@ Manage and set up project environments from a local `zoi.yaml` file.
 
 **Arguments:**
 
-* `[env_alias]`: The alias of the environment to set up. If not provided, an interactive prompt is shown.
+- `[env_alias]`: The alias of the environment to set up. If not provided, an interactive prompt is shown.
 
 **Options:**
 
-* `--export-shell <shell>`: (Hidden) Outputs environment variable exports for evaluation by a shell hook.
+- `--export-shell <shell>`: (Hidden) Outputs environment variable exports for evaluation by a shell hook.
 
-***
+---
 
 ### `zoi exec <SOURCE> [ARGS]...`
 
@@ -279,15 +279,15 @@ Resolve a package and its dependencies into an ephemeral environment, then run t
 
 **Arguments:**
 
-* `<SOURCE>`: Package name, local path, or URL to execute.
-* `[ARGS]...`: Arguments to pass to the executed binary.
+- `<SOURCE>`: Package name, local path, or URL to execute.
+- `[ARGS]...`: Arguments to pass to the executed binary.
 
 **Options:**
 
-* `--bin <NAME>`: Specific binary to run (required if the package provides multiple binaries).
-* `-v`, `--verbose`: Show execution details (resolution, installation, sandboxing).
+- `--bin <NAME>`: Specific binary to run (required if the package provides multiple binaries).
+- `-v`, `--verbose`: Show execution details (resolution, installation, sandboxing).
 
-***
+---
 
 ### `zoi extension`
 
@@ -297,10 +297,10 @@ Manage Zoi extensions.
 
 **Subcommands:**
 
-* `add <name>`: Add an extension.
-* `remove <name>`: Remove an extension.
+- `add <name>`: Add an extension.
+- `remove <name>`: Remove an extension.
 
-***
+---
 
 ### `zoi files <package>`
 
@@ -308,9 +308,9 @@ List all files owned by a package.
 
 **Arguments:**
 
-* `<package>`: The name of the package.
+- `<package>`: The name of the package.
 
-***
+---
 
 ### `zoi history`
 
@@ -318,11 +318,11 @@ Shows the history of past package operations (install, uninstall, upgrade) from 
 
 **Options:**
 
-* `--verify`: Verify audit log chain integrity instead of printing entries.
-* `--export <PATH>`: Export audit history to a file.
-* `--ndjson`: Export as newline-delimited JSON instead of a JSON array. Requires `--export`.
+- `--verify`: Verify audit log chain integrity instead of printing entries.
+- `--export <PATH>`: Export audit history to a file.
+- `--ndjson`: Export as newline-delimited JSON instead of a JSON array. Requires `--export`.
 
-***
+---
 
 ### `zoi helper`
 
@@ -330,16 +330,17 @@ Helper commands for various tasks.
 
 **Subcommands:**
 
-* `get-hash <source>`: Get a hash of a local file or a file from a URL.
-  * `--hash <sha512|sha256>`: The hash algorithm to use (default: `sha512`).
+- `get-hash <source>`: Get a hash of a local file or a file from a URL.
+  - `--hash <sha512|sha256>`: The hash algorithm to use (default: `sha512`).
+- `validate <source>`: Validate a `.pkg.lua` or Zoi spec file for correctness.
 
-***
+---
 
 ### `zoi info`
 
 Displays detected operating system and architecture information.
 
-***
+---
 
 ### `zoi install [SOURCES]...`
 
@@ -351,27 +352,28 @@ Zoi resolves dependencies, checks for conflicts, and then sequentially downloads
 
 **Arguments:**
 
-* `[SOURCES]...`: Package names (e.g. `my-pkg`, `my-pkg:sub`), local paths, or URLs to `.pkg.lua` files.
+- `[SOURCES]...`: Package names (e.g. `my-pkg`, `my-pkg:sub`), local paths, or URLs to `.pkg.lua` files.
 
 **Options:**
 
-* `--repo <REPO>`: Install from a git repository (e.g. 'Zillowe/Hello', 'gl:Zillowe/Hello').
-* `--force`: Force re-installation even if the package is already installed.
-* `--all-optional`: Accept all optional dependencies.
-* `--scope <user|system|project>`: The scope to install the package to.
-* `--local`: Install packages to the current project (alias for `--scope=project`).
-* `--global`: Install packages globally for the current user (alias for `--scope=user`).
-* `--save`: Save the package to the project's `zoi.yaml`.
-* `--type <TYPE>`: The type of package to build if building from source. Specifying a type other than `pre-compiled` or `pre-built` will force a local build.
-* `--build` (alias: `-b`): Force building from source even if a pre-compiled archive is available in the registry.
-* `--frozen-lockfile`: Install exactly what is pinned in `zoi.lock` (project scope only, lockfile must already exist, no lockfile updates are allowed, and recorded sub-package/dependency selections are preserved).
-* `--retry <N>`: Retry failed downloads up to `N` attempts (minimum `1`, default `3`).
-* `-v`, `--verbose`: Show additional install details, including package origins and preflight information.
-* `--explain`: Print dependency-selection and install-decision explanation.
-* `--plan-json`: Emit machine-readable install plan JSON.
-* `--dry-run`: Do not actually install, just show what would be done.
+- `--purl <PURL>`: Install a package by its Package URL (PURL), e.g. `pkg:zoi/zoidberg/core/curl`.
+- `--repo <REPO>`: Install from a git repository (e.g. 'Zillowe/Hello', 'gl:Zillowe/Hello').
+- `--force`: Force re-installation even if the package is already installed.
+- `--all-optional`: Accept all optional dependencies.
+- `--scope <user|system|project>`: The scope to install the package to.
+- `--local`: Install packages to the current project (alias for `--scope=project`).
+- `--global`: Install packages globally for the current user (alias for `--scope=user`).
+- `--save`: Save the package to the project's `zoi.yaml`.
+- `--type <TYPE>`: The type of package to build if building from source. Specifying a type other than `pre-compiled` or `pre-built` will force a local build.
+- `--build` (alias: `-b`): Force building from source even if a pre-compiled archive is available in the registry.
+- `--frozen-lockfile`: Install exactly what is pinned in `zoi.lock` (project scope only, lockfile must already exist, no lockfile updates are allowed, and recorded sub-package/dependency selections are preserved).
+- `--retry <N>`: Retry failed downloads up to `N` attempts (minimum `1`, default `3`).
+- `-v`, `--verbose`: Show additional install details, including package origins and preflight information.
+- `--explain`: Print dependency-selection and install-decision explanation.
+- `--plan-json`: Emit machine-readable install plan JSON.
+- `--dry-run`: Do not actually install, just show what would be done.
 
-***
+---
 
 ### `zoi list`
 
@@ -381,14 +383,14 @@ Lists installed or all available packages.
 
 **Options:**
 
-* `-a`, `--all`: List all packages from the database, not just installed ones.
-* `-o`, `--outdated`: List only installed packages that have updates available in the registry.
-* `-m`, `--foreign`: List packages not found in any configured registry.
-* `--registry <HANDLE>`: Filter by specific registry handle.
-* `--repo <REPO>`: Filter by repository.
-* `-t`, `--type <TYPE>`: Filter by package type (`package`, `app`, `collection`, `extension`).
+- `-a`, `--all`: List all packages from the database, not just installed ones.
+- `-o`, `--outdated`: List only installed packages that have updates available in the registry.
+- `-m`, `--foreign`: List packages not found in any configured registry.
+- `--registry <HANDLE>`: Filter by specific registry handle.
+- `--repo <REPO>`: Filter by repository.
+- `-t`, `--type <TYPE>`: Filter by package type (`package`, `app`, `collection`, `extension`).
 
-***
+---
 
 ### `zoi man <package_name>`
 
@@ -396,14 +398,14 @@ Shows a package's manual.
 
 **Arguments:**
 
-* `<package_name>`: The name of the package to show the manual for.
+- `<package_name>`: The name of the package to show the manual for.
 
 **Options:**
 
-* `--upstream`: Always look at the upstream manual even if it's downloaded.
-* `--raw`: Print the manual to the terminal raw.
+- `--upstream`: Always look at the upstream manual even if it's downloaded.
+- `--raw`: Print the manual to the terminal raw.
 
-***
+---
 
 ### `zoi mark <PACKAGES>...`
 
@@ -413,10 +415,10 @@ Modify the installation reason of one or more packages.
 
 **Options:**
 
-* `--as-dependency` (alias: `--asdeps`): Mark packages as dependencies.
-* `--as-explicit` (alias: `--asexpl`): Mark packages as explicitly installed.
+- `--as-dependency` (alias: `--asdeps`): Mark packages as dependencies.
+- `--as-explicit` (alias: `--asexpl`): Mark packages as explicitly installed.
 
-***
+---
 
 ### `zoi migrate scoop <input>`
 
@@ -424,19 +426,19 @@ Convert a Scoop package manifest (`.json`/JSON5) into a Zoi `.pkg.lua` package f
 
 **Arguments:**
 
-* `<input>`: Path to the Scoop manifest file.
+- `<input>`: Path to the Scoop manifest file.
 
 **Options:**
 
-* `-o`, `--output <PATH>`: Output path for generated `.pkg.lua`.
-* `--repo <REPO>`: Value for `metadata.repo` in generated package.
-* `--name <NAME>`: Override output package name.
-* `--version <VERSION>`: Override package version.
-* `--maintainer-name <NAME>`: Maintainer name to set in metadata.
-* `--maintainer-email <EMAIL>`: Maintainer email to set in metadata.
-* `--dry-run`: Print generated `.pkg.lua` instead of writing a file.
+- `-o`, `--output <PATH>`: Output path for generated `.pkg.lua`.
+- `--repo <REPO>`: Value for `metadata.repo` in generated package.
+- `--name <NAME>`: Override output package name.
+- `--version <VERSION>`: Override package version.
+- `--maintainer-name <NAME>`: Maintainer name to set in metadata.
+- `--maintainer-email <EMAIL>`: Maintainer email to set in metadata.
+- `--dry-run`: Print generated `.pkg.lua` instead of writing a file.
 
-***
+---
 
 ### `zoi owner <path>`
 
@@ -446,9 +448,9 @@ Find which package owns a file.
 
 **Arguments:**
 
-* `<path>`: Path to the file.
+- `<path>`: Path to the file.
 
-***
+---
 
 ### `zoi package`
 
@@ -458,38 +460,38 @@ Build, create, and manage Zoi packages.
 
 **Subcommands:**
 
-* `build <package_file>`: Build a package from a `.pkg.lua` file.
-  * `--type <TYPE>`: The type of package to build (e.g. `source`, `pre-compiled`). If omitted, Zoi chooses `pre-compiled`, then `source`, then the first listed type.
-  * `-p`, `--platform <PLATFORM>`: The platform to build for (default: `current`).
-  * `-o`, `--output-dir <DIR>`: Directory to output the built package to.
-  * `--sign <KEY>`: Sign the package with the given PGP key.
-  * `--sub <SUB_PACKAGES...>`: For a split package, build only the specified sub-packages.
-  * `--test`: Run package tests before building.
-  * `--install-deps`: Automatically install build-time dependencies defined in the package before building.
-  * `--version-override <VERSION>`: Override the package version.
-  * `--method <native|docker>`: The build method to use (default: `native`).
-  * `--image <IMAGE>`: The Docker image to use for the build (required for `--method docker`).
-  * `--fakeroot`: Force root ownership (UID/GID 0) in the built archive.
-* `test <package_file>`: Run tests for a package. This command accepts the same arguments as `build`.
-  * `--type <TYPE>`: The build type to use for testing. If omitted, Zoi chooses `pre-compiled`, then `source`, then the first listed type.
-  * `-p`, `--platform <PLATFORM>`: The platform to test on.
-  * `--sub <SUB_PACKAGES...>`: For a split package, test only the specified sub-packages.
-  * `--version-override <VERSION>`: Override the package version for testing.
-  * `--fakeroot`: Use fakeroot for the test build.
-* `install <package_file>`: Install a package from a local archive.
-  * `--scope <user|system>`: The scope to install the package to (default: `user`).
-  * `--sub <SUB_PACKAGES...>`: For a split package, install only the specified sub-packages from the archive.
-  * `--yes`: Automatically answer yes to prompts.
-* `doctor <package_file>`: Lint and validate a `.pkg.lua` package definition. Performs consistency checks, including verifying that the metadata `repo` field matches the file's location in the registry.
-  * `--platform <PLATFORM>`: Validate as a specific platform (defaults to current).
-  * `--version-override <VERSION>`: Override package version while validating.
-* `inspect <package_file>`: Parse a package definition and output its fully resolved metadata.
-  * `--json`: Output as pretty-printed JSON (ideal for CI/CD and automation).
-  * `--platform <PLATFORM>`: Resolve metadata for a specific platform.
-  * `--version-override <VERSION>`: Override package version while inspecting.
-* `init-lsp`: Initialize LSP support with EmmyLua type definitions and `.luarc.json`.
+- `build <package_file>`: Build a package from a `.pkg.lua` file.
+  - `--type <TYPE>`: The type of package to build (e.g. `source`, `pre-compiled`). If omitted, Zoi chooses `pre-compiled`, then `source`, then the first listed type.
+  - `-p`, `--platform <PLATFORM>`: The platform to build for (default: `current`).
+  - `-o`, `--output-dir <DIR>`: Directory to output the built package to.
+  - `--sign <KEY>`: Sign the package with the given PGP key.
+  - `--sub <SUB_PACKAGES...>`: For a split package, build only the specified sub-packages.
+  - `--test`: Run package tests before building.
+  - `--install-deps`: Automatically install build-time dependencies defined in the package before building.
+  - `--version-override <VERSION>`: Override the package version.
+  - `--method <native|docker>`: The build method to use (default: `native`).
+  - `--image <IMAGE>`: The Docker image to use for the build (required for `--method docker`).
+  - `--fakeroot`: Force root ownership (UID/GID 0) in the built archive.
+- `test <package_file>`: Run tests for a package. This command accepts the same arguments as `build`.
+  - `--type <TYPE>`: The build type to use for testing. If omitted, Zoi chooses `pre-compiled`, then `source`, then the first listed type.
+  - `-p`, `--platform <PLATFORM>`: The platform to test on.
+  - `--sub <SUB_PACKAGES...>`: For a split package, test only the specified sub-packages.
+  - `--version-override <VERSION>`: Override the package version for testing.
+  - `--fakeroot`: Use fakeroot for the test build.
+- `install <package_file>`: Install a package from a local archive.
+  - `--scope <user|system>`: The scope to install the package to (default: `user`).
+  - `--sub <SUB_PACKAGES...>`: For a split package, install only the specified sub-packages from the archive.
+  - `--yes`: Automatically answer yes to prompts.
+- `doctor <package_file>`: Lint and validate a `.pkg.lua` package definition. Performs consistency checks, including verifying that the metadata `repo` field matches the file's location in the registry.
+  - `--platform <PLATFORM>`: Validate as a specific platform (defaults to current).
+  - `--version-override <VERSION>`: Override package version while validating.
+- `inspect <package_file>`: Parse a package definition and output its fully resolved metadata.
+  - `--json`: Output as pretty-printed JSON (ideal for CI/CD and automation).
+  - `--platform <PLATFORM>`: Resolve metadata for a specific platform.
+  - `--version-override <VERSION>`: Override package version while inspecting.
+- `init-lsp`: Initialize LSP support with EmmyLua type definitions and `.luarc.json`.
 
-***
+---
 
 ### `zoi pgp`
 
@@ -497,23 +499,23 @@ Manage PGP keys for package signature verification.
 
 **Subcommands:**
 
-* `add`: Add a PGP key from a file, URL, or a keyserver.
-  * `--path <PATH>`: Path to the PGP key file.
-  * `--fingerprint <FINGERPRINT>`: Fingerprint of the PGP key to fetch.
-  * `--url <URL>`: URL of the PGP key to import.
-  * `--name <NAME>`: Name to associate with the key.
-* `remove` (alias: `rm`): Remove a PGP key.
-  * `<name>`: Name of the key to remove.
-  * `--fingerprint <FINGERPRINT>`: Fingerprint of the key to remove.
-* `list` (alias: `ls`): List all imported PGP keys.
-* `search <term>`: Search for a PGP key by user ID or fingerprint.
-* `show <name>`: Show the public key of a stored PGP key.
-* `verify`: Verify a file's detached signature.
-  * `--file <FILE>`: Path to the file to verify.
-  * `--sig <SIG>`: Path to the detached signature file.
-  * `--key <KEY>`: Name of the key in the local store to use for verification.
+- `add`: Add a PGP key from a file, URL, or a keyserver.
+  - `--path <PATH>`: Path to the PGP key file.
+  - `--fingerprint <FINGERPRINT>`: Fingerprint of the PGP key to fetch.
+  - `--url <URL>`: URL of the PGP key to import.
+  - `--name <NAME>`: Name to associate with the key.
+- `remove` (alias: `rm`): Remove a PGP key.
+  - `<name>`: Name of the key to remove.
+  - `--fingerprint <FINGERPRINT>`: Fingerprint of the key to remove.
+- `list` (alias: `ls`): List all imported PGP keys.
+- `search <term>`: Search for a PGP key by user ID or fingerprint.
+- `show <name>`: Show the public key of a stored PGP key.
+- `verify`: Verify a file's detached signature.
+  - `--file <FILE>`: Path to the file to verify.
+  - `--sig <SIG>`: Path to the detached signature file.
+  - `--key <KEY>`: Name of the key in the local store to use for verification.
 
-***
+---
 
 ### `zoi pin <package> <version>`
 
@@ -521,10 +523,10 @@ Pin a package to a specific version.
 
 **Arguments:**
 
-* `<package>`: The name of the package to pin.
-* `<version>`: The version to pin the package to.
+- `<package>`: The name of the package to pin.
+- `<version>`: The version to pin the package to.
 
-***
+---
 
 ### `zoi repo`
 
@@ -534,24 +536,24 @@ Manage package repositories.
 
 **Subcommands:**
 
-* `add [repo_or_url]`: Add an official repo by name or clone from a git URL.
-* `remove <repo_name>` (alias: `rm`): Remove a repository from the active configuration.
-* `list [all]` (alias: `ls`): List active repositories. Use `list all` to show all available.
-* `git`: Manage cloned git repositories.
-  * `list` (alias: `ls`): Show cloned git repositories.
-  * `rm <repo_name>`: Remove a cloned git repository.
+- `add [repo_or_url]`: Add an official repo by name or clone from a git URL.
+- `remove <repo_name>` (alias: `rm`): Remove a repository from the active configuration.
+- `list [all]` (alias: `ls`): List active repositories. Use `list all` to show all available.
+- `git`: Manage cloned git repositories.
+  - `list` (alias: `ls`): Show cloned git repositories.
+  - `rm <repo_name>`: Remove a cloned git repository.
 
-***
+---
 
 ### `zoi provides <TERM>`
 
-Find which package provides a specific command or file. This command searches through package names, explicitly defined binaries (`bins`), and the global file index (if populated via `zoi sync --files`).
+Find which package provides a specific command or file. This command searches through package names, explicitly defined binaries (`bins`), and the global file index (populated automatically during `zoi sync`).
 
 **Arguments:**
 
-* `<TERM>`: The command name (e.g. `magick`) or a file path fragment (e.g. `bin/magick`).
+- `<TERM>`: The command name (e.g. `magick`) or a file path fragment (e.g. `bin/magick`).
 
-***
+---
 
 ### `zoi rollback [PACKAGE]`
 
@@ -559,15 +561,15 @@ Rollback a package to the previously installed version.
 
 **Arguments:**
 
-* `[PACKAGE]`: The name of the package to rollback.
+- `[PACKAGE]`: The name of the package to rollback.
 
 If multiple installed packages match the same name, Zoi will prompt you to choose the exact installed package. For non-interactive use, pass an explicit source such as `#handle@repo/name[:sub]@version`.
 
 **Options:**
 
-* `--last-transaction`: Roll back the newest remaining transaction log.
+- `--last-transaction`: Roll back the newest remaining transaction log.
 
-***
+---
 
 ### `zoi run [cmd_alias] [args]...`
 
@@ -575,10 +577,10 @@ Execute a command defined in a local `zoi.yaml` file.
 
 **Arguments:**
 
-* `[cmd_alias]`: The alias of the command to execute.
-* `[args]...`: Arguments to pass to the command.
+- `[cmd_alias]`: The alias of the command to execute.
+- `[args]...`: Arguments to pass to the command.
 
-***
+---
 
 ### `zoi search <search_term>`
 
@@ -588,19 +590,19 @@ Searches for packages by name or description.
 
 **Arguments:**
 
-* `<search_term>`: The term to search for.
+- `<search_term>`: The term to search for.
 
 **Options:**
 
-* `--registry <HANDLE>`: Filter by specific registry handle.
-* `--repo <REPO>`: Filter by repository.
-* `--type <TYPE>`: Filter by package type.
-* `-t`, `--tag <TAGS>`: Filter by tags (comma-separated).
-* `--sort <name|repo|type>`: Sort results by field (default: `name`).
-* `-f`, `--files`: Search for files provided by packages instead of package names.
-* `-i`, `--interactive`: Open results in an interactive TUI.
+- `--registry <HANDLE>`: Filter by specific registry handle.
+- `--repo <REPO>`: Filter by repository.
+- `--type <TYPE>`: Filter by package type.
+- `-t`, `--tag <TAGS>`: Filter by tags (comma-separated).
+- `--sort <name|repo|type>`: Sort results by field (default: `name`).
+- `-f`, `--files`: Search for files provided by packages instead of package names.
+- `-i`, `--interactive`: Open results in an interactive TUI.
 
-***
+---
 
 ### `zoi service <ACTION> [PACKAGE]`
 
@@ -610,13 +612,13 @@ Manage background services for installed packages. This command uses the native 
 
 **Subcommands:**
 
-* `start <package>`: Start the service defined by the package.
-* `stop <package>`: Stop the service.
-* `restart <package>`: Restart the service.
-* `status <package>`: Show the current status of the service.
-* `list` (alias `ls`): List all installed packages that define a service and their current status.
+- `start <package>`: Start the service defined by the package.
+- `stop <package>`: Stop the service.
+- `restart <package>`: Restart the service.
+- `status <package>`: Show the current status of the service.
+- `list` (alias `ls`): List all installed packages that define a service and their current status.
 
-***
+---
 
 ### `zoi shell [shell]`
 
@@ -624,16 +626,16 @@ Installs completion scripts for a given shell and setup PATH for Zoi. If `--hook
 
 **Arguments:**
 
-* `[shell]`: The shell name (`bash`, `zsh`, `fish`, `elvish`, `powershell`).
+- `[shell]`: The shell name (`bash`, `zsh`, `fish`, `elvish`, `powershell`).
 
 **Options:**
 
-* `--hook`: Generate a shell hook script to be evaluated by your shell configuration (e.g. `eval "$(zoi shell --hook bash)"`).
-* `-p`, `--package <PACKAGE>`: Package(s) to include in the ephemeral environment.
-* `-r`, `--run <COMMAND>`: Run a command in the ephemeral environment and exit.
-* `--scope <user|system>`: The scope to apply the shell setup to (default: `user`).
+- `--hook`: Generate a shell hook script to be evaluated by your shell configuration (e.g. `eval "$(zoi shell --hook bash)"`).
+- `-p`, `--package <PACKAGE>`: Package(s) to include in the ephemeral environment.
+- `-r`, `--run <COMMAND>`: Run a command in the ephemeral environment and exit.
+- `--scope <user|system>`: The scope to apply the shell setup to (default: `user`).
 
-***
+---
 
 ### `zoi show <package_name>`
 
@@ -641,15 +643,16 @@ Shows detailed information about a package.
 
 **Arguments:**
 
-* `<package_name>`: The name of the package to show.
+- `<package_name>`: The name of the package to show.
 
 **Options:**
 
-* `--raw`: Display the raw, unformatted package file.
+- `--raw`: Display the raw, unformatted package file.
+- `--purl`: Display the Package URL (PURL) for the package.
 
 If the package is installed more than once across scopes or registries, Zoi will prompt you to choose which installed package status to display.
 
-***
+---
 
 ### `zoi sync`
 
@@ -659,20 +662,19 @@ Downloads or updates the package database from the remote repository.
 
 **Flags:**
 
-* `-v`, `--verbose`: Show detailed git output and intermediate sync steps.
-* `--fallback`: Fallback to other mirrors if the default one fails.
-* `--no-pm`: Do not check for installed native package managers.
-* `-f`, `--files`: Download and index file lists for global search (requires server-side support).
-* `--force`: Rebuild all registry databases from scratch by removing existing caches, git clones, and re-cloning. Installed packages and their records are preserved.
+- `-v`, `--verbose`: Show detailed git output and intermediate sync steps.
+- `--fallback`: Fallback to other mirrors if the default one fails.
+- `--no-pm`: Do not check for installed native package managers.
+- `--force`: Rebuild all registry databases from scratch by removing existing caches, git clones, and re-cloning. Installed packages and their records are preserved.
 
 **Subcommands:**
 
-* `add <url>`: Add a new registry.
-* `remove <handle>`: Remove a configured registry by its handle.
-* `list`: List configured registries.
-* `set <url>`: Set the default registry URL (`default`, `github`, `gitlab`, `codeberg`, or a URL).
+- `add <url>`: Add a new registry.
+- `remove <handle>`: Remove a configured registry by its handle.
+- `list`: List configured registries.
+- `set <url>`: Set the default registry URL (`default`, `github`, `gitlab`, `codeberg`, or a URL).
 
-***
+---
 
 ### `zoi telemetry <action>`
 
@@ -680,9 +682,9 @@ Manage telemetry settings.
 
 **Arguments:**
 
-* `<action>`: `status`, `enable`, or `disable`.
+- `<action>`: `status`, `enable`, or `disable`.
 
-***
+---
 
 ### `zoi tree <PACKAGES>...`
 
@@ -690,9 +692,9 @@ Visualize the dependency tree of one or more packages. This command uses the Pub
 
 **Arguments:**
 
-* `<PACKAGES>...`: One or more package names, paths, or URLs to visualize.
+- `<PACKAGES>...`: One or more package names, paths, or URLs to visualize.
 
-***
+---
 
 ### `zoi uninstall <PACKAGES>...`
 
@@ -702,21 +704,21 @@ Uninstalls one or more packages. To uninstall a sub-package, use the `package:su
 
 **Arguments:**
 
-* `<PACKAGES>...`: One or more packages to uninstall.
+- `<PACKAGES>...`: One or more packages to uninstall.
 
 If multiple installed packages match the same name, Zoi will prompt you to choose the exact installed package. For non-interactive use, pass an explicit source such as `#handle@repo/name[:sub]@version`.
 
 **Options:**
 
-* `--scope <user|system|project>`: The scope to uninstall the package from.
-* `--local`: Uninstall packages from the current project.
-* `--global`: Uninstall packages globally for the current user.
-* `--save`: Remove the package from the project's `zoi.yaml`.
-* `-s`, `--recursive`: Recursively remove dependencies that are no longer needed.
-* `--explain`: Show uninstall reasoning and reverse-dependency impact.
-* `--plan-json`: Emit machine-readable uninstall plan JSON.
+- `--scope <user|system|project>`: The scope to uninstall the package from.
+- `--local`: Uninstall packages from the current project.
+- `--global`: Uninstall packages globally for the current user.
+- `--save`: Remove the package from the project's `zoi.yaml`.
+- `-s`, `--recursive`: Recursively remove dependencies that are no longer needed.
+- `--explain`: Show uninstall reasoning and reverse-dependency impact.
+- `--plan-json`: Emit machine-readable uninstall plan JSON.
 
-***
+---
 
 ### `zoi unpin <package>`
 
@@ -724,9 +726,9 @@ Unpin a package, allowing it to be updated.
 
 **Arguments:**
 
-* `<package>`: The name of the package to unpin.
+- `<package>`: The name of the package to unpin.
 
-***
+---
 
 ### `zoi update [PACKAGES]...`
 
@@ -737,17 +739,17 @@ When using `--all`, Zoi also prints explicit pinned/skipped summaries and adviso
 
 **Arguments:**
 
-* `[PACKAGES]...`: The name(s) of the package(s) to update. If none are provided, you must use `--all`.
+- `[PACKAGES]...`: The name(s) of the package(s) to update. If none are provided, you must use `--all`.
 
 **Options:**
 
-* `--all`: Update all installed packages.
-* `--interactive`: Interactively choose a subset of upgrade candidates (requires `--all`).
-* `--explain`: Explain why each package is selected or skipped.
-* `--plan-json`: Emit machine-readable update plan JSON.
-* `--dry-run`: Do not actually perform the update, just show what would be done.
+- `--all`: Update all installed packages.
+- `--interactive`: Interactively choose a subset of upgrade candidates (requires `--all`).
+- `--explain`: Explain why each package is selected or skipped.
+- `--plan-json`: Emit machine-readable update plan JSON.
+- `--dry-run`: Do not actually perform the update, just show what would be done.
 
-***
+---
 
 ### `zoi use <PACKAGES>...`
 
@@ -757,14 +759,14 @@ Adds a tool to the current project or global configuration and installs it in on
 
 **Arguments:**
 
-* `<PACKAGES>...`: Package identifiers (e.g. `node@20`).
+- `<PACKAGES>...`: Package identifiers (e.g. `node@20`).
 
 **Options:**
 
-* `-g`, `--global`: Add to global configuration (user `versions` map) instead of the local project (`zoi.yaml`).
-* `-y`, `--yes`: Automatically answer yes to prompts (including JIT installation prompts).
+- `-g`, `--global`: Add to global configuration (user `versions` map) instead of the local project (`zoi.yaml`).
+- `-y`, `--yes`: Automatically answer yes to prompts (including JIT installation prompts).
 
-***
+---
 
 ### `zoi upgrade`
 
@@ -774,11 +776,11 @@ Upgrades the Zoi binary to the latest version.
 
 **Options:**
 
-* `--force`: Force a full download.
-* `--tag <TAG>`: Upgrade to a specific git tag.
-* `--branch <BRANCH>`: Upgrade to the latest release of a specific branch.
+- `--force`: Force a full download.
+- `--tag <TAG>`: Upgrade to a specific git tag.
+- `--branch <BRANCH>`: Upgrade to the latest release of a specific branch.
 
-***
+---
 
 ### `zoi version`
 
@@ -786,7 +788,7 @@ Upgrades the Zoi binary to the latest version.
 
 Prints concise version and build information.
 
-***
+---
 
 ### `zoi why <package_name>`
 
@@ -794,7 +796,7 @@ Explains why a package is installed.
 
 If multiple installed packages match the same name, Zoi will prompt you to choose the exact installed package before inspecting dependency reasons.
 
-***
+---
 
 ### `zoi transaction`
 
@@ -804,11 +806,11 @@ Inspect recorded transactions.
 
 **Subcommands:**
 
-* `list` (alias: `ls`): List available transaction logs with their start time and operation count.
-* `show <id>`: Show the ordered operations recorded in a transaction.
-* `files <id>`: List the unique files modified by a transaction.
+- `list` (alias: `ls`): List available transaction logs with their start time and operation count.
+- `show <id>`: Show the ordered operations recorded in a transaction.
+- `files <id>`: List the unique files modified by a transaction.
 
-***
+---
 
 ### `zoi doctor`
 

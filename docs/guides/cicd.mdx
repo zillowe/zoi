@@ -12,7 +12,7 @@ There are two primary ways to use Zoi in a CI/CD environment:
 1. **Direct Installation:** Use the Zoi installer script to install the CLI directly on the runner.
 2. **Docker Image:** Use the official Zoi CLI Docker image as the base for your CI jobs.
 
-***
+---
 
 ## GitHub Actions
 
@@ -58,14 +58,14 @@ publish-pkg:
     - uses: actions/checkout@v4
     - name: Install Zoi
       run: |
-	curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash
-	echo "$HOME/.zoi/pkgs/bin" >> $GITHUB_PATH
+ curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash
+ echo "$HOME/.zoi/pkgs/bin" >> $GITHUB_PATH
 
     - name: Build Package
       run: zoi package build my-tool.pkg.lua --type source --platform linux-amd64
 ```
 
-***
+---
 
 ## GitLab CI/CD
 
@@ -100,7 +100,7 @@ run-tests:
     - zoi env test # Runs the 'test' environment defined in zoi.yaml
 ```
 
-***
+---
 
 ## Jenkins
 
@@ -133,7 +133,7 @@ pipeline {
 }
 ```
 
-***
+---
 
 ## Caching Zoi Packages
 
@@ -159,7 +159,7 @@ cache:
     - .zoi/pkgs/store/
 ```
 
-***
+---
 
 ## Best Practices for CI/CD
 
