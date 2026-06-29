@@ -57,7 +57,6 @@ fn default_revision() -> String {
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct AdvisoryRegistry {
-    #[serde(default = "default_version")]
     pub version: String,
     pub last_id: u32,
     pub year: u32,
@@ -273,7 +272,7 @@ pub struct Author {
     pub website: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[allow(dead_code)]
 pub struct DependencyOptionGroup {
     pub name: String,
@@ -283,7 +282,7 @@ pub struct DependencyOptionGroup {
     pub depends: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum DependencyGroup {
     Simple(Vec<String>),
@@ -337,7 +336,7 @@ impl DependencyGroup {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
 pub struct ComplexDependencyGroup {
     #[serde(default)]
     pub required: Vec<String>,
@@ -349,24 +348,85 @@ pub struct ComplexDependencyGroup {
     pub sub_packages: Option<HashMap<String, DependencyGroup>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
 pub struct TypedBuildDependencies {
     pub types: HashMap<String, DependencyGroup>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum BuildDependencies {
     Typed(TypedBuildDependencies),
     Group(DependencyGroup),
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct Dependencies {
     #[serde(default)]
     pub runtime: Option<DependencyGroup>,
     #[serde(default)]
     pub build: Option<BuildDependencies>,
+}
+
+pub fn to_dependencies_v2(deps: Dependencies) -> DependenciesV2 {
+    let mut runtime = Vec::new();
+    if let Some(r) = deps.runtime {
+        runtime = match r {
+            DependencyGroup::Simple(d) => d,
+            DependencyGroup::Complex(c) => {
+                let mut all = c.required;
+                all.extend(c.optional);
+                for opt in c.options {
+                    all.extend(opt.depends);
+                }
+                all
+            }
+        };
+    }
+
+    let mut build = Vec::new();
+    if let Some(b) = deps.build {
+        match b {
+            BuildDependencies::Group(g) => {
+                let packages = match g {
+                    DependencyGroup::Simple(d) => d,
+                    DependencyGroup::Complex(c) => {
+                        let mut all = c.required;
+                        all.extend(c.optional);
+                        for opt in c.options {
+                            all.extend(opt.depends);
+                        }
+                        all
+                    }
+                };
+                build.push(BuildDependencyV2 {
+                    build_type: "source".to_string(),
+                    packages,
+                });
+            }
+            BuildDependencies::Typed(t) => {
+                for (bt, g) in t.types {
+                    let packages = match g {
+                        DependencyGroup::Simple(d) => d,
+                        DependencyGroup::Complex(c) => {
+                            let mut all = c.required;
+                            all.extend(c.optional);
+                            for opt in c.options {
+                                all.extend(opt.depends);
+                            }
+                            all
+                        }
+                    };
+                    build.push(BuildDependencyV2 {
+                        build_type: bt,
+                        packages,
+                    });
+                }
+            }
+        }
+    }
+
+    DependenciesV2 { runtime, build }
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
@@ -632,76 +692,84 @@ pub struct SharableInstallManifest {
     pub repo: String,
     pub registry_handle: String,
     pub scope: Scope,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sub_package: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub chosen_options: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub chosen_optionals: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
-pub struct ZoiLock {
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RegistryIndexV2 {
     pub version: String,
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub registries: HashMap<String, String>,
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub packages: HashMap<String, String>,
-    #[serde(flatten)]
-    pub details: HashMap<String, HashMap<String, LockPackageDetail>>,
+    pub packages: BTreeMap<String, PurlPackageIndexV2>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct LockPackageDetail {
+pub struct PurlPackageIndexV2 {
+    pub repo: String,
+    pub repo_type: String,
     pub version: String,
-    #[serde(default = "default_revision")]
     pub revision: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub sub_package: Option<String>,
-    pub integrity: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub git_sha: Option<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub dependencies: Vec<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub options_dependencies: Vec<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub optionals_dependencies: Vec<String>,
+    pub description: String,
+    pub sub_packages: Vec<String>,
+    pub main_sub_packages: Vec<String>,
+    pub vuln: Vec<MiniVulnerability>,
+    pub dependencies: Option<DependenciesV2>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Lockfile {
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
+pub struct DependenciesV2 {
+    #[serde(default)]
+    pub runtime: Vec<String>,
+    #[serde(default)]
+    pub build: Vec<BuildDependencyV2>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct BuildDependencyV2 {
+    #[serde(rename = "type")]
+    pub build_type: String,
+    pub packages: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct ZoiLockV2 {
     pub version: String,
-    pub packages: HashMap<String, LockfilePackage>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub packages_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub registries_hash: Option<String>,
+    pub registries: HashMap<String, LockRegistryV2>,
+    pub installed_packages: HashMap<String, LockPackageDetailV2>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct LockfilePackage {
+pub struct LockRegistryV2 {
+    pub revision: String,
+    pub url: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LockPackageDetailV2 {
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sub_package: Option<String>,
     pub repo: String,
-    pub registry: String,
+    pub repo_type: String,
     pub version: String,
-    #[serde(default = "default_revision")]
     pub revision: String,
-    pub date: String,
-    pub reason: InstallReason,
-    pub scope: Scope,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub bins: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub conflicts: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub replaces: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub provides: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub backup: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub dependencies: Vec<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub chosen_options: Vec<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub chosen_optionals: Vec<String>,
+    pub registry: String,
+    pub why: String,
+    pub description: String,
+    #[serde(rename = "type")]
+    pub package_type_install: String,
+    pub install_method: String,
+    pub installed_sub_packages: Vec<String>,
+    pub platform: String,
+    pub hash: String,
+    pub dependencies: Option<DependenciesV2>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

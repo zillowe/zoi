@@ -397,6 +397,9 @@ enum Commands {
         /// Command to run in the dev shell instead of an interactive shell
         #[arg(short, long)]
         run: Option<String>,
+        /// Temporary clone a repository and enter its development shell
+        #[arg(long)]
+        repo: Option<String>,
     },
 
     /// Upgrades the Zoi binary to the latest version
@@ -1009,7 +1012,7 @@ pub fn run() -> anyhow::Result<()> {
                 env_alias,
                 export_shell,
             } => cmd::env::run(env_alias, export_shell),
-            Commands::Dev { run } => cmd::dev::run(run),
+            Commands::Dev { run, repo } => cmd::dev::run(run, repo),
             Commands::Upgrade { force, tag, branch } => {
                 match cmd::upgrade::run(BRANCH, STATUS, NUMBER, force, tag, branch) {
                     Ok(()) => {

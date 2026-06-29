@@ -5,7 +5,46 @@ use std::collections::HashMap;
 use std::process::Command;
 use zoi_project::config as project_config;
 
-pub fn run(run_cmd: Option<String>) -> Result<()> {
+pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
+    let _temp_dir = if let Some(repo_url) = repo {
+        let full_url = if repo_url.starts_with("http") || repo_url.contains('@') {
+            repo_url
+        } else if let Some((provider, path)) = repo_url.split_once(':') {
+            match provider {
+                "gh" | "github" => format!("https://github.com/{}.git", path),
+                "gl" | "gitlab" => format!("https://gitlab.com/{}.git", path),
+                "cb" | "codeberg" => format!("https://codeberg.org/{}.git", path),
+                _ => return Err(anyhow!("Unknown provider: {}", provider)),
+            }
+        } else {
+            format!("https://github.com/{}.git", repo_url)
+        };
+
+        println!(
+            "{} Cloning repository: {}...",
+            "::".bold().blue(),
+            full_url.cyan()
+        );
+
+        let temp = tempfile::Builder::new().prefix("zoi-dev-").tempdir()?;
+        let status = Command::new("git")
+            .arg("clone")
+            .arg("--depth")
+            .arg("1")
+            .arg(full_url)
+            .arg(temp.path())
+            .status()?;
+
+        if !status.success() {
+            return Err(anyhow!("Failed to clone repository."));
+        }
+
+        std::env::set_current_dir(temp.path())?;
+        Some(temp)
+    } else {
+        None
+    };
+
     let config = project_config::load()?;
     println!(
         "{} Entering development shell for project: {}",

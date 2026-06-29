@@ -26,7 +26,15 @@ Zoi is packed with features designed to make package management and environment 
 
 - **Native Linux Sandboxing:** Run packages in a secure, "default-deny" isolated environment using Bubblewrap. Package maintainers explicitly define network, system, and file access permissions, protecting your host system from malicious or buggy software.
 
-- **Reproducible Project Installs (`--frozen-lockfile`):** Rebuild a project environment from `zoi.lock` without re-resolving versions, sub-packages, or recorded dependency choices.
+- **Lua-Based Project Configuration (`zoi.lua`):** Define project environments with a powerful, scriptable Lua API. Supports dynamic dependency selection, registry overrides, and complex environment setup.
+
+- **Hermetic Project Environments:** Strictly isolate project dependencies and registries within `./.zoi/pkgs/`. Ensure that project-level syncs do not affect global state and remain reproducible across machines.
+
+- **Pinned Registry Inputs:** Lock registries to exact Git revisions (branch, tag, or commit hash) in `zoi.lua`. `zoi.lock` automatically pins these to SHA-1 hashes for absolute reproducibility.
+
+- **Reproducible Project Installs (`--frozen-lockfile`):** Rebuild a project environment from `zoi.lock` without re-resolving versions, sub-packages, or recorded dependency choices. Zoi Specification v2 lockfiles include directory hashes to verify the integrity of the entire local state.
+
+- **Automated Dev Repo Discovery (`zoi dev --repo`):** Instantly enter a development shell for any Git repository. Zoi clones the repository to a temporary directory, sets up the environment defined in its `zoi.lua`, and cleans up automatically on exit.
 
 - **Global Transaction Hooks:** Automate system maintenance tasks (like font cache updates) based on modified file paths. Hooks run once per transaction, preventing redundant script execution.
 

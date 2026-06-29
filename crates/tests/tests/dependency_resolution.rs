@@ -51,6 +51,7 @@ fn test_get_versions_does_not_leak_across_distinct_explicit_sources() {
         true,
         true,
         false,
+        None,
     )
     .expect("provider should be created");
 
