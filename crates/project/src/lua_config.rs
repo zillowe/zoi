@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
-pub fn load_zoi_lua(path: &Path) -> Result<ProjectConfig> {
+pub fn load_zoi_lua(path: &Path, env: HashMap<String, String>) -> Result<ProjectConfig> {
     let lua = Lua::new();
     let content = fs::read_to_string(path)?;
 
@@ -18,8 +18,10 @@ pub fn load_zoi_lua(path: &Path) -> Result<ProjectConfig> {
     let environments_data = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
 
     let env_table = lua.create_table().map_err(|e| anyhow!(e.to_string()))?;
-    for (k, v) in std::env::vars() {
-        env_table.set(k, v).map_err(|e| anyhow!(e.to_string()))?;
+    for (k, v) in &env {
+        env_table
+            .set(k.as_str(), v.as_str())
+            .map_err(|e| anyhow!(e.to_string()))?;
     }
     lua.globals()
         .set("ENV", env_table)
@@ -134,8 +136,11 @@ pub fn load_zoi_lua(path: &Path) -> Result<ProjectConfig> {
         .ok_or_else(|| anyhow!("zoi.lua must define project name"))?;
 
     let local = project_map
-        .get("local")
+        .get("config")
+        .and_then(|v| v.as_object())
+        .and_then(|obj| obj.get("local"))
         .and_then(|v| v.as_bool())
+        .or_else(|| project_map.get("local").and_then(|v| v.as_bool()))
         .unwrap_or(false);
 
     let mut pkgs = Vec::new();
