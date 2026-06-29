@@ -86,7 +86,7 @@ deny:
     - *base_apt
     - cd /tmp && cargo install cargo-deny --locked
   script:
-    - cargo deny check
+    - cd $CI_PROJECT_DIR && cargo deny check
   rules:
     - if: $CI_COMMIT_TAG
       when: never
