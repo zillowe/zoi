@@ -109,9 +109,13 @@ pub struct EnvironmentSpec {
 }
 
 pub fn load() -> Result<ProjectConfig> {
+    load_with_env(std::env::vars().collect())
+}
+
+pub fn load_with_env(env: HashMap<String, String>) -> Result<ProjectConfig> {
     let lua_path = Path::new("zoi.lua");
     if lua_path.exists() {
-        return crate::lua_config::load_zoi_lua(lua_path);
+        return crate::lua_config::load_zoi_lua(lua_path, env);
     }
 
     let config_path = Path::new("zoi.yaml");

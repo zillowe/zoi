@@ -6,6 +6,7 @@ use std::process::Command;
 use zoi_project::config as project_config;
 
 pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
+    let is_repo = repo.is_some();
     let _temp_dir = if let Some(repo_url) = repo {
         let full_url = if repo_url.starts_with("http") || repo_url.contains('@') {
             repo_url
@@ -45,7 +46,11 @@ pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
         None
     };
 
-    let config = project_config::load()?;
+    let config = if is_repo {
+        project_config::load_with_env(HashMap::new())?
+    } else {
+        project_config::load()?
+    };
     println!(
         "{} Entering development shell for project: {}",
         "::".bold().blue(),

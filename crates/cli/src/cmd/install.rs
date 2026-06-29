@@ -206,7 +206,12 @@ pub fn run(
 
     for source in &sources_to_process {
         if source.ends_with("zoi.pkgs.json") {
-            install::lockfile::process_lockfile(source, &mut final_sources, &mut temp_files)?;
+            install::lockfile::process_lockfile(
+                source,
+                &mut final_sources,
+                &mut temp_files,
+                scope_override.unwrap_or(types::Scope::User),
+            )?;
         } else {
             final_sources.push(source.to_string());
         }

@@ -8,6 +8,7 @@ pub fn process_lockfile(
     lockfile_path: &str,
     sources_to_process: &mut Vec<String>,
     temp_files: &mut Vec<NamedTempFile>,
+    scope: types::Scope,
 ) -> Result<()> {
     println!("=> Installing packages from lockfile: {}", lockfile_path);
     let content = fs::read_to_string(lockfile_path)?;
@@ -23,7 +24,7 @@ pub fn process_lockfile(
             version: pkg.version,
             repo: pkg.repo,
             registry_handle: pkg.registry,
-            scope: types::Scope::User,
+            scope,
             sub_package,
             chosen_options: Vec::new(),
             chosen_optionals: Vec::new(),
