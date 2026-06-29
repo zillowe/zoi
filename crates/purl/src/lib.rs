@@ -37,14 +37,14 @@ pub struct PurlPackageIndex {
     #[serde(default = "default_revision")]
     pub revision: String,
     pub description: String,
-    pub dependencies: Option<Vec<String>>,
-    pub sub_packages: Option<serde_json::Value>,
-    pub vuln: Option<Vec<MiniVulnerability>>,
+    pub sub_packages: Vec<String>,
+    pub main_sub_packages: Vec<String>,
+    pub vuln: Vec<MiniVulnerability>,
+    pub dependencies: Option<zoi_core::types::Dependencies>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RegistryIndex {
-    #[serde(default = "default_version")]
     pub version: String,
     pub packages: BTreeMap<String, PurlPackageIndex>,
 }
@@ -210,27 +210,15 @@ pub fn resolve_purl(purl_str: &str) -> Result<ResolvedPurl> {
 
     let index = fetch_registry_index(registry)?;
 
-    let full_path = format!("{}/{}", expected_repo, package_path);
-    let package_info = if let Some(info) = index.packages.get(&full_path) {
-        info
-    } else {
-        let info = index.packages.get(package_path).ok_or_else(|| {
-            anyhow!(
-                "Package '{}' not found in registry '{}'",
-                package_path,
-                registry_handle
-            )
-        })?;
-        if expected_repo != info.repo {
-            return Err(anyhow!(
-                "Repository mismatch in PURL. Package '{}' is in repository '{}', but PURL specified '{}'",
-                package_path,
-                info.repo,
-                expected_repo
-            ));
-        }
-        info
-    };
+    let packages_key = format!("@{}/{}", expected_repo, package_path);
+    let package_info = index.packages.get(&packages_key).ok_or_else(|| {
+        anyhow!(
+            "Package '{}' not found in registry '{}' within repository '{}'",
+            package_path,
+            registry_handle,
+            expected_repo
+        )
+    })?;
 
     let resolved_version = if version == "latest" {
         package_info.version.clone()
@@ -253,29 +241,20 @@ pub fn fetch_and_store_purl_package(purl_str: &str) -> Result<String> {
     let db_root = zoi_core::utils::get_db_root()?;
 
     let mut fetched = std::collections::HashSet::new();
+    let packages_key = format!("@{}/{}", resolved.package_info.repo, resolved.package_path);
     fetch_and_store_recursive(
         &resolved.registry_handle,
         &resolved.registry,
         &resolved.index,
-        &resolved.package_path,
+        &packages_key,
         &db_root,
         &mut fetched,
     )?;
 
-    let ident = if resolved.package_info.repo.is_empty() {
-        format!(
-            "#{}@{}@{}",
-            resolved.registry_handle, resolved.package_path, resolved.version
-        )
-    } else {
-        format!(
-            "#{}@{}/{}@{}",
-            resolved.registry_handle,
-            resolved.package_info.repo,
-            resolved.package_path,
-            resolved.version
-        )
-    };
+    let ident = format!(
+        "#{}@{}@{}",
+        resolved.registry_handle, packages_key, resolved.version
+    );
     Ok(ident)
 }
 
@@ -283,50 +262,80 @@ fn fetch_and_store_recursive(
     registry_handle: &str,
     registry: &RegistryInfo,
     index: &RegistryIndex,
-    package_path: &str,
+    packages_key: &str,
     db_root: &Path,
     fetched: &mut std::collections::HashSet<String>,
 ) -> Result<()> {
-    if fetched.contains(package_path) {
+    if fetched.contains(packages_key) {
         return Ok(());
     }
-    fetched.insert(package_path.to_string());
+    fetched.insert(packages_key.to_string());
 
-    let pkg_info = index.packages.get(package_path).ok_or_else(|| {
+    let pkg_info = index.packages.get(packages_key).ok_or_else(|| {
         anyhow!(
             "Dependency '{}' not found in registry '{}'",
-            package_path,
+            packages_key,
             registry_handle
         )
     })?;
 
-    let lua_content = fetch_package_lua(registry, &pkg_info.repo, package_path)?;
+    let package_name = packages_key.split('/').next_back().unwrap_or(packages_key);
+
+    let lua_content = fetch_package_lua(registry, &pkg_info.repo, package_name)?;
 
     let mut dest_dir = db_root.join(registry_handle);
     if !pkg_info.repo.is_empty() {
         dest_dir = dest_dir.join(&pkg_info.repo);
     }
-    dest_dir = dest_dir.join(package_path);
+    dest_dir = dest_dir.join(package_name);
 
     std::fs::create_dir_all(&dest_dir)?;
-    let dest_file = dest_dir.join(format!("{}.pkg.lua", package_path));
+    let dest_file = dest_dir.join(format!("{}.pkg.lua", package_name));
     std::fs::write(&dest_file, lua_content)?;
 
     if let Some(deps) = &pkg_info.dependencies {
-        for dep in deps {
-            if dep.starts_with('@') {
-                continue;
+        let mut to_fetch = Vec::new();
+        if let Some(runtime) = &deps.runtime {
+            match runtime {
+                zoi_core::types::DependencyGroup::Simple(d) => to_fetch.extend(d.clone()),
+                zoi_core::types::DependencyGroup::Complex(c) => {
+                    to_fetch.extend(c.required.clone());
+                    to_fetch.extend(c.optional.clone());
+                    for opt in &c.options {
+                        to_fetch.extend(opt.depends.clone());
+                    }
+                }
             }
+        }
 
-            if index.packages.contains_key(dep) {
-                let _ = fetch_and_store_recursive(
-                    registry_handle,
-                    registry,
-                    index,
-                    dep,
-                    db_root,
-                    fetched,
-                );
+        for dep_str in to_fetch {
+            if let Some(zoi_dep) = dep_str.strip_prefix("zoi:") {
+                let dep_pkg_name = zoi_dep.split('@').next().unwrap_or(zoi_dep);
+
+                let mut found_key = None;
+                for key in index.packages.keys() {
+                    if key.ends_with(&format!("/{}", dep_pkg_name))
+                        || (key.starts_with('@')
+                            && key
+                                .split_once('/')
+                                .map(|(_, n)| n == dep_pkg_name)
+                                .unwrap_or(false))
+                    {
+                        found_key = Some(key.clone());
+                        break;
+                    }
+                }
+
+                if let Some(key) = found_key {
+                    let _ = fetch_and_store_recursive(
+                        registry_handle,
+                        registry,
+                        index,
+                        &key,
+                        db_root,
+                        fetched,
+                    );
+                }
             }
         }
     }

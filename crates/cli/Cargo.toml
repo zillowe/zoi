@@ -32,6 +32,7 @@ crossterm.workspace = true
 dialoguer.workspace = true
 dirs.workspace = true
 fs2.workspace = true
+git2.workspace = true
 hex.workspace = true
 home.workspace = true
 indicatif.workspace = true

@@ -1,11 +1,101 @@
 ---
 title: Migrating to Zoi
-description: A guide for migrating packages from other managers to Zoi's .pkg.lua format.
+description: A guide for migrating packages from other managers and transitioning to Zoi Specification v2.
 ---
 
-This guide is for package maintainers who want to port an existing package from another system (like Homebrew, APT, or Pacman) to Zoi's `.pkg.lua` format. Zoi's Lua-based scripting provides immense flexibility, and you'll find that most concepts from other package managers map over quite naturally.
+This guide covers two main areas:
 
-## General Concept Mapping
+1. Porting existing packages from other systems (Homebrew, APT, etc.) to Zoi's `.pkg.lua` format.
+2. Migrating your existing Zoi v1 projects and configurations to **Zoi Specification v2** (introduced in Zoi v1.20.0).
+
+---
+
+## Migrating to Zoi Specification v2
+
+Zoi Specification v2 is a major architectural overhaul that introduces breaking changes to improve reproducibility, flexibility, and security. **There is no backward compatibility with Specification v1 configurations or lockfiles.**
+
+### Key Changes at a Glance
+
+| Feature            | Spec v1                     | Spec v2                                      |
+| :----------------- | :-------------------------- | :------------------------------------------- |
+| **Project Config** | `zoi.yaml`                  | `zoi.lua` (primary), `zoi.yaml` (tasks only) |
+| **Lockfile**       | `zoi.lock` (v1)             | `zoi.lock` (v2, with directory hashes)       |
+| **Registry Sync**  | Global only                 | Global or Project-local (`.zoi/pkgs/db`)     |
+| **Package IDs**    | `package` or `repo/package` | Strictly `@repo/package`                     |
+| **Versioning**     | String-based                | Strict SemVer                                |
+
+### 1. Migrating `zoi.yaml` to `zoi.lua`
+
+In Specification v2, `zoi.lua` is the primary scriptable configuration for your project. The `zoi.yaml` file is now restricted strictly to task definitions (`run` and `env`).
+
+**Action Required:**
+Move your `pkgs`, `registries`, and `config` fields from `zoi.yaml` to a new `zoi.lua` file.
+
+**Zoi v1 / Spec v1 (`zoi.yaml`):**
+
+```yaml
+name: my-project
+config:
+  local: true
+registries:
+  - https://github.com/YourOrg/custom-registry.git
+pkgs:
+  - eza
+  - fzf: "0.44.1"
+```
+
+**Zoi v1.20 / Spec v2 (`zoi.lua`):**
+
+```lua
+project({
+    name = "my-project",
+})
+
+registries({
+    custom = {
+        url = "https://github.com/YourOrg/custom-registry.git",
+        revision = "main" -- Optional: pin to a specific branch/hash
+    }
+})
+
+packages({
+    "@core/eza",
+    ["@community/fzf"] = {
+        version = "0.44.1"
+    }
+})
+```
+
+### 2. Updating Package Identifiers
+
+Specification v2 adopts the `@repo/package` format for all internal identifiers to prevent name collisions across repository tiers.
+
+**Action Required:**
+Update your package lists to use the full scoped name.
+
+- `eza` -> `@core/eza`
+- `htop` -> `@community/htop`
+- `linux:headers` -> `@core/linux:headers`
+
+### 3. Regenerating Lockfiles
+
+The v2 lockfile includes cryptographic hashes of your local store and database directories to ensure absolute reproducibility.
+
+**Action Required:**
+
+1. Delete your existing `zoi.lock`.
+2. Run `zoi install --local` to generate a new v2 lockfile.
+3. Commit the new `zoi.lock` to your repository.
+
+### 4. Project-Local Isolation
+
+Specification v2 strictly isolates project dependencies within `./.zoi/pkgs/`. Registries are now synced per-project if defined in `zoi.lua`, allowing different projects to use different versions of the same registry without conflict.
+
+---
+
+## General Concept Mapping (Other Managers)
+
+... (rest of the file)
 
 Most packaging systems split the process into metadata definition, dependency declaration, and scripted build steps. Here's how they generally correspond to Zoi's `.pkg.lua`:
 

@@ -3,11 +3,11 @@ title: Specifications
 description: List of Zoi's specifications and usage.
 ---
 
-This document outlines the v1 specifications for the core metadata files used by the Zoi package manager to manage registries, repositories, and security advisories.
+This document outlines the v2 specifications for the core metadata files used by the Zoi package manager to manage registries, repositories, and security advisories.
 
 ## General Design
 
-All Zoi specification files support a `version` field to ensure future compatibility. Currently, all specifications are at version `"1"`. If omitted, the default is `"1"`.
+All Zoi specification files support a `version` field to ensure future compatibility. Version `"2"` is the current standard for Zoi Specification v2. There is no backward compatibility with version `"1"`.
 
 ## 1. registries.json
 
@@ -21,17 +21,11 @@ The `registries.json` file is the central database of all official and supported
 
 ```json
 {
-  "version": "1",
+  "version": "2",
   "zoidberg": {
     "name": "Zoidberg Official Registry",
     "description": "The primary official registry for Zoi packages.",
     "git": "https://github.com/zillowe/zoidberg",
-    "branch": "main"
-  },
-  "community": {
-    "name": "Zoi Community",
-    "description": "Community-maintained packages.",
-    "git": "https://github.com/zillowe/community",
     "branch": "main"
   }
 }
@@ -39,7 +33,7 @@ The `registries.json` file is the central database of all official and supported
 
 ### Fields
 
-- **`version`** (String): Spec version. Defaults to `"1"`.
+- **`version`** (String): Spec version. Defaults to `"2"`.
 - **`[registry-handle]`** (Object): The short name of the registry (e.g. `zoidberg`).
   - **`name`** (String): Full display name of the registry.
   - **`description`** (String): A short description of the registry's purpose.
@@ -57,37 +51,35 @@ The `repo.yaml` file defines the configuration for a specific package repository
 ### Structure
 
 ```yaml
-version: "1"
+version: "2"
 name: "Zoidberg"
 description: "Main repository configuration"
-advisory_prefix: "ZOI-SEC"
+advisory_prefix: "ZSA"
 git:
   - url: "https://github.com/zillowe/zoidberg.git"
     branch: "main"
 pkg:
-  - url: "https://pkg.zillowe.com"
-db: "https://db.zillowe.com"
+  - url: "https://zillowe.pages.dev/pkgs/{repo}/{os}/{arch}/{version}"
 pgp:
-  - id: "A1B2C3D4E5F6G7H8"
-    url: "https://zillowe.com/keys/zoidberg.asc"
+  - id: "842293159C4B03357C8328D3A75793A3E674252E"
+    url: "https://zillowe.pages.dev/keys/zillowez.asc"
 repos:
-  - name: "main"
+  - name: "core"
     type: "official"
     active: true
-  - name: "extra"
-    type: "community"
+  - name: "main"
+    type: "official"
     active: true
 ```
 
 ### Fields
 
-- **`version`** (String): Spec version. Defaults to `"1"`.
+- **`version`** (String): Spec version. Defaults to `"2"`.
 - **`name`** (String): Repository/Registry name.
 - **`description`** (String): Description of the repository collection.
-- **`advisory_prefix`** (String, Optional): Prefix used for security advisories (e.g. `ZOI-SEC`).
+- **`advisory_prefix`** (String, Optional): Prefix used for security advisories (e.g. `ZSA`).
 - **`git`** (List of Objects): Git mirrors for the repository content.
-- **`pkg`** (List of Objects): Package download mirrors.
-- **`db`** (String, Optional): Database download URL.
+- **`pkg`** (List of Objects): Package download mirrors. Supports placeholders like `{repo}`, `{os}`, `{arch}`, `{version}`.
 - **`pgp`** (List of Objects): Trusted PGP keys for signature verification.
 - **`repos`** (List of Objects): Sub-repositories contained within this registry.
   - **`name`** (String): Name of the sub-repo (e.g. `main`).
@@ -98,7 +90,7 @@ repos:
 
 ## 3. advisories.json / \*.sec.yaml
 
-These files define the security advisories and vulnerabilities affecting packages. `advisories.json` is the registry index, whereas files ending in `.sec.yaml` (e.g. `ZSA-2026-D0042.sec.yaml`) specify individual `Advisory` items.
+These files define the security advisories and vulnerabilities affecting packages. `advisories.json` is the registry index, whereas files ending in `.sec.yaml` specify individual `Advisory` items.
 
 **Format:** JSON (for `advisories.json`) or YAML (for `.sec.yaml`)
 
@@ -106,11 +98,11 @@ These files define the security advisories and vulnerabilities affecting package
 
 ```json
 {
-  "version": "1",
+  "version": "2",
   "last_id": 42,
   "year": 2026,
   "advisories": {
-    "ZOI-SEC-2026-C0042": "main/curl/sec.yaml"
+    "ZSA-2026-C0042": "core/curl/ZSA-2026-C0042.sec.yaml"
   }
 }
 ```
@@ -118,9 +110,9 @@ These files define the security advisories and vulnerabilities affecting package
 ### Structure (Individual Advisory)
 
 ```yaml
-id: "ZOI-SEC-2026-C0042"
+id: "ZSA-2026-C0042"
 package: "curl"
-sub_package: "libcurl"
+sub_packages: ["libcurl"]
 summary: "Buffer overflow in curl"
 severity: "high"
 cvss: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
@@ -135,11 +127,11 @@ references:
 
 - **`id`** (String): The unique advisory identifier.
 - **`package`** (String): The name of the affected package.
-- **`sub_package`** (String, Optional): The specific sub-package affected, if applicable.
+- **`sub_packages`** (List of Strings, Optional): The specific sub-packages affected.
 - **`summary`** (String): A short summary of the vulnerability.
 - **`severity`** (String): The severity level (`low`, `medium`, `high`, `critical`).
 - **`cvss`** (String, Optional): The CVSS vector string.
-- **`affected_range`** (String): Version range affected (e.g. `<1.2.3`).
+- **`affected_range`** (String): SemVer range affected (e.g. `<1.2.3`).
 - **`fixed_in`** (String, Optional): The version where the issue was fixed.
 - **`description`** (String): Detailed description of the vulnerability.
 - **`references`** (List of Strings, Optional): URLs to external advisories, CVEs, or pull requests.
@@ -148,7 +140,7 @@ references:
 
 ## 4. packages.json
 
-The `packages.json` file is generated by a registry to list all packages it contains, including their sub-packages, versions, repository locations, and vulnerabilities.
+The `packages.json` file is generated by a registry to list all packages it contains. In version 2, it uses `@repo/package` keys for better identification.
 
 **Format:** JSON
 
@@ -156,23 +148,30 @@ The `packages.json` file is generated by a registry to list all packages it cont
 
 ```json
 {
-  "version": "1",
+  "version": "2",
   "packages": {
-    "curl": {
-      "description": "Command line tool and library for transferring data with URLs",
-      "repo": "main/curl",
+    "@core/curl": {
+      "repo": "core",
       "repo_type": "official",
       "version": "8.4.0",
-      "sub_packages": {
-        "libcurl": {
-          "description": "The multiprotocol file transfer library"
-        }
+      "revision": "1",
+      "description": "Command line tool and library for transferring data with URLs",
+      "sub_packages": ["libcurl", "headers"],
+      "main_sub_packages": ["libcurl"],
+      "dependencies": {
+        "runtime": ["zoi:openssl", "zoi:zlib"],
+        "build": [
+          {
+            "type": "source",
+            "packages": ["zoi:gcc", "zoi:make"]
+          }
+        ]
       },
-      "dependencies": ["openssl", "zlib"],
       "vuln": [
         {
-          "id": "ZOI-SEC-2026-C0042",
+          "id": "ZSA-2026-C0042",
           "severity": "high",
+          "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
           "affected_range": "<8.4.0",
           "fixed_in": "8.4.0",
           "summary": "Buffer overflow in curl"
@@ -185,13 +184,74 @@ The `packages.json` file is generated by a registry to list all packages it cont
 
 ### Fields
 
-- **`version`** (String): Spec version. Defaults to `"1"`.
-- **`packages`** (Object): Map of package names to their metadata.
-  - **`[package_name]`** (Object):
-    - **`description`** (String, Optional): A short description of the package.
-    - **`repo`** (String): The path relative to the registry root (e.g. `main/curl`).
-    - **`repo_type`** (String): The type of sub-repo it resides in (e.g. `official`, `community`).
-    - **`version`** (String): The latest stable version of the package.
-    - **`sub_packages`** (Object, Optional): Map of sub-package names to their details.
-    - **`dependencies`** (List of Strings, Optional): List of direct dependencies.
-    - **`vuln`** (List of Objects, Optional): Known vulnerabilities for this package (fields match the Advisory format).
+- **`version`** (String): Spec version. Defaults to `"2"`.
+- **`packages`** (Object): Map of `@repo/package` identifiers to their metadata.
+  - **`repo`** (String): The repository tier (e.g. `core`).
+  - **`repo_type`** (String): The type of repository (`official`, `community`).
+  - **`version`** (String): The latest stable version (SemVer).
+  - **`revision`** (String): Package revision number.
+  - **`description`** (String, Optional): A short description of the package.
+  - **`sub_packages`** (List of Strings): All sub-packages provided by this definition.
+  - **`main_sub_packages`** (List of Strings): Default sub-packages to install.
+  - **`dependencies`** (Object): Detailed dependencies for v2.
+    - **`runtime`** (List of Strings): Runtime dependency strings.
+    - **`build`** (List of Objects): Build dependency groups.
+  - **`vuln`** (List of Objects): Known vulnerabilities (Mini-Advisory format).
+
+---
+
+## 5. zoi.lock
+
+The `zoi.lock` file ensures reproducibility by pinning the exact state of a project's dependencies.
+
+**Format:** JSON
+
+### Structure
+
+```json
+{
+  "version": "2",
+  "packages_hash": "sha512-...",
+  "registries_hash": "sha512-...",
+  "registries": {
+    "zoidberg": {
+      "url": "https://github.com/zillowe/zoidberg.git",
+      "revision": "a1b2c3d4..."
+    }
+  },
+  "installed_packages": {
+    "@core/curl": {
+      "repo": "core",
+      "repo_type": "official",
+      "version": "8.4.0",
+      "revision": "1",
+      "registry": "zoidberg",
+      "why": "direct",
+      "description": "...",
+      "type": "pre-compiled",
+      "install_method": "pre-built",
+      "installed_sub_packages": ["libcurl"],
+      "platform": "linux-amd64",
+      "hash": "sha512-...",
+      "dependencies": {
+        "runtime": ["zoi:openssl", "zoi:zlib"],
+        "build": []
+      }
+    }
+  }
+}
+```
+
+### Fields
+
+- **`version`** (String): Spec version. Defaults to `"2"`.
+- **`packages_hash`** (String): SHA-512 hash of the `./.zoi/pkgs/store` directory.
+- **`registries_hash`** (String): SHA-512 hash of the `./.zoi/pkgs/db` directory.
+- **`registries`** (Object): Map of registry handles to their pinned state.
+  - **`url`** (String): Registry Git URL.
+  - **`revision`** (String): The exact Git commit hash (SHA-1).
+- **`installed_packages`** (Object): Map of `@repo/package` identifiers to installation details.
+  - **`why`** (String): `direct` or `dependency`.
+  - **`hash`** (String): SHA-512 hash of the specific package's store directory.
+  - **`platform`** (String): The platform identifier (e.g. `linux-amd64`).
+  - **`dependencies`** (Object): The specific dependencies resolved and installed for this package.

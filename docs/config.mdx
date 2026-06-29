@@ -3,11 +3,14 @@ title: Zoi Configuration
 description: A detailed guide to Zoi's config.yaml file for customizing its behavior.
 ---
 
-Zoi's behavior can be customized through one or more `config.yaml` files. This allows users and system administrators to configure everything from active package repositories to security policies. This document covers the structure of the configuration file, where to place it, and all the available options.
+Zoi's behavior can be customized through two distinct configuration layers:
 
-## Configuration File Locations
+1. **Hierarchical `config.yaml`**: Standard YAML files for global system-wide policies, user preferences, and project-level settings.
+2. **Scriptable `zoi.lua`**: The primary project configuration for defining dependencies, registries, and environment setup using Zoi's Lua API.
 
-Zoi uses a hierarchical configuration system, merging settings from up to three different locations. This allows for global system-wide settings to be overridden by user-specific or project-specific configurations.
+## Configuration Hierarchy (config.yaml)
+
+Zoi merges settings from up to three `config.yaml` locations. This allows for global system-wide settings to be overridden by user-specific or project-specific configurations.
 
 The files are loaded and merged in the following order of precedence (lower numbers are overridden by higher numbers):
 
@@ -19,12 +22,17 @@ The files are loaded and merged in the following order of precedence (lower numb
    - **Linux/macOS:** `~/.zoi/pkgs/config.yaml`
    - **Windows:** `%USERPROFILE%\.zoi\pkgs\config.yaml`
 
-3. **Project:** Project-specific configuration, useful for team-based settings.
+3. **Project Policy:** Project-specific overrides for system behavior.
    - **Path:** `./.zoi/pkgs/config.yaml` (relative to the current directory)
 
-Settings from a higher-precedence file will override those from a lower-precedence file, unless a `policy` in the system configuration prevents it.
+<Callout title="Spec v2 Note">
+  In Zoi Specification v2 (Zoi v1.20.0+), project-specific dependencies and
+  registry definitions should be placed in `zoi.lua`. The project `config.yaml`
+  remains useful for overriding tool-specific behaviors or system paths for a
+  specific workspace.
+</Callout>
 
-## Configuration Schema
+## Configuration Schema (config.yaml)
 
 Here are all the fields available in `config.yaml`.
 
