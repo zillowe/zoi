@@ -57,9 +57,10 @@ packages({
 - **`project`**:
   - `name`: (string) Required project name.
   - `config.local`: (boolean) If `true`, dependencies and registries are stored in the project root (`./.zoi/pkgs`).
-- **`registries`**: A map of handles to registry definitions (`url`, `revision`).
+- **`registries`**: A map of handles to registry definitions (`url`, `revision`, `type`).
+  - `type`: (string) `"set"` (default) — bare package names search this registry's repos; `"added"` — requires explicit `#handle` prefix.
 - **`packages`**: A map or list of `@repo/package` identifiers.
-  - `version`: (string) SemVer requirement.
+  - `version`: (string) SemVer requirement, supports ranges (`^1.0`, `>=2.0`, `~1.2.3`) and channels (`@nightly`).
   - `sub_packages`: (list of string) Specific sub-packages to install.
   - `dependencies`: (object) Overrides for package dependencies.
 
@@ -130,6 +131,8 @@ Zoi Specification v2 lockfiles are designed for absolute reproducibility. They p
 - **Enter a dev shell**: `zoi dev`. If the repository is remote, use `zoi dev --repo <url>`.
 - **Run a task**: `zoi run <alias>`.
 - **Set up environment**: `zoi env <alias>`.
+- **Sync local registries**: `zoi sync --local` (pins revisions from `zoi.lua`).
+- **Sync from lockfile**: `zoi sync --local --frozen-lock` (pins revisions from `zoi.lock`).
 - **Install project dependencies**: `zoi install --local`.
 
 ## Best Practices
