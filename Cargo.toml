@@ -27,7 +27,7 @@ members = [
 default-members = ["crates/zoi-rs", "crates/mini"]
 
 [workspace.package]
-version = "1.20.3"
+version = "1.20.4"
 edition = "2024"
 rust-version = "1.92.0"
 description = "Advanced Package Manager & Environment Orchestrator"
@@ -40,7 +40,11 @@ categories = ["command-line-utilities", "development-tools"]
 
 [workspace.dependencies]
 anyhow = "1.0.103"
-chrono = { version = "0.4.45", default-features = false, features = ["serde", "clock", "std"] }
+chrono = { version = "0.4.45", default-features = false, features = [
+    "serde",
+    "clock",
+    "std",
+] }
 clap = { version = "4.6.1", features = ["derive", "color"] }
 clap_complete = "4.6.6"
 clap_mangen = "0.3.0"
@@ -51,17 +55,30 @@ dialoguer = "0.12.0"
 dirs = "6.0.0"
 flate2 = "1.1.9"
 fs2 = "0.4.3"
-git2 = { version = "0.21.0", default-features = false, features = ["https", "vendored-openssl"] }
+git2 = { version = "0.21.0", default-features = false, features = [
+    "https",
+    "vendored-openssl",
+] }
 hex = "0.4.3"
 home = "0.5.12"
 indicatif = "0.18.6"
 junction = "2.0.0"
 md5 = "0.8.0"
-mlua = { version = "0.11.6", default-features = false, features = ["luau", "serde"] }
-nix = { version = "0.31.3", default-features = false, features = ["user", "fs"] }
-openssl = { version = "0.10.81", default-features = false, features = ["vendored"] }
+mlua = { version = "0.11.6", default-features = false, features = [
+    "luau",
+    "serde",
+] }
+nix = { version = "0.31.3", default-features = false, features = [
+    "user",
+    "fs",
+] }
+openssl = { version = "0.10.81", default-features = false, features = [
+    "vendored",
+] }
 pulldown-cmark = { version = "0.13.4", default-features = false }
-ratatui = { version = "0.30.2", default-features = false, features = ["crossterm"] }
+ratatui = { version = "0.30.2", default-features = false, features = [
+    "crossterm",
+] }
 rayon = "1.12.0"
 regex = "1.12.4"
 reqwest = { version = "0.13.4", default-features = false, features = [
@@ -86,14 +103,19 @@ toml = "1.1.2"
 urlencoding = "2.1.3"
 uuid = { version = "1.23.4", default-features = false, features = ["v7"] }
 walkdir = "2.5.0"
-winapi = { version = "0.3.9", default-features = false, features = ["securitybaseapi", "winnt"] }
+winapi = { version = "0.3.9", default-features = false, features = [
+    "securitybaseapi",
+    "winnt",
+] }
 xz2 = "0.1.7"
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
 zstd = "0.13.3"
 ar = "0.9.0"
 sevenz-rust = "0.6.1"
 phf = "0.14.0"
-rusqlite = { version = "0.40.1", default-features = false, features = ["bundled"] }
+rusqlite = { version = "0.40.1", default-features = false, features = [
+    "bundled",
+] }
 glob = "0.3.3"
 pubgrub = "0.4.0"
 thiserror = "2.0.18"
@@ -103,26 +125,26 @@ purl = "0.1.6"
 dotenvy = "0.15.7"
 phf_codegen = "0.14.0"
 
-zoi-core = { path = "crates/core", version = "1.20.3" }
-zoi-hooks = { path = "crates/hooks", version = "1.20.3" }
-zoi-lua = { path = "crates/lua", version = "1.20.3" }
-zoi-purl = { path = "crates/purl", version = "1.20.3" }
-zoi-resolver = { path = "crates/resolver", version = "1.20.3" }
-zoi-sandbox = { path = "crates/sandbox", version = "1.20.3" }
-zoi-telemetry = { path = "crates/telemetry", version = "1.20.3" }
-zoi-project = { path = "crates/project", version = "1.20.3" }
-zoi-cli = { path = "crates/cli", version = "1.20.3" }
-zoi-db = { path = "crates/db", version = "1.20.3" }
-zoi-audit = { path = "crates/audit", version = "1.20.3" }
-zoi-pm = { path = "crates/pm", version = "1.20.3" }
-zoi-deps = { path = "crates/dependencies", version = "1.20.3" }
-zoi-install = { path = "crates/install", version = "1.20.3" }
-zoi-package = { path = "crates/package", version = "1.20.3" }
-zoi-sync = { path = "crates/sync", version = "1.20.3" }
-zoi-uninstall = { path = "crates/uninstall", version = "1.20.3" }
-zoi-transaction = { path = "crates/transaction", version = "1.20.3" }
-zoi-plugins = { path = "crates/plugins", version = "1.20.3" }
-zoi-rs = { path = "crates/zoi-rs", version = "1.20.3" }
+zoi-core = { path = "crates/core", version = "1.20.4" }
+zoi-hooks = { path = "crates/hooks", version = "1.20.4" }
+zoi-lua = { path = "crates/lua", version = "1.20.4" }
+zoi-purl = { path = "crates/purl", version = "1.20.4" }
+zoi-resolver = { path = "crates/resolver", version = "1.20.4" }
+zoi-sandbox = { path = "crates/sandbox", version = "1.20.4" }
+zoi-telemetry = { path = "crates/telemetry", version = "1.20.4" }
+zoi-project = { path = "crates/project", version = "1.20.4" }
+zoi-cli = { path = "crates/cli", version = "1.20.4" }
+zoi-db = { path = "crates/db", version = "1.20.4" }
+zoi-audit = { path = "crates/audit", version = "1.20.4" }
+zoi-pm = { path = "crates/pm", version = "1.20.4" }
+zoi-deps = { path = "crates/dependencies", version = "1.20.4" }
+zoi-install = { path = "crates/install", version = "1.20.4" }
+zoi-package = { path = "crates/package", version = "1.20.4" }
+zoi-sync = { path = "crates/sync", version = "1.20.4" }
+zoi-uninstall = { path = "crates/uninstall", version = "1.20.4" }
+zoi-transaction = { path = "crates/transaction", version = "1.20.4" }
+zoi-plugins = { path = "crates/plugins", version = "1.20.4" }
+zoi-rs = { path = "crates/zoi-rs", version = "1.20.4" }
 
 [workspace.lints.clippy]
 too_many_arguments = "allow"

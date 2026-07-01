@@ -117,6 +117,33 @@ pub fn get_db_root() -> Result<std::path::PathBuf> {
     ))
 }
 
+pub fn get_store_base_dir(scope: crate::types::Scope) -> Result<PathBuf> {
+    match scope {
+        crate::types::Scope::User => {
+            let home_dir =
+                home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
+            Ok(crate::sysroot::apply_sysroot(
+                home_dir.join(".zoi").join("pkgs").join("store"),
+            ))
+        }
+        crate::types::Scope::System => {
+            if cfg!(target_os = "windows") {
+                Ok(crate::sysroot::apply_sysroot(PathBuf::from(
+                    "C:\\ProgramData\\zoi\\pkgs\\store",
+                )))
+            } else {
+                Ok(crate::sysroot::apply_sysroot(PathBuf::from(
+                    "/var/lib/zoi/pkgs/store",
+                )))
+            }
+        }
+        crate::types::Scope::Project => {
+            let current_dir = std::env::current_dir()?;
+            Ok(current_dir.join(".zoi").join("pkgs").join("store"))
+        }
+    }
+}
+
 /// Generates a unique ID for a package based on its origin.
 /// The format for the hash is `#{registry-handle}@{repo/path/to/package}/{package-name}`.
 pub fn generate_package_id(registry_handle: &str, repo_path: &str, package_name: &str) -> String {

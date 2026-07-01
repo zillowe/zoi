@@ -2,7 +2,7 @@ use anyhow::{Result, anyhow};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const ZOI_LUA_DEFINITIONS: &str = include_str!("../../core/src/builtin/lsp/zoi.lua");
+const ZOI_LUA_DEFINITIONS: &str = include_str!("./builtin/lsp/zoi.lua");
 
 pub fn setup_lsp_workspace(path: &Path) -> Result<()> {
     let lsp_dir = get_lsp_definitions_dir()?;
