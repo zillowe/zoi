@@ -51,6 +51,12 @@ pub fn read_zoi_lock() -> Result<types::ZoiLockV2> {
         if let Some(platform_lock) = read_lockfile_from(&platform_path)? {
             return Ok(platform_lock);
         }
+
+        eprintln!(
+            "Warning: zoi.lock has packages targeting a different platform \
+             and no zoi.{}.lock was found — falling back to unconstrained resolution",
+            platform
+        );
     }
 
     Ok(types::ZoiLockV2 {
