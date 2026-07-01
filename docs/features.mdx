@@ -140,7 +140,7 @@ Zoi is packed with features designed to make package management and environment 
     - **Orphaned Packages:** Identifies packages installed as dependencies that are no longer needed by any other package.
     - **Duplicate Package IDs:** Identifies packages with the same name/path across different registries, which can cause ambiguity.
     - **PGP Configuration:** Verifies if trusted PGP keys specified in your configuration are present in the local keyring.
-    - **Package Record Integrity:** Validates that all packages recorded in `zoi.pkgs.json` are actually present in the installation store.
+    - **Package Record Integrity:** Validates that all packages recorded in the lockfile are actually present in the installation store.
     - **Ghost Dependents:** Scans for broken dependent links where the parent package is missing, offering to prune them.
 
 - **Shell Integration:**
@@ -675,6 +675,8 @@ Downloads or updates the package database from the remote repository.
 - `--fallback`: Fallback to other mirrors if the default one fails.
 - `--no-pm`: Do not check for installed native package managers.
 - `--force`: Rebuild all registry databases from scratch by removing existing caches, git clones, and re-cloning. Installed packages and their records are preserved.
+- `--local`: Sync registries to the project's local `.zoi/pkgs/db/` using revisions from `zoi.lua`.
+- `--frozen-lock`: When used with `--local`, sync using revisions from `zoi.lock` instead of `zoi.lua`.
 
 **Subcommands:**
 

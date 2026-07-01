@@ -5,21 +5,21 @@ description: How to back up your Zoi environment and restore it on another machi
 
 Zoi makes it easy to keep your development environment portable. Since Zoi tracks all installed packages in a central manifest, you can back up this manifest and use it to recreate your entire environment on a new system with a single command.
 
-## The Package Record (`zoi.pkgs.json`)
+## The Package Record (`zoi.lock`)
 
 Every time you install or uninstall a package globally (in `user` or `system` scope), Zoi updates a master record of your environment.
 
-- **Linux/macOS:** `~/.zoi/pkgs/zoi.pkgs.json`
-- **Windows:** `%USERPROFILE%\.zoi\pkgs\zoi.pkgs.json`
+- **Linux/macOS:** `~/.zoi/pkgs/zoi.lock`
+- **Windows:** `%USERPROFILE%\.zoi\pkgs\zoi.lock`
 
 This file contains a detailed manifest of every package you have installed, including its origin (registry/repo), version, and chosen optional dependencies.
 
 ### Backing Up
 
-To back up your Zoi environment, simply copy the `zoi.pkgs.json` file to a safe location (e.g. a cloud drive, a git repository, or your dotfiles manager).
+To back up your Zoi environment, simply copy the `zoi.lock` file to a safe location (e.g. a cloud drive, a git repository, or your dotfiles manager).
 
 ```sh
-cp ~/.zoi/pkgs/zoi.pkgs.json ~/my-backups/zoi-backup.json
+cp ~/.zoi/pkgs/zoi.lock ~/my-backups/zoi-backup.json
 ```
 
 ### Restoring
