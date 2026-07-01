@@ -4,6 +4,60 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
+## [Prod. Release 1.20.0] - 2026-07-01
+
+### ♻️ Refactor
+
+- Replace deprecated serde_yaml with yaml_serde and improve code consistency
+- _(core)_ Switch hash maps to btreemaps for deterministic ordering
+
+### ⚡ Performance
+
+- Optimize package verification and registry sync
+
+### ✨ Features
+
+- Add registry type field, local sync, semver ranges, and platform lockfiles
+- Implement Zoi Specification v2
+- Add optional build lifecycle function
+- _(man)_ Add support for multiple manual pages and TUI navigation
+- _(install)_ Gate PGP signature messages behind --verbose
+- _(install)_ Resume interrupted pkg.tar.zst downloads
+- _(install)_ Implement PGP signature verification using registry authorities
+- Add junction crate and improve Windows symlink fallback
+- _(installer)_ Add CI runner support and conditional package recording
+- _(registry)_ Allow optional package and repository arguments for add-advisory
+- _(exec)_ Refactor exec command for full dependency resolution
+- Making packages sizes sync with 'sync' command
+- _(sync)_ Add force flag to rebuild databases from scratch
+- _(db)_ Add support for sub-package resolution and indexing
+
+### 🎨 Styling
+
+- Format markdown files
+- Update banners to use Zeno Sans font
+
+### 🔒 Security
+
+- _(config)_ Restrict Lua env for --repo and fix scope/local bugs
+
+### 🛠️ Build
+
+- _(config)_ Load environment variables during build process
+
+### 🛡️ Dependencies
+
+- Disable default features for workspace dependencie
+
+### 🧪 Testing
+
+- _(man)_ Add integration tests for manual page functionality
+
+### 🩹 Bug Fixes
+
+- Warn on cross-platform lockfile mismatch
+- Hash project-local db for registries_hash
+
 ## [Pub. Release 1.19.1] - 2026-06-26
 
 ### ✨ Features
