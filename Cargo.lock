@@ -68,7 +68,7 @@ version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40c48f72fd53cd289104fc64099abca73db4166ad86ea0b4341abe65af83dadc"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -79,7 +79,7 @@ checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
 dependencies = [
  "anstyle",
  "once_cell_polyfill",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -356,9 +356,9 @@ dependencies = [
 
 [[package]]
 name = "clap_complete"
-version = "4.6.5"
+version = "4.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0a7a9bfdb35811f9e59832f0f05975114d2251b415fb534108e6f34060fd772"
+checksum = "97bf4965940c2382204c0ded6dd3dd48c0c4e872f1e76fb1bf94f45991a2cb6a"
 dependencies = [
  "clap",
 ]
@@ -412,7 +412,7 @@ version = "3.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "faf9468729b8cbcea668e36183cb69d317348c2e08e994829fb56ebfdfbaac34"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -452,9 +452,9 @@ dependencies = [
 
 [[package]]
 name = "console"
-version = "0.16.3"
+version = "0.16.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d64e8af5551369d19cf50138de61f1c42074ab970f74e99be916646777f8fc87"
+checksum = "4fe5f465a4f6fee88fad41b85d990f84c835335e85b5d9e6e63e0d06d28cba7c"
 dependencies = [
  "encode_unicode",
  "libc",
@@ -759,7 +759,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -854,7 +854,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1450,9 +1450,9 @@ dependencies = [
 
 [[package]]
 name = "indicatif"
-version = "0.18.4"
+version = "0.18.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25470f23803092da7d239834776d653104d551bc4d7eacaf31e6837854b8e9eb"
+checksum = "9433806cd6b4ec1aba79c021c7e4c58fb4c3b9977c085062e611ac929998fb0c"
 dependencies = [
  "console",
  "portable-atomic",
@@ -1597,7 +1597,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "160f2eade097f30263b548aae5deb12ad349c909baa710fa24b92c9090b2e006"
 dependencies = [
  "scopeguard",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -2725,7 +2725,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2782,7 +2782,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3149,7 +3149,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52d1cfed4120b4d927bf7c0f86d2087a4a7d6027c906d9f9d525a80573b9be51"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -3302,7 +3302,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3311,7 +3311,7 @@ version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d8c27177b12a6399ffc08b98f76f7c9a1f4fe9fc967c784c5a071fa8d93cf7e1"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -3865,7 +3865,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4102,7 +4102,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d6f32a0ff4a9f6f01231eb2059cc85479330739333e0e58cadf03b6af2cca10"
 dependencies = [
  "cfg-if",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -4295,7 +4295,7 @@ checksum = "b8848ee67ecc8aedbaf3e4122217aff892639231befc6a1b58d29fff4c2cabaa"
 
 [[package]]
 name = "zoi-audit"
-version = "1.20.0-dev"
+version = "1.20.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4309,7 +4309,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-cli"
-version = "1.20.0-dev"
+version = "1.20.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4366,7 +4366,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-core"
-version = "1.20.0-dev"
+version = "1.20.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4400,7 +4400,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-db"
-version = "1.20.0-dev"
+version = "1.20.0"
 dependencies = [
  "anyhow",
  "rusqlite",
@@ -4411,7 +4411,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-deps"
-version = "1.20.0-dev"
+version = "1.20.0"
 dependencies = [
  "anyhow",
  "colored",
@@ -4425,7 +4425,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-hooks"
-version = "1.20.0-dev"
+version = "1.20.0"
 dependencies = [
  "anyhow",
  "colored",
@@ -4441,7 +4441,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-install"
-version = "1.20.0-dev"
+version = "1.20.0"
 dependencies = [
  "anyhow",
  "colored",
@@ -4478,7 +4478,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-lua"
-version = "1.20.0-dev"
+version = "1.20.0"
 dependencies = [
  "anyhow",
  "ar",
@@ -4504,7 +4504,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-mini"
-version = "1.20.0-dev"
+version = "1.20.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -4516,7 +4516,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-package"
-version = "1.20.0-dev"
+version = "1.20.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4540,7 +4540,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-plugins"
-version = "1.20.0-dev"
+version = "1.20.0"
 dependencies = [
  "anyhow",
  "colored",
@@ -4568,7 +4568,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-pm"
-version = "1.20.0-dev"
+version = "1.20.0"
 dependencies = [
  "phf 0.14.0",
  "phf_codegen",
@@ -4578,7 +4578,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-project"
-version = "1.20.0-dev"
+version = "1.20.0"
 dependencies = [
  "anyhow",
  "clap_complete",
@@ -4598,7 +4598,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-purl"
-version = "1.20.0-dev"
+version = "1.20.0"
 dependencies = [
  "anyhow",
  "purl",
@@ -4609,7 +4609,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-resolver"
-version = "1.20.0-dev"
+version = "1.20.0"
 dependencies = [
  "anyhow",
  "colored",
@@ -4634,7 +4634,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-rs"
-version = "1.20.0-dev"
+version = "1.20.0"
 dependencies = [
  "anyhow",
  "colored",
@@ -4650,7 +4650,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-sandbox"
-version = "1.20.0-dev"
+version = "1.20.0"
 dependencies = [
  "anyhow",
  "home",
@@ -4659,7 +4659,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-sync"
-version = "1.20.0-dev"
+version = "1.20.0"
 dependencies = [
  "anyhow",
  "colored",
@@ -4679,7 +4679,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-telemetry"
-version = "1.20.0-dev"
+version = "1.20.0"
 dependencies = [
  "chrono",
  "home",
@@ -4691,7 +4691,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-tests"
-version = "1.20.0-dev"
+version = "1.20.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4743,7 +4743,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-transaction"
-version = "1.20.0-dev"
+version = "1.20.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4762,7 +4762,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-uninstall"
-version = "1.20.0-dev"
+version = "1.20.0"
 dependencies = [
  "anyhow",
  "colored",
