@@ -183,7 +183,7 @@ pub fn check_pgp_configuration() -> Result<Vec<String>> {
     Ok(missing_keys)
 }
 
-pub fn validate_pkgs_json_integrity() -> Result<Vec<String>> {
+pub fn validate_lockfile_integrity() -> Result<Vec<String>> {
     let recorded_packages = recorder::get_recorded_packages()?;
 
     let missing_packages: Vec<String> = recorded_packages

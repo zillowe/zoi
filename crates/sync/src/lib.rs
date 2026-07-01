@@ -6,7 +6,7 @@ use git2::{
 };
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -1054,6 +1054,121 @@ fn sync_registry(
     }
 
     Ok((reg, reg_changed))
+}
+
+pub fn run_local(verbose: bool, _fallback: bool, force: bool, frozen_lock: bool) -> Result<()> {
+    let local_db_root = std::env::current_dir()?
+        .join(".zoi")
+        .join("pkgs")
+        .join("db");
+    fs::create_dir_all(&local_db_root)?;
+
+    let registries: Vec<(String, String, String)> = if frozen_lock {
+        let lockfile = zoi_project::lockfile::read_zoi_lock()?;
+        lockfile
+            .registries
+            .into_iter()
+            .map(|(handle, lr)| (handle, lr.url, lr.revision))
+            .collect()
+    } else {
+        let project = zoi_project::config::load_with_env(HashMap::new())?;
+
+        project
+            .registries
+            .into_iter()
+            .map(|(handle, spec)| {
+                let rev = spec.revision.clone().unwrap_or_else(|| "main".to_string());
+                (handle, spec.url, rev)
+            })
+            .collect()
+    };
+
+    if registries.is_empty() {
+        println!("{} No registries found in zoi.lua.", "::".bold().yellow());
+        return Ok(());
+    }
+
+    let m = if verbose {
+        None
+    } else {
+        Some(MultiProgress::new())
+    };
+
+    let results: Vec<((String, String), String)> = registries
+        .into_par_iter()
+        .map(|(handle, url, revision)| {
+            let target_dir = local_db_root.join(&handle);
+
+            if force && target_dir.exists() {
+                fs::remove_dir_all(&target_dir)?;
+            }
+
+            try_sync_at_path(&url, &target_dir, verbose, m.as_ref(), None)?;
+
+            if !revision.is_empty() {
+                if verbose {
+                    println!(
+                        "  Checking out revision '{}' for registry '{}'...",
+                        revision, handle
+                    );
+                }
+                let status = Command::new("git")
+                    .arg("-C")
+                    .arg(&target_dir)
+                    .arg("checkout")
+                    .arg(&revision)
+                    .stdout(if verbose {
+                        Stdio::inherit()
+                    } else {
+                        Stdio::null()
+                    })
+                    .stderr(if verbose {
+                        Stdio::inherit()
+                    } else {
+                        Stdio::null()
+                    })
+                    .status()
+                    .map_err(|e| anyhow!("Failed to run git checkout: {}", e))?;
+                if !status.success() {
+                    return Err(anyhow!(
+                        "Failed to checkout revision '{}' for registry '{}'",
+                        revision,
+                        handle
+                    ));
+                }
+            }
+
+            refresh_registry_db(&handle, &target_dir, m.as_ref(), verbose, None)?;
+
+            let resolved_hash = if frozen_lock {
+                revision.clone()
+            } else if let Ok(repo) = git2::Repository::open(&target_dir) {
+                repo.head()
+                    .ok()
+                    .and_then(|h| h.target().map(|oid| oid.to_string()))
+                    .unwrap_or(revision.clone())
+            } else {
+                revision.clone()
+            };
+
+            Ok(((handle, url), resolved_hash))
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    if !frozen_lock {
+        let mut lockfile = zoi_project::lockfile::read_zoi_lock()?;
+        for ((handle, url), revision) in results {
+            lockfile
+                .registries
+                .entry(handle)
+                .or_insert(types::LockRegistryV2 { revision, url });
+        }
+        lockfile.version = "2".to_string();
+        zoi_project::lockfile::write_zoi_lock(&lockfile)?;
+    }
+
+    println!("{} Local sync complete.", "::".bold().blue());
+    Ok(())
 }
 
 pub fn run(verbose: bool, fallback: bool, no_pm: bool, force: bool) -> Result<()> {

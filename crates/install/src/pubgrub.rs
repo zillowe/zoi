@@ -3,11 +3,23 @@ use rusqlite::params;
 use rustc_hash::FxHashMap;
 use semver::Version;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fmt::Display;
 use thiserror::Error;
 use zoi_core::types;
 use zoi_db as db;
 use zoi_resolver::resolve;
+
+fn parse_pkgs_v2_key(key: &str) -> (String, String) {
+    let key = key.trim_start_matches('#');
+    let key = key.trim_start_matches('@');
+    if let Some((repo, name)) = key.split_once('/') {
+        let name = name.split(':').next().unwrap_or(name);
+        (repo.to_string(), name.to_string())
+    } else {
+        (String::new(), key.to_string())
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct PkgName {
@@ -60,6 +72,7 @@ pub struct ZoiDependencyProvider {
     pub all_optional: bool,
     pub mini_index: Option<zoi_resolver::mini_resolve::MiniRegistryIndex>,
     pub project_config: Option<zoi_project::config::ProjectConfig>,
+    pub pkgs_v2_constraints: HashMap<(String, String), String>,
     pub deps_cache:
         RefCell<FxHashMap<(PkgName, SemVersion), FxHashMap<PkgName, Ranges<SemVersion>>>>,
     pub chosen_cache:
@@ -164,6 +177,21 @@ impl ZoiDependencyProvider {
             None
         };
 
+        let pkgs_v2_constraints = project_config
+            .as_ref()
+            .map(|config| {
+                config
+                    .pkgs_v2
+                    .iter()
+                    .filter_map(|(key, spec)| {
+                        spec.version
+                            .as_ref()
+                            .map(|v| (parse_pkgs_v2_key(key), v.clone()))
+                    })
+                    .collect::<HashMap<_, _>>()
+            })
+            .unwrap_or_default();
+
         Ok(Self {
             root_deps,
             initial_sources,
@@ -172,6 +200,7 @@ impl ZoiDependencyProvider {
             all_optional,
             mini_index,
             project_config,
+            pkgs_v2_constraints,
             deps_cache: RefCell::new(FxHashMap::default()),
             chosen_cache: RefCell::new(FxHashMap::default()),
         })
@@ -300,6 +329,15 @@ impl ZoiDependencyProvider {
 
         all_versions.sort();
         all_versions.dedup();
+
+        if let Some(version_spec) = self
+            .pkgs_v2_constraints
+            .get(&(package.repo.clone(), package.name.clone()))
+        {
+            let range = semver_to_range(version_spec);
+            all_versions.retain(|v| range.contains(v));
+        }
+
         Ok(all_versions)
     }
 }
@@ -342,7 +380,11 @@ impl DependencyProvider for ZoiDependencyProvider {
             };
 
             if let Some(spec) = config.pkgs_v2.get(&packages_key)
-                && spec.version.as_ref().is_none_or(|v| v == &version_str)
+                && spec.version.as_ref().is_none_or(|v| {
+                    let range = semver_to_range(v);
+                    let parsed = Version::parse(&version_str);
+                    parsed.is_ok_and(|pv| range.contains(&SemVersion(pv))) || v == &version_str
+                })
             {
                 package_deps = spec.dependencies.clone().map(types::to_dependencies_v2);
             }

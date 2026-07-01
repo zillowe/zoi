@@ -205,7 +205,7 @@ pub fn run(
     let mut final_sources = Vec::new();
 
     for source in &sources_to_process {
-        if source.ends_with("zoi.pkgs.json") {
+        if source.ends_with(".lock") {
             install::lockfile::process_lockfile(
                 source,
                 &mut final_sources,

@@ -33,4 +33,3 @@ chrono.workspace = true
 hex.workspace = true
 rayon.workspace = true
 serde_yaml.workspace = true
-zoi-purl.workspace = true
