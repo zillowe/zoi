@@ -13,95 +13,68 @@ pub fn run() -> Result<()> {
         .collect::<Vec<_>>();
 
     let mut lockfile_pkgs_map = HashMap::new();
-    for (reg_key, pkgs) in &lockfile.details {
-        for (short_id, detail) in pkgs {
-            let full_id = format!("{}{}", reg_key, short_id);
-            lockfile_pkgs_map.insert(full_id, detail);
-        }
+    for (pkg_key, detail) in &lockfile.installed_packages {
+        lockfile_pkgs_map.insert(pkg_key.clone(), detail);
     }
 
     let mut installed_pkgs_map = HashMap::new();
     for installed_pkg in &installed_packages {
-        let name_with_sub = if let Some(sub) = &installed_pkg.sub_package {
-            format!("{}:{}", installed_pkg.name, sub)
+        let pkg_key = if let Some(sub) = &installed_pkg.sub_package {
+            format!("@{}/{}:{}", installed_pkg.repo, installed_pkg.name, sub)
         } else {
-            installed_pkg.name.clone()
+            format!("@{}/{}", installed_pkg.repo, installed_pkg.name)
         };
-        let full_id = format!(
-            "#{}@{}/{}",
-            installed_pkg.registry_handle, installed_pkg.repo, name_with_sub
-        );
-        installed_pkgs_map.insert(full_id, installed_pkg);
+        installed_pkgs_map.insert(pkg_key, installed_pkg);
     }
 
-    for (full_id, lock_detail) in &lockfile_pkgs_map {
-        if let Some(installed_pkg) = installed_pkgs_map.get(full_id) {
+    for (pkg_key, lock_detail) in &lockfile_pkgs_map {
+        if let Some(installed_pkg) = installed_pkgs_map.get(pkg_key) {
             if installed_pkg.version != lock_detail.version {
                 return Err(anyhow!(
                     "Version mismatch for '{}': lockfile requires v{}, but v{} is installed.",
-                    full_id,
+                    pkg_key,
                     lock_detail.version,
                     installed_pkg.version
                 ));
             }
 
-            let parts: Vec<&str> = full_id.split('@').collect();
-            if parts.len() < 2 {
+            let package_dir = local::get_package_dir(
+                types::Scope::Project,
+                &lock_detail.registry,
+                &lock_detail.repo,
+                &installed_pkg.name,
+            )?;
+            let version_dir = package_dir.join(&lock_detail.version);
+            if !version_dir.exists() {
                 return Err(anyhow!(
-                    "Invalid package ID format in lockfile: {}",
-                    full_id
+                    "Package '{}' is missing from the project's .zoi directory, though it is in the manifest.",
+                    pkg_key
                 ));
             }
-            let registry_handle = parts[0].strip_prefix('#').ok_or_else(|| {
-                anyhow!("Invalid registry handle format in lockfile: {}", parts[0])
-            })?;
-            let repo_and_name_with_sub = parts[1];
-
-            if let Some(last_slash_idx) = repo_and_name_with_sub.rfind('/') {
-                let (repo, name_with_sub) = repo_and_name_with_sub.split_at(last_slash_idx);
-                let name_with_sub = &name_with_sub[1..];
-
-                let name = if let Some(colon_idx) = name_with_sub.rfind(':') {
-                    &name_with_sub[..colon_idx]
-                } else {
-                    name_with_sub
-                };
-
-                let package_dir =
-                    local::get_package_dir(types::Scope::Project, registry_handle, repo, name)?;
-                let latest_dir = package_dir.join("latest");
-                if !latest_dir.exists() {
-                    return Err(anyhow!(
-                        "Package '{}' is missing from the project's .zoi directory, though it is in the manifest.",
-                        full_id
-                    ));
-                }
-                let integrity = hash::calculate_dir_hash(&latest_dir)?;
-                if integrity != lock_detail.integrity {
-                    return Err(anyhow!(
-                        "Integrity check failed for '{}'. The installed files do not match the lockfile. Your project is in an inconsistent state.",
-                        full_id
-                    ));
-                }
-            } else {
+            let integrity = hash::calculate_dir_hash(&version_dir)?;
+            let lock_hash_only = lock_detail
+                .hash
+                .strip_prefix("sha512-")
+                .unwrap_or(&lock_detail.hash);
+            if integrity != lock_hash_only {
                 return Err(anyhow!(
-                    "Invalid package ID format in lockfile: {}",
-                    full_id
+                    "Integrity check failed for '{}'. The installed files do not match the lockfile. Your project is in an inconsistent state.",
+                    pkg_key
                 ));
             }
         } else {
             return Err(anyhow!(
                 "Package '{}' from zoi.lock is not installed.",
-                full_id
+                pkg_key
             ));
         }
     }
 
-    for full_id in installed_pkgs_map.keys() {
-        if !lockfile_pkgs_map.contains_key(full_id) {
+    for pkg_key in installed_pkgs_map.keys() {
+        if !lockfile_pkgs_map.contains_key(pkg_key) {
             return Err(anyhow!(
                 "Package '{}' is installed in the project but is not in zoi.lock.",
-                full_id
+                pkg_key
             ));
         }
     }

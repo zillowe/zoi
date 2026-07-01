@@ -28,3 +28,4 @@ serde_yaml.workspace = true
 sha2.workspace = true
 zoi-core.workspace = true
 zoi-resolver.workspace = true
+mlua = { workspace = true, features = ["luau", "serde"] }

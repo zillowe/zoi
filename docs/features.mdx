@@ -26,7 +26,15 @@ Zoi is packed with features designed to make package management and environment 
 
 - **Native Linux Sandboxing:** Run packages in a secure, "default-deny" isolated environment using Bubblewrap. Package maintainers explicitly define network, system, and file access permissions, protecting your host system from malicious or buggy software.
 
-- **Reproducible Project Installs (`--frozen-lockfile`):** Rebuild a project environment from `zoi.lock` without re-resolving versions, sub-packages, or recorded dependency choices.
+- **Lua-Based Project Configuration (`zoi.lua`):** Define project environments with a powerful, scriptable Lua API. Supports dynamic dependency selection, registry overrides, and complex environment setup.
+
+- **Hermetic Project Environments:** Strictly isolate project dependencies and registries within `./.zoi/pkgs/`. Ensure that project-level syncs do not affect global state and remain reproducible across machines.
+
+- **Pinned Registry Inputs:** Lock registries to exact Git revisions (branch, tag, or commit hash) in `zoi.lua`. `zoi.lock` automatically pins these to SHA-1 hashes for absolute reproducibility.
+
+- **Reproducible Project Installs (`--frozen-lockfile`):** Rebuild a project environment from `zoi.lock` without re-resolving versions, sub-packages, or recorded dependency choices. Zoi Specification v2 lockfiles include directory hashes to verify the integrity of the entire local state.
+
+- **Automated Dev Repo Discovery (`zoi dev --repo`):** Instantly enter a development shell for any Git repository. Zoi clones the repository to a temporary directory, sets up the environment defined in its `zoi.lua`, and cleans up automatically on exit.
 
 - **Global Transaction Hooks:** Automate system maintenance tasks (like font cache updates) based on modified file paths. Hooks run once per transaction, preventing redundant script execution.
 
@@ -132,7 +140,7 @@ Zoi is packed with features designed to make package management and environment 
     - **Orphaned Packages:** Identifies packages installed as dependencies that are no longer needed by any other package.
     - **Duplicate Package IDs:** Identifies packages with the same name/path across different registries, which can cause ambiguity.
     - **PGP Configuration:** Verifies if trusted PGP keys specified in your configuration are present in the local keyring.
-    - **Package Record Integrity:** Validates that all packages recorded in `zoi.pkgs.json` are actually present in the installation store.
+    - **Package Record Integrity:** Validates that all packages recorded in the lockfile are actually present in the installation store.
     - **Ghost Dependents:** Scans for broken dependent links where the parent package is missing, offering to prune them.
 
 - **Shell Integration:**
@@ -667,6 +675,8 @@ Downloads or updates the package database from the remote repository.
 - `--fallback`: Fallback to other mirrors if the default one fails.
 - `--no-pm`: Do not check for installed native package managers.
 - `--force`: Rebuild all registry databases from scratch by removing existing caches, git clones, and re-cloning. Installed packages and their records are preserved.
+- `--local`: Sync registries to the project's local `.zoi/pkgs/db/` using revisions from `zoi.lua`.
+- `--frozen-lock`: When used with `--local`, sync using revisions from `zoi.lock` instead of `zoi.lua`.
 
 **Subcommands:**
 

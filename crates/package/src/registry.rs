@@ -9,7 +9,6 @@ use std::path::Path;
 use walkdir::WalkDir;
 use zoi_core::types;
 use zoi_lua;
-use zoi_purl;
 
 pub fn init(path: &Path) -> Result<()> {
     println!(
@@ -84,7 +83,7 @@ repos:
     let packages_json_path = path.join("packages.json");
     if !packages_json_path.exists() {
         let content = r#"{
-  "version": "1",
+  "version": "2",
   "packages": {}
 }"#;
         fs::write(packages_json_path, content)?;
@@ -95,7 +94,7 @@ repos:
         let current_year = chrono::Utc::now().year();
         let content = format!(
             r#"{{
-  "version": "1",
+  "version": "2",
   "advisories": {{}},
   "last_id": 0,
   "year": {}
@@ -447,12 +446,9 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
                     if id_num > max_id {
                         max_id = id_num;
                     }
-                    let pkg_display = if let Some(sub) = &content.sub_package {
-                        format!("{}:{}", content.package, sub)
-                    } else {
-                        content.package.clone()
-                    };
-                    advisories_map.insert(format!("{:04}", id_num), pkg_display);
+                    let rel_path = entry.path().strip_prefix(registry_root)?;
+                    advisories_map
+                        .insert(content.id.clone(), rel_path.to_string_lossy().to_string());
                 }
             }
         }
@@ -460,7 +456,7 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
 
     adv_registry.last_id = max_id;
     adv_registry.advisories = advisories_map;
-    adv_registry.version = "1".to_string();
+    adv_registry.version = "2".to_string();
     fs::write(
         &advisories_json_path,
         serde_json::to_string_pretty(&adv_registry)?,
@@ -530,38 +526,89 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
                     }
                 }
 
-                let sub_packages = if let Some(subs) = &pkg.sub_packages {
-                    let mut map = serde_json::Map::new();
-                    for sub in subs {
-                        map.insert(
-                            sub.clone(),
-                            serde_json::Value::Object(serde_json::Map::new()),
-                        );
+                let packages_key = format!("@{}/{}", repo_path, pkg.name);
+
+                let dependencies_v2 = pkg.dependencies.map(|deps| {
+                    let mut runtime = Vec::new();
+                    if let Some(r) = deps.runtime {
+                        runtime = match r {
+                            types::DependencyGroup::Simple(d) => d,
+                            types::DependencyGroup::Complex(c) => {
+                                let mut all = c.required;
+                                all.extend(c.optional);
+                                for opt in c.options {
+                                    all.extend(opt.depends);
+                                }
+                                all
+                            }
+                        };
                     }
-                    Some(serde_json::Value::Object(map))
-                } else {
-                    None
-                };
+
+                    let mut build = Vec::new();
+                    if let Some(b) = deps.build {
+                        match b {
+                            types::BuildDependencies::Group(g) => {
+                                let packages = match g {
+                                    types::DependencyGroup::Simple(d) => d,
+                                    types::DependencyGroup::Complex(c) => {
+                                        let mut all = c.required;
+                                        all.extend(c.optional);
+                                        for opt in c.options {
+                                            all.extend(opt.depends);
+                                        }
+                                        all
+                                    }
+                                };
+                                build.push(types::BuildDependencyV2 {
+                                    build_type: "source".to_string(),
+                                    packages,
+                                });
+                            }
+                            types::BuildDependencies::Typed(t) => {
+                                for (bt, g) in t.types {
+                                    let packages = match g {
+                                        types::DependencyGroup::Simple(d) => d,
+                                        types::DependencyGroup::Complex(c) => {
+                                            let mut all = c.required;
+                                            all.extend(c.optional);
+                                            for opt in c.options {
+                                                all.extend(opt.depends);
+                                            }
+                                            all
+                                        }
+                                    };
+                                    build.push(types::BuildDependencyV2 {
+                                        build_type: bt,
+                                        packages,
+                                    });
+                                }
+                            }
+                        }
+                    }
+
+                    types::DependenciesV2 { runtime, build }
+                });
 
                 packages_map.insert(
-                    pkg.name.clone(),
-                    zoi_purl::PurlPackageIndex {
+                    packages_key,
+                    types::PurlPackageIndexV2 {
                         repo: repo_path,
                         repo_type,
                         version,
                         revision: pkg.revision.clone(),
                         description: pkg.description,
-                        dependencies: None,
-                        sub_packages,
-                        vuln: if vulns.is_empty() { None } else { Some(vulns) },
+                        dependencies: dependencies_v2,
+                        sub_packages: pkg.sub_packages.unwrap_or_default(),
+                        main_sub_packages: pkg.main_subs.unwrap_or_default(),
+                        vuln: vulns,
                     },
                 );
             }
         }
     }
 
-    let index = zoi_purl::RegistryIndex {
-        version: "1".to_string(),
+    let index = types::RegistryIndexV2 {
+        version: "2".to_string(),
         packages: packages_map,
     };
     fs::write(

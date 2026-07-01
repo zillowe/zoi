@@ -114,7 +114,7 @@ zoi update --all
 If an update causes problems, roll back:
 
 ```sh
-zoi rollback <package>
+zoi rollback @zillowe/hello
 ```
 
 For a failed or interrupted transaction:
@@ -125,24 +125,28 @@ zoi rollback --last-transaction
 
 ## 7. Create a Project Environment
 
-Create `zoi.yaml` in your project root:
+Create `zoi.lua` in your project root:
+
+```lua
+project({
+    name = "my-project",
+    config = { ["local"] = true }
+})
+
+packages({
+    "@core/eza",
+    "@community/fzf"
+})
+```
+
+Create `zoi.yaml` for tasks:
 
 ```yaml
-name: my-project
-config:
-  local: true
-pkgs:
-  - eza
-  - fzf
 commands:
   - cmd: build
     run: make build
   - cmd: test
     run: make test
-shell:
-  env:
-    default:
-      DEBUG: "true"
 ```
 
 Install project-local packages:
@@ -164,7 +168,7 @@ zoi run build
 zoi run test
 ```
 
-Commit both `zoi.yaml` and `zoi.lock` so other machines can reproduce the same environment.
+Commit `zoi.lua`, `zoi.yaml`, and `zoi.lock` so other machines can reproduce the same environment.
 
 For strict reproducibility in CI:
 

@@ -1,5 +1,4 @@
 use anyhow::{Result, anyhow};
-use std::collections::HashSet;
 use std::fs;
 use zoi_core::types;
 
@@ -7,31 +6,66 @@ fn get_lockfile_path() -> Result<std::path::PathBuf> {
     Ok(std::env::current_dir()?.join("zoi.lock"))
 }
 
-pub fn read_zoi_lock() -> Result<types::ZoiLock> {
-    let path = get_lockfile_path()?;
+fn read_lockfile_from(path: &std::path::Path) -> Result<Option<types::ZoiLockV2>> {
     if !path.exists() {
-        return Ok(types::ZoiLock {
-            version: "1".to_string(),
-            ..Default::default()
-        });
+        return Ok(None);
     }
     let content = fs::read_to_string(path)?;
     if content.trim().is_empty() {
-        return Ok(types::ZoiLock {
-            version: "1".to_string(),
-            ..Default::default()
-        });
+        return Ok(None);
     }
-
-    serde_json::from_str(&content).map_err(|e| {
+    serde_json::from_str(&content).map(Some).map_err(|e| {
         anyhow!(
-            "Failed to parse zoi.lock. It might be corrupted or in an old format. Error: {}",
+            "Failed to parse {}. It might be corrupted or in an old format. Error: {}",
+            path.display(),
             e
         )
     })
 }
 
-pub fn write_zoi_lock(lockfile: &types::ZoiLock) -> Result<()> {
+fn is_lockfile_compatible(lockfile: &types::ZoiLockV2) -> bool {
+    let current_platform = zoi_core::utils::get_platform().unwrap_or_default();
+    if lockfile.installed_packages.is_empty() {
+        return true;
+    }
+    lockfile.installed_packages.values().all(|pkg| {
+        pkg.platform.is_empty()
+            || pkg.platform == current_platform
+            || zoi_core::utils::is_platform_compatible(
+                &current_platform,
+                std::slice::from_ref(&pkg.platform),
+            )
+    })
+}
+
+pub fn read_zoi_lock() -> Result<types::ZoiLockV2> {
+    let path = get_lockfile_path()?;
+
+    if let Some(lockfile) = read_lockfile_from(&path)? {
+        if is_lockfile_compatible(&lockfile) {
+            return Ok(lockfile);
+        }
+
+        let platform = zoi_core::utils::get_platform().unwrap_or_default();
+        let platform_path = path.with_file_name(format!("zoi.{}.lock", platform));
+        if let Some(platform_lock) = read_lockfile_from(&platform_path)? {
+            return Ok(platform_lock);
+        }
+
+        eprintln!(
+            "Warning: zoi.lock has packages targeting a different platform \
+             and no zoi.{}.lock was found — falling back to unconstrained resolution",
+            platform
+        );
+    }
+
+    Ok(types::ZoiLockV2 {
+        version: "2".to_string(),
+        ..Default::default()
+    })
+}
+
+pub fn write_zoi_lock(lockfile: &types::ZoiLockV2) -> Result<()> {
     let path = get_lockfile_path()?;
     let content = serde_json::to_string_pretty(lockfile)?;
     fs::write(path, content)?;
@@ -45,65 +79,30 @@ pub struct FrozenLockPackage {
     pub direct: bool,
     pub chosen_options: Vec<String>,
     pub chosen_optionals: Vec<String>,
-    pub dependencies: Vec<String>,
+    pub dependencies: Option<types::DependenciesV2>,
     pub git_sha: Option<String>,
 }
 
-fn append_sub_package_if_needed(base_id: &str, sub_package: Option<&str>) -> String {
-    if base_id.contains(':') {
-        base_id.to_string()
-    } else if let Some(sub_package) = sub_package {
-        format!("{}:{}", base_id, sub_package)
-    } else {
-        base_id.to_string()
-    }
-}
-
-pub fn locked_packages(lockfile: &types::ZoiLock) -> Vec<FrozenLockPackage> {
-    let direct_ids: HashSet<String> = lockfile.packages.keys().cloned().collect();
+pub fn locked_packages(lockfile: &types::ZoiLockV2) -> Vec<FrozenLockPackage> {
     let mut packages = Vec::new();
 
-    for (reg_key, pkgs) in &lockfile.details {
-        for (short_id, detail) in pkgs {
-            let base_id = append_sub_package_if_needed(
-                &format!("{}{}", reg_key, short_id),
-                detail.sub_package.as_deref(),
-            );
-            packages.push(FrozenLockPackage {
-                source: format!("{}@{}", base_id, detail.version),
-                revision: detail.revision.clone(),
-                direct: direct_ids.is_empty() || direct_ids.contains(&base_id),
-                chosen_options: detail.options_dependencies.clone(),
-                chosen_optionals: detail.optionals_dependencies.clone(),
-                dependencies: detail.dependencies.clone(),
-                git_sha: detail.git_sha.clone(),
-            });
-        }
-    }
-
-    if packages.is_empty() {
-        packages.extend(
-            lockfile
-                .packages
-                .iter()
-                .map(|(full_id, version)| FrozenLockPackage {
-                    source: format!("{}@{}", full_id, version),
-                    revision: "1".to_string(),
-                    direct: true,
-                    chosen_options: Vec::new(),
-                    chosen_optionals: Vec::new(),
-                    dependencies: Vec::new(),
-                    git_sha: None,
-                }),
-        );
+    for (key, detail) in &lockfile.installed_packages {
+        packages.push(FrozenLockPackage {
+            source: format!("{}@{}", key, detail.version),
+            revision: detail.revision.clone(),
+            direct: detail.why == "direct",
+            chosen_options: Vec::new(),
+            chosen_optionals: Vec::new(),
+            dependencies: detail.dependencies.clone(),
+            git_sha: None,
+        });
     }
 
     packages.sort_by(|a, b| a.source.cmp(&b.source));
-    packages.dedup_by(|a, b| a.source == b.source);
     packages
 }
 
-pub fn sources_from_lock(lockfile: &types::ZoiLock) -> Vec<String> {
+pub fn sources_from_lock(lockfile: &types::ZoiLockV2) -> Vec<String> {
     locked_packages(lockfile)
         .into_iter()
         .map(|entry| entry.source)

@@ -17,13 +17,15 @@ The package database is the core git repository that Zoi clones to `~/.zoi/pkgs/
 
 This is useful if you want to use a mirror or a completely different package database.
 
-| Command                         | Description                                                                                  |
-| ------------------------------- | -------------------------------------------------------------------------------------------- |
-| `zoi sync set <url-or-keyword>` | Sets the package database registry URL. Keywords: `default`, `gitlab`, `github`, `codeberg`. |
-| `zoi sync list`                 | Displays the current configured registries.                                                  |
-| `zoi sync add <url>`            | Adds a new registry to be synced.                                                            |
-| `zoi sync remove <handle>`      | Removes a configured registry by its handle.                                                 |
-| `zoi sync --force`              | Rebuilds all registry databases from scratch by removing existing caches and re-cloning.     |
+| Command                          | Description                                                                                  |
+| -------------------------------- | -------------------------------------------------------------------------------------------- |
+| `zoi sync set <url-or-keyword>`  | Sets the package database registry URL. Keywords: `default`, `gitlab`, `github`, `codeberg`. |
+| `zoi sync list`                  | Displays the current configured registries.                                                  |
+| `zoi sync add <url>`             | Adds a new registry to be synced.                                                            |
+| `zoi sync remove <handle>`       | Removes a configured registry by its handle.                                                 |
+| `zoi sync --force`               | Rebuilds all registry databases from scratch by removing existing caches and re-cloning.     |
+| `zoi sync --local`               | Sync registries to the project's `.zoi/pkgs/db/` using revisions from `zoi.lua`.             |
+| `zoi sync --local --frozen-lock` | Sync registries using revisions pinned in `zoi.lock`.                                        |
 
 ### Examples
 

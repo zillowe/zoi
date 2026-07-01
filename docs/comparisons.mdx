@@ -23,7 +23,7 @@ Zoi also does not pretend native package managers do not exist. A `.pkg.lua` pac
 
 Zoi is not a full operating system distribution, and it does not snapshot your entire machine. When Zoi asks APT, Homebrew, Cargo, NPM, or another external manager to install a dependency, that external manager still owns its own state.
 
-Zoi is also not as purely reproducible as Nix. Zoi improves reproducibility with `zoi.lock`, package hashes, registry metadata, PGP verification, and project-local installs, but external package managers can still change independently.
+Zoi is also not as purely reproducible as Nix, although Zoi Specification v2 significantly closes the gap. Zoi improves reproducibility with `zoi.lock` (Spec v2), package hashes, registry metadata pinning, PGP verification, and project-local isolation, but external package managers can still change independently.
 
 ## Main Comparison
 
@@ -32,7 +32,7 @@ Zoi is also not as purely reproducible as Nix. Zoi improves reproducibility with
 | Cross-platform CLI workflow   | Yes: Linux, macOS, Windows                                           | Mostly Linux/macOS                                  | Usually one OS family                    | Mostly Linux/macOS        | Mostly Linux/macOS              |
 | Own package format            | `.pkg.lua`                                                           | `.nix`                                              | Manager-specific formats                 | Plugin definitions        | Nix-based config                |
 | Package store                 | Zoi versioned store                                                  | Content-addressed Nix store                         | System/user manager locations            | Tool/plugin locations     | Nix store                       |
-| Project environments          | `zoi.yaml`, `zoi dev`, `zoi run`, `zoi env`                          | Shells and flakes                                   | Not usually the main model               | Runtime-focused           | Yes                             |
+| Project environments          | `zoi.lua`, `zoi dev`, `zoi run`, `zoi env`                           | Shells and flakes                                   | Not usually the main model               | Runtime-focused           | Yes                             |
 | Runtime version switching     | Intelligent shims and plugins                                        | Through Nix profiles/shells                         | Limited or manager-specific              | Core feature              | Through Nix                     |
 | Native dependency integration | First-class via `native:` and manager prefixes                       | Usually avoided or isolated                         | Native by definition                     | Limited                   | Usually via Nix                 |
 | Package authoring             | Lua package scripts                                                  | Nix expressions                                     | Different per manager                    | Plugins                   | Nix packages/config             |
@@ -44,14 +44,14 @@ Zoi is also not as purely reproducible as Nix. Zoi improves reproducibility with
 
 Nix is the stronger choice if your main requirement is fully reproducible builds and environments. Its store model and functional package language are designed around reproducibility from the ground up.
 
-Zoi is the stronger choice if you want a packaging system that is easier to script with familiar Lua, works across Linux, macOS, and Windows, and can cooperate with existing package managers. A Zoi package can combine a Zoi-managed binary with dependencies from APT on Ubuntu, Homebrew on macOS, Scoop on Windows, Cargo for Rust tools, or NPM for JavaScript tools.
+Zoi is the stronger choice if you want a packaging system that is easier to script with familiar Lua, works across Linux, macOS, and Windows, and can cooperate with existing package managers. Zoi v2 introduces Nix-like pinned inputs via its Lua project configuration and cryptographic state verification in its lockfiles.
 
 Tradeoff:
 
-- Nix gives stronger isolation and reproducibility.
-- Zoi gives a more hybrid, host-aware workflow and a package format that is closer to traditional scripting.
+- Nix gives stronger isolation and reproducibility via a purely functional approach.
+- Zoi gives a more hybrid, host-aware workflow with scriptable Lua configuration and deep integration with native managers.
 
-Choose Nix when you want the environment to be independent from the host. Choose Zoi when the host package manager is part of the intended setup.
+Choose Nix when you want the environment to be independent from the host. Choose Zoi when you want Nix-like pinning and isolation while maintaining first-class access to your host system's tools.
 
 ## Zoi vs. Homebrew, APT, Pacman, Scoop, and Winget
 

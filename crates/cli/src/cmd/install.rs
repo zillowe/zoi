@@ -108,17 +108,24 @@ pub fn run(
         );
         is_project_install = true;
     } else if sources.is_empty() && repo.is_none() {
-        if std::path::Path::new("zoi.yaml").exists() {
+        if std::path::Path::new("zoi.lua").exists() || std::path::Path::new("zoi.yaml").exists() {
             if let Ok(config) = project::config::load() {
+                let config_file = if std::path::Path::new("zoi.lua").exists() {
+                    "zoi.lua"
+                } else {
+                    "zoi.yaml"
+                };
                 if lockfile_exists {
                     println!(
-                        "{} zoi.lock found. Installing from zoi.yaml then verifying...",
-                        "::".bold().blue()
+                        "{} zoi.lock found. Installing from {} then verifying...",
+                        "::".bold().blue(),
+                        config_file
                     );
                 } else {
                     println!(
-                        "{} Installing project packages from zoi.yaml...",
-                        "::".bold().blue()
+                        "{} Installing project packages from {}...",
+                        "::".bold().blue(),
+                        config_file
                     );
                 }
                 sources_to_process = config.pkgs.clone();
@@ -198,8 +205,13 @@ pub fn run(
     let mut final_sources = Vec::new();
 
     for source in &sources_to_process {
-        if source.ends_with("zoi.pkgs.json") {
-            install::lockfile::process_lockfile(source, &mut final_sources, &mut temp_files)?;
+        if source.ends_with(".lock") {
+            install::lockfile::process_lockfile(
+                source,
+                &mut final_sources,
+                &mut temp_files,
+                scope_override.unwrap_or(types::Scope::User),
+            )?;
         } else {
             final_sources.push(source.to_string());
         }
@@ -864,19 +876,38 @@ pub fn run(
         } else {
             println!("\nUpdating zoi.lock...");
             let mut lockfile =
-                project::lockfile::read_zoi_lock().unwrap_or_else(|_| types::ZoiLock {
-                    version: "1".to_string(),
+                project::lockfile::read_zoi_lock().unwrap_or_else(|_| types::ZoiLockV2 {
+                    version: "2".to_string(),
                     ..Default::default()
                 });
 
-            lockfile.packages.clear();
-            lockfile.details.clear();
+            lockfile.installed_packages.clear();
+            lockfile.registries.clear();
 
             let all_regs_config = crate::pkg::config::read_config().unwrap_or_default();
             let mut all_configured_regs = all_regs_config.added_registries;
             if let Some(default_reg) = all_regs_config.default_registry {
                 all_configured_regs.push(default_reg);
             }
+
+            let store_dir = crate::pkg::local::get_store_base_dir(types::Scope::Project)?;
+            let db_dir = if is_any_project_install {
+                std::env::current_dir()?
+                    .join(".zoi")
+                    .join("pkgs")
+                    .join("db")
+            } else {
+                crate::pkg::resolve::get_db_root()?
+            };
+
+            lockfile.packages_hash = Some(format!(
+                "sha512-{}",
+                crate::pkg::hash::calculate_dir_hash(&store_dir).unwrap_or_default()
+            ));
+            lockfile.registries_hash = Some(format!(
+                "sha512-{}",
+                crate::pkg::hash::calculate_dir_hash(&db_dir).unwrap_or_default()
+            ));
 
             let installed_manifests = installed_manifests.into_inner().map_err(|e| {
                 anyhow!(
@@ -885,27 +916,33 @@ pub fn run(
                 )
             })?;
             for manifest in &installed_manifests {
-                let name_with_sub = if let Some(sub) = &manifest.sub_package {
-                    format!("{}:{}", manifest.name, sub)
+                let packages_key = if let Some(sub) = &manifest.sub_package {
+                    format!("@{}/{}:{}", manifest.repo, manifest.name, sub)
                 } else {
-                    manifest.name.clone()
+                    format!("@{}/{}", manifest.repo, manifest.name)
                 };
-
-                let full_id = format!(
-                    "#{}@{}/{}",
-                    manifest.registry_handle, manifest.repo, name_with_sub
-                );
-                if matches!(manifest.reason, types::InstallReason::Direct) {
-                    lockfile.packages.insert(full_id, manifest.version.clone());
-                }
 
                 if let Some(reg) = all_configured_regs
                     .iter()
                     .find(|r| r.handle == manifest.registry_handle)
                 {
-                    lockfile
-                        .registries
-                        .insert(reg.handle.clone(), reg.url.clone());
+                    let mut revision = "unknown".to_string();
+                    let reg_path = db_dir.join(&reg.handle);
+                    if reg_path.exists()
+                        && let Ok(repo) = git2::Repository::open(&reg_path)
+                        && let Ok(head) = repo.head()
+                        && let Some(target) = head.target()
+                    {
+                        revision = target.to_string();
+                    }
+
+                    lockfile.registries.insert(
+                        reg.handle.clone(),
+                        types::LockRegistryV2 {
+                            url: reg.url.clone(),
+                            revision,
+                        },
+                    );
                 }
 
                 let package_dir = crate::pkg::local::get_package_dir(
@@ -914,9 +951,9 @@ pub fn run(
                     &manifest.repo,
                     &manifest.name,
                 )?;
-                let latest_dir = package_dir.join("latest");
+                let version_dir = package_dir.join(&manifest.version);
                 let integrity =
-                    crate::pkg::hash::calculate_dir_hash(&latest_dir).unwrap_or_else(|e| {
+                    crate::pkg::hash::calculate_dir_hash(&version_dir).unwrap_or_else(|e| {
                         eprintln!(
                             "Warning: could not calculate integrity for {}: {}",
                             manifest.name, e
@@ -924,57 +961,38 @@ pub fn run(
                         String::new()
                     });
 
-                let pkg_id = if let Some(sub) = &manifest.sub_package {
-                    format!("{}@{}:{}", manifest.name, manifest.version, sub)
+                let why = if matches!(manifest.reason, types::InstallReason::Direct) {
+                    "direct".to_string()
                 } else {
-                    format!("{}@{}", manifest.name, manifest.version)
+                    "dependency".to_string()
                 };
 
-                let git_sha = graph.nodes.get(&pkg_id).and_then(|n| n.git_sha.clone());
-
-                let dependencies: Vec<String> = graph
-                    .adj
-                    .get(&pkg_id)
-                    .map(|deps| {
-                        deps.iter()
-                            .map(|dep_id| {
-                                let node = graph.nodes.get(dep_id).ok_or_else(|| {
-                                    anyhow!(
-                                        "Dependency node missing from graph during lockfile update"
-                                    )
-                                })?;
-                                Ok(crate::pkg::local::package_source_string(
-                                    &node.registry_handle,
-                                    &node.pkg.repo,
-                                    &node.pkg.name,
-                                    node.sub_package.as_deref(),
-                                    &node.version,
-                                ))
-                            })
-                            .collect::<Result<Vec<String>>>()
-                    })
-                    .transpose()?
-                    .unwrap_or_default();
-
-                let detail = types::LockPackageDetail {
+                let detail = types::LockPackageDetailV2 {
+                    name: manifest.name.clone(),
+                    sub_package: manifest.sub_package.clone(),
+                    repo: manifest.repo.clone(),
+                    repo_type: "official".to_string(),
                     version: manifest.version.clone(),
                     revision: manifest.revision.clone(),
-                    sub_package: manifest.sub_package.clone(),
-                    integrity,
-                    git_sha,
-                    dependencies,
-                    options_dependencies: manifest.chosen_options.clone(),
-                    optionals_dependencies: manifest.chosen_optionals.clone(),
+                    registry: manifest.registry_handle.clone(),
+                    why,
+                    description: String::new(),
+                    package_type_install: format!("{:?}", manifest.package_type).to_lowercase(),
+                    install_method: manifest
+                        .install_method
+                        .clone()
+                        .unwrap_or_else(|| "pre-built".to_string()),
+                    installed_sub_packages: manifest
+                        .sub_package
+                        .clone()
+                        .map(|s| vec![s])
+                        .unwrap_or_default(),
+                    platform: crate::pkg::utils::get_platform().unwrap_or_default(),
+                    hash: format!("sha512-{}", integrity),
+                    dependencies: None,
                 };
 
-                let registry_key = format!("#{}", manifest.registry_handle);
-                let short_id = format!("@{}/{}", manifest.repo, name_with_sub);
-
-                lockfile
-                    .details
-                    .entry(registry_key)
-                    .or_default()
-                    .insert(short_id, detail);
+                lockfile.installed_packages.insert(packages_key, detail);
             }
 
             if let Err(e) = project::lockfile::write_zoi_lock(&lockfile) {

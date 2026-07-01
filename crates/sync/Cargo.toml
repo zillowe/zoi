@@ -28,3 +28,4 @@ zoi-core.workspace = true
 zoi-db.workspace = true
 zoi-install.workspace = true
 zoi-lua.workspace = true
+zoi-project.workspace = true

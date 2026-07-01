@@ -94,6 +94,24 @@ impl DependencyGraph {
     }
 }
 
+fn extract_zoi_dependencies(deps: &types::DependenciesV2) -> Vec<String> {
+    let mut zoi_deps = Vec::new();
+
+    let mut to_process = deps.runtime.clone();
+    for b in &deps.build {
+        to_process.extend(b.packages.clone());
+    }
+
+    for dep_str in to_process {
+        if let Ok(dep) = dependencies::parse_dependency_string(&dep_str)
+            && dep.manager == "zoi"
+        {
+            zoi_deps.push(dep.package.to_string());
+        }
+    }
+    zoi_deps
+}
+
 pub fn build_graph_from_locked_packages(
     locked_packages: &[FrozenLockPackage],
     scope_override: Option<types::Scope>,
@@ -106,6 +124,7 @@ pub fn build_graph_from_locked_packages(
 
     let mut graph = DependencyGraph::new();
     let mut reverse_deps: HashMap<String, Vec<String>> = HashMap::new();
+    let mut pkg_id_to_locked_deps: HashMap<String, Vec<String>> = HashMap::new();
 
     for locked in locked_packages {
         let request = resolve::parse_source_string(&locked.source)?;
@@ -122,6 +141,14 @@ pub fn build_graph_from_locked_packages(
         } else {
             format!("{}@{}", pkg.name, version_str)
         };
+
+        let flattened_deps = if let Some(deps) = &locked.dependencies {
+            extract_zoi_dependencies(deps)
+        } else {
+            Vec::new()
+        };
+
+        pkg_id_to_locked_deps.insert(pkg_id.clone(), flattened_deps.clone());
 
         graph.nodes.insert(
             pkg_id.clone(),
@@ -141,31 +168,28 @@ pub fn build_graph_from_locked_packages(
                 registry_handle: handle.unwrap_or_else(|| "zoidberg".to_string()),
                 chosen_options: locked.chosen_options.clone(),
                 chosen_optionals: locked.chosen_optionals.clone(),
-                dependencies: locked.dependencies.clone(),
+                dependencies: flattened_deps,
                 git_sha: locked.git_sha.clone().or(git_sha),
             },
         );
     }
 
-    for (pkg_id, node) in &graph.nodes {
+    for pkg_id in graph.nodes.keys() {
         let mut children = HashSet::new();
-        for dep_str in &node.dependencies {
-            let dep = dependencies::parse_dependency_string(dep_str)?;
-            if dep.manager != "zoi" {
-                continue;
-            }
+        if let Some(locked_deps) = pkg_id_to_locked_deps.get(pkg_id) {
+            for dep_pkg_source in locked_deps {
+                let dep_req = resolve::parse_source_string(dep_pkg_source)?;
+                let dep_version = dep_req.version_spec.as_deref().unwrap_or_default();
+                let dep_id = if let Some(sub) = dep_req.sub_package {
+                    format!("{}@{}:{}", dep_req.name, dep_version, sub)
+                } else {
+                    format!("{}@{}", dep_req.name, dep_version)
+                };
 
-            let dep_req = resolve::parse_source_string(dep.package)?;
-            let dep_version = dep.version_str.as_deref().unwrap_or_default();
-            let dep_id = if let Some(sub) = dep_req.sub_package {
-                format!("{}@{}:{}", dep_req.name, dep_version, sub)
-            } else {
-                format!("{}@{}", dep_req.name, dep_version)
-            };
-
-            if graph.nodes.contains_key(&dep_id) {
-                children.insert(dep_id.clone());
-                reverse_deps.entry(dep_id).or_default().push(pkg_id.clone());
+                if graph.nodes.contains_key(&dep_id) {
+                    children.insert(dep_id.clone());
+                    reverse_deps.entry(dep_id).or_default().push(pkg_id.clone());
+                }
             }
         }
         graph.adj.insert(pkg_id.clone(), children);
@@ -272,12 +296,15 @@ pub fn resolve_dependency_graph(
         root_deps.insert(pkg_name, range);
     }
 
+    let project_config = zoi_project::config::load().ok();
+
     let provider = ZoiDependencyProvider::new(
         root_deps,
         initial_sources.to_vec(),
         quiet,
         yes,
         all_optional,
+        project_config,
     )?;
     let root_pkg = PkgName {
         name: "$root".to_string(),

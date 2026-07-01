@@ -75,6 +75,14 @@ Zoidberg organizes packages into tiers. These tiers help to indicate the stabili
 
 Note: Packages from `community`, `test`, and `archive` may carry higher risk. Zoi prints warnings where appropriate.
 
+Packages from `extra` repo requires using the `@extra/<package>` format because its not active by default, to activate it:
+
+```sh
+zoi repo add extra
+```
+
+And now you can install packages from the `extra` repo like you would from `core` or `main`.
+
 For details on how to use and manage repositories, see the [Repositories guide](/docs/zds/zoi/repositories).
 
 ## Reporting Security Issues

@@ -137,14 +137,11 @@ pub fn run() -> Result<()> {
         }
     }
 
-    println!(
-        "\n{} Validating zoi.pkgs.json integrity...",
-        "->".bold().cyan()
-    );
-    match pkg::doctor::validate_pkgs_json_integrity() {
+    println!("\n{} Validating zoi.lock integrity...", "->".bold().cyan());
+    match pkg::doctor::validate_lockfile_integrity() {
         Ok(missing_packages) => {
             if missing_packages.is_empty() {
-                println!("{}", "zoi.pkgs.json integrity is good.".green());
+                println!("{}", "zoi.lock integrity is good.".green());
             } else {
                 issues_found += missing_packages.len();
                 println!(
@@ -160,7 +157,7 @@ pub fn run() -> Result<()> {
             }
         }
         Err(e) => {
-            eprintln!("{}: Failed to validate zoi.pkgs.json: {}", "Error".red(), e);
+            eprintln!("{}: Failed to validate zoi.lock: {}", "Error".red(), e);
             issues_found += 1;
         }
     }

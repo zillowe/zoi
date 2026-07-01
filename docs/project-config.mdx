@@ -1,273 +1,142 @@
 ---
 title: Project Configuration
-description: Define project commands and environments with zoi.yaml.
+description: Define project environments and tasks with zoi.lua and zoi.yaml.
 ---
 
-Zoi can manage per-project commands and environments using a `zoi.yaml` file placed in your project root. This page describes the schema and provides examples.
+Zoi v1.20+ (Specification v2) uses a split configuration model to separate environment definitions from task automation.
 
-## File location
+- **`zoi.lua`**: The primary, scriptable configuration for defining project metadata, package dependencies, and registries.
+- **`zoi.yaml`**: A restricted configuration file dedicated to task automation (`run` and `env`).
 
-- Create `zoi.yaml` in the root of your project repository.
-- Commands refer to paths relative to the project root unless you use absolute paths.
+## 1. Project Configuration (`zoi.lua`)
 
-## Schema
+The `zoi.lua` file is the heart of your project. It uses Zoi's Lua API to define the environment in a programmable way.
 
-The `zoi.yaml` file allows for simple and complex configurations, including platform-specific commands and environment variables.
+### Schema
 
-```yaml
-# Required project name (used in output)
-name: my-project
+```lua
+-- zoi.lua
 
-# Optional: List of supplementary registries for this project
-registries:
-  - https://github.com/YourOrg/custom-registry.git
+-- Define project metadata
+project({
+    name = "my-awesome-project",
+    -- Enable project-local isolation (default: true in Spec v2 if file exists)
+    config = {
+        ["local"] = true
+    }
+})
 
-# Optional: Enable project-level package management
-config:
-  local: true
+-- Define supplementary registries
+registries({
+custom = {
+url = "<https://github.com/YourOrg/custom-registry.git>",
+revision = "main" -- Can be a branch, tag, or commit hash
+}
+})
 
-# Optional: List of packages to install for this project
-# Requires `config.local: true`
-pkgs:
-  - eza
-  - fzf: "0.44.1" # Version map support
+-- Define package dependencies
+packages({
+-- Simple list
+"@core/eza",
+"@community/bat",
 
-# Optional: Verify important tools are available
-# Each item runs a check command; non-zero exit indicates missing or incompatible
-packages:
-  - name: git
-    check: git --version
-  - name: node
-    check: node --version
+    -- Advanced pinning and options
+    ["@community/fzf"] = {
+        version = "0.44.1",
+        sub_packages = {"cli"},
+        dependencies = {
+            runtime = {"zoi:ncurses"}
+        }
+    }
 
-# Optional: Short, named commands runnable via `zoi run <cmd>`
-commands:
-  # Simple command
-  - cmd: test
-    run: npm test
-    # Feature: Task dependencies (DAG)
-    depends_on: ["build"]
-
-  - cmd: build
-    run: npm run build
-    # Feature: File-based caching
-    cache_files: ["src/**", "package-lock.json"]
-
-  # Platform-specific command with environment variables
-  - cmd: dev
-    run:
-      # Platform is in format <os>-<arch>, e.g. linux-amd64, macos-arm64, windows-amd64
-      linux-amd64: npm run dev:linux
-      macos-amd64: npm run dev:mac
-      windows-amd64: npm run dev:win
-      default: npm run dev # Fallback for other platforms
-    env:
-      # Simple env vars for all platforms
-      API_KEY: "12345"
-
-# Optional: Environment setups runnable via `zoi env <alias>`
-environments:
-  - name: Web development environment
-    cmd: web
-    run:
-      default:
-        - npm ci
-        - npm run build
-      windows-amd64:
-        - npm ci
-        - echo "Building for Windows..."
-        - npm run build:win
-    env:
-      # Platform-specific environment maps use platform keys directly.
-      # `default` is used when the current platform has no exact match.
-      default:
-        NODE_ENV: "production"
-      windows-amd64:
-        NODE_ENV: "production_win"
-
-  - name: Rust toolchain setup
-    cmd: rust
-    run:
-      - rustup toolchain install stable
-      - rustup component add clippy rustfmt
-
-# Optional: Shell configuration for `zoi dev`
-shell:
-  env:
-    # Custom environment variables for the dev shell
-    DEBUG: "true"
-```
-
-For platform-specific `env`, use platform keys at the top level:
-
-```yaml
-shell:
-  env:
-    linux-amd64:
-      CC: "gcc"
-    macos-arm64:
-      CC: "clang"
-    default:
-      CC: "cc"
+})
 ```
 
 ### Field Reference
 
-- `name`: `string` (required)
-- `registries`: `list` of `string` (optional). Additional Git URLs for package registries to search for this project.
-- `config`: `object` (optional)
-  - `local`: `boolean` (default: `false`). If `true`, enables project-local package management.
-- `pkgs`: `list` of strings or objects (optional). A list of packages to be installed locally to the project. Supports version maps (e.g. `- fzf: "0.44.1"`). Requires `config.local: true`.
-- `packages`: `list` of objects (optional). Note: this is for validating tools, not for installing packages. See `pkgs` for installation.
-  - `name`: `string` (label only)
-  - `check`: `string` (command to validate presence/version)
-- `commands`: `list` of objects (optional)
-  - `cmd`: `string` (alias)
-  - `run`: `string` or `map` (command)
-    - If a `string`, it's the command for all platforms.
-    - If a `map`, keys are platforms (`<os>-<arch>`) and values are command strings. A `default` key can be used as a fallback.
-  - `env`: `map` (optional)
-    - Can be a simple `map` of `string: string` for environment variables.
-    - Can be a platform map where keys are platform strings such as `linux-amd64`, plus optional `default`, and values are environment-variable maps.
-  - `depends_on`: `list` of `string` (optional). List of other command aliases that must run successfully before this command.
-  - `cache_files`: `list` of `string` (optional). List of file glob patterns. The command will be skipped if the hashes of these files haven't changed since the last successful run.
-- `environments`: `list` of objects (optional)
-  - `name`: `string` (label)
-  - `cmd`: `string` (alias)
-  - `run`: `list of strings` or `map` (commands)
-    - If a `list of strings`, it's the command list for all platforms.
-    - If a `map`, keys are platforms (`<os>-<arch>`) and values are lists of command strings. A `default` key can be used as a fallback.
-  - `env`: `map` (optional) - Same structure as in `commands`.
-- `shell`: `object` (optional)
-  - `env`: `map` (optional) - Environment variables to set when entering `zoi dev`. Same structure as in `commands`.
+- **`project`**:
+  - `name`: (string) Required project name.
+  - `config.local`: (boolean) If `true`, dependencies and registries are stored in the project root (`./.zoi/pkgs`).
+- **`registries`**: A map of handles to registry definitions (`url`, `revision`, `type`).
+  - `type`: (string) `"set"` (default) — bare package names search this registry's repos; `"added"` — requires explicit `#handle` prefix.
+- **`packages`**: A map or list of `@repo/package` identifiers.
+  - `version`: (string) SemVer requirement, supports ranges (`^1.0`, `>=2.0`, `~1.2.3`) and channels (`@nightly`).
+  - `sub_packages`: (list of string) Specific sub-packages to install.
+  - `dependencies`: (object) Overrides for package dependencies.
 
-Zoi determines the platform from the OS and architecture (e.g. `linux-amd64`, `macos-arm64`, `windows-amd64`).
+---
 
-## Project-local Package Management
+## 2. Task Configuration (`zoi.yaml`)
 
-Zoi can manage project-specific package dependencies, similar to `package.json` in Node.js or `Cargo.toml` in Rust.
+The `zoi.yaml` file is used to define named tasks and environments. It no longer supports package or registry definitions.
 
-To enable this feature, set `config.local` to `true` in your `zoi.yaml`. Then, list the packages your project needs under the `pkgs` key.
+### Schema
 
 ```yaml
-name: my-awesome-project
-config:
-  local: true
-pkgs:
-  - eza
-  - bat
-  - fzf
+# zoi.yaml
+
+# Short, named commands runnable via `zoi run <cmd>`
+commands:
+  - cmd: test
+    run: cargo test
+    depends_on: ["build"]
+
+  - cmd: build
+    run: cargo build --release
+    cache_files: ["src/**", "Cargo.toml"]
+
+# Full environment setups runnable via `zoi env <alias>`
+environments:
+  - name: Prepare Workspace
+    cmd: prep
+    run:
+      - zoi run build
+      - cargo clippy
+    env:
+      RUST_BACKTRACE: "1"
 ```
 
-When this is configured, running `zoi install` (with no arguments) in the project directory will:
+---
 
-1. Read the `pkgs` list.
-2. Install the specified packages into a project-local directory. These packages will not affect your global user or system installations.
-3. Create two files:
-   - `.zoi/pkgs/zoi.pkgs.json`: A detailed manifest of all installed packages, their dependencies, and metadata. This file is intended for local tracking.
-   - `zoi.lock`: A file containing cryptographic hashes of the installed packages in the project root. This file is used to verify the integrity of the packages and should be committed to your repository.
+## The `zoi.lock` File (Spec v2)
 
-Commit `zoi.yaml` and `zoi.lock` to your repository. This ensures that other developers who clone the project can run `zoi install` to get the exact same versions of the dependencies, creating a reproducible and secure environment.
+Zoi Specification v2 lockfiles are designed for absolute reproducibility. They pin not only package versions but also the exact Git revisions of your registries and the cryptographic hashes of your local state.
 
-For strict reproducibility, use:
-
-```sh
-zoi install --frozen-lockfile --local
-```
-
-This installs only versions pinned in `zoi.lock` and refuses to update the lockfile during the run.
-
-## The `zoi.lock` File
-
-The `zoi.lock` file is a JSON file that records the exact versions and integrity hashes of all the packages installed in a project. It's automatically generated and updated when you run `zoi install` in a project with local packages enabled.
-
-Its primary purpose is to ensure that every developer on a team has the exact same version of every dependency, providing a reproducible environment. It also serves as a security measure, as it allows `zoi` to verify that the installed packages have not been tampered with.
-
-### Lockfile Schema
-
-- `version`: The version of the lockfile format.
-- `registries`: A map of registry handles to their URLs.
-- `packages`: A map of package IDs to their resolved versions.
-- Registry handle keys (e.g. `#zoidberg`): A flattened map containing detailed information about each package, including its version, integrity hash, dependencies, and any chosen optional dependencies.
-
-Here is a simplified example of a `zoi.lock` file:
+### Lockfile Structure
 
 ```json
 {
-  "version": "1.8.0",
+  "version": "2",
+  "packages_hash": "sha512-...", // Hash of all package files
+  "registries_hash": "sha512-...", // Hash of the local database
   "registries": {
-    "zoidberg": "https://github.com/zillowe/zoidberg.git"
+    "zoidberg": {
+      "url": "https://github.com/zillowe/zoidberg.git",
+      "revision": "a1b2c3d4..." // Exact commit hash
+    }
   },
-  "packages": {
-    "#zoidberg@core/linux:headers": "6.5.9"
-  },
-  "#zoidberg": {
-    "@core/linux:headers": {
-      "version": "6.5.9",
-      "sub_package": "headers",
-      "integrity": "sha512-....",
-      "dependencies": [],
-      "options_dependencies": [],
-      "optionals_dependencies": []
+  "installed_packages": {
+    "@core/curl": {
+      "version": "8.4.0",
+      "hash": "sha512-...",
+      "platform": "linux-amd64",
+      "why": "direct"
     }
   }
 }
 ```
 
-## CLI usage
+## CLI Usage
 
-- Enter a development shell:
+- **Enter a dev shell**: `zoi dev`. If the repository is remote, use `zoi dev --repo <url>`.
+- **Run a task**: `zoi run <alias>`.
+- **Set up environment**: `zoi env <alias>`.
+- **Sync local registries**: `zoi sync --local` (pins revisions from `zoi.lua`).
+- **Sync from lockfile**: `zoi sync --local --frozen-lock` (pins revisions from `zoi.lock`).
+- **Install project dependencies**: `zoi install --local`.
 
-```sh
-zoi dev
-```
+## Best Practices
 
-- Run a command directly in the dev shell environment and exit:
-
-```sh
-zoi dev --run "make build"
-```
-
-- Run a command by alias:
-
-```sh
-zoi run dev
-```
-
-- To pass arguments to the underlying script, add them after the command alias. Use `--` to separate the arguments from Zoi's own options if needed.
-
-```sh
-# If 'test' is 'npm test', this runs 'npm test --watch'
-zoi run test -- --watch
-
-# If 'fmt' is 'cargo fmt', this runs 'cargo fmt --all'
-zoi run fmt -- --all
-```
-
-- Interactively choose a command (no alias provided):
-
-```sh
-zoi run
-```
-
-- Set up an environment by alias:
-
-```sh
-zoi env web
-```
-
-- Interactively choose an environment:
-
-```sh
-zoi env
-```
-
-If `zoi.yaml` is missing, Zoi prints an error. If no commands or environments are defined, the respective subcommands will also error.
-
-## Best practices
-
-- Keep `check` commands fast and side-effect free.
-- Prefer explicit toolchain versions in environment steps to ensure reproducibility.
-- Use short, memorable `cmd` aliases.
-- Split long setups into multiple environments (e.g. `deps`, `build`, `lint`).
-- Use the `default` key in platform-specific maps to provide a good fallback experience.
+1. **Commit your lockfile**: Always commit `zoi.lock` to ensure your team uses the exact same environment.
+2. **Use `@repo/package`**: Always use scoped identifiers in `zoi.lua` to avoid ambiguity.
+3. **Pin Registry Revisions**: For production projects, pin your `registries` in `zoi.lua` to a specific commit hash for maximum security.

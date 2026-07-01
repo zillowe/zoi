@@ -3,11 +3,23 @@ use rusqlite::params;
 use rustc_hash::FxHashMap;
 use semver::Version;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fmt::Display;
 use thiserror::Error;
 use zoi_core::types;
 use zoi_db as db;
 use zoi_resolver::resolve;
+
+fn parse_pkgs_v2_key(key: &str) -> (String, String) {
+    let key = key.trim_start_matches('#');
+    let key = key.trim_start_matches('@');
+    if let Some((repo, name)) = key.split_once('/') {
+        let name = name.split(':').next().unwrap_or(name);
+        (repo.to_string(), name.to_string())
+    } else {
+        (String::new(), key.to_string())
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct PkgName {
@@ -59,6 +71,8 @@ pub struct ZoiDependencyProvider {
     pub yes: bool,
     pub all_optional: bool,
     pub mini_index: Option<zoi_resolver::mini_resolve::MiniRegistryIndex>,
+    pub project_config: Option<zoi_project::config::ProjectConfig>,
+    pub pkgs_v2_constraints: HashMap<(String, String), String>,
     pub deps_cache:
         RefCell<FxHashMap<(PkgName, SemVersion), FxHashMap<PkgName, Ranges<SemVersion>>>>,
     pub chosen_cache:
@@ -155,12 +169,28 @@ impl ZoiDependencyProvider {
         quiet: bool,
         yes: bool,
         all_optional: bool,
+        project_config: Option<zoi_project::config::ProjectConfig>,
     ) -> Result<Self, anyhow::Error> {
         let mini_index = if zoi_core::utils::is_mini_mode() {
             Some(zoi_resolver::mini_resolve::fetch_registry_index()?)
         } else {
             None
         };
+
+        let pkgs_v2_constraints = project_config
+            .as_ref()
+            .map(|config| {
+                config
+                    .pkgs_v2
+                    .iter()
+                    .filter_map(|(key, spec)| {
+                        spec.version
+                            .as_ref()
+                            .map(|v| (parse_pkgs_v2_key(key), v.clone()))
+                    })
+                    .collect::<HashMap<_, _>>()
+            })
+            .unwrap_or_default();
 
         Ok(Self {
             root_deps,
@@ -169,6 +199,8 @@ impl ZoiDependencyProvider {
             yes,
             all_optional,
             mini_index,
+            project_config,
+            pkgs_v2_constraints,
             deps_cache: RefCell::new(FxHashMap::default()),
             chosen_cache: RefCell::new(FxHashMap::default()),
         })
@@ -297,6 +329,15 @@ impl ZoiDependencyProvider {
 
         all_versions.sort();
         all_versions.dedup();
+
+        if let Some(version_spec) = self
+            .pkgs_v2_constraints
+            .get(&(package.repo.clone(), package.name.clone()))
+        {
+            let range = semver_to_range(version_spec);
+            all_versions.retain(|v| range.contains(v));
+        }
+
         Ok(all_versions)
     }
 }
@@ -329,100 +370,120 @@ impl DependencyProvider for ZoiDependencyProvider {
 
         let version_str = version.to_string();
 
-        let dependencies_opt = db::get_package_dependencies(
-            &package.registry,
-            &package.name,
-            &version_str,
-            package.sub_package.as_deref(),
-            &package.repo,
-        )
-        .ok()
-        .flatten();
+        let mut package_deps: Option<types::DependenciesV2> = None;
 
-        let package_deps = if let Some(deps_json) = dependencies_opt
-            && !deps_json.is_empty()
-        {
-            serde_json::from_str::<types::Dependencies>(&deps_json).ok()
-        } else {
-            let source = package
-                .explicit_source
-                .clone()
-                .unwrap_or_else(|| format!("{}@{}", package, version_str));
-            let pkg_res = resolve::resolve_package_and_version(&source, self.quiet, self.yes);
+        if let Some(config) = &self.project_config {
+            let packages_key = if let Some(sub) = &package.sub_package {
+                format!("@{}/{}:{}", package.repo, package.name, sub)
+            } else {
+                format!("@{}/{}", package.repo, package.name)
+            };
 
-            match pkg_res {
-                Ok((pkg, _, _, _, _, _)) => pkg.dependencies,
-                Err(_) => None,
+            if let Some(spec) = config.pkgs_v2.get(&packages_key)
+                && spec.version.as_ref().is_none_or(|v| {
+                    let range = semver_to_range(v);
+                    let parsed = Version::parse(&version_str);
+                    parsed.is_ok_and(|pv| range.contains(&SemVersion(pv))) || v == &version_str
+                })
+            {
+                package_deps = spec.dependencies.clone().map(types::to_dependencies_v2);
             }
-        };
+        }
+
+        if package_deps.is_none() {
+            let dependencies_opt = db::get_package_dependencies(
+                &package.registry,
+                &package.name,
+                &version_str,
+                package.sub_package.as_deref(),
+                &package.repo,
+            )
+            .ok()
+            .flatten();
+
+            let v1_deps = if let Some(deps_json) = dependencies_opt
+                && !deps_json.is_empty()
+            {
+                serde_json::from_str::<types::Dependencies>(&deps_json).ok()
+            } else {
+                let source = package
+                    .explicit_source
+                    .clone()
+                    .unwrap_or_else(|| format!("{}@{}", package, version_str));
+                let pkg_res = resolve::resolve_package_and_version(&source, self.quiet, self.yes);
+
+                match pkg_res {
+                    Ok((pkg, _, _, _, _, _)) => pkg.dependencies,
+                    Err(_) => None,
+                }
+            };
+            package_deps = v1_deps.map(types::to_dependencies_v2);
+        }
 
         let mut deps = FxHashMap::default();
 
-        let mut chosen_opts = Vec::new();
-        let mut chosen_opts_opt = Vec::new();
+        let chosen_opts = Vec::new();
+        let chosen_opts_opt = Vec::new();
         let mut all_req = Vec::new();
 
-        if let Some(dependencies) = package_deps
-            && let Some(runtime) = &dependencies.runtime
-        {
-            let (req_deps, co, coo) = zoi_deps::collect_dependencies_for_group(
-                runtime,
-                package.sub_package.as_deref(),
-                Some("runtime"),
-                self.yes,
-                self.all_optional,
-            )
-            .map_err(|e| ZoiSolverError::Dependency(e.to_string()))?;
+        if let Some(dependencies) = package_deps {
+            let mut groups = Vec::new();
+            groups.push(&dependencies.runtime);
+            for b in &dependencies.build {
+                groups.push(&b.packages);
+            }
 
-            chosen_opts = co;
-            chosen_opts_opt = coo;
-            all_req = req_deps.clone();
-
-            for dep_str in req_deps {
-                let dep_req = zoi_deps::parse_dependency_string(&dep_str)
-                    .map_err(|e| ZoiSolverError::Dependency(e.to_string()))?;
-
-                if dep_req.manager == "zoi" {
-                    let req = resolve::parse_source_string(dep_req.package)
+            for group_pkgs in groups {
+                for dep_str in group_pkgs {
+                    let dep_req = zoi_deps::parse_dependency_string(dep_str)
                         .map_err(|e| ZoiSolverError::Dependency(e.to_string()))?;
-                    let resolved_dep =
-                        resolve::resolve_source(dep_req.package, self.quiet, self.yes)
+
+                    if dep_req.manager == "zoi" {
+                        let req = resolve::parse_source_string(dep_req.package)
                             .map_err(|e| ZoiSolverError::Dependency(e.to_string()))?;
+                        let resolved_dep =
+                            resolve::resolve_source(dep_req.package, self.quiet, self.yes)
+                                .map_err(|e| ZoiSolverError::Dependency(e.to_string()))?;
 
-                    let dep_name = PkgName {
-                        name: req.name,
-                        sub_package: req.sub_package,
-                        repo: resolved_dep.repo_name.unwrap_or_default(),
-                        registry: resolved_dep
-                            .registry_handle
-                            .unwrap_or_else(|| "zoidberg".to_string()),
-                        explicit_source: matches!(
-                            resolved_dep.source_type,
-                            zoi_core::types::SourceType::LocalFile
-                                | zoi_core::types::SourceType::Url
-                                | zoi_core::types::SourceType::GitRepo(_)
-                        )
-                        .then(|| dep_req.package.to_string()),
-                    };
+                        let dep_name = PkgName {
+                            name: req.name,
+                            sub_package: req.sub_package,
+                            repo: resolved_dep.repo_name.unwrap_or_default(),
+                            registry: resolved_dep
+                                .registry_handle
+                                .unwrap_or_else(|| "zoidberg".to_string()),
+                            explicit_source: matches!(
+                                resolved_dep.source_type,
+                                zoi_core::types::SourceType::LocalFile
+                                    | zoi_core::types::SourceType::Url
+                                    | zoi_core::types::SourceType::GitRepo(_)
+                            )
+                            .then(|| dep_req.package.to_string()),
+                        };
 
-                    let range = if req.version_spec.is_some() {
-                        let resolved_version =
-                            resolve::resolve_requested_version_spec(dep_req.package, true, true)
-                                .map_err(|e| ZoiSolverError::Dependency(e.to_string()))?
-                                .ok_or_else(|| {
-                                    ZoiSolverError::Dependency(format!(
-                                        "version spec missing for '{}'",
-                                        dep_req.package
-                                    ))
-                                })?;
-                        self.semver_to_range(&resolved_version)
-                    } else {
-                        Ranges::full()
-                    };
+                        let range = if req.version_spec.is_some() {
+                            let resolved_version = resolve::resolve_requested_version_spec(
+                                dep_req.package,
+                                true,
+                                true,
+                            )
+                            .map_err(|e| ZoiSolverError::Dependency(e.to_string()))?
+                            .ok_or_else(|| {
+                                ZoiSolverError::Dependency(format!(
+                                    "version spec missing for '{}'",
+                                    dep_req.package
+                                ))
+                            })?;
+                            self.semver_to_range(&resolved_version)
+                        } else {
+                            Ranges::full()
+                        };
 
-                    deps.insert(dep_name, range);
+                        deps.insert(dep_name, range);
+                    }
                 }
             }
+            all_req = dependencies.runtime.clone();
         }
 
         self.deps_cache

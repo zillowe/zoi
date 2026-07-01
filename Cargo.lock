@@ -4323,6 +4323,7 @@ dependencies = [
  "dirs",
  "dotenvy",
  "fs2",
+ "git2",
  "hex",
  "home",
  "indicatif",
@@ -4533,7 +4534,6 @@ dependencies = [
  "zoi-core",
  "zoi-deps",
  "zoi-lua",
- "zoi-purl",
  "zoi-resolver",
  "zstd",
 ]
@@ -4586,6 +4586,7 @@ dependencies = [
  "dialoguer",
  "glob",
  "hex",
+ "mlua",
  "rayon",
  "serde",
  "serde_json",
@@ -4673,6 +4674,7 @@ dependencies = [
  "zoi-db",
  "zoi-install",
  "zoi-lua",
+ "zoi-project",
 ]
 
 [[package]]

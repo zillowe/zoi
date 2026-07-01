@@ -1,5 +1,5 @@
 use anyhow::{Result, anyhow};
-use serde::{Deserialize, Deserializer};
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -16,16 +16,36 @@ pub struct ShellSpec {
     pub env: PlatformOrEnvMap,
 }
 
+#[derive(Debug, Deserialize, Clone)]
+pub struct RegistrySpec {
+    pub url: String,
+    pub revision: Option<String>,
+    #[serde(rename = "type")]
+    pub registry_type: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct PackageSpec {
+    #[serde(rename = "type")]
+    pub package_type: Option<String>,
+    pub install_method: Option<String>,
+    pub sub_packages: Option<Vec<String>>,
+    pub version: Option<String>,
+    pub dependencies: Option<zoi_core::types::Dependencies>,
+}
+
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct ProjectConfig {
     pub name: String,
     #[serde(default)]
-    pub registries: Option<Vec<String>>,
+    pub registries: HashMap<String, RegistrySpec>,
     #[serde(default)]
     pub packages: Vec<PackageCheck>,
-    #[serde(default, deserialize_with = "deserialize_pkgs")]
+    #[serde(default)]
     pub pkgs: Vec<String>,
+    #[serde(default)]
+    pub pkgs_v2: HashMap<String, PackageSpec>,
     #[serde(default)]
     pub config: ProjectLocalConfig,
     #[serde(default)]
@@ -34,32 +54,6 @@ pub struct ProjectConfig {
     pub environments: Vec<EnvironmentSpec>,
     #[serde(default)]
     pub shell: Option<ShellSpec>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-enum PkgOrPkgWithVersion {
-    Name(String),
-    Versioned(HashMap<String, String>),
-}
-
-fn deserialize_pkgs<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let v = Vec::<PkgOrPkgWithVersion>::deserialize(deserializer)?;
-    Ok(v.into_iter()
-        .flat_map(|item| {
-            let strings: Vec<String> = match item {
-                PkgOrPkgWithVersion::Name(name) => vec![name],
-                PkgOrPkgWithVersion::Versioned(map) => map
-                    .into_iter()
-                    .map(|(k, v)| format!("{}@{}", k, v))
-                    .collect(),
-            };
-            strings
-        })
-        .collect())
 }
 
 #[derive(Debug, Deserialize)]
@@ -117,10 +111,19 @@ pub struct EnvironmentSpec {
 }
 
 pub fn load() -> Result<ProjectConfig> {
+    load_with_env(std::env::vars().collect())
+}
+
+pub fn load_with_env(env: HashMap<String, String>) -> Result<ProjectConfig> {
+    let lua_path = Path::new("zoi.lua");
+    if lua_path.exists() {
+        return crate::lua_config::load_zoi_lua(lua_path, env);
+    }
+
     let config_path = Path::new("zoi.yaml");
     if !config_path.exists() {
         return Err(anyhow!(
-            "No 'zoi.yaml' file found in the current directory."
+            "No 'zoi.lua' or 'zoi.yaml' file found in the current directory."
         ));
     }
 

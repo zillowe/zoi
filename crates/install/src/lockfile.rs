@@ -8,20 +8,26 @@ pub fn process_lockfile(
     lockfile_path: &str,
     sources_to_process: &mut Vec<String>,
     temp_files: &mut Vec<NamedTempFile>,
+    scope: types::Scope,
 ) -> Result<()> {
     println!("=> Installing packages from lockfile: {}", lockfile_path);
     let content = fs::read_to_string(lockfile_path)?;
-    let lockfile: types::Lockfile = serde_json::from_str(&content)?;
+    let lockfile: types::ZoiLockV2 = serde_json::from_str(&content)?;
 
-    for (_, pkg) in lockfile.packages {
+    for (pkg_key, pkg) in lockfile.installed_packages {
+        let name_with_sub = pkg_key.split('/').next_back().unwrap_or(&pkg_key);
+        let name = name_with_sub.split(':').next().unwrap_or(name_with_sub);
+        let sub_package = name_with_sub.split(':').nth(1).map(|s| s.to_string());
+
         let manifest = types::SharableInstallManifest {
-            name: pkg.name,
+            name: name.to_string(),
             version: pkg.version,
             repo: pkg.repo,
             registry_handle: pkg.registry,
-            scope: pkg.scope,
-            chosen_options: pkg.chosen_options,
-            chosen_optionals: pkg.chosen_optionals,
+            scope,
+            sub_package,
+            chosen_options: Vec::new(),
+            chosen_optionals: Vec::new(),
         };
 
         let mut temp_file = NamedTempFile::new()?;
