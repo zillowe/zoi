@@ -283,7 +283,7 @@ license-report:
   before_script:
     - cd /tmp && cargo install cargo-about --locked --features cli
   script:
-    - cargo about generate about.hbs > license.html
+    - cd $CI_PROJECT_DIR && cargo about generate about.hbs > license.html
   artifacts:
     paths:
       - license.html
