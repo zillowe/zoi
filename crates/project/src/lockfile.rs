@@ -6,27 +6,56 @@ fn get_lockfile_path() -> Result<std::path::PathBuf> {
     Ok(std::env::current_dir()?.join("zoi.lock"))
 }
 
-pub fn read_zoi_lock() -> Result<types::ZoiLockV2> {
-    let path = get_lockfile_path()?;
+fn read_lockfile_from(path: &std::path::Path) -> Result<Option<types::ZoiLockV2>> {
     if !path.exists() {
-        return Ok(types::ZoiLockV2 {
-            version: "2".to_string(),
-            ..Default::default()
-        });
+        return Ok(None);
     }
     let content = fs::read_to_string(path)?;
     if content.trim().is_empty() {
-        return Ok(types::ZoiLockV2 {
-            version: "2".to_string(),
-            ..Default::default()
-        });
+        return Ok(None);
     }
-
-    serde_json::from_str(&content).map_err(|e| {
+    serde_json::from_str(&content).map(Some).map_err(|e| {
         anyhow!(
-            "Failed to parse zoi.lock. It might be corrupted or in an old format. Error: {}",
+            "Failed to parse {}. It might be corrupted or in an old format. Error: {}",
+            path.display(),
             e
         )
+    })
+}
+
+fn is_lockfile_compatible(lockfile: &types::ZoiLockV2) -> bool {
+    let current_platform = zoi_core::utils::get_platform().unwrap_or_default();
+    if lockfile.installed_packages.is_empty() {
+        return true;
+    }
+    lockfile.installed_packages.values().all(|pkg| {
+        pkg.platform.is_empty()
+            || pkg.platform == current_platform
+            || zoi_core::utils::is_platform_compatible(
+                &current_platform,
+                std::slice::from_ref(&pkg.platform),
+            )
+    })
+}
+
+pub fn read_zoi_lock() -> Result<types::ZoiLockV2> {
+    let path = get_lockfile_path()?;
+
+    if let Some(lockfile) = read_lockfile_from(&path)? {
+        if is_lockfile_compatible(&lockfile) {
+            return Ok(lockfile);
+        }
+
+        let platform = zoi_core::utils::get_platform().unwrap_or_default();
+        let platform_path = path.with_file_name(format!("zoi.{}.lock", platform));
+        if let Some(platform_lock) = read_lockfile_from(&platform_path)? {
+            return Ok(platform_lock);
+        }
+    }
+
+    Ok(types::ZoiLockV2 {
+        version: "2".to_string(),
+        ..Default::default()
     })
 }
 

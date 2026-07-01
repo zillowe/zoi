@@ -22,10 +22,9 @@ project({
     name = "my-awesome-project",
     -- Enable project-local isolation (default: true in Spec v2 if file exists)
     config = {
-        local = true
+        ["local"] = true
     }
 })
-```
 
 -- Define supplementary registries
 registries({
@@ -51,19 +50,18 @@ packages({
     }
 
 })
-
-````
+```
 
 ### Field Reference
 
 - **`project`**:
-    - `name`: (string) Required project name.
-    - `config.local`: (boolean) If `true`, dependencies and registries are stored in the project root (`./.zoi/pkgs`).
+  - `name`: (string) Required project name.
+  - `config.local`: (boolean) If `true`, dependencies and registries are stored in the project root (`./.zoi/pkgs`).
 - **`registries`**: A map of handles to registry definitions (`url`, `revision`).
 - **`packages`**: A map or list of `@repo/package` identifiers.
-    - `version`: (string) SemVer requirement.
-    - `sub_packages`: (list of string) Specific sub-packages to install.
-    - `dependencies`: (object) Overrides for package dependencies.
+  - `version`: (string) SemVer requirement.
+  - `sub_packages`: (list of string) Specific sub-packages to install.
+  - `dependencies`: (object) Overrides for package dependencies.
 
 ---
 
@@ -95,7 +93,7 @@ environments:
       - cargo clippy
     env:
       RUST_BACKTRACE: "1"
-````
+```
 
 ---
 

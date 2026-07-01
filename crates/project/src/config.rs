@@ -20,6 +20,8 @@ pub struct ShellSpec {
 pub struct RegistrySpec {
     pub url: String,
     pub revision: Option<String>,
+    #[serde(rename = "type")]
+    pub registry_type: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]

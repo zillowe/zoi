@@ -138,6 +138,14 @@ enum Commands {
         /// Force re-sync by removing existing databases and re-cloning from scratch
         #[arg(long)]
         force: bool,
+
+        /// Sync registries to the project's local .zoi/pkgs/db/ using revisions from zoi.lua
+        #[arg(long)]
+        local: bool,
+
+        /// When used with --local, sync using revisions from zoi.lock instead of zoi.lua
+        #[arg(long)]
+        frozen_lock: bool,
     },
 
     /// Migration helpers for converting external manifests to Zoi package files
@@ -878,6 +886,8 @@ pub fn run() -> anyhow::Result<()> {
                 fallback,
                 no_package_managers,
                 force,
+                local,
+                frozen_lock,
             } => {
                 if let Some(cmd) = command {
                     match cmd {
@@ -886,6 +896,11 @@ pub fn run() -> anyhow::Result<()> {
                         SyncCommands::List => cmd::sync::list_registries(),
                         SyncCommands::Set { url } => cmd::sync::set_registry(&url),
                     }
+                } else if local {
+                    plugin_manager.trigger_hook("on_pre_sync", None)?;
+                    let res = cmd::sync::run_local(verbose, fallback, force, frozen_lock);
+                    plugin_manager.trigger_hook_nonfatal("on_post_sync", None);
+                    res
                 } else {
                     plugin_manager.trigger_hook("on_pre_sync", None)?;
                     let res = cmd::sync::run(verbose, fallback, no_package_managers, force);

@@ -4534,7 +4534,6 @@ dependencies = [
  "zoi-core",
  "zoi-deps",
  "zoi-lua",
- "zoi-purl",
  "zoi-resolver",
  "zstd",
 ]
@@ -4587,7 +4586,6 @@ dependencies = [
  "dialoguer",
  "glob",
  "hex",
- "indicatif",
  "mlua",
  "rayon",
  "serde",
@@ -4676,6 +4674,7 @@ dependencies = [
  "zoi-db",
  "zoi-install",
  "zoi-lua",
+ "zoi-project",
 ]
 
 [[package]]

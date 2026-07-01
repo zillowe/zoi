@@ -308,23 +308,34 @@ fn fetch_and_store_recursive(
             }
         }
 
+        let current_repo = packages_key
+            .strip_prefix('@')
+            .and_then(|k| k.split_once('/'))
+            .map(|(repo, _)| repo)
+            .unwrap_or("");
+
         for dep_str in to_fetch {
             if let Some(zoi_dep) = dep_str.strip_prefix("zoi:") {
-                let dep_pkg_name = zoi_dep.split('@').next().unwrap_or(zoi_dep);
-
-                let mut found_key = None;
-                for key in index.packages.keys() {
-                    if key.ends_with(&format!("/{}", dep_pkg_name))
-                        || (key.starts_with('@')
-                            && key
-                                .split_once('/')
-                                .map(|(_, n)| n == dep_pkg_name)
-                                .unwrap_or(false))
-                    {
-                        found_key = Some(key.clone());
-                        break;
+                let found_key = if zoi_dep.starts_with('@') {
+                    if index.packages.contains_key(zoi_dep) {
+                        Some(zoi_dep.to_string())
+                    } else {
+                        None
                     }
-                }
+                } else {
+                    let dep_pkg_name = zoi_dep.split('@').next().unwrap_or(zoi_dep);
+                    let scoped = format!("@{}/{}", current_repo, dep_pkg_name);
+
+                    if index.packages.contains_key(&scoped) {
+                        Some(scoped)
+                    } else {
+                        index
+                            .packages
+                            .keys()
+                            .find(|k| k.ends_with(&format!("/{}", dep_pkg_name)))
+                            .cloned()
+                    }
+                };
 
                 if let Some(key) = found_key {
                     let _ = fetch_and_store_recursive(

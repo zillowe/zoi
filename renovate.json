@@ -6,5 +6,6 @@
   ],
   "enabledManagers": [
     "cargo"
-  ]
+  ],
+  "rangeStrategy": "bump"
 }

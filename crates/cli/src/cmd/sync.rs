@@ -18,6 +18,18 @@ pub fn run(verbose: bool, fallback: bool, no_pm: bool, force: bool) -> Result<()
     Ok(())
 }
 
+pub fn run_local(verbose: bool, fallback: bool, force: bool, frozen_lock: bool) -> Result<()> {
+    println!(
+        "{} Syncing project-local package databases...",
+        "::".bold().blue()
+    );
+
+    pkg::sync::run_local(verbose, fallback, force, frozen_lock)?;
+
+    println!("{}", "Local sync complete.".green());
+    Ok(())
+}
+
 pub fn set_registry(url_or_keyword: &str) -> Result<()> {
     let url_storage;
     let url = match url_or_keyword {
