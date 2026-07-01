@@ -70,8 +70,7 @@
       - [Scoop](#scoop)
     - [Crates.io](#cratesio)
     - [NPM](#npm)
-  - [Build from Source](#%EF%B8%8F-build-from-source)
-- [Dependencies Support](#-dependencies-support)
+  - [Build from Source](#-build-from-source)
 - [Usage](#-usage)
 - [Packaging Status](#-packaging-status)
 - [Repositories & Mirrors](#-repositories--mirrors)
@@ -82,7 +81,7 @@
 
 Zoi is an advanced package manager and environment orchestrator, designed to simplify package management and environment configuration across multiple operating systems.
 
-## ✨ Features
+## Features
 
 - **Cross-Platform:** Works seamlessly on Linux, macOS, and Windows.
 - **Dynamic Package Definitions:** Define packages with dynamic Lua scripts (`.pkg.lua`) for maximum flexibility.
@@ -113,17 +112,18 @@ Zoi is an advanced package manager and environment orchestrator, designed to sim
   - `zoi rollback`: Revert a package to its previous version or rollback the entire last transaction.
   - `zoi pin`: Pin a package to a specific version.
   - `zoi exec`: Run a package's binary without installing it.
+  - `zoi shell -p`: Enter a temporary shell with a package available in PATH.
 - **Zoi Mini:** A lightweight, zero-sync version for quick, one-off installations via `zm.sh` or `zm.ps1`. Supports `install`, `update`, `uninstall`, and `list` commands.
 - **Library Support:** Core functionality is available as a Rust library to be integrated into other applications.
 
-## 💓 Special Thanks
+## Special Thanks
 
 Thanks you all for helping with developing Zoi.
 
 - [GitLab](https://gitlab.com): For offering their Ultimate plan for OSS projects.
 - [Cloudflare](https://cloudflare.com): For offering their Pro plan through [Project Alexandria](https://www.cloudflare.com/lp/project-alexandria).
 
-## 🚀 Getting Started
+## Getting Started
 
 Getting started with Zoi is simple. Just follow these three steps:
 
@@ -166,11 +166,11 @@ powershell -c "irm zillowe.pages.dev/zm.ps1 | iex" -args "i @zillowe/hello"
 
 This will download the `zoi-mini` binary to a temporary location, resolve the package metadata dynamically, and perform the installation.
 
-## 📦 Installation
+## Installation
 
 You can install Zoi using a package manager, an installer script, or by building it from source.
 
-### 📜 Scripts
+### Scripts
 
 You can also use our installer scripts for a quick setup.
 
@@ -295,7 +295,7 @@ pnpm dlx @zillowe/zoi
 yarn dlx @zillowe/zoi
 ```
 
-### 🛠️ Build from Source
+### Build from Source
 
 If you prefer, you can build Zoi from source. You'll need [Rust](https://www.rust-lang.org) installed.
 
@@ -319,37 +319,9 @@ sudo make install
 make setup
 ```
 
-## 🔗 Dependencies Support
+Zoi integrates with over 40 system and language package managers (`apt`, `brew`, `cargo`, `npm`, `pip`, `go`, `bun`, and many more). See the full list on the [Dependencies docs](https://zillowe.qzz.io/docs/zds/zoi/dependencies).
 
-What dependency installation we support.
-
-| Manager   | Ecosystem / OS                  | Example                                                                         |
-| --------- | ------------------------------- | ------------------------------------------------------------------------------- |
-| `zoi`     | Zoi                             | `zoi:my-other-package`                                                          |
-| `native`  | System's native package manager | `native:openssl`                                                                |
-| `apt`     | Debian, Ubuntu, etc.            | `apt:libssl-dev`                                                                |
-| `pacman`  | Arch Linux                      | `pacman:base-devel`                                                             |
-| `aur`     | Arch Linux (AUR)                | `aur:visual-studio-code-bin`                                                    |
-| `brew`    | macOS (Homebrew)                | `brew:node`                                                                     |
-| `scoop`   | Windows                         | `scoop:git`                                                                     |
-| `snap`    | Linux (Snapcraft)               | `snap:node`                                                                     |
-| `flatpak` | Linux (Flathub)                 | `flatpak:org.gimp.GIMP`                                                         |
-| `npm`     | Node.js                         | `npm:typescript`                                                                |
-| `bun`     | Bun                             | `bun:elysia`                                                                    |
-| `deno`    | Deno                            | `deno:npm-chalk` or `deno:jsr-@std/bytes` (the `-` instead of `:` is important) |
-| `jsr`     | JavaScript Registry             | `jsr:@std/http`                                                                 |
-| `pip`     | Python                          | `pip:requests`                                                                  |
-| `nix`     | NixOS / Nix                     | `nix:nixpkgs.hello`                                                             |
-
-And many more.
-
-For more dependencies and information please visit the [Dependencies Page](https://zillowe.qzz.io/docs/zds/zoi/dependencies) on Docs.
-
-Some of the package manager are OS specific, so when a dependency is in that package manager it only installs it for that OS.
-
-But some other package managers like `npm`, it installs the dependency if the package manager is available.
-
-## 💡 Usage
+## Usage
 
 Here are some common commands to get you started.
 
@@ -404,6 +376,18 @@ Here are some common commands to get you started.
   zoi run <command_alias>
   ```
 
+- **Run a command without installing the package:**
+
+  ```sh
+  zoi exec <package_name> -- <command>
+  ```
+
+- **Enter a shell with a package:**
+
+  ```sh
+  zoi shell -p <package_name>
+  ```
+
 - **Add a new repository:**
 
   ```sh
@@ -425,17 +409,17 @@ Here are some common commands to get you started.
 
 For more detailed information, please refer to the [Docs](https://zillowe.qzz.io/docs/zds/zoi).
 
-## 📦 Packaging Status
+## Packaging Status
 
 [![Packaging status](https://repology.org/badge/vertical-allrepos/zoi.svg)](https://repology.org/project/zoi/versions)
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions from the community! If you'd like to contribute, please read our [Contributing Guidelines](./CONTRIBUTING.md) for more information.
 
 New features, enhancements and bug reports are welcome.
 
-## 📚 Repositories & Mirrors
+## Repositories & Mirrors
 
 Zoi is hosted on multiple forges. The primary locations and mirrors are:
 
@@ -461,7 +445,7 @@ Repository tiers for [Zoidberg](https://gitlab.com/zillowe/zillwen/zusty/zoidber
 
 For details and CLI usage examples, see the docs page: [Repositories](https://zillowe.qzz.io/docs/zds/zoi/repositories).
 
-## 📜 License
+## License
 
 Zoi is licensed under the [Apache 2.0 License](./LICENSE).
 
