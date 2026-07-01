@@ -891,7 +891,14 @@ pub fn run(
             }
 
             let store_dir = crate::pkg::local::get_store_base_dir(types::Scope::Project)?;
-            let db_dir = crate::pkg::resolve::get_db_root()?;
+            let db_dir = if is_any_project_install {
+                std::env::current_dir()?
+                    .join(".zoi")
+                    .join("pkgs")
+                    .join("db")
+            } else {
+                crate::pkg::resolve::get_db_root()?
+            };
 
             lockfile.packages_hash = Some(format!(
                 "sha512-{}",
