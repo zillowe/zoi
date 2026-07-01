@@ -331,7 +331,8 @@ release:crates-io:
   stage: release
   image: rust:latest
   script:
-    - cargo publish --workspace --token $CRATESIO_REGISTRY_TOKEN
+    - echo "$CRATESIO_REGISTRY_TOKEN" | cargo login
+    - cargo publish --workspace
   needs:
     - create_release
   rules:

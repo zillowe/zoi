@@ -4,33 +4,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 use zoi_core::config;
-use zoi_core::sysroot::apply_sysroot;
 use zoi_core::types::{self, InstallManifest, Scope};
 use zoi_core::utils;
 
 pub fn get_store_base_dir(scope: Scope) -> Result<PathBuf> {
-    match scope {
-        Scope::User => {
-            let home_dir = home::home_dir()
-                .ok_or_else(|| anyhow::anyhow!("Could not find home directory."))?;
-            Ok(apply_sysroot(
-                home_dir.join(".zoi").join("pkgs").join("store"),
-            ))
-        }
-        Scope::System => {
-            if cfg!(target_os = "windows") {
-                Ok(apply_sysroot(PathBuf::from(
-                    "C:\\ProgramData\\zoi\\pkgs\\store",
-                )))
-            } else {
-                Ok(apply_sysroot(PathBuf::from("/var/lib/zoi/pkgs/store")))
-            }
-        }
-        Scope::Project => {
-            let current_dir = std::env::current_dir()?;
-            Ok(current_dir.join(".zoi").join("pkgs").join("store"))
-        }
-    }
+    utils::get_store_base_dir(scope)
 }
 
 pub fn get_package_dir(

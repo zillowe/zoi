@@ -1,7 +1,7 @@
 use crate::types;
 use anyhow::{Result, anyhow};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 fn get_lockfile_path(scope: types::Scope) -> Result<PathBuf> {
     let path = if scope == types::Scope::Project {
@@ -62,6 +62,8 @@ pub fn record_package(
     };
     let platform = format!("{}-{}", os, arch);
 
+    let hash = compute_package_hash(pkg, registry_handle);
+
     let detail = types::LockPackageDetailV2 {
         name: pkg.name.clone(),
         sub_package: sub_package.clone(),
@@ -79,14 +81,81 @@ pub fn record_package(
         install_method: "pre-built".to_string(),
         installed_sub_packages: sub_package.clone().map(|s| vec![s]).unwrap_or_default(),
         platform,
-        hash: "".to_string(),
+        hash,
         dependencies: pkg.dependencies.clone().map(types::to_dependencies_v2),
     };
 
     lockfile.installed_packages.insert(package_key, detail);
     lockfile.version = "2".to_string();
 
+    if !lockfile.registries.contains_key(registry_handle)
+        && let Some(reg_info) = resolve_registry_info(registry_handle)
+    {
+        lockfile
+            .registries
+            .insert(registry_handle.to_string(), reg_info);
+    }
+
     write_lockfile(&lockfile, pkg.scope)
+}
+
+fn compute_package_hash(pkg: &types::Package, registry_handle: &str) -> String {
+    let Some(version) = &pkg.version else {
+        return String::new();
+    };
+    let Ok(store_base) = crate::utils::get_store_base_dir(pkg.scope) else {
+        return String::new();
+    };
+    let package_id = crate::utils::generate_package_id(registry_handle, &pkg.repo, &pkg.name);
+    let package_dir_name = crate::utils::get_package_dir_name(&package_id, &pkg.name);
+    let version_dir = store_base.join(&package_dir_name).join(version);
+    if version_dir.exists() {
+        crate::hash::calculate_dir_hash(&version_dir).unwrap_or_else(|e| {
+            eprintln!("Warning: could not calculate hash for {}: {}", pkg.name, e);
+            String::new()
+        })
+    } else {
+        String::new()
+    }
+}
+
+fn resolve_registry_info(registry_handle: &str) -> Option<types::LockRegistryV2> {
+    let Ok(config) = crate::config::read_config() else {
+        return None;
+    };
+    let reg = config
+        .default_registry
+        .as_ref()
+        .filter(|r| r.handle == registry_handle)
+        .or_else(|| {
+            config
+                .added_registries
+                .iter()
+                .find(|r| r.handle == registry_handle)
+        })?;
+
+    let db_root = crate::utils::get_db_root().ok()?;
+    let reg_path = db_root.join(registry_handle);
+    let revision = resolve_git_head(&reg_path).unwrap_or_else(|| "unknown".to_string());
+
+    Some(types::LockRegistryV2 {
+        url: reg.url.clone(),
+        revision,
+    })
+}
+
+fn resolve_git_head(repo_path: &Path) -> Option<String> {
+    let head_file = repo_path.join(".git").join("HEAD");
+    let content = fs::read_to_string(&head_file).ok()?;
+    let content = content.trim();
+    if let Some(ref_path) = content.strip_prefix("ref: ") {
+        let ref_file = repo_path.join(".git").join(ref_path);
+        fs::read_to_string(&ref_file)
+            .ok()
+            .map(|s| s.trim().to_string())
+    } else {
+        Some(content.to_string())
+    }
 }
 
 pub fn update_package_reason(

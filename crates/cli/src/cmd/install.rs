@@ -61,9 +61,9 @@ pub fn run(
                 "--save cannot be used with --frozen-lockfile because the lockfile must remain unchanged."
             ));
         }
-        if !std::path::Path::new("zoi.yaml").exists() {
+        if !std::path::Path::new("zoi.lua").exists() {
             return Err(anyhow!(
-                "--frozen-lockfile requires a local zoi.yaml in the current project."
+                "--frozen-lockfile requires a local zoi.lua in the current project."
             ));
         }
         if !std::path::Path::new("zoi.lock").exists() {
