@@ -25,6 +25,7 @@ crossterm.workspace = true
 dirs.workspace = true
 fs2.workspace = true
 nix.workspace = true
+openssl.workspace = true
 hex.workspace = true
 home.workspace = true
 junction.workspace = true
