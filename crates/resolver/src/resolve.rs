@@ -201,56 +201,95 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
     let db_root = get_db_root()?;
     let config = config::read_config()?;
 
-    let (registry_db_path, search_repos, is_default_registry, registry_handle) =
-        if let Some(h) = &request.handle {
-            let is_default = config
-                .default_registry
-                .as_ref()
-                .is_some_and(|reg| reg.handle == *h);
+    let (registry_db_path, search_repos, is_default_registry, registry_handle) = if let Some(h) =
+        &request.handle
+    {
+        let is_default = config
+            .default_registry
+            .as_ref()
+            .is_some_and(|reg| reg.handle == *h);
 
-            if is_default {
-                let default_registry = config
-                    .default_registry
-                    .as_ref()
-                    .ok_or_else(|| anyhow!("Default registry not found"))?;
-                (
-                    db_root.join(&default_registry.handle),
-                    config.repos,
-                    true,
-                    Some(default_registry.handle.clone()),
-                )
-            } else if let Some(registry) = config.added_registries.iter().find(|r| r.handle == *h) {
-                let repo_path = db_root.join(&registry.handle);
-                let all_sub_repos = if repo_path.exists() {
-                    fs::read_dir(&repo_path)?
-                        .filter_map(Result::ok)
-                        .filter(|entry| entry.path().is_dir() && entry.file_name() != ".git")
-                        .map(|entry| entry.file_name().to_string_lossy().into_owned())
-                        .collect()
-                } else {
-                    Vec::new()
-                };
-                (
-                    repo_path,
-                    all_sub_repos,
-                    false,
-                    Some(registry.handle.clone()),
-                )
-            } else {
-                return Err(anyhow!("Registry with handle '{}' not found.", h));
-            }
-        } else {
+        if is_default {
             let default_registry = config
                 .default_registry
                 .as_ref()
-                .ok_or_else(|| anyhow!("No default registry set."))?;
+                .ok_or_else(|| anyhow!("Default registry not found"))?;
             (
                 db_root.join(&default_registry.handle),
                 config.repos,
                 true,
                 Some(default_registry.handle.clone()),
             )
+        } else if let Some(registry) = config.added_registries.iter().find(|r| r.handle == *h) {
+            let repo_path = db_root.join(&registry.handle);
+            let all_sub_repos = if repo_path.exists() {
+                fs::read_dir(&repo_path)?
+                    .filter_map(Result::ok)
+                    .filter(|entry| entry.path().is_dir() && entry.file_name() != ".git")
+                    .map(|entry| entry.file_name().to_string_lossy().into_owned())
+                    .collect()
+            } else {
+                Vec::new()
+            };
+            (
+                repo_path,
+                all_sub_repos,
+                false,
+                Some(registry.handle.clone()),
+            )
+        } else {
+            return Err(anyhow!("Registry with handle '{}' not found.", h));
+        }
+    } else {
+        let default_registry = config
+            .default_registry
+            .as_ref()
+            .ok_or_else(|| anyhow!("No default registry set."))?;
+
+        let default_handle = default_registry.handle.clone();
+        let default_path = db_root.join(&default_handle);
+
+        let (registry_path, effective_handle) = if default_path.exists()
+            && default_path.join("repo.yaml").exists()
+        {
+            (default_path, default_handle)
+        } else {
+            let mut found_path = default_path.clone();
+            let mut found_handle = default_handle.clone();
+            let mut found = false;
+            if let Ok(entries) = fs::read_dir(&db_root) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if !path.is_dir() {
+                        continue;
+                    }
+                    let name = entry.file_name();
+                    if name == ".git" {
+                        continue;
+                    }
+                    let candidate = name.to_string_lossy().to_string();
+                    let candidate_path = db_root.join(&candidate);
+                    if candidate_path.join("repo.yaml").exists()
+                        || candidate_path.join("packages.json").exists()
+                    {
+                        found_path = candidate_path;
+                        found_handle = candidate;
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            if !found {
+                return Err(anyhow!(
+                    "No synced registries found in '{}'. Please run 'zoi sync' to download the package database.",
+                    db_root.display()
+                ));
+            }
+            (found_path, found_handle)
         };
+
+        (registry_path, config.repos, true, Some(effective_handle))
+    };
 
     if !registry_db_path.exists() {
         return Err(anyhow!(
