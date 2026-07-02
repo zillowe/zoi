@@ -380,14 +380,25 @@ pub fn run(
         }
     }
 
-    if save
-        && let Err(e) = zoi_project::config::remove_packages_from_config(&successfully_uninstalled)
-    {
-        eprintln!(
-            "{}: Failed to remove packages from zoi.yaml: {}",
-            "Warning".yellow().bold(),
-            e
-        );
+    if save {
+        if std::path::Path::new("zoi.lua").exists() {
+            println!(
+                "\n{} Project uses zoi.lua. Automatic saving is not supported for Lua configurations.",
+                "Note:".yellow().bold()
+            );
+            println!("   Please remove the following from your packages() block in zoi.lua:");
+            for pkg in &successfully_uninstalled {
+                println!("   - \"{}\"", pkg);
+            }
+        } else if let Err(e) =
+            zoi_project::config::remove_packages_from_config(&successfully_uninstalled)
+        {
+            eprintln!(
+                "{}: Failed to remove packages from zoi.yaml: {}",
+                "Warning".yellow().bold(),
+                e
+            );
+        }
     }
     ux::print_transaction_summary(&ux::TransactionSummary {
         command: "uninstall".to_string(),

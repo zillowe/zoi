@@ -133,6 +133,11 @@ pub fn load_with_env(env: HashMap<String, String>) -> Result<ProjectConfig> {
 }
 
 pub fn add_packages_to_config(packages: &[String]) -> Result<()> {
+    if Path::new("zoi.lua").exists() {
+        return Err(anyhow!(
+            "Project uses zoi.lua. Automatic saving is not supported for Lua configurations."
+        ));
+    }
     let config_path = Path::new("zoi.yaml");
     if !config_path.exists() {
         return Err(anyhow!(
@@ -166,6 +171,9 @@ pub fn add_packages_to_config(packages: &[String]) -> Result<()> {
 }
 
 pub fn remove_packages_from_config(packages_to_remove: &[String]) -> Result<()> {
+    if Path::new("zoi.lua").exists() {
+        return Ok(());
+    }
     let config_path = Path::new("zoi.yaml");
     if !config_path.exists() {
         return Ok(());

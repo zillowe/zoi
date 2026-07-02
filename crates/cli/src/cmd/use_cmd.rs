@@ -2,7 +2,6 @@ use crate::pkg::{config, types};
 use anyhow::{Result, anyhow};
 use colored::*;
 use std::collections::HashMap;
-use zoi_project as project;
 
 pub fn run(packages: Vec<String>, global: bool) -> Result<()> {
     if global {
@@ -41,18 +40,20 @@ fn run_global(packages: Vec<String>) -> Result<()> {
 }
 
 fn run_project(packages: Vec<String>) -> Result<()> {
-    let zoi_yaml = std::path::Path::new("zoi.yaml");
-    if !zoi_yaml.exists() {
+    if !std::path::Path::new("zoi.lua").exists() {
         return Err(anyhow!(
-            "No 'zoi.yaml' found. Run 'zoi use --global' or initialize a project first."
+            "No 'zoi.lua' found in the current directory. Run 'zoi use --global' or initialize a project first."
         ));
     }
 
     println!(
-        "{} Adding packages to project configuration...",
-        "::".bold().blue()
+        "{} Project uses zoi.lua. Automatic saving is not supported for Lua configurations.",
+        "Note:".yellow().bold()
     );
-    project::config::add_packages_to_config(&packages)?;
+    println!("   Please add the following to your packages() block in zoi.lua:");
+    for pkg in &packages {
+        println!("   - \"{}\"", pkg);
+    }
 
     println!("{} Installing project packages...", "::".bold().blue());
     let options = crate::SourceInstallOptions {
