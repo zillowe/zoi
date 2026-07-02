@@ -46,7 +46,10 @@ pub fn run(
         scope_override = Some(types::Scope::User);
     }
 
-    if save && scope_override.is_none() && std::path::Path::new("zoi.yaml").exists() {
+    if save
+        && scope_override.is_none()
+        && (std::path::Path::new("zoi.lua").exists() || std::path::Path::new("zoi.yaml").exists())
+    {
         scope_override = Some(types::Scope::Project);
     }
 
@@ -84,7 +87,7 @@ pub fn run(
     let lockfile_exists = sources.is_empty()
         && repo.is_none()
         && std::path::Path::new("zoi.lock").exists()
-        && std::path::Path::new("zoi.yaml").exists();
+        && (std::path::Path::new("zoi.lua").exists() || std::path::Path::new("zoi.yaml").exists());
 
     let mut sources_to_process: Vec<String> = sources.to_vec();
     let mut is_project_install = false;
@@ -1051,14 +1054,25 @@ pub fn run(
                 e
             )
         })?;
-        if !successfully_installed.is_empty()
-            && let Err(e) = project::config::add_packages_to_config(&successfully_installed)
-        {
-            eprintln!(
-                "{}: Failed to save packages to zoi.yaml: {}",
-                "Warning".yellow().bold(),
-                e
-            );
+
+        if !successfully_installed.is_empty() {
+            if std::path::Path::new("zoi.lua").exists() {
+                println!(
+                    "\n{} Project uses zoi.lua. Automatic saving is not supported for Lua configurations.",
+                    "Note:".yellow().bold()
+                );
+                println!("   Please add the following to your packages() block in zoi.lua:");
+                for pkg in &successfully_installed {
+                    println!("   - \"{}\"", pkg);
+                }
+            } else if let Err(e) = project::config::add_packages_to_config(&successfully_installed)
+            {
+                eprintln!(
+                    "{}: Failed to save packages to zoi.yaml: {}",
+                    "Warning".yellow().bold(),
+                    e
+                );
+            }
         }
     }
 
