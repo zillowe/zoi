@@ -195,13 +195,12 @@ pub fn read_config() -> Result<Config> {
         merged_cfg.default_registry = system_cfg.default_registry;
     }
 
-    if project_val.get("parallel_jobs").is_some() && !system_policy.parallel_jobs_unoverridable {
-        merged_cfg.parallel_jobs = project_cfg.parallel_jobs;
-    } else if user_val.get("parallel_jobs").is_some() && !system_policy.parallel_jobs_unoverridable
-    {
-        merged_cfg.parallel_jobs = user_cfg.parallel_jobs;
+    if project_val.get("jobs").is_some() && !system_policy.jobs_unoverridable {
+        merged_cfg.jobs = project_cfg.jobs;
+    } else if user_val.get("jobs").is_some() && !system_policy.jobs_unoverridable {
+        merged_cfg.jobs = user_cfg.jobs;
     } else {
-        merged_cfg.parallel_jobs = system_cfg.parallel_jobs;
+        merged_cfg.jobs = system_cfg.jobs;
     }
 
     if project_val.get("protect_db").is_some() && !system_policy.protect_db_unoverridable {
@@ -790,8 +789,8 @@ fn merge_policies(base: &mut crate::types::Policy, remote: &crate::types::Policy
     if remote.cache_mirrors_unoverridable {
         base.cache_mirrors_unoverridable = true;
     }
-    if remote.parallel_jobs_unoverridable {
-        base.parallel_jobs_unoverridable = true;
+    if remote.jobs_unoverridable {
+        base.jobs_unoverridable = true;
     }
     if remote.advisory_enforcement_unoverridable {
         base.advisory_enforcement_unoverridable = true;

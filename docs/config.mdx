@@ -152,13 +152,13 @@ If `true`, Zoi will keep the previous version of a package when upgrading, allow
 - **Default:** `true`
 - **Example:** `rollback_enabled: false`
 
-### `parallel_jobs`
+### `jobs`
 
-The number of parallel jobs to use during package installation. This can speed up the installation of multiple packages or packages with many dependencies.
+The number of parallel jobs to use during package installation. This can speed up the installation of multiple packages or packages with many dependencies. Setting this to `0` will use all available CPU cores.
 
 - **Type:** `integer`
 - **Default:** `3`
-- **Example:** `parallel_jobs: 5`
+- **Example:** `jobs: 5`
 
 ### `protect_db`
 
@@ -270,7 +270,7 @@ When a policy field is set to `true`, the corresponding configuration from the s
 - `audit_log_enabled_unoverridable`: If `true`, the `audit_log_enabled` setting is locked.
 - `rollback_enabled_unoverridable`: If `true`, the `rollback_enabled` setting is locked.
 - `protect_db_unoverridable`: If `true`, the `protect_db` setting is locked.
-- `parallel_jobs_unoverridable`: If `true`, the `parallel_jobs` setting is locked.
+- `jobs_unoverridable`: If `true`, the `jobs` setting is locked.
 - `advisory_enforcement_unoverridable`: If `true`, advisory enforcement policy cannot be overridden by lower-precedence configs.
 - `max_resolution_depth_unoverridable`: If `true`, the `max_resolution_depth` setting is locked.
 - `offline_mode_unoverridable`: If `true`, the `offline_mode` setting is locked.

@@ -195,15 +195,87 @@ pub fn download_and_cache_archive(
     Ok(archive_path)
 }
 
-pub fn install_node(
+#[derive(Clone)]
+pub struct PreparedNode {
+    pub archive_path: PathBuf,
+    pub install_method: String,
+    pub is_build: bool,
+}
+
+pub fn prepare_node(
     node: &InstallNode,
     action: &plan::InstallAction,
     m: Option<&MultiProgress>,
     build_type: Option<&str>,
+    verbose: bool,
+) -> Result<PreparedNode> {
+    let pkg = &node.pkg;
+    let version = &node.version;
+
+    let pb_style = ProgressStyle::default_bar()
+        .template("{spinner:.green} {msg:30.cyan} [{bar:40.cyan/blue}] {percent}%")?
+        .progress_chars("#>-");
+
+    let pb = if let Some(m_inner) = m {
+        let pb = m_inner.add(ProgressBar::new(100));
+        pb.set_style(pb_style);
+        let name = if let Some(sub) = &node.sub_package {
+            format!("{}:{}", pkg.name, sub)
+        } else {
+            pkg.name.clone()
+        };
+        let version_display = if node.revision != "1" {
+            format!("{}-{}", version, node.revision)
+        } else {
+            version.clone()
+        };
+        pb.set_message(format!("zoi: @{}:{}", name, version_display));
+        Some(pb)
+    } else {
+        None
+    };
+
+    let (archive_path, install_method, is_build) = match action {
+        plan::InstallAction::DownloadAndInstall(details) => {
+            if let Some(p) = &pb {
+                p.set_message("Downloading package...");
+            }
+            let archive_path = download_and_cache_archive(node, details, pb.as_ref(), verbose)?;
+            (archive_path, "pre-compiled".to_string(), false)
+        }
+        plan::InstallAction::InstallFromArchive(archive_path) => {
+            if let Some(p) = &pb {
+                p.set_message("Using local archive...");
+                p.finish();
+            }
+            (archive_path.clone(), "pre-compiled".to_string(), false)
+        }
+        plan::InstallAction::BuildAndInstall => {
+            let pkg_lua_path = Path::new(&node.source);
+            let archive_path = prebuilt::build_archive(pkg_lua_path, pkg, build_type, pb.as_ref())?;
+            (archive_path, "source".to_string(), true)
+        }
+    };
+
+    if let Some(p) = pb {
+        p.finish_and_clear();
+    }
+
+    Ok(PreparedNode {
+        archive_path,
+        install_method,
+        is_build,
+    })
+}
+
+pub fn install_prepared_node(
+    node: &InstallNode,
+    prepared: &PreparedNode,
+    m: Option<&MultiProgress>,
     yes: bool,
     record: bool,
     link_bins: bool,
-    verbose: bool,
+    _verbose: bool,
 ) -> Result<types::InstallManifest> {
     let pkg = &node.pkg;
     let version = &node.version;
@@ -255,25 +327,8 @@ pub fn install_node(
     let sub_package_to_install = node.sub_package.clone();
     let sub_packages_vec = sub_package_to_install.clone().map(|s| vec![s]);
 
-    let (archive_path, install_method) = match action {
-        plan::InstallAction::DownloadAndInstall(details) => {
-            let pb_for_step = step_pb.as_ref().or(main_pb.as_ref());
-            if let Some(pb) = pb_for_step {
-                pb.set_message("Downloading package...");
-            }
-            let archive_path = download_and_cache_archive(node, details, pb_for_step, verbose)?;
-            (archive_path, "pre-compiled".to_string())
-        }
-        plan::InstallAction::InstallFromArchive(archive_path) => {
-            (archive_path.clone(), "pre-compiled".to_string())
-        }
-        plan::InstallAction::BuildAndInstall => {
-            let pb_for_step = step_pb.as_ref().or(main_pb.as_ref());
-            let pkg_lua_path = Path::new(&node.source);
-            let archive_path = prebuilt::build_archive(pkg_lua_path, pkg, build_type, pb_for_step)?;
-            (archive_path, "source".to_string())
-        }
-    };
+    let archive_path = &prepared.archive_path;
+    let install_method = &prepared.install_method;
 
     let needs_escalation = pkg.scope == types::Scope::System && !zoi_core::utils::is_admin();
 
@@ -292,8 +347,8 @@ pub fn install_node(
         cmd.arg(std::env::current_exe()?);
         cmd.arg("helper").arg("elevate-install-node");
         cmd.arg("--node-json").arg(temp_path);
-        cmd.arg("--archive").arg(&archive_path);
-        cmd.arg("--install-method").arg(&install_method);
+        cmd.arg("--archive").arg(archive_path);
+        cmd.arg("--install-method").arg(install_method);
         if yes {
             cmd.arg("--yes");
         }
@@ -332,7 +387,7 @@ pub fn install_node(
         }
 
         let installed_files = crate::pkg_install::run(
-            &archive_path,
+            archive_path,
             Some(pkg.scope),
             &node.registry_handle,
             Some(&node.version),
@@ -383,8 +438,8 @@ pub fn install_node(
         manifest
     };
 
-    if let plan::InstallAction::BuildAndInstall = action {
-        let _ = fs::remove_file(&archive_path);
+    if prepared.is_build {
+        let _ = fs::remove_file(archive_path);
     }
 
     if record {
@@ -429,7 +484,21 @@ pub fn install_node(
         pb.finish();
     }
 
-    util::send_telemetry("install", pkg, handle, Some(&install_method));
+    util::send_telemetry("install", pkg, handle, Some(install_method));
 
     Ok(manifest)
+}
+
+pub fn install_node(
+    node: &InstallNode,
+    action: &plan::InstallAction,
+    m: Option<&MultiProgress>,
+    build_type: Option<&str>,
+    yes: bool,
+    record: bool,
+    link_bins: bool,
+    verbose: bool,
+) -> Result<types::InstallManifest> {
+    let prepared = prepare_node(node, action, m, build_type, verbose)?;
+    install_prepared_node(node, &prepared, m, yes, record, link_bins, verbose)
 }
