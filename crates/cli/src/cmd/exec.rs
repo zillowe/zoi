@@ -1,7 +1,9 @@
 use crate::pkg::{install, local};
 use anyhow::{Result, anyhow};
 use colored::*;
-use std::collections::HashSet;
+use indicatif::MultiProgress;
+use rayon::prelude::*;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
@@ -33,6 +35,42 @@ pub fn run(source: String, bin: Option<String>, args: Vec<String>, verbose: bool
     let mut session_installed = Vec::new();
     if !install_plan.is_empty() {
         if verbose {
+            println!("\n{} Preparing packages...", "::".bold().blue());
+        }
+        let m_prep = MultiProgress::new();
+        if !verbose {
+            m_prep.set_draw_target(indicatif::ProgressDrawTarget::hidden());
+        }
+        let prepared_nodes = Mutex::new(HashMap::new());
+
+        stages
+            .par_iter()
+            .flatten()
+            .try_for_each(|pkg_id| -> Result<()> {
+                let node = graph.nodes.get(pkg_id).ok_or_else(|| {
+                    anyhow!(
+                        "Package node missing from graph for '{}' during preparation",
+                        pkg_id
+                    )
+                })?;
+                let action = install_plan.get(pkg_id).ok_or_else(|| {
+                    anyhow!(
+                        "Install action missing for package '{}' during preparation",
+                        pkg_id
+                    )
+                })?;
+
+                let prepared =
+                    install::installer::prepare_node(node, action, Some(&m_prep), None, verbose)?;
+
+                let mut lock = prepared_nodes.lock().map_err(|e| {
+                    anyhow!("Prepared nodes mutex poisoned during preparation: {}", e)
+                })?;
+                lock.insert(pkg_id.clone(), prepared);
+                Ok(())
+            })?;
+
+        if verbose {
             println!(
                 "{} Installing {} packages...",
                 "::".bold().blue(),
@@ -46,21 +84,25 @@ pub fn run(source: String, bin: Option<String>, args: Vec<String>, verbose: bool
         let session_installed_mutex = Mutex::new(Vec::new());
 
         for stage in stages {
-            use rayon::prelude::*;
             stage.into_par_iter().try_for_each(|pkg_id| -> Result<()> {
                 let node = graph
                     .nodes
                     .get(&pkg_id)
                     .ok_or_else(|| anyhow!("Package node missing from graph for '{}'", pkg_id))?;
-                let action = install_plan
-                    .get(&pkg_id)
-                    .ok_or_else(|| anyhow!("Install action missing for package '{}'", pkg_id))?;
 
-                let manifest = install::installer::install_node(
+                let prepared = {
+                    let lock = prepared_nodes.lock().map_err(|e| {
+                        anyhow!("Prepared nodes mutex poisoned during install: {}", e)
+                    })?;
+                    lock.get(&pkg_id)
+                        .cloned()
+                        .ok_or_else(|| anyhow!("Prepared node missing for: {}", pkg_id))?
+                };
+
+                let manifest = install::installer::install_prepared_node(
                     node,
-                    action,
+                    &prepared,
                     Some(&m),
-                    None,
                     true,
                     false,
                     false,

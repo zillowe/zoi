@@ -574,7 +574,7 @@ pub struct Config {
     #[serde(default)]
     pub remote_policy: Option<RemotePolicyConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub parallel_jobs: Option<usize>,
+    pub jobs: Option<usize>,
     #[serde(default)]
     pub protect_db: bool,
     #[serde(default)]
@@ -608,7 +608,7 @@ impl Default for Config {
             rollback_enabled: true,
             policy: Policy::default(),
             remote_policy: None,
-            parallel_jobs: None,
+            jobs: None,
             protect_db: false,
             max_resolution_depth: None,
             offline_mode: false,
@@ -650,7 +650,7 @@ pub struct Policy {
     #[serde(default, skip_serializing_if = "is_false")]
     pub cache_mirrors_unoverridable: bool,
     #[serde(default, skip_serializing_if = "is_false")]
-    pub parallel_jobs_unoverridable: bool,
+    pub jobs_unoverridable: bool,
     #[serde(default, skip_serializing_if = "is_false")]
     pub advisory_enforcement_unoverridable: bool,
 

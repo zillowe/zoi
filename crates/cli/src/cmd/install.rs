@@ -6,7 +6,7 @@ use indicatif::MultiProgress;
 use mlua::LuaSerdeExt;
 use rayon::prelude::*;
 use serde_json::json;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use zoi_project as project;
@@ -192,13 +192,11 @@ pub fn run(
     }
 
     let config = config::read_config().unwrap_or_default();
-    let parallel_jobs = config.parallel_jobs.unwrap_or(3);
-    if parallel_jobs > 0 {
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(parallel_jobs)
-            .build_global()
-            .ok();
-    }
+    let jobs = config.jobs.unwrap_or(3);
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(jobs)
+        .build_global()
+        .ok();
 
     let failed_packages = Mutex::new(Vec::new());
     let mut temp_files = Vec::new();
@@ -625,6 +623,42 @@ pub fn run(
     let transaction_id = transaction.lock().unwrap().id.clone();
     let dependency_installed_count = AtomicUsize::new(0);
 
+    println!("\n{} Preparing packages...", "::".bold().blue());
+    let m_prep = MultiProgress::new();
+    let prepared_nodes = Mutex::new(HashMap::new());
+
+    stages
+        .par_iter()
+        .flatten()
+        .try_for_each(|pkg_id| -> Result<()> {
+            let node = graph.nodes.get(pkg_id).ok_or_else(|| {
+                anyhow!(
+                    "Package node '{}' missing from graph during preparation",
+                    pkg_id
+                )
+            })?;
+            let action = install_plan.get(pkg_id).ok_or_else(|| {
+                anyhow!(
+                    "Install action missing for package '{}' during preparation",
+                    pkg_id
+                )
+            })?;
+
+            let prepared = install::installer::prepare_node(
+                node,
+                action,
+                Some(&m_prep),
+                build_type.as_deref(),
+                verbose,
+            )?;
+
+            let mut lock = prepared_nodes
+                .lock()
+                .map_err(|e| anyhow!("Prepared nodes mutex poisoned during preparation: {}", e))?;
+            lock.insert(pkg_id.clone(), prepared);
+            Ok(())
+        })?;
+
     if !dependencies.is_empty() || !non_zoi_deps.is_empty() {
         println!("\n{} Installing dependencies...", "::".bold().blue());
         let m_deps = MultiProgress::new();
@@ -667,18 +701,23 @@ pub fn run(
                 if matches!(node.reason, types::InstallReason::Direct) {
                     return Ok(());
                 }
-                let action = install_plan.get(pkg_id).ok_or_else(|| {
-                    anyhow!(
-                        "Install action missing for package '{}' during installation",
-                        pkg_id
-                    )
-                })?;
 
-                match install::installer::install_node(
+                let prepared = {
+                    let lock = prepared_nodes.lock().map_err(|e| {
+                        anyhow!(
+                            "Prepared nodes mutex poisoned during dependency install: {}",
+                            e
+                        )
+                    })?;
+                    lock.get(pkg_id)
+                        .cloned()
+                        .ok_or_else(|| anyhow!("Prepared node missing for: {}", pkg_id))?
+                };
+
+                match install::installer::install_prepared_node(
                     node,
-                    action,
+                    &prepared,
                     Some(&m_deps),
-                    build_type.as_deref(),
                     yes,
                     true,
                     true,
@@ -763,18 +802,22 @@ pub fn run(
                     )
                 })?;
 
-                let action = install_plan.get(pkg_id).ok_or_else(|| {
-                    anyhow!(
-                        "Install action missing for package '{}' during final installation",
-                        pkg_id
-                    )
-                })?;
+                let prepared = {
+                    let lock = prepared_nodes.lock().map_err(|e| {
+                        anyhow!(
+                            "Prepared nodes mutex poisoned during package install: {}",
+                            e
+                        )
+                    })?;
+                    lock.get(pkg_id)
+                        .cloned()
+                        .ok_or_else(|| anyhow!("Prepared node missing for: {}", pkg_id))?
+                };
 
-                match install::installer::install_node(
+                match install::installer::install_prepared_node(
                     node,
-                    action,
+                    &prepared,
                     Some(&m_pkg),
-                    build_type.as_deref(),
                     yes,
                     true,
                     true,
