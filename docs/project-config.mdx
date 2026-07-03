@@ -48,7 +48,35 @@ packages({
             runtime = {"zoi:ncurses"}
         }
     }
+})
 
+-- Define named tasks (runnable via `zoi run <cmd>`)
+tasks({
+    {
+        cmd = "test",
+        run = "cargo test",
+        depends_on = {"build"},
+        cache_files = {"src/**", "Cargo.toml"},
+    },
+    {
+        cmd = "build",
+        run = "cargo build --release",
+    },
+})
+
+-- Define environment setups (runnable via `zoi env <alias>`)
+environments({
+    {
+        name = "Prepare Workspace",
+        cmd = "prep",
+        run = {
+            "zoi run build",
+            "cargo clippy",
+        },
+        env = {
+            RUST_BACKTRACE = "1",
+        },
+    },
 })
 ```
 
@@ -63,6 +91,17 @@ packages({
   - `version`: (string) SemVer requirement, supports ranges (`^1.0`, `>=2.0`, `~1.2.3`) and channels (`@nightly`).
   - `sub_packages`: (list of string) Specific sub-packages to install.
   - `dependencies`: (object) Overrides for package dependencies.
+- **`tasks`**: An array of `CommandSpec` objects (same schema as `commands` in `zoi.yaml`).
+  - `cmd`: (string) Task alias for `zoi run <cmd>`.
+  - `run`: (string or platform map) Command to execute.
+  - `depends_on`: (list of string) Task aliases that must run first.
+  - `cache_files`: (list of string) Glob patterns for cache invalidation.
+  - `env`: (object or platform map) Environment variables for the task.
+- **`environments`**: An array of `EnvironmentSpec` objects (same schema as `environments` in `zoi.yaml`).
+  - `name`: (string) Display name.
+  - `cmd`: (string) Alias for `zoi env <cmd>`.
+  - `run`: (list of string or platform map) Commands to execute.
+  - `env`: (object or platform map) Environment variables.
 
 ---
 
