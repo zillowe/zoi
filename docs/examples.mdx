@@ -190,43 +190,27 @@ zoi.register_command({
 })
 ```
 
-## 6. Complex `zoi.yaml` (Project Environment)
+## 6. Project Environment (`zoi.yaml` and `zoi.lua`)
 
-A real-world project configuration with custom environments and a development shell.
+Zoi supports two formats for project configuration: `zoi.yaml` (declarative) and `zoi.lua` (scriptable).
+
+### `zoi.yaml` (Declarative)
 
 ```yaml
 # zoi.yaml
 name: my-backend-api
 
-# Project-local package isolation
-config:
-  local: true
-
-# Required packages for development
-pkgs:
-  - zoi:postgresql
-  - zoi:redis
-  - zoi:go@1.22
-
-# Environment variables for 'zoi dev'
-shell:
-  env:
-    default:
-      DEBUG: "true"
-      DATABASE_URL: "postgres://localhost:5432/mydb"
-    linux-amd64:
-      DEBUG: "true"
-      DATABASE_URL: "postgres://localhost:5432/mydb"
-      CC: "gcc"
-    macos-arm64:
-      DEBUG: "true"
-      DATABASE_URL: "postgres://localhost:5432/mydb"
-      CC: "clang"
+# System package checks
+packages:
+  - name: Git
+    check: git --version
 
 # Short aliases for common tasks
 commands:
   - cmd: build
     run: go build -o api main.go
+    depends_on: ["test"]
+    cache_files: ["src/**", "go.mod", "go.sum"]
   - cmd: test
     run: go test ./...
   - cmd: db:up
@@ -242,6 +226,69 @@ environments:
       - zoi run test
     env:
       NODE_ENV: "test"
+      CGO_ENABLED: "0"
+```
+
+### `zoi.lua` (Scriptable Equivalent)
+
+```lua
+-- zoi.lua
+project({
+    name = "my-backend-api",
+    config = {
+        ["local"] = true,
+    },
+})
+
+registries({
+    custom = {
+        url = "https://github.com/YourOrg/custom-registry.git",
+        revision = "main",
+    },
+})
+
+packages({
+    "@core/go",
+    "@community/redis",
+    "@community/postgresql",
+    ["@community/go"] = {
+        version = "1.22",
+        sub_packages = { "dev" },
+    },
+})
+
+tasks({
+    {
+        cmd = "build",
+        run = "go build -o api main.go",
+        depends_on = { "test" },
+        cache_files = { "src/**", "go.mod", "go.sum" },
+    },
+    {
+        cmd = "test",
+        run = "go test ./...",
+    },
+    {
+        cmd = "db:up",
+        run = "zoi service start postgresql",
+    },
+})
+
+environments({
+    {
+        name = "CI Pipeline",
+        cmd = "ci",
+        run = {
+            "go mod download",
+            "zoi run build",
+            "zoi run test",
+        },
+        env = {
+            NODE_ENV = "test",
+            CGO_ENABLED = "0",
+        },
+    },
+})
 ```
 
 ## 7. Global Transaction Hook

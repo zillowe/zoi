@@ -1,0 +1,309 @@
+---
+title: Packaging Libraries
+description: How to package shared and static libraries with Zoi, and how to consume them from other packages.
+---
+
+This guide covers the lifecycle of a library in Zoi: packaging it for distribution and consuming it from another package. Libraries follow a different split-package convention than applications — the runtime binary (`.so`, `.dylib`, `.dll`) is separate from headers and development artefacts.
+
+## Package Shape
+
+A typical library package uses three sub-packages:
+
+| Sub-package   | Contents                                                  |
+| ------------- | --------------------------------------------------------- |
+| `mylib:lib`   | Runtime shared library (`libmylib.so`, `libmylib.dylib`)  |
+| `mylib:devel` | Headers, `pkg-config` file, static library, `.so` symlink |
+| `mylib:doc`   | API documentation (optional)                              |
+
+Installing `mylib` (the base name) should install `lib` by default. The `devel` sub-package is pulled in only when another package needs to compile against the library.
+
+## 1. Writing the Library Package
+
+Below is a complete example for a fictional C library, `libmylib`, that uses CMake. The same pattern applies to any build system.
+
+### `libmylib.pkg.lua`
+
+```lua
+local version = "2.1.0"
+local archive = "v" .. version .. ".tar.gz"
+local url = "https://github.com/example/libmylib/archive/refs/tags/" .. archive
+
+metadata({
+  name = "libmylib",
+  repo = "community",
+  version = version,
+  description = "An example C library for string processing",
+  website = "https://github.com/example/libmylib",
+  license = "MIT",
+  types = { "source" },
+  platforms = { "linux", "macos" },
+  sub_packages = { "lib", "devel", "doc" },
+  main_subs = { "lib" },
+  tags = { "library", "c", "string-processing" },
+})
+
+dependencies({
+  build = {
+    types = {
+      source = {
+        required = { "native:cmake", "native:gcc", "native:ninja" }
+      }
+    }
+  },
+  runtime = {
+    sub_packages = {
+      devel = {
+        required = { "native:cmake" }
+      }
+    }
+  }
+})
+
+function prepare()
+  UTILS.EXTRACT(url, "src")
+
+  cmd("cmake -S src/libmylib-" .. version
+    .. " -B build -G Ninja"
+    .. " -DCMAKE_BUILD_TYPE=Release"
+    .. " -DCMAKE_INSTALL_PREFIX=/usr"
+    .. " -DBUILD_SHARED_LIBS=ON")
+
+  cmd("cmake --build build")
+  cmd("DESTDIR=" .. BUILD_DIR .. "/install cmake --install build")
+end
+
+function verify()
+  return true
+end
+
+function package(args)
+  local sub = args.sub or "lib"
+  local root = "install/usr"
+
+  if sub == "lib" then
+    -- Runtime library only — versioned .so files
+    cmd("rm -rf lib-runtime && mkdir -p lib-runtime")
+    cmd("cp -a " .. root .. "/lib/. lib-runtime/ 2>/dev/null; true")
+    cmd("rm -rf lib-runtime/pkgconfig 2>/dev/null; true")
+    cmd("rm -f lib-runtime/libmylib.a 2>/dev/null; true")
+    cmd("rm -f lib-runtime/libmylib.so 2>/dev/null; true")
+    zcp("lib-runtime", "${pkgstore}/lib")
+    zlicense("src/libmylib-" .. version .. "/LICENSE")
+  elseif sub == "devel" then
+    if UTILS.FS.exists(root .. "/include") then
+      zcp(root .. "/include", "${pkgstore}/include")
+    end
+    if UTILS.FS.exists(root .. "/lib/pkgconfig") then
+      zcp(root .. "/lib/pkgconfig", "${pkgstore}/lib/pkgconfig")
+    end
+    -- Static library (if any)
+    if UTILS.FS.exists(root .. "/lib/libmylib.a") then
+      zcp(root .. "/lib/libmylib.a", "${pkgstore}/lib/libmylib.a")
+    end
+    -- Unversioned .so symlink for -lmylib linking
+    if UTILS.FS.exists(root .. "/lib/libmylib.so") then
+      cmd("mkdir -p devel-lib")
+      cmd("cp -a " .. root .. "/lib/libmylib.so devel-lib/")
+      zcp("devel-lib", "${pkgstore}/lib")
+    end
+    zlicense("src/libmylib-" .. version .. "/LICENSE")
+  elseif sub == "doc" then
+    if UTILS.FS.exists(root .. "/share/doc/libmylib") then
+      zcp(root .. "/share/doc/libmylib", "${pkgstore}/share/doc/libmylib")
+    end
+  end
+end
+
+function test(args)
+  local sub = args.sub or "lib"
+  if sub == "lib" then
+    -- Verify the shared library was staged correctly
+    local lib_path = STAGING_DIR .. "/data/lib/pkgstore/lib/libmylib.so"
+    if UTILS.FS.exists(lib_path) then
+      return true
+    end
+    -- Try versioned variant
+    local files = UTILS.FIND.file(STAGING_DIR .. "/data/lib/pkgstore/lib", "libmylib.so*")
+    return files ~= nil and #files > 0
+  end
+  return true
+end
+```
+
+### Key Points
+
+- **Split convention**: `lib` gets the runtime `.so.*`, `devel` gets headers, `.pc` files, and the unversioned `.so` symlink.
+- **`main_subs = { "lib" }`**: `zoi install libmylib` installs only the runtime library. Users add `:devel` explicitly when they need to compile against it.
+- **`zlicense`**: Each sub-package includes its own copy of the license, matching the RPM convention.
+- **`UTILS.FS.exists` guards**: The `package()` function checks for files before copying, so it works whether or not the upstream build system produces static libs, docs, or pkg-config files.
+
+## 2. Consuming the Library from Another Package
+
+Once `libmylib` is packaged and published, other packages declare it as a dependency.
+
+### Depending on the Runtime Library
+
+A tool that dynamically links against `libmylib` only needs the runtime library:
+
+```lua
+-- mytool.pkg.lua
+metadata({
+  name = "mytool",
+  repo = "community",
+  version = "1.0.0",
+  description = "A tool that uses libmylib at runtime",
+  bins = { "mytool" },
+  types = { "pre-compiled" }
+})
+
+dependencies({
+  runtime = {
+    required = { "zoi:libmylib" }
+  }
+})
+```
+
+Zoi resolves `"zoi:libmylib"` to the latest version and installs the default sub-packages (`lib`, as defined by `main_subs`).
+
+### Depending on the Development Headers
+
+A package that compiles against `libmylib` needs the `devel` sub-package at build time:
+
+```lua
+-- myapp.pkg.lua
+metadata({
+  name = "myapp",
+  repo = "community",
+  version = "1.0.0",
+  description = "An app that compiles against libmylib",
+  bins = { "myapp" },
+  types = { "source" }
+})
+
+dependencies({
+  build = {
+    types = {
+      source = {
+        required = {
+          "zoi:libmylib:devel",
+          "native:gcc", "native:make"
+        }
+      }
+    }
+  },
+  runtime = {
+    required = { "zoi:libmylib" }
+  }
+})
+
+function prepare()
+  cmd("git clone https://github.com/example/myapp.git source")
+end
+
+function package()
+  -- The compiler finds libmylib headers and .so via Zoi's store paths,
+  -- which are automatically added to CFLAGS and LDFLAGS
+  cmd("cd source && make")
+  zcp("source/myapp", "${pkgstore}/bin/myapp")
+end
+```
+
+The key line is `"zoi:libmylib:devel"` in `build.types.source.required`. This tells Zoi to install the `devel` sub-package of `libmylib` (headers, `.pc` file, static lib) during the build phase.
+
+### How Zoi Resolves Library Paths
+
+When Zoi installs a package, it sets environment variables so compilers and linkers can find the library:
+
+| Variable          | Value                                     |
+| ----------------- | ----------------------------------------- |
+| `CFLAGS`          | `-I${ZOI_PKG_STORE}/libmylib/include`     |
+| `LDFLAGS`         | `-L${ZOI_PKG_STORE}/libmylib/lib`         |
+| `PKG_CONFIG_PATH` | `${ZOI_PKG_STORE}/libmylib/lib/pkgconfig` |
+
+If the `devel` sub-package provides a `.pc` file, `pkg-config --cflags --libs libmylib` works automatically. Build systems like CMake or Meson that use `pkg-config` will discover the library without additional configuration.
+
+## 3. Version Pinning
+
+To depend on a specific version of a library, use the `@` syntax:
+
+```lua
+dependencies({
+  build = {
+    types = {
+      source = {
+        required = { "zoi:libmylib:devel@^2.0" }
+      }
+    }
+  },
+  runtime = {
+    required = { "zoi:libmylib@>=2.0.0" }
+  }
+})
+```
+
+Supported version operators: `^`, `~`, `>=`, `<=`, `>`, `<`, `=`, or bare version strings. Ranges work too: `">=1.0 <3.0"`.
+
+## 4. Static Libraries
+
+For packages that provide static libraries (`.a` files), the static archive belongs in the `devel` sub-package, not `lib`. The `lib` sub-package should contain only the shared library (`.so.*` / `.dylib`) needed at runtime.
+
+```lua
+elseif sub == "devel" then
+  -- Headers
+  if UTILS.FS.exists(root .. "/include") then
+    zcp(root .. "/include", "${pkgstore}/include")
+  end
+  -- Static library
+  if UTILS.FS.exists(root .. "/lib/libmylib.a") then
+    zcp(root .. "/lib/libmylib.a", "${pkgstore}/lib/libmylib.a")
+  end
+  -- pkg-config
+  if UTILS.FS.exists(root .. "/lib/pkgconfig") then
+    zcp(root .. "/lib/pkgconfig", "${pkgstore}/lib/pkgconfig")
+  end
+```
+
+A consumer that wants static linking adds the dependency to their build configuration:
+
+```lua
+dependencies({
+  build = {
+    required = { "zoi:libmylib:devel" }
+  }
+})
+```
+
+## 5. Cross-Platform Libraries
+
+Use the `platforms` field to restrict where the library can be built, and `SYSTEM` inside lifecycle functions for platform-specific logic:
+
+```lua
+metadata({
+  platforms = { "linux", "macos" },
+})
+
+function package(args)
+  local sub = args.sub or "lib"
+  local root = "install/usr"
+
+  if sub == "lib" then
+    if SYSTEM.OS == "macos" then
+      zcp(root .. "/lib/libmylib.dylib", "${pkgstore}/lib/libmylib.dylib")
+    else
+      zcp(root .. "/lib/libmylib.so.*", "${pkgstore}/lib/")
+    end
+  end
+end
+```
+
+## Summary
+
+| Concern                     | Approach                                                 |
+| --------------------------- | -------------------------------------------------------- |
+| Runtime library             | `lib` sub-package, `main_subs = { "lib" }`               |
+| Headers and link-time files | `devel` sub-package, consumed via `"zoi:pkg:devel"`      |
+| Documentation               | `doc` sub-package (optional)                             |
+| Static libraries            | `.a` in `devel` sub-package                              |
+| Cross-package dependency    | `"zoi:pkg"` in `dependencies{}`                          |
+| Version pinning             | `"zoi:pkg@^1.0"` syntax                                  |
+| Library discovery           | `CFLAGS`, `LDFLAGS`, `PKG_CONFIG_PATH` set automatically |
