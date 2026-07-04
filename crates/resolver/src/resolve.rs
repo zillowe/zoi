@@ -18,6 +18,7 @@ pub struct ResolvedSource {
     pub path: PathBuf,
     pub source_type: SourceType,
     pub repo_name: Option<String>,
+    pub repo_type: Option<String>,
     pub registry_handle: Option<String>,
     pub sharable_manifest: Option<types::SharableInstallManifest>,
     pub git_sha: Option<String>,
@@ -308,6 +309,7 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
         path: PathBuf,
         source_type: SourceType,
         repo_name: String,
+        repo_type: String,
         description: String,
         license: String,
         size: Option<u64>,
@@ -332,21 +334,19 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
             .unwrap_or_default()
             .to_lowercase();
 
-        let source_type = if is_default_registry {
-            let repo_config = config::read_repo_config(registry_db_path).ok();
-            if let Some(ref cfg) = repo_config {
-                if let Some(repo_entry) = cfg.repos.iter().find(|r| r.name == major_repo) {
-                    if repo_entry.repo_type == "official" {
-                        SourceType::OfficialRepo
-                    } else {
-                        SourceType::UntrustedRepo(repo_name.to_string())
-                    }
-                } else {
-                    SourceType::UntrustedRepo(repo_name.to_string())
-                }
-            } else {
-                SourceType::UntrustedRepo(repo_name.to_string())
-            }
+        let repo_config = config::read_repo_config(registry_db_path).ok();
+        let repo_type = if let Some(ref cfg) = repo_config {
+            cfg.repos
+                .iter()
+                .find(|r| r.name == major_repo)
+                .map(|r| r.repo_type.clone())
+                .unwrap_or_else(|| "unofficial".to_string())
+        } else {
+            "unofficial".to_string()
+        };
+
+        let source_type = if is_default_registry && repo_type == "official" {
+            SourceType::OfficialRepo
         } else {
             SourceType::UntrustedRepo(repo_name.to_string())
         };
@@ -355,6 +355,7 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
             path,
             source_type,
             repo_name: pkg.repo.clone(),
+            repo_type,
             description: pkg.description,
             license: pkg.license,
             size: pkg.installed_size,
@@ -452,23 +453,18 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
                         .next()
                         .unwrap_or_default()
                         .to_lowercase();
-                    let source_type = if is_default_registry {
-                        let repo_config = config::read_repo_config(&registry_db_path).ok();
-                        if let Some(ref cfg) = repo_config {
-                            if let Some(repo_entry) =
-                                cfg.repos.iter().find(|r| r.name == major_repo)
-                            {
-                                if repo_entry.repo_type == "official" {
-                                    SourceType::OfficialRepo
-                                } else {
-                                    SourceType::UntrustedRepo(repo_name.clone())
-                                }
-                            } else {
-                                SourceType::UntrustedRepo(repo_name.clone())
-                            }
-                        } else {
-                            SourceType::UntrustedRepo(repo_name.clone())
-                        }
+                    let repo_config = config::read_repo_config(&registry_db_path).ok();
+                    let repo_type = if let Some(ref cfg) = repo_config {
+                        cfg.repos
+                            .iter()
+                            .find(|r| r.name == major_repo)
+                            .map(|r| r.repo_type.clone())
+                            .unwrap_or_else(|| "unofficial".to_string())
+                    } else {
+                        "unofficial".to_string()
+                    };
+                    let source_type = if is_default_registry && repo_type == "official" {
+                        SourceType::OfficialRepo
                     } else {
                         SourceType::UntrustedRepo(repo_name.clone())
                     };
@@ -476,6 +472,7 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
                         path: entry.path().to_path_buf(),
                         source_type,
                         repo_name: pkg.repo.clone(),
+                        repo_type,
                         description: pkg.description,
                         license: pkg.license,
                         size: pkg.installed_size,
@@ -505,6 +502,7 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
             path: chosen.path.clone(),
             source_type: chosen.source_type.clone(),
             repo_name: Some(chosen.repo_name.clone()),
+            repo_type: Some(chosen.repo_type.clone()),
             registry_handle: registry_handle.clone(),
             sharable_manifest: None,
             git_sha: None,
@@ -553,6 +551,7 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
             path: chosen.path.clone(),
             source_type: chosen.source_type.clone(),
             repo_name: Some(chosen.repo_name.clone()),
+            repo_type: Some(chosen.repo_type.clone()),
             registry_handle: registry_handle.clone(),
             sharable_manifest: None,
             git_sha: None,
@@ -592,6 +591,7 @@ fn download_from_url(url: &str) -> Result<ResolvedSource> {
                     path: cache_path,
                     source_type: SourceType::Url,
                     repo_name: None,
+                    repo_type: None,
                     registry_handle: Some("local".to_string()),
                     sharable_manifest: None,
                     git_sha: None,
@@ -605,6 +605,7 @@ fn download_from_url(url: &str) -> Result<ResolvedSource> {
                 path: cache_path,
                 source_type: SourceType::Url,
                 repo_name: None,
+                repo_type: None,
                 registry_handle: Some("local".to_string()),
                 sharable_manifest: None,
                 git_sha: None,
@@ -679,6 +680,7 @@ fn download_from_url(url: &str) -> Result<ResolvedSource> {
         path: cache_path,
         source_type: SourceType::Url,
         repo_name: None,
+        repo_type: None,
         registry_handle: Some("local".to_string()),
         sharable_manifest: None,
         git_sha: None,
@@ -1065,10 +1067,12 @@ pub fn resolve_package_and_version(
     PathBuf,
     Option<String>,
     Option<String>,
+    Option<String>,
 )> {
     let request = parse_source_string(source_str)?;
     let resolved_source = resolve_source(source_str, quiet, yes)?;
     let registry_handle = resolved_source.registry_handle.clone();
+    let repo_type = resolved_source.repo_type.clone();
     let pkg_lua_path = resolved_source.path.clone();
     let git_sha = resolved_source.git_sha.clone();
 
@@ -1117,6 +1121,7 @@ pub fn resolve_package_and_version(
         resolved_source.sharable_manifest,
         pkg_lua_path,
         registry_handle,
+        repo_type,
         git_sha,
     ))
 }
@@ -1262,6 +1267,7 @@ fn resolve_source_recursive(
             path: cache_path,
             source_type: SourceType::GitRepo(repo_name.clone()),
             repo_name: Some(repo_name),
+            repo_type: Some("unofficial".to_string()),
             registry_handle: None,
             sharable_manifest: None,
             git_sha: None,
@@ -1322,6 +1328,7 @@ fn resolve_source_recursive(
             path,
             source_type: SourceType::GitRepo(repo_name.to_string()),
             repo_name: Some(format!("git/{}", repo_name)),
+            repo_type: Some("unofficial".to_string()),
             registry_handle: Some("local".to_string()),
             sharable_manifest: None,
             git_sha,
@@ -1343,6 +1350,7 @@ fn resolve_source_recursive(
             path,
             source_type: SourceType::LocalFile,
             repo_name: None,
+            repo_type: None,
             registry_handle: Some("local".to_string()),
             sharable_manifest: None,
             git_sha: None,
@@ -1371,6 +1379,7 @@ fn resolve_source_recursive(
         let lua_url = crate::mini_resolve::get_package_lua_url(&repo, &request.name);
         let mut resolved = download_from_url(&lua_url)?;
         resolved.repo_name = Some(repo.clone());
+        resolved.repo_type = Some(repo_type.clone());
         resolved.registry_handle = Some("zoidberg".to_string());
 
         resolved.source_type = if repo_type == "official" {

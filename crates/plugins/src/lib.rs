@@ -196,8 +196,9 @@ impl PluginManager {
         let get_package = self
             .lua
             .create_function(|lua, name: String| {
-                let (pkg, _, _, _, _, _) = resolve::resolve_package_and_version(&name, true, false)
-                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                let (pkg, _, _, _, _, _, _) =
+                    resolve::resolve_package_and_version(&name, true, false)
+                        .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
                 lua.to_value(&pkg)
             })
             .map_err(|e| anyhow!(e.to_string()))?;

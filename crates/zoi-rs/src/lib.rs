@@ -175,6 +175,8 @@ pub struct ResolvedPackage {
     pub source_path: PathBuf,
     /// Registry handle, when the source came from a registry.
     pub registry_handle: Option<String>,
+    /// Registry repository type (official, community, etc.).
+    pub repo_type: Option<String>,
     /// Git commit SHA, when the source came from a git repository.
     pub git_sha: Option<String>,
 }
@@ -299,7 +301,7 @@ pub fn install_sources(sources: &[String], options: &SourceInstallOptions) -> Re
 }
 
 pub fn resolve_package(source: &str, yes: bool) -> Result<ResolvedPackage> {
-    let (package, version, sharable_manifest, source_path, registry_handle, git_sha) =
+    let (package, version, sharable_manifest, source_path, registry_handle, repo_type, git_sha) =
         zoi_resolver::resolve::resolve_package_and_version(source, true, yes)?;
     Ok(ResolvedPackage {
         package,
@@ -307,6 +309,7 @@ pub fn resolve_package(source: &str, yes: bool) -> Result<ResolvedPackage> {
         sharable_manifest,
         source_path,
         registry_handle,
+        repo_type,
         git_sha,
     })
 }

@@ -42,6 +42,7 @@ pub fn elevate_install_node(cmd: &crate::cmd::helper::ElevateInstallNodeCommand)
         Some(cmd.install_method.clone()),
         installed_files,
         handle,
+        node.repo_type.clone(),
         &node.chosen_options,
         &node.chosen_optionals,
         node.sub_package.clone(),

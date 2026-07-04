@@ -19,6 +19,8 @@ fn graph_with_package(
     graph.nodes.insert(
         id,
         InstallNode {
+            description: "".to_string(),
+            repo_type: "official".to_string(),
             pkg: Package {
                 name: name.to_string(),
                 repo: repo.to_string(),

@@ -103,7 +103,7 @@ fn test_resolve_requested_version_spec_local_channel_alpha() {
 
 #[test]
 fn test_resolve_package_defaults_deterministically_without_stable() {
-    let (_, version, _, _, _, _) =
+    let (_, version, _, _, _, _, _) =
         resolve::resolve_package_and_version("tests/assets/test_no_stable.pkg.lua", true, true)
             .expect("package should resolve");
     assert_eq!(version, "1.0.0-alpha".to_string());

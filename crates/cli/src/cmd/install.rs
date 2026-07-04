@@ -1017,12 +1017,12 @@ pub fn run(
                     name: manifest.name.clone(),
                     sub_package: manifest.sub_package.clone(),
                     repo: manifest.repo.clone(),
-                    repo_type: "official".to_string(),
+                    repo_type: manifest.repo_type.clone(),
                     version: manifest.version.clone(),
                     revision: manifest.revision.clone(),
                     registry: manifest.registry_handle.clone(),
                     why,
-                    description: String::new(),
+                    description: manifest.description.clone(),
                     package_type_install: format!("{:?}", manifest.package_type).to_lowercase(),
                     install_method: manifest
                         .install_method
@@ -1033,9 +1033,9 @@ pub fn run(
                         .clone()
                         .map(|s| vec![s])
                         .unwrap_or_default(),
-                    platform: crate::pkg::utils::get_platform().unwrap_or_default(),
+                    platform: manifest.platform.clone(),
                     hash: format!("sha512-{}", integrity),
-                    dependencies: None,
+                    dependencies: manifest.dependencies_v2.clone(),
                 };
 
                 lockfile.installed_packages.insert(packages_key, detail);

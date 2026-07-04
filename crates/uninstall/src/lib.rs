@@ -297,7 +297,7 @@ fn load_installed_package(
     }
 
     let source = local::installed_manifest_source(manifest);
-    let (mut pkg, _, _, pkg_lua_path, _, _) =
+    let (mut pkg, _, _, pkg_lua_path, _, _, _) =
         resolve::resolve_package_and_version(&source, true, yes)?;
     pkg.scope = manifest.scope;
     pkg.sub_package = manifest.sub_package.clone();
