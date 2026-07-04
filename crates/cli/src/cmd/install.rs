@@ -917,133 +917,160 @@ pub fn run(
 
     let is_any_project_install = scope_override == Some(types::Scope::Project);
 
-    if is_any_project_install {
-        if is_project_install && lockfile_exists {
-        } else {
-            println!("\nUpdating zoi.lock...");
-            let mut lockfile =
-                project::lockfile::read_zoi_lock().unwrap_or_else(|_| types::ZoiLockV2 {
-                    version: "2".to_string(),
-                    ..Default::default()
-                });
+    if is_any_project_install && !frozen_lockfile {
+        println!("\nUpdating zoi.lock...");
+        let mut lockfile =
+            project::lockfile::read_zoi_lock().unwrap_or_else(|_| types::ZoiLockV2 {
+                version: "2".to_string(),
+                ..Default::default()
+            });
 
-            lockfile.installed_packages.clear();
-            lockfile.registries.clear();
+        lockfile.installed_packages.clear();
+        lockfile.registries.clear();
 
-            let all_regs_config = crate::pkg::config::read_config().unwrap_or_default();
-            let mut all_configured_regs = all_regs_config.added_registries;
-            if let Some(default_reg) = all_regs_config.default_registry {
-                all_configured_regs.push(default_reg);
+        let all_regs_config = crate::pkg::config::read_config().unwrap_or_default();
+        let mut all_configured_regs = all_regs_config.added_registries;
+        if let Some(default_reg) = all_regs_config.default_registry {
+            all_configured_regs.push(default_reg);
+        }
+
+        let store_dir = crate::pkg::local::get_store_base_dir(types::Scope::Project)?;
+        let db_dir = std::env::current_dir()?
+            .join(".zoi")
+            .join("pkgs")
+            .join("db");
+
+        lockfile.packages_hash = Some(format!(
+            "sha512-{}",
+            crate::pkg::hash::calculate_dir_hash(&store_dir).unwrap_or_default()
+        ));
+        lockfile.registries_hash = Some(format!(
+            "sha512-{}",
+            crate::pkg::hash::calculate_dir_hash(&db_dir).unwrap_or_default()
+        ));
+
+        let mut all_final_manifests = Vec::new();
+
+        let just_installed = installed_manifests.into_inner().map_err(|e| {
+            anyhow!(
+                "Installed manifests mutex poisoned during lockfile update: {}",
+                e
+            )
+        })?;
+        all_final_manifests.extend(just_installed);
+
+        for (pkg_id, node) in &graph.nodes {
+            if all_final_manifests.iter().any(|m| {
+                let m_id = if let Some(sub) = &m.sub_package {
+                    format!("{}@{}:{}", m.name, m.version, sub)
+                } else {
+                    format!("{}@{}", m.name, m.version)
+                };
+                m_id == *pkg_id
+            }) {
+                continue;
             }
 
-            let store_dir = crate::pkg::local::get_store_base_dir(types::Scope::Project)?;
-            let db_dir = if is_any_project_install {
-                std::env::current_dir()?
-                    .join(".zoi")
-                    .join("pkgs")
-                    .join("db")
+            let request_source = crate::pkg::local::package_source_string(
+                &node.registry_handle,
+                &node.pkg.repo,
+                &node.pkg.name,
+                node.sub_package.as_deref(),
+                &node.version,
+            );
+            if let Ok(request) = resolve::parse_source_string(&request_source)
+                && let Ok(matches) = crate::pkg::local::find_installed_manifests_matching(
+                    &request,
+                    scope_override.unwrap_or(node.pkg.scope),
+                )
+                && let Some(m) = matches.first()
+            {
+                all_final_manifests.push(m.clone());
+            }
+        }
+
+        for manifest in &all_final_manifests {
+            let packages_key = if let Some(sub) = &manifest.sub_package {
+                format!("@{}/{}:{}", manifest.repo, manifest.name, sub)
             } else {
-                crate::pkg::resolve::get_db_root()?
+                format!("@{}/{}", manifest.repo, manifest.name)
             };
 
-            lockfile.packages_hash = Some(format!(
-                "sha512-{}",
-                crate::pkg::hash::calculate_dir_hash(&store_dir).unwrap_or_default()
-            ));
-            lockfile.registries_hash = Some(format!(
-                "sha512-{}",
-                crate::pkg::hash::calculate_dir_hash(&db_dir).unwrap_or_default()
-            ));
-
-            let installed_manifests = installed_manifests.into_inner().map_err(|e| {
-                anyhow!(
-                    "Installed manifests mutex poisoned during lockfile update: {}",
-                    e
-                )
-            })?;
-            for manifest in &installed_manifests {
-                let packages_key = if let Some(sub) = &manifest.sub_package {
-                    format!("@{}/{}:{}", manifest.repo, manifest.name, sub)
-                } else {
-                    format!("@{}/{}", manifest.repo, manifest.name)
-                };
-
-                if let Some(reg) = all_configured_regs
-                    .iter()
-                    .find(|r| r.handle == manifest.registry_handle)
+            if let Some(reg) = all_configured_regs
+                .iter()
+                .find(|r| r.handle == manifest.registry_handle)
+            {
+                let mut revision = "unknown".to_string();
+                let reg_path = db_dir.join(&reg.handle);
+                if reg_path.exists()
+                    && let Ok(repo) = git2::Repository::open(&reg_path)
+                    && let Ok(head) = repo.head()
+                    && let Some(target) = head.target()
                 {
-                    let mut revision = "unknown".to_string();
-                    let reg_path = db_dir.join(&reg.handle);
-                    if reg_path.exists()
-                        && let Ok(repo) = git2::Repository::open(&reg_path)
-                        && let Ok(head) = repo.head()
-                        && let Some(target) = head.target()
-                    {
-                        revision = target.to_string();
-                    }
-
-                    lockfile.registries.insert(
-                        reg.handle.clone(),
-                        types::LockRegistryV2 {
-                            url: reg.url.clone(),
-                            revision,
-                        },
-                    );
+                    revision = target.to_string();
                 }
 
-                let package_dir = crate::pkg::local::get_package_dir(
-                    types::Scope::Project,
-                    &manifest.registry_handle,
-                    &manifest.repo,
-                    &manifest.name,
-                )?;
-                let version_dir = package_dir.join(&manifest.version);
-                let integrity =
-                    crate::pkg::hash::calculate_dir_hash(&version_dir).unwrap_or_else(|e| {
-                        eprintln!(
-                            "Warning: could not calculate integrity for {}: {}",
-                            manifest.name, e
-                        );
-                        String::new()
-                    });
-
-                let why = if matches!(manifest.reason, types::InstallReason::Direct) {
-                    "direct".to_string()
-                } else {
-                    "dependency".to_string()
-                };
-
-                let detail = types::LockPackageDetailV2 {
-                    name: manifest.name.clone(),
-                    sub_package: manifest.sub_package.clone(),
-                    repo: manifest.repo.clone(),
-                    repo_type: manifest.repo_type.clone(),
-                    version: manifest.version.clone(),
-                    revision: manifest.revision.clone(),
-                    registry: manifest.registry_handle.clone(),
-                    why,
-                    description: manifest.description.clone(),
-                    package_type_install: format!("{:?}", manifest.package_type).to_lowercase(),
-                    install_method: manifest
-                        .install_method
-                        .clone()
-                        .unwrap_or_else(|| "pre-built".to_string()),
-                    installed_sub_packages: manifest
-                        .sub_package
-                        .clone()
-                        .map(|s| vec![s])
-                        .unwrap_or_default(),
-                    platform: manifest.platform.clone(),
-                    hash: format!("sha512-{}", integrity),
-                    dependencies: manifest.dependencies_v2.clone(),
-                };
-
-                lockfile.installed_packages.insert(packages_key, detail);
+                lockfile.registries.insert(
+                    reg.handle.clone(),
+                    types::LockRegistryV2 {
+                        url: reg.url.clone(),
+                        revision,
+                    },
+                );
             }
 
-            if let Err(e) = project::lockfile::write_zoi_lock(&lockfile) {
-                eprintln!("Warning: Failed to write zoi.lock file: {}", e);
-            }
+            let package_dir = crate::pkg::local::get_package_dir(
+                types::Scope::Project,
+                &manifest.registry_handle,
+                &manifest.repo,
+                &manifest.name,
+            )?;
+            let version_dir = package_dir.join(&manifest.version);
+            let integrity =
+                crate::pkg::hash::calculate_dir_hash(&version_dir).unwrap_or_else(|e| {
+                    eprintln!(
+                        "Warning: could not calculate integrity for {}: {}",
+                        manifest.name, e
+                    );
+                    String::new()
+                });
+
+            let why = if matches!(manifest.reason, types::InstallReason::Direct) {
+                "direct".to_string()
+            } else {
+                "dependency".to_string()
+            };
+
+            let detail = types::LockPackageDetailV2 {
+                name: manifest.name.clone(),
+                sub_package: manifest.sub_package.clone(),
+                repo: manifest.repo.clone(),
+                repo_type: manifest.repo_type.clone(),
+                version: manifest.version.clone(),
+                revision: manifest.revision.clone(),
+                registry: manifest.registry_handle.clone(),
+                why,
+                description: manifest.description.clone(),
+                package_type_install: format!("{:?}", manifest.package_type).to_lowercase(),
+                install_method: manifest
+                    .install_method
+                    .clone()
+                    .unwrap_or_else(|| "pre-built".to_string()),
+                installed_sub_packages: manifest
+                    .sub_package
+                    .clone()
+                    .map(|s| vec![s])
+                    .unwrap_or_default(),
+                platform: manifest.platform.clone(),
+                hash: format!("sha512-{}", integrity),
+                dependencies: manifest.dependencies_v2.clone(),
+            };
+
+            lockfile.installed_packages.insert(packages_key, detail);
+        }
+
+        if let Err(e) = project::lockfile::write_zoi_lock(&mut lockfile) {
+            eprintln!("Warning: Failed to write zoi.lock file: {}", e);
         }
     }
 

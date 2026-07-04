@@ -1,6 +1,7 @@
-use crate::pkg::{install, local, types};
+use crate::pkg::{install, local, resolve, types};
 use anyhow::{Result, anyhow};
 use colored::*;
+use indicatif::MultiProgress;
 use std::collections::HashMap;
 use std::process::Command;
 use zoi_project::config as project_config;
@@ -67,34 +68,88 @@ pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
         true,
     )?;
 
-    let install_plan = install::plan::create_install_plan(&graph.nodes, None, false)?;
+    let mut missing_nodes = HashMap::new();
+    for (id, node) in &graph.nodes {
+        let request_source = crate::pkg::local::package_source_string(
+            &node.registry_handle,
+            &node.pkg.repo,
+            &node.pkg.name,
+            node.sub_package.as_deref(),
+            &node.version,
+        );
+        if let Ok(request) = resolve::parse_source_string(&request_source) {
+            let matches = crate::pkg::local::find_installed_manifests_matching(
+                &request,
+                types::Scope::Project,
+            )?;
+            if !matches
+                .iter()
+                .any(|manifest| manifest.version == node.version)
+            {
+                missing_nodes.insert(id.clone(), node.clone());
+            }
+        } else {
+            missing_nodes.insert(id.clone(), node.clone());
+        }
+    }
+
+    let install_plan = install::plan::create_install_plan(&missing_nodes, None, false)?;
     if !install_plan.is_empty() {
         println!(
             "{} Ensuring project dependencies are installed...",
             "::".bold().blue()
         );
+
+        use rayon::prelude::*;
+        use std::sync::Mutex;
+
+        let m_prep = MultiProgress::new();
+        let prepared_nodes = Mutex::new(HashMap::new());
+
+        missing_nodes
+            .par_iter()
+            .try_for_each(|(pkg_id, node)| -> Result<()> {
+                let action = install_plan
+                    .get(pkg_id)
+                    .ok_or_else(|| anyhow!("Install action not found for: {}", pkg_id))?;
+
+                let prepared =
+                    install::installer::prepare_node(node, action, Some(&m_prep), None, false)?;
+
+                let mut lock = prepared_nodes.lock().map_err(|e| {
+                    anyhow!("Prepared nodes mutex poisoned during preparation: {}", e)
+                })?;
+                lock.insert(pkg_id.clone(), prepared);
+                Ok(())
+            })?;
+
         let m = indicatif::MultiProgress::new();
         let stages = graph.toposort()?;
         for stage in stages {
-            use rayon::prelude::*;
             stage.into_par_iter().try_for_each(|pkg_id| -> Result<()> {
-                let node = graph
-                    .nodes
-                    .get(&pkg_id)
-                    .ok_or_else(|| anyhow!("Package not found in graph: {}", pkg_id))?;
-                let action = install_plan
-                    .get(&pkg_id)
-                    .ok_or_else(|| anyhow!("Install action not found for: {}", pkg_id))?;
-                install::installer::install_node(
-                    node,
-                    action,
-                    Some(&m),
-                    None,
-                    true,
-                    true,
-                    true,
-                    false,
-                )?;
+                let prepared = {
+                    let lock = prepared_nodes.lock().map_err(|e| {
+                        anyhow!("Prepared nodes mutex poisoned during install: {}", e)
+                    })?;
+                    lock.get(&pkg_id).cloned()
+                };
+
+                if let Some(prepared) = prepared {
+                    let node = graph
+                        .nodes
+                        .get(&pkg_id)
+                        .ok_or_else(|| anyhow!("Package not found in graph: {}", pkg_id))?;
+
+                    install::installer::install_prepared_node(
+                        node,
+                        &prepared,
+                        Some(&m),
+                        true,
+                        true,
+                        true,
+                        false,
+                    )?;
+                }
                 Ok(())
             })?;
         }

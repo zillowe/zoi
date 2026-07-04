@@ -30,8 +30,32 @@ fn read_lockfile(scope: types::Scope) -> Result<types::ZoiLockV2> {
     Ok(lockfile)
 }
 
-fn write_lockfile(lockfile: &types::ZoiLockV2, scope: types::Scope) -> Result<()> {
+fn write_lockfile(lockfile: &mut types::ZoiLockV2, scope: types::Scope) -> Result<()> {
     let path = get_lockfile_path(scope)?;
+
+    if let Ok(store_dir) = crate::utils::get_store_base_dir(scope) {
+        lockfile.packages_hash = Some(format!(
+            "sha512-{}",
+            crate::hash::calculate_dir_hash(&store_dir).unwrap_or_default()
+        ));
+    }
+
+    let db_dir = if scope == types::Scope::Project {
+        std::env::current_dir()?
+            .join(".zoi")
+            .join("pkgs")
+            .join("db")
+    } else {
+        crate::utils::get_db_root().unwrap_or_default()
+    };
+
+    if db_dir.exists() {
+        lockfile.registries_hash = Some(format!(
+            "sha512-{}",
+            crate::hash::calculate_dir_hash(&db_dir).unwrap_or_default()
+        ));
+    }
+
     let content = serde_json::to_string_pretty(lockfile)?;
     fs::write(path, content)?;
     Ok(())
@@ -97,7 +121,7 @@ pub fn record_package(
             .insert(registry_handle.to_string(), reg_info);
     }
 
-    write_lockfile(&lockfile, pkg.scope)
+    write_lockfile(&mut lockfile, pkg.scope)
 }
 
 fn compute_package_hash(pkg: &types::Package, registry_handle: &str) -> String {
@@ -111,10 +135,10 @@ fn compute_package_hash(pkg: &types::Package, registry_handle: &str) -> String {
     let package_dir_name = crate::utils::get_package_dir_name(&package_id, &pkg.name);
     let version_dir = store_base.join(&package_dir_name).join(version);
     if version_dir.exists() {
-        crate::hash::calculate_dir_hash(&version_dir).unwrap_or_else(|e| {
-            eprintln!("Warning: could not calculate hash for {}: {}", pkg.name, e);
-            String::new()
-        })
+        format!(
+            "sha512-{}",
+            crate::hash::calculate_dir_hash(&version_dir).unwrap_or_default()
+        )
     } else {
         String::new()
     }
@@ -176,7 +200,7 @@ pub fn update_package_reason(
             types::InstallReason::Dependency { .. } => "dependency".to_string(),
         };
         lockfile.version = "2".to_string();
-        write_lockfile(&lockfile, manifest.scope)?;
+        write_lockfile(&mut lockfile, manifest.scope)?;
         Ok(())
     } else {
         Err(anyhow!("Package '{}' not found in record.", manifest.name))
@@ -193,7 +217,7 @@ pub fn remove_package_from_record(manifest: &types::InstallManifest) -> Result<(
 
     if lockfile.installed_packages.remove(&package_key).is_some() {
         lockfile.version = "2".to_string();
-        write_lockfile(&lockfile, manifest.scope)?;
+        write_lockfile(&mut lockfile, manifest.scope)?;
     }
 
     Ok(())
