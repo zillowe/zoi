@@ -38,20 +38,20 @@ cargo build --bin zoi-mini --release
 
 This produces the `zoi` and `zoi-mini` binaries in `target/release/`.
 
-### Using the Makefile
+### Using the Justfile
 
-The provided `Makefile` simplifies the build and installation process.
+The provided `Justfile` simplifies the build and installation process.
 
 ```sh
-# Configure installation paths (creates config.mk)
+# Configure installation paths (creates config.just)
 # You can also specify which binaries to build: --with-bin=zoi|zoi-mini|both (default: both)
 ./configure --prefix=/usr/local --with-bin=both
 
 # Build the release binaries
-make build
+just build
 
 # Install to configured location
-sudo make install
+sudo just install
 ```
 
 ### Using Build Scripts
