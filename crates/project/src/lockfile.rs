@@ -65,8 +65,28 @@ pub fn read_zoi_lock() -> Result<types::ZoiLockV2> {
     })
 }
 
-pub fn write_zoi_lock(lockfile: &types::ZoiLockV2) -> Result<()> {
+pub fn write_zoi_lock(lockfile: &mut types::ZoiLockV2) -> Result<()> {
     let path = get_lockfile_path()?;
+
+    if let Ok(store_dir) = zoi_core::utils::get_store_base_dir(types::Scope::Project) {
+        lockfile.packages_hash = Some(format!(
+            "sha512-{}",
+            zoi_core::hash::calculate_dir_hash(&store_dir).unwrap_or_default()
+        ));
+    }
+
+    let db_dir = std::env::current_dir()?
+        .join(".zoi")
+        .join("pkgs")
+        .join("db");
+
+    if db_dir.exists() {
+        lockfile.registries_hash = Some(format!(
+            "sha512-{}",
+            zoi_core::hash::calculate_dir_hash(&db_dir).unwrap_or_default()
+        ));
+    }
+
     let content = serde_json::to_string_pretty(lockfile)?;
     fs::write(path, content)?;
     Ok(())

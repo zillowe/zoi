@@ -1160,11 +1160,10 @@ pub fn run_local(verbose: bool, _fallback: bool, force: bool, frozen_lock: bool)
         for ((handle, url), revision) in results {
             lockfile
                 .registries
-                .entry(handle)
-                .or_insert(types::LockRegistryV2 { revision, url });
+                .insert(handle, types::LockRegistryV2 { revision, url });
         }
         lockfile.version = "2".to_string();
-        zoi_project::lockfile::write_zoi_lock(&lockfile)?;
+        zoi_project::lockfile::write_zoi_lock(&mut lockfile)?;
     }
 
     println!("{} Local sync complete.", "::".bold().blue());
