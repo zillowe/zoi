@@ -47,8 +47,10 @@ fn test_package_outdated_on_revision_bump() {
         revision: "1".to_string(),
         sub_package: None,
         repo: repo.to_string(),
+        repo_type: "official".to_string(),
         registry_handle: handle.to_string(),
         package_type: types::PackageType::Package,
+        description: "".to_string(),
         reason: types::InstallReason::Direct,
         scope: types::Scope::User,
         bins: None,
@@ -57,9 +59,11 @@ fn test_package_outdated_on_revision_bump() {
         provides: None,
         backup: None,
         installed_dependencies: vec![],
+        dependencies_v2: None,
         chosen_options: vec![],
         chosen_optionals: vec![],
         install_method: Some("test".to_string()),
+        platform: zoi_core::utils::get_platform().unwrap_or_default(),
         service: None,
         installed_files: vec![],
         installed_size: None,
@@ -78,7 +82,7 @@ fn test_package_outdated_on_revision_bump() {
     db::update_package(&conn, &pkg_meta, handle, None, None, None).unwrap();
 
     let source = format!("#{}@{}/{}", handle, repo, pkg_name);
-    let (resolved_pkg, new_version, _, _, _, _) =
+    let (resolved_pkg, new_version, _, _, _, _, _) =
         zoi::pkg::resolve::resolve_package_and_version(&source, true, true).unwrap();
 
     assert_eq!(new_version, version);

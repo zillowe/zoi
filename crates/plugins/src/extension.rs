@@ -139,7 +139,7 @@ fn revert_extension_change(
 pub fn add(ext_name: &str, yes: bool, plugin_manager: Option<&PluginManager>) -> Result<()> {
     println!("Adding extension: {}", ext_name);
 
-    let (pkg, _, _, pkg_lua_path, registry_handle, _) =
+    let (pkg, _, _, pkg_lua_path, registry_handle, repo_type, _) =
         resolve::resolve_package_and_version(ext_name, false, yes)?;
 
     if pkg.package_type != types::PackageType::Extension {
@@ -200,8 +200,10 @@ pub fn add(ext_name: &str, yes: bool, plugin_manager: Option<&PluginManager>) ->
         revision: pkg.revision.clone(),
         sub_package: None,
         repo: pkg.repo.clone(),
+        repo_type: repo_type.unwrap_or_else(|| "unofficial".to_string()),
         registry_handle: registry_handle.unwrap_or_default(),
         package_type: pkg.package_type,
+        description: pkg.description.clone(),
         reason: types::InstallReason::Direct,
         scope: pkg.scope,
         bins: None,
@@ -210,9 +212,11 @@ pub fn add(ext_name: &str, yes: bool, plugin_manager: Option<&PluginManager>) ->
         provides: None,
         backup: None,
         installed_dependencies: vec![],
+        dependencies_v2: None,
         chosen_options: vec![],
         chosen_optionals: vec![],
         install_method: None,
+        platform: zoi_core::utils::get_platform().unwrap_or_default(),
         service: None,
         installed_files: vec![],
         installed_size: pkg.installed_size,
@@ -361,7 +365,7 @@ pub fn remove(ext_name: &str, yes: bool, plugin_manager: Option<&PluginManager>)
         zoi_lua::parser::parse_lua_package(path, Some(&manifest.version), true)?
     } else {
         let source = local::installed_manifest_source(&manifest);
-        let (pkg, _, _, _, _, _) = resolve::resolve_package_and_version(&source, true, yes)?;
+        let (pkg, _, _, _, _, _, _) = resolve::resolve_package_and_version(&source, true, yes)?;
         pkg
     };
 

@@ -268,7 +268,7 @@ enum Commands {
     /// Installs one or more packages from a name, local file, URL, or git repository
     #[command(aliases = ["i", "in", "add"])]
     Install {
-        #[arg(value_name = "ALL_SOURCES", value_hint = ValueHint::FilePath, help = PKG_SOURCE_HELP)]
+        #[arg(value_name = "ALL_SOURCES", help = PKG_SOURCE_HELP)]
         sources: Vec<String>,
         /// Install from a git repository (e.g. 'Zillowe/Hello', 'gl:Zillowe/Hello')
         #[arg(long, value_name = "REPO", conflicts_with = "sources")]
@@ -537,7 +537,7 @@ enum Commands {
         long_about = "Resolves a package and its dependencies, installs them if needed, then runs the requested binary directly. By default runs the first binary the package provides. Uses bwrap for sandboxed packages."
     )]
     Exec {
-        #[arg(value_name = "ALL_SOURCES", value_hint = ValueHint::FilePath, help = PKG_SOURCE_HELP)]
+        #[arg(value_name = "ALL_SOURCES", help = PKG_SOURCE_HELP)]
         source: String,
 
         /// Specific binary to run (required if package provides multiple binaries)

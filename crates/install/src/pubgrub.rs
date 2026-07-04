@@ -413,7 +413,7 @@ impl DependencyProvider for ZoiDependencyProvider {
                 let pkg_res = resolve::resolve_package_and_version(&source, self.quiet, self.yes);
 
                 match pkg_res {
-                    Ok((pkg, _, _, _, _, _)) => pkg.dependencies,
+                    Ok((pkg, _, _, _, _, _, _)) => pkg.dependencies,
                     Err(_) => None,
                 }
             };

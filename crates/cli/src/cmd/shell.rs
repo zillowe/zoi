@@ -119,6 +119,20 @@ _zoi_installed_packages() {
     _describe -t packages 'installed packages' packages
 }
 
+_zoi_packages() {
+    local -a packages
+    case $words[2] in
+        uninstall|un|rm|remove|mark|m|update|up|why|files|pin|unpin|downgrade|dg|rollback)
+            packages=(${(f)"$(_zoi_do_list_installed)"})
+            _describe -t packages 'installed packages' packages
+            ;;
+        *)
+            packages=(${(f)"$(_zoi_do_list_all)"})
+            _describe -t packages 'available packages' packages
+            ;;
+    esac
+}
+
 _zoi_do_list_all() {
     zoi list -a --completion 2>/dev/null
 }
@@ -128,19 +142,63 @@ _zoi_do_list_installed() {
 }
 "#;
             script.push_str(helper);
+
             script = script.replace("':ALL_SOURCES: '", "':package:(_zoi_all_packages)'");
             script = script.replace("':ALL_PACKAGES: '", "':package:(_zoi_all_packages)'");
             script = script.replace("':INST_PACKAGES: '", "':package:(_zoi_installed_packages)'");
+
+            let desc_marker = " -- Package identifier (e.g. @repo/name, path, or URL):";
+            let mut search_start = 0;
+            while let Some(pos) = script[search_start..].find(desc_marker) {
+                let abs_pos = search_start + pos;
+                let after_colon = abs_pos + desc_marker.len();
+                if let Some(quote_pos) = script[after_colon..].find('\'') {
+                    let action_end = after_colon + quote_pos;
+                    script.replace_range(after_colon..action_end, ":_zoi_packages");
+                }
+                search_start = after_colon;
+            }
         }
         Shell::Bash => {
-            let helper = r#"
-_zoi_all_packages() {
+            let helpers = r#"
+_zoi_all_packages_comp() {
     local cur=${COMP_WORDS[COMP_CWORD]}
     local pkgs=$(zoi list -a --names 2>/dev/null)
     COMPREPLY=( $(compgen -W "${pkgs}" -- "$cur") )
 }
+
+_zoi_installed_packages_comp() {
+    local cur=${COMP_WORDS[COMP_CWORD]}
+    local pkgs=$(zoi list --names 2>/dev/null)
+    COMPREPLY=( $(compgen -W "${pkgs}" -- "$cur") )
+}
+
+_zoi_wrapper() {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    local prev="${COMP_WORDS[COMP_CWORD-1]}"
+    local cmd="${COMP_WORDS[1]}"
+
+    if [[ "$prev" == -* ]]; then
+        _zoi
+        return 0
+    fi
+
+    case $cmd in
+        install|i|in|add|show|exec|x|create|clone|use|tree|man|shell)
+            _zoi_all_packages_comp
+            return 0
+            ;;
+        uninstall|un|rm|remove|mark|m|update|up|why|files|pin|unpin|downgrade|dg|rollback)
+            _zoi_installed_packages_comp
+            return 0
+            ;;
+    esac
+
+    _zoi
+}
+complete -F _zoi_wrapper zoi
 "#;
-            script = format!("{}\n{}", helper, script);
+            script = format!("{}\n{}", script, helpers);
         }
         _ => {}
     }
@@ -148,6 +206,17 @@ _zoi_all_packages() {
 }
 
 pub fn run(shell: Shell, scope: SetupScope) -> Result<()> {
+    if scope == SetupScope::System && !utils::is_admin() {
+        let exe = std::env::current_exe()?;
+        let args: Vec<String> = std::env::args().collect();
+        let status = Command::new("sudo")
+            .arg(&exe)
+            .args(&args[1..])
+            .status()
+            .map_err(|e| anyhow!("Failed to elevate with sudo: {}", e))?;
+        std::process::exit(status.code().unwrap_or(1));
+    }
+
     println!(
         "{} Setting up shell: {}...",
         "::".bold().blue(),

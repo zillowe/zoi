@@ -160,7 +160,7 @@ fn spawn_pager(pager: &str, content: &str) -> Result<()> {
 }
 
 pub fn resolve_package_for_man(term: &str) -> Result<(types::Package, Option<String>)> {
-    if let Ok((pkg, _, _, _, registry_handle, _)) =
+    if let Ok((pkg, _, _, _, registry_handle, _, _)) =
         resolve::resolve_package_and_version(term, false, false)
     {
         return Ok((pkg, registry_handle));

@@ -468,8 +468,11 @@ pub struct InstallManifest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sub_package: Option<String>,
     pub repo: String,
+    #[serde(default)]
+    pub repo_type: String,
     pub registry_handle: String,
     pub package_type: PackageType,
+    pub description: String,
     pub reason: InstallReason,
     pub scope: Scope,
     pub bins: Option<Vec<String>>,
@@ -484,11 +487,15 @@ pub struct InstallManifest {
     #[serde(default)]
     pub installed_dependencies: Vec<String>,
     #[serde(default)]
+    pub dependencies_v2: Option<DependenciesV2>,
+    #[serde(default)]
     pub chosen_options: Vec<String>,
     #[serde(default)]
     pub chosen_optionals: Vec<String>,
     #[serde(default)]
     pub install_method: Option<String>,
+    #[serde(default)]
+    pub platform: String,
     #[serde(default)]
     pub service: Option<Service>,
     #[serde(default)]

@@ -98,7 +98,7 @@ fn run_list_outdated(
             )
         };
 
-        if let Ok((pkg, new_version, _, _, _, _)) =
+        if let Ok((pkg, new_version, _, _, _, _, _)) =
             crate::pkg::resolve::resolve_package_and_version(&source, true, false)
             && (manifest.version != new_version || manifest.revision != pkg.revision)
         {

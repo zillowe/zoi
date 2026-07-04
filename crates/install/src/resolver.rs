@@ -16,6 +16,8 @@ pub struct InstallNode {
     pub version: String,
     pub revision: String,
     pub sub_package: Option<String>,
+    pub repo_type: String,
+    pub description: String,
     pub reason: InstallReason,
     pub source: String,
     pub registry_handle: String,
@@ -128,7 +130,7 @@ pub fn build_graph_from_locked_packages(
 
     for locked in locked_packages {
         let request = resolve::parse_source_string(&locked.source)?;
-        let (pkg, version_str, _, pkg_lua_path, handle, git_sha) =
+        let (pkg, version_str, _, pkg_lua_path, handle, repo_type, git_sha) =
             resolve::resolve_package_and_version(&locked.source, quiet, yes)?;
 
         let mut pkg = pkg;
@@ -153,6 +155,8 @@ pub fn build_graph_from_locked_packages(
         graph.nodes.insert(
             pkg_id.clone(),
             InstallNode {
+                description: pkg.description.clone(),
+                repo_type: repo_type.unwrap_or_else(|| "unofficial".to_string()),
                 pkg,
                 version: version_str,
                 revision: locked.revision.clone(),
@@ -329,7 +333,7 @@ pub fn resolve_dependency_graph(
                     .explicit_source
                     .clone()
                     .unwrap_or_else(|| format!("{}@{}", name, version));
-                let (pkg, version_str, _, pkg_lua_path, handle, git_sha) =
+                let (pkg, version_str, _, pkg_lua_path, handle, repo_type, git_sha) =
                     resolve::resolve_package_and_version(&source, quiet, yes)?;
 
                 let mut pkg = pkg;
@@ -360,6 +364,8 @@ pub fn resolve_dependency_graph(
                 }
 
                 let node = InstallNode {
+                    description: pkg.description.clone(),
+                    repo_type: repo_type.unwrap_or_else(|| "unofficial".to_string()),
                     pkg: pkg.clone(),
                     version: version_str,
                     revision: pkg.revision.clone(),
