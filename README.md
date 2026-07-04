@@ -313,10 +313,8 @@ If you prefer, you can build Zoi from source. You'll need [Rust](https://www.rus
 
 ```sh
 ./configure
-make build
-sudo make install
-# (optional) Install CLI completions and setup Zoi's PATH
-make setup
+just build
+sudo just install
 ```
 
 Zoi integrates with over 40 system and language package managers (`apt`, `brew`, `cargo`, `npm`, `pip`, `go`, `bun`, and many more). See the full list on the [Dependencies docs](https://zillowe.qzz.io/docs/zds/zoi/dependencies).
