@@ -14,6 +14,52 @@ pub fn create_manifest(
     sub_package: Option<String>,
 ) -> Result<types::InstallManifest> {
     let platform = zoi_core::utils::get_platform().unwrap_or_default();
+
+    let mut installed_dependencies = installed_dependencies;
+    installed_dependencies.sort();
+
+    let mut installed_files = installed_files;
+    installed_files.sort();
+
+    let mut chosen_options = chosen_options.to_vec();
+    chosen_options.sort();
+
+    let mut chosen_optionals = chosen_optionals.to_vec();
+    chosen_optionals.sort();
+
+    let mut bins = pkg.bins.clone();
+    if let Some(ref mut b) = bins {
+        b.sort();
+    }
+
+    let mut conflicts = pkg.conflicts.clone();
+    if let Some(ref mut c) = conflicts {
+        c.sort();
+    }
+
+    let mut replaces = pkg.replaces.clone();
+    if let Some(ref mut r) = replaces {
+        r.sort();
+    }
+
+    let mut provides = pkg.provides.clone();
+    if let Some(ref mut p) = provides {
+        p.sort();
+    }
+
+    let mut backup = pkg.backup.clone();
+    if let Some(ref mut b) = backup {
+        b.sort();
+    }
+
+    let mut dependencies_v2 = pkg.dependencies.clone().map(types::to_dependencies_v2);
+    if let Some(ref mut deps) = dependencies_v2 {
+        deps.runtime.sort();
+        for b in &mut deps.build {
+            b.packages.sort();
+        }
+    }
+
     Ok(types::InstallManifest {
         name: pkg.name.clone(),
         version: pkg.version.clone().ok_or_else(|| {
@@ -31,15 +77,15 @@ pub fn create_manifest(
         description: pkg.description.clone(),
         reason,
         scope: pkg.scope,
-        bins: pkg.bins.clone(),
-        conflicts: pkg.conflicts.clone(),
-        replaces: pkg.replaces.clone(),
-        provides: pkg.provides.clone(),
-        backup: pkg.backup.clone(),
+        bins,
+        conflicts,
+        replaces,
+        provides,
+        backup,
         installed_dependencies,
-        dependencies_v2: pkg.dependencies.clone().map(types::to_dependencies_v2),
-        chosen_options: chosen_options.to_vec(),
-        chosen_optionals: chosen_optionals.to_vec(),
+        dependencies_v2,
+        chosen_options,
+        chosen_optionals,
         install_method,
         platform,
         service: pkg.service.clone(),

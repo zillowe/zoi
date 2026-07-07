@@ -19,6 +19,9 @@ pub fn run(verbose: bool, fallback: bool, no_pm: bool, force: bool) -> Result<()
 }
 
 pub fn run_local(verbose: bool, fallback: bool, force: bool, frozen_lock: bool) -> Result<()> {
+    if frozen_lock {
+        crate::pkg::frozen::set_frozen(true);
+    }
     println!(
         "{} Syncing project-local package databases...",
         "::".bold().blue()
