@@ -1,0 +1,77 @@
+{
+  "version": "2",
+  "packages_hash": "sha512-f02e7d6096b5c3219a05426f34a081799080fa28a18b91f84bc44f46b1a56876575b00f1cd3e70214c4b200aab3a44884d26837c864015ccb4f1a8f4cb2fb66d",
+  "registries_hash": "sha512-a9fcdb91b01b641001565f4d1b12cdcea1247d9e1a7710bde6f23f70a740efe535e2c9c365fc7370ee7469d5f6afe58c4672159fab8f2e1b5bfbd6692fe9ac2b",
+  "registries": {
+    "zoidberg": {
+      "revision": "e1979510901715a379ea2881278884c92ddf6d8e",
+      "url": "https://gitlab.com/zillowe/zillwen/zusty/zoidberg.git"
+    }
+  },
+  "installed_packages": {
+    "@zillowe/gct": {
+      "name": "gct",
+      "repo": "zillowe",
+      "repo_type": "official",
+      "version": "1.4.1",
+      "revision": "1",
+      "registry": "zoidberg",
+      "why": "direct",
+      "description": "An intelligent, AI-powered Git assistant",
+      "type": "package",
+      "install_method": "pre-compiled",
+      "installed_sub_packages": [],
+      "platform": "linux-amd64",
+      "hash": "sha512-be174f8ffd9c80580ee28d6e7dae2439ba2afe47e50554566fc3d5167773d26bdda2e3ffd7ccead8de2e893457dedd9e7a390b3f19dba580f31675ec6514fe85",
+      "dependencies": {
+        "runtime": [
+          "native:git"
+        ],
+        "build": [
+          {
+            "type": "source",
+            "packages": [
+              "brew:git",
+              "brew:go",
+              "choco:git",
+              "choco:golang",
+              "pacman:git",
+              "pacman:go"
+            ]
+          }
+        ]
+      }
+    },
+    "@zillowe/hello": {
+      "name": "hello",
+      "repo": "zillowe",
+      "repo_type": "official",
+      "version": "5.0.0",
+      "revision": "1",
+      "registry": "zoidberg",
+      "why": "direct",
+      "description": "Hello World",
+      "type": "package",
+      "install_method": "pre-compiled",
+      "installed_sub_packages": [],
+      "platform": "linux-amd64",
+      "hash": "sha512-830550bede062e213e123329a1fb3c0e93fe5986eab16ad4449d1a35f6200951b8485bd7582500de23e43d48c17e602fee300948ebd8090ce9c09d3cf05b1523",
+      "dependencies": {
+        "runtime": [],
+        "build": [
+          {
+            "type": "source",
+            "packages": [
+              "brew:git",
+              "brew:zig",
+              "choco:git",
+              "choco:zig",
+              "pacman:git",
+              "pacman:zig"
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

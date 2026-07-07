@@ -7,9 +7,15 @@ project({
 
 registries({
 	zoidberg = {
-		url = "https://github.com/zillowe/zoidberg.git",
+		url = "https://gitlab.com/zillowe/zillwen/zusty/zoidberg.git",
 		revision = "main",
+		type = "set",
 	},
+})
+
+packages({
+	"@zillowe/hello",
+	"@zillowe/gct",
 })
 
 tasks({
@@ -20,10 +26,6 @@ tasks({
 	{
 		cmd = "lines",
 		run = "cloc crates",
-	},
-	{
-		cmd = "install",
-		run = "cargo clean && ./configure && make && sudo make install && make install-completions",
 	},
 	{
 		cmd = "deps",
@@ -39,11 +41,11 @@ tasks({
 	},
 	{
 		cmd = "check",
-		run = "cargo check",
+		run = "cargo check --workspace --all-targets",
 	},
 	{
 		cmd = "test",
-		run = "cargo test --all-features",
+		run = "cargo test --all-features -- --test-threads=1",
 	},
 	{
 		cmd = "speed",
