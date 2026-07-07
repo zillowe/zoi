@@ -20,9 +20,18 @@ pub fn run() -> Result<()> {
     let mut installed_pkgs_map = HashMap::new();
     for installed_pkg in &installed_packages {
         let pkg_key = if let Some(sub) = &installed_pkg.sub_package {
-            format!("@{}/{}:{}", installed_pkg.repo, installed_pkg.name, sub)
+            format!(
+                "@{}/{}:{}",
+                installed_pkg.repo.trim(),
+                installed_pkg.name.trim(),
+                sub.trim()
+            )
         } else {
-            format!("@{}/{}", installed_pkg.repo, installed_pkg.name)
+            format!(
+                "@{}/{}",
+                installed_pkg.repo.trim(),
+                installed_pkg.name.trim()
+            )
         };
         installed_pkgs_map.insert(pkg_key, installed_pkg);
     }
@@ -57,15 +66,36 @@ pub fn run() -> Result<()> {
                 .strip_prefix("sha512-")
                 .unwrap_or(&lock_detail.hash);
             if integrity != lock_hash_only {
+                let manifest_filename = if let Some(sub) = &lock_detail.sub_package {
+                    format!("manifest-{}.yaml", sub)
+                } else {
+                    "manifest.yaml".to_string()
+                };
+                let manifest_path = version_dir.join(manifest_filename);
+
                 return Err(anyhow!(
-                    "Integrity check failed for '{}'. The installed files do not match the lockfile. Your project is in an inconsistent state.",
-                    pkg_key
+                    "Integrity check failed for '{}'. The installed files do not match the lockfile.\n\
+                     Expected hash: {}\n\
+                     Actual hash:   {}\n\
+                     Manifest path: {}\n\
+                     Your project is in an inconsistent state.",
+                    pkg_key,
+                    lock_hash_only,
+                    integrity,
+                    manifest_path.display()
                 ));
             }
         } else {
+            let hex_key = pkg_key
+                .as_bytes()
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<Vec<_>>()
+                .join("");
             return Err(anyhow!(
-                "Package '{}' from zoi.lock is not installed.",
-                pkg_key
+                "Package '{}' (hex: {}) from zoi.lock is not installed.",
+                pkg_key,
+                hex_key
             ));
         }
     }

@@ -228,10 +228,19 @@ pub fn package_source_string(
     sub_package: Option<&str>,
     version: &str,
 ) -> String {
+    let registry_handle = registry_handle.trim();
+    let repo = repo.trim();
+    let name = name.trim();
+    let version = version.trim();
+
     if let Some(sub_package) = sub_package {
         format!(
             "#{}@{}/{}:{}@{}",
-            registry_handle, repo, name, sub_package, version
+            registry_handle,
+            repo,
+            name,
+            sub_package.trim(),
+            version
         )
     } else {
         format!("#{}@{}/{}@{}", registry_handle, repo, name, version)

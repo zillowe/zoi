@@ -748,8 +748,8 @@ pub struct ZoiLockV2 {
     pub packages_hash: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub registries_hash: Option<String>,
-    pub registries: HashMap<String, LockRegistryV2>,
-    pub installed_packages: HashMap<String, LockPackageDetailV2>,
+    pub registries: BTreeMap<String, LockRegistryV2>,
+    pub installed_packages: BTreeMap<String, LockPackageDetailV2>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

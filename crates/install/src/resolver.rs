@@ -127,6 +127,8 @@ pub fn build_graph_from_locked_packages(
     let mut graph = DependencyGraph::new();
     let mut reverse_deps: HashMap<String, Vec<String>> = HashMap::new();
     let mut pkg_id_to_locked_deps: HashMap<String, Vec<String>> = HashMap::new();
+    let mut pkg_id_to_locked_deps_v2: HashMap<String, Option<types::DependenciesV2>> =
+        HashMap::new();
 
     for locked in locked_packages {
         let request = resolve::parse_source_string(&locked.source)?;
@@ -151,6 +153,7 @@ pub fn build_graph_from_locked_packages(
         };
 
         pkg_id_to_locked_deps.insert(pkg_id.clone(), flattened_deps.clone());
+        pkg_id_to_locked_deps_v2.insert(pkg_id.clone(), locked.dependencies.clone());
 
         graph.nodes.insert(
             pkg_id.clone(),
@@ -172,7 +175,7 @@ pub fn build_graph_from_locked_packages(
                 registry_handle: handle.unwrap_or_else(|| "zoidberg".to_string()),
                 chosen_options: locked.chosen_options.clone(),
                 chosen_optionals: locked.chosen_optionals.clone(),
-                dependencies: flattened_deps,
+                dependencies: Vec::new(),
                 git_sha: locked.git_sha.clone().or(git_sha),
             },
         );
@@ -214,35 +217,80 @@ pub fn build_graph_from_locked_packages(
         .insert("$root".to_string(), direct_ids.iter().cloned().collect());
 
     let direct_id_set: HashSet<String> = direct_ids.iter().cloned().collect();
-    let parent_sources: HashMap<String, String> = reverse_deps
+
+    let mut parent_map = HashMap::new();
+    for (pkg_id, parents) in &reverse_deps {
+        if !direct_id_set.contains(pkg_id)
+            && let Some(parent_id) = parents.first()
+            && let Some(parent_node) = graph.nodes.get(parent_id)
+        {
+            let parent_source = zoi_resolver::local::package_source_string(
+                &parent_node.registry_handle,
+                &parent_node.pkg.repo,
+                &parent_node.pkg.name,
+                parent_node.sub_package.as_deref(),
+                &parent_node.version,
+            );
+            parent_map.insert(pkg_id.clone(), parent_source);
+        }
+    }
+
+    let resolved_child_sources: HashMap<String, Vec<String>> = graph
+        .adj
         .iter()
-        .filter_map(|(pkg_id, parents)| {
-            let parent_id = parents.first()?;
-            let parent_node = graph.nodes.get(parent_id)?;
-            Some((
-                pkg_id.clone(),
-                zoi_resolver::local::package_source_string(
-                    &parent_node.registry_handle,
-                    &parent_node.pkg.repo,
-                    &parent_node.pkg.name,
-                    parent_node.sub_package.as_deref(),
-                    &parent_node.version,
-                ),
-            ))
+        .map(|(pkg_id, children)| {
+            let deps = children
+                .iter()
+                .filter_map(|child| {
+                    graph.nodes.get(child).map(|child_node| {
+                        format!(
+                            "zoi:{}",
+                            zoi_resolver::local::package_source_string(
+                                &child_node.registry_handle,
+                                &child_node.pkg.repo,
+                                &child_node.pkg.name,
+                                child_node.sub_package.as_deref(),
+                                &child_node.version,
+                            )
+                        )
+                    })
+                })
+                .collect::<Vec<_>>();
+            (pkg_id.clone(), deps)
         })
         .collect();
 
     for (pkg_id, node) in &mut graph.nodes {
         if direct_id_set.contains(pkg_id) {
             node.reason = InstallReason::Direct;
-        } else if let Some(parent_source) = parent_sources.get(pkg_id) {
+        } else if let Some(parent_source) = parent_map.get(pkg_key_as_str(pkg_id)) {
             node.reason = InstallReason::Dependency {
                 parent: parent_source.clone(),
             };
         }
+
+        let mut resolved_deps = resolved_child_sources
+            .get(pkg_id)
+            .cloned()
+            .unwrap_or_default();
+
+        if let Some(Some(deps_v2)) = pkg_id_to_locked_deps_v2.get(pkg_id) {
+            for dep_str in &deps_v2.runtime {
+                if let Ok(dep_req) = dependencies::parse_dependency_string(dep_str)
+                    && dep_req.manager != "zoi"
+                {
+                    resolved_deps.push(dep_str.clone());
+                }
+            }
+        }
+        node.dependencies = resolved_deps;
     }
 
     Ok((graph, Vec::new()))
+}
+
+fn pkg_key_as_str(s: &String) -> &String {
+    s
 }
 
 pub fn resolve_dependency_graph(

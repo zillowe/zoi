@@ -94,7 +94,17 @@ pub fn calculate_dir_hash(path: &Path) -> Result<String> {
     paths.sort();
 
     for file_path in paths {
+        if let Ok(rel_path) = file_path.strip_prefix(path) {
+            let rel_path_str = rel_path.to_string_lossy().to_string().replace('\\', "/");
+            let path_bytes = rel_path_str.as_bytes();
+            hasher.update((path_bytes.len() as u64).to_le_bytes());
+            hasher.update(path_bytes);
+        }
+
         let mut file = fs::File::open(&file_path)?;
+        let metadata = file.metadata()?;
+        hasher.update(metadata.len().to_le_bytes());
+
         let mut buffer = [0; 8192];
         loop {
             let bytes_read = file.read(&mut buffer)?;

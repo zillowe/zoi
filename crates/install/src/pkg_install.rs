@@ -275,8 +275,11 @@ pub fn run(
                     .filter_map(|e| e.ok())
                 {
                     if entry.file_type().is_file() {
-                        let dest_path = root_dest.join(entry.path().strip_prefix(&usrroot_src)?);
-                        installed_files.push(dest_path.to_string_lossy().to_string());
+                        let rel_to_root = entry.path().strip_prefix(&usrroot_src)?;
+                        installed_files.push(format!(
+                            "${{usrroot}}/{}",
+                            rel_to_root.to_string_lossy().replace('\\', "/")
+                        ));
                     }
                 }
             }
@@ -292,8 +295,11 @@ pub fn run(
                     .filter_map(|e| e.ok())
                 {
                     if entry.file_type().is_file() {
-                        let dest_path = home_dest.join(entry.path().strip_prefix(&usrhome_src)?);
-                        installed_files.push(dest_path.to_string_lossy().to_string());
+                        let rel_to_home = entry.path().strip_prefix(&usrhome_src)?;
+                        installed_files.push(format!(
+                            "${{usrhome}}/{}",
+                            rel_to_home.to_string_lossy().replace('\\', "/")
+                        ));
                     }
                 }
             }
@@ -310,7 +316,10 @@ pub fn run(
     {
         if entry.file_type().is_file() {
             let rel_path = entry.path().strip_prefix(staging_dir.path())?;
-            installed_files.push(version_dir.join(rel_path).to_string_lossy().to_string());
+            installed_files.push(format!(
+                "${{pkgstore}}/{}",
+                rel_path.to_string_lossy().replace('\\', "/")
+            ));
         }
     }
 
@@ -410,7 +419,10 @@ pub fn run(
                 }
 
                 if std::os::unix::fs::symlink(&app_path, &symlink_path).is_ok() {
-                    installed_files.push(symlink_path.to_string_lossy().to_string());
+                    installed_files.push(format!(
+                        "${{applications}}/{}",
+                        app_name.to_string_lossy().replace('\\', "/")
+                    ));
                     if pb.is_none() {
                         println!(
                             "Linked {} to {}",

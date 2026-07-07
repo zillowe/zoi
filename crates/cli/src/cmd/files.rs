@@ -14,13 +14,22 @@ pub fn run(package_name: &str) -> Result<()> {
 
     println!("Files for {} {}:", pkg.name.cyan(), pkg.version.yellow());
 
+    let version_dir = local::get_package_version_dir(
+        pkg.scope,
+        &pkg.registry_handle,
+        &pkg.repo,
+        &pkg.name,
+        &pkg.version,
+    )?;
+
     if pkg.installed_files.is_empty() {
         println!("(No files recorded for this package)");
     } else {
         let mut sorted_files = pkg.installed_files.clone();
         sorted_files.sort();
         for file in &sorted_files {
-            println!("{}", file);
+            let expanded = crate::pkg::utils::expand_placeholders(file, &version_dir, pkg.scope)?;
+            println!("{}", expanded);
         }
     }
 

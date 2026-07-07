@@ -2,6 +2,7 @@ pub mod builtin;
 pub mod cache;
 pub mod config;
 pub mod dependency;
+pub mod frozen;
 pub mod hash;
 pub mod lock;
 pub mod offline;

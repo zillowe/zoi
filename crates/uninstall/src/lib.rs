@@ -533,7 +533,8 @@ pub fn run(
         }
 
         for file_path_str in &manifest.installed_files {
-            let file_path = PathBuf::from(file_path_str);
+            let expanded = core_utils::expand_placeholders(file_path_str, &version_dir, scope)?;
+            let file_path = PathBuf::from(expanded);
             if file_path.exists() {
                 if file_path.is_dir() {
                     let _ = fs::remove_dir_all(&file_path);

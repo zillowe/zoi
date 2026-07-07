@@ -50,14 +50,14 @@ pub fn load_zoi_lua(path: &Path, env: HashMap<String, String>) -> Result<Project
                 let (k, v) = pair?;
                 match k {
                     Value::String(s) => {
-                        let key = s.to_str()?.to_string();
+                        let key = s.to_str()?.trim().to_string();
                         let spec = lua.from_value::<PackageSpec>(v)?;
                         data.insert(key, spec);
                     }
                     Value::Integer(_) => {
                         if let Value::String(s) = v {
                             data.insert(
-                                s.to_str()?.to_string(),
+                                s.to_str()?.trim().to_string(),
                                 PackageSpec {
                                     package_type: None,
                                     install_method: None,
