@@ -30,6 +30,38 @@ done
 OS_NAME=$(uname -s)
 ARCH_NAME=$(uname -m)
 
+echo "Checking dependencies..."
+
+check_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Error: '$1' is not installed or not in PATH."
+    return 1
+  fi
+  return 0
+}
+
+MISSING_DEPS=0
+check_cmd "cargo" || MISSING_DEPS=1
+check_cmd "gcc" || check_cmd "cc" || MISSING_DEPS=1
+check_cmd "pkg-config" || MISSING_DEPS=1
+check_cmd "git" || MISSING_DEPS=1
+
+if ! command -v "clang" >/dev/null 2>&1; then
+  echo "Error: 'clang' is not installed. It is required for bindgen (openssl-sys, etc)."
+  if [ -f /etc/fedora-release ] || [ -f /etc/redhat-release ]; then
+     echo "  -> On Fedora/RHEL, run: sudo dnf install clang clang-devel"
+  elif [ -f /etc/debian_version ]; then
+     echo "  -> On Debian/Ubuntu, run: sudo apt-get install clang libclang-dev"
+  fi
+  MISSING_DEPS=1
+fi
+
+if [ $MISSING_DEPS -eq 1 ]; then
+  echo ""
+  echo "Some required dependencies are missing. Please install them and try again."
+  exit 1
+fi
+
 case $OS_NAME in
 Linux) OS_NAME="linux" ;;
 Darwin) OS_NAME="macos" ;;

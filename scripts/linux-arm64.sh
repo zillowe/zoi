@@ -16,6 +16,11 @@ MINI_NAME="zoi-mini-linux-arm64"
 echo -e "${CYAN}🏗 Building Zoi for ${TARGET}...${NC}"
 mkdir -p "$OUTPUT_DIR"
 
+if ! command -v clang &>/dev/null; then
+  echo -e "${RED}❌ 'clang' is not installed. It is required for bindgen during build.${NC}"
+  exit 1
+fi
+
 rustup target add "$TARGET"
 
 export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc

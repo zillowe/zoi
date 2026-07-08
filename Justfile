@@ -30,6 +30,7 @@ default: dev
 
 build:
     @if [ "{{ _is_configured }}" != "true" ]; then echo "Error: Project not configured. Run 'just configure' first."; exit 1; fi
+    @if ! command -v clang >/dev/null 2>&1; then echo "Error: 'clang' is not installed. It is required for bindgen."; exit 1; fi
     @echo "Building Zoi targets: {{ WITH_BIN }} in release mode (commit: {{ COMMIT_HASH }})..."
     @set -a; source .env 2>/dev/null; export ZOI_COMMIT_HASH={{ COMMIT_HASH }}; \
     if [ "{{ WITH_BIN }}" = "zoi" ]; then \
@@ -43,6 +44,7 @@ build:
 
 dev:
     @if [ "{{ _is_configured }}" != "true" ]; then echo "Error: Project not configured. Run 'just configure' first."; exit 1; fi
+    @if ! command -v clang >/dev/null 2>&1; then echo "Error: 'clang' is not installed. It is required for bindgen."; exit 1; fi
     @echo "Building Zoi targets: {{ WITH_BIN }} in debug mode (commit: {{ COMMIT_HASH }})..."
     @set -a; source .env 2>/dev/null; export ZOI_COMMIT_HASH={{ COMMIT_HASH }}; \
     if [ "{{ WITH_BIN }}" = "zoi" ]; then \

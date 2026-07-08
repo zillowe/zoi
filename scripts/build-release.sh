@@ -20,6 +20,11 @@ COMMIT=$(git rev-parse --short=10 HEAD 2>/dev/null || echo "dev")
 echo -e "${CYAN}Building Zoi release binary for $(uname -s)...${NC}"
 echo -e "${CYAN}Commit: $COMMIT${NC}"
 
+if ! command -v clang &>/dev/null; then
+    echo -e "${RED}❌ 'clang' is not installed. It is required for bindgen during build.${NC}"
+    exit 1
+fi
+
 if ZOI_COMMIT_HASH="$COMMIT" cargo build -p zoi-rs -p zoi-mini --release; then
     echo -e "${GREEN}Cargo build successful.${NC}"
 else
