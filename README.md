@@ -260,7 +260,7 @@ Install Zoi on macOS.
 Install Zoi using Homebrew (Also supports linux):
 
 ```sh
-brew install Zillowe/tap/zoi
+brew install zillowe/tap/zoi
 ```
 
 #### Windows
