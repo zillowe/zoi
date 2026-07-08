@@ -4,6 +4,38 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
+## [Prod. Release 1.21.0] - 2026-07-08
+
+### ⏩ Merged
+
+- Merge branch 'renovate/mlua-0.x' into 'main'
+
+### ♻️ Refactor
+
+- *(lockfile)* Implement automated integrity hashing and sync improvements
+- Unify Cargo.toml for all crates
+
+### ✨ Features
+
+- Implement parallel package preparation and align CLI with Spec v2
+- *(install)* Implement two-phase package installation process
+
+### 🛠️ Build
+
+- Add Clang as a dep
+- Add zoi.lock
+- Remove Makefile in favour of Justfile
+
+### 🛡️ Dependencies
+
+- Fix cargo-deny
+- Update Rust crate mlua to 0.12.0
+
+### 🩹 Bug Fixes
+
+- *(project)* Ensure absolute integrity and state determinism
+- *(use)* Add support for zoi.lua detection instead of zoi.yaml
+
 ## [Prod. Release 1.20.3] - 2026-07-01
 
 ### ♻️ Refactor
