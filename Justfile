@@ -6,12 +6,12 @@ set dotenv-filename := "config.just"
 PREFIX := env("PREFIX", "/usr/local")
 OS_NAME := env("OS_NAME", shell("uname -s | tr '[:upper:]' '[:lower:]'"))
 ARCH_NAME := env("ARCH_NAME", shell("uname -m"))
+SHELL_NAME := env("SHELL_NAME", shell("basename $SHELL"))
 WITH_BIN := env("WITH_BIN", "both")
 
 BINDIR := env("BINDIR", PREFIX + "/bin")
 DEBUGDIR := env("DEBUGDIR", "dist")
 DEV_BINDIR := DEBUGDIR + "/bin"
-DEV_MANDIR := DEBUGDIR + "/man"
 NAME := "zoi"
 
 MINI_NAME := "zoi-mini"
@@ -26,11 +26,13 @@ MINI_DEBUG_SRC_BIN := "target/debug/" + MINI_NAME + EXE_EXT
 [private]
 _is_configured := if path_exists("config.just") == "true" { "true" } else { "false" }
 
-default: dev
+default: all
+
+all: build install setup
+    @echo "Done"
 
 build:
     @if [ "{{ _is_configured }}" != "true" ]; then echo "Error: Project not configured. Run 'just configure' first."; exit 1; fi
-    @if ! command -v clang >/dev/null 2>&1; then echo "Error: 'clang' is not installed. It is required for bindgen."; exit 1; fi
     @echo "Building Zoi targets: {{ WITH_BIN }} in release mode (commit: {{ COMMIT_HASH }})..."
     @set -a; source .env 2>/dev/null; export ZOI_COMMIT_HASH={{ COMMIT_HASH }}; \
     if [ "{{ WITH_BIN }}" = "zoi" ]; then \
@@ -44,7 +46,6 @@ build:
 
 dev:
     @if [ "{{ _is_configured }}" != "true" ]; then echo "Error: Project not configured. Run 'just configure' first."; exit 1; fi
-    @if ! command -v clang >/dev/null 2>&1; then echo "Error: 'clang' is not installed. It is required for bindgen."; exit 1; fi
     @echo "Building Zoi targets: {{ WITH_BIN }} in debug mode (commit: {{ COMMIT_HASH }})..."
     @set -a; source .env 2>/dev/null; export ZOI_COMMIT_HASH={{ COMMIT_HASH }}; \
     if [ "{{ WITH_BIN }}" = "zoi" ]; then \
@@ -94,25 +95,22 @@ uninstall:
     @rm -f "{{ BINDIR }}/{{ MINI_NAME }}{{ EXE_EXT }}"
     @echo "Binaries uninstalled."
 
-man:
-    @if [ "{{ _is_configured }}" != "true" ]; then echo "Error: Project not configured. Run 'just configure' first."; exit 1; fi
-    @mkdir -p "{{ DEV_MANDIR }}"
-    @OUT_DIR="{{ DEV_MANDIR }}" {{ DEBUG_SRC_BIN }} generate-manual
-
 clean:
     @echo "Cleaning project artifacts..."
     @cargo clean
     @rm -f config.mk config.just
     @echo "Cleaned."
 
+setup:
+    @if [ "{{ _is_configured }}" != "true" ]; then echo "Error: Project not configured. Run 'just configure' first."; exit 1; fi
+    @echo "Running setup for the '{{ SHELL_NAME }}' shell..."
+    @{{ SRC_BIN }} shell {{ SHELL_NAME }}
+    @{{ SRC_BIN }} setup
+    @echo ""
+    @echo "Setup complete. Please restart your shell."
+
 configure *args:
     ./configure {{ args }}
 
 help:
-    @echo "just 		alias to 'just dev'"
-    @echo "just build 	build zoi in release mode"
-    @echo "just dev 	build zoi in debug mode"
-    @echo "just install 	install Zoi binary to PREFIX or default user's bin location"
-    @echo "just uninstall 	uninstall Zoi binary"
-    @echo "just man        generate man pages"
-    @echo "just clean 	clean project artifacts"
+    @just --list

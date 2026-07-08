@@ -82,7 +82,6 @@ pub fn run(
             ));
         }
         scope_override = Some(types::Scope::Project);
-        crate::pkg::frozen::set_frozen(true);
     }
 
     let lockfile_exists = sources.is_empty()
@@ -787,7 +786,7 @@ pub fn run(
                 } else {
                     node.version.clone()
                 };
-                println!("@{}:{}", name, version_display);
+                println!(" @{}:{}", name, version_display);
                 stage_direct_ids.push(pkg_id.clone());
             }
         }
@@ -992,14 +991,9 @@ pub fn run(
 
         for manifest in &all_final_manifests {
             let packages_key = if let Some(sub) = &manifest.sub_package {
-                format!(
-                    "@{}/{}:{}",
-                    manifest.repo.trim(),
-                    manifest.name.trim(),
-                    sub.trim()
-                )
+                format!("@{}/{}:{}", manifest.repo, manifest.name, sub)
             } else {
-                format!("@{}/{}", manifest.repo.trim(), manifest.name.trim())
+                format!("@{}/{}", manifest.repo, manifest.name)
             };
 
             if let Some(reg) = all_configured_regs

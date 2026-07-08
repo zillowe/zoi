@@ -66,9 +66,6 @@ pub fn read_zoi_lock() -> Result<types::ZoiLockV2> {
 }
 
 pub fn write_zoi_lock(lockfile: &mut types::ZoiLockV2) -> Result<()> {
-    if zoi_core::frozen::is_frozen() {
-        return Ok(());
-    }
     let path = get_lockfile_path()?;
 
     if let Ok(store_dir) = zoi_core::utils::get_store_base_dir(types::Scope::Project) {
@@ -111,7 +108,7 @@ pub fn locked_packages(lockfile: &types::ZoiLockV2) -> Vec<FrozenLockPackage> {
 
     for (key, detail) in &lockfile.installed_packages {
         packages.push(FrozenLockPackage {
-            source: format!("{}@{}", key.trim(), detail.version),
+            source: format!("{}@{}", key, detail.version),
             revision: detail.revision.clone(),
             direct: detail.why == "direct",
             chosen_options: Vec::new(),

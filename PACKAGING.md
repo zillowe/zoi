@@ -12,7 +12,6 @@ These are required to compile Zoi from source.
 
 - **Rust**: Current minimum version is `1.92.0` 2024 edition from the stable channel (see [`rust-toolchain.toml`](./rust-toolchain.toml) for the channel and [`Cargo.toml`](./Cargo.toml) for the Rust version and edition).
 - **C Compiler**: A C compiler like `gcc` is required. Packages like `build-essential` (Debian/Ubuntu) or `base-devel` (Arch Linux) usually provide this.
-- **Clang/LLVM**: `clang` and `libclang-dev` (Debian/Ubuntu) or `clang-devel` (Fedora) are required for `bindgen` (used by `openssl-sys` and other crates).
 - **OpenSSL**: The development libraries for OpenSSL are required. This is usually `libssl-dev` (Debian/Ubuntu) or `openssl-devel` (Fedora/CentOS).
 - **pkg-config**: The `pkg-config` utility is needed to locate libraries.
 - **liblzma**: The development libraries for lzma (`liblzma-dev`).
@@ -43,20 +42,20 @@ cargo build --bin zoi-mini --release
 
 This will produce the `zoi` and `zoi-mini` binaries in `target/release/`.
 
-### Using the Justfile
+### Using the Makefile
 
-The project provides a `Justfile` for convenience, which simplifies building and installing.
+The project provides a `Makefile` for convenience, which simplifies building and installing.
 
 ```sh
-# Configure build paths (creates config.just)
+# Configure build paths (creates config.mk)
 # You can also specify which binaries to build: --with-bin=zoi|zoi-mini|both (default: both)
 ./configure --prefix=/usr/local --with-bin=both
 
 # Build zoi and zoi-mini in release mode
-just build
+make build
 
 # Install the binaries to the configured location
-sudo just install
+sudo make install
 ```
 
 ### Using Build Scripts
