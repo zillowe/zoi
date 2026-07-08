@@ -21,6 +21,11 @@ if ! command -v cargo &>/dev/null; then
   exit 1
 fi
 
+if ! command -v clang &>/dev/null; then
+  echo -e "${RED}❌ 'clang' is not installed. It is required for bindgen during build.${NC}"
+  exit 1
+fi
+
 echo -e "${CYAN}🏗 Starting native macOS build process...${NC}"
 echo -e "${CYAN}▸ Commit: ${COMMIT}${NC}\n"
 mkdir -p "$OUTPUT_DIR"

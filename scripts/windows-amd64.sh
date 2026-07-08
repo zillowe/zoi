@@ -16,6 +16,11 @@ MINI_NAME="zoi-mini-windows-amd64.exe"
 echo -e "${CYAN}🏗 Building Zoi for ${TARGET}...${NC}"
 mkdir -p "$OUTPUT_DIR"
 
+if ! command -v clang &>/dev/null; then
+  echo -e "${RED}❌ 'clang' is not installed. It is required for bindgen during build.${NC}"
+  exit 1
+fi
+
 rustup target add "$TARGET"
 
 export CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc

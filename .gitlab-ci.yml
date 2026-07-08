@@ -16,7 +16,7 @@ stages:
 
 .base_apt: &base_apt
   - apt-get update -yq
-  - apt-get install -y build-essential gcc libssl-dev pkg-config liblzma-dev git
+  - apt-get install -y build-essential gcc libssl-dev pkg-config liblzma-dev git clang libclang-dev
 
 .rust_setup:
   image: rust:latest
@@ -123,7 +123,7 @@ build:linux-arm64:
   before_script:
     - dpkg --add-architecture arm64
     - apt-get update -yq
-    - apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libssl-dev:arm64 pkg-config liblzma-dev:arm64 git
+    - apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libssl-dev:arm64 pkg-config liblzma-dev:arm64 git clang libclang-dev
   script:
     - chmod +x ./scripts/linux-arm64.sh
     - ./scripts/linux-arm64.sh
@@ -139,7 +139,7 @@ build:windows-amd64:
   extends: .build_linux_base
   before_script:
     - apt-get update -yq
-    - apt-get install -y gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 git
+    - apt-get install -y gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 git clang libclang-dev
   script:
     - chmod +x ./scripts/windows-amd64.sh
     - ./scripts/windows-amd64.sh
@@ -191,7 +191,7 @@ package:deb:
   before_script:
     - dpkg --add-architecture arm64
     - apt-get update -yq
-    - apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libssl-dev:arm64 liblzma-dev:arm64
+    - apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libssl-dev:arm64 liblzma-dev:arm64 git clang libclang-dev
     - cargo install cargo-deb
   script:
     - chmod +x ./scripts/deb-package.sh
@@ -212,7 +212,7 @@ package:rpm:
   before_script:
     - dpkg --add-architecture arm64
     - apt-get update -yq
-    - apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libssl-dev:arm64 liblzma-dev:arm64
+    - apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libssl-dev:arm64 liblzma-dev:arm64 git clang libclang-dev
     - cargo install cargo-generate-rpm
   script:
     - chmod +x ./scripts/rpm-package.sh

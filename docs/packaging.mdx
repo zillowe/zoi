@@ -11,6 +11,7 @@ These are required to compile Zoi from source.
 
 - **Rust Toolchain**: Zoi requires a specific version of the Rust compiler. Refer to `rust-toolchain.toml` for the exact channel and `Cargo.toml` for the Rust version and edition.
 - **C Compiler**: A C compiler like `gcc` or `clang`.
+- **Clang/LLVM**: `clang` and `libclang-dev` (Debian/Ubuntu) or `clang-devel` (Fedora) are required for `bindgen` (used by `openssl-sys` and other crates).
 - **OpenSSL**: Development libraries for OpenSSL (`libssl-dev` or `openssl-devel`).
 - **pkg-config**: The `pkg-config` utility.
 - **liblzma**: Development libraries for lzma (`liblzma-dev`).
