@@ -108,3 +108,14 @@ if [[ -n $(git status --porcelain) ]]; then
   git push origin main
 fi
 cd ..
+
+echo "--- Fedora COPR ---"
+git clone "ssh://git@github.com/zillowe/fedora-zoi.git" fedora_zoi
+cp "$TMP_PACKAGES/fedora/zoi.spec" fedora_zoi/
+cd fedora_zoi
+if [[ -n $(git status --porcelain) ]]; then
+  git add .
+  git commit -m "Release: $VERSION"
+  git push origin main
+fi
+cd ..
