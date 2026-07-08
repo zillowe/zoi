@@ -2,6 +2,9 @@ use crate::types;
 use anyhow::{Result, anyhow};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{LazyLock, Mutex};
+
+static RECORD_MUTEX: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
 fn get_lockfile_path(scope: types::Scope) -> Result<PathBuf> {
     let path = if scope == types::Scope::Project {
@@ -31,6 +34,9 @@ fn read_lockfile(scope: types::Scope) -> Result<types::ZoiLockV2> {
 }
 
 fn write_lockfile(lockfile: &mut types::ZoiLockV2, scope: types::Scope) -> Result<()> {
+    if crate::frozen::is_frozen() {
+        return Ok(());
+    }
     let path = get_lockfile_path(scope)?;
 
     if let Ok(store_dir) = crate::utils::get_store_base_dir(scope) {
@@ -71,12 +77,15 @@ pub fn record_package(
     _chosen_optionals: &[String],
     sub_package: Option<String>,
 ) -> Result<()> {
+    let _lock = RECORD_MUTEX
+        .lock()
+        .map_err(|e| anyhow!("Mutex poisoned: {}", e))?;
     let mut lockfile = read_lockfile(pkg.scope)?;
 
     let package_key = if let Some(sub) = &sub_package {
-        format!("@{}/{}:{}", pkg.repo, pkg.name, sub)
+        format!("@{}/{}:{}", pkg.repo.trim(), pkg.name.trim(), sub.trim())
     } else {
-        format!("@{}/{}", pkg.repo, pkg.name)
+        format!("@{}/{}", pkg.repo.trim(), pkg.name.trim())
     };
 
     let os = std::env::consts::OS;
@@ -102,8 +111,14 @@ pub fn record_package(
             types::InstallReason::Dependency { .. } => "dependency".to_string(),
         },
         description: pkg.description.clone(),
-        package_type_install: "pre-compiled".to_string(),
-        install_method: "pre-built".to_string(),
+        package_type_install: format!("{:?}", pkg.package_type).to_lowercase(),
+        install_method: if pkg.types.contains(&"source".to_string())
+            && !pkg.types.contains(&"pre-compiled".to_string())
+        {
+            "source".to_string()
+        } else {
+            "pre-compiled".to_string()
+        },
         installed_sub_packages: sub_package.clone().map(|s| vec![s]).unwrap_or_default(),
         platform,
         hash,
@@ -187,11 +202,17 @@ pub fn update_package_reason(
     manifest: &types::InstallManifest,
     new_reason: types::InstallReason,
 ) -> Result<()> {
+    let _lock = RECORD_MUTEX
+        .lock()
+        .map_err(|e| anyhow!("Mutex poisoned: {}", e))?;
     let mut lockfile = read_lockfile(manifest.scope)?;
+    let repo = manifest.repo.trim();
+    let name = manifest.name.trim();
+
     let package_key = if let Some(sub) = &manifest.sub_package {
-        format!("@{}/{}:{}", manifest.repo, manifest.name, sub)
+        format!("@{}/{}:{}", repo, name, sub.trim())
     } else {
-        format!("@{}/{}", manifest.repo, manifest.name)
+        format!("@{}/{}", repo, name)
     };
 
     if let Some(pkg) = lockfile.installed_packages.get_mut(&package_key) {
@@ -208,11 +229,17 @@ pub fn update_package_reason(
 }
 
 pub fn remove_package_from_record(manifest: &types::InstallManifest) -> Result<()> {
+    let _lock = RECORD_MUTEX
+        .lock()
+        .map_err(|e| anyhow!("Mutex poisoned: {}", e))?;
     let mut lockfile = read_lockfile(manifest.scope)?;
+    let repo = manifest.repo.trim();
+    let name = manifest.name.trim();
+
     let package_key = if let Some(sub) = &manifest.sub_package {
-        format!("@{}/{}:{}", manifest.repo, manifest.name, sub)
+        format!("@{}/{}:{}", repo, name, sub.trim())
     } else {
-        format!("@{}/{}", manifest.repo, manifest.name)
+        format!("@{}/{}", repo, name)
     };
 
     if lockfile.installed_packages.remove(&package_key).is_some() {

@@ -787,6 +787,35 @@ pub fn confirm_untrusted_source(
     }
 }
 
+pub fn expand_placeholders(
+    path: &str,
+    version_dir: &Path,
+    scope: crate::types::Scope,
+) -> Result<String> {
+    let mut expanded = path.to_string();
+    expanded = expanded.replace("${pkgstore}", &version_dir.to_string_lossy());
+    expanded = expanded.replace(
+        "${usrroot}",
+        &crate::sysroot::apply_sysroot(PathBuf::from("/")).to_string_lossy(),
+    );
+    if let Some(home_dir) = home::home_dir() {
+        expanded = expanded.replace("${usrhome}", &home_dir.to_string_lossy());
+    }
+
+    let applications_dir = match scope {
+        crate::types::Scope::System => PathBuf::from("/Applications"),
+        crate::types::Scope::User => home::home_dir()
+            .map(|h| h.join("Applications"))
+            .unwrap_or_else(|| PathBuf::from("/Applications")),
+        crate::types::Scope::Project => std::env::current_dir()
+            .unwrap_or_default()
+            .join("Applications"),
+    };
+    expanded = expanded.replace("${applications}", &applications_dir.to_string_lossy());
+
+    Ok(expanded)
+}
+
 pub fn get_current_shell() -> Option<Shell> {
     if cfg!(windows) {
         return Some(Shell::PowerShell);

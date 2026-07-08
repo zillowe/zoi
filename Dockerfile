@@ -12,7 +12,7 @@ ARG ZOI_ABOUT_PACKAGER_AUTHOR=""
 ARG ZOI_ABOUT_PACKAGER_EMAIL=""
 ARG ZOI_ABOUT_PACKAGER_HOMEPAGE=""
 
-RUN pacman -Syu --noconfirm --needed base-devel pkgconf openssl git rust
+RUN pacman -Syu --noconfirm --needed base-devel pkgconf openssl git rust clang
 
 # Set the working directory.
 WORKDIR /usr/src/app

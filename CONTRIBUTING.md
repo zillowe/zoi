@@ -64,11 +64,11 @@ To get started with developing Zoi, you'll need to set up your local environment
 ### Prerequisites
 
 - **Rust:** Make sure you have the latest version of Rust and Cargo installed. You can find instructions at [rust-lang.org](https://www.rust-lang.org/tools/install).
-- **Make:** The `make` command is required for our Makefile-based build process.
+- **Just:** The `just` command is required for our Justfile-based build process.
 
 ### First-Time Setup
 
-Because Zoi is used to manage its own development, you must first build and install it manually using `make` (Or you can install [pre-compiled binaries](/README.md#-installation) instead):
+Because Zoi is used to manage its own development, you must first build and install it manually using `just` (Or you can install [pre-compiled binaries](/README.md#-installation) instead):
 
 1. **Configure the build:**
 
@@ -79,12 +79,10 @@ Because Zoi is used to manage its own development, you must first build and inst
 2. **Build and install:**
 
    ```sh
-   make build
+   just build
    # Or for a debug build:
-   # make dev
-   sudo make install
-   # (optional) Install CLI completions and setup Zoi's PATH
-   make setup
+   # just dev
+   sudo just install
    ```
 
 Once you have a working `zoi` command, you can use it for all other development tasks.
@@ -202,20 +200,16 @@ Here are the most common commands defined in `zoi.yaml`:
   zoi run build
   ```
 
-- **`build` (Just/Make)**: Builds a release version of Zoi.
+- **`build` (Just)**: Builds a release version of Zoi.
 
   ```sh
   just build
-  # or
-  make build
   ```
 
-- **`dev` (Just/Make)**: Builds a dev version of Zoi.
+- **`dev` (Just)**: Builds a dev version of Zoi.
 
   ```sh
   just dev
-  # or
-  make dev
   ```
 
 - **`install`**: Performs a clean build and installs the latest version of Zoi, including shell completions. This is useful for testing your changes in a live environment.

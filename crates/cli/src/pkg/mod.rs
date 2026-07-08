@@ -1,5 +1,6 @@
 pub use zoi_core::config;
 pub use zoi_core::dependency;
+pub use zoi_core::frozen;
 pub use zoi_core::hash;
 pub use zoi_core::lock;
 pub use zoi_core::offline;

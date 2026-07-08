@@ -16,6 +16,11 @@ MINI_NAME="zoi-mini-macos-amd64"
 echo -e "${CYAN}🏗 Building Zoi for ${TARGET}...${NC}"
 mkdir -p "$OUTPUT_DIR"
 
+if ! command -v clang &>/dev/null; then
+  echo -e "${RED}❌ 'clang' is not installed. It is required for bindgen during build.${NC}"
+  exit 1
+fi
+
 rustup target add "$TARGET"
 
 if ! ZOI_COMMIT_HASH="$COMMIT" cargo build -p zoi-rs -p zoi-mini --target "$TARGET" --release; then
