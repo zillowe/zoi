@@ -375,6 +375,10 @@ enum Commands {
         #[arg(short, long)]
         recursive: bool,
 
+        /// Do not actually uninstall, just show what would be done
+        #[arg(long)]
+        dry_run: bool,
+
         /// Explain uninstall decisions (dependency impact and safety blocks)
         #[arg(long)]
         explain: bool,
@@ -1024,6 +1028,7 @@ pub fn run() -> anyhow::Result<()> {
                 global,
                 save,
                 recursive,
+                dry_run,
                 explain,
                 plan_json,
             } => cmd::uninstall::run(
@@ -1037,6 +1042,7 @@ pub fn run() -> anyhow::Result<()> {
                 Some(&plugin_manager),
                 explain,
                 plan_json,
+                dry_run,
             )
             .map_err(|e| cmd::ux::with_failure_hint("uninstall", e)),
             Commands::Run { cmd_alias, args } => cmd::run::run(cmd_alias, args),

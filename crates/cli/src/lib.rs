@@ -86,5 +86,5 @@ pub fn install_sources(sources: &[String], options: &SourceInstallOptions) -> Re
 }
 
 pub fn uninstall_package(package_name: &str, scope_override: Option<Scope>) -> Result<()> {
-    zoi_uninstall::run(package_name, scope_override, false, false).map(|_| ())
+    zoi_uninstall::run(package_name, scope_override, false, false, false).map(|_| ())
 }
