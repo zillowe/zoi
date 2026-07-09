@@ -281,9 +281,10 @@ license-report:
   stage: package
   image: rust:latest
   before_script:
-    - cd /tmp && cargo install cargo-about --locked --features cli
+    - curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+    - cargo binstall cargo-about -y
   script:
-    - cd $CI_PROJECT_DIR && cargo about generate about.hbs > license.html
+    - cargo about generate about.hbs > license.html
   artifacts:
     paths:
       - license.html
