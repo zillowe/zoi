@@ -107,45 +107,29 @@ fn post_process_completions(shell: Shell, mut script: String) -> String {
     match shell {
         Shell::Zsh => {
             let helper = r#"
+_zoi_packages() {
+    local -a entries
+    local line
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        entries+=("$line")
+    done < <(zoi complete zsh $CURRENT "${words[@]}" 2>/dev/null)
+    _describe -t packages 'packages' entries
+}
+
 _zoi_all_packages() {
-    local -a packages
-    packages=(${(f)"$(_zoi_do_list_all)"})
-    _describe -t packages 'available packages' packages
+    _zoi_packages
 }
 
 _zoi_installed_packages() {
-    local -a packages
-    packages=(${(f)"$(_zoi_do_list_installed)"})
-    _describe -t packages 'installed packages' packages
-}
-
-_zoi_packages() {
-    local -a packages
-    case $words[2] in
-        uninstall|un|rm|remove|mark|m|update|up|why|files|pin|unpin|downgrade|dg|rollback)
-            packages=(${(f)"$(_zoi_do_list_installed)"})
-            _describe -t packages 'installed packages' packages
-            ;;
-        *)
-            packages=(${(f)"$(_zoi_do_list_all)"})
-            _describe -t packages 'available packages' packages
-            ;;
-    esac
-}
-
-_zoi_do_list_all() {
-    zoi list -a --completion 2>/dev/null
-}
-
-_zoi_do_list_installed() {
-    zoi list --completion 2>/dev/null
+    _zoi_packages
 }
 "#;
             script.push_str(helper);
 
-            script = script.replace("':ALL_SOURCES: '", "':package:(_zoi_all_packages)'");
-            script = script.replace("':ALL_PACKAGES: '", "':package:(_zoi_all_packages)'");
-            script = script.replace("':INST_PACKAGES: '", "':package:(_zoi_installed_packages)'");
+            script = script.replace("':ALL_SOURCES: '", "':package:(_zoi_packages)'");
+            script = script.replace("':ALL_PACKAGES: '", "':package:(_zoi_packages)'");
+            script = script.replace("':INST_PACKAGES: '", "':package:(_zoi_packages)'");
 
             let desc_marker = " -- Package identifier (e.g. @repo/name, path, or URL):";
             let mut search_start = 0;

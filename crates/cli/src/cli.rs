@@ -91,6 +91,18 @@ enum Commands {
         shell: Shell,
     },
 
+    /// Dynamic shell completions (internal use)
+    #[command(hide = true)]
+    Complete {
+        /// The shell to complete for
+        #[arg(value_enum)]
+        shell: Shell,
+        /// Current word index (1-based)
+        index: usize,
+        /// All words in the command line
+        words: Vec<String>,
+    },
+
     /// Generates man pages for zoi
     #[command(hide = true)]
     GenerateManual,
@@ -870,6 +882,11 @@ pub fn run() -> anyhow::Result<()> {
                 generate(shell, &mut cmd, bin_name, &mut io::stdout());
                 Ok(())
             }
+            Commands::Complete {
+                shell,
+                index,
+                words,
+            } => cmd::complete::run(shell, index, words),
             Commands::GenerateManual => cmd::gen_man::run().map_err(Into::into),
             Commands::Version => {
                 cmd::version::run(BRANCH, STATUS, NUMBER, commit);
