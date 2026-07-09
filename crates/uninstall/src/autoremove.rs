@@ -51,7 +51,7 @@ pub fn run(yes: bool, dry_run: bool) -> Result<()> {
 
     for pkg_name in &packages_to_remove {
         println!("\n{} Removing {}...", "::".bold().blue(), pkg_name.bold());
-        if let Err(e) = crate::run(pkg_name, None, yes, false) {
+        if let Err(e) = crate::run(pkg_name, None, yes, false, false) {
             eprintln!("{} Failed to remove {}: {}", "Error:".red(), pkg_name, e);
         }
     }

@@ -20,6 +20,7 @@ pub fn run(
     plugin_manager: Option<&crate::pkg::plugin::PluginManager>,
     explain: bool,
     plan_json: bool,
+    dry_run: bool,
 ) -> Result<()> {
     let mut scope_override = scope.map(|s| match s {
         crate::cli::InstallScope::User => types::Scope::User,
@@ -297,6 +298,17 @@ pub fn run(
         }
     }
 
+    if dry_run {
+        println!("\n{}", "Dry-run mode: no changes will be made.".yellow());
+        ux::print_transaction_summary(&ux::TransactionSummary {
+            command: "uninstall".to_string(),
+            success: 0,
+            failed: 0,
+            skipped: manifests_to_uninstall.len(),
+        });
+        return Ok(());
+    }
+
     if !crate::utils::ask_for_confirmation(":: Proceed with removal?", yes) {
         let _ = lock::release_lock();
         ux::print_transaction_summary(&ux::TransactionSummary {
@@ -342,7 +354,7 @@ pub fn run(
             source_str.blue().bold()
         );
 
-        match pkg::uninstall::run(&source_str, scope_override, yes, false) {
+        match pkg::uninstall::run(&source_str, scope_override, yes, false, false) {
             Ok(uninstalled_manifest) => {
                 if let Err(e) = transaction::record_operation(
                     &mut transaction,

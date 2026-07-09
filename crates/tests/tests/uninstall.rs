@@ -122,7 +122,7 @@ fn test_uninstall_uses_stored_package_source_over_registry_drift() {
         Some("${usrhome}/db-hit"),
     );
 
-    uninstall::run("test-pkg", Some(types::Scope::User), true, false).unwrap();
+    uninstall::run("test-pkg", Some(types::Scope::User), true, false, false).unwrap();
 
     assert!(
         !stored_hit.exists(),
@@ -145,7 +145,7 @@ fn test_uninstall_requires_explicit_source_for_ambiguous_name_matches() {
     local::write_manifest(&sample_manifest("shared", "core")).unwrap();
     local::write_manifest(&sample_manifest("shared", "extra")).unwrap();
 
-    let err = uninstall::run("shared", Some(types::Scope::User), true, false).unwrap_err();
+    let err = uninstall::run("shared", Some(types::Scope::User), true, false, false).unwrap_err();
     assert!(err.to_string().contains("ambiguous"));
 }
 
@@ -174,6 +174,7 @@ fn test_uninstall_explicit_source_removes_only_matching_install() {
         "#local@extra/shared@1.0.0",
         Some(types::Scope::User),
         true,
+        false,
         false,
     )
     .unwrap();
@@ -225,6 +226,7 @@ fn test_cmd_uninstall_respects_scope_override_when_names_overlap() {
         true,
         false,
         Some(&plugin_manager),
+        false,
         false,
         false,
     )

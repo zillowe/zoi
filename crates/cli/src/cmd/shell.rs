@@ -125,7 +125,11 @@ _zoi_installed_packages() {
     _zoi_packages
 }
 "#;
-            script.push_str(helper);
+            let mut parts = script.splitn(2, '\n');
+            let header = parts.next().unwrap_or("");
+            let body = parts.next().unwrap_or("");
+
+            script = format!("{}\n{}\n{}", header, helper, body);
 
             script = script.replace("':ALL_SOURCES: '", "':package:(_zoi_packages)'");
             script = script.replace("':ALL_PACKAGES: '", "':package:(_zoi_packages)'");

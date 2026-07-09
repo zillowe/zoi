@@ -126,9 +126,14 @@ fn uninstall_collection(
     registry_handle: Option<String>,
     yes: bool,
     quiet: bool,
+    dry_run: bool,
 ) -> anyhow::Result<types::InstallManifest> {
     if !quiet {
         println!("Uninstalling collection '{}'...", pkg.name.bold());
+    }
+
+    if dry_run {
+        return Ok(manifest.clone());
     }
 
     let dependencies_to_uninstall = &manifest.installed_dependencies;
@@ -192,7 +197,7 @@ fn uninstall_collection(
             }
 
             if let Err(e) = dependencies::uninstall_dependency(dep_str, &move |name| {
-                run(name, Some(scope), yes, quiet).map(|_| ())
+                run(name, Some(scope), yes, quiet, dry_run).map(|_| ())
             }) && !quiet
             {
                 eprintln!(
@@ -309,6 +314,7 @@ pub fn run(
     scope_override: Option<types::Scope>,
     yes: bool,
     quiet: bool,
+    dry_run: bool,
 ) -> anyhow::Result<types::InstallManifest> {
     let request = resolve::parse_source_string(package_name)?;
     let (manifest, scope) = find_installed_manifest(&request, scope_override)?;
@@ -317,7 +323,19 @@ pub fn run(
     let (pkg, pkg_lua_path) = load_installed_package(&manifest, yes)?;
 
     if pkg.package_type == types::PackageType::Collection {
-        return uninstall_collection(&pkg, &manifest, scope, registry_handle.clone(), yes, quiet);
+        return uninstall_collection(
+            &pkg,
+            &manifest,
+            scope,
+            registry_handle.clone(),
+            yes,
+            quiet,
+            dry_run,
+        );
+    }
+
+    if dry_run {
+        return Ok(manifest);
     }
 
     let handle = manifest.registry_handle.as_str();
