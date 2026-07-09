@@ -16,11 +16,12 @@ The Security Policy can be found online at [zillowe.qzz.io/docs/book/guidelines/
 | [AUR `zoi-bin`](https://aur.archlinux.org/packages/zoi-bin)                               | ✔️        |
 | [Debian / Ubuntu (`.deb`)](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases)       | ✔️        |
 | [Fedora / RHEL (`.rpm`)](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases)         | ✔️        |
+| [Fedora (COPR)](https://copr.fedorainfracloud.org/coprs/zillowez/zoi/)                    | ✔️        |
 | [Homebrew](https://github.com/zillowe/homebrew-tap)                                       | ✔️        |
 | [Scoop](https://github.com/zillowe/scoop)                                                 | ✔️        |
 | [Crates.io `zoi-rs`](https://crates.io/crates/zoi-rs)                                     | ✔️        |
 | [Docker Image (GitLab)](https://gitlab.com/zillowe/zillwen/zusty/zoi/container_registry)  | ✔️        |
-| [Fedora `zoi-rs`](https://github.com/terrapkg/packages/tree/frawhide/anda/langs/rust/zoi) | ❌        |
+| [Fedora Terra](https://github.com/terrapkg/packages/tree/frawhide/anda/langs/rust/zoi)    | ❔        |
 | [NPM `@zillowe/zoi`](https://www.npmjs.com/package/@zillowe/zoi)                          | ❌        |
 
 The NPM package just runs the installer script.
@@ -30,7 +31,7 @@ Fedora package is from an external [Terra](https://terra.fyralabs.com/) repo and
 Meanings:
 
 - ✔️ Fully supported
-- ❔ Not fully supported
+- ❔ Somewhat supported
 - ❌ Not supported
 
 ## Security Updates

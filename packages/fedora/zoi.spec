@@ -5,7 +5,7 @@ Summary:        Advanced Package Manager & Environment Orchestrator
 
 License:        Apache-2.0
 URL:            https://gitlab.com/zillowe/zillwen/zusty/zoi
-Source0:        %{url}/-/archive/%{version}/zoi-%{version}.tar.gz
+Source0:        %{url}/-/archive/Prod-Release-%{version}/Prod-Release-%{version}.tar.gz
 
 BuildRequires:  cargo
 BuildRequires:  rust
@@ -54,5 +54,4 @@ cp manuals/*.1 %{buildroot}%{_mandir}/man1/
 %changelog
 * Wed Jul 08 2026 Zillowe Foundation <contact@zillowe.qzz.io> - 1.21.0-1
 - Initial release for Fedora COPR
-- Added zoi-mini binary
 - Added shell completions and man pages
