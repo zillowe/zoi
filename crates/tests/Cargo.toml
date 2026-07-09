@@ -10,6 +10,7 @@ homepage.workspace = true
 documentation.workspace = true
 keywords.workspace = true
 categories.workspace = true
+publish = false
 
 [package.metadata.cargo-machete]
 ignored = [
@@ -82,7 +83,7 @@ zstd.workspace = true
 rusqlite.workspace = true
 rustc-hash.workspace = true
 
-zoi = { path = "../zoi-rs", package = "zoi-rs" }
+zoi.workspace = true
 zoi-core.workspace = true
 zoi-db.workspace = true
 zoi-deps.workspace = true

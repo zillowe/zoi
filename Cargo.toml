@@ -144,7 +144,7 @@ zoi-sync = { path = "crates/sync", version = "1.21.0" }
 zoi-uninstall = { path = "crates/uninstall", version = "1.21.0" }
 zoi-transaction = { path = "crates/transaction", version = "1.21.0" }
 zoi-plugins = { path = "crates/plugins", version = "1.21.0" }
-zoi-rs = { path = "crates/zoi-rs", version = "1.21.0" }
+zoi = { path = "crates/zoi-rs", version = "1.21.0", package = "zoi-rs" }
 
 [workspace.lints.clippy]
 too_many_arguments = "allow"
