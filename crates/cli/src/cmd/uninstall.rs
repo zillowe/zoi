@@ -98,9 +98,35 @@ pub fn run(
 
     let mut total_size_freed_bytes: u64 = 0;
     for manifest in &manifests_to_uninstall {
+        if let Some(size) = manifest.installed_size
+            && size > 0
+        {
+            total_size_freed_bytes += size;
+            continue;
+        }
+
+        let version_dir = match pkg::local::get_package_version_dir(
+            manifest.scope,
+            &manifest.registry_handle,
+            &manifest.repo,
+            &manifest.name,
+            &manifest.version,
+        ) {
+            Ok(d) => d,
+            Err(_) => continue,
+        };
+
         let mut package_size: u64 = 0;
         for file_path_str in &manifest.installed_files {
-            let path = Path::new(file_path_str);
+            let expanded = match pkg::utils::expand_placeholders(
+                file_path_str,
+                &version_dir,
+                manifest.scope,
+            ) {
+                Ok(e) => e,
+                Err(_) => continue,
+            };
+            let path = Path::new(&expanded);
             if !path.exists() {
                 continue;
             }
