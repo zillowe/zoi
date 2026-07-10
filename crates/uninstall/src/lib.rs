@@ -383,7 +383,7 @@ pub fn run(
     if !dependents.is_empty() {
         return Err(anyhow::anyhow!(
             "Cannot uninstall '{}' because other packages depend on it:\n  -{}\n\nPlease uninstall these packages first.",
-            &pkg.name,
+            pkg.name,
             dependents.join("\n  - ")
         ));
     }

@@ -272,7 +272,7 @@ fn install_zoi_dependency(
     println!("Not installed. Proceeding with zoi installation...");
 
     let (graph, _) = match crate::resolver::resolve_dependency_graph(
-        &[zoi_dep_name.to_string()],
+        std::slice::from_ref(&zoi_dep_name),
         Some(scope),
         false,
         yes,

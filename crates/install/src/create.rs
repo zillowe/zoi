@@ -73,7 +73,7 @@ pub fn run(
                     "{}",
                     format!(
                         "Warning: Directory '{}' already exists and is not empty.",
-                        &dest_name
+                        dest_name
                     )
                     .yellow()
                 );
@@ -84,7 +84,7 @@ pub fn run(
         } else {
             return Err(anyhow!(
                 "A file with the name '{}' already exists.",
-                &dest_name
+                dest_name
             ));
         }
     }
