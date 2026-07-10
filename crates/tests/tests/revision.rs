@@ -68,6 +68,7 @@ fn test_package_outdated_on_revision_bump() {
         installed_files: vec![],
         installed_size: None,
         sandbox: None,
+        completions: None,
     };
     local::write_manifest(&manifest).unwrap();
 

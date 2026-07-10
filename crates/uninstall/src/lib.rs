@@ -35,6 +35,43 @@ fn get_bin_root(scope: types::Scope) -> anyhow::Result<PathBuf> {
     }
 }
 
+fn get_completions_root(scope: types::Scope, shell: &str) -> anyhow::Result<PathBuf> {
+    match scope {
+        types::Scope::User => {
+            let home_dir =
+                home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
+            Ok(sysroot::apply_sysroot(
+                home_dir.join(".zoi/pkgs/shell").join(shell),
+            ))
+        }
+        types::Scope::System => {
+            if cfg!(target_os = "windows") {
+                Ok(sysroot::apply_sysroot(PathBuf::from(format!(
+                    "C:\\ProgramData\\zoi\\pkgs\\shell\\{}",
+                    shell
+                ))))
+            } else {
+                let base = match shell {
+                    "bash" => "/usr/share/bash-completion/completions",
+                    "zsh" => "/usr/share/zsh/site-functions",
+                    "fish" => "/usr/share/fish/vendor_completions.d",
+                    "elvish" => "/usr/share/elvish/lib",
+                    _ => "/usr/local/share/zoi/completions",
+                };
+                Ok(sysroot::apply_sysroot(PathBuf::from(base)))
+            }
+        }
+        types::Scope::Project => {
+            let current_dir = std::env::current_dir()?;
+            Ok(current_dir
+                .join(".zoi")
+                .join("pkgs")
+                .join("shell")
+                .join(shell))
+        }
+    }
+}
+
 fn cleanup_service(package_name: &str, scope: types::Scope) -> anyhow::Result<()> {
     let service_name = format!("zoi-{}", package_name);
     let is_user = scope != types::Scope::System;
@@ -546,6 +583,51 @@ pub fn run(
                         );
                     }
                     fs::remove_file(symlink_path)?;
+                }
+            }
+        }
+
+        if let Some(completions) = &manifest.completions {
+            for completion in completions {
+                let completions_root = get_completions_root(scope, &completion.shell)?;
+                let pkg_dir = completions_root.join(&pkg.name);
+                let symlink_path = pkg_dir.join(&completion.filename);
+                if symlink_path.is_symlink() || symlink_path.exists() {
+                    let other_providers = db::find_provides("local", &completion.filename)?;
+                    let still_provided = other_providers.iter().any(|(p, _)| {
+                        p.name != pkg.name || (p.sub_package != manifest.sub_package)
+                    });
+
+                    if !still_provided {
+                        if !quiet {
+                            println!(
+                                "Removing {} completion for {} from {}...",
+                                completion.shell.cyan(),
+                                completion.filename.cyan(),
+                                symlink_path.display()
+                            );
+                        }
+                        fs::remove_file(&symlink_path)?;
+                    } else if !quiet {
+                        println!(
+                            "Keeping {} completion for {} as it is still provided by other packages.",
+                            completion.shell.cyan(),
+                            completion.filename.cyan()
+                        );
+                    }
+                }
+            }
+
+            let shells: std::collections::HashSet<String> =
+                completions.iter().map(|c| c.shell.clone()).collect();
+            for shell_name in shells {
+                let pkg_dir = get_completions_root(scope, &shell_name)?.join(&pkg.name);
+                if pkg_dir.exists()
+                    && fs::read_dir(&pkg_dir)
+                        .map(|mut e| e.next().is_none())
+                        .unwrap_or(false)
+                {
+                    let _ = fs::remove_dir(&pkg_dir);
                 }
             }
         }

@@ -19,6 +19,67 @@ fn create_shim(link_path: &std::path::Path) -> Result<()> {
         .map_err(|e| anyhow!("Failed to create shim: {}", e))
 }
 
+pub(crate) fn get_completions_root(scope: types::Scope, shell: &str) -> Result<std::path::PathBuf> {
+    match scope {
+        types::Scope::User => {
+            let home_dir =
+                home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
+            Ok(zoi_core::sysroot::apply_sysroot(
+                home_dir.join(".zoi/pkgs/shell").join(shell),
+            ))
+        }
+        types::Scope::System => {
+            if cfg!(target_os = "windows") {
+                Ok(zoi_core::sysroot::apply_sysroot(std::path::PathBuf::from(
+                    format!("C:\\ProgramData\\zoi\\pkgs\\shell\\{}", shell),
+                )))
+            } else {
+                let base = match shell {
+                    "bash" => "/usr/share/bash-completion/completions",
+                    "zsh" => "/usr/share/zsh/site-functions",
+                    "fish" => "/usr/share/fish/vendor_completions.d",
+                    "elvish" => "/usr/share/elvish/lib",
+                    _ => "/usr/local/share/zoi/completions",
+                };
+                Ok(zoi_core::sysroot::apply_sysroot(std::path::PathBuf::from(
+                    base,
+                )))
+            }
+        }
+        types::Scope::Project => {
+            let current_dir = std::env::current_dir()?;
+            Ok(current_dir
+                .join(".zoi")
+                .join("pkgs")
+                .join("shell")
+                .join(shell))
+        }
+    }
+}
+
+pub(crate) fn create_completion_symlink(
+    source: &std::path::Path,
+    link: &std::path::Path,
+) -> Result<()> {
+    if link.exists() || link.is_symlink() {
+        fs::remove_file(link)?;
+    }
+    if let Some(parent) = link.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(source, link)
+            .map_err(|e| anyhow!("Failed to create completion symlink: {}", e))?;
+    }
+    #[cfg(windows)]
+    {
+        std::os::windows::fs::symlink_file(source, link)
+            .map_err(|e| anyhow!("Failed to create completion symlink: {}", e))?;
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone)]
 pub struct TransactionMetadata {
     pub id: String,

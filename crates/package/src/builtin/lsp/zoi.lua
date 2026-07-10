@@ -187,6 +187,13 @@ function zlicense(source) end
 ---@param source string Path relative to BUILD_DIR or ${pkgluadir}.
 function zdoc(source) end
 
+--- Stages a shell completion file for a specific shell.
+--- The file is copied to ${pkgstore}/shell/{shell}/{filename} and symlinked
+--- into the global completions directory (~/.zoi/pkgs/shell/{shell}/{package}/).
+---@param source string Path relative to BUILD_DIR or ${pkgluadir}.
+---@param shell string The shell name: "bash", "zsh", "fish", or "elvish".
+function zshell(source, shell) end
+
 --- Performs a regular expression replacement on a file within the build directory.
 ---@param pattern string The regex pattern to match.
 ---@param replacement string The string to replace the matched pattern.

@@ -72,6 +72,7 @@ fn test_linux_service_lifecycle() {
         installed_files: vec![],
         installed_size: None,
         sandbox: None,
+        completions: None,
     };
 
     let manifest_path = version_path.join("manifest.yaml");

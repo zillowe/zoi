@@ -35,6 +35,7 @@ fn sample_manifest(name: &str, repo: &str) -> types::InstallManifest {
         installed_files: vec![],
         installed_size: None,
         sandbox: None,
+        completions: None,
     }
 }
 

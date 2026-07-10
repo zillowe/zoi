@@ -35,6 +35,7 @@ fn test_manifest(name: &str, version: &str) -> InstallManifest {
         installed_files: vec![],
         installed_size: None,
         sandbox: None,
+        completions: None,
     }
 }
 

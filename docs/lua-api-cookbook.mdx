@@ -201,3 +201,38 @@ hooks({
     }
 })
 ```
+
+## Shell Completions
+
+Use `zshell()` to bundle shell completion scripts with your package. Zoi automatically symlinks them into the user's global completions directory and cleans them up on uninstall.
+
+```lua
+-- my-cli.pkg.lua
+metadata({
+  name = "my-cli",
+  repo = "community",
+  version = "1.0.0",
+  description = "A CLI tool with shell completions",
+  bins = { "my-cli" },
+  types = { "pre-compiled" },
+})
+
+function prepare()
+  UTILS.EXTRACT("https://example.com/my-cli-" .. SYSTEM.OS .. ".tar.zst", "src")
+end
+
+function package()
+  zcp("src/my-cli", "${pkgstore}/bin/my-cli")
+
+  -- Stage shell completions
+  zshell("${pkgluadir}/completions/_my-cli", "zsh")
+  zshell("${pkgluadir}/completions/my-cli.bash", "bash")
+  zshell("${pkgluadir}/completions/my-cli.fish", "fish")
+end
+```
+
+After installation, completions are available at:
+
+- **zsh**: `~/.zoi/pkgs/shell/zsh/my-cli/_my-cli` (add `~/.zoi/pkgs/shell/zsh` to `fpath`)
+- **bash**: `~/.zoi/pkgs/shell/bash/my-cli/my-cli.bash`
+- **fish**: `~/.zoi/pkgs/shell/fish/my-cli/my-cli.fish`

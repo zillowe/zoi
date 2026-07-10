@@ -214,6 +214,8 @@ pub fn run(shell: Shell, scope: SetupScope) -> Result<()> {
     let mut cmd = Cli::command();
     install_completions(shell, scope, &mut cmd)?;
 
+    install_package_completions(shell, scope)?;
+
     println!();
 
     let scope_to_pass = match scope {
@@ -221,6 +223,86 @@ pub fn run(shell: Shell, scope: SetupScope) -> Result<()> {
         SetupScope::System => types::Scope::System,
     };
     utils::setup_path(scope_to_pass)?;
+    Ok(())
+}
+
+fn get_completions_dir(scope: SetupScope, shell: &str) -> Result<PathBuf> {
+    match scope {
+        SetupScope::User => {
+            let home = dirs::home_dir().ok_or_else(|| anyhow!("Home directory not found"))?;
+            Ok(home.join(".zoi/pkgs/shell").join(shell))
+        }
+        SetupScope::System => {
+            if cfg!(target_os = "windows") {
+                Ok(PathBuf::from(format!(
+                    "C:\\ProgramData\\zoi\\pkgs\\shell\\{}",
+                    shell
+                )))
+            } else {
+                let base = match shell {
+                    "bash" => "/usr/share/bash-completion/completions",
+                    "zsh" => "/usr/share/zsh/site-functions",
+                    "fish" => "/usr/share/fish/vendor_completions.d",
+                    "elvish" => "/usr/share/elvish/lib",
+                    _ => "/usr/local/share/zoi/completions",
+                };
+                Ok(PathBuf::from(base))
+            }
+        }
+    }
+}
+
+fn install_package_completions(shell: Shell, scope: SetupScope) -> Result<()> {
+    let shell_name = match shell {
+        Shell::Bash => "bash",
+        Shell::Zsh => "zsh",
+        Shell::Fish => "fish",
+        Shell::Elvish => "elvish",
+        _ => return Ok(()),
+    };
+
+    let completions_dir = get_completions_dir(scope, shell_name)?;
+    fs::create_dir_all(&completions_dir)?;
+
+    match shell {
+        Shell::Zsh => {
+            let fpath_entry = completions_dir.to_string_lossy().to_string();
+            println!(
+                "{} Add this to your .zshrc to load package completions:",
+                "::".bold().blue()
+            );
+            println!("  fpath=({:?} $fpath)", fpath_entry);
+            println!("  autoload -Uz compinit && compinit");
+        }
+        Shell::Bash => {
+            let bash_completion_dir = match scope {
+                SetupScope::User => {
+                    let home =
+                        dirs::home_dir().ok_or_else(|| anyhow!("Home directory not found"))?;
+                    home.join(".local/share/bash-completion/completions")
+                }
+                SetupScope::System => PathBuf::from("/usr/share/bash-completion/completions"),
+            };
+            if bash_completion_dir.exists() {
+                println!(
+                    "{} Package completions directory: {:?}",
+                    "::".bold().blue(),
+                    completions_dir
+                );
+                println!("  Completions from installed packages will be available automatically.");
+            }
+        }
+        Shell::Fish => {
+            println!(
+                "{} Package completions directory: {:?}",
+                "::".bold().blue(),
+                completions_dir
+            );
+            println!("  Completions from installed packages will be available automatically.");
+        }
+        _ => {}
+    }
+
     Ok(())
 }
 
