@@ -120,6 +120,22 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
         create_shim(&symlink_path)?;
     }
 
+    if let Some(completions) = &prev_manifest.completions {
+        let prev_version_dir = package_dir.join(&previous_version);
+        for completion in completions {
+            let store_path = prev_version_dir
+                .join("shell")
+                .join(&completion.shell)
+                .join(&completion.filename);
+            let completions_root = super::get_completions_root(scope, &completion.shell)?;
+            let pkg_dir = completions_root.join(&prev_manifest.name);
+            let link_path = pkg_dir.join(&completion.filename);
+            if store_path.exists() {
+                let _ = super::create_completion_symlink(&store_path, &link_path);
+            }
+        }
+    }
+
     let current_version_dir = package_dir.join(&current_version);
     let mut has_other_manifests = false;
     if let Ok(entries) = fs::read_dir(&current_version_dir) {

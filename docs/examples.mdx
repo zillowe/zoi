@@ -888,3 +888,55 @@ metadata({
   types = { "pre-compiled" }
 })
 ```
+
+## 29. Shell Completions (`zshell`)
+
+Bundle shell completion scripts with your package. Zoi automatically symlinks them into the global completions directory and removes them on uninstall.
+
+```lua
+-- my-tool.pkg.lua
+metadata({
+  name = "my-tool",
+  repo = "community",
+  version = "1.0.0",
+  description = "A CLI tool with shell completions",
+  maintainer = { name = "Author", email = "author@example.com" },
+  bins = { "my-tool" },
+  types = { "pre-compiled" },
+  license = "MIT",
+})
+
+function prepare()
+  local url = string.format(
+    "https://example.com/my-tool-%s-%s.tar.gz",
+    SYSTEM.OS, SYSTEM.ARCH
+  )
+  UTILS.EXTRACT(url, "src")
+end
+
+function package()
+  zcp("src/my-tool", "${pkgstore}/bin/my-tool")
+
+  -- Bundle shell completions for multiple shells
+  zshell("${pkgluadir}/completions/_my-tool", "zsh")
+  zshell("${pkgluadir}/completions/my-tool.bash", "bash")
+  zshell("${pkgluadir}/completions/my-tool.fish", "fish")
+end
+```
+
+After installation, completions are symlinked to:
+
+```
+~/.zoi/pkgs/shell/zsh/my-tool/_my-tool
+~/.zoi/pkgs/shell/bash/my-tool/my-tool.bash
+~/.zoi/pkgs/shell/fish/my-tool/my-tool.fish
+```
+
+For **zsh**, add the parent directory to your `fpath` in `.zshrc`:
+
+```bash
+fpath=(~/.zoi/pkgs/shell/zsh $fpath)
+autoload -Uz compinit && compinit
+```
+
+For **bash** and **fish**, completions are available automatically if the global shell directory is on your completion search path.

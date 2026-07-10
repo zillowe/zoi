@@ -60,6 +60,15 @@ pub fn create_manifest(
         }
     }
 
+    let mut completions = pkg.completions.clone();
+    if let Some(ref mut c) = completions {
+        c.sort_by(|a, a2| {
+            a.shell
+                .cmp(&a2.shell)
+                .then_with(|| a.filename.cmp(&a2.filename))
+        });
+    }
+
     Ok(types::InstallManifest {
         name: pkg.name.clone(),
         version: pkg.version.clone().ok_or_else(|| {
@@ -92,5 +101,6 @@ pub fn create_manifest(
         installed_files,
         installed_size: pkg.installed_size,
         sandbox: pkg.sandbox.clone(),
+        completions,
     })
 }

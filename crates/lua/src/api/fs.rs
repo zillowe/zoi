@@ -86,6 +86,38 @@ pub fn add_zdoc(lua: &Lua) -> Result<(), mlua::Error> {
     Ok(())
 }
 
+pub fn add_zshell(lua: &Lua) -> Result<(), mlua::Error> {
+    let zshell_fn = lua.create_function(|lua, (source, shell): (String, String)| {
+        let filename = Path::new(&source)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .ok_or_else(|| mlua::Error::RuntimeError("Invalid source path for zshell".to_string()))?
+            .to_string();
+
+        let destination = format!("${{pkgstore}}/shell/{}/{}", shell, filename);
+        let zcp: mlua::Function = lua.globals().get("zcp")?;
+        zcp.call::<()>((source, destination.clone()))?;
+
+        let shells_table: Table = match lua.globals().get("__ZoiPackageShells") {
+            Ok(t) => t,
+            Err(_) => {
+                let new_t = lua.create_table()?;
+                lua.globals().set("__ZoiPackageShells", new_t.clone())?;
+                new_t
+            }
+        };
+
+        let shell_files: Vec<String> = shells_table.get(&*shell).unwrap_or_default();
+        let mut shell_files = shell_files;
+        shell_files.push(filename);
+        shells_table.set(shell, shell_files)?;
+
+        Ok(())
+    })?;
+    lua.globals().set("zshell", zshell_fn)?;
+    Ok(())
+}
+
 pub fn add_zsed(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let zsed_fn = lua.create_function(
         move |lua, (pattern, replacement, file): (String, String, String)| {

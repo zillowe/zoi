@@ -221,6 +221,7 @@ pub fn add(ext_name: &str, yes: bool, plugin_manager: Option<&PluginManager>) ->
         installed_files: vec![],
         installed_size: pkg.installed_size,
         sandbox: None,
+        completions: None,
     };
     let mut wrote_manifest = false;
     let mut applied_changes = Vec::new();

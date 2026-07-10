@@ -73,6 +73,22 @@ Stages a documentation file to the package store. This is a convenience wrapper 
 
 - **source**: Path relative to `BUILD_DIR`, or use `${pkgluadir}`.
 
+### `zshell(source, shell)`
+
+Stages a shell completion file for a specific shell. The file is copied to `${pkgstore}/shell/{shell}/{filename}` and symlinked into the global completions directory (`~/.zoi/pkgs/shell/{shell}/{package}/`). Zoi automatically manages the symlinks during install and uninstall.
+
+- **source**: Path relative to `BUILD_DIR`, or use `${pkgluadir}`.
+- **shell**: The shell name. Supported values: `"bash"`, `"zsh"`, `"fish"`, `"elvish"`.
+
+```lua
+function package()
+    zcp("${pkgluadir}/my-tool", "${pkgstore}/bin/my-tool")
+    zshell("${pkgluadir}/_my-tool", "zsh")
+    zshell("${pkgluadir}/my-tool.bash", "bash")
+    zshell("${pkgluadir}/my-tool.fish", "fish")
+end
+```
+
 ### `zsed(pattern, replacement, file)`
 
 Performs an in-place regular expression replacement on a file within the build directory. This avoids the need for external `sed` commands and provides cross-platform regex support.

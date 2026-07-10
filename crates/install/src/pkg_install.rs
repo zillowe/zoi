@@ -39,6 +39,63 @@ fn get_bin_root(scope: types::Scope) -> Result<PathBuf> {
     }
 }
 
+fn get_completions_root(scope: types::Scope, shell: &str) -> Result<PathBuf> {
+    match scope {
+        types::Scope::User => {
+            let home_dir =
+                home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
+            Ok(zoi_core::sysroot::apply_sysroot(
+                home_dir.join(".zoi/pkgs/shell").join(shell),
+            ))
+        }
+        types::Scope::System => {
+            if cfg!(target_os = "windows") {
+                Ok(zoi_core::sysroot::apply_sysroot(PathBuf::from(format!(
+                    "C:\\ProgramData\\zoi\\pkgs\\shell\\{}",
+                    shell
+                ))))
+            } else {
+                let base = match shell {
+                    "bash" => "/usr/share/bash-completion/completions",
+                    "zsh" => "/usr/share/zsh/site-functions",
+                    "fish" => "/usr/share/fish/vendor_completions.d",
+                    "elvish" => "/usr/share/elvish/lib",
+                    _ => "/usr/local/share/zoi/completions",
+                };
+                Ok(zoi_core::sysroot::apply_sysroot(PathBuf::from(base)))
+            }
+        }
+        types::Scope::Project => {
+            let current_dir = std::env::current_dir()?;
+            Ok(current_dir
+                .join(".zoi")
+                .join("pkgs")
+                .join("shell")
+                .join(shell))
+        }
+    }
+}
+
+fn create_completion_symlink(source: &Path, link: &Path) -> Result<()> {
+    if link.exists() || link.is_symlink() {
+        fs::remove_file(link)?;
+    }
+    if let Some(parent) = link.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(source, link)
+            .map_err(|e| anyhow!("Failed to create completion symlink: {}", e))?;
+    }
+    #[cfg(windows)]
+    {
+        std::os::windows::fs::symlink_file(source, link)
+            .map_err(|e| anyhow!("Failed to create completion symlink: {}", e))?;
+    }
+    Ok(())
+}
+
 fn check_and_handle_file_conflicts(
     source_dir: &Path,
     dest_dir: &Path,
@@ -370,6 +427,42 @@ pub fn run(
                 let _ = fs::remove_file(shim);
             }
             return Err(anyhow!("Failed to create shims: {}", e));
+        }
+    }
+
+    let shell_dir = version_dir.join("shell");
+    if shell_dir.exists() {
+        for shell_entry in fs::read_dir(&shell_dir)
+            .map_err(|e| anyhow!("Failed to read shell completions directory: {}", e))?
+        {
+            let shell_entry = shell_entry?;
+            if !shell_entry.file_type()?.is_dir() {
+                continue;
+            }
+            let shell_name = shell_entry.file_name().to_string_lossy().to_string();
+            let completions_root = get_completions_root(scope, &shell_name)?;
+            let pkg_completions_dir = completions_root.join(&metadata.name);
+            fs::create_dir_all(&pkg_completions_dir)?;
+
+            for file_entry in fs::read_dir(shell_entry.path())
+                .map_err(|e| anyhow!("Failed to read shell/{}/ directory: {}", shell_name, e))?
+            {
+                let file_entry = file_entry?;
+                if !file_entry.file_type()?.is_file() {
+                    continue;
+                }
+                let filename = file_entry.file_name().to_string_lossy().to_string();
+                let store_path = file_entry.path();
+                let link_path = pkg_completions_dir.join(&filename);
+                create_completion_symlink(&store_path, &link_path)?;
+                if pb.is_none() {
+                    println!(
+                        "Linked {} completion: {}",
+                        shell_name.green(),
+                        filename.cyan()
+                    );
+                }
+            }
         }
     }
 

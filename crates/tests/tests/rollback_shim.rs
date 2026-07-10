@@ -57,6 +57,7 @@ fn test_rollback_restores_shims() {
         installed_files: vec![bin_path.to_string_lossy().to_string()],
         installed_size: None,
         sandbox: None,
+        completions: None,
     };
 
     local::write_manifest(&manifest).unwrap();

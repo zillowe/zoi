@@ -109,6 +109,7 @@ end
         installed_files: vec![binary_path.to_string_lossy().to_string()],
         installed_size: None,
         sandbox: None,
+        completions: None,
     };
     fs::write(
         version_dir.join("manifest.yaml"),

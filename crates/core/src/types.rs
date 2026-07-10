@@ -129,6 +129,12 @@ pub struct Service {
     pub error_log_path: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ShellCompletion {
+    pub shell: String,
+    pub filename: String,
+}
+
 impl InstallManifest {
     pub fn into_package(self) -> Package {
         Package {
@@ -231,6 +237,8 @@ pub struct Package {
     pub archive_size: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sandbox: Option<SandboxConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub completions: Option<Vec<ShellCompletion>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -472,6 +480,7 @@ pub struct InstallManifest {
     pub repo_type: String,
     pub registry_handle: String,
     pub package_type: PackageType,
+    #[serde(default)]
     pub description: String,
     pub reason: InstallReason,
     pub scope: Scope,
@@ -504,6 +513,8 @@ pub struct InstallManifest {
     pub installed_size: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sandbox: Option<SandboxConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub completions: Option<Vec<ShellCompletion>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

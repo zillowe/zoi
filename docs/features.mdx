@@ -48,6 +48,8 @@ Zoi is packed with features designed to make package management and environment 
 
 - **Version Multiplexing via Intelligent Shims:** Automatically switch between different versions of the same tool (e.g. Node.js 18 vs 20) based on your current project (`zoi.yaml`), global configuration, or legacy files (like `.nvmrc` and `.python-version`) via its extensible Lua plugin system. Replaces static symlinks with intelligent shims that resolve the correct version at runtime.
 
+- **Shell Completions via `zshell()`:** Bundle shell completion scripts (Bash, Zsh, Fish, Elvish) with your packages using the `zshell()` lifecycle function. Zoi automatically symlinks completions into per-package directories under `~/.zoi/pkgs/shell/` and cleans them up on uninstall. Supports versioned completions since each package version's files are stored separately in the Zoi store.
+
 - **Generic Project Handlers via Plugins:** Extend `zoi install` to support any ecosystem (NPM, Pip, etc.) by implementing simple Lua hooks that detect project files and manage dependencies using native high-performance APIs.
 
 - **Ephemeral Environments:** Enter a temporary subshell with specific packages available in `PATH` without installing them globally. Perfect for testing tools or running scripts with specific language versions.
