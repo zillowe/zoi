@@ -4,6 +4,24 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
+## [Prod. Release 1.21.1] - 2026-07-11
+
+### ✨ Features
+
+- *(package)* Add install_deps flag to docker build process
+- *(package)* Add zshell API for automatic shell completion management
+- *(uninstall)* Implement dry-run mode
+
+### 🛠️ Build
+
+- Implement incremental build number tracking
+
+### 🩹 Bug Fixes
+
+- *(clippy)* Remove redundant borrows and unnecessary to_string
+- *(cli)* Implement dynamic shell completion support
+- *(uninstall)* Resolve correct package file paths during uninstallation
+
 ## [Prod. Release 1.21.0] - 2026-07-08
 
 ### ⏩ Merged
