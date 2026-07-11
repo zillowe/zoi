@@ -56,6 +56,7 @@ end
         "native",
         None,
         true,
+        false,
     )
     .expect("Build should succeed");
 

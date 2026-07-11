@@ -109,6 +109,7 @@ pub fn run(
         "native",
         None,
         false,
+        false,
     )?;
 
     let archive_filename = format!(

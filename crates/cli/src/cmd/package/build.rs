@@ -110,5 +110,6 @@ pub fn run(args: BuildCommand) -> Result<()> {
         &args.method,
         args.image.as_deref(),
         args.fakeroot,
+        args.install_deps,
     )
 }
