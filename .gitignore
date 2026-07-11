@@ -5,6 +5,7 @@ dist/
 .gct/
 .agents/
 skills-lock.json
+.build_*
 
 # binaries
 scripts/compiled
