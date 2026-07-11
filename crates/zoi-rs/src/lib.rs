@@ -247,6 +247,7 @@ pub fn build_with_options(package_file: &Path, options: &BuildOptions<'_>) -> Re
         options.method,
         options.image,
         options.fakeroot,
+        options.install_deps,
     )
 }
 

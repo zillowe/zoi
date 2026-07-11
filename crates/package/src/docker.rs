@@ -15,6 +15,7 @@ pub fn run(
     sub_packages: Option<Vec<String>>,
     image: &str,
     fakeroot: bool,
+    install_deps: bool,
 ) -> Result<()> {
     println!("{} Building package using Docker...", "::".bold().blue());
     println!("Image: {}", image.cyan());
@@ -103,6 +104,10 @@ pub fn run(
             elif command -v dnf >/dev/null 2>&1; then dnf install -y sudo gnupg; \
             elif command -v apk >/dev/null 2>&1; then apk add --update sudo gnupg; fi; \
          fi && \
+         if command -v pacman >/dev/null 2>&1; then pacman -Sy --noconfirm base-devel git; \
+         elif command -v apt-get >/dev/null 2>&1; then apt-get update && apt-get install -y build-essential git; \
+         elif command -v dnf >/dev/null 2>&1; then dnf install -y @development-tools git; \
+         elif command -v apk >/dev/null 2>&1; then apk add --update build-base git; fi && \
          curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash && \
          export PATH=\"$HOME/.local/bin:$PATH\" && \
          zoi sync && \
@@ -134,6 +139,10 @@ pub fn run(
 
     if fakeroot {
         inner_cmd.push_str(" --fakeroot");
+    }
+
+    if install_deps {
+        inner_cmd.push_str(" --install-deps");
     }
 
     docker_args.push("bash".to_string());

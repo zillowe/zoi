@@ -721,6 +721,7 @@ pub fn run(
     method: &str,
     image: Option<&str>,
     fakeroot: bool,
+    install_deps: bool,
 ) -> Result<()> {
     if method == "docker" {
         let docker_image = image.ok_or_else(|| {
@@ -736,6 +737,7 @@ pub fn run(
             sub_packages,
             docker_image,
             fakeroot,
+            install_deps,
         );
     }
 
@@ -757,6 +759,8 @@ pub fn run(
             "Building for 'all' platforms is not supported in this flow yet. Please specify platforms explicitly."
         ));
     }
+
+    let mut any_failed = false;
 
     for platform in &platforms_to_build {
         if !quiet {
@@ -783,7 +787,12 @@ pub fn run(
                 platform.red(),
                 e
             );
+            any_failed = true;
         }
+    }
+
+    if any_failed {
+        return Err(anyhow!("One or more platform builds failed"));
     }
 
     Ok(())
