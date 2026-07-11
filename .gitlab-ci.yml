@@ -330,7 +330,7 @@ build-docker-image:
 
 release:crates-io:
   stage: release
-  image: rust:latest
+  extends: .rust_setup
   script:
     - echo "$CRATESIO_REGISTRY_TOKEN" | cargo login
     - cargo publish --workspace
