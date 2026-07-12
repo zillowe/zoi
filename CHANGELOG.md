@@ -8,8 +8,8 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 
 ### ✨ Features
 
-- *(package)* Add install_deps flag to docker build process
 - *(package)* Add zshell API for automatic shell completion management
+- *(package)* Add install_deps flag to docker build process
 - *(uninstall)* Implement dry-run mode
 
 ### 🛠️ Build
