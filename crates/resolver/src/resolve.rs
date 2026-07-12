@@ -561,10 +561,7 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
 
 fn download_from_url(url: &str) -> Result<ResolvedSource> {
     let (base_url, expected_hash) = if let Some((base, hash_part)) = url.split_once('#') {
-        if hash_part.starts_with("sha256-")
-            || hash_part.starts_with("sha512-")
-            || hash_part.starts_with("md5-")
-        {
+        if hash_part.starts_with("sha256-") || hash_part.starts_with("sha512-") {
             (base, Some(hash_part))
         } else {
             (url, None)
@@ -701,9 +698,6 @@ fn verify_content_hash(content: &[u8], hash_spec: &str) -> Result<bool> {
             let mut hasher = sha2::Sha512::new();
             hasher.update(content);
             hex::encode(hasher.finalize())
-        }
-        "md5" => {
-            format!("{:x}", md5::compute(content))
         }
         _ => return Err(anyhow!("Unsupported hash algorithm: {}", algo)),
     };

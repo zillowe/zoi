@@ -744,7 +744,7 @@ fn render_pkg_lua(g: &Generated) -> String {
 
     out.push_str("local function split_hash(hash)\n");
     out.push_str("  if not hash or hash == \"\" then return nil, nil end\n");
-    out.push_str("  local algo, digest = hash:match(\"^(sha512|sha256|sha1|md5)[:%-](.+)$\")\n");
+    out.push_str("  local algo, digest = hash:match(\"^(sha512|sha256|sha1)[:%-](.+)$\")\n");
     out.push_str("  if algo and digest then return algo, digest end\n");
     out.push_str("  return \"sha256\", hash\n");
     out.push_str("end\n\n");
