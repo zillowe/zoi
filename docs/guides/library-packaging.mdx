@@ -3,7 +3,7 @@ title: Packaging Libraries
 description: How to package shared and static libraries with Zoi, and how to consume them from other packages.
 ---
 
-This guide covers the lifecycle of a library in Zoi: packaging it for distribution and consuming it from another package. Libraries follow a different split-package convention than applications — the runtime binary (`.so`, `.dylib`, `.dll`) is separate from headers and development artefacts.
+This guide covers the lifecycle of a library in Zoi: packaging it for distribution and consuming it from another package. Libraries follow a different split-package convention than applications, the runtime binary (`.so`, `.dylib`, `.dll`) is separate from headers and development artefacts.
 
 ## Package Shape
 
@@ -81,7 +81,7 @@ function package(args)
   local root = "install/usr"
 
   if sub == "lib" then
-    -- Runtime library only — versioned .so files
+    -- Runtime library only, versioned .so files
     cmd("rm -rf lib-runtime && mkdir -p lib-runtime")
     cmd("cp -a " .. root .. "/lib/. lib-runtime/ 2>/dev/null; true")
     cmd("rm -rf lib-runtime/pkgconfig 2>/dev/null; true")
