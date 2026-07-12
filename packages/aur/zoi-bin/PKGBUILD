@@ -10,7 +10,7 @@ url="https://gitlab.com/zillowe/zillwen/zusty/zoi"
 license=('Apache-2.0')
 provides=("${pkgname%-bin}")
 conflicts=("${pkgname%-bin}")
-depends=('git', 'gnupg')
+depends=('git' 'gnupg')
 optdepends=(
   'bash-completion: for bash shell completion'
   'zsh: for zsh shell completion'
