@@ -1,3 +1,5 @@
+# Maintainer: ZilloweZ <zillowez@gmail.com>
+
 Name:           zoi
 Version:        __VERSION__
 Release:        1%{?dist}
@@ -12,11 +14,14 @@ BuildRequires:  rust
 BuildRequires:  gcc
 BuildRequires:  openssl-devel
 BuildRequires:  pkgconfig
-BuildRequires:  liblzma-devel
+BuildRequires:  xz-devel
+BuildRequires:  git
+BuildRequires:  clang
 BuildRequires:  clang-devel
+BuildREquires:  bubblewrap
 
 Requires:       git
-Requires:       bubblewrap
+Requires:       gnupg
 
 %description
 Zoi is an advanced package manager and environment orchestrator, designed to simplify package management and environment configuration across multiple operating systems.

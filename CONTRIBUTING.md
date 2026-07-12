@@ -131,15 +131,14 @@ We use `zoi` itself to manage project tasks, which are defined in the `zoi.yaml`
 
 If you run `zoi run` or `zoi env` without arguments, you'll get an interactive list of available commands.
 
-#### The `zoi.yaml` file
+#### The `zoi.lua` file
 
-The `zoi.yaml` file is the heart of our project-specific workflow. It defines:
+The `zoi.lua` file is the heart of our project-specific workflow. It defines:
 
-- `packages`: Required tools for the project, with commands to check if they are installed.
 - `commands`: Aliases for longer shell commands, e.g. `zoi run lint`. These can be platform-specific.
 - `environments`: Groups of commands to set up a development environment, e.g. `zoi env pre`.
 
-When adding a new build step or a useful script, you should add it to the `commands` section in `zoi.yaml`.
+When adding a new build step or a useful script, you should add it to the `commands` section in `zoi.lua`.
 
 #### Passing Arguments to Commands
 
@@ -210,12 +209,6 @@ Here are the most common commands defined in `zoi.yaml`:
 
   ```sh
   just dev
-  ```
-
-- **`install`**: Performs a clean build and installs the latest version of Zoi, including shell completions. This is useful for testing your changes in a live environment.
-
-  ```sh
-  zoi run install
   ```
 
 - **`lines`**: Counts the lines of code in the project using `cloc`.

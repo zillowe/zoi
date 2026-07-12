@@ -336,7 +336,7 @@ pub fn check_external_tools() -> ToolCheckResult {
     let mut recommended_missing = Vec::new();
 
     let essential = ["git"];
-    let recommended = ["gpg"];
+    let recommended = ["gpg", "bwrap"];
 
     for tool in essential {
         if !utils::command_exists(tool) {
