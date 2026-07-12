@@ -189,6 +189,8 @@ fn build_for_platform(
             Some(&version),
             package_file.to_str(),
             None,
+            Some(build_dir.path().to_str().unwrap_or("")),
+            Some(staging_dir.to_str().unwrap_or("")),
             sub_pkg_name,
             quiet,
         )

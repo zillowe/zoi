@@ -431,6 +431,8 @@ pub fn run(
             Some(&manifest.version),
             pkg_lua_path.to_str(),
             None,
+            None,
+            None,
             sub_package_to_uninstall.as_deref(),
             true,
         )
