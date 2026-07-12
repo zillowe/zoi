@@ -1,5 +1,4 @@
 use anyhow::{Result, anyhow};
-use md5;
 use sha2::{Digest, Sha256, Sha512};
 use std::fs;
 use std::io::Read;
@@ -10,7 +9,6 @@ use walkdir::WalkDir;
 pub enum HashAlgorithm {
     Sha512,
     Sha256,
-    Md5,
 }
 
 impl HashAlgorithm {
@@ -18,7 +16,6 @@ impl HashAlgorithm {
         match len {
             128 => Some(HashAlgorithm::Sha512),
             64 => Some(HashAlgorithm::Sha256),
-            32 => Some(HashAlgorithm::Md5),
             _ => None,
         }
     }
@@ -27,7 +24,6 @@ impl HashAlgorithm {
         match name.to_lowercase().as_str() {
             "sha512" => Some(HashAlgorithm::Sha512),
             "sha256" => Some(HashAlgorithm::Sha256),
-            "md5" => Some(HashAlgorithm::Md5),
             _ => None,
         }
     }
@@ -61,18 +57,6 @@ pub fn calculate_file_hash(path: &Path, algo: HashAlgorithm) -> Result<String> {
                 hasher.update(&buffer[..bytes_read]);
             }
             Ok(hex::encode(hasher.finalize()))
-        }
-        HashAlgorithm::Md5 => {
-            let mut hasher = md5::Context::new();
-            let mut buffer = [0; 8192];
-            loop {
-                let bytes_read = file.read(&mut buffer)?;
-                if bytes_read == 0 {
-                    break;
-                }
-                hasher.consume(&buffer[..bytes_read]);
-            }
-            Ok(format!("{:x}", hasher.finalize()))
         }
     }
 }

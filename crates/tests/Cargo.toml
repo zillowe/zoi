@@ -22,7 +22,6 @@ ignored = [
     "glob",
     "home",
     "indicatif",
-    "md5",
     "rayon",
     "regex",
     "rusqlite",
@@ -66,7 +65,6 @@ glob.workspace = true
 hex.workspace = true
 home.workspace = true
 indicatif.workspace = true
-md5.workspace = true
 mlua.workspace = true
 rayon.workspace = true
 regex.workspace = true

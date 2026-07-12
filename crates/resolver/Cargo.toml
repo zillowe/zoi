@@ -26,7 +26,6 @@ git2.workspace = true
 hex.workspace = true
 home.workspace = true
 indicatif.workspace = true
-md5.workspace = true
 rayon.workspace = true
 regex.workspace = true
 semver.workspace = true
