@@ -88,7 +88,7 @@ reqwest = { version = "0.13.4", default-features = false, features = [
 ] }
 self_update = "0.44.0"
 semver = "1.0.28"
-sequoia-openpgp = { version = "2.4.0", default-features = false, features = [
+sequoia-openpgp = { version = "2.4.1", default-features = false, features = [
     "crypto-openssl",
 ] }
 serde = { version = "1.0.228", default-features = false, features = ["derive"] }

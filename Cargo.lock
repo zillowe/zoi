@@ -699,6 +699,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ctor"
+version = "1.0.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fb22e947478ccf9dc44d8922042c677a63fbb88f2cb468521d1145816e5087cb"
+dependencies = [
+ "link-section",
+ "linktime-proc-macro",
+]
+
+[[package]]
 name = "darling"
 version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1794,10 +1804,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "link-section"
+version = "0.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e333fe507b738576d6da5bb3f1a7d7a1c80307ed9ef31624c057d844c19c93e9"
+
+[[package]]
 name = "linked-hash-map"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0717cef1bc8b636c6e1c1bbdefc09e6322da8a9321966e8928ef80d20f7f770f"
+
+[[package]]
+name = "linktime-proc-macro"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8c7b0a3383c2a1002d11349c92c85a666a5fb679e96c79d782cf0dbe557fd6ee"
 
 [[package]]
 name = "linux-raw-sys"
@@ -2995,15 +3017,16 @@ checksum = "8a7852d02fc848982e0c167ef163aaff9cd91dc640ba85e263cb1ce46fae51cd"
 
 [[package]]
 name = "sequoia-openpgp"
-version = "2.4.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e421679c8175ef4674d913af7fdb8ad0078c8a2599db633ad0b4d02a06b2cb3c"
+checksum = "0fbc8f9818a6fad141d85993777ba298ee52c80a09bd23d45dda461a6b7c83cb"
 dependencies = [
  "anyhow",
  "argon2",
  "base64",
  "buffered-reader",
  "chrono",
+ "ctor",
  "dyn-clone",
  "getrandom 0.2.17",
  "idna",
@@ -3011,6 +3034,7 @@ dependencies = [
  "lalrpop-util",
  "libc",
  "memsec",
+ "openssl-sys",
  "ossl",
  "regex",
  "regex-syntax",
