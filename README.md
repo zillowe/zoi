@@ -85,16 +85,12 @@ Zoi is an advanced package manager and environment orchestrator, designed to sim
 
 - **Cross-Platform:** Works seamlessly on Linux, macOS, and Windows.
 - **Dynamic Package Definitions:** Define packages with dynamic Lua scripts (`.pkg.lua`) for maximum flexibility.
-- **Universal Package Support:** Install packages from pre-built binaries, compressed archives, or build them from source.
 - **Extensive Dependency Management:** Integrates with over 40 system and language package managers (`apt`, `brew`, `cargo`, `npm`, `pip`, `go`, `bun`, etc.).
-- **Rich Dependencies:** Define runtime and build dependencies with required, optional, and selectable options.
-- **Project Environments:** Manage project-specific commands and environments using a local `zoi.yaml` file.
+- **Project Environments:** Manage project-specific commands and environments using a local `zoi.yaml` or a `zoi.lua` file.
 - **Repository-Based:** Use official, community, or your own private/public Git-based repositories. Manage multiple registries.
-- **Parallel Registry Sync:** Concurrently sync multiple package registries for significantly faster updates.
 - **Secure & Verifiable:** Verifies package integrity with checksums and authenticity with GPG signatures. Supports Git commit signature verification for entire registries (Chain of Trust) and includes a built-in PGP keyring for out-of-the-box security.
 - **Decentralized Security Advisories:** Automated vulnerability tracking via `.sec.yaml` files co-located with packages. Zoi proactively warns you during installation or upgrades if a package has known security issues.
 - **Compliance & Audit Logging:** Maintain a persistent, tamper-evident audit log of all package operations (install, uninstall, upgrade), viewable via the `zoi history` command.
-- **Enhanced File Conflict Detection:** Prevents packages from accidentally overwriting existing files. Supports pre-download conflict checking via remote metadata to save bandwidth.
 - **Advanced Dependencies:** Supports virtual packages (`provides`) and package replacement (`replaces`).
 - **Versatile Package Types:** Supports different types of packages:
   - `Package`: A standard software package.
@@ -105,14 +101,9 @@ Zoi is an advanced package manager and environment orchestrator, designed to sim
 - **Advanced CLI Tools:**
   - `zoi search`: Interactive TUI mode with result sorting and rich metadata.
   - `zoi audit`: Scan installed packages for known security vulnerabilities.
-  - `zoi history`: Read the persistent audit trail of past transactions.
   - `zoi doctor`: Proactive system health checks, including orphaned package detection and broken symlink scanning.
   - `zoi man`: Read package manuals in the terminal.
-  - `zoi why`: Understand why a package is installed.
   - `zoi rollback`: Revert a package to its previous version or rollback the entire last transaction.
-  - `zoi pin`: Pin a package to a specific version.
-  - `zoi exec`: Run a package's binary without installing it.
-  - `zoi shell -p`: Enter a temporary shell with a package available in PATH.
 - **Zoi Mini:** A lightweight, zero-sync version for quick, one-off installations via `zm.sh` or `zm.ps1`. Supports `install`, `update`, `uninstall`, and `list` commands.
 - **Library Support:** Core functionality is available as a Rust library to be integrated into other applications.
 
@@ -203,7 +194,7 @@ Install Zoi on Linux distros.
 Install [`zoi-bin`](https://aur.archlinux.org/packages/zoi-bin) (Pre-compiled binary) or [`zoi`](https://aur.archlinux.org/packages/zoi) (built from source) from the AUR using your favorite helper (e.g. `yay`, `paru`):
 
 ```sh
-yay -S zoi-bin
+paru -S zoi-bin
 ```
 
 Or manually without any helpers:

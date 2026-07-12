@@ -36,5 +36,8 @@ class Zoi < Formula
     (bash_completion/"zoi").write `#{bin}/zoi generate-completions bash`
     (zsh_completion/"_zoi").write `#{bin}/zoi generate-completions zsh`
     (fish_completion/"zoi.fish").write `#{bin}/zoi generate-completions fish`
+
+    system "#{bin}/zoi", "generate-manual"
+    man1.install Dir["manuals/*.1"]
   end
 end

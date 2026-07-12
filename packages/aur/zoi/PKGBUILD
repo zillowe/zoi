@@ -10,13 +10,13 @@ url="https://gitlab.com/zillowe/zillwen/zusty/zoi"
 license=('Apache-2.0')
 provides=("${pkgname%-bin}")
 conflicts=("${pkgname%-bin}")
-makedepends=('cargo' 'make')
-depends=('git')
+makedepends=('cargo' 'just')
+depends=('git', 'gnupg')
 optdepends=(
   'bash-completion: for bash shell completion'
   'zsh: for zsh shell completion'
   'fish: for fish shell completion'
-  'less: for viewing files'
+  'bubblewrap: for running contained apps'
 )
 
 source=("$url/-/archive/$_tag/Zoi-Prod-Release-$pkgver.tar.gz"
@@ -27,12 +27,12 @@ sha512sums=('__SHA512_SRC__'
 build() {
   cd "$srcdir/$_pkgname_cap-$_tag"
   ./configure --prefix=/usr
-  make
+  just build
 }
 
 package() {
   cd "$srcdir/$_pkgname_cap-$_tag"
-  make DESTDIR="$pkgdir" install
+  just install
 
   install -Dm644 "$srcdir/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 
