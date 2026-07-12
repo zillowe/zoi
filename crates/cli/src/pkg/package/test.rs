@@ -73,6 +73,8 @@ pub fn run(args: &cmd::package::build::BuildCommand) -> Result<()> {
             Some(&version),
             args.package_file.to_str(),
             None,
+            None,
+            None,
             sub_pkg_name,
             false,
         )

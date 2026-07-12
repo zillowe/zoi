@@ -8,6 +8,8 @@ pub fn setup_lua_environment(
     version_override: Option<&str>,
     file_path: Option<&str>,
     create_pkg_dir: Option<&str>,
+    build_dir: Option<&str>,
+    staging_dir: Option<&str>,
     sub_package: Option<&str>,
     quiet: bool,
 ) -> Result<(), mlua::Error> {
@@ -101,7 +103,47 @@ pub fn setup_lua_environment(
         };
         pkg_table.set("lua", abs_path.to_string_lossy().to_string())?;
     }
-    zoi_table.set("PKG", pkg_table)?;
+    zoi_table.set("PKG", pkg_table.clone())?;
+
+    let location_table = lua.create_table()?;
+    if let Some(home_dir) = home::home_dir() {
+        location_table.set(
+            "PKGSTORE",
+            home_dir
+                .join(".zoi")
+                .join("pkgs")
+                .join("store")
+                .to_string_lossy()
+                .to_string(),
+        )?;
+        location_table.set("HOME", home_dir.to_string_lossy().to_string())?;
+    }
+    location_table.set("ROOT", root.to_string())?;
+    if let Ok(current_dir) = std::env::current_dir() {
+        location_table.set("TEMPLATE", current_dir.to_string_lossy().to_string())?;
+    }
+    if let Some(path_str) = file_path {
+        let abs_path = if let Ok(p) = std::fs::canonicalize(path_str) {
+            p
+        } else {
+            std::path::Path::new(path_str).to_path_buf()
+        };
+        location_table.set(
+            "PKGLUADIR",
+            abs_path
+                .parent()
+                .unwrap_or(&abs_path)
+                .to_string_lossy()
+                .to_string(),
+        )?;
+    }
+    if let Some(bd) = build_dir {
+        location_table.set("BUILDDIR", bd)?;
+    }
+    if let Some(sd) = staging_dir {
+        location_table.set("STAGINGDIR", sd)?;
+    }
+    zoi_table.set("LOCATION", location_table)?;
 
     lua.globals().set("ZOI", zoi_table)?;
 

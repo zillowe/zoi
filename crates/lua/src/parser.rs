@@ -46,6 +46,8 @@ pub fn parse_lua_package_for_platform(
         Some(file_path),
         None,
         None,
+        None,
+        None,
         quiet,
     )
     .map_err(|e| anyhow!("Failed to setup Lua environment for '{}': {}", file_path, e))?;

@@ -4,7 +4,18 @@ use zoi::pkg::lua::functions;
 #[test]
 fn test_lua_zcp_records_operation() {
     let lua = Lua::new();
-    functions::setup_lua_environment(&lua, "linux-amd64", None, None, None, None, true).unwrap();
+    functions::setup_lua_environment(
+        &lua,
+        "linux-amd64",
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        true,
+    )
+    .unwrap();
 
     lua.load(r#"zcp("src", "dest")"#).exec().unwrap();
 
@@ -22,7 +33,18 @@ fn test_lua_zcp_records_operation() {
 #[test]
 fn test_lua_zlicense_records_zcp_operation() {
     let lua = Lua::new();
-    functions::setup_lua_environment(&lua, "linux-amd64", None, None, None, None, true).unwrap();
+    functions::setup_lua_environment(
+        &lua,
+        "linux-amd64",
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        true,
+    )
+    .unwrap();
 
     lua.load(r#"zlicense("LICENSE.txt")"#).exec().unwrap();
 
@@ -39,7 +61,18 @@ fn test_lua_zlicense_records_zcp_operation() {
 #[test]
 fn test_lua_zdoc_records_zcp_operation() {
     let lua = Lua::new();
-    functions::setup_lua_environment(&lua, "linux-amd64", None, None, None, None, true).unwrap();
+    functions::setup_lua_environment(
+        &lua,
+        "linux-amd64",
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        true,
+    )
+    .unwrap();
 
     lua.load(r#"zdoc("docs/README.md")"#).exec().unwrap();
 
@@ -56,7 +89,18 @@ fn test_lua_zdoc_records_zcp_operation() {
 #[test]
 fn test_lua_zln_records_operation() {
     let lua = Lua::new();
-    functions::setup_lua_environment(&lua, "linux-amd64", None, None, None, None, true).unwrap();
+    functions::setup_lua_environment(
+        &lua,
+        "linux-amd64",
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        true,
+    )
+    .unwrap();
 
     lua.load(r#"zln("target", "link")"#).exec().unwrap();
 

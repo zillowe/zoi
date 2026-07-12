@@ -13,6 +13,7 @@ These variables are automatically available in your script's scope.
 | :------------ | :------- | :---------------------------------------------------------------- |
 | `SYSTEM`      | `table`  | Information about the host system.                                |
 | `ZOI`         | `table`  | Information about the Zoi environment.                            |
+| `LOCATION`    | `table`  | Absolute paths for common package locations.                      |
 | `PKG`         | `table`  | A table populated from your `metadata{...}` fields.               |
 | `BUILD_DIR`   | `string` | Absolute path to the temporary build directory.                   |
 | `STAGING_DIR` | `string` | Absolute path to the staging directory.                           |
@@ -49,6 +50,20 @@ These variables provide absolute paths related to the current package environmen
 | `ZOI.PKG.root`     | `string` | Absolute path to the system root (`/` or `C:\`).                |
 | `ZOI.PKG.home`     | `string` | Absolute path to the user's home directory.                     |
 | `ZOI.PKG.lua`      | `string` | Absolute path to the current `pkg.lua` script.                  |
+
+### The `LOCATION` Table
+
+The `LOCATION` table provides absolute paths that correspond to the placeholder variables used in build functions like `zcp`, `zln`, `zmkdir`, etc. These are useful when you need to construct paths programmatically in Lua (e.g., in `cmd()` calls or custom logic) without using the `${...}` placeholders.
+
+| Variable | Type | Description |
+| :----------------- | :------- | :------------------------------------------------------------------------------------------------------- |
+| `LOCATION.PKGSTORE` | `string` | Package store path (`~/.zoi/pkgs/store`). Corresponds to `${pkgstore}`. |
+| `LOCATION.HOME` | `string` | User's home directory. Corresponds to `${usrhome}`. |
+| `LOCATION.ROOT` | `string` | System root (`/` or `C:\`). Corresponds to `${usrroot}`. |
+| `LOCATION.TEMPLATE` | `string` | Current working directory (project template root). Corresponds to `${createpkgdir}`. |
+| `LOCATION.PKGLUADIR` | `string` | Directory containing the current `pkg.lua` script. Corresponds to `${pkgluadir}`. |
+| `LOCATION.BUILDDIR` | `string` | Temporary build directory (`BUILD_DIR`). |
+| `LOCATION.STAGINGDIR` | `string` | Staging directory (`STAGING_DIR`). |
 
 ---
 
@@ -88,6 +103,19 @@ function package()
     zshell("${pkgluadir}/my-tool.fish", "fish")
 end
 ```
+
+> **Note**: The `${...}` placeholders (like `${pkgstore}`, `${pkgluadir}`) only work in build functions like `zcp`, `zln`, `zmkdir`, `zchmod`, `zchown`, `zrm`, `zlicense`, `zdoc`, and `zshell`. They do **not** work in `cmd()` or raw Lua strings.
+>
+> To use these paths in `cmd()` or custom Lua logic, use the `LOCATION` table:
+>
+> ```lua
+> function build()
+>     -- Use LOCATION table for cmd() - no placeholder substitution in shell commands
+>     cmd("make DESTDIR=" .. LOCATION.STAGINGDIR .. " install")
+>     -- Or construct paths programmatically
+>     local bin_path = LOCATION.PKGSTORE .. "/bin/my-tool"
+> end
+> ```
 
 ### `zsed(pattern, replacement, file)`
 

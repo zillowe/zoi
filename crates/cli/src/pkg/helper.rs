@@ -90,6 +90,8 @@ pub fn elevate_uninstall(cmd: &crate::cmd::helper::ElevateUninstallCommand) -> R
             Some(&manifest.version),
             pkg_lua_path.to_str(),
             None,
+            None,
+            None,
             manifest.sub_package.as_deref(),
             true,
         )
