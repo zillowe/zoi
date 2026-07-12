@@ -106,21 +106,58 @@ pub fn setup_lua_environment(
     zoi_table.set("PKG", pkg_table.clone())?;
 
     let location_table = lua.create_table()?;
-    if let Some(home_dir) = home::home_dir() {
+    if let Some(sd) = staging_dir {
+        let staging_path = std::path::Path::new(sd);
         location_table.set(
             "PKGSTORE",
-            home_dir
-                .join(".zoi")
-                .join("pkgs")
-                .join("store")
+            staging_path
+                .join("data/pkgstore")
                 .to_string_lossy()
                 .to_string(),
         )?;
-        location_table.set("HOME", home_dir.to_string_lossy().to_string())?;
-    }
-    location_table.set("ROOT", root.to_string())?;
-    if let Ok(current_dir) = std::env::current_dir() {
-        location_table.set("TEMPLATE", current_dir.to_string_lossy().to_string())?;
+        location_table.set(
+            "HOME",
+            staging_path
+                .join("data/usrhome")
+                .to_string_lossy()
+                .to_string(),
+        )?;
+        location_table.set(
+            "ROOT",
+            staging_path
+                .join("data/usrroot")
+                .to_string_lossy()
+                .to_string(),
+        )?;
+        location_table.set(
+            "TEMPLATE",
+            staging_path
+                .join("data/createpkgdir")
+                .to_string_lossy()
+                .to_string(),
+        )?;
+    } else {
+        if let Some(home_dir) = home::home_dir() {
+            location_table.set(
+                "PKGSTORE",
+                home_dir
+                    .join(".zoi")
+                    .join("pkgs")
+                    .join("store")
+                    .to_string_lossy()
+                    .to_string(),
+            )?;
+            location_table.set("HOME", home_dir.to_string_lossy().to_string())?;
+        }
+        let root = if cfg!(target_os = "windows") {
+            "C:\\"
+        } else {
+            "/"
+        };
+        location_table.set("ROOT", root.to_string())?;
+        if let Ok(current_dir) = std::env::current_dir() {
+            location_table.set("TEMPLATE", current_dir.to_string_lossy().to_string())?;
+        }
     }
     if let Some(path_str) = file_path {
         let abs_path = if let Ok(p) = std::fs::canonicalize(path_str) {

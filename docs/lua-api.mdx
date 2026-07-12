@@ -53,17 +53,21 @@ These variables provide absolute paths related to the current package environmen
 
 ### The `LOCATION` Table
 
-The `LOCATION` table provides absolute paths that correspond to the placeholder variables used in build functions like `zcp`, `zln`, `zmkdir`, etc. These are useful when you need to construct paths programmatically in Lua (e.g., in `cmd()` calls or custom logic) without using the `${...}` placeholders.
+The `LOCATION` table provides absolute paths that correspond **exactly** to the `${...}` placeholder variables used in build functions like `zcp`, `zln`, `zmkdir`, etc. These are the **staging directory paths** where files are placed during build, not the final install paths. This makes them directly usable in `cmd()` calls to achieve the same behavior as the placeholders.
 
 | Variable | Type | Description |
 | :----------------- | :------- | :------------------------------------------------------------------------------------------------------- |
-| `LOCATION.PKGSTORE` | `string` | Package store path (`~/.zoi/pkgs/store`). Corresponds to `${pkgstore}`. |
-| `LOCATION.HOME` | `string` | User's home directory. Corresponds to `${usrhome}`. |
-| `LOCATION.ROOT` | `string` | System root (`/` or `C:\`). Corresponds to `${usrroot}`. |
-| `LOCATION.TEMPLATE` | `string` | Current working directory (project template root). Corresponds to `${createpkgdir}`. |
+| `LOCATION.PKGSTORE` | `string` | Staging path for package store (`STAGING_DIR/data/pkgstore/`). Corresponds to `${pkgstore}`. |
+| `LOCATION.HOME` | `string` | Staging path for user home (`STAGING_DIR/data/usrhome/`). Corresponds to `${usrhome}`. |
+| `LOCATION.ROOT` | `string` | Staging path for system root (`STAGING_DIR/data/usrroot/`). Corresponds to `${usrroot}`. |
+| `LOCATION.TEMPLATE` | `string` | Staging path for createpkgdir (`STAGING_DIR/data/createpkgdir/`). Corresponds to `${createpkgdir}`. |
 | `LOCATION.PKGLUADIR` | `string` | Directory containing the current `pkg.lua` script. Corresponds to `${pkgluadir}`. |
 | `LOCATION.BUILDDIR` | `string` | Temporary build directory (`BUILD_DIR`). |
 | `LOCATION.STAGINGDIR` | `string` | Staging directory (`STAGING_DIR`). |
+
+<Callout>
+  During build, `${pkgstore}` in `zcp`/`zln` expands to `STAGING_DIR/data/pkgstore/`. `LOCATION.PKGSTORE` gives you that same path for use in `cmd()`.
+</Callout>
 
 ---
 
@@ -104,18 +108,24 @@ function package()
 end
 ```
 
-> **Note**: The `${...}` placeholders (like `${pkgstore}`, `${pkgluadir}`) only work in build functions like `zcp`, `zln`, `zmkdir`, `zchmod`, `zchown`, `zrm`, `zlicense`, `zdoc`, and `zshell`. They do **not** work in `cmd()` or raw Lua strings.
->
-> To use these paths in `cmd()` or custom Lua logic, use the `LOCATION` table:
->
-> ```lua
-> function build()
->     -- Use LOCATION table for cmd() - no placeholder substitution in shell commands
->     cmd("make DESTDIR=" .. LOCATION.STAGINGDIR .. " install")
->     -- Or construct paths programmatically
->     local bin_path = LOCATION.PKGSTORE .. "/bin/my-tool"
-> end
-> ```
+<Callout>
+  The `${...}` placeholders (like `${pkgstore}`, `${pkgluadir}`) only work in build functions like `zcp`, `zln`, `zmkdir`, `zchmod`, `zchown`, `zrm`, `zlicense`, `zdoc`, and `zshell`. They do **not** work in `cmd()` or raw Lua strings.
+
+  To use these paths in `cmd()` or custom Lua logic, use the `LOCATION` table, they map to the **same staging paths** as the placeholders:
+
+  ```lua
+  function build()
+      -- Install to STAGING_DIR/data/pkgstore (same as ${pkgstore} in zcp)
+      cmd("make DESTDIR=" .. LOCATION.PKGSTORE .. " install")
+      
+      -- Or install to full staging root
+      cmd("make DESTDIR=" .. LOCATION.STAGINGDIR .. " install")
+  end
+  ```
+
+  After `package()` runs, the contents of `STAGING_DIR` become the package archive.
+
+</Callout>
 
 ### `zsed(pattern, replacement, file)`
 
@@ -237,7 +247,7 @@ Runs first to fetch source code or binaries into `BUILD_DIR`.
 
 ### `build(args)`
 
-Optional function that runs after `prepare` and before `package`. Use it for compilation steps in `BUILD_DIR` — this keeps `prepare` for fetching and `package` for staging.
+Optional function that runs after `prepare` and before `package`. Use it for compilation steps in `BUILD_DIR`, this keeps `prepare` for fetching and `package` for staging.
 
 ### `package(args)`
 
