@@ -814,7 +814,6 @@ pub fn run() -> anyhow::Result<()> {
         .placeholder(styling::AnsiColor::Cyan.on_default());
 
     let commit: &str = option_env!("ZOI_COMMIT_HASH").unwrap_or("dev");
-    let build_no: Option<&str> = option_env!("ZOI_BUILD_NO");
     let cmd = Cli::command().styles(styles.clone());
     let matches = cmd.clone().get_matches();
     let cli = match Cli::from_arg_matches(&matches) {
@@ -859,7 +858,7 @@ pub fn run() -> anyhow::Result<()> {
     }
 
     if cli.version_flag {
-        cmd::version::run(BRANCH, STATUS, NUMBER, commit, build_no);
+        cmd::version::run(BRANCH, STATUS, NUMBER, commit);
         return Ok(());
     }
 
@@ -894,7 +893,7 @@ pub fn run() -> anyhow::Result<()> {
             } => cmd::complete::run(shell, index, words),
             Commands::GenerateManual => cmd::gen_man::run().map_err(Into::into),
             Commands::Version => {
-                cmd::version::run(BRANCH, STATUS, NUMBER, commit, build_no);
+                cmd::version::run(BRANCH, STATUS, NUMBER, commit);
                 Ok(())
             }
             Commands::About => {

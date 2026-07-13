@@ -23,15 +23,8 @@ MINI_SRC_BIN := "target/release/" + MINI_NAME + EXE_EXT
 DEBUG_SRC_BIN := "target/debug/" + NAME + EXE_EXT
 MINI_DEBUG_SRC_BIN := "target/debug/" + MINI_NAME + EXE_EXT
 
-# Build number file for tracking dev builds on same commit
-BUILD_NO_FILE := ".build_no"
-
 [private]
 _is_configured := if path_exists("config.just") == "true" { "true" } else { "false" }
-
-[private]
-get_build_no:
-    @BUILD_NO_FILE=.build_no; LAST_COMMIT=$(cat "$BUILD_NO_FILE.commit" 2>/dev/null || echo ""); BUILD_NO=$(cat "$BUILD_NO_FILE.count" 2>/dev/null || echo 0); COMMIT_HASH=$(git rev-parse --short=10 HEAD); if [ "$LAST_COMMIT" = "$COMMIT_HASH" ]; then NEW_BUILD_NO=$((BUILD_NO + 1)); echo "$NEW_BUILD_NO" > "$BUILD_NO_FILE.count"; echo "$NEW_BUILD_NO"; else echo "$COMMIT_HASH" > "$BUILD_NO_FILE.commit"; echo 1 > "$BUILD_NO_FILE.count"; echo 1; fi
 
 # Alias to `just help`
 default: help
@@ -40,9 +33,8 @@ default: help
 build:
     @if [ "{{ _is_configured }}" != "true" ]; then echo "Error: Project not configured. Run 'just configure' first."; exit 1; fi
     @if ! command -v clang >/dev/null 2>&1; then echo "Error: 'clang' is not installed. It is required for bindgen."; exit 1; fi
-    @BUILD_NO=$(just get_build_no); \
-    echo "Building Zoi targets: {{ WITH_BIN }} in release mode (commit: {{ COMMIT_HASH }}, build: $BUILD_NO)..."; \
-    set -a; source .env 2>/dev/null; export ZOI_COMMIT_HASH={{ COMMIT_HASH }}; export ZOI_BUILD_NO=$BUILD_NO; \
+    @echo "Building Zoi targets: {{ WITH_BIN }} in release mode (commit: {{ COMMIT_HASH }})..."; \
+    set -a; source .env 2>/dev/null; export ZOI_COMMIT_HASH={{ COMMIT_HASH }}; \
     if [ "{{ WITH_BIN }}" = "zoi" ]; then \
         cargo build --bin zoi --release; \
     elif [ "{{ WITH_BIN }}" = "zoi-mini" ]; then \
@@ -56,9 +48,8 @@ build:
 dev:
     @if [ "{{ _is_configured }}" != "true" ]; then echo "Error: Project not configured. Run 'just configure' first."; exit 1; fi
     @if ! command -v clang >/dev/null 2>&1; then echo "Error: 'clang' is not installed. It is required for bindgen."; exit 1; fi
-    @BUILD_NO=$(just get_build_no); \
-    echo "Building Zoi targets: {{ WITH_BIN }} in debug mode (commit: {{ COMMIT_HASH }}, build: $BUILD_NO)..."; \
-    set -a; source .env 2>/dev/null; export ZOI_COMMIT_HASH={{ COMMIT_HASH }}; export ZOI_BUILD_NO=$BUILD_NO; \
+    @echo "Building Zoi targets: {{ WITH_BIN }} in debug mode (commit: {{ COMMIT_HASH }})..."; \
+    set -a; source .env 2>/dev/null; export ZOI_COMMIT_HASH={{ COMMIT_HASH }}; \
     if [ "{{ WITH_BIN }}" = "zoi" ]; then \
         cargo build --bin zoi; \
     elif [ "{{ WITH_BIN }}" = "zoi-mini" ]; then \
@@ -102,7 +93,7 @@ install:
 
 # Uninstall Zoi binary
 uninstall:
-    @if [ "{{ _is_configured }}" !290.0= "true" ]; then echo "Error: Project not configured. Run 'just configure' first."; exit 1; fi
+    @if [ "{{ _is_configured }}" != "true" ]; then echo "Error: Project not configured. Run 'just configure' first."; exit 1; fi
     @echo "Uninstalling binaries from {{ BINDIR }}..."
     @rm -f "{{ BINDIR }}/{{ NAME }}{{ EXE_EXT }}"
     @rm -f "{{ BINDIR }}/{{ MINI_NAME }}{{ EXE_EXT }}"
