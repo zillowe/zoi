@@ -10,9 +10,9 @@ use colored::Colorize;
 use std::io::{self};
 
 // Development, Special, Public or Production
-const BRANCH: &str = "Production";
+const BRANCH: &str = "Development";
 const STATUS: &str = "Release";
-const NUMBER: &str = "1.22.0";
+const NUMBER: &str = "1.23.0";
 const PKG_SOURCE_HELP: &str = "Package identifier (e.g. @repo/name, path, or URL)";
 
 /// Zoi - The Advanced Package Manager & Environment Orchestrator.
