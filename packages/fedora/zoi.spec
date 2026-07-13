@@ -27,7 +27,7 @@ Requires:       gnupg
 Zoi is an advanced package manager and environment orchestrator, designed to simplify package management and environment configuration across multiple operating systems.
 
 %prep
-%setup -q
+%setup -q -n zoi-Prod-Release-%{version}
 
 %build
 cargo build --release --bin zoi
