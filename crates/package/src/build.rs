@@ -1,12 +1,3 @@
-/// Orchestrates the Zoi package build process.
-///
-/// This module is responsible for turning a `.pkg.lua` definition into a
-/// distributable `.pkg.tar.zst` archive. It:
-/// - Executes the `prepare()`, `build()`, and `package()` Lua functions.
-/// - Manages the staging area where files are organized into Zoi's data structure.
-/// - Generates accompanying metadata: `.hash` (SHA-512), `.size`, and `.files`.
-/// - Supports native builds, Docker-based builds, and cross-compilation via CI tags.
-/// - Handles optional PGP signing of the resulting archive.
 use anyhow::{Result, anyhow};
 use colored::*;
 use mlua::{Lua, LuaSerdeExt, Table};
@@ -64,7 +55,6 @@ pub fn get_build_dependencies(
             .ok_or_else(|| anyhow!("Path contains invalid UTF-8 characters: {:?}", package_file))?,
         platform,
         version_override,
-        None,
         quiet,
     )?;
 
@@ -134,7 +124,6 @@ fn build_for_platform(
             .ok_or_else(|| anyhow!("Path contains invalid UTF-8 characters: {:?}", package_file))?,
         platform,
         version_override,
-        None,
         quiet,
     )?;
 
@@ -203,7 +192,6 @@ fn build_for_platform(
             Some(build_dir.path().to_str().unwrap_or("")),
             Some(staging_dir.to_str().unwrap_or("")),
             sub_pkg_name,
-            Some(pkg_for_meta.scope),
             quiet,
         )
         .map_err(|e| {

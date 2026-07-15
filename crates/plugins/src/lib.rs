@@ -15,26 +15,11 @@ use zoi_resolver::{local, resolve};
 
 const PLUGIN_ENV_OVERRIDES_KEY: &str = "__ZOI_ENV_OVERRIDES";
 
-/// Orchestrates Zoi's extensibility via global Lua plugins.
-///
-/// Plugins allow users to customize Zoi's behavior by:
-/// - Registering new subcommands (`zoi.register_command`).
-/// - Intercepting lifecycle events (`zoi.on_post_install`, etc.).
-/// - Overriding tool versions at runtime (shim resolution).
-///
-/// Plugins are stored in `~/.zoi/plugins/` and are verified against
-/// a `trusted_hashes.json` database to prevent unauthorized execution.
 pub struct PluginManager {
-    /// The initialized mlua Lua Virtual Machine.
     pub lua: Lua,
 }
 
 impl PluginManager {
-    /// Initializes a new PluginManager and sets up the global Lua API.
-    ///
-    /// This injects the entire `zoi.*` API surface into the Lua environment,
-    /// enabling plugins to interact with the filesystem, HTTP, archives,
-    /// the UI, and the hook registry.
     pub fn new() -> Result<Self> {
         let lua = Lua::new();
         let manager = Self { lua };
@@ -212,7 +197,7 @@ impl PluginManager {
             .lua
             .create_function(|lua, name: String| {
                 let (pkg, _, _, _, _, _, _) =
-                    resolve::resolve_package_and_version(&name, None, true, false)
+                    resolve::resolve_package_and_version(&name, true, false)
                         .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
                 lua.to_value(&pkg)
             })

@@ -11,14 +11,6 @@ use serde_json::json;
 use std::fs;
 use std::sync::Mutex;
 
-/// The primary high-level orchestration for the `zoi update` command.
-///
-/// This function handles:
-/// - Batch Updates: When `--all` is specified, it scans all installed packages.
-/// - Targeted Updates: Updates specific packages provided by name.
-/// - Advisory Deltas: Calculates and displays changes in security vulnerabilities.
-/// - Cleanup: Automatically removes old versions after a successful upgrade
-///    (if rollbacks are not required).
 pub fn run(
     all: bool,
     package_names: &[String],
@@ -76,7 +68,7 @@ fn run_update_single_logic(
     );
 
     let (new_pkg, new_version, _, _, registry_handle, _, _) =
-        resolve::resolve_package_and_version(package_name, None, false, yes)?;
+        resolve::resolve_package_and_version(package_name, false, yes)?;
 
     if pin::is_pinned(package_name)? {
         println!(
@@ -283,7 +275,6 @@ fn run_update_single_logic(
     )?;
 
     install::util::check_policy_compliance(&graph)?;
-    install::util::check_scope_compliance(&graph)?;
     for node in graph.nodes.values() {
         if !install::util::display_updates(&node.pkg, yes)? {
             return Err(anyhow!("Update aborted by user."));
@@ -465,8 +456,6 @@ fn run_update_all_logic(
     let mut up_to_date_sources = Vec::new();
     let mut packages_to_upgrade: Vec<UpdateCandidate> = Vec::new();
 
-    // --- Phase 1: Upgrade Scanning ---
-    // We scan all installed packages and compare them against the latest registry metadata.
     println!("{} Checking for upgrades...", "::".bold().blue());
     let pb = ProgressBar::new(installed_packages.len() as u64);
     pb.set_style(
@@ -500,7 +489,7 @@ fn run_update_all_logic(
         }
 
         let (new_pkg, new_version, _, _, _registry_handle, _, _) =
-            match resolve::resolve_package_and_version(&source, Some(manifest.scope), true, false) {
+            match resolve::resolve_package_and_version(&source, true, false) {
                 Ok(result) => result,
                 Err(e) => {
                     eprintln!(
@@ -752,9 +741,6 @@ fn run_update_all_logic(
         return Ok(());
     }
 
-    // --- Phase 2: Transactional Upgrade ---
-    // We execute the upgrade plan. Each package is processed in parallel
-    // where possible, but all are wrapped in a single machine-wide transaction.
     let transaction = Mutex::new(transaction::begin()?);
     let transaction_id = transaction.lock().unwrap().id.clone();
     let failed_updates = Mutex::new(Vec::new());
@@ -804,20 +790,6 @@ fn run_update_all_logic(
             if let Err(e) = install::util::check_policy_compliance(&graph) {
                 eprintln!(
                     "{}: Policy check failed for '{}': {}",
-                    "Error".red().bold(),
-                    candidate.source,
-                    e
-                );
-                failed_updates
-                    .lock()
-                    .map_err(|e| anyhow!("mutex poisoned: {}", e))?
-                    .push(candidate.source.clone());
-                return Ok(());
-            }
-
-            if let Err(e) = install::util::check_scope_compliance(&graph) {
-                eprintln!(
-                    "{}: Scope check failed for '{}': {}",
                     "Error".red().bold(),
                     candidate.source,
                     e

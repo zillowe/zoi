@@ -38,7 +38,6 @@ pub fn run(args: InspectCommand) -> Result<()> {
         file_path,
         &platform,
         args.version_override.as_deref(),
-        None,
         true,
     )?;
 

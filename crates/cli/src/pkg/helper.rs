@@ -69,12 +69,9 @@ pub fn elevate_uninstall(cmd: &crate::cmd::helper::ElevateUninstallCommand) -> R
         let path_str = pkg_lua_path
             .to_str()
             .ok_or_else(|| anyhow!("Package path contains invalid UTF-8"))?;
-        if let Ok(p) = crate::pkg::lua::parser::parse_lua_package(
-            path_str,
-            Some(&manifest.version),
-            Some(manifest.scope),
-            true,
-        ) {
+        if let Ok(p) =
+            crate::pkg::lua::parser::parse_lua_package(path_str, Some(&manifest.version), true)
+        {
             pkg_opt = Some(p);
         }
     }
@@ -96,7 +93,6 @@ pub fn elevate_uninstall(cmd: &crate::cmd::helper::ElevateUninstallCommand) -> R
             None,
             None,
             manifest.sub_package.as_deref(),
-            Some(manifest.scope),
             true,
         )
         .is_ok()
