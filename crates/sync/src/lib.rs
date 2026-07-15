@@ -99,7 +99,7 @@ fn refresh_registry_db(
                 p.inc(1);
             }
             let path_str = path.to_string_lossy();
-            if let Ok(mut pkg) = lua_parser::parse_lua_package(&path_str, None, true) {
+            if let Ok(mut pkg) = lua_parser::parse_lua_package(&path_str, None, None, true) {
                 if pkg.repo.is_empty()
                     && let Ok(rel_path) = path.strip_prefix(registry_path)
                     && let Some(parent) = rel_path.parent()

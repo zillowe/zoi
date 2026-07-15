@@ -48,6 +48,7 @@ fn test_get_versions_does_not_leak_across_distinct_explicit_sources() {
     let provider = pubgrub::ZoiDependencyProvider::new(
         FxHashMap::default(),
         vec![source_a.clone(), source_b],
+        None,
         true,
         true,
         false,

@@ -285,7 +285,7 @@ pub fn get_packages_from_repos(repos: &[String]) -> Result<Vec<zoi_core::types::
                     anyhow::anyhow!("Package path contains invalid UTF-8: {:?}", pkg_file_path)
                 })?;
                 let mut pkg: zoi_core::types::Package =
-                    zoi_lua::parser::parse_lua_package(pkg_file_path_str, None, true)?;
+                    zoi_lua::parser::parse_lua_package(pkg_file_path_str, None, None, true)?;
 
                 if let Ok(repo_subpath) = entry.path().strip_prefix(&db_root) {
                     let mut repo_path = repo_subpath

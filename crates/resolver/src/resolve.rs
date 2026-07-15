@@ -326,6 +326,7 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
             path.to_str()
                 .ok_or_else(|| anyhow!("Path contains invalid UTF-8 characters: {:?}", path))?,
             None,
+            None,
             quiet,
         )?;
         let major_repo = repo_name
@@ -443,6 +444,7 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
                     entry.path().to_str().ok_or_else(|| {
                         anyhow!("Path contains invalid UTF-8 characters: {:?}", entry.path())
                     })?,
+                    None,
                     None,
                     true,
                 ) && let Some(provides) = &pkg.provides
@@ -966,6 +968,7 @@ fn get_version_for_install(
 
 pub fn resolve_requested_version_spec(
     source_str: &str,
+    scope: Option<types::Scope>,
     quiet: bool,
     yes: bool,
 ) -> Result<Option<String>> {
@@ -974,7 +977,7 @@ pub fn resolve_requested_version_spec(
         return Ok(None);
     };
 
-    let resolved_source = resolve_source(source_str, quiet, yes)?;
+    let resolved_source = resolve_source(source_str, scope, quiet, yes)?;
     let mut pkg = zoi_lua::parser::parse_lua_package(
         resolved_source.path.to_str().ok_or_else(|| {
             anyhow!(
@@ -983,6 +986,7 @@ pub fn resolve_requested_version_spec(
             )
         })?,
         None,
+        scope,
         quiet,
     )?;
 
@@ -998,10 +1002,15 @@ pub fn resolve_requested_version_spec(
     .map(Some)
 }
 
-pub fn resolve_source(source: &str, quiet: bool, yes: bool) -> Result<ResolvedSource> {
+pub fn resolve_source(
+    source: &str,
+    scope: Option<types::Scope>,
+    quiet: bool,
+    yes: bool,
+) -> Result<ResolvedSource> {
     let config = config::read_config().unwrap_or_default();
     let max_depth = config.max_resolution_depth.unwrap_or(7);
-    let resolved = resolve_source_recursive(source, 0, max_depth, quiet)?;
+    let resolved = resolve_source_recursive(source, 0, max_depth, scope, quiet)?;
 
     if !quiet {
         let confirmation_key = match &resolved.source_type {
@@ -1052,6 +1061,7 @@ pub fn resolve_source(source: &str, quiet: bool, yes: bool) -> Result<ResolvedSo
 
 pub fn resolve_package_and_version(
     source_str: &str,
+    scope: Option<types::Scope>,
     quiet: bool,
     yes: bool,
 ) -> Result<(
@@ -1064,7 +1074,7 @@ pub fn resolve_package_and_version(
     Option<String>,
 )> {
     let request = parse_source_string(source_str)?;
-    let resolved_source = resolve_source(source_str, quiet, yes)?;
+    let resolved_source = resolve_source(source_str, scope, quiet, yes)?;
     let registry_handle = resolved_source.registry_handle.clone();
     let repo_type = resolved_source.repo_type.clone();
     let pkg_lua_path = resolved_source.path.clone();
@@ -1078,6 +1088,7 @@ pub fn resolve_package_and_version(
             )
         })?,
         None,
+        scope,
         quiet,
     )?;
 
@@ -1100,6 +1111,7 @@ pub fn resolve_package_and_version(
             )
         })?,
         Some(&version_string),
+        scope,
         quiet,
     )?;
     if let Some(repo_name) = resolved_source.repo_name.clone() {
@@ -1124,6 +1136,7 @@ fn resolve_source_recursive(
     source: &str,
     depth: u8,
     max_depth: u8,
+    scope: Option<types::Scope>,
     quiet: bool,
 ) -> Result<ResolvedSource> {
     if max_depth > 0 && depth > max_depth {
@@ -1154,7 +1167,7 @@ fn resolve_source_recursive(
             sharable_manifest.version
         );
         let mut resolved_source =
-            resolve_source_recursive(&new_source, depth + 1, max_depth, quiet)?;
+            resolve_source_recursive(&new_source, depth + 1, max_depth, scope, quiet)?;
         resolved_source.sharable_manifest = Some(sharable_manifest);
         return Ok(resolved_source);
     }
@@ -1394,6 +1407,7 @@ fn resolve_source_recursive(
             )
         })?,
         None,
+        scope,
         quiet,
     )?;
 
@@ -1457,10 +1471,11 @@ fn resolve_source_recursive(
                     })?,
                     depth + 1,
                     max_depth,
+                    scope,
                     quiet,
                 )?
             } else {
-                resolve_source_recursive(&alt_source, depth + 1, max_depth, quiet)?
+                resolve_source_recursive(&alt_source, depth + 1, max_depth, scope, quiet)?
             };
 
         return Ok(alt_resolved_source);

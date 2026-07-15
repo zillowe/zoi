@@ -477,7 +477,7 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
         {
             let path = entry.path();
             let path_str = path.to_string_lossy();
-            if let Ok(pkg) = zoi_lua::parser::parse_lua_package(&path_str, None, true) {
+            if let Ok(pkg) = zoi_lua::parser::parse_lua_package(&path_str, None, None, true) {
                 let rel_path = path.strip_prefix(registry_root)?;
                 let mut repo_parts: Vec<_> = rel_path
                     .components()
@@ -597,6 +597,8 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
                         version,
                         revision: pkg.revision.clone(),
                         description: pkg.description,
+                        scope: Some(pkg.scope),
+                        scopes: pkg.scopes.clone(),
                         dependencies: dependencies_v2,
                         sub_packages: pkg.sub_packages.unwrap_or_default(),
                         main_sub_packages: pkg.main_subs.unwrap_or_default(),

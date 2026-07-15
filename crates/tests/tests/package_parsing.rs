@@ -3,7 +3,7 @@ use zoi::pkg::lua::parser;
 #[test]
 fn test_parse_lua_package() {
     let pkg_path = "tests/assets/test.pkg.lua";
-    let pkg = parser::parse_lua_package(pkg_path, None, true).unwrap();
+    let pkg = parser::parse_lua_package(pkg_path, None, None, true).unwrap();
 
     assert_eq!(pkg.name, "test-pkg");
     assert_eq!(pkg.repo, "core");

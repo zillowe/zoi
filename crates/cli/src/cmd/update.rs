@@ -68,7 +68,7 @@ fn run_update_single_logic(
     );
 
     let (new_pkg, new_version, _, _, registry_handle, _, _) =
-        resolve::resolve_package_and_version(package_name, false, yes)?;
+        resolve::resolve_package_and_version(package_name, None, false, yes)?;
 
     if pin::is_pinned(package_name)? {
         println!(
@@ -275,6 +275,7 @@ fn run_update_single_logic(
     )?;
 
     install::util::check_policy_compliance(&graph)?;
+    install::util::check_scope_compliance(&graph)?;
     for node in graph.nodes.values() {
         if !install::util::display_updates(&node.pkg, yes)? {
             return Err(anyhow!("Update aborted by user."));
@@ -489,7 +490,7 @@ fn run_update_all_logic(
         }
 
         let (new_pkg, new_version, _, _, _registry_handle, _, _) =
-            match resolve::resolve_package_and_version(&source, true, false) {
+            match resolve::resolve_package_and_version(&source, Some(manifest.scope), true, false) {
                 Ok(result) => result,
                 Err(e) => {
                     eprintln!(
@@ -790,6 +791,20 @@ fn run_update_all_logic(
             if let Err(e) = install::util::check_policy_compliance(&graph) {
                 eprintln!(
                     "{}: Policy check failed for '{}': {}",
+                    "Error".red().bold(),
+                    candidate.source,
+                    e
+                );
+                failed_updates
+                    .lock()
+                    .map_err(|e| anyhow!("mutex poisoned: {}", e))?
+                    .push(candidate.source.clone());
+                return Ok(());
+            }
+
+            if let Err(e) = install::util::check_scope_compliance(&graph) {
+                eprintln!(
+                    "{}: Scope check failed for '{}': {}",
                     "Error".red().bold(),
                     candidate.source,
                     e

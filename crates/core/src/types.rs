@@ -203,6 +203,8 @@ pub struct Package {
     #[serde(default)]
     pub scope: Scope,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scopes: Option<Vec<Scope>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub registry_handle: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sub_package: Option<String>,
@@ -731,6 +733,10 @@ pub struct PurlPackageIndexV2 {
     pub version: String,
     pub revision: String,
     pub description: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope: Option<Scope>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scopes: Option<Vec<Scope>>,
     pub sub_packages: Vec<String>,
     pub main_sub_packages: Vec<String>,
     pub vuln: Vec<MiniVulnerability>,

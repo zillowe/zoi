@@ -233,6 +233,7 @@ pub fn run(
             .ok_or_else(|| anyhow!("Path contains invalid UTF-8 characters: {:?}", pkg_lua_path))?,
         &platform,
         version_override,
+        Some(scope),
         true,
     )?;
     let version = metadata.version.as_ref().ok_or_else(|| {

@@ -330,7 +330,12 @@ fn load_installed_package(
         let path = installed_source_path
             .to_str()
             .ok_or_else(|| anyhow!("Stored package source path contains invalid UTF-8"))?;
-        let mut pkg = zoi_lua::parser::parse_lua_package(path, Some(&manifest.version), true)?;
+        let mut pkg = zoi_lua::parser::parse_lua_package(
+            path,
+            Some(&manifest.version),
+            Some(manifest.scope),
+            true,
+        )?;
         pkg.repo = manifest.repo.clone();
         pkg.scope = manifest.scope;
         pkg.registry_handle = Some(manifest.registry_handle.clone());
@@ -340,7 +345,7 @@ fn load_installed_package(
 
     let source = local::installed_manifest_source(manifest);
     let (mut pkg, _, _, pkg_lua_path, _, _, _) =
-        resolve::resolve_package_and_version(&source, true, yes)?;
+        resolve::resolve_package_and_version(&source, Some(manifest.scope), true, yes)?;
     pkg.scope = manifest.scope;
     pkg.sub_package = manifest.sub_package.clone();
     Ok((pkg, pkg_lua_path))
@@ -434,6 +439,7 @@ pub fn run(
             None,
             None,
             sub_package_to_uninstall.as_deref(),
+            Some(scope),
             true,
         )
         .map_err(|e| anyhow!(e.to_string()))?;

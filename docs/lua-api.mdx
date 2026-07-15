@@ -13,6 +13,7 @@ These variables are automatically available in your script's scope.
 | :------------ | :------- | :---------------------------------------------------------------- |
 | `SYSTEM`      | `table`  | Information about the host system.                                |
 | `ZOI`         | `table`  | Information about the Zoi environment.                            |
+| `ZOI.scope`   | `string` | The currently requested installation scope (e.g. `"user"`).       |
 | `LOCATION`    | `table`  | Absolute paths for common package locations.                      |
 | `PKG`         | `table`  | A table populated from your `metadata{...}` fields.               |
 | `BUILD_DIR`   | `string` | Absolute path to the temporary build directory.                   |
@@ -36,6 +37,7 @@ These variables are automatically available in your script's scope.
 ### The `ZOI` Table
 
 - `ZOI.VERSION`: The version of the package being built (resolved from metadata).
+- `ZOI.scope`: The currently requested installation scope (`user`, `system`, or `project`).
 - `ZOI.PATH.user`: Path to Zoi's user directory (`~/.zoi`).
 - `ZOI.PATH.system`: Path to Zoi's system-wide binary directory.
 

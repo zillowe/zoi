@@ -21,6 +21,7 @@ pub fn run(args: &cmd::package::build::BuildCommand) -> Result<()> {
         })?,
         &platform,
         args.version_override.as_deref(),
+        None,
         false,
     )?;
 
@@ -76,6 +77,7 @@ pub fn run(args: &cmd::package::build::BuildCommand) -> Result<()> {
             None,
             None,
             sub_pkg_name,
+            Some(pkg_for_meta.scope),
             false,
         )
         .map_err(|e| anyhow!(e.to_string()))?;
