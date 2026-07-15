@@ -58,6 +58,7 @@ fn build_candidate_displays(candidates: &[types::InstallManifest]) -> Vec<Candid
                     let pkg = crate::pkg::lua::parser::parse_lua_package(
                         path,
                         Some(&manifest.version),
+                        Some(manifest.scope),
                         true,
                     )
                     .ok()?;

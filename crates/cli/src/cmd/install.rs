@@ -353,6 +353,7 @@ pub fn run(
             }
         }
         install::util::check_policy_compliance(&graph)?;
+        install::util::check_scope_compliance(&graph)?;
         install::util::check_for_vulnerabilities(&graph, yes)?;
 
         let m_for_conflict_check = MultiProgress::new();

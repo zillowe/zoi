@@ -52,6 +52,22 @@ function package()
 end
 ```
 
+## Scope-Aware Staging
+
+Use `ZOI.scope` to adjust installation paths or behaviors depending on whether the package is being installed for a single user, a project, or system-wide.
+
+```lua
+function package()
+  if ZOI.scope == "system" then
+    -- Install to a global location
+    zcp("bin/tool", "${usrroot}/usr/bin/tool")
+  else
+    -- Standard store installation
+    zcp("bin/tool", "${pkgstore}/bin/tool")
+  end
+end
+```
+
 ## Dynamic Versioning from GitHub
 
 Instead of hardcoding a version, you can fetch the latest release tag directly from GitHub using Zoi's utility functions.

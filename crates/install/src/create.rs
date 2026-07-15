@@ -44,7 +44,7 @@ pub fn run(
     plugin_manager: Option<&PluginManager>,
 ) -> Result<()> {
     let (pkg, _, _, pkg_lua_path, _, _, _) =
-        resolver::resolve::resolve_package_and_version(source, false, false)?;
+        resolver::resolve::resolve_package_and_version(source, None, false, false)?;
 
     if pkg.package_type != types::PackageType::App {
         return Err(anyhow!(

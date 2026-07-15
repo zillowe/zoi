@@ -57,7 +57,7 @@ pub fn run(source: &str, raw: bool, purl: bool) -> Result<()> {
         source_str = crate::pkg::purl::fetch_and_store_purl_package(&source_str)?;
     }
     let source = source_str.as_str();
-    let resolved_source = resolve::resolve_source(source, false, false)?;
+    let resolved_source = resolve::resolve_source(source, None, false, false)?;
 
     if raw {
         let content = fs::read_to_string(&resolved_source.path)?;
@@ -71,6 +71,7 @@ pub fn run(source: &str, raw: bool, purl: bool) -> Result<()> {
                 resolved_source.path
             )
         })?,
+        None,
         None,
         false,
     )?;

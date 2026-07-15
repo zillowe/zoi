@@ -138,6 +138,22 @@ pub fn get_conflicts(
     Ok(conflict_messages)
 }
 
+pub fn check_scope_compliance(graph: &super::resolver::DependencyGraph) -> Result<()> {
+    for node in graph.nodes.values() {
+        if let Some(allowed_scopes) = &node.pkg.scopes
+            && !allowed_scopes.contains(&node.pkg.scope)
+        {
+            return Err(anyhow!(
+                "Package '{}' is not allowed to be installed in scope {:?}. Allowed scopes: {:?}",
+                node.pkg.name,
+                node.pkg.scope,
+                allowed_scopes
+            ));
+        }
+    }
+    Ok(())
+}
+
 pub fn check_for_conflicts(packages_to_install: &[&types::Package], yes: bool) -> Result<()> {
     let installed_packages = zoi_resolver::local::get_installed_packages()?;
     let mut all_conflict_messages = HashSet::new();

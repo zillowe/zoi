@@ -84,7 +84,13 @@ fn test_package_outdated_on_revision_bump() {
 
     let source = format!("#{}@{}/{}", handle, repo, pkg_name);
     let (resolved_pkg, new_version, _, _, _, _, _) =
-        zoi::pkg::resolve::resolve_package_and_version(&source, true, true).unwrap();
+        zoi::pkg::resolve::resolve_package_and_version(
+            &source,
+            Some(types::Scope::User),
+            true,
+            true,
+        )
+        .unwrap();
 
     assert_eq!(new_version, version);
     assert_eq!(resolved_pkg.revision, "2");

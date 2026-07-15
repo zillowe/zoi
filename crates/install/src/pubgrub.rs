@@ -67,6 +67,7 @@ pub enum ZoiSolverError {
 pub struct ZoiDependencyProvider {
     pub root_deps: FxHashMap<PkgName, Ranges<SemVersion>>,
     pub initial_sources: Vec<String>,
+    pub scope: Option<types::Scope>,
     pub quiet: bool,
     pub yes: bool,
     pub all_optional: bool,
@@ -166,6 +167,7 @@ impl ZoiDependencyProvider {
     pub fn new(
         root_deps: FxHashMap<PkgName, Ranges<SemVersion>>,
         initial_sources: Vec<String>,
+        scope: Option<types::Scope>,
         quiet: bool,
         yes: bool,
         all_optional: bool,
@@ -195,6 +197,7 @@ impl ZoiDependencyProvider {
         Ok(Self {
             root_deps,
             initial_sources,
+            scope,
             quiet,
             yes,
             all_optional,
@@ -231,7 +234,7 @@ impl ZoiDependencyProvider {
             return false;
         }
 
-        let Ok(resolved_source) = resolve::resolve_source(source, true, true) else {
+        let Ok(resolved_source) = resolve::resolve_source(source, self.scope, true, true) else {
             return false;
         };
 
@@ -285,9 +288,9 @@ impl ZoiDependencyProvider {
             }
         });
 
-        if let Ok(resolved) = resolve::resolve_source(&source_str, true, true) {
+        if let Ok(resolved) = resolve::resolve_source(&source_str, self.scope, true, true) {
             let path_str = resolved.path.to_string_lossy();
-            if let Ok(pkg) = zoi_lua::parser::parse_lua_package(&path_str, None, true) {
+            if let Ok(pkg) = zoi_lua::parser::parse_lua_package(&path_str, None, self.scope, true) {
                 if let Some(v_str) = &pkg.version {
                     let v_clean = v_str.trim_start_matches('v');
                     if let Ok(v) = Version::parse(v_clean) {
@@ -410,7 +413,8 @@ impl DependencyProvider for ZoiDependencyProvider {
                     .explicit_source
                     .clone()
                     .unwrap_or_else(|| format!("{}@{}", package, version_str));
-                let pkg_res = resolve::resolve_package_and_version(&source, self.quiet, self.yes);
+                let pkg_res =
+                    resolve::resolve_package_and_version(&source, self.scope, self.quiet, self.yes);
 
                 match pkg_res {
                     Ok((pkg, _, _, _, _, _, _)) => pkg.dependencies,
@@ -441,9 +445,13 @@ impl DependencyProvider for ZoiDependencyProvider {
                     if dep_req.manager == "zoi" {
                         let req = resolve::parse_source_string(dep_req.package)
                             .map_err(|e| ZoiSolverError::Dependency(e.to_string()))?;
-                        let resolved_dep =
-                            resolve::resolve_source(dep_req.package, self.quiet, self.yes)
-                                .map_err(|e| ZoiSolverError::Dependency(e.to_string()))?;
+                        let resolved_dep = resolve::resolve_source(
+                            dep_req.package,
+                            self.scope,
+                            self.quiet,
+                            self.yes,
+                        )
+                        .map_err(|e| ZoiSolverError::Dependency(e.to_string()))?;
 
                         let dep_name = PkgName {
                             name: req.name,
@@ -464,6 +472,7 @@ impl DependencyProvider for ZoiDependencyProvider {
                         let range = if req.version_spec.is_some() {
                             let resolved_version = resolve::resolve_requested_version_spec(
                                 dep_req.package,
+                                self.scope,
                                 true,
                                 true,
                             )

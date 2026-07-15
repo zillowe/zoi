@@ -303,7 +303,7 @@ pub fn install_sources(sources: &[String], options: &SourceInstallOptions) -> Re
 
 pub fn resolve_package(source: &str, yes: bool) -> Result<ResolvedPackage> {
     let (package, version, sharable_manifest, source_path, registry_handle, repo_type, git_sha) =
-        zoi_resolver::resolve::resolve_package_and_version(source, true, yes)?;
+        zoi_resolver::resolve::resolve_package_and_version(source, None, true, yes)?;
     Ok(ResolvedPackage {
         package,
         version,

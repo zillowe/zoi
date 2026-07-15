@@ -10,7 +10,7 @@ pub fn run(package_name: &str, location: Option<String>, yes: bool) -> Result<()
         package_name.cyan().bold()
     );
 
-    let resolved_source = resolve::resolve_source(package_name, false, yes)?;
+    let resolved_source = resolve::resolve_source(package_name, None, false, yes)?;
 
     let pkg: types::Package = crate::pkg::lua::parser::parse_lua_package(
         resolved_source.path.to_str().ok_or_else(|| {
@@ -19,6 +19,7 @@ pub fn run(package_name: &str, location: Option<String>, yes: bool) -> Result<()
                 resolved_source.path
             )
         })?,
+        None,
         None,
         false,
     )?;

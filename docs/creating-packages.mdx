@@ -68,6 +68,7 @@ This table lists all the available fields you can use inside the `metadata` bloc
 | `ci`             | `table`   | CI runner configuration for build pipelines. See [CI Runner Support](#ci-runner-support) below.                                                                                                                                             |
 | `type`           | `string`  | The type of package. Can be `package` (default), `collection`, `app`, or `extension`. See [Package Types](#5-package-types).                                                                                                                |
 | `scope`          | `string`  | The default installation scope (`user`, `system`, or `project`). Users can override this with CLI flags.                                                                                                                                    |
+| `scopes`         | `list`    | A list of allowed installation scopes (e.g. `{ "user", "system" }`). If provided, Zoi will block installation to any scope not in this list.                                                                                                |
 | `sub_packages`   | `list`    | A list of sub-package names to define a split package. See [Split Packages](#6-split-packages).                                                                                                                                             |
 | `main_subs`      | `list`    | For a split package, a list of the default sub-packages to install.                                                                                                                                                                         |
 | `extension`      | `table`   | Extension metadata for `type = "extension"` packages. Usually declared directly in `metadata`.                                                                                                                                              |
@@ -172,7 +173,7 @@ When Zoi executes your script, it provides a rich environment of global variable
 | Variable      | Type     | Description                                                                                                         |
 | ------------- | -------- | ------------------------------------------------------------------------------------------------------------------- |
 | `SYSTEM`      | `table`  | Contains system info: `OS`, `ARCH`, `DISTRO`, `DISTRO_VER`, `DE`, `SERVER`, `KERNEL_VER`, `CPU`, `GPU`, `MANAGER`.  |
-| `ZOI`         | `table`  | Contains Zoi-specific info: `VERSION` (the version being built), `PATH.user`, `PATH.system`, and `PKG` (see below). |
+| `ZOI`         | `table`  | Contains Zoi-specific info: `VERSION` (the version being built), `scope` (the requested scope), `PATH.user`, `PATH.system`, and `PKG` (see below). |
 | `ZOI.PKG`     | `table`  | Contains absolute paths: `store`, `template`, `root`, `home`, `lua`.                                                |
 | `PKG`         | `table`  | A table containing all the fields you defined in your `metadata{...}` block.                                        |
 | `BUILD_DIR`   | `string` | The absolute path to the temporary build directory. Use this as the destination for all downloaded and built files. |

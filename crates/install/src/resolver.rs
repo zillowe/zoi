@@ -133,7 +133,7 @@ pub fn build_graph_from_locked_packages(
     for locked in locked_packages {
         let request = resolve::parse_source_string(&locked.source)?;
         let (pkg, version_str, _, pkg_lua_path, handle, repo_type, git_sha) =
-            resolve::resolve_package_and_version(&locked.source, quiet, yes)?;
+            resolve::resolve_package_and_version(&locked.source, scope_override, quiet, yes)?;
 
         let mut pkg = pkg;
         if let Some(scope) = scope_override {
@@ -319,7 +319,7 @@ pub fn resolve_dependency_graph(
         }
 
         let request = resolve::parse_source_string(source)?;
-        let resolved = resolve::resolve_source(source, quiet, yes)?;
+        let resolved = resolve::resolve_source(source, scope_override, quiet, yes)?;
 
         let pkg_name = PkgName {
             name: request.name,
@@ -338,8 +338,11 @@ pub fn resolve_dependency_graph(
         };
 
         let range = if request.version_spec.is_some() {
-            let resolved_version = resolve::resolve_requested_version_spec(source, true, true)?
-                .ok_or_else(|| anyhow!("version spec missing despite check for '{}'", source))?;
+            let resolved_version =
+                resolve::resolve_requested_version_spec(source, scope_override, true, true)?
+                    .ok_or_else(|| {
+                        anyhow!("version spec missing despite check for '{}'", source)
+                    })?;
             crate::pubgrub::semver_to_range(&resolved_version)
         } else {
             Ranges::full()
@@ -353,6 +356,7 @@ pub fn resolve_dependency_graph(
     let provider = ZoiDependencyProvider::new(
         root_deps,
         initial_sources.to_vec(),
+        scope_override,
         quiet,
         yes,
         all_optional,
@@ -382,7 +386,7 @@ pub fn resolve_dependency_graph(
                     .clone()
                     .unwrap_or_else(|| format!("{}@{}", name, version));
                 let (pkg, version_str, _, pkg_lua_path, handle, repo_type, git_sha) =
-                    resolve::resolve_package_and_version(&source, quiet, yes)?;
+                    resolve::resolve_package_and_version(&source, scope_override, quiet, yes)?;
 
                 let mut pkg = pkg;
                 if let Some(s) = scope_override {

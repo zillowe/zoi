@@ -11,6 +11,7 @@ pub fn setup_lua_environment(
     build_dir: Option<&str>,
     staging_dir: Option<&str>,
     sub_package: Option<&str>,
+    scope: Option<zoi_core::types::Scope>,
     quiet: bool,
 ) -> Result<(), mlua::Error> {
     let system_table = lua.create_table()?;
@@ -46,6 +47,11 @@ pub fn setup_lua_environment(
     let zoi_table = lua.create_table()?;
     if let Some(ver) = version_override {
         zoi_table.set("VERSION", ver)?;
+    }
+
+    if let Some(s) = scope {
+        let scope_str = format!("{:?}", s).to_lowercase();
+        zoi_table.set("scope", scope_str)?;
     }
 
     if let Some(dir) = create_pkg_dir {

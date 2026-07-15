@@ -55,6 +55,7 @@ pub fn get_build_dependencies(
             .ok_or_else(|| anyhow!("Path contains invalid UTF-8 characters: {:?}", package_file))?,
         platform,
         version_override,
+        None,
         quiet,
     )?;
 
@@ -124,6 +125,7 @@ fn build_for_platform(
             .ok_or_else(|| anyhow!("Path contains invalid UTF-8 characters: {:?}", package_file))?,
         platform,
         version_override,
+        None,
         quiet,
     )?;
 
@@ -192,6 +194,7 @@ fn build_for_platform(
             Some(build_dir.path().to_str().unwrap_or("")),
             Some(staging_dir.to_str().unwrap_or("")),
             sub_pkg_name,
+            Some(pkg_for_meta.scope),
             quiet,
         )
         .map_err(|e| {
