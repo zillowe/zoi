@@ -72,21 +72,30 @@ pub enum Scope {
     Project,
 }
 
+/// Defines the category of a Zoi package.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum PackageType {
+    /// A standard software package containing binaries or libraries.
     #[default]
     Package,
+    /// A meta-package that groups other packages together via dependencies.
     Collection,
+    /// A project template used by `zoi create`.
     App,
+    /// A configuration package that modifies Zoi's own settings.
     Extension,
 }
 
+/// The severity or category of an update notice.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum UpdateType {
+    /// A general change notice.
     Change,
+    /// A critical security vulnerability notice.
     Vulnerability,
+    /// A standard software update notice.
     Update,
 }
 
@@ -97,17 +106,26 @@ pub struct UpdateInfo {
     pub message: String,
 }
 
+/// Defines a specific configuration change applied by an Extension.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
 #[serde(rename_all = "kebab-case")]
 pub enum ExtensionChange {
+    /// Clones a third-party Git repository into Zoi's sources.
     RepoGit { add: String },
+    /// Replaces the primary registry URL.
     RegistryRepo { add: String },
+    /// Adds a supplementary registry.
     RegistryAdd { add: String },
+    /// Activates an official repository tier (e.g. "test").
     RepoAdd { add: String },
+    /// Creates a `zoi.yaml` project file in the current directory.
     Project { add: String },
+    /// Imports a PGP public key for verification.
     Pgp { name: String, key: String },
+    /// Registers a new global Lua plugin.
     Plugin { name: String, script: String },
+    /// Registers a new global transaction hook.
     Hook { name: String, content: String },
 }
 
@@ -165,45 +183,75 @@ pub enum ManSpec {
     Map(BTreeMap<String, String>),
 }
 
+/// The core package definition blueprint.
+///
+/// This struct is the Rust representation of the `metadata({...})` block in a `.pkg.lua` file.
+/// It defines what a package is, where it comes from, and how it can be installed,
+/// but does not represent an actual installation on disk (see `InstallManifest` for that).
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[allow(dead_code)]
 pub struct Package {
+    /// Unique name of the package.
     pub name: String,
+    /// The repository tier this package belongs to (e.g. "core", "main").
     pub repo: String,
+    /// The resolved version string.
     pub version: Option<String>,
+    /// Incremental revision for the same upstream version (e.g. for packaging fixes).
     #[serde(default = "default_revision")]
     pub revision: String,
+    /// List of available sub-packages for split-package definitions.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sub_packages: Option<Vec<String>>,
+    /// Default sub-packages to install if none are specified.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub main_subs: Option<Vec<String>>,
+    /// Map of version channels (e.g. "stable", "nightly") to versions.
     pub versions: Option<HashMap<String, String>>,
+    /// Short summary of the package.
     pub description: String,
+    /// Project homepage URL.
     pub website: Option<String>,
+    /// URL or path to the package README.
     #[serde(default)]
     pub readme: Option<String>,
+    /// Manual page specification.
     #[serde(default)]
     pub man: Option<ManSpec>,
+    /// Upstream Git repository URL.
     #[serde(default)]
     pub git: String,
+    /// The maintainer responsible for the Zoi package definition.
     pub maintainer: Maintainer,
+    /// The original software author.
     pub author: Option<Author>,
+    /// SPDX license identifier.
     #[serde(default)]
     pub license: String,
+    /// Supported build types (e.g. "source", "pre-compiled").
     #[serde(default)]
     pub types: Vec<String>,
+    /// Supported OS/Arch platforms.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub platforms: Option<Vec<String>>,
+    /// CI runner configuration for registry pipelines.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ci: Option<CiConfig>,
+    /// Build and runtime dependencies.
     pub dependencies: Option<Dependencies>,
+    /// The package category (Package, App, Extension, etc.).
     #[serde(rename = "type", default)]
     pub package_type: PackageType,
+    /// Pointer to an alternative package definition.
     pub alt: Option<String>,
+    /// The primary/default installation scope for this package.
     #[serde(default)]
     pub scope: Scope,
+    /// List of allowed installation scopes. If provided, Zoi will enforce that
+    /// the package is only installed into one of these targets.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scopes: Option<Vec<Scope>>,
+    /// Handle of the registry this package was resolved from.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub registry_handle: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -469,23 +517,40 @@ pub struct CiConfig {
     pub tags: Option<HashMap<String, String>>,
 }
 
+/// The record of an actual package installation on disk.
+///
+/// Unlike the `Package` blueprint, the `InstallManifest` is the "Source of Truth"
+/// for what is currently installed. It is stored in `manifest.yaml` inside the
+/// package's version directory in the Zoi store.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct InstallManifest {
+    /// Name of the installed package.
     pub name: String,
+    /// Exact version installed.
     pub version: String,
+    /// Revision of the package definition used for this install.
     #[serde(default = "default_revision")]
     pub revision: String,
+    /// For split packages, the name of the installed sub-package.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sub_package: Option<String>,
+    /// Repository tier the package came from.
     pub repo: String,
+    /// Trust level of the repository (official, community, etc.).
     #[serde(default)]
     pub repo_type: String,
+    /// Registry handle the package was installed from.
     pub registry_handle: String,
+    /// Category of the installed package.
     pub package_type: PackageType,
+    /// Short summary.
     #[serde(default)]
     pub description: String,
+    /// Whether the user installed this directly or if it's a dependency.
     pub reason: InstallReason,
+    /// The scope where this package was installed.
     pub scope: Scope,
+    /// List of linked binary names.
     pub bins: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub conflicts: Option<Vec<String>>,
@@ -720,9 +785,17 @@ pub struct SharableInstallManifest {
     pub chosen_optionals: Vec<String>,
 }
 
+/// The root structure of a `packages.json` registry index file (Specification v2).
+///
+/// This file is generated by `zoi registry generate-metadata` and acts as a highly
+/// optimized, centralized index of every `.pkg.lua` file in a registry.
+/// It allows Zoi clients to perform SAT resolution without downloading or
+/// evaluating thousands of Lua scripts locally.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RegistryIndexV2 {
+    /// The registry index specification version (always "2").
     pub version: String,
+    /// A map of package identifiers (`@repo/name`) to their pre-computed metadata.
     pub packages: BTreeMap<String, PurlPackageIndexV2>,
 }
 
@@ -758,14 +831,26 @@ pub struct BuildDependencyV2 {
     pub packages: Vec<String>,
 }
 
+/// The root structure of a `zoi.lock` file (Specification v2).
+///
+/// This lockfile guarantees absolute reproducibility for project environments.
+/// Instead of just pinning versions, it pins:
+/// - Local State Hashes: Cryptographic hashes of the actual store and database directories.
+/// - Registry Revisions: The exact Git commit SHAs of the registries used to resolve packages.
+/// - Package Hashes: Expected checksums for every installed package directory.
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct ZoiLockV2 {
+    /// The lockfile specification version (always "2").
     pub version: String,
+    /// The SHA-512 hash of the `.zoi/pkgs/store` directory, capturing the exact file state.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub packages_hash: Option<String>,
+    /// The SHA-512 hash of the `.zoi/pkgs/db` directory, capturing the registry metadata state.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub registries_hash: Option<String>,
+    /// A map of registry handles to their pinned Git URLs and commit revisions.
     pub registries: BTreeMap<String, LockRegistryV2>,
+    /// A map of package identifiers to their fully resolved installation state.
     pub installed_packages: BTreeMap<String, LockPackageDetailV2>,
 }
 

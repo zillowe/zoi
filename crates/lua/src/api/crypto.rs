@@ -5,6 +5,15 @@ use zoi_core::utils;
 use colored::Colorize;
 use sequoia_openpgp::{Cert, parse::Parse};
 use std::fs;
+/// Exposes cryptographic utilities to the Lua environment.
+///
+/// These functions allow package scripts to perform security validations:
+/// - `verifyHash`: Checks a file's SHA-256 or SHA-512 integrity.
+/// - `verifySignature`: Validates a detached PGP signature using a local or remote key.
+/// - `addPgpKey`: Dynamically imports a trusted PGP key into the Zoi keyring.
+///
+/// This provides the "Chain of Trust" within the package build process, ensuring
+/// that downloaded assets have not been tampered with.
 pub fn add_verify_hash(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let verify_hash_fn = lua.create_function(move |lua, args: mlua::MultiValue| {
         let mut args_iter = args.into_iter();

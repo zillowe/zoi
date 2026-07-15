@@ -15,6 +15,11 @@ pub fn open_connection(registry_handle: &str) -> Result<Connection> {
     Ok(conn)
 }
 
+/// Opens a raw SQLite connection and configures high-performance pragmas.
+///
+/// Performance Tuning:
+/// - `WAL` (Write-Ahead Logging): Allows concurrent readers and a single writer.
+/// - `NORMAL` Synchronous: Balanced safety and speed for registry metadata.
 pub fn open_connection_no_setup(registry_handle: &str) -> Result<Connection> {
     let db_path = get_db_path(registry_handle)?;
     if let Some(parent) = db_path.parent() {
@@ -34,6 +39,15 @@ pub fn open_connection_no_setup(registry_handle: &str) -> Result<Connection> {
     Ok(conn)
 }
 
+/// Initializes or migrates the Zoi registry metadata schema.
+///
+/// Schema Highlights:
+/// - `packages`: The main metadata store with FTS5 search indexing.
+/// - `package_files`: Index of every file path provided by every package (used by `zoi provides`).
+/// - `package_advisories`: Security vulnerability database.
+///
+/// FTS5 Search: Uses SQLite's virtual tables for sub-millisecond full-text
+/// search across thousands of package descriptions and tags.
 fn setup_schema(conn: &Connection) -> Result<()> {
     conn.execute(
         "CREATE TABLE IF NOT EXISTS packages (

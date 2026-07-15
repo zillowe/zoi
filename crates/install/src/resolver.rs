@@ -10,26 +10,53 @@ use zoi_deps as dependencies;
 use zoi_project::lockfile::FrozenLockPackage;
 use zoi_resolver::resolve;
 
+/// Represents a single package node within the resolved dependency graph.
+///
+/// This node encapsulates everything needed to install the package, including:
+/// - The fully parsed package metadata.
+/// - The exact resolved version and sub-package selection.
+/// - The reason it was included (Direct request vs. Dependency).
+/// - The specific options and optionals chosen by the user/resolver.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InstallNode {
+    /// The core metadata definition for the package.
     pub pkg: Package,
+    /// The exact resolved SemVer version.
     pub version: String,
+    /// The package revision number (used for packaging updates).
     pub revision: String,
+    /// The selected sub-package, if applicable (e.g. `Some("docs")`).
     pub sub_package: Option<String>,
+    /// The tier of the repository this package belongs to (e.g. "official", "community").
     pub repo_type: String,
+    /// A short description of the package.
     pub description: String,
+    /// Why this package is being installed (e.g. Direct request vs Dependency).
     pub reason: InstallReason,
+    /// The original source string used to request this package.
     pub source: String,
+    /// The handle of the registry this package was resolved from.
     pub registry_handle: String,
+    /// The names of explicit dependency options chosen by the user.
     pub chosen_options: Vec<String>,
+    /// The names of optional dependencies chosen by the user.
     pub chosen_optionals: Vec<String>,
+    /// The final list of runtime dependency source strings required by this node.
     pub dependencies: Vec<String>,
+    /// The Git commit SHA of the repository when this package was resolved (used for lockfiles).
     pub git_sha: Option<String>,
 }
 
+/// A Directed Acyclic Graph (DAG) representing the installation plan.
+///
+/// The graph ensures that dependencies are installed before the packages
+/// that require them. The `$root` node acts as the entry point linking
+/// all direct user requests.
 #[derive(Default, Debug)]
 pub struct DependencyGraph {
+    /// A map of package IDs to their complete installation data.
     pub nodes: HashMap<String, InstallNode>,
+    /// The adjacency list representing the directed edges (dependencies) between packages.
     pub adj: HashMap<String, HashSet<String>>,
 }
 
@@ -293,6 +320,14 @@ fn pkg_key_as_str(s: &String) -> &String {
     s
 }
 
+/// Computes the complete dependency graph for a set of input sources.
+///
+/// This is the core "Resolution Engine" of Zoi. It:
+/// - Maps each source string to a `PkgName` in the PubGrub solver.
+/// - Uses the PubGrub SAT algorithm to find a set of versions that satisfy all
+///    SemVer requirements and constraints.
+/// - Handles backtracking and human-readable error reporting on failure.
+/// - Returns a `DependencyGraph` containing all nodes (packages) and edges (dependencies).
 pub fn resolve_dependency_graph(
     initial_sources: &[String],
     scope_override: Option<types::Scope>,

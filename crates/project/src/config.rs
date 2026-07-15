@@ -34,24 +34,38 @@ pub struct PackageSpec {
     pub dependencies: Option<zoi_core::types::Dependencies>,
 }
 
+/// Represents the combined evaluation of a project's `zoi.lua` and `zoi.yaml` configuration.
+///
+/// This struct acts as the central definition for a project environment. It unifies:
+/// - The scriptable package and registry requirements defined in `zoi.lua`.
+/// - The declarative task (`commands`) and `environments` defined in `zoi.yaml`.
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct ProjectConfig {
+    /// The name of the project.
     pub name: String,
+    /// Registries scoped specifically to this project.
     #[serde(default)]
     pub registries: HashMap<String, RegistrySpec>,
+    /// Declarative package checks (legacy v1).
     #[serde(default)]
     pub packages: Vec<PackageCheck>,
+    /// A flat list of simple package dependencies.
     #[serde(default)]
     pub pkgs: Vec<String>,
+    /// A map of packages defining explicit version requirements and options.
     #[serde(default)]
     pub pkgs_v2: HashMap<String, PackageSpec>,
+    /// Project-local configuration overrides (e.g. `--local` isolation).
     #[serde(default)]
     pub config: ProjectLocalConfig,
+    /// Declared task aliases and their underlying scripts.
     #[serde(default)]
     pub commands: Vec<CommandSpec>,
+    /// Full environment setup groups.
     #[serde(default)]
     pub environments: Vec<EnvironmentSpec>,
+    /// Ephemeral shell configurations.
     #[serde(default)]
     pub shell: Option<ShellSpec>,
 }

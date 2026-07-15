@@ -51,6 +51,14 @@ enum MiniCommands {
     List,
 }
 
+/// Entry point for Zoi Mini, a lightweight, zero-sync package manager.
+///
+/// Execution Model:
+/// Zoi Mini is designed for one-off installations. It sets `ZOI_MINI_MODE=1`,
+/// which tells the underlying Zoi engine to:
+/// - Bypass Local DB: Instead of querying the SQLite cache, it fetches
+///    metadata and vulnerabilities directly from the registry over HTTP.
+/// - Skip Registry Sync: It does not require a local Git clone of the registry.
 fn main() -> Result<()> {
     #[cfg(windows)]
     colored::control::set_virtual_terminal(true).ok();

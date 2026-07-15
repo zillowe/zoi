@@ -10,8 +10,22 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::SystemTime;
 
+/// Manages PGP keys and signature verification for the Zoi "Chain of Trust".
+///
+/// Zoi uses PGP to verify:
+/// - Registry Integrity: Every git commit in an official registry should be signed.
+/// - Package Authenticity: Pre-built archives are verified against maintainer keys.
+///
+/// This module handles local keyring management (`~/.zoi/pgps/`) and provides
+/// utilities for importing, searching, and verifying signatures.
+
 include!(concat!(env!("OUT_DIR"), "/generated_pgp_keys.rs"));
 
+/// Synchronizes the local keyring with trusted keys embedded in the Zoi binary.
+///
+/// During the build process, Zoi bakes in "Root of Trust" keys for official
+/// registries. This function ensures these keys are present and up-to-date
+/// in the user's local keyring on every startup.
 pub fn ensure_builtin_keys() -> Result<()> {
     for (name, bytes) in BUILTIN_KEYS {
         if let Err(e) = add_key_from_bytes(bytes, name, true) {

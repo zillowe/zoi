@@ -4,8 +4,17 @@
 //! Rust applications to leverage its package management and environment setup
 //! capabilities.
 //!
-//! For user documentation please visit [Zoi's Docs](https://zillowe.qzz.io/docs/zds/zoi), for the library documentation using this or
-//! [Zoi's Lib Docs](https://zillowe.qzz.io/docs/zds/zoi/lib) is fine.
+//! Architectural Design:
+//! Zoi's library API is designed around "Pragmatic Transactionality". It allows
+//! programmatic control over the two-phase installation process, SAT-based
+//! dependency resolution, and cryptographically verified registry state.
+//!
+//! For user documentation please visit [Zoi's Docs](https://zillowe.qzz.io/docs/zds/zoi).
+//!
+//! ## Key Library Entry Points:
+//! - `install_sources`: The high-level API used by the CLI for standard installations.
+//! - `resolve_dependency_graph`: Calculate required packages without modifying disk.
+//! - `build_with_options`: Create distributable `.pkg.tar.zst` archives.
 //!
 //! ## Getting Started
 //!

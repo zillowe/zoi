@@ -10,6 +10,18 @@ use zoi_deps::MANAGERS;
 use zoi_resolver::local;
 use zoi_resolver::resolve;
 
+/// Installs a dependency using the appropriate package manager.
+///
+/// The Native Bridge:
+/// This function acts as the bridge between Zoi and the host system.
+/// - If the manager is "zoi", it performs a Zoi-native install.
+/// - If the manager is "native", it detects the system's manager and redirects.
+/// - Otherwise, it constructs a command using templates from `managers.json`
+///    and executes it, potentially with `sudo` escalation.
+///
+/// Important: External package managers are not atomic within Zoi's
+/// transaction system. Zoi will try to uninstall them on failure, but
+/// cannot guarantee a clean revert of the host's state.
 pub fn install_dependency(
     dep: &Dependency,
     parent_id: &str,

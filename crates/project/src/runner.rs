@@ -8,6 +8,14 @@ use std::fs;
 use std::path::PathBuf;
 use zoi_core::utils;
 
+/// Executes one or more project tasks concurrently with dependency resolution.
+///
+/// This runner performs:
+/// - Dependency Resolution: Builds a DAG of tasks using topological sort.
+/// - Stage Grouping: Identifies independent tasks that can run in parallel.
+/// - Parallel Execution: Uses `rayon` to execute stages concurrently.
+/// - Incremental Builds: Uses file-based hashing (`cache_files`) to skip
+///    tasks if their inputs haven't changed.
 pub fn run(cmd_alias: Option<&str>, args: &[String], config: &config::ProjectConfig) -> Result<()> {
     if config.commands.is_empty() {
         return Err(anyhow!("No commands defined in zoi.yaml"));

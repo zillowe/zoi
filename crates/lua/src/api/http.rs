@@ -2,6 +2,14 @@ use mlua::{self, Lua, LuaSerdeExt, Table, Value};
 use zoi_core::utils;
 
 use serde::Deserialize;
+/// Exposes HTTP and Git-forge utilities to the Lua environment.
+///
+/// These functions enable dynamic package definitions by allowing them to:
+/// - `UTILS.FETCH.url`: Fetch raw text content (e.g. version files, checksums).
+/// - `UTILS.FETCH.<FORGE>.LATEST`: Query Git forges (GitHub, GitLab, etc.) for the
+///   latest tags, releases, or commit SHAs.
+///
+/// All network requests respect Zoi's global `--offline` and timeout settings.
 pub fn add_fetch_util(lua: &Lua) -> Result<(), mlua::Error> {
     let fetch_table = lua.create_table()?;
 
