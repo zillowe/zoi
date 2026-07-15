@@ -5,6 +5,17 @@ use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 use zoi_core::types::MiniVulnerability;
 
+/// Manages Package URL (PURL) resolution for the Zoi ecosystem.
+///
+/// PURL (pkg:zoi/...) enables decentralized, human-readable identifiers
+/// that can be resolved to any Zoi registry globally. This module:
+/// - Fetches the "Central Database" of known registries.
+/// - Resolves PURL namespaces to specific Git-backed registries.
+/// - Dynamically fetches `.pkg.lua` definitions from Git providers (GitHub, GitLab, etc.).
+///
+/// This allows Zoi to install packages without requiring the user to
+/// manually add repositories first.
+
 fn default_version() -> String {
     "1".to_string()
 }

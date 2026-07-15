@@ -9,12 +9,16 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
+/// Returns the default registry URL for Zoi.
+///
+/// This is typically hardcoded or provided via an environment variable during the build.
 pub fn get_default_registry() -> String {
     option_env!("ZOI_DEFAULT_REGISTRY")
         .unwrap_or("community")
         .to_string()
 }
 
+/// Returns the built-in PGP authorities for the default registry.
 pub fn get_builtin_authorities() -> Vec<String> {
     let auth_str = option_env!("ZOI_BUILTIN_AUTHORITIES").unwrap_or_default();
     if auth_str.is_empty() {
@@ -79,6 +83,15 @@ fn read_config_from_path(path: &Path) -> Result<Config> {
     serde_yaml::from_str(&content).map_err(Into::into)
 }
 
+/// Loads and merges configuration from system, user, and project-local paths.
+///
+/// Zoi uses a hierarchical configuration model with the following precedence:
+/// - System: (`/etc/zoi/config.yaml`) - Defines global machine policy.
+/// - User: (`~/.zoi/pkgs/config.yaml`) - Defines user preferences.
+/// - Project: (`./.zoi/pkgs/config.yaml`) - Local overrides for a specific project.
+///
+/// Policy Enforcement: If a field is marked as `unoverridable` in the
+/// system-level policy, Zoi will ignore any overrides found in user or project configs.
 pub fn read_config() -> Result<Config> {
     let system_val = read_yaml_value(&get_system_config_path()?)?;
     let user_val = read_yaml_value(&get_user_config_path()?)?;
@@ -362,6 +375,7 @@ pub fn read_config() -> Result<Config> {
     Ok(merged_cfg)
 }
 
+/// Writes the user-specific configuration to disk.
 pub fn write_user_config(config: &Config) -> Result<()> {
     let config_path = get_user_config_path()?;
     let parent_dir = config_path
@@ -701,6 +715,10 @@ pub fn update_global_versions(versions: HashMap<String, String>) -> Result<()> {
     write_user_config(&config)
 }
 
+/// Synchronizes the remote security policy if configured in system `config.yaml`.
+///
+/// This allows organizations to manage security constraints (allowed/denied lists)
+/// centrally. It verifies the policy's PGP signature before caching it locally.
 pub fn sync_remote_policy() -> Result<()> {
     let config = read_config()?;
     let Some(remote_cfg) = &config.remote_policy else {
@@ -746,6 +764,11 @@ pub fn sync_remote_policy() -> Result<()> {
     Ok(())
 }
 
+/// Merges a remote security policy into the local machine policy.
+///
+/// Precedence: If a field is already unoverridable in the base (machine) policy,
+/// it remains so. Otherwise, the remote policy's unoverridable flags and lists
+/// are added/merged into the local state.
 fn merge_policies(base: &mut crate::types::Policy, remote: &crate::types::Policy) {
     if remote.repos_unoverridable {
         base.repos_unoverridable = true;

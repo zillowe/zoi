@@ -12,6 +12,16 @@ fn get_lock_path() -> Result<PathBuf> {
     ))
 }
 
+/// Acquires a system-wide lock to prevent concurrent modifications to the Zoi store.
+///
+/// Locking Mechanism:
+/// - Attempts to open/create `~/.zoi/pkgs/lock`.
+/// - Uses `flock` (via `fs2`) to acquire an exclusive advisory lock on the file.
+/// - If busy, reads the file to display the PID of the process currently holding the lock.
+/// - Once acquired, writes the current process PID to the lock file.
+///
+/// This ensures that operations like `install`, `uninstall`, and `update` never
+/// run simultaneously, preventing database and filesystem corruption.
 pub fn acquire_lock() -> Result<LockGuard> {
     let lock_path = get_lock_path()?;
 

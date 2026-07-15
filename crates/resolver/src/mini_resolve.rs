@@ -8,6 +8,10 @@ fn default_revision() -> String {
     "1".to_string()
 }
 
+/// A simplified version of package metadata used in Zoi Mini's remote index.
+///
+/// This index allows Zoi Mini to perform fast lookups and vulnerability checks
+/// without downloading individual `.pkg.lua` files or cloning entire registries.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MiniPackageIndex {
     pub repo: String,
@@ -38,6 +42,10 @@ pub struct MiniRegistryIndex {
     pub packages: HashMap<String, MiniPackageIndex>,
 }
 
+/// Fetches the optimized JSON index from the official Zoidberg registry.
+///
+/// This index is the backbone of Zoi Mini, providing a pre-resolved mapping
+/// of package names to their current versions and metadata.
 pub fn fetch_registry_index() -> Result<MiniRegistryIndex> {
     let url = "https://gitlab.com/zillowe/zillwen/zusty/zoidberg/-/raw/main/packages.json";
     let client = zoi_core::utils::get_http_client()?;
@@ -74,6 +82,10 @@ pub fn get_package_lua_url(repo: &str, name: &str) -> String {
     )
 }
 
+/// Scans the package metadata for known security advisories.
+///
+/// Returns `true` if the package is safe to install, or if the user
+/// explicitly chooses to bypass a security warning.
 pub fn check_vulnerabilities(
     pkg_name: &str,
     pkg_index: &MiniPackageIndex,

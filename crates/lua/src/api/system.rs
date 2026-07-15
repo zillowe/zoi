@@ -1,5 +1,13 @@
 use mlua::{self, Lua};
 
+/// Exposes system command and patching utilities to the Lua environment.
+///
+/// These functions provide the bridge to the host operating system's tools:
+/// - `cmd`: Executes a shell command and captures its output and exit code.
+/// - `zpatch`: A wrapper around the `patch` command for applying diffs.
+///
+/// All commands are executed relative to the `BUILD_DIR` and respect the
+/// user's environment and Zoi's quiet/verbose settings.
 pub fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let cmd_fn = lua.create_function(move |lua, command: String| {
         let build_dir: String = lua.globals().get("BUILD_DIR")?;

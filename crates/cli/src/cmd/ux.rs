@@ -4,6 +4,10 @@ use serde::Serialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
 
+/// Classifies the source and method used to install a package.
+///
+/// This is used for reporting and telemetry to understand where packages
+/// are coming from in the ecosystem.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InstallOrigin {
     RegistryPrebuilt,
@@ -101,10 +105,18 @@ impl ExplainReport {
     }
 }
 
+/// The standard JSON schema for Zoi execution plans (Specification v2).
+///
+/// This provides a stable, machine-readable interface for CI/CD pipelines
+/// and external tools to understand what Zoi intends to do before it
+/// performs any destructive actions.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct PlanJsonV1 {
+    /// Schema version (currently "zoi.plan.v1").
     pub schema: String,
+    /// The command that generated this plan (e.g. "install", "update").
     pub command: String,
+    /// Command-specific fields (e.g. "packages", "totals", "dry_run").
     #[serde(flatten)]
     pub fields: BTreeMap<String, Value>,
 }

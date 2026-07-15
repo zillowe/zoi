@@ -7,6 +7,10 @@ use zoi_core::utils;
 
 include!(concat!(env!("OUT_DIR"), "/generated_managers.rs"));
 
+/// Parses a dependency string with Zoi-specific manager validation.
+///
+/// Recognized managers include "zoi", "native", and all external managers
+/// defined in `managers.json`.
 pub fn parse_dependency_string(dep_str: &str) -> Result<Dependency<'_>> {
     zoi_core::dependency::parse_dependency_string(dep_str, |m| {
         m == "zoi" || m == "native" || MANAGERS.contains_key(m)
@@ -15,6 +19,10 @@ pub fn parse_dependency_string(dep_str: &str) -> Result<Dependency<'_>> {
 
 type ZoiUninstaller = dyn Fn(&str) -> Result<()>;
 
+/// Attempts to remove a dependency using its responsible package manager.
+///
+/// Note: Zoi cannot guarantee full rollbacks for external package managers
+/// as it does not own their internal state.
 pub fn uninstall_dependency(dep_str: &str, zoi_uninstaller: &ZoiUninstaller) -> Result<()> {
     let dep = parse_dependency_string(dep_str)?;
     println!(
@@ -52,6 +60,13 @@ pub fn uninstall_dependency(dep_str: &str, zoi_uninstaller: &ZoiUninstaller) -> 
     }
 }
 
+/// Recursively collects all dependencies for a package, including sub-package specific ones.
+///
+/// This function handles the complex logic of:
+/// - Required Dependencies: Automatically added to the list.
+/// - Optional Dependencies: Prompts the user (unless `--all-optional` or `--yes` is used).
+/// - Selectable Options: Prompts the user to choose between multiple providers.
+/// - Recursive Sub-packages: Follows `sub_packages` maps to pull in component-specific requirements.
 pub fn collect_dependencies_for_group(
     group: &types::DependencyGroup,
     sub_package_name: Option<&str>,
@@ -98,6 +113,7 @@ pub fn collect_dependencies_for_group(
     Ok((deps, chosen_options, chosen_optionals))
 }
 
+/// Presents interactive choices for selectable dependency groups.
 pub fn prompt_for_options(
     option_groups: &[types::DependencyOptionGroup],
     yes: bool,
@@ -180,6 +196,7 @@ pub fn prompt_for_options(
     Ok(chosen)
 }
 
+/// Prompts the user to install optional dependencies.
 pub fn prompt_for_optionals(
     deps: &[String],
     dep_type: Option<&str>,

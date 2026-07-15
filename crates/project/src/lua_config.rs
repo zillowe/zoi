@@ -7,6 +7,15 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
+/// Parses and executes a `zoi.lua` file to load project-specific configuration.
+///
+/// This is the core of Zoi Specification v2. It:
+/// - Exposes a declarative API (`project`, `packages`, `tasks`, etc.) to Lua.
+/// - Executes the script, capturing metadata into temporary thread-safe maps.
+/// - Resolves script-level choices into a static `ProjectConfig` struct.
+///
+/// This allows project environments to be programmable, enabling logic like
+/// conditionally selecting registries based on environment variables.
 pub fn load_zoi_lua(path: &Path, env: HashMap<String, String>) -> Result<ProjectConfig> {
     let lua = Lua::new();
     let content = fs::read_to_string(path)?;

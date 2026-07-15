@@ -64,22 +64,58 @@ pub enum ZoiSolverError {
     Other(String),
 }
 
+/// Adapts Zoi's package and registry model to the PubGrub SAT solver.
+///
+/// This is the most performance-critical part of the resolution logic.
+/// It implements the `DependencyProvider` trait, which allows the solver
+/// to "ask" Zoi:
+/// - "What versions are available for this package?"
+/// - "What are the dependencies for this specific version?"
+///
+/// The adapter handles querying the local SQLite index, remote registries,
+/// and project-local `zoi.lua` overrides in a unified way.
 pub struct ZoiDependencyProvider {
+    /// The initial set of direct dependencies requested by the user.
     pub root_deps: FxHashMap<PkgName, Ranges<SemVersion>>,
+    /// The raw string sources (e.g. "#reg@repo/pkg@ver") provided to the CLI.
     pub initial_sources: Vec<String>,
+    /// The target installation scope (User, System, Project).
     pub scope: Option<types::Scope>,
+    /// Whether to suppress non-critical warnings during resolution.
     pub quiet: bool,
+    /// Automatically accept default choices for interactive dependency options.
     pub yes: bool,
+    /// Automatically include all optional dependencies.
     pub all_optional: bool,
+    /// An in-memory cache of the registry used in 'mini' mode to avoid disk I/O.
     pub mini_index: Option<zoi_resolver::mini_resolve::MiniRegistryIndex>,
+    /// The loaded `zoi.lua` or `zoi.yaml` project configuration, if applicable.
     pub project_config: Option<zoi_project::config::ProjectConfig>,
+    /// Hard version constraints enforced by a project's lockfile or configuration.
     pub pkgs_v2_constraints: HashMap<(String, String), String>,
+    /// Memoization cache mapping a package+version to its resolved dependency requirements.
+    /// The `RefCell` allows interior mutability since the PubGrub solver requires `&self`.
     pub deps_cache:
         RefCell<FxHashMap<(PkgName, SemVersion), FxHashMap<PkgName, Ranges<SemVersion>>>>,
+    /// Memoization cache storing the explicit options and optional dependencies chosen by the user.
     pub chosen_cache:
         RefCell<FxHashMap<(PkgName, SemVersion), (Vec<String>, Vec<String>, Vec<String>)>>,
 }
 
+/// Converts a SemVer requirement string into a PubGrub version range.
+///
+/// This function bridges the gap between the `semver` crate's flexible requirement
+/// strings and `pubgrub`'s mathematical version ranges.
+///
+/// Mapping Examples:
+/// - `1.2.3` -> `Ranges::singleton(1.2.3)` (Exact match)
+/// - `^1.2.3` -> `[1.2.3, 2.0.0)` (Caret: compatible updates)
+/// - `~1.2.3` -> `[1.2.3, 1.3.0)` (Tilde: patch-level updates)
+/// - `>=1.0.0, <2.0.0` -> `[1.0.0, 2.0.0)` (Intersection of ranges)
+///
+/// If a version string is not a valid SemVer requirement (e.g. a channel name like
+/// `@stable`), it is treated as a `Ranges::full()` to let Zoi's higher-level
+/// resolver handle the channel-to-version mapping.
 pub fn semver_to_range(req_str: &str) -> Ranges<SemVersion> {
     let req_str = req_str.trim_start_matches('@').trim_start_matches('v');
 

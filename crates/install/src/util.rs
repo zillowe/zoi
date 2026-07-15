@@ -72,6 +72,12 @@ pub fn display_updates(pkg: &types::Package, yes: bool) -> Result<bool> {
     Ok(true)
 }
 
+/// Checks for logical conflicts between a package and the current system state.
+///
+/// Conflict Categories:
+/// - Explicit Conflicts: Packages listed in the `conflicts` metadata field.
+/// - Binary Collisions: Binary names (`bins`) already provided by other packages.
+/// - Virtual Collisions: Virtual packages (`provides`) already provided.
 pub fn get_conflicts(
     pkg: &types::Package,
     installed_packages: &[types::InstallManifest],
@@ -138,6 +144,10 @@ pub fn get_conflicts(
     Ok(conflict_messages)
 }
 
+/// Enforces that a package is being installed into an authorized scope.
+///
+/// If a package definition includes a `scopes` list, Zoi will block
+/// installation if the target scope is not present in that list.
 pub fn check_scope_compliance(graph: &super::resolver::DependencyGraph) -> Result<()> {
     for node in graph.nodes.values() {
         if let Some(allowed_scopes) = &node.pkg.scopes
@@ -701,6 +711,15 @@ pub fn get_remote_file_list(url: &str) -> Result<Vec<String>> {
         .collect())
 }
 
+/// Performs pre-emptive conflict detection against the filesystem.
+///
+/// Pre-flight Safety Check:
+/// Instead of waiting for a conflict to occur during extraction, Zoi can:
+/// - Download `.files` metadata from the registry index.
+/// - Check every intended destination path against the real system.
+/// - Ignore files already owned by the same package (enabling safe upgrades).
+///
+/// This saves bandwidth and prevents partial installation failures.
 pub fn check_file_conflicts(
     graph: &super::resolver::DependencyGraph,
     yes: bool,

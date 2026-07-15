@@ -1,3 +1,11 @@
+/// Implements proactive "System Health Checks" for the Zoi environment.
+///
+/// These checks (run via `zoi doctor`) help users identify and fix:
+/// - Orphaned Packages: Dependencies no longer required by any package.
+/// - Broken Symlinks: Stale binary shims in the PATH.
+/// - Integrity Issues: Mismatches between the store and the lockfile.
+/// - Path Configuration: Missing Zoi binary directories in the host PATH.
+/// - Registry Staleness: Repositories that haven't been synced recently.
 use anyhow::{Result, anyhow};
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};

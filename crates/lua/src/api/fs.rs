@@ -4,6 +4,17 @@ use zoi_core::utils;
 
 use std::fs;
 use walkdir::WalkDir;
+/// Exposes filesystem and staging utilities to the Lua environment.
+///
+/// This module provides the "Staging Engine" for Zoi packages. Key functions include:
+/// - `zcp`: Stages files and directories into the `STAGING_DIR` using origin-aware placeholders.
+/// - `zln`: Records symbolic link creation to be performed during the final installation.
+/// - `zmkdir`: Records directory creation.
+/// - `zchmod`/`zchown`: Records metadata changes for staged files.
+///
+/// These functions do not always perform immediate actions; instead, they often record
+/// operations into `__ZoiBuildOperations` for the Rust engine to execute atomically
+/// during the staging-to-store move.
 pub fn add_file_util(lua: &Lua) -> Result<(), mlua::Error> {
     let file_fn = lua.create_function(
         |_, (url, path): (String, String)| -> Result<(), mlua::Error> {

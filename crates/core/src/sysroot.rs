@@ -1,3 +1,13 @@
+/// Manages the "Sysroot" (System Root) for Zoi operations.
+///
+/// A Sysroot allows Zoi to operate on an external directory as if it were the
+/// primary system root (`/`). This is a powerful feature for:
+/// - Bootstrapping: Creating a bootable OS image or container from the outside.
+/// - Cross-Installation: Installing packages for an embedded system or another partition.
+/// - Isolation: Testing installations without affecting the current host system.
+///
+/// When a sysroot is set, Zoi transparently redirects all absolute and relative
+/// paths to reside within this target directory.
 use std::path::PathBuf;
 use std::sync::{OnceLock, RwLock};
 

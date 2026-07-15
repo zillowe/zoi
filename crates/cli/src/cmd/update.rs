@@ -11,6 +11,14 @@ use serde_json::json;
 use std::fs;
 use std::sync::Mutex;
 
+/// The primary high-level orchestration for the `zoi update` command.
+///
+/// This function handles:
+/// - Batch Updates: When `--all` is specified, it scans all installed packages.
+/// - Targeted Updates: Updates specific packages provided by name.
+/// - Advisory Deltas: Calculates and displays changes in security vulnerabilities.
+/// - Cleanup: Automatically removes old versions after a successful upgrade
+///    (if rollbacks are not required).
 pub fn run(
     all: bool,
     package_names: &[String],
@@ -457,6 +465,8 @@ fn run_update_all_logic(
     let mut up_to_date_sources = Vec::new();
     let mut packages_to_upgrade: Vec<UpdateCandidate> = Vec::new();
 
+    // --- Phase 1: Upgrade Scanning ---
+    // We scan all installed packages and compare them against the latest registry metadata.
     println!("{} Checking for upgrades...", "::".bold().blue());
     let pb = ProgressBar::new(installed_packages.len() as u64);
     pb.set_style(
@@ -742,6 +752,9 @@ fn run_update_all_logic(
         return Ok(());
     }
 
+    // --- Phase 2: Transactional Upgrade ---
+    // We execute the upgrade plan. Each package is processed in parallel
+    // where possible, but all are wrapped in a single machine-wide transaction.
     let transaction = Mutex::new(transaction::begin()?);
     let transaction_id = transaction.lock().unwrap().id.clone();
     let failed_updates = Mutex::new(Vec::new());

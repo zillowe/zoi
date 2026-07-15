@@ -1,3 +1,10 @@
+/// Implements "Direct Repository Installation" (`zoi install --repo`).
+///
+/// This allows Zoi to install a package directly from a Git repository
+/// that contains a `zoi.yaml` or `zoi.lua` project file. It:
+/// - Detects the Git provider (GitHub, GitLab, Codeberg).
+/// - Fetches the project configuration over HTTP (RAW URL).
+/// - Resolves and installs the specific package defined in the project.
 use crate::pkg::types;
 use anyhow::{Result, anyhow};
 use colored::*;

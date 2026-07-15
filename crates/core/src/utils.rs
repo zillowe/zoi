@@ -90,6 +90,10 @@ pub fn command_exists(command: &str) -> bool {
     }
 }
 
+/// Returns a standard Zoi platform identifier (e.g. "linux-amd64", "windows-arm64").
+///
+/// This string is used extensively in registries and package definitions to
+/// handle platform-specific dependencies and build artifacts.
 pub fn get_platform() -> Result<String> {
     let os = match std::env::consts::OS {
         "linux" => "linux",
@@ -117,6 +121,12 @@ pub fn get_db_root() -> Result<std::path::PathBuf> {
     ))
 }
 
+/// Returns the root directory of the package store for a given scope.
+///
+/// Store Locations:
+/// - `User`: `~/.zoi/pkgs/store/`
+/// - `System`: `/var/lib/zoi/pkgs/store/` (Linux) or `C:\ProgramData\zoi\pkgs\store` (Windows)
+/// - `Project`: `./.zoi/pkgs/store/` (Relative to current project root)
 pub fn get_store_base_dir(scope: crate::types::Scope) -> Result<PathBuf> {
     match scope {
         crate::types::Scope::User => {
@@ -144,8 +154,13 @@ pub fn get_store_base_dir(scope: crate::types::Scope) -> Result<PathBuf> {
     }
 }
 
-/// Generates a unique ID for a package based on its origin.
-/// The format for the hash is `#{registry-handle}@{repo/path/to/package}/{package-name}`.
+/// Generates a unique, origin-aware ID for a package.
+///
+/// This ID prevents collisions between packages with the same name that reside
+/// in different registries or repository tiers.
+///
+/// ID Format: `#{registry-handle}@{repo-path}/{package-name}`
+/// Hashed Result: First 32 characters of the SHA-512 hash of the ID string.
 pub fn generate_package_id(registry_handle: &str, repo_path: &str, package_name: &str) -> String {
     let format_string = format!("#{}@{}/{}", registry_handle, repo_path, package_name);
     let mut hasher = Sha512::new();
@@ -193,6 +208,10 @@ pub fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+/// Performs a jittered exponential backoff sleep.
+///
+/// Used during network retries to prevent thundering herd problems and
+/// improve reliability on unstable connections.
 pub fn retry_backoff_sleep(attempt: u32) {
     let base_ms = 500u64.saturating_mul(1u64 << (attempt.saturating_sub(1)));
     let jitter = (std::time::SystemTime::now()
@@ -225,6 +244,18 @@ pub fn get_linux_distribution_info() -> Option<HashMap<String, String>> {
     }
 }
 
+/// Detects the general family of a Linux distribution (e.g. "debian", "arch", "fedora").
+///
+/// This is used to map specific distributions to their primary package manager
+/// and standard filesystem locations.
+///
+/// Strategy:
+/// - ID_LIKE Check: We first check the `ID_LIKE` field in `/etc/os-release`.
+///    This is the most reliable way to identify derivatives (e.g. Ubuntu is `debian`).
+/// - Direct ID Match: If `ID_LIKE` is missing, we fall back to the primary `ID`.
+/// - Normalization: We group similar distros under a common "family" key
+///    to simplify downstream logic (e.g. Rocky, Alma, and CentOS all map to `fedora`
+///    because they share the DNF/RPM ecosystem).
 pub fn get_linux_distro_family() -> Option<String> {
     if let Some(info) = get_linux_distribution_info() {
         if let Some(id_like) = info.get("ID_LIKE") {
@@ -426,6 +457,9 @@ pub fn get_gpu_info() -> Option<String> {
     None
 }
 
+/// Identifies the primary package manager for the current operating system.
+///
+/// This is used to resolve `native:` dependencies.
 pub fn get_native_package_manager() -> Option<String> {
     let os = std::env::consts::OS;
     match os {
@@ -470,6 +504,10 @@ pub fn get_native_package_manager() -> Option<String> {
     }
 }
 
+/// Scans the system for all supported package managers.
+///
+/// This provides the list of available managers shown in `zoi info` and
+/// used to validate `manager:` prefixes in dependency strings.
 pub fn get_all_available_package_managers() -> Vec<String> {
     let mut managers = Vec::new();
     let all_possible_managers = [
@@ -534,6 +572,10 @@ pub fn format_size_diff(diff: i64) -> String {
     format!("{} {}", sign, format_bytes(bytes))
 }
 
+/// Verifies that a given path is "Safe" and doesn't attempt to escape the base directory.
+///
+/// This is a critical security check against "Path Traversal" attacks in
+/// package archives or Lua scripts.
 pub fn is_safe_path(base: &Path, path: &Path) -> bool {
     let base = base.canonicalize().unwrap_or_else(|_| base.to_path_buf());
     let joined = if path.is_absolute() {

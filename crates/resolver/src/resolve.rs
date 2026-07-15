@@ -1002,6 +1002,13 @@ pub fn resolve_requested_version_spec(
     .map(Some)
 }
 
+/// Resolves a source identifier into a concrete local path to a `.pkg.lua` file.
+///
+/// This is the primary entry point for package discovery. It handles:
+/// - Parsing the source string (e.g. #reg@repo/name@version).
+/// - Deciding if the source is a local file, a URL, or a registry-backed package.
+/// - Recursively following 'alt' references if the package definition points elsewhere.
+/// - Confirming trust for untrusted sources (URLs/local files).
 pub fn resolve_source(
     source: &str,
     scope: Option<types::Scope>,

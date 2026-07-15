@@ -3,6 +3,16 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use zoi_core::types::SandboxConfig;
 
+/// Wraps a command in a secure Linux sandbox using Bubblewrap (bwrap).
+///
+/// Default-Deny Security Model:
+/// - The environment is completely isolated (empty root, no host files).
+/// - Only the package's own store directory is mounted read-only by default.
+/// - All other resources (Network, System Libraries, Home Data) must be
+///    explicitly requested in the `SandboxConfig` within the package definition.
+///
+/// This prevents malicious or buggy applications from accessing sensitive
+/// user data like SSH keys or personal documents.
 pub fn wrap_command(
     original_exe: &Path,
     args: &[String],

@@ -18,6 +18,14 @@ use zoi_db as db;
 use zoi_install::util as install_util;
 use zoi_lua::parser as lua_parser;
 
+/// Rebuilds the SQLite metadata database from the raw registry files.
+///
+/// This is the "Indexing Phase" of a sync. It:
+/// - Scans the local Git clone for all `.pkg.lua` and `.sec.yaml` files.
+/// - Parses each file (using the Lua VM where needed) to extract version info,
+///    descriptions, dependencies, and security advisories.
+/// - Fetches remote metadata (sizes and file lists) if configured in `repo.yaml`.
+/// - Atomic Commit: Updates the SQLite tables within a single transaction.
 fn refresh_registry_db(
     registry_handle: &str,
     registry_path: &Path,
@@ -290,6 +298,10 @@ fn refresh_registry_db(
     Ok(())
 }
 
+/// Verifies the PGP signature of the latest commit in a registry repository.
+///
+/// This ensures that the registry state hasn't been tampered with on the server.
+/// If verification fails, the sync is aborted for security reasons.
 fn verify_registry_signature(
     repo_path: &Path,
     authorities: &[String],
@@ -358,6 +370,10 @@ fn get_git_root() -> Result<PathBuf> {
     ))
 }
 
+/// Synchronizes raw Git repositories that contain Zoi packages.
+///
+/// These are cloned into `~/.zoi/pkgs/git/` and are typically used for
+/// personal or third-party package collections that are not full registries.
 fn sync_git_repos(verbose: bool) -> Result<()> {
     if offline::is_offline() {
         println!(
@@ -867,6 +883,16 @@ fn fetch_handle_for_url(url: &str, verbose: bool) -> Result<String> {
     }
 }
 
+/// Synchronizes a single registry (default or added) with its remote Git source.
+///
+/// Logic Flow:
+/// - Handle Resolution: If the handle is missing, it clones the repo to find it.
+/// - Mirror Fallback: If the primary Git URL fails, it automatically tries mirrors
+///    defined in the registry's `repo.yaml`.
+/// - Signature Verification: If `authorities` are configured, it verifies the
+///    signature of the latest commit to ensure the entire registry state is trusted.
+/// - Key Sync: Automatically imports PGP keys defined in the registry's `repo.yaml`.
+/// - Indexing: Triggers `refresh_registry_db` to update the local SQLite cache.
 fn sync_registry(
     mut reg: types::Registry,
     db_root: &Path,
@@ -1056,6 +1082,11 @@ fn sync_registry(
     Ok((reg, reg_changed))
 }
 
+/// Performs a project-local sync of registries.
+///
+/// In Specification v2, projects can have their own isolated package databases
+/// stored in `./.zoi/pkgs/db`. This ensures that a project's dependencies
+/// are reproducible and independent of the user's global registry state.
 pub fn run_local(verbose: bool, _fallback: bool, force: bool, frozen_lock: bool) -> Result<()> {
     let local_db_root = std::env::current_dir()?
         .join(".zoi")
@@ -1170,6 +1201,13 @@ pub fn run_local(verbose: bool, _fallback: bool, force: bool, frozen_lock: bool)
     Ok(())
 }
 
+/// The primary entry point for synchronizing Zoi registries and system state.
+///
+/// This function:
+/// - Synchronizes all configured global registries.
+/// - Updates local SQLite indexes.
+/// - Detects and records available native package managers.
+/// - Synchronizes the remote security policy if configured.
 pub fn run(verbose: bool, fallback: bool, no_pm: bool, force: bool) -> Result<()> {
     let merged_config = config::read_config()?;
     if force {

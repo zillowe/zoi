@@ -1,3 +1,12 @@
+/// Orchestrates the Zoi package build process.
+///
+/// This module is responsible for turning a `.pkg.lua` definition into a
+/// distributable `.pkg.tar.zst` archive. It:
+/// - Executes the `prepare()`, `build()`, and `package()` Lua functions.
+/// - Manages the staging area where files are organized into Zoi's data structure.
+/// - Generates accompanying metadata: `.hash` (SHA-512), `.size`, and `.files`.
+/// - Supports native builds, Docker-based builds, and cross-compilation via CI tags.
+/// - Handles optional PGP signing of the resulting archive.
 use anyhow::{Result, anyhow};
 use colored::*;
 use mlua::{Lua, LuaSerdeExt, Table};

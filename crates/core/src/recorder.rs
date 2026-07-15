@@ -33,6 +33,16 @@ fn read_lockfile(scope: types::Scope) -> Result<types::ZoiLockV2> {
     Ok(lockfile)
 }
 
+/// Persists the state of the Zoi environment into the lockfile (`zoi.lock`).
+///
+/// Specification v2 uses a "Snapshot" model for reproducibility. Instead of just
+/// recording versions, Zoi computes:
+/// - `packages_hash`: A recursive SHA-512 hash of the entire package store.
+/// - `registries_hash`: A recursive SHA-512 hash of the metadata database.
+/// - Per-Package Hash: A hash of the specific version directory.
+///
+/// This ensures that a project environment can be verified for 100% bit-for-bit
+/// identicality across different machines.
 fn write_lockfile(lockfile: &mut types::ZoiLockV2, scope: types::Scope) -> Result<()> {
     if crate::frozen::is_frozen() {
         return Ok(());
@@ -139,6 +149,10 @@ pub fn record_package(
     write_lockfile(&mut lockfile, pkg.scope)
 }
 
+/// Calculates the current SHA-512 directory hash for an installed package version.
+///
+/// This is used to verify that the files in the store haven't been modified
+/// since they were originally staged.
 fn compute_package_hash(pkg: &types::Package, registry_handle: &str) -> String {
     let Some(version) = &pkg.version else {
         return String::new();

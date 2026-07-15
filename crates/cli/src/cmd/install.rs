@@ -11,6 +11,14 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use zoi_project as project;
 
+/// The primary high-level orchestration for the `zoi install` command.
+///
+/// This function coordinates:
+/// - Context Resolution: Decides between global, user, or project-local scopes.
+/// - Dependency Resolution: Triggers the SAT solver to build the dependency graph.
+/// - Safety Checks: Validates policy compliance, security advisories, and file conflicts.
+/// - Transactional Execution: Executes the install plan within an atomic transaction.
+/// - Lockfile Updates: Synchronizes `zoi.lock` for project-local installations.
 pub fn run(
     sources: &[String],
     repo: Option<String>,
@@ -34,6 +42,9 @@ pub fn run(
 ) -> Result<()> {
     crate::pkg::install::util::set_download_retry_attempts(retry);
 
+    // --- Phase 1: Context & Scope Resolution ---
+    // We decide whether this is a global, user, or project-local installation
+    // and whether we are operating in 'frozen' mode from a lockfile.
     let mut scope_override = scope.map(|s| match s {
         crate::cli::InstallScope::User => types::Scope::User,
         crate::cli::InstallScope::System => types::Scope::System,
@@ -222,6 +233,9 @@ pub fn run(
     let successfully_installed_sources = Mutex::new(Vec::new());
     let installed_manifests = Mutex::new(Vec::new());
 
+    // --- Phase 2: Dependency Resolution ---
+    // We trigger the SAT solver to build the complete dependency graph.
+    // If we're in frozen mode, we build it strictly from the lockfile.
     let (mut graph, mut non_zoi_deps) =
         if let Some(locked_packages) = frozen_locked_packages.as_ref() {
             install::resolver::build_graph_from_locked_packages(
@@ -342,6 +356,8 @@ pub fn run(
         crate::utils::print_repo_warning(&node.pkg.repo);
     }
 
+    // --- Phase 3: Safety & Compliance Checks ---
+    // Before touching the disk, we validate policy, signatures, and file conflicts.
     println!("{} Looking for conflicts...", "::".bold().blue());
     let packages_to_install: Vec<&types::Package> = graph.nodes.values().map(|n| &n.pkg).collect();
 
@@ -605,6 +621,9 @@ pub fn run(
         return Ok(());
     }
 
+    // --- Phase 4: Transactional Execution ---
+    // We execute the install plan within an atomic transaction.
+    // Preparation happens in parallel, but installation follows the topological order.
     let install_path = crate::pkg::local::get_store_base_dir(scope_override.unwrap_or_default())?;
     std::fs::create_dir_all(&install_path)?;
 

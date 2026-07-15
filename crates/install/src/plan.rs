@@ -21,6 +21,16 @@ pub enum InstallAction {
     BuildAndInstall,
 }
 
+/// Creates an execution plan for installing the resolved dependency graph.
+///
+/// This function decides the **Install Action** for each package:
+/// - Download and Install: If a pre-built archive exists in the registry for
+///    the target platform and the user didn't force a build.
+/// - Build and Install: If no pre-built archive is available, or if the
+///    user explicitly requested a build (via `--build` or `--type source`).
+///
+/// It utilizes `rayon` for parallel evaluation of pre-built availability across
+/// mirrors and registries.
 pub fn create_install_plan(
     graph: &HashMap<String, InstallNode>,
     build_type: Option<&str>,

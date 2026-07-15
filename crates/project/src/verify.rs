@@ -3,6 +3,16 @@ use std::collections::HashMap;
 use zoi_core::{hash, types};
 use zoi_resolver::local;
 
+/// Verifies the cryptographic integrity of the project's local environment.
+///
+/// This is a critical security and reproducibility check in Specification v2.
+/// It performs a three-way cross-reference between:
+/// - `zoi.lock`: The record of what SHOULD be installed and its SHA-512 hash.
+/// - `manifest.yaml`: The record of what IS recorded as installed in the store.
+/// - Filesystem: The actual presence and content of files on disk.
+///
+/// If any file in the store has been tampered with or if a manual change was made
+/// that isn't reflected in the lockfile, this function will return an error.
 pub fn run() -> Result<()> {
     println!("Verifying project integrity with zoi.lock...");
 
