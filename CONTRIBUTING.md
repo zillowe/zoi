@@ -28,8 +28,8 @@ We welcome contributions in many forms, including bug reports, feature requests,
 
 You can use two of our [mirrors](/README.md#-repositories-mirrors) for contributions.
 
-- [GitLab](https://gitlab.com/zillowe/zillwen/zusty/zoi) (Main & Preferred)
-- [GitHub](https://github.com/zillowe/zoi) (Issues and PRs are mirrored to GitLab)
+- [GitLab](https://gitlab.com/zillowe/zillwen/zusty/zoi):Main & Preferred
+- [GitHub](https://github.com/zillowe/zoi) or [Codeberg](https://codeberg.org/zillowe/zoi): Issues and PRs are welcomed if you don't want to use GitLab.
 
 ### Reporting Bugs or Requesting Features
 
@@ -38,8 +38,6 @@ If you find a bug or have an idea for a new feature, please check our [**issue t
 - [Report a Bug](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/issues/new?issuable_template=Bug%20Report)
 - [Request a Feature](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/issues/new?issuable_template=Feature%20Request)
 - [Request an Enhancement](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/issues/new?issuable_template=Enhancement%20Request)
-
-(Same on GitHub)
 
 ### Contributing Code
 
