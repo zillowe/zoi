@@ -202,6 +202,15 @@ pub struct PreparedNode {
     pub is_build: bool,
 }
 
+/// Performs the non-destructive first phase of installation: "Preparation".
+///
+/// Preparation includes:
+/// - Downloading pre-built archives from the registry.
+/// - Verifying checksums and PGP signatures (Root of Trust).
+/// - Or, building the package from source in a temporary sandbox if requested.
+///
+/// This phase always runs in user-space and does not modify the system state
+/// or the package store.
 pub fn prepare_node(
     node: &InstallNode,
     action: &plan::InstallAction,
@@ -268,6 +277,16 @@ pub fn prepare_node(
     })
 }
 
+/// Performs the destructive second phase of installation: "Execution".
+///
+/// This phase takes a `PreparedNode` and:
+/// - Unpacks the archive into the versioned store directory.
+/// - Creates binary shims in the global Zoi `bin` directory.
+/// - Registers the installation in the registry database and lockfile.
+///
+/// Just-in-Time Escalation: If the target scope is `system`, this function
+/// will spawn a privileged sub-process (`sudo zoi helper elevate-install-node`)
+/// to perform the final file moves, keeping the main CLI unprivileged.
 pub fn install_prepared_node(
     node: &InstallNode,
     prepared: &PreparedNode,

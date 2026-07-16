@@ -54,6 +54,11 @@ Utilize Zoi's `sub_packages` feature to keep the main installation lean. Standar
 - `:docs`: For manuals, examples, and heavy documentation.
 - `:lib`: For shared libraries if the binary is separate.
 
+### 3.3. Scopes
+
+- **`PKG.scope`**: Define a default `scope` if your package is intended for a specific target (e.g. `system` for core libraries).
+- **`PKG.scopes`**: Use the `scopes` list to restrict where a package *can* be installed. This is mandatory for core system components that would be non-functional in `user` scope.
+
 ## 4. Versioning & Revisions
 
 ### 4.1. `PKG.version`

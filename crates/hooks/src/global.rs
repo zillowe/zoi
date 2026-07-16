@@ -11,6 +11,16 @@ use zoi_core::{sysroot, utils};
 
 include!(concat!(env!("OUT_DIR"), "/generated_builtin_hooks.rs"));
 
+/// Manages system-wide "Global Transaction Hooks".
+///
+/// Unlike package-specific hooks, global hooks are triggered based on the
+/// file paths modified during a transaction. For example, if any package
+/// touches a file in `/usr/share/fonts`, a global hook can automatically
+/// run `fc-cache` exactly once at the end of the transaction.
+///
+/// Hooks are verified against a local trust database (`trusted_hashes.json`)
+/// before execution to prevent unauthorized arbitrary command execution.
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GlobalHook {
     pub name: String,

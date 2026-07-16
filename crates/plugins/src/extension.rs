@@ -140,7 +140,7 @@ pub fn add(ext_name: &str, yes: bool, plugin_manager: Option<&PluginManager>) ->
     println!("Adding extension: {}", ext_name);
 
     let (pkg, _, _, pkg_lua_path, registry_handle, repo_type, _) =
-        resolve::resolve_package_and_version(ext_name, false, yes)?;
+        resolve::resolve_package_and_version(ext_name, None, false, yes)?;
 
     if pkg.package_type != types::PackageType::Extension {
         return Err(anyhow!("'{}' is not an extension package.", ext_name));
@@ -363,10 +363,16 @@ pub fn remove(ext_name: &str, yes: bool, plugin_manager: Option<&PluginManager>)
         let path = installed_source_path
             .to_str()
             .ok_or_else(|| anyhow!("Stored package source path contains invalid UTF-8"))?;
-        zoi_lua::parser::parse_lua_package(path, Some(&manifest.version), true)?
+        zoi_lua::parser::parse_lua_package(
+            path,
+            Some(&manifest.version),
+            Some(manifest.scope),
+            true,
+        )?
     } else {
         let source = local::installed_manifest_source(&manifest);
-        let (pkg, _, _, _, _, _, _) = resolve::resolve_package_and_version(&source, true, yes)?;
+        let (pkg, _, _, _, _, _, _) =
+            resolve::resolve_package_and_version(&source, Some(manifest.scope), true, yes)?;
         pkg
     };
 

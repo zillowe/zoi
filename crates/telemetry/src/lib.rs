@@ -2,6 +2,7 @@ use serde::Serialize;
 use std::{error::Error, fs};
 use uuid::Timestamp;
 
+/// Represents an anonymous telemetry event sent to PostHog.
 #[derive(Debug, Serialize)]
 pub struct PackageEvent<'a> {
     pub client_id: &'a str,
@@ -19,6 +20,7 @@ pub struct PackageEvent<'a> {
     pub install_type: Option<String>,
 }
 
+/// A privacy-preserving subset of package metadata for analytics.
 #[derive(Debug, Serialize)]
 pub struct MinimalPackage<'a> {
     pub name: &'a str,
@@ -71,6 +73,16 @@ fn ensure_client_id() -> Result<String, Box<dyn Error>> {
     }
 }
 
+/// Securely captures an anonymous event and sends it to PostHog.
+///
+/// Privacy Guarantee:
+/// - No IP addresses, hostnames, or personal data are ever collected.
+/// - The `client_id` is a randomly generated UUID v7 stored in `~/.zoi/telemetry/client_id`.
+/// - Telemetry is strictly opt-in. This function returns `false` immediately
+///   if `telemetry_enabled` is not set to `true` in the user's config.
+///
+/// Data collected is limited to: event type (install/uninstall), package metadata
+/// (name, version, license), and basic environment info (OS, Arch, Shell).
 pub fn posthog_capture_event(
     event_name: &str,
     pkg: &zoi_core::types::Package,

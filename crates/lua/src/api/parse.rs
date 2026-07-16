@@ -1,5 +1,14 @@
 use mlua::{self, Lua, LuaSerdeExt, Table};
 
+/// Exposes data parsing utilities to the Lua environment.
+///
+/// These helpers allow package scripts to easily consume structured data
+/// commonly found in upstream projects:
+/// - `json`/`yaml`/`toml`: Parsers for structured configuration files.
+/// - `checksumFile`: A specialized parser for standard checksum files (e.g. `sha256sums`).
+///
+/// These utilities return native Lua tables, allowing for idiomatic manipulation
+/// of complex data within the package script.
 pub fn add_parse_util(lua: &Lua) -> Result<(), mlua::Error> {
     let parse_table = lua.create_table()?;
 

@@ -4,7 +4,7 @@ use colored::*;
 
 pub fn run(package_name: &str) -> Result<()> {
     let (pkg_meta, _, _, _, _, _, _) =
-        resolve::resolve_package_and_version(package_name, false, false)?;
+        resolve::resolve_package_and_version(package_name, None, false, false)?;
 
     let installed_packages = local::get_installed_packages()?;
 

@@ -12,6 +12,8 @@ Zoi is packed with features designed to make package management and environment 
 
 - **Just-in-Time Privilege Escalation:** Automatically prompts for `sudo` password only when system-wide operations (like extracting to `/var/lib/zoi` or linking to `/usr/local/bin`) are required. This ensures your local package database and caches remain in your user-space, avoiding the need to run the entire CLI as root.
 
+- **Explicit Scope Control:** Restrict package installation to specific scopes (`user`, `system`, or `project`) using the `scopes` metadata field. Zoi automatically enforces these constraints during installation and updates.
+
 - **Sysroot Support (`--root`):** Operates on a different root directory, allowing you to bootstrap entire OS images, containers, or embedded systems from the outside.
 
 - **Metadata Caching:** Uses an optimized SQLite database with FTS5 indexing for near-instant search and listing of thousands of packages, ensuring performance scales to enterprise levels.

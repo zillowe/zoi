@@ -80,10 +80,14 @@ pub(crate) fn create_completion_symlink(
     Ok(())
 }
 
+/// High-level metadata summarizing a completed or in-progress transaction.
 #[derive(Debug, Clone)]
 pub struct TransactionMetadata {
+    /// The UUID v7 identifier for the transaction.
     pub id: String,
+    /// The RFC 3339 timestamp when the transaction began.
     pub start_time: String,
+    /// The number of distinct package operations (install, uninstall, upgrade) recorded.
     pub operation_count: usize,
 }
 
@@ -98,6 +102,11 @@ fn get_transaction_path(id: &str) -> Result<PathBuf> {
     Ok(get_transactions_dir()?.join(format!("{}.json", id)))
 }
 
+/// Starts a new package transaction.
+///
+/// Returns a `Transaction` object with a UUID v7 ID, which provides both
+/// uniqueness and chronological sorting. No log file is written until the
+/// first operation is recorded.
 pub fn begin() -> Result<types::Transaction> {
     Ok(types::Transaction {
         id: Uuid::new_v7(Timestamp::from_unix(
@@ -275,6 +284,12 @@ fn restore_shims(manifest: &types::InstallManifest) -> Result<()> {
     Ok(())
 }
 
+/// Reverts all operations recorded in a transaction.
+///
+/// This is the "Atomic Rollback" mechanism. It processes operations in reverse order:
+/// - Installs are uninstalled.
+/// - Uninstalls are re-installed (either from local store or registry).
+/// - Upgrades are reverted to the previous version.
 pub fn rollback(transaction_id: &str) -> Result<()> {
     let path = get_transaction_path(transaction_id)?;
     if !path.exists() {

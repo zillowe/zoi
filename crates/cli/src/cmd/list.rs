@@ -99,7 +99,7 @@ fn run_list_outdated(
         };
 
         if let Ok((pkg, new_version, _, _, _, _, _)) =
-            crate::pkg::resolve::resolve_package_and_version(&source, true, false)
+            crate::pkg::resolve::resolve_package_and_version(&source, None, true, false)
             && (manifest.version != new_version || manifest.revision != pkg.revision)
         {
             let current_display = if manifest.revision != "1" {

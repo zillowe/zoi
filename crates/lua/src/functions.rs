@@ -2,6 +2,12 @@ use crate::api;
 use mlua::Lua;
 use zoi_core::utils;
 
+/// Bootstraps the Lua environment for executing a package definition.
+///
+/// This function populates the global Lua scope with system information,
+/// directory paths, and utility functions that the `.pkg.lua` script
+/// expects to have available. It effectively creates the "sandbox" where
+/// package builds and installations are defined.
 pub fn setup_lua_environment(
     lua: &Lua,
     platform: &str,
@@ -11,8 +17,12 @@ pub fn setup_lua_environment(
     build_dir: Option<&str>,
     staging_dir: Option<&str>,
     sub_package: Option<&str>,
+    scope: Option<zoi_core::types::Scope>,
     quiet: bool,
 ) -> Result<(), mlua::Error> {
+    // Host System Information
+    // Exposes a 'SYSTEM' table containing OS, Architecture, Distro, etc.
+    // Allow maintainers to write platform-specific logic easily.
     let system_table = lua.create_table()?;
     let parts: Vec<&str> = platform.split('-').collect();
     system_table.set("OS", *parts.first().unwrap_or(&""))?;
@@ -46,6 +56,11 @@ pub fn setup_lua_environment(
     let zoi_table = lua.create_table()?;
     if let Some(ver) = version_override {
         zoi_table.set("VERSION", ver)?;
+    }
+
+    if let Some(s) = scope {
+        let scope_str = format!("{:?}", s).to_lowercase();
+        zoi_table.set("scope", scope_str)?;
     }
 
     if let Some(dir) = create_pkg_dir {

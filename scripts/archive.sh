@@ -34,6 +34,7 @@ check_command "zstd"
 check_command "curl"
 check_command "jq"
 check_command "gpg"
+check_command "bsdiff"
 
 if [ ! -d "$COMPILED_DIR" ]; then
     echo -e "${RED}Error: Compiled directory '${COMPILED_DIR}' not found.${NC}"
@@ -65,6 +66,15 @@ if RESPONSE=$(curl --silent --show-error --fail "$API_URL" 2>&1); then
     fi
 else
     echo -e "${YELLOW}API call failed: $RESPONSE${NC}"
+fi
+
+PREV_TAG=""
+if [ -n "${CI_COMMIT_TAG:-}" ]; then
+    PREFIX="${CI_COMMIT_TAG%-*}"
+    PREV_TAG=$(echo "$RESPONSE" | jq -r "[.[] | select(.tag_name | startswith(\"${PREFIX}-\")) | .tag_name] | .[0] // empty" 2>/dev/null || echo "")
+    if [ -n "$PREV_TAG" ]; then
+        echo -e "${CYAN}Detected previous tag for prefix ${PREFIX}: ${PREV_TAG}${NC}"
+    fi
 fi
 
 echo -e "${CYAN}📦 Starting archival process...${NC}"
@@ -110,6 +120,37 @@ for binary_path in "$COMPILED_DIR"/*; do
         zstd -T0 "${TMP_ARCHIVE_DIR}/${archive_basename}.tar"
         mv "${TMP_ARCHIVE_DIR}/${archive_basename}.tar.zst" "${ARCHIVE_DIR}/"
         sign_file "${ARCHIVE_DIR}/${archive_basename}.tar.zst"
+    fi
+
+    # Delta patch generation
+    if [ -n "${PREV_TAG:-}" ] && [ -n "${CI_COMMIT_TAG:-}" ]; then
+        OLD_VERSION="${PREV_TAG##*-}"
+        CURRENT_VERSION="${CI_COMMIT_TAG##*-}"
+
+        OLD_EXT=".tar.zst"
+        [[ "$filename" == *"windows"* ]] && OLD_EXT=".zip"
+
+        OLD_ARCHIVE_URL="https://gitlab.com/${GITLAB_PROJECT_PATH}/-/releases/${PREV_TAG}/downloads/${archive_basename}${OLD_EXT}"
+
+        OLD_ARCHIVE_FILE="${TMP_ARCHIVE_DIR}/old_archive${OLD_EXT}"
+        if curl --fail -sL -o "$OLD_ARCHIVE_FILE" "$OLD_ARCHIVE_URL"; then
+            echo -e "${CYAN}  -> Generating bsdiff patch from ${PREV_TAG}...${NC}"
+            OLD_BIN_DIR="${TMP_ARCHIVE_DIR}/old_bin"
+            mkdir -p "$OLD_BIN_DIR"
+            if [[ "$filename" == *"windows"* ]]; then
+                unzip -q -o "$OLD_ARCHIVE_FILE" -d "$OLD_BIN_DIR"
+            else
+                tar -xf "$OLD_ARCHIVE_FILE" -C "$OLD_BIN_DIR" --use-compress-program=zstd
+            fi
+
+            OLD_BIN_FILE="$OLD_BIN_DIR/$final_binary_name"
+            if [ -f "$OLD_BIN_FILE" ]; then
+                BSDIFF_NAME="${archive_basename}.from-v${OLD_VERSION}-to-v${CURRENT_VERSION}.bsdiff"
+                bsdiff "$OLD_BIN_FILE" "$binary_path" "${TMP_ARCHIVE_DIR}/patch.raw"
+                zstd -19 -q "${TMP_ARCHIVE_DIR}/patch.raw" -o "${ARCHIVE_DIR}/${BSDIFF_NAME}"
+                sign_file "${ARCHIVE_DIR}/${BSDIFF_NAME}"
+            fi
+        fi
     fi
 
     rm -rf "$TMP_ARCHIVE_DIR"

@@ -7,6 +7,14 @@ use std::path::Path;
 use std::path::PathBuf;
 use zoi_core::{config, types};
 
+/// Manages Zoi's tamper-evident audit log.
+///
+/// The audit log records all state-changing operations (Install, Uninstall, Upgrade).
+/// It uses a "Hash Chain" mechanism where each new entry contains a SHA-256 hash
+/// of its contents PLUS the hash of the previous entry. This makes it
+/// mathematically impossible to modify or delete a historical entry without
+/// breaking the chain.
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum AuditAction {
     Install,

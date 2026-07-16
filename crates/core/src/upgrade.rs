@@ -168,6 +168,58 @@ fn fallback_full_upgrade(
     Ok((new_binary_path, temp_dir))
 }
 
+fn try_delta_upgrade(
+    base_url: &str,
+    checksums_content: &str,
+    os: &str,
+    arch: &str,
+    current_version: &str,
+    latest_version: &str,
+) -> Result<(PathBuf, tempfile::TempDir)> {
+    let archive_basename = format!("zoi-{os}-{arch}");
+    let bsdiff_filename =
+        format!("{archive_basename}.from-v{current_version}-to-v{latest_version}.bsdiff");
+    let download_url = format!("{base_url}/{bsdiff_filename}");
+
+    if !checksums_content.contains(&bsdiff_filename) {
+        return Err(anyhow!("Delta patch not available for this upgrade path."));
+    }
+
+    let temp_dir = Builder::new().prefix("zoi-delta-upgrade").tempdir()?;
+    let temp_patch_path = temp_dir.path().join(&bsdiff_filename);
+
+    println!("{} Downloading delta patch...", "::".bold().blue());
+    download_file(&download_url, &temp_patch_path)?;
+    verify_checksum(&temp_patch_path, checksums_content, &bsdiff_filename)?;
+
+    println!("{} Applying delta patch...", "::".bold().blue());
+    let current_exe_path = env::current_exe()?;
+    let mut old_binary = Vec::new();
+    File::open(&current_exe_path)?.read_to_end(&mut old_binary)?;
+
+    let mut patch_data = Vec::new();
+    File::open(&temp_patch_path)?.read_to_end(&mut patch_data)?;
+
+    let raw_patch = if patch_data.starts_with(&[0x28, 0xB5, 0x2F, 0xFD]) {
+        let mut decoder = ZstdDecoder::new(std::io::Cursor::new(&patch_data))?;
+        let mut buf = Vec::new();
+        decoder.read_to_end(&mut buf)?;
+        buf
+    } else {
+        patch_data
+    };
+
+    let mut cursor = std::io::Cursor::new(raw_patch);
+    let mut new_binary = Vec::new();
+    bsdiff::patch(&old_binary, &mut cursor, &mut new_binary)?;
+
+    let binary_filename = if os == "windows" { "zoi.exe" } else { "zoi" };
+    let new_binary_path = temp_dir.path().join(binary_filename);
+    std::fs::write(&new_binary_path, &new_binary)?;
+
+    Ok((new_binary_path, temp_dir))
+}
+
 pub fn run(
     branch: &str,
     status: &str,
@@ -288,8 +340,24 @@ pub fn run(
     );
     let checksums_txt_content = reqwest::blocking::get(&checksums_txt_url)?.text()?;
 
-    let (new_binary_path, _temp_dir_guard) =
-        fallback_full_upgrade(&base_url, &checksums_txt_content, os, arch)?;
+    let (new_binary_path, _temp_dir_guard) = if !force {
+        match try_delta_upgrade(
+            &base_url,
+            &checksums_txt_content,
+            os,
+            arch,
+            &current_version,
+            &latest_version_str,
+        ) {
+            Ok(res) => res,
+            Err(e) => {
+                println!("Delta upgrade failed: {}. Falling back to full upgrade.", e);
+                fallback_full_upgrade(&base_url, &checksums_txt_content, os, arch)?
+            }
+        }
+    } else {
+        fallback_full_upgrade(&base_url, &checksums_txt_content, os, arch)?
+    };
 
     println!("Replacing current executable...");
     self_replace::self_replace(&new_binary_path)?;

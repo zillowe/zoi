@@ -5,9 +5,12 @@ use std::io::Read;
 use std::path::Path;
 use walkdir::WalkDir;
 
+/// Supported hashing algorithms for integrity verification.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HashAlgorithm {
+    /// SHA-512 (128 character hex string).
     Sha512,
+    /// SHA-256 (64 character hex string).
     Sha256,
 }
 
@@ -29,6 +32,7 @@ impl HashAlgorithm {
     }
 }
 
+/// Calculates the cryptographic hash of a single file.
 pub fn calculate_file_hash(path: &Path, algo: HashAlgorithm) -> Result<String> {
     let mut file =
         fs::File::open(path).map_err(|e| anyhow!("Failed to open file {:?}: {}", path, e))?;
@@ -61,6 +65,15 @@ pub fn calculate_file_hash(path: &Path, algo: HashAlgorithm) -> Result<String> {
     }
 }
 
+/// Calculates a recursive hash of an entire directory's contents.
+///
+/// Deterministic Algorithm:
+/// - Collects all files in the directory.
+/// - Sorts files by their relative paths to ensure consistency.
+/// - Hashes each file's relative path, its metadata length, and finally its raw content.
+///
+/// This provides a single SHA-512 "Snapshot" hash that represents the exact state
+/// of the directory, used for bit-for-bit reproducibility checks in Specification v2.
 pub fn calculate_dir_hash(path: &Path) -> Result<String> {
     if !path.is_dir() {
         return Err(anyhow!("Path is not a directory"));

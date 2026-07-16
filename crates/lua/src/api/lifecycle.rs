@@ -2,6 +2,16 @@ use mlua::{self, Lua, LuaSerdeExt, Table, Value};
 use std::fs;
 use std::path::Path;
 
+/// Exposes the core Package DSL and lifecycle functions to the Lua environment.
+///
+/// This module defines the primary entry points for a `.pkg.lua` script:
+/// - `metadata`: Defines the static `Package` struct fields.
+/// - `dependencies`: Defines the runtime and build dependency graph.
+/// - `prepare`/`build`/`package`: Placeholder functions that the maintainer overrides
+///   to define the build logic.
+/// - `IMPORT`/`INCLUDE`: Helpers for modular package definitions.
+///
+/// These functions bridge the declarative metadata and the imperative build logic.
 pub fn add_import_util(lua: &Lua, current_path: &Path) -> Result<(), mlua::Error> {
     let current_path_buf = current_path.to_path_buf();
     let import_fn = lua.create_function(move |lua, file_name: String| {

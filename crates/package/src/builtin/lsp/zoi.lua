@@ -16,6 +16,7 @@ SYSTEM = {}
 
 ---@class ZoiInfo
 ---@field VERSION string The version of the package being built.
+---@field scope "user"|"system"|"project"? The currently requested installation scope.
 ---@field PATH { user: string, system: string } Zoi installation paths.
 ---@field PKG { store: string, template: string, root: string, home: string, lua: string } Package-specific absolute paths.
 ZOI = {}
@@ -56,6 +57,7 @@ ZOI = {}
 ---@field ci CiConfig? CI runner configuration for build pipelines.
 ---@field type "package"|"collection"|"app"|"extension"? The type of package.
 ---@field scope "user"|"system"|"project"? Default installation scope.
+---@field scopes ("user"|"system"|"project")[]? Allowed installation scopes.
 ---@field sub_packages string[]? List of sub-package names.
 ---@field main_subs string[]? Default sub-packages to install.
 ---@field tags string[]? Keywords for search.

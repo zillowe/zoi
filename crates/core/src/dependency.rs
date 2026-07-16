@@ -3,12 +3,21 @@ use regex::Regex;
 use semver::VersionReq;
 use std::sync::LazyLock;
 
+/// A parsed dependency specification.
+///
+/// This represents a requirement for another package, which may be managed by Zoi
+/// or an external package manager (e.g. `apt`, `brew`, `npm`).
 #[derive(Debug)]
 pub struct Dependency<'a> {
+    /// The name of the package manager responsible for this dependency (e.g. "zoi", "apt").
     pub manager: &'a str,
+    /// The name of the package in the target ecosystem.
     pub package: &'a str,
+    /// A semver version requirement, if applicable.
     pub req: Option<VersionReq>,
+    /// The raw version string or channel name (e.g. "1.2.3", "stable").
     pub version_str: Option<String>,
+    /// An optional description of the dependency.
     pub description: Option<&'a str>,
 }
 
@@ -21,6 +30,14 @@ static VER_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^(?P<pkg>.*?)(?P<ver>@.+|[=><~^].+)?$").expect("Static VER_RE regex is valid")
 });
 
+/// Parses a dependency string into its constituent parts.
+///
+/// The expected format is `manager:package[@version][:description]`.
+/// If the manager is omitted, it defaults to "zoi".
+///
+/// Arguments:
+/// - `dep_str`: The raw dependency string from a package definition.
+/// - `is_known_manager`: A closure that determines if a prefix should be treated as a manager name.
 pub fn parse_dependency_string<'a>(
     dep_str: &'a str,
     is_known_manager: impl Fn(&str) -> bool,
