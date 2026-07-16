@@ -18,7 +18,7 @@ use std::sync::Mutex;
 /// - Targeted Updates: Updates specific packages provided by name.
 /// - Advisory Deltas: Calculates and displays changes in security vulnerabilities.
 /// - Cleanup: Automatically removes old versions after a successful upgrade
-///    (if rollbacks are not required).
+///   (if rollbacks are not required).
 pub fn run(
     all: bool,
     package_names: &[String],

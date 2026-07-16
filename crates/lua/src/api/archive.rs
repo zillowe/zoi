@@ -18,8 +18,8 @@ use zstd::stream::read::Decoder as ZstdDecoder;
 /// - Remote Fetching: If the source starts with http(s), it downloads the file to `BUILD_DIR`.
 /// - Format Detection: Dispatches to the appropriate decoder (Zip, Tar, Zstd, Xz, 7z, etc.).
 /// - Error Propagation: Any failure (network, filesystem, or corruption) is converted
-///    into an `mlua::Error::RuntimeError`, which halts the Lua execution and is
-///    caught by the Rust build engine to trigger a rollback.
+///   into an `mlua::Error::RuntimeError`, which halts the Lua execution and is
+///   caught by the Rust build engine to trigger a rollback.
 pub fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let extract_fn =
         lua.create_function(move |lua, (source, out_name): (String, Option<String>)| {

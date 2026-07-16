@@ -9,7 +9,7 @@ use zoi_core::types::SandboxConfig;
 /// - The environment is completely isolated (empty root, no host files).
 /// - Only the package's own store directory is mounted read-only by default.
 /// - All other resources (Network, System Libraries, Home Data) must be
-///    explicitly requested in the `SandboxConfig` within the package definition.
+///   explicitly requested in the `SandboxConfig` within the package definition.
 ///
 /// This prevents malicious or buggy applications from accessing sensitive
 /// user data like SSH keys or personal documents.

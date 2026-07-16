@@ -325,7 +325,7 @@ fn pkg_key_as_str(s: &String) -> &String {
 /// This is the core "Resolution Engine" of Zoi. It:
 /// - Maps each source string to a `PkgName` in the PubGrub solver.
 /// - Uses the PubGrub SAT algorithm to find a set of versions that satisfy all
-///    SemVer requirements and constraints.
+///   SemVer requirements and constraints.
 /// - Handles backtracking and human-readable error reporting on failure.
 /// - Returns a `DependencyGraph` containing all nodes (packages) and edges (dependencies).
 pub fn resolve_dependency_graph(

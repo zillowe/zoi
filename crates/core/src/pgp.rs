@@ -10,14 +10,14 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::SystemTime;
 
-/// Manages PGP keys and signature verification for the Zoi "Chain of Trust".
-///
-/// Zoi uses PGP to verify:
-/// - Registry Integrity: Every git commit in an official registry should be signed.
-/// - Package Authenticity: Pre-built archives are verified against maintainer keys.
-///
-/// This module handles local keyring management (`~/.zoi/pgps/`) and provides
-/// utilities for importing, searching, and verifying signatures.
+// Manages PGP keys and signature verification for the Zoi "Chain of Trust".
+//
+// Zoi uses PGP to verify:
+// - Registry Integrity: Every git commit in an official registry should be signed.
+// - Package Authenticity: Pre-built archives are verified against maintainer keys.
+//
+// This module handles local keyring management (`~/.zoi/pgps/`) and provides
+// utilities for importing, searching, and verifying signatures.
 
 include!(concat!(env!("OUT_DIR"), "/generated_pgp_keys.rs"));
 

@@ -7,7 +7,7 @@ use colored::*;
 /// - If the binary is invoked as `zoi`, it runs the standard CLI.
 /// - If it is invoked via a symlink (e.g. `node` -> `zoi`), it acts as a "Shim".
 /// - In shim mode, it dynamically resolves the correct version of the requested
-///    tool based on the current project context, environment, or plugins.
+///   tool based on the current project context, environment, or plugins.
 fn main() {
     #[cfg(windows)]
     colored::control::set_virtual_terminal(true).ok();
@@ -38,15 +38,15 @@ fn main() {
             }
         };
 
-        /// A JIT (Just-in-Time) installation callback used by shims.
-        ///
-        /// This is a unique Zoi feature: if a shim resolves to a version that is NOT
-        /// currently installed (e.g. via a project's .tool-versions file), Zoi
-        /// doesn't just fail. Instead, it triggers this callback to:
-        /// - Prompt the user for JIT installation.
-        /// - Resolve the required package and its dependency tree.
-        /// - Install it into the appropriate store scope.
-        /// - Seamlessly continue the original execution.
+        // A JIT (Just-in-Time) installation callback used by shims.
+        //
+        // This is a unique Zoi feature: if a shim resolves to a version that is NOT
+        // currently installed (e.g. via a project's .tool-versions file), Zoi
+        // doesn't just fail. Instead, it triggers this callback to:
+        // - Prompt the user for JIT installation.
+        // - Resolve the required package and its dependency tree.
+        // - Install it into the appropriate store scope.
+        // - Seamlessly continue the original execution.
         let auto_install = |name: &str, version: &str| -> anyhow::Result<()> {
             let spec = format!("{}@{}", name, version);
             let scope = if std::path::Path::new("zoi.yaml").exists() {

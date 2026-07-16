@@ -429,10 +429,10 @@ enum Commands {
     /// Upgrades the Zoi binary to the latest version
     #[command(
         alias = "ug",
-        long_about = "Downloads the latest release from GitLab, verifies its checksum, and replaces the current executable."
+        long_about = "Upgrades Zoi to the latest version. By default, it attempts a delta upgrade (bsdiff) to minimize download size. If the delta upgrade is unavailable or fails, it automatically falls back to a full download."
     )]
     Upgrade {
-        /// Force a full download
+        /// Force a full download instead of a delta upgrade
         #[arg(long)]
         force: bool,
 

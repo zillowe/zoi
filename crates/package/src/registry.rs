@@ -361,7 +361,7 @@ references:
 /// - Parses every `.pkg.lua` file to extract static metadata.
 /// - Populates `packages.json` (the primary index) and `advisories.json`.
 /// - Enables clients to resolve packages and vulnerabilities without cloning
-///    the entire Git repository or parsing thousands of Lua scripts.
+///   the entire Git repository or parsing thousands of Lua scripts.
 pub fn generate_metadata(registry_root: &Path) -> Result<()> {
     if !registry_root.join("repo.yaml").exists() {
         return Err(anyhow!(

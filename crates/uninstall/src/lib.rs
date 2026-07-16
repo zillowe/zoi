@@ -355,12 +355,12 @@ fn load_installed_package(
 ///
 /// This is a complex multi-stage operation:
 /// - Dependent Check: Verifies if any other package requires this one
-///    (via the `dependents/` directory). Blocks if busy.
+///   (via the `dependents/` directory). Blocks if busy.
 /// - Hook Execution: Runs the `pre_remove` hook defined in `.pkg.lua`.
 /// - Lua Cleanup: Executes the `uninstall()` function and `zrm` operations.
 /// - File Removal: Deletes every file recorded in the package's `InstallManifest`.
 /// - Shim/Completion Cleanup: Unlinks binaries and completions if no other
-///    package provides them (ref-counting via the database).
+///   package provides them (ref-counting via the database).
 ///
 /// If `recursive` is true, Zoi also attempts to uninstall any dependencies
 /// that are no longer needed by any other package.

@@ -251,11 +251,11 @@ pub fn get_linux_distribution_info() -> Option<HashMap<String, String>> {
 ///
 /// Strategy:
 /// - ID_LIKE Check: We first check the `ID_LIKE` field in `/etc/os-release`.
-///    This is the most reliable way to identify derivatives (e.g. Ubuntu is `debian`).
+///   This is the most reliable way to identify derivatives (e.g. Ubuntu is `debian`).
 /// - Direct ID Match: If `ID_LIKE` is missing, we fall back to the primary `ID`.
 /// - Normalization: We group similar distros under a common "family" key
-///    to simplify downstream logic (e.g. Rocky, Alma, and CentOS all map to `fedora`
-///    because they share the DNF/RPM ecosystem).
+///   to simplify downstream logic (e.g. Rocky, Alma, and CentOS all map to `fedora`
+///   because they share the DNF/RPM ecosystem).
 pub fn get_linux_distro_family() -> Option<String> {
     if let Some(info) = get_linux_distribution_info() {
         if let Some(id_like) = info.get("ID_LIKE") {

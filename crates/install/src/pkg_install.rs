@@ -149,7 +149,7 @@ fn check_and_handle_file_conflicts(
 /// - The archive is unpacked into a temporary system `temp_dir`.
 /// - Files are then moved into a `.tmp-install-` subdirectory within the target store.
 /// - Only after ALL files are staged and shims are verified does Zoi move
-///    the staging folder to its final versioned path (`{version}/`).
+///   the staging folder to its final versioned path (`{version}/`).
 ///
 /// This ensures that a crash, power loss, or network failure during extraction
 /// never leaves a partially-installed or broken package in the Zoi store.

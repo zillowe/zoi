@@ -15,7 +15,6 @@ use zoi_core::types::MiniVulnerability;
 ///
 /// This allows Zoi to install packages without requiring the user to
 /// manually add repositories first.
-
 fn default_version() -> String {
     "1".to_string()
 }

@@ -237,7 +237,7 @@ package:archive:
     - package:rpm
   before_script:
     - apt-get update -y && apt-get install -y p7zip-full tar zstd curl git jq
-      unzip gnupg coreutils
+      unzip gnupg coreutils bsdiff
   script:
     - |
       set -euo pipefail

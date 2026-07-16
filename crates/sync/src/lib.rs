@@ -23,7 +23,7 @@ use zoi_lua::parser as lua_parser;
 /// This is the "Indexing Phase" of a sync. It:
 /// - Scans the local Git clone for all `.pkg.lua` and `.sec.yaml` files.
 /// - Parses each file (using the Lua VM where needed) to extract version info,
-///    descriptions, dependencies, and security advisories.
+///   descriptions, dependencies, and security advisories.
 /// - Fetches remote metadata (sizes and file lists) if configured in `repo.yaml`.
 /// - Atomic Commit: Updates the SQLite tables within a single transaction.
 fn refresh_registry_db(
@@ -888,9 +888,9 @@ fn fetch_handle_for_url(url: &str, verbose: bool) -> Result<String> {
 /// Logic Flow:
 /// - Handle Resolution: If the handle is missing, it clones the repo to find it.
 /// - Mirror Fallback: If the primary Git URL fails, it automatically tries mirrors
-///    defined in the registry's `repo.yaml`.
+///   defined in the registry's `repo.yaml`.
 /// - Signature Verification: If `authorities` are configured, it verifies the
-///    signature of the latest commit to ensure the entire registry state is trusted.
+///   signature of the latest commit to ensure the entire registry state is trusted.
 /// - Key Sync: Automatically imports PGP keys defined in the registry's `repo.yaml`.
 /// - Indexing: Triggers `refresh_registry_db` to update the local SQLite cache.
 fn sync_registry(

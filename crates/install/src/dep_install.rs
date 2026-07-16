@@ -17,7 +17,7 @@ use zoi_resolver::resolve;
 /// - If the manager is "zoi", it performs a Zoi-native install.
 /// - If the manager is "native", it detects the system's manager and redirects.
 /// - Otherwise, it constructs a command using templates from `managers.json`
-///    and executes it, potentially with `sudo` escalation.
+///   and executes it, potentially with `sudo` escalation.
 ///
 /// Important: External package managers are not atomic within Zoi's
 /// transaction system. Zoi will try to uninstall them on failure, but

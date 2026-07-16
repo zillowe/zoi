@@ -15,7 +15,7 @@ use zoi_core::utils;
 /// - Stage Grouping: Identifies independent tasks that can run in parallel.
 /// - Parallel Execution: Uses `rayon` to execute stages concurrently.
 /// - Incremental Builds: Uses file-based hashing (`cache_files`) to skip
-///    tasks if their inputs haven't changed.
+///   tasks if their inputs haven't changed.
 pub fn run(cmd_alias: Option<&str>, args: &[String], config: &config::ProjectConfig) -> Result<()> {
     if config.commands.is_empty() {
         return Err(anyhow!("No commands defined in zoi.yaml"));
