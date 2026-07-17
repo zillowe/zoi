@@ -1,4 +1,5 @@
 pub mod build;
+pub mod bundle;
 pub mod bwrap;
 pub mod docker;
 pub mod doctor;

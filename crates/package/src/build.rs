@@ -1,7 +1,7 @@
 /// Orchestrates the Zoi package build process.
 ///
 /// This module is responsible for turning a `.pkg.lua` definition into a
-/// distributable `.pkg.tar.zst` archive. It:
+/// distributable `.zpa` archive. It:
 /// - Executes the `prepare()`, `build()`, and `package()` Lua functions.
 /// - Manages the staging area where files are organized into Zoi's data structure.
 /// - Generates accompanying metadata: `.hash` (SHA-512), `.size`, and `.files`.
@@ -12,12 +12,13 @@ use colored::*;
 use mlua::{Lua, LuaSerdeExt, Table};
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
-use tar::Builder as TarBuilder;
+use tar::{Archive, Builder as TarBuilder};
 use tempfile::Builder;
 use walkdir::WalkDir;
 use zoi_core::{types, utils};
 use zoi_lua;
 use zoi_resolver::resolve;
+use zstd::stream::read::Decoder as ZstdDecoder;
 use zstd::stream::write::Encoder as ZstdEncoder;
 
 pub fn resolve_build_type(
@@ -610,7 +611,7 @@ fn build_for_platform(
         ),
     )?;
 
-    let output_filename = format!("{}-{}-{}.pkg.tar.zst", pkg_for_meta.name, version, platform);
+    let output_filename = format!("{}-{}-{}.zpa", pkg_for_meta.name, version, platform);
     let output_base = if let Some(dir) = output_dir {
         dir.to_path_buf()
     } else {
@@ -748,6 +749,42 @@ pub fn run(
     fakeroot: bool,
     install_deps: bool,
 ) -> Result<()> {
+    let mut _temp_zsa_dir = None;
+    let mut actual_package_file = package_file.to_path_buf();
+
+    if package_file.to_string_lossy().ends_with(".zsa") {
+        if !quiet {
+            println!(
+                "{} Extracting source bundle: {}",
+                "::".bold().blue(),
+                package_file.display()
+            );
+        }
+        let temp_dir = Builder::new().prefix("zoi-zsa-extract-").tempdir()?;
+        let file = File::open(package_file)?;
+        let decoder = ZstdDecoder::new(file)?;
+        let mut archive = Archive::new(decoder);
+        archive.unpack(temp_dir.path())?;
+
+        // Locate the .pkg.lua file inside the bundle
+        let mut pkg_lua = None;
+        for entry in WalkDir::new(temp_dir.path())
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            if entry.file_name().to_string_lossy().ends_with(".pkg.lua") {
+                pkg_lua = Some(entry.path().to_path_buf());
+                break;
+            }
+        }
+
+        actual_package_file = pkg_lua
+            .ok_or_else(|| anyhow!("Could not find .pkg.lua file inside the .zsa bundle."))?;
+        _temp_zsa_dir = Some(temp_dir);
+    }
+
+    let package_file = actual_package_file.as_path();
+
     if method == "docker" {
         let docker_image = image.ok_or_else(|| {
             anyhow!("An image must be specified when using the 'docker' build method.")

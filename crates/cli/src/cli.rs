@@ -61,7 +61,7 @@ pub struct Cli {
 
     #[arg(
         long = "pkg-dir",
-        help = "Additional directory to search for .pkg.tar.zst archives",
+        help = "Additional directory to search for .zpa archives",
         global = true,
         value_hint = ValueHint::DirPath
     )]
@@ -744,7 +744,7 @@ pub enum SyncCommands {
 pub enum CacheCommands {
     /// Add package archive(s) to the local cache
     Add {
-        /// Path to the .pkg.tar.zst archive(s)
+        /// Path to the .zpa archive(s)
         #[arg(required = true)]
         files: Vec<std::path::PathBuf>,
     },

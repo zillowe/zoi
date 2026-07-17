@@ -46,7 +46,7 @@ pub fn run(
     {
         for entry in entries.flatten() {
             let filename = entry.file_name().to_string_lossy().to_string();
-            if filename.starts_with(&pkg.name) && filename.ends_with(".pkg.tar.zst") {
+            if filename.starts_with(&pkg.name) && filename.ends_with(".zpa") {
                 let parts: Vec<&str> = filename.split('-').collect();
                 if parts.len() >= 2 {
                     let v_str = parts[1];

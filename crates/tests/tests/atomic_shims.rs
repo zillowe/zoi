@@ -46,7 +46,7 @@ metadata({{
     let pkg_lua_path = version_dir.join(format!("{}.pkg.lua", pkg_name));
     fs::write(&pkg_lua_path, pkg_lua_content).unwrap();
 
-    let archive_path = root.join("dummy.pkg.tar.zst");
+    let archive_path = root.join("dummy.zpa");
     fs::write(&archive_path, "").unwrap();
 
     let bin_root = root.join(".zoi/pkgs/bin");

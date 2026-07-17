@@ -27,7 +27,7 @@ pub fn download_and_cache_archive(
         .final_url
         .split('/')
         .next_back()
-        .unwrap_or("archive.pkg.tar.zst");
+        .unwrap_or("archive.zpa");
     let cached_archive_path = archive_cache_root.join(archive_filename);
     let sig_filename = format!("{}.sig", archive_filename);
     let cached_sig_path = archive_cache_root.join(&sig_filename);
@@ -253,11 +253,17 @@ pub fn prepare_node(
             (archive_path, "pre-compiled".to_string(), false)
         }
         plan::InstallAction::InstallFromArchive(archive_path) => {
-            if let Some(p) = &pb {
-                p.set_message("Using local archive...");
-                p.finish();
+            if archive_path.to_string_lossy().ends_with(".zsa") {
+                let archive_path =
+                    prebuilt::build_archive(archive_path, pkg, build_type, pb.as_ref())?;
+                (archive_path, "source".to_string(), true)
+            } else {
+                if let Some(p) = &pb {
+                    p.set_message("Using local archive...");
+                    p.finish();
+                }
+                (archive_path.clone(), "pre-compiled".to_string(), false)
             }
-            (archive_path.clone(), "pre-compiled".to_string(), false)
         }
         plan::InstallAction::BuildAndInstall => {
             let pkg_lua_path = Path::new(&node.source);

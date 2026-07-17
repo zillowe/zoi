@@ -35,14 +35,14 @@ zoi sync
 
 ### 2. Populate the Archive Cache
 
-You need the actual package binaries (`.pkg.tar.zst`). You can download these on a machine with internet and move them to the air-gapped system.
+You need the actual package binaries (`.zpa`). You can download these on a machine with internet and move them to the air-gapped system.
 
 #### Using `zoi cache add`
 
 If you have a folder of downloaded archives, you can "index" them into Zoi's internal cache:
 
 ```sh
-zoi cache add ./my-downloads/*.pkg.tar.zst
+zoi cache add ./my-downloads/*.zpa
 ```
 
 #### Using `--pkg-dir`

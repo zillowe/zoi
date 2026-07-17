@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
 pub struct InstallCommand {
-    /// Path to the package archive file (e.g. path/to/name-os-arch.pkg.tar.zst)
+    /// Path to the package archive file (e.g. path/to/name-os-arch.zpa)
     #[arg(required = true)]
     pub package_file: PathBuf,
     /// The sub-packages to install from the archive.

@@ -185,7 +185,7 @@ pub fn classify_source_origin(source: &str, action_name: &str) -> InstallOrigin 
     if source.starts_with("http://") || source.starts_with("https://") {
         return InstallOrigin::RemoteUrl;
     }
-    if source.ends_with(".pkg.tar.zst") || source.ends_with(".pkg.tar.xz") {
+    if source.ends_with(".zpa") || source.ends_with(".pkg.tar.xz") || source.ends_with(".zsa") {
         return InstallOrigin::LocalArchive;
     }
     if (source.ends_with(".pkg.lua") || source.ends_with(".manifest.yaml"))

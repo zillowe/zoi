@@ -60,7 +60,7 @@ end
     )
     .expect("Build should succeed");
 
-    let archive_filename = format!("{}-{}-{}.pkg.tar.zst", pkg_name, version, platform);
+    let archive_filename = format!("{}-{}-{}.zpa", pkg_name, version, platform);
     let archive_path = output_dir.join(archive_filename);
     assert!(archive_path.exists());
 

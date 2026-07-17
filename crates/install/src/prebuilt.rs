@@ -115,7 +115,7 @@ pub fn build_archive(
         ));
     }
 
-    let archive_filename = format!("{}-{}-{}.pkg.tar.zst", pkg.name, version, current_platform);
+    let archive_filename = format!("{}-{}-{}.zpa", pkg.name, version, current_platform);
     let archive_path = pkg_lua_path
         .parent()
         .ok_or_else(|| anyhow!("pkg_lua_path should have a parent: {:?}", pkg_lua_path))?
