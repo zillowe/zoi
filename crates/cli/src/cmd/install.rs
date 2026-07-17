@@ -33,7 +33,7 @@ pub fn run(
     dry_run: bool,
     plugin_manager: Option<&crate::pkg::plugin::PluginManager>,
     build: bool,
-    frozen_lockfile: bool,
+    frozen: bool,
     explain: bool,
     plan_json: bool,
     retry: u32,
@@ -61,32 +61,32 @@ pub fn run(
         scope_override = Some(crate::pkg::utils::resolve_fallback_scope());
     }
 
-    if frozen_lockfile {
+    if frozen {
         if repo.is_some() || !sources.is_empty() {
             return Err(anyhow!(
-                "--frozen-lockfile can only be used without explicit sources or --repo."
+                "--frozen can only be used without explicit sources or --repo."
             ));
         }
         if save {
             return Err(anyhow!(
-                "--save cannot be used with --frozen-lockfile because the lockfile must remain unchanged."
+                "--save cannot be used with --frozen because the lockfile must remain unchanged."
             ));
         }
         if !std::path::Path::new("zoi.lua").exists() {
             return Err(anyhow!(
-                "--frozen-lockfile requires a local zoi.lua in the current project."
+                "--frozen requires a local zoi.lua in the current project."
             ));
         }
         if !std::path::Path::new("zoi.lock").exists() {
             return Err(anyhow!(
-                "--frozen-lockfile requires zoi.lock. Generate it first with a normal project install."
+                "--frozen requires zoi.lock. Generate it first with a normal project install."
             ));
         }
         if let Some(scope) = scope_override
             && scope != types::Scope::Project
         {
             return Err(anyhow!(
-                "--frozen-lockfile is only supported for project scope installs."
+                "--frozen is only supported for project scope installs."
             ));
         }
         scope_override = Some(types::Scope::Project);
@@ -101,7 +101,7 @@ pub fn run(
     let mut sources_to_process: Vec<String> = sources.to_vec();
     let mut is_project_install = false;
     let mut frozen_locked_packages = None;
-    if frozen_lockfile {
+    if frozen {
         let lockfile = project::lockfile::read_zoi_lock()?;
         let locked_packages = project::lockfile::locked_packages(&lockfile);
         sources_to_process = locked_packages
@@ -109,13 +109,11 @@ pub fn run(
             .map(|entry| entry.source.clone())
             .collect();
         if sources_to_process.is_empty() {
-            return Err(anyhow!(
-                "zoi.lock is empty. Cannot continue with --frozen-lockfile."
-            ));
+            return Err(anyhow!("zoi.lock is empty. Cannot continue with --frozen."));
         }
         frozen_locked_packages = Some(locked_packages);
         println!(
-            "{} --frozen-lockfile enabled. Installing pinned lockfile sources only...",
+            "{} --frozen enabled. Installing pinned lockfile sources only...",
             "::".bold().blue()
         );
         is_project_install = true;
@@ -509,7 +507,7 @@ pub fn run(
                 "Scope",
                 format!("{:?}", scope_override.unwrap_or(types::Scope::User)),
             )
-            .row("Frozen lockfile", frozen_lockfile.to_string())
+            .row("Frozen lockfile", frozen.to_string())
             .row("Retry attempts", retry.to_string())
             .row("Direct packages", direct_packages.len().to_string())
             .row(
@@ -594,7 +592,7 @@ pub fn run(
 
         let plan = json!({
             "dry_run": dry_run,
-            "frozen_lockfile": frozen_lockfile,
+            "frozen": frozen,
             "retry_attempts": retry,
             "scope": format!("{:?}", scope_override.unwrap_or(types::Scope::User)),
             "totals": {
@@ -935,7 +933,7 @@ pub fn run(
 
     let is_any_project_install = scope_override == Some(types::Scope::Project);
 
-    if is_any_project_install && !frozen_lockfile {
+    if is_any_project_install && !frozen {
         println!("\nUpdating zoi.lock...");
         let mut lockfile =
             project::lockfile::read_zoi_lock().unwrap_or_else(|_| types::ZoiLockV2 {

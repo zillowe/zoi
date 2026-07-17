@@ -157,7 +157,7 @@ pub struct SourceInstallOptions {
     /// Force building from source even when a prebuilt archive is available.
     pub build: bool,
     /// Enforce the current `zoi.lock` exactly for project installs.
-    pub frozen_lockfile: bool,
+    pub frozen: bool,
 }
 
 /// Options for resolving a dependency graph without installing packages.
@@ -307,7 +307,7 @@ pub fn install_sources(sources: &[String], options: &SourceInstallOptions) -> Re
         options.dry_run,
         pm_ptr,
         options.build,
-        options.frozen_lockfile,
+        options.frozen,
         false,
         false,
         3,

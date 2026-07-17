@@ -36,7 +36,7 @@ Zoi is packed with features designed to make package management and environment 
 
 - **Pinned Registry Inputs:** Lock registries to exact Git revisions (branch, tag, or commit hash) in `zoi.lua`. `zoi.lock` automatically pins these to SHA-1 hashes for absolute reproducibility.
 
-- **Reproducible Project Installs (`--frozen-lockfile`):** Rebuild a project environment from `zoi.lock` without re-resolving versions, sub-packages, or recorded dependency choices. Zoi Specification v2 lockfiles include directory hashes to verify the integrity of the entire local state.
+- **Reproducible Project Installs (`--frozen`):** Rebuild a project environment from `zoi.lock` without re-resolving versions, sub-packages, or recorded dependency choices. Zoi Specification v2 lockfiles include directory hashes to verify the integrity of the entire local state.
 
 - **Automated Dev Repo Discovery (`zoi dev --repo`):** Instantly enter a development shell for any Git repository. Zoi clones the repository to a temporary directory, sets up the environment defined in its `zoi.lua`, and cleans up automatically on exit.
 
@@ -382,7 +382,7 @@ Zoi resolves dependencies, checks for conflicts, and then sequentially downloads
 - `--save`: Save the package to the project's `zoi.yaml`.
 - `--type <TYPE>`: The type of package to build if building from source. Specifying a type other than `pre-compiled` or `pre-built` will force a local build.
 - `--build` (alias: `-b`): Force building from source even if a pre-compiled archive is available in the registry.
-- `--frozen-lockfile`: Install exactly what is pinned in `zoi.lock` (project scope only, lockfile must already exist, no lockfile updates are allowed, and recorded sub-package/dependency selections are preserved).
+- `--frozen`: Install exactly what is pinned in `zoi.lock` (project scope only, lockfile must already exist, no lockfile updates are allowed, and recorded sub-package/dependency selections are preserved).
 - `--retry <N>`: Retry failed downloads up to `N` attempts (minimum `1`, default `3`).
 - `-v`, `--verbose`: Show additional install details, including package origins and preflight information.
 - `--explain`: Print dependency-selection and install-decision explanation.
@@ -684,7 +684,7 @@ Downloads or updates the package database from the remote repository.
 - `--no-pm`: Do not check for installed native package managers.
 - `--force`: Rebuild all registry databases from scratch by removing existing caches, git clones, and re-cloning. Installed packages and their records are preserved.
 - `--local`: Sync registries to the project's local `.zoi/pkgs/db/` using revisions from `zoi.lua`.
-- `--frozen-lock`: When used with `--local`, sync using revisions from `zoi.lock` instead of `zoi.lua`.
+- `--frozen`: When used with `--local`, sync using revisions from `zoi.lock` instead of `zoi.lua`.
 
 **Subcommands:**
 

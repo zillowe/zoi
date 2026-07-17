@@ -181,7 +181,7 @@ enum Commands {
 
         /// When used with --local, sync using revisions from zoi.lock instead of zoi.lua
         #[arg(long)]
-        frozen_lock: bool,
+        frozen: bool,
     },
 
     /// Migration helpers for converting external manifests to Zoi package files
@@ -340,7 +340,7 @@ enum Commands {
 
         /// Enforce zoi.lock exactly (project install only, no lockfile updates)
         #[arg(long)]
-        frozen_lockfile: bool,
+        frozen: bool,
 
         /// Explain dependency selection and install decisions
         #[arg(long)]
@@ -932,7 +932,7 @@ pub fn run() -> anyhow::Result<()> {
                 no_package_managers,
                 force,
                 local,
-                frozen_lock,
+                frozen,
             } => {
                 if let Some(cmd) = command {
                     match cmd {
@@ -943,7 +943,7 @@ pub fn run() -> anyhow::Result<()> {
                     }
                 } else if local {
                     plugin_manager.trigger_hook("on_pre_sync", None)?;
-                    let res = cmd::sync::run_local(verbose, fallback, force, frozen_lock);
+                    let res = cmd::sync::run_local(verbose, fallback, force, frozen);
                     plugin_manager.trigger_hook_nonfatal("on_post_sync", None);
                     res
                 } else {
@@ -1016,7 +1016,7 @@ pub fn run() -> anyhow::Result<()> {
                 r#type,
                 dry_run,
                 build,
-                frozen_lockfile,
+                frozen,
                 explain,
                 plan_json,
                 retry,
@@ -1036,7 +1036,7 @@ pub fn run() -> anyhow::Result<()> {
                 dry_run,
                 Some(&plugin_manager),
                 build,
-                frozen_lockfile,
+                frozen,
                 explain,
                 plan_json,
                 retry,
