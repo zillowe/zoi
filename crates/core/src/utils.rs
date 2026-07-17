@@ -304,6 +304,23 @@ pub fn get_linux_distribution() -> Option<String> {
     get_linux_distribution_info().and_then(|info| info.get("ID").cloned())
 }
 
+/// Returns true if the current system is a ZoiOS-based distribution (like Parlex).
+pub fn is_zoios() -> bool {
+    if let Some(info) = get_linux_distribution_info() {
+        if let Some(id) = info.get("ID")
+            && (id == "zoios" || id == "parlex")
+        {
+            return true;
+        }
+        if let Some(id_like) = info.get("ID_LIKE")
+            && id_like.split_whitespace().any(|s| s == "zoios")
+        {
+            return true;
+        }
+    }
+    false
+}
+
 pub fn get_desktop_environment() -> Option<String> {
     if cfg!(target_os = "windows") {
         return Some("windows".to_string());
