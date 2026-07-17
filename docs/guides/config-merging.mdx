@@ -1,0 +1,68 @@
+---
+title: Configuration Merging
+description: How Zoi handles configuration file updates and user modifications using 3-way merging.
+---
+
+When you upgrade a package, Zoi needs to handle files in the `backup` field of the package manifest. These are typically configuration files (like those in `/etc/` or `~/.config/`) that users might have modified.
+
+Zoi uses an advanced **3-Way Merge** strategy to ensure that security updates and new upstream defaults are applied automatically without losing your custom tweaks.
+
+## The 3-Way Merge Strategy
+
+To perform a reliable merge, Zoi maintains three versions of every tracked configuration file:
+
+1. **Base (`.zoiorig`)**: The original, unmodified default configuration from the version you currently have installed.
+2. **Yours**: Your current configuration file on disk, including any edits you've made.
+3. **Theirs**: The new default configuration file provided by the package update.
+
+### How it works
+
+When you run `zoi update`, Zoi evaluates the state of your configuration:
+
+| Scenario | Logic | Result |
+| :--- | :--- | :--- |
+| **Unmodified** | Yours == Base | Zoi simply replaces the old file with the new upstream default (**Theirs**). |
+| **Upstream Unchanged** | Theirs == Base | Zoi keeps your modified file (**Yours**) as-is. |
+| **Clean Merge** | Both changed, no overlaps | Zoi automatically combines your changes with the upstream changes. |
+| **Conflict** | Both changed same lines | Zoi inserts standard merge markers (`<<<<<<<`, `=======`, `>>>>>>>`) and warns you. |
+
+## Handling Conflicts
+
+If a conflict occurs during an upgrade, Zoi will print a warning:
+
+```text
+:: Merging changes for 'etc/my-app.conf'...
+   Warning: Conflict in etc/my-app.conf. Standard markers inserted.
+```
+
+Your configuration file will now look like this:
+
+```text
+# Server Settings
+port = 8080
+<<<<<<< YOURS
+max_connections = 100
+=======
+max_connections = 500
+>>>>>>> THEIRS
+```
+
+### Resolving Conflicts
+
+1. **Edit the file**: Open the conflicted configuration file and choose which changes to keep.
+2. **Remove the markers**: Delete the `<<<<<<<`, `=======`, and `>>>>>>>` lines.
+3. **Reference the new default**: Zoi saves the pure upstream default as `.zoinew` (e.g., `etc/my-app.conf.zoinew`) so you can refer to it if needed.
+
+## Manual Restoration (Legacy Fallback)
+
+If you are upgrading from a version of Zoi older than `1.23.0`, the `.zoiorig` base file might not exist yet. In this case, Zoi falls back to its legacy behavior:
+
+1. Your modified configuration is preserved.
+2. The new upstream default is saved alongside it with a `.zoinew` extension.
+3. You must manually compare the files and apply updates.
+
+## Technical Details
+
+- **Storage**: Base files are stored in the versioned package store as `{filename}.zoiorig`.
+- **Algorithm**: Zoi uses the `diffy` engine for in-memory text merging.
+- **Binary Files**: 3-way merging is only attempted for valid UTF-8 text files. Binary configuration files always fall back to the `.zoinew` behavior.

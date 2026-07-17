@@ -71,6 +71,7 @@ zoi-sync.workspace = true
 zoi-uninstall.workspace = true
 zoi-transaction.workspace = true
 zoi-plugins.workspace = true
+diffy.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
 zoi-sandbox.workspace = true
