@@ -576,6 +576,17 @@ fn build_for_platform(
         }
     }
 
+    if platform.starts_with("linux")
+        && let Err(e) = super::relocate::relocate_elfs(&staging_dir, quiet)
+    {
+        eprintln!(
+            "{} Failed to relocate ELF binaries for platform {}: {}",
+            "Warning:".yellow(),
+            platform.cyan(),
+            e
+        );
+    }
+
     let mut files_list = Vec::new();
     for entry in WalkDir::new(&staging_dir) {
         let entry = entry?;
