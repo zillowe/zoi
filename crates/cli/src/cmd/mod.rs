@@ -9,6 +9,7 @@ pub mod create;
 pub mod dev;
 pub mod doctor;
 pub mod downgrade;
+pub mod download;
 pub mod env;
 pub mod exec;
 pub mod extension;
