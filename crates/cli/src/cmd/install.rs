@@ -57,11 +57,14 @@ pub fn run(
         scope_override = Some(types::Scope::User);
     }
 
-    if save
-        && scope_override.is_none()
-        && (std::path::Path::new("zoi.lua").exists() || std::path::Path::new("zoi.yaml").exists())
-    {
-        scope_override = Some(types::Scope::Project);
+    if scope_override.is_none() {
+        if std::path::Path::new("zoi.lua").exists() || std::path::Path::new("zoi.yaml").exists() {
+            scope_override = Some(types::Scope::Project);
+        } else if crate::pkg::utils::is_zoios() {
+            scope_override = Some(types::Scope::System);
+        } else {
+            scope_override = Some(types::Scope::User);
+        }
     }
 
     if frozen_lockfile {
