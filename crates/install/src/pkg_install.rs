@@ -394,6 +394,31 @@ pub fn run(
     fs::create_dir_all(&version_dir)?;
     copy_dir_all(staging_dir.path(), &version_dir)?;
 
+    // Create .zoiorig copies for 3-way merge support
+    if let Some(backup_files) = &metadata.backup {
+        for backup_file_rel in backup_files {
+            let backup_src = version_dir.join(backup_file_rel);
+            if backup_src.exists() && backup_src.is_file() {
+                let orig_path = backup_src.with_extension(format!(
+                    "{}.zoiorig",
+                    backup_src
+                        .extension()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or_default()
+                ));
+                if let Err(e) = fs::copy(&backup_src, &orig_path)
+                    && pb.is_none()
+                {
+                    eprintln!(
+                        "Warning: failed to create .zoiorig for {}: {}",
+                        backup_src.display(),
+                        e
+                    );
+                }
+            }
+        }
+    }
+
     if link_bins && let Some(bins) = &metadata.bins {
         let bin_root = get_bin_root(scope)?;
         fs::create_dir_all(&bin_root)?;

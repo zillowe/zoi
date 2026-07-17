@@ -1,5 +1,6 @@
 use crate::cmd::utils as cmd_utils;
 use crate::cmd::ux;
+use crate::pkg::merge::handle_backup_files;
 use crate::pkg::{config, db, hooks, install, local, pin, resolve, transaction, types};
 use anyhow::{Result, anyhow};
 use colored::*;
@@ -364,36 +365,7 @@ fn run_update_single_logic(
                 &new_manifest.version,
             )?;
 
-            for backup_file_rel in backup_files {
-                let old_path = old_version_dir.join(backup_file_rel);
-                let new_path = new_version_dir.join(backup_file_rel);
-
-                if old_path.exists() {
-                    if new_path.exists() {
-                        let zoinew_path = new_path.with_extension(format!(
-                            "{}.zoinew",
-                            new_path
-                                .extension()
-                                .and_then(|s| s.to_str())
-                                .unwrap_or_default()
-                        ));
-                        println!(
-                            "Configuration file '{}' exists in new version. Saving as .zoinew",
-                            new_path.display()
-                        );
-                        if let Err(e) = fs::rename(&new_path, &zoinew_path) {
-                            eprintln!("Warning: failed to rename to .zoinew: {}", e);
-                            continue;
-                        }
-                    }
-                    if let Some(p) = new_path.parent() {
-                        fs::create_dir_all(p)?;
-                    }
-                    if let Err(e) = fs::rename(&old_path, &new_path) {
-                        eprintln!("Warning: failed to restore backup file: {}", e);
-                    }
-                }
-            }
+            handle_backup_files(&old_version_dir, &new_version_dir, backup_files)?;
         }
 
         cleanup_old_versions(
@@ -1009,35 +981,7 @@ fn run_update_all_logic(
                 &new_manifest.name,
                 &new_manifest.version,
             )?;
-            for backup_file_rel in backup_files {
-                let old_path = old_version_dir.join(backup_file_rel);
-                let new_path = new_version_dir.join(backup_file_rel);
-                if old_path.exists() {
-                    if new_path.exists() {
-                        let zoinew_path = new_path.with_extension(format!(
-                            "{}.zoinew",
-                            new_path
-                                .extension()
-                                .and_then(|s| s.to_str())
-                                .unwrap_or_default()
-                        ));
-                        println!(
-                            "Configuration file '{}' exists in new version. Saving as .zoinew",
-                            new_path.display()
-                        );
-                        if let Err(e) = fs::rename(&new_path, &zoinew_path) {
-                            eprintln!("Warning: failed to rename to .zoinew: {}", e);
-                            continue;
-                        }
-                    }
-                    if let Some(p) = new_path.parent() {
-                        fs::create_dir_all(p)?;
-                    }
-                    if let Err(e) = fs::rename(&old_path, &new_path) {
-                        eprintln!("Warning: failed to restore backup file: {}", e);
-                    }
-                }
-            }
+            handle_backup_files(&old_version_dir, &new_version_dir, backup_files)?;
         }
 
         if let Err(e) = cleanup_old_versions(

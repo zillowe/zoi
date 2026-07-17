@@ -19,6 +19,7 @@ pub use zoi_deps as dependencies;
 pub use zoi_plugins::extension;
 pub use zoi_uninstall::autoremove;
 pub mod helper;
+pub mod merge;
 pub use zoi_hooks as hooks;
 pub use zoi_install as install;
 pub use zoi_lua as lua;

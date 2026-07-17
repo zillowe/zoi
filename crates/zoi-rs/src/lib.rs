@@ -316,6 +316,14 @@ pub fn install_sources(sources: &[String], options: &SourceInstallOptions) -> Re
     )
 }
 
+/// Updates one or more installed packages.
+///
+/// This function checks for updates in the configured registries and performs
+/// a transactional upgrade if a newer version is available.
+pub fn update_packages(all: bool, package_names: &[String], yes: bool) -> Result<()> {
+    zoi_cli::cmd::update::run(all, package_names, yes, false, false, false, false)
+}
+
 pub fn resolve_package(source: &str, yes: bool) -> Result<ResolvedPackage> {
     let (package, version, sharable_manifest, source_path, registry_handle, repo_type, git_sha) =
         zoi_resolver::resolve::resolve_package_and_version(source, None, true, yes)?;
