@@ -4538,6 +4538,7 @@ dependencies = [
  "hex",
  "home",
  "mlua",
+ "nix",
  "rayon",
  "regex",
  "serde_json",
