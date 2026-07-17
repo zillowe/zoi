@@ -755,6 +755,20 @@ pub fn run(
         );
     }
 
+    if method == "bwrap" {
+        return super::bwrap::run(
+            package_file,
+            build_type,
+            platforms,
+            sign_key,
+            output_dir,
+            version_override,
+            sub_packages,
+            fakeroot,
+            install_deps,
+        );
+    }
+
     if !quiet {
         println!("Building package from: {}", package_file.display());
     }
