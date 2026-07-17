@@ -356,9 +356,10 @@ pub fn resolve_dependency_graph(
 pub fn bundle_package(
     package_file: &Path,
     output_dir: Option<&Path>,
+    sign: Option<String>,
     version_override: Option<&str>,
 ) -> Result<()> {
-    zoi_package::bundle::run(package_file, output_dir, version_override)
+    zoi_package::bundle::run(package_file, output_dir, sign, version_override)
 }
 
 /// Builds a Zoi package from a local `.pkg.lua` file.

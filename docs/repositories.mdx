@@ -261,8 +261,14 @@ pkg:
     hash: https://zillowe.pages.dev/pkgs/{repo}/{os}/{arch}/{version}/{name}-{version}-{platform}.zpa.hash
     size: https://zillowe.pages.dev/pkgs/{repo}/{os}/{arch}/{version}/{name}-{version}-{platform}.zpa.size
     files: https://zillowe.pages.dev/pkgs/{repo}/{os}/{arch}/{version}/{name}-{version}-{platform}.zpa.files
+  # Example 2: Source bundle mirror (Zoi appends .zsa filename)
+  - type: source-main
+    url: https://zillowe.pages.dev/source-pkgs/{repo}/{version}
+    hash: https://zillowe.pages.dev/source-pkgs/{repo}/{version}/{name}-{version}.zsa.hash
+  - type: source-mirror
+    url: https://mirror.example.com/source-pkgs/{repo}/{version}
 
-  # Example 2: Direct file link (Full control)
+  # Example 3: Direct file link (Full control)
   - type: mirror
     url: https://mirror.example.com/{repo}/{name}-{version}-{platform}.zpa
 ```

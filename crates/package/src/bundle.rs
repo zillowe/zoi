@@ -3,13 +3,14 @@ use colored::*;
 use mlua::{Lua, LuaSerdeExt, Table, Value};
 use std::collections::HashSet;
 use std::fs::{self, File};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tar::Builder as TarBuilder;
 use zstd::stream::write::Encoder as ZstdEncoder;
 
 pub fn run(
     package_file: &Path,
     output_dir: Option<&Path>,
+    sign: Option<String>,
     version_override: Option<&str>,
 ) -> Result<()> {
     println!(
@@ -190,6 +191,24 @@ pub fn run(
         "::".bold().green(),
         output_path.display()
     );
+
+    if let Some(key_id) = sign {
+        println!(
+            "{} Signing bundle with key '{}'...",
+            "::".bold().blue(),
+            key_id.cyan()
+        );
+        let signature_path = PathBuf::from(format!("{}.sig", output_path.display()));
+        if signature_path.exists() {
+            fs::remove_file(&signature_path)?;
+        }
+        zoi_core::pgp::sign_detached(&output_path, &signature_path, &key_id)?;
+        println!(
+            "{} Successfully created signature: {}",
+            "::".bold().green(),
+            signature_path.display()
+        );
+    }
 
     Ok(())
 }

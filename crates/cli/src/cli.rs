@@ -8,6 +8,7 @@ use clap_complete::Shell;
 use clap_complete::generate;
 use colored::Colorize;
 use std::io::{self};
+use std::path::PathBuf;
 
 // Development, Special, Public or Production
 const BRANCH: &str = "Development";
@@ -125,6 +126,29 @@ enum Commands {
         long_about = "Detects and displays key system details, including the OS, CPU architecture, Linux distribution (if applicable), and available package managers."
     )]
     Info,
+
+    /// Downloads a package archive or source bundle
+    #[command(
+        alias = "dl",
+        long_about = "Downloads the binary archive (.zpa) or source bundle (.zsa) for a package to the local cache or a specified directory."
+    )]
+    Download {
+        /// Package identifier (e.g. @repo/name, path, or URL)
+        #[arg(value_name = "PACKAGE", required = true, help = PKG_SOURCE_HELP)]
+        package: String,
+
+        /// Download the binary archive (.zpa) [default]
+        #[arg(long, group = "type")]
+        archive: bool,
+
+        /// Download the source bundle (.zsa)
+        #[arg(long, group = "type")]
+        source: bool,
+
+        /// Directory to output the downloaded file to
+        #[arg(short, long)]
+        output_dir: Option<PathBuf>,
+    },
 
     /// Downloads or updates the package database from the remote repository
     #[command(
@@ -1133,6 +1157,19 @@ pub fn run() -> anyhow::Result<()> {
                 verbose,
                 args,
             } => cmd::exec::run(source, bin, args, verbose),
+            Commands::Download {
+                package,
+                archive: _,
+                source,
+                output_dir,
+            } => {
+                let download_type = if source {
+                    cmd::download::DownloadType::Source
+                } else {
+                    cmd::download::DownloadType::Archive
+                };
+                cmd::download::run(package, download_type, output_dir)
+            }
             Commands::Clean { dry_run } => cmd::clean::run(dry_run),
             Commands::Clone { package, location } => cmd::clone::run(&package, location, cli.yes),
             Commands::Cache { command } => match command {

@@ -1023,10 +1023,11 @@ pub fn resolve_url_placeholders(
         .replace("{platform}", platform)
 }
 
-pub fn find_prebuilt_info_for_package(
+pub fn find_registry_info_for_package(
     pkg: &types::Package,
     registry_handle: &str,
     version: &str,
+    is_source: bool,
 ) -> Result<Option<types::PrebuiltInfo>> {
     let platform = zoi_core::utils::get_platform()?;
 
@@ -1039,25 +1040,33 @@ pub fn find_prebuilt_info_for_package(
     };
 
     if let Some(repo_config) = repo_config {
+        let main_type = if is_source { "source-main" } else { "main" };
+        let mirror_type = if is_source { "source-mirror" } else { "mirror" };
+        let extension = if is_source { ".zsa" } else { ".zpa" };
+
         let mut pkg_links_to_try = Vec::new();
-        if let Some(main_pkg) = repo_config.pkg.iter().find(|p| p.link_type == "main") {
+        if let Some(main_pkg) = repo_config.pkg.iter().find(|p| p.link_type == main_type) {
             pkg_links_to_try.push(main_pkg.clone());
         }
         pkg_links_to_try.extend(
             repo_config
                 .pkg
                 .iter()
-                .filter(|p| p.link_type == "mirror")
+                .filter(|p| p.link_type == mirror_type)
                 .cloned(),
         );
 
         if let Some(pkg_link) = pkg_links_to_try.into_iter().next() {
             let final_url_base =
                 resolve_url_placeholders(&pkg_link.url, &pkg.name, &pkg.repo, version, &platform);
-            let final_url = if final_url_base.ends_with(".zpa") {
+            let final_url = if final_url_base.ends_with(extension) {
                 final_url_base
             } else {
-                let archive_filename = format!("{}-{}-{}.zpa", pkg.name, version, platform);
+                let archive_filename = if is_source {
+                    format!("{}-{}{}", pkg.name, version, extension)
+                } else {
+                    format!("{}-{}-{}{}", pkg.name, version, platform, extension)
+                };
                 format!(
                     "{}/{}",
                     final_url_base.trim_end_matches('/'),
@@ -1100,8 +1109,28 @@ pub fn find_prebuilt_info_for_package(
     Ok(None)
 }
 
+pub fn find_prebuilt_info_for_package(
+    pkg: &types::Package,
+    registry_handle: &str,
+    version: &str,
+) -> Result<Option<types::PrebuiltInfo>> {
+    find_registry_info_for_package(pkg, registry_handle, version, false)
+}
+
+pub fn find_source_bundle_info_for_package(
+    pkg: &types::Package,
+    registry_handle: &str,
+    version: &str,
+) -> Result<Option<types::PrebuiltInfo>> {
+    find_registry_info_for_package(pkg, registry_handle, version, true)
+}
+
 pub fn find_prebuilt_info(node: &InstallNode) -> Result<Option<types::PrebuiltInfo>> {
     find_prebuilt_info_for_package(&node.pkg, &node.registry_handle, &node.version)
+}
+
+pub fn find_source_bundle_info(node: &InstallNode) -> Result<Option<types::PrebuiltInfo>> {
+    find_source_bundle_info_for_package(&node.pkg, &node.registry_handle, &node.version)
 }
 
 pub fn get_package_sizes(pkg: &types::Package, registry_handle: &str, version: &str) -> (u64, u64) {
