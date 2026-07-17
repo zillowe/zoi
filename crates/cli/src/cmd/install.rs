@@ -58,13 +58,7 @@ pub fn run(
     }
 
     if scope_override.is_none() {
-        if std::path::Path::new("zoi.lua").exists() || std::path::Path::new("zoi.yaml").exists() {
-            scope_override = Some(types::Scope::Project);
-        } else if crate::pkg::utils::is_zoios() {
-            scope_override = Some(types::Scope::System);
-        } else {
-            scope_override = Some(types::Scope::User);
-        }
+        scope_override = Some(crate::pkg::utils::resolve_fallback_scope());
     }
 
     if frozen_lockfile {

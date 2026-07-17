@@ -224,7 +224,8 @@ pub fn retry_backoff_sleep(attempt: u32) {
 }
 
 pub fn get_linux_distribution_info() -> Option<HashMap<String, String>> {
-    if let Ok(contents) = fs::read_to_string("/etc/os-release") {
+    let path = crate::sysroot::apply_sysroot("/etc/os-release");
+    if let Ok(contents) = fs::read_to_string(path) {
         let info: HashMap<String, String> = contents
             .lines()
             .filter_map(|line| {
@@ -319,6 +320,17 @@ pub fn is_zoios() -> bool {
         }
     }
     false
+}
+
+/// Resolves the default installation scope based on the current environment.
+pub fn resolve_fallback_scope() -> crate::types::Scope {
+    if std::path::Path::new("zoi.lua").exists() || std::path::Path::new("zoi.yaml").exists() {
+        crate::types::Scope::Project
+    } else if is_zoios() {
+        crate::types::Scope::System
+    } else {
+        crate::types::Scope::User
+    }
 }
 
 pub fn get_desktop_environment() -> Option<String> {

@@ -28,6 +28,8 @@ Zoi is packed with features designed to make package management and environment 
 
 - **Native Linux Sandboxing:** Run packages in a secure, "default-deny" isolated environment using Bubblewrap. Package maintainers explicitly define network, system, and file access permissions, protecting your host system from malicious or buggy software.
 
+- **Automated Relocation Engine:** Automatically rewrites ELF binary headers (`RUNPATH`/`RPATH`) to use `$ORIGIN` relative paths during build. This ensures Zoi packages are fully relocatable and can find their internal shared libraries regardless of where they are installed or symlinked.
+
 - **Lua-Based Project Configuration (`zoi.lua`):** Define project environments with a powerful, scriptable Lua API. Supports dynamic dependency selection, registry overrides, and complex environment setup.
 
 - **Hermetic Project Environments:** Strictly isolate project dependencies and registries within `./.zoi/pkgs/`. Ensure that project-level syncs do not affect global state and remain reproducible across machines.
