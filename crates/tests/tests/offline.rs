@@ -31,7 +31,7 @@ fn test_pkg_dirs_can_be_replaced() {
     let ctx = common::TestContextGuard::acquire();
     let first = tempdir().unwrap();
     let second = tempdir().unwrap();
-    let filename = "archive.pkg.tar.zst";
+    let filename = "archive.zpa";
 
     fs::write(first.path().join(filename), "first").unwrap();
     fs::write(second.path().join(filename), "second").unwrap();

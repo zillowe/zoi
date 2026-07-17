@@ -50,13 +50,13 @@ fn test_cache_mirror_config_roundtrip_and_candidates() {
     );
 
     let candidates =
-        zoi::pkg::cache::mirror_candidate_urls("https://upstream.example.com/pkgs/foo.pkg.tar.zst");
+        zoi::pkg::cache::mirror_candidate_urls("https://upstream.example.com/pkgs/foo.zpa");
     assert_eq!(
         candidates,
         vec![
-            "https://upstream.example.com/pkgs/foo.pkg.tar.zst".to_string(),
-            "https://cache-1.example.com/zoi/foo.pkg.tar.zst".to_string(),
-            "https://cache-2.example.com/mirror/foo.pkg.tar.zst".to_string(),
+            "https://upstream.example.com/pkgs/foo.zpa".to_string(),
+            "https://cache-1.example.com/zoi/foo.zpa".to_string(),
+            "https://cache-2.example.com/mirror/foo.zpa".to_string(),
         ]
     );
 

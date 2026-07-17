@@ -15,6 +15,9 @@ use std::path::Path;
 pub fn add_import_util(lua: &Lua, current_path: &Path) -> Result<(), mlua::Error> {
     let current_path_buf = current_path.to_path_buf();
     let import_fn = lua.create_function(move |lua, file_name: String| {
+        if let Ok(refs) = lua.globals().get::<Table>("__ZoiReferencedFiles") {
+            let _ = refs.push(file_name.clone());
+        }
         let parent = current_path_buf.parent().ok_or_else(|| {
             mlua::Error::RuntimeError(
                 "Could not determine parent directory of package file".to_string(),
@@ -57,6 +60,9 @@ pub fn add_include_util(lua: &Lua, current_path: &Path) -> Result<(), mlua::Erro
     let current_path_buf = current_path.to_path_buf();
     let include_fn =
         lua.create_function(move |lua, file_name: String| -> Result<(), mlua::Error> {
+            if let Ok(refs) = lua.globals().get::<Table>("__ZoiReferencedFiles") {
+                let _ = refs.push(file_name.clone());
+            }
             let parent = current_path_buf.parent().ok_or_else(|| {
                 mlua::Error::RuntimeError(
                     "Could not determine parent directory of package file".to_string(),

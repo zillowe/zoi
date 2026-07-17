@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 pub mod build;
+pub mod bundle;
 pub mod doctor;
 pub mod init_lsp;
 pub mod inspect;
@@ -17,6 +18,8 @@ pub struct PackageCommand {
 enum Commands {
     /// Build a package from a pkg.lua file
     Build(build::BuildCommand),
+    /// Bundle a package and its local assets into a .zsa archive
+    Bundle(bundle::BundleCommand),
     /// Test a package from a pkg.lua file
     Test(build::BuildCommand),
     /// Install a package from a local archive
@@ -32,6 +35,7 @@ enum Commands {
 pub fn run(args: PackageCommand) -> Result<()> {
     match args.command {
         Commands::Build(cmd) => build::run(cmd),
+        Commands::Bundle(cmd) => bundle::run(cmd),
         Commands::Test(cmd) => test::run(cmd),
         Commands::Install(cmd) => install::run(cmd),
         Commands::Doctor(cmd) => doctor::run(cmd),

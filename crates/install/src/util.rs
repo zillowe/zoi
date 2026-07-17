@@ -1054,10 +1054,10 @@ pub fn find_prebuilt_info_for_package(
         if let Some(pkg_link) = pkg_links_to_try.into_iter().next() {
             let final_url_base =
                 resolve_url_placeholders(&pkg_link.url, &pkg.name, &pkg.repo, version, &platform);
-            let final_url = if final_url_base.ends_with(".pkg.tar.zst") {
+            let final_url = if final_url_base.ends_with(".zpa") {
                 final_url_base
             } else {
-                let archive_filename = format!("{}-{}-{}.pkg.tar.zst", pkg.name, version, platform);
+                let archive_filename = format!("{}-{}-{}.zpa", pkg.name, version, platform);
                 format!(
                     "{}/{}",
                     final_url_base.trim_end_matches('/'),

@@ -59,7 +59,7 @@ fn main() -> Result<()> {
 
 ## Building a Package
 
-This example demonstrates how to build a package from a `.pkg.lua` file. This will create a distributable package archive (`.pkg.tar.zst`).
+This example demonstrates how to build a package from a `.pkg.lua` file. This will create a distributable package archive (`.zpa`).
 
 ### Code
 
@@ -102,7 +102,7 @@ use anyhow::Result;
 
 fn main() -> Result<()> {
     // Path to the package archive.
-    let archive_path = Path::new("path/to/your/package-1.0.0-linux-amd64.pkg.tar.zst");
+    let archive_path = Path::new("path/to/your/package-1.0.0-linux-amd64.zpa");
 
     let options = PackageInstallOptions {
         scope_override: Some(Scope::User),

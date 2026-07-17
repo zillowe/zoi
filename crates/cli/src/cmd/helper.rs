@@ -30,7 +30,7 @@ pub struct ElevateInstallNodeCommand {
     /// Path to the JSON file containing the serialized InstallNode
     #[arg(long)]
     pub node_json: std::path::PathBuf,
-    /// Path to the package archive (.pkg.tar.zst)
+    /// Path to the package archive (.zpa)
     #[arg(long)]
     pub archive: std::path::PathBuf,
     /// The install method used (e.g. "source", "pre-compiled")

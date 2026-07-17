@@ -113,7 +113,7 @@ pub fn run(
     )?;
 
     let archive_filename = format!(
-        "{}-{}-{}.pkg.tar.zst",
+        "{}-{}-{}.zpa",
         pkg.name,
         pkg.version.as_deref().unwrap_or_default(),
         utils::get_platform()?,

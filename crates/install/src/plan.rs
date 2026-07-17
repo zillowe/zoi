@@ -39,12 +39,21 @@ pub fn create_install_plan(
     let plan: HashMap<String, InstallAction> = graph
         .par_iter()
         .map(|(id, node)| {
-            if build
+            if (build
                 || (build_type.is_some()
                     && build_type != Some("pre-compiled")
-                    && build_type != Some("pre-built"))
+                    && build_type != Some("pre-built")))
+                && !node.source.ends_with(".zpa")
+                && !node.source.ends_with(".zsa")
             {
                 return (id.clone(), InstallAction::BuildAndInstall);
+            }
+
+            if node.source.ends_with(".zpa") || node.source.ends_with(".zsa") {
+                return (
+                    id.clone(),
+                    InstallAction::InstallFromArchive(PathBuf::from(&node.source)),
+                );
             }
 
             let action = match util::find_prebuilt_info(node) {

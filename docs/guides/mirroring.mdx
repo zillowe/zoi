@@ -24,12 +24,12 @@ The Zoi package database is a standard Git repository. To mirror it:
 
 ## 2. Hosting Pre-built Binaries
 
-Zoi can download pre-compiled archives (`.pkg.tar.zst`) to avoid building from source on every client.
+Zoi can download pre-compiled archives (`.zpa`) to avoid building from source on every client.
 
 ### Directory Structure
 
 Your binary server should follow a predictable structure. A common pattern is:
-`https://bin.yourcorp.com/pkgs/{repo}/{os}/{arch}/{version}/{name}-{version}-{platform}.pkg.tar.zst`
+`https://bin.yourcorp.com/pkgs/{repo}/{os}/{arch}/{version}/{name}-{version}-{platform}.zpa`
 
 ### Metadata Generation
 
@@ -50,9 +50,9 @@ name: MyCorp-Registry
 pkg:
   - type: main
     url: https://bin.yourcorp.com/pkgs/{repo}/{os}/{arch}/{version}
-    hash: https://bin.yourcorp.com/pkgs/{repo}/{os}/{arch}/{version}/{name}-{version}-{platform}.pkg.tar.zst.hash
-    size: https://bin.yourcorp.com/pkgs/{repo}/{os}/{arch}/{version}/{name}-{version}-{platform}.pkg.tar.zst.size
-    files: https://bin.yourcorp.com/pkgs/{repo}/{os}/{arch}/{version}/{name}-{version}-{platform}.pkg.tar.zst.files
+    hash: https://bin.yourcorp.com/pkgs/{repo}/{os}/{arch}/{version}/{name}-{version}-{platform}.zpa.hash
+    size: https://bin.yourcorp.com/pkgs/{repo}/{os}/{arch}/{version}/{name}-{version}-{platform}.zpa.size
+    files: https://bin.yourcorp.com/pkgs/{repo}/{os}/{arch}/{version}/{name}-{version}-{platform}.zpa.files
 ```
 
 ## 4. Client Configuration

@@ -138,7 +138,7 @@ This optional function runs after `prepare()` and before `package()`. Its purpos
 
 ### `package()`
 
-This function runs after `build()` (or `prepare()` if no `build()` is defined). It takes the prepared files from the `BUILD_DIR` and copies only the final, distributable files into the `STAGING_DIR`. The contents of the staging directory are what will be included in the final `.pkg.tar.zst` archive.
+This function runs after `build()` (or `prepare()` if no `build()` is defined). It takes the prepared files from the `BUILD_DIR` and copies only the final, distributable files into the `STAGING_DIR`. The contents of the staging directory are what will be included in the final `.zpa` archive.
 
 - **Common tasks:** Running `make install`, copying binaries, libraries, and documentation.
 
@@ -537,12 +537,32 @@ zoi package test --type <build-type> /path/to/your-package.pkg.lua
 
 This command will execute the `prepare()`, `build()`, `package()`, and `test()` functions. If `test()` returns `false` or errors, the command will fail.
 
-### Step 6: Build the Distributable Archive
+### Step 6: Bundle for Distribution
 
-Once your tests are passing, build the final `.pkg.tar.zst` archive.
+Zoi uses three primary formats for distributing and building packages:
+
+- **`.pkg.lua`**: The raw Lua script that defines the package. This is ideal for development and contributing to registries.
+- **`.zsa` (Zoi Source Archive)**: A compressed bundle containing the `.pkg.lua` file and all its local dependencies (like `INCLUDE` scripts, `IMPORT` data, and local assets). This is the best format for sharing source packages that require multiple files.
+- **`.zpa` (Zoi Package Archive)**: The final, pre-built binary package ready for installation. It contains the staged files and is platform-specific.
+
+To create a source bundle (`.zsa`), use the `bundle` command:
 
 ```sh
+zoi package bundle /path/to/your-package.pkg.lua
+```
+
+Zoi intelligently parses your script to include only the necessary local files.
+
+### Step 7: Build the Distributable Archive
+
+Once your tests are passing, build the final `.zpa` archive. You can build directly from a `.pkg.lua` script or from a `.zsa` bundle.
+
+```sh
+# Build from script
 zoi package build --type <build-type> /path/to/your-package.pkg.lua
+
+# Build from source bundle
+zoi package build /path/to/your-package.zsa
 ```
 
 You can also combine testing and building in one step with the `--test` flag. The build will only proceed if the tests pass.
@@ -569,7 +589,7 @@ zoi package build --type <build-type> --test /path/to/your-package.pkg.lua
 Install the built archive to ensure it's correct and installs properly for end-users.
 
 ```sh
-zoi package install /path/to/your-package-1.0.0-linux-amd64.pkg.tar.zst
+zoi package install /path/to/your-package-1.0.0-linux-amd64.zpa
 ```
 
 **`zoi package install` Flags:**

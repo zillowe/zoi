@@ -14,7 +14,7 @@
 //! ## Key Library Entry Points:
 //! - `install_sources`: The high-level API used by the CLI for standard installations.
 //! - `resolve_dependency_graph`: Calculate required packages without modifying disk.
-//! - `build_with_options`: Create distributable `.pkg.tar.zst` archives.
+//! - `build_with_options`: Create distributable `.zpa` archives.
 //!
 //! ## Getting Started
 //!
@@ -37,7 +37,7 @@
 //! use anyhow::Result;
 //!
 //! fn main() -> Result<()> {
-//!     let archive_path = Path::new("path/to/your/package-1.0.0-linux-amd64.pkg.tar.zst");
+//!     let archive_path = Path::new("path/to/your/package-1.0.0-linux-amd64.zpa");
 //!     let options = zoi::PackageInstallOptions {
 //!         scope_override: Some(Scope::User),
 //!         registry_handle: "local".to_string(),
@@ -73,6 +73,10 @@ pub struct BuildOptions<'a> {
     pub platforms: Vec<String>,
     /// Optional PGP key name or fingerprint used to sign the output archive.
     pub sign_key: Option<String>,
+    /// Optional directory to output the built package to.
+    pub output_dir: Option<PathBuf>,
+    /// Optional sub-packages to build.
+    pub sub_packages: Option<Vec<String>>,
     /// Whether to install build-time dependencies before building.
     pub install_deps: bool,
     /// Build backend to use. Supported values are `native` and `docker`.
@@ -93,6 +97,8 @@ impl<'a> Default for BuildOptions<'a> {
                 zoi_core::utils::get_platform().unwrap_or_else(|_| "linux-amd64".to_string()),
             ],
             sign_key: None,
+            output_dir: None,
+            sub_packages: None,
             install_deps: true,
             method: "native",
             image: None,
@@ -102,7 +108,7 @@ impl<'a> Default for BuildOptions<'a> {
     }
 }
 
-/// Options for installing a local `.pkg.tar.zst` archive.
+/// Options for installing a local `.zpa` archive.
 #[derive(Debug, Clone)]
 pub struct PackageInstallOptions {
     /// Optional installation scope override.
@@ -249,9 +255,9 @@ pub fn build_with_options(package_file: &Path, options: &BuildOptions<'_>) -> Re
         options.build_type,
         &options.platforms,
         options.sign_key.clone(),
-        None,
+        options.output_dir.as_deref(),
         options.version_override,
-        None,
+        options.sub_packages.clone(),
         false,
         options.method,
         options.image,
@@ -343,10 +349,22 @@ pub fn resolve_dependency_graph(
     })
 }
 
+/// Bundles a Zoi package and its local assets into a `.zsa` archive.
+///
+/// This function intelligently parses the `.pkg.lua` file to identify and
+/// include only the necessary local files.
+pub fn bundle_package(
+    package_file: &Path,
+    output_dir: Option<&Path>,
+    version_override: Option<&str>,
+) -> Result<()> {
+    zoi_package::bundle::run(package_file, output_dir, version_override)
+}
+
 /// Builds a Zoi package from a local `.pkg.lua` file.
 ///
 /// This function reads a package definition, runs the build process, and creates
-/// a distributable `.pkg.tar.zst` archive.
+/// a distributable `.zpa` archive.
 ///
 /// # Arguments
 ///
@@ -389,6 +407,8 @@ pub fn build(
         build_type,
         platforms: platforms.to_vec(),
         sign_key,
+        output_dir: None,
+        sub_packages: None,
         install_deps,
         method,
         image,
@@ -400,7 +420,7 @@ pub fn build(
 
 /// Installs a Zoi package from a local package archive.
 ///
-/// This function unpacks a `.pkg.tar.zst` archive and installs its contents
+/// This function unpacks a `.zpa` archive and installs its contents
 /// into the appropriate Zoi store, linking any binaries.
 ///
 /// # Arguments
@@ -428,7 +448,7 @@ pub fn build(
 /// use anyhow::Result;
 ///
 /// fn main() -> Result<()> {
-///     let archive_path = Path::new("my-package-1.0.0-linux-amd64.pkg.tar.zst");
+///     let archive_path = Path::new("my-package-1.0.0-linux-amd64.zpa");
 ///     install_package(archive_path, Some(Scope::User), "local", true, None)?;
 ///     println!("Package installed!");
 ///     Ok(())

@@ -50,7 +50,10 @@ static CONFIRMED_UNTRUSTED_SOURCES: LazyLock<Mutex<std::collections::HashSet<Str
 fn split_explicit_file_source(source_str: &str) -> Option<(&str, Option<String>, Option<String>)> {
     let (main_part, version_spec) = if let Some((base, version)) = source_str.rsplit_once('@') {
         let base_path = if let Some((path, sub)) = base.rsplit_once(':') {
-            if (path.ends_with(".pkg.lua") || path.ends_with(".manifest.yaml"))
+            if (path.ends_with(".pkg.lua")
+                || path.ends_with(".manifest.yaml")
+                || path.ends_with(".zpa")
+                || path.ends_with(".zsa"))
                 && !sub.contains('/')
             {
                 path
@@ -61,7 +64,11 @@ fn split_explicit_file_source(source_str: &str) -> Option<(&str, Option<String>,
             base
         };
 
-        if base_path.ends_with(".pkg.lua") || base_path.ends_with(".manifest.yaml") {
+        if base_path.ends_with(".pkg.lua")
+            || base_path.ends_with(".manifest.yaml")
+            || base_path.ends_with(".zpa")
+            || base_path.ends_with(".zsa")
+        {
             (base, Some(version.to_string()))
         } else {
             (source_str, None)
@@ -71,7 +78,12 @@ fn split_explicit_file_source(source_str: &str) -> Option<(&str, Option<String>,
     };
 
     let (path_part, sub_package) = if let Some((base, sub)) = main_part.rsplit_once(':') {
-        if (base.ends_with(".pkg.lua") || base.ends_with(".manifest.yaml")) && !sub.contains('/') {
+        if (base.ends_with(".pkg.lua")
+            || base.ends_with(".manifest.yaml")
+            || base.ends_with(".zpa")
+            || base.ends_with(".zsa"))
+            && !sub.contains('/')
+        {
             (base, Some(sub.to_string()))
         } else {
             (main_part, None)
@@ -80,7 +92,11 @@ fn split_explicit_file_source(source_str: &str) -> Option<(&str, Option<String>,
         (main_part, None)
     };
 
-    if path_part.ends_with(".pkg.lua") || path_part.ends_with(".manifest.yaml") {
+    if path_part.ends_with(".pkg.lua")
+        || path_part.ends_with(".manifest.yaml")
+        || path_part.ends_with(".zpa")
+        || path_part.ends_with(".zsa")
+    {
         Some((path_part, sub_package, version_spec))
     } else {
         None

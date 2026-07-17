@@ -4517,6 +4517,7 @@ dependencies = [
  "serde_json",
  "sevenz-rust",
  "tar",
+ "tempfile",
  "toml",
  "urlencoding",
  "walkdir",

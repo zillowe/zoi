@@ -38,3 +38,4 @@ walkdir.workspace = true
 xz2.workspace = true
 zip.workspace = true
 zstd.workspace = true
+tempfile.workspace = true

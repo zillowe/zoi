@@ -201,7 +201,7 @@ A map of binary names to their preferred global versions. This is used by Zoi's 
 
 ### `pkg_dirs`
 
-A list of additional directories to search for `.pkg.tar.zst` archives during installation.
+A list of additional directories to search for `.zpa` archives during installation.
 
 - **Type:** `list` of `string`
 - **Example:**
@@ -296,7 +296,7 @@ By default, Zoi automatically verifies PGP signatures on pre-built packages when
 
 - **Type:** `object`
 - **Fields:**
-  - `enable`: (boolean) If `true`, Zoi will _only_ install pre-built packages (`.pkg.tar.zst` archives) that are signed by a trusted PGP key. It will fail on unsigned packages and will not fall back to building from source.
+  - `enable`: (boolean) If `true`, Zoi will _only_ install pre-built packages (`.zpa` archives) that are signed by a trusted PGP key. It will fail on unsigned packages and will not fall back to building from source.
   - `trusted_keys`: (list of string) A list of trusted PGP key names or fingerprints. These keys must already be present in the Zoi PGP keyring (see `zoi pgp list`).
 
 ### Example Policy
