@@ -1087,14 +1087,14 @@ fn sync_registry(
 /// In Specification v2, projects can have their own isolated package databases
 /// stored in `./.zoi/pkgs/db`. This ensures that a project's dependencies
 /// are reproducible and independent of the user's global registry state.
-pub fn run_local(verbose: bool, _fallback: bool, force: bool, frozen_lock: bool) -> Result<()> {
+pub fn run_local(verbose: bool, _fallback: bool, force: bool, frozen: bool) -> Result<()> {
     let local_db_root = std::env::current_dir()?
         .join(".zoi")
         .join("pkgs")
         .join("db");
     fs::create_dir_all(&local_db_root)?;
 
-    let registries: Vec<(String, String, String)> = if frozen_lock {
+    let registries: Vec<(String, String, String)> = if frozen {
         let lockfile = zoi_project::lockfile::read_zoi_lock()?;
         lockfile
             .registries
@@ -1171,7 +1171,7 @@ pub fn run_local(verbose: bool, _fallback: bool, force: bool, frozen_lock: bool)
 
             refresh_registry_db(&handle, &target_dir, m.as_ref(), verbose, None)?;
 
-            let resolved_hash = if frozen_lock {
+            let resolved_hash = if frozen {
                 revision.clone()
             } else if let Ok(repo) = git2::Repository::open(&target_dir) {
                 repo.head()
@@ -1186,7 +1186,7 @@ pub fn run_local(verbose: bool, _fallback: bool, force: bool, frozen_lock: bool)
         })
         .collect::<Result<Vec<_>>>()?;
 
-    if !frozen_lock {
+    if !frozen {
         let mut lockfile = zoi_project::lockfile::read_zoi_lock()?;
         for ((handle, url), revision) in results {
             lockfile

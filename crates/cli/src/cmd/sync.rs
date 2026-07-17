@@ -18,8 +18,8 @@ pub fn run(verbose: bool, fallback: bool, no_pm: bool, force: bool) -> Result<()
     Ok(())
 }
 
-pub fn run_local(verbose: bool, fallback: bool, force: bool, frozen_lock: bool) -> Result<()> {
-    if frozen_lock {
+pub fn run_local(verbose: bool, fallback: bool, force: bool, frozen: bool) -> Result<()> {
+    if frozen {
         crate::pkg::frozen::set_frozen(true);
     }
     println!(
@@ -27,7 +27,7 @@ pub fn run_local(verbose: bool, fallback: bool, force: bool, frozen_lock: bool) 
         "::".bold().blue()
     );
 
-    pkg::sync::run_local(verbose, fallback, force, frozen_lock)?;
+    pkg::sync::run_local(verbose, fallback, force, frozen)?;
 
     println!("{}", "Local sync complete.".green());
     Ok(())

@@ -127,12 +127,12 @@ Zoi's reproducibility depends on what kind of dependency is being installed.
 | Zoi package built from source                                 | Depends on package definition and upstream source stability |
 | Native package through `apt`, `brew`, `pacman`, `scoop`, etc. | Depends on that manager's repositories                      |
 | Language package through `npm`, `cargo`, `pip`, etc.          | Depends on that ecosystem and version constraints           |
-| Project install with `--frozen-lockfile`                      | Highest Zoi project mode                                    |
+| Project install with `--frozen`                      | Highest Zoi project mode                                    |
 
 For strict project installs, commit `zoi.yaml` and `zoi.lock`, then use:
 
 ```sh
-zoi install --local --frozen-lockfile
+zoi install --local --frozen
 ```
 
 ## Security Expectations
