@@ -134,7 +134,7 @@ fn test_locked_packages_preserve_direct_flags_and_metadata() {
 }
 
 #[test]
-fn test_install_frozen_lockfile_rejects_explicit_sources() {
+fn test_install_frozen_rejects_explicit_sources() {
     let plugin_manager = PluginManager::new().expect("plugin manager should initialize");
 
     let err = cmd::install::run(
@@ -158,16 +158,16 @@ fn test_install_frozen_lockfile_rejects_explicit_sources() {
         false,
         false,
     )
-    .expect_err("frozen lockfile with explicit source must fail");
+    .expect_err("frozen mode with explicit source must fail");
 
     assert!(
         err.to_string()
-            .contains("--frozen-lockfile can only be used without explicit sources")
+            .contains("--frozen can only be used without explicit sources")
     );
 }
 
 #[test]
-fn test_install_frozen_lockfile_requires_zoi_lock() {
+fn test_install_frozen_requires_zoi_lock() {
     let mut ctx = common::TestContextGuard::acquire();
     let tmp = tempdir().expect("tempdir should be created");
     ctx.set_current_dir(tmp.path());
@@ -198,8 +198,5 @@ fn test_install_frozen_lockfile_requires_zoi_lock() {
     )
     .expect_err("missing zoi.lock must fail in frozen mode");
 
-    assert!(
-        err.to_string()
-            .contains("--frozen-lockfile requires zoi.lock")
-    );
+    assert!(err.to_string().contains("--frozen requires zoi.lock"));
 }

@@ -126,6 +126,7 @@ purl = "0.1.6"
 dotenvy = "0.15.7"
 phf_codegen = "0.14.0"
 diffy = "0.5.0"
+ignore = "0.4.30"
 
 zoi-core = { path = "crates/core", version = "1.23.0-dev" }
 zoi-hooks = { path = "crates/hooks", version = "1.23.0-dev" }

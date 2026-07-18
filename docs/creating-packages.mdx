@@ -553,6 +553,18 @@ zoi package bundle /path/to/your-package.pkg.lua
 
 Zoi intelligently parses your script to include only the necessary local files.
 
+#### Excluding files with `.zoiignore`
+
+You can create a `.zoiignore` file in the same directory as your `.pkg.lua` to exclude specific files or directories from being bundled into the `.zsa` archive. It follows the same pattern syntax as `.gitignore`.
+
+```text
+# .zoiignore example
+secret.txt
+*.tmp
+temp/
+!important.tmp
+```
+
 ### Step 7: Build the Distributable Archive
 
 Once your tests are passing, build the final `.zpa` archive. You can build directly from a `.pkg.lua` script or from a `.zsa` bundle.

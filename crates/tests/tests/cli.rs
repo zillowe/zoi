@@ -25,20 +25,14 @@ fn test_cli_parsing_help() {
 fn test_cli_parsing_install_flags() {
     let mut cmd = Cli::command();
     let matches = cmd
-        .try_get_matches_from_mut(vec![
-            "zoi",
-            "install",
-            "--local",
-            "--frozen-lockfile",
-            "--yes",
-        ])
+        .try_get_matches_from_mut(vec!["zoi", "install", "--local", "--frozen", "--yes"])
         .expect("Parsing install flags failed");
 
     let (subcommand, sub_matches) = matches.subcommand().unwrap();
     assert_eq!(subcommand, "install");
 
     assert!(sub_matches.get_flag("local"));
-    assert!(sub_matches.get_flag("frozen_lockfile"));
+    assert!(sub_matches.get_flag("frozen"));
 
     assert!(matches.get_flag("yes"));
 }

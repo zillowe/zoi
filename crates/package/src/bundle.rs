@@ -1,10 +1,13 @@
 use anyhow::{Result, anyhow};
 use colored::*;
+use ignore::gitignore::GitignoreBuilder;
 use mlua::{Lua, LuaSerdeExt, Table, Value};
 use std::collections::HashSet;
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 use tar::Builder as TarBuilder;
+use tempfile::Builder;
+use walkdir::WalkDir;
 use zstd::stream::write::Encoder as ZstdEncoder;
 
 pub fn run(
@@ -13,6 +16,26 @@ pub fn run(
     sign: Option<String>,
     version_override: Option<&str>,
 ) -> Result<()> {
+    let pkg_dir = package_file
+        .parent()
+        .ok_or_else(|| anyhow!("Could not get parent directory"))?;
+
+    // Load .zoiignore if it exists
+    let mut ignore_builder = GitignoreBuilder::new(pkg_dir);
+    let zoiignore_path = pkg_dir.join(".zoiignore");
+    if zoiignore_path.exists()
+        && let Some(err) = ignore_builder.add(&zoiignore_path)
+    {
+        eprintln!("{}: Error parsing .zoiignore: {}", "Warning".yellow(), err);
+    }
+    let ignore = ignore_builder.build()?;
+
+    let is_ignored = |rel_path: &Path| -> bool {
+        // ignore-rs expectations: directories should have a trailing slash or be explicitly marked
+        // but here we just check the path.
+        ignore.matched(rel_path, rel_path.is_dir()).is_ignore()
+    };
+
     println!(
         "{} Bundling package: {}",
         "::".bold().blue(),
@@ -55,8 +78,10 @@ pub fn run(
         .set("PKG", pkg_global_table)
         .map_err(|e| anyhow!(e.to_string()))?;
 
-    // Setup a mocked environment
-    // We want to avoid heavy side effects like actually extracting or running commands
+    // Setup a mocked environment for metadata and asset discovery
+    // We run it twice: once to find local assets, and once to actually run prepare() if needed.
+
+    // Phase 1: Metadata & Local Asset Discovery
     zoi_lua::functions::setup_lua_environment(
         &lua,
         &platform,
@@ -71,7 +96,11 @@ pub fn run(
     )
     .map_err(|e| anyhow!(e.to_string()))?;
 
-    // Mock UTILS.EXTRACT to avoid downloads
+    lua.globals()
+        .set("BUILD_TYPE", "source")
+        .map_err(|e| anyhow!(e.to_string()))?;
+
+    // Mock UTILS.EXTRACT to record local references but avoid downloads (in this phase)
     if let Ok(utils) = lua.globals().get::<Table>("UTILS") {
         let mock_extract = lua
             .create_function(|_, (_source, _out_dir): (String, String)| Ok(()))
@@ -81,7 +110,7 @@ pub fn run(
             .map_err(|e| anyhow!(e.to_string()))?;
     }
 
-    // Mock cmd to avoid shell execution
+    // Mock cmd to avoid shell execution in this phase
     let mock_cmd = lua
         .create_function(|_, _command: String| Ok((String::new(), String::new(), 0)))
         .map_err(|e| anyhow!(e.to_string()))?;
@@ -99,10 +128,11 @@ pub fn run(
         )
     })?;
 
-    // Optionally call package() if it exists to find ${pkgluadir} references
+    let args = lua.create_table().map_err(|e| anyhow!(e.to_string()))?;
+
+    // Call lifecycle functions to find ${pkgluadir} references
     if let Ok(pkg_fn) = lua.globals().get::<mlua::Function>("package") {
-        let args = lua.create_table().map_err(|e| anyhow!(e.to_string()))?;
-        let _ = pkg_fn.call::<()>(args);
+        let _ = pkg_fn.call::<()>(args.clone());
     }
 
     let mut files_to_include = HashSet::new();
@@ -113,28 +143,140 @@ pub fn run(
         .ok_or_else(|| anyhow!("Invalid package file"))?;
     files_to_include.insert(pkg_filename.to_string_lossy().to_string());
 
-    // 1. Collect from __ZoiReferencedFiles (IMPORT/INCLUDE)
-    let refs: Table = lua
-        .globals()
-        .get("__ZoiReferencedFiles")
-        .map_err(|e| anyhow!(e.to_string()))?;
-    for val in refs.sequence_values::<String>() {
-        files_to_include.insert(val.map_err(|e| anyhow!(e.to_string()))?);
+    // Collect from __ZoiReferencedFiles (IMPORT/INCLUDE)
+    if let Ok(refs) = lua.globals().get::<Table>("__ZoiReferencedFiles") {
+        for val in refs.sequence_values::<String>() {
+            files_to_include.insert(val.map_err(|e| anyhow!(e.to_string()))?);
+        }
     }
 
-    // 2. Collect from __ZoiBuildOperations (zcp/zln with ${pkgluadir})
+    // Collect from __ZoiBuildOperations (zcp/zln with ${pkgluadir})
     if let Ok(ops) = lua.globals().get::<Table>("__ZoiBuildOperations") {
         for op in ops.sequence_values::<Table>() {
             let op = op.map_err(|e| anyhow!(e.to_string()))?;
-            if let Ok(source) = op.get::<String>("source") {
-                if let Some(rel) = source.strip_prefix("${pkgluadir}/") {
-                    files_to_include.insert(rel.to_string());
-                } else if source.contains("${pkgluadir}") {
-                    // Handle cases like "foo/${pkgluadir}/bar" if anyone does that
-                    files_to_include.insert(source.replace("${pkgluadir}/", ""));
-                }
+
+            // Check 'source' (used by zcp)
+            if let Ok(source) = op.get::<String>("source")
+                && let Some(rel) = source.strip_prefix("${pkgluadir}/")
+            {
+                files_to_include.insert(rel.to_string());
+            }
+
+            // Check 'target' (used by zln)
+            if let Ok(target) = op.get::<String>("target")
+                && let Some(rel) = target.strip_prefix("${pkgluadir}/")
+            {
+                files_to_include.insert(rel.to_string());
             }
         }
+    }
+
+    // Phase 2: Fetching Upstream Sources (Running prepare)
+    println!("{} Fetching upstream sources...", "::".bold().blue());
+    let fetch_dir = Builder::new().prefix("zoi-bundle-fetch-").tempdir()?;
+
+    // Setup a real environment for prepare()
+    let lua_fetch = Lua::new();
+
+    // Initialize package metadata tables for the fetch state
+    let pkg_meta_table_f = lua_fetch
+        .create_table()
+        .map_err(|e| anyhow!(e.to_string()))?;
+    let pkg_deps_table_f = lua_fetch
+        .create_table()
+        .map_err(|e| anyhow!(e.to_string()))?;
+    let pkg_updates_table_f = lua_fetch
+        .create_table()
+        .map_err(|e| anyhow!(e.to_string()))?;
+    let pkg_hooks_table_f = lua_fetch
+        .create_table()
+        .map_err(|e| anyhow!(e.to_string()))?;
+    let pkg_service_table_f = lua_fetch
+        .create_table()
+        .map_err(|e| anyhow!(e.to_string()))?;
+    lua_fetch
+        .globals()
+        .set("__ZoiPackageMeta", pkg_meta_table_f)
+        .map_err(|e| anyhow!(e.to_string()))?;
+    lua_fetch
+        .globals()
+        .set("__ZoiPackageDeps", pkg_deps_table_f)
+        .map_err(|e| anyhow!(e.to_string()))?;
+    lua_fetch
+        .globals()
+        .set("__ZoiPackageUpdates", pkg_updates_table_f)
+        .map_err(|e| anyhow!(e.to_string()))?;
+    lua_fetch
+        .globals()
+        .set("__ZoiPackageHooks", pkg_hooks_table_f)
+        .map_err(|e| anyhow!(e.to_string()))?;
+    lua_fetch
+        .globals()
+        .set("__ZoiPackageService", pkg_service_table_f)
+        .map_err(|e| anyhow!(e.to_string()))?;
+
+    let pkg_global_table_f = lua_fetch
+        .create_table()
+        .map_err(|e| anyhow!(e.to_string()))?;
+    lua_fetch
+        .globals()
+        .set("PKG", pkg_global_table_f)
+        .map_err(|e| anyhow!(e.to_string()))?;
+
+    zoi_lua::functions::setup_lua_environment(
+        &lua_fetch,
+        &platform,
+        version_override,
+        package_file.to_str(),
+        None,
+        Some(fetch_dir.path().to_str().unwrap_or("")),
+        Some("/tmp/mock-staging"),
+        None,
+        None,
+        true, // quiet
+    )
+    .map_err(|e| anyhow!(e.to_string()))?;
+
+    lua_fetch
+        .globals()
+        .set("BUILD_TYPE", "source")
+        .map_err(|e| anyhow!(e.to_string()))?;
+
+    lua_fetch
+        .globals()
+        .set(
+            "BUILD_DIR",
+            fetch_dir
+                .path()
+                .to_str()
+                .ok_or_else(|| anyhow!("Invalid fetch path"))?,
+        )
+        .map_err(|e| anyhow!(e.to_string()))?;
+
+    // We use the real cmd implementation for fetching
+    zoi_lua::api::system::add_cmd_util(&lua_fetch, true).map_err(|e| anyhow!(e.to_string()))?;
+
+    // Reload script in the fetch environment
+    lua_fetch.load(&lua_code).exec().map_err(|e| {
+        anyhow!(
+            "Failed to execute Lua package file '{}' during fetch:\n{}",
+            package_file.display(),
+            e
+        )
+    })?;
+
+    if let Ok(prep_fn) = lua_fetch.globals().get::<mlua::Function>("prepare") {
+        println!("  Running prepare()...");
+        let args_fetch = lua_fetch
+            .create_table()
+            .map_err(|e| anyhow!(e.to_string()))?;
+        prep_fn.call::<()>(args_fetch).map_err(|e| {
+            anyhow!(
+                "The 'prepare' function in '{}' failed during bundling:\n{}",
+                package_file.display(),
+                e
+            )
+        })?;
     }
 
     // Determine output path
@@ -164,26 +306,54 @@ pub fn run(
     let encoder = ZstdEncoder::new(file, 0)?.auto_finish();
     let mut tar_builder = TarBuilder::new(encoder);
 
+    // Include local files
     let mut sorted_files: Vec<_> = files_to_include.into_iter().collect();
     sorted_files.sort();
 
     for rel_path_str in sorted_files {
-        let abs_path = pkg_dir.join(&rel_path_str);
+        let rel_path = Path::new(&rel_path_str);
+        if is_ignored(rel_path) {
+            println!("  Ignored: {}", rel_path_str);
+            continue;
+        }
+
+        let abs_path = pkg_dir.join(rel_path);
         if abs_path.exists() {
             if abs_path.is_dir() {
                 tar_builder.append_dir_all(&rel_path_str, &abs_path)?;
             } else {
                 tar_builder.append_path_with_name(&abs_path, &rel_path_str)?;
             }
-            println!("  Included: {}", rel_path_str);
-        } else {
-            eprintln!(
-                "{} Referenced file not found: {}",
-                "Warning:".yellow(),
-                rel_path_str
-            );
+            println!("  Included local: {}", rel_path_str);
         }
     }
+
+    // Include fetched files from BUILD_DIR
+    for entry in WalkDir::new(fetch_dir.path()).min_depth(1) {
+        let entry = entry?;
+        let rel_path = entry.path().strip_prefix(fetch_dir.path())?;
+        let rel_path_str = rel_path.to_string_lossy();
+
+        if is_ignored(rel_path) {
+            println!("  Ignored fetch: {}", rel_path_str);
+            continue;
+        }
+
+        if entry.file_type().is_dir() {
+            // We'll add directories as we encounter their files or empty dirs
+            continue;
+        }
+
+        tar_builder.append_path_with_name(entry.path(), rel_path)?;
+        println!("  Included fetch: {}", rel_path_str);
+    }
+
+    // Mark as a full bundle so build knows to skip prepare
+    let mut header = tar::Header::new_gnu();
+    header.set_path(".zoi-prepared")?;
+    header.set_size(0);
+    header.set_cksum();
+    tar_builder.append(&header, &[][..])?;
 
     tar_builder.finish()?;
     println!(

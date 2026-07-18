@@ -100,7 +100,7 @@ pub fn run(
 
     let mut sources_to_process: Vec<String> = sources.to_vec();
     let mut is_project_install = false;
-    let mut frozen_locked_packages = None;
+    let mut frozen_packages = None;
     if frozen {
         let lockfile = project::lockfile::read_zoi_lock()?;
         let locked_packages = project::lockfile::locked_packages(&lockfile);
@@ -111,7 +111,7 @@ pub fn run(
         if sources_to_process.is_empty() {
             return Err(anyhow!("zoi.lock is empty. Cannot continue with --frozen."));
         }
-        frozen_locked_packages = Some(locked_packages);
+        frozen_packages = Some(locked_packages);
         println!(
             "{} --frozen enabled. Installing pinned lockfile sources only...",
             "::".bold().blue()
@@ -231,25 +231,24 @@ pub fn run(
     // --- Phase 2: Dependency Resolution ---
     // We trigger the SAT solver to build the complete dependency graph.
     // If we're in frozen mode, we build it strictly from the lockfile.
-    let (mut graph, mut non_zoi_deps) =
-        if let Some(locked_packages) = frozen_locked_packages.as_ref() {
-            install::resolver::build_graph_from_locked_packages(
-                locked_packages,
-                scope_override,
-                false,
-                yes,
-            )?
-        } else {
-            install::resolver::resolve_dependency_graph(
-                &final_sources,
-                scope_override,
-                force,
-                yes,
-                all_optional,
-                build_type.as_deref(),
-                false,
-            )?
-        };
+    let (mut graph, mut non_zoi_deps) = if let Some(locked_packages) = frozen_packages.as_ref() {
+        install::resolver::build_graph_from_locked_packages(
+            locked_packages,
+            scope_override,
+            false,
+            yes,
+        )?
+    } else {
+        install::resolver::resolve_dependency_graph(
+            &final_sources,
+            scope_override,
+            force,
+            yes,
+            all_optional,
+            build_type.as_deref(),
+            false,
+        )?
+    };
 
     let mut skipped_existing_count = 0usize;
     if !force {
