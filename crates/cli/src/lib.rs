@@ -40,7 +40,7 @@ pub struct SourceInstallOptions {
     pub build_type: Option<String>,
     pub dry_run: bool,
     pub build: bool,
-    pub frozen_lockfile: bool,
+    pub frozen: bool,
 }
 
 fn to_install_scope(scope: Scope) -> cli::InstallScope {
@@ -76,7 +76,7 @@ pub fn install_sources(sources: &[String], options: &SourceInstallOptions) -> Re
         options.dry_run,
         pm_ptr,
         options.build,
-        options.frozen_lockfile,
+        options.frozen,
         false,
         false,
         3,

@@ -11,7 +11,7 @@ fn test_config_3way_merge_integration() {
     let tmp = tempdir().expect("failed to create temp dir");
     let root = tmp.path().to_path_buf();
 
-    // 1. Set up a local Zoi registry
+    // Set up a local Zoi registry
     let reg_dir = root.join("my-registry");
     fs::create_dir_all(&reg_dir).unwrap();
 
@@ -70,7 +70,7 @@ end
     run_git(&["add", "."], &reg_dir);
     run_git(&["commit", "-m", "v1"], &reg_dir);
 
-    // 2. Set up Sysroot and isolated Config
+    // Set up Sysroot and isolated Config
     let sysroot = root.join("sysroot");
     fs::create_dir_all(&sysroot).unwrap();
     ctx.set_sysroot(sysroot.clone());
@@ -98,7 +98,7 @@ policy:
     ctx.set_env_var("HOME", root.join("home"));
     ctx.set_current_dir(&root);
 
-    // 3. Sync and Install v1
+    // Sync and Install v1
     zoi::cmd::sync::run(false, false, false, false).unwrap();
 
     zoi::install_sources(
@@ -127,11 +127,11 @@ policy:
         ".zoiorig should be created on install"
     );
 
-    // 4. User modifies config
+    // User modifies config
     let user_modified_content = "setting_a = 99\nsetting_b = 20\n";
     fs::write(&config_path_v1, user_modified_content).unwrap();
 
-    // 5. Update registry to v2
+    // Update registry to v2
     let upstream_v2_content = "setting_a = 10\nsetting_b = 20\nsetting_c = 30\n";
     fs::write(pkg_repo_dir.join("config.txt"), upstream_v2_content).unwrap();
 
@@ -159,11 +159,11 @@ end
     run_git(&["add", "."], &reg_dir);
     run_git(&["commit", "-m", "v2"], &reg_dir);
 
-    // 6. Sync and Update
+    // Sync and Update
     zoi::cmd::sync::run(false, false, false, false).unwrap();
     zoi::update_packages(true, &[], true).expect("v2 upgrade failed");
 
-    // 7. Verify result
+    // Verify result
     let store_dir_v2 = zoi_resolver::local::get_package_version_dir(
         Scope::User,
         "my-registry",

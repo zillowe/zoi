@@ -36,12 +36,12 @@ end
 "#;
     fs::write(&pkg_lua, lua_code).unwrap();
 
-    // 1. Bundle
+    // Bundle
     zoi::bundle_package(&pkg_lua, Some(&root), None, None).expect("bundling failed");
     let zsa_path = root.join("my-pkg-1.0.0.zsa");
     assert!(zsa_path.exists(), ".zsa bundle should exist");
 
-    // 2. Build from .zsa
+    // Build from .zsa
     let build_options = zoi::BuildOptions {
         build_type: Some("source"),
         output_dir: Some(root.clone()),
@@ -56,7 +56,7 @@ end
         ".zpa archive should exist after build from .zsa"
     );
 
-    // 3. Install from .zsa (end-to-end)
+    // Install from .zsa (end-to-end)
     let install_options = zoi::SourceInstallOptions {
         scope_override: Some(Scope::User),
         yes: true,

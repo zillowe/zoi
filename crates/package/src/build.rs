@@ -168,6 +168,21 @@ fn build_for_platform(
     if !quiet {
         println!("Using build directory: {}", build_dir.path().display());
     }
+
+    let mut skip_prepare = false;
+    if let Some(parent) = package_file.parent()
+        && parent.join(".zoi-prepared").exists()
+    {
+        if !quiet {
+            println!(
+                "{} Detected pre-prepared source bundle, copying files...",
+                "::".bold().blue()
+            );
+        }
+        utils::copy_dir_all(parent, build_dir.path())?;
+        skip_prepare = true;
+    }
+
     let staging_dir = build_dir.path().join("staging");
     fs::create_dir_all(&staging_dir)?;
 
@@ -256,7 +271,7 @@ fn build_for_platform(
                 .map_err(|e| anyhow!(e.to_string()))?;
         }
 
-        if let Ok(prepare_fn) = lua.globals().get::<mlua::Function>("prepare") {
+        if !skip_prepare && let Ok(prepare_fn) = lua.globals().get::<mlua::Function>("prepare") {
             if !quiet {
                 println!("Running prepare()...");
             }
@@ -751,6 +766,7 @@ pub fn run(
 ) -> Result<()> {
     let mut _temp_zsa_dir = None;
     let mut actual_package_file = package_file.to_path_buf();
+    let mut default_output_dir = None;
 
     if package_file.to_string_lossy().ends_with(".zsa") {
         if !quiet {
@@ -760,6 +776,11 @@ pub fn run(
                 package_file.display()
             );
         }
+
+        if output_dir.is_none() {
+            default_output_dir = package_file.parent().map(|p| p.to_path_buf());
+        }
+
         let temp_dir = Builder::new().prefix("zoi-zsa-extract-").tempdir()?;
         let file = File::open(package_file)?;
         let decoder = ZstdDecoder::new(file)?;
@@ -784,6 +805,7 @@ pub fn run(
     }
 
     let package_file = actual_package_file.as_path();
+    let output_dir = output_dir.or(default_output_dir.as_deref());
 
     if method == "docker" {
         let docker_image = image.ok_or_else(|| {

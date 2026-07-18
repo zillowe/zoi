@@ -7,9 +7,9 @@ use std::path::Path;
 /// Performs a 3-way merge on configuration files defined in the `backup` manifest field.
 ///
 /// It compares:
-/// 1. Base: The original package default from the previous version (`.zoiorig`).
-/// 2. Yours: The user's modified config in the previous version's directory.
-/// 3. Theirs: The new package default in the incoming version's directory.
+/// - Base: The original package default from the previous version (`.zoiorig`).
+/// - Yours: The user's modified config in the previous version's directory.
+/// - Theirs: The new package default in the incoming version's directory.
 ///
 /// Merging logic:
 /// - If Yours == Base: User didn't change it. Use Theirs (do nothing, already in place).

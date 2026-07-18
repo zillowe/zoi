@@ -174,11 +174,11 @@ pub struct SourceInstallOptions {
     pub build_type: Option<String>,
     pub dry_run: bool,
     pub build: bool,
-    pub frozen_lockfile: bool,
+    pub frozen: bool,
 }
 ```
 
-When `frozen_lockfile` is `true`, `install_sources` follows the exact entries recorded in `zoi.lock` rather than re-resolving the project from `zoi.yaml`. That preserves pinned versions, selected sub-packages, and recorded dependency choices for reproducible project installs.
+When `frozen` is `true`, `install_sources` follows the exact entries recorded in `zoi.lock` rather than re-resolving the project from `zoi.yaml`. That preserves pinned versions, selected sub-packages, and recorded dependency choices for reproducible project installs.
 
 ---
 

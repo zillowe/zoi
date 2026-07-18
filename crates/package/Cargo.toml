@@ -25,6 +25,7 @@ zoi-resolver.workspace = true
 anyhow.workspace = true
 elb.workspace = true
 colored.workspace = true
+ignore.workspace = true
 mlua.workspace = true
 regex.workspace = true
 tar.workspace = true
