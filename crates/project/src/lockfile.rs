@@ -54,7 +54,7 @@ pub fn read_zoi_lock() -> Result<types::ZoiLockV2> {
 
         eprintln!(
             "Warning: zoi.lock has packages targeting a different platform \
-             and no zoi.{}.lock was found — falling back to unconstrained resolution",
+             and no zoi.{}.lock was found, falling back to unconstrained resolution",
             platform
         );
     }

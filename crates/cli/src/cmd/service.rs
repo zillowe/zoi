@@ -33,6 +33,16 @@ pub enum ServiceCommands {
         /// The name of the package whose service status to show
         package: String,
     },
+    /// Enable a service (start at boot)
+    Enable {
+        /// The name of the package whose service to enable
+        package: String,
+    },
+    /// Disable a service
+    Disable {
+        /// The name of the package whose service to disable
+        package: String,
+    },
     /// List all packages that define a service and their current status
     #[command(alias = "ls")]
     List,
@@ -57,6 +67,16 @@ pub fn run(args: ServiceCommand) -> Result<()> {
         }
         ServiceCommands::Status { package } => {
             service::manage_service(&package, ServiceAction::Status)?;
+        }
+        ServiceCommands::Enable { package } => {
+            println!("Enabling service for package '{}'...", package.cyan());
+            service::manage_service(&package, ServiceAction::Enable)?;
+            println!("{}", "Service enabled successfully.".green());
+        }
+        ServiceCommands::Disable { package } => {
+            println!("Disabling service for package '{}'...", package.cyan());
+            service::manage_service(&package, ServiceAction::Disable)?;
+            println!("{}", "Service disabled successfully.".green());
         }
         ServiceCommands::List => {
             let services = service::list_services()?;

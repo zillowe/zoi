@@ -887,6 +887,22 @@ pub fn expand_placeholders(
     Ok(expanded)
 }
 
+pub fn expand_tilde<P: AsRef<Path>>(path: P) -> PathBuf {
+    let path = path.as_ref();
+    if !path.starts_with("~") {
+        return path.to_path_buf();
+    }
+    if let Some(home_dir) = home::home_dir() {
+        if path == Path::new("~") {
+            return home_dir;
+        }
+        if let Ok(stripped) = path.strip_prefix("~/") {
+            return home_dir.join(stripped);
+        }
+    }
+    path.to_path_buf()
+}
+
 pub fn get_current_shell() -> Option<Shell> {
     if cfg!(windows) {
         return Some(Shell::PowerShell);

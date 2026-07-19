@@ -1,0 +1,80 @@
+---
+title: home.lua Reference
+description: Guide to ZoiOS user-specific declarative configuration.
+---
+
+The `~/.config/zoi/home.lua` file allows ZoiOS users to manage their personal environment, including dotfiles and user-scoped packages declaratively.
+
+## Core Functions
+
+### `packages(list)`
+
+Defines the set of packages installed in the user scope (`~/.zoi/pkgs/store`).
+
+```lua
+packages({
+    "@community/bat",
+    "@community/fzf",
+    "@community/starship",
+    "cargo:ripgrep",
+})
+```
+
+---
+
+### `dotfiles(table)`
+
+Manages symbolic links for configuration files. Zoi will automatically create the symlink and its parent directories. Supports `~/` expansion for the source path.
+
+| Key | Value |
+| :--- | :--- |
+| Target Path (rel to `~`) | Source Path (absolute or `~/`) |
+
+```lua
+dotfiles({
+    [".zshrc"] = "~/code/dotfiles/zshrc",
+    [".config/nvim"] = "~/code/dotfiles/nvim",
+})
+```
+
+---
+
+### `env(table)`
+
+Defines personal environment variables. Zoi writes these to `~/.zoi/env`, which you can source in your shell profile.
+
+```lua
+env({
+    EDITOR = "nvim",
+    PAGER = "bat",
+    -- Secrets are automatically decrypted if using ZOISEC strings
+    OPENAI_API_KEY = "ZOISEC:v1:..."
+})
+```
+
+---
+
+## Applying Changes
+
+To apply your user configuration:
+
+```sh
+zoi home apply
+```
+
+Zoi will:
+
+1. **Resolve and install** the listed packages to your user store.
+2. **Create symlinks** for your dotfiles.
+3. **Generate `~/.zoi/env`** with your decrypted environment variables.
+
+### Shell Integration
+
+To ensure your environment variables are always active, add this to your `.bashrc` or `.zshrc`:
+
+```bash
+# Source Zoi user environment
+if [ -f "$HOME/.zoi/env" ]; then
+    source "$HOME/.zoi/env"
+fi
+```

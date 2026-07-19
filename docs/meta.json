@@ -6,6 +6,7 @@
     "examples",
     "config",
     "project-config",
+    "zoios",
     "guides",
     "---Maintainers Guides---",
     "creating-packages",
