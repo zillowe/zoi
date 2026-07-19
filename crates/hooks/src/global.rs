@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use zoi_core::{sysroot, utils};
+use zoi_core::{sysroot, types, utils};
 
 include!(concat!(env!("OUT_DIR"), "/generated_builtin_hooks.rs"));
 
@@ -91,24 +91,66 @@ pub fn load_all_hooks() -> Result<Vec<GlobalHook>> {
         }
     }
 
-    let dirs = vec![get_system_hooks_dir()?, get_user_hooks_dir()?];
+    let mut dirs = vec![get_system_hooks_dir()?, get_user_hooks_dir()?];
+
+    // Scan the package store for bundled hooks
+    for scope in [
+        types::Scope::System,
+        types::Scope::User,
+        types::Scope::Project,
+    ] {
+        if let Ok(store_root) = utils::get_store_base_dir(scope) {
+            if !store_root.exists() {
+                continue;
+            }
+            // Each package has a directory: {hash}-{name}/{version}/hooks/
+            if let Ok(pkg_dirs) = fs::read_dir(store_root) {
+                for pkg_dir_entry in pkg_dirs.flatten() {
+                    let pkg_dir = pkg_dir_entry.path();
+                    if !pkg_dir.is_dir() {
+                        continue;
+                    }
+                    // Iterate over version directories
+                    if let Ok(version_dirs) = fs::read_dir(&pkg_dir) {
+                        for version_dir_entry in version_dirs.flatten() {
+                            let version_dir = version_dir_entry.path();
+                            if !version_dir.is_dir()
+                                || version_dir.file_name().and_then(|s| s.to_str())
+                                    == Some("latest")
+                                || version_dir.file_name().and_then(|s| s.to_str())
+                                    == Some("dependents")
+                            {
+                                continue;
+                            }
+                            let hooks_dir = version_dir.join("hooks");
+                            if hooks_dir.exists() && hooks_dir.is_dir() {
+                                dirs.push(hooks_dir);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     for dir in dirs {
         if !dir.exists() {
             continue;
         }
         let mut hook_paths = Vec::new();
-        for entry in fs::read_dir(dir)? {
-            let entry = entry?;
-            hook_paths.push(entry.path());
+        if let Ok(entries) = fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                hook_paths.push(entry.path());
+            }
         }
         hook_paths.sort();
         for path in hook_paths {
-            if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("yaml") {
-                let content = fs::read_to_string(&path)?;
-                if let Ok(hook) = serde_yaml::from_str::<GlobalHook>(&content) {
-                    hook_map.insert(hook.name.clone(), hook);
-                }
+            if path.is_file()
+                && path.extension().and_then(|s| s.to_str()) == Some("yaml")
+                && let Ok(content) = fs::read_to_string(&path)
+                && let Ok(hook) = serde_yaml::from_str::<GlobalHook>(&content)
+            {
+                hook_map.insert(hook.name.clone(), hook);
             }
         }
     }
