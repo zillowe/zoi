@@ -1,0 +1,101 @@
+---
+title: ZoiOS Management
+description: Declarative system management features exclusive to ZoiOS distributions.
+---
+
+ZoiOS (and its reference implementation, Parlex Linux) features a declarative system management engine powered by Zoi. These features allow you to manage the entire operating system state using a single Lua configuration file.
+
+<Callout type="warn">
+  The commands on this page are **only available on ZoiOS-based systems**.
+  Generic Linux, macOS, and Windows installations of Zoi do not include these features.
+</Callout>
+
+## The `zoi system` Command
+
+The `zoi system` suite is used to manage system-level generations and configuration.
+
+### `zoi system apply [file]`
+
+Reads a `system.lua` file and applies its state to the machine. This involves:
+
+1. Resolving all required packages.
+2. Creating a new **System Generation**.
+3. Updating the **Transactional FHS View** to point to the new generation.
+
+```sh
+# Apply the default system configuration
+sudo zoi system apply
+
+# Apply a specific configuration file
+sudo zoi system apply ./my-server.lua
+```
+
+### `zoi system distro build --target <path> --config <file>`
+
+The primary command for bootstrapping new ZoiOS systems. It automates partitioning, formatting, and installation.
+
+**Safety Features:**
+
+- **Pre-flight Validation**: Automatically verifies that all base packages exist in your registry before touching the disk.
+- **Build Plan Summary**: Shows a detailed table of destructive actions (formatting) and system configuration before proceeding.
+- **Dry-Run Mode**: Use `--dry-run` to see exactly what commands will be executed without modifying your hardware.
+
+```sh
+# Preview the build plan
+sudo zoi system distro build --target /mnt --config ./system.lua --dry-run
+
+# Orchestrate the full build
+sudo zoi system distro build --target /mnt --config ./system.lua
+```
+
+### `zoi system list`
+
+Lists all available system generations on the machine, including their creation date and the packages they contain.
+
+```sh
+zoi system list
+```
+
+### `zoi system status`
+
+Shows the current system status, including the active generation ID and daemon state.
+
+```sh
+zoi system status
+```
+
+### `zoi system rollback <id>`
+
+Reverts the operating system to a previous generation. This is an atomic operation that flips the FHS symlink view.
+
+```sh
+sudo zoi system rollback 41
+```
+
+### `zoi system secret`
+
+Manage sensitive information like passwords and API keys.
+
+- **`zoi system secret hash <password>`**: Generates a one-way Argon2 hash of a password. Use this in your `system.lua` for user passwords.
+- **`zoi system secret encrypt <value>`**: Encrypts a string so only Zoi on this specific machine can decrypt it. It returns a `ZOISEC:v1:...` string.
+
+### `zoi system secret decrypt <ZOISEC>`: Decrypts a `ZOISEC` string back to plaintext (useful if you forgot the value)
+
+---
+
+## Declarative Configuration
+
+ZoiOS uses two primary Lua files to manage its state:
+
+- **[system.lua Reference](/docs/zds/zoi/guides/system-lua)**: Manage system-wide packages, users, bootloaders, and filesystems.
+- **[home.lua Reference](/docs/zds/zoi/guides/home-lua)**: Manage your personal user environment, dotfiles, and user-scoped packages.
+
+---
+
+## Architectural Foundation
+
+ZoiOS uses a **Generation-based** architecture:
+
+1. **The Store:** All packages reside in `/var/lib/zoi/pkgs/store/`, isolated by version and input hashes.
+2. **Generations:** A generation is a directory (e.g. `/var/lib/zoi/generations/42/`) containing a "symlink farm" that provides a standard FHS view of the active packages.
+3. **The View Flip:** The system's standard paths (like `/usr/bin`) point into a master symlink (`/var/lib/zoi/pkgs/view/current`) which Zoi flips atomically to switch between generations.

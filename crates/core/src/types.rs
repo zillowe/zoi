@@ -672,6 +672,12 @@ pub struct Config {
     pub cache_mirrors: Vec<String>,
     #[serde(default)]
     pub versions: HashMap<String, String>,
+    #[serde(default = "default_system_generations_limit")]
+    pub system_generations_limit: u32,
+}
+
+fn default_system_generations_limit() -> u32 {
+    4
 }
 
 fn default_rollback_enabled() -> bool {
@@ -700,6 +706,7 @@ impl Default for Config {
             pkg_dirs: Vec::new(),
             cache_mirrors: Vec::new(),
             versions: HashMap::new(),
+            system_generations_limit: 4,
         }
     }
 }
@@ -738,6 +745,8 @@ pub struct Policy {
     pub jobs_unoverridable: bool,
     #[serde(default, skip_serializing_if = "is_false")]
     pub advisory_enforcement_unoverridable: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub system_generations_limit_unoverridable: bool,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub allowed_licenses: Option<Vec<String>>,

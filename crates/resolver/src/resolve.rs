@@ -1372,9 +1372,9 @@ fn resolve_source_recursive(
         }
         download_from_url(download_source_for_explicit_path(source, path_part))?
     } else if let Some(path_part) = path_part {
-        let path = PathBuf::from(path_part);
+        let path = zoi_core::utils::expand_tilde(path_part);
         if !path.exists() {
-            return Err(anyhow!("Local file not found at '{path_part}'"));
+            return Err(anyhow!("Local file not found at '{:?}'", path));
         }
         ResolvedSource {
             path,

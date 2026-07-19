@@ -627,6 +627,12 @@ enum Commands {
     #[command(alias = "reg")]
     Registry(cmd::registry::RegistryCommand),
 
+    /// Manage declarative user environments (ZoiOS only)
+    Home(cmd::home::HomeCommand),
+
+    /// Manage the underlying ZoiOS system (ZoiOS only)
+    System(cmd::system::SystemCommand),
+
     /// Manage package repositories
     #[command(
         aliases = ["repositories"],
@@ -1189,6 +1195,8 @@ pub fn run() -> anyhow::Result<()> {
             },
             Commands::Repo(args) => cmd::repo::run(args),
             Commands::Registry(args) => cmd::registry::run(args),
+            Commands::Home(args) => cmd::home::run(args),
+            Commands::System(args) => cmd::system::run(args, cli.yes),
             Commands::Telemetry { action } => {
                 use cmd::telemetry::{TelemetryCommand, run};
                 let cmd = match action {

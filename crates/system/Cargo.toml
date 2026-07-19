@@ -1,0 +1,39 @@
+[package]
+name = "zoi-system"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "ZoiOS system state management and FHS views"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+
+[lib]
+name = "zoi_system"
+
+[dependencies]
+zoi-core.workspace = true
+zoi-lua.workspace = true
+zoi-resolver.workspace = true
+zoi-install.workspace = true
+anyhow.workspace = true
+colored.workspace = true
+home.workspace = true
+chrono.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+mlua.workspace = true
+walkdir.workspace = true
+uuid.workspace = true
+hex.workspace = true
+sha2.workspace = true
+tempfile.workspace = true
+aes-gcm.workspace = true
+rand.workspace = true
+getrandom.workspace = true
+argon2.workspace = true
+base64.workspace = true
+
+[dev-dependencies]

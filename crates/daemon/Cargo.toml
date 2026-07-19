@@ -1,0 +1,25 @@
+[package]
+name = "zoi-daemon"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "ZoiOS privileged system daemon"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+
+[[bin]]
+name = "zoid"
+path = "src/main.rs"
+
+[dependencies]
+zoi.workspace = true
+zoi-core.workspace = true
+zoi-system.workspace = true
+zoi-install.workspace = true
+anyhow.workspace = true
+nix.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+clap.workspace = true

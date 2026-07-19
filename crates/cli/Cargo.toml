@@ -66,6 +66,7 @@ zoi-project.workspace = true
 zoi-lua.workspace = true
 zoi-purl.workspace = true
 zoi-resolver.workspace = true
+zoi-system.workspace = true
 zoi-telemetry.workspace = true
 zoi-sync.workspace = true
 zoi-uninstall.workspace = true

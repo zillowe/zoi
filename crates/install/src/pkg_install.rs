@@ -197,6 +197,10 @@ pub fn run(
     let decoder =
         ZstdDecoder::new(file).map_err(|e| anyhow!("Failed to initialize zstd decoder: {}", e))?;
     let mut archive = Archive::new(decoder);
+
+    #[cfg(target_os = "linux")]
+    archive.set_unpack_xattrs(true);
+
     let temp_dir = Builder::new().prefix("zoi-install-").tempdir()?;
     let unpack_path = temp_dir.path().to_path_buf();
 
