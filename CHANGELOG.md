@@ -4,12 +4,74 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
+## [Prod. Release 1.23.0] - 2026-07-19
+
+### ⏩ Merged
+
+- Branch 'distro-builder' into 'main'
+- Branch 'renovate/uuid-1.x' into 'main'
+- Branch 'renovate/toml-1.x' into 'main'
+- Branch 'renovate/regex-1.x' into 'main'
+- Branch 'renovate/clap-4.x' into 'main'
+
+### ♻️ Refactor
+
+- *(system)* Strengthen security and messaging protocols
+- *(cli)* Rename frozen-lock and frozen-lockfile flags to frozen
+
+### ✨ Features
+
+- *(hooks)* Add support for scanning bundled package hooks
+- *(service)* Add service enable and disable functionality
+- Implement ZoiOS system and home management
+- *(bundle)* Implement .zoiignore support and pre-bundled source detection
+- *(pkg)* Implement 3-way merge for configuration files
+- *(cli)* Add download command and PGP signing for bundles
+- Introduce zpa package format and zsa source bundles
+- *(package)* Implement ELF relocation engine and improve scope resolution
+- *(package)* Implement hermetic build-time sandboxing
+- *(install)* Implement context-aware default scoping
+- *(upgrade)* Implement delta upgrades via bsdiff
+- *(core)* Implement explicit installation scope control
+
+### 🛠️ Build
+
+- Fix rpm spec
+- Remove incremental build number tracking
+
+### 🛡️ Dependencies
+
+- Update Rust crate uuid to 1.24.0
+- Update Rust crate toml to 1.1.3
+- Update Rust crate regex to 1.13.1
+- Update Rust crate clap to 4.6.2
+
+## [Prod. Release 1.22.0] - 2026-07-12
+
+### ✨ Features
+
+- *(lua)* Update LOCATION table to reflect staging directory paths
+- *(lua)* Add LOCATION table to Lua environment
+
+### 🛠️ Build
+
+- Fix Zoi packages
+
+### 🛡️ Dependencies
+
+- Update Rust crate regex to 1.13.0
+- Update Rust crate sequoia-openpgp to 2.4.1
+
+### 🧹 Cleanup
+
+- Remove MD5 support
+
 ## [Prod. Release 1.21.1] - 2026-07-11
 
 ### ✨ Features
 
-- *(package)* Add zshell API for automatic shell completion management
 - *(package)* Add install_deps flag to docker build process
+- *(package)* Add zshell API for automatic shell completion management
 - *(uninstall)* Implement dry-run mode
 
 ### 🛠️ Build
