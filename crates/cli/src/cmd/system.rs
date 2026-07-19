@@ -2,8 +2,11 @@ use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
 use colored::*;
 use zoi_core::utils::is_zoios;
-use zoi_system::client::send_request;
 use zoi_system::config::load_system_lua;
+
+#[cfg(unix)]
+use zoi_system::client::send_request;
+#[cfg(unix)]
 use zoi_system::protocol::{Request, Response};
 
 #[derive(Parser, Debug)]
@@ -77,7 +80,6 @@ pub enum SecretSubcommands {
 }
 
 pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
-    // secret commands and distro build are allowed on generic systems
     let is_secret = matches!(args.command, SystemSubcommands::Secret { .. });
     let is_distro = matches!(args.command, SystemSubcommands::Distro { .. });
 
@@ -220,37 +222,67 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
             }
         },
         SystemSubcommands::Apply { file } => {
-            println!("Reading system configuration from {}...", file.cyan());
-            let config = load_system_lua(&file)?;
-            let response = send_request(Request::ApplySystemConfig(Box::new(config)))?;
-            handle_response(response)?;
+            #[cfg(unix)]
+            {
+                println!("Reading system configuration from {}...", file.cyan());
+                let config = load_system_lua(&file)?;
+                let response = send_request(Request::ApplySystemConfig(Box::new(config)))?;
+                handle_response(response)?;
+            }
+            #[cfg(not(unix))]
+            return Err(anyhow!(
+                "OS management daemon commands are only supported on Unix."
+            ));
         }
         SystemSubcommands::List => {
-            let response = send_request(Request::ListGenerations)?;
-            match response {
-                Response::Generations(gens) => {
-                    println!("{:<5} {:<25} {:<50}", "ID", "Created At", "Packages");
-                    println!("{:-<80}", "");
-                    for generation in gens {
-                        println!(
-                            "{:<5} {:<25} {:<50}",
-                            generation.id,
-                            generation.created_at.to_rfc3339(),
-                            generation.packages.join(", ")
-                        );
+            #[cfg(unix)]
+            {
+                let response = send_request(Request::ListGenerations)?;
+                match response {
+                    Response::Generations(gens) => {
+                        println!("{:<5} {:<25} {:<50}", "ID", "Created At", "Packages");
+                        println!("{:-<80}", "");
+                        for generation in gens {
+                            println!(
+                                "{:<5} {:<25} {:<50}",
+                                generation.id,
+                                generation.created_at.to_rfc3339(),
+                                generation.packages.join(", ")
+                            );
+                        }
                     }
+                    _ => handle_response(response)?,
                 }
-                _ => handle_response(response)?,
             }
+            #[cfg(not(unix))]
+            return Err(anyhow!(
+                "OS management daemon commands are only supported on Unix."
+            ));
         }
         SystemSubcommands::Status => {
-            let response = send_request(Request::GetStatus)?;
-            handle_response(response)?;
+            #[cfg(unix)]
+            {
+                let response = send_request(Request::GetStatus)?;
+                handle_response(response)?;
+            }
+            #[cfg(not(unix))]
+            return Err(anyhow!(
+                "OS management daemon commands are only supported on Unix."
+            ));
         }
         SystemSubcommands::Rollback { id } => {
-            println!("Rolling back to generation {}...", id.to_string().yellow());
-            let response = send_request(Request::RollbackGeneration(id))?;
-            handle_response(response)?;
+            #[cfg(unix)]
+            {
+                println!("Rolling back to generation {}...", id.to_string().yellow());
+                let response = send_request(Request::RollbackGeneration(id))?;
+                handle_response(response)?;
+            }
+            #[cfg(not(unix))]
+            let _ = id;
+            #[cfg(not(unix))]
+            return Err(anyhow!(
+                "OS management daemon commands are only supported on Unix."
+            ));
         }
     }
 
@@ -320,6 +352,7 @@ fn print_build_summary(target: &str, config: &zoi_system::config::SystemConfig, 
     println!("  {}\n", config.packages.join(", "));
 }
 
+#[cfg(unix)]
 fn handle_response(response: Response) -> Result<()> {
     match response {
         Response::Ok => println!("{}", "Operation successful.".green()),
