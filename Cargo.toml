@@ -29,7 +29,7 @@ members = [
 default-members = ["crates/zoi-rs", "crates/mini"]
 
 [workspace.package]
-version = "1.23.0-dev"
+version = "1.23.0"
 edition = "2024"
 rust-version = "1.92.0"
 description = "Advanced Package Manager & Environment Orchestrator"
@@ -137,28 +137,28 @@ getrandom = "0.4.3"
 argon2 = "0.5.3"
 base64 = "0.22.1"
 
-zoi-core = { path = "crates/core", version = "1.23.0-dev" }
-zoi-hooks = { path = "crates/hooks", version = "1.23.0-dev" }
-zoi-lua = { path = "crates/lua", version = "1.23.0-dev" }
-zoi-purl = { path = "crates/purl", version = "1.23.0-dev" }
-zoi-resolver = { path = "crates/resolver", version = "1.23.0-dev" }
-zoi-sandbox = { path = "crates/sandbox", version = "1.23.0-dev" }
-zoi-telemetry = { path = "crates/telemetry", version = "1.23.0-dev" }
-zoi-project = { path = "crates/project", version = "1.23.0-dev" }
-zoi-cli = { path = "crates/cli", version = "1.23.0-dev" }
-zoi-db = { path = "crates/db", version = "1.23.0-dev" }
-zoi-audit = { path = "crates/audit", version = "1.23.0-dev" }
-zoi-pm = { path = "crates/pm", version = "1.23.0-dev" }
-zoi-deps = { path = "crates/dependencies", version = "1.23.0-dev" }
-zoi-install = { path = "crates/install", version = "1.23.0-dev" }
-zoi-package = { path = "crates/package", version = "1.23.0-dev" }
-zoi-sync = { path = "crates/sync", version = "1.23.0-dev" }
-zoi-uninstall = { path = "crates/uninstall", version = "1.23.0-dev" }
-zoi-transaction = { path = "crates/transaction", version = "1.23.0-dev" }
-zoi-plugins = { path = "crates/plugins", version = "1.23.0-dev" }
-zoi-daemon = { path = "crates/daemon", version = "1.23.0-dev" }
-zoi-system = { path = "crates/system", version = "1.23.0-dev" }
-zoi = { path = "crates/zoi-rs", version = "1.23.0-dev", package = "zoi-rs" }
+zoi-core = { path = "crates/core", version = "1.23.0" }
+zoi-hooks = { path = "crates/hooks", version = "1.23.0" }
+zoi-lua = { path = "crates/lua", version = "1.23.0" }
+zoi-purl = { path = "crates/purl", version = "1.23.0" }
+zoi-resolver = { path = "crates/resolver", version = "1.23.0" }
+zoi-sandbox = { path = "crates/sandbox", version = "1.23.0" }
+zoi-telemetry = { path = "crates/telemetry", version = "1.23.0" }
+zoi-project = { path = "crates/project", version = "1.23.0" }
+zoi-cli = { path = "crates/cli", version = "1.23.0" }
+zoi-db = { path = "crates/db", version = "1.23.0" }
+zoi-audit = { path = "crates/audit", version = "1.23.0" }
+zoi-pm = { path = "crates/pm", version = "1.23.0" }
+zoi-deps = { path = "crates/dependencies", version = "1.23.0" }
+zoi-install = { path = "crates/install", version = "1.23.0" }
+zoi-package = { path = "crates/package", version = "1.23.0" }
+zoi-sync = { path = "crates/sync", version = "1.23.0" }
+zoi-uninstall = { path = "crates/uninstall", version = "1.23.0" }
+zoi-transaction = { path = "crates/transaction", version = "1.23.0" }
+zoi-plugins = { path = "crates/plugins", version = "1.23.0" }
+zoi-daemon = { path = "crates/daemon", version = "1.23.0" }
+zoi-system = { path = "crates/system", version = "1.23.0" }
+zoi = { path = "crates/zoi-rs", version = "1.23.0", package = "zoi-rs" }
 
 [workspace.lints.clippy]
 too_many_arguments = "allow"

@@ -1,11 +1,10 @@
 name: ldconfig
-description: Updates the dynamic linker run-time bindings.
+description: Configuring dynamic linker run-time bindings...
 platforms: ["linux"]
 trigger:
-  paths:
-    - "usr/lib/*.so*"
-    - "lib/*.so*"
+  dirs: ["usr/lib"]
+  paths: ["etc/ld.so.conf", "etc/ld.so.conf.d/*", "usr/lib/ld.so.conf.d/*"]
   operation: ["install", "upgrade", "remove"]
 action:
   when: PostTransaction
-  exec: ldconfig
+  exec: "/usr/bin/ldconfig -r /"
