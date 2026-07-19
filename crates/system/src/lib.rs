@@ -1,4 +1,5 @@
 pub mod boot;
+#[cfg(unix)]
 pub mod client;
 pub mod config;
 pub mod distro;

@@ -1,8 +1,5 @@
 use anyhow::{Result, anyhow};
-use colored::*;
 use std::path::Path;
-use std::process::Command;
-use zoi_core::utils;
 
 pub fn run(
     package_file: &Path,
@@ -33,6 +30,10 @@ pub fn run(
 
     #[cfg(target_os = "linux")]
     {
+        use colored::*;
+        use std::process::Command;
+        use zoi_core::utils;
+
         println!(
             "{} Building package using Bubblewrap sandbox...",
             "::".bold().blue()
