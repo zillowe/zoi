@@ -47,9 +47,10 @@ After changing the mirror, run `zoi sync` to update your local metadata.
 
 ## Security & PGP Keys
 
-If you are using an unofficial Zoi binary or wish to manually verify the Zoidberg registry, you should import the maintainer's PGP key:
+If you installed Zoi from an unofficial source you'll need to add PGP keys of the maintainers of Zoidberg to be able to sync packages safely, if you installed Zoi from an official source you won't need to do that because it's backed into Zoi:
 
 ```sh
+zoi pgp add https://zillowe.pages.dev/keys/zillowe-main.asc
 zoi pgp add https://zillowe.pages.dev/keys/zillowez.asc
 ```
 

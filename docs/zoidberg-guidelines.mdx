@@ -49,7 +49,7 @@ Providing a `source` build type is highly encouraged as a secondary option. It p
 
 Zoidberg uses a **Flat Naming** convention.
 
-* **Simplicity:** Use the simplest, most common name for the software (e.g., `ripgrep`, not `rust-ripgrep`).
+* **Simplicity:** Use the simplest, most common name for the software (e.g. `ripgrep`, not `rust-ripgrep`).
 * **Lowercase:** All package names MUST be lowercase ASCII.
 * **Characters:** Use only lowercase letters, digits, and hyphens (`-`). Avoid underscores or periods.
 * **Collision Handling:** Collisions are handled on a case-by-case basis. If a name is already taken, prioritize the more popular or established tool.
@@ -58,7 +58,7 @@ Zoidberg uses a **Flat Naming** convention.
 
 The `version` field MUST match the upstream version verbatim.
 
-* **Prefixes:** Strip any `v` prefixes (e.g., use `1.2.3` instead of `v1.2.3`).
+* **Prefixes:** Strip any `v` prefixes (e.g. use `1.2.3` instead of `v1.2.3`).
 * **SemVer:** Follow [SemVer](https://semver.org) patterns where possible.
 
 ### 3.3. Revisions (`PKG.revision`)
@@ -83,7 +83,7 @@ Every submission MUST include:
 
 ### 4.2. Recommended Testing
 
-Implementing a `test()` lifecycle function is **highly recommended** for the `core` and `main` tiers, and strongly encouraged for all others. The test should verify that the binary executes correctly (e.g., running `myapp --version`).
+Implementing a `test()` lifecycle function is **highly recommended** for the `core` and `main` tiers, and strongly encouraged for all others. The test should verify that the binary executes correctly (e.g. running `myapp --version`).
 
 ```lua
 function test()

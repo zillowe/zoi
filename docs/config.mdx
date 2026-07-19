@@ -199,6 +199,16 @@ A map of binary names to their preferred global versions. This is used by Zoi's 
     python: "3.12.1"
   ```
 
+### `system_generations_limit`
+
+Defines the maximum number of ZoiOS system generations to keep in the store and bootloader. When a new generation is created, Zoi will automatically prune the oldest generations exceeding this limit.
+
+- **Type:** `integer`
+- **Default:** `4`
+- **Value of 0:** Infinite generations (no pruning).
+- **Note:** The current active generation is never pruned.
+- **Example:** `system_generations_limit: 10`
+
 ### `pkg_dirs`
 
 A list of additional directories to search for `.zpa` archives during installation.
@@ -272,6 +282,7 @@ When a policy field is set to `true`, the corresponding configuration from the s
 - `protect_db_unoverridable`: If `true`, the `protect_db` setting is locked.
 - `jobs_unoverridable`: If `true`, the `jobs` setting is locked.
 - `advisory_enforcement_unoverridable`: If `true`, advisory enforcement policy cannot be overridden by lower-precedence configs.
+- `system_generations_limit_unoverridable`: If `true`, the `system_generations_limit` setting is locked.
 - `max_resolution_depth_unoverridable`: If `true`, the `max_resolution_depth` setting is locked.
 - `offline_mode_unoverridable`: If `true`, the `offline_mode` setting is locked.
 - `pkg_dirs_unoverridable`: If `true`, the `pkg_dirs` list is locked.

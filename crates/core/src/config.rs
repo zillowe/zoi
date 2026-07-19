@@ -372,6 +372,18 @@ pub fn read_config() -> Result<Config> {
         }
     }
 
+    if project_val.get("system_generations_limit").is_some()
+        && !system_policy.system_generations_limit_unoverridable
+    {
+        merged_cfg.system_generations_limit = project_cfg.system_generations_limit;
+    } else if user_val.get("system_generations_limit").is_some()
+        && !system_policy.system_generations_limit_unoverridable
+    {
+        merged_cfg.system_generations_limit = user_cfg.system_generations_limit;
+    } else {
+        merged_cfg.system_generations_limit = system_cfg.system_generations_limit;
+    }
+
     Ok(merged_cfg)
 }
 

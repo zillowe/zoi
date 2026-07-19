@@ -1,0 +1,134 @@
+---
+title: Building a ZoiOS Distro
+description: A guide on how to bootstrap and build a ZoiOS distribution (like Parlex Linux) from scratch using Zoi.
+---
+
+Zoi provides a powerful set of tools to act as a "Universal Distro Engine." This allows you to construct an entire, bootable, declarative operating system (ZoiOS) from a standard Linux environment using the `zoi system distro build` command.
+
+This guide walks you through bootstrapping a ZoiOS system (e.g. Parlex Linux) onto a new disk, assuming the required base packages are available in your configured Zoi registry.
+
+## Prerequisites
+
+1. **A Host Linux System**: You need a running Linux environment (like an Ubuntu Live USB or a Fedora host) to perform the initial installation.
+2. **Zoi CLI Installed**: The host system must have the Zoi CLI installed.
+3. **Root Privileges**: Formatting disks and installing bootloaders requires `sudo`.
+4. **A Configured Registry**: Your Zoi instance must be configured to sync with a registry that provides the essential ZoiOS packages (e.g. `@core/linux`, `@core/glibc`, `@core/systemd`).
+
+## Step 1: Prepare the `system.lua` Configuration
+
+The entire state of a ZoiOS machine is defined in a `system.lua` file. This file acts as the blueprint for your new distribution.
+
+Create a file named `target-system.lua`:
+
+```lua
+-- target-system.lua
+
+system({
+    hostname = "my-zoios-machine",
+    timezone = "UTC",
+    locale = "en_US.UTF-8",
+    -- Optional kernel parameters
+    kernel_params = "quiet splash rw",
+})
+
+-- Essential base packages required for a bootable system
+packages({
+    "@core/linux",
+    "@core/glibc",
+    "@core/systemd",
+    "@core/bash",
+    "@core/coreutils",
+    "@core/filesystem",
+    "@core/dracut",
+    "@core/grub2",
+    "@core/btrfs-progs",
+    "@main/NetworkManager",
+})
+
+services({
+    NetworkManager = { enable = true },
+    sshd = { enable = true },
+})
+
+filesystems({
+    {
+        device = "LABEL=zoios_root",
+        mount = "/",
+        type = "btrfs",
+        options = "subvol=@root,compress=zstd:3,ssd",
+    },
+    {
+        device = "LABEL=zoios_boot",
+        mount = "/boot",
+        type = "ext4",
+        options = "defaults",
+    }
+})
+```
+
+## Step 2: Partition the Target Disk
+
+Before Zoi can orchestrate the installation, you must partition your target disk. ZoiOS strongly recommends Btrfs for the root filesystem to support snapshots and advanced rollback features.
+
+*Disclaimer: Replace `/dev/sdX` with your actual target device. Be extremely careful not to format your host machine's drive!*
+
+Use a tool like `parted` or `fdisk` to create:
+
+1. **Boot Partition** (e.g. `/dev/sdX1`, 512MB - 1GB)
+2. **Root Partition** (e.g. `/dev/sdX2`, remainder of disk)
+
+**Note:** You do **not** need to format them manually; `zoi system distro build` will handle formatting based on your `system.lua`.
+
+---
+
+## Step 3: Run the Universal Distro Builder
+
+Now, simply run the builder. This is the "One-Command" step that replaces manual formatting, mounting, and package installation.
+
+```bash
+# We mount the target partition temporarily so Zoi knows where to install
+sudo mount /dev/sdX2 /mnt
+
+# Orchestrate the entire build
+sudo zoi system distro build --target /mnt --config ./target-system.lua
+```
+
+### What happens under the hood?
+
+In this single step, Zoi:
+
+1. **Automates Formatting**: Executes `mkfs.btrfs` and `mkfs.ext4` on your partitions.
+2. **Manages Btrfs Subvolumes**: Creates `@root`, `@home`, and `@var` as defined in your mount options.
+3. **Initializes Sysroot**: Drops the `/etc/os-release` marker (`ID=zoios`) so the disk is recognized as ZoiOS.
+4. **Bootstrap Installation**: Directly installs the entire base package set (`@core/linux`, `@core/glibc`, etc.) into the target Zoi store.
+5. **Builds the First Generation**: Creates the FHS symlink farm (`/usr/bin`, etc.) so the disk layout is complete.
+
+---
+
+## Step 4: Finalize the Bootloader
+
+Once the build is complete, the final step is to ensure the bootloader is installed on the target disk's master boot record (MBR) or EFI partition.
+
+```bash
+sudo chroot /mnt
+grub-install /dev/sdX
+grub-mkconfig -o /boot/grub/grub.cfg
+exit
+```
+
+## Step 5: Reboot
+
+Unmount the filesystems and reboot into your newly built ZoiOS system!
+
+```bash
+sudo umount -R /mnt
+sudo reboot
+```
+
+## How It Works: The ZoiOS Guard
+
+You might wonder why you can't run `zoi system apply` on a standard Ubuntu or macOS host.
+
+Zoi includes a **ZoiOS Environment Guard**. Commands like `zoi system apply`, `list`, and `rollback` check for specific OS markers (like `ID=zoios` or `ID=parlex` in `/etc/os-release`). If the system is not a recognized ZoiOS distribution, these commands are safely disabled to prevent accidental damage to a standard generic Linux environment.
+
+The `zoi system distro build` command is explicitly allowed on generic systems so that you can bootstrap new disks, and its primary job is to establish that initial marker so the target disk becomes a valid ZoiOS environment.

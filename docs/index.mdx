@@ -20,6 +20,7 @@ Zoi is an advanced package manager and environment orchestrator, designed to sim
 - **Just-in-Time Privilege Escalation:** Automatically prompts for `sudo` only when system-wide operations are required, keeping your environment and caches cleanly in user-space.
 - **Dynamic Package Definitions:** Define packages with dynamic Lua scripts (`.pkg.lua`) for maximum flexibility.
 - **Universal Package Support:** Install packages from pre-built binaries, compressed archives, or build them from source.
+- **ZoiOS Distro Engine:** Bootstrap and manage entire Linux distributions declaratively. Includes generational rollbacks and transactional FHS views.
 - **Extensive Dependency Management:** Integrates with over 40 system and language package managers (`apt`, `brew`, `cargo`, `npm`, `pip`, `go`, `bun`, etc.).
 - **Version Multiplexing via Intelligent Shims:** Automatically switch between different versions of the same tool (e.g. Node.js 18 vs 20) based on your project context (`zoi.lua`) or legacy configuration files (`.nvmrc`) through its extensible Lua plugin system.
 - **Rich Dependencies:** Define runtime and build dependencies with required, optional, and selectable options.
@@ -108,6 +109,17 @@ zoi why openssl                   # See what requires it
 zoi update --all --dry-run        # See what will change
 zoi update --all                  # Apply changes
 zoi rollback --last-transaction   # Undo if broken
+```
+
+### Building a Distribution (ZoiOS)
+
+```sh
+# Bootstrap ZoiOS onto a new disk or directory
+sudo zoi system distro build --target /mnt --config ./system.lua
+
+# Enter chroot and manage system generations
+sudo zoi system apply
+sudo zoi system rollback 42
 ```
 
 ### Forcing a source build
