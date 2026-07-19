@@ -1,7 +1,6 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::fs;
-use std::io::{Read, Write};
 use std::os::unix::io::AsRawFd;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::Path;
@@ -122,6 +121,14 @@ fn start_daemon() -> Result<()> {
     }
 
     let listener = UnixListener::bind(SOCKET_PATH)?;
+
+    // Restrict socket permissions (root only)
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(SOCKET_PATH, fs::Permissions::from_mode(0o600))?;
+    }
+
     println!("zoid listening on {}", SOCKET_PATH);
 
     let gen_manager = GenerationManager::new()?;
@@ -149,20 +156,7 @@ fn start_daemon() -> Result<()> {
 }
 
 fn handle_client(mut stream: UnixStream, gen_manager: &GenerationManager) -> Result<bool> {
-    let mut buffer = Vec::new();
-    let mut chunk = [0u8; 1024];
-    loop {
-        let n = stream.read(&mut chunk)?;
-        if n == 0 {
-            break;
-        }
-        buffer.extend_from_slice(&chunk[..n]);
-        if n < 1024 {
-            break;
-        }
-    }
-
-    let request: Request = serde_json::from_slice(&buffer)?;
+    let request: Request = zoi_system::protocol::receive_message(&mut stream)?;
     let mut should_exit = false;
     let response = match request {
         Request::Shutdown => {
@@ -257,7 +251,6 @@ fn handle_client(mut stream: UnixStream, gen_manager: &GenerationManager) -> Res
         }
     };
 
-    let response_bytes = serde_json::to_vec(&response)?;
-    stream.write_all(&response_bytes)?;
+    zoi_system::protocol::send_message(&mut stream, &response)?;
     Ok(should_exit)
 }

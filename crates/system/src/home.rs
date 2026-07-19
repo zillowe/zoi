@@ -111,7 +111,9 @@ pub fn apply_home_config(config: &HomeConfig) -> Result<()> {
 
     for (key, value) in &config.env {
         let decrypted_value = crate::secret::decrypt_secret(value)?;
-        env_content.push_str(&format!("export {}='{}'\n", key, decrypted_value));
+        // Escape single quotes for shell safety
+        let escaped_value = decrypted_value.replace("'", "'\\''");
+        env_content.push_str(&format!("export {}='{}'\n", key, escaped_value));
     }
 
     if let Some(parent) = zoi_env_path.parent() {
