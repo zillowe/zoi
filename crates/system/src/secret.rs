@@ -40,7 +40,23 @@ fn get_master_key() -> Result<[u8; 32]> {
         }
         let mut key = [0u8; 32];
         rng().fill_bytes(&mut key);
-        fs::write(&key_path, key)?;
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            let mut file = fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .open(&key_path)?;
+            use std::io::Write;
+            file.write_all(&key)?;
+        }
+        #[cfg(not(unix))]
+        {
+            fs::write(&key_path, key)?;
+        }
+
         return Ok(key);
     }
 

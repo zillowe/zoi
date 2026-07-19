@@ -56,16 +56,38 @@ pub fn prepare_target_filesystems(config: &SystemConfig, dry_run: bool) -> Resul
                 fs_cfg.device
             );
             let temp_mount = tempfile::tempdir()?;
-            Command::new("mount")
+            let mount_status = Command::new("mount")
                 .arg(&fs_cfg.device)
                 .arg(temp_mount.path())
                 .status()?;
-            Command::new("btrfs")
+            if !mount_status.success() {
+                return Err(anyhow!(
+                    "Failed to mount {} to temporary directory",
+                    fs_cfg.device
+                ));
+            }
+
+            let subvol_status = Command::new("btrfs")
                 .arg("subvolume")
                 .arg("create")
                 .arg(temp_mount.path().join(subvol_name))
                 .status()?;
-            Command::new("umount").arg(temp_mount.path()).status()?;
+
+            let umount_status = Command::new("umount").arg(temp_mount.path()).status()?;
+
+            if !subvol_status.success() {
+                return Err(anyhow!(
+                    "Failed to create subvolume {} on {}",
+                    subvol_name,
+                    fs_cfg.device
+                ));
+            }
+            if !umount_status.success() {
+                return Err(anyhow!(
+                    "Failed to unmount temporary directory {}",
+                    temp_mount.path().display()
+                ));
+            }
         }
     }
     Ok(())

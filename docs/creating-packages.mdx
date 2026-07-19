@@ -230,6 +230,27 @@ The `destination` argument uses special variables to place files in the correct 
 | `${usrroot}`      | Copies files to the system's root (`/`). **Use with caution.** Zoi will automatically prompt for `sudo` privileges if required to write to these paths. |
 | `${usrhome}`      | Copies files to the user's home directory (`~`).                                                                                                        |
 
+#### Packaging for ZoiOS (System Scope)
+
+When creating packages specifically for ZoiOS (like the `@core` bootstrap set), keep the following path conventions in mind:
+
+- **`${pkgstore}` is treated as `/usr`**: For system-scoped packages, ZoiOS mirrors the `pkgstore` contents into the global `/usr` directory of the active generation.
+  - Stage binaries to `${pkgstore}/bin/`.
+  - Stage libraries to `${pkgstore}/lib/`.
+  - Stage headers to `${pkgstore}/include/`.
+- **Use `${usrroot}` for outside of `/usr`**: If a file *must* exist outside of the read-only `/usr` tree (like in `/etc` or `/var`), use `${usrroot}`.
+  - **Important:** Files placed via `${usrroot}` are NOT part of the Generation symlink farm and will persist across system rollbacks. Use this only for persistent configuration or state.
+
+```lua
+function package()
+    -- Available in the versioned Generation view (/usr/bin/mytool)
+    zcp("mytool", "${pkgstore}/bin/mytool")
+
+    -- Persistent system-wide config (/etc/mytool.conf)
+    zcp("mytool.conf", "${usrroot}/etc/mytool.conf")
+end
+```
+
 ---
 
 ## 5. Package Types
@@ -616,7 +637,7 @@ zoi package install /path/to/your-package-1.0.0-linux-amd64.zpa
 
 This example demonstrates many of the concepts above by packaging a simple "Hello, World!" program written in Zig.
 
-_For the full source code of this example, see the `hello` package in the [Zoidberg repository](https://gitlab.com/zillowe/zillwen/zusty/zoidberg/-/tree/main/zillowe/hello)._
+*For the full source code of this example, see the `hello` package in the [Zoidberg repository](https://gitlab.com/zillowe/zillwen/zusty/zoidberg/-/tree/main/zillowe/hello).*
 
 ### `hello.pkg.lua`
 

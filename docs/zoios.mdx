@@ -98,4 +98,12 @@ ZoiOS uses a **Generation-based** architecture:
 
 1. **The Store:** All packages reside in `/var/lib/zoi/pkgs/store/`, isolated by version and input hashes.
 2. **Generations:** A generation is a directory (e.g. `/var/lib/zoi/generations/42/`) containing a "symlink farm" that provides a standard FHS view of the active packages.
-3. **The View Flip:** The system's standard paths (like `/usr/bin`) point into a master symlink (`/var/lib/zoi/pkgs/view/current`) which Zoi flips atomically to switch between generations.
+3. **The View Flip**: The system's standard paths (like `/usr/bin`) point into a master symlink (`/var/lib/zoi/pkgs/view/current`) which Zoi flips atomically to switch between generations.
+
+## Packaging Conventions
+
+For developers building ZoiOS-native packages:
+
+- **Root Mapping**: The `${pkgstore}` of a system package is mapped directly to the `/usr` directory of the generation.
+- **Selective Persistence**: Use `${usrroot}` for files that must live in `/etc` or `/var`. These files are written directly to the host root and are **not** managed by the Generation symlink farm.
+- **Rollback Safety**: Only files inside `${pkgstore}` (the `/usr` tree) are guaranteed to revert during a `zoi system rollback`.
