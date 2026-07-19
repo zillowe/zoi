@@ -79,9 +79,6 @@ pub fn load_home_lua<P: AsRef<Path>>(path: P) -> Result<HomeConfig> {
 }
 
 pub fn apply_home_config(config: &HomeConfig) -> Result<()> {
-    // Install user packages
-    // This would call zoi::install_sources with Scope::User
-
     // Manage dotfiles symlinks
     let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory"))?;
 

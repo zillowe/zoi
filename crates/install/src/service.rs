@@ -10,6 +10,8 @@ pub enum ServiceAction {
     Stop,
     Restart,
     Status,
+    Enable,
+    Disable,
 }
 
 pub fn manage_service(package_name: &str, action: ServiceAction) -> Result<()> {
@@ -208,22 +210,19 @@ fn manage_linux_service(
         ServiceAction::Status => {
             cmd.arg("status").arg(name);
         }
+        ServiceAction::Enable => {
+            cmd.arg("enable").arg("--now").arg(name);
+        }
+        ServiceAction::Disable => {
+            cmd.arg("disable").arg("--now").arg(name);
+        }
     }
 
     let status = cmd
         .status()
         .with_context(|| format!("Failed to run systemctl for action {:?}", name))?;
     if !status.success() {
-        return Err(anyhow!(
-            "Failed to {} service '{}'.",
-            match action {
-                ServiceAction::Start => "start",
-                ServiceAction::Stop => "stop",
-                ServiceAction::Restart => "restart",
-                ServiceAction::Status => "get status of",
-            },
-            name
-        ));
+        return Err(anyhow!("Failed to perform service action on '{}'.", name));
     }
 
     Ok(())
@@ -321,7 +320,7 @@ fn manage_macos_service(
     }
 
     match action {
-        ServiceAction::Start => {
+        ServiceAction::Start | ServiceAction::Enable => {
             Command::new("launchctl")
                 .arg("bootstrap")
                 .arg(if is_user { "gui" } else { "system" })
@@ -329,7 +328,7 @@ fn manage_macos_service(
                 .status()
                 .context("Failed to run launchctl bootstrap")?;
         }
-        ServiceAction::Stop => {
+        ServiceAction::Stop | ServiceAction::Disable => {
             Command::new("launchctl")
                 .arg("bootout")
                 .arg(if is_user { "gui" } else { "system" })
@@ -508,6 +507,25 @@ fn manage_windows_service(
                 .arg(name)
                 .status()
                 .context("Failed to run sc query")?;
+        }
+        ServiceAction::Enable => {
+            if !service_exists_windows(name)? {
+                create_windows_service(name, service)?;
+            }
+            Command::new("sc")
+                .arg("config")
+                .arg(name)
+                .arg("start=auto")
+                .status()?;
+            Command::new("sc").arg("start").arg(name).status()?;
+        }
+        ServiceAction::Disable => {
+            Command::new("sc").arg("stop").arg(name).status()?;
+            Command::new("sc")
+                .arg("config")
+                .arg(name)
+                .arg("start=disabled")
+                .status()?;
         }
     }
     Ok(())
