@@ -41,14 +41,14 @@ keywords = ["cli", "package-manager", "dev-tools", "universal", "environment"]
 categories = ["command-line-utilities", "development-tools"]
 
 [workspace.dependencies]
-anyhow = "1.0.104"
+anyhow = "1.0.103"
 elb = "0.4.0"
 chrono = { version = "0.4.45", default-features = false, features = [
     "serde",
     "clock",
     "std",
 ] }
-clap = { version = "4.6.2", features = ["derive", "color"] }
+clap = { version = "4.6.3", features = ["derive", "color"] }
 clap_complete = "4.6.7"
 clap_mangen = "0.3.0"
 colored = "3.1.1"
