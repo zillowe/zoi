@@ -243,7 +243,7 @@ dependencies = [
  "regex",
  "rustc-hash",
  "shlex 1.3.0",
- "syn 2.0.118",
+ "syn",
 ]
 
 [[package]]
@@ -487,7 +487,7 @@ dependencies = [
  "heck",
  "proc-macro2",
  "quote",
- "syn 2.0.118",
+ "syn",
 ]
 
 [[package]]
@@ -812,7 +812,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "strsim",
- "syn 2.0.118",
+ "syn",
 ]
 
 [[package]]
@@ -823,7 +823,7 @@ checksum = "ac3984ec7bd6cfa798e62b4a642426a5be0e68f9401cfc2a01e3fa9ea2fcdb8d"
 dependencies = [
  "darling_core",
  "quote",
- "syn 2.0.118",
+ "syn",
 ]
 
 [[package]]
@@ -861,7 +861,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "rustc_version",
- "syn 2.0.118",
+ "syn",
 ]
 
 [[package]]
@@ -936,7 +936,7 @@ checksum = "1ac70aa55017e108007fbaf5aa0f54b021c98f92ff8af59d42eda9da96e3dd4f"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.118",
+ "syn",
 ]
 
 [[package]]
@@ -1693,7 +1693,7 @@ dependencies = [
  "indoc",
  "proc-macro2",
  "quote",
- "syn 2.0.118",
+ "syn",
 ]
 
 [[package]]
@@ -1759,7 +1759,7 @@ dependencies = [
  "quote",
  "rustc_version",
  "simd_cesu8",
- "syn 2.0.118",
+ "syn",
 ]
 
 [[package]]
@@ -1778,7 +1778,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "38c0b942f458fe50cdac086d2f946512305e5631e720728f2a61aabcd47a6264"
 dependencies = [
  "quote",
- "syn 2.0.118",
+ "syn",
 ]
 
 [[package]]
@@ -2255,7 +2255,7 @@ checksum = "a948666b637a0f465e8564c73e89d4dde00d72d4d473cc972f390fc3dcee7d9c"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.118",
+ "syn",
 ]
 
 [[package]]
@@ -2342,7 +2342,7 @@ dependencies = [
  "by_address",
  "proc-macro2",
  "quote",
- "syn 2.0.118",
+ "syn",
 ]
 
 [[package]]
@@ -2465,7 +2465,7 @@ dependencies = [
  "phf_shared 0.11.3",
  "proc-macro2",
  "quote",
- "syn 2.0.118",
+ "syn",
  "unicase",
 ]
 
@@ -2567,7 +2567,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "479ca8adacdd7ce8f1fb39ce9ecccbfe93a3f1344b3d0d97f20bc0196208f62b"
 dependencies = [
  "proc-macro2",
- "syn 2.0.118",
+ "syn",
 ]
 
 [[package]]
@@ -3236,7 +3236,7 @@ checksum = "d540f220d3187173da220f885ab66608367b6574e925011a9353e4badda91d79"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.118",
+ "syn",
 ]
 
 [[package]]
@@ -3498,7 +3498,7 @@ dependencies = [
  "heck",
  "proc-macro2",
  "quote",
- "syn 2.0.118",
+ "syn",
 ]
 
 [[package]]
@@ -3512,17 +3512,6 @@ name = "syn"
 version = "2.0.118"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b9ae57f904213ebb649ce6895b8a66c66f0203b9319718f69a5612a065b1422"
-dependencies = [
- "proc-macro2",
- "quote",
- "unicode-ident",
-]
-
-[[package]]
-name = "syn"
-version = "3.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a207d6d6a2b7fc470b80443726053f18a2481b7e1eee970597051596567987a3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3546,7 +3535,7 @@ checksum = "728a70f3dbaf5bab7f0c4b1ac8d7ae5ea60a4b5549c8a5914361c99147a709d2"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.118",
+ "syn",
 ]
 
 [[package]]
@@ -3605,22 +3594,22 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "2.0.19"
+version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09a43598840e33d5b0331f38c5e30d13bb11c11210a4b58f0d9b18a5a5eefcd9"
+checksum = "4288b5bcbc7920c07a1149a35cf9590a2aa808e0bc1eafaade0b80947865fbc4"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.19"
+version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43cbfe0cf76104d42a574802844187e84a305e531ed54455f11fbde0f10541cd"
+checksum = "ebc4ee7f67670e9b64d05fa4253e753e016c6c95ff35b89b7941d6b856dec1d5"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 3.0.2",
+ "syn",
 ]
 
 [[package]]
@@ -4091,7 +4080,7 @@ dependencies = [
  "bumpalo",
  "proc-macro2",
  "quote",
- "syn 2.0.118",
+ "syn",
  "wasm-bindgen-shared",
 ]
 
@@ -4185,7 +4174,7 @@ checksum = "053e2e040ab57b9dc951b72c264860db7eb3b0200ba345b4e4c3b14f67855ddf"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.118",
+ "syn",
 ]
 
 [[package]]
@@ -4196,7 +4185,7 @@ checksum = "3f316c4a2570ba26bbec722032c4099d8c8bc095efccdc15688708623367e358"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.118",
+ "syn",
 ]
 
 [[package]]
@@ -4393,7 +4382,7 @@ checksum = "de844c262c8848816172cef550288e7dc6c7b7814b4ee56b3e1553f275f1858e"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.118",
+ "syn",
  "synstructure",
 ]
 
@@ -4414,7 +4403,7 @@ checksum = "11532158c46691caf0f2593ea8358fed6bbf68a0315e80aae9bd41fbade684a1"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.118",
+ "syn",
  "synstructure",
 ]
 
@@ -4454,7 +4443,7 @@ checksum = "625dc425cab0dca6dc3c3319506e6593dcb08a9f387ea3b284dbd52a92c40555"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.118",
+ "syn",
 ]
 
 [[package]]
@@ -4485,7 +4474,7 @@ checksum = "b8848ee67ecc8aedbaf3e4122217aff892639231befc6a1b58d29fff4c2cabaa"
 
 [[package]]
 name = "zoi-audit"
-version = "1.23.4"
+version = "1.24.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4499,7 +4488,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-cli"
-version = "1.23.4"
+version = "1.24.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4558,7 +4547,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-core"
-version = "1.23.4"
+version = "1.24.0"
 dependencies = [
  "anyhow",
  "bsdiff",
@@ -4593,7 +4582,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-daemon"
-version = "1.23.4"
+version = "1.24.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -4602,13 +4591,16 @@ dependencies = [
  "serde_json",
  "zoi-core",
  "zoi-install",
+ "zoi-resolver",
  "zoi-rs",
  "zoi-system",
+ "zoi-transaction",
+ "zoi-uninstall",
 ]
 
 [[package]]
 name = "zoi-db"
-version = "1.23.4"
+version = "1.24.0"
 dependencies = [
  "anyhow",
  "rusqlite",
@@ -4619,7 +4611,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-deps"
-version = "1.23.4"
+version = "1.24.0"
 dependencies = [
  "anyhow",
  "colored",
@@ -4633,7 +4625,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-hooks"
-version = "1.23.4"
+version = "1.24.0"
 dependencies = [
  "anyhow",
  "colored",
@@ -4649,7 +4641,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-install"
-version = "1.23.4"
+version = "1.24.0"
 dependencies = [
  "anyhow",
  "colored",
@@ -4686,7 +4678,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-lua"
-version = "1.23.4"
+version = "1.24.0"
 dependencies = [
  "anyhow",
  "ar",
@@ -4713,7 +4705,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-mini"
-version = "1.23.4"
+version = "1.24.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -4725,7 +4717,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-package"
-version = "1.23.4"
+version = "1.24.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4753,7 +4745,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-plugins"
-version = "1.23.4"
+version = "1.24.0"
 dependencies = [
  "anyhow",
  "colored",
@@ -4781,7 +4773,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-pm"
-version = "1.23.4"
+version = "1.24.0"
 dependencies = [
  "phf 0.14.0",
  "phf_codegen",
@@ -4791,7 +4783,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-project"
-version = "1.23.4"
+version = "1.24.0"
 dependencies = [
  "anyhow",
  "clap_complete",
@@ -4811,7 +4803,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-purl"
-version = "1.23.4"
+version = "1.24.0"
 dependencies = [
  "anyhow",
  "purl",
@@ -4822,7 +4814,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-resolver"
-version = "1.23.4"
+version = "1.24.0"
 dependencies = [
  "anyhow",
  "colored",
@@ -4846,7 +4838,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-rs"
-version = "1.23.4"
+version = "1.24.0"
 dependencies = [
  "anyhow",
  "colored",
@@ -4862,7 +4854,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-sandbox"
-version = "1.23.4"
+version = "1.24.0"
 dependencies = [
  "anyhow",
  "home",
@@ -4871,7 +4863,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-sync"
-version = "1.23.4"
+version = "1.24.0"
 dependencies = [
  "anyhow",
  "colored",
@@ -4891,7 +4883,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-system"
-version = "1.23.4"
+version = "1.24.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -4919,7 +4911,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-telemetry"
-version = "1.23.4"
+version = "1.24.0"
 dependencies = [
  "chrono",
  "home",
@@ -4931,7 +4923,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-tests"
-version = "1.23.4"
+version = "1.24.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4982,7 +4974,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-transaction"
-version = "1.23.4"
+version = "1.24.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -5001,7 +4993,7 @@ dependencies = [
 
 [[package]]
 name = "zoi-uninstall"
-version = "1.23.4"
+version = "1.24.0"
 dependencies = [
  "anyhow",
  "colored",

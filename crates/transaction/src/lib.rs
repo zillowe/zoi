@@ -99,7 +99,13 @@ fn get_transactions_dir() -> Result<PathBuf> {
 }
 
 fn get_transaction_path(id: &str) -> Result<PathBuf> {
-    Ok(get_transactions_dir()?.join(format!("{}.json", id)))
+    let dir = get_transactions_dir()?;
+    let active_path = dir.join(format!("{}.json", id));
+    if active_path.exists() {
+        return Ok(active_path);
+    }
+    let history_path = dir.join("history").join(format!("{}.json", id));
+    Ok(history_path)
 }
 
 /// Starts a new package transaction.
@@ -153,14 +159,24 @@ pub fn record_operation(
 
     transaction.operations.push(operation);
 
-    let path = get_transaction_path(&transaction.id)?;
+    let path = get_transactions_dir()?.join(format!("{}.json", transaction.id));
     let content = serde_json::to_string_pretty(&transaction)?;
     fs::write(path, content)?;
     Ok(())
 }
 
 pub fn commit(transaction_id: &str) -> Result<()> {
-    delete_log(transaction_id)
+    let dir = get_transactions_dir()?;
+    let path = dir.join(format!("{}.json", transaction_id));
+    if !path.exists() {
+        return Ok(());
+    }
+
+    let history_dir = dir.join("history");
+    fs::create_dir_all(&history_dir)?;
+    let dest = history_dir.join(format!("{}.json", transaction_id));
+    fs::rename(path, dest)?;
+    Ok(())
 }
 
 pub fn get_modified_files(transaction_id: &str) -> Result<Vec<String>> {

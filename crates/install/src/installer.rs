@@ -346,7 +346,7 @@ pub fn install_prepared_node(
         if let Some(pb) = &step_pb {
             pb.set_message("Running pre-install hooks...");
         }
-        hooks::run_hooks(hooks, hooks::HookType::PreInstall)?;
+        hooks::run_hooks(hooks, hooks::HookType::PreInstall, pkg.scope)?;
     }
 
     let sub_package_to_install = node.sub_package.clone();
@@ -469,15 +469,18 @@ pub fn install_prepared_node(
     }
 
     if record {
-        if let Ok(conn) = db::open_connection("local") {
-            let _ = db::update_package(
+        if let Ok(conn) = db::open_connection("local")
+            && let Ok(pkg_id) = db::update_package(
                 &conn,
                 pkg,
                 handle,
                 Some(pkg.scope),
                 sub_package_to_install.as_deref(),
                 Some(&node.reason),
-            );
+            )
+        {
+            let _ = db::clear_package_files(&conn, pkg_id);
+            let _ = db::index_package_files(&conn, pkg_id, &manifest.installed_files);
         }
 
         if let Err(e) = recorder::record_package(
@@ -501,7 +504,7 @@ pub fn install_prepared_node(
         if let Some(pb) = &step_pb {
             pb.set_message("Running post-install hooks...");
         }
-        hooks::run_hooks(hooks, hooks::HookType::PostInstall)?;
+        hooks::run_hooks(hooks, hooks::HookType::PostInstall, pkg.scope)?;
     }
 
     if let Some(pb) = main_pb {

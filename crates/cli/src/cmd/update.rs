@@ -270,7 +270,7 @@ fn run_update_single_logic(
     let mut transaction = transaction::begin()?;
 
     if let Some(hooks) = &new_pkg.hooks {
-        hooks::run_hooks(hooks, hooks::HookType::PreUpgrade)?;
+        hooks::run_hooks(hooks, hooks::HookType::PreUpgrade, old_manifest.scope)?;
     }
 
     let (graph, _) = install::resolver::resolve_dependency_graph(
@@ -343,6 +343,7 @@ fn run_update_single_logic(
                     crate::pkg::hooks::global::HookWhen::PostTransaction,
                     &modified_files,
                     "upgrade",
+                    old_manifest.scope,
                 );
             }
             transaction::commit(&transaction.id)?;
@@ -388,7 +389,7 @@ fn run_update_single_logic(
         }
 
         if let Some(hooks) = &new_pkg.hooks {
-            hooks::run_hooks(hooks, hooks::HookType::PostUpgrade)?;
+            hooks::run_hooks(hooks, hooks::HookType::PostUpgrade, new_pkg.scope)?;
         }
 
         println!("\n{}", "Success:".green());
@@ -745,7 +746,11 @@ fn run_update_all_logic(
             );
 
             if let Some(hooks) = &candidate.new_pkg.hooks {
-                hooks::run_hooks(hooks, hooks::HookType::PreUpgrade)?;
+                hooks::run_hooks(
+                    hooks,
+                    hooks::HookType::PreUpgrade,
+                    candidate.old_manifest.scope,
+                )?;
             }
 
             let (graph, _) = match install::resolver::resolve_dependency_graph(
@@ -949,10 +954,18 @@ fn run_update_all_logic(
     }
 
     if let Ok(modified_files) = transaction::get_modified_files(&transaction_id) {
+        let upgrades_lock = successful_upgrades
+            .lock()
+            .map_err(|e| anyhow!("mutex poisoned: {}", e))?;
+        let first_scope = upgrades_lock
+            .first()
+            .map(|(old, _, _)| old.scope)
+            .unwrap_or(types::Scope::User);
         let _ = crate::pkg::hooks::global::run_global_hooks(
             crate::pkg::hooks::global::HookWhen::PostTransaction,
             &modified_files,
             "upgrade",
+            first_scope,
         );
     }
     transaction::commit(&transaction_id)?;
@@ -1008,7 +1021,8 @@ fn run_update_all_logic(
         }
 
         if let Some(hooks) = &new_pkg.hooks
-            && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PostUpgrade)
+            && let Err(e) =
+                hooks::run_hooks(hooks, hooks::HookType::PostUpgrade, new_manifest.scope)
         {
             eprintln!(
                 "{}: Post-upgrade hook failed for '{}': {}",
@@ -1088,7 +1102,7 @@ fn cleanup_old_versions(
 
     versions.sort();
 
-    let versions_to_keep = if rollback_enabled { 2 } else { 1 };
+    let versions_to_keep = if rollback_enabled { 3 } else { 1 };
 
     if versions.len() > versions_to_keep {
         let num_to_delete = versions.len() - versions_to_keep;

@@ -13,9 +13,9 @@ Zoi is packed with features designed to make package management and environment 
 - **Just-in-Time Privilege Escalation:** Automatically prompts for `sudo` password only when system-wide operations (like extracting to `/var/lib/zoi` or linking to `/usr/local/bin`) are required. This ensures your local package database and caches remain in your user-space, avoiding the need to run the entire CLI as root.
 
 - **ZoiOS Management (Exclusive):** Manage an entire operating system state declaratively via `/etc/zoi/system.lua`.
-  - **Generation-Based Architecture:** Every system change creates a new, versioned "Generation" in the store. Revert any OS update instantly via symlink flip or bootloader selection.
-  - **Transactional FHS View:** Zoi generates a standard FHS symlink farm (`/usr/bin`, `/usr/lib`, etc.) pointing to versioned assets, ensuring 100% compatibility with standard Linux software while maintaining a hashed store.
-  - **Universal Distro Builder:** Bootstrap an entire ZoiOS distribution onto a new disk or directory with a single command (`zoi system distro build`). Handles formatting, subvolume creation, and base system installation.
+  - **Transaction-Linked Generations:** Every system change creates a versioned "Generation" record linked to a Zoi package transaction. Revert any OS update safely by rolling back the associated transactions.
+  - **Direct FHS Installation:** ZoiOS installs packages directly into the system root (`/usr/bin`, `/usr/lib`, etc.), ensuring 100% compatibility with standard Linux software while maintaining a versioned store for safety.
+  - **Universal Distro Builder:** Bootstrap an entire ZoiOS distribution onto a manually partitioned and formatted disk or directory with a single command (`zoi system distro build`).
 
 - **Explicit Scope Control:** Restrict package installation to specific scopes (`user`, `system`, or `project`) using the `scopes` metadata field. Zoi automatically enforces these constraints during installation and updates.
 

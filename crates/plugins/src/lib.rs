@@ -9,7 +9,7 @@ use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use zoi_core::utils;
+use zoi_core::{types, utils};
 use zoi_project as project;
 use zoi_resolver::{local, resolve};
 
@@ -313,9 +313,22 @@ impl PluginManager {
         system
             .set("arch", parts.get(1).unwrap_or(&"unknown").to_string())
             .map_err(|e| anyhow!(e.to_string()))?;
+        if let Some(distro) = utils::get_linux_distribution() {
+            system
+                .set("distro", distro)
+                .map_err(|e| anyhow!(e.to_string()))?;
+        }
+        if let Some(dv) = utils::get_distro_version() {
+            system
+                .set("distro_ver", dv)
+                .map_err(|e| anyhow!(e.to_string()))?;
+        }
+
         zoi.set("system", system)
             .map_err(|e| anyhow!(e.to_string()))?;
         zoi.set("version", env!("CARGO_PKG_VERSION"))
+            .map_err(|e| anyhow!(e.to_string()))?;
+        zoi.set("scope", "user") // Default
             .map_err(|e| anyhow!(e.to_string()))?;
 
         let shell = self
@@ -340,6 +353,12 @@ impl PluginManager {
                     let (key, value) =
                         pair.map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
                     command.env(key, value);
+                }
+
+                if let Ok(zoi_table) = lua.globals().get::<Table>("zoi")
+                    && let Ok(scope_str) = zoi_table.get::<String>("scope")
+                {
+                    command.env("ZOI_SCOPE", scope_str);
                 }
 
                 let status = command.status();
@@ -778,6 +797,18 @@ impl PluginManager {
             .set("IMPORT", import_fn)
             .map_err(|e| anyhow!(e.to_string()))?;
 
+        Ok(())
+    }
+
+    pub fn set_context(&self, scope: types::Scope) -> Result<()> {
+        let zoi: Table = self
+            .lua
+            .globals()
+            .get("zoi")
+            .map_err(|e| anyhow!(e.to_string()))?;
+        let scope_str = format!("{:?}", scope).to_lowercase();
+        zoi.set("scope", scope_str)
+            .map_err(|e| anyhow!(e.to_string()))?;
         Ok(())
     }
 

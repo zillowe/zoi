@@ -258,6 +258,9 @@ pub fn get_linux_distribution_info() -> Option<HashMap<String, String>> {
 ///   to simplify downstream logic (e.g. Rocky, Alma, and CentOS all map to `fedora`
 ///   because they share the DNF/RPM ecosystem).
 pub fn get_linux_distro_family() -> Option<String> {
+    if is_zoios() {
+        return Some("zoios".to_string());
+    }
     if let Some(info) = get_linux_distribution_info() {
         if let Some(id_like) = info.get("ID_LIKE") {
             let families: Vec<&str> = id_like.split_whitespace().collect();
@@ -504,6 +507,7 @@ pub fn get_native_package_manager() -> Option<String> {
                     "void" => "xbps-install",
                     "solus" => "eopkg",
                     "guix" => "guix",
+                    "zoios" => "zoi",
                     _ => "unknown",
                 }
                 .to_string()

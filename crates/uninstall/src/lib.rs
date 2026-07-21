@@ -437,7 +437,7 @@ pub fn run(
         }
     } else {
         if let Some(hooks) = &pkg.hooks
-            && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PreRemove)
+            && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PreRemove, scope)
         {
             return Err(anyhow::anyhow!("Pre-remove hook failed: {}", e));
         }
@@ -653,12 +653,45 @@ pub fn run(
             }
         }
 
+        let pkg_id_opt = if let Ok(conn) = db::open_connection("local") {
+            db::get_package_id(
+                &conn,
+                &pkg.name,
+                manifest.sub_package.as_deref(),
+                &pkg.repo,
+                handle,
+            )
+            .ok()
+        } else {
+            None
+        };
+
         for file_path_str in &manifest.installed_files {
             let expanded = core_utils::expand_placeholders(file_path_str, &version_dir, scope)?;
-            let file_path = PathBuf::from(expanded);
+            let file_path = PathBuf::from(&expanded);
+
+            if let Some(pkg_id) = pkg_id_opt
+                && let Ok(conn) = db::open_connection("local")
+                && let Ok(true) = db::has_other_owners(&conn, file_path_str, pkg_id)
+            {
+                if !quiet {
+                    println!(
+                        "Keeping {} as it is still owned by other packages.",
+                        file_path_str.dimmed()
+                    );
+                }
+                continue;
+            }
+
             if file_path.exists() {
                 if file_path.is_dir() {
-                    let _ = fs::remove_dir_all(&file_path);
+                    // Only remove if empty to be safe
+                    if fs::read_dir(&file_path)
+                        .map(|mut e| e.next().is_none())
+                        .unwrap_or(false)
+                    {
+                        let _ = fs::remove_dir_all(&file_path);
+                    }
                 } else {
                     let _ = fs::remove_file(&file_path);
                 }
@@ -759,7 +792,7 @@ pub fn run(
         }
 
         if let Some(hooks) = &pkg.hooks
-            && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PostRemove)
+            && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PostRemove, scope)
             && !quiet
         {
             eprintln!("{} post-remove hook failed: {}", "Warning:".yellow(), e);

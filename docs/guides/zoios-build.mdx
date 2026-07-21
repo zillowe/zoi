@@ -66,28 +66,42 @@ filesystems({
 })
 ```
 
-## Step 2: Partition the Target Disk
+## Step 2: Partition and Format the Target Disk
 
-Before Zoi can orchestrate the installation, you must partition your target disk. ZoiOS strongly recommends Btrfs for the root filesystem to support snapshots and advanced rollback features.
+Before Zoi can orchestrate the installation, you must partition and format your target disk manually. ZoiOS strongly recommends Btrfs for the root filesystem to support snapshots.
 
 *Disclaimer: Replace `/dev/sdX` with your actual target device. Be extremely careful not to format your host machine's drive!*
 
+### Example Partitioning (UEFI)
+
 Use a tool like `parted` or `fdisk` to create:
 
-1. **Boot Partition** (e.g. `/dev/sdX1`, 512MB - 1GB)
-2. **Root Partition** (e.g. `/dev/sdX2`, remainder of disk)
+1. **EFI Partition** (e.g. `/dev/sdX1`, 512MB, format as `vfat`)
+2. **Root Partition** (e.g. `/dev/sdX2`, remainder of disk, format as `btrfs`)
 
-**Note:** You do **not** need to format them manually; `zoi system distro build` will handle formatting based on your `system.lua`.
+```bash
+# Example formatting
+sudo mkfs.vfat -F 32 /dev/sdX1
+sudo mkfs.btrfs -L zoios_root /dev/sdX2
+
+# Create subvolumes if desired
+sudo mount /dev/sdX2 /mnt
+sudo btrfs subvolume create /mnt/@root
+sudo btrfs subvolume create /mnt/@home
+sudo umount /mnt
+```
 
 ---
 
 ## Step 3: Run the Universal Distro Builder
 
-Now, simply run the builder. This is the "One-Command" step that replaces manual formatting, mounting, and package installation.
+Now, simply run the builder. This command establishes the system marker and installs the base packages.
 
 ```bash
-# We mount the target partition temporarily so Zoi knows where to install
-sudo mount /dev/sdX2 /mnt
+# We mount the target root subvolume temporarily so Zoi knows where to install
+sudo mount -o subvol=@root /dev/sdX2 /mnt
+sudo mkdir -p /mnt/boot/efi
+sudo mount /dev/sdX1 /mnt/boot/efi
 
 # Orchestrate the entire build
 sudo zoi system distro build --target /mnt --config ./target-system.lua
@@ -97,24 +111,25 @@ sudo zoi system distro build --target /mnt --config ./target-system.lua
 
 In this single step, Zoi:
 
-1. **Automates Formatting**: Executes `mkfs.btrfs` and `mkfs.ext4` on your partitions.
-2. **Manages Btrfs Subvolumes**: Creates `@root`, `@home`, and `@var` as defined in your mount options.
-3. **Initializes Sysroot**: Drops the `/etc/os-release` marker (`ID=zoios`) so the disk is recognized as ZoiOS.
-4. **Bootstrap Installation**: Directly installs the entire base package set (`@core/linux`, `@core/glibc`, etc.) into the target Zoi store.
-5. **Builds the First Generation**: Creates the FHS symlink farm (`/usr/bin`, etc.) so the disk layout is complete.
+1. **Initializes Sysroot**: Drops the `/etc/os-release` marker (`ID=zoios`) so the disk is recognized as ZoiOS.
+2. **Bootstrap Installation**: Directly installs the entire base package set (`@core/linux`, `@core/glibc`, etc.) into the target Zoi store and then into the system root.
+3. **Builds the First Generation**: Creates a lightweight record of the installation and links it to the package transaction.
+4. **Generates fstab**: Writes `/etc/fstab` based on your `system.lua` configuration.
 
 ---
 
 ## Step 4: Finalize the Bootloader
 
-Once the build is complete, the final step is to ensure the bootloader is installed on the target disk's master boot record (MBR) or EFI partition.
+Once the build is complete, you must ensure the bootloader is properly installed.
 
 ```bash
-sudo chroot /mnt
-grub-install /dev/sdX
-grub-mkconfig -o /boot/grub/grub.cfg
-exit
+# You can enter a chroot to finalize settings
+sudo zoi dev --root /mnt --run "grub-install /dev/sdX && grub-mkconfig -o /boot/grub/grub.cfg"
 ```
+
+<Callout title="Pro Tip">
+  Use `zoi system apply` inside the system or via `--root` to update your bootloader configuration declaratively.
+</Callout>
 
 ## Step 5: Reboot
 

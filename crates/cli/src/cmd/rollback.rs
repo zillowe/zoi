@@ -25,6 +25,7 @@ pub fn run(
         crate::cmd::installed_select::choose_installed_manifest(package_name, &candidates, yes)?;
 
     if let Some(pm) = plugin_manager {
+        pm.set_context(chosen.scope)?;
         pm.trigger_hook("on_rollback", None)?;
     }
     pkg::rollback::run(&pkg::local::installed_manifest_source(&chosen), yes)

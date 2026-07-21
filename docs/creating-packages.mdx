@@ -230,24 +230,43 @@ The `destination` argument uses special variables to place files in the correct 
 | `${usrroot}`      | Copies files to the system's root (`/`). **Use with caution.** Zoi will automatically prompt for `sudo` privileges if required to write to these paths. |
 | `${usrhome}`      | Copies files to the user's home directory (`~`).                                                                                                        |
 
+#### Pooled ZPA & Scope Awareness
+
+Zoi Specification v2 introduced the **Shared Pool + Mapping** architecture. This allows a single `.zpa` archive to support multiple installation scopes (`user`, `system`, `project`) perfectly, without duplicating file content.
+
+During `zoi package build`, Zoi executes your `package()` function multiple times—once for each supported scope. You can use the `ZOI.scope` variable to tailor the package structure:
+
+```lua
+function package()
+    if ZOI.scope == "system" then
+        -- On ZoiOS system scope, we install directly to /usr/bin
+        zcp("mytool", "${usrroot}/usr/bin/mytool")
+    else
+        -- Standard user or project install goes to the versioned store
+        zcp("mytool", "${pkgstore}/bin/mytool")
+    end
+end
+```
+
+Zoi hashes all staged files into a central `pool/` directory and generates a mapping manifest. This ensures that even if `package()` behaves differently across scopes, the archive remains compact and efficient.
+
 #### Packaging for ZoiOS (System Scope)
 
 When creating packages specifically for ZoiOS (like the `@core` bootstrap set), keep the following path conventions in mind:
 
-- **`${pkgstore}` is treated as `/usr`**: For system-scoped packages, ZoiOS mirrors the `pkgstore` contents into the global `/usr` directory of the active generation.
-  - Stage binaries to `${pkgstore}/bin/`.
-  - Stage libraries to `${pkgstore}/lib/`.
-  - Stage headers to `${pkgstore}/include/`.
-- **Use `${usrroot}` for outside of `/usr`**: If a file *must* exist outside of the read-only `/usr` tree (like in `/etc` or `/var`), use `${usrroot}`.
-  - **Important:** Files placed via `${usrroot}` are NOT part of the Generation symlink farm and will persist across system rollbacks. Use this only for persistent configuration or state.
+- **Direct Root Installation**: For system-scoped packages on ZoiOS, it is recommended to install directly to `${usrroot}/usr/...`.
+- **Selective Persistence**: Use `${usrroot}` for files that must live outside of `/usr` (like in `/etc` or `/var`).
 
 ```lua
 function package()
-    -- Available in the versioned Generation view (/usr/bin/mytool)
-    zcp("mytool", "${pkgstore}/bin/mytool")
-
-    -- Persistent system-wide config (/etc/mytool.conf)
-    zcp("mytool.conf", "${usrroot}/etc/mytool.conf")
+    if ZOI.scope == "system" then
+        -- Installed to the live system root (/usr/bin/mytool)
+        zcp("mytool", "${usrroot}/usr/bin/mytool")
+        -- Persistent system-wide config (/etc/mytool.conf)
+        zcp("mytool.conf", "${usrroot}/etc/mytool.conf")
+    else
+        zcp("mytool", "${pkgstore}/bin/mytool")
+    end
 end
 ```
 

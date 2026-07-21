@@ -63,6 +63,17 @@ action:
 
 ---
 
+## Hook Environment
+
+When Zoi executes a hook's `action.exec` command, it injects the following environment variables:
+
+- `ZOI_SCOPE`: The scope of the current transaction (`user`, `system`, or `project`).
+- `ZOI_TRANSACTION_ID`: The UUID v7 identifier for the active transaction.
+
+This allows hooks to perform scope-specific actions, such as reloading a user-space daemon versus a system-wide service.
+
+---
+
 ## Builtin Hooks
 
 Zoi ships with several essential builtin hooks for Linux systems:

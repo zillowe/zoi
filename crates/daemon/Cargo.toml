@@ -8,6 +8,7 @@ license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 documentation.workspace = true
+publish = false
 
 [[bin]]
 name = "zoid"
@@ -18,6 +19,9 @@ zoi.workspace = true
 zoi-core.workspace = true
 zoi-system.workspace = true
 zoi-install.workspace = true
+zoi-transaction.workspace = true
+zoi-resolver.workspace = true
+zoi-uninstall.workspace = true
 anyhow.workspace = true
 nix.workspace = true
 serde.workspace = true

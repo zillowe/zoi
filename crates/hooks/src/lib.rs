@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
 use colored::*;
 use std::process::Command;
-use zoi_core::types::{Hooks, PlatformOrStringVec};
+use zoi_core::types::{self, Hooks, PlatformOrStringVec};
 use zoi_core::utils;
 
 pub mod global;
@@ -15,14 +15,23 @@ pub enum HookType {
     PostRemove,
 }
 
-fn execute_commands(commands: &[String]) -> Result<()> {
+fn execute_commands(commands: &[String], scope: types::Scope) -> Result<()> {
+    let scope_str = format!("{:?}", scope).to_lowercase();
     for cmd_str in commands {
         println!("> {}", cmd_str.cyan());
-        let status = if cfg!(target_os = "windows") {
-            Command::new("pwsh").arg("-Command").arg(cmd_str).status()?
+        let mut command = if cfg!(target_os = "windows") {
+            let mut c = Command::new("pwsh");
+            c.arg("-Command").arg(cmd_str);
+            c
         } else {
-            Command::new("bash").arg("-c").arg(cmd_str).status()?
+            let mut c = Command::new("bash");
+            c.arg("-c").arg(cmd_str);
+            c
         };
+
+        command.env("ZOI_SCOPE", &scope_str);
+
+        let status = command.status()?;
 
         if !status.success() {
             return Err(anyhow!("Hook command failed: {}", cmd_str));
@@ -31,7 +40,7 @@ fn execute_commands(commands: &[String]) -> Result<()> {
     Ok(())
 }
 
-pub fn run_hooks(hooks: &Hooks, hook_type: HookType) -> Result<()> {
+pub fn run_hooks(hooks: &Hooks, hook_type: HookType, scope: types::Scope) -> Result<()> {
     let platform = utils::get_platform()?;
 
     let commands_to_run = match hook_type {
@@ -46,13 +55,13 @@ pub fn run_hooks(hooks: &Hooks, hook_type: HookType) -> Result<()> {
     if let Some(platform_or_string_vec) = commands_to_run {
         match platform_or_string_vec {
             PlatformOrStringVec::StringVec(cmds) => {
-                execute_commands(cmds)?;
+                execute_commands(cmds, scope)?;
             }
             PlatformOrStringVec::Platform(platform_map) => {
                 if let Some(cmds) = platform_map.get(&platform) {
-                    execute_commands(cmds)?;
+                    execute_commands(cmds, scope)?;
                 } else if let Some(cmds) = platform_map.get("default") {
-                    execute_commands(cmds)?;
+                    execute_commands(cmds, scope)?;
                 }
             }
         }

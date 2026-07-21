@@ -265,10 +265,17 @@ fn is_hook_trusted(hook: &GlobalHook) -> Result<bool> {
     }
 }
 
-pub fn run_global_hooks(when: HookWhen, modified_files: &[String], operation: &str) -> Result<()> {
+pub fn run_global_hooks(
+    when: HookWhen,
+    modified_files: &[String],
+    operation: &str,
+    scope: types::Scope,
+) -> Result<()> {
     let all_hooks = load_all_hooks()?;
     let mut triggered_hooks = HashSet::new();
     let current_platform = utils::get_platform()?;
+
+    let scope_str = format!("{:?}", scope).to_lowercase();
 
     for hook in all_hooks {
         if hook.action.when != when {
@@ -302,17 +309,19 @@ pub fn run_global_hooks(when: HookWhen, modified_files: &[String], operation: &s
                 hook.description.dimmed()
             );
 
-            let status = if cfg!(target_os = "windows") {
-                Command::new("pwsh")
-                    .arg("-Command")
-                    .arg(&hook.action.exec)
-                    .status()?
+            let mut command = if cfg!(target_os = "windows") {
+                let mut c = Command::new("pwsh");
+                c.arg("-Command").arg(&hook.action.exec);
+                c
             } else {
-                Command::new("bash")
-                    .arg("-c")
-                    .arg(&hook.action.exec)
-                    .status()?
+                let mut c = Command::new("bash");
+                c.arg("-c").arg(&hook.action.exec);
+                c
             };
+
+            command.env("ZOI_SCOPE", &scope_str);
+
+            let status = command.status()?;
 
             if !status.success() {
                 eprintln!(
