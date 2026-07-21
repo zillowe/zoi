@@ -216,29 +216,46 @@ pub fn run(source: String, bin: Option<String>, args: Vec<String>, verbose: bool
         );
     }
 
+    let mut envs = HashMap::new();
+    envs.insert("PATH".to_string(), new_path);
+
     #[cfg(target_os = "linux")]
-    let mut cmd = if let Some(sandbox_config) = &node.pkg.sandbox
-        && sandbox_config.enabled
-    {
-        if verbose {
-            println!("{} Sandboxing with bwrap.", "::".bold().yellow());
+    let mut cmd = {
+        let sysroot = zoi_core::sysroot::get_sysroot();
+        if let Some(root) = sysroot {
+            if verbose {
+                println!(
+                    "{} Executing within sysroot: {}",
+                    "::".bold().yellow(),
+                    root.display()
+                );
+            }
+            let exe_inside_root = actual_bin_path
+                .strip_prefix(&root)
+                .map(PathBuf::from)
+                .unwrap_or(actual_bin_path.clone());
+
+            crate::sandbox::wrap_command_in_root(&root, &exe_inside_root, &args, &envs)?
+        } else if let Some(sandbox_config) = &node.pkg.sandbox
+            && sandbox_config.enabled
+        {
+            if verbose {
+                println!("{} Sandboxing with bwrap.", "::".bold().yellow());
+            }
+            crate::sandbox::wrap_command(&actual_bin_path, &args, sandbox_config, &version_dir)?
+        } else {
+            let mut c = Command::new(&actual_bin_path);
+            c.args(&args);
+            c.envs(&envs);
+            c
         }
-        let mut bwrap_cmd =
-            crate::sandbox::wrap_command(&actual_bin_path, &args, sandbox_config, &version_dir)?;
-        bwrap_cmd.env("PATH", &new_path);
-        bwrap_cmd
-    } else {
-        let mut c = Command::new(&actual_bin_path);
-        c.args(&args);
-        c.env("PATH", &new_path);
-        c
     };
 
     #[cfg(not(target_os = "linux"))]
     let mut cmd = {
         let mut c = Command::new(&actual_bin_path);
         c.args(&args);
-        c.env("PATH", &new_path);
+        c.envs(&envs);
         c
     };
 

@@ -5,10 +5,10 @@ use anyhow::{Result, anyhow};
 use clap::CommandFactory;
 use clap_complete::{Shell, generate};
 use colored::*;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Mutex;
 
@@ -454,55 +454,107 @@ pub fn enter_ephemeral_shell(
         }
     }
 
+    let sep = if cfg!(windows) { ";" } else { ":" };
     let mut new_path = temp_bin_dir.to_string_lossy().to_string();
     if let Ok(old_path) = std::env::var("PATH") {
-        new_path = format!(
-            "{}{}{}",
-            new_path,
-            if cfg!(windows) { ";" } else { ":" },
-            old_path
-        );
+        new_path = format!("{}{}{}", new_path, sep, old_path);
     }
 
     let package_list = package_sources.join(",");
 
-    let mut shell_command = if let Some(cmd_str) = run_cmd {
-        if verbose {
-            println!("{} Running: {}", "::".bold().blue(), cmd_str.cyan());
-        }
+    let shell_bin = std::env::var("SHELL").unwrap_or_else(|_| {
         if cfg!(windows) {
-            let mut c = Command::new("pwsh");
-            c.arg("-Command").arg(&cmd_str);
+            "pwsh".to_string()
+        } else {
+            "bash".to_string()
+        }
+    });
+
+    let mut envs = HashMap::new();
+    envs.insert("PATH".to_string(), new_path);
+    envs.insert("ZOI_SHELL".to_string(), "ephemeral".to_string());
+    envs.insert("IN_ZOI_SHELL".to_string(), "ephemeral".to_string());
+    envs.insert("ZOI_SHELL_PACKAGES".to_string(), package_list);
+
+    #[cfg(target_os = "linux")]
+    let mut shell_command = {
+        let sysroot = zoi_core::sysroot::get_sysroot();
+        if let Some(root) = sysroot {
+            if verbose {
+                println!(
+                    "{} Entering shell within sysroot: {}",
+                    "::".bold().yellow(),
+                    root.display()
+                );
+            }
+
+            if let Some(cmd_str) = run_cmd {
+                let args = vec!["-c".to_string(), cmd_str];
+                crate::sandbox::wrap_command_in_root(&root, Path::new(&shell_bin), &args, &envs)?
+            } else {
+                crate::sandbox::wrap_command_in_root(&root, Path::new(&shell_bin), &[], &envs)?
+            }
+        } else if let Some(cmd_str) = run_cmd {
+            if verbose {
+                println!("{} Running: {}", "::".bold().blue(), cmd_str.cyan());
+            }
+            let mut c = if cfg!(windows) {
+                Command::new("pwsh")
+            } else {
+                Command::new("bash")
+            };
+            if !cfg!(windows) {
+                c.arg("-c");
+            } else {
+                c.arg("-Command");
+            }
+            c.arg(&cmd_str);
+            c.envs(&envs);
             c
         } else {
-            let mut c = Command::new("bash");
-            c.arg("-c").arg(&cmd_str);
+            if verbose {
+                println!(
+                    "{} Entering ephemeral shell (type 'exit' to leave)...",
+                    "::".bold().green()
+                );
+            }
+            let mut c = Command::new(&shell_bin);
+            c.envs(&envs);
             c
         }
-    } else {
-        let shell_bin = std::env::var("SHELL").unwrap_or_else(|_| {
-            if cfg!(windows) {
-                "pwsh".to_string()
-            } else {
-                "bash".to_string()
-            }
-        });
-
-        if verbose {
-            println!(
-                "{} Entering ephemeral shell (type 'exit' to leave)...",
-                "::".bold().green()
-            );
-        }
-
-        Command::new(&shell_bin)
     };
 
-    shell_command
-        .env("PATH", new_path)
-        .env("ZOI_SHELL", "ephemeral")
-        .env("IN_ZOI_SHELL", "ephemeral")
-        .env("ZOI_SHELL_PACKAGES", package_list);
+    #[cfg(not(target_os = "linux"))]
+    let mut shell_command = {
+        if let Some(cmd_str) = run_cmd {
+            if verbose {
+                println!("{} Running: {}", "::".bold().blue(), cmd_str.cyan());
+            }
+            let mut c = if cfg!(windows) {
+                Command::new("pwsh")
+            } else {
+                Command::new("bash")
+            };
+            if !cfg!(windows) {
+                c.arg("-c");
+            } else {
+                c.arg("-Command");
+            }
+            c.arg(&cmd_str);
+            c.envs(&envs);
+            c
+        } else {
+            if verbose {
+                println!(
+                    "{} Entering ephemeral shell (type 'exit' to leave)...",
+                    "::".bold().green()
+                );
+            }
+            let mut c = Command::new(&shell_bin);
+            c.envs(&envs);
+            c
+        }
+    };
 
     let status = shell_command.status()?;
 
