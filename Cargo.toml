@@ -41,7 +41,7 @@ keywords = ["cli", "package-manager", "dev-tools", "universal", "environment"]
 categories = ["command-line-utilities", "development-tools"]
 
 [workspace.dependencies]
-anyhow = "1.0.103"
+anyhow = "1.0.104"
 elb = "0.4.0"
 chrono = { version = "0.4.45", default-features = false, features = [
     "serde",
