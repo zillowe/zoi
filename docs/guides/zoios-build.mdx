@@ -120,15 +120,16 @@ In this single step, Zoi:
 
 ## Step 4: Finalize the Bootloader
 
-Once the build is complete, you must ensure the bootloader is properly installed.
+Once the build is complete, you must ensure the bootloader is properly installed. Zoi makes this easy by allowing you to enter an ephemeral shell that is redirected into your new system's root using the `--root` flag.
 
 ```bash
-# You can enter a chroot to finalize settings
-sudo zoi dev --root /mnt --run "grub-install /dev/sdX && grub-mkconfig -o /boot/grub/grub.cfg"
+# Finalize the bootloader using a Zoi ephemeral shell
+# This automatically handles mounting /dev, /proc, and /sys into the target
+sudo zoi shell -p @core/grub2 --root /mnt --run "grub-install /dev/sdX && grub-mkconfig -o /boot/grub/grub.cfg"
 ```
 
 <Callout title="Pro Tip">
-  Use `zoi system apply` inside the system or via `--root` to update your bootloader configuration declaratively.
+  Using `zoi shell -p --root` is preferred over manual `chroot` because it leverages Zoi's sandbox engine to safely bridge your host's system devices into the target environment.
 </Callout>
 
 ## Step 5: Reboot
@@ -138,6 +139,59 @@ Unmount the filesystems and reboot into your newly built ZoiOS system!
 ```bash
 sudo umount -R /mnt
 sudo reboot
+```
+
+---
+
+## Creating a Bootable USB Stick
+
+You can use Zoi to create a fully persistent, declarative ZoiOS USB stick. This is perfect for a portable "Swiss Army Knife" OS or a secure live environment.
+
+### 1. Prepare the Configuration
+
+Create a `usb-system.lua` file. It should look like a standard ZoiOS configuration but optimized for USB (e.g. using `ext4` or `btrfs` with `noatime`).
+
+### 2. Partition and Format the USB
+
+Assuming your USB is `/dev/sdX`:
+
+```bash
+# Create EFI and Root partitions
+sudo parted /dev/sdX -- mklabel gpt
+sudo parted /dev/sdX -- mkpart ESP fat32 1MiB 512MiB
+sudo parted /dev/sdX -- set 1 esp on
+sudo parted /dev/sdX -- mkpart primary ext4 512MiB 100%
+
+# Format and Label
+sudo mkfs.vfat -F 32 -n ZOI_BOOT /dev/sdX1
+sudo mkfs.ext4 -L ZOI_ROOT /dev/sdX2
+```
+
+### 3. Mount and Build
+
+```bash
+sudo mkdir -p /mnt/zoi-usb
+sudo mount /dev/sdX2 /mnt/zoi-usb
+sudo mkdir -p /mnt/zoi-usb/boot/efi
+sudo mount /dev/sdX1 /mnt/zoi-usb/boot/efi
+
+# Bootstrap the OS
+sudo zoi system distro build --target /mnt/zoi-usb --config ./usb-system.lua
+```
+
+### 4. Finalize the Bootloader
+
+Use the Zoi ephemeral shell to install GRUB to the USB's EFI partition in removable mode:
+
+```bash
+sudo zoi shell -p @core/grub2 --root /mnt/zoi-usb --run "grub-install --target=x86_64-efi --efi-directory=/boot/efi --removable && grub-mkconfig -o /boot/grub/grub.cfg"
+```
+
+### 5. Cleanup and Boot
+
+```bash
+sudo umount -R /mnt/zoi-usb
+sync
 ```
 
 ## How It Works: The ZoiOS Guard

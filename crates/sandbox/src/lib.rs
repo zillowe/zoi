@@ -154,6 +154,51 @@ pub fn wrap_command(
     Ok(bwrap)
 }
 
+/// Wraps a command in a sysroot (chroot-like) using Bubblewrap on Linux.
+///
+/// This binds the host's sysroot directory to '/' in the sandbox,
+/// and provides access to essential system devices and kernels (/dev, /proc, /sys).
+pub fn wrap_command_in_root(
+    sysroot: &Path,
+    exe_inside_root: &Path,
+    args: &[String],
+    env: &std::collections::HashMap<String, String>,
+) -> Result<Command> {
+    if !zoi_core::utils::command_exists("bwrap") {
+        return Err(anyhow!(
+            "Bubblewrap ('bwrap') is required for sysroot execution but was not found. Please install it."
+        ));
+    }
+
+    let mut bwrap = Command::new("bwrap");
+
+    // Bind the sysroot to /
+    bwrap.arg("--bind").arg(sysroot).arg("/");
+
+    // Essential system mounts for hardware interaction (grub, etc)
+    bwrap.arg("--dev").arg("/dev");
+    bwrap.arg("--proc").arg("/proc");
+    bwrap.arg("--bind").arg("/sys").arg("/sys");
+    bwrap.arg("--tmpfs").arg("/run");
+    bwrap.arg("--tmpfs").arg("/tmp");
+
+    // Share network for downloads/etc if needed
+    bwrap.arg("--share-net");
+
+    bwrap.arg("--die-with-parent");
+
+    // Set environment variables
+    bwrap.arg("--clearenv");
+    for (k, v) in env {
+        bwrap.arg("--setenv").arg(k).arg(v);
+    }
+
+    bwrap.arg("--").arg(exe_inside_root);
+    bwrap.args(args);
+
+    Ok(bwrap)
+}
+
 fn expand_home(path: &str) -> Result<PathBuf> {
     if let Some(stripped) = path.strip_prefix("~/") {
         let home = home::home_dir()
