@@ -13,7 +13,7 @@ use std::path::PathBuf;
 // Development, Special, Public or Production
 const BRANCH: &str = "Production";
 const STATUS: &str = "Release";
-const NUMBER: &str = "1.23.4";
+const NUMBER: &str = "1.24.0";
 const PKG_SOURCE_HELP: &str = "Package identifier (e.g. @repo/name, path, or URL)";
 
 /// Zoi - The Advanced Package Manager & Environment Orchestrator.
