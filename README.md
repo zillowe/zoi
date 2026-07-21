@@ -84,8 +84,13 @@ Zoi is an advanced package manager and environment orchestrator, designed to sim
 ## Features
 
 - **Cross-Platform:** Works seamlessly on Linux, macOS, and Windows.
+- **Just-in-Time Privilege Escalation:** Automatically prompts for `sudo` only when system-wide operations are required, keeping your environment and caches cleanly in user-space.
 - **Dynamic Package Definitions:** Define packages with dynamic Lua scripts (`.pkg.lua`) for maximum flexibility.
+- **Universal Package Support:** Install packages from pre-built binaries, compressed archives, or build them from source.
+- **ZoiOS Distro Engine:** Bootstrap and manage entire Linux distributions declaratively. Includes generational rollbacks and transactional FHS views.
 - **Extensive Dependency Management:** Integrates with over 40 system and language package managers (`apt`, `brew`, `cargo`, `npm`, `pip`, `go`, `bun`, etc.).
+- **Version Multiplexing via Intelligent Shims:** Automatically switch between different versions of the same tool (e.g. Node.js 18 vs 20) based on your project context (`zoi.lua`) or legacy configuration files (`.nvmrc`) through its extensible Lua plugin system.
+- **Rich Dependencies:** Define runtime and build dependencies with required, optional, and selectable options.
 - **Project Environments:** Manage project-specific commands and environments using a local `zoi.yaml` or a `zoi.lua` file.
 - **Repository-Based:** Use official, community, or your own private/public Git-based repositories. Manage multiple registries.
 - **Secure & Verifiable:** Verifies package integrity with checksums and authenticity with GPG signatures. Supports Git commit signature verification for entire registries (Chain of Trust) and includes a built-in PGP keyring for out-of-the-box security.
@@ -97,13 +102,17 @@ Zoi is an advanced package manager and environment orchestrator, designed to sim
   - `Collection`: A meta-package that groups other packages together.
   - `App`: A template for bootstrapping new projects (`zoi create`).
   - `Extension`: A package to extend Zoi's own functionality or configuration.
-- **Local Package Development:** A dedicated `zoi package` command set (`build`, `install`) to streamline creating and testing packages locally.
+- **Local Package Development:** A dedicated `zoi package` command set (`build`, `bundle`, `install`, `doctor`, `init-lsp`) to streamline creating, linting, and testing packages locally.
 - **Advanced CLI Tools:**
-  - `zoi search`: Interactive TUI mode with result sorting and rich metadata.
-  - `zoi audit`: Scan installed packages for known security vulnerabilities.
-  - `zoi doctor`: Proactive system health checks, including orphaned package detection and broken symlink scanning.
   - `zoi man`: Read package manuals in the terminal.
-  - `zoi rollback`: Revert a package to its previous version or rollback the entire last transaction.
+  - `zoi audit`: Scan installed packages for known security vulnerabilities.
+  - `zoi clone`: Clone a package's git repository.
+  - `zoi download`: Download a package archive (.zpa) or source bundle (.zsa).
+  - `zoi why`: Understand why a package is installed.
+  - `zoi rollback`: Revert a package to its previous version or roll back the newest remaining transaction log.
+  - `zoi pin`: Pin a package to a specific version.
+  - `zoi exec`: Run a package's binary without installing it.
+  - `zoi dev`: Enter a project-specific development shell with all dependencies.
 - **Zoi Mini:** A lightweight, zero-sync version for quick, one-off installations via `zm.sh` or `zm.ps1`. Supports `install`, `update`, `uninstall`, and `list` commands.
 - **Library Support:** Core functionality is available as a Rust library to be integrated into other applications.
 
@@ -355,6 +364,18 @@ Here are some common commands to get you started.
   zoi search <term> -i
   ```
 
+- **Find which package provides a command:**
+
+  ```sh
+  zoi provides <command>
+  ```
+
+- **View dependency tree:**
+
+  ```sh
+  zoi tree <package_name>
+  ```
+
 - **View operation history:**
 
   ```sh
@@ -374,16 +395,29 @@ Here are some common commands to get you started.
   zoi run <command_alias>
   ```
 
+- **Enter a development shell:**
+
+  ```sh
+  # Enter a subshell with project dependencies available
+  zoi dev
+  ```
+
 - **Run a command without installing the package:**
 
   ```sh
   zoi exec <package_name> -- <command>
   ```
 
-- **Enter a shell with a package:**
+- **Enter an ephemeral shell with packages:**
 
   ```sh
-  zoi shell -p <package_name>
+  zoi shell -p <package1> <package2>
+  ```
+
+- **Create a new project from a template:**
+
+  ```sh
+  zoi create <app_template> <project_name>
   ```
 
 - **Add a new repository:**

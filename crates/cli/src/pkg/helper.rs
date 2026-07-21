@@ -82,7 +82,11 @@ pub fn elevate_uninstall(cmd: &crate::cmd::helper::ElevateUninstallCommand) -> R
     if let Some(pkg) = &pkg_opt
         && let Some(hooks) = &pkg.hooks
     {
-        let _ = crate::pkg::hooks::run_hooks(hooks, crate::pkg::hooks::HookType::PreRemove);
+        let _ = crate::pkg::hooks::run_hooks(
+            hooks,
+            crate::pkg::hooks::HookType::PreRemove,
+            manifest.scope,
+        );
     }
 
     if pkg_lua_path.exists() {
@@ -218,7 +222,11 @@ pub fn elevate_uninstall(cmd: &crate::cmd::helper::ElevateUninstallCommand) -> R
     if let Some(pkg) = &pkg_opt
         && let Some(hooks) = &pkg.hooks
     {
-        let _ = crate::pkg::hooks::run_hooks(hooks, crate::pkg::hooks::HookType::PostRemove);
+        let _ = crate::pkg::hooks::run_hooks(
+            hooks,
+            crate::pkg::hooks::HookType::PostRemove,
+            manifest.scope,
+        );
     }
 
     Ok(())

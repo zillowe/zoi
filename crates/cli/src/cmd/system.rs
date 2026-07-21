@@ -140,7 +140,7 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
 
                 if !dry_run
                     && !zoi_core::utils::ask_for_confirmation(
-                        "Are you sure you want to proceed with the build? This will format the target device!",
+                        "Are you sure you want to proceed with the build? This will install ZoiOS to the target device.",
                         yes,
                     )
                 {
@@ -152,9 +152,6 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
                     "::".bold().blue(),
                     target.cyan()
                 );
-
-                //Format & Subvolumes
-                zoi_system::distro::prepare_target_filesystems(&config, dry_run)?;
 
                 // Marker
                 zoi_system::distro::initialize_zoios_marker(
@@ -314,7 +311,7 @@ fn print_build_summary(target: &str, config: &zoi_system::config::SystemConfig, 
     ]);
     for fs in &config.filesystems {
         fs_table.add_row(vec![
-            "Format".red().to_string(),
+            "Configure (fstab)".blue().to_string(),
             fs.device.clone(),
             fs.fs_type.clone(),
             fs.mount.clone(),

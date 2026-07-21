@@ -175,12 +175,117 @@ fn handle_client(mut stream: UnixStream, gen_manager: &GenerationManager) -> Res
             Ok(gens) => Response::Generations(gens),
             Err(e) => Response::Error(e.to_string()),
         },
-        Request::RollbackGeneration(id) => match gen_manager.activate_generation(id) {
-            Ok(_) => Response::Success(format!("Activated generation {}", id)),
-            Err(e) => Response::Error(e.to_string()),
-        },
+        Request::RollbackGeneration(target_id) => {
+            let mut gens = gen_manager.list_generations()?;
+            gens.sort_by_key(|g| g.id);
+
+            let current_id = gen_manager.get_current_generation_id()?.unwrap_or(0);
+
+            if target_id >= current_id {
+                Response::Error(format!(
+                    "Target generation {} is not older than current generation {}",
+                    target_id, current_id
+                ))
+            } else {
+                let gens_to_rollback: Vec<_> = gens
+                    .into_iter()
+                    .filter(|g| g.id > target_id && g.id <= current_id)
+                    .rev()
+                    .collect();
+
+                let mut rolled_back_ids = Vec::new();
+                let mut error = None;
+
+                for g in gens_to_rollback {
+                    if let Some(tid) = g.transaction_id {
+                        println!(
+                            "Rolling back transaction {} for generation {}...",
+                            tid, g.id
+                        );
+                        if let Err(e) = zoi_transaction::rollback(&tid) {
+                            error = Some(format!(
+                                "Failed to roll back transaction {} for generation {}: {}",
+                                tid, g.id, e
+                            ));
+                            break;
+                        }
+                    } else {
+                        println!(
+                            "Warning: Generation {} has no transaction ID. Performing legacy activation.",
+                            g.id
+                        );
+                    }
+                    rolled_back_ids.push(g.id);
+                }
+
+                if let Some(err) = error {
+                    Response::Error(err)
+                } else {
+                    if let Err(e) = gen_manager.activate_generation(target_id) {
+                        Response::Error(format!(
+                            "Transactions rolled back, but failed to activate generation {}: {}",
+                            target_id, e
+                        ))
+                    } else {
+                        Response::Success(format!(
+                            "Successfully rolled back to generation {}. (Rolled back generations: {:?})",
+                            target_id, rolled_back_ids
+                        ))
+                    }
+                }
+            }
+        }
         Request::ApplySystemConfig(config) => {
             println!("Applying system configuration...");
+
+            // --- Phase 1: Declarative Uninstallation ---
+            // We identify packages that are currently installed in the system scope
+            // but are no longer present in the new system.lua configuration.
+            if let Ok(installed) = zoi_resolver::local::get_installed_packages() {
+                let current_system_packages: Vec<_> = installed
+                    .into_iter()
+                    .filter(|m| m.scope == zoi::Scope::System)
+                    .collect();
+
+                let new_package_specs = &config.packages;
+
+                for manifest in current_system_packages {
+                    let mut is_still_requested = false;
+                    for spec in new_package_specs {
+                        if let Ok(request) = zoi_resolver::resolve::parse_source_string(spec)
+                            && request.name == manifest.name
+                            && request.sub_package == manifest.sub_package
+                            && request.repo.as_ref().is_none_or(|r| r == &manifest.repo)
+                            && request
+                                .handle
+                                .as_ref()
+                                .is_none_or(|h| h == &manifest.registry_handle)
+                        {
+                            is_still_requested = true;
+                            break;
+                        }
+                    }
+
+                    if !is_still_requested {
+                        let source = zoi_resolver::local::installed_manifest_source(&manifest);
+                        println!("Removing package no longer in configuration: {}...", source);
+                        if let Err(e) = zoi_uninstall::run(
+                            &source,
+                            Some(zoi::Scope::System),
+                            true,
+                            false,
+                            false,
+                        ) {
+                            eprintln!(
+                                "Warning: failed to uninstall orphaned system package {}: {}",
+                                source, e
+                            );
+                        }
+                    }
+                }
+            }
+
+            // --- Phase 2: Installation ---
             let sources = config.packages.clone();
             let install_options = zoi::SourceInstallOptions {
                 scope_override: Some(zoi::Scope::System),
@@ -191,7 +296,10 @@ fn handle_client(mut stream: UnixStream, gen_manager: &GenerationManager) -> Res
             if let Err(e) = zoi::install_sources(&sources, &install_options) {
                 Response::Error(format!("Failed to install system packages: {}", e))
             } else {
-                match gen_manager.create_generation(config.packages) {
+                let transaction_id = zoi_transaction::get_last_transaction_id().ok().flatten();
+                match gen_manager
+                    .create_generation_with_transaction(config.packages, transaction_id)
+                {
                     Ok(id) => {
                         // Update Bootloader
                         let mut boot_msg = String::new();

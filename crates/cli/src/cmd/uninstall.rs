@@ -325,6 +325,10 @@ pub fn run(
     let mut failed_packages = Vec::new();
     let mut successfully_uninstalled = Vec::new();
 
+    if let Some(pm) = plugin_manager {
+        pm.set_context(scope_override.unwrap_or_default())?;
+    }
+
     for manifest in &manifests_to_uninstall {
         let mut pkg_val = None;
         if let Some(pm) = plugin_manager {
@@ -410,6 +414,7 @@ pub fn run(
                 crate::pkg::hooks::global::HookWhen::PostTransaction,
                 &modified_files,
                 "remove",
+                scope_override.unwrap_or_default(),
             );
         }
 

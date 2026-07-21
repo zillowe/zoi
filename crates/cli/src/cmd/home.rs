@@ -38,7 +38,7 @@ pub fn run(args: HomeCommand) -> Result<()> {
             println!("Reading user configuration from {}...", config_path.cyan());
             let config = load_home_lua(&config_path)?;
 
-            // 1. Install user packages
+            // Install user packages
             if !config.packages.is_empty() {
                 println!(
                     "{} Installing {} user packages...",
@@ -68,7 +68,7 @@ pub fn run(args: HomeCommand) -> Result<()> {
                 )?;
             }
 
-            // 2. Apply dotfiles and env
+            // Apply dotfiles and env
             apply_home_config(&config)?;
             println!("{}", "User environment applied successfully.".green());
         }

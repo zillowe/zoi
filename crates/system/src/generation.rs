@@ -2,7 +2,7 @@ use anyhow::{Result, anyhow};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use zoi_core::utils;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -10,6 +10,8 @@ pub struct Generation {
     pub id: u32,
     pub created_at: DateTime<Utc>,
     pub packages: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transaction_id: Option<String>,
 }
 
 pub struct GenerationManager {
@@ -51,6 +53,14 @@ impl GenerationManager {
     }
 
     pub fn create_generation(&self, packages: Vec<String>) -> Result<u32> {
+        self.create_generation_with_transaction(packages, None)
+    }
+
+    pub fn create_generation_with_transaction(
+        &self,
+        packages: Vec<String>,
+        transaction_id: Option<String>,
+    ) -> Result<u32> {
         let id = self.next_id()?;
         let gen_path = self.root.join(id.to_string());
         fs::create_dir_all(&gen_path)?;
@@ -59,70 +69,19 @@ impl GenerationManager {
             id,
             created_at: Utc::now(),
             packages,
+            transaction_id,
         };
 
         let meta_path = gen_path.join("generation.json");
         fs::write(meta_path, serde_json::to_string_pretty(&generation)?)?;
 
-        // Logic for creating the FHS symlink farm will go here
-        self.build_fhs_view(&gen_path, &generation)?;
-
         Ok(id)
     }
 
-    fn build_fhs_view(&self, gen_path: &Path, generation: &Generation) -> Result<()> {
-        let usr_bin = gen_path.join("usr/bin");
-        let usr_lib = gen_path.join("usr/lib");
-        let usr_share = gen_path.join("usr/share");
-
-        fs::create_dir_all(&usr_bin)?;
-        fs::create_dir_all(&usr_lib)?;
-        fs::create_dir_all(&usr_share)?;
-
-        // Ensure common compat symlinks exist
-        utils::symlink_dir(Path::new("usr/bin"), &gen_path.join("bin"))?;
-        utils::symlink_dir(Path::new("usr/lib"), &gen_path.join("lib"))?;
-        #[cfg(target_arch = "x86_64")]
-        utils::symlink_dir(Path::new("usr/lib"), &gen_path.join("lib64"))?;
-
-        for pkg_id in &generation.packages {
-            let request = zoi_resolver::resolve::parse_source_string(pkg_id)?;
-            if let Some(manifest) = zoi_resolver::local::is_package_installed(
-                &request.name,
-                request.sub_package.as_deref(),
-                zoi_core::types::Scope::System,
-            )? {
-                let version_dir = zoi_resolver::local::get_package_version_dir(
-                    zoi_core::types::Scope::System,
-                    &manifest.registry_handle,
-                    &manifest.repo,
-                    &manifest.name,
-                    &manifest.version,
-                )?;
-
-                for file in &manifest.installed_files {
-                    if let Some(rel_path) = file.strip_prefix("${pkgstore}/") {
-                        let source_path = version_dir.join(rel_path);
-                        let dest_path = gen_path.join("usr").join(rel_path);
-
-                        if let Some(parent) = dest_path.parent() {
-                            fs::create_dir_all(parent)?;
-                        }
-
-                        if dest_path.exists() || dest_path.is_symlink() {
-                            fs::remove_file(&dest_path)?;
-                        }
-
-                        utils::symlink_file(&source_path, &dest_path)?;
-                    }
-                }
-            }
-        }
-
-        Ok(())
-    }
-
     pub fn activate_generation(&self, id: u32) -> Result<()> {
+        // In the traditional model, activation happens during 'zoi system apply'
+        // which installs packages directly to usrroot.
+        // We can still maintain a 'current' symlink for status purposes.
         let gen_path = self.root.join(id.to_string());
         if !gen_path.exists() {
             return Err(anyhow!("Generation {} does not exist", id));
@@ -143,12 +102,7 @@ impl GenerationManager {
 
         utils::symlink_dir(&gen_path, &current_view)?;
 
-        // Restore SELinux context for the new view
-        let _ = crate::selinux::restore_context(&current_view);
-
-        // In a real ZoiOS system, we would also flip /usr to point into current/usr
-        // and ensure /etc is merged. This is handled by the Early Boot Root module.
-        println!("Generation {} activated at {}", id, current_view.display());
+        println!("Generation {} recorded as active.", id);
 
         Ok(())
     }

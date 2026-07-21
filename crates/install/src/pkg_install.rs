@@ -250,6 +250,25 @@ pub fn run(
         Some(scope),
         true,
     )?;
+
+    let pooled_manifest_path = unpack_path.join("manifest.json");
+    if pooled_manifest_path.exists() {
+        let content = fs::read_to_string(&pooled_manifest_path)?;
+        if let Ok(pooled_manifest) = serde_json::from_str::<types::PooledZpaManifest>(&content) {
+            return extract_pooled_zpa(
+                &pooled_manifest,
+                &unpack_path,
+                scope,
+                &metadata,
+                sub_packages,
+                link_bins,
+                pb,
+                yes,
+                registry_handle,
+            );
+        }
+    }
+
     let version = metadata.version.as_ref().ok_or_else(|| {
         anyhow!(
             "Package '{}' is missing version field in its metadata.",
@@ -395,9 +414,33 @@ pub fn run(
         }
     }
 
-    fs::create_dir_all(&version_dir)?;
     copy_dir_all(staging_dir.path(), &version_dir)?;
 
+    finalize_installation(
+        &version_dir,
+        &metadata,
+        scope,
+        link_bins,
+        pb,
+        &mut installed_files,
+    )?;
+
+    if let Some(p) = pb {
+        p.set_position(100);
+    } else {
+        println!("{} Installation complete.", "Success:".green());
+    }
+    Ok(installed_files)
+}
+
+fn finalize_installation(
+    version_dir: &Path,
+    metadata: &types::Package,
+    scope: types::Scope,
+    link_bins: bool,
+    pb: Option<&indicatif::ProgressBar>,
+    _installed_files: &mut Vec<String>,
+) -> Result<()> {
     // Create .zoiorig copies for 3-way merge support
     if let Some(backup_files) = &metadata.backup {
         for backup_file_rel in backup_files {
@@ -428,20 +471,19 @@ pub fn run(
         fs::create_dir_all(&bin_root)?;
 
         let mut created_shims = Vec::new();
-        let link_error: Option<String> = None;
+        let mut link_error: Option<String> = None;
 
         for bin_name in bins {
             let mut found_bin = false;
-            for entry in WalkDir::new(&version_dir)
-                .into_iter()
-                .filter_map(|e| e.ok())
-            {
+            for entry in WalkDir::new(version_dir).into_iter().filter_map(|e| e.ok()) {
                 if entry.file_type().is_file() && entry.file_name().to_string_lossy() == *bin_name {
                     let link_path = bin_root.join(bin_name);
 
                     let zoi_exe = std::env::current_exe()?;
-                    zoi_core::utils::symlink_file(&zoi_exe, &link_path)
-                        .map_err(|e| anyhow!("Failed to create shim: {}", e))?;
+                    if let Err(e) = zoi_core::utils::symlink_file(&zoi_exe, &link_path) {
+                        link_error = Some(e.to_string());
+                        break;
+                    }
                     created_shims.push(link_path);
 
                     if pb.is_none() {
@@ -519,7 +561,7 @@ pub fn run(
         };
 
         let mut app_bundles = Vec::new();
-        for entry in WalkDir::new(&version_dir)
+        for entry in WalkDir::new(version_dir)
             .max_depth(2)
             .into_iter()
             .filter_map(|e| e.ok())
@@ -552,7 +594,7 @@ pub fn run(
                 }
 
                 if std::os::unix::fs::symlink(&app_path, &symlink_path).is_ok() {
-                    installed_files.push(format!(
+                    _installed_files.push(format!(
                         "${{applications}}/{}",
                         app_name.to_string_lossy().replace('\\', "/")
                     ));
@@ -568,10 +610,235 @@ pub fn run(
         }
     }
 
+    Ok(())
+}
+
+fn extract_pooled_zpa(
+    pooled_manifest: &types::PooledZpaManifest,
+    unpack_path: &Path,
+    scope: types::Scope,
+    metadata: &types::Package,
+    sub_packages: Option<Vec<String>>,
+    link_bins: bool,
+    pb: Option<&indicatif::ProgressBar>,
+    yes: bool,
+    registry_handle: &str,
+) -> Result<Vec<String>> {
+    let version = metadata.version.as_ref().ok_or_else(|| {
+        anyhow!(
+            "Package '{}' is missing version field in its metadata.",
+            metadata.name
+        )
+    })?;
+
+    if pb.is_none() {
+        println!(
+            "Installing pooled package: {} v{} [{:?}]",
+            metadata.name.cyan(),
+            version.yellow(),
+            scope
+        );
+    }
+
+    let package_dir =
+        local::get_package_dir(scope, registry_handle, &metadata.repo, &metadata.name)?;
+    fs::create_dir_all(&package_dir)?;
+
+    let staging_dir = tempfile::Builder::new()
+        .prefix(".tmp-install-")
+        .tempdir_in(&package_dir)?;
+
+    let mut installed_files: Vec<String> = Vec::new();
+    let version_dir = package_dir.join(version);
+
+    let subs_to_install = if let Some(subs) = sub_packages {
+        subs
+    } else if let Some(subs) = &metadata.sub_packages {
+        if let Some(main_subs) = &metadata.main_subs {
+            main_subs.clone()
+        } else {
+            subs.clone()
+        }
+    } else {
+        vec!["".to_string()]
+    };
+
+    let pool_dir = unpack_path.join("pool");
+
+    let mut conflicts = Vec::new();
+    let mut owned_files = HashSet::new();
+
+    for sub in &subs_to_install {
+        let sub_opt = if sub.is_empty() {
+            None
+        } else {
+            Some(sub.as_str())
+        };
+        if let Ok(Some(manifest)) = local::is_package_installed(&metadata.name, sub_opt, scope) {
+            owned_files.extend(manifest.installed_files);
+        }
+
+        if let Some(sub_mapping) = pooled_manifest.mappings.get(sub)
+            && let Some(scope_mapping) = sub_mapping.scopes.get(&scope)
+        {
+            for mapped_file in &scope_mapping.files {
+                let dest_path = expand_pooled_path(&mapped_file.dest, staging_dir.path(), scope)?;
+                // We only check conflicts for files that land outside the Zoi store's staging area
+                if !mapped_file.dest.starts_with("${pkgstore}")
+                    && dest_path.exists()
+                    && !owned_files.contains(&mapped_file.dest)
+                {
+                    conflicts.push(dest_path);
+                }
+            }
+        }
+    }
+
+    if !conflicts.is_empty() {
+        println!();
+        println!("{}", "File Conflict Detected:".red().bold());
+        println!(
+            "The following files that this package wants to install already exist on your system:"
+        );
+        for file in &conflicts {
+            println!("- {}", file.display());
+        }
+        println!();
+
+        if !utils::ask_for_confirmation(
+            "Do you want to overwrite these files and continue with the installation?",
+            yes,
+        ) {
+            return Err(anyhow!(
+                "Installation aborted by user due to file conflicts."
+            ));
+        }
+    }
+
+    for sub in subs_to_install {
+        let sub_mapping = match pooled_manifest.mappings.get(&sub) {
+            Some(m) => m,
+            None => {
+                if pb.is_none() {
+                    eprintln!(
+                        "Warning: mapping for sub-package '{}' not found in archive, skipping.",
+                        sub
+                    );
+                }
+                continue;
+            }
+        };
+
+        let scope_mapping = match sub_mapping.scopes.get(&scope) {
+            Some(m) => m,
+            None => {
+                if pb.is_none() {
+                    eprintln!(
+                        "Warning: mapping for scope {:?} not found for sub-package '{}', skipping.",
+                        scope, sub
+                    );
+                }
+                continue;
+            }
+        };
+
+        // Step 1: Create directories
+        for mapped_dir in &scope_mapping.dirs {
+            let dest_path = expand_pooled_path(&mapped_dir.path, staging_dir.path(), scope)?;
+            fs::create_dir_all(&dest_path)?;
+
+            #[cfg(unix)]
+            {
+                if let Some(mode) = mapped_dir.mode {
+                    use std::os::unix::fs::PermissionsExt;
+                    fs::set_permissions(&dest_path, fs::Permissions::from_mode(mode))?;
+                }
+                if let (Some(owner), Some(group)) = (&mapped_dir.owner, &mapped_dir.group) {
+                    let _ = utils::set_path_owner(&dest_path, owner, group);
+                }
+            }
+        }
+
+        // Step 2: Extract files
+        for mapped_file in &scope_mapping.files {
+            let pool_file = pool_dir.join(&mapped_file.hash);
+            if !pool_file.exists() {
+                return Err(anyhow!("Pool file missing: {}", mapped_file.hash));
+            }
+
+            let dest_path = expand_pooled_path(&mapped_file.dest, staging_dir.path(), scope)?;
+
+            if let Some(parent) = dest_path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+
+            fs::copy(&pool_file, &dest_path)?;
+
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                fs::set_permissions(&dest_path, fs::Permissions::from_mode(mapped_file.mode))?;
+                if let (Some(owner), Some(group)) = (&mapped_file.owner, &mapped_file.group) {
+                    let _ = utils::set_path_owner(&dest_path, owner, group);
+                }
+            }
+
+            installed_files.push(mapped_file.dest.clone());
+        }
+
+        // Step 3: Create symlinks
+        for mapped_link in &scope_mapping.symlinks {
+            let dest_path = expand_pooled_path(&mapped_link.link, staging_dir.path(), scope)?;
+
+            if let Some(parent) = dest_path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+
+            if dest_path.exists() || dest_path.is_symlink() {
+                fs::remove_file(&dest_path).ok();
+            }
+
+            // Resolve target placeholders if any
+            let target = mapped_link.target.clone();
+
+            utils::symlink_file(Path::new(&target), &dest_path)?;
+            installed_files.push(mapped_link.link.clone());
+        }
+    }
+
+    // Finalize staging-to-store move
+    fs::create_dir_all(&version_dir)?;
+    copy_dir_all(staging_dir.path(), &version_dir)?;
+
+    finalize_installation(
+        &version_dir,
+        metadata,
+        scope,
+        link_bins,
+        pb,
+        &mut installed_files,
+    )?;
+
     if let Some(p) = pb {
         p.set_position(100);
-    } else {
-        println!("{} Installation complete.", "Success:".green());
     }
+
     Ok(installed_files)
+}
+
+fn expand_pooled_path(path: &str, staging_path: &Path, _scope: types::Scope) -> Result<PathBuf> {
+    if let Some(rel) = path.strip_prefix("${pkgstore}/") {
+        Ok(staging_path.join(rel))
+    } else if let Some(rel) = path.strip_prefix("${usrroot}/") {
+        Ok(zoi_core::sysroot::apply_sysroot(
+            PathBuf::from("/").join(rel),
+        ))
+    } else if let Some(rel) = path.strip_prefix("${usrhome}/") {
+        let home_dir = home::home_dir().ok_or_else(|| anyhow!("Home dir not found"))?;
+        Ok(home_dir.join(rel))
+    } else if let Some(rel) = path.strip_prefix("${createpkgdir}/") {
+        Ok(std::env::current_dir()?.join(rel))
+    } else {
+        Err(anyhow!("Invalid pooled path placeholder: {}", path))
+    }
 }

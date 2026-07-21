@@ -63,13 +63,68 @@ pub struct AdvisoryRegistry {
     pub advisories: BTreeMap<String, String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy, Default)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Scope {
     #[default]
     User,
     System,
     Project,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PooledZpaManifest {
+    pub version: String,
+    pub pool: BTreeMap<String, PoolFileEntry>,
+    pub mappings: BTreeMap<String, SubPackageMapping>, // sub_package -> mapping
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PoolFileEntry {
+    pub size: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SubPackageMapping {
+    pub scopes: BTreeMap<Scope, ScopeMapping>, // scope -> mapping
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct ScopeMapping {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub files: Vec<MappedFile>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub symlinks: Vec<MappedSymlink>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dirs: Vec<MappedDir>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MappedFile {
+    pub dest: String,
+    pub hash: String,
+    pub mode: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MappedSymlink {
+    pub link: String,
+    pub target: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MappedDir {
+    pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
 }
 
 /// Defines the category of a Zoi package.

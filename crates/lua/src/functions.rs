@@ -125,29 +125,20 @@ pub fn setup_lua_environment(
         let staging_path = std::path::Path::new(sd);
         location_table.set(
             "PKGSTORE",
-            staging_path
-                .join("data/pkgstore")
-                .to_string_lossy()
-                .to_string(),
+            staging_path.join("pkgstore").to_string_lossy().to_string(),
         )?;
         location_table.set(
             "HOME",
-            staging_path
-                .join("data/usrhome")
-                .to_string_lossy()
-                .to_string(),
+            staging_path.join("usrhome").to_string_lossy().to_string(),
         )?;
         location_table.set(
             "ROOT",
-            staging_path
-                .join("data/usrroot")
-                .to_string_lossy()
-                .to_string(),
+            staging_path.join("usrroot").to_string_lossy().to_string(),
         )?;
         location_table.set(
             "TEMPLATE",
             staging_path
-                .join("data/createpkgdir")
+                .join("createpkgdir")
                 .to_string_lossy()
                 .to_string(),
         )?;

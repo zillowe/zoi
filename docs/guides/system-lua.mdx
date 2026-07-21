@@ -126,6 +126,10 @@ services({
 
 Defines the disk layout and mount points for `/etc/fstab`.
 
+<Callout type="warn">
+  ZoiOS does **not** automatically partition or format your drives. You must manually partition and format your target disk before installation. The `filesystems` block is used exclusively to generate a valid `/etc/fstab` for the target system.
+</Callout>
+
 | Field | Type | Description |
 | :--- | :--- | :--- |
 | `device` | `string` | Device path or Label (e.g. `"/dev/sda1"`, `"LABEL=root"`). |

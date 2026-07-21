@@ -14,13 +14,14 @@ ZoiOS (and its reference implementation, Parlex Linux) features a declarative sy
 
 The `zoi system` suite is used to manage system-level generations and configuration.
 
-### `zoi system apply [file]`
+### `zoi.system.apply [file]`
 
 Reads a `system.lua` file and applies its state to the machine. This involves:
 
 1. Resolving all required packages.
-2. Creating a new **System Generation**.
-3. Updating the **Transactional FHS View** to point to the new generation.
+2. Creating a new **System Generation** record.
+3. Directly installing/updating packages in the system root within an atomic transaction.
+4. **Declarative State Enforcement**: Automatically identifies and removes any packages currently installed in the system scope that are not explicitly listed in the configuration file.
 
 ```sh
 # Apply the default system configuration
@@ -32,12 +33,12 @@ sudo zoi system apply ./my-server.lua
 
 ### `zoi system distro build --target <path> --config <file>`
 
-The primary command for bootstrapping new ZoiOS systems. It automates partitioning, formatting, and installation.
+The primary command for bootstrapping new ZoiOS systems onto manually partitioned and formatted disks.
 
 **Safety Features:**
 
 - **Pre-flight Validation**: Automatically verifies that all base packages exist in your registry before touching the disk.
-- **Build Plan Summary**: Shows a detailed table of destructive actions (formatting) and system configuration before proceeding.
+- **Build Plan Summary**: Shows a detailed table of configured filesystems and packages before proceeding.
 - **Dry-Run Mode**: Use `--dry-run` to see exactly what commands will be executed without modifying your hardware.
 
 ```sh
@@ -50,7 +51,7 @@ sudo zoi system distro build --target /mnt --config ./system.lua
 
 ### `zoi system list`
 
-Lists all available system generations on the machine, including their creation date and the packages they contain.
+Lists all available system generations on the machine, including their creation date, the packages they contain, and their linked Zoi transaction IDs.
 
 ```sh
 zoi system list
@@ -58,7 +59,7 @@ zoi system list
 
 ### `zoi system status`
 
-Shows the current system status, including the active generation ID and daemon state.
+Shows the current system status, including the active generation ID and transaction state.
 
 ```sh
 zoi system status
@@ -66,7 +67,7 @@ zoi system status
 
 ### `zoi system rollback <id>`
 
-Reverts the operating system to a previous generation. This is an atomic operation that flips the FHS symlink view.
+Reverts the operating system to a previous generation by sequentially rolling back the Zoi package transactions that occurred after the target generation.
 
 ```sh
 sudo zoi system rollback 41
@@ -79,7 +80,9 @@ Manage sensitive information like passwords and API keys.
 - **`zoi system secret hash <password>`**: Generates a one-way Argon2 hash of a password. Use this in your `system.lua` for user passwords.
 - **`zoi system secret encrypt <value>`**: Encrypts a string so only Zoi on this specific machine can decrypt it. It returns a `ZOISEC:v1:...` string.
 
-### `zoi system secret decrypt <ZOISEC>`: Decrypts a `ZOISEC` string back to plaintext (useful if you forgot the value)
+### `zoi system secret decrypt <ZOISEC>`
+
+Decrypts a `ZOISEC` string back to plaintext (useful if you forgot the value)
 
 ---
 
@@ -94,16 +97,17 @@ ZoiOS uses two primary Lua files to manage its state:
 
 ## Architectural Foundation
 
-ZoiOS uses a **Generation-based** architecture:
+ZoiOS uses a **Transaction-based** architecture:
 
 1. **The Store:** All packages reside in `/var/lib/zoi/pkgs/store/`, isolated by version and input hashes.
-2. **Generations:** A generation is a directory (e.g. `/var/lib/zoi/generations/42/`) containing a "symlink farm" that provides a standard FHS view of the active packages.
-3. **The View Flip**: The system's standard paths (like `/usr/bin`) point into a master symlink (`/var/lib/zoi/pkgs/view/current`) which Zoi flips atomically to switch between generations.
+2. **Shared Pool:** Zoi packages use a "Shared Pool + Mapping" architecture. Files are stored in a central `pool/` directory within the archive and mapped to their final destinations (`/usr`, `/etc`, etc.) at install time based on the scope.
+3. **Generations:** A generation is a lightweight record (e.g. `/var/lib/zoi/generations/42/`) of the system state, linked to a specific Zoi package transaction.
+4. **Traditional Management**: Unlike NixOS, ZoiOS installs files directly into the system root (`usrroot`). Rollbacks are performed by sequentially reverting package transactions, providing a traditional FHS experience with declarative safety.
 
 ## Packaging Conventions
 
 For developers building ZoiOS-native packages:
 
-- **Root Mapping**: The `${pkgstore}` of a system package is mapped directly to the `/usr` directory of the generation.
-- **Selective Persistence**: Use `${usrroot}` for files that must live in `/etc` or `/var`. These files are written directly to the host root and are **not** managed by the Generation symlink farm.
-- **Rollback Safety**: Only files inside `${pkgstore}` (the `/usr` tree) are guaranteed to revert during a `zoi system rollback`.
+- **Scope Awareness**: Use `ZOI.scope` in your `.pkg.lua` to adjust behavior. When `ZOI.scope == "system"`, files should generally be staged to `${usrroot}/usr/...` or other absolute paths.
+- **Pooled ZPA**: Zoi automatically builds "Pooled" archives that capture the package state for `user`, `system`, and `project` scopes simultaneously, ensuring zero duplication while supporting perfect scope-specific behavior.
+- **Transactional Safety**: All changes to `/usr`, `/etc`, and `/var` are recorded in Zoi's transaction log, enabling atomic rollbacks of the entire system state.

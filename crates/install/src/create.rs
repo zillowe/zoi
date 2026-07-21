@@ -24,15 +24,52 @@ fn install_app_from_archive(archive_path: &Path, destination_dir: &Path) -> Resu
 
     archive.unpack(temp_extract_dir.path())?;
 
-    let create_pkg_dir = temp_extract_dir.path().join("data/createpkgdir");
-
-    if !create_pkg_dir.exists() {
-        return Err(anyhow!(
-            "Archive is not a valid app package: missing 'data/createpkgdir' directory."
-        ));
+    let manifest_path = temp_extract_dir.path().join("manifest.json");
+    if !manifest_path.exists() {
+        // Fallback to legacy format
+        let create_pkg_dir = temp_extract_dir.path().join("data/createpkgdir");
+        if !create_pkg_dir.exists() {
+            return Err(anyhow!(
+                "Archive is not a valid app package: missing 'manifest.json' or legacy 'data/createpkgdir'."
+            ));
+        }
+        utils::copy_dir_all(&create_pkg_dir, destination_dir)?;
+        return Ok(());
     }
 
-    utils::copy_dir_all(&create_pkg_dir, destination_dir)?;
+    // Pooled format
+    let content = fs::read_to_string(&manifest_path)?;
+    let pooled_manifest = serde_json::from_str::<types::PooledZpaManifest>(&content)?;
+    let pool_dir = temp_extract_dir.path().join("pool");
+
+    // App templates usually use the "" sub-package and project scope
+    if let Some(sub_mapping) = pooled_manifest.mappings.get("")
+        && let Some(scope_mapping) = sub_mapping.scopes.get(&types::Scope::Project)
+    {
+        for mapped_dir in &scope_mapping.dirs {
+            if let Some(rel) = mapped_dir.path.strip_prefix("${createpkgdir}/") {
+                fs::create_dir_all(destination_dir.join(rel))?;
+            }
+        }
+        for mapped_file in &scope_mapping.files {
+            if let Some(rel) = mapped_file.dest.strip_prefix("${createpkgdir}/") {
+                let dest_path = destination_dir.join(rel);
+                if let Some(parent) = dest_path.parent() {
+                    fs::create_dir_all(parent)?;
+                }
+                fs::copy(pool_dir.join(&mapped_file.hash), &dest_path)?;
+            }
+        }
+        for mapped_link in &scope_mapping.symlinks {
+            if let Some(rel) = mapped_link.link.strip_prefix("${createpkgdir}/") {
+                let dest_path = destination_dir.join(rel);
+                if let Some(parent) = dest_path.parent() {
+                    fs::create_dir_all(parent)?;
+                }
+                utils::symlink_file(Path::new(&mapped_link.target), &dest_path)?;
+            }
+        }
+    }
 
     Ok(())
 }

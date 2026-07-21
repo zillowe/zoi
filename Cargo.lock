@@ -4591,8 +4591,11 @@ dependencies = [
  "serde_json",
  "zoi-core",
  "zoi-install",
+ "zoi-resolver",
  "zoi-rs",
  "zoi-system",
+ "zoi-transaction",
+ "zoi-uninstall",
 ]
 
 [[package]]

@@ -653,6 +653,23 @@ pub fn index_package_files(conn: &Connection, package_id: i64, files: &[String])
     Ok(())
 }
 
+pub fn clear_package_files(conn: &Connection, package_id: i64) -> Result<()> {
+    conn.execute(
+        "DELETE FROM package_files WHERE package_id = ?1",
+        params![package_id],
+    )?;
+    Ok(())
+}
+
+pub fn has_other_owners(conn: &Connection, path: &str, current_package_id: i64) -> Result<bool> {
+    let count: i64 = conn.query_row(
+        "SELECT count(*) FROM package_files WHERE path = ?1 AND package_id != ?2",
+        params![path, current_package_id],
+        |row| row.get(0),
+    )?;
+    Ok(count > 0)
+}
+
 pub fn delete_package(
     conn: &Connection,
     name: &str,

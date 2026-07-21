@@ -321,6 +321,9 @@ pub fn run(
     }
 
     if !dry_run {
+        if let Some(pm) = plugin_manager {
+            pm.set_context(scope_override.unwrap_or_default())?;
+        }
         for node in graph.nodes.values() {
             if let Some(pm) = plugin_manager {
                 let pkg_val = pm
@@ -904,6 +907,7 @@ pub fn run(
             crate::pkg::hooks::global::HookWhen::PostTransaction,
             &modified_files,
             "install",
+            scope_override.unwrap_or_default(),
         );
     }
 
