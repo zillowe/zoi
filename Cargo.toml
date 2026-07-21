@@ -121,7 +121,7 @@ phf = "0.14.0"
 rusqlite = { version = "0.40.1", default-features = false, features = [
     "bundled",
 ] }
-glob = "0.3.3"
+glob = "0.3.4"
 pubgrub = "0.4.0"
 thiserror = "2.0.19"
 rustc-hash = "2.1.3"
