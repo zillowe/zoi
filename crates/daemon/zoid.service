@@ -1,0 +1,12 @@
+[Unit]
+Description=ZoiOS Privileged System Daemon
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/zoid start --foreground
+Restart=always
+User=root
+RuntimeDirectory=zoi
+
+[Install]
+WantedBy=multi-user.target

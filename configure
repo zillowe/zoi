@@ -14,14 +14,14 @@ for arg in "$@"; do
     ;;
   --with-bin=*)
     WITH_BIN=$(echo "$arg" | sed 's/--with-bin=//')
-    if [ "$WITH_BIN" != "zoi" ] && [ "$WITH_BIN" != "zoi-mini" ] && [ "$WITH_BIN" != "both" ]; then
-      echo "Error: --with-bin must be 'zoi', 'zoi-mini', or 'both'."
+    if [ "$WITH_BIN" != "zoi" ] && [ "$WITH_BIN" != "zoi-mini" ] && [ "$WITH_BIN" != "zoid" ] && [ "$WITH_BIN" != "all" ] && [ "$WITH_BIN" != "both" ]; then
+      echo "Error: --with-bin must be 'zoi', 'zoi-mini', 'zoid', 'all', or 'both'."
       exit 1
     fi
     ;;
   *)
     echo "Unknown option: $arg"
-    echo "Usage: ./configure [--prefix=/path/to/install] [--debug-dir=dist] [--with-bin=zoi|zoi-mini|both]"
+    echo "Usage: ./configure [--prefix=/path/to/install] [--debug-dir=dist] [--with-bin=zoi|zoi-mini|zoid|all]"
     exit 1
     ;;
   esac
@@ -49,9 +49,9 @@ check_cmd "git" || MISSING_DEPS=1
 if ! command -v "clang" >/dev/null 2>&1; then
   echo "Error: 'clang' is not installed. It is required for bindgen (openssl-sys, etc)."
   if [ -f /etc/fedora-release ] || [ -f /etc/redhat-release ]; then
-     echo "  -> On Fedora/RHEL, run: sudo dnf install clang clang-devel"
+    echo "  -> On Fedora/RHEL, run: sudo dnf install clang clang-devel"
   elif [ -f /etc/debian_version ]; then
-     echo "  -> On Debian/Ubuntu, run: sudo apt-get install clang libclang-dev"
+    echo "  -> On Debian/Ubuntu, run: sudo apt-get install clang libclang-dev"
   fi
   MISSING_DEPS=1
 fi
