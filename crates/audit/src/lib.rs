@@ -5,7 +5,7 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
-use zoi_core::{config, types};
+use zoi_core::{config, types, utils};
 
 /// Manages Zoi's tamper-evident audit log.
 ///
@@ -61,8 +61,9 @@ pub struct AuditVerification {
 }
 
 fn get_audit_log_path() -> Result<PathBuf> {
-    let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
-    let zoi_dir = home_dir.join(".zoi");
+    let home_dir =
+        utils::get_user_home().ok_or_else(|| anyhow!("Could not find home directory."))?;
+    let zoi_dir = zoi_core::sysroot::apply_sysroot(home_dir.join(".zoi"));
     if !zoi_dir.exists() {
         fs::create_dir_all(&zoi_dir)?;
     }

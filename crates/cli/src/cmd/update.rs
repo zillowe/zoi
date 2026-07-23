@@ -339,9 +339,12 @@ fn run_update_single_logic(
             transaction::delete_log(&transaction.id)?;
         } else {
             if let Ok(modified_files) = transaction::get_modified_files(&transaction.id) {
+                let modified_packages =
+                    transaction::get_modified_packages(&transaction.id).unwrap_or_default();
                 let _ = crate::pkg::hooks::global::run_global_hooks(
                     crate::pkg::hooks::global::HookWhen::PostTransaction,
                     &modified_files,
+                    &modified_packages,
                     "upgrade",
                     old_manifest.scope,
                 );
@@ -954,6 +957,8 @@ fn run_update_all_logic(
     }
 
     if let Ok(modified_files) = transaction::get_modified_files(&transaction_id) {
+        let modified_packages =
+            transaction::get_modified_packages(&transaction_id).unwrap_or_default();
         let upgrades_lock = successful_upgrades
             .lock()
             .map_err(|e| anyhow!("mutex poisoned: {}", e))?;
@@ -964,6 +969,7 @@ fn run_update_all_logic(
         let _ = crate::pkg::hooks::global::run_global_hooks(
             crate::pkg::hooks::global::HookWhen::PostTransaction,
             &modified_files,
+            &modified_packages,
             "upgrade",
             first_scope,
         );

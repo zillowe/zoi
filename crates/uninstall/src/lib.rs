@@ -15,8 +15,8 @@ use zoi_telemetry as telemetry;
 fn get_bin_root(scope: types::Scope) -> anyhow::Result<PathBuf> {
     match scope {
         types::Scope::User => {
-            let home_dir =
-                home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
+            let home_dir = core_utils::get_user_home()
+                .ok_or_else(|| anyhow!("Could not find home directory."))?;
             Ok(sysroot::apply_sysroot(home_dir.join(".zoi/pkgs/bin")))
         }
         types::Scope::System => {
@@ -38,8 +38,8 @@ fn get_bin_root(scope: types::Scope) -> anyhow::Result<PathBuf> {
 fn get_completions_root(scope: types::Scope, shell: &str) -> anyhow::Result<PathBuf> {
     match scope {
         types::Scope::User => {
-            let home_dir =
-                home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
+            let home_dir = core_utils::get_user_home()
+                .ok_or_else(|| anyhow!("Could not find home directory."))?;
             Ok(sysroot::apply_sysroot(
                 home_dir.join(".zoi/pkgs/shell").join(shell),
             ))
@@ -79,8 +79,8 @@ fn cleanup_service(package_name: &str, scope: types::Scope) -> anyhow::Result<()
     match std::env::consts::OS {
         "linux" => {
             let unit_path = if is_user {
-                let home =
-                    home::home_dir().ok_or_else(|| anyhow!("Could not find home directory"))?;
+                let home = core_utils::get_user_home()
+                    .ok_or_else(|| anyhow!("Could not find home directory"))?;
                 sysroot::apply_sysroot(
                     home.join(".config/systemd/user")
                         .join(format!("{}.service", service_name)),
@@ -109,8 +109,8 @@ fn cleanup_service(package_name: &str, scope: types::Scope) -> anyhow::Result<()
         }
         "macos" => {
             let plist_path = if is_user {
-                let home =
-                    home::home_dir().ok_or_else(|| anyhow!("Could not find home directory"))?;
+                let home = core_utils::get_user_home()
+                    .ok_or_else(|| anyhow!("Could not find home directory"))?;
                 sysroot::apply_sysroot(
                     home.join("Library/LaunchAgents")
                         .join(format!("{}.plist", service_name)),
@@ -453,6 +453,7 @@ pub fn run(
             None,
             sub_package_to_uninstall.as_deref(),
             Some(scope),
+            None,
             true,
         )
         .map_err(|e| anyhow!(e.to_string()))?;
@@ -482,7 +483,7 @@ pub fn run(
                     path_to_remove =
                         path_to_remove.replace("${pkgstore}", &version_dir.to_string_lossy());
 
-                    if let Some(home_dir) = home::home_dir() {
+                    if let Some(home_dir) = core_utils::get_user_home() {
                         path_to_remove =
                             path_to_remove.replace("${usrhome}", &home_dir.to_string_lossy());
                     }

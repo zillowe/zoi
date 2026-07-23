@@ -230,12 +230,21 @@ pub fn run(source: String, bin: Option<String>, args: Vec<String>, verbose: bool
                     root.display()
                 );
             }
+
+            let extra_binds = vec![(temp_dir.path().to_path_buf(), temp_dir.path().to_path_buf())];
+
             let exe_inside_root = actual_bin_path
                 .strip_prefix(&root)
                 .map(PathBuf::from)
                 .unwrap_or(actual_bin_path.clone());
 
-            crate::sandbox::wrap_command_in_root(&root, &exe_inside_root, &args, &envs)?
+            crate::sandbox::wrap_command_in_root(
+                &root,
+                &exe_inside_root,
+                &args,
+                &envs,
+                &extra_binds,
+            )?
         } else if let Some(sandbox_config) = &node.pkg.sandbox
             && sandbox_config.enabled
         {

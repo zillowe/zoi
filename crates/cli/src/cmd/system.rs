@@ -58,6 +58,17 @@ pub enum DistroSubcommands {
         #[arg(long)]
         dry_run: bool,
     },
+    /// Enter a ZoiOS sysroot (chroot) with automatic device mounting
+    Chroot {
+        /// Path to the ZoiOS root directory
+        target: String,
+        /// Command to run inside the chroot (defaults to /bin/bash)
+        #[arg(short, long)]
+        run: Option<String>,
+        /// Show additional details
+        #[arg(long, short)]
+        verbose: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -217,6 +228,69 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
                     target.cyan()
                 );
             }
+            DistroSubcommands::Chroot {
+                target,
+                run,
+                verbose,
+            } => {
+                let target_path = std::path::Path::new(&target);
+                if !target_path.exists() {
+                    return Err(anyhow!("Target path '{}' does not exist.", target));
+                }
+
+                let os_release = target_path.join("etc/os-release");
+                if !os_release.exists() {
+                    return Err(anyhow!(
+                        "Target path '{}' is not a valid ZoiOS root (missing /etc/os-release).",
+                        target
+                    ));
+                }
+
+                if verbose {
+                    println!(
+                        "{} Entering sysroot at {}...",
+                        "::".bold().blue(),
+                        target.cyan()
+                    );
+                }
+
+                let mut envs = std::collections::HashMap::new();
+                envs.insert(
+                    "PATH".to_string(),
+                    "/usr/bin:/bin:/usr/sbin:/sbin".to_string(),
+                );
+                envs.insert("SHELL".to_string(), "/bin/bash".to_string());
+                envs.insert(
+                    "TERM".to_string(),
+                    std::env::var("TERM").unwrap_or_else(|_| "xterm-256color".to_string()),
+                );
+
+                let shell_bin = std::path::PathBuf::from("/bin/bash");
+
+                #[cfg(target_os = "linux")]
+                let mut cmd = if let Some(run_cmd) = run {
+                    let args = vec!["-c".to_string(), run_cmd];
+                    crate::sandbox::wrap_command_in_root(
+                        target_path,
+                        &shell_bin,
+                        &args,
+                        &envs,
+                        &[],
+                    )?
+                } else {
+                    crate::sandbox::wrap_command_in_root(target_path, &shell_bin, &[], &envs, &[])?
+                };
+
+                #[cfg(not(target_os = "linux"))]
+                return Err(anyhow!(
+                    "Distro chroot is only supported on Linux via Bubblewrap."
+                ));
+
+                let status = cmd.status()?;
+                if !status.success() {
+                    std::process::exit(status.code().unwrap_or(1));
+                }
+            }
         },
         SystemSubcommands::Apply { file } => {
             #[cfg(unix)]
@@ -287,66 +361,91 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
 }
 
 fn print_build_summary(target: &str, config: &zoi_system::config::SystemConfig, dry_run: bool) {
-    use comfy_table::Table;
-    use comfy_table::presets::UTF8_FULL;
+    use comfy_table::modifiers::UTF8_ROUND_CORNERS;
+    use comfy_table::presets::UTF8_FULL_CONDENSED;
+    use comfy_table::{Cell, Color, Table};
 
-    println!("\n{}", "ZoiOS Build Plan Summary".bold().underline());
+    println!("\n{}", " ZoiOS Build Plan ".bold().on_blue().white());
     if dry_run {
         println!(
             "{}",
-            "[DRY-RUN MODE - NO CHANGES WILL BE MADE]".yellow().bold()
+            " [DRY-RUN MODE - NO CHANGES WILL BE MADE] "
+                .on_yellow()
+                .black()
+                .bold()
         );
     }
-    println!("Target Device/Root: {}\n", target.cyan());
+    println!("{} {}\n", "Target Root:".bold(), target.cyan());
 
     // Filesystems
     let mut fs_table = Table::new();
-    fs_table.load_preset(UTF8_FULL);
-    fs_table.set_header(vec![
-        "Action",
-        "Device",
-        "FS Type",
-        "Mount Point",
-        "Options",
-    ]);
+    fs_table
+        .load_preset(UTF8_FULL_CONDENSED)
+        .apply_modifier(UTF8_ROUND_CORNERS)
+        .set_header(vec![
+            Cell::new("Action").fg(Color::Yellow),
+            Cell::new("Device").fg(Color::Yellow),
+            Cell::new("FS Type").fg(Color::Yellow),
+            Cell::new("Mount Point").fg(Color::Yellow),
+            Cell::new("Options").fg(Color::Yellow),
+        ]);
+
     for fs in &config.filesystems {
         fs_table.add_row(vec![
-            "Configure (fstab)".blue().to_string(),
-            fs.device.clone(),
-            fs.fs_type.clone(),
-            fs.mount.clone(),
-            fs.options.as_deref().unwrap_or("defaults").to_string(),
+            Cell::new("Configure (fstab)").fg(Color::Blue),
+            Cell::new(&fs.device),
+            Cell::new(&fs.fs_type),
+            Cell::new(&fs.mount).fg(Color::Cyan),
+            Cell::new(fs.options.as_deref().unwrap_or("defaults")),
         ]);
     }
-    println!("{}", "Filesystem & Partitioning:".bold());
+    println!("{}", " 1. Filesystem & Partitioning ".bold().underline());
     println!("{}\n", fs_table);
 
     // System Info
     let mut sys_table = Table::new();
-    sys_table.load_preset(UTF8_FULL);
-    sys_table.set_header(vec!["Property", "Value"]);
+    sys_table
+        .load_preset(UTF8_FULL_CONDENSED)
+        .apply_modifier(UTF8_ROUND_CORNERS)
+        .set_header(vec![
+            Cell::new("Property").fg(Color::Yellow),
+            Cell::new("Value").fg(Color::Yellow),
+        ]);
+
     sys_table.add_row(vec![
-        "Hostname",
-        config.system.hostname.as_deref().unwrap_or("zoios"),
+        Cell::new("Hostname"),
+        Cell::new(config.system.hostname.as_deref().unwrap_or("zoios")).fg(Color::Cyan),
     ]);
     sys_table.add_row(vec![
-        "Timezone",
-        config.system.timezone.as_deref().unwrap_or("UTC"),
+        Cell::new("Timezone"),
+        Cell::new(config.system.timezone.as_deref().unwrap_or("UTC")),
     ]);
     sys_table.add_row(vec![
-        "Locale",
-        config.system.locale.as_deref().unwrap_or("en_US.UTF-8"),
+        Cell::new("Locale"),
+        Cell::new(config.system.locale.as_deref().unwrap_or("en_US.UTF-8")),
     ]);
-    println!("{}", "System Configuration:".bold());
+
+    println!("{}", " 2. System Configuration ".bold().underline());
     println!("{}\n", sys_table);
 
     // Packages
+    println!("{}", " 3. Packages ".bold().underline());
     println!(
-        "{} {} base packages will be installed.",
-        "Packages:".bold(),
-        config.packages.len().to_string().cyan()
+        "{} base packages will be installed from the registry.\n",
+        config.packages.len().to_string().green().bold()
     );
-    println!("  {}\n", config.packages.join(", "));
+
+    let mut pkg_list = String::new();
+    for (i, pkg) in config.packages.iter().enumerate() {
+        pkg_list.push_str(&format!("{}", pkg.cyan()));
+        if i < config.packages.len() - 1 {
+            pkg_list.push_str(", ");
+        }
+        if (i + 1) % 5 == 0 {
+            pkg_list.push('\n');
+        }
+    }
+    println!("{}\n", pkg_list);
 }
 
 #[cfg(unix)]

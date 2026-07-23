@@ -26,7 +26,7 @@ fn get_bin_root(scope: Scope) -> Result<PathBuf> {
     match scope {
         Scope::User => {
             let home_dir =
-                home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
+                utils::get_user_home().ok_or_else(|| anyhow!("Could not find home directory."))?;
             Ok(sysroot::apply_sysroot(home_dir.join(".zoi/pkgs/bin")))
         }
         Scope::System => {
@@ -76,7 +76,7 @@ pub fn check_broken_symlinks() -> Result<Vec<PathBuf>> {
 }
 
 pub fn check_path_configuration() -> Result<Option<String>> {
-    if let Some(home) = home::home_dir() {
+    if let Some(home) = utils::get_user_home() {
         let zoi_bin_dir = sysroot::apply_sysroot(home.join(".zoi").join("pkgs").join("bin"));
         if !zoi_bin_dir.exists() {
             return Ok(None);

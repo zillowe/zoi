@@ -56,13 +56,18 @@ fn test_hook_dir_trigger_matches_descendants_once_per_transaction_input() {
         paths: Vec::new(),
         dirs: vec!["usr/share/icons".to_string()],
         operation: Vec::new(),
+        packages: Vec::new(),
     };
     let modified_files = vec![
         "usr/share/icons/hicolor/48x48/apps/example.png".to_string(),
         "usr/share/icons/hicolor/index.theme".to_string(),
     ];
 
-    assert!(trigger_matches_modified_files(&trigger, &modified_files));
+    assert!(trigger_matches_modified_files(
+        &trigger,
+        &modified_files,
+        &[]
+    ));
 }
 
 #[test]
@@ -71,10 +76,15 @@ fn test_hook_dir_trigger_does_not_match_similar_prefix() {
         paths: Vec::new(),
         dirs: vec!["usr/share/icons".to_string()],
         operation: Vec::new(),
+        packages: Vec::new(),
     };
     let modified_files = vec!["usr/share/icons-extra/example.png".to_string()];
 
-    assert!(!trigger_matches_modified_files(&trigger, &modified_files));
+    assert!(!trigger_matches_modified_files(
+        &trigger,
+        &modified_files,
+        &[]
+    ));
 }
 
 #[test]
@@ -88,6 +98,7 @@ fn test_hook_trigger_matches_sysroot_relative_dir() {
         paths: Vec::new(),
         dirs: vec!["usr/share/icons".to_string()],
         operation: Vec::new(),
+        packages: Vec::new(),
     };
     let modified_files = vec![
         root.join("usr/share/icons/hicolor/index.theme")
@@ -95,7 +106,11 @@ fn test_hook_trigger_matches_sysroot_relative_dir() {
             .to_string(),
     ];
 
-    assert!(trigger_matches_modified_files(&trigger, &modified_files));
+    assert!(trigger_matches_modified_files(
+        &trigger,
+        &modified_files,
+        &[]
+    ));
 }
 
 #[test]
@@ -104,10 +119,15 @@ fn test_hook_path_trigger_still_matches_globs() {
         paths: vec!["usr/share/fonts/**".to_string()],
         dirs: Vec::new(),
         operation: Vec::new(),
+        packages: Vec::new(),
     };
     let modified_files = vec!["usr/share/fonts/TTF/example.ttf".to_string()];
 
-    assert!(trigger_matches_modified_files(&trigger, &modified_files));
+    assert!(trigger_matches_modified_files(
+        &trigger,
+        &modified_files,
+        &[]
+    ));
 }
 
 #[test]

@@ -11,8 +11,10 @@ use std::path::PathBuf;
 pub fn build_archive(
     pkg_lua_path: &std::path::Path,
     pkg: &types::Package,
+    sub_package: Option<&str>,
     build_type_override: Option<&str>,
     pb: Option<&indicatif::ProgressBar>,
+    quiet: bool,
 ) -> Result<PathBuf> {
     let build_type = if let Some(t) = build_type_override {
         if !pkg.types.contains(&t.to_string()) {
@@ -42,11 +44,17 @@ pub fn build_archive(
         )
     })?;
 
+    let display_name = if let Some(sub) = sub_package {
+        format!("{}:{}", pkg.name, sub)
+    } else {
+        pkg.name.clone()
+    };
+
     if let Some(p) = pb {
-        p.set_message("Building package...");
+        p.set_message(format!("Building {}...", display_name.cyan()));
         p.set_position(0);
     } else {
-        println!("Building {}...", pkg.name.cyan());
+        println!("Building {}...", display_name.cyan());
     }
 
     if let Some(dep_strings) = zoi_package::build::get_build_dependencies(
@@ -54,13 +62,19 @@ pub fn build_archive(
         Some(build_type),
         &current_platform,
         Some(version),
-        true,
+        quiet,
     )? && !dep_strings.is_empty()
     {
         if let Some(p) = pb {
-            p.set_message("Installing build dependencies...");
-        } else {
-            println!("Installing build dependencies...");
+            p.set_message(format!(
+                "Installing build deps for {}...",
+                display_name.cyan()
+            ));
+        } else if !quiet {
+            println!(
+                "Installing build dependencies for {}...",
+                display_name.cyan()
+            );
         }
         let processed = std::sync::Mutex::new(std::collections::HashSet::new());
         let mut installed = Vec::new();
@@ -79,6 +93,10 @@ pub fn build_archive(
         }
     }
 
+    if let Some(p) = pb {
+        p.set_message(format!("Building {}...", display_name.cyan()));
+    }
+
     let pkg_lua_path_clone = pkg_lua_path.to_path_buf();
     let build_type_clone = build_type.to_string();
     let current_platform_clone = current_platform.clone();
@@ -93,7 +111,7 @@ pub fn build_archive(
             None,
             Some(&version_clone),
             None,
-            true,
+            quiet,
             "native",
             None,
             false,
@@ -103,14 +121,15 @@ pub fn build_archive(
 
     let build_result = build_handle
         .join()
-        .map_err(|_| anyhow!("Build thread panicked"))?;
+        .map_err(|_| anyhow!("Build thread panicked for package '{}'", pkg.name))?;
 
     if let Err(e) = build_result {
         if let Some(p) = pb {
-            p.finish_with_message(format!("{}", "Build failed".red()));
+            p.finish_with_message(format!("{}: {}", pkg.name.cyan(), "Build failed".red()));
         }
         return Err(anyhow!(
-            "'build' step failed: {}\nEnable verbose logging with -v to see more details.",
+            "Build failed for package '{}': {}\nEnable verbose logging with -v to see more details.",
+            pkg.name,
             e
         ));
     }

@@ -1,6 +1,5 @@
 use anyhow::{Result, anyhow};
 use colored::*;
-use home;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use zoi_core::utils;
@@ -67,7 +66,7 @@ pub fn run(
         let host_gpg_home = std::env::var("GNUPGHOME")
             .map(PathBuf::from)
             .unwrap_or_else(|_| {
-                home::home_dir()
+                utils::get_user_home()
                     .map(|h| h.join(".gnupg"))
                     .unwrap_or_default()
             });

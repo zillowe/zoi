@@ -2,11 +2,27 @@ use anyhow::Result;
 use rusqlite::{Connection, params};
 use std::path::PathBuf;
 use zoi_core::types;
-use zoi_resolver::resolve::get_db_root;
+use zoi_resolver::resolve::{get_db_root, get_host_db_root};
 
 pub fn get_db_path(registry_handle: &str) -> Result<PathBuf> {
-    let db_root = get_db_root()?;
-    Ok(db_root.join(format!("{}.db", registry_handle)))
+    let target_root = get_db_root()?;
+    let target_path = target_root.join(format!("{}.db", registry_handle));
+
+    if !target_path.exists() && zoi_core::sysroot::get_sysroot().is_some() {
+        // Fallback to host metadata for bootstrapping
+        let host_root = get_host_db_root()?;
+        let host_path = host_root.join(format!("{}.db", registry_handle));
+
+        if host_path.exists() {
+            if let Some(parent) = target_path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            // Copy host registry DB to target so records are kept in target
+            let _ = std::fs::copy(&host_path, &target_path);
+        }
+    }
+
+    Ok(target_path)
 }
 
 pub fn open_connection(registry_handle: &str) -> Result<Connection> {

@@ -101,6 +101,7 @@ pub fn elevate_uninstall(cmd: &crate::cmd::helper::ElevateUninstallCommand) -> R
             None,
             manifest.sub_package.as_deref(),
             Some(manifest.scope),
+            None,
             true,
         )
         .is_ok()
@@ -120,7 +121,7 @@ pub fn elevate_uninstall(cmd: &crate::cmd::helper::ElevateUninstallCommand) -> R
                             let mut path_to_remove: String = op.get("path").unwrap_or_default();
                             path_to_remove = path_to_remove
                                 .replace("${pkgstore}", &version_dir.to_string_lossy());
-                            if let Some(home_dir) = home::home_dir() {
+                            if let Some(home_dir) = crate::pkg::utils::get_user_home() {
                                 path_to_remove = path_to_remove
                                     .replace("${usrhome}", &home_dir.to_string_lossy());
                             }

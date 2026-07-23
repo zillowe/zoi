@@ -488,11 +488,25 @@ pub fn enter_ephemeral_shell(
                 );
             }
 
+            let extra_binds = vec![(temp_dir.path().to_path_buf(), temp_dir.path().to_path_buf())];
+
             if let Some(cmd_str) = run_cmd {
                 let args = vec!["-c".to_string(), cmd_str];
-                crate::sandbox::wrap_command_in_root(&root, Path::new(&shell_bin), &args, &envs)?
+                crate::sandbox::wrap_command_in_root(
+                    &root,
+                    Path::new(&shell_bin),
+                    &args,
+                    &envs,
+                    &extra_binds,
+                )?
             } else {
-                crate::sandbox::wrap_command_in_root(&root, Path::new(&shell_bin), &[], &envs)?
+                crate::sandbox::wrap_command_in_root(
+                    &root,
+                    Path::new(&shell_bin),
+                    &[],
+                    &envs,
+                    &extra_binds,
+                )?
             }
         } else if let Some(cmd_str) = run_cmd {
             if verbose {

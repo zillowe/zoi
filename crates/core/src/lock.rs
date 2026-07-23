@@ -6,10 +6,9 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 
 fn get_lock_path() -> Result<PathBuf> {
-    let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(crate::sysroot::apply_sysroot(
-        home_dir.join(".zoi").join("pkgs").join("lock"),
-    ))
+    let home_dir =
+        crate::utils::get_user_home().ok_or_else(|| anyhow!("Could not find home directory."))?;
+    Ok(home_dir.join(".zoi").join("pkgs").join("lock"))
 }
 
 /// Acquires a system-wide lock to prevent concurrent modifications to the Zoi store.
@@ -23,6 +22,9 @@ fn get_lock_path() -> Result<PathBuf> {
 /// This ensures that operations like `install`, `uninstall`, and `update` never
 /// run simultaneously, preventing database and filesystem corruption.
 pub fn acquire_lock() -> Result<LockGuard> {
+    if std::env::var("ZOI_SKIP_LOCK").is_ok_and(|v| v == "1") {
+        return Ok(LockGuard::noop());
+    }
     let lock_path = get_lock_path()?;
 
     if let Some(parent) = lock_path.parent()
@@ -89,6 +91,15 @@ pub fn release_lock() -> Result<()> {
 pub struct LockGuard {
     path: Option<PathBuf>,
     _file: Option<fs::File>,
+}
+
+impl LockGuard {
+    pub fn noop() -> Self {
+        Self {
+            path: None,
+            _file: None,
+        }
+    }
 }
 
 impl Drop for LockGuard {

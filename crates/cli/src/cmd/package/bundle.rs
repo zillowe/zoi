@@ -19,6 +19,10 @@ pub struct BundleCommand {
     /// Override the package version
     #[arg(long)]
     pub version_override: Option<String>,
+
+    /// The build type to bundle (e.g. 'source', 'pre-compiled')
+    #[arg(long, short = 't')]
+    pub build_type: Option<String>,
 }
 
 pub fn run(args: BundleCommand) -> Result<()> {
@@ -27,5 +31,6 @@ pub fn run(args: BundleCommand) -> Result<()> {
         args.output_dir.as_deref(),
         args.sign,
         args.version_override.as_deref(),
+        args.build_type,
     )
 }

@@ -294,7 +294,8 @@ pub fn setup_path(scope: Scope) -> anyhow::Result<()> {
 
     let zoi_bin_dir = match scope {
         Scope::User => {
-            let home = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
+            let home = crate::pkg::utils::get_user_home()
+                .ok_or_else(|| anyhow!("Could not find home directory."))?;
             crate::pkg::sysroot::apply_sysroot(home.join(".zoi").join("pkgs").join("bin"))
         }
         Scope::System => {
@@ -322,7 +323,8 @@ pub fn setup_path(scope: Scope) -> anyhow::Result<()> {
     #[cfg(unix)]
     {
         use std::fs::{File, OpenOptions};
-        let home = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
+        let home = crate::pkg::utils::get_user_home()
+            .ok_or_else(|| anyhow!("Could not find home directory."))?;
         let zoi_bin_str = "$HOME/.zoi/pkgs/bin";
 
         let shell_name = std::env::var("SHELL").unwrap_or_default();
@@ -457,7 +459,7 @@ set paths = [ ~/.zoi/pkgs/bin $paths... ]
 }
 
 pub fn check_path() {
-    if let Some(home) = home::home_dir() {
+    if let Some(home) = crate::pkg::utils::get_user_home() {
         let zoi_bin_dir = crate::pkg::sysroot::apply_sysroot(home.join(".zoi/pkgs/bin"));
         if !zoi_bin_dir.exists() {
             return;

@@ -21,7 +21,7 @@ pub fn initialize_zoios_marker(target: &Path, hostname: Option<&str>, dry_run: b
 
     let os_release = target.join("etc/os-release");
     let marker = format!(
-        "ID=zoios\nNAME=ZoiOS\nID_LIKE=zoios\nPRETTY_NAME=\"ZoiOS (Parlex Foundation)\"\nHOSTNAME={}\n",
+        "ID=zoios\nNAME=ZoiOS\nID_LIKE=zoios\nPRETTY_NAME=\"ZoiOS\"\nHOSTNAME={}\n",
         hostname.unwrap_or("zoios")
     );
     fs::write(os_release, marker)?;
