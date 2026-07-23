@@ -12,6 +12,7 @@ COMMIT=$(git rev-parse --short=10 HEAD 2>/dev/null || echo "dev")
 TARGET="x86_64-unknown-linux-gnu"
 NAME="zoi-linux-amd64"
 MINI_NAME="zoi-mini-linux-amd64"
+DAEMON_NAME="zoid-linux-amd64"
 
 echo -e "${CYAN}🏗 Building Zoi for ${TARGET}...${NC}"
 mkdir -p "$OUTPUT_DIR"
@@ -23,12 +24,13 @@ fi
 
 rustup target add "$TARGET"
 
-if ! ZOI_COMMIT_HASH="$COMMIT" cargo build -p zoi-rs -p zoi-mini --target "$TARGET" --release; then
+if ! ZOI_COMMIT_HASH="$COMMIT" cargo build -p zoi-rs -p zoi-mini -p zoi-daemon --target "$TARGET" --release; then
   echo -e "${RED}❌ Build failed for ${TARGET}${NC}"
   exit 1
 fi
 
 install -m 755 "target/${TARGET}/release/zoi" "$OUTPUT_DIR/$NAME"
 install -m 755 "target/${TARGET}/release/zoi-mini" "$OUTPUT_DIR/$MINI_NAME"
+install -m 755 "target/${TARGET}/release/zoid" "$OUTPUT_DIR/$DAEMON_NAME"
 
-echo -e "${GREEN}✅ Successfully built ${NAME} and ${MINI_NAME}${NC}"
+echo -e "${GREEN}✅ Successfully built ${NAME}, ${MINI_NAME}, and ${DAEMON_NAME}${NC}"

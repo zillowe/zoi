@@ -114,8 +114,10 @@ build:linux-amd64:
     paths:
       - scripts/release/zoi-linux-amd64
       - scripts/release/zoi-mini-linux-amd64
+      - scripts/release/zoid-linux-amd64
       - target/x86_64-unknown-linux-gnu/release/zoi
       - target/x86_64-unknown-linux-gnu/release/zoi-mini
+      - target/x86_64-unknown-linux-gnu/release/zoid
     expire_in: 1 day
 
 build:linux-arm64:
@@ -131,8 +133,10 @@ build:linux-arm64:
     paths:
       - scripts/release/zoi-linux-arm64
       - scripts/release/zoi-mini-linux-arm64
+      - scripts/release/zoid-linux-arm64
       - target/aarch64-unknown-linux-gnu/release/zoi
       - target/aarch64-unknown-linux-gnu/release/zoi-mini
+      - target/aarch64-unknown-linux-gnu/release/zoid
     expire_in: 1 day
 
 build:windows-amd64:

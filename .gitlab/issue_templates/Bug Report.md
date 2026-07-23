@@ -1,6 +1,6 @@
 <!-- Please prefix your title with "[BUG]" -->
 
-**NOTE: If your issue is a security concern, open a security report on [GitHub Security Advisory](https://github.com/Zillowe/Zoi/security/advisories/new) or email: [contact@zillowe.qzz.io](mailto:contact@zillowe.qzz.io) instead of opening a public issue, visit the [Security Policy](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/blob/main/SECURITY.md) for more information.**
+**NOTE: If your issue is a security concern, open a security report on [GitHub Security Advisory](https://github.com/zillowe/zoi/security/advisories/new) or email: [contact@zillowe.qzz.io](mailto:contact@zillowe.qzz.io) instead of opening a public issue, visit the [Security Policy](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/blob/main/SECURITY.md) for more information.**
 
 ---
 
@@ -15,7 +15,7 @@ Please read this!
 -->
 
 - [ ] I am using the latest version of Zoi (you can check with `zoi --version` or `zoi upgrade`).
-- [ ] I have checked the [existing issues](https://gitlab.com/Zillowe/Zillwen/Zusty/Zoi/-/issues?scope=all&state=all&label_name[]=Kind%2FBug) to ensure this is not a duplicate.
+- [ ] I have checked the [existing issues](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/issues?scope=all&state=all&label_name[]=Kind%2FBug) to ensure this is not a duplicate.
 
 ### Summary
 

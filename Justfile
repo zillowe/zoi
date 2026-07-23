@@ -15,13 +15,16 @@ DEV_MANDIR := DEBUGDIR + "/man"
 NAME := "zoi"
 
 MINI_NAME := "zoi-mini"
+DAEMON_NAME := "zoid"
 COMMIT_HASH := shell("git rev-parse --short=10 HEAD")
 IS_WINDOWS := if OS_NAME == "windows" { "1" } else { "0" }
 EXE_EXT := if IS_WINDOWS == "1" { ".exe" } else { "" }
 SRC_BIN := "target/release/" + NAME + EXE_EXT
 MINI_SRC_BIN := "target/release/" + MINI_NAME + EXE_EXT
+DAEMON_SRC_BIN := "target/release/" + DAEMON_NAME + EXE_EXT
 DEBUG_SRC_BIN := "target/debug/" + NAME + EXE_EXT
 MINI_DEBUG_SRC_BIN := "target/debug/" + MINI_NAME + EXE_EXT
+DAEMON_DEBUG_SRC_BIN := "target/debug/" + DAEMON_NAME + EXE_EXT
 
 [private]
 _is_configured := if path_exists("config.just") == "true" { "true" } else { "false" }
@@ -39,8 +42,12 @@ build:
         cargo build --bin zoi --release; \
     elif [ "{{ WITH_BIN }}" = "zoi-mini" ]; then \
         cargo build --bin zoi-mini --release; \
-    else \
+    elif [ "{{ WITH_BIN }}" = "zoid" ]; then \
+        cargo build --bin zoid --release; \
+    elif [ "{{ WITH_BIN }}" = "both" ]; then \
         cargo build --bin zoi --bin zoi-mini --release; \
+    else \
+        cargo build --bin zoi --bin zoi-mini --bin zoid --release; \
     fi
     @echo "Build complete for {{ OS_NAME }} ({{ ARCH_NAME }})."
 
@@ -54,17 +61,25 @@ dev:
         cargo build --bin zoi; \
     elif [ "{{ WITH_BIN }}" = "zoi-mini" ]; then \
         cargo build --bin zoi-mini; \
-    else \
+    elif [ "{{ WITH_BIN }}" = "zoid" ]; then \
+        cargo build --bin zoid; \
+    elif [ "{{ WITH_BIN }}" = "both" ]; then \
         cargo build --bin zoi --bin zoi-mini; \
+    else \
+        cargo build --bin zoi --bin zoi-mini --bin zoid; \
     fi
     @mkdir -p "{{ DEV_BINDIR }}"
-    @if [ "{{ WITH_BIN }}" != "zoi-mini" ]; then \
+    @if [ "{{ WITH_BIN }}" = "zoi" ] || [ "{{ WITH_BIN }}" = "all" ] || [ "{{ WITH_BIN }}" = "both" ]; then \
         cp -f "{{ DEBUG_SRC_BIN }}" "{{ DEV_BINDIR }}/{{ NAME }}{{ EXE_EXT }}"; \
         echo "Zoi (debug) copied to {{ DEV_BINDIR }}/{{ NAME }}{{ EXE_EXT }}"; \
     fi
-    @if [ "{{ WITH_BIN }}" != "zoi" ]; then \
+    @if [ "{{ WITH_BIN }}" = "zoi-mini" ] || [ "{{ WITH_BIN }}" = "all" ] || [ "{{ WITH_BIN }}" = "both" ]; then \
         cp -f "{{ MINI_DEBUG_SRC_BIN }}" "{{ DEV_BINDIR }}/{{ MINI_NAME }}{{ EXE_EXT }}"; \
         echo "Zoi Mini (debug) copied to {{ DEV_BINDIR }}/{{ MINI_NAME }}{{ EXE_EXT }}"; \
+    fi
+    @if [ "{{ WITH_BIN }}" = "zoid" ] || [ "{{ WITH_BIN }}" = "all" ]; then \
+        cp -f "{{ DAEMON_DEBUG_SRC_BIN }}" "{{ DEV_BINDIR }}/{{ DAEMON_NAME }}{{ EXE_EXT }}"; \
+        echo "Zoid (debug) copied to {{ DEV_BINDIR }}/{{ DAEMON_NAME }}{{ EXE_EXT }}"; \
     fi
     @echo "Build complete for {{ OS_NAME }} ({{ ARCH_NAME }})."
 
@@ -73,7 +88,7 @@ install:
     @if [ "{{ _is_configured }}" != "true" ]; then echo "Error: Project not configured. Run 'just configure' first."; exit 1; fi
     @echo "Installing requested binaries to {{ BINDIR }}..."
     @mkdir -p "{{ BINDIR }}"
-    @if [ "{{ WITH_BIN }}" != "zoi-mini" ]; then \
+    @if [ "{{ WITH_BIN }}" = "zoi" ] || [ "{{ WITH_BIN }}" = "all" ] || [ "{{ WITH_BIN }}" = "both" ]; then \
         if [ "{{ IS_WINDOWS }}" = "1" ]; then \
             cp -f "{{ SRC_BIN }}" "{{ BINDIR }}/{{ NAME }}.exe"; \
         else \
@@ -81,13 +96,25 @@ install:
         fi; \
         echo "Zoi installed successfully to {{ BINDIR }}/{{ NAME }}{{ EXE_EXT }}"; \
     fi
-    @if [ "{{ WITH_BIN }}" != "zoi" ]; then \
+    @if [ "{{ WITH_BIN }}" = "zoi-mini" ] || [ "{{ WITH_BIN }}" = "all" ] || [ "{{ WITH_BIN }}" = "both" ]; then \
         if [ "{{ IS_WINDOWS }}" = "1" ]; then \
             cp -f "{{ MINI_SRC_BIN }}" "{{ BINDIR }}/{{ MINI_NAME }}.exe"; \
         else \
             install -m 755 "{{ MINI_SRC_BIN }}" "{{ BINDIR }}/{{ MINI_NAME }}"; \
         fi; \
         echo "Zoi Mini installed successfully to {{ BINDIR }}/{{ MINI_NAME }}{{ EXE_EXT }}"; \
+    fi
+    @if [ "{{ WITH_BIN }}" = "zoid" ] || [ "{{ WITH_BIN }}" = "all" ]; then \
+        if [ "{{ IS_WINDOWS }}" = "1" ]; then \
+            echo "Error: zoid is not supported on Windows."; \
+        else \
+            install -m 755 "{{ DAEMON_SRC_BIN }}" "{{ BINDIR }}/{{ DAEMON_NAME }}"; \
+            echo "Zoid installed successfully to {{ BINDIR }}/{{ DAEMON_NAME }}{{ EXE_EXT }}"; \
+            if [ -d "/usr/lib/systemd/system" ]; then \
+                sudo install -m 644 "crates/daemon/zoid.service" "/usr/lib/systemd/system/zoid.service"; \
+                echo "Zoid systemd service installed."; \
+            fi; \
+        fi; \
     fi
     @echo "Make sure '{{ BINDIR }}' is in your PATH."
 
@@ -97,6 +124,11 @@ uninstall:
     @echo "Uninstalling binaries from {{ BINDIR }}..."
     @rm -f "{{ BINDIR }}/{{ NAME }}{{ EXE_EXT }}"
     @rm -f "{{ BINDIR }}/{{ MINI_NAME }}{{ EXE_EXT }}"
+    @rm -f "{{ BINDIR }}/{{ DAEMON_NAME }}{{ EXE_EXT }}"
+    @if [ -f "/usr/lib/systemd/system/zoid.service" ]; then \
+        sudo rm -f "/usr/lib/systemd/system/zoid.service"; \
+        echo "Zoid systemd service removed."; \
+    fi
     @echo "Binaries uninstalled."
 
 # Generate man pages

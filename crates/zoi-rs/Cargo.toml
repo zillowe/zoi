@@ -45,6 +45,8 @@ section = "utils"
 priority = "optional"
 assets = [
   { source = "target/release/zoi", dest = "/usr/bin/zoi", mode = "755" },
+  { source = "target/release/zoid", dest = "/usr/bin/zoid", mode = "755" },
+  { source = "crates/daemon/zoid.service", dest = "/usr/lib/systemd/system/zoid.service", mode = "644" },
   { source = "../../README.md", dest = "/usr/share/doc/zoi/README.md", mode = "644" },
 ]
 
@@ -52,6 +54,8 @@ assets = [
 name = "zoi"
 assets = [
   { source = "target/release/zoi", dest = "/usr/bin/zoi", mode = "755" },
+  { source = "target/release/zoid", dest = "/usr/bin/zoid", mode = "755" },
+  { source = "crates/daemon/zoid.service", dest = "/usr/lib/systemd/system/zoid.service", mode = "644" },
   { source = "../../README.md", dest = "/usr/share/doc/zoi/README.md", mode = "644", doc = true },
   { source = "../../LICENSE", dest = "/usr/share/licenses/zoi/LICENSE", mode = "644", doc = true },
 ]
