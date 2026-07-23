@@ -26,8 +26,25 @@ This is useful if you want to use a mirror or a completely different package dat
 | `zoi sync --force`               | Rebuilds all registry databases from scratch by removing existing caches and re-cloning.     |
 | `zoi sync --local`               | Sync registries to the project's `.zoi/pkgs/db/` using revisions from `zoi.lua`.             |
 | `zoi sync --local --frozen` | Sync registries using revisions pinned in `zoi.lock`.                                        |
+| `zoi sync --scope <user\|system>` | Explicitly target a specific metadata database location.                                     |
 
 ### Examples
+
+```sh
+# Sync the system-wide package database (/var/lib/zoi/pkgs/db)
+sudo zoi sync --scope system
+
+# Sync registries into a target sysroot during bootstrapping
+sudo zoi sync --root /mnt --scope system
+```
+
+### Automatic Scope Detection
+
+Zoi is intelligent about where it stores metadata:
+
+- **Running as Root?** Zoi defaults to `--scope system`.
+- **Using `--root`?** Zoi defaults to `--scope system` within the target.
+- **Normal User?** Zoi defaults to `--scope user` (`~/.zoi/pkgs/db`).
 
 ```sh
 # Show the current configured registries

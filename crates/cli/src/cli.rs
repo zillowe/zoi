@@ -182,6 +182,10 @@ enum Commands {
         /// When used with --local, sync using revisions from zoi.lock instead of zoi.lua
         #[arg(long)]
         frozen: bool,
+
+        /// The scope to sync the registries to
+        #[arg(long, value_enum, conflicts_with = "local")]
+        scope: Option<SetupScope>,
     },
 
     /// Migration helpers for converting external manifests to Zoi package files
@@ -939,6 +943,7 @@ pub fn run() -> anyhow::Result<()> {
                 force,
                 local,
                 frozen,
+                scope,
             } => {
                 if let Some(cmd) = command {
                     match cmd {
@@ -954,7 +959,7 @@ pub fn run() -> anyhow::Result<()> {
                     res
                 } else {
                     plugin_manager.trigger_hook("on_pre_sync", None)?;
-                    let res = cmd::sync::run(verbose, fallback, no_package_managers, force);
+                    let res = cmd::sync::run(verbose, fallback, no_package_managers, force, scope);
                     plugin_manager.trigger_hook_nonfatal("on_post_sync", None);
                     res
                 }

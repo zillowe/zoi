@@ -54,12 +54,13 @@ action:
 | `description`       | `string` | A short summary of what the hook does.                                                                 |
 | `platforms`         | `list`   | (Optional) List of supported platforms (e.g. `["linux"]`).                                             |
 | `trigger.dirs`      | `list`   | A list of directory paths. If any modified file is inside one of these directories, the hook triggers. |
-| `trigger.paths`     | `list`   | A list of glob patterns. If any modified file matches, the hook triggers.                              |
+| `trigger.paths`     | `list`   | A list of glob patterns. If any modified file matches, the hook triggers. Also supports Arch-style directory paths ending in `/`. |
+| `trigger.packages`  | `list`   | A list of package names. If any of these packages are installed, upgraded, or removed, the hook triggers. |
 | `trigger.operation` | `list`   | (Optional) Restrict to specific operations: `install`, `upgrade`, `remove`.                            |
 | `action.when`       | `enum`   | When to run: `PostTransaction` (currently supported).                                                  |
 | `action.exec`       | `string` | The shell command to execute.                                                                          |
 
-`trigger.dirs` is preferred for directory-wide maintenance triggers such as icon themes. `trigger.paths` remains useful when a hook should only match specific filenames or extensions, such as `usr/share/applications/*.desktop`.
+`trigger.dirs` is preferred for directory-wide maintenance triggers such as icon themes. `trigger.paths` remains useful when a hook should only match specific filenames or extensions, such as `usr/share/applications/*.desktop`. `trigger.packages` is the most reliable way to trigger a hook based on the presence of a specific package in the transaction.
 
 ---
 

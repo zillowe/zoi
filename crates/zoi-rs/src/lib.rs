@@ -366,8 +366,9 @@ pub fn bundle_package(
     output_dir: Option<&Path>,
     sign: Option<String>,
     version_override: Option<&str>,
+    build_type: Option<String>,
 ) -> Result<()> {
-    zoi_package::bundle::run(package_file, output_dir, sign, version_override)
+    zoi_package::bundle::run(package_file, output_dir, sign, version_override, build_type)
 }
 
 /// Builds a Zoi package from a local `.pkg.lua` file.

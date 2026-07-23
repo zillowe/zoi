@@ -43,7 +43,7 @@ pub struct MinimalPerson<'a> {
 }
 
 fn get_client_id_path() -> Result<std::path::PathBuf, Box<dyn Error>> {
-    let home = home::home_dir().ok_or("Could not find home directory")?;
+    let home = zoi_core::utils::get_user_home().ok_or("Could not find home directory")?;
     Ok(home.join(".zoi").join("telemetry").join("client_id"))
 }
 

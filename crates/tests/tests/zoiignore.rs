@@ -43,7 +43,7 @@ end
     fs::write(&pkg_lua, lua_code).unwrap();
 
     // Bundle
-    zoi::bundle_package(&pkg_lua, Some(&root), None, None).expect("bundling failed");
+    zoi::bundle_package(&pkg_lua, Some(&root), None, None, None).expect("bundling failed");
     let zsa_path = root.join("my-pkg-1.0.0.zsa");
     assert!(zsa_path.exists(), ".zsa bundle should exist");
 

@@ -29,6 +29,9 @@ serde_yaml.workspace = true
 sha2.workspace = true
 zoi-core.workspace = true
 
+[target.'cfg(target_os = "linux")'.dependencies]
+zoi-sandbox.workspace = true
+
 [build-dependencies]
 serde.workspace = true
 serde_json.workspace = true

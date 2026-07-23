@@ -91,32 +91,6 @@ fn parse_lua_package_from_file_for_platform(
     let lua_code = fs::read_to_string(file_path)?;
     let lua = Lua::new();
 
-    let pkg_meta_table = lua.create_table().map_err(|e| anyhow!(e.to_string()))?;
-    let pkg_deps_table = lua.create_table().map_err(|e| anyhow!(e.to_string()))?;
-    let pkg_updates_table = lua.create_table().map_err(|e| anyhow!(e.to_string()))?;
-    let pkg_hooks_table = lua.create_table().map_err(|e| anyhow!(e.to_string()))?;
-    let pkg_service_table = lua.create_table().map_err(|e| anyhow!(e.to_string()))?;
-    lua.globals()
-        .set("__ZoiPackageMeta", pkg_meta_table)
-        .map_err(|e| anyhow!(e.to_string()))?;
-    lua.globals()
-        .set("__ZoiPackageDeps", pkg_deps_table)
-        .map_err(|e| anyhow!(e.to_string()))?;
-    lua.globals()
-        .set("__ZoiPackageUpdates", pkg_updates_table)
-        .map_err(|e| anyhow!(e.to_string()))?;
-    lua.globals()
-        .set("__ZoiPackageHooks", pkg_hooks_table)
-        .map_err(|e| anyhow!(e.to_string()))?;
-    lua.globals()
-        .set("__ZoiPackageService", pkg_service_table)
-        .map_err(|e| anyhow!(e.to_string()))?;
-
-    let pkg_table = lua.create_table().map_err(|e| anyhow!(e.to_string()))?;
-    lua.globals()
-        .set("PKG", pkg_table)
-        .map_err(|e| anyhow!(e.to_string()))?;
-
     functions::setup_lua_environment(
         &lua,
         platform,
@@ -127,6 +101,7 @@ fn parse_lua_package_from_file_for_platform(
         None,
         None,
         scope,
+        None,
         quiet,
     )
     .map_err(|e| anyhow!("Failed to setup Lua environment for '{}': {}", file_path, e))?;

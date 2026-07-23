@@ -11,6 +11,7 @@ pub fn pool_files(
     pool_dir: &Path,
     pool: &mut BTreeMap<String, PoolFileEntry>,
     scope_mapping: &mut ScopeMapping,
+    fakeroot: bool,
 ) -> Result<()> {
     if !virtual_staging_dir.exists() {
         return Ok(());
@@ -42,19 +43,23 @@ pub fn pool_files(
 
         #[cfg(unix)]
         let (owner, group) = {
-            use nix::unistd::{Gid, Group, Uid, User};
-            use std::os::unix::fs::MetadataExt;
-            let uid = metadata.uid();
-            let gid = metadata.gid();
-            let owner = User::from_uid(Uid::from_raw(uid))
-                .ok()
-                .flatten()
-                .map(|u| u.name);
-            let group = Group::from_gid(Gid::from_raw(gid))
-                .ok()
-                .flatten()
-                .map(|g| g.name);
-            (owner, group)
+            if fakeroot {
+                (Some("root".to_string()), Some("root".to_string()))
+            } else {
+                use nix::unistd::{Gid, Group, Uid, User};
+                use std::os::unix::fs::MetadataExt;
+                let uid = metadata.uid();
+                let gid = metadata.gid();
+                let owner = User::from_uid(Uid::from_raw(uid))
+                    .ok()
+                    .flatten()
+                    .map(|u| u.name);
+                let group = Group::from_gid(Gid::from_raw(gid))
+                    .ok()
+                    .flatten()
+                    .map(|g| g.name);
+                (owner, group)
+            }
         };
         #[cfg(not(unix))]
         let (owner, group) = (None, None);

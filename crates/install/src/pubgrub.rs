@@ -1,3 +1,4 @@
+use colored::Colorize;
 use pubgrub::{Dependencies, DependencyProvider, Ranges};
 use rusqlite::params;
 use rustc_hash::FxHashMap;
@@ -43,12 +44,77 @@ impl Display for PkgName {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct SemVersion(pub Version);
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct SemVersion {
+    pub v: Version,
+    pub original: String,
+}
+
+impl SemVersion {
+    pub fn new(v: Version, original: String) -> Self {
+        Self { v, original }
+    }
+
+    pub fn parse(v: &str) -> Result<Self, anyhow::Error> {
+        let clean = sanitize_version_string(v);
+        match Version::parse(&clean) {
+            Ok(parsed) => Ok(SemVersion {
+                v: parsed,
+                original: v.to_string(),
+            }),
+            Err(_) => {
+                // Fallback for extremely weird versions: use 0.0.0+original
+                Ok(SemVersion {
+                    v: Version::new(0, 0, 0),
+                    original: v.to_string(),
+                })
+            }
+        }
+    }
+}
+
+impl Ord for SemVersion {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.v.cmp(&other.v)
+    }
+}
+
+impl PartialOrd for SemVersion {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
 
 impl Display for SemVersion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "{}", self.original)
+    }
+}
+
+/// Sanitizes non-standard version strings into valid SemVer format.
+///
+/// Logic:
+/// - Padds missing parts (e.g. "2.41" -> "2.41.0").
+/// - Converts extra parts into build metadata (e.g. "7.1.4.arch1" -> "7.1.4+arch1").
+/// - Cleans up prefixes and suffixes.
+fn sanitize_version_string(v: &str) -> String {
+    let v = v.trim_start_matches('v').replace('-', "+");
+    let parts: Vec<&str> = v.split('.').collect();
+
+    if parts.len() == 1 {
+        format!("{}.0.0", parts[0])
+    } else if parts.len() == 2 {
+        format!("{}.{}.0", parts[0], parts[1])
+    } else if parts.len() > 3 {
+        format!(
+            "{}.{}.{}+{}",
+            parts[0],
+            parts[1],
+            parts[2],
+            parts[3..].join(".")
+        )
+    } else {
+        v.to_string()
     }
 }
 
@@ -117,22 +183,31 @@ pub struct ZoiDependencyProvider {
 /// `@stable`), it is treated as a `Ranges::full()` to let Zoi's higher-level
 /// resolver handle the channel-to-version mapping.
 pub fn semver_to_range(req_str: &str) -> Ranges<SemVersion> {
-    let req_str = req_str.trim_start_matches('@').trim_start_matches('v');
+    let req_str_clean = req_str.trim_start_matches('@').trim_start_matches('v');
 
-    if let Ok(version) = Version::parse(req_str) {
-        return Ranges::singleton(SemVersion(version));
+    if let Ok(version) = SemVersion::parse(req_str_clean) {
+        return Ranges::singleton(version);
     }
 
-    if let Ok(req) = semver::VersionReq::parse(req_str) {
+    if let Ok(req) = semver::VersionReq::parse(req_str_clean) {
         let mut range = Ranges::full();
         for comparator in &req.comparators {
-            let v = SemVersion(Version {
-                major: comparator.major,
-                minor: comparator.minor.unwrap_or(0),
-                patch: comparator.patch.unwrap_or(0),
-                pre: comparator.pre.clone(),
-                build: semver::BuildMetadata::EMPTY,
-            });
+            let v_str = format!(
+                "{}.{}.{}",
+                comparator.major,
+                comparator.minor.unwrap_or(0),
+                comparator.patch.unwrap_or(0)
+            );
+            let v = SemVersion {
+                v: Version {
+                    major: comparator.major,
+                    minor: comparator.minor.unwrap_or(0),
+                    patch: comparator.patch.unwrap_or(0),
+                    pre: comparator.pre.clone(),
+                    build: semver::BuildMetadata::EMPTY,
+                },
+                original: v_str,
+            };
 
             let comp_range = match comparator.op {
                 semver::Op::Exact => Ranges::singleton(v),
@@ -141,17 +216,21 @@ pub fn semver_to_range(req_str: &str) -> Ranges<SemVersion> {
                 semver::Op::Less => Ranges::strictly_lower_than(v),
                 semver::Op::LessEq => Ranges::lower_than(v),
                 semver::Op::Tilde => {
-                    let next_minor = SemVersion(Version {
+                    let next_minor_v = Version {
                         major: comparator.major,
                         minor: comparator.minor.unwrap_or(0) + 1,
                         patch: 0,
                         pre: semver::Prerelease::EMPTY,
                         build: semver::BuildMetadata::EMPTY,
-                    });
+                    };
+                    let next_minor = SemVersion {
+                        v: next_minor_v.clone(),
+                        original: next_minor_v.to_string(),
+                    };
                     Ranges::higher_than(v).intersection(&Ranges::strictly_lower_than(next_minor))
                 }
                 semver::Op::Caret => {
-                    let next = if comparator.major > 0 {
+                    let next_v = if comparator.major > 0 {
                         Version {
                             major: comparator.major + 1,
                             minor: 0,
@@ -186,8 +265,11 @@ pub fn semver_to_range(req_str: &str) -> Ranges<SemVersion> {
                             build: semver::BuildMetadata::EMPTY,
                         }
                     };
-                    Ranges::higher_than(v)
-                        .intersection(&Ranges::strictly_lower_than(SemVersion(next)))
+                    let next = SemVersion {
+                        v: next_v.clone(),
+                        original: next_v.to_string(),
+                    };
+                    Ranges::higher_than(v).intersection(&Ranges::strictly_lower_than(next))
                 }
                 _ => Ranges::full(),
             };
@@ -286,17 +368,17 @@ impl ZoiDependencyProvider {
 
         if let Some(index) = &self.mini_index
             && let Some(pkg_info) = index.packages.get(&package.name)
-            && let Ok(v) = Version::parse(pkg_info.version.trim_start_matches('v'))
+            && let Ok(v) = SemVersion::parse(pkg_info.version.trim_start_matches('v'))
         {
-            all_versions.push(SemVersion(v));
+            all_versions.push(v);
         }
 
         if let Ok(version_strings) =
             db::get_all_versions(&package.registry, &package.name, &package.repo)
         {
             for v_str in version_strings {
-                if let Ok(v) = Version::parse(&v_str) {
-                    all_versions.push(SemVersion(v));
+                if let Ok(v) = SemVersion::parse(&v_str) {
+                    all_versions.push(v);
                 }
             }
         }
@@ -305,11 +387,9 @@ impl ZoiDependencyProvider {
             if self.source_matches_package(package, source)
                 && let Ok(req) = resolve::parse_source_string(source)
                 && let Some(v_spec) = req.version_spec
+                && let Ok(v) = SemVersion::parse(&v_spec)
             {
-                let v_clean = v_spec.trim_start_matches('@').trim_start_matches('v');
-                if let Ok(v) = Version::parse(v_clean) {
-                    all_versions.push(SemVersion(v));
-                }
+                all_versions.push(v);
             }
         }
 
@@ -327,19 +407,17 @@ impl ZoiDependencyProvider {
         if let Ok(resolved) = resolve::resolve_source(&source_str, self.scope, true, true) {
             let path_str = resolved.path.to_string_lossy();
             if let Ok(pkg) = zoi_lua::parser::parse_lua_package(&path_str, None, self.scope, true) {
-                if let Some(v_str) = &pkg.version {
-                    let v_clean = v_str.trim_start_matches('v');
-                    if let Ok(v) = Version::parse(v_clean) {
-                        all_versions.push(SemVersion(v));
-                    }
+                if let Some(v_str) = &pkg.version
+                    && let Ok(v) = SemVersion::parse(v_str)
+                {
+                    all_versions.push(v);
                 }
                 if let Some(versions_map) = &pkg.versions {
                     for channel in versions_map.keys() {
-                        if let Ok(v_str) = resolve::resolve_channel(versions_map, channel) {
-                            let v_clean = v_str.trim_start_matches('v');
-                            if let Ok(v) = Version::parse(v_clean) {
-                                all_versions.push(SemVersion(v));
-                            }
+                        if let Ok(v_str) = resolve::resolve_channel(versions_map, channel)
+                            && let Ok(v) = SemVersion::parse(&v_str)
+                        {
+                            all_versions.push(v);
                         }
                     }
                 }
@@ -357,11 +435,10 @@ impl ZoiDependencyProvider {
                 .map_err(|e| ZoiSolverError::Other(e.to_string()))?;
 
             for v_res in rows {
-                if let Ok(Some(v_str)) = v_res {
-                    let v_clean = v_str.trim_start_matches('v');
-                    if let Ok(v) = Version::parse(v_clean) {
-                        all_versions.push(SemVersion(v));
-                    }
+                if let Ok(Some(v_str)) = v_res
+                    && let Ok(v) = SemVersion::parse(&v_str)
+                {
+                    all_versions.push(v);
                 }
             }
         }
@@ -421,8 +498,11 @@ impl DependencyProvider for ZoiDependencyProvider {
             if let Some(spec) = config.pkgs_v2.get(&packages_key)
                 && spec.version.as_ref().is_none_or(|v| {
                     let range = semver_to_range(v);
-                    let parsed = Version::parse(&version_str);
-                    parsed.is_ok_and(|pv| range.contains(&SemVersion(pv))) || v == &version_str
+                    if let Ok(pv) = SemVersion::parse(&version_str) {
+                        range.contains(&pv) || v == &version_str
+                    } else {
+                        v == &version_str
+                    }
                 })
             {
                 package_deps = spec.dependencies.clone().map(types::to_dependencies_v2);
@@ -445,16 +525,33 @@ impl DependencyProvider for ZoiDependencyProvider {
             {
                 serde_json::from_str::<types::Dependencies>(&deps_json).ok()
             } else {
-                let source = package
-                    .explicit_source
-                    .clone()
-                    .unwrap_or_else(|| format!("{}@{}", package, version_str));
+                let source = package.explicit_source.clone().unwrap_or_else(|| {
+                    if let Some(sub) = &package.sub_package {
+                        format!(
+                            "#{}@{}/{}:{}@{}",
+                            package.registry, package.repo, package.name, sub, version_str
+                        )
+                    } else {
+                        format!(
+                            "#{}@{}/{}@{}",
+                            package.registry, package.repo, package.name, version_str
+                        )
+                    }
+                });
+
                 let pkg_res =
                     resolve::resolve_package_and_version(&source, self.scope, self.quiet, self.yes);
 
                 match pkg_res {
                     Ok((pkg, _, _, _, _, _, _)) => pkg.dependencies,
-                    Err(_) => None,
+                    Err(e) => {
+                        println!(
+                            "{} Failed to resolve source for deps: {}",
+                            "::".bold().red(),
+                            e
+                        );
+                        None
+                    }
                 }
             };
             package_deps = v1_deps.map(types::to_dependencies_v2);
@@ -475,26 +572,55 @@ impl DependencyProvider for ZoiDependencyProvider {
 
             for group_pkgs in groups {
                 for dep_str in group_pkgs {
-                    let dep_req = zoi_deps::parse_dependency_string(dep_str)
-                        .map_err(|e| ZoiSolverError::Dependency(e.to_string()))?;
+                    let dep_req = zoi_deps::parse_dependency_string(dep_str).map_err(|e| {
+                        ZoiSolverError::Dependency(format!("parse fail for '{}': {}", dep_str, e))
+                    })?;
 
                     if dep_req.manager == "zoi" {
-                        let req = resolve::parse_source_string(dep_req.package)
-                            .map_err(|e| ZoiSolverError::Dependency(e.to_string()))?;
-                        let resolved_dep = resolve::resolve_source(
+                        let req = match resolve::parse_source_string(dep_req.package) {
+                            Ok(r) => r,
+                            Err(e) => {
+                                println!(
+                                    "{} Dependency parse failed for '{}': {}",
+                                    "::".bold().red(),
+                                    dep_req.package,
+                                    e
+                                );
+                                return Err(ZoiSolverError::Dependency(format!(
+                                    "parse source fail for '{}': {}",
+                                    dep_req.package, e
+                                )));
+                            }
+                        };
+
+                        let resolved_dep = match resolve::resolve_source(
                             dep_req.package,
                             self.scope,
-                            self.quiet,
+                            false,
                             self.yes,
-                        )
-                        .map_err(|e| ZoiSolverError::Dependency(e.to_string()))?;
+                        ) {
+                            Ok(r) => r,
+                            Err(e) => {
+                                println!(
+                                    "{} Dependency resolution failed for '{}': {}",
+                                    "::".bold().red(),
+                                    dep_req.package,
+                                    e
+                                );
+                                return Err(ZoiSolverError::Dependency(format!(
+                                    "resolve fail for '{}': {}",
+                                    dep_req.package, e
+                                )));
+                            }
+                        };
 
                         let dep_name = PkgName {
                             name: req.name,
                             sub_package: req.sub_package,
-                            repo: resolved_dep.repo_name.unwrap_or_default(),
+                            repo: resolved_dep.repo_name.clone().unwrap_or_default(),
                             registry: resolved_dep
                                 .registry_handle
+                                .clone()
                                 .unwrap_or_else(|| "zoidberg".to_string()),
                             explicit_source: matches!(
                                 resolved_dep.source_type,
@@ -506,20 +632,27 @@ impl DependencyProvider for ZoiDependencyProvider {
                         };
 
                         let range = if req.version_spec.is_some() {
-                            let resolved_version = resolve::resolve_requested_version_spec(
+                            match resolve::resolve_requested_version_spec(
                                 dep_req.package,
                                 self.scope,
+                                false,
                                 true,
-                                true,
-                            )
-                            .map_err(|e| ZoiSolverError::Dependency(e.to_string()))?
-                            .ok_or_else(|| {
-                                ZoiSolverError::Dependency(format!(
-                                    "version spec missing for '{}'",
-                                    dep_req.package
-                                ))
-                            })?;
-                            self.semver_to_range(&resolved_version)
+                            ) {
+                                Ok(Some(v)) => self.semver_to_range(&v),
+                                Ok(None) => Ranges::full(),
+                                Err(e) => {
+                                    println!(
+                                        "{} Version resolution failed for '{}': {}",
+                                        "::".bold().red(),
+                                        dep_req.package,
+                                        e
+                                    );
+                                    return Err(ZoiSolverError::Dependency(format!(
+                                        "version resolve fail for '{}': {}",
+                                        dep_req.package, e
+                                    )));
+                                }
+                            }
                         } else {
                             Ranges::full()
                         };
@@ -548,7 +681,10 @@ impl DependencyProvider for ZoiDependencyProvider {
         versions: &pubgrub::Ranges<Self::V>,
     ) -> Result<Option<Self::V>, Self::Err> {
         if package.name == "$root" {
-            return Ok(Some(SemVersion(Version::new(0, 0, 0))));
+            return Ok(Some(SemVersion {
+                v: Version::new(0, 0, 0),
+                original: "0.0.0".to_string(),
+            }));
         }
         let all_versions = self.get_versions(package)?;
         let best_version = all_versions.into_iter().rfind(|v| versions.contains(v));

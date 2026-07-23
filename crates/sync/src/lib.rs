@@ -13,7 +13,7 @@ use std::process::{Command, Stdio};
 use tempfile::Builder;
 use walkdir::WalkDir;
 use zoi_core::offline;
-use zoi_core::{config, pgp, sysroot, types, utils as core_utils};
+use zoi_core::{config, pgp, types, utils as core_utils};
 use zoi_db as db;
 use zoi_install::util as install_util;
 use zoi_lua::parser as lua_parser;
@@ -356,25 +356,11 @@ fn verify_registry_signature(
     }
 }
 
-fn get_db_path() -> Result<PathBuf> {
-    let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(sysroot::apply_sysroot(
-        home_dir.join(".zoi").join("pkgs").join("db"),
-    ))
-}
-
-fn get_git_root() -> Result<PathBuf> {
-    let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(sysroot::apply_sysroot(
-        home_dir.join(".zoi").join("pkgs").join("git"),
-    ))
-}
-
 /// Synchronizes raw Git repositories that contain Zoi packages.
 ///
-/// These are cloned into `~/.zoi/pkgs/git/` and are typically used for
+/// These are cloned into Zoi's git root and are typically used for
 /// personal or third-party package collections that are not full registries.
-fn sync_git_repos(verbose: bool) -> Result<()> {
+fn sync_git_repos(verbose: bool, scope: types::Scope) -> Result<()> {
     if offline::is_offline() {
         println!(
             "\n{}",
@@ -382,7 +368,7 @@ fn sync_git_repos(verbose: bool) -> Result<()> {
         );
         return Ok(());
     }
-    let git_root = get_git_root()?;
+    let git_root = core_utils::get_git_base_dir(scope)?;
     if !git_root.exists() {
         return Ok(());
     }
@@ -648,6 +634,42 @@ fn try_sync_at_path(
     m: Option<&MultiProgress>,
     pb: Option<&ProgressBar>,
 ) -> Result<()> {
+    // Check if it's a local directory
+    let local_path = Path::new(db_url);
+    if local_path.is_dir() {
+        if verbose {
+            let msg = format!("Syncing local registry: {}", db_url.cyan());
+            if let Some(m_ref) = m {
+                let _ = m_ref.println(&msg);
+            } else {
+                println!("{}", msg);
+            }
+        }
+
+        // For local registries, we ensure db_path is a symlink to the local_path
+        if db_path.exists() {
+            if !db_path.is_symlink() {
+                // If it's a directory (from a previous git sync), remove it
+                fs::remove_dir_all(db_path)?;
+            } else {
+                // It's already a symlink, check if it points to the right place
+                if let Ok(target) = fs::read_link(db_path)
+                    && target == local_path
+                {
+                    return Ok(());
+                }
+                fs::remove_file(db_path)?;
+            }
+        }
+
+        if let Some(parent) = db_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        return core_utils::symlink_dir(local_path, db_path)
+            .map_err(|e| anyhow!("Failed to symlink local registry: {}", e));
+    }
+
     if offline::is_offline() {
         if db_path.exists() {
             let msg = format!(
@@ -863,6 +885,17 @@ fn fetch_handle_for_url(url: &str, verbose: bool) -> Result<String> {
             url.cyan()
         );
     }
+
+    // Check if it's a local directory
+    let local_path = Path::new(url);
+    if local_path.is_dir() {
+        if verbose {
+            println!("Detected local directory registry.");
+        }
+        let repo_config = config::read_repo_config(local_path)?;
+        return Ok(repo_config.name);
+    }
+
     match fetch_repo_yaml_content(url) {
         Ok(content) => {
             let repo_config: types::RepoConfig = serde_yaml::from_str(&content)?;
@@ -973,6 +1006,8 @@ fn sync_registry(
         }
     }
 
+    let is_local = Path::new(&reg.url).is_dir();
+
     if !sync_success {
         let e = last_error.unwrap_or_else(|| anyhow!("All sync candidates failed."));
         if let Some(p) = &pb {
@@ -980,7 +1015,8 @@ fn sync_registry(
         }
         return Err(e);
     } else {
-        if let Some(authorities) = &reg.authorities
+        if !is_local
+            && let Some(authorities) = &reg.authorities
             && let Err(e) = verify_registry_signature(&target_dir, authorities, verbose)
         {
             let rollback_msg = if let Some(oid) = pre_sync_head {
@@ -1022,10 +1058,13 @@ fn sync_registry(
             return Err(e);
         }
 
-        sync_pgp_keys_at_path(&target_dir, verbose, pb.as_ref())?;
+        if !is_local {
+            sync_pgp_keys_at_path(&target_dir, verbose, pb.as_ref())?;
+        }
 
         let mut db_downloaded = false;
-        if let Ok(repo_config) = config::read_repo_config(&target_dir)
+        if !is_local
+            && let Ok(repo_config) = config::read_repo_config(&target_dir)
             && let Some(db_url_template) = &repo_config.db
         {
             let platform = core_utils::get_platform().unwrap_or_default();
@@ -1088,10 +1127,12 @@ fn sync_registry(
 /// stored in `./.zoi/pkgs/db`. This ensures that a project's dependencies
 /// are reproducible and independent of the user's global registry state.
 pub fn run_local(verbose: bool, _fallback: bool, force: bool, frozen: bool) -> Result<()> {
-    let local_db_root = std::env::current_dir()?
-        .join(".zoi")
-        .join("pkgs")
-        .join("db");
+    let local_db_root = zoi_core::sysroot::apply_sysroot(
+        std::env::current_dir()?
+            .join(".zoi")
+            .join("pkgs")
+            .join("db"),
+    );
     fs::create_dir_all(&local_db_root)?;
 
     let registries: Vec<(String, String, String)> = if frozen {
@@ -1208,7 +1249,13 @@ pub fn run_local(verbose: bool, _fallback: bool, force: bool, frozen: bool) -> R
 /// - Updates local SQLite indexes.
 /// - Detects and records available native package managers.
 /// - Synchronizes the remote security policy if configured.
-pub fn run(verbose: bool, fallback: bool, no_pm: bool, force: bool) -> Result<()> {
+pub fn run(
+    verbose: bool,
+    fallback: bool,
+    no_pm: bool,
+    force: bool,
+    scope: Option<types::Scope>,
+) -> Result<()> {
     let merged_config = config::read_config()?;
     if force {
         println!(
@@ -1216,8 +1263,17 @@ pub fn run(verbose: bool, fallback: bool, no_pm: bool, force: bool) -> Result<()
             "::".bold().yellow()
         );
     }
+
+    let effective_scope = scope.unwrap_or_else(|| {
+        if core_utils::is_admin() || zoi_core::sysroot::get_sysroot().is_some() {
+            types::Scope::System
+        } else {
+            types::Scope::User
+        }
+    });
+
     if merged_config.protect_db || force {
-        let db_root = get_db_path()?;
+        let db_root = core_utils::get_db_base_dir(effective_scope)?;
         if db_root.exists() {
             if verbose || force {
                 println!("Making package database writable...");
@@ -1238,7 +1294,7 @@ pub fn run(verbose: bool, fallback: bool, no_pm: bool, force: bool) -> Result<()
         }
     }
 
-    let db_root = get_db_path()?;
+    let db_root = core_utils::get_db_base_dir(effective_scope)?;
     let mut registries_to_sync = Vec::new();
 
     if let Some(default_reg) = &config.default_registry {
@@ -1318,10 +1374,10 @@ pub fn run(verbose: bool, fallback: bool, no_pm: bool, force: bool) -> Result<()
 
     let _ = config::sync_remote_policy();
 
-    sync_git_repos(verbose)?;
+    sync_git_repos(verbose, effective_scope)?;
 
     if merged_config.protect_db {
-        let db_root = get_db_path()?;
+        let db_root = core_utils::get_db_base_dir(effective_scope)?;
         if db_root.exists() {
             if verbose {
                 println!("Making package database read-only...");

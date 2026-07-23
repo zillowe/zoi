@@ -180,8 +180,8 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
 fn get_bin_root(scope: types::Scope) -> Result<PathBuf> {
     match scope {
         types::Scope::User => {
-            let home_dir =
-                home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
+            let home_dir = core_utils::get_user_home()
+                .ok_or_else(|| anyhow!("Could not find home directory."))?;
             Ok(sysroot::apply_sysroot(home_dir.join(".zoi/pkgs/bin")))
         }
         types::Scope::System => {

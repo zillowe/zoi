@@ -1,7 +1,6 @@
 use crate::resolver::InstallNode;
 use anyhow::{Result, anyhow};
 use colored::*;
-use home;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use semver::{Version, VersionReq};
@@ -835,7 +834,7 @@ pub fn get_conflicts_from_list(
                 PathBuf::from("/").join(stripped),
             ))
         } else if let Some(stripped) = rel_to_data.strip_prefix("usrhome/") {
-            home::home_dir().map(|h| h.join(stripped))
+            utils::get_user_home().map(|h| h.join(stripped))
         } else {
             None
         };
@@ -905,7 +904,7 @@ pub fn get_file_conflicts_from_archive(
 
         let usrhome_src = sub_data_dir.join("usrhome");
         if usrhome_src.exists()
-            && let Some(home_dest) = home::home_dir()
+            && let Some(home_dest) = utils::get_user_home()
         {
             for entry in WalkDir::new(&usrhome_src)
                 .into_iter()

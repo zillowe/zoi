@@ -18,8 +18,66 @@ pub fn setup_lua_environment(
     staging_dir: Option<&str>,
     sub_package: Option<&str>,
     scope: Option<zoi_core::types::Scope>,
+    build_type: Option<&str>,
     quiet: bool,
 ) -> Result<(), mlua::Error> {
+    // Initialize the global PKG table for script use
+    let pkg_table = if let Ok(table) = lua.globals().get::<mlua::Table>("PKG") {
+        table
+    } else {
+        let table = lua.create_table()?;
+        lua.globals().set("PKG", table.clone())?;
+        table
+    };
+
+    if let Some(bt) = build_type {
+        lua.globals().set("BUILD_TYPE", bt)?;
+    }
+
+    // Initialize internal metadata capture tables if they don't exist
+    if lua
+        .globals()
+        .get::<mlua::Table>("__ZoiPackageMeta")
+        .is_err()
+    {
+        let pkg_meta_table = lua.create_table()?;
+        lua.globals().set("__ZoiPackageMeta", pkg_meta_table)?;
+    }
+    if lua
+        .globals()
+        .get::<mlua::Table>("__ZoiPackageDeps")
+        .is_err()
+    {
+        let pkg_deps_table = lua.create_table()?;
+        lua.globals().set("__ZoiPackageDeps", pkg_deps_table)?;
+    }
+    if lua
+        .globals()
+        .get::<mlua::Table>("__ZoiPackageUpdates")
+        .is_err()
+    {
+        let pkg_updates_table = lua.create_table()?;
+        lua.globals()
+            .set("__ZoiPackageUpdates", pkg_updates_table)?;
+    }
+    if lua
+        .globals()
+        .get::<mlua::Table>("__ZoiPackageHooks")
+        .is_err()
+    {
+        let pkg_hooks_table = lua.create_table()?;
+        lua.globals().set("__ZoiPackageHooks", pkg_hooks_table)?;
+    }
+    if lua
+        .globals()
+        .get::<mlua::Table>("__ZoiPackageService")
+        .is_err()
+    {
+        let pkg_service_table = lua.create_table()?;
+        lua.globals()
+            .set("__ZoiPackageService", pkg_service_table)?;
+    }
+
     // Host System Information
     // Exposes a 'SYSTEM' table containing OS, Architecture, Distro, etc.
     // Allow maintainers to write platform-specific logic easily.
@@ -72,7 +130,7 @@ pub fn setup_lua_environment(
     }
 
     let path_table = lua.create_table()?;
-    if let Some(home_dir) = home::home_dir() {
+    if let Some(home_dir) = utils::get_user_home() {
         path_table.set("user", home_dir.join(".zoi").to_string_lossy().to_string())?;
     }
 
@@ -85,8 +143,7 @@ pub fn setup_lua_environment(
 
     zoi_table.set("PATH", path_table)?;
 
-    let pkg_table = lua.create_table()?;
-    if let Some(home_dir) = home::home_dir() {
+    if let Some(home_dir) = utils::get_user_home() {
         pkg_table.set("home", home_dir.to_string_lossy().to_string())?;
         pkg_table.set(
             "store",
@@ -143,7 +200,7 @@ pub fn setup_lua_environment(
                 .to_string(),
         )?;
     } else {
-        if let Some(home_dir) = home::home_dir() {
+        if let Some(home_dir) = utils::get_user_home() {
             location_table.set(
                 "PKGSTORE",
                 home_dir
@@ -182,9 +239,11 @@ pub fn setup_lua_environment(
     }
     if let Some(bd) = build_dir {
         location_table.set("BUILDDIR", bd)?;
+        lua.globals().set("BUILD_DIR", bd)?;
     }
     if let Some(sd) = staging_dir {
         location_table.set("STAGINGDIR", sd)?;
+        lua.globals().set("STAGING_DIR", sd)?;
     }
     zoi_table.set("LOCATION", location_table)?;
 

@@ -404,7 +404,10 @@ pub fn resolve_dependency_graph(
         registry: "".to_string(),
         explicit_source: None,
     };
-    let root_version = SemVersion(Version::new(0, 0, 0));
+    let root_version = SemVersion {
+        v: Version::new(0, 0, 0),
+        original: "0.0.0".to_string(),
+    };
 
     let mut final_nodes = HashMap::new();
     let mut final_adj: HashMap<String, HashSet<String>> = HashMap::new();
@@ -566,7 +569,13 @@ pub fn resolve_dependency_graph(
                 node.dependencies = resolved_deps;
             }
         }
-        Err(e) => return Err(anyhow!("Dependency resolution failed: {}", e)),
+        Err(e) => {
+            let error_msg = format!("{:?}", e);
+            if error_msg.contains("DependencyProviderError") {
+                return Err(anyhow!("Dependency resolution failed: {}", error_msg));
+            }
+            return Err(anyhow!("Dependency resolution failed: {}", e));
+        }
     }
 
     Ok((

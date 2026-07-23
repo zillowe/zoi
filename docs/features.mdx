@@ -16,8 +16,11 @@ Zoi is packed with features designed to make package management and environment 
   - **Transaction-Linked Generations:** Every system change creates a versioned "Generation" record linked to a Zoi package transaction. Revert any OS update safely by rolling back the associated transactions.
   - **Direct FHS Installation:** ZoiOS installs packages directly into the system root (`/usr/bin`, `/usr/lib`, etc.), ensuring 100% compatibility with standard Linux software while maintaining a versioned store for safety.
   - **Universal Distro Builder:** Bootstrap an entire ZoiOS distribution onto a manually partitioned and formatted disk or directory with a single command (`zoi system distro build`).
+  - **Native Distro Chroot:** Enter any ZoiOS root directory with `zoi system distro chroot`, which automatically sets up a secure sandbox with `/dev`, `/proc`, and `/sys` mounted from the host.
 
 - **Explicit Scope Control:** Restrict package installation to specific scopes (`user`, `system`, or `project`) using the `scopes` metadata field. Zoi automatically enforces these constraints during installation and updates.
+
+- **Scope-Aware Registry Sync:** Synchronize package metadata to either your user directory (`~/.zoi`) or the system-wide store (`/var/lib/zoi`). Zoi automatically detects the correct scope when running as root or with a sysroot (`--root`).
 
 - **Sysroot Support (`--root`):** Operates on a different root directory, allowing you to bootstrap entire OS images, containers, or embedded systems from the outside.
 
@@ -45,7 +48,7 @@ Zoi is packed with features designed to make package management and environment 
 
 - **Automated Dev Repo Discovery (`zoi dev --repo`):** Instantly enter a development shell for any Git repository. Zoi clones the repository to a temporary directory, sets up the environment defined in its `zoi.lua`, and cleans up automatically on exit.
 
-- **Global Transaction Hooks:** Automate system maintenance tasks (like font cache updates) based on modified file paths. Hooks run once per transaction, preventing redundant script execution.
+- **Global Transaction Hooks:** Automate system maintenance tasks (like font cache updates) based on modified file paths or package names. Hooks run once per transaction, preventing redundant script execution. Support for sysroots ensures hooks execute correctly inside the target OS during distribution builds.
 
 - **Transaction Inspection:** Inspect recorded package operations and touched files with `zoi transaction list`, `zoi transaction show`, and `zoi transaction files`.
 

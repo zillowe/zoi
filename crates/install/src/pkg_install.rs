@@ -15,8 +15,8 @@ use zstd::stream::read::Decoder as ZstdDecoder;
 fn get_bin_root(scope: types::Scope) -> Result<PathBuf> {
     match scope {
         types::Scope::User => {
-            let home_dir =
-                home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
+            let home_dir = zoi_core::utils::get_user_home()
+                .ok_or_else(|| anyhow!("Could not find home directory."))?;
             Ok(zoi_core::sysroot::apply_sysroot(
                 home_dir.join(".zoi/pkgs/bin"),
             ))
@@ -42,8 +42,8 @@ fn get_bin_root(scope: types::Scope) -> Result<PathBuf> {
 fn get_completions_root(scope: types::Scope, shell: &str) -> Result<PathBuf> {
     match scope {
         types::Scope::User => {
-            let home_dir =
-                home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
+            let home_dir = zoi_core::utils::get_user_home()
+                .ok_or_else(|| anyhow!("Could not find home directory."))?;
             Ok(zoi_core::sysroot::apply_sysroot(
                 home_dir.join(".zoi/pkgs/shell").join(shell),
             ))
@@ -298,9 +298,9 @@ pub fn run(
     let data_dir = temp_dir.path().join("data");
     if data_dir.exists() {
         if let Some(p) = pb {
-            p.set_message("Installing package...");
+            p.set_message(format!("Installing {}...", metadata.name.cyan()));
         } else {
-            println!("Installing package...");
+            println!("Installing {}...", metadata.name.cyan());
         }
 
         let subs_to_install = if let Some(subs) = sub_packages {
@@ -309,7 +309,9 @@ pub fn run(
             if let Some(main_subs) = &metadata.main_subs {
                 main_subs.clone()
             } else {
-                subs.clone()
+                let mut all = vec!["".to_string()];
+                all.extend(subs.clone());
+                all
             }
         } else {
             vec!["".to_string()]
@@ -377,8 +379,8 @@ pub fn run(
 
             let usrhome_src = sub_data_dir.join("usrhome");
             if usrhome_src.exists() {
-                let home_dest =
-                    home::home_dir().ok_or_else(|| anyhow!("Could not find home directory"))?;
+                let home_dest = zoi_core::utils::get_user_home()
+                    .ok_or_else(|| anyhow!("Could not find home directory"))?;
                 check_and_handle_file_conflicts(&usrhome_src, &home_dest, &owned_files, yes)?;
                 copy_dir_all(&usrhome_src, &home_dest)?;
                 for entry in WalkDir::new(&usrhome_src)
@@ -553,8 +555,8 @@ fn finalize_installation(
         let applications_dir = match scope {
             types::Scope::System => PathBuf::from("/Applications"),
             types::Scope::User => {
-                let home_dir =
-                    home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
+                let home_dir = zoi_core::utils::get_user_home()
+                    .ok_or_else(|| anyhow!("Could not find home directory."))?;
                 home_dir.join("Applications")
             }
             types::Scope::Project => std::env::current_dir()?.join("Applications"),
@@ -834,7 +836,8 @@ fn expand_pooled_path(path: &str, staging_path: &Path, _scope: types::Scope) -> 
             PathBuf::from("/").join(rel),
         ))
     } else if let Some(rel) = path.strip_prefix("${usrhome}/") {
-        let home_dir = home::home_dir().ok_or_else(|| anyhow!("Home dir not found"))?;
+        let home_dir =
+            zoi_core::utils::get_user_home().ok_or_else(|| anyhow!("Home dir not found"))?;
         Ok(home_dir.join(rel))
     } else if let Some(rel) = path.strip_prefix("${createpkgdir}/") {
         Ok(std::env::current_dir()?.join(rel))

@@ -110,7 +110,7 @@ pub fn wrap_command(
     if let Ok(path) = std::env::var("PATH") {
         bwrap.arg("--setenv").arg("PATH").arg(path);
     }
-    if let Some(home) = home::home_dir() {
+    if let Some(home) = zoi_core::utils::get_user_home() {
         bwrap
             .arg("--setenv")
             .arg("HOME")
@@ -163,6 +163,7 @@ pub fn wrap_command_in_root(
     exe_inside_root: &Path,
     args: &[String],
     env: &std::collections::HashMap<String, String>,
+    extra_binds: &[(PathBuf, PathBuf)],
 ) -> Result<Command> {
     if !zoi_core::utils::command_exists("bwrap") {
         return Err(anyhow!(
@@ -181,6 +182,11 @@ pub fn wrap_command_in_root(
     bwrap.arg("--bind").arg("/sys").arg("/sys");
     bwrap.arg("--tmpfs").arg("/run");
     bwrap.arg("--tmpfs").arg("/tmp");
+
+    // Additional binds (e.g. for ephemeral package symlinks)
+    for (host_path, guest_path) in extra_binds {
+        bwrap.arg("--bind").arg(host_path).arg(guest_path);
+    }
 
     // Share network for downloads/etc if needed
     bwrap.arg("--share-net");
@@ -201,7 +207,7 @@ pub fn wrap_command_in_root(
 
 fn expand_home(path: &str) -> Result<PathBuf> {
     if let Some(stripped) = path.strip_prefix("~/") {
-        let home = home::home_dir()
+        let home = zoi_core::utils::get_user_home()
             .ok_or_else(|| anyhow!("Could not find home directory for expansion: {}", path))?;
         Ok(home.join(stripped))
     } else {

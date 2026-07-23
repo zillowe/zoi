@@ -74,10 +74,11 @@ pub fn run(args: &cmd::package::build::BuildCommand) -> Result<()> {
             Some(&version),
             args.package_file.to_str(),
             None,
-            None,
-            None,
+            Some(build_dir.path().to_str().unwrap_or("")),
+            Some(staging_dir.to_str().unwrap_or("")),
             sub_pkg_name,
             Some(pkg_for_meta.scope),
+            Some(resolved_build_type.as_str()),
             false,
         )
         .map_err(|e| anyhow!(e.to_string()))?;
@@ -87,26 +88,6 @@ pub fn run(args: &cmd::package::build::BuildCommand) -> Result<()> {
             .map_err(|e| anyhow!(e.to_string()))?;
         lua.globals()
             .set("PKG", pkg_table)
-            .map_err(|e| anyhow!(e.to_string()))?;
-        lua.globals()
-            .set(
-                "BUILD_DIR",
-                build_dir
-                    .path()
-                    .to_str()
-                    .ok_or_else(|| anyhow!("build_dir path contains invalid UTF-8"))?,
-            )
-            .map_err(|e| anyhow!(e.to_string()))?;
-        lua.globals()
-            .set(
-                "STAGING_DIR",
-                staging_dir
-                    .to_str()
-                    .ok_or_else(|| anyhow!("staging_dir path contains invalid UTF-8"))?,
-            )
-            .map_err(|e| anyhow!(e.to_string()))?;
-        lua.globals()
-            .set("BUILD_TYPE", resolved_build_type.as_str())
             .map_err(|e| anyhow!(e.to_string()))?;
 
         let lua_code = std::fs::read_to_string(&args.package_file)?;

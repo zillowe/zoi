@@ -49,6 +49,22 @@ sudo zoi system distro build --target /mnt --config ./system.lua --dry-run
 sudo zoi system distro build --target /mnt --config ./system.lua
 ```
 
+### `zoi system distro chroot <target>`
+
+Enter a ZoiOS sysroot (chroot) with automatic device mounting and sandbox protection. This is the recommended way to run commands like `dracut` or `grub-install` during the final stages of bootstrapping a ZoiOS installation, as it ensures all operations are safely contained within the target environment.
+
+**Options:**
+
+- `--run <command>`: Run a specific command inside the chroot and exit, rather than dropping into an interactive shell.
+
+```sh
+# Enter an interactive shell inside the ZoiOS root
+sudo zoi system distro chroot /mnt/zoios
+
+# Run a specific command inside the ZoiOS root
+sudo zoi system distro chroot /mnt/zoios --run "grub-mkconfig -o /boot/grub/grub.cfg"
+```
+
 ### `zoi system list`
 
 Lists all available system generations on the machine, including their creation date, the packages they contain, and their linked Zoi transaction IDs.

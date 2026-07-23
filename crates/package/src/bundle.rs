@@ -15,6 +15,7 @@ pub fn run(
     output_dir: Option<&Path>,
     sign: Option<String>,
     version_override: Option<&str>,
+    build_type: Option<String>,
 ) -> Result<()> {
     let pkg_dir = package_file
         .parent()
@@ -51,35 +52,10 @@ pub fn run(
         .set("__ZoiReferencedFiles", refs_table)
         .map_err(|e| anyhow!(e.to_string()))?;
 
-    // Initialize package metadata tables
-    let pkg_meta_table = lua.create_table().map_err(|e| anyhow!(e.to_string()))?;
-    let pkg_deps_table = lua.create_table().map_err(|e| anyhow!(e.to_string()))?;
-    let pkg_updates_table = lua.create_table().map_err(|e| anyhow!(e.to_string()))?;
-    let pkg_hooks_table = lua.create_table().map_err(|e| anyhow!(e.to_string()))?;
-    let pkg_service_table = lua.create_table().map_err(|e| anyhow!(e.to_string()))?;
-    lua.globals()
-        .set("__ZoiPackageMeta", pkg_meta_table)
-        .map_err(|e| anyhow!(e.to_string()))?;
-    lua.globals()
-        .set("__ZoiPackageDeps", pkg_deps_table)
-        .map_err(|e| anyhow!(e.to_string()))?;
-    lua.globals()
-        .set("__ZoiPackageUpdates", pkg_updates_table)
-        .map_err(|e| anyhow!(e.to_string()))?;
-    lua.globals()
-        .set("__ZoiPackageHooks", pkg_hooks_table)
-        .map_err(|e| anyhow!(e.to_string()))?;
-    lua.globals()
-        .set("__ZoiPackageService", pkg_service_table)
-        .map_err(|e| anyhow!(e.to_string()))?;
-
-    let pkg_global_table = lua.create_table().map_err(|e| anyhow!(e.to_string()))?;
-    lua.globals()
-        .set("PKG", pkg_global_table)
-        .map_err(|e| anyhow!(e.to_string()))?;
-
     // Setup a mocked environment for metadata and asset discovery
     // We run it twice: once to find local assets, and once to actually run prepare() if needed.
+
+    let bundle_type = build_type.as_deref().unwrap_or("source");
 
     // Phase 1: Metadata & Local Asset Discovery
     zoi_lua::functions::setup_lua_environment(
@@ -92,12 +68,13 @@ pub fn run(
         Some("/tmp/mock-staging"),
         None,
         None,
+        Some(bundle_type),
         true, // quiet
     )
     .map_err(|e| anyhow!(e.to_string()))?;
 
     lua.globals()
-        .set("BUILD_TYPE", "source")
+        .set("BUILD_TYPE", bundle_type)
         .map_err(|e| anyhow!(e.to_string()))?;
 
     // Mock UTILS.EXTRACT to record local references but avoid downloads (in this phase)
@@ -233,13 +210,14 @@ pub fn run(
         Some("/tmp/mock-staging"),
         None,
         None,
+        Some(bundle_type),
         true, // quiet
     )
     .map_err(|e| anyhow!(e.to_string()))?;
 
     lua_fetch
         .globals()
-        .set("BUILD_TYPE", "source")
+        .set("BUILD_TYPE", bundle_type)
         .map_err(|e| anyhow!(e.to_string()))?;
 
     lua_fetch

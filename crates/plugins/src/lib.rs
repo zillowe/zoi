@@ -1012,7 +1012,8 @@ impl PluginManager {
 }
 
 pub fn get_plugin_dir() -> Result<PathBuf> {
-    let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
+    let home_dir =
+        utils::get_user_home().ok_or_else(|| anyhow!("Could not find home directory."))?;
     let plugin_dir = home_dir.join(".zoi").join("plugins");
     if !plugin_dir.exists() {
         fs::create_dir_all(&plugin_dir)?;

@@ -68,7 +68,8 @@ pub fn run(
             .parent()
             .ok_or_else(|| anyhow!("Could not get zoi executable directory"))?;
 
-        let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not get home directory"))?;
+        let home_dir = zoi_core::utils::get_user_home()
+            .ok_or_else(|| anyhow!("Could not get home directory"))?;
         let zoi_home = home_dir.join(".zoi");
 
         // Base bwrap arguments
@@ -116,10 +117,13 @@ pub fn run(
             "--setenv".to_string(),
             "PATH".to_string(),
             "/zoi_bin:/usr/bin:/bin:/usr/sbin:/sbin".to_string(),
+            "--setenv".to_string(),
+            "ZOI_SKIP_LOCK".to_string(),
+            "1".to_string(),
         ];
 
         if zoi_home.exists() {
-            bwrap_args.push("--ro-bind".to_string());
+            bwrap_args.push("--bind".to_string());
             bwrap_args.push(zoi_home.display().to_string());
             bwrap_args.push(zoi_home.display().to_string());
         }
@@ -127,7 +131,7 @@ pub fn run(
         // Also bind /var/lib/zoi if it exists
         let system_zoi = Path::new("/var/lib/zoi");
         if system_zoi.exists() {
-            bwrap_args.push("--ro-bind".to_string());
+            bwrap_args.push("--bind".to_string());
             bwrap_args.push(system_zoi.display().to_string());
             bwrap_args.push(system_zoi.display().to_string());
         }

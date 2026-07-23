@@ -2,7 +2,7 @@ use anyhow::{Context, Result, anyhow};
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
-use zoi_core::{sysroot, types};
+use zoi_core::{sysroot, types, utils};
 use zoi_resolver::local;
 
 pub enum ServiceAction {
@@ -59,8 +59,8 @@ pub fn cleanup_service(package_name: &str, scope: types::Scope) -> Result<()> {
     match std::env::consts::OS {
         "linux" => {
             let unit_path = if is_user {
-                let home =
-                    home::home_dir().ok_or_else(|| anyhow!("Could not find home directory"))?;
+                let home = utils::get_user_home()
+                    .ok_or_else(|| anyhow!("Could not find home directory"))?;
                 sysroot::apply_sysroot(
                     home.join(".config/systemd/user")
                         .join(format!("{}.service", service_name)),
@@ -89,8 +89,8 @@ pub fn cleanup_service(package_name: &str, scope: types::Scope) -> Result<()> {
         }
         "macos" => {
             let plist_path = if is_user {
-                let home =
-                    home::home_dir().ok_or_else(|| anyhow!("Could not find home directory"))?;
+                let home = utils::get_user_home()
+                    .ok_or_else(|| anyhow!("Could not find home directory"))?;
                 sysroot::apply_sysroot(
                     home.join("Library/LaunchAgents")
                         .join(format!("{}.plist", service_name)),
@@ -230,7 +230,8 @@ fn manage_linux_service(
 
 fn ensure_linux_unit_file(name: &str, service: &types::Service, is_user: bool) -> Result<()> {
     let unit_path = if is_user {
-        let home = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory"))?;
+        let home =
+            utils::get_user_home().ok_or_else(|| anyhow!("Could not find home directory"))?;
         let path = sysroot::apply_sysroot(home.join(".config/systemd/user"));
         fs::create_dir_all(&path)
             .with_context(|| format!("Failed to create directory: {}", path.display()))?;
@@ -354,7 +355,8 @@ fn manage_macos_service(
 
 fn ensure_macos_plist(name: &str, service: &types::Service, is_user: bool) -> Result<PathBuf> {
     let plist_path = if is_user {
-        let home = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory"))?;
+        let home =
+            utils::get_user_home().ok_or_else(|| anyhow!("Could not find home directory"))?;
         let path = sysroot::apply_sysroot(home.join("Library/LaunchAgents"));
         fs::create_dir_all(&path)
             .with_context(|| format!("Failed to create directory: {}", path.display()))?;

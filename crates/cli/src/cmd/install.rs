@@ -401,6 +401,31 @@ pub fn run(
         }
     }
 
+    let default_handle = config
+        .default_registry
+        .as_ref()
+        .map(|r| r.handle.as_str())
+        .unwrap_or("");
+    let active_repos = &config.repos;
+
+    let format_display_name = |registry: &str, repo: &str, name: &str, sub: Option<&str>| {
+        let base_name = if let Some(s) = sub {
+            format!("{}:{}", name, s)
+        } else {
+            name.to_string()
+        };
+
+        if registry == default_handle || registry == "local" || registry.is_empty() {
+            if active_repos.contains(&repo.to_string()) || repo.is_empty() {
+                base_name
+            } else {
+                format!("@{}/{}", repo, base_name)
+            }
+        } else {
+            format!("#{}@{}/{}", registry, repo, base_name)
+        }
+    };
+
     println!(
         "\n{} Packages ({})",
         "::".bold().blue(),
@@ -409,17 +434,20 @@ pub fn run(
     let direct_list: Vec<_> = direct_packages
         .iter()
         .map(|n| {
-            let name = if let Some(sub) = &n.sub_package {
-                format!("{}:{}", n.pkg.name, sub)
-            } else {
-                n.pkg.name.clone()
-            };
+            let display_name = format_display_name(
+                &n.registry_handle,
+                &n.pkg.repo,
+                &n.pkg.name,
+                n.sub_package.as_deref(),
+            );
             let version_display = if n.revision != "1" {
                 format!("{}-{}", n.version, n.revision)
             } else {
                 n.version.clone()
             };
-            format!("@{}:{}", name, version_display).cyan().to_string()
+            format!("{}@{}", display_name, version_display)
+                .cyan()
+                .to_string()
         })
         .collect();
     println!(" {}", direct_list.join("  "));
@@ -440,11 +468,12 @@ pub fn run(
                 None => "unknown",
             };
             let origin = ux::classify_source_origin(&node.source, action_name);
-            let display_name = if let Some(sub) = &node.sub_package {
-                format!("{}:{}", node.pkg.name, sub)
-            } else {
-                node.pkg.name.clone()
-            };
+            let display_name = format_display_name(
+                &node.registry_handle,
+                &node.pkg.repo,
+                &node.pkg.name,
+                node.sub_package.as_deref(),
+            );
             let version_display = if node.revision != "1" {
                 format!("{}-{}", node.version, node.revision)
             } else {
@@ -468,18 +497,19 @@ pub fn run(
         );
         let mut dep_list = Vec::new();
         for n in &dependencies {
-            let name = if let Some(sub) = &n.sub_package {
-                format!("{}:{}", n.pkg.name, sub)
-            } else {
-                n.pkg.name.clone()
-            };
+            let display_name = format_display_name(
+                &n.registry_handle,
+                &n.pkg.repo,
+                &n.pkg.name,
+                n.sub_package.as_deref(),
+            );
             let version_display = if n.revision != "1" {
                 format!("{}-{}", n.version, n.revision)
             } else {
                 n.version.clone()
             };
             dep_list.push(
-                format!("zoi: @{}:{}", name, version_display)
+                format!("zoi:{}@{}", display_name, version_display)
                     .dimmed()
                     .to_string(),
             );
@@ -903,9 +933,12 @@ pub fn run(
     }
 
     if let Ok(modified_files) = transaction::get_modified_files(&transaction_id) {
+        let modified_packages =
+            transaction::get_modified_packages(&transaction_id).unwrap_or_default();
         let _ = crate::pkg::hooks::global::run_global_hooks(
             crate::pkg::hooks::global::HookWhen::PostTransaction,
             &modified_files,
+            &modified_packages,
             "install",
             scope_override.unwrap_or_default(),
         );

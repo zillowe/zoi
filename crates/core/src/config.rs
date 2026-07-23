@@ -1,6 +1,6 @@
 use crate::sysroot::apply_sysroot;
 use crate::types::{Config, Registry, RepoConfig};
-use crate::utils::get_db_root;
+use crate::utils::{get_db_root, get_user_home};
 use anyhow::{Result, anyhow};
 use colored::*;
 use serde_yaml::Value;
@@ -39,22 +39,24 @@ fn get_system_config_path() -> Result<PathBuf> {
 }
 
 fn get_user_config_path() -> Result<PathBuf> {
-    let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(apply_sysroot(
-        home_dir.join(".zoi").join("pkgs").join("config.yaml"),
-    ))
+    let home_dir = get_user_home().ok_or_else(|| anyhow!("Could not find home directory."))?;
+    Ok(apply_sysroot(home_dir.join(".zoi"))
+        .join("pkgs")
+        .join("config.yaml"))
 }
 
 fn get_project_config_path() -> Result<PathBuf> {
     let current_dir = std::env::current_dir()?;
-    Ok(current_dir.join(".zoi").join("pkgs").join("config.yaml"))
+    Ok(apply_sysroot(current_dir.join(".zoi"))
+        .join("pkgs")
+        .join("config.yaml"))
 }
 
 fn get_git_root() -> Result<PathBuf> {
-    let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(apply_sysroot(
-        home_dir.join(".zoi").join("pkgs").join("git"),
-    ))
+    let home_dir = get_user_home().ok_or_else(|| anyhow!("Could not find home directory."))?;
+    Ok(apply_sysroot(home_dir.join(".zoi"))
+        .join("pkgs")
+        .join("git"))
 }
 
 fn get_remote_policy_cache_path() -> Result<PathBuf> {

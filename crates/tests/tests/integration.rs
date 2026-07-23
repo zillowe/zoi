@@ -14,6 +14,7 @@ fn test_lua_zcp_records_operation() {
         None,
         None,
         None,
+        None,
         true,
     )
     .unwrap();
@@ -37,6 +38,7 @@ fn test_lua_zlicense_records_zcp_operation() {
     functions::setup_lua_environment(
         &lua,
         "linux-amd64",
+        None,
         None,
         None,
         None,
@@ -73,6 +75,7 @@ fn test_lua_zdoc_records_zcp_operation() {
         None,
         None,
         None,
+        None,
         true,
     )
     .unwrap();
@@ -95,6 +98,7 @@ fn test_lua_zln_records_operation() {
     functions::setup_lua_environment(
         &lua,
         "linux-amd64",
+        None,
         None,
         None,
         None,
