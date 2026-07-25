@@ -425,9 +425,17 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
                         &args,
                         &envs,
                         &[],
+                        false,
                     )?
                 } else {
-                    crate::sandbox::wrap_command_in_root(target_path, &shell_bin, &[], &envs, &[])?
+                    crate::sandbox::wrap_command_in_root(
+                        target_path,
+                        &shell_bin,
+                        &[],
+                        &envs,
+                        &[],
+                        false,
+                    )?
                 };
 
                 if verbose {

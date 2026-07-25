@@ -26,6 +26,8 @@ fn get_bin_root(scope: types::Scope) -> Result<PathBuf> {
                 Ok(zoi_core::sysroot::apply_sysroot(PathBuf::from(
                     "C:\\ProgramData\\zoi\\pkgs\\bin",
                 )))
+            } else if zoi_core::utils::is_zoios() {
+                Ok(zoi_core::sysroot::apply_sysroot(PathBuf::from("/usr/bin")))
             } else {
                 Ok(zoi_core::sysroot::apply_sysroot(PathBuf::from(
                     "/usr/local/bin",
@@ -54,6 +56,15 @@ fn get_completions_root(scope: types::Scope, shell: &str) -> Result<PathBuf> {
                     "C:\\ProgramData\\zoi\\pkgs\\shell\\{}",
                     shell
                 ))))
+            } else if zoi_core::utils::is_zoios() {
+                let base = match shell {
+                    "bash" => "/usr/share/bash-completion/completions",
+                    "zsh" => "/usr/share/zsh/site-functions",
+                    "fish" => "/usr/share/fish/vendor_completions.d",
+                    "elvish" => "/usr/share/elvish/lib",
+                    _ => "/usr/share/zoi/completions",
+                };
+                Ok(zoi_core::sysroot::apply_sysroot(PathBuf::from(base)))
             } else {
                 let base = match shell {
                     "bash" => "/usr/share/bash-completion/completions",
