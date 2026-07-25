@@ -2,7 +2,7 @@
 
 PREFIX="/usr/local"
 DEBUGDIR="dist"
-WITH_BIN="both"
+WITH_BIN="zoi"
 
 for arg in "$@"; do
   case $arg in
@@ -14,8 +14,8 @@ for arg in "$@"; do
     ;;
   --with-bin=*)
     WITH_BIN=$(echo "$arg" | sed 's/--with-bin=//')
-    if [ "$WITH_BIN" != "zoi" ] && [ "$WITH_BIN" != "zoi-mini" ] && [ "$WITH_BIN" != "zoid" ] && [ "$WITH_BIN" != "all" ] && [ "$WITH_BIN" != "both" ]; then
-      echo "Error: --with-bin must be 'zoi', 'zoi-mini', 'zoid', 'all', or 'both'."
+    if [ "$WITH_BIN" != "zoi" ] && [ "$WITH_BIN" != "zoi-mini" ] && [ "$WITH_BIN" != "zoid" ] && [ "$WITH_BIN" != "all" ]; then
+      echo "Error: --with-bin must be 'zoi', 'zoi-mini', 'zoid', or 'all'."
       exit 1
     fi
     ;;
