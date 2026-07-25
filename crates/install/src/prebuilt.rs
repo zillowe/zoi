@@ -15,26 +15,27 @@ pub fn build_archive(
     build_type_override: Option<&str>,
     pb: Option<&indicatif::ProgressBar>,
     quiet: bool,
-) -> Result<PathBuf> {
-    let build_type = if let Some(t) = build_type_override {
-        if !pkg.types.contains(&t.to_string()) {
-            return Err(anyhow!(
-                "Build type '{}' not supported by this package. Supported types: {:?}",
-                t,
-                pkg.types
-            ));
-        }
-        t
-    } else if pkg.types.contains(&"pre-compiled".to_string()) {
-        "pre-compiled"
-    } else if !pkg.types.is_empty() {
-        &pkg.types[0]
-    } else {
-        return Err(anyhow!(
-            "No supported build types found in package '{}'. Please specify a `types` field in the package file (e.g. `types = {{ 'source' }}`).",
-            pkg.name
-        ));
-    };
+) -> Result<Option<PathBuf>> {
+    let build_type =
+        match zoi_package::build::resolve_build_type(build_type_override, &pkg.types, &pkg.name)? {
+            Some(t) => t,
+            None => {
+                if let Some(p) = pb {
+                    p.finish_with_message(format!(
+                        "{} Skipping build for '{}': no build types supported.",
+                        "::".bold().yellow(),
+                        pkg.name
+                    ));
+                } else if !quiet {
+                    println!(
+                        "{} Skipping build for '{}': no build types supported.",
+                        "::".bold().yellow(),
+                        pkg.name
+                    );
+                }
+                return Ok(None);
+            }
+        };
 
     let current_platform = utils::get_platform()?;
     let version = pkg.version.as_deref().ok_or_else(|| {
@@ -53,13 +54,13 @@ pub fn build_archive(
     if let Some(p) = pb {
         p.set_message(format!("Building {}...", display_name.cyan()));
         p.set_position(0);
-    } else {
+    } else if !quiet {
         println!("Building {}...", display_name.cyan());
     }
 
     if let Some(dep_strings) = zoi_package::build::get_build_dependencies(
         pkg_lua_path,
-        Some(build_type),
+        Some(&build_type),
         &current_platform,
         Some(version),
         quiet,
@@ -149,9 +150,9 @@ pub fn build_archive(
 
     if let Some(p) = pb {
         p.set_position(100);
-    } else {
+    } else if !quiet {
         println!("Finished building {}.", pkg.name.cyan());
     }
 
-    Ok(archive_path)
+    Ok(Some(archive_path))
 }

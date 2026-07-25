@@ -165,6 +165,14 @@ pub fn run(
 ) -> Result<Vec<String>> {
     let scope = scope_override.unwrap_or(types::Scope::User);
 
+    // Handle meta-packages with no archive
+    if package_file.as_os_str().is_empty() {
+        if pb.is_none() {
+            println!("Initializing meta-package...");
+        }
+        return Ok(Vec::new());
+    }
+
     if pb.is_none() {
         println!(
             "Installing from package archive: {}",

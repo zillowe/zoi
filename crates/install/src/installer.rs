@@ -273,7 +273,10 @@ pub fn prepare_node(
                     pb.as_ref(),
                     !verbose,
                 )?;
-                (archive_path, "source".to_string(), true)
+                match archive_path {
+                    Some(path) => (path, "source".to_string(), true),
+                    None => (PathBuf::new(), "meta".to_string(), false),
+                }
             } else {
                 if let Some(p) = &pb {
                     p.set_message("Using local archive...");
@@ -297,7 +300,11 @@ pub fn prepare_node(
                 pb.as_ref(),
                 !verbose,
             )?;
-            (archive_path, "source".to_string(), true)
+
+            match archive_path {
+                Some(path) => (path, "source".to_string(), true),
+                None => (PathBuf::new(), "meta".to_string(), false),
+            }
         }
     };
 

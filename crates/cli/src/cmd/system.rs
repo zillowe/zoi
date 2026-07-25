@@ -1,6 +1,7 @@
 use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
 use colored::*;
+use std::io::Read;
 use zoi_core::utils::is_zoios;
 use zoi_system::config::load_system_lua;
 
@@ -246,6 +247,135 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
                     ));
                 }
 
+                // --- BOOTSTRAP AUDIT ---
+
+                // Filesystem check
+                let fs_type = std::process::Command::new("stat")
+                    .arg("-f")
+                    .arg("-c")
+                    .arg("%T")
+                    .arg(&target)
+                    .output();
+                if let Ok(out) = fs_type {
+                    let t = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                    if t == "msdos" || t == "vfat" {
+                        eprintln!(
+                            "\n{} CRITICAL: Target filesystem is '{}'. ZoiOS requires a Linux filesystem (ext4, btrfs, xfs) to support hard links and permissions. Your bootstrap will NOT work on FAT32.",
+                            "Error:".red().bold(),
+                            t.yellow()
+                        );
+                    } else if verbose {
+                        println!("{} Filesystem type: {}", "::".bold().blue(), t.green());
+                    }
+                }
+
+                // Merged-Usr Symlink Audit
+                let mut broken_layout = false;
+                for sym in &["bin", "sbin", "lib", "lib64"] {
+                    let p = target_path.join(sym);
+                    let meta = std::fs::symlink_metadata(&p);
+                    if let Ok(m) = meta {
+                        if !m.file_type().is_symlink() {
+                            eprintln!(
+                                "{} WARNING: '/{}' is a real directory, but ZoiOS expects a merged-usr symlink to 'usr/{}'.",
+                                "::".bold().yellow(),
+                                sym,
+                                sym
+                            );
+                            broken_layout = true;
+                        } else if let Ok(target) = std::fs::read_link(&p) {
+                            if target.is_absolute() {
+                                eprintln!(
+                                    "{} WARNING: '/{}' is an absolute symlink to '{}'. This WILL break inside the chroot. It should be relative (e.g. 'usr/{}').",
+                                    "::".bold().yellow(),
+                                    sym,
+                                    target.display(),
+                                    sym
+                                );
+                                broken_layout = true;
+                            } else {
+                                let abs_target = target_path.join(target);
+                                if !abs_target.exists() {
+                                    eprintln!(
+                                        "{} WARNING: Symlink '/{}' points to non-existent path '{}'.",
+                                        "::".bold().yellow(),
+                                        sym,
+                                        abs_target.display()
+                                    );
+                                    broken_layout = true;
+                                }
+                            }
+                        }
+                    } else if *sym != "sbin" {
+                        eprintln!(
+                            "{} WARNING: '/{}' is missing! Your binaries will likely fail to find their loader or shell.",
+                            "::".bold().yellow(),
+                            sym
+                        );
+                        broken_layout = true;
+                    }
+                }
+
+                // ISA Baseline Check (x86-64-v3 detection)
+                let host_has_avx2 = if let Ok(cpuinfo) = std::fs::read_to_string("/proc/cpuinfo") {
+                    cpuinfo.contains("avx2")
+                } else {
+                    true
+                };
+                if !host_has_avx2 {
+                    println!(
+                        "{} Host CPU lacks AVX2. If guest binaries are built for x86-64-v3, they WILL Segfault (139).",
+                        "::".bold().yellow()
+                    );
+                }
+
+                // Dynamic Loader Validation (The common cause of 139)
+                let mut loader_found = false;
+                let loaders = [
+                    "usr/lib/ld-linux-x86-64.so.2",
+                    "lib64/ld-linux-x86-64.so.2",
+                    "lib/ld-linux-x86-64.so.2",
+                ];
+                for l in &loaders {
+                    let lp = target_path.join(l);
+                    if lp.exists() {
+                        loader_found = true;
+                        if let Ok(mut file) = std::fs::File::open(&lp) {
+                            let mut magic = [0u8; 4];
+                            if file.read_exact(&mut magic).is_ok() {
+                                if magic != [0x7f, b'E', b'L', b'F'] {
+                                    eprintln!(
+                                        "{} CRITICAL: Dynamic loader '{}' is NOT an ELF file! Your glibc installation is corrupted.",
+                                        "Error:".red().bold(),
+                                        l
+                                    );
+                                }
+                            } else {
+                                eprintln!(
+                                    "{} CRITICAL: Dynamic loader '{}' is 0 bytes or unreadable.",
+                                    "Error:".red().bold(),
+                                    l
+                                );
+                            }
+                        }
+                        break;
+                    }
+                }
+                if !loader_found {
+                    eprintln!(
+                        "{} Dynamic loader not found. Binaries WILL Segfault (139).",
+                        "::".bold().yellow()
+                    );
+                }
+
+                if broken_layout || !loader_found {
+                    println!(
+                        "{} Hint: run 'zoi install @parlex/glibc:main --root {} --force --build' to repair the bootstrap.",
+                        "::".bold().blue(),
+                        target
+                    );
+                }
+
                 if verbose {
                     println!(
                         "{} Entering sysroot at {}...",
@@ -259,13 +389,32 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
                     "PATH".to_string(),
                     "/usr/bin:/bin:/usr/sbin:/sbin".to_string(),
                 );
-                envs.insert("SHELL".to_string(), "/bin/bash".to_string());
+                envs.insert("SHELL".to_string(), "/usr/bin/bash".to_string());
                 envs.insert(
                     "TERM".to_string(),
                     std::env::var("TERM").unwrap_or_else(|_| "xterm-256color".to_string()),
                 );
 
-                let shell_bin = std::path::PathBuf::from("/bin/bash");
+                // Resolve shell path in guest (Prefer /usr/bin/bash)
+                let mut shell_bin = std::path::PathBuf::from("/usr/bin/bash");
+                if !target_path.join("usr/bin/bash").exists()
+                    && target_path.join("bin/bash").exists()
+                {
+                    shell_bin = std::path::PathBuf::from("/bin/bash");
+                }
+
+                if verbose {
+                    let cmd_display = if let Some(r) = &run {
+                        format!("{} -c '{}'", shell_bin.display(), r)
+                    } else {
+                        shell_bin.display().to_string()
+                    };
+                    println!(
+                        "{} Running inside chroot: {}",
+                        "::".bold().blue(),
+                        cmd_display.green()
+                    );
+                }
 
                 #[cfg(target_os = "linux")]
                 let mut cmd = if let Some(run_cmd) = run {
@@ -281,6 +430,10 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
                     crate::sandbox::wrap_command_in_root(target_path, &shell_bin, &[], &envs, &[])?
                 };
 
+                if verbose {
+                    println!("{} Full command: {:?}", "::".bold().blue(), cmd);
+                }
+
                 #[cfg(not(target_os = "linux"))]
                 return Err(anyhow!(
                     "Distro chroot is only supported on Linux via Bubblewrap."
@@ -288,7 +441,13 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
 
                 let status = cmd.status()?;
                 if !status.success() {
-                    std::process::exit(status.code().unwrap_or(1));
+                    let code = status.code().unwrap_or(1);
+                    eprintln!(
+                        "\n{} Chroot execution failed with exit code: {}",
+                        "Error:".red().bold(),
+                        code.to_string().yellow()
+                    );
+                    std::process::exit(code);
                 }
             }
         },

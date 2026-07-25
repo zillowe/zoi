@@ -29,7 +29,7 @@ pub fn resolve_build_type(
     requested: Option<&str>,
     supported: &[String],
     pkg_name: &str,
-) -> Result<String> {
+) -> Result<Option<String>> {
     if let Some(t) = requested {
         if !supported.iter().any(|s| s == t) {
             return Err(anyhow!(
@@ -39,20 +39,17 @@ pub fn resolve_build_type(
                 supported
             ));
         }
-        return Ok(t.to_string());
+        return Ok(Some(t.to_string()));
     }
 
     if supported.iter().any(|t| t == "pre-compiled") {
-        Ok("pre-compiled".to_string())
+        Ok(Some("pre-compiled".to_string()))
     } else if supported.iter().any(|t| t == "source") {
-        Ok("source".to_string())
+        Ok(Some("source".to_string()))
     } else if let Some(first) = supported.first() {
-        Ok(first.clone())
+        Ok(Some(first.clone()))
     } else {
-        Err(anyhow!(
-            "No build types supported by package '{}'.",
-            pkg_name
-        ))
+        Ok(None)
     }
 }
 
