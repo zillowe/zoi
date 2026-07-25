@@ -512,12 +512,23 @@ pub fn run(
                 println!("Saving configuration files...");
             }
             for backup_file_rel in backup_files {
-                let backup_src = version_dir.join(backup_file_rel);
+                let expanded_path = zoi_core::utils::expand_placeholders(
+                    backup_file_rel,
+                    &version_dir,
+                    manifest.scope,
+                )?;
+                let backup_src = PathBuf::from(expanded_path);
+
                 if backup_src.exists() {
+                    let backup_filename = backup_src
+                        .file_name()
+                        .ok_or_else(|| anyhow!("Invalid backup source name"))?
+                        .to_string_lossy();
                     let backup_dest = version_dir
                         .parent()
                         .ok_or_else(|| anyhow!("version_dir should have a parent (package_dir)"))?
-                        .join(format!("{}.zoisave", backup_file_rel));
+                        .join(format!("{}.zoisave", backup_filename));
+
                     if let Some(p) = backup_dest.parent()
                         && let Err(e) = fs::create_dir_all(p)
                     {
@@ -537,10 +548,17 @@ pub fn run(
                             backup_dest.display()
                         );
                     }
-                    if let Err(e) = fs::rename(&backup_src, &backup_dest)
-                        && !quiet
-                    {
-                        eprintln!("Warning: failed to save {}: {}", backup_src.display(), e);
+                    // Use copy + remove for potential cross-device moves
+                    if let Err(e) = fs::copy(&backup_src, &backup_dest) {
+                        if !quiet {
+                            eprintln!(
+                                "Warning: failed to copy backup {}: {}",
+                                backup_src.display(),
+                                e
+                            );
+                        }
+                    } else {
+                        let _ = fs::remove_file(&backup_src);
                     }
                 }
             }

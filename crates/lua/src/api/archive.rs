@@ -1,7 +1,5 @@
-use colored::*;
 use mlua::{self, Lua, Table};
 use std::path::{Path, PathBuf};
-use zoi_core::utils;
 
 use ar::Archive as ArArchive;
 use flate2::read::GzDecoder;
@@ -27,43 +25,9 @@ pub fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
             let build_dir = Path::new(&build_dir_str);
 
             let archive_file = if source.starts_with("http") {
-                if source.starts_with("http://") && !quiet {
-                    println!("{}: downloading over insecure HTTP: {}", "Warning:".yellow(), source);
-                }
-                if !quiet {
-                    println!("Downloading: {}", source);
-                }
                 let file_name = source.split('/').next_back().unwrap_or("download.tmp");
                 let temp_path = build_dir.join(file_name);
-                let client = utils::get_http_client()
-                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-                let mut attempt = 0u32;
-                let mut response = loop {
-                    attempt += 1;
-                    match client.get(&source).send() {
-                        Ok(resp) => break resp,
-                        Err(e) => {
-                            if attempt < 3 {
-                                if !quiet {
-                                    eprintln!("Download failed ({}). Retrying...", e);
-                                }
-                                zoi_core::utils::retry_backoff_sleep(attempt);
-                                continue;
-                            } else {
-                                return Err(mlua::Error::RuntimeError(e.to_string()));
-                            }
-                        }
-                    }
-                };
-
-                if !response.status().is_success() {
-                    return Err(mlua::Error::RuntimeError(format!("Failed to download {}: {}", source, response.status())));
-                }
-
-                let mut temp_file = fs::File::create(&temp_path)
-                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-                std::io::copy(&mut response, &mut temp_file)
-                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                super::download::download_with_progress(&source, &temp_path, quiet)?;
 
                 temp_path
             } else {

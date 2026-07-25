@@ -31,11 +31,21 @@ pub fn run(args: &cmd::package::build::BuildCommand) -> Result<()> {
         pkg::resolve::get_default_version(&pkg_for_meta, None)?
     };
 
-    let resolved_build_type = crate::pkg::package::build::resolve_build_type(
+    let resolved_build_type = match crate::pkg::package::build::resolve_build_type(
         args.r#type.as_deref(),
         &pkg_for_meta.types,
         &pkg_for_meta.name,
-    )?;
+    )? {
+        Some(t) => t,
+        None => {
+            println!(
+                "{} Skipping tests for package '{}': no build types supported.",
+                "::".bold().yellow(),
+                pkg_for_meta.name
+            );
+            return Ok(());
+        }
+    };
 
     let build_dir = tempfile::Builder::new()
         .prefix(&format!("zoi-test-{}-{}", pkg_for_meta.name, platform))
