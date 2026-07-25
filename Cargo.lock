@@ -4697,6 +4697,7 @@ dependencies = [
  "colored",
  "flate2",
  "home",
+ "indicatif",
  "mlua",
  "regex",
  "sequoia-openpgp",
