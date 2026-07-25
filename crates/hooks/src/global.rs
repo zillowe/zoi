@@ -367,6 +367,7 @@ pub fn run_global_hooks(
                             .collect::<Vec<_>>(),
                         &envs,
                         &[], // No extra binds for standard hooks
+                        false,
                     )?
                 } else {
                     let mut c = Command::new("bash");

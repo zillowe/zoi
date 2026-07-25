@@ -164,6 +164,7 @@ pub fn wrap_command_in_root(
     args: &[String],
     env: &std::collections::HashMap<String, String>,
     extra_binds: &[(PathBuf, PathBuf)],
+    fakeroot: bool,
 ) -> Result<Command> {
     if !zoi_core::utils::command_exists("bwrap") {
         return Err(anyhow!(
@@ -192,6 +193,11 @@ pub fn wrap_command_in_root(
     bwrap.arg("--unshare-all");
     bwrap.arg("--new-session");
     bwrap.arg("--share-net");
+
+    if fakeroot {
+        bwrap.arg("--uid").arg("0");
+        bwrap.arg("--gid").arg("0");
+    }
 
     // Bind the sysroot to /
     bwrap.arg("--bind").arg(&actual_sysroot).arg("/");

@@ -244,6 +244,7 @@ pub fn run(source: String, bin: Option<String>, args: Vec<String>, verbose: bool
                 &args,
                 &envs,
                 &extra_binds,
+                false,
             )?
         } else if let Some(sandbox_config) = &node.pkg.sandbox
             && sandbox_config.enabled

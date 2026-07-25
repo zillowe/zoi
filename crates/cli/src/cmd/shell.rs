@@ -498,6 +498,7 @@ pub fn enter_ephemeral_shell(
                     &args,
                     &envs,
                     &extra_binds,
+                    false,
                 )?
             } else {
                 crate::sandbox::wrap_command_in_root(
@@ -506,6 +507,7 @@ pub fn enter_ephemeral_shell(
                     &[],
                     &envs,
                     &extra_binds,
+                    false,
                 )?
             }
         } else if let Some(cmd_str) = run_cmd {

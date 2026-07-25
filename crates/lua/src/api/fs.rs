@@ -51,7 +51,26 @@ pub fn add_zcp(lua: &Lua) -> Result<(), mlua::Error> {
 
 pub fn add_zlicense(lua: &Lua) -> Result<(), mlua::Error> {
     let zlicense_fn = lua.create_function(|lua, source: String| {
-        let destination = "${pkgstore}/LICENSE".to_string();
+        let zoi_table: Table = lua.globals().get("ZOI")?;
+        let scope: String = zoi_table
+            .get("scope")
+            .unwrap_or_else(|_| "user".to_string());
+        let pkg_table: Table = lua.globals().get("PKG")?;
+        let pkg_name: String = pkg_table
+            .get("name")
+            .unwrap_or_else(|_| "unknown".to_string());
+
+        let filename = Path::new(&source)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("LICENSE");
+
+        let destination = if scope == "system" {
+            format!("${{usrroot}}/usr/share/licenses/{}/{}", pkg_name, filename)
+        } else {
+            format!("${{pkgstore}}/{}", filename)
+        };
+
         let zcp: mlua::Function = lua.globals().get("zcp")?;
         zcp.call::<()>((source, destination))?;
         Ok(())
@@ -62,11 +81,26 @@ pub fn add_zlicense(lua: &Lua) -> Result<(), mlua::Error> {
 
 pub fn add_zdoc(lua: &Lua) -> Result<(), mlua::Error> {
     let zdoc_fn = lua.create_function(|lua, source: String| {
+        let zoi_table: Table = lua.globals().get("ZOI")?;
+        let scope: String = zoi_table
+            .get("scope")
+            .unwrap_or_else(|_| "user".to_string());
+        let pkg_table: Table = lua.globals().get("PKG")?;
+        let pkg_name: String = pkg_table
+            .get("name")
+            .unwrap_or_else(|_| "unknown".to_string());
+
         let filename = Path::new(&source)
             .file_name()
             .and_then(|n| n.to_str())
             .ok_or_else(|| mlua::Error::RuntimeError("Invalid source path".to_string()))?;
-        let destination = format!("${{pkgstore}}/doc/{}", filename);
+
+        let destination = if scope == "system" {
+            format!("${{usrroot}}/usr/share/doc/{}/{}", pkg_name, filename)
+        } else {
+            format!("${{pkgstore}}/doc/{}", filename)
+        };
+
         let zcp: mlua::Function = lua.globals().get("zcp")?;
         zcp.call::<()>((source, destination))?;
         Ok(())

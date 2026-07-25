@@ -84,13 +84,19 @@ Stages a file or directory to be included in the final package.
 
 ### `zlicense(source)`
 
-Stages a license file to the package store. This is a convenience wrapper around `zcp` that automatically copies the file to `${pkgstore}/LICENSE`.
+Stages a license file for the package. The destination path is determined by the installation scope:
+
+- **System Scope**: `${usrroot}/usr/share/licenses/<pkgname>/<filename>` (standard FHS location).
+- **Other Scopes**: `${pkgstore}/<filename>`.
 
 - **source**: Path relative to `BUILD_DIR`, or use `${pkgluadir}`.
 
 ### `zdoc(source)`
 
-Stages a documentation file to the package store. This is a convenience wrapper around `zcp` that automatically copies the file to `${pkgstore}/doc/{filename}`.
+Stages a documentation file for the package. The destination path is determined by the installation scope:
+
+- **System Scope**: `${usrroot}/usr/share/doc/<pkgname>/<filename>` (standard FHS location).
+- **Other Scopes**: `${pkgstore}/doc/<filename>`.
 
 - **source**: Path relative to `BUILD_DIR`, or use `${pkgluadir}`.
 
@@ -174,7 +180,7 @@ Creates a directory in the package.
 
 ### `zrm(path)`
 
-Used in the `uninstall()` function to remove files or directories outside of the package store.
+Used in the `uninstall()` function to remove files or directories outside of the package store. Supports placeholders like `${pkgstore}`, `${usrroot}`, and `${usrhome}`.
 
 ### `cmd(command)`
 
