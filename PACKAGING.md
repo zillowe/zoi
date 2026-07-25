@@ -52,7 +52,7 @@ The project provides a `Justfile` for convenience, which simplifies building and
 
 ```sh
 # Configure build paths (creates config.just)
-# You can also specify which binaries to build: --with-bin=zoi|zoi-mini|zoid|all (default: both)
+# You can also specify which binaries to build: --with-bin=zoi|zoi-mini|zoid|all (default: zoi)
 ./configure --prefix=/usr/local --with-bin=all
 
 # Build release binaries
