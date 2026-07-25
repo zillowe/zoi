@@ -1,3 +1,5 @@
+#!/usr/bin/env -S just --working-directory . --justfile
+
 set shell := ["bash", "-c"]
 
 set dotenv-load
