@@ -369,7 +369,12 @@ fn run_update_single_logic(
                 &new_manifest.version,
             )?;
 
-            handle_backup_files(&old_version_dir, &new_version_dir, backup_files)?;
+            handle_backup_files(
+                &old_version_dir,
+                &new_version_dir,
+                backup_files,
+                old_manifest.scope,
+            )?;
         }
 
         cleanup_old_versions(
@@ -1000,7 +1005,12 @@ fn run_update_all_logic(
                 &new_manifest.name,
                 &new_manifest.version,
             )?;
-            handle_backup_files(&old_version_dir, &new_version_dir, backup_files)?;
+            handle_backup_files(
+                &old_version_dir,
+                &new_version_dir,
+                backup_files,
+                old_manifest.scope,
+            )?;
         }
 
         if let Err(e) = cleanup_old_versions(

@@ -446,15 +446,18 @@ fn finalize_installation(
     // Create .zoiorig copies for 3-way merge support
     if let Some(backup_files) = &metadata.backup {
         for backup_file_rel in backup_files {
-            let backup_src = version_dir.join(backup_file_rel);
+            let expanded_path = utils::expand_placeholders(backup_file_rel, version_dir, scope)?;
+            let backup_src = PathBuf::from(expanded_path);
+
             if backup_src.exists() && backup_src.is_file() {
-                let orig_path = backup_src.with_extension(format!(
-                    "{}.zoiorig",
-                    backup_src
-                        .extension()
-                        .and_then(|s| s.to_str())
-                        .unwrap_or_default()
-                ));
+                let mut orig_path = backup_src.clone();
+                let ext = orig_path
+                    .extension()
+                    .and_then(|s| s.to_str())
+                    .map(|s| format!("{}.zoiorig", s))
+                    .unwrap_or_else(|| "zoiorig".to_string());
+                orig_path.set_extension(ext);
+
                 if let Err(e) = fs::copy(&backup_src, &orig_path)
                     && pb.is_none()
                 {

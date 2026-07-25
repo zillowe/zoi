@@ -101,6 +101,7 @@ pub fn build_archive(
     let build_type_clone = build_type.to_string();
     let current_platform_clone = current_platform.clone();
     let version_clone = version.to_string();
+    let sub_packages = sub_package.map(|s| vec![s.to_string()]);
 
     let build_handle = thread::spawn(move || {
         zoi_package::build::run(
@@ -110,7 +111,7 @@ pub fn build_archive(
             None,
             None,
             Some(&version_clone),
-            None,
+            sub_packages,
             quiet,
             "native",
             None,

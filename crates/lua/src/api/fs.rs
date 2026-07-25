@@ -15,32 +15,10 @@ use walkdir::WalkDir;
 /// These functions do not always perform immediate actions; instead, they often record
 /// operations into `__ZoiBuildOperations` for the Rust engine to execute atomically
 /// during the staging-to-store move.
-pub fn add_file_util(lua: &Lua) -> Result<(), mlua::Error> {
+pub fn add_file_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let file_fn = lua.create_function(
-        |_, (url, path): (String, String)| -> Result<(), mlua::Error> {
-            let client =
-                utils::get_http_client().map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-            let mut attempt = 0u32;
-            let response = loop {
-                attempt += 1;
-                match client.get(&url).send() {
-                    Ok(resp) => break resp,
-                    Err(e) => {
-                        if attempt < 3 {
-                            eprintln!("Download failed ({}). Retrying...", e);
-                            zoi_core::utils::retry_backoff_sleep(attempt);
-                            continue;
-                        } else {
-                            return Err(mlua::Error::RuntimeError(e.to_string()));
-                        }
-                    }
-                }
-            };
-            let content = response
-                .bytes()
-                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-            fs::write(path, content).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-            Ok(())
+        move |_, (url, path): (String, String)| -> Result<(), mlua::Error> {
+            super::download::download_with_progress(&url, Path::new(&path), quiet)
         },
     )?;
 

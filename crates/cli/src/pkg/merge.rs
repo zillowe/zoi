@@ -21,19 +21,25 @@ pub fn handle_backup_files(
     old_version_dir: &Path,
     new_version_dir: &Path,
     backup_files: &[String],
+    scope: crate::pkg::types::Scope,
 ) -> Result<()> {
     for backup_file_rel in backup_files {
-        let old_path = old_version_dir.join(backup_file_rel);
-        let new_path = new_version_dir.join(backup_file_rel);
+        let old_expanded =
+            crate::pkg::utils::expand_placeholders(backup_file_rel, old_version_dir, scope)?;
+        let new_expanded =
+            crate::pkg::utils::expand_placeholders(backup_file_rel, new_version_dir, scope)?;
+
+        let old_path = std::path::PathBuf::from(old_expanded);
+        let new_path = std::path::PathBuf::from(new_expanded);
 
         // Zoi creates .zoiorig in pkg_install.rs
-        let old_orig_path = old_path.with_extension(format!(
-            "{}.zoiorig",
-            old_path
-                .extension()
-                .and_then(|s| s.to_str())
-                .unwrap_or_default()
-        ));
+        let mut old_orig_path = old_path.clone();
+        let ext = old_orig_path
+            .extension()
+            .and_then(|s| s.to_str())
+            .map(|s| format!("{}.zoiorig", s))
+            .unwrap_or_else(|| "zoiorig".to_string());
+        old_orig_path.set_extension(ext);
 
         if old_path.exists() {
             // Try 3-way merge if we have the original base
@@ -144,7 +150,13 @@ mod tests {
         fs::write(old_dir.join("config.txt"), base).unwrap();
         fs::write(new_dir.join("config.txt"), "line1\nline2\nline3\n").unwrap();
 
-        handle_backup_files(&old_dir, &new_dir, &["config.txt".to_string()]).unwrap();
+        handle_backup_files(
+            &old_dir,
+            &new_dir,
+            &["config.txt".to_string()],
+            crate::pkg::types::Scope::User,
+        )
+        .unwrap();
 
         // Should keep new version
         assert_eq!(
@@ -166,7 +178,13 @@ mod tests {
         fs::write(old_dir.join("config.txt"), "line1\nline2\nuser_mod\n").unwrap();
         fs::write(new_dir.join("config.txt"), base).unwrap();
 
-        handle_backup_files(&old_dir, &new_dir, &["config.txt".to_string()]).unwrap();
+        handle_backup_files(
+            &old_dir,
+            &new_dir,
+            &["config.txt".to_string()],
+            crate::pkg::types::Scope::User,
+        )
+        .unwrap();
 
         // Should keep user version
         assert_eq!(
@@ -188,7 +206,13 @@ mod tests {
         fs::write(old_dir.join("config.txt"), "user_pref\ncommon\n").unwrap();
         fs::write(new_dir.join("config.txt"), "common\nupstream_add\n").unwrap();
 
-        handle_backup_files(&old_dir, &new_dir, &["config.txt".to_string()]).unwrap();
+        handle_backup_files(
+            &old_dir,
+            &new_dir,
+            &["config.txt".to_string()],
+            crate::pkg::types::Scope::User,
+        )
+        .unwrap();
 
         let result = fs::read_to_string(new_dir.join("config.txt")).unwrap();
         assert!(result.contains("user_pref"));
@@ -209,7 +233,13 @@ mod tests {
         fs::write(old_dir.join("config.txt"), "user\n").unwrap();
         fs::write(new_dir.join("config.txt"), "upstream\n").unwrap();
 
-        handle_backup_files(&old_dir, &new_dir, &["config.txt".to_string()]).unwrap();
+        handle_backup_files(
+            &old_dir,
+            &new_dir,
+            &["config.txt".to_string()],
+            crate::pkg::types::Scope::User,
+        )
+        .unwrap();
 
         let result = fs::read_to_string(new_dir.join("config.txt")).unwrap();
         assert!(result.contains("<<<<<<<"));

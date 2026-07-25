@@ -74,7 +74,10 @@ pub fn get_build_dependencies(
     )?;
 
     let resolved_build_type =
-        resolve_build_type(build_type, &pkg_for_meta.types, &pkg_for_meta.name)?;
+        match resolve_build_type(build_type, &pkg_for_meta.types, &pkg_for_meta.name)? {
+            Some(t) => t,
+            None => return Ok(None),
+        };
 
     if let Some(deps) = &pkg_for_meta.dependencies
         && let Some(build_deps) = &deps.build
@@ -375,8 +378,23 @@ fn build_for_platform(
         return Ok(());
     }
 
-    let resolved_build_type =
-        resolve_build_type(build_type, &pkg_for_meta.types, &pkg_for_meta.name)?;
+    let resolved_build_type = match resolve_build_type(
+        build_type,
+        &pkg_for_meta.types,
+        &pkg_for_meta.name,
+    )? {
+        Some(t) => t,
+        None => {
+            if !quiet {
+                println!(
+                    "{} Skipping build for package '{}': no build types supported (likely a collection or template).",
+                    "::".bold().yellow(),
+                    pkg_for_meta.name
+                );
+            }
+            return Ok(());
+        }
+    };
 
     let version = if let Some(v) = version_override {
         v.to_string()
@@ -417,9 +435,13 @@ fn build_for_platform(
     let subs_to_build = if let Some(subs) = sub_packages {
         subs.clone()
     } else if let Some(subs) = &pkg_for_meta.sub_packages {
-        let mut all_subs = vec!["".to_string()];
-        all_subs.extend(subs.clone());
-        all_subs
+        if subs.contains(&"".to_string()) || subs.contains(&"main".to_string()) {
+            subs.clone()
+        } else {
+            let mut all_subs = vec!["".to_string()];
+            all_subs.extend(subs.clone());
+            all_subs
+        }
     } else {
         vec!["".to_string()]
     };
