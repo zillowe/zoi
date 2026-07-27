@@ -71,7 +71,10 @@ pub fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                 archive
                     .unpack(&out_dir)
                     .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-            } else if archive_path_str.ends_with(".tar.zst") {
+            } else if archive_path_str.ends_with(".tar.zst")
+                || archive_path_str.ends_with(".zpa")
+                || archive_path_str.ends_with(".zsa")
+            {
                 let tar_zst =
                     ZstdDecoder::new(file).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
                 let mut archive = tar::Archive::new(tar_zst);
@@ -266,7 +269,7 @@ pub fn add_archive_util(lua: &Lua) -> Result<(), mlua::Error> {
                         .to_string(),
                 );
             }
-        } else if path.ends_with(".tar.zst") {
+        } else if path.ends_with(".tar.zst") || path.ends_with(".zpa") || path.ends_with(".zsa") {
             let tar_zst =
                 ZstdDecoder::new(file).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
             let mut archive = tar::Archive::new(tar_zst);
