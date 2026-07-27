@@ -316,19 +316,6 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
                     }
                 }
 
-                // ISA Baseline Check (x86-64-v3 detection)
-                let host_has_avx2 = if let Ok(cpuinfo) = std::fs::read_to_string("/proc/cpuinfo") {
-                    cpuinfo.contains("avx2")
-                } else {
-                    true
-                };
-                if !host_has_avx2 {
-                    println!(
-                        "{} Host CPU lacks AVX2. If guest binaries are built for x86-64-v3, they WILL Segfault (139).",
-                        "::".bold().yellow()
-                    );
-                }
-
                 // Dynamic Loader Validation (The common cause of 139)
                 let mut loader_found = false;
                 let loaders = [
@@ -370,9 +357,8 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
 
                 if broken_layout || !loader_found {
                     println!(
-                        "{} Hint: run 'zoi install @parlex/glibc:main --root {} --force --build' to repair the bootstrap.",
-                        "::".bold().blue(),
-                        target
+                        "{} Hint: Your ZoiOS bootstrap appears incomplete or corrupted. Please verify your base system packages.",
+                        "::".bold().blue()
                     );
                 }
 
@@ -455,6 +441,12 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
                         "Error:".red().bold(),
                         code.to_string().yellow()
                     );
+                    if code == 139 {
+                        println!(
+                            "{} Hint: Segfaults (139) often indicate an instruction set mismatch (e.g. x86-64-v3 binaries on older CPUs).",
+                            "::".bold().blue()
+                        );
+                    }
                     std::process::exit(code);
                 }
             }
