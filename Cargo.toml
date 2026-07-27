@@ -135,7 +135,7 @@ aes-gcm = "0.11.0"
 rand = { version = "0.10.2", features = ["std", "thread_rng", "sys_rng"] }
 getrandom = "0.4.3"
 argon2 = "0.5.3"
-base64 = "0.22.1"
+base64 = "0.23.0"
 
 zoi-core = { path = "crates/core", version = "1.24.0" }
 zoi-hooks = { path = "crates/hooks", version = "1.24.0" }
