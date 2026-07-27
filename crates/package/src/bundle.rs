@@ -31,11 +31,8 @@ pub fn run(
     }
     let ignore = ignore_builder.build()?;
 
-    let is_ignored = |rel_path: &Path| -> bool {
-        // ignore-rs expectations: directories should have a trailing slash or be explicitly marked
-        // but here we just check the path.
-        ignore.matched(rel_path, rel_path.is_dir()).is_ignore()
-    };
+    let is_ignored =
+        |rel_path: &Path, is_dir: bool| -> bool { ignore.matched(rel_path, is_dir).is_ignore() };
 
     println!(
         "{} Bundling package: {}",
@@ -290,29 +287,66 @@ pub fn run(
 
     for rel_path_str in sorted_files {
         let rel_path = Path::new(&rel_path_str);
-        if is_ignored(rel_path) {
+        let abs_path = pkg_dir.join(rel_path);
+        let is_dir = abs_path.is_dir();
+
+        if is_ignored(rel_path, is_dir) {
             println!("  Ignored: {}", rel_path_str);
             continue;
         }
 
-        let abs_path = pkg_dir.join(rel_path);
         if abs_path.exists() {
-            if abs_path.is_dir() {
-                tar_builder.append_dir_all(&rel_path_str, &abs_path)?;
+            if is_dir {
+                // Manually walk local directories to respect ignores recursively
+                let mut it = WalkDir::new(&abs_path).into_iter();
+                loop {
+                    let entry = match it.next() {
+                        None => break,
+                        Some(Err(e)) => return Err(e.into()),
+                        Some(Ok(e)) => e,
+                    };
+                    let entry_rel = entry.path().strip_prefix(pkg_dir)?;
+                    let entry_is_dir = entry.file_type().is_dir();
+                    if is_ignored(entry_rel, entry_is_dir) {
+                        if entry_is_dir {
+                            it.skip_current_dir();
+                        }
+                        continue;
+                    }
+
+                    if entry.file_type().is_file() {
+                        tar_builder.append_path_with_name(entry.path(), entry_rel)?;
+                        println!("  Included local: {}", entry_rel.display());
+                    }
+                }
             } else {
                 tar_builder.append_path_with_name(&abs_path, &rel_path_str)?;
+                println!("  Included local: {}", rel_path_str);
             }
-            println!("  Included local: {}", rel_path_str);
         }
     }
 
     // Include fetched files from BUILD_DIR
-    for entry in WalkDir::new(fetch_dir.path()).min_depth(1) {
-        let entry = entry?;
+    let mut it = WalkDir::new(fetch_dir.path()).into_iter();
+    loop {
+        let entry = match it.next() {
+            None => break,
+            Some(Err(e)) => return Err(e.into()),
+            Some(Ok(e)) => e,
+        };
+
+        if entry.depth() == 0 {
+            continue;
+        }
+
         let rel_path = entry.path().strip_prefix(fetch_dir.path())?;
         let rel_path_str = rel_path.to_string_lossy();
+        let is_dir = entry.file_type().is_dir();
 
-        if is_ignored(rel_path) {
+        if is_ignored(rel_path, is_dir) {
+            if is_dir {
+                it.skip_current_dir();
+            }
             println!("  Ignored fetch: {}", rel_path_str);
             continue;
         }
