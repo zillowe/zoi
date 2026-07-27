@@ -245,7 +245,8 @@ pub fn setup_lua_environment(
         location_table.set("STAGINGDIR", sd)?;
         lua.globals().set("STAGING_DIR", sd)?;
     }
-    zoi_table.set("LOCATION", location_table)?;
+    zoi_table.set("LOCATION", location_table.clone())?;
+    lua.globals().set("LOCATION", location_table)?;
 
     lua.globals().set("ZOI", zoi_table)?;
 
