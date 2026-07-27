@@ -36,18 +36,22 @@ for target in "${TARGETS[@]}"; do
   x86_64-unknown-linux-gnu)
     NAME="zoi-linux-amd64"
     MINI_NAME="zoi-mini-linux-amd64"
+    DAEMON_NAME="zoid-linux-amd64"
     ;;
   aarch64-unknown-linux-gnu)
     NAME="zoi-linux-arm64"
     MINI_NAME="zoi-mini-linux-arm64"
+    DAEMON_NAME="zoid-linux-arm64"
     ;;
   x86_64-pc-windows-gnu)
     NAME="zoi-windows-amd64.exe"
     MINI_NAME="zoi-mini-windows-amd64.exe"
+    DAEMON_NAME="" # No daemon for Windows
     ;;
   *)
     NAME="zoi-$target"
     MINI_NAME="zoi-mini-$target"
+    DAEMON_NAME="zoid-$target"
     ;;
   esac
 
@@ -57,20 +61,26 @@ for target in "${TARGETS[@]}"; do
 
   LINKER_ENV=""
   OPENSSL_ENV=""
+  EXTRA_BINS=""
   if [[ "$target" == "aarch64-unknown-linux-gnu" ]]; then
     LINKER_ENV="CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc"
     OPENSSL_ENV="PKG_CONFIG_ALLOW_CROSS=1 PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig"
+    EXTRA_BINS="-p zoi-daemon"
+  elif [[ "$target" == "x86_64-unknown-linux-gnu" ]]; then
+    EXTRA_BINS="-p zoi-daemon"
   elif [[ "$target" == "x86_64-pc-windows-gnu" ]]; then
     LINKER_ENV="CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=x86_64-w64-mingw32-gcc"
   fi
 
-  if ! env $LINKER_ENV $OPENSSL_ENV ZOI_COMMIT_HASH="$COMMIT" cargo build -p zoi-rs -p zoi-mini --target "$target" --release; then
+  if ! env $LINKER_ENV "$OPENSSL_ENV" ZOI_COMMIT_HASH="$COMMIT" cargo build -p zoi-rs -p zoi-mini :"$EXTRA_BINS" --target "$target" --release; then
     echo -e "${RED}❌ Build failed for ${target}${NC}"
     exit 1
   fi
 
   SRC_BINARY="target/${target}/release/zoi"
   MINI_SRC_BINARY="target/${target}/release/zoi-mini"
+  DAEMON_SRC_BINARY="target/${target}/release/zoid"
+
   if [[ "$target" == *"-windows-"* ]]; then
     SRC_BINARY+=".exe"
     MINI_SRC_BINARY+=".exe"
@@ -78,8 +88,12 @@ for target in "${TARGETS[@]}"; do
 
   install -m 755 "$SRC_BINARY" "$OUTPUT_DIR/$NAME"
   install -m 755 "$MINI_SRC_BINARY" "$OUTPUT_DIR/$MINI_NAME"
-
-  echo -e "${GREEN}✅ Successfully built ${NAME} and ${MINI_NAME}${NC}\n"
+  if [[ -n "$DAEMON_NAME" ]]; then
+    install -m 755 "$DAEMON_SRC_BINARY" "$OUTPUT_DIR/$DAEMON_NAME"
+    echo -e "${GREEN}✅ Successfully built ${NAME}, ${MINI_NAME}, and ${DAEMON_NAME}${NC}\n"
+  else
+    echo -e "${GREEN}✅ Successfully built ${NAME} and ${MINI_NAME}${NC}\n"
+  fi
 done
 
 echo -e "\n${GREEN}🎉 All Linux and Windows builds completed successfully!${NC}"

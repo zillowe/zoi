@@ -410,9 +410,12 @@ pub fn run(
         ));
     } else {
         if let Ok(modified_files) = transaction::get_modified_files(&transaction.id) {
+            let modified_packages =
+                transaction::get_modified_packages(&transaction.id).unwrap_or_default();
             let _ = crate::pkg::hooks::global::run_global_hooks(
                 crate::pkg::hooks::global::HookWhen::PostTransaction,
                 &modified_files,
+                &modified_packages,
                 "remove",
                 scope_override.unwrap_or_default(),
             );

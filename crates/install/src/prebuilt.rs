@@ -11,28 +11,31 @@ use std::path::PathBuf;
 pub fn build_archive(
     pkg_lua_path: &std::path::Path,
     pkg: &types::Package,
+    sub_package: Option<&str>,
     build_type_override: Option<&str>,
     pb: Option<&indicatif::ProgressBar>,
-) -> Result<PathBuf> {
-    let build_type = if let Some(t) = build_type_override {
-        if !pkg.types.contains(&t.to_string()) {
-            return Err(anyhow!(
-                "Build type '{}' not supported by this package. Supported types: {:?}",
-                t,
-                pkg.types
-            ));
-        }
-        t
-    } else if pkg.types.contains(&"pre-compiled".to_string()) {
-        "pre-compiled"
-    } else if !pkg.types.is_empty() {
-        &pkg.types[0]
-    } else {
-        return Err(anyhow!(
-            "No supported build types found in package '{}'. Please specify a `types` field in the package file (e.g. `types = {{ 'source' }}`).",
-            pkg.name
-        ));
-    };
+    quiet: bool,
+) -> Result<Option<PathBuf>> {
+    let build_type =
+        match zoi_package::build::resolve_build_type(build_type_override, &pkg.types, &pkg.name)? {
+            Some(t) => t,
+            None => {
+                if let Some(p) = pb {
+                    p.finish_with_message(format!(
+                        "{} Skipping build for '{}': no build types supported.",
+                        "::".bold().yellow(),
+                        pkg.name
+                    ));
+                } else if !quiet {
+                    println!(
+                        "{} Skipping build for '{}': no build types supported.",
+                        "::".bold().yellow(),
+                        pkg.name
+                    );
+                }
+                return Ok(None);
+            }
+        };
 
     let current_platform = utils::get_platform()?;
     let version = pkg.version.as_deref().ok_or_else(|| {
@@ -42,25 +45,37 @@ pub fn build_archive(
         )
     })?;
 
-    if let Some(p) = pb {
-        p.set_message("Building package...");
-        p.set_position(0);
+    let display_name = if let Some(sub) = sub_package {
+        format!("{}:{}", pkg.name, sub)
     } else {
-        println!("Building {}...", pkg.name.cyan());
+        pkg.name.clone()
+    };
+
+    if let Some(p) = pb {
+        p.set_message(format!("Building {}...", display_name.cyan()));
+        p.set_position(0);
+    } else if !quiet {
+        println!("Building {}...", display_name.cyan());
     }
 
     if let Some(dep_strings) = zoi_package::build::get_build_dependencies(
         pkg_lua_path,
-        Some(build_type),
+        Some(&build_type),
         &current_platform,
         Some(version),
-        true,
+        quiet,
     )? && !dep_strings.is_empty()
     {
         if let Some(p) = pb {
-            p.set_message("Installing build dependencies...");
-        } else {
-            println!("Installing build dependencies...");
+            p.set_message(format!(
+                "Installing build deps for {}...",
+                display_name.cyan()
+            ));
+        } else if !quiet {
+            println!(
+                "Installing build dependencies for {}...",
+                display_name.cyan()
+            );
         }
         let processed = std::sync::Mutex::new(std::collections::HashSet::new());
         let mut installed = Vec::new();
@@ -79,10 +94,15 @@ pub fn build_archive(
         }
     }
 
+    if let Some(p) = pb {
+        p.set_message(format!("Building {}...", display_name.cyan()));
+    }
+
     let pkg_lua_path_clone = pkg_lua_path.to_path_buf();
     let build_type_clone = build_type.to_string();
     let current_platform_clone = current_platform.clone();
     let version_clone = version.to_string();
+    let sub_packages = sub_package.map(|s| vec![s.to_string()]);
 
     let build_handle = thread::spawn(move || {
         zoi_package::build::run(
@@ -92,8 +112,8 @@ pub fn build_archive(
             None,
             None,
             Some(&version_clone),
-            None,
-            true,
+            sub_packages,
+            quiet,
             "native",
             None,
             false,
@@ -103,14 +123,15 @@ pub fn build_archive(
 
     let build_result = build_handle
         .join()
-        .map_err(|_| anyhow!("Build thread panicked"))?;
+        .map_err(|_| anyhow!("Build thread panicked for package '{}'", pkg.name))?;
 
     if let Err(e) = build_result {
         if let Some(p) = pb {
-            p.finish_with_message(format!("{}", "Build failed".red()));
+            p.finish_with_message(format!("{}: {}", pkg.name.cyan(), "Build failed".red()));
         }
         return Err(anyhow!(
-            "'build' step failed: {}\nEnable verbose logging with -v to see more details.",
+            "Build failed for package '{}': {}\nEnable verbose logging with -v to see more details.",
+            pkg.name,
             e
         ));
     }
@@ -129,9 +150,9 @@ pub fn build_archive(
 
     if let Some(p) = pb {
         p.set_position(100);
-    } else {
+    } else if !quiet {
         println!("Finished building {}.", pkg.name.cyan());
     }
 
-    Ok(archive_path)
+    Ok(Some(archive_path))
 }

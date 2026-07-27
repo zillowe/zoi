@@ -31,6 +31,7 @@ pub fn run(
     #[cfg(target_os = "linux")]
     {
         use colored::*;
+        use std::path::PathBuf;
         use std::process::Command;
         use zoi_core::utils;
 
@@ -68,88 +69,9 @@ pub fn run(
             .parent()
             .ok_or_else(|| anyhow!("Could not get zoi executable directory"))?;
 
-        let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not get home directory"))?;
+        let home_dir = zoi_core::utils::get_user_home()
+            .ok_or_else(|| anyhow!("Could not get home directory"))?;
         let zoi_home = home_dir.join(".zoi");
-
-        // Base bwrap arguments
-        let mut bwrap_args = vec![
-            "--ro-bind".to_string(),
-            "/usr".to_string(),
-            "/usr".to_string(),
-            "--symlink".to_string(),
-            "/usr/bin".to_string(),
-            "/bin".to_string(),
-            "--symlink".to_string(),
-            "/usr/lib".to_string(),
-            "/lib".to_string(),
-            "--symlink".to_string(),
-            "/usr/lib64".to_string(),
-            "/lib64".to_string(),
-            "--symlink".to_string(),
-            "/usr/sbin".to_string(),
-            "/sbin".to_string(),
-            "--ro-bind".to_string(),
-            "/etc".to_string(),
-            "/etc".to_string(),
-            "--dev".to_string(),
-            "/dev".to_string(),
-            "--proc".to_string(),
-            "/proc".to_string(),
-            "--tmpfs".to_string(),
-            "/tmp".to_string(),
-            "--bind".to_string(),
-            package_dir.display().to_string(),
-            container_workdir.to_string(),
-            "--bind".to_string(),
-            abs_output_dir.display().to_string(),
-            container_output_dir.to_string(),
-            // Bind the directory containing zoi so it's available
-            "--ro-bind".to_string(),
-            zoi_exe_dir.display().to_string(),
-            "/zoi_bin".to_string(),
-            "--chdir".to_string(),
-            container_workdir.to_string(),
-            "--unshare-all".to_string(),
-            "--share-net".to_string(),
-            "--hostname".to_string(),
-            "zoi-build".to_string(),
-            "--setenv".to_string(),
-            "PATH".to_string(),
-            "/zoi_bin:/usr/bin:/bin:/usr/sbin:/sbin".to_string(),
-        ];
-
-        if zoi_home.exists() {
-            bwrap_args.push("--ro-bind".to_string());
-            bwrap_args.push(zoi_home.display().to_string());
-            bwrap_args.push(zoi_home.display().to_string());
-        }
-
-        // Also bind /var/lib/zoi if it exists
-        let system_zoi = Path::new("/var/lib/zoi");
-        if system_zoi.exists() {
-            bwrap_args.push("--ro-bind".to_string());
-            bwrap_args.push(system_zoi.display().to_string());
-            bwrap_args.push(system_zoi.display().to_string());
-        }
-
-        if fakeroot {
-            bwrap_args.push("--uid".to_string());
-            bwrap_args.push("0".to_string());
-            bwrap_args.push("--gid".to_string());
-            bwrap_args.push("0".to_string());
-        } else {
-            let uid = nix::unistd::getuid().as_raw();
-            let gid = nix::unistd::getgid().as_raw();
-            bwrap_args.push("--uid".to_string());
-            bwrap_args.push(uid.to_string());
-            bwrap_args.push("--gid".to_string());
-            bwrap_args.push(gid.to_string());
-        }
-
-        // Export HOME so Zoi knows where to look for configs
-        bwrap_args.push("--setenv".to_string());
-        bwrap_args.push("HOME".to_string());
-        bwrap_args.push(home_dir.display().to_string());
 
         let package_filename = abs_package_file
             .file_name()
@@ -192,18 +114,130 @@ pub fn run(
             inner_cmd.push_str(" --install-deps");
         }
 
-        bwrap_args.push("bash".to_string());
-        bwrap_args.push("-c".to_string());
-        bwrap_args.push(inner_cmd);
+        // Base bwrap arguments
+        let sysroot = zoi_core::sysroot::get_sysroot();
 
-        if !utils::is_admin() && fakeroot {
+        let mut envs = std::collections::HashMap::new();
+        envs.insert(
+            "PATH".to_string(),
+            "/zoi_bin:/usr/bin:/bin:/usr/sbin:/sbin".to_string(),
+        );
+        envs.insert("ZOI_SKIP_LOCK".to_string(), "1".to_string());
+        envs.insert("HOME".to_string(), home_dir.display().to_string());
+
+        let status = if let Some(root) = &sysroot {
             println!(
-                "{} Running with fakeroot via user namespaces...",
-                "::".bold().yellow()
+                "{} Isolated build using sysroot: {}",
+                "::".bold().yellow(),
+                root.display()
             );
-        }
 
-        let status = Command::new("bwrap").args(&bwrap_args).status()?;
+            let extra_binds = vec![
+                (package_dir.to_path_buf(), PathBuf::from(container_workdir)),
+                (abs_output_dir.clone(), PathBuf::from(container_output_dir)),
+                (zoi_exe_dir.to_path_buf(), PathBuf::from("/zoi_bin")),
+            ];
+
+            let mut cmd = zoi_sandbox::wrap_command_in_root(
+                root,
+                &PathBuf::from("/bin/bash"),
+                &["-c".to_string(), inner_cmd],
+                &envs,
+                &extra_binds,
+                fakeroot,
+            )?;
+            cmd.status()?
+        } else {
+            // Base bwrap arguments for non-sysroot build
+            let mut bwrap_args = vec![
+                "--unshare-all".to_string(),
+                "--share-net".to_string(),
+                "--hostname".to_string(),
+                "zoi-build".to_string(),
+                "--dev".to_string(),
+                "/dev".to_string(),
+                "--proc".to_string(),
+                "/proc".to_string(),
+                "--tmpfs".to_string(),
+                "/tmp".to_string(),
+                "--tmpfs".to_string(),
+                "/run".to_string(),
+                "--tmpfs".to_string(),
+                "/var".to_string(),
+                "--ro-bind".to_string(),
+                "/usr".to_string(),
+                "/usr".to_string(),
+                "--symlink".to_string(),
+                "/usr/bin".to_string(),
+                "/bin".to_string(),
+                "--symlink".to_string(),
+                "/usr/lib".to_string(),
+                "/lib".to_string(),
+                "--symlink".to_string(),
+                "/usr/lib64".to_string(),
+                "/lib64".to_string(),
+                "--symlink".to_string(),
+                "/usr/sbin".to_string(),
+                "/sbin".to_string(),
+                "--ro-bind".to_string(),
+                "/etc".to_string(),
+                "/etc".to_string(),
+                "--bind".to_string(),
+                package_dir.display().to_string(),
+                container_workdir.to_string(),
+                "--bind".to_string(),
+                abs_output_dir.display().to_string(),
+                container_output_dir.to_string(),
+                "--ro-bind".to_string(),
+                zoi_exe_dir.display().to_string(),
+                "/zoi_bin".to_string(),
+                "--chdir".to_string(),
+                container_workdir.to_string(),
+                "--setenv".to_string(),
+                "PATH".to_string(),
+                "/zoi_bin:/usr/bin:/bin:/usr/sbin:/sbin".to_string(),
+                "--setenv".to_string(),
+                "ZOI_SKIP_LOCK".to_string(),
+                "1".to_string(),
+            ];
+
+            if zoi_home.exists() {
+                bwrap_args.push("--bind".to_string());
+                bwrap_args.push(zoi_home.display().to_string());
+                bwrap_args.push(zoi_home.display().to_string());
+            }
+
+            let system_zoi = Path::new("/var/lib/zoi");
+            if system_zoi.exists() {
+                bwrap_args.push("--bind".to_string());
+                bwrap_args.push(system_zoi.display().to_string());
+                bwrap_args.push(system_zoi.display().to_string());
+            }
+
+            if fakeroot {
+                bwrap_args.push("--uid".to_string());
+                bwrap_args.push("0".to_string());
+                bwrap_args.push("--gid".to_string());
+                bwrap_args.push("0".to_string());
+            } else {
+                let uid = nix::unistd::getuid().as_raw();
+                let gid = nix::unistd::getgid().as_raw();
+                bwrap_args.push("--uid".to_string());
+                bwrap_args.push(uid.to_string());
+                bwrap_args.push("--gid".to_string());
+                bwrap_args.push(gid.to_string());
+            }
+
+            bwrap_args.push("--setenv".to_string());
+            bwrap_args.push("HOME".to_string());
+            bwrap_args.push(home_dir.display().to_string());
+
+            bwrap_args.push("bash".to_string());
+            bwrap_args.push("-c".to_string());
+            bwrap_args.push(inner_cmd);
+
+            Command::new("bwrap").args(&bwrap_args).status()?
+        };
 
         if !status.success() {
             return Err(anyhow!(

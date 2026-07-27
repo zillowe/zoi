@@ -127,10 +127,14 @@ pub fn get_db_root() -> Result<PathBuf> {
         return Ok(local_db);
     }
 
-    let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(zoi_core::sysroot::apply_sysroot(
-        home_dir.join(".zoi").join("pkgs").join("db"),
-    ))
+    // Default to user scope for normal CLI usage
+    zoi_core::utils::get_db_base_dir(zoi_core::types::Scope::User)
+}
+
+pub fn get_host_db_root() -> Result<PathBuf> {
+    let home_dir = zoi_core::utils::get_user_home()
+        .ok_or_else(|| anyhow!("Could not find home directory."))?;
+    Ok(home_dir.join(".zoi").join("pkgs").join("db"))
 }
 
 pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
@@ -238,7 +242,17 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
                 Some(default_registry.handle.clone()),
             )
         } else if let Some(registry) = config.added_registries.iter().find(|r| r.handle == *h) {
-            let repo_path = db_root.join(&registry.handle);
+            let mut repo_path = db_root.join(&registry.handle);
+
+            if !repo_path.exists() && zoi_core::sysroot::get_sysroot().is_some() {
+                // Fallback to host metadata for resolution
+                let host_root = get_host_db_root()?;
+                let host_path = host_root.join(&registry.handle);
+                if host_path.exists() {
+                    repo_path = host_path;
+                }
+            }
+
             let all_sub_repos = if repo_path.exists() {
                 fs::read_dir(&repo_path)?
                     .filter_map(Result::ok)
@@ -264,42 +278,64 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
             .ok_or_else(|| anyhow!("No default registry set."))?;
 
         let default_handle = default_registry.handle.clone();
-        let default_path = db_root.join(&default_handle);
+        let mut default_path = db_root.join(&default_handle);
+
+        if !default_path.exists() && zoi_core::sysroot::get_sysroot().is_some() {
+            // Fallback to host metadata for resolution
+            let host_root = get_host_db_root()?;
+            let host_path = host_root.join(&default_handle);
+            if host_path.exists() {
+                default_path = host_path;
+            }
+        }
 
         let (registry_path, effective_handle) = if default_path.exists()
-            && default_path.join("repo.yaml").exists()
+            && (default_path.join("repo.yaml").exists()
+                || default_path.join("packages.json").exists())
         {
             (default_path, default_handle)
         } else {
             let mut found_path = default_path.clone();
             let mut found_handle = default_handle.clone();
             let mut found = false;
-            if let Ok(entries) = fs::read_dir(&db_root) {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if !path.is_dir() {
-                        continue;
-                    }
-                    let name = entry.file_name();
-                    if name == ".git" {
-                        continue;
-                    }
-                    let candidate = name.to_string_lossy().to_string();
-                    let candidate_path = db_root.join(&candidate);
-                    if candidate_path.join("repo.yaml").exists()
-                        || candidate_path.join("packages.json").exists()
-                    {
-                        found_path = candidate_path;
-                        found_handle = candidate;
-                        found = true;
-                        break;
+
+            let roots_to_check = if zoi_core::sysroot::get_sysroot().is_some() {
+                vec![db_root.clone(), get_host_db_root()?]
+            } else {
+                vec![db_root.clone()]
+            };
+
+            for root in roots_to_check {
+                if let Ok(entries) = fs::read_dir(&root) {
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if !path.is_dir() {
+                            continue;
+                        }
+                        let name = entry.file_name();
+                        if name == ".git" {
+                            continue;
+                        }
+                        let candidate = name.to_string_lossy().to_string();
+                        let candidate_path = root.join(&candidate);
+                        if candidate_path.join("repo.yaml").exists()
+                            || candidate_path.join("packages.json").exists()
+                        {
+                            found_path = candidate_path;
+                            found_handle = candidate;
+                            found = true;
+                            break;
+                        }
                     }
                 }
+                if found {
+                    break;
+                }
             }
+
             if !found {
                 return Err(anyhow!(
-                    "No synced registries found in '{}'. Please run 'zoi sync' to download the package database.",
-                    db_root.display()
+                    "No synced registries found. Please run 'zoi sync' to download the package database."
                 ));
             }
             (found_path, found_handle)
@@ -407,38 +443,19 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
         }
     } else {
         for repo_name in &repos_to_search {
-            let repo_path = registry_db_path.join(repo_name);
-            if !repo_path.is_dir() {
-                continue;
-            }
-            for entry in WalkDir::new(&repo_path)
-                .into_iter()
-                .filter_map(|e| e.ok())
-                .filter(|e| e.file_type().is_dir() && e.file_name() == request.name.as_str())
+            let pkg_dir_path = registry_db_path.join(repo_name).join(&request.name);
+            let pkg_file_path = pkg_dir_path.join(format!("{}.pkg.lua", request.name));
+
+            if pkg_file_path.exists()
+                && let Ok(found) = process_found_package(
+                    pkg_file_path,
+                    repo_name,
+                    is_default_registry,
+                    &registry_db_path,
+                    quiet,
+                )
             {
-                let pkg_dir_path = entry.path();
-
-                if let Ok(relative_path) = pkg_dir_path.strip_prefix(&repo_path) {
-                    if relative_path.components().count() > 1 {
-                        continue;
-                    }
-                } else {
-                    continue;
-                }
-
-                let pkg_file_path = pkg_dir_path.join(format!("{}.pkg.lua", request.name));
-
-                if pkg_file_path.exists()
-                    && let Ok(found) = process_found_package(
-                        pkg_file_path,
-                        repo_name,
-                        is_default_registry,
-                        &registry_db_path,
-                        quiet,
-                    )
-                {
-                    found_packages.push(found);
-                }
+                found_packages.push(found);
             }
         }
     }
@@ -1320,7 +1337,8 @@ fn resolve_source_recursive(
             .last()
             .ok_or_else(|| anyhow!("Empty path in git source"))?;
 
-        let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
+        let home_dir = zoi_core::utils::get_user_home()
+            .ok_or_else(|| anyhow!("Could not find home directory."))?;
         let mut path = home_dir
             .join(".zoi")
             .join("pkgs")

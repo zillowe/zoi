@@ -4654,6 +4654,7 @@ dependencies = [
  "sha2 0.11.0",
  "yaml_serde",
  "zoi-core",
+ "zoi-sandbox",
 ]
 
 [[package]]
@@ -4702,6 +4703,7 @@ dependencies = [
  "colored",
  "flate2",
  "home",
+ "indicatif",
  "mlua",
  "regex",
  "sequoia-openpgp",

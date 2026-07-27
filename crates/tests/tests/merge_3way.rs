@@ -99,7 +99,7 @@ policy:
     ctx.set_current_dir(&root);
 
     // Sync and Install v1
-    zoi::cmd::sync::run(false, false, false, false).unwrap();
+    zoi::cmd::sync::run(false, false, false, false, None).unwrap();
 
     zoi::install_sources(
         &[pkg_name.to_string()],
@@ -160,7 +160,7 @@ end
     run_git(&["commit", "-m", "v2"], &reg_dir);
 
     // Sync and Update
-    zoi::cmd::sync::run(false, false, false, false).unwrap();
+    zoi::cmd::sync::run(false, false, false, false, None).unwrap();
     zoi::update_packages(true, &[], true).expect("v2 upgrade failed");
 
     // Verify result

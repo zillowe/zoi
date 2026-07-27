@@ -11,6 +11,9 @@ use std::process::Command;
 use std::sync::OnceLock;
 use std::time::Duration;
 
+#[cfg(unix)]
+use nix;
+
 /// Creates an HTTP client with Zoi's default configuration.
 pub fn get_http_client() -> Result<&'static reqwest::blocking::Client> {
     if crate::offline::is_offline() {
@@ -110,15 +113,27 @@ pub fn get_platform() -> Result<String> {
     Ok(format!("{}-{}", os, arch))
 }
 
+/// Returns the home directory of the current user, or the original user if run via sudo.
+pub fn get_user_home() -> Option<PathBuf> {
+    if let Ok(sudo_user) = std::env::var("SUDO_USER") {
+        #[cfg(unix)]
+        {
+            use nix::unistd::User;
+            if let Ok(Some(user)) = User::from_name(&sudo_user) {
+                return Some(user.dir);
+            }
+        }
+    }
+    home::home_dir()
+}
+
 /// Returns the root directory for the package database.
 pub fn get_db_root() -> Result<std::path::PathBuf> {
     if let Ok(path) = std::env::var("ZOI_DB_DIR") {
         return Ok(std::path::PathBuf::from(path));
     }
-    let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(crate::sysroot::apply_sysroot(
-        home_dir.join(".zoi").join("pkgs").join("db"),
-    ))
+    let home_dir = get_user_home().ok_or_else(|| anyhow!("Could not find home directory."))?;
+    Ok(home_dir.join(".zoi").join("pkgs").join("db"))
 }
 
 /// Returns the root directory of the package store for a given scope.
@@ -131,7 +146,7 @@ pub fn get_store_base_dir(scope: crate::types::Scope) -> Result<PathBuf> {
     match scope {
         crate::types::Scope::User => {
             let home_dir =
-                home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
+                get_user_home().ok_or_else(|| anyhow!("Could not find home directory."))?;
             Ok(crate::sysroot::apply_sysroot(
                 home_dir.join(".zoi").join("pkgs").join("store"),
             ))
@@ -150,6 +165,60 @@ pub fn get_store_base_dir(scope: crate::types::Scope) -> Result<PathBuf> {
         crate::types::Scope::Project => {
             let current_dir = std::env::current_dir()?;
             Ok(current_dir.join(".zoi").join("pkgs").join("store"))
+        }
+    }
+}
+
+pub fn get_db_base_dir(scope: crate::types::Scope) -> Result<PathBuf> {
+    match scope {
+        crate::types::Scope::User => {
+            let home_dir =
+                get_user_home().ok_or_else(|| anyhow!("Could not find home directory."))?;
+            Ok(crate::sysroot::apply_sysroot(
+                home_dir.join(".zoi").join("pkgs").join("db"),
+            ))
+        }
+        crate::types::Scope::System => {
+            if cfg!(target_os = "windows") {
+                Ok(crate::sysroot::apply_sysroot(PathBuf::from(
+                    "C:\\ProgramData\\zoi\\pkgs\\db",
+                )))
+            } else {
+                Ok(crate::sysroot::apply_sysroot(PathBuf::from(
+                    "/var/lib/zoi/pkgs/db",
+                )))
+            }
+        }
+        crate::types::Scope::Project => {
+            let current_dir = std::env::current_dir()?;
+            Ok(current_dir.join(".zoi").join("pkgs").join("db"))
+        }
+    }
+}
+
+pub fn get_git_base_dir(scope: crate::types::Scope) -> Result<PathBuf> {
+    match scope {
+        crate::types::Scope::User => {
+            let home_dir =
+                get_user_home().ok_or_else(|| anyhow!("Could not find home directory."))?;
+            Ok(crate::sysroot::apply_sysroot(
+                home_dir.join(".zoi").join("pkgs").join("git"),
+            ))
+        }
+        crate::types::Scope::System => {
+            if cfg!(target_os = "windows") {
+                Ok(crate::sysroot::apply_sysroot(PathBuf::from(
+                    "C:\\ProgramData\\zoi\\pkgs\\git",
+                )))
+            } else {
+                Ok(crate::sysroot::apply_sysroot(PathBuf::from(
+                    "/var/lib/zoi/pkgs/git",
+                )))
+            }
+        }
+        crate::types::Scope::Project => {
+            let current_dir = std::env::current_dir()?;
+            Ok(current_dir.join(".zoi").join("pkgs").join("git"))
         }
     }
 }
@@ -195,6 +264,11 @@ pub fn get_package_dir_name(package_id: &str, package_name: &str) -> String {
 }
 
 pub fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
+    let src = if src.as_os_str().is_empty() {
+        Path::new(".")
+    } else {
+        src
+    };
     fs::create_dir_all(dst)?;
     for entry in fs::read_dir(src)? {
         let entry = entry?;
@@ -873,13 +947,13 @@ pub fn expand_placeholders(
         "${usrroot}",
         &crate::sysroot::apply_sysroot(PathBuf::from("/")).to_string_lossy(),
     );
-    if let Some(home_dir) = home::home_dir() {
+    if let Some(home_dir) = get_user_home() {
         expanded = expanded.replace("${usrhome}", &home_dir.to_string_lossy());
     }
 
     let applications_dir = match scope {
         crate::types::Scope::System => PathBuf::from("/Applications"),
-        crate::types::Scope::User => home::home_dir()
+        crate::types::Scope::User => get_user_home()
             .map(|h| h.join("Applications"))
             .unwrap_or_else(|| PathBuf::from("/Applications")),
         crate::types::Scope::Project => std::env::current_dir()
@@ -896,7 +970,7 @@ pub fn expand_tilde<P: AsRef<Path>>(path: P) -> PathBuf {
     if !path.starts_with("~") {
         return path.to_path_buf();
     }
-    if let Some(home_dir) = home::home_dir() {
+    if let Some(home_dir) = get_user_home() {
         if path == Path::new("~") {
             return home_dir;
         }

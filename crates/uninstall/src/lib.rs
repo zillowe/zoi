@@ -15,8 +15,8 @@ use zoi_telemetry as telemetry;
 fn get_bin_root(scope: types::Scope) -> anyhow::Result<PathBuf> {
     match scope {
         types::Scope::User => {
-            let home_dir =
-                home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
+            let home_dir = core_utils::get_user_home()
+                .ok_or_else(|| anyhow!("Could not find home directory."))?;
             Ok(sysroot::apply_sysroot(home_dir.join(".zoi/pkgs/bin")))
         }
         types::Scope::System => {
@@ -38,8 +38,8 @@ fn get_bin_root(scope: types::Scope) -> anyhow::Result<PathBuf> {
 fn get_completions_root(scope: types::Scope, shell: &str) -> anyhow::Result<PathBuf> {
     match scope {
         types::Scope::User => {
-            let home_dir =
-                home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
+            let home_dir = core_utils::get_user_home()
+                .ok_or_else(|| anyhow!("Could not find home directory."))?;
             Ok(sysroot::apply_sysroot(
                 home_dir.join(".zoi/pkgs/shell").join(shell),
             ))
@@ -79,8 +79,8 @@ fn cleanup_service(package_name: &str, scope: types::Scope) -> anyhow::Result<()
     match std::env::consts::OS {
         "linux" => {
             let unit_path = if is_user {
-                let home =
-                    home::home_dir().ok_or_else(|| anyhow!("Could not find home directory"))?;
+                let home = core_utils::get_user_home()
+                    .ok_or_else(|| anyhow!("Could not find home directory"))?;
                 sysroot::apply_sysroot(
                     home.join(".config/systemd/user")
                         .join(format!("{}.service", service_name)),
@@ -109,8 +109,8 @@ fn cleanup_service(package_name: &str, scope: types::Scope) -> anyhow::Result<()
         }
         "macos" => {
             let plist_path = if is_user {
-                let home =
-                    home::home_dir().ok_or_else(|| anyhow!("Could not find home directory"))?;
+                let home = core_utils::get_user_home()
+                    .ok_or_else(|| anyhow!("Could not find home directory"))?;
                 sysroot::apply_sysroot(
                     home.join("Library/LaunchAgents")
                         .join(format!("{}.plist", service_name)),
@@ -453,6 +453,7 @@ pub fn run(
             None,
             sub_package_to_uninstall.as_deref(),
             Some(scope),
+            None,
             true,
         )
         .map_err(|e| anyhow!(e.to_string()))?;
@@ -482,7 +483,7 @@ pub fn run(
                     path_to_remove =
                         path_to_remove.replace("${pkgstore}", &version_dir.to_string_lossy());
 
-                    if let Some(home_dir) = home::home_dir() {
+                    if let Some(home_dir) = core_utils::get_user_home() {
                         path_to_remove =
                             path_to_remove.replace("${usrhome}", &home_dir.to_string_lossy());
                     }
@@ -511,12 +512,23 @@ pub fn run(
                 println!("Saving configuration files...");
             }
             for backup_file_rel in backup_files {
-                let backup_src = version_dir.join(backup_file_rel);
+                let expanded_path = zoi_core::utils::expand_placeholders(
+                    backup_file_rel,
+                    &version_dir,
+                    manifest.scope,
+                )?;
+                let backup_src = PathBuf::from(expanded_path);
+
                 if backup_src.exists() {
+                    let backup_filename = backup_src
+                        .file_name()
+                        .ok_or_else(|| anyhow!("Invalid backup source name"))?
+                        .to_string_lossy();
                     let backup_dest = version_dir
                         .parent()
                         .ok_or_else(|| anyhow!("version_dir should have a parent (package_dir)"))?
-                        .join(format!("{}.zoisave", backup_file_rel));
+                        .join(format!("{}.zoisave", backup_filename));
+
                     if let Some(p) = backup_dest.parent()
                         && let Err(e) = fs::create_dir_all(p)
                     {
@@ -536,10 +548,17 @@ pub fn run(
                             backup_dest.display()
                         );
                     }
-                    if let Err(e) = fs::rename(&backup_src, &backup_dest)
-                        && !quiet
-                    {
-                        eprintln!("Warning: failed to save {}: {}", backup_src.display(), e);
+                    // Use copy + remove for potential cross-device moves
+                    if let Err(e) = fs::copy(&backup_src, &backup_dest) {
+                        if !quiet {
+                            eprintln!(
+                                "Warning: failed to copy backup {}: {}",
+                                backup_src.display(),
+                                e
+                            );
+                        }
+                    } else {
+                        let _ = fs::remove_file(&backup_src);
                     }
                 }
             }

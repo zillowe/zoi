@@ -225,20 +225,26 @@ pub fn prepare_node(
         .template("{spinner:.green} {msg:30.cyan} [{bar:40.cyan/blue}] {percent}%")?
         .progress_chars("#>-");
 
+    let spinner_style = ProgressStyle::default_spinner()
+        .template("{spinner:.green} {msg:30.cyan}")?
+        .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ ");
+
+    let display_name = if let Some(sub) = &node.sub_package {
+        format!("{}:{}", pkg.name, sub)
+    } else {
+        pkg.name.clone()
+    };
+    let version_display = if node.revision != "1" {
+        format!("{}-{}", version, node.revision)
+    } else {
+        version.clone()
+    };
+    let message = format!("zoi:{}@{}", display_name, version_display);
+
     let pb = if let Some(m_inner) = m {
         let pb = m_inner.add(ProgressBar::new(100));
         pb.set_style(pb_style);
-        let name = if let Some(sub) = &node.sub_package {
-            format!("{}:{}", pkg.name, sub)
-        } else {
-            pkg.name.clone()
-        };
-        let version_display = if node.revision != "1" {
-            format!("{}-{}", version, node.revision)
-        } else {
-            version.clone()
-        };
-        pb.set_message(format!("zoi: @{}:{}", name, version_display));
+        pb.set_message(message.clone());
         Some(pb)
     } else {
         None
@@ -254,9 +260,23 @@ pub fn prepare_node(
         }
         plan::InstallAction::InstallFromArchive(archive_path) => {
             if archive_path.to_string_lossy().ends_with(".zsa") {
-                let archive_path =
-                    prebuilt::build_archive(archive_path, pkg, build_type, pb.as_ref())?;
-                (archive_path, "source".to_string(), true)
+                if let Some(p) = &pb {
+                    p.set_style(spinner_style);
+                    p.enable_steady_tick(std::time::Duration::from_millis(100));
+                    p.set_message(format!("Building {}...", display_name));
+                }
+                let archive_path = prebuilt::build_archive(
+                    archive_path,
+                    pkg,
+                    node.sub_package.as_deref(),
+                    build_type,
+                    pb.as_ref(),
+                    !verbose,
+                )?;
+                match archive_path {
+                    Some(path) => (path, "source".to_string(), true),
+                    None => (PathBuf::new(), "meta".to_string(), false),
+                }
             } else {
                 if let Some(p) = &pb {
                     p.set_message("Using local archive...");
@@ -266,9 +286,25 @@ pub fn prepare_node(
             }
         }
         plan::InstallAction::BuildAndInstall => {
+            if let Some(p) = &pb {
+                p.set_style(spinner_style);
+                p.enable_steady_tick(std::time::Duration::from_millis(100));
+                p.set_message(format!("Building {}...", display_name));
+            }
             let pkg_lua_path = Path::new(&node.source);
-            let archive_path = prebuilt::build_archive(pkg_lua_path, pkg, build_type, pb.as_ref())?;
-            (archive_path, "source".to_string(), true)
+            let archive_path = prebuilt::build_archive(
+                pkg_lua_path,
+                pkg,
+                node.sub_package.as_deref(),
+                build_type,
+                pb.as_ref(),
+                !verbose,
+            )?;
+
+            match archive_path {
+                Some(path) => (path, "source".to_string(), true),
+                None => (PathBuf::new(), "meta".to_string(), false),
+            }
         }
     };
 
@@ -307,13 +343,13 @@ pub fn install_prepared_node(
     let handle = &node.registry_handle;
     let is_direct = matches!(node.reason, types::InstallReason::Direct);
 
-    let pb_style = ProgressStyle::default_bar()
-        .template("{spinner:.green} {msg:30.cyan} [{bar:40.cyan/blue}] {percent}%")?
-        .progress_chars("#>-");
+    let pb_style = ProgressStyle::default_spinner()
+        .template("{spinner:.green} {msg:30.cyan}")?
+        .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ ");
 
     let main_pb = if let Some(m_inner) = m {
         if !is_direct {
-            let pb = m_inner.add(ProgressBar::new(100));
+            let pb = m_inner.add(ProgressBar::new_spinner());
             pb.set_style(pb_style.clone());
             let name = if let Some(sub) = &node.sub_package {
                 format!("{}:{}", pkg.name, sub)
@@ -325,7 +361,8 @@ pub fn install_prepared_node(
             } else {
                 version.clone()
             };
-            pb.set_message(format!("zoi: @{}:{}", name, version_display));
+            pb.set_message(format!("zoi:{}@{}", name, version_display));
+            pb.enable_steady_tick(std::time::Duration::from_millis(100));
             Some(pb)
         } else {
             None
@@ -335,8 +372,9 @@ pub fn install_prepared_node(
     };
 
     let step_pb = if is_direct && let Some(m_inner) = m {
-        let pb = m_inner.add(ProgressBar::new(100));
+        let pb = m_inner.add(ProgressBar::new_spinner());
         pb.set_style(pb_style);
+        pb.enable_steady_tick(std::time::Duration::from_millis(100));
         Some(pb)
     } else {
         None
@@ -407,8 +445,7 @@ pub fn install_prepared_node(
         manifest
     } else {
         if let Some(pb) = step_pb.as_ref().or(main_pb.as_ref()) {
-            pb.set_message("Installing package...");
-            pb.set_position(0);
+            pb.set_message(format!("Installing {}...", pkg.name.cyan()));
         }
 
         let installed_files = crate::pkg_install::run(

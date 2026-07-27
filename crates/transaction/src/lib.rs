@@ -22,8 +22,8 @@ fn create_shim(link_path: &std::path::Path) -> Result<()> {
 pub(crate) fn get_completions_root(scope: types::Scope, shell: &str) -> Result<std::path::PathBuf> {
     match scope {
         types::Scope::User => {
-            let home_dir =
-                home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
+            let home_dir = zoi_core::utils::get_user_home()
+                .ok_or_else(|| anyhow!("Could not find home directory."))?;
             Ok(zoi_core::sysroot::apply_sysroot(
                 home_dir.join(".zoi/pkgs/shell").join(shell),
             ))
@@ -92,8 +92,9 @@ pub struct TransactionMetadata {
 }
 
 fn get_transactions_dir() -> Result<PathBuf> {
-    let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
-    let dir = home_dir.join(".zoi").join("transactions");
+    let home_dir = zoi_core::utils::get_user_home()
+        .ok_or_else(|| anyhow!("Could not find home directory."))?;
+    let dir = zoi_core::sysroot::apply_sysroot(home_dir.join(".zoi")).join("transactions");
     fs::create_dir_all(&dir)?;
     Ok(dir)
 }
@@ -216,6 +217,35 @@ pub fn get_modified_files(transaction_id: &str) -> Result<Vec<String>> {
     Ok(files.into_iter().collect())
 }
 
+pub fn get_modified_packages(transaction_id: &str) -> Result<Vec<String>> {
+    let path = get_transaction_path(transaction_id)?;
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let content = fs::read_to_string(&path)?;
+    let transaction: types::Transaction = serde_json::from_str(&content)?;
+
+    let mut packages = HashSet::new();
+    for op in transaction.operations {
+        match op {
+            types::TransactionOperation::Install { manifest } => {
+                packages.insert(manifest.name);
+            }
+            types::TransactionOperation::Uninstall { manifest } => {
+                packages.insert(manifest.name);
+            }
+            types::TransactionOperation::Upgrade {
+                old_manifest,
+                new_manifest,
+            } => {
+                packages.insert(old_manifest.name);
+                packages.insert(new_manifest.name);
+            }
+        }
+    }
+    Ok(packages.into_iter().collect())
+}
+
 pub fn delete_log(transaction_id: &str) -> Result<()> {
     let path = get_transaction_path(transaction_id)?;
     if path.exists() {
@@ -271,8 +301,8 @@ fn restore_shims(manifest: &types::InstallManifest) -> Result<()> {
     if let Some(bins) = &manifest.bins {
         let bin_root = match manifest.scope {
             types::Scope::User => {
-                let home =
-                    home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
+                let home = zoi_core::utils::get_user_home()
+                    .ok_or_else(|| anyhow!("Could not find home directory."))?;
                 sysroot::apply_sysroot(home.join(".zoi/pkgs/bin"))
             }
             types::Scope::System => {

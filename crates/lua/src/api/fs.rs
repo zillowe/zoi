@@ -15,32 +15,10 @@ use walkdir::WalkDir;
 /// These functions do not always perform immediate actions; instead, they often record
 /// operations into `__ZoiBuildOperations` for the Rust engine to execute atomically
 /// during the staging-to-store move.
-pub fn add_file_util(lua: &Lua) -> Result<(), mlua::Error> {
+pub fn add_file_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let file_fn = lua.create_function(
-        |_, (url, path): (String, String)| -> Result<(), mlua::Error> {
-            let client =
-                utils::get_http_client().map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-            let mut attempt = 0u32;
-            let response = loop {
-                attempt += 1;
-                match client.get(&url).send() {
-                    Ok(resp) => break resp,
-                    Err(e) => {
-                        if attempt < 3 {
-                            eprintln!("Download failed ({}). Retrying...", e);
-                            zoi_core::utils::retry_backoff_sleep(attempt);
-                            continue;
-                        } else {
-                            return Err(mlua::Error::RuntimeError(e.to_string()));
-                        }
-                    }
-                }
-            };
-            let content = response
-                .bytes()
-                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-            fs::write(path, content).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-            Ok(())
+        move |_, (url, path): (String, String)| -> Result<(), mlua::Error> {
+            super::download::download_with_progress(&url, Path::new(&path), quiet)
         },
     )?;
 
@@ -73,7 +51,26 @@ pub fn add_zcp(lua: &Lua) -> Result<(), mlua::Error> {
 
 pub fn add_zlicense(lua: &Lua) -> Result<(), mlua::Error> {
     let zlicense_fn = lua.create_function(|lua, source: String| {
-        let destination = "${pkgstore}/LICENSE".to_string();
+        let zoi_table: Table = lua.globals().get("ZOI")?;
+        let scope: String = zoi_table
+            .get("scope")
+            .unwrap_or_else(|_| "user".to_string());
+        let pkg_table: Table = lua.globals().get("PKG")?;
+        let pkg_name: String = pkg_table
+            .get("name")
+            .unwrap_or_else(|_| "unknown".to_string());
+
+        let filename = Path::new(&source)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("LICENSE");
+
+        let destination = if scope == "system" {
+            format!("${{usrroot}}/usr/share/licenses/{}/{}", pkg_name, filename)
+        } else {
+            format!("${{pkgstore}}/{}", filename)
+        };
+
         let zcp: mlua::Function = lua.globals().get("zcp")?;
         zcp.call::<()>((source, destination))?;
         Ok(())
@@ -84,11 +81,26 @@ pub fn add_zlicense(lua: &Lua) -> Result<(), mlua::Error> {
 
 pub fn add_zdoc(lua: &Lua) -> Result<(), mlua::Error> {
     let zdoc_fn = lua.create_function(|lua, source: String| {
+        let zoi_table: Table = lua.globals().get("ZOI")?;
+        let scope: String = zoi_table
+            .get("scope")
+            .unwrap_or_else(|_| "user".to_string());
+        let pkg_table: Table = lua.globals().get("PKG")?;
+        let pkg_name: String = pkg_table
+            .get("name")
+            .unwrap_or_else(|_| "unknown".to_string());
+
         let filename = Path::new(&source)
             .file_name()
             .and_then(|n| n.to_str())
             .ok_or_else(|| mlua::Error::RuntimeError("Invalid source path".to_string()))?;
-        let destination = format!("${{pkgstore}}/doc/{}", filename);
+
+        let destination = if scope == "system" {
+            format!("${{usrroot}}/usr/share/doc/{}/{}", pkg_name, filename)
+        } else {
+            format!("${{pkgstore}}/doc/{}", filename)
+        };
+
         let zcp: mlua::Function = lua.globals().get("zcp")?;
         zcp.call::<()>((source, destination))?;
         Ok(())

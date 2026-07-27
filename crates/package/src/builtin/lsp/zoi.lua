@@ -4,14 +4,14 @@
 ---@class SystemInfo
 ---@field OS "linux"|"macos"|"windows" The operating system name.
 ---@field ARCH "amd64"|"arm64" The CPU architecture.
----@field DISTRO string? The Linux distribution ID (e.g., "ubuntu", "arch").
----@field DISTRO_VER string? The version of the distribution (e.g., "22.04", "14.1").
----@field DE string? The detected Desktop Environment (e.g., "kde", "gnome", "windows").
----@field SERVER string? The display server in use (e.g., "x11", "wayland", "quartz").
+---@field DISTRO string? The Linux distribution ID (e.g. "ubuntu", "arch").
+---@field DISTRO_VER string? The version of the distribution (e.g. "22.04", "14.1").
+---@field DE string? The detected Desktop Environment (e.g. "kde", "gnome", "windows").
+---@field SERVER string? The display server in use (e.g. "x11", "wayland", "quartz").
 ---@field KERNEL_VER string? The kernel version of the operating system.
 ---@field CPU string? CPU model information.
 ---@field GPU string? GPU model information.
----@field MANAGER string? The detected native package manager (e.g., "apt", "pacman").
+---@field MANAGER string? The detected native package manager (e.g. "apt", "pacman").
 SYSTEM = {}
 
 ---@class ZoiInfo
@@ -32,7 +32,7 @@ ZOI = {}
 ---@field website string? Author website.
 
 ---@class CiConfig
----@field tags table<string, string>? Runner tags per OS (e.g., { linux = "saas-linux-medium-amd64" }).
+---@field tags table<string, string>? Runner tags per OS (e.g. { linux = "saas-linux-medium-amd64" }).
 
 ---@class PkgMetadata
 ---@field name string Required. The name of the package.
@@ -275,9 +275,11 @@ UTILS.FETCH.GITHUB = { LATEST = {} }
 ---@param args GithubLatestArgs
 ---@return string
 function UTILS.FETCH.GITHUB.LATEST.tag(args) end
+
 ---@param args GithubLatestArgs
 ---@return string
 function UTILS.FETCH.GITHUB.LATEST.release(args) end
+
 ---@param args GithubLatestArgs
 ---@return string
 function UTILS.FETCH.GITHUB.LATEST.commit(args) end
@@ -286,9 +288,11 @@ UTILS.FETCH.GITLAB = { LATEST = {} }
 ---@param args GithubLatestArgs
 ---@return string
 function UTILS.FETCH.GITLAB.LATEST.tag(args) end
+
 ---@param args GithubLatestArgs
 ---@return string
 function UTILS.FETCH.GITLAB.LATEST.release(args) end
+
 ---@param args GithubLatestArgs
 ---@return string
 function UTILS.FETCH.GITLAB.LATEST.commit(args) end
@@ -297,12 +301,15 @@ UTILS.PARSE = {}
 ---@param str string
 ---@return table?
 function UTILS.PARSE.json(str) end
+
 ---@param str string
 ---@return table?
 function UTILS.PARSE.yaml(str) end
+
 ---@param str string
 ---@return table?
 function UTILS.PARSE.toml(str) end
+
 ---@param content string
 ---@param filename string
 ---@return string?
@@ -317,14 +324,17 @@ UTILS.FS = {}
 ---@param path string
 ---@return boolean
 function UTILS.FS.exists(path) end
+
 ---@param src string
 ---@param dest string
 ---@return boolean
 function UTILS.FS.copy(src, dest) end
+
 ---@param src string
 ---@param dest string
 ---@return boolean
 function UTILS.FS.move(src, dest) end
+
 ---@param path string
 ---@param mode integer
 function UTILS.FS.chmod(path, mode) end

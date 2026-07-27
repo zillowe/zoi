@@ -10,8 +10,9 @@ fn get_lockfile_path(scope: types::Scope) -> Result<PathBuf> {
     let path = if scope == types::Scope::Project {
         std::env::current_dir()?.join("zoi.lock")
     } else {
-        let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
-        crate::sysroot::apply_sysroot(home_dir.join(".zoi").join("pkgs").join("zoi.lock"))
+        let home_dir = crate::utils::get_user_home()
+            .ok_or_else(|| anyhow!("Could not find home directory."))?;
+        home_dir.join(".zoi").join("pkgs").join("zoi.lock")
     };
 
     if let Some(parent) = path.parent() {

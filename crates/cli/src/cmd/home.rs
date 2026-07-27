@@ -30,7 +30,7 @@ pub fn run(args: HomeCommand) -> Result<()> {
     match args.command {
         HomeSubcommands::Apply { file } => {
             let config_path = file.unwrap_or_else(|| {
-                let mut p = home::home_dir().unwrap();
+                let mut p = crate::pkg::utils::get_user_home().unwrap();
                 p.push(".config/zoi/home.lua");
                 p.to_string_lossy().to_string()
             });
