@@ -97,8 +97,6 @@ for binary_path in "$COMPILED_DIR"/*; do
 
     if [[ "$filename" == "zoi-mini"* ]]; then
         binary_base="zoi-mini"
-    elif [[ "$filename" == "zoid"* ]]; then
-        binary_base="zoid"
     else
         binary_base="zoi"
     fi

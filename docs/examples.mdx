@@ -425,7 +425,7 @@ end
 
 ## 11. Configuration File Handling (`backup`)
 
-Ensure user modifications to configuration files are preserved during upgrades. The `backup` field supports path placeholders like `${usrroot}` and `${usrhome}`.
+Ensure user modifications to configuration files are preserved during upgrades.
 
 ```lua
 -- web-server.pkg.lua
@@ -435,8 +435,7 @@ metadata({
   version = "1.5.0",
   description = "Web server with persistent config",
   -- Files listed here are saved as .zoisave/zoinew on upgrade/remove
-  -- Supports placeholders for system-wide or user-specific paths
-  backup = { "${usrroot}/etc/server.conf", "etc/relative_to_pkgstore.conf" },
+  backup = { "etc/server.conf" },
   types = { "pre-compiled" }
 })
 

@@ -1,15 +1,8 @@
-use crate::cli::SetupScope;
 use crate::pkg;
 use anyhow::Result;
 use colored::*;
 
-pub fn run(
-    verbose: bool,
-    fallback: bool,
-    no_pm: bool,
-    force: bool,
-    scope: Option<SetupScope>,
-) -> Result<()> {
+pub fn run(verbose: bool, fallback: bool, no_pm: bool, force: bool) -> Result<()> {
     println!("{} Syncing package databases...", "::".bold().blue());
 
     if force {
@@ -19,13 +12,7 @@ pub fn run(
         );
     }
 
-    let pkg_scope = match scope {
-        Some(SetupScope::User) => Some(crate::pkg::types::Scope::User),
-        Some(SetupScope::System) => Some(crate::pkg::types::Scope::System),
-        None => None,
-    };
-
-    pkg::sync::run(verbose, fallback, no_pm, force, pkg_scope)?;
+    pkg::sync::run(verbose, fallback, no_pm, force)?;
 
     println!("{}", "Sync complete.".green());
     Ok(())
@@ -66,14 +53,8 @@ pub fn set_registry(url_or_keyword: &str) -> Result<()> {
 }
 
 pub fn add_registry(url: &str) -> Result<()> {
-    let mut final_url = url.to_string();
-    let path = std::path::Path::new(url);
-    if path.is_dir() {
-        final_url = std::fs::canonicalize(path)?.to_string_lossy().to_string();
-    }
-
-    pkg::config::add_added_registry(&final_url)?;
-    println!("Registry '{}' added.", final_url.cyan());
+    pkg::config::add_added_registry(url)?;
+    println!("Registry '{}' added.", url.cyan());
     println!("It will be synced on the next 'zoi sync' run.");
     Ok(())
 }

@@ -31,21 +31,11 @@ pub fn run(args: &cmd::package::build::BuildCommand) -> Result<()> {
         pkg::resolve::get_default_version(&pkg_for_meta, None)?
     };
 
-    let resolved_build_type = match crate::pkg::package::build::resolve_build_type(
+    let resolved_build_type = crate::pkg::package::build::resolve_build_type(
         args.r#type.as_deref(),
         &pkg_for_meta.types,
         &pkg_for_meta.name,
-    )? {
-        Some(t) => t,
-        None => {
-            println!(
-                "{} Skipping tests for package '{}': no build types supported.",
-                "::".bold().yellow(),
-                pkg_for_meta.name
-            );
-            return Ok(());
-        }
-    };
+    )?;
 
     let build_dir = tempfile::Builder::new()
         .prefix(&format!("zoi-test-{}-{}", pkg_for_meta.name, platform))
@@ -84,11 +74,10 @@ pub fn run(args: &cmd::package::build::BuildCommand) -> Result<()> {
             Some(&version),
             args.package_file.to_str(),
             None,
-            Some(build_dir.path().to_str().unwrap_or("")),
-            Some(staging_dir.to_str().unwrap_or("")),
+            None,
+            None,
             sub_pkg_name,
             Some(pkg_for_meta.scope),
-            Some(resolved_build_type.as_str()),
             false,
         )
         .map_err(|e| anyhow!(e.to_string()))?;
@@ -98,6 +87,26 @@ pub fn run(args: &cmd::package::build::BuildCommand) -> Result<()> {
             .map_err(|e| anyhow!(e.to_string()))?;
         lua.globals()
             .set("PKG", pkg_table)
+            .map_err(|e| anyhow!(e.to_string()))?;
+        lua.globals()
+            .set(
+                "BUILD_DIR",
+                build_dir
+                    .path()
+                    .to_str()
+                    .ok_or_else(|| anyhow!("build_dir path contains invalid UTF-8"))?,
+            )
+            .map_err(|e| anyhow!(e.to_string()))?;
+        lua.globals()
+            .set(
+                "STAGING_DIR",
+                staging_dir
+                    .to_str()
+                    .ok_or_else(|| anyhow!("staging_dir path contains invalid UTF-8"))?,
+            )
+            .map_err(|e| anyhow!(e.to_string()))?;
+        lua.globals()
+            .set("BUILD_TYPE", resolved_build_type.as_str())
             .map_err(|e| anyhow!(e.to_string()))?;
 
         let lua_code = std::fs::read_to_string(&args.package_file)?;

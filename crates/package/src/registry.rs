@@ -165,7 +165,7 @@ metadata({{
   revision = "1",
   description = "A short description of {name}.",
   website = "https://example.com",
-  license = "Apache-2.0",
+  license = "MIT",
   maintainer = {{ name = "Your Name", email = "you@example.com" }},
   bins = {{ "{name}" }},
   types = {{ "pre-compiled" }}, -- Supports "source", "pre-compiled"

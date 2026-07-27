@@ -1,7 +1,6 @@
 use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
 use colored::*;
-use std::io::Read;
 use zoi_core::utils::is_zoios;
 use zoi_system::config::load_system_lua;
 
@@ -58,17 +57,6 @@ pub enum DistroSubcommands {
         /// Show the build plan without executing destructive commands
         #[arg(long)]
         dry_run: bool,
-    },
-    /// Enter a ZoiOS sysroot (chroot) with automatic device mounting
-    Chroot {
-        /// Path to the ZoiOS root directory
-        target: String,
-        /// Command to run inside the chroot (defaults to /bin/bash)
-        #[arg(short, long)]
-        run: Option<String>,
-        /// Show additional details
-        #[arg(long, short)]
-        verbose: bool,
     },
 }
 
@@ -229,235 +217,6 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
                     target.cyan()
                 );
             }
-            DistroSubcommands::Chroot {
-                target,
-                run,
-                verbose,
-            } => {
-                let target_path = std::path::Path::new(&target);
-                if !target_path.exists() {
-                    return Err(anyhow!("Target path '{}' does not exist.", target));
-                }
-
-                let os_release = target_path.join("etc/os-release");
-                if !os_release.exists() {
-                    return Err(anyhow!(
-                        "Target path '{}' is not a valid ZoiOS root (missing /etc/os-release).",
-                        target
-                    ));
-                }
-
-                // --- BOOTSTRAP AUDIT ---
-
-                // Filesystem check
-                let fs_type = std::process::Command::new("stat")
-                    .arg("-f")
-                    .arg("-c")
-                    .arg("%T")
-                    .arg(&target)
-                    .output();
-                if let Ok(out) = fs_type {
-                    let t = String::from_utf8_lossy(&out.stdout).trim().to_string();
-                    if t == "msdos" || t == "vfat" {
-                        eprintln!(
-                            "\n{} CRITICAL: Target filesystem is '{}'. ZoiOS requires a Linux filesystem (ext4, btrfs, xfs) to support hard links and permissions. Your bootstrap will NOT work on FAT32.",
-                            "Error:".red().bold(),
-                            t.yellow()
-                        );
-                    } else if verbose {
-                        println!("{} Filesystem type: {}", "::".bold().blue(), t.green());
-                    }
-                }
-
-                // Merged-Usr Symlink Audit
-                let mut broken_layout = false;
-                for sym in &["bin", "sbin", "lib", "lib64"] {
-                    let p = target_path.join(sym);
-                    let meta = std::fs::symlink_metadata(&p);
-                    if let Ok(m) = meta {
-                        if !m.file_type().is_symlink() {
-                            eprintln!(
-                                "{} WARNING: '/{}' is a real directory, but ZoiOS expects a merged-usr symlink to 'usr/{}'.",
-                                "::".bold().yellow(),
-                                sym,
-                                sym
-                            );
-                            broken_layout = true;
-                        } else if let Ok(target) = std::fs::read_link(&p) {
-                            if target.is_absolute() {
-                                eprintln!(
-                                    "{} WARNING: '/{}' is an absolute symlink to '{}'. This WILL break inside the chroot. It should be relative (e.g. 'usr/{}').",
-                                    "::".bold().yellow(),
-                                    sym,
-                                    target.display(),
-                                    sym
-                                );
-                                broken_layout = true;
-                            } else {
-                                let abs_target = target_path.join(target);
-                                if !abs_target.exists() {
-                                    eprintln!(
-                                        "{} WARNING: Symlink '/{}' points to non-existent path '{}'.",
-                                        "::".bold().yellow(),
-                                        sym,
-                                        abs_target.display()
-                                    );
-                                    broken_layout = true;
-                                }
-                            }
-                        }
-                    } else if *sym != "sbin" {
-                        eprintln!(
-                            "{} WARNING: '/{}' is missing! Your binaries will likely fail to find their loader or shell.",
-                            "::".bold().yellow(),
-                            sym
-                        );
-                        broken_layout = true;
-                    }
-                }
-
-                // ISA Baseline Check (x86-64-v3 detection)
-                let host_has_avx2 = if let Ok(cpuinfo) = std::fs::read_to_string("/proc/cpuinfo") {
-                    cpuinfo.contains("avx2")
-                } else {
-                    true
-                };
-                if !host_has_avx2 {
-                    println!(
-                        "{} Host CPU lacks AVX2. If guest binaries are built for x86-64-v3, they WILL Segfault (139).",
-                        "::".bold().yellow()
-                    );
-                }
-
-                // Dynamic Loader Validation (The common cause of 139)
-                let mut loader_found = false;
-                let loaders = [
-                    "usr/lib/ld-linux-x86-64.so.2",
-                    "lib64/ld-linux-x86-64.so.2",
-                    "lib/ld-linux-x86-64.so.2",
-                ];
-                for l in &loaders {
-                    let lp = target_path.join(l);
-                    if lp.exists() {
-                        loader_found = true;
-                        if let Ok(mut file) = std::fs::File::open(&lp) {
-                            let mut magic = [0u8; 4];
-                            if file.read_exact(&mut magic).is_ok() {
-                                if magic != [0x7f, b'E', b'L', b'F'] {
-                                    eprintln!(
-                                        "{} CRITICAL: Dynamic loader '{}' is NOT an ELF file! Your glibc installation is corrupted.",
-                                        "Error:".red().bold(),
-                                        l
-                                    );
-                                }
-                            } else {
-                                eprintln!(
-                                    "{} CRITICAL: Dynamic loader '{}' is 0 bytes or unreadable.",
-                                    "Error:".red().bold(),
-                                    l
-                                );
-                            }
-                        }
-                        break;
-                    }
-                }
-                if !loader_found {
-                    eprintln!(
-                        "{} Dynamic loader not found. Binaries WILL Segfault (139).",
-                        "::".bold().yellow()
-                    );
-                }
-
-                if broken_layout || !loader_found {
-                    println!(
-                        "{} Hint: run 'zoi install @parlex/glibc:main --root {} --force --build' to repair the bootstrap.",
-                        "::".bold().blue(),
-                        target
-                    );
-                }
-
-                if verbose {
-                    println!(
-                        "{} Entering sysroot at {}...",
-                        "::".bold().blue(),
-                        target.cyan()
-                    );
-                }
-
-                let mut envs = std::collections::HashMap::new();
-                envs.insert(
-                    "PATH".to_string(),
-                    "/usr/bin:/bin:/usr/sbin:/sbin".to_string(),
-                );
-                envs.insert("SHELL".to_string(), "/usr/bin/bash".to_string());
-                envs.insert(
-                    "TERM".to_string(),
-                    std::env::var("TERM").unwrap_or_else(|_| "xterm-256color".to_string()),
-                );
-
-                // Resolve shell path in guest (Prefer /usr/bin/bash)
-                let mut shell_bin = std::path::PathBuf::from("/usr/bin/bash");
-                if !target_path.join("usr/bin/bash").exists()
-                    && target_path.join("bin/bash").exists()
-                {
-                    shell_bin = std::path::PathBuf::from("/bin/bash");
-                }
-
-                if verbose {
-                    let cmd_display = if let Some(r) = &run {
-                        format!("{} -c '{}'", shell_bin.display(), r)
-                    } else {
-                        shell_bin.display().to_string()
-                    };
-                    println!(
-                        "{} Running inside chroot: {}",
-                        "::".bold().blue(),
-                        cmd_display.green()
-                    );
-                }
-
-                #[cfg(target_os = "linux")]
-                let mut cmd = if let Some(run_cmd) = run {
-                    let args = vec!["-c".to_string(), run_cmd];
-                    crate::sandbox::wrap_command_in_root(
-                        target_path,
-                        &shell_bin,
-                        &args,
-                        &envs,
-                        &[],
-                        false,
-                    )?
-                } else {
-                    crate::sandbox::wrap_command_in_root(
-                        target_path,
-                        &shell_bin,
-                        &[],
-                        &envs,
-                        &[],
-                        false,
-                    )?
-                };
-
-                if verbose {
-                    println!("{} Full command: {:?}", "::".bold().blue(), cmd);
-                }
-
-                #[cfg(not(target_os = "linux"))]
-                return Err(anyhow!(
-                    "Distro chroot is only supported on Linux via Bubblewrap."
-                ));
-
-                let status = cmd.status()?;
-                if !status.success() {
-                    let code = status.code().unwrap_or(1);
-                    eprintln!(
-                        "\n{} Chroot execution failed with exit code: {}",
-                        "Error:".red().bold(),
-                        code.to_string().yellow()
-                    );
-                    std::process::exit(code);
-                }
-            }
         },
         SystemSubcommands::Apply { file } => {
             #[cfg(unix)]
@@ -528,91 +287,66 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
 }
 
 fn print_build_summary(target: &str, config: &zoi_system::config::SystemConfig, dry_run: bool) {
-    use comfy_table::modifiers::UTF8_ROUND_CORNERS;
-    use comfy_table::presets::UTF8_FULL_CONDENSED;
-    use comfy_table::{Cell, Color, Table};
+    use comfy_table::Table;
+    use comfy_table::presets::UTF8_FULL;
 
-    println!("\n{}", " ZoiOS Build Plan ".bold().on_blue().white());
+    println!("\n{}", "ZoiOS Build Plan Summary".bold().underline());
     if dry_run {
         println!(
             "{}",
-            " [DRY-RUN MODE - NO CHANGES WILL BE MADE] "
-                .on_yellow()
-                .black()
-                .bold()
+            "[DRY-RUN MODE - NO CHANGES WILL BE MADE]".yellow().bold()
         );
     }
-    println!("{} {}\n", "Target Root:".bold(), target.cyan());
+    println!("Target Device/Root: {}\n", target.cyan());
 
     // Filesystems
     let mut fs_table = Table::new();
-    fs_table
-        .load_preset(UTF8_FULL_CONDENSED)
-        .apply_modifier(UTF8_ROUND_CORNERS)
-        .set_header(vec![
-            Cell::new("Action").fg(Color::Yellow),
-            Cell::new("Device").fg(Color::Yellow),
-            Cell::new("FS Type").fg(Color::Yellow),
-            Cell::new("Mount Point").fg(Color::Yellow),
-            Cell::new("Options").fg(Color::Yellow),
-        ]);
-
+    fs_table.load_preset(UTF8_FULL);
+    fs_table.set_header(vec![
+        "Action",
+        "Device",
+        "FS Type",
+        "Mount Point",
+        "Options",
+    ]);
     for fs in &config.filesystems {
         fs_table.add_row(vec![
-            Cell::new("Configure (fstab)").fg(Color::Blue),
-            Cell::new(&fs.device),
-            Cell::new(&fs.fs_type),
-            Cell::new(&fs.mount).fg(Color::Cyan),
-            Cell::new(fs.options.as_deref().unwrap_or("defaults")),
+            "Configure (fstab)".blue().to_string(),
+            fs.device.clone(),
+            fs.fs_type.clone(),
+            fs.mount.clone(),
+            fs.options.as_deref().unwrap_or("defaults").to_string(),
         ]);
     }
-    println!("{}", " 1. Filesystem & Partitioning ".bold().underline());
+    println!("{}", "Filesystem & Partitioning:".bold());
     println!("{}\n", fs_table);
 
     // System Info
     let mut sys_table = Table::new();
-    sys_table
-        .load_preset(UTF8_FULL_CONDENSED)
-        .apply_modifier(UTF8_ROUND_CORNERS)
-        .set_header(vec![
-            Cell::new("Property").fg(Color::Yellow),
-            Cell::new("Value").fg(Color::Yellow),
-        ]);
-
+    sys_table.load_preset(UTF8_FULL);
+    sys_table.set_header(vec!["Property", "Value"]);
     sys_table.add_row(vec![
-        Cell::new("Hostname"),
-        Cell::new(config.system.hostname.as_deref().unwrap_or("zoios")).fg(Color::Cyan),
+        "Hostname",
+        config.system.hostname.as_deref().unwrap_or("zoios"),
     ]);
     sys_table.add_row(vec![
-        Cell::new("Timezone"),
-        Cell::new(config.system.timezone.as_deref().unwrap_or("UTC")),
+        "Timezone",
+        config.system.timezone.as_deref().unwrap_or("UTC"),
     ]);
     sys_table.add_row(vec![
-        Cell::new("Locale"),
-        Cell::new(config.system.locale.as_deref().unwrap_or("en_US.UTF-8")),
+        "Locale",
+        config.system.locale.as_deref().unwrap_or("en_US.UTF-8"),
     ]);
-
-    println!("{}", " 2. System Configuration ".bold().underline());
+    println!("{}", "System Configuration:".bold());
     println!("{}\n", sys_table);
 
     // Packages
-    println!("{}", " 3. Packages ".bold().underline());
     println!(
-        "{} base packages will be installed from the registry.\n",
-        config.packages.len().to_string().green().bold()
+        "{} {} base packages will be installed.",
+        "Packages:".bold(),
+        config.packages.len().to_string().cyan()
     );
-
-    let mut pkg_list = String::new();
-    for (i, pkg) in config.packages.iter().enumerate() {
-        pkg_list.push_str(&format!("{}", pkg.cyan()));
-        if i < config.packages.len() - 1 {
-            pkg_list.push_str(", ");
-        }
-        if (i + 1) % 5 == 0 {
-            pkg_list.push('\n');
-        }
-    }
-    println!("{}\n", pkg_list);
+    println!("  {}\n", config.packages.join(", "));
 }
 
 #[cfg(unix)]

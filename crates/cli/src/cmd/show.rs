@@ -41,16 +41,6 @@ fn print_dependency_group(group: &types::DependencyGroup, indent: usize) {
         }
     }
 
-    if let types::DependencyGroup::Complex(complex) = group
-        && let Some(subs) = &complex.sub_packages
-    {
-        for (sub_name, sub_group) in subs {
-            println!("{}{}:", prefix, sub_name.bold().cyan());
-            print_dependency_group(sub_group, indent + 1);
-            count += 1;
-        }
-    }
-
     if count == 0 {
         println!("{}- {}", prefix, "None".italic());
     }

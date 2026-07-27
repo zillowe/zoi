@@ -27,10 +27,7 @@ static DEP_RE: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 static VER_RE: LazyLock<Regex> = LazyLock::new(|| {
-    // Matches package name and optional version.
-    // Supports scoped packages (@repo/name) and versions (@ver, =ver, etc.)
-    Regex::new(r"^(?P<pkg>@[^@/]+/[^@]+|[^@=><~^]+)(?P<ver>@.+|[=><~^].+)?$")
-        .expect("Static VER_RE regex is valid")
+    Regex::new(r"^(?P<pkg>.*?)(?P<ver>@.+|[=><~^].+)?$").expect("Static VER_RE regex is valid")
 });
 
 /// Parses a dependency string into its constituent parts.
@@ -50,7 +47,6 @@ pub fn parse_dependency_string<'a>(
         _ => ("zoi", dep_str),
     };
 
-    let rest = rest.trim();
     if rest.is_empty() {
         return Err(anyhow!("Invalid dependency string: {}", dep_str));
     }
@@ -67,9 +63,8 @@ pub fn parse_dependency_string<'a>(
                 rest
             )
         })?
-        .as_str()
-        .trim();
-    let description = caps.name("desc").map(|m| m.as_str().trim());
+        .as_str();
+    let description = caps.name("desc").map(|m| m.as_str());
 
     let ver_caps = VER_RE.captures(package_and_version).ok_or_else(|| {
         anyhow!(
@@ -86,8 +81,7 @@ pub fn parse_dependency_string<'a>(
                 package_and_version
             )
         })?
-        .as_str()
-        .trim();
+        .as_str();
     let mut version_str = ver_caps.name("ver").map(|m| m.as_str().to_string());
 
     if let Some(v) = &version_str

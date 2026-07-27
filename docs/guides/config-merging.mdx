@@ -5,13 +5,6 @@ description: How Zoi handles configuration file updates and user modifications u
 
 When you upgrade a package, Zoi needs to handle files in the `backup` field of the package manifest. These are typically configuration files (like those in `/etc/` or `~/.config/`) that users might have modified.
 
-The `backup` field supports placeholders to reference absolute system paths or user-specific locations:
-
-- `${usrroot}`: The system's root directory (e.g. `/etc/my-app.conf`).
-- `${usrhome}`: The user's home directory (e.g. `~/.config/my-app.conf`).
-- `${pkgstore}`: The package's own version directory.
-- `${applications}`: The system or user applications directory.
-
 Zoi uses an advanced **3-Way Merge** strategy to ensure that security updates and new upstream defaults are applied automatically without losing your custom tweaks.
 
 ## The 3-Way Merge Strategy

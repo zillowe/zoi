@@ -39,12 +39,9 @@ cargo build --bin zoi --release
 
 # Build zoi-mini in release mode
 cargo build --bin zoi-mini --release
-
-# Build zoid (ZoiOS daemon) in release mode
-cargo build --bin zoid --release
 ```
 
-This will produce the `zoi`, `zoi-mini`, and `zoid` binaries in `target/release/`.
+This will produce the `zoi` and `zoi-mini` binaries in `target/release/`.
 
 ### Using the Justfile
 
@@ -52,10 +49,10 @@ The project provides a `Justfile` for convenience, which simplifies building and
 
 ```sh
 # Configure build paths (creates config.just)
-# You can also specify which binaries to build: --with-bin=zoi|zoi-mini|zoid|all (default: zoi)
-./configure --prefix=/usr/local --with-bin=all
+# You can also specify which binaries to build: --with-bin=zoi|zoi-mini|both (default: both)
+./configure --prefix=/usr/local --with-bin=both
 
-# Build release binaries
+# Build zoi and zoi-mini in release mode
 just build
 
 # Install the binaries to the configured location

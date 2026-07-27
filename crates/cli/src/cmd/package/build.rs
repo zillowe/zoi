@@ -53,58 +53,9 @@ pub struct BuildCommand {
     /// Force root ownership (UID/GID 0) in the built archive
     #[arg(long)]
     pub fakeroot: bool,
-
-    /// Build in a clean, isolated sysroot.
-    /// Requires a base package (specified by --root-package) to be installed into the sysroot.
-    #[arg(long)]
-    pub pure: bool,
-
-    /// The base package to install when using --pure (default: @core/base:dev).
-    #[arg(long, default_value = "@core/base:dev")]
-    pub root_package: String,
 }
 
-pub fn run(mut args: BuildCommand) -> Result<()> {
-    let mut _temp_root = None;
-
-    if args.pure {
-        if args.method == "docker" {
-            return Err(anyhow::anyhow!(
-                "--pure is not compatible with --method docker"
-            ));
-        }
-        args.method = "bwrap".to_string();
-
-        let temp = tempfile::Builder::new().prefix("zoi-pure-").tempdir()?;
-        println!(
-            "{} Initializing pure build environment in {}...",
-            "::".bold().blue(),
-            temp.path().display()
-        );
-
-        // Create ZoiOS marker so Zoi uses /usr/bin instead of /usr/local/bin
-        // This ensures the root package and build deps land where bwrap expects them.
-        let etc_dir = temp.path().join("etc");
-        std::fs::create_dir_all(&etc_dir)?;
-        std::fs::write(etc_dir.join("os-release"), "ID=zoios\nID_LIKE=zoios\n")?;
-
-        crate::pkg::sysroot::set_sysroot(temp.path().to_path_buf());
-        _temp_root = Some(temp);
-
-        // Install the root base environment package
-        let root_dep = crate::pkg::dependencies::parse_dependency_string(&args.root_package)?;
-        crate::pkg::install::dep_install::install_dependency(
-            &root_dep,
-            "pure-root",
-            crate::pkg::types::Scope::System,
-            true,
-            true,
-            &std::sync::Mutex::new(std::collections::HashSet::new()),
-            &mut Vec::new(),
-            None,
-        )?;
-    }
-
+pub fn run(args: BuildCommand) -> Result<()> {
     if args.test {
         println!("Running tests before building...");
         crate::pkg::package::test::run(&args)?;
@@ -135,11 +86,7 @@ pub fn run(mut args: BuildCommand) -> Result<()> {
                     crate::pkg::install::dep_install::install_dependency(
                         &dep,
                         "build",
-                        if args.pure {
-                            crate::pkg::types::Scope::System
-                        } else {
-                            crate::pkg::types::Scope::User
-                        },
+                        crate::pkg::types::Scope::User,
                         true,
                         true,
                         &processed,

@@ -9,4 +9,5 @@ pub mod home;
 pub mod mount;
 pub mod protocol;
 pub mod secret;
+pub mod selinux;
 pub mod service;

@@ -62,7 +62,7 @@ This table lists all the available fields you can use inside the `metadata` bloc
 | `conflicts`      | `list`    | A list of other package names that this package conflicts with.                                                                                                                                                                             |
 | `provides`       | `list`    | A list of virtual package names this package provides. Other packages can depend on these.                                                                                                                                                  |
 | `replaces`       | `list`    | A list of packages that this package replaces. Zoi will offer to remove them upon installation.                                                                                                                                             |
-| `backup`         | `list`    | A list of configuration files to preserve during upgrades. Zoi will create `.zoinew` and `.zoisave` files for these. Supports placeholders like `${pkgstore}`, `${usrroot}`, `${usrhome}`, and `${applications}`. |
+| `backup`         | `list`    | A list of configuration files to preserve during upgrades. Zoi will create `.zoinew` and `.zoisave` files for these.                                                                                                                        |
 | `types`          | `list`    | **Required for buildable packages.** A list of supported build methods (e.g. `source`, `pre-compiled`).                                                                                                                                     |
 | `platforms`      | `list`    | A list of supported platforms (e.g. `linux`, `macos`, `windows`, `linux-amd64`). If specified, builds for other platforms will be skipped. Use `ci:<target>:<build>` (e.g. `ci:windows-amd64:linux`) for cross-compilation in CI pipelines. |
 | `ci`             | `table`   | CI runner configuration for build pipelines. See [CI Runner Support](#ci-runner-support) below.                                                                                                                                             |
@@ -187,8 +187,8 @@ When Zoi executes your script, it provides a rich environment of global variable
 | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `cmd(command)`                            | Executes a shell command within the `BUILD_DIR` and returns `stdout`, `stderr`, and `exit_code`.                                                                                                                                         |
 | `zcp(source, dest)`                       | Copies files/directories to the `STAGING_DIR`. The `source` can be a path inside `BUILD_DIR`, an absolute path, or a path relative to the `.pkg.lua` file using `${pkgluadir}`. See [Staging Files with `zcp`](#staging-files-with-zcp). |
-| `zlicense(source)`                        | Stages a license file. Uses standard FHS paths (`/usr/share/licenses/...`) in system scope, or `${pkgstore}` otherwise.                                                                                                                  |
-| `zdoc(source)`                            | Stages a documentation file. Uses standard FHS paths (`/usr/share/doc/...`) in system scope, or `${pkgstore}/doc` otherwise.                                                                                                              |
+| `zlicense(source)`                        | Convenience function to copy a license file to `${pkgstore}/LICENSE`.                                                                                                                                                                    |
+| `zdoc(source)`                            | Convenience function to copy a documentation file to `${pkgstore}/doc/{filename}`.                                                                                                                                                       |
 | `zsed(pattern, replacement, file)`        | Performs an in-place regex replacement on a file in `BUILD_DIR`.                                                                                                                                                                         |
 | `zpatch(patch_file, strip)`               | Applies a patch file to the `BUILD_DIR`.                                                                                                                                                                                                 |
 | `zln(target, link)`                       | Creates a symbolic link in the package.                                                                                                                                                                                                  |
@@ -269,16 +269,6 @@ function package()
     end
 end
 ```
-
-### Target Paths for `zrm`
-
-The `zrm(path)` function, typically used in `uninstall()`, supports placeholders to safely reference paths outside the package store.
-
-| Variable      | Description                                                                                                     |
-| ------------- | --------------------------------------------------------------------------------------------------------------- |
-| `${pkgstore}` | The package's version directory in the Zoi store.                                                               |
-| `${usrroot}`  | The system's root (`/`). Zoi handles `sudo` escalation automatically if needed.                                 |
-| `${usrhome}`  | The user's home directory (`~`).                                                                                |
 
 ---
 
@@ -643,10 +633,8 @@ zoi package build --type <build-type> --test /path/to/your-package.pkg.lua
 - `--install-deps`: Automatically install build-time dependencies from other package managers (e.g. Pacman, APT, Cargo) before building.
 - `--version-override <VERSION>`: Override the package version defined in the `.pkg.lua` file.
 - `--method <native|docker>`: The build method to use. Defaults to `native`. Use `docker` for containerized builds.
-- `--pure`: Build in a clean, isolated sysroot. This ensures the build process only has access to explicitly declared dependencies and a minimal base system.
-- `--root-package <SOURCE>`: The base package to install into the sysroot when using `--pure`. Defaults to `@core/base:dev`.
 - `--image <IMAGE>`: The Docker image to use for the build (required when `--method docker` is used).
-- `--fakeroot`: Force root ownership (UID/GID 0) in the built archive. Useful for official registry packages. Supports both native and `--pure` builds.
+- `--fakeroot`: Force root ownership (UID/GID 0) in the built archive. Useful for official registry packages.
 
 ### Step 7: Verify the Final Archive
 

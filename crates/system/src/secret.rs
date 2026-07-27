@@ -8,10 +8,9 @@ use argon2::{
     password_hash::{PasswordHasher, SaltString},
 };
 use base64::{Engine as _, engine::general_purpose};
-use rand::Rng;
+use rand::Rng; // Former RngCore
 use rand::rng;
-use std::fs;
-use zoi_core::utils::get_user_home;
+use std::fs; // Former thread_rng
 
 const SECRET_PREFIX: &str = "ZOISEC:v1:";
 
@@ -32,7 +31,7 @@ pub fn hash_password(password: &str) -> Result<String> {
 
 /// Retrieves or generates the local master key for two-way encryption.
 fn get_master_key() -> Result<[u8; 32]> {
-    let mut key_path = get_user_home().ok_or_else(|| anyhow!("Could not find home directory"))?;
+    let mut key_path = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory"))?;
     key_path.push(".zoi/master.key");
 
     if !key_path.exists() {

@@ -20,9 +20,8 @@ pub fn setup_lsp_workspace(path: &Path) -> Result<()> {
     Ok(())
 }
 
-pub fn get_lsp_definitions_dir() -> Result<PathBuf> {
-    let home_dir = zoi_core::utils::get_user_home()
-        .ok_or_else(|| anyhow!("Could not find home directory."))?;
+fn get_lsp_definitions_dir() -> Result<PathBuf> {
+    let home_dir = home::home_dir().ok_or_else(|| anyhow!("Could not find home directory."))?;
     Ok(home_dir.join(".zoi").join("lsp"))
 }
 
