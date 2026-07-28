@@ -256,6 +256,7 @@ pub fn setup_lua_environment(
     api::http::add_fetch_util(lua)?;
     api::parse::add_parse_util(lua)?;
     api::http::add_git_fetch_util(lua)?;
+    api::download::add_download_util(lua, quiet)?;
     api::fs::add_file_util(lua, quiet)?;
     api::fs::add_zcp(lua)?;
     api::fs::add_zlicense(lua)?;
