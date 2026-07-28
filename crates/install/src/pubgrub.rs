@@ -46,25 +46,38 @@ impl Display for PkgName {
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct SemVersion {
+    pub epoch: u32,
     pub v: Version,
     pub original: String,
 }
 
 impl SemVersion {
-    pub fn new(v: Version, original: String) -> Self {
-        Self { v, original }
+    pub fn new(epoch: u32, v: Version, original: String) -> Self {
+        Self { epoch, v, original }
     }
 
     pub fn parse(v: &str) -> Result<Self, anyhow::Error> {
-        let clean = sanitize_version_string(v);
+        let (epoch, version_str) = if let Some((e_str, v_str)) = v.split_once(':') {
+            if let Ok(e) = e_str.parse::<u32>() {
+                (e, v_str)
+            } else {
+                (0, v)
+            }
+        } else {
+            (0, v)
+        };
+
+        let clean = sanitize_version_string(version_str);
         match Version::parse(&clean) {
             Ok(parsed) => Ok(SemVersion {
+                epoch,
                 v: parsed,
                 original: v.to_string(),
             }),
             Err(_) => {
                 // Fallback for extremely weird versions: use 0.0.0+original
                 Ok(SemVersion {
+                    epoch,
                     v: Version::new(0, 0, 0),
                     original: v.to_string(),
                 })
@@ -75,7 +88,9 @@ impl SemVersion {
 
 impl Ord for SemVersion {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.v.cmp(&other.v)
+        self.epoch
+            .cmp(&other.epoch)
+            .then_with(|| self.v.cmp(&other.v))
     }
 }
 
@@ -199,6 +214,7 @@ pub fn semver_to_range(req_str: &str) -> Ranges<SemVersion> {
                 comparator.patch.unwrap_or(0)
             );
             let v = SemVersion {
+                epoch: 0,
                 v: Version {
                     major: comparator.major,
                     minor: comparator.minor.unwrap_or(0),
@@ -224,6 +240,7 @@ pub fn semver_to_range(req_str: &str) -> Ranges<SemVersion> {
                         build: semver::BuildMetadata::EMPTY,
                     };
                     let next_minor = SemVersion {
+                        epoch: 0,
                         v: next_minor_v.clone(),
                         original: next_minor_v.to_string(),
                     };
@@ -266,6 +283,7 @@ pub fn semver_to_range(req_str: &str) -> Ranges<SemVersion> {
                         }
                     };
                     let next = SemVersion {
+                        epoch: 0,
                         v: next_v.clone(),
                         original: next_v.to_string(),
                     };
@@ -682,6 +700,7 @@ impl DependencyProvider for ZoiDependencyProvider {
     ) -> Result<Option<Self::V>, Self::Err> {
         if package.name == "$root" {
             return Ok(Some(SemVersion {
+                epoch: 0,
                 v: Version::new(0, 0, 0),
                 original: "0.0.0".to_string(),
             }));

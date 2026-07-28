@@ -83,9 +83,13 @@ Every submission MUST include:
 
 ### 4.2. Recommended Testing
 
-Implementing a `test()` lifecycle function is **highly recommended** for the `core` and `main` tiers, and strongly encouraged for all others. The test should verify that the binary executes correctly (e.g. running `myapp --version`).
+Implementing a `test()` lifecycle function is **highly recommended** for the `core` and `main` tiers, and strongly encouraged for all others. The test should verify that the binary executes correctly (e.g. running `myapp --version`). Zoi supports installing `test` dependencies defined in the `dependencies()` block when the user or CI runner specifies `--install-deps` with `zoi package test` or `zoi package build --test`.
 
 ```lua
+dependencies({
+  test = { required = { "native:shellcheck" } }
+})
+
 function test()
   local _, _, code = cmd("${pkgstore}/bin/myapp --version")
   return code == 0

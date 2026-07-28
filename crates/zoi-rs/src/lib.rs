@@ -79,6 +79,8 @@ pub struct BuildOptions<'a> {
     pub sub_packages: Option<Vec<String>>,
     /// Whether to install build-time dependencies before building.
     pub install_deps: bool,
+    /// Whether to run tests before building.
+    pub test: bool,
     /// Build backend to use. Supported values are `native` and `docker`.
     pub method: &'a str,
     /// Docker image to use when `method` is `docker`.
@@ -100,6 +102,7 @@ impl<'a> Default for BuildOptions<'a> {
             output_dir: None,
             sub_packages: None,
             install_deps: true,
+            test: false,
             method: "native",
             image: None,
             version_override: None,
@@ -263,6 +266,7 @@ pub fn build_with_options(package_file: &Path, options: &BuildOptions<'_>) -> Re
         options.image,
         options.fakeroot,
         options.install_deps,
+        options.test,
     )
 }
 
@@ -420,6 +424,7 @@ pub fn build(
         output_dir: None,
         sub_packages: None,
         install_deps,
+        test: false,
         method,
         image,
         version_override,

@@ -136,15 +136,17 @@ fn print_beautiful(
     pkg: &crate::pkg::types::Package,
     installed_manifest: Option<&types::InstallManifest>,
 ) {
-    let version_display = if pkg.revision != "1" {
-        format!(
-            "{}-{}",
-            pkg.version.as_deref().unwrap_or("N/A"),
-            pkg.revision
-        )
+    let mut version_display = if pkg.epoch > 0 {
+        format!("{}:", pkg.epoch)
     } else {
-        pkg.version.clone().unwrap_or_else(|| "N/A".to_string())
+        String::new()
     };
+
+    version_display.push_str(pkg.version.as_deref().unwrap_or("N/A"));
+
+    if pkg.revision != "1" {
+        version_display = format!("{}-{}", version_display, pkg.revision);
+    }
 
     println!(
         "{} {} - {}",
@@ -286,6 +288,11 @@ fn print_beautiful(
                     }
                 }
             }
+        }
+
+        if let Some(test_deps) = &deps.test {
+            println!("  Test Dependencies:");
+            print_dependency_group(test_deps, 2);
         }
     }
 }

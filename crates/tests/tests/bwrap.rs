@@ -26,6 +26,7 @@ fn test_bwrap_build_checks_command_existence() {
             None,
             false,
             false,
+            false,
         );
         assert!(result.is_err());
         assert!(

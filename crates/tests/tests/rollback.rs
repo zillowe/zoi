@@ -24,8 +24,9 @@ fn test_transaction_rollback_uninstall() {
     fs::create_dir_all(&version_dir).unwrap();
 
     let manifest = types::InstallManifest {
-        name: pkg_name.to_string(),
+        name: "test-pkg".to_string(),
         version: version.to_string(),
+        epoch: 0,
         revision: "1".to_string(),
         sub_package: None,
         repo: repo.to_string(),
@@ -85,6 +86,7 @@ fn test_package_rollback_requires_explicit_source_for_ambiguous_name_matches() {
     let base_manifest = types::InstallManifest {
         name: "shared".to_string(),
         version: "1.0.0".to_string(),
+        epoch: 0,
         revision: "1".to_string(),
         sub_package: None,
         repo: "core".to_string(),

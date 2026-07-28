@@ -115,6 +115,7 @@ pub fn record_package(
         repo: pkg.repo.clone(),
         repo_type: repo_type.to_string(),
         version: pkg.version.clone().unwrap_or_default(),
+        epoch: pkg.epoch,
         revision: pkg.revision.clone(),
         registry: registry_handle.to_string(),
         why: match reason {

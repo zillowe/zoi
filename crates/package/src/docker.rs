@@ -15,6 +15,7 @@ pub fn run(
     image: &str,
     fakeroot: bool,
     install_deps: bool,
+    test: bool,
 ) -> Result<()> {
     println!("{} Building package using Docker...", "::".bold().blue());
     println!("Image: {}", image.cyan());
@@ -142,6 +143,10 @@ pub fn run(
 
     if install_deps {
         inner_cmd.push_str(" --install-deps");
+    }
+
+    if test {
+        inner_cmd.push_str(" --test");
     }
 
     docker_args.push("bash".to_string());

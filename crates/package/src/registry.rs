@@ -594,7 +594,26 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
                         }
                     }
 
-                    types::DependenciesV2 { runtime, build }
+                    let mut test = Vec::new();
+                    if let Some(t) = deps.test {
+                        test = match t {
+                            types::DependencyGroup::Simple(d) => d,
+                            types::DependencyGroup::Complex(c) => {
+                                let mut all = c.required;
+                                all.extend(c.optional);
+                                for opt in c.options {
+                                    all.extend(opt.depends);
+                                }
+                                all
+                            }
+                        };
+                    }
+
+                    types::DependenciesV2 {
+                        runtime,
+                        build,
+                        test,
+                    }
                 });
 
                 packages_map.insert(
@@ -603,6 +622,7 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
                         repo: repo_path,
                         repo_type,
                         version,
+                        epoch: pkg.epoch,
                         revision: pkg.revision.clone(),
                         description: pkg.description,
                         scope: Some(pkg.scope),

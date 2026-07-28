@@ -46,8 +46,9 @@ fn test_linux_service_lifecycle() {
     };
 
     let manifest = types::InstallManifest {
-        name: pkg_name.to_string(),
-        version: version.to_string(),
+        name: "test-svc".to_string(),
+        version: "1.0.0".to_string(),
+        epoch: 0,
         revision: "1".to_string(),
         sub_package: None,
         repo: repo.to_string(),
