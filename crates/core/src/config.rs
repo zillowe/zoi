@@ -568,7 +568,7 @@ pub fn clone_git_repo(url: &str) -> Result<()> {
     }
 
     println!(
-        "Cloned git repo as '{}' (use with '@git/{}/<pkg>')",
+        "Cloned git repo as '{}' (use with '#git@{}/<pkg>')",
         repo_name.green(),
         repo_name
     );
