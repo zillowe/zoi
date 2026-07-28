@@ -11,7 +11,7 @@ Zoi can install dependencies via many ecosystem and OS package managers. This pa
 
 ## Declaring dependencies in `.pkg.lua`
 
-Dependencies are specified in the `dependencies` section. Both `runtime` and `build` dependency groups can be defined as a simple list of required dependencies, or as a more advanced object with `required`, `optional`, and selectable `options`.
+Dependencies are specified in the `dependencies` section. Both `runtime`, `build`, and `test` dependency groups can be defined as a simple list of required dependencies, or as a more advanced object with `required`, `optional`, and selectable `options`.
 
 ### Dependency String Format
 
@@ -72,6 +72,10 @@ dependencies({
   build = {
     -- Build dependencies can be general (for all build types)
     -- or specific to a build type using the 'types' table.
+  },
+  test = {
+    -- Test dependencies installed only when running `zoi package test` or `zoi package build --test`
+    required = { "npm:jest", "cargo:cargo-nextest" }
   }
 })
 

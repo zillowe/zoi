@@ -1104,6 +1104,7 @@ pub fn run(
                 repo: manifest.repo.clone(),
                 repo_type: manifest.repo_type.clone(),
                 version: manifest.version.clone(),
+                epoch: manifest.epoch,
                 revision: manifest.revision.clone(),
                 registry: manifest.registry_handle.clone(),
                 why,

@@ -197,6 +197,7 @@ pub fn add(ext_name: &str, yes: bool, plugin_manager: Option<&PluginManager>) ->
     let manifest = types::InstallManifest {
         name: pkg.name.clone(),
         version: pkg.version.clone().unwrap_or_default(),
+        epoch: pkg.epoch,
         revision: pkg.revision.clone(),
         sub_package: None,
         repo: pkg.repo.clone(),

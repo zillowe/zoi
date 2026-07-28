@@ -49,6 +49,7 @@ This table lists all the available fields you can use inside the `metadata` bloc
 | `name`           | `string`  | **Required.** The name of the package.                                                                                                                                                                                                      |
 | `repo`           | `string`  | **Required.** The repository tier where the package belongs (e.g. `core`, `community`).                                                                                                                                                     |
 | `version`        | `string`  | The package version. Set either `version` or `versions`. Can be hardcoded or determined dynamically.                                                                                                                                        |
+| `epoch`          | `integer` | Forced version precedence (defaults to `0`). Useful when switching versioning schemes to ensure newer packages are always seen as upgrades.                                                                                                   |
 | `revision`       | `string`  | The package revision (defaults to `"1"`). Increment this to trigger an update when the package definition changes but the upstream version remains the same.                                                                                |
 | `versions`       | `table`   | A map of channels to versions (e.g. `{ stable = "1.2.3", beta = "1.4.0" }`). Required if `version` is not set.                                                                                                                              |
 | `description`    | `string`  | **Required.** A short, one-line description of the package.                                                                                                                                                                                 |
@@ -84,7 +85,7 @@ This table lists all the available fields you can use inside the `metadata` bloc
 
 ## 2. Dependencies
 
-The `dependencies{...}` block declares build-time and runtime dependencies. Zoi can pull these from over 40 different package managers.
+The `dependencies{...}` block declares build-time, runtime, and test-time dependencies. Zoi can pull these from over 40 different package managers.
 
 <Callout title="Learn More">
   For a complete guide on the dependency format, version pinning, and all
@@ -200,6 +201,7 @@ When Zoi executes your script, it provides a rich environment of global variable
 | `verifySignature(file, sig, key)`         | Verifies a PGP signature.                                                                                                                                                                                                                |
 | `addPgpKey(url_or_path, name)`            | Adds a PGP key to Zoi's keyring for verification.                                                                                                                                                                                        |
 | `UTILS.EXTRACT(url_or_path, out_dir)`     | Downloads and extracts a `.zip`, `.tar.*`, `.7z`, `.rar`, `.deb`, `.dmg`, or `.pkg` archive.                                                                                                                                             |
+| `UTILS.MAKE_ARCHIVE(src, out, algo)`      | Creates an archive from a source file, directory, or a list of paths.                                                                                                                                                                     |
 | `UTILS.FETCH.url(url)`                    | Fetches a URL's content as a string.                                                                                                                                                                                                     |
 | `UTILS.FETCH.GITHUB.LATEST.release{...}`  | Fetches the latest release tag from a GitHub repository.                                                                                                                                                                                 |
 | `UTILS.FIND.file(dir, name)`              | Finds a file within the `BUILD_DIR`.                                                                                                                                                                                                     |

@@ -325,6 +325,22 @@ Downloads (if URL) and extracts an archive (`.zip`, `.tar.gz`, `.tar.xz`, `.tar.
   host system
 </Callout>
 
+### `UTILS.MAKE_ARCHIVE(source, output, algorithm)`
+
+Creates an archive from local source(s) and places it in the `BUILD_DIR`.
+
+- **source**: (string or table) A single file/directory path or a list of paths relative to `BUILD_DIR` (or absolute).
+- **output**: (string) The destination path for the created archive. If relative, it is placed in `BUILD_DIR`.
+- **algorithm**: (string, optional) The compression algorithm. Supported values: `"tar"`, `"zip"`, `"gz"`, `"tar.gz"`, `"tar.xz"`, `"tar.zst"`, `"zst"`. Defaults to `"zst"` (`tar.zst`).
+
+```lua
+function package()
+    -- Create a zip archive of multiple directories
+    UTILS.MAKE_ARCHIVE({ "bin", "share" }, "release.zip", "zip")
+    zcp("release.zip", "${pkgstore}/release.zip")
+end
+```
+
 ---
 
 ## Security Functions

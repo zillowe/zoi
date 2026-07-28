@@ -11,6 +11,7 @@ pub fn run(
     sub_packages: Option<Vec<String>>,
     fakeroot: bool,
     install_deps: bool,
+    test: bool,
 ) -> Result<()> {
     #[cfg(not(target_os = "linux"))]
     {
@@ -24,6 +25,7 @@ pub fn run(
             sub_packages,
             fakeroot,
             install_deps,
+            test,
         );
         return Err(anyhow!("Bubblewrap ('bwrap') is only supported on Linux."));
     }
@@ -112,6 +114,10 @@ pub fn run(
 
         if install_deps {
             inner_cmd.push_str(" --install-deps");
+        }
+
+        if test {
+            inner_cmd.push_str(" --test");
         }
 
         // Base bwrap arguments

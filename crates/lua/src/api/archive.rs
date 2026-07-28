@@ -346,8 +346,161 @@ pub fn add_archive_util(lua: &Lua) -> Result<(), mlua::Error> {
     })?;
     archive_table.set("list", list_fn)?;
 
+    let make_archive_fn = lua.create_function(
+        move |lua, (source, output, algorithm): (mlua::Value, String, Option<String>)| {
+            let algo = algorithm
+                .unwrap_or_else(|| "zst".to_string())
+                .to_lowercase();
+            let build_dir_str: String = lua.globals().get("BUILD_DIR")?;
+            let build_dir = Path::new(&build_dir_str);
+
+            let output_path = if Path::new(&output).is_absolute() {
+                PathBuf::from(&output)
+            } else {
+                build_dir.join(&output)
+            };
+
+            if let Some(parent) = output_path.parent() {
+                fs::create_dir_all(parent).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+            }
+
+            let mut source_paths = Vec::new();
+            match source {
+                mlua::Value::String(s) => {
+                    let s_str = s.to_str()?;
+                    let p = build_dir.join(&*s_str);
+                    if p.exists() {
+                        source_paths.push((p, s_str.to_string()));
+                    } else if Path::new(&*s_str).exists() {
+                        source_paths.push((PathBuf::from(s_str.to_string()), s_str.to_string()));
+                    } else {
+                        return Err(mlua::Error::RuntimeError(format!(
+                            "MAKE_ARCHIVE: source path does not exist: {}",
+                            &*s_str
+                        )));
+                    }
+                }
+                mlua::Value::Table(t) => {
+                    for val in t.sequence_values::<String>() {
+                        let s_str = val?;
+                        let p = build_dir.join(&s_str);
+                        if p.exists() {
+                            source_paths.push((p, s_str.to_string()));
+                        } else if Path::new(&s_str).exists() {
+                            source_paths.push((PathBuf::from(&s_str), s_str.to_string()));
+                        } else {
+                            return Err(mlua::Error::RuntimeError(format!(
+                                "MAKE_ARCHIVE: source path does not exist: {}",
+                                s_str
+                            )));
+                        }
+                    }
+                }
+                _ => {
+                    return Err(mlua::Error::RuntimeError(
+                        "MAKE_ARCHIVE: source must be string or table".to_string(),
+                    ));
+                }
+            }
+
+            let file = fs::File::create(&output_path)
+                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+
+            match algo.as_str() {
+                "gz" => {
+                    let mut encoder =
+                        flate2::write::GzEncoder::new(file, flate2::Compression::default());
+                    for (path, _) in source_paths {
+                        let mut f = fs::File::open(path)
+                            .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                        std::io::copy(&mut f, &mut encoder)
+                            .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                    }
+                    encoder
+                        .finish()
+                        .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                }
+                "zip" => {
+                    let mut zip = zip::ZipWriter::new(file);
+                    let options = zip::write::SimpleFileOptions::default()
+                        .compression_method(zip::CompressionMethod::Deflated);
+
+                    for (path, rel_name) in source_paths {
+                        if path.is_dir() {
+                            for entry in walkdir::WalkDir::new(&path)
+                                .into_iter()
+                                .filter_map(|e| e.ok())
+                            {
+                                let rel =
+                                    entry.path().strip_prefix(path.parent().unwrap()).unwrap();
+                                if entry.file_type().is_dir() {
+                                    zip.add_directory(rel.to_string_lossy(), options)
+                                        .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                                } else {
+                                    zip.start_file(rel.to_string_lossy(), options)
+                                        .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                                    let mut f = fs::File::open(entry.path())
+                                        .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                                    std::io::copy(&mut f, &mut zip)
+                                        .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                                }
+                            }
+                        } else {
+                            zip.start_file(rel_name, options)
+                                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                            let mut f = fs::File::open(path)
+                                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                            std::io::copy(&mut f, &mut zip)
+                                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                        }
+                    }
+                    zip.finish()
+                        .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                }
+                "tar" | "tar.gz" | "tar.xz" | "tar.zst" | "zst" => {
+                    let writer: Box<dyn std::io::Write> = match algo.as_str() {
+                        "tar" => Box::new(file),
+                        "tar.gz" => Box::new(flate2::write::GzEncoder::new(
+                            file,
+                            flate2::Compression::default(),
+                        )),
+                        "tar.xz" => Box::new(xz2::write::XzEncoder::new(file, 6)),
+                        "tar.zst" | "zst" => Box::new(
+                            zstd::stream::write::Encoder::new(file, 0)
+                                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?
+                                .auto_finish(),
+                        ),
+                        _ => unreachable!(),
+                    };
+
+                    let mut tar = tar::Builder::new(writer);
+                    for (path, rel_name) in source_paths {
+                        if path.is_dir() {
+                            tar.append_dir_all(rel_name, path)
+                                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                        } else {
+                            tar.append_path_with_name(path, rel_name)
+                                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                        }
+                    }
+                    tar.finish()
+                        .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                }
+                _ => {
+                    return Err(mlua::Error::RuntimeError(format!(
+                        "MAKE_ARCHIVE: unsupported algorithm: {}",
+                        algo
+                    )));
+                }
+            }
+
+            Ok(())
+        },
+    )?;
+
     let utils_table: Table = lua.globals().get("UTILS")?;
     utils_table.set("ARCHIVE", archive_table)?;
+    utils_table.set("MAKE_ARCHIVE", make_archive_fn)?;
 
     Ok(())
 }

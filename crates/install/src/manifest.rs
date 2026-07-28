@@ -77,6 +77,7 @@ pub fn create_manifest(
                 pkg.name
             )
         })?,
+        epoch: pkg.epoch,
         revision: pkg.revision.clone(),
         sub_package,
         repo: pkg.repo.clone(),

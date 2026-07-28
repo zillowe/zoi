@@ -38,6 +38,7 @@ ZOI = {}
 ---@field name string Required. The name of the package.
 ---@field repo string Required. The repository tier (e.g., "core", "community").
 ---@field version string? The package version.
+---@field epoch integer? Forced version precedence (defaults to 0).
 ---@field revision string? The package revision (defaults to "1").
 ---@field versions table<string, string>? A map of channels to versions (e.g., { stable = "1.2.3" }).
 ---@field description string Required. A short description of the package.
@@ -97,6 +98,7 @@ SUBPKG = nil
 ---@class Dependencies
 ---@field runtime DependencyGroup? Runtime dependencies.
 ---@field build (DependencyGroup|TypedBuildDependencies)? Build-time dependencies.
+---@field test DependencyGroup? Test-time dependencies.
 
 ---@class Service
 ---@field run string The command to run the service.
@@ -265,6 +267,12 @@ UTILS.FETCH = {}
 ---@param url string
 ---@return string
 function UTILS.FETCH.url(url) end
+
+--- Creates an archive from source(s).
+---@param source string|string[] Single file, directory, or list of paths.
+---@param output string Destination path.
+---@param algorithm "tar"|"zip"|"gz"|"tar.gz"|"tar.xz"|"tar.zst"? Algorithm (default "tar.zst").
+function UTILS.MAKE_ARCHIVE(source, output, algorithm) end
 
 ---@class GithubLatestArgs
 ---@field repo string "owner/repo"

@@ -105,50 +105,14 @@ pub fn run(mut args: BuildCommand) -> Result<()> {
         )?;
     }
 
+    if args.install_deps {
+        install_dependencies_for_build(&args, args.test)?;
+    }
+
     if args.test {
         println!("Running tests before building...");
         crate::pkg::package::test::run(&args)?;
         println!("Tests passed, proceeding with build...");
-    }
-
-    if args.install_deps {
-        for platform in &args.platform {
-            let current_platform = if platform == "current" {
-                crate::pkg::utils::get_platform()?
-            } else {
-                platform.clone()
-            };
-
-            if let Some(dep_strings) = crate::pkg::package::build::get_build_dependencies(
-                &args.package_file,
-                args.r#type.as_deref(),
-                &current_platform,
-                args.version_override.as_deref(),
-                false,
-            )? && !dep_strings.is_empty()
-            {
-                println!("{} Installing build dependencies...", "::".bold().blue());
-                let processed = std::sync::Mutex::new(std::collections::HashSet::new());
-                let mut installed = Vec::new();
-                for dep_str in dep_strings {
-                    let dep = crate::pkg::dependencies::parse_dependency_string(&dep_str)?;
-                    crate::pkg::install::dep_install::install_dependency(
-                        &dep,
-                        "build",
-                        if args.pure {
-                            crate::pkg::types::Scope::System
-                        } else {
-                            crate::pkg::types::Scope::User
-                        },
-                        true,
-                        true,
-                        &processed,
-                        &mut installed,
-                        None,
-                    )?;
-                }
-            }
-        }
     }
 
     crate::pkg::package::build::run(
@@ -164,5 +128,62 @@ pub fn run(mut args: BuildCommand) -> Result<()> {
         args.image.as_deref(),
         args.fakeroot,
         args.install_deps,
+        args.test,
     )
+}
+
+pub fn install_dependencies_for_build(args: &BuildCommand, include_test: bool) -> Result<()> {
+    for platform in &args.platform {
+        let current_platform = if platform == "current" {
+            crate::pkg::utils::get_platform()?
+        } else {
+            platform.clone()
+        };
+
+        if let Some(mut dep_strings) = crate::pkg::package::build::get_build_dependencies(
+            &args.package_file,
+            args.r#type.as_deref(),
+            &current_platform,
+            args.version_override.as_deref(),
+            false,
+        )? {
+            if include_test
+                && let Some(test_deps) = crate::pkg::package::build::get_test_dependencies(
+                    &args.package_file,
+                    &current_platform,
+                    args.version_override.as_deref(),
+                    false,
+                )?
+            {
+                dep_strings.extend(test_deps);
+            }
+
+            if !dep_strings.is_empty() {
+                println!(
+                    "{} Installing build/test dependencies...",
+                    "::".bold().blue()
+                );
+                let processed = std::sync::Mutex::new(std::collections::HashSet::new());
+                let mut installed = Vec::new();
+                for dep_str in dep_strings {
+                    let dep = crate::pkg::dependencies::parse_dependency_string(&dep_str)?;
+                    crate::pkg::install::dep_install::install_dependency(
+                        &dep,
+                        "build",
+                        if crate::pkg::sysroot::get_sysroot().is_some() {
+                            crate::pkg::types::Scope::System
+                        } else {
+                            crate::pkg::types::Scope::User
+                        },
+                        true,
+                        true,
+                        &processed,
+                        &mut installed,
+                        None,
+                    )?;
+                }
+            }
+        }
+    }
+    Ok(())
 }

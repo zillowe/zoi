@@ -151,8 +151,7 @@ fn parse_lua_package_from_file_for_platform(
     } else {
         Some(lua.from_value(Value::Table(final_pkg_deps)).map_err(|e| {
             anyhow!(
-                "Failed to parse 'dependencies' block in package file '{}':
-{}",
+                "Failed to parse 'dependencies' block in package file '{}':\n{}",
                 file_path,
                 e
             )

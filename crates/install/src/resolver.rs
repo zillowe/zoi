@@ -405,6 +405,7 @@ pub fn resolve_dependency_graph(
         explicit_source: None,
     };
     let root_version = SemVersion {
+        epoch: 0,
         v: Version::new(0, 0, 0),
         original: "0.0.0".to_string(),
     };

@@ -94,6 +94,33 @@ pub fn get_build_dependencies(
     Ok(None)
 }
 
+pub fn get_test_dependencies(
+    package_file: &Path,
+    platform: &str,
+    version_override: Option<&str>,
+    quiet: bool,
+) -> Result<Option<Vec<String>>> {
+    let pkg_for_meta = zoi_lua::parser::parse_lua_package_for_platform(
+        package_file
+            .to_str()
+            .ok_or_else(|| anyhow!("Path contains invalid UTF-8 characters: {:?}", package_file))?,
+        platform,
+        version_override,
+        None,
+        quiet,
+    )?;
+
+    if let Some(deps) = &pkg_for_meta.dependencies
+        && let Some(test_deps) = &deps.test
+    {
+        let mut all_deps = Vec::new();
+        collect_deps_from_group_no_prompt(test_deps, &mut all_deps);
+        return Ok(Some(all_deps));
+    }
+
+    Ok(None)
+}
+
 fn collect_deps_from_group_no_prompt(group: &types::DependencyGroup, deps: &mut Vec<String>) {
     match group {
         types::DependencyGroup::Simple(d) => {
@@ -343,6 +370,8 @@ fn build_for_platform(
     sub_packages: Option<&Vec<String>>,
     quiet: bool,
     fakeroot: bool,
+    _install_deps: bool,
+    _test: bool,
 ) -> Result<()> {
     let pkg_lua_dir = package_file
         .parent()
@@ -796,6 +825,7 @@ pub fn run(
     image: Option<&str>,
     fakeroot: bool,
     install_deps: bool,
+    test: bool,
 ) -> Result<()> {
     let mut _temp_zsa_dir = None;
     let mut actual_package_file = package_file.to_path_buf();
@@ -855,6 +885,7 @@ pub fn run(
             docker_image,
             fakeroot,
             install_deps,
+            test,
         );
     }
 
@@ -869,6 +900,7 @@ pub fn run(
             sub_packages,
             fakeroot,
             install_deps,
+            test,
         );
     }
 
@@ -911,6 +943,8 @@ pub fn run(
             sub_packages.as_ref(),
             quiet,
             fakeroot,
+            install_deps,
+            test,
         ) {
             eprintln!(
                 "{}: Failed to build for platform {}: {}",

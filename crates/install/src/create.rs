@@ -147,6 +147,7 @@ pub fn run(
         None,
         false,
         false,
+        false,
     )?;
 
     let archive_filename = format!(

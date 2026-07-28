@@ -42,8 +42,9 @@ fn test_package_outdated_on_revision_bump() {
     ).unwrap();
 
     let manifest = types::InstallManifest {
-        name: pkg_name.to_string(),
-        version: version.to_string(),
+        name: "test-rev".to_string(),
+        version: "1.0.0".to_string(),
+        epoch: 0,
         revision: "1".to_string(),
         sub_package: None,
         repo: repo.to_string(),

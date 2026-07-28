@@ -214,6 +214,7 @@ impl InstallManifest {
             name: self.name,
             repo: self.repo,
             version: Some(self.version),
+            epoch: self.epoch,
             sub_package: self.sub_package,
             package_type: self.package_type,
             registry_handle: Some(self.registry_handle),
@@ -252,6 +253,9 @@ pub struct Package {
     pub repo: String,
     /// The resolved version string.
     pub version: Option<String>,
+    /// Forced version precedence (default 0).
+    #[serde(default)]
+    pub epoch: u32,
     /// Incremental revision for the same upstream version (e.g. for packaging fixes).
     #[serde(default = "default_revision")]
     pub revision: String,
@@ -479,6 +483,8 @@ pub struct Dependencies {
     pub runtime: Option<DependencyGroup>,
     #[serde(default)]
     pub build: Option<BuildDependencies>,
+    #[serde(default)]
+    pub test: Option<DependencyGroup>,
 }
 
 pub fn to_dependencies_v2(deps: Dependencies) -> DependenciesV2 {
@@ -539,7 +545,26 @@ pub fn to_dependencies_v2(deps: Dependencies) -> DependenciesV2 {
         }
     }
 
-    DependenciesV2 { runtime, build }
+    let mut test = Vec::new();
+    if let Some(t) = deps.test {
+        test = match t {
+            DependencyGroup::Simple(d) => d,
+            DependencyGroup::Complex(c) => {
+                let mut all = c.required;
+                all.extend(c.optional);
+                for opt in c.options {
+                    all.extend(opt.depends);
+                }
+                all
+            }
+        };
+    }
+
+    DependenciesV2 {
+        runtime,
+        build,
+        test,
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
@@ -583,6 +608,9 @@ pub struct InstallManifest {
     pub name: String,
     /// Exact version installed.
     pub version: String,
+    /// Forced version precedence.
+    #[serde(default)]
+    pub epoch: u32,
     /// Revision of the package definition used for this install.
     #[serde(default = "default_revision")]
     pub revision: String,
@@ -868,6 +896,8 @@ pub struct PurlPackageIndexV2 {
     pub repo: String,
     pub repo_type: String,
     pub version: String,
+    #[serde(default)]
+    pub epoch: u32,
     pub revision: String,
     pub description: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -886,6 +916,8 @@ pub struct DependenciesV2 {
     pub runtime: Vec<String>,
     #[serde(default)]
     pub build: Vec<BuildDependencyV2>,
+    #[serde(default)]
+    pub test: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -932,6 +964,8 @@ pub struct LockPackageDetailV2 {
     pub repo: String,
     pub repo_type: String,
     pub version: String,
+    #[serde(default)]
+    pub epoch: u32,
     pub revision: String,
     pub registry: String,
     pub why: String,
