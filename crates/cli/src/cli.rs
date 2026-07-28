@@ -14,7 +14,7 @@ use std::path::PathBuf;
 const BRANCH: &str = "Production";
 const STATUS: &str = "Release";
 const NUMBER: &str = "1.24.0";
-const PKG_SOURCE_HELP: &str = "Package identifier (e.g. @repo/name, path, or URL)";
+const PKG_SOURCE_HELP: &str = "Package identifier (e.g. @repo/name, #git@repo/name, path, or URL)";
 
 /// Zoi - The Advanced Package Manager & Environment Orchestrator.
 ///
