@@ -312,6 +312,23 @@ Runs when the package is uninstalled to clean up external state.
 
 Downloads a file from a URL directly to the specified local path.
 
+### `UTILS.DOWNLOAD(url, filename, hash)`
+
+Downloads a file from a URL and optionally verifies its hash.
+
+- **url**: (string) The URL to download from.
+- **filename**: (string, optional) The output filename. If omitted, the filename is extracted from the URL.
+- **hash**: (string, optional) The expected hash of the file (e.g., `"sha512-..."` or `"sha256-..."`). If provided, the downloaded file is automatically verified. If the hash does not match, the function returns a `RuntimeError`, causing the build to fail.
+- **Returns**: (string) The final filename of the downloaded file.
+
+```lua
+function prepare()
+    -- Download and verify a file
+    local file = UTILS.DOWNLOAD("https://example.com/tool.tar.gz", nil, "sha512-abc123...")
+    UTILS.EXTRACT(file, "src")
+end
+```
+
 ### `UTILS.FS`
 
 - `UTILS.FS.exists(path)`: Returns `true` if the path exists.

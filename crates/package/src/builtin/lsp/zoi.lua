@@ -323,13 +323,21 @@ function UTILS.PARSE.toml(str) end
 ---@return string?
 function UTILS.PARSE.checksumFile(content, filename) end
 
---- Downloads a file from a URL to a local path.
+--- Downloads a file from a URL to the specified local path.
 ---@param url string
 ---@param path string
 function UTILS.FILE(url, path) end
 
+--- Downloads a file from a URL and optionally verifies its hash.
+---@param url string
+---@param filename string? Optional output filename (defaults to URL filename).
+---@param hash string? Optional hash to verify (e.g., "sha512-..." or "sha256-...").
+---@return string filename The final filename of the downloaded file.
+function UTILS.DOWNLOAD(url, filename, hash) end
+
 UTILS.FS = {}
 ---@param path string
+
 ---@return boolean
 function UTILS.FS.exists(path) end
 
