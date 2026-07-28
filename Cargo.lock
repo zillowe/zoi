@@ -4714,6 +4714,7 @@ dependencies = [
  "tempfile",
  "toml",
  "urlencoding",
+ "uuid",
  "walkdir",
  "xz2",
  "yaml_serde",

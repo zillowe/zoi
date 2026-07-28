@@ -40,3 +40,4 @@ xz2.workspace = true
 zip.workspace = true
 zstd.workspace = true
 tempfile.workspace = true
+uuid = { workspace = true, features = ["v4"] }

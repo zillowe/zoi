@@ -9,8 +9,18 @@ Developing packages for Windows requires understanding how Zoi handles shell exe
 
 In a `.pkg.lua` definition, the `cmd()` function behavior depends on the host operating system:
 
-- **Unix (Linux/macOS)**: `cmd()` executes commands via `bash -c`.
-- **Windows**: `cmd()` executes commands via `pwsh -Command` (PowerShell Core).
+- **Unix (Linux/macOS)**: `cmd()` executes commands via a **persistent `bash` session**.
+- **Windows**: `cmd()` executes commands via a **persistent `pwsh` session** (PowerShell Core).
+
+### State Persistence
+
+Because the shell session is persistent, directory changes and variable assignments stick:
+
+```lua
+-- On Windows, this works across calls:
+cmd("$env:MY_VAR = 'hello'")
+cmd("Write-Host $env:MY_VAR") -- Prints 'hello'
+```
 
 ### Portability Tips
 
@@ -23,7 +33,7 @@ cmd("export FOO=bar && ./build.sh") -- 'export' doesn't exist in PowerShell
 ```
 
 **Prefer (Portable):**
-Zoi provides the `SYSTEM` and `ZOI` tables to help you handle logic in Lua instead of the shell.
+Zoi provides the `SYSTEM` and `ZOI` tables to help you handle logic in Lua instead of the shell. Additionally, Zoi automatically exports common metadata as environment variables in both shell types.
 
 ```lua
 local build_cmd = "./build.sh"
