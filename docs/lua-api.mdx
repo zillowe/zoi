@@ -184,7 +184,19 @@ Used in the `uninstall()` function to remove files or directories outside of the
 
 ### `cmd(command)`
 
-Executes a shell command within the `BUILD_DIR`. Returns three values: standard output, standard error, and exit code.
+Executes a shell command within the `BUILD_DIR`.
+
+- **Persistence**: Unlike standard shell wrappers, `cmd()` in Zoi uses a **persistent shell session**. This means state changes like directory changes (`cd`), environment variable exports (`export`), and shell function definitions **persist** across multiple `cmd()` calls within the same lifecycle phase (e.g. within `build()` or `package()`).
+- **Returns**: Three values: `stdout` (string), `stderr` (string), and `exit_code` (integer).
+
+```lua
+function build()
+    -- These commands share the same shell process
+    cmd("cd source")
+    cmd("export CFLAGS='-O3'")
+    cmd("make") -- Runs inside 'source' with 'CFLAGS' set
+end
+```
 
 ### `IMPORT(file_name)`
 

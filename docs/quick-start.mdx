@@ -237,6 +237,12 @@ function test()
 end
 ```
 
+<Callout title="Persistent Shell">
+  The `cmd()` function uses a **persistent shell session**. Directory changes
+  (`cd`) and exported variables persist between separate `cmd()` calls within
+  the same function.
+</Callout>
+
 Validate it:
 
 ```sh

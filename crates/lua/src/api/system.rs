@@ -1,9 +1,140 @@
-use mlua::{self, Lua};
+use mlua::{self, Lua, Table, Value};
+use std::fs;
+use std::io::{BufRead, BufReader, Write};
+use std::path::PathBuf;
+use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::sync::Mutex;
+
+struct InnerSession {
+    child: Child,
+    stdin: ChildStdin,
+    stdout: BufReader<ChildStdout>,
+    stderr_path: PathBuf,
+    sentinel: String,
+}
+
+impl Drop for InnerSession {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+        if self.stderr_path.exists() {
+            let _ = fs::remove_file(&self.stderr_path);
+        }
+    }
+}
+
+struct ShellSession {
+    inner: Mutex<InnerSession>,
+}
+
+impl ShellSession {
+    fn new(lua: &Lua, build_dir: &str) -> Result<Self, anyhow::Error> {
+        let sentinel = format!("---ZOI_CMD_COMPLETE_{}---", uuid::Uuid::new_v4());
+        let stderr_path = PathBuf::from(build_dir).join(format!(".zoi_stderr_{}", sentinel));
+
+        let mut child = if cfg!(target_os = "windows") {
+            Command::new("pwsh")
+                .arg("-NoProfile")
+                .arg("-NonInteractive")
+                .arg("-Command")
+                .arg("-")
+                .current_dir(build_dir)
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::null())
+                .spawn()?
+        } else {
+            Command::new("bash")
+                .arg("--noprofile")
+                .arg("--norc")
+                .current_dir(build_dir)
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::null())
+                .spawn()?
+        };
+
+        let mut stdin = child.stdin.take().expect("Failed to open stdin");
+        let stdout = BufReader::new(child.stdout.take().expect("Failed to open stdout"));
+
+        // Inject Zoi environment variables
+        let mut env_cmds = String::new();
+        let globals = lua.globals();
+
+        let vars = [
+            ("BUILD_TYPE", "BUILD_TYPE"),
+            ("SUBPKG", "SUBPKG"),
+            ("BUILD_DIR", "BUILD_DIR"),
+            ("STAGING_DIR", "STAGING_DIR"),
+        ];
+
+        for (lua_name, env_name) in vars {
+            if let Ok(val) = globals.get::<String>(lua_name) {
+                if cfg!(target_os = "windows") {
+                    env_cmds.push_str(&format!(
+                        "$env:{} = '{}'\n",
+                        env_name,
+                        val.replace("'", "''")
+                    ));
+                } else {
+                    env_cmds.push_str(&format!("export {}={:?}\n", env_name, val));
+                }
+            }
+        }
+
+        // Handle SYSTEM and ZOI tables
+        let tables = [("SYSTEM", "SYSTEM_"), ("ZOI", "ZOI_")];
+        for (table_name, prefix) in tables {
+            if let Ok(table) = globals.get::<Table>(table_name) {
+                for (k, v) in table.pairs::<String, Value>().flatten() {
+                    let val_str = match v {
+                        Value::String(s) => s
+                            .to_str()
+                            .map_err(|e| anyhow::anyhow!(e.to_string()))?
+                            .to_string(),
+                        Value::Integer(i) => i.to_string(),
+                        Value::Number(n) => n.to_string(),
+                        Value::Boolean(b) => b.to_string(),
+                        _ => continue,
+                    };
+                    if cfg!(target_os = "windows") {
+                        env_cmds.push_str(&format!(
+                            "$env:{}{} = '{}'\n",
+                            prefix,
+                            k.to_uppercase(),
+                            val_str.replace("'", "''")
+                        ));
+                    } else {
+                        env_cmds.push_str(&format!(
+                            "export {}{}={:?}\n",
+                            prefix,
+                            k.to_uppercase(),
+                            val_str
+                        ));
+                    }
+                }
+            }
+        }
+
+        stdin.write_all(env_cmds.as_bytes())?;
+        stdin.flush()?;
+
+        Ok(Self {
+            inner: Mutex::new(InnerSession {
+                child,
+                stdin,
+                stdout,
+                stderr_path,
+                sentinel,
+            }),
+        })
+    }
+}
 
 /// Exposes system command and patching utilities to the Lua environment.
 ///
 /// These functions provide the bridge to the host operating system's tools:
-/// - `cmd`: Executes a shell command and captures its output and exit code.
+/// - `cmd`: Executes a shell command in a persistent session and captures its output and exit code.
 /// - `zpatch`: A wrapper around the `patch` command for applying diffs.
 ///
 /// All commands are executed relative to the `BUILD_DIR` and respect the
@@ -12,45 +143,96 @@ pub fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let cmd_fn = lua.create_function(move |lua, command: String| {
         let build_dir: String = lua.globals().get("BUILD_DIR")?;
 
+        let session_is_dead = if let Some(session) = lua.app_data_ref::<ShellSession>() {
+            let mut inner = session.inner.lock().unwrap();
+            inner.child.try_wait().map(|s| s.is_some()).unwrap_or(true)
+        } else {
+            true
+        };
+
+        if session_is_dead {
+            let session = ShellSession::new(lua, &build_dir)
+                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+            lua.set_app_data(session);
+        }
+
+        let session = lua
+            .app_data_ref::<ShellSession>()
+            .expect("ShellSession missing from app_data");
+        let mut inner = session.inner.lock().unwrap();
+
         if !quiet {
             println!("Executing: {}", command);
         }
-        let output = if cfg!(target_os = "windows") {
-            std::process::Command::new("pwsh")
-                .arg("-Command")
-                .arg(&command)
-                .current_dir(&build_dir)
-                .output()
+
+        let sentinel = inner.sentinel.clone();
+
+        if cfg!(target_os = "windows") {
+            let stderr_path_str = inner.stderr_path.to_string_lossy().replace("'", "''");
+            let cmd_text = format!(
+                "$ErrorActionPreference = 'Continue'; & {{ {} }} 2> '{}'; \"{} $LASTEXITCODE\"\n",
+                command, stderr_path_str, sentinel
+            );
+            inner
+                .stdin
+                .write_all(cmd_text.as_bytes())
+                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+            inner
+                .stdin
+                .flush()
+                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
         } else {
-            std::process::Command::new("bash")
-                .arg("-c")
-                .arg(&command)
-                .current_dir(&build_dir)
-                .output()
-        };
-
-        match output {
-            Ok(out) => {
-                let stdout = String::from_utf8_lossy(&out.stdout).to_string();
-                let stderr = String::from_utf8_lossy(&out.stderr).to_string();
-                let exit_code =
-                    out.status
-                        .code()
-                        .unwrap_or(if out.status.success() { 0 } else { 1 });
-
-                if !out.status.success() && !quiet {
-                    eprintln!("[cmd] {}", stderr);
-                }
-
-                Ok((stdout, stderr, exit_code))
-            }
-            Err(e) => {
-                if !quiet {
-                    eprintln!("[cmd] Failed to execute command: {}", e);
-                }
-                Ok((String::new(), e.to_string(), 1))
-            }
+            let cmd_text = format!(
+                "{{ {} ; }} 2>{:?} ; printf \"\\n%s %d\\n\" {:?} $?\n",
+                command, inner.stderr_path, sentinel
+            );
+            inner
+                .stdin
+                .write_all(cmd_text.as_bytes())
+                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+            inner
+                .stdin
+                .flush()
+                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
         }
+
+        let mut stdout_accum = String::new();
+        let mut line = String::new();
+        let exit_code;
+
+        loop {
+            line.clear();
+            let n = inner
+                .stdout
+                .read_line(&mut line)
+                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+            if n == 0 {
+                return Err(mlua::Error::RuntimeError(
+                    "Shell session ended unexpectedly".to_string(),
+                ));
+            }
+
+            if let Some(idx) = line.find(&sentinel) {
+                let out_part = &line[..idx];
+                stdout_accum.push_str(out_part);
+
+                let rest = line[idx..].strip_prefix(&sentinel).unwrap().trim();
+                exit_code = rest.parse::<i32>().unwrap_or(0);
+                break;
+            }
+            stdout_accum.push_str(&line);
+        }
+
+        let stderr = fs::read_to_string(&inner.stderr_path).unwrap_or_default();
+        if inner.stderr_path.exists() {
+            let _ = fs::File::create(&inner.stderr_path);
+        }
+
+        if exit_code != 0 && !quiet {
+            eprintln!("[cmd] {}", stderr);
+        }
+
+        Ok((stdout_accum.trim_end().to_string(), stderr, exit_code))
     })?;
     lua.globals().set("cmd", cmd_fn)?;
     Ok(())
@@ -76,7 +258,7 @@ pub fn add_zpatch(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
             match output {
                 Ok(out) => {
                     if !out.status.success() {
-                        let stderr = String::from_utf8_lossy(&out.stderr);
+                        let stderr = String::from_utf8_lossy(&out.stderr).to_string();
                         return Err(mlua::Error::RuntimeError(format!(
                             "patch failed: {}",
                             stderr

@@ -66,7 +66,9 @@ Zoi is packed with features designed to make package management and environment 
 
 - **Ephemeral Environments:** Enter a temporary subshell with specific packages available in `PATH` without installing them globally. Perfect for testing tools or running scripts with specific language versions.
 
-- **Dynamic Package Definitions:** Packages are defined using `.pkg.lua` scripts, offering unparalleled flexibility. Use Lua to dynamically determine download URLs, set up build steps, and handle platform-specific logic.
+- **Stateful Shell Scripting**: The `cmd()` function uses a persistent shell process, allowing directory changes (`cd`) and environment variable exports to persist between calls. This makes writing package scripts feel natural and less boilerplate-heavy.
+
+- **Dynamic Package Definitions**: Packages are defined using `.pkg.lua` scripts, offering unparalleled flexibility. Use Lua to dynamically determine download URLs, set up build steps, and handle platform-specific logic.
 
 - **Universal Package Support:** Install software from any source:
   - Pre-compiled binaries
