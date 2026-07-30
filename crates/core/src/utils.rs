@@ -123,6 +123,8 @@ pub fn get_user_home() -> Option<PathBuf> {
                 return Some(user.dir);
             }
         }
+        #[cfg(not(unix))]
+        let _ = sudo_user;
     }
     home::home_dir()
 }

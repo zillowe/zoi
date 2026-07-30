@@ -109,6 +109,60 @@ pub fn add_zdoc(lua: &Lua) -> Result<(), mlua::Error> {
     Ok(())
 }
 
+pub fn add_zman(lua: &Lua) -> Result<(), mlua::Error> {
+    let zman_fn = lua.create_function(|lua, (source, section): (String, Option<String>)| {
+        let zoi_table: Table = lua.globals().get("ZOI")?;
+        let scope: String = zoi_table
+            .get("scope")
+            .unwrap_or_else(|_| "user".to_string());
+
+        let path = Path::new(&source);
+        let filename = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .ok_or_else(|| mlua::Error::RuntimeError("Invalid source path for zman".to_string()))?;
+
+        let inferred_section = if let Some(s) = section {
+            s
+        } else {
+            // Try to infer from extension (e.g. .1, .5, .1.gz, .5.bz2)
+            let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+            let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+
+            if ext.parse::<u8>().is_ok() {
+                ext.to_string()
+            } else if (ext == "gz" || ext == "bz2" || ext == "xz") && !stem.is_empty() {
+                let inner_ext = Path::new(stem)
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .unwrap_or("");
+                if inner_ext.parse::<u8>().is_ok() {
+                    inner_ext.to_string()
+                } else {
+                    "1".to_string()
+                }
+            } else {
+                "1".to_string()
+            }
+        };
+
+        let destination = if scope == "system" {
+            format!(
+                "${{usrroot}}/usr/share/man/man{}/{}",
+                inferred_section, filename
+            )
+        } else {
+            format!("${{pkgstore}}/man/man{}/{}", inferred_section, filename)
+        };
+
+        let zcp: mlua::Function = lua.globals().get("zcp")?;
+        zcp.call::<()>((source, destination))?;
+        Ok(())
+    })?;
+    lua.globals().set("zman", zman_fn)?;
+    Ok(())
+}
+
 pub fn add_zshell(lua: &Lua) -> Result<(), mlua::Error> {
     let zshell_fn = lua.create_function(|lua, (source, shell): (String, String)| {
         let filename = Path::new(&source)

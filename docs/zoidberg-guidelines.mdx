@@ -1,145 +1,139 @@
 ---
-title: Zoidberg Packaging Guidelines
-description: Official standards and policies for packages in the Zoidberg registry.
+title: Zoidberg Packaging Policy
+description: Authoritative standards and policies for packages in the official Zoidberg registry.
 ---
 
-This document defines the official packaging guidelines for **Zoidberg**, the primary Zoi package registry. These standards ensure that Zoi remains a high-quality, secure, and consistent ecosystem for developers across Linux, macOS, and Windows.
+This document defines the official packaging standards for **Zoidberg**, the primary Zoi package registry. To ensure consistency, security, and quality, these guidelines adopt a rigorous policy-driven approach.
 
-Packages submitted to the `core`, `main`, and `extra` tiers must adhere strictly to these guidelines.
+The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHALL**, **SHALL NOT**, **SHOULD**, **SHOULD NOT**, **RECOMMENDED**, **MAY**, and **OPTIONAL** in this document are to be interpreted as described in [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119).
 
-## 1. Inclusion Policy & Tiers
+## 1. Applicability & Licensing
 
-Zoidberg is dedicated to high-quality software that enhances the developer and system environment.
+Zoidberg is dedicated to providing high-quality free and open-source software.
 
-### 1.1. Tier Definition
+### 1.1. Tier Scope
 
-* `core`: Essential packages and libraries. Very common, high stability, and well-maintained.
-* `main`: Important packages that are essential for most users but don't fit in `core`.
-* `extra`: Niche or specialized packages. Less common or less actively maintained.
-* `community`: User-submitted packages. This is the starting point for most new submissions.
-* `test`: For testing new Zoi features or packages before they graduate.
-* `archive`: For software that is no longer maintained.
+* **`core` and `main` tiers**: These tiers **MUST** follow all guidelines in this document without exception. Software in these tiers **MUST** be Free Software (FOSS).
+* **`extra` tier**: Guidelines in this tier are relaxed. It is intended for niche, specialized, or less stable packages where strict adherence to all FHS or bundling policies is not always practical.
 
-### 1.2. Licensing & Proprietary Software
+### 1.2. Free Software Requirement
 
-* **Open Source Preferred:** Software in the `core` and `main` tiers MUST be licensed under an [OSI-approved open-source license](https://opensource.org/licenses).
-* **Proprietary Consideration:** Proprietary or "source-available" software may be considered for the `community` or `extra` tiers provided it is legally redistributable and clearly states its restrictions.
-* **Prohibited Content:** Packages containing malware, spyware, offensive content, or software primarily intended for illegal activities are strictly prohibited.
+All software in the `core` and `main` tiers **MUST** be under licenses determined to be Free Software by the [Free Software Foundation (FSF)](https://www.gnu.org/philosophy/free-sw.en.html) or the [Open Source Initiative (OSI)](https://opensource.org/osd).
 
-## 2. Build Methodology: Binary-First
+### 1.3. SPDX Identifiers
 
-Zoidberg follows a **Binary-First, Pragmatic Hybrid** model.
+The `license` field in `metadata()` **MUST** be populated with a valid [SPDX license identifier](https://spdx.org/licenses/) or expression.
 
-### 2.1. Preference for Pre-compiled
+* **Complex Licenses:** Use `AND`, `OR`, and `WITH` operators to accurately reflect multi-licensed software (e.g. `MIT AND Apache-2.0`).
+* **Missing License Text:** If upstream fails to include a license file, the maintainer **SHOULD** contact upstream. If required by the license, a believed-correct copy of the license text **MUST** be included in the package via `zlicense()`.
 
-To ensure fast and reliable installation for end-users, `pre-compiled` is the **preferred build type**. When available, a package should provide a `pre-compiled` type that downloads tested binaries from an upstream release.
+---
 
-### 2.2. Source Builds
+## 2. Versioning & Revisions
 
-Providing a `source` build type is highly encouraged as a secondary option. It provides transparency and allows for platform-specific optimizations.
+Zoi uses an automated SAT solver that depends on strict, sortable versioning.
 
-### 2.3. Pragmatic Bundling (Vendoring)
+### 2.1. Upstream Versions (`version`)
 
-* **Shared Over Bundled:** Prefer declaring dependencies via `zoi:`, `native:`, or ecosystem-specific managers instead of bundling them inside your package.
-* **Pragmatic Exception:** Bundling (vendoring) is allowed when upstream makes it exceptionally difficult to separate dependencies, or for ecosystems where vendoring is the standard.
+The `version` field **MUST** match the upstream project version verbatim.
 
-## 3. Naming & Versioning Standards
+* **No Prefixes:** Do not include `v` prefixes (e.g. use `1.2.3`, not `v1.2.3`).
+* **Leading Zeroes:** Do not trim leading zeroes if they are part of the upstream scheme.
 
-### 3.1. Flat Naming
+### 2.2. Downstream Revisions (`revision`)
 
-Zoidberg uses a **Flat Naming** convention.
+The `revision` field tracks changes to the Zoi package definition itself.
 
-* **Simplicity:** Use the simplest, most common name for the software (e.g. `ripgrep`, not `rust-ripgrep`).
-* **Lowercase:** All package names MUST be lowercase ASCII.
-* **Characters:** Use only lowercase letters, digits, and hyphens (`-`). Avoid underscores or periods.
-* **Collision Handling:** Collisions are handled on a case-by-case basis. If a name is already taken, prioritize the more popular or established tool.
+* **Increments:** Increment the `revision` when fixing bugs in the Lua script, applying security patches, or updating dependencies while upstream remains the same.
+* **Resets:** The `revision` **MUST** be reset to `"1"` whenever the upstream `version` is updated.
 
-### 3.2. Versioning (`PKG.version`)
+### 2.3. Snapshot Versioning
 
-The `version` field MUST match the upstream version verbatim.
+For software taken from a source control system that is not a formal release, the following format **MUST** be used:
+`[LAST_VERSION]^[YYYYMMDD]g[COMMIT_HASH]`
 
-* **Prefixes:** Strip any `v` prefixes (e.g. use `1.2.3` instead of `v1.2.3`).
-* **SemVer:** Follow [SemVer](https://semver.org) patterns where possible.
+* **Example:** `1.0.0^20240320gabc123`
+* **Rationale:** This ensures that snapshots sort higher than the last release but lower than the next release.
 
-### 3.3. Revisions (`PKG.revision`)
+---
 
-The `revision` field tracks downstream changes to the package definition itself.
+## 3. "What Can Be Packaged" Policy
 
-* **Increment** if you fix a bug in the Lua script, update a dependency, or change a configuration file while the upstream version remains the same.
-* **Reset** to `"1"` whenever the upstream `version` is bumped.
+### 3.1. Bundling & Duplication
 
-## 4. Metadata & Quality Requirements
+Packages **MUST** make every effort to avoid bundling (vendoring) libraries that are already available in Zoi or as native system packages.
 
-### 4.1. Required Fields
+* **Requirement:** If upstream supports building against system libraries, the package **MUST** be configured to do so.
+* **Deletion:** Bundled third-party source code **SHOULD** be removed in `prepare()` to ensure the build process uses system-provided dependencies.
 
-Every submission MUST include:
+### 3.2. Pre-built Binaries in Source Builds
 
-* `name`: The flat package name.
-* `repo`: The targeted tier.
-* `version`: Upstream version.
-* `description`: A concise, one-line summary.
-* `license`: A valid [SPDX license identifier](https://spdx.org/licenses).
-* `maintainer`: Name and email of the package maintainer.
+For packages providing a `source` build type, all binaries and libraries **MUST** be built from the source code included in the build process.
 
-### 4.2. Recommended Testing
+* **Prohibition:** Maintainers **MUST NOT** include pre-compiled `.o`, `.so`, or `.exe` files in a source build.
+* **Exception:** This rule does not apply to content files (e.g. `.png`, `.pdf`) or "bootstrap" binaries required to build a compiler, provided those binaries are themselves open-source and temporary.
 
-Implementing a `test()` lifecycle function is **highly recommended** for the `core` and `main` tiers, and strongly encouraged for all others. The test should verify that the binary executes correctly (e.g. running `myapp --version`). Zoi supports installing `test` dependencies defined in the `dependencies()` block when the user or CI runner specifies `--install-deps` with `zoi package test` or `zoi package build --test`.
+### 3.3. Impermissible Content
 
-```lua
-dependencies({
-  test = { required = { "native:shellcheck" } }
-})
+Zoidberg **SHALL NOT** host content that is:
 
-function test()
-  local _, _, code = cmd("${pkgstore}/bin/myapp --version")
-  return code == 0
-end
-```
+* Legally questionable (patent-encumbered formats in certain jurisdictions).
+* Offensive, discriminatory, or derogatory.
+* Proprietary binary blobs (excluding permissible firmware for `core` hardware support).
 
-## 5. Dependency Management
+---
 
-### 5.1. Manager Hierarchy
+## 4. Sub-package Separation Standards
 
-When resolving dependencies, use the following priority:
+To minimize the installation footprint and save bandwidth, large packages **MUST** be split into functional components using the following naming convention:
 
-1. **`zoi:`**: For other Zoi-native packages.
-2. **`native:`**: For core system libraries (like `openssl`) to ensure host compatibility.
-3. **Language Managers**: Use `npm:`, `cargo:`, `pip:`, etc., for tools specific to those ecosystems.
+| Suffix | Purpose |
+| :--- | :--- |
+| `:main` | **Primary Binary:** The main executable or CLI tool (if the package is split). |
+| `:lib` | **Runtime Libraries:** Shared objects (`.so`, `.dylib`) and versioned runtime files. |
+| `:dev` | **Development Files:** Headers (`.h`), static libraries (`.a`), and `pkg-config` files. |
+| `:docs` | **Documentation:** Large manuals, HTML documentation, and examples. |
 
-### 5.2. No Direct Internet in Build/Package
+* **Dependency Chain:** The `:dev` sub-package **MUST** depend on the base package (or `:lib`) with an exact version match.
+* **Default Install:** The base package (or `main_subs`) **SHOULD** only include the files necessary for standard execution.
 
-Lifecycle functions like `build()` and `package()` SHOULD NOT access the internet. All downloads MUST happen in `prepare()`.
+---
 
-## 6. Integration & Security
+## 5. Security & Verification
 
-### 6.1. Shell Integration
+### 5.1. Mandatory Hashes
 
-Use the `zshell()` helper function to bundle completion scripts for Bash, Zsh, and Fish.
+Every remote download performed in `prepare()` **MUST** be verified for integrity.
+
+* **Requirement:** Use `verifyHash()` or `UTILS.DOWNLOAD` with the `hash` parameter.
+* **Algorithms:** `sha512` is **REQUIRED** for all new packages. `sha256` is acceptable for legacy reasons.
+
+### 5.2. Chain of Trust (GPG)
+
+For packages in the `core` tier, maintainers **MUST** verify OpenPGP signatures of upstream sources whenever they are available.
+
+* **Method:** Use `addPgpKey()` to import the upstream key and `verifySignature()` to validate the downloaded source before extraction.
+
+---
+
+## 6. Staging & Integration
+
+### 6.1. Manual Pages
+
+Maintainers **MUST** use the `zman()` helper function to bundle manual pages. This ensures they are available via `zoi man` and placed in standard FHS-compliant locations.
 
 ### 6.2. License Staging
 
-Every package MUST stage its license text to the package store using the `zlicense()` helper.
+Every package (and every independent sub-package) **MUST** stage its license text to the package store using the `zlicense()` helper.
 
 ```lua
-function package()
-  -- Stage binary...
-  zcp("bin/tool", "${pkgstore}/bin/tool")
-  -- Stage license
+function package(args)
+  -- Stage binary to main package
+  if args.sub == "" then
+    zcp("bin/tool", "${pkgstore}/bin/tool")
+    zman("doc/tool.1")
+  end
+  -- Stage license (mandatory for all)
   zlicense("LICENSE")
 end
 ```
-
-### 6.3. Security Verification
-
-* **Hashes Required:** All `pre-compiled` downloads MUST be verified using `verifyHash()` with a strong algorithm (`sha512` or `sha256`).
-* **Signatures:** Use `verifySignature()` with upstream PGP keys whenever available.
-
-## 7. Submission Process
-
-Before submitting a Merge Request:
-
-1. **Linter:** Run `zoi package doctor` on your script.
-2. **Test:** Run `zoi package test` locally.
-3. **Inspect:** Run `zoi package inspect --json` to verify resolved metadata.
-
-For a detailed step-by-step on contributing, see the [CONTRIBUTING.md](https://gitlab.com/zillowe/zillwen/zusty/zoidberg/-/blob/main/CONTRIBUTING.md).
