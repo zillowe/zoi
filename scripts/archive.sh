@@ -126,23 +126,8 @@ for binary_path in "$COMPILED_DIR"/*; do
 
     # Delta patch generation
     if [ -n "${PREV_TAG:-}" ] && [ -n "${CI_COMMIT_TAG:-}" ]; then
-        # Extract status and version from tags
-        # Tag format: [Branch]-[Status]-[Version]
-        OLD_STATUS=$(echo "$PREV_TAG" | cut -d'-' -f2 | tr '[:upper:]' '[:lower:]')
-        OLD_NUM=$(echo "$PREV_TAG" | cut -d'-' -f3)
-        if [[ "$OLD_STATUS" == "release" || "$OLD_STATUS" == "stable" ]]; then
-            OLD_VERSION="$OLD_NUM"
-        else
-            OLD_VERSION="${OLD_NUM}-${OLD_STATUS}"
-        fi
-
-        CURRENT_STATUS=$(echo "$CI_COMMIT_TAG" | cut -d'-' -f2 | tr '[:upper:]' '[:lower:]')
-        CURRENT_NUM=$(echo "$CI_COMMIT_TAG" | cut -d'-' -f3)
-        if [[ "$CURRENT_STATUS" == "release" || "$CURRENT_STATUS" == "stable" ]]; then
-            CURRENT_VERSION="$CURRENT_NUM"
-        else
-            CURRENT_VERSION="${CURRENT_NUM}-${CURRENT_STATUS}"
-        fi
+        OLD_VERSION="${PREV_TAG##*-}"
+        CURRENT_VERSION="${CI_COMMIT_TAG##*-}"
 
         OLD_EXT=".tar.zst"
         [[ "$filename" == *"windows"* ]] && OLD_EXT=".zip"

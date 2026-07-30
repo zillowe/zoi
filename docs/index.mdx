@@ -511,7 +511,7 @@ Zoi is hosted on multiple forges. The primary locations and mirrors are:
 </Accordion>
 
   <Accordion title="How do I view a package's manual?">
-    Use `zoi man <package-name>` to view it in your terminal. For uninstalled packages, Zoi will automatically fetch the manual from the registry.
+    If the package maintainer has provided a `man` URL in the package definition, you can run `zoi man <package-name>` to view it in your terminal.
   </Accordion>
 
 <Accordion title="How do I add a new repository?">
@@ -556,7 +556,7 @@ Zoi is hosted on multiple forges. The primary locations and mirrors are:
 
   <Accordion title="How do I use a custom git package repository?">
     Add it with `zoi repo add https://github.com/you/your-zoi-repo.git`.
-    Install packages from it using `#git@<repo-name>/<pkg-name>`.
+    Install packages from it using `@git/<repo-name>/<pkg-name>`.
     List/remove cloned git repos with `zoi repo git ls` and
     `zoi repo git rm <repo-name>`.
   </Accordion>

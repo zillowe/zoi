@@ -415,11 +415,6 @@ pub fn run(
             name.to_string()
         };
 
-        if registry == "local" && repo.starts_with("git/") {
-            let repo_name = &repo[4..];
-            return format!("#git@{}/{}", repo_name, base_name);
-        }
-
         if registry == default_handle || registry == "local" || registry.is_empty() {
             if active_repos.contains(&repo.to_string()) || repo.is_empty() {
                 base_name

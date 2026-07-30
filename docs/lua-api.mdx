@@ -100,16 +100,6 @@ Stages a documentation file for the package. The destination path is determined 
 
 - **source**: Path relative to `BUILD_DIR`, or use `${pkgluadir}`.
 
-### `zman(source, section)`
-
-Stages a manual page for the package. The destination path is determined by the installation scope:
-
-- **System Scope**: `${usrroot}/usr/share/man/man{section}/<filename>` (standard FHS location).
-- **Other Scopes**: `${pkgstore}/man/man{section}/<filename>`.
-
-- **source**: Path relative to `BUILD_DIR`, or use `${pkgluadir}`.
-- **section**: (Optional) The manual section (1-9). If omitted, Zoi attempts to infer it from the file extension (e.g. `.1`, `.5`).
-
 ### `zshell(source, shell)`
 
 Stages a shell completion file for a specific shell. The file is copied to `${pkgstore}/shell/{shell}/{filename}` and symlinked into the global completions directory (`~/.zoi/pkgs/shell/{shell}/{package}/`). Zoi automatically manages the symlinks during install and uninstall.
@@ -328,7 +318,7 @@ Downloads a file from a URL and optionally verifies its hash.
 
 - **url**: (string) The URL to download from.
 - **filename**: (string, optional) The output filename. If omitted, the filename is extracted from the URL.
-- **hash**: (string, optional) The expected hash of the file (e.g. `"sha512-..."` or `"sha256-..."`). If provided, the downloaded file is automatically verified. If the hash does not match, the function returns a `RuntimeError`, causing the build to fail.
+- **hash**: (string, optional) The expected hash of the file (e.g., `"sha512-..."` or `"sha256-..."`). If provided, the downloaded file is automatically verified. If the hash does not match, the function returns a `RuntimeError`, causing the build to fail.
 - **Returns**: (string) The final filename of the downloaded file.
 
 ```lua

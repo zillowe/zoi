@@ -1321,13 +1321,13 @@ fn resolve_source_recursive(
         });
     }
 
-    let resolved_source = if source.starts_with("#git@") {
-        let full_path_str = source.trim_start_matches("#git@");
+    let resolved_source = if source.starts_with("@git/") {
+        let full_path_str = source.trim_start_matches("@git/");
         let parts: Vec<&str> = full_path_str.split('/').collect();
 
         if parts.len() < 2 {
             return Err(anyhow!(
-                "Invalid git source. Use #git@<repo-name>/<path/to/pkg>"
+                "Invalid git source. Use @git/<repo-name>/<path/to/pkg>"
             ));
         }
 
@@ -1362,7 +1362,7 @@ fn resolve_source_recursive(
         }
         println!(
             "Warning: using external git repo '{}{}' not from official Zoi database.",
-            "#git@".yellow(),
+            "@git/".yellow(),
             repo_name.yellow()
         );
         let git_repo_root = home_dir

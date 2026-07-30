@@ -1,6 +1,6 @@
 use crate::pkg::{
     db, local, resolve,
-    types::{self},
+    types::{self, ManSpec},
 };
 use anyhow::{Result, anyhow};
 use crossterm::{
@@ -18,7 +18,7 @@ use ratatui::{
         Wrap,
     },
 };
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::fs;
 use std::io;
 use std::path::Path;
@@ -222,164 +222,30 @@ pub fn gather_manual_pages(
                     }
                 }
             }
-
-            // Also check standard system locations if scope is system
-            if scope == types::Scope::System {
-                let system_man = Path::new("/usr/share/man");
-                if system_man.exists() {
-                    let system_pages = find_man_pages_in_hierarchy(system_man, &pkg.name)?;
-                    if !system_pages.is_empty() {
-                        if !raw {
-                            println!("Displaying manual from system /usr/share/man...");
-                        }
-                        pages.extend(system_pages);
-                        break;
-                    }
-                }
-            }
         }
     }
 
-    if pages.is_empty() {
+    if pages.is_empty()
+        && let Some(man_spec) = &pkg.man
+    {
         if !raw {
-            println!("Package not installed or local manual not found. Fetching from upstream...");
+            println!("Fetching manual from upstream...");
         }
-        let upstream_pages = gather_manual_pages_from_upstream(pkg, registry_handle)?;
-        pages.extend(upstream_pages);
-    }
-
-    Ok(pages)
-}
-
-fn find_man_pages_in_hierarchy(root: &Path, term: &str) -> Result<BTreeMap<String, String>> {
-    let mut pages = BTreeMap::new();
-    if !root.exists() {
-        return Ok(pages);
-    }
-
-    for entry in WalkDir::new(root).max_depth(3) {
-        let entry = entry?;
-        if entry.file_type().is_file() {
-            let name = entry.file_name().to_string_lossy();
-            if name.starts_with(term) {
-                let content = fs::read_to_string(entry.path())?;
-                pages.insert(
-                    name.to_string(),
-                    if content.starts_with('.') {
-                        parse_roff(&content)
-                    } else {
-                        content
-                    },
-                );
+        match man_spec {
+            ManSpec::Single(url) => {
+                pages.insert("main".to_string(), fetch_url(url)?);
             }
-        }
-    }
-    Ok(pages)
-}
-
-fn gather_manual_pages_from_upstream(
-    pkg: &types::Package,
-    registry_handle: &Option<String>,
-) -> Result<BTreeMap<String, String>> {
-    // Resolve the package to get its archive source
-    let source = if let Some(handle) = registry_handle {
-        format!("#{}@{}", handle, pkg.name)
-    } else {
-        pkg.name.clone()
-    };
-
-    let (mut graph, _) = crate::pkg::install::resolver::resolve_dependency_graph(
-        &[source],
-        None,
-        false,
-        true,
-        true,
-        None,
-        true,
-    )?;
-
-    if graph.nodes.is_empty() {
-        return Ok(BTreeMap::new());
-    }
-
-    let node_id = graph.nodes.keys().next().unwrap().clone();
-    let node = graph.nodes.remove(&node_id).unwrap();
-
-    let install_plan = crate::pkg::install::plan::create_install_plan(
-        &HashMap::from([(node_id.clone(), node.clone())]),
-        None,
-        false,
-    )?;
-
-    let action = install_plan
-        .get(&node_id)
-        .ok_or_else(|| anyhow!("No install action for package"))?;
-
-    // Prepare the node (download/build)
-    let prepared = crate::pkg::install::installer::prepare_node(&node, action, None, None, false)?;
-
-    // Extract to a temp directory
-    let temp_dir = tempfile::Builder::new()
-        .prefix("zoi-man-extract-")
-        .tempdir()?;
-    let extract_path = temp_dir.path();
-
-    if prepared.archive_path.exists() {
-        let file = fs::File::open(&prepared.archive_path)?;
-        let decoder = zstd::stream::read::Decoder::new(file)?;
-        let mut archive = tar::Archive::new(decoder);
-        archive.unpack(extract_path)?;
-    }
-
-    // Look for man pages in the extracted content
-    // We check:
-    // - manifest.json (for pooled ZPA)
-    // - data/pkgstore/man/
-    // - data/usrroot/usr/share/man/
-    // - any .pkg.lua in the root
-
-    let mut pages = BTreeMap::new();
-
-    let pooled_manifest = extract_path.join("manifest.json");
-    if pooled_manifest.exists() {
-        let content = fs::read_to_string(&pooled_manifest)?;
-        let manifest: types::PooledZpaManifest = serde_json::from_str(&content)?;
-        let pool_dir = extract_path.join("pool");
-
-        for (sub_name, sub_mapping) in manifest.mappings {
-            for (scope, scope_mapping) in sub_mapping.scopes {
-                for file in scope_mapping.files {
-                    if file.dest.contains("/man/")
-                        || file.dest.ends_with(".1")
-                        || file.dest.ends_with(".5")
-                    {
-                        let pool_file = pool_dir.join(&file.hash);
-                        if pool_file.exists() {
-                            let content = fs::read_to_string(pool_file)?;
-                            let display_name = format!(
-                                "{}[{}:{:?}]",
-                                Path::new(&file.dest).file_name().unwrap().to_string_lossy(),
-                                sub_name,
-                                scope
-                            );
-                            pages.insert(
-                                display_name,
-                                if content.starts_with('.') {
-                                    parse_roff(&content)
-                                } else {
-                                    content
-                                },
-                            );
-                        }
-                    }
+            ManSpec::Multiple(urls) => {
+                for (i, url) in urls.iter().enumerate() {
+                    pages.insert(format!("page{}", i + 1), fetch_url(url)?);
+                }
+            }
+            ManSpec::Map(map) => {
+                for (name, url) in map {
+                    pages.insert(name.clone(), fetch_url(url)?);
                 }
             }
         }
-    }
-
-    let legacy_man = extract_path.join("data/pkgstore/man");
-    if legacy_man.exists() {
-        pages.extend(find_local_man_pages(&extract_path.join("data/pkgstore"))?);
     }
 
     Ok(pages)
@@ -401,29 +267,30 @@ fn find_local_man_pages(latest_dir: &Path) -> Result<BTreeMap<String, String>> {
         return Ok(pages);
     }
 
-    let search_dirs = [latest_dir.join("share").join("man"), latest_dir.join("man")];
-
-    for dir in search_dirs {
-        if dir.exists() {
-            for entry in WalkDir::new(dir) {
-                let entry = entry?;
-                if entry.file_type().is_file() {
-                    let path = entry.path();
-                    let name = path.file_name().unwrap().to_string_lossy().to_string();
-                    let content = fs::read_to_string(path)?;
-                    if name.ends_with(".md") {
-                        pages.insert(name, content);
-                    } else if content.starts_with('.') {
-                        pages.insert(name, parse_roff(&content));
-                    } else {
-                        pages.insert(name, content);
-                    }
+    let share_man = latest_dir.join("share").join("man");
+    if share_man.exists() {
+        for entry in WalkDir::new(share_man) {
+            let entry = entry?;
+            if entry.file_type().is_file() {
+                let path = entry.path();
+                let name = path.file_name().unwrap().to_string_lossy().to_string();
+                let content = fs::read_to_string(path)?;
+                if name.ends_with(".md") {
+                    pages.insert(name, content);
+                } else if content.starts_with('.') {
+                    pages.insert(name, parse_roff(&content));
+                } else {
+                    pages.insert(name, content);
                 }
             }
         }
     }
 
     Ok(pages)
+}
+
+fn fetch_url(url: &str) -> Result<String> {
+    Ok(reqwest::blocking::get(url)?.text()?)
 }
 
 pub fn parse_roff(content: &str) -> String {

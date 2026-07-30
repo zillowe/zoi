@@ -403,54 +403,52 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
                 }
 
                 #[cfg(target_os = "linux")]
-                {
-                    let mut cmd = if let Some(run_cmd) = run {
-                        let args = vec!["-c".to_string(), run_cmd];
-                        crate::sandbox::wrap_command_in_root(
-                            target_path,
-                            &shell_bin,
-                            &args,
-                            &envs,
-                            &[],
-                            false,
-                        )?
-                    } else {
-                        crate::sandbox::wrap_command_in_root(
-                            target_path,
-                            &shell_bin,
-                            &[],
-                            &envs,
-                            &[],
-                            false,
-                        )?
-                    };
+                let mut cmd = if let Some(run_cmd) = run {
+                    let args = vec!["-c".to_string(), run_cmd];
+                    crate::sandbox::wrap_command_in_root(
+                        target_path,
+                        &shell_bin,
+                        &args,
+                        &envs,
+                        &[],
+                        false,
+                    )?
+                } else {
+                    crate::sandbox::wrap_command_in_root(
+                        target_path,
+                        &shell_bin,
+                        &[],
+                        &envs,
+                        &[],
+                        false,
+                    )?
+                };
 
-                    if verbose {
-                        println!("{} Full command: {:?}", "::".bold().blue(), cmd);
-                    }
-
-                    let status = cmd.status()?;
-                    if !status.success() {
-                        let code = status.code().unwrap_or(1);
-                        eprintln!(
-                            "\n{} Chroot execution failed with exit code: {}",
-                            "Error:".red().bold(),
-                            code.to_string().yellow()
-                        );
-                        if code == 139 {
-                            println!(
-                                "{} Hint: Segfaults (139) often indicate an instruction set mismatch (e.g. x86-64-v3 binaries on older CPUs).",
-                                "::".bold().blue()
-                            );
-                        }
-                        std::process::exit(code);
-                    }
+                if verbose {
+                    println!("{} Full command: {:?}", "::".bold().blue(), cmd);
                 }
 
                 #[cfg(not(target_os = "linux"))]
                 return Err(anyhow!(
                     "Distro chroot is only supported on Linux via Bubblewrap."
                 ));
+
+                let status = cmd.status()?;
+                if !status.success() {
+                    let code = status.code().unwrap_or(1);
+                    eprintln!(
+                        "\n{} Chroot execution failed with exit code: {}",
+                        "Error:".red().bold(),
+                        code.to_string().yellow()
+                    );
+                    if code == 139 {
+                        println!(
+                            "{} Hint: Segfaults (139) often indicate an instruction set mismatch (e.g. x86-64-v3 binaries on older CPUs).",
+                            "::".bold().blue()
+                        );
+                    }
+                    std::process::exit(code);
+                }
             }
         },
         SystemSubcommands::Apply { file } => {

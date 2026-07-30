@@ -42,7 +42,7 @@ pub struct BuildCommand {
     #[arg(long)]
     pub version_override: Option<String>,
 
-    /// Method to use for building ('native', 'bwrap', or 'docker')
+    /// Method to use for building ('native' or 'docker')
     #[arg(long, default_value = "native")]
     pub method: String,
 

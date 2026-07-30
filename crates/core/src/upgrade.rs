@@ -286,10 +286,7 @@ pub fn run(
         }
     }
 
-    let current_version = if status.is_empty()
-        || status.eq_ignore_ascii_case("stable")
-        || status.eq_ignore_ascii_case("release")
-    {
+    let current_version = if status.is_empty() || status.eq_ignore_ascii_case("stable") {
         number.to_string()
     } else {
         format!("{}-{}", number, status.to_lowercase())
@@ -311,21 +308,13 @@ pub fn run(
     };
 
     let parts: Vec<&str> = latest_tag.split('-').collect();
-    let latest_version_num = if parts.len() >= 3 {
-        parts[2]
-    } else {
-        parts
-            .last()
-            .ok_or(anyhow!("Could not get version number from tag"))?
-    };
+    let latest_version_num = parts
+        .last()
+        .ok_or(anyhow!("Could not get version number from tag"))?;
 
-    let latest_version_str = if parts.len() >= 3 {
+    let latest_version_str = if parts.len() > 2 {
         let prerelease = parts[1].to_lowercase();
-        if prerelease == "release" || prerelease == "stable" {
-            latest_version_num.to_string()
-        } else {
-            format!("{}-{}", latest_version_num, prerelease)
-        }
+        format!("{}-{}", latest_version_num, prerelease)
     } else {
         latest_version_num.to_string()
     };

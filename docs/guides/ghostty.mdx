@@ -5,14 +5,13 @@ description: A real-world guide to packaging Ghostty with Zoi, including native 
 
 This guide walks through packaging [Ghostty](https://ghostty.org/) as a Zoi package. Ghostty is a good real-world example because it is not just a single downloaded binary: it has native Linux desktop dependencies, Zig build tooling, generated resources, shell integration files, terminfo files, manuals, desktop files, icons, shared libraries, and optional Nautilus integration.
 
-The example adopts the rigorous authoritative standards required for the Zoidberg `main` tier:
+The example combines the packaging conventions from Arch Linux's PKGBUILD and openSUSE's RPM spec:
 
 - fetch the Ghostty release tarball from GitHub
-- mandatory integrity verification with `sha512`
 - install native build and runtime dependencies with `native:`
 - run Ghostty's Zig cache bootstrap script
 - build with `zig build`
-- split the package into functional sub-packages using the standard `:lib`, `:dev`, and `:docs` convention.
+- split the package into fine-grained sub-packages
 
 <Callout title="Linux-focused guide" type="warn">
   This is a Linux source-build guide. Ghostty packaging differs across
@@ -27,9 +26,9 @@ Ghostty maps naturally to a split package with 13 sub-packages, offering granula
 
 | Sub-package                  | Origin         | Purpose                                                               |
 | ---------------------------- | -------------- | --------------------------------------------------------------------- |
-| `ghostty:main`               | PKGBUILD + RPM | **Primary Binary:** The terminal binary, desktop files, and icons.    |
-| `ghostty:lib`                | RPM spec       | **Runtime:** Shared library (`libghostty-vt.so`)                      |
-| `ghostty:dev`                | RPM spec       | **Development:** Headers and `.pc` file                               |
+| `ghostty:main`               | PKGBUILD + RPM | The terminal binary, desktop files, icons, manuals, themes, resources |
+| `ghostty:lib`                | RPM spec       | Runtime shared library (`libghostty-vt.so`)                           |
+| `ghostty:devel`              | RPM spec       | Development headers and `.pc` file                                    |
 | `ghostty:terminfo`           | both           | Terminfo entries, useful on hosts accessed over SSH                   |
 | `ghostty:bash-completion`    | RPM spec       | Bash completions + bash shell integration                             |
 | `ghostty:fish-completion`    | RPM spec       | Fish completions + fish shell integration                             |
@@ -38,7 +37,7 @@ Ghostty maps naturally to a split package with 13 sub-packages, offering granula
 | `ghostty:nautilus`           | both           | Optional GNOME Files integration                                      |
 | `ghostty:neovim`             | RPM spec       | Neovim syntax highlighting and compiler                               |
 | `ghostty:vim`                | RPM spec       | Vim syntax highlighting and compiler                                  |
-| `ghostty:docs`               | RPM spec       | **Documentation:** HTML documentation                                 |
+| `ghostty:doc`                | RPM spec       | HTML documentation                                                    |
 | `ghostty:lang`               | RPM spec       | Translation files (if present)                                        |
 
 Installing `ghostty` installs the main terminal plus shared library and terminfo by default, while leaving optional components like shell completions, editor integrations, and Nautilus integration for explicit selection.
@@ -61,9 +60,8 @@ The `prepare()` function downloads, extracts, and builds Ghostty in a single pas
 
 ```lua
 function prepare()
-  -- Mandatory integrity check
-  local file = UTILS.DOWNLOAD(url, archive, "sha512-...")
-  UTILS.EXTRACT(file, "src")
+  UTILS.FILE(url, archive)
+  UTILS.EXTRACT(archive, "src")
   cmd("cd src/" .. src_dir
     .. " && ZIG_GLOBAL_CACHE_DIR=" .. zig_global_cache_dir
     .. " ./nix/build-support/fetch-zig-cache.sh")
@@ -115,7 +113,7 @@ dependencies({
       },
       neovim = { required = { "native:neovim" } },
       vim    = { required = { "native:vim" } },
-      dev    = { required = { "native:zig" } },
+      devel  = { required = { "native:zig" } },
     }
   }
 })
@@ -123,7 +121,7 @@ dependencies({
 
 ### Library and Development Split
 
-Following the Zoidberg policy, the shared library and development artefacts are separate sub-packages. The `:lib` sub-package contains only the versioned `.so.*` runtime files, while `:dev` ships headers, the unversioned `.so` symlink, and the `pkg-config` file:
+Following the RPM convention, the shared library and development artefacts are separate sub-packages. The `lib` sub-package contains only the versioned `.so.*` runtime files, while `devel` ships headers, the unversioned `.so` symlink, and the `pkg-config` file:
 
 ```lua
 elseif sub == "lib" then
@@ -131,7 +129,7 @@ elseif sub == "lib" then
   cmd("cp -a " .. root .. "/lib/. lib-runtime/ 2>/dev/null; true")
   cmd("rm -rf lib-runtime/pkgconfig 2>/dev/null; true")
   zcp("lib-runtime", "${pkgstore}/lib")
-elseif sub == "dev" then
+elseif sub == "devel" then
   if UTILS.FS.exists(root .. "/include") then
     zcp(root .. "/include", "${pkgstore}/include")
   end
@@ -139,9 +137,9 @@ elseif sub == "dev" then
     zcp(root .. "/lib/pkgconfig", "${pkgstore}/lib/pkgconfig")
   end
   if UTILS.FS.exists(root .. "/lib/libghostty-vt.so") then
-    cmd("mkdir -p dev-lib")
-    cmd("cp -a " .. root .. "/lib/libghostty-vt.so dev-lib/")
-    zcp("dev-lib", "${pkgstore}/lib")
+    cmd("mkdir -p devel-lib")
+    cmd("cp -a " .. root .. "/lib/libghostty-vt.so devel-lib/")
+    zcp("devel-lib", "${pkgstore}/lib")
   end
 end
 ```
@@ -193,8 +191,7 @@ zoi install ./ghostty.pkg.lua
 
 When turning this into a registry package:
 
-- **MUST** confirm the SHA512 hash in `prepare()` matches the current release
-- **MUST** use valid SPDX license expressions
+- confirm the SHA256 hash in `verify()` matches the current release
 - confirm native package names for each supported distro
 - adjust copied resource paths based on the current Ghostty install tree
 - consider a separate pre-compiled package once trusted release archives are available

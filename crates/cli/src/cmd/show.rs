@@ -148,17 +148,11 @@ fn print_beautiful(
         version_display = format!("{}-{}", version_display, pkg.revision);
     }
 
-    let repo_display = if pkg.repo.starts_with("git/") {
-        format!("#git@{}", &pkg.repo[4..])
-    } else {
-        pkg.repo.clone()
-    };
-
     println!(
         "{} {} - {}",
         pkg.name.bold().green(),
         version_display.dimmed(),
-        repo_display
+        pkg.repo
     );
     if let Some(website) = &pkg.website {
         println!("Website: {}", website.cyan().underline());

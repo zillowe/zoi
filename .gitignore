@@ -5,7 +5,6 @@ dist/
 .gct/
 .agents/
 skills-lock.json
-AGENTS.md
 
 # binaries
 scripts/compiled

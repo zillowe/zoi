@@ -41,6 +41,4 @@ serde_yaml.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
 zoi-sandbox.workspace = true
-
-[target.'cfg(unix)'.dependencies]
 nix.workspace = true

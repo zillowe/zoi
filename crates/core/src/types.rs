@@ -231,6 +231,14 @@ impl InstallManifest {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum ManSpec {
+    Single(String),
+    Multiple(Vec<String>),
+    Map(BTreeMap<String, String>),
+}
+
 /// The core package definition blueprint.
 ///
 /// This struct is the Rust representation of the `metadata({...})` block in a `.pkg.lua` file.
@@ -266,6 +274,9 @@ pub struct Package {
     /// URL or path to the package README.
     #[serde(default)]
     pub readme: Option<String>,
+    /// Manual page specification.
+    #[serde(default)]
+    pub man: Option<ManSpec>,
     /// Upstream Git repository URL.
     #[serde(default)]
     pub git: String,

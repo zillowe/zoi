@@ -67,7 +67,7 @@ Clones a Git repository containing `.pkg.lua` files into Zoi's local package sou
 
 - **Purpose:** To add a custom, third-party package repository.
 - **`add` Value:** A valid Git repository URL (e.g. `https://github.com/user/my-zoi-repo.git`).
-- **Effect:** Zoi clones the repository into `~/.zoi/pkgs/git/`. Users can then install packages from it using the `#git@<repo-name>/<pkg-name>` syntax.
+- **Effect:** Zoi clones the repository into `~/.zoi/pkgs/git/`. Users can then install packages from it using the `@git/<repo-name>/<pkg-name>` syntax.
 - **On Removal:** The cloned repository directory is deleted.
 
 #### `repo-add`

@@ -1,5 +1,5 @@
 use crate::resolver::InstallNode;
-use crate::{manifest, plan, prebuilt, util};
+use crate::{manifest, plan, post_install, prebuilt, util};
 use anyhow::{Result, anyhow};
 use colored::Colorize;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -462,6 +462,22 @@ pub fn install_prepared_node(
         if let types::InstallReason::Dependency { ref parent } = node.reason {
             let package_dir = local::get_package_dir(pkg.scope, handle, &pkg.repo, &pkg.name)?;
             local::add_dependent(&package_dir, parent)?;
+        }
+
+        if let Err(e) =
+            post_install::install_manual_if_available(pkg, version, handle, step_pb.as_ref())
+        {
+            let msg = format!(
+                "Warning: failed to install manual for '{}': {}",
+                pkg.name, e
+            );
+            if let Some(p) = &step_pb {
+                p.println(msg);
+            } else if let Some(p) = &main_pb {
+                p.println(msg);
+            } else {
+                eprintln!("{}", msg);
+            }
         }
 
         let manifest = manifest::create_manifest(

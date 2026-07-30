@@ -13,9 +13,6 @@ pub fn pool_files(
     scope_mapping: &mut ScopeMapping,
     fakeroot: bool,
 ) -> Result<()> {
-    #[cfg(not(unix))]
-    let _ = fakeroot;
-
     if !virtual_staging_dir.exists() {
         return Ok(());
     }
