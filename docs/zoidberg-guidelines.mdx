@@ -24,7 +24,7 @@ All software in the `core` and `main` tiers **MUST** be under licenses determine
 
 The `license` field in `metadata()` **MUST** be populated with a valid [SPDX license identifier](https://spdx.org/licenses/) or expression.
 
-* **Complex Licenses:** Use `AND`, `OR`, and `WITH` operators to accurately reflect multi-licensed software (e.g., `MIT AND Apache-2.0`).
+* **Complex Licenses:** Use `AND`, `OR`, and `WITH` operators to accurately reflect multi-licensed software (e.g. `MIT AND Apache-2.0`).
 * **Missing License Text:** If upstream fails to include a license file, the maintainer **SHOULD** contact upstream. If required by the license, a believed-correct copy of the license text **MUST** be included in the package via `zlicense()`.
 
 ---
@@ -37,7 +37,7 @@ Zoi uses an automated SAT solver that depends on strict, sortable versioning.
 
 The `version` field **MUST** match the upstream project version verbatim.
 
-* **No Prefixes:** Do not include `v` prefixes (e.g., use `1.2.3`, not `v1.2.3`).
+* **No Prefixes:** Do not include `v` prefixes (e.g. use `1.2.3`, not `v1.2.3`).
 * **Leading Zeroes:** Do not trim leading zeroes if they are part of the upstream scheme.
 
 ### 2.2. Downstream Revisions (`revision`)
@@ -71,7 +71,7 @@ Packages **MUST** make every effort to avoid bundling (vendoring) libraries that
 For packages providing a `source` build type, all binaries and libraries **MUST** be built from the source code included in the build process.
 
 * **Prohibition:** Maintainers **MUST NOT** include pre-compiled `.o`, `.so`, or `.exe` files in a source build.
-* **Exception:** This rule does not apply to content files (e.g., `.png`, `.pdf`) or "bootstrap" binaries required to build a compiler, provided those binaries are themselves open-source and temporary.
+* **Exception:** This rule does not apply to content files (e.g. `.png`, `.pdf`) or "bootstrap" binaries required to build a compiler, provided those binaries are themselves open-source and temporary.
 
 ### 3.3. Impermissible Content
 
@@ -137,7 +137,3 @@ function package(args)
   zlicense("LICENSE")
 end
 ```
-
-### 6.3. Persistent Shell (`cmd`)
-
-The `cmd()` function uses a persistent shell session. Maintainers **SHOULD** use this to their advantage to write clean, stateful build logic (e.g., `cd`, `export`) without excessive boilerplate.
