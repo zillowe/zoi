@@ -100,6 +100,9 @@ pub fn setup_lua_environment(
     if let Some(kernel) = utils::get_kernel_version() {
         system_table.set("KERNEL_VER", kernel)?;
     }
+    if let Some(init) = utils::get_init_system() {
+        system_table.set("INIT", init)?;
+    }
     if let Some(cpu) = utils::get_cpu_info() {
         system_table.set("CPU", cpu)?;
     }

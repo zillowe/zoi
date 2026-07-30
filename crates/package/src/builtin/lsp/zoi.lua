@@ -9,6 +9,7 @@
 ---@field DE string? The detected Desktop Environment (e.g. "kde", "gnome", "windows").
 ---@field SERVER string? The display server in use (e.g. "x11", "wayland", "quartz").
 ---@field KERNEL_VER string? The kernel version of the operating system.
+---@field INIT "systemd"|"openrc"|"busybox"|"unknown"? The init system in use.
 ---@field CPU string? CPU model information.
 ---@field GPU string? GPU model information.
 ---@field MANAGER string? The detected native package manager (e.g. "apt", "pacman").
