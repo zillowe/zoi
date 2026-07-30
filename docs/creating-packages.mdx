@@ -55,7 +55,6 @@ This table lists all the available fields you can use inside the `metadata` bloc
 | `description`    | `string`  | **Required.** A short, one-line description of the package.                                                                                                                                                                                 |
 | `website`        | `string`  | The official website of the software.                                                                                                                                                                                                       |
 | `git`            | `string`  | The source code's git repository URL.                                                                                                                                                                                                       |
-| `man`            | `string`  | A URL to the package's manual page (can be a raw markdown or text file).                                                                                                                                                                    |
 | `maintainer`     | `table`   | **Required.** A table with `name`, `email`, and optionally `website` of the package maintainer.                                                                                                                                             |
 | `author`         | `table`   | A table with `name`, `email`, and `website` of the original software author.                                                                                                                                                                |
 | `license`        | `string`  | The [SPDX license identifier](https://spdx.org/licenses/) for the software (e.g. `MIT`, `GPL-3.0-or-later`).                                                                                                                                |
@@ -190,6 +189,7 @@ When Zoi executes your script, it provides a rich environment of global variable
 | `zcp(source, dest)`                       | Copies files/directories to the `STAGING_DIR`. The `source` can be a path inside `BUILD_DIR`, an absolute path, or a path relative to the `.pkg.lua` file using `${pkgluadir}`. See [Staging Files with `zcp`](#staging-files-with-zcp). |
 | `zlicense(source)`                        | Stages a license file. Uses standard FHS paths (`/usr/share/licenses/...`) in system scope, or `${pkgstore}` otherwise.                                                                                                                  |
 | `zdoc(source)`                            | Stages a documentation file. Uses standard FHS paths (`/usr/share/doc/...`) in system scope, or `${pkgstore}/doc` otherwise.                                                                                                              |
+| `zman(source, section)`                  | Stages a manual page. Uses standard FHS paths (`/usr/share/man/man{section}/...`) in system scope, or `${pkgstore}/man/man{section}/` otherwise.                                                                                          |
 | `zsed(pattern, replacement, file)`        | Performs an in-place regex replacement on a file in `BUILD_DIR`.                                                                                                                                                                         |
 | `zpatch(patch_file, strip)`               | Applies a patch file to the `BUILD_DIR`.                                                                                                                                                                                                 |
 | `zln(target, link)`                       | Creates a symbolic link in the package.                                                                                                                                                                                                  |
@@ -693,7 +693,6 @@ metadata({
   description = "Hello World",
   website = "https://github.com/zillowe/hello",
   git = git_url,
-  man = "https://raw.githubusercontent.com/zillowe/hello/refs/heads/main/app/man.md",
   maintainer = { name = "Zillowe", email = "contact@zillowe.org" },
   license = "Apache-2.0",
   bins = { "hello" },
@@ -711,6 +710,10 @@ dependencies({
 
 -- 4. Lifecycle Functions
 function prepare()
+  -- Fetch the manual page
+  local man_url = "https://raw.githubusercontent.com/zillowe/hello/refs/heads/main/app/man.md"
+  UTILS.FILE(man_url, "hello.md")
+
   if BUILD_TYPE == "pre-compiled" then
     local ext = (SYSTEM.OS == "windows") and "zip" or "tar.xz"
     local file_name = "hello-" .. SYSTEM.OS .. "-" .. SYSTEM.ARCH .. "." .. ext
@@ -726,6 +729,9 @@ function package()
   local bin_name = (SYSTEM.OS == "windows") and "hello.exe" or "hello"
   local source_path = (BUILD_TYPE == "source") and "source/" or "precompiled/"
   zcp(source_path .. bin_name, "${pkgstore}/bin/" .. bin_name)
+
+  -- Stage the manual page
+  zman("hello.md")
 end
 
 function verify()

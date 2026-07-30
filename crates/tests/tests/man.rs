@@ -6,33 +6,6 @@ use zoi::pkg::{config, db, local, types};
 mod common;
 
 #[test]
-fn test_manspec_deserialization() {
-    let single_json = r#""https://example.com/man.md""#;
-    let single: types::ManSpec = serde_json::from_str(single_json).unwrap();
-    match single {
-        types::ManSpec::Single(s) => assert_eq!(s, "https://example.com/man.md"),
-        _ => panic!("Expected Single variant"),
-    }
-
-    let multiple_json = r#"["url1", "url2"]"#;
-    let multiple: types::ManSpec = serde_json::from_str(multiple_json).unwrap();
-    match multiple {
-        types::ManSpec::Multiple(m) => assert_eq!(m, vec!["url1", "url2"]),
-        _ => panic!("Expected Multiple variant"),
-    }
-
-    let map_json = r#"{"page1": "url1", "page2": "url2"}"#;
-    let map: types::ManSpec = serde_json::from_str(map_json).unwrap();
-    match map {
-        types::ManSpec::Map(m) => {
-            assert_eq!(m.get("page1").unwrap(), "url1");
-            assert_eq!(m.get("page2").unwrap(), "url2");
-        }
-        _ => panic!("Expected Map variant"),
-    }
-}
-
-#[test]
 fn test_parse_roff_basic() {
     let roff = r#"
 .TH MYTOOL 1
