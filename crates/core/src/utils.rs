@@ -463,6 +463,36 @@ pub fn get_kernel_version() -> Option<String> {
     None
 }
 
+pub fn get_init_system() -> Option<String> {
+    if let Ok(val) = std::env::var("ZOI_INIT") {
+        return Some(val.to_lowercase());
+    }
+
+    let run_systemd = crate::sysroot::apply_sysroot(PathBuf::from("/run/systemd/system"));
+    if run_systemd.exists() {
+        return Some("systemd".to_string());
+    }
+
+    let run_openrc = crate::sysroot::apply_sysroot(PathBuf::from("/run/openrc"));
+    if run_openrc.exists() {
+        return Some("openrc".to_string());
+    }
+
+    let sbin_init = crate::sysroot::apply_sysroot(PathBuf::from("/sbin/init"));
+    if let Ok(target) = std::fs::read_link(&sbin_init) {
+        let target_str = target.to_string_lossy();
+        if target_str.contains("systemd") {
+            return Some("systemd".to_string());
+        } else if target_str.contains("openrc") {
+            return Some("openrc".to_string());
+        } else if target_str.contains("busybox") {
+            return Some("busybox".to_string());
+        }
+    }
+
+    None
+}
+
 pub fn get_distro_version() -> Option<String> {
     if let Some(info) = get_linux_distribution_info()
         && let Some(vid) = info.get("VERSION_ID")
