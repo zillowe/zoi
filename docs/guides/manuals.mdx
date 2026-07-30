@@ -45,47 +45,22 @@ zoi man <package_name> --raw
 
 ## Providing Manuals in Packages
 
-Package authors can provide manuals in several ways within their `.pkg.lua` definitions.
+Package authors can provide manual pages using the `zman()` helper function within their `.pkg.lua` definitions. This is the recommended way to ensure manuals are correctly placed for both system-wide and user-scoped installations.
 
-### 1. Remote Manuals (Metadata)
+### Using `zman(source, section)`
 
-You can specify remote URLs for manual pages in the `metadata` block. Zoi supports single URLs, lists of URLs, or a map for named pages.
+The `zman()` function stages a manual file to the appropriate location based on the installation scope.
 
-```lua
-metadata({
-  -- Single manual page
-  man = "https://example.com/man.md",
+- **source**: Path to the manual file (Markdown, ROFF, or Text), relative to `BUILD_DIR` or `${pkgluadir}`.
+- **section**: (Optional) The manual section (e.g. `"1"` for commands, `"5"` for config files). If omitted, Zoi automatically infers the section from the file extension.
 
-  -- Multiple manual pages (auto-named)
-  man = {
-    "https://example.com/main.md",
-    "https://example.com/extra.md"
-  },
-
-  -- Multiple manual pages with custom names
-  man = {
-    main = "https://example.com/main.md",
-    config = "https://example.com/config.md"
-  }
-})
-```
-
-Zoi will download these pages upon installation or when requested with the `--upstream` flag.
-
-### 2. Local Manual Files
-
-During the `package()` step, you can stage manual files to specific locations in the package store. Zoi searches for manuals in the following order:
-
-1. `${pkgstore}/man.md`
-2. `${pkgstore}/man.txt`
-3. `${pkgstore}/share/man/` (ROFF, Markdown, or Text files)
-
-#### Example: Staging a ROFF Page
+#### Example: Staging a traditional ROFF Page
 
 ```lua
 function package()
-  -- Stage a traditional ROFF man page
-  zcp("doc/mytool.1", "${pkgstore}/share/man/man1/mytool.1")
+  -- Stage a traditional ROFF man page (section 1)
+  -- If source is 'man/mytool.1', Zoi infers section 1 automatically.
+  zman("man/mytool.1")
 end
 ```
 
@@ -93,12 +68,39 @@ end
 
 ```lua
 function package()
-  -- Stage a Markdown manual
-  zcp("docs/manual.md", "${pkgstore}/man.md")
+  -- Stage a Markdown manual and explicitly set section 7 (Miscellaneous)
+  zman("docs/guide.md", "7")
 end
 ```
 
-### ROFF Parsing
+### Installation Locations
+
+Zoi places manuals in standard locations to ensure they are discoverable:
+
+| Scope | Location |
+| :--- | :--- |
+| **System** | `/usr/share/man/man{section}/` |
+| **User** | `~/.zoi/pkgs/store/{pkg}/man/man{section}/` |
+| **Project** | `./.zoi/pkgs/store/{pkg}/man/man{section}/` |
+
+---
+
+## Viewing Manuals for Uninstalled Packages
+
+One of Zoi's advanced features is the ability to view manuals for packages that are not yet installed on your system.
+
+When you run `zoi man <package_name>` for an uninstalled package:
+
+1. Zoi **resolves** the package from your active registries.
+2. It **downloads or builds** the package archive into a temporary cache.
+3. It **extracts** the archive to a temporary directory.
+4. It **gathers** the manual pages from the extracted contents and displays them.
+
+This allows you to research a tool's capabilities and configuration before deciding to install it globally.
+
+---
+
+## ROFF Parsing
 
 Zoi includes a cross-platform ROFF-to-Markdown parser. This allows traditional man pages to be rendered with syntax highlighting and styling in Zoi's TUI, even on systems without `man-db` or `groff` installed (like Windows).
 
@@ -106,6 +108,6 @@ Zoi includes a cross-platform ROFF-to-Markdown parser. This allows traditional m
 
 ## Troubleshooting
 
-- **"No manual pages found"**: Ensure the package maintainer has provided a `man` URL or staged files in the store.
-- **Upstream Manuals**: If the local manual is missing or you want the latest version, use `zoi man <pkg> --upstream`.
+- **"No manual pages found"**: Ensure the package maintainer has used `zman()` to stage files in the package.
+- **Upstream Manuals**: If the local manual is missing or you want the latest version from the registry (including uninstalled ones), use `zoi man <pkg> --upstream`.
 - **Formatting Issues**: While Zoi's ROFF parser handles common macros, complex man pages might display better with `--raw` if you have a local `man` command.

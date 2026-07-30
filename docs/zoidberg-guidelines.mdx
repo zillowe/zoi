@@ -116,7 +116,11 @@ Lifecycle functions like `build()` and `package()` SHOULD NOT access the interne
 
 Use the `zshell()` helper function to bundle completion scripts for Bash, Zsh, and Fish.
 
-### 6.2. License Staging
+### 6.2. Manual Pages
+
+Use the `zman()` helper function to bundle manual pages. This ensures they are available via `zoi man` and placed in standard locations.
+
+### 6.3. License Staging
 
 Every package MUST stage its license text to the package store using the `zlicense()` helper.
 
@@ -124,12 +128,14 @@ Every package MUST stage its license text to the package store using the `zlicen
 function package()
   -- Stage binary...
   zcp("bin/tool", "${pkgstore}/bin/tool")
+  -- Stage manual page
+  zman("doc/tool.1")
   -- Stage license
   zlicense("LICENSE")
 end
 ```
 
-### 6.3. Security Verification
+### 6.4. Security Verification
 
 * **Hashes Required:** All `pre-compiled` downloads MUST be verified using `verifyHash()` with a strong algorithm (`sha512` or `sha256`).
 * **Signatures:** Use `verifySignature()` with upstream PGP keys whenever available.

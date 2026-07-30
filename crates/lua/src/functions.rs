@@ -261,6 +261,7 @@ pub fn setup_lua_environment(
     api::fs::add_zcp(lua)?;
     api::fs::add_zlicense(lua)?;
     api::fs::add_zdoc(lua)?;
+    api::fs::add_zman(lua)?;
     api::fs::add_zshell(lua)?;
     api::fs::add_zsed(lua, quiet)?;
     api::fs::add_zln(lua)?;

@@ -100,6 +100,16 @@ Stages a documentation file for the package. The destination path is determined 
 
 - **source**: Path relative to `BUILD_DIR`, or use `${pkgluadir}`.
 
+### `zman(source, section)`
+
+Stages a manual page for the package. The destination path is determined by the installation scope:
+
+- **System Scope**: `${usrroot}/usr/share/man/man{section}/<filename>` (standard FHS location).
+- **Other Scopes**: `${pkgstore}/man/man{section}/<filename>`.
+
+- **source**: Path relative to `BUILD_DIR`, or use `${pkgluadir}`.
+- **section**: (Optional) The manual section (1-9). If omitted, Zoi attempts to infer it from the file extension (e.g. `.1`, `.5`).
+
 ### `zshell(source, shell)`
 
 Stages a shell completion file for a specific shell. The file is copied to `${pkgstore}/shell/{shell}/{filename}` and symlinked into the global completions directory (`~/.zoi/pkgs/shell/{shell}/{package}/`). Zoi automatically manages the symlinks during install and uninstall.

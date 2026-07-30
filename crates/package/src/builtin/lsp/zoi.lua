@@ -44,7 +44,6 @@ ZOI = {}
 ---@field description string Required. A short description of the package.
 ---@field website string? The official website URL.
 ---@field git string? The source code's git repository URL.
----@field man string? A URL to the package's manual page.
 ---@field maintainer Maintainer Required. The package maintainer.
 ---@field author Author? The original software author.
 ---@field license string? The SPDX license identifier.
@@ -190,6 +189,13 @@ function zlicense(source) end
 --- Copies a documentation file to the package store (${pkgstore}/doc/{filename}).
 ---@param source string Path relative to BUILD_DIR or ${pkgluadir}.
 function zdoc(source) end
+
+--- Stages a manual page for the package.
+--- If scope is system, it is copied to /usr/share/man/man{section}/{filename}.
+--- Otherwise, it is copied to ${pkgstore}/man/man{section}/{filename}.
+---@param source string Path relative to BUILD_DIR or ${pkgluadir}.
+---@param section string? Optional manual section (1-9). If omitted, it's inferred from extension.
+function zman(source, section) end
 
 --- Stages a shell completion file for a specific shell.
 --- The file is copied to ${pkgstore}/shell/{shell}/{filename} and symlinked

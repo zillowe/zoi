@@ -1,5 +1,5 @@
 use crate::pkg::{
-    install::{manifest, post_install, resolver::InstallNode},
+    install::{manifest, resolver::InstallNode},
     local, types,
 };
 use anyhow::{Result, anyhow};
@@ -32,8 +32,6 @@ pub fn elevate_install_node(cmd: &crate::cmd::helper::ElevateInstallNodeCommand)
         let package_dir = local::get_package_dir(pkg.scope, handle, &pkg.repo, &pkg.name)?;
         local::add_dependent(&package_dir, parent)?;
     }
-
-    let _ = post_install::install_manual_if_available(pkg, &node.version, handle, None);
 
     let manifest = manifest::create_manifest(
         pkg,
