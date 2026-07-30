@@ -66,6 +66,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 
 ### 🩹 Bug Fixes
 
+- *(package)* Correct scoping of unix-specific path operations
 - *(zoiignore)* Implement recursive directory ignoring during bundle
 - *(config)* Change default build binary to zoi
 

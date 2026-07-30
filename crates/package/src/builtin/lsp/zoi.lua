@@ -36,11 +36,11 @@ ZOI = {}
 
 ---@class PkgMetadata
 ---@field name string Required. The name of the package.
----@field repo string Required. The repository tier (e.g., "core", "community").
+---@field repo string Required. The repository tier (e.g. "core", "community").
 ---@field version string? The package version.
 ---@field epoch integer? Forced version precedence (defaults to 0).
 ---@field revision string? The package revision (defaults to "1").
----@field versions table<string, string>? A map of channels to versions (e.g., { stable = "1.2.3" }).
+---@field versions table<string, string>? A map of channels to versions (e.g. { stable = "1.2.3" }).
 ---@field description string Required. A short description of the package.
 ---@field website string? The official website URL.
 ---@field git string? The source code's git repository URL.
@@ -52,8 +52,8 @@ ZOI = {}
 ---@field provides string[]? List of virtual packages provided.
 ---@field replaces string[]? List of packages this one replaces.
 ---@field backup string[]? List of config files to preserve during upgrades.
----@field types string[] Required. Supported build methods (e.g., "source", "pre-compiled").
----@field platforms string[]? Supported platforms (e.g., "linux", "macos", "windows", "ci:windows-amd64:linux" for cross-build).
+---@field types string[] Required. Supported build methods (e.g. "source", "pre-compiled").
+---@field platforms string[]? Supported platforms (e.g. "linux", "macos", "windows", "ci:windows-amd64:linux" for cross-build).
 ---@field ci CiConfig? CI runner configuration for build pipelines.
 ---@field type "package"|"collection"|"app"|"extension"? The type of package.
 ---@field scope "user"|"system"|"project"? Default installation scope.
@@ -222,7 +222,7 @@ function zln(target, link) end
 
 --- Sets permissions of a staged file or directory.
 ---@param path string
----@param mode integer Octal mode (e.g., 493 for 0755).
+---@param mode integer Octal mode (e.g. 493 for 0755).
 function zchmod(path, mode) end
 
 --- Sets ownership of a staged file or directory.
@@ -250,7 +250,7 @@ function INCLUDE(filename) end
 
 --- Verifies a file's checksum.
 ---@param file_path string
----@param hash_spec string e.g., "sha256-..."
+---@param hash_spec string e.g. "sha256-..."
 ---@return boolean
 function verifyHash(file_path, hash_spec) end
 
@@ -337,7 +337,7 @@ function UTILS.FILE(url, path) end
 --- Downloads a file from a URL and optionally verifies its hash.
 ---@param url string
 ---@param filename string? Optional output filename (defaults to URL filename).
----@param hash string? Optional hash to verify (e.g., "sha512-..." or "sha256-...").
+---@param hash string? Optional hash to verify (e.g. "sha512-..." or "sha256-...").
 ---@return string filename The final filename of the downloaded file.
 function UTILS.DOWNLOAD(url, filename, hash) end
 
