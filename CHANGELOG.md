@@ -21,6 +21,7 @@ To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | b
 
 ### ♻️ Refactor
 
+- *(system)* Improve cross-platform compilation support
 - *(core)* Update git source identifier syntax
 
 ### ✨ Features
