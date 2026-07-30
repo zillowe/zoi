@@ -303,9 +303,9 @@ fn process_build_operations(
                         ));
                     }
 
-                    let full_path = target_staging_dir.join(&dest_rel);
                     #[cfg(unix)]
                     {
+                        let full_path = target_staging_dir.join(&dest_rel);
                         use std::os::unix::fs::PermissionsExt;
                         fs::set_permissions(full_path, fs::Permissions::from_mode(mode))?;
                     }
@@ -328,11 +328,10 @@ fn process_build_operations(
                     }
 
                     #[cfg(unix)]
-                    let full_path = target_staging_dir.join(&dest_rel);
-                    #[cfg(unix)]
-                    utils::set_path_owner(&full_path, &owner, &group)?;
-                    #[cfg(not(unix))]
-                    let _ = (owner, group);
+                    {
+                        let full_path = target_staging_dir.join(&dest_rel);
+                        utils::set_path_owner(&full_path, &owner, &group)?;
+                    }
                     if !quiet {
                         println!("Set ownership {}:{} on '{}'", owner, group, dest_rel);
                     }
