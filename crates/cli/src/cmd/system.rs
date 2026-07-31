@@ -187,12 +187,24 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
                     );
 
                     // Use CLI's install engine
+                    let project_config = zoi_project::config::ProjectConfig {
+                        name: "system".to_string(),
+                        registries: std::collections::HashMap::new(),
+                        packages: Vec::new(),
+                        pkgs: config.packages.clone(),
+                        pkgs_v2: config.packages_v2.clone(),
+                        config: zoi_project::config::ProjectLocalConfig::default(),
+                        commands: Vec::new(),
+                        environments: Vec::new(),
+                        shell: Some(zoi_project::config::ShellSpec::default()),
+                    };
+
                     crate::cmd::install::run(
                         &config.packages,
                         None,
-                        false,
-                        false,
-                        true,
+                        false, // force
+                        false, // all_optional
+                        yes,
                         Some(crate::cli::InstallScope::System),
                         false,
                         false,
@@ -207,6 +219,7 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
                         3,
                         false,
                         false,
+                        Some(project_config),
                     )?;
                 }
 

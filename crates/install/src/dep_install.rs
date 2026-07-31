@@ -291,6 +291,7 @@ fn install_zoi_dependency(
         all_optional,
         None,
         true,
+        None,
     ) {
         Ok(res) => res,
         Err(e) => {

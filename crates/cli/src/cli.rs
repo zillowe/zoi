@@ -1053,6 +1053,7 @@ pub fn run() -> anyhow::Result<()> {
                 retry,
                 verbose,
                 purl,
+                None,
             )
             .map_err(|e| cmd::ux::with_failure_hint("install", e)),
             Commands::Use { packages, global } => cmd::use_cmd::run(packages, global),

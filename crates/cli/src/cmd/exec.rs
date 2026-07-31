@@ -27,6 +27,7 @@ pub fn run(source: String, bin: Option<String>, args: Vec<String>, verbose: bool
         true,
         None,
         !verbose,
+        None,
     )?;
 
     let install_plan = install::plan::create_install_plan(&graph.nodes, None, false)?;

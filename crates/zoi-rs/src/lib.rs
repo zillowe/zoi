@@ -317,6 +317,7 @@ pub fn install_sources(sources: &[String], options: &SourceInstallOptions) -> Re
         3,
         false,
         false,
+        None,
     )
 }
 
@@ -354,6 +355,7 @@ pub fn resolve_dependency_graph(
         options.all_optional,
         options.build_type.as_deref(),
         options.quiet,
+        None,
     )?;
     Ok(DependencyResolution {
         graph,

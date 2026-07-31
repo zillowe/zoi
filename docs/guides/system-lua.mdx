@@ -49,17 +49,30 @@ bootloader({
 
 ---
 
-### `packages(list)`
+### `packages(table)`
 
-Defines the base set of packages installed in the system scope.
+Defines the base set of packages installed in the system scope. You can provide a simple list of names or a table for advanced pinning and option selection.
 
 ```lua
 packages({
+    -- Simple list
     "@core/linux",
     "@core/systemd",
-    "@main/NetworkManager",
-    "@main/git",
-    "@main/neovim",
+
+    -- Pinning to a specific version or range
+    ["@main/neovim"] = { version = "^0.10" },
+
+    -- Pinning to a channel
+    ["@core/zoi"] = { version = "@stable" },
+
+    -- Advanced pinning and options
+    ["@core/base"] = {
+        options = {
+            "zoi:@core/systemd",
+            "zoi:@core/linux",
+            "zoi:@core/sudo"
+        }
+    }
 })
 ```
 

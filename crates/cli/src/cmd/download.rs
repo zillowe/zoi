@@ -30,6 +30,7 @@ pub fn run(
         false,
         None,
         true,
+        None,
     )?;
 
     if graph.nodes.is_empty() {

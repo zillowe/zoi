@@ -38,6 +38,7 @@ fn resolves_dependency_graph_for_local_pkg_lua_source_in_test_assets() {
         false,
         None,
         true,
+        None,
     )
     .expect("local pkg.lua source should resolve");
 
@@ -72,6 +73,7 @@ fn resolves_dependency_graph_for_versioned_local_pkg_lua_source() {
         false,
         None,
         true,
+        None,
     )
     .expect("versioned local pkg.lua source should resolve");
 
@@ -113,6 +115,7 @@ fn resolves_dependency_graph_for_local_pkg_lua_stable_channel() {
         false,
         None,
         true,
+        None,
     )
     .expect("stable channel local pkg.lua source should resolve");
 
@@ -143,6 +146,7 @@ fn resolves_dependency_graph_for_local_pkg_lua_alpha_channel() {
         false,
         None,
         true,
+        None,
     )
     .expect("alpha channel local pkg.lua source should resolve");
 

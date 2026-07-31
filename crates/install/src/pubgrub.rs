@@ -174,6 +174,8 @@ pub struct ZoiDependencyProvider {
     pub project_config: Option<zoi_project::config::ProjectConfig>,
     /// Hard version constraints enforced by a project's lockfile or configuration.
     pub pkgs_v2_constraints: HashMap<(String, String), String>,
+    /// Build type used for selecting typed build dependencies.
+    pub build_type: Option<String>,
     /// Memoization cache mapping a package+version to its resolved dependency requirements.
     /// The `RefCell` allows interior mutability since the PubGrub solver requires `&self`.
     pub deps_cache:
@@ -308,6 +310,7 @@ impl ZoiDependencyProvider {
         yes: bool,
         all_optional: bool,
         project_config: Option<zoi_project::config::ProjectConfig>,
+        build_type: Option<String>,
     ) -> Result<Self, anyhow::Error> {
         let mini_index = if zoi_core::utils::is_mini_mode() {
             Some(zoi_resolver::mini_resolve::fetch_registry_index()?)
@@ -340,6 +343,7 @@ impl ZoiDependencyProvider {
             mini_index,
             project_config,
             pkgs_v2_constraints,
+            build_type,
             deps_cache: RefCell::new(FxHashMap::default()),
             chosen_cache: RefCell::new(FxHashMap::default()),
         })
@@ -504,6 +508,26 @@ impl DependencyProvider for ZoiDependencyProvider {
 
         let version_str = version.to_string();
 
+        let mut chosen_opts = Vec::new();
+        let mut chosen_opts_opt = Vec::new();
+
+        if let Some(config) = &self.project_config {
+            let packages_key = if let Some(sub) = &package.sub_package {
+                format!("@{}/{}:{}", package.repo, package.name, sub)
+            } else {
+                format!("@{}/{}", package.repo, package.name)
+            };
+
+            if let Some(spec) = config.pkgs_v2.get(&packages_key) {
+                if let Some(opts) = &spec.options {
+                    chosen_opts.extend(opts.clone());
+                }
+                if let Some(opt_optionals) = &spec.optionals {
+                    chosen_opts_opt.extend(opt_optionals.clone());
+                }
+            }
+        }
+
         let mut package_deps: Option<types::DependenciesV2> = None;
 
         if let Some(config) = &self.project_config {
@@ -522,8 +546,15 @@ impl DependencyProvider for ZoiDependencyProvider {
                         v == &version_str
                     }
                 })
+                && let Some(v1_deps) = &spec.dependencies
             {
-                package_deps = spec.dependencies.clone().map(types::to_dependencies_v2);
+                package_deps = Some(v1_deps.resolve(
+                    &chosen_opts,
+                    &chosen_opts_opt,
+                    package.sub_package.as_deref(),
+                    self.all_optional,
+                    self.build_type.as_deref(),
+                ));
             }
         }
 
@@ -572,13 +603,19 @@ impl DependencyProvider for ZoiDependencyProvider {
                     }
                 }
             };
-            package_deps = v1_deps.map(types::to_dependencies_v2);
+
+            package_deps = v1_deps.map(|d| {
+                d.resolve(
+                    &chosen_opts,
+                    &chosen_opts_opt,
+                    package.sub_package.as_deref(),
+                    self.all_optional,
+                    self.build_type.as_deref(),
+                )
+            });
         }
 
         let mut deps = FxHashMap::default();
-
-        let chosen_opts = Vec::new();
-        let chosen_opts_opt = Vec::new();
         let mut all_req = Vec::new();
 
         if let Some(dependencies) = package_deps {

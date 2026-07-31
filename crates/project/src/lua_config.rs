@@ -73,6 +73,8 @@ pub fn load_zoi_lua(path: &Path, env: HashMap<String, String>) -> Result<Project
                                     sub_packages: None,
                                     version: None,
                                     dependencies: None,
+                                    options: None,
+                                    optionals: None,
                                 },
                             );
                         }

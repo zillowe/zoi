@@ -281,6 +281,7 @@ fn run_update_single_logic(
         false,
         None,
         false,
+        None,
     )?;
 
     install::util::check_policy_compliance(&graph)?;
@@ -769,6 +770,7 @@ fn run_update_all_logic(
                 false,
                 None,
                 false,
+                None,
             ) {
                 Ok(res) => res,
                 Err(e) => {

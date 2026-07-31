@@ -15,6 +15,7 @@ name = "zoi_system"
 [dependencies]
 zoi-core.workspace = true
 zoi-lua.workspace = true
+zoi-project.workspace = true
 zoi-resolver.workspace = true
 zoi-install.workspace = true
 anyhow.workspace = true

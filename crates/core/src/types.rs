@@ -440,6 +440,51 @@ impl DependencyGroup {
             DependencyGroup::Complex(group) => &group.optional,
         }
     }
+
+    pub fn resolve(
+        &self,
+        chosen_options: &[String],
+        chosen_optionals: &[String],
+        sub_package: Option<&str>,
+        all_optional: bool,
+    ) -> Vec<String> {
+        let mut result = Vec::new();
+        match self {
+            DependencyGroup::Simple(deps) => {
+                result.extend(deps.clone());
+            }
+            DependencyGroup::Complex(group) => {
+                result.extend(group.required.clone());
+
+                for opt_group in &group.options {
+                    for dep in &opt_group.depends {
+                        if chosen_options.contains(dep) {
+                            result.push(dep.clone());
+                        }
+                    }
+                }
+
+                for opt in &group.optional {
+                    if all_optional || chosen_optionals.contains(opt) {
+                        result.push(opt.clone());
+                    }
+                }
+
+                if let Some(sub) = sub_package
+                    && let Some(sub_map) = &group.sub_packages
+                    && let Some(sub_group) = sub_map.get(sub)
+                {
+                    result.extend(sub_group.resolve(
+                        chosen_options,
+                        chosen_optionals,
+                        None,
+                        all_optional,
+                    ));
+                }
+            }
+        }
+        result
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
@@ -474,6 +519,65 @@ pub struct Dependencies {
     pub build: Option<BuildDependencies>,
     #[serde(default)]
     pub test: Option<DependencyGroup>,
+}
+
+impl Dependencies {
+    pub fn resolve(
+        &self,
+        chosen_options: &[String],
+        chosen_optionals: &[String],
+        sub_package: Option<&str>,
+        all_optional: bool,
+        build_type: Option<&str>,
+    ) -> DependenciesV2 {
+        let runtime = self
+            .runtime
+            .as_ref()
+            .map(|g| g.resolve(chosen_options, chosen_optionals, sub_package, all_optional))
+            .unwrap_or_default();
+
+        let mut build = Vec::new();
+        if let Some(b) = &self.build {
+            match b {
+                BuildDependencies::Group(g) => {
+                    let packages =
+                        g.resolve(chosen_options, chosen_optionals, sub_package, all_optional);
+                    build.push(BuildDependencyV2 {
+                        build_type: "source".to_string(),
+                        packages,
+                    });
+                }
+                BuildDependencies::Typed(t) => {
+                    for (bt, g) in &t.types {
+                        if build_type.is_none() || build_type == Some(bt) {
+                            let packages = g.resolve(
+                                chosen_options,
+                                chosen_optionals,
+                                sub_package,
+                                all_optional,
+                            );
+                            build.push(BuildDependencyV2 {
+                                build_type: bt.clone(),
+                                packages,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        let test = self
+            .test
+            .as_ref()
+            .map(|g| g.resolve(chosen_options, chosen_optionals, sub_package, all_optional))
+            .unwrap_or_default();
+
+        DependenciesV2 {
+            runtime,
+            build,
+            test,
+        }
+    }
 }
 
 pub fn to_dependencies_v2(deps: Dependencies) -> DependenciesV2 {

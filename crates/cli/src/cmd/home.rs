@@ -45,6 +45,19 @@ pub fn run(args: HomeCommand) -> Result<()> {
                     "::".bold().blue(),
                     config.packages.len().to_string().cyan()
                 );
+
+                let project_config = zoi_project::config::ProjectConfig {
+                    name: "home".to_string(),
+                    registries: std::collections::HashMap::new(),
+                    packages: Vec::new(),
+                    pkgs: config.packages.clone(),
+                    pkgs_v2: config.packages_v2.clone(),
+                    config: zoi_project::config::ProjectLocalConfig::default(),
+                    commands: Vec::new(),
+                    environments: Vec::new(),
+                    shell: Some(zoi_project::config::ShellSpec::default()),
+                };
+
                 crate::cmd::install::run(
                     &config.packages,
                     None,
@@ -65,6 +78,7 @@ pub fn run(args: HomeCommand) -> Result<()> {
                     3,
                     false,
                     false,
+                    Some(project_config),
                 )?;
             }
 

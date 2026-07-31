@@ -1,5 +1,5 @@
 use anyhow::{Result, anyhow};
-use mlua::{Lua, Table};
+use mlua::{Lua, LuaSerdeExt, Table};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -8,6 +8,7 @@ use std::path::Path;
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct HomeConfig {
     pub packages: Vec<String>,
+    pub packages_v2: HashMap<String, zoi_project::config::PackageSpec>,
     pub dotfiles: HashMap<String, String>,
     pub env: HashMap<String, String>,
 }
@@ -17,16 +18,41 @@ pub fn load_home_lua<P: AsRef<Path>>(path: P) -> Result<HomeConfig> {
     let content = fs::read_to_string(path)?;
 
     let packages_data = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let packages_v2_data = std::sync::Arc::new(std::sync::Mutex::new(HashMap::new()));
     let dotfiles_data = std::sync::Arc::new(std::sync::Mutex::new(HashMap::new()));
     let env_data = std::sync::Arc::new(std::sync::Mutex::new(HashMap::new()));
 
     // Define 'packages' function
     let p_clone = packages_data.clone();
+    let pv2_clone = packages_v2_data.clone();
     let packages_fn = lua
-        .create_function(move |_, table: Table| {
+        .create_function(move |lua, table: mlua::Table| {
             let mut data = p_clone.lock().unwrap();
-            for val in table.sequence_values::<String>() {
-                data.push(val.map_err(|e| mlua::Error::RuntimeError(e.to_string()))?);
+            let mut data_v2 = pv2_clone.lock().unwrap();
+            for pair in table.pairs::<mlua::Value, mlua::Value>() {
+                let (k, v) = pair?;
+                match k {
+                    mlua::Value::String(s) => {
+                        let key = s.to_str()?.trim().to_string();
+                        let spec = lua.from_value::<zoi_project::config::PackageSpec>(v)?;
+                        data_v2.insert(key.clone(), spec.clone());
+                        let mut ident = key;
+                        if let Some(ver) = &spec.version {
+                            if ver.starts_with('@') {
+                                ident = format!("{}{}", ident, ver);
+                            } else {
+                                ident = format!("{}@{}", ident, ver);
+                            }
+                        }
+                        data.push(ident);
+                    }
+                    mlua::Value::Integer(_) => {
+                        if let mlua::Value::String(s) = v {
+                            data.push(s.to_str()?.trim().to_string());
+                        }
+                    }
+                    _ => {}
+                }
             }
             Ok(())
         })
@@ -73,6 +99,7 @@ pub fn load_home_lua<P: AsRef<Path>>(path: P) -> Result<HomeConfig> {
 
     Ok(HomeConfig {
         packages: packages_data.lock().unwrap().clone(),
+        packages_v2: packages_v2_data.lock().unwrap().clone(),
         dotfiles: dotfiles_data.lock().unwrap().clone(),
         env: env_data.lock().unwrap().clone(),
     })
