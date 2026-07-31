@@ -426,6 +426,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                     true,
                     None,
                     true,
+                    None,
                 ) {
                     Ok(res) => res,
                     Err(e) => {
@@ -566,6 +567,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                     true,
                     None,
                     true,
+                    None,
                 ) {
                     Ok(res) => res,
                     Err(e) => {

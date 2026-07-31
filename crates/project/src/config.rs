@@ -1,10 +1,10 @@
 use anyhow::{Result, anyhow};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Deserialize, Default, Clone)]
 pub struct ProjectLocalConfig {
     #[serde(default)]
     pub local: bool,
@@ -24,7 +24,7 @@ pub struct RegistrySpec {
     pub registry_type: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PackageSpec {
     #[serde(rename = "type")]
     pub package_type: Option<String>,
@@ -32,6 +32,8 @@ pub struct PackageSpec {
     pub sub_packages: Option<Vec<String>>,
     pub version: Option<String>,
     pub dependencies: Option<zoi_core::types::Dependencies>,
+    pub options: Option<Vec<String>>,
+    pub optionals: Option<Vec<String>>,
 }
 
 /// Represents the combined evaluation of a project's `zoi.lua` and `zoi.yaml` configuration.
@@ -39,7 +41,7 @@ pub struct PackageSpec {
 /// This struct acts as the central definition for a project environment. It unifies:
 /// - The scriptable package and registry requirements defined in `zoi.lua`.
 /// - The declarative task (`commands`) and `environments` defined in `zoi.yaml`.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[allow(dead_code)]
 pub struct ProjectConfig {
     /// The name of the project.
@@ -70,7 +72,7 @@ pub struct ProjectConfig {
     pub shell: Option<ShellSpec>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct PackageCheck {
     pub name: String,
     pub check: String,

@@ -4928,6 +4928,7 @@ dependencies = [
  "zoi-core",
  "zoi-install",
  "zoi-lua",
+ "zoi-project",
  "zoi-resolver",
 ]
 

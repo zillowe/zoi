@@ -11,8 +11,16 @@ pub fn run(package_names: &[String]) -> Result<()> {
 
     println!("{} Resolving dependency tree...", "::".bold().blue());
 
-    let (graph, non_zoi_deps) =
-        resolver::resolve_dependency_graph(package_names, None, false, true, true, None, true)?;
+    let (graph, non_zoi_deps) = resolver::resolve_dependency_graph(
+        package_names,
+        None,
+        false,
+        true,
+        true,
+        None,
+        true,
+        None,
+    )?;
 
     if !non_zoi_deps.is_empty() {
         println!(

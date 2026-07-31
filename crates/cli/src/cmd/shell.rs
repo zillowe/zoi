@@ -379,6 +379,7 @@ pub fn enter_ephemeral_shell(
         true,
         None,
         !verbose,
+        None,
     )?;
 
     let install_plan = install::plan::create_install_plan(&graph.nodes, None, false)?;

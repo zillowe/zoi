@@ -66,6 +66,7 @@ pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
         true,
         None,
         true,
+        Some(config.clone()),
     )?;
 
     let mut missing_nodes = HashMap::new();

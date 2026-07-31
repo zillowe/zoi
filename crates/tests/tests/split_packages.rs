@@ -61,6 +61,7 @@ fn resolver_install_node_has_sub_package_from_source() {
         false,
         None,
         true,
+        None,
     )
     .expect("split pkg.lua source with sub should resolve");
 
@@ -95,6 +96,7 @@ fn resolver_install_node_base_has_no_sub_package() {
         false,
         None,
         true,
+        None,
     )
     .expect("split pkg.lua source should resolve");
 

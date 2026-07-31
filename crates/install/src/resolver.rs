@@ -336,6 +336,7 @@ pub fn resolve_dependency_graph(
     all_optional: bool,
     _build_type: Option<&str>,
     quiet: bool,
+    project_config: Option<zoi_project::config::ProjectConfig>,
 ) -> Result<(DependencyGraph, Vec<String>)> {
     if !quiet {
         println!(":: Resolving dependencies...");
@@ -386,7 +387,7 @@ pub fn resolve_dependency_graph(
         root_deps.insert(pkg_name, range);
     }
 
-    let project_config = zoi_project::config::load().ok();
+    let project_config = project_config.or_else(|| zoi_project::config::load().ok());
 
     let provider = ZoiDependencyProvider::new(
         root_deps,
@@ -396,6 +397,7 @@ pub fn resolve_dependency_graph(
         yes,
         all_optional,
         project_config,
+        _build_type.map(|s| s.to_string()),
     )?;
     let root_pkg = PkgName {
         name: "$root".to_string(),

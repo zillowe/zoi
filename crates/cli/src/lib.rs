@@ -82,6 +82,7 @@ pub fn install_sources(sources: &[String], options: &SourceInstallOptions) -> Re
         3,
         false,
         false,
+        None,
     )
 }
 

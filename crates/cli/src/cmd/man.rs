@@ -296,6 +296,7 @@ fn gather_manual_pages_from_upstream(
         true,
         None,
         true,
+        None,
     )?;
 
     if graph.nodes.is_empty() {

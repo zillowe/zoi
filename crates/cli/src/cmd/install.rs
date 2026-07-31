@@ -39,6 +39,7 @@ pub fn run(
     retry: u32,
     verbose: bool,
     purl: bool,
+    project_config: Option<project::config::ProjectConfig>,
 ) -> Result<()> {
     crate::pkg::install::util::set_download_retry_attempts(retry);
 
@@ -247,6 +248,7 @@ pub fn run(
             all_optional,
             build_type.as_deref(),
             false,
+            project_config,
         )?
     };
 

@@ -54,6 +54,7 @@ pub struct SystemConfig {
     pub system: SystemMetadata,
     pub bootloader: Option<BootloaderConfig>,
     pub packages: Vec<String>,
+    pub packages_v2: HashMap<String, zoi_project::config::PackageSpec>,
     pub users: HashMap<String, UserConfig>,
     pub groups: HashMap<String, GroupConfig>,
     pub services: HashMap<String, ServiceConfig>,
@@ -67,6 +68,7 @@ pub fn load_system_lua<P: AsRef<Path>>(path: P) -> Result<SystemConfig> {
     let system_data = std::sync::Arc::new(std::sync::Mutex::new(SystemMetadata::default()));
     let bootloader_data = std::sync::Arc::new(std::sync::Mutex::new(None));
     let packages_data = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let packages_v2_data = std::sync::Arc::new(std::sync::Mutex::new(HashMap::new()));
     let users_data = std::sync::Arc::new(std::sync::Mutex::new(HashMap::new()));
     let groups_data = std::sync::Arc::new(std::sync::Mutex::new(HashMap::new()));
     let services_data = std::sync::Arc::new(std::sync::Mutex::new(HashMap::new()));
@@ -105,11 +107,35 @@ pub fn load_system_lua<P: AsRef<Path>>(path: P) -> Result<SystemConfig> {
 
     // Define 'packages' function
     let p_clone = packages_data.clone();
+    let pv2_clone = packages_v2_data.clone();
     let packages_fn = lua
-        .create_function(move |_, table: Table| {
+        .create_function(move |lua, table: Table| {
             let mut data = p_clone.lock().unwrap();
-            for val in table.sequence_values::<String>() {
-                data.push(val.map_err(|e| mlua::Error::RuntimeError(e.to_string()))?);
+            let mut data_v2 = pv2_clone.lock().unwrap();
+            for pair in table.pairs::<Value, Value>() {
+                let (k, v) = pair?;
+                match k {
+                    Value::String(s) => {
+                        let key = s.to_str()?.trim().to_string();
+                        let spec = lua.from_value::<zoi_project::config::PackageSpec>(v)?;
+                        data_v2.insert(key.clone(), spec.clone());
+                        let mut ident = key;
+                        if let Some(ver) = &spec.version {
+                            if ver.starts_with('@') {
+                                ident = format!("{}{}", ident, ver);
+                            } else {
+                                ident = format!("{}@{}", ident, ver);
+                            }
+                        }
+                        data.push(ident);
+                    }
+                    Value::Integer(_) => {
+                        if let Value::String(s) = v {
+                            data.push(s.to_str()?.trim().to_string());
+                        }
+                    }
+                    _ => {}
+                }
             }
             Ok(())
         })
@@ -203,6 +229,7 @@ pub fn load_system_lua<P: AsRef<Path>>(path: P) -> Result<SystemConfig> {
         system: system_data.lock().unwrap().clone(),
         bootloader: bootloader_data.lock().unwrap().clone(),
         packages: packages_data.lock().unwrap().clone(),
+        packages_v2: packages_v2_data.lock().unwrap().clone(),
         users: users_data.lock().unwrap().clone(),
         groups: groups_data.lock().unwrap().clone(),
         services: services_data.lock().unwrap().clone(),

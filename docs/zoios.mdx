@@ -109,6 +109,34 @@ ZoiOS uses two primary Lua files to manage its state:
 - **[system.lua Reference](/docs/zds/zoi/guides/system-lua)**: Manage system-wide packages, users, bootloaders, and filesystems.
 - **[home.lua Reference](/docs/zds/zoi/guides/home-lua)**: Manage your personal user environment, dotfiles, and user-scoped packages.
 
+## Bootstrapping a System
+
+A functional ZoiOS system is defined by a `collection` package, typically **`@core/base`**. This package provides a foundational set of utilities (POSIX tools, C library, Shell) and allows you to choose your primary system components via interactive or declarative options.
+
+### The `@core/base` Profile
+
+When installing or building a ZoiOS system, you can pre-select your core components in `system.lua` to avoid interactive prompts:
+
+```lua
+-- /etc/zoi/system.lua
+packages({
+    ["@core/base"] = {
+        options = {
+            "zoi:@core/systemd",         -- Choose your Init system
+            "zoi:@core/linux-hardened", -- Choose your Kernel
+            "zoi:@core/doas"            -- Choose your privilege escalator
+        }
+    }
+})
+```
+
+### Multi-Init and Escalation Support
+
+ZoiOS is designed to be flexible. It supports multiple init systems and privilege escalation tools out of the box:
+
+- **Init Detection**: Use `SYSTEM.INIT` in your `.pkg.lua` scripts to detect if the target system is running `systemd` or `openrc`.
+- **Privilege Escalation**: Zoi automatically detects and uses either `sudo` or `doas` for Just-in-Time escalation. In your `base` package, these are interchangeable virtual providers.
+
 ---
 
 ## Architectural Foundation

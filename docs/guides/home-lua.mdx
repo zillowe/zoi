@@ -7,16 +7,31 @@ The `~/.config/zoi/home.lua` file allows ZoiOS users to manage their personal en
 
 ## Core Functions
 
-### `packages(list)`
+### `packages(table)`
 
-Defines the set of packages installed in the user scope (`~/.zoi/pkgs/store`).
+Defines the set of packages installed in the user scope (`~/.zoi/pkgs/store`). You can provide a simple list of names or a table for advanced pinning and option selection.
 
 ```lua
 packages({
+    -- Simple list
     "@community/bat",
-    "@community/fzf",
-    "@community/starship",
     "cargo:ripgrep",
+
+    -- Version pinning (exact)
+    ["@community/neovim"] = { version = "0.9.5" },
+
+    -- Version range pinning (SemVer)
+    ["@community/eza"] = { version = "^0.18" },
+
+    -- Channel pinning
+    ["@community/ghostty"] = { version = "@nightly" },
+
+    -- Advanced pinning and options
+    ["@community/fzf"] = {
+        version = "0.44.1",
+        options = {"zoi:@main/fzf-shell-integration"},
+        optionals = {"zoi:@main/fzf-tmux"}
+    }
 })
 ```
 
