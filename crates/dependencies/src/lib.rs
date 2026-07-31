@@ -39,11 +39,11 @@ pub fn uninstall_dependency(dep_str: &str, zoi_uninstaller: &ZoiUninstaller) -> 
         let mut uninstall_cmd = pm_commands.uninstall.replace("{package}", dep.package);
 
         if pm_commands.sudo_uninstall && !utils::is_admin() {
-            if utils::command_exists("sudo") {
-                uninstall_cmd = format!("sudo {}", uninstall_cmd);
+            if let Some(escalator) = utils::get_privilege_escalator() {
+                uninstall_cmd = format!("{} {}", escalator, uninstall_cmd);
             } else {
                 eprintln!(
-                    "{}: sudo is required for '{}' but not found. Attempting to run without sudo...",
+                    "{}: root privileges are required for '{}' but neither 'sudo' nor 'doas' was found. Attempting to run without escalation...",
                     "Warning".yellow(),
                     dep.manager
                 );

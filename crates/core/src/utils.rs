@@ -113,18 +113,18 @@ pub fn get_platform() -> Result<String> {
     Ok(format!("{}-{}", os, arch))
 }
 
-/// Returns the home directory of the current user, or the original user if run via sudo.
+/// Returns the home directory of the current user, or the original user if run via sudo or doas.
 pub fn get_user_home() -> Option<PathBuf> {
-    if let Ok(sudo_user) = std::env::var("SUDO_USER") {
+    if let Ok(user_var) = std::env::var("SUDO_USER").or_else(|_| std::env::var("DOAS_USER")) {
         #[cfg(unix)]
         {
             use nix::unistd::User;
-            if let Ok(Some(user)) = User::from_name(&sudo_user) {
+            if let Ok(Some(user)) = User::from_name(&user_var) {
                 return Some(user.dir);
             }
         }
         #[cfg(not(unix))]
-        let _ = sudo_user;
+        let _ = user_var;
     }
     home::home_dir()
 }
@@ -491,6 +491,16 @@ pub fn get_init_system() -> Option<String> {
     }
 
     None
+}
+
+pub fn get_privilege_escalator() -> Option<String> {
+    if command_exists("sudo") {
+        Some("sudo".to_string())
+    } else if command_exists("doas") {
+        Some("doas".to_string())
+    } else {
+        None
+    }
 }
 
 pub fn get_distro_version() -> Option<String> {

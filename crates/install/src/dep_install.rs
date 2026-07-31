@@ -152,11 +152,11 @@ pub fn install_dependency(
         }
 
         if pm_commands.sudo_install && !utils::is_admin() {
-            if utils::command_exists("sudo") {
-                install_cmd = format!("sudo {}", install_cmd);
+            if let Some(escalator) = utils::get_privilege_escalator() {
+                install_cmd = format!("{} {}", escalator, install_cmd);
             } else {
                 eprintln!(
-                    "{}: sudo is required for '{}' but not found. Attempting to run without sudo...",
+                    "{}: root privileges are required for '{}' but neither 'sudo' nor 'doas' was found. Attempting to run without escalation...",
                     "Warning".yellow(),
                     dep.manager
                 );
