@@ -395,9 +395,15 @@ pub fn install_prepared_node(
 
     let needs_escalation = pkg.scope == types::Scope::System && !zoi_core::utils::is_admin();
 
-    let manifest = if needs_escalation {
+    let install_manifest = if needs_escalation {
+        let escalator = zoi_core::utils::get_privilege_escalator()
+            .ok_or_else(|| anyhow!("Root privileges required for system scope installation, but neither 'sudo' nor 'doas' was found."))?;
+
         if let Some(pb) = step_pb.as_ref().or(main_pb.as_ref()) {
-            pb.set_message("Waiting for sudo privileges to install system package...");
+            pb.set_message(format!(
+                "Waiting for {} privileges to install system package...",
+                escalator
+            ));
         }
 
         let node_json = serde_json::to_string(node)?;
@@ -406,7 +412,7 @@ pub fn install_prepared_node(
         temp_file.write_all(node_json.as_bytes())?;
         let temp_path = temp_file.path();
 
-        let mut cmd = std::process::Command::new("sudo");
+        let mut cmd = std::process::Command::new(escalator);
         cmd.arg(std::env::current_exe()?);
         cmd.arg("helper").arg("elevate-install-node");
         cmd.arg("--node-json").arg(temp_path);
@@ -421,7 +427,7 @@ pub fn install_prepared_node(
 
         let status = cmd
             .status()
-            .map_err(|e| anyhow!("Failed to spawn sudo: {}", e))?;
+            .map_err(|e| anyhow!("Failed to spawn privilege escalator: {}", e))?;
         if !status.success() {
             return Err(anyhow!("Escalated installation failed."));
         }
@@ -440,9 +446,9 @@ pub fn install_prepared_node(
         };
         let manifest_path = version_dir.join(manifest_filename);
         let content = std::fs::read_to_string(&manifest_path)?;
-        let manifest: types::InstallManifest = serde_yaml::from_str(&content)?;
+        let install_manifest: types::InstallManifest = serde_yaml::from_str(&content)?;
 
-        manifest
+        install_manifest
     } else {
         if let Some(pb) = step_pb.as_ref().or(main_pb.as_ref()) {
             pb.set_message(format!("Installing {}...", pkg.name.cyan()));
@@ -464,7 +470,7 @@ pub fn install_prepared_node(
             local::add_dependent(&package_dir, parent)?;
         }
 
-        let manifest = manifest::create_manifest(
+        let install_manifest = manifest::create_manifest(
             pkg,
             node.reason.clone(),
             node.dependencies.clone(),
@@ -478,11 +484,11 @@ pub fn install_prepared_node(
         )?;
 
         if record {
-            local::write_manifest(&manifest)?;
-            local::persist_package_source(&manifest, Path::new(&node.source))?;
+            local::write_manifest(&install_manifest)?;
+            local::persist_package_source(&install_manifest, Path::new(&node.source))?;
         }
 
-        manifest
+        install_manifest
     };
 
     if prepared.is_build {
@@ -501,7 +507,7 @@ pub fn install_prepared_node(
             )
         {
             let _ = db::clear_package_files(&conn, pkg_id);
-            let _ = db::index_package_files(&conn, pkg_id, &manifest.installed_files);
+            let _ = db::index_package_files(&conn, pkg_id, &install_manifest.installed_files);
         }
 
         if let Err(e) = recorder::record_package(
@@ -537,7 +543,7 @@ pub fn install_prepared_node(
 
     util::send_telemetry("install", pkg, handle, Some(install_method));
 
-    Ok(manifest)
+    Ok(install_manifest)
 }
 
 pub fn install_node(

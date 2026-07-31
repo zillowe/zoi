@@ -409,10 +409,14 @@ pub fn run(
     let needs_escalation = scope == types::Scope::System && !core_utils::is_admin();
 
     if needs_escalation {
+        let escalator = core_utils::get_privilege_escalator()
+            .ok_or_else(|| anyhow!("Root privileges required to remove system package, but neither 'sudo' nor 'doas' was found."))?;
+
         if !quiet {
             println!(
-                "{} Escalating to root to remove system package...",
-                "::".bold().blue()
+                "{} Escalating to root via {} to remove system package...",
+                "::".bold().blue(),
+                escalator
             );
         }
         let manifest_json = serde_json::to_string(&manifest)?;
@@ -421,7 +425,7 @@ pub fn run(
         temp_file.write_all(manifest_json.as_bytes())?;
         let temp_path = temp_file.path();
 
-        let mut cmd = std::process::Command::new("sudo");
+        let mut cmd = std::process::Command::new(escalator);
         cmd.arg(std::env::current_exe()?);
         cmd.arg("helper").arg("elevate-uninstall");
         cmd.arg("--manifest-json").arg(temp_path);
@@ -431,7 +435,7 @@ pub fn run(
 
         let status = cmd
             .status()
-            .map_err(|e| anyhow::anyhow!("Failed to spawn sudo: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to spawn privilege escalator: {}", e))?;
         if !status.success() {
             return Err(anyhow::anyhow!("Escalated uninstallation failed."));
         }

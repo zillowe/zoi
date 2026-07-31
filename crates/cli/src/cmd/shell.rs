@@ -197,11 +197,14 @@ pub fn run(shell: Shell, scope: SetupScope) -> Result<()> {
     if scope == SetupScope::System && !utils::is_admin() {
         let exe = std::env::current_exe()?;
         let args: Vec<String> = std::env::args().collect();
-        let status = Command::new("sudo")
+        let escalator = crate::pkg::utils::get_privilege_escalator()
+            .ok_or_else(|| anyhow!("Root privileges required for system-wide setup, but neither 'sudo' nor 'doas' was found."))?;
+
+        let status = Command::new(escalator)
             .arg(&exe)
             .args(&args[1..])
             .status()
-            .map_err(|e| anyhow!("Failed to elevate with sudo: {}", e))?;
+            .map_err(|e| anyhow!("Failed to elevate privileges: {}", e))?;
         std::process::exit(status.code().unwrap_or(1));
     }
 
