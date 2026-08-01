@@ -20,4 +20,3 @@ workspace = true
 [dependencies]
 zoi-core.workspace = true
 anyhow.workspace = true
-home.workspace = true

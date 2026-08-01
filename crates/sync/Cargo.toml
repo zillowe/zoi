@@ -21,7 +21,6 @@ workspace = true
 anyhow.workspace = true
 colored.workspace = true
 git2.workspace = true
-home.workspace = true
 indicatif.workspace = true
 rayon.workspace = true
 serde_yaml.workspace = true

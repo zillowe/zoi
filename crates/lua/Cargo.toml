@@ -23,7 +23,6 @@ anyhow.workspace = true
 ar.workspace = true
 colored.workspace = true
 flate2.workspace = true
-home.workspace = true
 indicatif.workspace = true
 mlua.workspace = true
 regex.workspace = true
