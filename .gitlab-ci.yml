@@ -370,7 +370,7 @@ docs:update:
   script:
     - echo "Cloning website repository..."
     - git clone
-      "https://oauth2:${GITLAB_TOKEN_DOCS}@gitlab.com/Zillowe/Website.git"
+      "https://oauth2:${GITLAB_TOKEN_DOCS}@gitlab.com/zillowe/website.git"
     - cd Website
     - echo "Removing old documentation..."
     - rm -rf "content/docs/(main)/zds/zoi"
@@ -384,7 +384,7 @@ docs:update:
       else
         echo "Committing and pushing changes..."
         git commit -m "Docs: Update Zoi documentation from $CI_COMMIT_SHA"
-        git push
+        git push "https://oauth2:${GITLAB_TOKEN_DOCS}@gitlab.com/zillowe/website.git" HEAD:main
       fi
   rules:
     - if: "$CI_COMMIT_MESSAGE =~ /^Docs: Docs/"
