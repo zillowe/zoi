@@ -4,6 +4,28 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
+## [Prod. Release 1.24.1] - 2026-08-01
+
+### ⏩ Merged
+
+- Branch 'renovate/clap-4.x' into 'main'
+- Branch 'renovate/toml-1.x' into 'main'
+
+### ✨ Features
+
+- *(zoios)* Add support for package options and optionals
+- *(core)* Add support for doas as privilege escalator
+- *(lua)* Add init system detection to system environment
+
+### 🛡️ Dependencies
+
+- Update Rust crate clap to 4.6.5
+- Update Rust crate toml to 1.1.4
+
+### 🩹 Bug Fixes
+
+- *(upgrade)* Handle release and stable tag formats
+
 ## [Prod. Release 1.24.0] - 2026-07-30
 
 ### ⏩ Merged
