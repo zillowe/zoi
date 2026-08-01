@@ -202,3 +202,7 @@ We maintain packaging files for several package managers in the `packages/` dire
 ### Scoop
 
 - [`zoi.json`](./packages/scoop/zoi.json): Scoop manifest for Windows.
+
+## Packaging Status
+
+[![Packaging status](https://repology.org/badge/vertical-allrepos/zoi.svg)](https://repology.org/project/zoi/versions)

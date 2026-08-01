@@ -13,7 +13,7 @@ First of all, thank you for considering contributing to Zoi! We're excited to ha
   - [First-Time Setup](#first-time-setup)
   - [Development with Docker](#development-with-docker)
   - [Development Workflow with Zoi](#development-workflow-with-zoi)
-    - [The `zoi.yaml` file](#the-zoiyaml-file)
+    - [The `zoi.lua` file](#the-zoilua-file)
     - [Passing Arguments to Commands](#passing-arguments-to-commands)
     - [Environment Preparation](#environment-preparation)
     - [Development Commands](#development-commands)
@@ -125,7 +125,7 @@ If you need to build the Docker image locally (e.g. for custom configurations or
 
 ### Development Workflow with Zoi
 
-We use `zoi` itself to manage project tasks, which are defined in the `zoi.yaml` file. You can run tasks using `zoi run <command>` or set up environments with `zoi env <environment>`.
+We use `zoi` itself to manage project tasks, which are defined in the `zoi.lua` file. You can run tasks using `zoi run <command>` or set up environments with `zoi env <environment>`.
 
 If you run `zoi run` or `zoi env` without arguments, you'll get an interactive list of available commands.
 
@@ -159,7 +159,7 @@ This single command is equivalent to running `zoi run deps`, `zoi run lint`, `zo
 
 #### Development Commands
 
-Here are the most common commands defined in `zoi.yaml`:
+Here are the most common commands defined in `zoi.lua`:
 
 - **`check`**: Checks the project for errors without performing a full build.
 
