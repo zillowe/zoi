@@ -52,8 +52,8 @@ tasks({
 		run = "hyperfine '~/.local/bin/zoi install @zillowe/zoko --dry-run' './dist/bin/zoi install @zillowe/zoko --dry-run'",
 	},
 	{
-		cmd = "shell",
-		run = "zoi dev",
+		cmd = "bump",
+		run = "./scripts/bump.sh",
 	},
 })
 

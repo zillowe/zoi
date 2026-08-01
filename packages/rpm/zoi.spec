@@ -18,7 +18,7 @@ BuildRequires:  xz-devel
 BuildRequires:  git
 BuildRequires:  clang
 BuildRequires:  clang-devel
-BuildREquires:  bubblewrap
+BuildRequires:  bubblewrap
 
 Requires:       git
 Requires:       gnupg
