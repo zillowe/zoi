@@ -54,5 +54,5 @@ If you discover a security vulnerability, please follow these steps:
    - A description of the vulnerability
    - Steps to reproduce the issue
    - Potential impact
-4. If you're creating a GitLab issue on make sure you turn on confidentiality.
+4. If you're creating a GitLab issue make sure you turn on confidentiality.
 5. If you're sending an email make sure to encrypt your email with our [public PGP key](https://zillowe.pages.dev/keys/zillowe-main.asc) and link your public key.

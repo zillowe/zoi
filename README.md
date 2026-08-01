@@ -43,7 +43,6 @@
   <br/>
   <a href="./CODE_OF_CONDUCT.md"><strong>Code of Conduct</strong></a> •
   <a href="./PACKAGING.md"><strong>Packaging</strong></a> •
-  <a href="./RELEASE.md"><strong>Release Guidelines</strong></a>
 </div>
 
 <br/>
@@ -53,29 +52,18 @@
 <details>
 <summary>Table of Contents</summary>
 
-- [Features](#-features)
-- [Special Thanks](#-special-thanks)
-- [Getting Started](#-getting-started)
+- [Features](#features)
+- [Special Thanks](#special-thanks)
+- [Getting Started](#getting-started)
+- [Installation](#installation)
+  - [Scripts](#scripts)
+  - [Build from Source](#build-from-source)
   - [Zoi Mini](#zoi-mini)
     - [Quick Start (Zero-Install)](#quick-start-zero-install)
-- [Installation](#-installation)
-  - [Package Managers](#package-managers)
-    - [Scripts](#-scripts)
-    - [Linux](#linux)
-      - [Arch Linux (AUR)](#arch-linux-aur)
-      - [Fedora](#fedora)
-    - [macOS](#macos)
-      - [Homebrew](#homebrew)
-    - [Windows](#windows)
-      - [Scoop](#scoop)
-    - [Crates.io](#cratesio)
-    - [NPM](#npm)
-  - [Build from Source](#-build-from-source)
-- [Usage](#-usage)
-- [Packaging Status](#-packaging-status)
-- [Repositories & Mirrors](#-repositories--mirrors)
-- [Contributing](#-contributing)
-- [License](#-license)
+- [Usage](#usage)
+- [Repositories & Mirrors](#repositories-mirrors)
+- [Contributing](#contributing)
+- [License](#license)
 
 </details>
 
@@ -84,15 +72,14 @@ Zoi is an advanced package manager and environment orchestrator, designed to sim
 ## Features
 
 - **Cross-Platform:** Works seamlessly on Linux, macOS, and Windows.
-- **Just-in-Time Privilege Escalation:** Automatically prompts for `sudo` only when system-wide operations are required, keeping your environment and caches cleanly in user-space.
+- **Just-in-Time Privilege Escalation:** Automatically prompts for `sudo` or `doas` only when system-wide operations are required, keeping your environment and caches cleanly in user-space.
 - **Dynamic Package Definitions:** Define packages with dynamic Lua scripts (`.pkg.lua`) for maximum flexibility.
-- **Universal Package Support:** Install packages from pre-built binaries, compressed archives, or build them from source.
-- **ZoiOS Distro Engine:** Bootstrap and manage entire Linux distributions declaratively. Includes generational rollbacks and transactional FHS views.
+- **ZoiOS Distro Engine:** Bootstrap and manage entire Linux distributions declaratively.
 - **Extensive Dependency Management:** Integrates with over 40 system and language package managers (`apt`, `brew`, `cargo`, `npm`, `pip`, `go`, `bun`, etc.).
 - **Version Multiplexing via Intelligent Shims:** Automatically switch between different versions of the same tool (e.g. Node.js 18 vs 20) based on your project context (`zoi.lua`) or legacy configuration files (`.nvmrc`) through its extensible Lua plugin system.
 - **Rich Dependencies:** Define runtime and build dependencies with required, optional, and selectable options.
 - **Project Environments:** Manage project-specific commands and environments using a local `zoi.yaml` or a `zoi.lua` file.
-- **Repository-Based:** Use official, community, or your own private/public Git-based repositories. Manage multiple registries.
+- **Repository-Based:** Use official, community, or your own private/public Git-based repositories.
 - **Secure & Verifiable:** Verifies package integrity with checksums and authenticity with GPG signatures. Supports Git commit signature verification for entire registries (Chain of Trust) and includes a built-in PGP keyring for out-of-the-box security.
 - **Decentralized Security Advisories:** Automated vulnerability tracking via `.sec.yaml` files co-located with packages. Zoi proactively warns you during installation or upgrades if a package has known security issues.
 - **Compliance & Audit Logging:** Maintain a persistent, tamper-evident audit log of all package operations (install, uninstall, upgrade), viewable via the `zoi history` command.
@@ -144,6 +131,51 @@ Getting started with Zoi is simple. Just follow these three steps:
    zoi install @zillowe/hello
    ```
 
+## Installation
+
+You can install Zoi using a package manager, an installer script, or by building it from source.
+
+### Scripts
+
+You can use our installer scripts for a quick setup.
+
+**Linux / macOS :**
+
+```sh
+curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash
+```
+
+Or if you want a truly safe way to run this script use [ZSM](https://zillowe.qzz.io/docs/zds/zsm).
+
+```sh
+curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.zsm | zsm
+```
+
+**Windows:**
+
+```powershell
+powershell -c "irm zillowe.pages.dev/scripts/zoi/install.ps1|iex"
+```
+
+Don't see your preferred installation method here? It's probably in [`INSTALL.md`](./INSTALL.md).
+
+### Build from Source
+
+If you prefer, you can build Zoi from source. You'll need [Rust](https://www.rust-lang.org) installed.
+
+**Build the release binary:**
+
+```sh
+./configure
+just build
+```
+
+**Install it locally:**
+
+```sh
+sudo just install
+```
+
 ### Zoi Mini
 
 Zoi Mini is a lightweight, zero-sync version of Zoi that allows you to install packages from the official Zoidberg registry without installing the full Zoi suite. It's designed for quick, one-off installations and supports basic management commands: `install`, `update`, `uninstall`, and `list`.
@@ -165,168 +197,6 @@ powershell -c "irm zillowe.pages.dev/zm.ps1 | iex" -args "i @zillowe/hello"
 ```
 
 This will download the `zoi-mini` binary to a temporary location, resolve the package metadata dynamically, and perform the installation.
-
-## Installation
-
-You can install Zoi using a package manager, an installer script, or by building it from source.
-
-### Scripts
-
-You can also use our installer scripts for a quick setup.
-
-**Linux / macOS :**
-
-```sh
-curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash
-```
-
-Or if you want a truly safe way to run this script use [ZSM](https://zillowe.qzz.io/docs/zds/zsm).
-
-```sh
-curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.zsm | zsm
-```
-
-**Windows:**
-
-```powershell
-powershell -c "irm zillowe.pages.dev/scripts/zoi/install.ps1|iex"
-```
-
-### Package Managers
-
-#### Linux
-
-Install Zoi on Linux distros.
-
-##### Arch Linux (AUR)
-
-Install [`zoi-bin`](https://aur.archlinux.org/packages/zoi-bin) (Pre-compiled binary) or [`zoi`](https://aur.archlinux.org/packages/zoi) (built from source) from the AUR using your favorite helper (e.g. `yay`, `paru`):
-
-```sh
-paru -S zoi-bin
-```
-
-Or manually without any helpers:
-
-```sh
-git clone https://aur.archlinux.org/zoi-bin.git
-cd zoi-bin
-makepkg -si
-```
-
-##### Debian / Ubuntu (.deb)
-
-Download the `.deb` package for your architecture from the [latest release](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases) and install it using `apt` or `dpkg`:
-
-```sh
-# Using apt (recommended, handles dependencies)
-sudo apt install ./zoi-*.deb
-
-# Using dpkg
-sudo dpkg -i zoi-*.deb
-```
-
-##### Fedora / RHEL (.rpm)
-
-Download the `.rpm` package for your architecture from the [latest release](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases) and install it using `dnf` or `rpm`:
-
-```sh
-# Using dnf (recommended)
-sudo dnf install ./zoi-*.rpm
-
-# Using rpm
-sudo rpm -i zoi-*.rpm
-```
-
-##### Fedora (COPR)
-
-Install `zoi` from Fedora [COPR](https://copr.fedorainfracloud.org/coprs/zillowez/zoi/) (Supports Fedora 43, 44, Rawhide, CentOS Stream 9/10, EPEL 9, and openSUSE Tumbleweed):
-
-```sh
-sudo dnf copr enable zillowez/zoi
-sudo dnf install zoi
-```
-
-##### Fedora (Terra)
-
-Install `zoi-rs` on Fedora from [Terra](https://terra.fyralabs.com) repo (not maintained by us so updates can be late, uses [Crates.io](#cratesio) version):
-
-```sh
-# add terra repo
-dnf install --nogpgcheck --repofrompath 'terra,https://repos.fyralabs.com/terra$releasever' terra-release
-# install Zoi
-sudo dnf install zoi-rs
-```
-
-More information and instructions for using Terra are available [here](https://developer.fyralabs.com/terra/installing).
-
-#### macOS
-
-Install Zoi on macOS.
-
-##### Homebrew
-
-Install Zoi using Homebrew (Also supports linux):
-
-```sh
-brew install zillowe/tap/zoi
-```
-
-#### Windows
-
-Install Zoi on Windows.
-
-##### Scoop
-
-Install Zoi using Scoop:
-
-```powershell
-scoop bucket add zillowe https://github.com/zillowe/scoop.git
-scoop install zoi
-```
-
-#### Crates.io
-
-You can install `zoi` directly from [crates.io](https://crates.io/crates/zoi-rs) using `cargo`:
-
-```sh
-cargo install zoi-rs
-```
-
-#### NPM
-
-You can install `@zillowe/zoi` from `npm` also.
-
-```sh
-npx @zillowe/zoi
-bunx @zillowe/zoi
-pnpm dlx @zillowe/zoi
-yarn dlx @zillowe/zoi
-```
-
-### Build from Source
-
-If you prefer, you can build Zoi from source. You'll need [Rust](https://www.rust-lang.org) installed.
-
-**Build the release binary:**
-
-```sh
-# For Linux/macOS
-./scripts/build-release.sh
-
-# For Windows
-./scripts/build-release.ps1
-```
-
-**Install it locally:**
-
-```sh
-./configure
-just build
-sudo just install
-```
-
-Zoi integrates with over 40 system and language package managers (`apt`, `brew`, `cargo`, `npm`, `pip`, `go`, `bun`, and many more). See the full list on the [Dependencies docs](https://zillowe.qzz.io/docs/zds/zoi/dependencies).
 
 ## Usage
 
@@ -440,10 +310,6 @@ Here are some common commands to get you started.
   ```
 
 For more detailed information, please refer to the [Docs](https://zillowe.qzz.io/docs/zds/zoi).
-
-## Packaging Status
-
-[![Packaging status](https://repology.org/badge/vertical-allrepos/zoi.svg)](https://repology.org/project/zoi/versions)
 
 ## Contributing
 
