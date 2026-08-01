@@ -42,7 +42,7 @@
   <a href="https://gitlab.com/zillowe/zillwen/zusty/zoi/-/issues/new?issuable_template=Enhancement%20Request"><strong>Request an Enhancement</strong></a>
   <br/>
   <a href="./CODE_OF_CONDUCT.md"><strong>Code of Conduct</strong></a> •
-  <a href="./PACKAGING.md"><strong>Packaging</strong></a> •
+  <a href="./PACKAGING.md"><strong>Packaging</strong></a>
 </div>
 
 <br/>
