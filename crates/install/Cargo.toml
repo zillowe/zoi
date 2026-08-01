@@ -30,7 +30,6 @@ zoi-resolver.workspace = true
 zoi-telemetry.workspace = true
 anyhow.workspace = true
 colored.workspace = true
-home.workspace = true
 indicatif.workspace = true
 pubgrub.workspace = true
 rayon.workspace = true

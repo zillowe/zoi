@@ -24,7 +24,6 @@ comfy-table.workspace = true
 dialoguer.workspace = true
 flate2.workspace = true
 hex.workspace = true
-home.workspace = true
 mlua.workspace = true
 reqwest.workspace = true
 serde.workspace = true

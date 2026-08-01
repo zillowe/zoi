@@ -24,7 +24,6 @@ comfy-table.workspace = true
 dialoguer.workspace = true
 git2.workspace = true
 hex.workspace = true
-home.workspace = true
 indicatif.workspace = true
 rayon.workspace = true
 regex.workspace = true

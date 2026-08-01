@@ -19,7 +19,6 @@ workspace = true
 
 [dependencies]
 chrono.workspace = true
-home.workspace = true
 reqwest.workspace = true
 serde.workspace = true
 uuid.workspace = true

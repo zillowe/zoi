@@ -20,7 +20,6 @@ workspace = true
 [dependencies]
 anyhow.workspace = true
 colored.workspace = true
-home.workspace = true
 mlua.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true
