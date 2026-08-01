@@ -371,7 +371,7 @@ docs:update:
     - echo "Cloning website repository..."
     - git clone
       "https://oauth2:${GITLAB_TOKEN_DOCS}@gitlab.com/zillowe/website.git"
-    - cd Website
+    - cd website
     - echo "Removing old documentation..."
     - rm -rf "content/docs/(main)/zds/zoi"
     - mkdir -p "content/docs/(main)/zds/zoi"
