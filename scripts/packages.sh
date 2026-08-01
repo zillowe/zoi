@@ -112,7 +112,7 @@ cd ..
 echo "--- Fedora COPR ---"
 git clone "ssh://git@github.com/zillowe/rpm-copr.git" rpm_copr
 mkdir -p rpm_copr/zoi
-cp "$TMP_PACKAGES/rpm/zoi.spec" copr_zoi/zoi/
+cp "$TMP_PACKAGES/rpm/zoi.spec" rpm_copr/zoi/
 cd fedora_zoi
 if [[ -n $(git status --porcelain) ]]; then
   git add .
