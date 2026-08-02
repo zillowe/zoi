@@ -3,11 +3,13 @@ name = "zoi-system"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-description = "ZoiOS system state management and FHS views"
+description.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 documentation.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [lib]
 name = "zoi_system"
