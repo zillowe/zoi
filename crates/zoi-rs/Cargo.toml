@@ -11,6 +11,7 @@ documentation.workspace = true
 keywords.workspace = true
 categories.workspace = true
 default-run = "zoi"
+readme = "../../README.md"
 
 [lib]
 name = "zoi"
