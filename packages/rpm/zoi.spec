@@ -29,9 +29,10 @@ Zoi is an advanced package manager and environment orchestrator, designed to sim
 %prep
 %setup -q -c -T
 tar -xf %{SOURCE0} --strip-components=1
+cargo fetch --locked
 
 %build
-cargo build --release --bin zoi
+cargo build --release --locked --bin zoi
 
 %install
 install -D -m 755 target/release/zoi %{buildroot}%{_bindir}/zoi
