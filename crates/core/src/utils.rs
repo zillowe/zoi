@@ -927,7 +927,7 @@ pub fn is_platform_compatible(current_platform: &str, allowed_platforms: &[Strin
 }
 
 pub fn check_license(license: &str) {
-    if license.is_empty() {
+    if license.is_empty() || license.eq_ignore_ascii_case("None") {
         return;
     }
     if license.eq_ignore_ascii_case("Proprietary") || license.eq_ignore_ascii_case("Unknown") {
