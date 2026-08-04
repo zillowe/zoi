@@ -231,6 +231,14 @@ pub fn check_license(license: &str) {
         return;
     }
 
+    if license.eq_ignore_ascii_case("None") {
+        println!(
+            "{}",
+            "Warning: Package does not provide a license.".yellow()
+        );
+        return;
+    }
+
     if license.eq_ignore_ascii_case("Proprietary") {
         println!(
             "{}",
