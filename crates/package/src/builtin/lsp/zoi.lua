@@ -53,6 +53,7 @@ ZOI = {}
 ---@field provides string[]? List of virtual packages provided.
 ---@field replaces string[]? List of packages this one replaces.
 ---@field backup string[]? List of config files to preserve during upgrades.
+---@field zoios boolean? Whether the package is ZoiOS-only (true), non-ZoiOS-only (false), or universal (nil).
 ---@field types string[] Required. Supported build methods (e.g. "source", "pre-compiled").
 ---@field platforms string[]? Supported platforms (e.g. "linux", "macos", "windows", "ci:windows-amd64:linux" for cross-build).
 ---@field ci CiConfig? CI runner configuration for build pipelines.

@@ -136,15 +136,19 @@ fn parse_lua_package_from_file_for_platform(
         .get("__ZoiPackageService")
         .map_err(|e| anyhow!(e.to_string()))?;
 
-    let mut package: types::Package =
-        lua.from_value(Value::Table(final_pkg_meta)).map_err(|e| {
+    let mut package: types::Package = lua
+        .from_value(Value::Table(final_pkg_meta.clone()))
+        .map_err(|e| {
             anyhow!(
-                "Failed to parse 'metadata' block in package file '{}':
-{}",
+                "Failed to parse 'metadata' block in package file '{}':\n{}",
                 file_path,
                 e
             )
         })?;
+
+    // Manually extract zoios field to handle boolean/nil correctly if needed,
+    // though from_value should handle it.
+    package.zoios = final_pkg_meta.get("zoios").ok();
 
     package.dependencies = if final_pkg_deps.is_empty() {
         None

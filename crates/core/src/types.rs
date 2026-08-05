@@ -328,6 +328,11 @@ pub struct Package {
     pub service: Option<Service>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub backup: Option<Vec<String>>,
+    /// Restricts installation to ZoiOS or non-ZoiOS systems.
+    /// None (default): Works on both.
+    /// Some(true): ZoiOS only.
+    /// Some(false): Non-ZoiOS only.
+    pub zoios: Option<bool>,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub installed_size: Option<u64>,
