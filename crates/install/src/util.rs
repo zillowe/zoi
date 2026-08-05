@@ -163,6 +163,28 @@ pub fn check_scope_compliance(graph: &super::resolver::DependencyGraph) -> Resul
     Ok(())
 }
 
+/// Enforces ZoiOS-only or non-ZoiOS-only package constraints.
+pub fn check_zoios_compliance(graph: &super::resolver::DependencyGraph) -> Result<()> {
+    let is_currently_zoios = zoi_core::utils::is_zoios();
+
+    for node in graph.nodes.values() {
+        if let Some(required_zoios) = node.pkg.zoios {
+            if required_zoios && !is_currently_zoios {
+                return Err(anyhow!(
+                    "Package '{}' can only be installed on ZoiOS systems.",
+                    node.pkg.name
+                ));
+            } else if !required_zoios && is_currently_zoios {
+                return Err(anyhow!(
+                    "Package '{}' cannot be installed on ZoiOS systems.",
+                    node.pkg.name
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn check_for_conflicts(packages_to_install: &[&types::Package], yes: bool) -> Result<()> {
     let installed_packages = zoi_resolver::local::get_installed_packages()?;
     let mut all_conflict_messages = HashSet::new();

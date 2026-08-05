@@ -103,12 +103,14 @@ Stages a documentation file for the package. The destination path is determined 
 
 ### `zman(source, section)`
 
-Stages a manual page for the package. The destination path is determined by the installation scope:
+Stages a manual page for the package. If a directory is provided as the `source`, Zoi will recursively stage all manual files found within that directory.
+
+The destination path is determined by the installation scope:
 
 - **System Scope**: `${usrroot}/usr/share/man/man{section}/<filename>` (standard FHS location).
 - **Other Scopes**: `${pkgstore}/man/man{section}/<filename>`.
 
-- **source**: Path relative to `BUILD_DIR`, or use `${pkgluadir}`.
+- **source**: Path to a file or directory relative to `BUILD_DIR`, or use `${pkgluadir}`.
 - **section**: (Optional) The manual section (1-9). If omitted, Zoi attempts to infer it from the file extension (e.g. `.1`, `.5`).
 
 ### `zshell(source, shell)`

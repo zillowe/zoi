@@ -117,46 +117,62 @@ pub fn add_zman(lua: &Lua) -> Result<(), mlua::Error> {
             .unwrap_or_else(|_| "user".to_string());
 
         let path = Path::new(&source);
-        let filename = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .ok_or_else(|| mlua::Error::RuntimeError("Invalid source path for zman".to_string()))?;
+        let mut source_paths = Vec::new();
 
-        let inferred_section = if let Some(s) = section {
-            s
+        if path.is_dir() {
+            // Read the directory and collect all files
+            if let Ok(entries) = fs::read_dir(path) {
+                for entry in entries.flatten() {
+                    if entry.file_type().is_ok_and(|t| t.is_file()) {
+                        source_paths.push(entry.path());
+                    }
+                }
+            }
         } else {
-            // Try to infer from extension (e.g. .1, .5, .1.gz, .5.bz2)
-            let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-            let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+            source_paths.push(path.to_path_buf());
+        }
 
-            if ext.parse::<u8>().is_ok() {
-                ext.to_string()
-            } else if (ext == "gz" || ext == "bz2" || ext == "xz") && !stem.is_empty() {
-                let inner_ext = Path::new(stem)
-                    .extension()
-                    .and_then(|e| e.to_str())
-                    .unwrap_or("");
-                if inner_ext.parse::<u8>().is_ok() {
-                    inner_ext.to_string()
+        for p in source_paths {
+            let filename = p.file_name().and_then(|n| n.to_str()).ok_or_else(|| {
+                mlua::Error::RuntimeError("Invalid source path for zman".to_string())
+            })?;
+
+            let inferred_section = if let Some(ref s) = section {
+                s.clone()
+            } else {
+                // Try to infer from extension (e.g. .1, .5, .1.gz, .5.bz2)
+                let stem = p.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+                let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("");
+
+                if ext.parse::<u8>().is_ok() {
+                    ext.to_string()
+                } else if (ext == "gz" || ext == "bz2" || ext == "xz") && !stem.is_empty() {
+                    let inner_ext = Path::new(stem)
+                        .extension()
+                        .and_then(|e| e.to_str())
+                        .unwrap_or("");
+                    if inner_ext.parse::<u8>().is_ok() {
+                        inner_ext.to_string()
+                    } else {
+                        "1".to_string()
+                    }
                 } else {
                     "1".to_string()
                 }
+            };
+
+            let destination = if scope == "system" {
+                format!(
+                    "${{usrroot}}/usr/share/man/man{}/{}",
+                    inferred_section, filename
+                )
             } else {
-                "1".to_string()
-            }
-        };
+                format!("${{pkgstore}}/man/man{}/{}", inferred_section, filename)
+            };
 
-        let destination = if scope == "system" {
-            format!(
-                "${{usrroot}}/usr/share/man/man{}/{}",
-                inferred_section, filename
-            )
-        } else {
-            format!("${{pkgstore}}/man/man{}/{}", inferred_section, filename)
-        };
-
-        let zcp: mlua::Function = lua.globals().get("zcp")?;
-        zcp.call::<()>((source, destination))?;
+            let zcp: mlua::Function = lua.globals().get("zcp")?;
+            zcp.call::<()>((p.to_string_lossy().to_string(), destination))?;
+        }
         Ok(())
     })?;
     lua.globals().set("zman", zman_fn)?;

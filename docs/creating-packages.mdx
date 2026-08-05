@@ -57,13 +57,14 @@ This table lists all the available fields you can use inside the `metadata` bloc
 | `git`            | `string`  | The source code's git repository URL.                                                                                                                                                                                                       |
 | `maintainer`     | `table`   | **Required.** A table with `name`, `email`, and optionally `website` of the package maintainer.                                                                                                                                             |
 | `author`         | `table`   | A table with `name`, `email`, and `website` of the original software author.                                                                                                                                                                |
-| `license`        | `string`  | The [SPDX license identifier](https://spdx.org/licenses/) for the software (e.g. `MIT`, `GPL-3.0-or-later`).                                                                                                                                |
+| `license`        | `string`  | The [SPDX identifier](https://spdx.org/licenses/) for the software (e.g. `MIT`, `GPL-3.0-or-later`). See [Licensing](#licensing) below.                                                                                                                                |
 | `bins`           | `list`    | A list of binary names the package provides. Zoi will create symlinks for these in a directory on the user's `PATH`.                                                                                                                        |
 | `conflicts`      | `list`    | A list of other package names that this package conflicts with.                                                                                                                                                                             |
 | `provides`       | `list`    | A list of virtual package names this package provides. Other packages can depend on these.                                                                                                                                                  |
 | `replaces`       | `list`    | A list of packages that this package replaces. Zoi will offer to remove them upon installation.                                                                                                                                             |
 | `backup`         | `list`    | A list of configuration files to preserve during upgrades. Zoi will create `.zoinew` and `.zoisave` files for these. Supports placeholders like `${pkgstore}`, `${usrroot}`, `${usrhome}`, and `${applications}`. |
-| `types`          | `list`    | **Required for buildable packages.** A list of supported build methods (e.g. `source`, `pre-compiled`).                                                                                                                                     |
+| `zoios`          | `boolean` | Restricts installation to ZoiOS systems (`true`), non-ZoiOS systems (`false`), or both (`nil`/unset). |
+| `types`          | `list`    | **Required for buildable packages.** A list of supported build methods (e.g. `source`, `pre-compiled`). |
 | `platforms`      | `list`    | A list of supported platforms (e.g. `linux`, `macos`, `windows`, `linux-amd64`). If specified, builds for other platforms will be skipped. Use `ci:<target>:<build>` (e.g. `ci:windows-amd64:linux`) for cross-compilation in CI pipelines. |
 | `ci`             | `table`   | CI runner configuration for build pipelines. See [CI Runner Support](#ci-runner-support) below.                                                                                                                                             |
 | `type`           | `string`  | The type of package. Can be `package` (default), `collection`, `app`, or `extension`. See [Package Types](#5-package-types).                                                                                                                |
@@ -79,6 +80,20 @@ This table lists all the available fields you can use inside the `metadata` bloc
 | `installed_size` | `integer` | The expected size of the package after installation (in bytes). Used for disk space checks.                                                                                                                                                 |
 | `archive_size`   | `integer` | The size of the pre-compiled archive (in bytes).                                                                                                                                                                                            |
 | `sandbox`        | `table`   | Configuration for Linux-native Bubblewrap isolation. See the [Sandboxing Apps](/docs/zds/zoi/guides/sandboxing) guide.                                                                                                                      |
+
+### Licensing
+
+The `license` field in Zoi metadata is used for both documentation and policy enforcement. It supports the following formats:
+
+- **SPDX Identifiers**: A single recognized identifier from the [SPDX License List](https://spdx.org/licenses/) (e.g., `MIT`, `Apache-2.0`).
+- **Special Keywords**:
+  - **`None`**: Explicitly declares that the package provides no license. Zoi will issue a warning upon installation.
+  - **`Proprietary`**: For non-free or commercial software.
+  - **`Unknown`**: Used when the license cannot be accurately determined.
+
+<Callout type="warn">
+  While Zoi supports `Proprietary` and `Unknown` licenses, the official Zoidberg `core` and `main` repositories only accept Free and Open Source Software (FOSS).
+</Callout>
 
 ---
 
