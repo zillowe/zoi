@@ -27,7 +27,7 @@ pub struct GlobalHook {
     pub name: String,
     /// A human-readable description of what the hook does.
     pub description: String,
-    /// Optional list of compatible platforms (e.g., ["linux", "macos"]).
+    /// Optional list of compatible platforms (e.g. ["linux", "macos"]).
     pub platforms: Option<Vec<String>>,
     /// The conditions that trigger this hook.
     pub trigger: HookTrigger,
@@ -47,7 +47,7 @@ pub struct HookTrigger {
     /// Directories that trigger the hook if any file within them is modified.
     #[serde(default)]
     pub dirs: Vec<String>,
-    /// The operation types (e.g., "install", "upgrade", "remove") that trigger the hook.
+    /// The operation types (e.g. "install", "upgrade", "remove") that trigger the hook.
     #[serde(default)]
     pub operation: Vec<String>,
     /// Specific package names that trigger the hook when modified.
@@ -330,7 +330,7 @@ fn is_hook_trusted(hook: &GlobalHook) -> Result<bool> {
 /// * `when` - Whether to run pre-transaction or post-transaction hooks.
 /// * `modified_files` - List of files modified during the transaction.
 /// * `modified_packages` - List of packages modified during the transaction.
-/// * `operation` - The type of operation being performed (e.g., "install").
+/// * `operation` - The type of operation being performed (e.g. "install").
 /// * `scope` - The installation scope.
 pub fn run_global_hooks(
     when: HookWhen,

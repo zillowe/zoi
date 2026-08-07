@@ -28,7 +28,7 @@ pub struct ResolvedSource {
     pub source_type: SourceType,
     /// The name of the repository, if applicable.
     pub repo_name: Option<String>,
-    /// The type of the repository (e.g., official, unofficial).
+    /// The type of the repository (e.g. official, unofficial).
     pub repo_type: Option<String>,
     /// The handle of the registry.
     pub registry_handle: Option<String>,
@@ -41,9 +41,9 @@ pub struct ResolvedSource {
 /// Represents a request for a package, parsed from a source string.
 #[derive(Debug, Default)]
 pub struct PackageRequest {
-    /// The registry handle (e.g., 'zoidberg').
+    /// The registry handle (e.g. 'zoidberg').
     pub handle: Option<String>,
-    /// The repository name (e.g., 'core').
+    /// The repository name (e.g. 'core').
     pub repo: Option<String>,
     /// The name of the package.
     pub name: String,

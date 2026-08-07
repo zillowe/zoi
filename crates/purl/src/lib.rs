@@ -48,7 +48,7 @@ pub struct RegistryInfo {
 /// Index entry for a specific package in a registry.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PurlPackageIndex {
-    /// Repository path within the registry (e.g., "base", "extra").
+    /// Repository path within the registry (e.g. "base", "extra").
     pub repo: String,
     /// Type of the repository.
     pub repo_type: String,

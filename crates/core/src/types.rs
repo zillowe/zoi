@@ -307,7 +307,7 @@ pub struct Service {
 /// Shell completion configuration.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ShellCompletion {
-    /// The shell for which completions are provided (e.g., "bash", "zsh").
+    /// The shell for which completions are provided (e.g. "bash", "zsh").
     pub shell: String,
     /// The filename of the completion script.
     pub filename: String,
@@ -945,7 +945,7 @@ pub struct InstallManifest {
     /// Optional dependencies chosen by the user.
     #[serde(default)]
     pub chosen_optionals: Vec<String>,
-    /// The method used to install the package (e.g., "source", "prebuilt").
+    /// The method used to install the package (e.g. "source", "prebuilt").
     #[serde(default)]
     pub install_method: Option<String>,
     /// The platform for which the package was installed.
@@ -1320,7 +1320,7 @@ pub struct DependenciesV2 {
 /// A build dependency with its associated build type.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct BuildDependencyV2 {
-    /// The build type (e.g., "source", "prebuilt").
+    /// The build type (e.g. "source", "prebuilt").
     #[serde(rename = "type")]
     pub build_type: String,
     /// The list of required packages for this build type.
@@ -1402,7 +1402,7 @@ pub struct LockPackageDetailV2 {
 /// A link to a Git repository in a repository configuration.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GitLink {
-    /// The type of link (e.g., "official").
+    /// The type of link (e.g. "official").
     #[serde(rename = "type")]
     pub link_type: String,
     /// The URL of the Git repository.
@@ -1412,7 +1412,7 @@ pub struct GitLink {
 /// A link to a package index or archive in a repository configuration.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PkgLink {
-    /// The type of link (e.g., "official").
+    /// The type of link (e.g. "official").
     #[serde(rename = "type")]
     pub link_type: String,
     /// The URL of the package index or archive.

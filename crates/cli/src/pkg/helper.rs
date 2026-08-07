@@ -305,7 +305,7 @@ pub mod validate {
     use colored::Colorize;
     use std::path::Path;
 
-    /// Validates a Zoi specification file (e.g., registries.json, repo.yaml).
+    /// Validates a Zoi specification file (e.g. registries.json, repo.yaml).
     pub fn run(file: &Path) -> Result<()> {
         if !file.exists() {
             return Err(anyhow!("File does not exist: {}", file.display()));

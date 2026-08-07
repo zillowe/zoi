@@ -103,7 +103,7 @@ pub fn write_zoi_lock(lockfile: &mut types::ZoiLockV2) -> Result<()> {
 /// Represents a package in a frozen lockfile state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FrozenLockPackage {
-    /// The package source string (e.g., `name@version`).
+    /// The package source string (e.g. `name@version`).
     pub source: String,
     /// The specific revision or commit.
     pub revision: String,

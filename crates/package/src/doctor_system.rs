@@ -362,9 +362,9 @@ pub fn prune_ghost_dependents(ghost_links: &[(PathBuf, String)]) -> Result<()> {
 
 /// Result of checking for external tool dependencies.
 pub struct ToolCheckResult {
-    /// List of essential tools (e.g., git) that are missing.
+    /// List of essential tools (e.g. git) that are missing.
     pub essential_missing: Vec<String>,
-    /// List of recommended tools (e.g., bwrap) that are missing.
+    /// List of recommended tools (e.g. bwrap) that are missing.
     pub recommended_missing: Vec<String>,
 }
 

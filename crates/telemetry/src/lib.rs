@@ -13,7 +13,7 @@ use uuid::Timestamp;
 pub struct PackageEvent<'a> {
     /// Unique anonymous identifier for the client.
     pub client_id: &'a str,
-    /// The name of the event (e.g., "install", "uninstall").
+    /// The name of the event (e.g. "install", "uninstall").
     pub event: &'a str,
     /// RFC3339 formatted timestamp of the event.
     pub ts: String,
@@ -29,13 +29,13 @@ pub struct PackageEvent<'a> {
     pub shell: Option<String>,
     /// Minimal package metadata.
     pub package: MinimalPackage<'a>,
-    /// Type of the package (e.g., "Package", "App").
+    /// Type of the package (e.g. "Package", "App").
     pub package_type: &'a str,
-    /// Installation scope (e.g., "global", "user").
+    /// Installation scope (e.g. "global", "user").
     pub scope: String,
-    /// Reason for the installation (e.g., "direct", "dependency").
+    /// Reason for the installation (e.g. "direct", "dependency").
     pub reason: String,
-    /// How the package was installed (e.g., "source", "binary").
+    /// How the package was installed (e.g. "source", "binary").
     pub install_type: Option<String>,
 }
 
