@@ -9,6 +9,7 @@ use mlua::{self, Lua, LuaSerdeExt, Table};
 ///
 /// These utilities return native Lua tables, allowing for idiomatic manipulation
 /// of complex data within the package script.
+/// Adds data parsing utilities (JSON, YAML, TOML, checksum files) to the `UTILS.PARSE` table.
 pub fn add_parse_util(lua: &Lua) -> Result<(), mlua::Error> {
     let parse_table = lua.create_table()?;
 

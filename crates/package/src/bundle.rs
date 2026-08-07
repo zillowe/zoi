@@ -1,3 +1,10 @@
+//! Logic for creating Zoi Source Archives (`.zsa`).
+//!
+//! This module handles the "bundling" process, which packages a `.pkg.lua`
+//! file together with its local assets and fetched upstream sources into
+//! a single, self-contained archive. This is useful for offline builds
+//! and for distributing source code along with build instructions.
+
 use anyhow::{Result, anyhow};
 use colored::*;
 use ignore::gitignore::GitignoreBuilder;
@@ -10,6 +17,7 @@ use tempfile::Builder;
 use walkdir::WalkDir;
 use zstd::stream::write::Encoder as ZstdEncoder;
 
+/// Bundles a package and its dependencies into a `.zsa` archive.
 pub fn run(
     package_file: &Path,
     output_dir: Option<&Path>,

@@ -1,12 +1,20 @@
+//! Logic for the `registry` command.
+//!
+//! This module provides commands for managing Zoi registries, including
+//! initialization, metadata generation, and package/advisory management.
+
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
+/// The root registry management command.
 #[derive(Parser, Debug)]
 pub struct RegistryCommand {
+    /// The specific registry subcommand to execute.
     #[command(subcommand)]
     pub command: RegistryCommands,
 }
 
+/// Available registry subcommands.
 #[derive(Subcommand, Debug)]
 pub enum RegistryCommands {
     /// Initialize a new Zoi registry
@@ -41,6 +49,7 @@ pub enum RegistryCommands {
     },
 }
 
+/// Run the registry management command.
 pub fn run(args: RegistryCommand) -> Result<()> {
     let registry_root = std::path::Path::new(".");
     match args.command {

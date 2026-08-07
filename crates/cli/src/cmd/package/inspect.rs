@@ -1,7 +1,10 @@
+//! Inspection of package files.
+
 use anyhow::{Result, anyhow};
 use clap::Parser;
 use std::path::PathBuf;
 
+/// Command to inspect a package file and display its metadata.
 #[derive(Parser, Debug)]
 pub struct InspectCommand {
     /// Path to the package file (e.g. path/to/name.pkg.lua)
@@ -21,6 +24,10 @@ pub struct InspectCommand {
     pub version_override: Option<String>,
 }
 
+/// Runs the package inspection command.
+///
+/// This parses the package's Lua definition and displays metadata such as name,
+/// version, repository, and description. It can also output the metadata in JSON format.
 pub fn run(args: InspectCommand) -> Result<()> {
     let platform = match args.platform {
         Some(p) => p,

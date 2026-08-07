@@ -1,3 +1,6 @@
+//! Zoi Mini: A lightweight, zero-sync package manager.
+
+/// Internal module for resolving package metadata from the Zoidberg registry in mini mode.
 mod mini_resolve;
 
 use anyhow::{Result, anyhow};
@@ -6,6 +9,7 @@ use colored::*;
 use zoi_core::types::Scope;
 use zoi_resolver::resolve::parse_source_string;
 
+/// CLI arguments for Zoi Mini.
 #[derive(Parser)]
 #[command(
     name = "zoi-mini",
@@ -14,9 +18,11 @@ use zoi_resolver::resolve::parse_source_string;
     version
 )]
 struct MiniCli {
+    /// The subcommand to run.
     #[command(subcommand)]
     command: MiniCommands,
 
+    /// Automatically answer yes to all prompts.
     #[arg(
         short = 'y',
         long,
@@ -26,6 +32,7 @@ struct MiniCli {
     yes: bool,
 }
 
+/// Supported subcommands for Zoi Mini.
 #[derive(Subcommand)]
 enum MiniCommands {
     /// Installs a package from Zoidberg registry
@@ -105,6 +112,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+/// Resolves and installs a package from the central registry.
 fn install(package_spec: &str, yes: bool) -> Result<()> {
     println!(
         "{} Resolving {} from Zoidberg...",
@@ -165,6 +173,7 @@ fn install(package_spec: &str, yes: bool) -> Result<()> {
     zoi_cli::install_sources(&[normalized_source.to_string()], &options)
 }
 
+/// Updates a previously installed package.
 fn update(package_name: &str, yes: bool) -> Result<()> {
     println!(
         "{} Checking for updates for {}...",
@@ -226,10 +235,12 @@ fn update(package_name: &str, yes: bool) -> Result<()> {
     zoi_cli::install_sources(&[normalized_source.to_string()], &options)
 }
 
+/// Uninstalls an installed package.
 fn uninstall(package_name: &str, _yes: bool) -> Result<()> {
     zoi_cli::uninstall_package(package_name, Some(Scope::User))
 }
 
+/// Lists all installed packages.
 fn list() -> Result<()> {
     let installed = zoi_cli::pkg::local::get_installed_packages()?;
     if installed.is_empty() {

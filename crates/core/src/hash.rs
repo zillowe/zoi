@@ -15,6 +15,7 @@ pub enum HashAlgorithm {
 }
 
 impl HashAlgorithm {
+    /// Returns the hash algorithm based on the length of the hex string.
     pub fn from_len(len: usize) -> Option<Self> {
         match len {
             128 => Some(HashAlgorithm::Sha512),
@@ -23,6 +24,7 @@ impl HashAlgorithm {
         }
     }
 
+    /// Returns the hash algorithm based on its name.
     pub fn from_name(name: &str) -> Option<Self> {
         match name.to_lowercase().as_str() {
             "sha512" => Some(HashAlgorithm::Sha512),

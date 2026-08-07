@@ -1,7 +1,12 @@
+//! Command for managing Zoi extensions (plugins).
+
 use crate::cli::{ExtensionCommand, ExtensionCommands};
 use crate::pkg;
 use anyhow::Result;
 
+/// Runs the 'extension' command.
+///
+/// Dispatches to subcommands for adding or removing extensions.
 pub fn run(
     args: ExtensionCommand,
     yes: bool,

@@ -6,8 +6,10 @@ use colored::*;
 use comfy_table::{Table, presets::UTF8_FULL};
 use std::collections::HashSet;
 
+/// Arguments for the `repo` command.
 #[derive(Parser)]
 pub struct RepoCommand {
+    /// Automatically answer yes to all prompts
     #[arg(
         short = 'y',
         long,
@@ -15,10 +17,12 @@ pub struct RepoCommand {
         global = true
     )]
     yes: bool,
+    /// The repository sub-command to run.
     #[command(subcommand)]
     command: Commands,
 }
 
+/// Available repository sub-commands.
 #[derive(Subcommand)]
 enum Commands {
     /// Add a repository to the configuration or clone from a git URL
@@ -29,10 +33,14 @@ enum Commands {
     },
     /// Remove a repository from the active configuration
     #[command(alias = "rm")]
-    Remove { repo_name: String },
+    Remove {
+        /// The name of the repository to remove
+        repo_name: String,
+    },
     /// List repositories (active by default); use `list all` to show all
     #[command(alias = "ls")]
     List {
+        /// Which repositories to list
         #[command(subcommand)]
         which: Option<ListSub>,
     },
@@ -41,6 +49,7 @@ enum Commands {
     Git(GitCommand),
 }
 
+/// Runs the `repo` command.
 pub fn run(args: RepoCommand) -> Result<()> {
     let yes = args.yes;
     match args.command {
@@ -79,6 +88,7 @@ pub fn run(args: RepoCommand) -> Result<()> {
     Ok(())
 }
 
+/// Lists active repositories.
 fn run_list_active() -> Result<()> {
     let config = config::read_config()?;
     if config.repos.is_empty() {
@@ -96,6 +106,7 @@ fn run_list_active() -> Result<()> {
     Ok(())
 }
 
+/// Lists all available repositories.
 fn run_list_all() -> Result<()> {
     let active_repos = config::read_config()?
         .repos
@@ -121,21 +132,27 @@ fn run_list_all() -> Result<()> {
     Ok(())
 }
 
+/// Options for listing repositories.
 #[derive(Subcommand)]
 enum ListSub {
     /// Show all available repositories (active + discovered)
     All,
 }
 
+/// Available git repository sub-commands.
 #[derive(Subcommand)]
 enum GitCommand {
     /// Show only cloned git repositories (~/.zoi/pkgs/git)
     #[command(alias = "ls")]
     List,
     /// Remove a cloned git repository directory (~/.zoi/pkgs/git/<repo-name>)
-    Rm { repo_name: String },
+    Rm {
+        /// The name of the repository to remove
+        repo_name: String,
+    },
 }
 
+/// Lists only cloned git repositories.
 fn run_list_git_only() -> Result<()> {
     let repos = config::list_git_repos()?;
     if repos.is_empty() {

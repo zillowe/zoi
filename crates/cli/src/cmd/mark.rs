@@ -1,7 +1,10 @@
+//! Implementation of the `mark` command, which allows changing the installation reason of a package.
+
 use crate::pkg::{db, local, recorder, resolve, types};
 use anyhow::{Result, anyhow};
 use colored::*;
 
+/// Runs the `mark` command.
 pub fn run(package_names: &[String], as_dependency: bool, as_explicit: bool) -> Result<()> {
     let new_reason = if as_dependency {
         types::InstallReason::Dependency {

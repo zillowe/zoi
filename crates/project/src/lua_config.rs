@@ -1,3 +1,9 @@
+//! Lua-based project configuration loading.
+//!
+//! This module implements the parsing and execution of `zoi.lua` files.
+//! It uses `mlua` to provide a declarative API within Lua for defining
+//! project metadata, packages, registries, tasks, and environments.
+
 use crate::config::{
     CommandSpec, EnvironmentSpec, PackageSpec, ProjectConfig, ProjectLocalConfig, RegistrySpec,
 };

@@ -1,12 +1,19 @@
+//! Telemetry command implementation.
+
 use anyhow::Result;
 use colored::*;
 
+/// Telemetry subcommands.
 pub enum TelemetryCommand {
+    /// Show telemetry status.
     Status,
+    /// Enable telemetry.
     Enable,
+    /// Disable telemetry.
     Disable,
 }
 
+/// Run the telemetry command.
 pub fn run(cmd: TelemetryCommand) -> Result<()> {
     match cmd {
         TelemetryCommand::Status => {

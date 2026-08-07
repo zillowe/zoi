@@ -1,8 +1,12 @@
+//! Automatic removal of unused dependencies.
+
 use anyhow::Result;
 use colored::*;
 use zoi_core::{types::InstallReason, utils as core_utils};
 use zoi_resolver::local;
 
+/// Runs the autoremove operation, identifying and removing packages that were installed
+/// as dependencies but are no longer required by any other package.
 pub fn run(yes: bool, dry_run: bool) -> Result<()> {
     println!("Checking for unused dependencies...");
     let all_installed = local::get_installed_packages()?;

@@ -1,8 +1,11 @@
+//! Implementation of the `owner` command, which finds the package that owns a given file.
+
 use crate::pkg::local;
 use anyhow::Result;
 use colored::*;
 use std::path::Path;
 
+/// Runs the `owner` command.
 pub fn run(path: &Path) -> Result<()> {
     let absolute_path = match path.canonicalize() {
         Ok(p) => p,

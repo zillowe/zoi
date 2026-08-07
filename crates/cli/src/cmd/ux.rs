@@ -1,3 +1,8 @@
+//! User experience (UX) utilities for the Zoi CLI.
+//!
+//! This module contains types and functions for formatting output,
+//! providing hints to the user, and emitting machine-readable plans.
+
 use anyhow::anyhow;
 use colored::Colorize;
 use serde::Serialize;
@@ -10,15 +15,22 @@ use std::collections::BTreeMap;
 /// are coming from in the ecosystem.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InstallOrigin {
+    /// Package installed from a prebuilt binary in the registry.
     RegistryPrebuilt,
+    /// Package built from source in the registry.
     RegistrySource,
+    /// Package installed from a local archive file.
     LocalArchive,
+    /// Package installed from a local package definition.
     LocalPackage,
+    /// Package downloaded and installed from a remote URL.
     RemoteUrl,
+    /// Origin of the package is unknown.
     Unknown,
 }
 
 impl InstallOrigin {
+    /// Returns the string representation of the install origin.
     pub fn as_str(self) -> &'static str {
         match self {
             InstallOrigin::RegistryPrebuilt => "registry-prebuilt",
@@ -31,27 +43,39 @@ impl InstallOrigin {
     }
 }
 
+/// A summary of a transaction's results.
 #[derive(Debug, Clone, Serialize)]
 pub struct TransactionSummary {
+    /// The command that was executed.
     pub command: String,
+    /// Number of successful operations.
     pub success: usize,
+    /// Number of failed operations.
     pub failed: usize,
+    /// Number of skipped operations.
     pub skipped: usize,
 }
 
+/// A single row in a preflight summary table.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct PreflightRow {
+    /// The key/label for the row.
     pub key: String,
+    /// The value for the row.
     pub value: String,
 }
 
+/// A summary of preflight checks before an operation.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct PreflightSummary {
+    /// The title of the summary.
     pub title: String,
+    /// The rows containing detailed information.
     pub rows: Vec<PreflightRow>,
 }
 
 impl PreflightSummary {
+    /// Creates a new preflight summary with the given title.
     pub fn new(title: impl Into<String>) -> Self {
         Self {
             title: title.into(),
@@ -59,6 +83,7 @@ impl PreflightSummary {
         }
     }
 
+    /// Adds a row to the summary.
     pub fn row(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
         self.rows.push(PreflightRow {
             key: key.into(),
@@ -68,21 +93,29 @@ impl PreflightSummary {
     }
 }
 
+/// An item in an explanation report.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct ExplainItem {
+    /// The subject of the explanation.
     pub subject: String,
+    /// The reason or brief explanation.
     pub reason: String,
+    /// Additional details about the item.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub details: Vec<String>,
 }
 
+/// A report explaining the reasons for certain actions or states.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct ExplainReport {
+    /// The title of the report.
     pub title: String,
+    /// The items in the report.
     pub items: Vec<ExplainItem>,
 }
 
 impl ExplainReport {
+    /// Creates a new explanation report with the given title.
     pub fn new(title: impl Into<String>) -> Self {
         Self {
             title: title.into(),
@@ -90,6 +123,7 @@ impl ExplainReport {
         }
     }
 
+    /// Adds an item to the report.
     pub fn item(
         mut self,
         subject: impl Into<String>,
@@ -122,6 +156,7 @@ pub struct PlanJsonV1 {
 }
 
 impl PlanJsonV1 {
+    /// Creates a new version 1 plan JSON object.
     pub fn new(command: impl Into<String>, fields: BTreeMap<String, Value>) -> Self {
         Self {
             schema: "zoi.plan.v1".to_string(),
@@ -131,6 +166,7 @@ impl PlanJsonV1 {
     }
 }
 
+/// Prints a preflight summary to the console.
 pub fn print_preflight(summary: &PreflightSummary) {
     println!("\n{} {}", "::".bold().blue(), summary.title.bold());
     for row in &summary.rows {
@@ -138,6 +174,7 @@ pub fn print_preflight(summary: &PreflightSummary) {
     }
 }
 
+/// Prints a transaction summary to the console.
 pub fn print_transaction_summary(summary: &TransactionSummary) {
     println!(
         "\n{} {} summary: success={}, failed={}, skipped={}",
@@ -149,12 +186,14 @@ pub fn print_transaction_summary(summary: &TransactionSummary) {
     );
 }
 
+/// Emits a plan in JSON format to stdout.
 pub fn emit_plan_json<T: Serialize>(plan: &T) -> anyhow::Result<()> {
     let json = serde_json::to_string_pretty(plan)?;
     println!("{}", json);
     Ok(())
 }
 
+/// Emits a version 1 plan in JSON format to stdout.
 pub fn emit_plan_json_v1(command: &str, payload: Value) -> anyhow::Result<()> {
     let mut fields = BTreeMap::new();
     match payload {
@@ -171,6 +210,7 @@ pub fn emit_plan_json_v1(command: &str, payload: Value) -> anyhow::Result<()> {
     emit_plan_json(&plan)
 }
 
+/// Prints an explanation report to the console.
 pub fn print_explain(report: &ExplainReport) {
     println!("\n{} {}", "::".bold().blue(), report.title);
     for item in &report.items {
@@ -181,6 +221,7 @@ pub fn print_explain(report: &ExplainReport) {
     }
 }
 
+/// Classifies the origin of a package based on its source string and the action being performed.
 pub fn classify_source_origin(source: &str, action_name: &str) -> InstallOrigin {
     if source.starts_with("http://") || source.starts_with("https://") {
         return InstallOrigin::RemoteUrl;
@@ -202,6 +243,7 @@ pub fn classify_source_origin(source: &str, action_name: &str) -> InstallOrigin 
     }
 }
 
+/// Wraps an error with a user-friendly hint if one is available for the given error message and command.
 pub fn with_failure_hint(command: &str, err: anyhow::Error) -> anyhow::Error {
     let msg = err.to_string();
     let hint = failure_hint(&msg, command);
@@ -212,6 +254,7 @@ pub fn with_failure_hint(command: &str, err: anyhow::Error) -> anyhow::Error {
     }
 }
 
+/// Returns a user-friendly hint for a given error message and command.
 fn failure_hint(message: &str, command: &str) -> Option<&'static str> {
     let m = message.to_lowercase();
     if m.contains("not synced") || m.contains("registry") && m.contains("sync") {

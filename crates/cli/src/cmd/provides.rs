@@ -1,3 +1,5 @@
+//! Searching for packages that provide a specific file or command.
+
 use crate::pkg::{config, db};
 use anyhow::Result;
 use colored::Colorize;
@@ -5,6 +7,10 @@ use comfy_table::{Attribute, Cell, ContentArrangement, Table, presets::UTF8_FULL
 
 use rayon::prelude::*;
 
+/// Searches for packages that provide a specific file or command.
+///
+/// This queries the configured registries to find which packages contain the given term
+/// in their file lists.
 pub fn run(term: &str) -> Result<()> {
     println!(
         "{} Searching for packages providing '{}'...",

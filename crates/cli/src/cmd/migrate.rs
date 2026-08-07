@@ -1,3 +1,7 @@
+//! Implementation of the `zoi migrate` command.
+//!
+//! This command facilitates migrating packages from other formats (like Scoop) to Zoi.
+
 use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand, ValueHint};
 use colored::Colorize;
@@ -5,18 +9,22 @@ use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
+/// Arguments for the `migrate` command.
 #[derive(Parser, Debug)]
 pub struct MigrateCommand {
+    /// The migration sub-command to run.
     #[command(subcommand)]
     command: Commands,
 }
 
+/// Available migration sub-commands.
 #[derive(Subcommand, Debug)]
 enum Commands {
     /// Convert a Scoop manifest (scoop.json) into a Zoi .pkg.lua package file
     Scoop(ScoopCommand),
 }
 
+/// Arguments for the Scoop migration sub-command.
 #[derive(Parser, Debug)]
 pub struct ScoopCommand {
     /// Path to Scoop manifest JSON/JSON5 file
@@ -45,55 +53,88 @@ pub struct ScoopCommand {
     dry_run: bool,
 }
 
+/// Represents a binary mapping from source path to target name.
 #[derive(Debug, Clone)]
 struct BinMapping {
+    /// The source path of the binary.
     source: String,
+    /// The target name of the binary.
     target: String,
+    /// Arguments to be passed to the binary.
     args: Vec<String>,
 }
 
+/// Represents a download specification for a package.
 #[derive(Debug, Clone)]
 struct DownloadSpec {
+    /// The architecture key (e.g., "64bit", "arm64", "default").
     arch_key: String,
+    /// The download URLs.
     urls: Vec<String>,
+    /// The hashes of the downloaded files.
     hashes: Vec<String>,
+    /// The directory within the archive to extract.
     extract_dir: Option<String>,
+    /// The directory to extract to.
     extract_to: Option<String>,
 }
 
+/// Represents hook scripts for different stages of the package lifecycle.
 #[derive(Debug, Clone, Default)]
 struct HookScripts {
+    /// Scripts to run before installation.
     pre_install: Vec<String>,
+    /// Scripts to run after installation.
     post_install: Vec<String>,
+    /// Scripts to run before removal.
     pre_remove: Vec<String>,
+    /// Scripts to run after removal.
     post_remove: Vec<String>,
 }
 
+/// Represents the generated package metadata and content.
 #[derive(Debug, Clone)]
 struct Generated {
+    /// Package name.
     name: String,
+    /// Package repository.
     repo: String,
+    /// Package version.
     version: String,
+    /// Package description.
     description: String,
+    /// Package website.
     website: String,
+    /// Package license.
     license: String,
+    /// Maintainer name.
     maintainer_name: String,
+    /// Maintainer email.
     maintainer_email: String,
+    /// Binary mappings.
     bins: Vec<BinMapping>,
+    /// Runtime dependencies.
     runtime_deps: Vec<String>,
+    /// Backup paths.
     backups: Vec<String>,
+    /// Download specifications.
     downloads: Vec<DownloadSpec>,
+    /// Hook scripts.
     hooks: HookScripts,
+    /// Migration notes.
     notes: Vec<String>,
+    /// The original manifest.
     manifest: Value,
 }
 
+/// Runs the `migrate` command.
 pub fn run(args: MigrateCommand) -> Result<()> {
     match args.command {
         Commands::Scoop(cmd) => run_scoop(cmd),
     }
 }
 
+/// Runs the Scoop migration sub-command.
 fn run_scoop(args: ScoopCommand) -> Result<()> {
     let content = std::fs::read_to_string(&args.input)
         .map_err(|e| anyhow!("Failed to read '{}': {}", args.input.display(), e))?;
@@ -173,6 +214,7 @@ fn run_scoop(args: ScoopCommand) -> Result<()> {
     Ok(())
 }
 
+/// Derives a package name from the input file path.
 fn derive_name_from_path(path: &Path) -> Result<String> {
     let stem = path
         .file_stem()
@@ -181,6 +223,7 @@ fn derive_name_from_path(path: &Path) -> Result<String> {
     Ok(stem.to_string())
 }
 
+/// Returns the default output path for the generated package file.
 fn default_output_path(input: &Path, name: &str) -> PathBuf {
     match input.parent() {
         Some(parent) => parent.join(format!("{}.pkg.lua", name)),
@@ -188,10 +231,12 @@ fn default_output_path(input: &Path, name: &str) -> PathBuf {
     }
 }
 
+/// Normalizes a package name by trimming, lowercasing, and replacing spaces with hyphens.
 fn normalize_name(name: &str) -> String {
     name.trim().to_lowercase().replace(' ', "-")
 }
 
+/// Extracts a string field from a JSON map.
 fn get_string_field(map: &serde_json::Map<String, Value>, key: &str) -> Option<String> {
     map.get(key)
         .and_then(Value::as_str)
@@ -199,6 +244,7 @@ fn get_string_field(map: &serde_json::Map<String, Value>, key: &str) -> Option<S
         .filter(|s| !s.is_empty())
 }
 
+/// Extracts the license field from a JSON map, handling both string and object formats.
 fn get_license_field(map: &serde_json::Map<String, Value>) -> Option<String> {
     let value = map.get("license")?;
     if let Some(s) = value.as_str() {
@@ -220,6 +266,7 @@ fn get_license_field(map: &serde_json::Map<String, Value>) -> Option<String> {
     None
 }
 
+/// Converts a JSON value (string or array) into a list of strings.
 fn value_to_string_list(value: Option<&Value>) -> Vec<String> {
     let Some(v) = value else {
         return Vec::new();
@@ -248,6 +295,7 @@ fn value_to_string_list(value: Option<&Value>) -> Vec<String> {
     }
 }
 
+/// Parses the `depends` field from a Scoop manifest.
 fn parse_depends(depends: Option<&Value>) -> Vec<String> {
     value_to_string_list(depends)
         .into_iter()
@@ -261,6 +309,7 @@ fn parse_depends(depends: Option<&Value>) -> Vec<String> {
         .collect()
 }
 
+/// Parses the `persist` field from a Scoop manifest.
 fn parse_persist(persist: Option<&Value>) -> Vec<String> {
     let Some(value) = persist else {
         return Vec::new();
@@ -301,6 +350,7 @@ fn parse_persist(persist: Option<&Value>) -> Vec<String> {
     result
 }
 
+/// Collects binary mappings from a Scoop manifest.
 fn collect_bins(manifest: &serde_json::Map<String, Value>) -> Vec<BinMapping> {
     let mut all = Vec::new();
     all.extend(parse_bin_value(manifest.get("bin")));
@@ -325,6 +375,7 @@ fn collect_bins(manifest: &serde_json::Map<String, Value>) -> Vec<BinMapping> {
         .collect()
 }
 
+/// Parses a `bin` value from a Scoop manifest.
 fn parse_bin_value(value: Option<&Value>) -> Vec<BinMapping> {
     let Some(value) = value else {
         return Vec::new();
@@ -379,6 +430,7 @@ fn parse_bin_value(value: Option<&Value>) -> Vec<BinMapping> {
     mappings
 }
 
+/// Returns the file stem or basename of a path, stripping common executable extensions.
 fn file_stem_or_basename(path: &str) -> String {
     let normalized = path.replace('\\', "/");
     let base = normalized.rsplit('/').next().unwrap_or(path).trim();
@@ -395,6 +447,7 @@ fn file_stem_or_basename(path: &str) -> String {
     base.to_string()
 }
 
+/// Collects download specifications from a Scoop manifest.
 fn collect_download_specs(map: &serde_json::Map<String, Value>) -> Result<Vec<DownloadSpec>> {
     let root_urls = value_to_string_list(map.get("url"));
     let root_hashes = value_to_string_list(map.get("hash"));
@@ -467,6 +520,7 @@ fn collect_download_specs(map: &serde_json::Map<String, Value>) -> Result<Vec<Do
     Ok(by_key.into_values().collect())
 }
 
+/// Collects hook scripts from a Scoop manifest.
 fn collect_hook_scripts(map: &serde_json::Map<String, Value>) -> HookScripts {
     let mut hooks = HookScripts::default();
 
@@ -529,11 +583,13 @@ fn collect_hook_scripts(map: &serde_json::Map<String, Value>) -> HookScripts {
     hooks
 }
 
+/// Dedupes a vector of strings while preserving order.
 fn dedupe_strings(values: &mut Vec<String>) {
     let mut seen = BTreeSet::new();
     values.retain(|v| seen.insert(v.clone()));
 }
 
+/// Collects migration notes based on the Scoop manifest content.
 fn collect_migration_notes(
     manifest: &serde_json::Map<String, Value>,
     bins: &[BinMapping],
@@ -588,6 +644,7 @@ fn collect_migration_notes(
     notes
 }
 
+/// Renders a generated package into a `.pkg.lua` file.
 fn render_pkg_lua(g: &Generated) -> String {
     let mut out = String::new();
 
@@ -896,6 +953,7 @@ fn render_pkg_lua(g: &Generated) -> String {
     out
 }
 
+/// Escapes a string for use in Lua.
 fn lua_quote(value: &str) -> String {
     let escaped = value
         .replace('\\', "\\\\")
@@ -904,6 +962,7 @@ fn lua_quote(value: &str) -> String {
     format!("\"{}\"", escaped)
 }
 
+/// Returns a Lua quoted string or `nil` if the value is empty or `None`.
 fn lua_optional(value: Option<&str>) -> String {
     match value {
         Some(v) if !v.trim().is_empty() => lua_quote(v),
@@ -911,6 +970,7 @@ fn lua_optional(value: Option<&str>) -> String {
     }
 }
 
+/// Converts a JSON value into a Lua table string.
 fn json_to_lua(value: &Value, indent: usize) -> String {
     match value {
         Value::Null => "nil".to_string(),

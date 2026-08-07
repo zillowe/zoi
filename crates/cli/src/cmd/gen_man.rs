@@ -1,3 +1,7 @@
+//! Implementation of the `zoi gen-man` command.
+//!
+//! This command generates man pages for the Zoi CLI and all its subcommands.
+
 use crate::cli::Cli;
 use clap::{Command, CommandFactory};
 use clap_mangen::Man;
@@ -6,6 +10,9 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+/// Runs the 'gen-man' command.
+///
+/// Generates man pages for the Zoi CLI and all its subcommands in the 'manuals' directory.
 pub fn run() -> io::Result<()> {
     let out_dir = env::var("OUT_DIR").unwrap_or_else(|_| "manuals".to_string());
     let out_path = PathBuf::from(out_dir);
@@ -27,13 +34,14 @@ pub fn run() -> io::Result<()> {
     Ok(())
 }
 
+/// Recursively generates man pages for a command and all its subcommands.
 fn generate_man_pages_recursive(
     cmd: &Command,
     out_path: &Path,
     parent_name: &str,
 ) -> io::Result<()> {
     if cmd.is_hide_set() {
-        return Ok(());
+        return Ok(())
     }
 
     let full_name = format!("{}-{}", parent_name, cmd.get_name());
@@ -48,6 +56,7 @@ fn generate_man_pages_recursive(
     Ok(())
 }
 
+/// Generates a single man page for a command.
 fn generate_man_page(app: &Command, out_path: &Path) -> io::Result<()> {
     let name = app.get_name();
     let out_file = out_path.join(format!("{}.1", name));

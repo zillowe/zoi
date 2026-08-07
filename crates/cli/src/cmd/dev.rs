@@ -1,3 +1,5 @@
+//! Implementation of the `dev` command for project development environments.
+
 use crate::pkg::{install, local, resolve, types};
 use anyhow::{Result, anyhow};
 use colored::*;
@@ -6,6 +8,7 @@ use std::collections::HashMap;
 use std::process::Command;
 use zoi_project::config as project_config;
 
+/// Runs the `dev` command to enter a development shell for a project.
 pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
     let is_repo = repo.is_some();
     let _temp_dir = if let Some(repo_url) = repo {

@@ -1,3 +1,8 @@
+//! Cryptographic utilities for the Lua environment.
+//!
+//! This module provides functions to verify file integrity using hashes and
+//! digital signatures, ensuring the security of downloaded assets.
+
 use mlua::{self, Lua, Value};
 use std::path::{Path, PathBuf};
 use zoi_core::utils;
@@ -93,6 +98,9 @@ pub fn add_verify_hash(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     Ok(())
 }
 
+/// Adds the `verifySignature` function to the Lua global environment.
+///
+/// This function allows package scripts to validate detached PGP signatures.
 pub fn add_verify_signature(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let verify_sig_fn = lua.create_function(move |lua, args: mlua::MultiValue| {
         let mut args_iter = args.into_iter();
@@ -213,6 +221,9 @@ pub fn add_verify_signature(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     Ok(())
 }
 
+/// Adds the `addPgpKey` function to the Lua global environment.
+///
+/// This function allows package scripts to import trusted PGP keys.
 pub fn add_add_pgp_key(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let add_pgp_key_fn = lua.create_function(move |lua, args: mlua::MultiValue| {
         let mut args_iter = args.into_iter();

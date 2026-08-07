@@ -1,8 +1,11 @@
+//! Installation of package archive files.
+
 use crate::cli::SetupScope;
 use anyhow::Result;
 use clap::Parser;
 use std::path::PathBuf;
 
+/// Command to install a package from a `.zpa` archive file.
 #[derive(Parser, Debug)]
 pub struct InstallCommand {
     /// Path to the package archive file (e.g. path/to/name-os-arch.zpa)
@@ -19,6 +22,9 @@ pub struct InstallCommand {
     pub yes: bool,
 }
 
+/// Runs the package installation command.
+///
+/// This installs a package from a local `.zpa` archive into the specified scope.
 pub fn run(args: InstallCommand) -> Result<()> {
     let scope = match args.scope {
         SetupScope::User => crate::pkg::types::Scope::User,

@@ -1,3 +1,5 @@
+//! Integration tests for general package resolution logic.
+
 use std::fs;
 use tempfile::tempdir;
 use zoi::pkg::resolve;

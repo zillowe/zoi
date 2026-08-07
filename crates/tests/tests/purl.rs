@@ -1,3 +1,5 @@
+//! Integration tests for Package URL (PURL) resolution.
+
 use std::fs;
 use tempfile::tempdir;
 use zoi::pkg::purl::resolve_purl;

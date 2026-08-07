@@ -8,6 +8,10 @@ use std::io::{self, Write};
 use std::process::Stdio;
 use zoi_core::utils;
 
+/// Sets up a project environment by running its specified commands.
+///
+/// If `env_alias` is provided, it tries to find and setup that specific environment.
+/// Otherwise, it prompts the user to choose an environment interactively.
 pub fn setup(env_alias: Option<&str>, config: &config::ProjectConfig) -> Result<()> {
     if config.environments.is_empty() {
         return Err(anyhow!("No environments defined in zoi.yaml"));
@@ -77,6 +81,7 @@ pub fn setup(env_alias: Option<&str>, config: &config::ProjectConfig) -> Result<
     Ok(())
 }
 
+/// Checks if all required packages defined in the configuration are present on the system.
 fn check_packages(config: &config::ProjectConfig) -> Result<()> {
     if config.packages.is_empty() {
         return Ok(());
@@ -105,6 +110,10 @@ fn check_packages(config: &config::ProjectConfig) -> Result<()> {
     Ok(())
 }
 
+/// Exports environment variables to the shell.
+///
+/// This prints shell-specific commands (e.g., `export` for Bash/Zsh) that can be
+/// evaluated to set up the environment variables for the current project.
 pub fn export_shell(
     env_alias: Option<&str>,
     config: &config::ProjectConfig,

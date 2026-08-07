@@ -1,9 +1,15 @@
+//! Command for viewing and verifying the audit history of Zoi operations.
+
 use crate::pkg::audit;
 use anyhow::{Result, anyhow};
 use colored::*;
 use comfy_table::{Cell, Color, ContentArrangement, Table, presets::UTF8_FULL};
 use std::path::PathBuf;
 
+/// Runs the 'history' command.
+///
+/// Displays the audit history in a table, exports it to a file,
+/// or verifies the cryptographic integrity of the history chain.
 pub fn run(verify: bool, export: Option<PathBuf>, ndjson: bool) -> Result<()> {
     if verify {
         let report = audit::verify_chain()?;

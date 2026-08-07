@@ -208,6 +208,7 @@ pub struct DependencyResolution {
     pub non_zoi_dependencies: Vec<String>,
 }
 
+/// Converts a generic Zoi scope to a CLI-specific install scope.
 fn to_install_scope(scope: Scope) -> zoi_cli::cli::InstallScope {
     match scope {
         Scope::User => zoi_cli::cli::InstallScope::User,
@@ -216,6 +217,7 @@ fn to_install_scope(scope: Scope) -> zoi_cli::cli::InstallScope {
     }
 }
 
+/// Builds a Zoi package from a `.pkg.lua` definition using the provided options.
 pub fn build_with_options(package_file: &Path, options: &BuildOptions<'_>) -> Result<()> {
     if options.install_deps {
         for platform in &options.platforms {
@@ -270,6 +272,7 @@ pub fn build_with_options(package_file: &Path, options: &BuildOptions<'_>) -> Re
     )
 }
 
+/// Installs a local `.zpa` package archive using the provided options.
 pub fn install_package_with_options(
     package_file: &Path,
     options: &PackageInstallOptions,
@@ -286,6 +289,9 @@ pub fn install_package_with_options(
     )
 }
 
+/// Installs one or more package sources using the provided options.
+///
+/// Sources can be registry package names, local `.pkg.lua` files, URLs, or local manifests.
 pub fn install_sources(sources: &[String], options: &SourceInstallOptions) -> Result<()> {
     let plugin_manager = if zoi_core::utils::is_mini_mode() {
         None
@@ -329,6 +335,7 @@ pub fn update_packages(all: bool, package_names: &[String], yes: bool) -> Result
     zoi_cli::cmd::update::run(all, package_names, yes, false, false, false, false)
 }
 
+/// Resolves a single source string into a package and its origin metadata.
 pub fn resolve_package(source: &str, yes: bool) -> Result<ResolvedPackage> {
     let (package, version, sharable_manifest, source_path, registry_handle, repo_type, git_sha) =
         zoi_resolver::resolve::resolve_package_and_version(source, None, true, yes)?;
@@ -343,6 +350,7 @@ pub fn resolve_package(source: &str, yes: bool) -> Result<ResolvedPackage> {
     })
 }
 
+/// Resolves the dependency graph for one or more package sources.
 pub fn resolve_dependency_graph(
     sources: &[String],
     options: &DependencyResolutionOptions,

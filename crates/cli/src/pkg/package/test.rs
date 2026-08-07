@@ -3,6 +3,7 @@ use anyhow::{Result, anyhow};
 use colored::*;
 use mlua::{Lua, LuaSerdeExt};
 
+/// Runs tests for a Zoi package defined in a `.pkg.lua` file.
 pub fn run(args: &cmd::package::build::BuildCommand) -> Result<()> {
     println!("Testing package from: {}", args.package_file.display());
 

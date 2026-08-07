@@ -5,11 +5,17 @@ use std::path::PathBuf;
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::Mutex;
 
+/// Represents an active shell process used for executing commands from Lua.
 struct InnerSession {
+    /// The handle to the child shell process.
     child: Child,
+    /// The standard input stream for the child process.
     stdin: ChildStdin,
+    /// The buffered standard output stream for the child process.
     stdout: BufReader<ChildStdout>,
+    /// The path to the file where standard error is redirected.
     stderr_path: PathBuf,
+    /// A unique string used to identify the end of a command's output.
     sentinel: String,
 }
 
@@ -23,11 +29,14 @@ impl Drop for InnerSession {
     }
 }
 
+/// A wrapper around `InnerSession` providing thread-safe access.
 struct ShellSession {
+    /// The inner session state, protected by a mutex.
     inner: Mutex<InnerSession>,
 }
 
 impl ShellSession {
+    /// Creates a new `ShellSession` within the specified build directory.
     fn new(lua: &Lua, build_dir: &str) -> Result<Self, anyhow::Error> {
         let sentinel = format!("---ZOI_CMD_COMPLETE_{}---", uuid::Uuid::new_v4());
         let stderr_path = PathBuf::from(build_dir).join(format!(".zoi_stderr_{}", sentinel));
@@ -139,6 +148,7 @@ impl ShellSession {
 ///
 /// All commands are executed relative to the `BUILD_DIR` and respect the
 /// user's environment and Zoi's quiet/verbose settings.
+/// Adds the `cmd` function to the Lua environment for executing shell commands.
 pub fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let cmd_fn = lua.create_function(move |lua, command: String| {
         let build_dir: String = lua.globals().get("BUILD_DIR")?;
@@ -238,6 +248,7 @@ pub fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     Ok(())
 }
 
+/// Adds the `zpatch` function to the Lua environment for applying patches.
 pub fn add_zpatch(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let zpatch_fn =
         lua.create_function(move |lua, (patch_file, strip): (String, Option<u32>)| {

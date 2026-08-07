@@ -15,6 +15,7 @@ use walkdir::WalkDir;
 /// These functions do not always perform immediate actions; instead, they often record
 /// operations into `__ZoiBuildOperations` for the Rust engine to execute atomically
 /// during the staging-to-store move.
+/// Adds file downloading utilities to the Lua environment.
 pub fn add_file_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let file_fn = lua.create_function(
         move |_, (url, path): (String, String)| -> Result<(), mlua::Error> {
@@ -28,6 +29,7 @@ pub fn add_file_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     Ok(())
 }
 
+/// Adds the `zcp` function to the Lua environment for staging files.
 pub fn add_zcp(lua: &Lua) -> Result<(), mlua::Error> {
     let zcp_fn = lua.create_function(|lua, (source, destination): (String, String)| {
         let ops_table: Table = match lua.globals().get("__ZoiBuildOperations") {
@@ -49,6 +51,7 @@ pub fn add_zcp(lua: &Lua) -> Result<(), mlua::Error> {
     Ok(())
 }
 
+/// Adds the `zlicense` function to the Lua environment for staging licenses.
 pub fn add_zlicense(lua: &Lua) -> Result<(), mlua::Error> {
     let zlicense_fn = lua.create_function(|lua, source: String| {
         let zoi_table: Table = lua.globals().get("ZOI")?;
@@ -79,6 +82,7 @@ pub fn add_zlicense(lua: &Lua) -> Result<(), mlua::Error> {
     Ok(())
 }
 
+/// Adds the `zdoc` function to the Lua environment for staging documentation files.
 pub fn add_zdoc(lua: &Lua) -> Result<(), mlua::Error> {
     let zdoc_fn = lua.create_function(|lua, source: String| {
         let zoi_table: Table = lua.globals().get("ZOI")?;
@@ -109,6 +113,7 @@ pub fn add_zdoc(lua: &Lua) -> Result<(), mlua::Error> {
     Ok(())
 }
 
+/// Adds the `zman` function to the Lua environment for staging manual pages.
 pub fn add_zman(lua: &Lua) -> Result<(), mlua::Error> {
     let zman_fn = lua.create_function(|lua, (source, section): (String, Option<String>)| {
         let zoi_table: Table = lua.globals().get("ZOI")?;
@@ -179,6 +184,7 @@ pub fn add_zman(lua: &Lua) -> Result<(), mlua::Error> {
     Ok(())
 }
 
+/// Adds the `zshell` function to the Lua environment for staging shell completions.
 pub fn add_zshell(lua: &Lua) -> Result<(), mlua::Error> {
     let zshell_fn = lua.create_function(|lua, (source, shell): (String, String)| {
         let filename = Path::new(&source)
@@ -211,6 +217,7 @@ pub fn add_zshell(lua: &Lua) -> Result<(), mlua::Error> {
     Ok(())
 }
 
+/// Adds the `zsed` function to the Lua environment for text replacements in files.
 pub fn add_zsed(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let zsed_fn = lua.create_function(
         move |lua, (pattern, replacement, file): (String, String, String)| {
@@ -242,6 +249,7 @@ pub fn add_zsed(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     Ok(())
 }
 
+/// Adds the `zln` function to the Lua environment for creating symbolic links.
 pub fn add_zln(lua: &Lua) -> Result<(), mlua::Error> {
     let zln_fn = lua.create_function(|lua, (target, link): (String, String)| {
         let ops_table: Table = match lua.globals().get("__ZoiBuildOperations") {
@@ -263,6 +271,7 @@ pub fn add_zln(lua: &Lua) -> Result<(), mlua::Error> {
     Ok(())
 }
 
+/// Adds the `zchmod` function to the Lua environment for changing file permissions.
 pub fn add_zchmod(lua: &Lua) -> Result<(), mlua::Error> {
     let zchmod_fn = lua.create_function(|lua, (path, mode): (String, u32)| {
         let ops_table: Table = match lua.globals().get("__ZoiBuildOperations") {
@@ -284,6 +293,7 @@ pub fn add_zchmod(lua: &Lua) -> Result<(), mlua::Error> {
     Ok(())
 }
 
+/// Adds the `zchown` function to the Lua environment for changing file ownership.
 pub fn add_zchown(lua: &Lua) -> Result<(), mlua::Error> {
     let zchown_fn =
         lua.create_function(|lua, (path, owner, group): (String, String, String)| {
@@ -307,6 +317,7 @@ pub fn add_zchown(lua: &Lua) -> Result<(), mlua::Error> {
     Ok(())
 }
 
+/// Adds the `zmkdir` function to the Lua environment for creating directories.
 pub fn add_zmkdir(lua: &Lua) -> Result<(), mlua::Error> {
     let zmkdir_fn = lua.create_function(|lua, path: String| {
         let ops_table: Table = match lua.globals().get("__ZoiBuildOperations") {
@@ -327,6 +338,7 @@ pub fn add_zmkdir(lua: &Lua) -> Result<(), mlua::Error> {
     Ok(())
 }
 
+/// Adds the `zrm` function to the Lua environment for removing files during uninstallation.
 pub fn add_zrm(lua: &Lua) -> Result<(), mlua::Error> {
     let zrm_fn = lua.create_function(|lua, path: String| {
         let ops_table: Table = match lua.globals().get("__ZoiUninstallOperations") {
@@ -348,6 +360,7 @@ pub fn add_zrm(lua: &Lua) -> Result<(), mlua::Error> {
     Ok(())
 }
 
+/// Adds general filesystem utilities to the `UTILS.FS` table.
 pub fn add_fs_util(lua: &Lua) -> Result<(), mlua::Error> {
     let fs_table = lua.create_table()?;
 
@@ -405,6 +418,7 @@ pub fn add_fs_util(lua: &Lua) -> Result<(), mlua::Error> {
     Ok(())
 }
 
+/// Adds file finding utilities to the `UTILS.FIND` table.
 pub fn add_find_util(lua: &Lua) -> Result<(), mlua::Error> {
     let find_table = lua.create_table()?;
 

@@ -1,3 +1,5 @@
+//! Integration tests for database collision handling.
+
 use tempfile::tempdir;
 use zoi::pkg::{db, types};
 mod common;

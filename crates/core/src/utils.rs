@@ -37,6 +37,7 @@ pub fn get_http_client() -> Result<&'static reqwest::blocking::Client> {
         .ok_or_else(|| anyhow!("HTTP_CLIENT should be set but was missing"))
 }
 
+/// Builds a blocking HTTP client with a custom timeout.
 pub fn build_blocking_http_client(timeout_secs: u64) -> Result<reqwest::blocking::Client> {
     if crate::offline::is_offline() {
         return Err(anyhow!(
@@ -51,6 +52,7 @@ pub fn build_blocking_http_client(timeout_secs: u64) -> Result<reqwest::blocking
     Ok(client)
 }
 
+/// Creates a symbolic link for a directory, handling platform-specific requirements.
 pub fn symlink_dir(target: &Path, link: &Path) -> std::io::Result<()> {
     if link.exists() || link.is_symlink() {
         if link.is_dir() && !link.is_symlink() {
@@ -74,6 +76,7 @@ pub fn symlink_dir(target: &Path, link: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+/// Checks if a command exists in the system's PATH.
 pub fn command_exists(command: &str) -> bool {
     if cfg!(target_os = "windows") {
         Command::new("where")
@@ -171,6 +174,7 @@ pub fn get_store_base_dir(scope: crate::types::Scope) -> Result<PathBuf> {
     }
 }
 
+/// Returns the root directory of the package database for a given scope.
 pub fn get_db_base_dir(scope: crate::types::Scope) -> Result<PathBuf> {
     match scope {
         crate::types::Scope::User => {
@@ -198,6 +202,7 @@ pub fn get_db_base_dir(scope: crate::types::Scope) -> Result<PathBuf> {
     }
 }
 
+/// Returns the root directory for Git repositories for a given scope.
 pub fn get_git_base_dir(scope: crate::types::Scope) -> Result<PathBuf> {
     match scope {
         crate::types::Scope::User => {
@@ -265,6 +270,7 @@ pub fn get_package_dir_name(package_id: &str, package_name: &str) -> String {
     format!("{}-{}", package_id, package_name)
 }
 
+/// Recursively copies all files and subdirectories from source to destination.
 pub fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
     let src = if src.as_os_str().is_empty() {
         Path::new(".")
@@ -299,6 +305,7 @@ pub fn retry_backoff_sleep(attempt: u32) {
     std::thread::sleep(Duration::from_millis(sleep_ms));
 }
 
+/// Retrieves information about the current Linux distribution from /etc/os-release.
 pub fn get_linux_distribution_info() -> Option<HashMap<String, String>> {
     let path = crate::sysroot::apply_sysroot("/etc/os-release");
     if let Ok(contents) = fs::read_to_string(path) {
@@ -380,6 +387,7 @@ pub fn get_linux_distro_family() -> Option<String> {
     None
 }
 
+/// Returns the ID of the current Linux distribution (e.g. "debian", "fedora").
 pub fn get_linux_distribution() -> Option<String> {
     get_linux_distribution_info().and_then(|info| info.get("ID").cloned())
 }
@@ -412,6 +420,7 @@ pub fn resolve_fallback_scope() -> crate::types::Scope {
     }
 }
 
+/// Returns the name of the current desktop environment (e.g. "gnome", "kde").
 pub fn get_desktop_environment() -> Option<String> {
     if cfg!(target_os = "windows") {
         return Some("windows".to_string());
@@ -429,6 +438,7 @@ pub fn get_desktop_environment() -> Option<String> {
     None
 }
 
+/// Returns the name of the current display server (e.g. "wayland", "x11").
 pub fn get_display_server() -> Option<String> {
     if cfg!(target_os = "windows") {
         return Some("windows".to_string());
@@ -444,6 +454,7 @@ pub fn get_display_server() -> Option<String> {
     None
 }
 
+/// Returns the version of the operating system kernel.
 pub fn get_kernel_version() -> Option<String> {
     if cfg!(unix) {
         let output = Command::new("uname").arg("-r").output().ok()?;
@@ -463,6 +474,7 @@ pub fn get_kernel_version() -> Option<String> {
     None
 }
 
+/// Returns the name of the system's init system (e.g. "systemd", "openrc").
 pub fn get_init_system() -> Option<String> {
     if let Ok(val) = std::env::var("ZOI_INIT") {
         return Some(val.to_lowercase());
@@ -493,6 +505,7 @@ pub fn get_init_system() -> Option<String> {
     None
 }
 
+/// Returns the name of the available privilege escalation tool (e.g. "sudo", "doas").
 pub fn get_privilege_escalator() -> Option<String> {
     if command_exists("sudo") {
         Some("sudo".to_string())
@@ -503,6 +516,7 @@ pub fn get_privilege_escalator() -> Option<String> {
     }
 }
 
+/// Returns the version of the current distribution.
 pub fn get_distro_version() -> Option<String> {
     if let Some(info) = get_linux_distribution_info()
         && let Some(vid) = info.get("VERSION_ID")
@@ -530,6 +544,7 @@ pub fn get_distro_version() -> Option<String> {
     None
 }
 
+/// Returns a short description of the system's CPU.
 pub fn get_cpu_info() -> Option<String> {
     if cfg!(target_os = "linux") {
         if let Ok(cpuinfo) = fs::read_to_string("/proc/cpuinfo") {
@@ -563,6 +578,7 @@ pub fn get_cpu_info() -> Option<String> {
     None
 }
 
+/// Returns a short description of the system's GPU.
 pub fn get_gpu_info() -> Option<String> {
     if cfg!(target_os = "linux") {
         if let Ok(output) = Command::new("lspci").output()
@@ -697,6 +713,7 @@ pub fn get_all_available_package_managers() -> Vec<String> {
     managers
 }
 
+/// Formats a byte count into a human-readable string (e.g. "1.24 MiB").
 pub fn format_bytes(bytes: u64) -> String {
     const KIB: u64 = 1024;
     const MIB: u64 = 1024 * KIB;
@@ -712,6 +729,7 @@ pub fn format_bytes(bytes: u64) -> String {
     }
 }
 
+/// Formats a size difference into a signed human-readable string (e.g. "+50 B").
 pub fn format_size_diff(diff: i64) -> String {
     if diff == 0 {
         return "0 B".to_string();
@@ -749,6 +767,7 @@ pub fn is_safe_path(base: &Path, path: &Path) -> bool {
     normalized.starts_with(&base)
 }
 
+/// Creates a symbolic link for a file, handling platform-specific requirements.
 pub fn symlink_file(target: &Path, link: &Path) -> std::io::Result<()> {
     if link.exists() || link.is_symlink() {
         fs::remove_file(link)?;
@@ -768,6 +787,7 @@ pub fn symlink_file(target: &Path, link: &Path) -> std::io::Result<()> {
     }
 }
 
+/// Checks if the current process has administrative privileges.
 pub fn is_admin() -> bool {
     #[cfg(unix)]
     {
@@ -779,6 +799,7 @@ pub fn is_admin() -> bool {
     }
 }
 
+/// Executes a shell command and returns an error if it fails.
 pub fn run_shell_command(command_str: &str) -> anyhow::Result<()> {
     let status = if cfg!(target_os = "windows") {
         Command::new("pwsh")
@@ -794,6 +815,7 @@ pub fn run_shell_command(command_str: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Executes a shell command quietly (suppressing output) and returns an error if it fails.
 pub fn run_shell_command_quietly(command_str: &str) -> anyhow::Result<()> {
     let status = if cfg!(target_os = "windows") {
         Command::new("pwsh")
@@ -816,10 +838,12 @@ pub fn run_shell_command_quietly(command_str: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Returns true if Zoi is running in "Mini" mode (lightweight, zero-sync).
 pub fn is_mini_mode() -> bool {
     std::env::var("ZOI_MINI_MODE").is_ok_and(|v| v == "1")
 }
 
+/// Prompts the user for confirmation (y/N) unless the `yes` flag is set.
 pub fn ask_for_confirmation(prompt: &str, yes: bool) -> bool {
     if yes {
         return true;
@@ -836,6 +860,7 @@ pub fn ask_for_confirmation(prompt: &str, yes: bool) -> bool {
     input.trim().eq_ignore_ascii_case("y")
 }
 
+/// Recursively sets a directory and its contents to be read-only.
 pub fn set_path_read_only(path: &Path) -> anyhow::Result<()> {
     if !path.exists() {
         return Ok(());
@@ -851,6 +876,7 @@ pub fn set_path_read_only(path: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Recursively ensures a directory and its contents are writable.
 pub fn set_path_writable(path: &Path) -> anyhow::Result<()> {
     if !path.exists() {
         return Ok(());
@@ -875,6 +901,7 @@ pub fn set_path_writable(path: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Sets the owner and group for a file or directory (Unix only).
 #[cfg(unix)]
 pub fn set_path_owner(path: &Path, owner: &str, group: &str) -> anyhow::Result<()> {
     use nix::unistd::{Gid, Group, Uid, User, chown};
@@ -906,6 +933,7 @@ pub fn set_path_owner(path: &Path, owner: &str, group: &str) -> anyhow::Result<(
     Ok(())
 }
 
+/// Checks if a target platform is compatible with a list of allowed platforms.
 pub fn is_platform_compatible(current_platform: &str, allowed_platforms: &[String]) -> bool {
     let os_part = current_platform
         .split('-')
@@ -926,6 +954,7 @@ pub fn is_platform_compatible(current_platform: &str, allowed_platforms: &[Strin
     })
 }
 
+/// Validates a package license against SPDX and organizational policies.
 pub fn check_license(license: &str) {
     if license.is_empty() || license.eq_ignore_ascii_case("None") {
         return;
@@ -941,6 +970,7 @@ pub fn check_license(license: &str) {
     {}
 }
 
+/// Prompts the user to confirm installation from an untrusted (non-official) source.
 pub fn confirm_untrusted_source(
     source_type: &crate::types::SourceType,
     yes: bool,
@@ -978,6 +1008,7 @@ pub fn confirm_untrusted_source(
     }
 }
 
+/// Expands standard Zoi path placeholders (e.g. `${pkgstore}`, `${usrhome}`) in a string.
 pub fn expand_placeholders(
     path: &str,
     version_dir: &Path,
@@ -1007,6 +1038,7 @@ pub fn expand_placeholders(
     Ok(expanded)
 }
 
+/// Expands the `~` character to the user's home directory.
 pub fn expand_tilde<P: AsRef<Path>>(path: P) -> PathBuf {
     let path = path.as_ref();
     if !path.starts_with("~") {
@@ -1023,6 +1055,7 @@ pub fn expand_tilde<P: AsRef<Path>>(path: P) -> PathBuf {
     path.to_path_buf()
 }
 
+/// Detects and returns the current shell being used.
 pub fn get_current_shell() -> Option<Shell> {
     if cfg!(windows) {
         return Some(Shell::PowerShell);
@@ -1041,3 +1074,4 @@ pub fn get_current_shell() -> Option<Shell> {
         None
     }
 }
+

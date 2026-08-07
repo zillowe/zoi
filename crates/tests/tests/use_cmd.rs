@@ -1,3 +1,5 @@
+//! Integration tests for the `zoi use` command.
+
 use std::fs;
 use tempfile::tempdir;
 use zoi::cmd::use_cmd;

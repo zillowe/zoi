@@ -10,6 +10,7 @@ use serde::Deserialize;
 ///   latest tags, releases, or commit SHAs.
 ///
 /// All network requests respect Zoi's global `--offline` and timeout settings.
+/// Adds basic HTTP fetching utilities to the `UTILS.FETCH` table.
 pub fn add_fetch_util(lua: &Lua) -> Result<(), mlua::Error> {
     let fetch_table = lua.create_table()?;
 
@@ -33,13 +34,18 @@ pub fn add_fetch_util(lua: &Lua) -> Result<(), mlua::Error> {
     Ok(())
 }
 
+/// Arguments for Git-related fetch operations.
 #[derive(Deserialize)]
 struct GitArgs {
+    /// The Git repository in "owner/repo" format.
     repo: String,
+    /// The optional domain for the Git forge (e.g. "https://api.github.com").
     domain: Option<String>,
+    /// The optional branch to fetch from.
     branch: Option<String>,
 }
 
+/// Helper function to fetch and parse JSON from a URL.
 fn fetch_json(url: &str) -> Result<serde_json::Value, mlua::Error> {
     let client = utils::get_http_client().map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
 
@@ -63,6 +69,7 @@ fn fetch_json(url: &str) -> Result<serde_json::Value, mlua::Error> {
     serde_json::from_str(&text).map_err(|e| mlua::Error::RuntimeError(e.to_string()))
 }
 
+/// Adds Git-forge specific fetching utilities (GitHub, GitLab, Gitea, Forgejo) to the `UTILS.FETCH` table.
 pub fn add_git_fetch_util(lua: &Lua) -> Result<(), mlua::Error> {
     let utils_table: Table = lua.globals().get("UTILS")?;
     let fetch_table: Table = utils_table.get("FETCH")?;

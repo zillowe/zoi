@@ -1,3 +1,5 @@
+//! Integration tests for package installation scoping.
+
 use std::fs;
 use tempfile::tempdir;
 use zoi::pkg::types;

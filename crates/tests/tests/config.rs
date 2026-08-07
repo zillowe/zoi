@@ -1,3 +1,5 @@
+//! Integration tests for Zoi configuration and policy handling.
+
 mod common;
 
 use tempfile::tempdir;

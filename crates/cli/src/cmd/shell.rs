@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Mutex;
 
+/// Returns the path to the completion script for a given shell and scope.
 fn get_completion_path(shell: Shell, scope: SetupScope) -> Result<PathBuf> {
     if scope == SetupScope::System {
         if !utils::is_admin() {
@@ -53,6 +54,7 @@ fn get_completion_path(shell: Shell, scope: SetupScope) -> Result<PathBuf> {
     }
 }
 
+/// Installs the completion script for a given shell and scope.
 fn install_completions(shell: Shell, scope: SetupScope, cmd: &mut clap::Command) -> Result<()> {
     if cfg!(windows) && scope == SetupScope::System {
         return Err(anyhow!(
@@ -103,6 +105,7 @@ fn install_completions(shell: Shell, scope: SetupScope, cmd: &mut clap::Command)
     Ok(())
 }
 
+/// Post-processes a completion script for a given shell.
 fn post_process_completions(shell: Shell, mut script: String) -> String {
     match shell {
         Shell::Zsh => {
@@ -193,6 +196,7 @@ complete -F _zoi_wrapper zoi
     script
 }
 
+/// Runs the shell setup command.
 pub fn run(shell: Shell, scope: SetupScope) -> Result<()> {
     if scope == SetupScope::System && !utils::is_admin() {
         let exe = std::env::current_exe()?;
@@ -229,6 +233,7 @@ pub fn run(shell: Shell, scope: SetupScope) -> Result<()> {
     Ok(())
 }
 
+/// Returns the directory for package completions for a given scope and shell.
 fn get_completions_dir(scope: SetupScope, shell: &str) -> Result<PathBuf> {
     match scope {
         SetupScope::User => {
@@ -255,6 +260,7 @@ fn get_completions_dir(scope: SetupScope, shell: &str) -> Result<PathBuf> {
     }
 }
 
+/// Installs the package-specific completion directories for a given shell and scope.
 fn install_package_completions(shell: Shell, scope: SetupScope) -> Result<()> {
     let shell_name = match shell {
         Shell::Bash => "bash",
@@ -309,6 +315,7 @@ fn install_package_completions(shell: Shell, scope: SetupScope) -> Result<()> {
     Ok(())
 }
 
+/// Prints the shell hook script for a given shell.
 pub fn print_hook(shell: Shell) -> Result<()> {
     match shell {
         Shell::Bash => {
@@ -356,6 +363,7 @@ end
     Ok(())
 }
 
+/// Enters an ephemeral shell with the given packages installed.
 pub fn enter_ephemeral_shell(
     package_sources: &[String],
     run_cmd: Option<String>,
@@ -622,6 +630,7 @@ pub fn enter_ephemeral_shell(
     Ok(())
 }
 
+/// Returns the version directory for a given install manifest.
 fn get_version_dir_from_manifest(manifest: &zoi_core::types::InstallManifest) -> Result<PathBuf> {
     local::get_package_version_dir(
         manifest.scope,

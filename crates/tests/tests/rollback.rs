@@ -1,3 +1,5 @@
+//! Integration tests for package transaction rollback functionality.
+
 use std::fs;
 use tempfile::tempdir;
 use zoi::pkg::{local, rollback, transaction, types};

@@ -1,5 +1,6 @@
 use std::sync::{OnceLock, RwLock};
 
+/// Returns the global store for the frozen mode flag.
 fn frozen_mode_store() -> &'static RwLock<bool> {
     static FROZEN_MODE: OnceLock<RwLock<bool>> = OnceLock::new();
     FROZEN_MODE.get_or_init(|| RwLock::new(false))

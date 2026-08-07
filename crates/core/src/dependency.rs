@@ -21,11 +21,13 @@ pub struct Dependency<'a> {
     pub description: Option<&'a str>,
 }
 
+/// Regex for parsing a dependency string into package+version and an optional description.
 static DEP_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^(?P<pkg_and_ver>.+?)(?::(?P<desc>[^:].*))?$")
         .expect("Static DEP_RE regex is valid")
 });
 
+/// Regex for parsing a package+version string into package name and version requirement.
 static VER_RE: LazyLock<Regex> = LazyLock::new(|| {
     // Matches package name and optional version.
     // Supports scoped packages (@repo/name) and versions (@ver, =ver, etc.)

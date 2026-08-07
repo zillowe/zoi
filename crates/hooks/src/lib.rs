@@ -1,20 +1,33 @@
+//! Hooks functionality for Zoi.
+//!
+//! This crate provides the logic for executing package-specific and global hooks.
+
 use anyhow::{Result, anyhow};
 use colored::*;
 use std::process::Command;
 use zoi_core::types::{self, Hooks, PlatformOrStringVec};
 use zoi_core::utils;
 
+/// Manages system-wide "Global Transaction Hooks".
 pub mod global;
 
+/// The type of hook being executed.
 pub enum HookType {
+    /// Runs before a package is installed.
     PreInstall,
+    /// Runs after a package is installed.
     PostInstall,
+    /// Runs before a package is upgraded.
     PreUpgrade,
+    /// Runs after a package is upgraded.
     PostUpgrade,
+    /// Runs before a package is removed.
     PreRemove,
+    /// Runs after a package is removed.
     PostRemove,
 }
 
+/// Executes a list of shell commands within a specific scope.
 fn execute_commands(commands: &[String], scope: types::Scope) -> Result<()> {
     let scope_str = format!("{:?}", scope).to_lowercase();
     for cmd_str in commands {
@@ -40,6 +53,13 @@ fn execute_commands(commands: &[String], scope: types::Scope) -> Result<()> {
     Ok(())
 }
 
+/// Runs the specified type of hooks for a package.
+///
+/// # Arguments
+///
+/// * `hooks` - The hooks configuration from the package.
+/// * `hook_type` - The type of hook to run.
+/// * `scope` - The installation scope (System, User, or Project).
 pub fn run_hooks(hooks: &Hooks, hook_type: HookType, scope: types::Scope) -> Result<()> {
     let platform = utils::get_platform()?;
 

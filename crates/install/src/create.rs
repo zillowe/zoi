@@ -1,3 +1,5 @@
+//! App creation logic.
+
 use anyhow::{Result, anyhow};
 use colored::*;
 use mlua::LuaSerdeExt;
@@ -11,6 +13,7 @@ use zoi_plugins::PluginManager;
 use zoi_resolver as resolver;
 use zstd::stream::read::Decoder as ZstdDecoder;
 
+/// Extracts an app from a ZPA archive to a destination directory.
 fn install_app_from_archive(archive_path: &Path, destination_dir: &Path) -> Result<()> {
     println!(
         "Extracting app to '{}'...",
@@ -74,6 +77,10 @@ fn install_app_from_archive(archive_path: &Path, destination_dir: &Path) -> Resu
     Ok(())
 }
 
+/// Runs the app creation process.
+///
+/// This involves resolving the package, building it as an app template,
+/// and then installing it to the target directory.
 pub fn run(
     source: &str,
     app_name: Option<String>,

@@ -1,3 +1,5 @@
+//! The primary executable for the Zoi package manager.
+
 use colored::*;
 
 /// The primary entry point for the Zoi CLI and its intelligent shims.

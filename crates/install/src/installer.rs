@@ -1,3 +1,5 @@
+//! Main installer logic.
+
 use crate::resolver::InstallNode;
 use crate::{manifest, plan, prebuilt, util};
 use anyhow::{Result, anyhow};
@@ -10,6 +12,12 @@ use zoi_db as db;
 use zoi_hooks as hooks;
 use zoi_resolver::local;
 
+/// Downloads and caches a package archive.
+///
+/// This function handles:
+/// - Checking pkg-dirs and the archive cache.
+/// - Downloading from mirrors if not found locally.
+/// - Verifying hashes and PGP signatures.
 pub fn download_and_cache_archive(
     _node: &InstallNode,
     details: &plan::PrebuiltDetails,
@@ -195,10 +203,14 @@ pub fn download_and_cache_archive(
     Ok(archive_path)
 }
 
+/// Information about a package that has been prepared for installation.
 #[derive(Clone)]
 pub struct PreparedNode {
+    /// Path to the downloaded or built archive.
     pub archive_path: PathBuf,
+    /// The method used for installation (e.g., "pre-compiled", "source").
     pub install_method: String,
+    /// Whether the archive was built from source.
     pub is_build: bool,
 }
 
@@ -546,6 +558,7 @@ pub fn install_prepared_node(
     Ok(install_manifest)
 }
 
+/// Performs both preparation and execution phases for an install node.
 pub fn install_node(
     node: &InstallNode,
     action: &plan::InstallAction,

@@ -3,12 +3,16 @@ use std::fs::{self, File};
 use std::io::{self, Read, Write};
 use std::path::PathBuf;
 
+/// Represents a package pinned to a specific version from a specific source.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PinnedPackage {
+    /// The source of the package (e.g., its PURL or name).
     pub source: String,
+    /// The specific version the package is pinned to.
     pub version: String,
 }
 
+/// Returns the path to the `pinned.json` file in the user's Zoi directory.
 fn get_pinned_json_path() -> Result<PathBuf, io::Error> {
     let home_dir = dirs::home_dir()
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Could not find home directory"))?;
@@ -19,6 +23,7 @@ fn get_pinned_json_path() -> Result<PathBuf, io::Error> {
     Ok(zoi_dir.join("pinned.json"))
 }
 
+/// Loads the list of pinned packages from `pinned.json`.
 pub fn get_pinned_packages() -> Result<Vec<PinnedPackage>, io::Error> {
     let path = get_pinned_json_path()?;
     if !path.exists() {
@@ -34,6 +39,7 @@ pub fn get_pinned_packages() -> Result<Vec<PinnedPackage>, io::Error> {
     Ok(packages)
 }
 
+/// Saves the list of pinned packages to `pinned.json`.
 pub fn write_pinned_packages(packages: &[PinnedPackage]) -> Result<(), io::Error> {
     let path = get_pinned_json_path()?;
     let mut file = File::create(path)?;
@@ -42,6 +48,7 @@ pub fn write_pinned_packages(packages: &[PinnedPackage]) -> Result<(), io::Error
     Ok(())
 }
 
+/// Retrieves the pinned version for a given source, if it exists.
 pub fn get_pinned_version(source: &str) -> Result<Option<String>, io::Error> {
     let pinned_packages = get_pinned_packages()?;
     Ok(pinned_packages
@@ -50,6 +57,7 @@ pub fn get_pinned_version(source: &str) -> Result<Option<String>, io::Error> {
         .map(|p| p.version.clone()))
 }
 
+/// Checks if a source has a pinned version.
 pub fn is_pinned(source: &str) -> Result<bool, io::Error> {
     let pinned_packages = get_pinned_packages()?;
     Ok(pinned_packages.iter().any(|p| p.source == source))

@@ -1,20 +1,32 @@
+//! Build script for zoi-deps.
+//!
+//! This script reads `managers.json` to generate a perfect hash map (`phf::Map`)
+//! of package manager commands, which are then embedded directly into the binary.
+
 use std::collections::BTreeMap;
 use std::env;
 use std::error::Error;
 use std::io::Write;
 use std::path::PathBuf;
 
+/// Represents the shell commands needed to operate a specific package manager.
 #[derive(serde::Deserialize)]
 struct ManagerCommands {
+    /// Command to check if a package is installed.
     is_installed: Option<String>,
+    /// Command to install a package.
     install: String,
+    /// Command to uninstall a package.
     uninstall: String,
+    /// Whether the install command requires `sudo` privileges.
     #[serde(default)]
     sudo_install: bool,
+    /// Whether the uninstall command requires `sudo` privileges.
     #[serde(default)]
     sudo_uninstall: bool,
 }
 
+/// Escapes a string literal so it can be safely injected into generated Rust code.
 fn escaped_string_literal(value: &str) -> String {
     format!("{value:?}")
 }
@@ -59,12 +71,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     writeln!(
         &mut file,
-        "use ::phf;\n\n#[derive(Debug, Clone)]\npub struct ManagerCommands {{\n    pub is_installed: Option<&'static str>,\n    pub install: &'static str,\n    pub uninstall: &'static str,\n    pub sudo_install: bool,\n    pub sudo_uninstall: bool,\n}}\n"
+        "use ::phf;\n\n/// Represents the shell commands needed to operate a specific package manager.\n#[derive(Debug, Clone)]\npub struct ManagerCommands {{\n    /// Command to check if a package is installed.\n    pub is_installed: Option<&'static str>,\n    /// Command to install a package.\n    pub install: &'static str,\n    /// Command to uninstall a package.\n    pub uninstall: &'static str,\n    /// Whether the install command requires `sudo` privileges.\n    pub sudo_install: bool,\n    /// Whether the uninstall command requires `sudo` privileges.\n    pub sudo_uninstall: bool,\n}}\n"
     )?;
 
     writeln!(
         &mut file,
-        "pub static MANAGERS: phf::Map<&'static str, ManagerCommands> = {};",
+        "/// A map of supported package managers and their associated commands.\npub static MANAGERS: phf::Map<&'static str, ManagerCommands> = {};",
         map.build()
     )?;
 

@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::sync::{OnceLock, RwLock};
 
+/// Provides thread-safe access to the global list of package search directories.
 fn pkg_dirs_store() -> &'static RwLock<Vec<PathBuf>> {
     static PKG_DIRS: OnceLock<RwLock<Vec<PathBuf>>> = OnceLock::new();
     PKG_DIRS.get_or_init(|| RwLock::new(Vec::new()))

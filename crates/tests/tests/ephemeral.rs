@@ -1,3 +1,5 @@
+//! Integration tests for ephemeral environment management.
+
 use std::fs;
 use tempfile::tempdir;
 use zoi::cmd::shell;

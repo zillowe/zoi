@@ -1,3 +1,9 @@
+//! Secure sandboxing for Zoi using Bubblewrap.
+//!
+//! This crate provides utilities to wrap commands in isolated environments
+//! on Linux, ensuring that packages can run with restricted access to the
+//! host system.
+
 use anyhow::{Result, anyhow};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -275,6 +281,9 @@ pub fn wrap_command_in_root(
     Ok(bwrap)
 }
 
+/// Expands the `~/` prefix in a path string to the user's home directory.
+///
+/// If the path doesn't start with `~/`, it is returned as-is.
 fn expand_home(path: &str) -> Result<PathBuf> {
     if let Some(stripped) = path.strip_prefix("~/") {
         let home = zoi_core::utils::get_user_home()

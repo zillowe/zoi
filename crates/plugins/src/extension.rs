@@ -8,18 +8,24 @@ use zoi_hooks as hooks;
 use zoi_lua;
 use zoi_resolver::{local, resolve};
 
+/// Filename used to store the persistent state of an extension.
 const EXTENSION_STATE_FILE: &str = "extension-state.yaml";
 
+/// Represents the persistent state of an installed extension, allowing for rollbacks.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 struct ExtensionState {
+    /// The default registry configuration before the extension was added.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     previous_default_registry: Option<types::Registry>,
+    /// The path to the project file created by the extension, if any.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     project_file_path: Option<PathBuf>,
+    /// Metadata about the installed extension itself.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     installed_extension: Option<types::ExtensionInfo>,
 }
 
+/// Returns the path to the extension state file for a given manifest.
 fn get_extension_state_path(manifest: &types::InstallManifest) -> Result<PathBuf> {
     let version_dir = local::get_package_version_dir(
         manifest.scope,
@@ -31,6 +37,7 @@ fn get_extension_state_path(manifest: &types::InstallManifest) -> Result<PathBuf
     Ok(version_dir.join(EXTENSION_STATE_FILE))
 }
 
+/// Writes the extension state to disk.
 fn write_extension_state(
     manifest: &types::InstallManifest,
     extension_state: &ExtensionState,
@@ -40,6 +47,7 @@ fn write_extension_state(
     Ok(())
 }
 
+/// Reads the extension state from disk, if it exists.
 fn read_extension_state(manifest: &types::InstallManifest) -> Result<Option<ExtensionState>> {
     let state_path = get_extension_state_path(manifest)?;
     if !state_path.exists() {
@@ -49,6 +57,7 @@ fn read_extension_state(manifest: &types::InstallManifest) -> Result<Option<Exte
     Ok(Some(serde_yaml::from_str(&content)?))
 }
 
+/// Restores the default registry to its previous state.
 fn restore_default_registry(
     saved_state: Option<&ExtensionState>,
     added_registry_url: &str,
@@ -69,18 +78,21 @@ fn restore_default_registry(
     Ok(())
 }
 
+/// Checks if the extension state contains any data that needs to be persisted.
 fn extension_state_requires_persistence(extension_state: &ExtensionState) -> bool {
     extension_state.previous_default_registry.is_some()
         || extension_state.project_file_path.is_some()
         || extension_state.installed_extension.is_some()
 }
 
+/// Returns the path to the project file, either from saved state or the default.
 fn get_project_file_path(saved_state: Option<&ExtensionState>) -> PathBuf {
     saved_state
         .and_then(|state| state.project_file_path.clone())
         .unwrap_or_else(|| PathBuf::from("zoi.yaml"))
 }
 
+/// Extracts the repository name from a git URL.
 fn get_repo_name_from_url(url: &str) -> &str {
     url.trim_end_matches('/')
         .split('/')
@@ -89,6 +101,7 @@ fn get_repo_name_from_url(url: &str) -> &str {
         .trim_end_matches(".git")
 }
 
+/// Reverts a specific change made by an extension.
 fn revert_extension_change(
     change: &types::ExtensionChange,
     saved_state: Option<&ExtensionState>,
@@ -136,6 +149,7 @@ fn revert_extension_change(
     Ok(())
 }
 
+/// Installs an extension, applying its declared changes to the system and registry configuration.
 pub fn add(ext_name: &str, yes: bool, plugin_manager: Option<&PluginManager>) -> Result<()> {
     println!("Adding extension: {}", ext_name);
 
@@ -325,6 +339,7 @@ pub fn add(ext_name: &str, yes: bool, plugin_manager: Option<&PluginManager>) ->
     Ok(())
 }
 
+/// Uninstalls an extension and reverts all changes it made to the system and configuration.
 pub fn remove(ext_name: &str, yes: bool, plugin_manager: Option<&PluginManager>) -> Result<()> {
     println!("Removing extension: {}", ext_name);
 
@@ -479,6 +494,7 @@ pub fn remove(ext_name: &str, yes: bool, plugin_manager: Option<&PluginManager>)
     Ok(())
 }
 
+/// Prompts the user to select one extension if multiple candidates match the request.
 fn select_candidate(
     package_name: &str,
     candidates: Vec<types::InstallManifest>,

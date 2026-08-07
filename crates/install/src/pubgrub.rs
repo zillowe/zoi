@@ -11,6 +11,9 @@ use zoi_core::types;
 use zoi_db as db;
 use zoi_resolver::resolve;
 
+/// Parses a package key from the `pkgs_v2` section of a `zoi.lua` file.
+///
+/// Keys are typically in the format `@repo/name` or `@repo/name:sub_package`.
 fn parse_pkgs_v2_key(key: &str) -> (String, String) {
     let key = key.trim_start_matches('#');
     let key = key.trim_start_matches('@');
@@ -22,12 +25,18 @@ fn parse_pkgs_v2_key(key: &str) -> (String, String) {
     }
 }
 
+/// Uniquely identifies a package within the PubGrub solver.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct PkgName {
+    /// The name of the package.
     pub name: String,
+    /// An optional sub-package name.
     pub sub_package: Option<String>,
+    /// The repository name where the package is hosted.
     pub repo: String,
+    /// The registry handle (e.g., "zoidberg").
     pub registry: String,
+    /// An explicit source URL, file path, or git reference, if provided.
     pub explicit_source: Option<String>,
 }
 
@@ -44,18 +53,26 @@ impl Display for PkgName {
     }
 }
 
+/// A semantic version with an optional epoch for ordering.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct SemVersion {
+    /// The version epoch. Versions with higher epochs always sort higher.
     pub epoch: u32,
+    /// The underlying semantic version.
     pub v: Version,
+    /// The original raw version string before parsing and sanitization.
     pub original: String,
 }
 
 impl SemVersion {
+    /// Creates a new `SemVersion`.
     pub fn new(epoch: u32, v: Version, original: String) -> Self {
         Self { epoch, v, original }
     }
 
+    /// Parses a version string into a `SemVersion`.
+    ///
+    /// Handles epoch prefixes (e.g., "1:1.2.3") and sanitizes non-standard strings.
     pub fn parse(v: &str) -> Result<Self, anyhow::Error> {
         let (epoch, version_str) = if let Some((e_str, v_str)) = v.split_once(':') {
             if let Ok(e) = e_str.parse::<u32>() {
@@ -133,14 +150,19 @@ fn sanitize_version_string(v: &str) -> String {
     }
 }
 
+/// Errors that can occur during dependency resolution using the PubGrub solver.
 #[derive(Error, Debug)]
 pub enum ZoiSolverError {
+    /// A general dependency error with a descriptive message.
     #[error("Dependency error: {0}")]
     Dependency(String),
+    /// A version-related error.
     #[error("Version error: {0}")]
     Version(String),
+    /// An unexpected error from another part of the system.
     #[error("Anyhow error: {0}")]
     Anyhow(#[from] anyhow::Error),
+    /// Other miscellaneous errors.
     #[error("Other error: {0}")]
     Other(String),
 }
@@ -302,6 +324,7 @@ pub fn semver_to_range(req_str: &str) -> Ranges<SemVersion> {
 }
 
 impl ZoiDependencyProvider {
+    /// Creates a new `ZoiDependencyProvider`.
     pub fn new(
         root_deps: FxHashMap<PkgName, Ranges<SemVersion>>,
         initial_sources: Vec<String>,
@@ -349,10 +372,12 @@ impl ZoiDependencyProvider {
         })
     }
 
+    /// Internal helper to convert a requirement string to a PubGrub range.
     fn semver_to_range(&self, req_str: &str) -> Ranges<SemVersion> {
         semver_to_range(req_str)
     }
 
+    /// Determines if a raw source string matches a resolved `PkgName`.
     fn source_matches_package(&self, package: &PkgName, source: &str) -> bool {
         if let Some(explicit_source) = &package.explicit_source {
             let explicit_base = explicit_source
@@ -385,6 +410,7 @@ impl ZoiDependencyProvider {
                 == package.registry
     }
 
+    /// Retrieves all available versions for a given package from registries and sources.
     pub fn get_versions(&self, package: &PkgName) -> Result<Vec<SemVersion>, ZoiSolverError> {
         let mut all_versions = Vec::new();
 

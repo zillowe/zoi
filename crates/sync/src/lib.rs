@@ -1,3 +1,8 @@
+//! Registry and repository synchronization logic for Zoi.
+//!
+//! This crate handles cloning and updating package registries, rebuilding the
+//! local SQLite metadata cache, and synchronizing external Git repositories.
+
 use anyhow::{Result, anyhow};
 use colored::*;
 use git2::{
@@ -442,6 +447,7 @@ fn sync_git_repos(verbose: bool, scope: types::Scope) -> Result<()> {
     Ok(())
 }
 
+/// Syncs a repository at a path using system git with verbose output.
 fn run_verbose_at_path(db_url: &str, db_path: &Path) -> Result<()> {
     if db_path.exists() {
         let status = Command::new("git")
@@ -473,6 +479,7 @@ fn run_verbose_at_path(db_url: &str, db_path: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Syncs a repository at a path using system git with minimal output.
 fn run_quiet_git_at_path(db_url: &str, db_path: &Path) -> Result<()> {
     if db_path.exists() {
         let output = Command::new("git")
@@ -506,6 +513,7 @@ fn run_quiet_git_at_path(db_url: &str, db_path: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Syncs a repository at a path using libgit2 with progress reporting.
 fn run_non_verbose_at_path(
     db_url: &str,
     db_path: &Path,
@@ -627,6 +635,7 @@ fn run_non_verbose_at_path(
     Ok(())
 }
 
+/// Attempts to sync a repository, handling local paths and falling back to system git if needed.
 fn try_sync_at_path(
     db_url: &str,
     db_path: &Path,
@@ -732,6 +741,7 @@ fn try_sync_at_path(
     }
 }
 
+/// Imports PGP keys from the repo.yaml file in a repository.
 fn sync_pgp_keys_at_path(db_path: &Path, verbose: bool, pb: Option<&ProgressBar>) -> Result<()> {
     if verbose {
         println!("\n{}", "Syncing PGP keys from repository...".green());
@@ -798,6 +808,7 @@ fn sync_pgp_keys_at_path(db_path: &Path, verbose: bool, pb: Option<&ProgressBar>
     Ok(())
 }
 
+/// Clones a repository to a temporary directory to read its repo.yaml and get its handle.
 fn fetch_handle_by_cloning(url: &str, verbose: bool) -> Result<String> {
     let temp_dir = Builder::new().prefix("zoi-handle-fetch").tempdir()?;
     if verbose {
@@ -828,6 +839,7 @@ fn fetch_handle_by_cloning(url: &str, verbose: bool) -> Result<String> {
     Ok(repo_config.name)
 }
 
+/// Parses a Git URL to identify the provider and repository path.
 fn parse_full_repo_url(url: &str) -> Option<(String, String)> {
     let url = url.trim_end_matches(".git").trim_end_matches('/');
     if let Some(path) = url.strip_prefix("https://github.com/") {
@@ -840,6 +852,7 @@ fn parse_full_repo_url(url: &str) -> Option<(String, String)> {
     }
 }
 
+/// Attempts to fetch the repo.yaml file directly from common Git providers without cloning.
 fn fetch_repo_yaml_content(url: &str) -> Result<String> {
     let (provider, repo_path) = parse_full_repo_url(url)
         .ok_or_else(|| anyhow!("Unsupported git provider or URL format for direct fetch."))?;
@@ -878,6 +891,7 @@ fn fetch_repo_yaml_content(url: &str) -> Result<String> {
     ))
 }
 
+/// Resolves the registry handle for a given URL, using direct fetch or cloning as needed.
 fn fetch_handle_for_url(url: &str, verbose: bool) -> Result<String> {
     if verbose {
         println!(

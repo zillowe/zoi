@@ -1,7 +1,10 @@
+//! Initialization of LSP support for package development.
+
 use anyhow::Result;
 use clap::Parser;
 use colored::Colorize;
 
+/// Command to initialize LSP support in a workspace.
 #[derive(Parser, Debug)]
 pub struct InitLspCommand {
     /// Path where the LSP configuration should be initialized
@@ -9,6 +12,10 @@ pub struct InitLspCommand {
     pub path: std::path::PathBuf,
 }
 
+/// Runs the LSP initialization command.
+///
+/// This setup creates necessary configuration files (like `.luarc.json`) and
+/// downloads type definitions to enable better development experience in LSP-supported editors.
 pub fn run(args: InitLspCommand) -> Result<()> {
     println!(
         "{} Initializing LSP support in {}...",

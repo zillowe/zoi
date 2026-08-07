@@ -19,29 +19,37 @@ pub use zoi_deps as dependencies;
 pub use zoi_plugins::extension;
 pub use zoi_uninstall::autoremove;
 pub mod helper;
+/// Package merging utilities.
 pub mod merge;
 pub use zoi_hooks as hooks;
 pub use zoi_install as install;
 pub use zoi_lua as lua;
 pub use zoi_resolver::local;
+/// Package management utilities.
 pub mod package;
 pub use zoi_deps as pm;
 pub use zoi_plugins as plugin;
 pub use zoi_purl as purl;
+/// Repository installation utilities.
 pub mod repo_install;
 
+/// Package creation utilities.
 pub mod create {
     pub use zoi_install::create::*;
 }
+/// Service management utilities.
 pub mod service {
     pub use zoi_install::service::*;
 }
+/// Package registry utilities.
 pub mod registry {
     pub use zoi_package::registry::*;
 }
+/// System doctor utilities.
 pub mod doctor {
     pub use zoi_package::doctor_system::*;
 }
+/// Package resolution utilities.
 pub mod resolve {
     pub use zoi_resolver::resolve::{
         PackageRequest, ResolvedSource, get_db_root, get_default_version, parse_source_string,
@@ -49,6 +57,7 @@ pub mod resolve {
         resolve_source, resolve_version_from_url,
     };
 }
+/// Minimal package resolution utilities.
 pub mod mini_resolve {
     pub use zoi_core::types::MiniVulnerability;
     pub use zoi_resolver::mini_resolve::{
@@ -59,6 +68,7 @@ pub mod mini_resolve {
 #[cfg(target_os = "linux")]
 pub use zoi_sandbox as sandbox;
 pub use zoi_transaction::rollback;
+/// Shim management utilities.
 pub mod shim {
     pub use zoi_install::shim::*;
 }

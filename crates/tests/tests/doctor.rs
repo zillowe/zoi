@@ -1,3 +1,5 @@
+//! Integration tests for the system doctor and external tool checks.
+
 use zoi::pkg::doctor;
 
 #[test]

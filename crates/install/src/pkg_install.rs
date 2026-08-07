@@ -12,6 +12,7 @@ use zoi_core::utils::{self, copy_dir_all};
 use zoi_resolver::local;
 use zstd::stream::read::Decoder as ZstdDecoder;
 
+/// Returns the root directory where binary shims should be created for a given scope.
 fn get_bin_root(scope: types::Scope) -> Result<PathBuf> {
     match scope {
         types::Scope::User => {
@@ -41,6 +42,7 @@ fn get_bin_root(scope: types::Scope) -> Result<PathBuf> {
     }
 }
 
+/// Returns the root directory where shell completions should be installed for a given scope and shell.
 fn get_completions_root(scope: types::Scope, shell: &str) -> Result<PathBuf> {
     match scope {
         types::Scope::User => {
@@ -87,6 +89,7 @@ fn get_completions_root(scope: types::Scope, shell: &str) -> Result<PathBuf> {
     }
 }
 
+/// Creates a symlink for a shell completion file, removing any existing file or link at the destination.
 fn create_completion_symlink(source: &Path, link: &Path) -> Result<()> {
     if link.exists() || link.is_symlink() {
         fs::remove_file(link)?;
@@ -107,6 +110,8 @@ fn create_completion_symlink(source: &Path, link: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Checks for file conflicts between a source directory and a destination directory, 
+/// prompting the user for confirmation if conflicts are found.
 fn check_and_handle_file_conflicts(
     source_dir: &Path,
     dest_dir: &Path,
@@ -454,6 +459,8 @@ pub fn run(
     Ok(installed_files)
 }
 
+/// Finalizes the installation by creating backups, linking binaries, 
+/// and installing shell completions and application bundles.
 fn finalize_installation(
     version_dir: &Path,
     metadata: &types::Package,
@@ -637,6 +644,8 @@ fn finalize_installation(
     Ok(())
 }
 
+/// Extracts and installs a pooled ZPA package using its manifest 
+/// to map files from the pool to their final destinations.
 fn extract_pooled_zpa(
     pooled_manifest: &types::PooledZpaManifest,
     unpack_path: &Path,
@@ -850,6 +859,7 @@ fn extract_pooled_zpa(
     Ok(installed_files)
 }
 
+/// Expands placeholders in a pooled path to their absolute filesystem paths.
 fn expand_pooled_path(path: &str, staging_path: &Path, _scope: types::Scope) -> Result<PathBuf> {
     if let Some(rel) = path.strip_prefix("${pkgstore}/") {
         Ok(staging_path.join(rel))

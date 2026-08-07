@@ -1,3 +1,8 @@
+//! Archive utilities for Lua scripts.
+//!
+//! This module provides functions for extracting and creating various archive
+//! formats (Zip, Tar, Zstd, Xz, etc.) within the Lua environment.
+
 use mlua::{self, Lua, Table};
 use std::path::{Path, PathBuf};
 
@@ -226,6 +231,12 @@ pub fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     Ok(())
 }
 
+/// Exposes the `UTILS.ARCHIVE` table and `UTILS.MAKE_ARCHIVE` function to the Lua environment.
+///
+/// `UTILS.ARCHIVE` includes:
+/// - `list(path)`: Lists the contents of an archive.
+///
+/// `UTILS.MAKE_ARCHIVE(source, output, algorithm)`: Creates an archive from a source path.
 pub fn add_archive_util(lua: &Lua) -> Result<(), mlua::Error> {
     let archive_table = lua.create_table()?;
 

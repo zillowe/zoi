@@ -1,14 +1,23 @@
+//! The about command displays information about Zoi.
 use crate::utils;
 use colored::*;
 
+/// The description of the application.
 const DESCRIPTION: &str = "Zoi - Advanced Package Manager & Environment Orchestrator.\n  Part of the Zillowe Development Suite (ZDS)";
+/// The author of the application.
 const AUTHOR: &str = "Zusty < Zillowe Foundation";
+/// The homepage of the application.
 const HOMEPAGE: &str = "https://zillowe.qzz.io/zds/zoi";
+/// The documentation URL for the application.
 const DOCS: &str = "https://zillowe.qzz.io/docs/zds/zoi";
+/// The git repository URL for the application.
 const GITREPO: &str = "https://gitlab.com/zillowe/zillwen/zusty/zoi";
+/// The contact email for the application.
 const EMAIL: &str = "contact@zillowe.qzz.io";
+/// The license of the application.
 const LICENSE: &str = "Apache 2.0";
 
+/// Executes the about command.
 pub fn run(branch: &str, status: &str, number: &str, commit: &str) {
     let full_version_string = utils::format_version_full(branch, status, number, commit);
 

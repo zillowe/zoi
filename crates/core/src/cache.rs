@@ -2,22 +2,26 @@ use anyhow::{Result, anyhow};
 use std::fs;
 use std::path::PathBuf;
 
+/// Returns the root directory for Zoi's cache.
 pub fn get_cache_root() -> Result<PathBuf> {
     let home_dir =
         crate::utils::get_user_home().ok_or_else(|| anyhow!("Could not find home directory."))?;
     Ok(home_dir.join(".zoi").join("cache"))
 }
 
+/// Returns the root directory for Zoi's archive cache.
 pub fn get_archive_cache_root() -> Result<PathBuf> {
     let cache_root = get_cache_root()?;
     Ok(cache_root.join("archives"))
 }
 
+/// Returns the root directory for Zoi's package definition cache.
 pub fn get_pkgdef_cache_root() -> Result<PathBuf> {
     let cache_root = get_cache_root()?;
     Ok(cache_root.join("pkgdefs"))
 }
 
+/// Returns a list of candidate URLs for a given URL, including configured mirrors.
 pub fn mirror_candidate_urls(url: &str) -> Vec<String> {
     let mut urls = vec![url.to_string()];
     let Ok(config) = crate::config::read_config() else {
@@ -35,6 +39,7 @@ pub fn mirror_candidate_urls(url: &str) -> Vec<String> {
     urls
 }
 
+/// Clears the entire Zoi cache.
 pub fn clear(dry_run: bool) -> Result<()> {
     let cache_dir = get_cache_root()?;
     if cache_dir.exists() {
@@ -53,6 +58,7 @@ pub fn clear(dry_run: bool) -> Result<()> {
     Ok(())
 }
 
+/// Clears only the archive cache.
 pub fn clear_archives(dry_run: bool) -> Result<()> {
     let archive_cache_dir = get_archive_cache_root()?;
     if archive_cache_dir.exists() {

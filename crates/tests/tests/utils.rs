@@ -1,3 +1,5 @@
+//! Tests for general Zoi utility functions.
+
 use zoi::pkg::utils;
 
 #[test]

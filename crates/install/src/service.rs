@@ -5,15 +5,23 @@ use std::process::Command;
 use zoi_core::{sysroot, types, utils};
 use zoi_resolver::local;
 
+/// Actions that can be performed on a background service.
 pub enum ServiceAction {
+    /// Start the service.
     Start,
+    /// Stop the service.
     Stop,
+    /// Restart the service.
     Restart,
+    /// Check the status of the service.
     Status,
+    /// Enable the service to start automatically.
     Enable,
+    /// Disable the service from starting automatically.
     Disable,
 }
 
+/// Manages a service for a given package.
 pub fn manage_service(package_name: &str, action: ServiceAction) -> Result<()> {
     let installed_packages = local::get_installed_packages()?;
     let manifest = installed_packages
@@ -38,6 +46,7 @@ pub fn manage_service(package_name: &str, action: ServiceAction) -> Result<()> {
     }
 }
 
+/// Lists all installed services and their current status.
 pub fn list_services() -> Result<Vec<(String, String)>> {
     let installed_packages = local::get_installed_packages()?;
     let mut services = Vec::new();
@@ -52,6 +61,7 @@ pub fn list_services() -> Result<Vec<(String, String)>> {
     Ok(services)
 }
 
+/// Cleans up service files for a given package.
 pub fn cleanup_service(package_name: &str, scope: types::Scope) -> Result<()> {
     let service_name = format!("zoi-{}", package_name);
     let is_user = scope != types::Scope::System;
@@ -125,6 +135,7 @@ pub fn cleanup_service(package_name: &str, scope: types::Scope) -> Result<()> {
     Ok(())
 }
 
+/// Gets the current status of a service.
 fn get_service_status(manifest: &types::InstallManifest) -> Result<String> {
     let service_name = format!("zoi-{}", manifest.name);
     match std::env::consts::OS {
@@ -178,6 +189,7 @@ fn get_service_status(manifest: &types::InstallManifest) -> Result<String> {
     }
 }
 
+/// Manages a Linux systemd service.
 fn manage_linux_service(
     name: &str,
     service: &types::Service,
@@ -228,6 +240,7 @@ fn manage_linux_service(
     Ok(())
 }
 
+/// Ensures a Linux systemd unit file exists.
 fn ensure_linux_unit_file(name: &str, service: &types::Service, is_user: bool) -> Result<()> {
     let unit_path = if is_user {
         let home =
@@ -307,6 +320,7 @@ WorkingDirectory=",
     Ok(())
 }
 
+/// Manages a macOS launchd service.
 fn manage_macos_service(
     name: &str,
     service: &types::Service,
@@ -353,6 +367,7 @@ fn manage_macos_service(
     Ok(())
 }
 
+/// Ensures a macOS launchd plist file exists.
 fn ensure_macos_plist(name: &str, service: &types::Service, is_user: bool) -> Result<PathBuf> {
     let plist_path = if is_user {
         let home =
@@ -463,6 +478,7 @@ fn ensure_macos_plist(name: &str, service: &types::Service, is_user: bool) -> Re
     Ok(plist_path)
 }
 
+/// Manages a Windows service.
 fn manage_windows_service(
     name: &str,
     service: &types::Service,
@@ -533,6 +549,7 @@ fn manage_windows_service(
     Ok(())
 }
 
+/// Checks if a Windows service exists.
 fn service_exists_windows(name: &str) -> Result<bool> {
     let output = Command::new("sc")
         .arg("query")
@@ -542,6 +559,7 @@ fn service_exists_windows(name: &str) -> Result<bool> {
     Ok(output.status.success())
 }
 
+/// Creates a Windows service.
 fn create_windows_service(name: &str, service: &types::Service) -> Result<()> {
     let mut cmd = Command::new("sc");
     cmd.arg("create")
@@ -558,3 +576,4 @@ fn create_windows_service(name: &str, service: &types::Service) -> Result<()> {
     }
     Ok(())
 }
+

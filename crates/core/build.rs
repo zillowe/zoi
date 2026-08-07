@@ -1,3 +1,8 @@
+//! Build script for zoi-core.
+//!
+//! This script is responsible for embedding the default environment variables
+//! and generating Rust code that includes the built-in PGP keys for signature verification.
+
 use std::env;
 use std::error::Error;
 use std::fs;
@@ -43,9 +48,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+/// Reads PGP key files from the `src/builtin/pgp` directory and generates a Rust source
+/// file containing the keys as static byte arrays.
 fn generate_pgp_keys(dest_path: &Path) {
     let pgp_dir = PathBuf::from("src/builtin/pgp");
-    let mut output = String::from("pub static BUILTIN_KEYS: &[(&str, &[u8])] = &[\n");
+    let mut output = String::from("/// A list of built-in PGP keys for registry and package verification.\n///\n/// Each entry is a tuple of (key_name, raw_key_bytes).\npub static BUILTIN_KEYS: &[(&str, &[u8])] = &[\n");
 
     if pgp_dir.exists()
         && let Ok(entries) = fs::read_dir(&pgp_dir)

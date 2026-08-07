@@ -1,3 +1,10 @@
+//! Project verification and integrity checks.
+//!
+//! This module provides functionality to verify that the local project environment
+//! matches the state defined in `zoi.lock`. It ensures that all installed packages
+//! are present, have the correct versions, and that their file integrity (SHA-512)
+//! is maintained.
+
 use anyhow::{Result, anyhow};
 use std::collections::HashMap;
 use zoi_core::{hash, types};

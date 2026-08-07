@@ -1,8 +1,11 @@
+//! Implementation of the `clone` command for cloning a package's git repository.
+
 use crate::pkg::{resolve, types};
 use anyhow::{Result, anyhow};
 use colored::*;
 use std::process::Command;
 
+/// Runs the `clone` command to clone a package's git repository.
 pub fn run(package_name: &str, location: Option<String>, yes: bool) -> Result<()> {
     println!(
         "{} Resolving package '{}' for cloning...",

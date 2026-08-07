@@ -1,3 +1,5 @@
+//! Integration tests for package backup and upgrade logic.
+
 use std::fs;
 use tempfile::tempdir;
 

@@ -1,7 +1,10 @@
+//! Logic for the `why` command.
+
 use crate::pkg::{local, resolve, types};
 use anyhow::{Result, anyhow};
 use colored::*;
 
+/// Run the why command.
 pub fn run(package_name: &str) -> Result<()> {
     let request = resolve::parse_source_string(package_name)?;
     let mut candidates = Vec::new();

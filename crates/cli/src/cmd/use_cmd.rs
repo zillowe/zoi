@@ -1,8 +1,14 @@
+//! Command for adding and installing packages to a project or global configuration.
+
 use crate::pkg::{config, types};
 use anyhow::{Result, anyhow};
 use colored::*;
 use std::collections::HashMap;
 
+/// Runs the 'use' command.
+///
+/// Adds the specified packages to either the global or project configuration
+/// and triggers an installation.
 pub fn run(packages: Vec<String>, global: bool) -> Result<()> {
     if global {
         run_global(packages)
@@ -11,6 +17,7 @@ pub fn run(packages: Vec<String>, global: bool) -> Result<()> {
     }
 }
 
+/// Updates the global configuration with the specified packages and installs them.
 fn run_global(packages: Vec<String>) -> Result<()> {
     println!(
         "{} Adding packages to global configuration...",
@@ -39,6 +46,7 @@ fn run_global(packages: Vec<String>) -> Result<()> {
     Ok(())
 }
 
+/// Installs project packages and prompts to update 'zoi.lua'.
 fn run_project(packages: Vec<String>) -> Result<()> {
     if !std::path::Path::new("zoi.lua").exists() {
         return Err(anyhow!(

@@ -1,3 +1,5 @@
+//! Implementation of the `download` command for downloading package archives.
+
 use anyhow::{Result, anyhow};
 use colored::*;
 use std::path::PathBuf;
@@ -5,12 +7,16 @@ use zoi_core::cache;
 use zoi_install::resolver::resolve_dependency_graph;
 use zoi_install::util;
 
+/// Type of download to perform.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DownloadType {
+    /// Download a pre-built archive (.zpa).
     Archive,
+    /// Download a source bundle (.zsa).
     Source,
 }
 
+/// Runs the `download` command to download a package archive or source bundle.
 pub fn run(
     package_source: String,
     download_type: DownloadType,

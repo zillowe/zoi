@@ -1,9 +1,12 @@
+//! Lockfile processing logic.
+
 use anyhow::{Result, anyhow};
 use std::fs;
 use std::io::Write;
 use tempfile::NamedTempFile;
 use zoi_core::types;
 
+/// Processes a lockfile and prepares a list of sources to install.
 pub fn process_lockfile(
     lockfile_path: &str,
     sources_to_process: &mut Vec<String>,

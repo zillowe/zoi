@@ -1,15 +1,23 @@
+//! Logic for the `home` command.
+//!
+//! This module provides commands for managing user-specific declarative
+//! configuration, including dotfiles and user-level package installations.
+
 use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
 use colored::*;
 use zoi_core::utils::is_zoios;
 use zoi_system::home::{apply_home_config, load_home_lua};
 
+/// The root home management command.
 #[derive(Parser, Debug)]
 pub struct HomeCommand {
+    /// The specific home subcommand to execute.
     #[command(subcommand)]
     pub command: HomeSubcommands,
 }
 
+/// Available home subcommands.
 #[derive(Subcommand, Debug)]
 pub enum HomeSubcommands {
     /// Apply a declarative user configuration from home.lua
@@ -20,6 +28,7 @@ pub enum HomeSubcommands {
     },
 }
 
+/// Run the home management command.
 pub fn run(args: HomeCommand) -> Result<()> {
     if !is_zoios() {
         return Err(anyhow!(

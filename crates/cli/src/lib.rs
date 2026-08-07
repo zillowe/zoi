@@ -1,7 +1,17 @@
+//! Zoi CLI library.
+//!
+//! This crate provides the command-line interface logic for Zoi, including
+//! command parsing, execution, and utility functions for interacting with Zoi.
+
+/// Command-line argument parsing and definitions.
 pub mod cli;
+/// Implementation of CLI commands.
 pub mod cmd;
+/// Package-related CLI logic.
 pub mod pkg;
+/// Project management.
 pub use zoi_project as project;
+/// CLI-specific utility functions.
 pub mod utils;
 
 use anyhow::Result;
@@ -29,20 +39,32 @@ pub use zoi_telemetry as telemetry;
 pub use pkg::local;
 pub use pkg::mini_resolve;
 
+/// Options for installing packages from source.
 #[derive(Debug, Clone, Default)]
 pub struct SourceInstallOptions {
+    /// The repository to install from.
     pub repo: Option<String>,
+    /// Whether to force the installation.
     pub force: bool,
+    /// Whether to install all optional dependencies.
     pub all_optional: bool,
+    /// Whether to skip confirmation prompts.
     pub yes: bool,
+    /// Override the installation scope.
     pub scope_override: Option<Scope>,
+    /// Whether to save the installation to the project file.
     pub save: bool,
+    /// The build type to use.
     pub build_type: Option<String>,
+    /// Whether to perform a dry run.
     pub dry_run: bool,
+    /// Whether to build the package.
     pub build: bool,
+    /// Whether to use the lockfile exactly (frozen).
     pub frozen: bool,
 }
 
+/// Converts a core `Scope` to a CLI `InstallScope`.
 fn to_install_scope(scope: Scope) -> cli::InstallScope {
     match scope {
         Scope::User => cli::InstallScope::User,
@@ -51,6 +73,7 @@ fn to_install_scope(scope: Scope) -> cli::InstallScope {
     }
 }
 
+/// Installs one or more packages from source strings (PURLs or names).
 pub fn install_sources(sources: &[String], options: &SourceInstallOptions) -> Result<()> {
     let plugin_manager = if crate::pkg::utils::is_mini_mode() {
         None
@@ -86,6 +109,7 @@ pub fn install_sources(sources: &[String], options: &SourceInstallOptions) -> Re
     )
 }
 
+/// Uninstalls a package by name.
 pub fn uninstall_package(package_name: &str, scope_override: Option<Scope>) -> Result<()> {
     zoi_uninstall::run(package_name, scope_override, false, false, false).map(|_| ())
 }

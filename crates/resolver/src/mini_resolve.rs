@@ -1,9 +1,15 @@
+//! Optimized dependency resolution for Zoi Mini.
+//!
+//! This module provides a fast, lightweight resolution path that uses a
+//! pre-compiled JSON index instead of full registry checkouts.
+
 use anyhow::{Result, anyhow};
 use colored::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 pub use zoi_core::types::MiniVulnerability;
 
+/// Returns the default package revision ("1").
 fn default_revision() -> String {
     "1".to_string()
 }
@@ -14,17 +20,25 @@ fn default_revision() -> String {
 /// without downloading individual `.pkg.lua` files or cloning entire registries.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MiniPackageIndex {
+    /// The repository where the package is located.
     pub repo: String,
+    /// The type of repository (e.g., official, unofficial).
     pub repo_type: String,
+    /// The current version of the package.
     pub version: String,
+    /// The revision of the package version.
     #[serde(default = "default_revision")]
     pub revision: String,
+    /// A short description of the package.
     pub description: String,
+    /// A list of sub-packages provided by this package.
     #[serde(default, deserialize_with = "deserialize_sub_packages")]
     pub sub_packages: Option<Vec<String>>,
+    /// Known vulnerabilities for this package.
     pub vuln: Option<Vec<MiniVulnerability>>,
 }
 
+/// Custom deserializer for sub-packages to handle potential null or non-array values gracefully.
 fn deserialize_sub_packages<'de, D>(deserializer: D) -> Result<Option<Vec<String>>, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -37,8 +51,10 @@ where
     }
 }
 
+/// A mapping of package names to their metadata in the Mini index.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MiniRegistryIndex {
+    /// The collection of packages in the index.
     pub packages: HashMap<String, MiniPackageIndex>,
 }
 
@@ -60,6 +76,7 @@ pub fn fetch_registry_index() -> Result<MiniRegistryIndex> {
     Ok(index)
 }
 
+/// Fetches the repository configuration from the official Zoidberg registry.
 pub fn fetch_registry_config() -> Result<zoi_core::types::RepoConfig> {
     let url = "https://gitlab.com/zillowe/zillwen/zusty/zoidberg/-/raw/main/repo.yaml";
     let client = zoi_core::utils::get_http_client()?;
@@ -75,6 +92,7 @@ pub fn fetch_registry_config() -> Result<zoi_core::types::RepoConfig> {
     Ok(config)
 }
 
+/// Returns the URL to download a package's `.pkg.lua` file from the official registry.
 pub fn get_package_lua_url(repo: &str, name: &str) -> String {
     format!(
         "https://gitlab.com/zillowe/zillwen/zusty/zoidberg/-/raw/main/{}/{}/{}.pkg.lua",

@@ -1,3 +1,8 @@
+//! Implementation of the `zoi exec` command.
+//!
+//! This command allows running a binary from a package without explicitly installing it
+//! into the global or user scope. It handles temporary installation and cleanup.
+
 use crate::pkg::{install, local};
 use anyhow::{Result, anyhow};
 use colored::*;
@@ -9,6 +14,10 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Mutex;
 
+/// Runs the 'exec' command.
+///
+/// Temporarily installs a package if necessary and executes a binary from it.
+/// Ephemeral packages are cleaned up after execution.
 pub fn run(source: String, bin: Option<String>, args: Vec<String>, verbose: bool) -> Result<()> {
     if verbose {
         println!("{} Resolving package...", "::".bold().blue());
@@ -316,6 +325,7 @@ pub fn run(source: String, bin: Option<String>, args: Vec<String>, verbose: bool
     Ok(())
 }
 
+/// Resolves the version directory path from an install manifest.
 fn get_version_dir_from_manifest(manifest: &zoi_core::types::InstallManifest) -> Result<PathBuf> {
     crate::pkg::local::get_package_version_dir(
         manifest.scope,

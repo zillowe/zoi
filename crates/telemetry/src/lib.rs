@@ -1,3 +1,9 @@
+//! Anonymous telemetry for Zoi.
+//!
+//! This crate handles the collection and transmission of anonymous usage
+//! statistics to help improve Zoi. It ensures privacy by only collecting
+//! non-identifiable data and requiring explicit user opt-in.
+
 use serde::Serialize;
 use std::{error::Error, fs};
 use uuid::Timestamp;
@@ -5,52 +11,82 @@ use uuid::Timestamp;
 /// Represents an anonymous telemetry event sent to PostHog.
 #[derive(Debug, Serialize)]
 pub struct PackageEvent<'a> {
+    /// Unique anonymous identifier for the client.
     pub client_id: &'a str,
+    /// The name of the event (e.g., "install", "uninstall").
     pub event: &'a str,
+    /// RFC3339 formatted timestamp of the event.
     pub ts: String,
+    /// Version of the Zoi application.
     pub app_version: &'a str,
+    /// Operating system name.
     pub os: &'a str,
+    /// CPU architecture.
     pub arch: &'a str,
+    /// Linux distribution name, if applicable.
     pub distro: Option<String>,
+    /// The user's current shell.
     pub shell: Option<String>,
+    /// Minimal package metadata.
     pub package: MinimalPackage<'a>,
+    /// Type of the package (e.g., "Package", "App").
     pub package_type: &'a str,
+    /// Installation scope (e.g., "global", "user").
     pub scope: String,
+    /// Reason for the installation (e.g., "direct", "dependency").
     pub reason: String,
+    /// How the package was installed (e.g., "source", "binary").
     pub install_type: Option<String>,
 }
 
 /// A privacy-preserving subset of package metadata for analytics.
 #[derive(Debug, Serialize)]
 pub struct MinimalPackage<'a> {
+    /// Name of the package.
     pub name: &'a str,
+    /// Optional sub-package name.
     pub sub_package: Option<&'a String>,
+    /// Repository where the package is hosted.
     pub repo: &'a str,
+    /// Package version.
     pub version: &'a str,
+    /// Brief description of the package.
     pub description: &'a str,
+    /// License of the package.
     pub license: &'a str,
+    /// Maintainer of the package.
     pub maintainer: MinimalPerson<'a>,
+    /// Original author of the package.
     pub author: Option<MinimalPerson<'a>>,
+    /// Registry handle.
     pub registry: &'a str,
+    /// URL of the registry.
     pub registry_url: &'a str,
 }
 
+/// A minimal representation of a person (maintainer or author) for telemetry.
 #[derive(Debug, Serialize)]
 pub struct MinimalPerson<'a> {
+    /// Name of the person.
     pub name: &'a str,
+    /// Email address of the person.
     pub email: &'a str,
+    /// Optional website URL.
     pub website: Option<&'a String>,
 }
 
+/// Returns the path to the file where the anonymous client ID is stored.
 fn get_client_id_path() -> Result<std::path::PathBuf, Box<dyn Error>> {
     let home = zoi_core::utils::get_user_home().ok_or("Could not find home directory")?;
     Ok(home.join(".zoi").join("telemetry").join("client_id"))
 }
 
+/// Returns the anonymous client ID, or "unknown" if it cannot be retrieved.
 pub fn get_anonymous_id() -> String {
     ensure_client_id().unwrap_or_else(|_| "unknown".to_string())
 }
 
+/// Ensures that an anonymous client ID exists, creating a new one if necessary.
 fn ensure_client_id() -> Result<String, Box<dyn Error>> {
     let path = get_client_id_path()?;
     if let Some(dir) = path.parent() {

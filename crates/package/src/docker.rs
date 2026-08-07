@@ -1,9 +1,17 @@
+//! Containerized package builds using Docker.
+//!
+//! This module allows building Zoi packages inside a Docker container.
+//! This is useful for cross-compilation, ensuring a clean and consistent
+//! build environment, and for building packages for different Linux
+//! distributions from a single host.
+
 use anyhow::{Result, anyhow};
 use colored::*;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use zoi_core::utils;
 
+/// Runs the package build process inside a Docker container.
 pub fn run(
     package_file: &Path,
     build_type: Option<&str>,

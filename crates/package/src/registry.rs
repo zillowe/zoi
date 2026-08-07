@@ -1,3 +1,8 @@
+//! Registry management and metadata generation.
+//!
+//! This module provides functions for initializing registries, adding packages and
+//! security advisories, and generating the optimized JSON index files used by Zoi.
+
 use crate::doctor as pkg_doctor;
 use crate::init_lsp;
 use anyhow::{Result, anyhow};
@@ -10,6 +15,10 @@ use walkdir::WalkDir;
 use zoi_core::types;
 use zoi_lua;
 
+/// Initializes a new Zoi registry at the given path.
+///
+/// This creates the necessary directory structure, `repo.yaml`, `packages.json`,
+/// and `advisories.json`, and sets up LSP support.
 pub fn init(path: &Path) -> Result<()> {
     println!(
         "{} Initializing new Zoi registry at {}...",
@@ -112,6 +121,10 @@ repos:
     Ok(())
 }
 
+/// Adds a new package definition to the registry.
+///
+/// This creates a new directory for the package and a template `.pkg.lua` file.
+/// If `name` or `repo` are not provided, it prompts the user for input.
 pub fn add_package(registry_root: &Path, name: Option<&str>, repo: Option<&str>) -> Result<()> {
     if !registry_root.join("repo.yaml").exists() {
         return Err(anyhow!(
@@ -221,6 +234,10 @@ end
     Ok(())
 }
 
+/// Adds a new security advisory to the registry.
+///
+/// This creates a temporary `.sec.yaml` file for the given package.
+/// The ID will be automatically assigned during `generate_metadata`.
 pub fn add_advisory(
     registry_root: &Path,
     package_name: Option<&str>,
@@ -651,6 +668,9 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Checks the integrity of all package definitions in the registry.
+///
+/// This runs `zoi doctor` on every `.pkg.lua` file in the registry.
 pub fn check(registry_root: &Path) -> Result<()> {
     if !registry_root.join("repo.yaml").exists() {
         return Err(anyhow!(

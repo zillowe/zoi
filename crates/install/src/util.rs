@@ -19,17 +19,21 @@ use zoi_core::utils;
 use zoi_db as db;
 use zstd::stream::read::Decoder as ZstdDecoder;
 
+/// The number of times to retry a download before giving up.
 static DOWNLOAD_RETRY_ATTEMPTS: AtomicU32 = AtomicU32::new(3);
 
+/// Sets the number of download retry attempts.
 pub fn set_download_retry_attempts(attempts: u32) {
     let normalized = attempts.max(1);
     DOWNLOAD_RETRY_ATTEMPTS.store(normalized, Ordering::Relaxed);
 }
 
+/// Gets the number of download retry attempts.
 fn get_download_retry_attempts() -> u32 {
     DOWNLOAD_RETRY_ATTEMPTS.load(Ordering::Relaxed).max(1)
 }
 
+/// Sends telemetry for a package installation event.
 pub fn send_telemetry(
     event: &str,
     pkg: &types::Package,
@@ -49,6 +53,7 @@ pub fn send_telemetry(
     }
 }
 
+/// Displays important updates from the package metadata to the user.
 pub fn display_updates(pkg: &types::Package, yes: bool) -> Result<bool> {
     if let Some(updates) = &pkg.updates {
         if updates.is_empty() {
@@ -185,6 +190,7 @@ pub fn check_zoios_compliance(graph: &super::resolver::DependencyGraph) -> Resul
     Ok(())
 }
 
+/// Checks for conflicts between packages to be installed and existing ones.
 pub fn check_for_conflicts(packages_to_install: &[&types::Package], yes: bool) -> Result<()> {
     let installed_packages = zoi_resolver::local::get_installed_packages()?;
     let mut all_conflict_messages = HashSet::new();
@@ -210,6 +216,7 @@ pub fn check_for_conflicts(packages_to_install: &[&types::Package], yes: bool) -
     Ok(())
 }
 
+/// Formats a package name for display, including its sub-package if applicable.
 fn package_display(node: &InstallNode) -> String {
     if let Some(sub) = &node.sub_package {
         format!("{}:{}", node.pkg.name, sub)
@@ -218,6 +225,7 @@ fn package_display(node: &InstallNode) -> String {
     }
 }
 
+/// Generates candidate strings for matching a package against policy rules.
 fn package_match_candidates(node: &InstallNode) -> Vec<String> {
     let mut values = Vec::new();
     let name = node.pkg.name.to_ascii_lowercase();
@@ -249,6 +257,7 @@ fn package_match_candidates(node: &InstallNode) -> Vec<String> {
     values
 }
 
+/// Checks if a policy rule matches a specific package.
 fn rule_matches_package(rule: &str, node: &InstallNode) -> bool {
     let normalized_rule = rule.trim().to_ascii_lowercase();
     if normalized_rule.is_empty() {
@@ -259,6 +268,7 @@ fn rule_matches_package(rule: &str, node: &InstallNode) -> bool {
         .any(|candidate| candidate == &normalized_rule)
 }
 
+/// Checks if a policy rule matches a repository.
 fn rule_matches_repo(rule: &str, repo: &str) -> bool {
     let normalized_rule = rule.trim().to_ascii_lowercase();
     if normalized_rule.is_empty() {
@@ -275,6 +285,7 @@ fn rule_matches_repo(rule: &str, repo: &str) -> bool {
     }
 }
 
+/// Tokenizes a license string into individual license identifiers.
 fn license_tokens(license: &str) -> HashSet<String> {
     license
         .split(|c: char| !(c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '+'))
@@ -291,6 +302,7 @@ fn license_tokens(license: &str) -> HashSet<String> {
         .collect()
 }
 
+/// Checks if a license string contains any denied license identifiers.
 fn license_contains_denied(license: &str, denied: &HashSet<String>) -> bool {
     if denied.is_empty() || license.trim().is_empty() {
         return false;
@@ -299,6 +311,7 @@ fn license_contains_denied(license: &str, denied: &HashSet<String>) -> bool {
     tokens.iter().any(|token| denied.contains(token))
 }
 
+/// Checks if a license string matches the allowed license policy.
 fn license_matches_allowed(license: &str, allowed: &HashSet<String>) -> bool {
     if allowed.is_empty() {
         return true;
@@ -318,6 +331,7 @@ fn license_matches_allowed(license: &str, allowed: &HashSet<String>) -> bool {
     !tokens.is_empty() && tokens.iter().any(|token| allowed.contains(token))
 }
 
+/// Checks if the dependency graph complies with a specific policy.
 pub fn check_policy_compliance_with_policy(
     graph: &super::resolver::DependencyGraph,
     policy: &types::Policy,
@@ -438,11 +452,13 @@ pub fn check_policy_compliance_with_policy(
     Ok(())
 }
 
+/// Checks if the dependency graph complies with the system-wide policy.
 pub fn check_policy_compliance(graph: &super::resolver::DependencyGraph) -> Result<()> {
     let config = zoi_core::config::read_config()?;
     check_policy_compliance_with_policy(graph, &config.policy)
 }
 
+/// Checks the dependency graph for known security vulnerabilities.
 pub fn check_for_vulnerabilities(
     graph: &super::resolver::DependencyGraph,
     yes: bool,
@@ -522,10 +538,12 @@ pub fn check_for_vulnerabilities(
     Ok(())
 }
 
+/// Extracts the filename from a URL.
 pub fn get_filename_from_url(url: &str) -> &str {
     url.split('/').next_back().unwrap_or_default()
 }
 
+/// Fetches the text content from a list of candidate URLs.
 fn get_text_from_candidate_urls(urls: &[String], resource_name: &str) -> Result<String> {
     let client = zoi_core::utils::get_http_client()?;
     let mut last_error = None;
@@ -547,6 +565,7 @@ fn get_text_from_candidate_urls(urls: &[String], resource_name: &str) -> Result<
     ))
 }
 
+/// Downloads a file from a URL with progress reporting.
 pub fn download_file_with_progress(
     url: &str,
     dest_path: &Path,
@@ -669,6 +688,7 @@ pub fn download_file_with_progress(
     Ok(())
 }
 
+/// Verifies the hash of a file against an expected hash.
 pub fn verify_file_hash(
     file_path: &Path,
     expected_hash: &str,
@@ -719,6 +739,7 @@ pub fn verify_file_hash(
     Ok(result)
 }
 
+/// Fetches a list of files from a remote registry.
 pub fn get_remote_file_list(url: &str) -> Result<Vec<String>> {
     if zoi_core::offline::is_offline() {
         return Ok(Vec::new());
@@ -830,6 +851,7 @@ pub fn check_file_conflicts(
     Ok(())
 }
 
+/// Identifies file conflicts from a list of files to be installed.
 pub fn get_conflicts_from_list(
     list: Vec<String>,
     pkg: &types::Package,
@@ -872,6 +894,7 @@ pub fn get_conflicts_from_list(
     Ok(conflicts)
 }
 
+/// Identifies file conflicts by inspecting a package archive.
 pub fn get_file_conflicts_from_archive(
     archive_path: &Path,
     pkg: &types::Package,
@@ -947,6 +970,7 @@ pub fn get_file_conflicts_from_archive(
     Ok(conflicts)
 }
 
+/// Fetches the expected hash for a file from a remote source.
 pub fn get_expected_hash(hash_url: &str, filename: Option<&str>) -> Result<String> {
     if zoi_core::offline::is_offline() {
         return Ok(String::new());
@@ -982,6 +1006,7 @@ pub fn get_expected_hash(hash_url: &str, filename: Option<&str>) -> Result<Strin
         .to_string())
 }
 
+/// Fetches the expected download and installed sizes for a package.
 pub fn get_expected_size(size_url: &str) -> Result<(u64, u64)> {
     if zoi_core::offline::is_offline() {
         return Ok((0, 0));
@@ -1017,6 +1042,7 @@ pub fn get_expected_size(size_url: &str) -> Result<(u64, u64)> {
     Ok((download_size, installed_size))
 }
 
+/// Resolves placeholders in a URL with actual values.
 pub fn resolve_url_placeholders(
     url: &str,
     pkg_name: &str,
@@ -1044,6 +1070,7 @@ pub fn resolve_url_placeholders(
         .replace("{platform}", platform)
 }
 
+/// Finds prebuilt info for a package in the registry.
 pub fn find_registry_info_for_package(
     pkg: &types::Package,
     registry_handle: &str,
@@ -1130,6 +1157,7 @@ pub fn find_registry_info_for_package(
     Ok(None)
 }
 
+/// Finds prebuilt info for a prebuilt package.
 pub fn find_prebuilt_info_for_package(
     pkg: &types::Package,
     registry_handle: &str,
@@ -1138,6 +1166,7 @@ pub fn find_prebuilt_info_for_package(
     find_registry_info_for_package(pkg, registry_handle, version, false)
 }
 
+/// Finds info for a source bundle package.
 pub fn find_source_bundle_info_for_package(
     pkg: &types::Package,
     registry_handle: &str,
@@ -1146,14 +1175,17 @@ pub fn find_source_bundle_info_for_package(
     find_registry_info_for_package(pkg, registry_handle, version, true)
 }
 
+/// Finds prebuilt info for an install node.
 pub fn find_prebuilt_info(node: &InstallNode) -> Result<Option<types::PrebuiltInfo>> {
     find_prebuilt_info_for_package(&node.pkg, &node.registry_handle, &node.version)
 }
 
+/// Finds source bundle info for an install node.
 pub fn find_source_bundle_info(node: &InstallNode) -> Result<Option<types::PrebuiltInfo>> {
     find_source_bundle_info_for_package(&node.pkg, &node.registry_handle, &node.version)
 }
 
+/// Gets the expected download and installed sizes for a package from various sources.
 pub fn get_package_sizes(pkg: &types::Package, registry_handle: &str, version: &str) -> (u64, u64) {
     let download_size = pkg.archive_size.unwrap_or(0);
     let installed_size = pkg.installed_size.unwrap_or(0);

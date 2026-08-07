@@ -1,3 +1,9 @@
+//! Manages external package dependencies for Zoi.
+//!
+//! This crate provides the logic to parse dependency strings and interact with
+//! various external package managers (e.g. apt, brew, cargo) to install and
+//! uninstall dependencies.
+
 use anyhow::{Result, anyhow};
 use colored::*;
 use dialoguer::{Select, theme::ColorfulTheme};
@@ -17,6 +23,7 @@ pub fn parse_dependency_string(dep_str: &str) -> Result<Dependency<'_>> {
     })
 }
 
+/// A callback function type for uninstalling a Zoi package by its name.
 type ZoiUninstaller = dyn Fn(&str) -> Result<()>;
 
 /// Attempts to remove a dependency using its responsible package manager.

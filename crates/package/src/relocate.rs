@@ -1,3 +1,9 @@
+//! ELF binary relocation for portability.
+//!
+//! This module provides utilities for rewriting the RPATH/RUNPATH of ELF binaries
+//! to use relative paths (using `$ORIGIN`). This makes packages relocatable,
+//! allowing them to find their shared libraries regardless of their install location.
+
 use anyhow::{Result, anyhow};
 use colored::*;
 use elb::{DynamicTag, Elf, ElfPatcher};
@@ -57,6 +63,7 @@ pub fn relocate_elfs(staging_dir: &Path, quiet: bool) -> Result<()> {
     Ok(())
 }
 
+/// Checks if a file is an ELF binary by looking for the `\x7fELF` magic bytes.
 fn is_elf(path: &Path) -> Result<bool> {
     let mut file = fs::File::open(path)?;
     let mut magic = [0u8; 4];
@@ -67,6 +74,7 @@ fn is_elf(path: &Path) -> Result<bool> {
     Ok(magic == [0x7f, 0x45, 0x4c, 0x46])
 }
 
+/// Relocates a single ELF file by rewriting its RUNPATH.
 fn relocate_file(path: &Path, staging_dir: &Path) -> Result<bool> {
     let mut file = OpenOptions::new()
         .read(true)
@@ -94,6 +102,7 @@ fn relocate_file(path: &Path, staging_dir: &Path) -> Result<bool> {
     Ok(true)
 }
 
+/// Calculates the appropriate relative RPATHs for an ELF file based on its location.
 fn calculate_rpaths(path: &Path, staging_dir: &Path) -> Vec<String> {
     // Determine common Zoi relative paths based on where the file is in the staging area.
     // We look for the 'pkgstore' directory which is the root of the package's isolated files.
@@ -119,6 +128,7 @@ fn calculate_rpaths(path: &Path, staging_dir: &Path) -> Vec<String> {
     rpaths
 }
 
+/// Finds the path of a file relative to the nearest `pkgstore` directory.
 fn find_rel_to_pkgstore(path: &Path, staging_dir: &Path) -> Option<std::path::PathBuf> {
     let mut current = path;
     while let Some(parent) = current.parent() {

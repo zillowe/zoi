@@ -4,35 +4,51 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
+/// Project-local configuration overrides.
 #[derive(Debug, Deserialize, Default, Clone)]
 pub struct ProjectLocalConfig {
+    /// Whether the project is isolated from the system registry.
     #[serde(default)]
     pub local: bool,
 }
 
+/// Shell configuration for the project.
 #[derive(Debug, Deserialize, Clone, Default)]
 pub struct ShellSpec {
+    /// Environment variables for the shell, potentially platform-specific.
     #[serde(default)]
     pub env: PlatformOrEnvMap,
 }
 
+/// Specification for a project-scoped registry.
 #[derive(Debug, Deserialize, Clone)]
 pub struct RegistrySpec {
+    /// The URL of the registry.
     pub url: String,
+    /// The git revision of the registry.
     pub revision: Option<String>,
+    /// The type of registry (e.g., "git").
     #[serde(rename = "type")]
     pub registry_type: Option<String>,
 }
 
+/// Specification for a package dependency.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PackageSpec {
+    /// The type of package.
     #[serde(rename = "type")]
     pub package_type: Option<String>,
+    /// The method used to install the package.
     pub install_method: Option<String>,
+    /// List of sub-packages to install.
     pub sub_packages: Option<Vec<String>>,
+    /// The version requirement for the package.
     pub version: Option<String>,
+    /// Dependencies specific to this package.
     pub dependencies: Option<zoi_core::types::Dependencies>,
+    /// List of build/install options.
     pub options: Option<Vec<String>>,
+    /// List of optional features to enable.
     pub optionals: Option<Vec<String>>,
 }
 
@@ -72,30 +88,42 @@ pub struct ProjectConfig {
     pub shell: Option<ShellSpec>,
 }
 
+/// A declarative package check.
 #[derive(Debug, Deserialize, Clone)]
 pub struct PackageCheck {
+    /// The name of the package.
     pub name: String,
+    /// The check command or requirement.
     pub check: String,
 }
 
+/// A value that can be a single string or a map of platform-specific strings.
 #[derive(Debug, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum PlatformOrString {
+    /// A simple string value.
     String(String),
+    /// A map of platform names to string values.
     Platform(HashMap<String, String>),
 }
 
+/// A value that can be a list of strings or a map of platform-specific string lists.
 #[derive(Debug, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum PlatformOrStringVec {
+    /// A simple list of strings.
     StringVec(Vec<String>),
+    /// A map of platform names to lists of strings.
     Platform(HashMap<String, Vec<String>>),
 }
 
+/// A value that can be an environment map or a map of platform-specific environment maps.
 #[derive(Debug, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum PlatformOrEnvMap {
+    /// A simple environment map.
     EnvMap(HashMap<String, String>),
+    /// A map of platform names to environment maps.
     Platform(HashMap<String, HashMap<String, String>>),
 }
 
@@ -105,31 +133,44 @@ impl Default for PlatformOrEnvMap {
     }
 }
 
+/// Specification for a declarative task/command.
 #[derive(Debug, Deserialize, Clone)]
 pub struct CommandSpec {
+    /// The name of the task.
     pub cmd: String,
+    /// The command to run, potentially platform-specific.
     pub run: PlatformOrString,
+    /// Environment variables for the task.
     #[serde(default)]
     pub env: PlatformOrEnvMap,
+    /// List of task names this task depends on.
     #[serde(default)]
     pub depends_on: Option<Vec<String>>,
+    /// List of files that contribute to the task's cache hash.
     #[serde(default)]
     pub cache_files: Option<Vec<String>>,
 }
 
+/// Specification for a project environment setup.
 #[derive(Debug, Deserialize, Clone)]
 pub struct EnvironmentSpec {
+    /// The name of the environment.
     pub name: String,
+    /// The command associated with this environment.
     pub cmd: String,
+    /// The commands to run to setup the environment.
     pub run: PlatformOrStringVec,
+    /// Environment variables for this setup.
     #[serde(default)]
     pub env: PlatformOrEnvMap,
 }
 
+/// Loads the project configuration from the current directory.
 pub fn load() -> Result<ProjectConfig> {
     load_with_env(std::env::vars().collect())
 }
 
+/// Loads the project configuration with a custom set of environment variables.
 pub fn load_with_env(env: HashMap<String, String>) -> Result<ProjectConfig> {
     let lua_path = Path::new("zoi.lua");
     if lua_path.exists() {
@@ -148,6 +189,7 @@ pub fn load_with_env(env: HashMap<String, String>) -> Result<ProjectConfig> {
     Ok(config)
 }
 
+/// Adds packages to the `zoi.yaml` configuration file.
 pub fn add_packages_to_config(packages: &[String]) -> Result<()> {
     if Path::new("zoi.lua").exists() {
         return Err(anyhow!(
@@ -186,6 +228,7 @@ pub fn add_packages_to_config(packages: &[String]) -> Result<()> {
     Ok(())
 }
 
+/// Removes packages from the `zoi.yaml` configuration file.
 pub fn remove_packages_from_config(packages_to_remove: &[String]) -> Result<()> {
     if Path::new("zoi.lua").exists() {
         return Ok(());

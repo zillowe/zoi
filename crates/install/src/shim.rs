@@ -13,6 +13,7 @@ use zoi_resolver::{local, resolve};
 #[cfg(target_os = "linux")]
 use zoi_sandbox as sandbox;
 
+/// Runs a binary through the Zoi shim mechanism.
 pub fn run_shim(
     bin_name: &str,
     args: Vec<String>,
@@ -84,6 +85,7 @@ pub fn run_shim(
     }
 }
 
+/// Resolves a binary name to its installed path in the Zoi store.
 pub fn resolve_to_installed_bin(
     bin_name: &str,
     plugin_manager: Option<&PluginManager>,
@@ -182,6 +184,7 @@ pub fn resolve_to_installed_bin(
     ))
 }
 
+/// Finds the version for a binary in a `.tool-versions` file.
 fn find_tool_versions_version(bin_name: &str) -> Result<Option<String>> {
     let mut current_dir = env::current_dir()?;
     loop {
@@ -206,6 +209,7 @@ fn find_tool_versions_version(bin_name: &str) -> Result<Option<String>> {
     Ok(None)
 }
 
+/// Gets the desired version for a binary from various sources.
 fn get_desired_version(
     bin_name: &str,
     plugin_manager: Option<&PluginManager>,
@@ -251,6 +255,7 @@ fn get_desired_version(
     Ok(None)
 }
 
+/// Searches the Zoi store for a specific version of a package that provides a binary.
 fn search_store_for_version(
     pkg_name: &str,
     version: &str,
@@ -308,6 +313,7 @@ fn search_store_for_version(
     Ok(None)
 }
 
+/// Finds a binary in a directory, checking `bin/` first and then walking the directory.
 fn find_bin_in_dir(dir: &std::path::Path, bin_name: &str) -> Option<PathBuf> {
     let bin_path = dir.join("bin").join(bin_name);
     if bin_path.exists() {
@@ -322,7 +328,9 @@ fn find_bin_in_dir(dir: &std::path::Path, bin_name: &str) -> Option<PathBuf> {
     None
 }
 
+/// Creates a shim for the current Zoi executable at the specified path.
 pub fn create_shim(link_path: &std::path::Path) -> Result<()> {
     let zoi_exe = env::current_exe()?;
     symlink_file(&zoi_exe, link_path).map_err(|e| anyhow!("Failed to create shim: {}", e))
 }
+

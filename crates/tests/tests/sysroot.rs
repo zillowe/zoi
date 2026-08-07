@@ -1,3 +1,5 @@
+//! Integration tests for sysroot management and isolation.
+
 use std::path::PathBuf;
 use zoi::pkg::sysroot;
 

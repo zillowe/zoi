@@ -1,15 +1,23 @@
+//! PGP key management commands for the Zoi CLI.
+//!
+//! These commands allow users to manage PGP keys used for verifying package
+//! signatures, ensuring the authenticity and integrity of installed software.
+
 use crate::pkg;
 use anyhow::{Result, anyhow};
 use clap::{ArgGroup, Parser, Subcommand};
 use std::path::Path;
 
+/// The root PGP management command.
 #[derive(Parser, Debug)]
 #[command(long_about = "Manages PGP keys for package signature verification.")]
 pub struct PgpCommand {
+    /// The specific PGP subcommand to execute.
     #[command(subcommand)]
     pub command: PgpCommands,
 }
 
+/// Available PGP subcommands.
 #[derive(Subcommand, Debug)]
 pub enum PgpCommands {
     /// Add a PGP key from a file, URL, or a keyserver
@@ -28,6 +36,7 @@ pub enum PgpCommands {
     Verify(VerifySig),
 }
 
+/// Arguments for the add-key command.
 #[derive(Parser, Debug)]
 #[command(group(
     ArgGroup::new("source")
@@ -52,6 +61,7 @@ pub struct AddKey {
     pub name: Option<String>,
 }
 
+/// Arguments for the remove-key command.
 #[derive(Parser, Debug)]
 #[command(group(
     ArgGroup::new("key_id")
@@ -67,6 +77,7 @@ pub struct RemoveKey {
     pub fingerprint: Option<String>,
 }
 
+/// Arguments for the search-key command.
 #[derive(Parser, Debug)]
 pub struct SearchKey {
     /// The user ID (name, email) or fingerprint to search for
@@ -74,6 +85,7 @@ pub struct SearchKey {
     pub term: String,
 }
 
+/// Arguments for the show-key command.
 #[derive(Parser, Debug)]
 pub struct ShowKey {
     /// The name of the key to show
@@ -81,6 +93,7 @@ pub struct ShowKey {
     pub name: String,
 }
 
+/// Arguments for the verify-signature command.
 #[derive(Parser, Debug)]
 pub struct VerifySig {
     /// Path to the file to verify
@@ -96,6 +109,7 @@ pub struct VerifySig {
     pub key: String,
 }
 
+/// Run the PGP management command.
 pub fn run(args: PgpCommand) -> Result<()> {
     match args.command {
         PgpCommands::Add(add_args) => {

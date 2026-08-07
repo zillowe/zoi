@@ -1,3 +1,8 @@
+//! Parser for Zoi package definitions (`.pkg.lua`).
+//!
+//! This module provides functions to parse Lua package definitions from files
+//! or Zoi archives, extracting metadata, dependencies, and other configuration.
+
 use crate::functions;
 use anyhow::{Result, anyhow};
 use mlua::{self, Lua, LuaSerdeExt, Table, Value};
@@ -8,6 +13,12 @@ use walkdir::WalkDir;
 use zoi_core::{types, utils};
 use zstd::stream::read::Decoder as ZstdDecoder;
 
+/// Parses a Lua package definition from a Zoi archive (`.zpa` or `.zsa`).
+///
+/// This function detects the current platform and uses it for resolution.
+///
+/// # Errors
+/// Returns an error if the archive cannot be read, unpacked, or if no `.pkg.lua` is found.
 pub fn parse_lua_package_from_archive(
     archive_path: &Path,
     version_override: Option<&str>,
@@ -24,6 +35,10 @@ pub fn parse_lua_package_from_archive(
     )
 }
 
+/// Parses a Lua package definition from a Zoi archive for a specific platform.
+///
+/// # Errors
+/// Returns an error if the archive cannot be read, unpacked, or if no `.pkg.lua` is found.
 pub fn parse_lua_package_from_archive_for_platform(
     archive_path: &Path,
     platform: &str,
@@ -62,6 +77,10 @@ pub fn parse_lua_package_from_archive_for_platform(
     )
 }
 
+/// Parses a Lua package definition from either a file or an archive for a specific platform.
+///
+/// # Errors
+/// Returns an error if the file or archive cannot be read or parsed.
 pub fn parse_lua_package_for_platform(
     file_path: &str,
     platform: &str,
@@ -81,6 +100,10 @@ pub fn parse_lua_package_for_platform(
     parse_lua_package_from_file_for_platform(file_path, platform, version_override, scope, quiet)
 }
 
+/// Internal function to parse a Lua package definition from a file for a specific platform.
+///
+/// This function sets up the Lua environment, executes the script, and extracts
+/// the resulting package metadata.
 fn parse_lua_package_from_file_for_platform(
     file_path: &str,
     platform: &str,
@@ -210,6 +233,12 @@ fn parse_lua_package_from_file_for_platform(
     Ok(package)
 }
 
+/// Parses a Lua package definition from either a file or an archive.
+///
+/// This function detects the current platform and uses it for resolution.
+///
+/// # Errors
+/// Returns an error if the file or archive cannot be read or parsed.
 pub fn parse_lua_package(
     file_path: &str,
     version_override: Option<&str>,

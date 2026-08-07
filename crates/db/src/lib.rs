@@ -1,9 +1,15 @@
+//! Database management for Zoi registry metadata.
+//!
+//! This crate provides functionality to manage the SQLite-based registry metadata,
+//! including package information, file indexing, and security advisories.
+
 use anyhow::Result;
-use rusqlite::{Connection, params};
+use rusqlite::{params, Connection};
 use std::path::PathBuf;
 use zoi_core::types;
 use zoi_resolver::resolve::{get_db_root, get_host_db_root};
 
+/// Gets the path to the database for a specific registry.
 pub fn get_db_path(registry_handle: &str) -> Result<PathBuf> {
     let target_root = get_db_root()?;
     let target_path = target_root.join(format!("{}.db", registry_handle));
@@ -25,6 +31,7 @@ pub fn get_db_path(registry_handle: &str) -> Result<PathBuf> {
     Ok(target_path)
 }
 
+/// Opens a connection to the registry database and ensures the schema is set up.
 pub fn open_connection(registry_handle: &str) -> Result<Connection> {
     let conn = open_connection_no_setup(registry_handle)?;
     setup_schema(&conn)?;
@@ -343,6 +350,7 @@ fn setup_schema(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+/// Updates or inserts a package in the database.
 pub fn update_package(
     conn: &Connection,
     pkg: &types::Package,
@@ -409,6 +417,7 @@ pub fn update_package(
     Ok(row_id)
 }
 
+/// Retrieves the internal database ID for a package.
 pub fn get_package_id(
     conn: &Connection,
     name: &str,
@@ -424,6 +433,7 @@ pub fn get_package_id(
     Ok(id)
 }
 
+/// Updates the archive and installed sizes for a package.
 pub fn set_package_sizes(
     conn: &Connection,
     package_id: i64,
@@ -437,6 +447,7 @@ pub fn set_package_sizes(
     Ok(())
 }
 
+/// Updates the archive hash for a package.
 pub fn set_package_hash(conn: &Connection, package_id: i64, hash: &str) -> Result<()> {
     conn.execute(
         "UPDATE packages SET archive_hash = ?1 WHERE id = ?2",
@@ -445,6 +456,7 @@ pub fn set_package_hash(conn: &Connection, package_id: i64, hash: &str) -> Resul
     Ok(())
 }
 
+/// Retrieves the archive hash for a package from the database.
 pub fn get_package_hash_from_db(
     registry_handle: &str,
     name: &str,
@@ -465,6 +477,7 @@ pub fn get_package_hash_from_db(
     Ok(hash)
 }
 
+/// Retrieves the archive and installed sizes for a package from the database.
 pub fn get_package_sizes_from_db(
     registry_handle: &str,
     name: &str,
@@ -487,6 +500,7 @@ pub fn get_package_sizes_from_db(
     }
 }
 
+/// Retrieves the list of files associated with a package from the database.
 pub fn get_package_files_from_db(
     registry_handle: &str,
     name: &str,
@@ -510,14 +524,20 @@ pub fn get_package_files_from_db(
     }
 }
 
+/// A single entry for shell completion.
 #[derive(Debug)]
 pub struct CompletionEntry {
+    /// The name of the package.
     pub name: String,
+    /// The repository where the package is located.
     pub repo: String,
+    /// A short description of the package.
     pub description: String,
+    /// The name of the sub-package, if applicable.
     pub sub_package: Option<String>,
 }
 
+/// Retrieves a list of packages suitable for shell completion.
 pub fn get_packages_for_completion(registry_handle: &str) -> Result<Vec<CompletionEntry>> {
     let conn = open_connection(registry_handle)?;
     let mut stmt =
@@ -539,6 +559,7 @@ pub fn get_packages_for_completion(registry_handle: &str) -> Result<Vec<Completi
     Ok(entries)
 }
 
+/// Updates or inserts a security advisory in the database.
 pub fn update_advisory(
     conn: &Connection,
     advisory: &types::Advisory,
@@ -581,6 +602,7 @@ pub fn update_advisory(
     Ok(())
 }
 
+/// Lists all security advisories in the database.
 pub fn list_all_advisories(registry_handle: &str) -> Result<Vec<(types::Advisory, String)>> {
     let conn = open_connection(registry_handle)?;
     let mut stmt = conn.prepare(
@@ -623,6 +645,7 @@ pub fn list_all_advisories(registry_handle: &str) -> Result<Vec<(types::Advisory
     Ok(advisories)
 }
 
+/// Retrieves all security advisories for a specific package.
 pub fn get_advisories_for_package(
     registry_handle: &str,
     package_name: &str,
@@ -680,6 +703,7 @@ pub fn get_advisories_for_package(
     Ok(advisories)
 }
 
+/// Indexes the files provided by a package.
 pub fn index_package_files(conn: &Connection, package_id: i64, files: &[String]) -> Result<()> {
     let mut stmt = conn.prepare("INSERT INTO package_files (package_id, path) VALUES (?1, ?2)")?;
     for file in files {
@@ -688,6 +712,7 @@ pub fn index_package_files(conn: &Connection, package_id: i64, files: &[String])
     Ok(())
 }
 
+/// Clears the file index for a specific package.
 pub fn clear_package_files(conn: &Connection, package_id: i64) -> Result<()> {
     conn.execute(
         "DELETE FROM package_files WHERE package_id = ?1",
@@ -696,6 +721,7 @@ pub fn clear_package_files(conn: &Connection, package_id: i64) -> Result<()> {
     Ok(())
 }
 
+/// Checks if a file path is owned by any package other than the specified one.
 pub fn has_other_owners(conn: &Connection, path: &str, current_package_id: i64) -> Result<bool> {
     let count: i64 = conn.query_row(
         "SELECT count(*) FROM package_files WHERE path = ?1 AND package_id != ?2",
@@ -705,6 +731,7 @@ pub fn has_other_owners(conn: &Connection, path: &str, current_package_id: i64) 
     Ok(count > 0)
 }
 
+/// Deletes a package from the database.
 pub fn delete_package(
     conn: &Connection,
     name: &str,
@@ -720,12 +747,14 @@ pub fn delete_package(
     Ok(())
 }
 
+/// Clears all package and advisory data from the database.
 pub fn clear_registry(conn: &Connection) -> Result<()> {
     conn.execute("DELETE FROM packages", [])?;
     conn.execute("DELETE FROM package_advisories", [])?;
     Ok(())
 }
 
+/// Finds packages that provide a specific command or file.
 pub fn find_provides(registry_handle: &str, term: &str) -> Result<Vec<(types::Package, String)>> {
     let conn = open_connection(registry_handle)?;
 
@@ -902,6 +931,7 @@ pub fn find_provides(registry_handle: &str, term: &str) -> Result<Vec<(types::Pa
     Ok(results)
 }
 
+/// Searches for packages matching a search term.
 pub fn search_packages(registry_handle: &str, term: &str) -> Result<Vec<types::Package>> {
     let conn = open_connection(registry_handle)?;
     let mut stmt = conn.prepare(
@@ -955,6 +985,7 @@ pub fn search_packages(registry_handle: &str, term: &str) -> Result<Vec<types::P
     Ok(pkgs)
 }
 
+/// Searches for files matching a search term.
 pub fn search_files(registry_handle: &str, term: &str) -> Result<Vec<(types::Package, String)>> {
     let conn = open_connection(registry_handle)?;
     let like_query = format!("%{}%", term);
@@ -1034,6 +1065,7 @@ pub fn search_files(registry_handle: &str, term: &str) -> Result<Vec<(types::Pac
     }
 }
 
+/// Lists all packages in the database.
 pub fn list_all_packages(registry_handle: &str) -> Result<Vec<types::Package>> {
     let conn = open_connection(registry_handle)?;
     let mut stmt = conn.prepare(
@@ -1109,6 +1141,7 @@ pub fn list_all_packages(registry_handle: &str) -> Result<Vec<types::Package>> {
     Ok(pkgs)
 }
 
+/// Retrieves all versions of a specific package from the database.
 pub fn get_all_versions(registry_handle: &str, name: &str, repo: &str) -> Result<Vec<String>> {
     let conn = open_connection(registry_handle)?;
     let mut stmt = conn.prepare("SELECT version FROM packages WHERE name = ?1 AND repo = ?2")?;
@@ -1120,6 +1153,7 @@ pub fn get_all_versions(registry_handle: &str, name: &str, repo: &str) -> Result
     Ok(versions)
 }
 
+/// Retrieves the dependencies of a specific package version.
 pub fn get_package_dependencies(
     registry_handle: &str,
     name: &str,

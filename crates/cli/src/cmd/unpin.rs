@@ -1,7 +1,10 @@
+//! Logic for the `unpin` command.
+
 use crate::pkg::{pin, resolve};
 use anyhow::Result;
 use colored::*;
 
+/// Run the unpin command.
 pub fn run(source: &str) -> Result<()> {
     let (pkg, _, _, _, _registry_handle, _, _) =
         resolve::resolve_package_and_version(source, None, false, false)?;

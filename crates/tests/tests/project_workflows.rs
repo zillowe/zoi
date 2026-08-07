@@ -1,3 +1,5 @@
+//! Integration tests for project workflow execution and task running.
+
 use std::fs;
 use tempfile::tempdir;
 use zoi::project::{config, runner};

@@ -1,3 +1,10 @@
+//! Tamper-evident audit logging for Zoi.
+//!
+//! This crate provides a hash-chained audit log that records all
+//! state-changing operations in Zoi, such as installs and uninstalls.
+//! The use of SHA-256 hashes ensures the integrity and chronological
+//! order of the log entries.
+
 use anyhow::{Result, anyhow};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -14,52 +21,79 @@ use zoi_core::{config, types, utils};
 /// of its contents PLUS the hash of the previous entry. This makes it
 /// mathematically impossible to modify or delete a historical entry without
 /// breaking the chain.
-
+/// The type of action recorded in the audit log.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum AuditAction {
+    /// A package was installed.
     Install,
+    /// A package was uninstalled.
     Uninstall,
+    /// A package was upgraded.
     Upgrade,
 }
 
+/// A single entry in the audit log.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AuditEntry {
+    /// When the action occurred.
     pub timestamp: DateTime<Utc>,
+    /// The user who performed the action.
     pub user: String,
+    /// The action performed.
     pub action: AuditAction,
+    /// Name of the package.
     pub package_name: String,
+    /// Version of the package.
     pub version: String,
+    /// Repository handle.
     pub repo: String,
+    /// Type of the package.
     pub package_type: types::PackageType,
+    /// Installation scope.
     pub scope: types::Scope,
+    /// Registry handle.
     pub registry: String,
 }
 
+/// The complete audit log structure.
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct AuditLog {
+    /// Version of the audit log format.
     pub version: String,
+    /// List of audit log lines.
     pub entries: Vec<AuditLogLine>,
 }
 
+/// A single line in the audit log, including cryptographic hashes.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AuditLogLine {
+    /// The core audit entry data.
     #[serde(flatten)]
     pub entry: AuditEntry,
+    /// SHA-256 hash of the previous entry.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prev_hash: Option<String>,
+    /// SHA-256 hash of the current entry (including `prev_hash`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hash: Option<String>,
 }
 
+/// Result of an audit log verification.
 #[derive(Debug, Clone)]
 pub struct AuditVerification {
+    /// Whether the audit chain is valid.
     pub valid: bool,
+    /// Total number of entries checked.
     pub total_entries: usize,
+    /// Number of entries with valid hashes.
     pub hashed_entries: usize,
+    /// Number of legacy (non-hashed) entries.
     pub legacy_entries: usize,
+    /// Descriptive message about the verification result.
     pub message: String,
 }
 
+/// Returns the path to the audit log file.
 fn get_audit_log_path() -> Result<PathBuf> {
     let home_dir =
         utils::get_user_home().ok_or_else(|| anyhow!("Could not find home directory."))?;
@@ -70,6 +104,7 @@ fn get_audit_log_path() -> Result<PathBuf> {
     Ok(zoi_dir.join("audit.json"))
 }
 
+/// Returns the current user's name.
 fn get_username() -> String {
     #[cfg(unix)]
     {
@@ -81,6 +116,7 @@ fn get_username() -> String {
     }
 }
 
+/// Calculates the SHA-256 hash for an audit entry.
 fn calculate_entry_hash(entry: &AuditEntry, prev_hash: Option<&str>) -> Result<String> {
     #[derive(Serialize)]
     struct HashPayload<'a> {
@@ -95,6 +131,7 @@ fn calculate_entry_hash(entry: &AuditEntry, prev_hash: Option<&str>) -> Result<S
     Ok(hex::encode(hasher.finalize()))
 }
 
+/// Reads the audit log from disk.
 fn read_audit_log() -> Result<AuditLog> {
     let path = get_audit_log_path()?;
     if !path.exists() {
@@ -138,6 +175,7 @@ fn read_audit_log() -> Result<AuditLog> {
     })
 }
 
+/// Writes the audit log to disk.
 fn write_audit_log(log: &AuditLog) -> Result<()> {
     let path = get_audit_log_path()?;
     let content = serde_json::to_string_pretty(log)?;
@@ -145,6 +183,7 @@ fn write_audit_log(log: &AuditLog) -> Result<()> {
     Ok(())
 }
 
+/// Logs a new event to the audit log.
 pub fn log_event(action: AuditAction, manifest: &types::InstallManifest) -> Result<()> {
     let config = config::read_config()?;
     if !config.audit_log_enabled {
@@ -179,11 +218,13 @@ pub fn log_event(action: AuditAction, manifest: &types::InstallManifest) -> Resu
     Ok(())
 }
 
+/// Returns the full audit history.
 pub fn get_history() -> Result<Vec<AuditEntry>> {
     let log = read_audit_log()?;
     Ok(log.entries.into_iter().map(|l| l.entry).collect())
 }
 
+/// Exports the audit history to a file.
 pub fn export_history(export_path: &Path, ndjson: bool) -> Result<usize> {
     let log = read_audit_log()?;
     if log.entries.is_empty() {
@@ -213,6 +254,7 @@ pub fn export_history(export_path: &Path, ndjson: bool) -> Result<usize> {
     Ok(log.entries.len())
 }
 
+/// Verifies the integrity of the audit log hash chain.
 pub fn verify_chain() -> Result<AuditVerification> {
     let log = read_audit_log()?;
     let mut total_entries = 0usize;

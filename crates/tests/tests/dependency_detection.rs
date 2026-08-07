@@ -1,3 +1,5 @@
+//! Integration tests for dependency detection and string parsing.
+
 use std::collections::HashSet;
 use std::sync::Mutex;
 use zoi::pkg::dependencies::parse_dependency_string;

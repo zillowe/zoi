@@ -1,7 +1,10 @@
+//! Command for cleaning the package cache.
+
 use crate::pkg;
 use anyhow::Result;
 use colored::*;
 
+/// Runs the clean command.
 pub fn run(dry_run: bool) -> Result<()> {
     if dry_run {
         println!("{} Cleaning cache (Dry-run)...", "::".bold().yellow());

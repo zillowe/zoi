@@ -28,6 +28,7 @@ pub fn get_builtin_authorities() -> Vec<String> {
     }
 }
 
+/// Returns the path to the system-wide configuration file.
 fn get_system_config_path() -> Result<PathBuf> {
     if cfg!(target_os = "windows") {
         Ok(apply_sysroot(PathBuf::from(
@@ -38,6 +39,7 @@ fn get_system_config_path() -> Result<PathBuf> {
     }
 }
 
+/// Returns the path to the user-specific configuration file.
 fn get_user_config_path() -> Result<PathBuf> {
     let home_dir = get_user_home().ok_or_else(|| anyhow!("Could not find home directory."))?;
     Ok(apply_sysroot(home_dir.join(".zoi"))
@@ -45,6 +47,7 @@ fn get_user_config_path() -> Result<PathBuf> {
         .join("config.yaml"))
 }
 
+/// Returns the path to the project-local configuration file.
 fn get_project_config_path() -> Result<PathBuf> {
     let current_dir = std::env::current_dir()?;
     Ok(apply_sysroot(current_dir.join(".zoi"))
@@ -52,6 +55,7 @@ fn get_project_config_path() -> Result<PathBuf> {
         .join("config.yaml"))
 }
 
+/// Returns the path to the directory where git repositories are cloned.
 fn get_git_root() -> Result<PathBuf> {
     let home_dir = get_user_home().ok_or_else(|| anyhow!("Could not find home directory."))?;
     Ok(apply_sysroot(home_dir.join(".zoi"))
@@ -59,6 +63,7 @@ fn get_git_root() -> Result<PathBuf> {
         .join("git"))
 }
 
+/// Returns the path to the remote policy cache file.
 fn get_remote_policy_cache_path() -> Result<PathBuf> {
     if cfg!(target_os = "windows") {
         Ok(apply_sysroot(PathBuf::from(
@@ -69,6 +74,7 @@ fn get_remote_policy_cache_path() -> Result<PathBuf> {
     }
 }
 
+/// Reads a YAML value from the specified path.
 fn read_yaml_value(path: &Path) -> Result<Value> {
     if !path.exists() {
         return Ok(Value::Null);
@@ -77,6 +83,7 @@ fn read_yaml_value(path: &Path) -> Result<Value> {
     serde_yaml::from_str(&content).map_err(Into::into)
 }
 
+/// Reads a Zoi configuration from the specified path.
 fn read_config_from_path(path: &Path) -> Result<Config> {
     if !path.exists() {
         return Ok(Config::default());
@@ -401,6 +408,7 @@ pub fn write_user_config(config: &Config) -> Result<()> {
     Ok(())
 }
 
+/// Verifies a remote file against a set of trusted PGP keys.
 pub fn verify_remote_file(url: &str, trusted_keys: &[String]) -> Result<Vec<u8>> {
     let client = crate::utils::get_http_client()?;
 
@@ -439,6 +447,7 @@ pub fn verify_remote_file(url: &str, trusted_keys: &[String]) -> Result<Vec<u8>>
     Ok(data.to_vec())
 }
 
+/// Adds a repository to the user-specific configuration.
 pub fn add_repo(repo_name: &str) -> Result<()> {
     let mut config = read_config_from_path(&get_user_config_path()?)?;
     let lower_repo_name = repo_name.to_lowercase();
@@ -452,6 +461,7 @@ pub fn add_repo(repo_name: &str) -> Result<()> {
     write_user_config(&config)
 }
 
+/// Removes a repository from the user-specific configuration.
 pub fn remove_repo(repo_name: &str) -> Result<()> {
     let mut config = read_config_from_path(&get_user_config_path()?)?;
     let lower_repo_name = repo_name.to_lowercase();
@@ -466,6 +476,7 @@ pub fn remove_repo(repo_name: &str) -> Result<()> {
     }
 }
 
+/// Prompts the user to interactively add a repository.
 pub fn interactive_add_repo() -> Result<()> {
     let config = read_config()?;
     let all_repos = get_all_repos()?;
@@ -516,6 +527,7 @@ pub fn interactive_add_repo() -> Result<()> {
     Ok(())
 }
 
+/// Returns a list of all available repositories from the default registry.
 pub fn get_all_repos() -> Result<Vec<String>> {
     let db_root = get_db_root()?;
     let config = read_config()?;
@@ -533,6 +545,7 @@ pub fn get_all_repos() -> Result<Vec<String>> {
     Ok(Vec::new())
 }
 
+/// Clones a git repository into the local git root.
 pub fn clone_git_repo(url: &str) -> Result<()> {
     let git_root = get_git_root()?;
     fs::create_dir_all(&git_root)?;
@@ -575,6 +588,7 @@ pub fn clone_git_repo(url: &str) -> Result<()> {
     Ok(())
 }
 
+/// Lists all cloned git repositories.
 pub fn list_git_repos() -> Result<Vec<String>> {
     let git_root = get_git_root()?;
     if !git_root.exists() {
@@ -592,6 +606,7 @@ pub fn list_git_repos() -> Result<Vec<String>> {
     Ok(repos)
 }
 
+/// Removes a cloned git repository.
 pub fn remove_git_repo(repo_name: &str) -> Result<()> {
     let git_root = get_git_root()?;
     let target = git_root.join(repo_name);
@@ -629,6 +644,7 @@ pub fn remove_git_repo(repo_name: &str) -> Result<()> {
     Ok(())
 }
 
+/// Adds a cache mirror URL to the user-specific configuration.
 pub fn add_cache_mirror(url: &str) -> Result<()> {
     let mut config = read_config_from_path(&get_user_config_path()?)?;
     if config.cache_mirrors.iter().any(|existing| existing == url) {
@@ -638,6 +654,7 @@ pub fn add_cache_mirror(url: &str) -> Result<()> {
     write_user_config(&config)
 }
 
+/// Removes a cache mirror URL from the user-specific configuration.
 pub fn remove_cache_mirror(url: &str) -> Result<()> {
     let mut config = read_config_from_path(&get_user_config_path()?)?;
     if let Some(pos) = config
@@ -652,6 +669,7 @@ pub fn remove_cache_mirror(url: &str) -> Result<()> {
     }
 }
 
+/// Sets the default registry URL in the user-specific configuration.
 pub fn set_default_registry(url: &str) -> Result<()> {
     let mut config = read_config_from_path(&get_user_config_path()?)?;
     config.default_registry = Some(Registry {
@@ -663,12 +681,14 @@ pub fn set_default_registry(url: &str) -> Result<()> {
     write_user_config(&config)
 }
 
+/// Sets the default registry in the user-specific configuration.
 pub fn set_user_default_registry(default_registry: Option<Registry>) -> Result<()> {
     let mut config = read_config_from_path(&get_user_config_path()?)?;
     config.default_registry = default_registry;
     write_user_config(&config)
 }
 
+/// Adds a registry URL to the list of added registries in the user-specific configuration.
 pub fn add_added_registry(url: &str) -> Result<()> {
     let mut config = read_config_from_path(&get_user_config_path()?)?;
     if config.added_registries.iter().any(|r| r.url == url) {
@@ -683,6 +703,7 @@ pub fn add_added_registry(url: &str) -> Result<()> {
     write_user_config(&config)
 }
 
+/// Removes an added registry by its handle or URL.
 pub fn remove_added_registry(handle_or_url: &str) -> Result<()> {
     let mut config = read_config_from_path(&get_user_config_path()?)?;
     if let Some(pos) = config
@@ -707,6 +728,7 @@ pub fn remove_added_registry(handle_or_url: &str) -> Result<()> {
     }
 }
 
+/// Reads the repository configuration from the specified database path.
 pub fn read_repo_config(db_path: &Path) -> Result<RepoConfig> {
     let config_path = db_path.join("repo.yaml");
     if !config_path.exists() {
@@ -719,10 +741,12 @@ pub fn read_repo_config(db_path: &Path) -> Result<RepoConfig> {
     Ok(config)
 }
 
+/// Reads the user-specific configuration.
 pub fn read_user_config() -> Result<Config> {
     read_config_from_path(&get_user_config_path()?)
 }
 
+/// Updates the global package versions in the user-specific configuration.
 pub fn update_global_versions(versions: HashMap<String, String>) -> Result<()> {
     let mut config = read_user_config()?;
     config.versions.extend(versions);

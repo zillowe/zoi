@@ -13,11 +13,14 @@ use std::env;
 use std::fs;
 use zoi_core::types::SourceType;
 
+/// A file in a repository that contains information about a package.
 #[derive(Debug, Deserialize)]
 struct RepoFile {
+    /// The package source or name.
     package: String,
 }
 
+/// Installs a package directly from a Git repository using its `zoi.yaml` or `zoi.lua`.
 pub fn run(
     repo_spec: &str,
     force: bool,
@@ -140,6 +143,7 @@ pub fn run(
     Ok(())
 }
 
+/// Parses a repository specification string into a provider and path.
 fn parse_repo_spec(spec: &str) -> Result<(String, String)> {
     if let Some((provider_alias, path)) = spec.split_once(':') {
         let provider = match provider_alias {
@@ -154,6 +158,7 @@ fn parse_repo_spec(spec: &str) -> Result<(String, String)> {
     }
 }
 
+/// Gets the URL for a file in a repository by checking common branches.
 fn get_repo_file_url(provider: &str, repo_path: &str, file_path: &str) -> Result<String> {
     let branches = ["main", "master"];
     let client = crate::pkg::utils::get_http_client()?;

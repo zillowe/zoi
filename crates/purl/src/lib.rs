@@ -1,3 +1,9 @@
+//! Package URL (PURL) resolution for Zoi.
+//!
+//! This crate implements the resolution of PURLs in the `pkg:zoi/` namespace.
+//! It allows Zoi to discover, resolve, and fetch package definitions from
+//! decentralized Git-backed registries.
+
 use anyhow::{Result, anyhow};
 use purl::GenericPurl;
 use serde::{Deserialize, Serialize};
@@ -5,60 +11,79 @@ use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 use zoi_core::types::MiniVulnerability;
 
-/// Manages Package URL (PURL) resolution for the Zoi ecosystem.
-///
-/// PURL (pkg:zoi/...) enables decentralized, human-readable identifiers
-/// that can be resolved to any Zoi registry globally. This module:
-/// - Fetches the "Central Database" of known registries.
-/// - Resolves PURL namespaces to specific Git-backed registries.
-/// - Dynamically fetches `.pkg.lua` definitions from Git providers (GitHub, GitLab, etc.).
-///
-/// This allows Zoi to install packages without requiring the user to
-/// manually add repositories first.
+/// Returns the default version ("1") for the central database.
 fn default_version() -> String {
     "1".to_string()
 }
 
+/// Returns the default revision ("1") for a package index.
 fn default_revision() -> String {
     "1".to_string()
 }
 
+/// Specification for the Central Registry Database.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CentralDbSpec {
+    /// Version of the database format.
     #[serde(default = "default_version")]
     pub version: String,
+    /// Map of registry handles to their connection information.
     #[serde(flatten)]
     pub registries: HashMap<String, RegistryInfo>,
 }
 
+/// Connection information for a Zoi package registry.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RegistryInfo {
+    /// Human-readable name of the registry.
     pub name: String,
+    /// Brief description of the registry's purpose or content.
     pub description: String,
+    /// URL to the Git repository containing the package definitions.
     pub git: String,
+    /// Branch name to use when fetching data from the Git repository.
     pub branch: String,
 }
 
+/// Index entry for a specific package in a registry.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PurlPackageIndex {
+    /// Repository path within the registry (e.g., "base", "extra").
     pub repo: String,
+    /// Type of the repository.
     pub repo_type: String,
+    /// Latest version of the package.
     pub version: String,
+    /// Revision of the package version.
     #[serde(default = "default_revision")]
     pub revision: String,
+    /// Brief description of the package.
     pub description: String,
+    /// List of sub-packages included in this package.
     pub sub_packages: Vec<String>,
+    /// List of main sub-packages.
     pub main_sub_packages: Vec<String>,
+    /// Known vulnerabilities for this package.
     pub vuln: Vec<MiniVulnerability>,
+    /// Dependencies required by this package.
     pub dependencies: Option<zoi_core::types::Dependencies>,
 }
 
+/// The full index of a Zoi registry.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RegistryIndex {
+    /// Version of the registry index format.
     pub version: String,
+    /// Map of package identifiers to their index entries.
     pub packages: BTreeMap<String, PurlPackageIndex>,
 }
 
+/// Fetches the central Zoi registry database from a remote URL or local file.
+///
+/// The URL can be overridden by the `ZOI_PURL_DB_URL` environment variable.
+///
+/// # Errors
+/// Returns an error if the database cannot be fetched, verified, or parsed.
 pub fn fetch_central_db() -> Result<HashMap<String, RegistryInfo>> {
     let url = std::env::var("ZOI_PURL_DB_URL")
         .unwrap_or_else(|_| "https://zillowe.pages.dev/zoi/registries.json".to_string());
@@ -87,6 +112,12 @@ pub fn fetch_central_db() -> Result<HashMap<String, RegistryInfo>> {
     Ok(spec.registries)
 }
 
+/// Constructs a raw content URL for a file in a Git repository.
+///
+/// Supports GitHub, GitLab, and Codeberg.
+///
+/// # Errors
+/// Returns an error if the Git provider is unsupported.
 pub fn construct_raw_url(git_url: &str, branch: &str, file_path: &str) -> Result<String> {
     let url = git_url.trim_end_matches(".git").trim_end_matches('/');
 
@@ -113,6 +144,10 @@ pub fn construct_raw_url(git_url: &str, branch: &str, file_path: &str) -> Result
     }
 }
 
+/// Fetches the `packages.json` index from a specific registry.
+///
+/// # Errors
+/// Returns an error if the index cannot be fetched or parsed.
 pub fn fetch_registry_index(registry: &RegistryInfo) -> Result<RegistryIndex> {
     let data = if !registry.git.starts_with("http") {
         let path = Path::new(&registry.git).join("packages.json");
@@ -141,6 +176,10 @@ pub fn fetch_registry_index(registry: &RegistryInfo) -> Result<RegistryIndex> {
     Ok(serde_json::from_slice(&data)?)
 }
 
+/// Fetches the `.pkg.lua` definition for a package from a registry.
+///
+/// # Errors
+/// Returns an error if the file cannot be fetched or read.
 pub fn fetch_package_lua(registry: &RegistryInfo, repo: &str, name: &str) -> Result<String> {
     let file_path = if repo.is_empty() {
         format!("{}/{}.pkg.lua", name, name)
@@ -170,16 +209,29 @@ pub fn fetch_package_lua(registry: &RegistryInfo, repo: &str, name: &str) -> Res
     Ok(response.text()?)
 }
 
+/// Details of a successfully resolved PURL.
 #[derive(Debug)]
 pub struct ResolvedPurl {
+    /// The handle of the registry where the package was found.
     pub registry_handle: String,
+    /// Connection info for the registry.
     pub registry: RegistryInfo,
+    /// Path to the package within the registry.
     pub package_path: String,
+    /// Index entry for the package.
     pub package_info: PurlPackageIndex,
+    /// The specific version resolved.
     pub version: String,
+    /// The full registry index.
     pub index: RegistryIndex,
 }
 
+/// Resolves a Zoi PURL string to its registry and package information.
+///
+/// Expected format: `pkg:zoi/[registry-handle]/[repo]/[package]`
+///
+/// # Errors
+/// Returns an error if the PURL is invalid, unsupported, or cannot be found in the registry.
 pub fn resolve_purl(purl_str: &str) -> Result<ResolvedPurl> {
     let purl: GenericPurl<String> = purl_str
         .parse()
@@ -246,6 +298,10 @@ pub fn resolve_purl(purl_str: &str) -> Result<ResolvedPurl> {
     })
 }
 
+/// Fetches a package and all its Zoi dependencies by PURL and stores them locally.
+///
+/// # Errors
+/// Returns an error if resolution, fetching, or local storage fails.
 pub fn fetch_and_store_purl_package(purl_str: &str) -> Result<String> {
     let resolved = resolve_purl(purl_str)?;
     let db_root = zoi_core::utils::get_db_root()?;
@@ -268,6 +324,10 @@ pub fn fetch_and_store_purl_package(purl_str: &str) -> Result<String> {
     Ok(ident)
 }
 
+/// Recursively fetches and stores package definitions.
+///
+/// # Errors
+/// Returns an error if fetching or writing to disk fails.
 fn fetch_and_store_recursive(
     registry_handle: &str,
     registry: &RegistryInfo,

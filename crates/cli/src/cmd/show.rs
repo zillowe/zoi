@@ -1,9 +1,12 @@
+//! Logic for the `show` command.
+
 use crate::pkg::{local, resolve, types};
 use crate::utils;
 use anyhow::{Result, anyhow};
 use colored::*;
 use std::fs;
 
+/// Prints a dependency group with the specified indentation.
 fn print_dependency_group(group: &types::DependencyGroup, indent: usize) {
     let prefix = " ".repeat(indent * 2);
     let mut count = 0;
@@ -56,6 +59,10 @@ fn print_dependency_group(group: &types::DependencyGroup, indent: usize) {
     }
 }
 
+/// Displays detailed information about a package.
+///
+/// This command fetches and parses the package definition (possibly from a PURL),
+/// and prints metadata such as description, version, dependencies, and installation status.
 pub fn run(source: &str, raw: bool, purl: bool) -> Result<()> {
     let mut source_str = source.trim().to_string();
     if purl {
@@ -106,6 +113,7 @@ pub fn run(source: &str, raw: bool, purl: bool) -> Result<()> {
     Ok(())
 }
 
+/// Finds the installed manifest for a package request.
 fn find_installed_manifest(
     request: &crate::pkg::resolve::PackageRequest,
 ) -> Result<Option<types::InstallManifest>> {
@@ -132,6 +140,7 @@ fn find_installed_manifest(
     ))
 }
 
+/// Prints the package information in a beautiful format.
 fn print_beautiful(
     pkg: &crate::pkg::types::Package,
     installed_manifest: Option<&types::InstallManifest>,

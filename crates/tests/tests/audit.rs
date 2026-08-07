@@ -1,3 +1,5 @@
+//! Integration tests for the Zoi audit log and hash chain verification.
+
 use chrono::Utc;
 use std::fs;
 use tempfile::tempdir;

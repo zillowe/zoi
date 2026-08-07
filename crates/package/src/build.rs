@@ -1,12 +1,13 @@
-/// Orchestrates the Zoi package build process.
-///
-/// This module is responsible for turning a `.pkg.lua` definition into a
-/// distributable `.zpa` archive. It:
-/// - Executes the `prepare()`, `build()`, and `package()` Lua functions.
-/// - Manages the staging area where files are organized into Zoi's data structure.
-/// - Generates accompanying metadata: `.hash` (SHA-512), `.size`, and `.files`.
-/// - Supports native builds, Docker-based builds, and cross-compilation via CI tags.
-/// - Handles optional PGP signing of the resulting archive.
+//! Orchestrates the Zoi package build process.
+//!
+//! This module is responsible for turning a `.pkg.lua` definition into a
+//! distributable `.zpa` archive. It:
+//! - Executes the `prepare()`, `build()`, and `package()` Lua functions.
+//! - Manages the staging area where files are organized into Zoi's data structure.
+//! - Generates accompanying metadata: `.hash` (SHA-512), `.size`, and `.files`.
+//! - Supports native builds, Docker-based builds, and cross-compilation via CI tags.
+//! - Handles optional PGP signing of the resulting archive.
+
 use anyhow::{Result, anyhow};
 use colored::*;
 use mlua::{Lua, LuaSerdeExt, Table};
@@ -25,6 +26,7 @@ use zoi_resolver::resolve;
 use zstd::stream::read::Decoder as ZstdDecoder;
 use zstd::stream::write::Encoder as ZstdEncoder;
 
+/// Resolves the build type to use based on requested type and supported types.
 pub fn resolve_build_type(
     requested: Option<&str>,
     supported: &[String],
@@ -53,6 +55,7 @@ pub fn resolve_build_type(
     }
 }
 
+/// Retrieves build-time dependencies for a package on a specific platform.
 pub fn get_build_dependencies(
     package_file: &Path,
     build_type: Option<&str>,
@@ -94,6 +97,7 @@ pub fn get_build_dependencies(
     Ok(None)
 }
 
+/// Retrieves test-time dependencies for a package on a specific platform.
 pub fn get_test_dependencies(
     package_file: &Path,
     platform: &str,
@@ -121,6 +125,7 @@ pub fn get_test_dependencies(
     Ok(None)
 }
 
+/// Recursively collects dependencies from a dependency group without prompting the user.
 fn collect_deps_from_group_no_prompt(group: &types::DependencyGroup, deps: &mut Vec<String>) {
     match group {
         types::DependencyGroup::Simple(d) => {
@@ -145,6 +150,7 @@ fn collect_deps_from_group_no_prompt(group: &types::DependencyGroup, deps: &mut 
     }
 }
 
+/// Processes build operations defined in the Lua environment and stages them into the target directory.
 fn process_build_operations(
     lua: &Lua,
     _sub_package: &str,
@@ -361,6 +367,7 @@ fn process_build_operations(
     Ok(())
 }
 
+/// Core implementation of the build process for a single platform.
 fn build_for_platform(
     package_file: &Path,
     build_type: Option<&str>,
@@ -813,6 +820,7 @@ fn build_for_platform(
     Ok(())
 }
 
+/// Executes the build process for one or more platforms.
 pub fn run(
     package_file: &Path,
     build_type: Option<&str>,

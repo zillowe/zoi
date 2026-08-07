@@ -1,7 +1,10 @@
+//! Implementation of the `create` command for scaffolding new applications from templates.
+
 use crate::pkg;
 use anyhow::Result;
 use clap::Parser;
 
+/// Arguments for the `create` command.
 #[derive(Parser)]
 pub struct CreateCommand {
     /// The source of the package (name, @repo/name, path to .pkg.lua, or URL)
@@ -10,6 +13,7 @@ pub struct CreateCommand {
     pub app_name: Option<String>,
 }
 
+/// Runs the `create` command.
 pub fn run(
     args: CreateCommand,
     yes: bool,

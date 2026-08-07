@@ -1,3 +1,5 @@
+//! Tests for Zoi internal helper functions.
+
 use std::io::Write;
 use std::path::PathBuf;
 use zoi::pkg::helper;

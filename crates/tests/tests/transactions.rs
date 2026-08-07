@@ -1,3 +1,5 @@
+//! Integration tests for package transaction management and atomicity.
+
 use std::fs;
 use tempfile::tempdir;
 use zoi::pkg::resolve;

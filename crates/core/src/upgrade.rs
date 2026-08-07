@@ -15,14 +15,19 @@ use tempfile::Builder;
 use zip::ZipArchive;
 use zstd::stream::read::Decoder as ZstdDecoder;
 
+/// The GitLab project path for the Zoi repository.
 const GITLAB_PROJECT_PATH: &str = "zillowe/zillwen/zusty/zoi";
+/// The GitLab project ID for the Zoi repository.
 const GITLAB_PROJECT_ID: &str = "71087662";
 
+/// Represents a release from the GitLab API.
 #[derive(Debug, Deserialize)]
 struct GitLabRelease {
+    /// The tag name of the release.
     tag_name: String,
 }
 
+/// Fetches the latest tag from GitLab for a given branch prefix.
 fn get_latest_tag(branch_prefix: &str) -> Result<String> {
     println!("Fetching latest release information from GitLab...");
     let api_url = format!(
@@ -49,6 +54,7 @@ fn get_latest_tag(branch_prefix: &str) -> Result<String> {
     Ok(latest_tag)
 }
 
+/// Downloads a file from a URL to a local path with a progress bar.
 fn download_file(url: &str, path: &Path) -> Result<()> {
     let mut response = reqwest::blocking::get(url)?;
     if !response.status().is_success() {
@@ -80,6 +86,7 @@ fn download_file(url: &str, path: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Extracts a zip or zstd-compressed tar archive to a target directory.
 fn extract_archive(archive_path: &Path, target_dir: &Path) -> Result<()> {
     println!("Extracting binary...");
     let file = File::open(archive_path)?;
@@ -95,6 +102,7 @@ fn extract_archive(archive_path: &Path, target_dir: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Verifies the SHA-512 checksum of a file against expected content.
 fn verify_checksum(file_path: &Path, checksums_content: &str, filename: &str) -> Result<()> {
     println!("Verifying checksum for {}...", filename);
     let expected_hash = checksums_content
@@ -125,6 +133,7 @@ fn verify_checksum(file_path: &Path, checksums_content: &str, filename: &str) ->
     Ok(())
 }
 
+/// Returns the current platform's OS and architecture labels used in release filenames.
 fn get_platform_info() -> Result<(&'static str, &'static str)> {
     let os = match env::consts::OS {
         "linux" => "linux",
@@ -140,6 +149,7 @@ fn get_platform_info() -> Result<(&'static str, &'static str)> {
     Ok((os, arch))
 }
 
+/// Performs a full upgrade by downloading the entire binary archive.
 fn fallback_full_upgrade(
     base_url: &str,
     checksums_content: &str,
@@ -168,6 +178,7 @@ fn fallback_full_upgrade(
     Ok((new_binary_path, temp_dir))
 }
 
+/// Attempts a delta upgrade by downloading a bsdiff patch.
 fn try_delta_upgrade(
     base_url: &str,
     checksums_content: &str,
@@ -220,6 +231,7 @@ fn try_delta_upgrade(
     Ok((new_binary_path, temp_dir))
 }
 
+/// Runs the upgrade process for Zoi.
 pub fn run(
     branch: &str,
     status: &str,

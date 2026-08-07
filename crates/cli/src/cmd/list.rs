@@ -1,8 +1,14 @@
+//! Command for listing installed or available packages.
+//!
+//! This module provides functionality to list packages based on various
+//! filters like registry, repository, package type, and outdated status.
+
 use crate::pkg::{config, local, types};
 use anyhow::{Result, anyhow};
 use comfy_table::{Attribute, Cell, Color, ContentArrangement, Table, presets::UTF8_FULL};
 use std::collections::HashSet;
 
+/// Runs the list command with the provided filters and options.
 pub fn run(
     all: bool,
     outdated: bool,
@@ -41,6 +47,7 @@ pub fn run(
     Ok(())
 }
 
+/// Lists outdated packages.
 fn run_list_outdated(
     registry_filter: Option<String>,
     repo_filter: Option<String>,
@@ -134,6 +141,7 @@ fn run_list_outdated(
     Ok(())
 }
 
+/// Lists installed packages.
 fn run_list_installed(
     registry_filter: Option<String>,
     repo_filter: Option<String>,
@@ -320,6 +328,7 @@ fn run_list_installed(
     Ok(())
 }
 
+/// Lists package names for completion or simple output.
 fn run_list_names(
     all: bool,
     registry_filter: Option<String>,
@@ -427,6 +436,7 @@ fn run_list_names(
     Ok(())
 }
 
+/// Lists all available packages from all active registries.
 fn run_list_all(
     registry_filter: Option<String>,
     repo_filter: Option<String>,

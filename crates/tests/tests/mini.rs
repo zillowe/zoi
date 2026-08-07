@@ -1,3 +1,5 @@
+//! Integration tests for mini registry index parsing and vulnerability checks.
+
 use std::fs;
 use zoi::pkg::mini_resolve::{MiniPackageIndex, MiniRegistryIndex, check_vulnerabilities};
 
@@ -58,10 +60,13 @@ fn test_mini_vulnerability_check() {
 
 #[test]
 fn test_is_mini_mode() {
+    // SAFETY: This is a single-threaded test environment.
     unsafe { std::env::set_var("ZOI_MINI_MODE", "1") };
     assert!(zoi::utils::is_mini_mode());
+    // SAFETY: This is a single-threaded test environment.
     unsafe { std::env::set_var("ZOI_MINI_MODE", "0") };
     assert!(!zoi::utils::is_mini_mode());
+    // SAFETY: This is a single-threaded test environment.
     unsafe { std::env::remove_var("ZOI_MINI_MODE") };
 }
 

@@ -1,3 +1,5 @@
+//! Tests for project configuration deserialization and management.
+
 use zoi::project::config;
 
 #[test]

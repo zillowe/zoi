@@ -1,3 +1,5 @@
+//! Utility functions for the Zoi CLI.
+
 use crate::pkg::types::Scope;
 use anyhow::anyhow;
 use colored::*;
@@ -8,10 +10,12 @@ use std::io::{Write, stdin, stdout};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+/// Prints information with a key and value.
 pub fn print_info<T: Display>(key: &str, value: T) {
     println!("{}: {}", key, value);
 }
 
+/// Formats a version summary with branch, status, and number.
 pub fn format_version_summary(branch: &str, status: &str, number: &str) -> String {
     let branch_short = if branch == "Production" {
         "Prod."
@@ -32,6 +36,7 @@ pub fn format_version_summary(branch: &str, status: &str, number: &str) -> Strin
     )
 }
 
+/// Formats a full version string including the commit hash.
 pub fn format_version_full(branch: &str, status: &str, number: &str, commit: &str) -> String {
     format!(
         "{} {}",
@@ -40,11 +45,13 @@ pub fn format_version_full(branch: &str, status: &str, number: &str, commit: &st
     )
 }
 
+/// Prints information aligned with a fixed width for the key.
 pub fn print_aligned_info(key: &str, value: &str) {
     let key_with_colon = format!("{}:", key);
     println!("{:<18}{}", key_with_colon.cyan(), value);
 }
 
+/// Prints a warning if the package is from a non-standard repository.
 pub fn print_repo_warning(repo_name: &str) {
     if crate::pkg::utils::is_mini_mode() {
         if let Ok(index) = crate::pkg::mini_resolve::fetch_registry_index()
@@ -101,6 +108,7 @@ pub fn print_repo_warning(repo_name: &str) {
     }
 }
 
+/// Gets all packages for shell completion.
 pub fn get_all_packages_for_completion() -> Vec<PackageCompletion> {
     let mut completions = Vec::new();
     let config = if let Ok(cfg) = crate::pkg::config::read_config() {
@@ -151,12 +159,17 @@ pub fn get_all_packages_for_completion() -> Vec<PackageCompletion> {
     completions
 }
 
+/// Represents a package completion entry.
 pub struct PackageCompletion {
+    /// The display name for the completion.
     pub display: String,
+    /// The repository name.
     pub repo: String,
+    /// The package description.
     pub description: String,
 }
 
+/// Creates a symlink to a file, replacing any existing file or symlink.
 pub fn symlink_file(target: &Path, link: &Path) -> std::io::Result<()> {
     if link.exists() || link.is_symlink() {
         fs::remove_file(link)?;
@@ -177,6 +190,7 @@ pub fn symlink_file(target: &Path, link: &Path) -> std::io::Result<()> {
     }
 }
 
+/// Checks if the current process has administrative or root privileges.
 pub fn is_admin() -> bool {
     #[cfg(windows)]
     {
@@ -222,6 +236,7 @@ pub fn is_admin() -> bool {
     }
 }
 
+/// Checks the license of a package and prints warnings if it's not OSI-approved or has issues.
 pub fn check_license(license: &str) {
     if license.is_empty() {
         println!(
@@ -277,6 +292,7 @@ pub fn check_license(license: &str) {
     }
 }
 
+/// Asks the user for confirmation with a prompt.
 pub fn ask_for_confirmation(prompt: &str, yes: bool) -> bool {
     if yes {
         return true;
@@ -295,6 +311,7 @@ pub fn ask_for_confirmation(prompt: &str, yes: bool) -> bool {
     input.trim().eq_ignore_ascii_case("y")
 }
 
+/// Sets up the PATH environment variable for the given scope.
 pub fn setup_path(scope: Scope) -> anyhow::Result<()> {
     if scope == Scope::Project {
         return Ok(());
@@ -466,6 +483,7 @@ set paths = [ ~/.zoi/pkgs/bin $paths... ]
     Ok(())
 }
 
+/// Checks if the Zoi bin directory is in the current PATH and prints a warning if not.
 pub fn check_path() {
     if let Some(home) = crate::pkg::utils::get_user_home() {
         let zoi_bin_dir = crate::pkg::sysroot::apply_sysroot(home.join(".zoi/pkgs/bin"));

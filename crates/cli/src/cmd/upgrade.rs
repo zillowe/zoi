@@ -1,7 +1,10 @@
+//! Logic for the `upgrade` command.
+
 use crate::pkg;
 use anyhow::Result;
 use colored::*;
 
+/// Run the upgrade command.
 pub fn run(
     branch: &str,
     status: &str,

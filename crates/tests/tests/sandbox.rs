@@ -1,3 +1,5 @@
+//! Integration tests for Linux-specific sandboxing.
+
 #![cfg(target_os = "linux")]
 use anyhow::Result;
 use std::path::Path;
@@ -120,6 +122,7 @@ fn test_sandbox_env_passthrough() -> Result<()> {
         return Ok(());
     }
 
+    // SAFETY: This is a test environment where we ensure thread safety.
     unsafe {
         std::env::set_var("ZOI_TEST_SECRET_ENV", "my_secret_value");
     }
@@ -143,6 +146,7 @@ fn test_sandbox_env_passthrough() -> Result<()> {
 
     assert!(stdout.contains("ZOI_TEST_SECRET_ENV=my_secret_value"));
 
+    // SAFETY: Cleaning up the environment variable in a test.
     unsafe {
         std::env::remove_var("ZOI_TEST_SECRET_ENV");
     }

@@ -1,8 +1,11 @@
+//! Logic for the `tree` command.
+
 use crate::pkg::install::resolver;
 use anyhow::{Result, anyhow};
 use colored::*;
 use std::collections::HashSet;
 
+/// Runs the `tree` command to display the dependency tree of one or more packages.
 pub fn run(package_names: &[String]) -> Result<()> {
     if package_names.is_empty() {
         println!("{}", "Please specify at least one package name.".yellow());
@@ -51,6 +54,7 @@ pub fn run(package_names: &[String]) -> Result<()> {
     Ok(())
 }
 
+/// Recursively prints a node in the dependency tree.
 fn print_node(
     graph: &resolver::DependencyGraph,
     pkg_id: &str,

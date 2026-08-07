@@ -1,3 +1,5 @@
+//! Integration tests for local package installation and resolution.
+
 use std::path::PathBuf;
 use tempfile::tempdir;
 use zoi::pkg::{install, types};

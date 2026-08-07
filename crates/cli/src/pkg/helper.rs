@@ -1,3 +1,6 @@
+//! Helper functions for package installation and uninstallation,
+//! including elevated operations and validation.
+
 use crate::pkg::{
     install::{manifest, resolver::InstallNode},
     local, types,
@@ -9,6 +12,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
+/// Installs a package with elevated privileges.
 pub fn elevate_install_node(cmd: &crate::cmd::helper::ElevateInstallNodeCommand) -> Result<()> {
     let content = std::fs::read_to_string(&cmd.node_json)?;
     let node: InstallNode = serde_json::from_str(&content)?;
@@ -52,6 +56,7 @@ pub fn elevate_install_node(cmd: &crate::cmd::helper::ElevateInstallNodeCommand)
     Ok(())
 }
 
+/// Uninstalls a package with elevated privileges.
 pub fn elevate_uninstall(cmd: &crate::cmd::helper::ElevateUninstallCommand) -> Result<()> {
     let content = std::fs::read_to_string(&cmd.manifest_json)?;
     let manifest: types::InstallManifest = serde_json::from_str(&content)?;
@@ -231,11 +236,15 @@ pub fn elevate_uninstall(cmd: &crate::cmd::helper::ElevateUninstallCommand) -> R
     Ok(())
 }
 
+/// Supported hash types for file verification.
 pub enum HashType {
+    /// SHA-512 hash.
     Sha512,
+    /// SHA-256 hash.
     Sha256,
 }
 
+/// Updates a digest from a reader.
 fn update_digest_from_reader<R: Read, D: Digest>(reader: &mut R, hasher: &mut D) -> Result<()> {
     let mut buffer = [0; 8192];
     loop {
@@ -248,6 +257,7 @@ fn update_digest_from_reader<R: Read, D: Digest>(reader: &mut R, hasher: &mut D)
     Ok(())
 }
 
+/// Calculates the hash of a file or remote URL.
 pub fn get_hash(source: &str, hash_type: HashType) -> Result<String> {
     let mut hasher_sha512 = Sha512::new();
     let mut hasher_sha256 = Sha256::new();
@@ -289,11 +299,13 @@ pub fn get_hash(source: &str, hash_type: HashType) -> Result<String> {
     Ok(hash)
 }
 
+/// Validation utilities for Zoi specification files.
 pub mod validate {
     use anyhow::{Result, anyhow};
     use colored::Colorize;
     use std::path::Path;
 
+    /// Validates a Zoi specification file (e.g., registries.json, repo.yaml).
     pub fn run(file: &Path) -> Result<()> {
         if !file.exists() {
             return Err(anyhow!("File does not exist: {}", file.display()));

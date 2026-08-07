@@ -1,3 +1,5 @@
+//! Integration tests for project task execution and runner logic.
+
 use std::fs;
 use tempfile::tempdir;
 use zoi::project::{config, runner};

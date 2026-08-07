@@ -11,9 +11,13 @@ use std::io::{self};
 use std::path::PathBuf;
 
 // Development, Special, Public or Production
+/// The release branch of the current build.
 const BRANCH: &str = "Production";
+/// The release status of the current build.
 const STATUS: &str = "Release";
+/// The version number of the current build.
 const NUMBER: &str = "1.24.7";
+/// Help text for package source identifiers.
 const PKG_SOURCE_HELP: &str = "Package identifier (e.g. @repo/name, #git@repo/name, path, or URL)";
 
 /// Zoi - The Advanced Package Manager & Environment Orchestrator.
@@ -27,9 +31,11 @@ const PKG_SOURCE_HELP: &str = "Package identifier (e.g. @repo/name, #git@repo/na
     arg_required_else_help = true,
 )]
 pub struct Cli {
+    /// The subcommand to execute.
     #[command(subcommand)]
     command: Option<Commands>,
 
+    /// Print detailed version information.
     #[arg(
         short = 'v',
         long = "version",
@@ -37,6 +43,7 @@ pub struct Cli {
     )]
     version_flag: bool,
 
+    /// Automatically answer yes to all prompts.
     #[arg(
         short = 'y',
         long,
@@ -45,6 +52,7 @@ pub struct Cli {
     )]
     yes: bool,
 
+    /// Operate on a different root directory.
     #[arg(
         long = "root",
         help = "Operate on a different root directory",
@@ -53,6 +61,7 @@ pub struct Cli {
     )]
     pub root: Option<std::path::PathBuf>,
 
+    /// Do not attempt to connect to the network.
     #[arg(
         long = "offline",
         help = "Do not attempt to connect to the network",
@@ -60,28 +69,38 @@ pub struct Cli {
     )]
     pub offline: bool,
 
+    /// Additional directory to search for .zpa archives.
     #[arg(
         long = "pkg-dir",
         help = "Additional directory to search for .zpa archives",
         global = true,
         value_hint = ValueHint::DirPath
     )]
+    /// Additional directory to search for .zpa archives.
     pub pkg_dirs: Vec<std::path::PathBuf>,
 }
 
+/// The target scope for system-level operations.
 #[derive(clap::ValueEnum, Clone, Debug, Copy, PartialEq, Eq)]
 pub enum SetupScope {
+    /// The current user's scope.
     User,
+    /// The system-wide scope.
     System,
 }
 
+/// The target scope for package installation.
 #[derive(clap::ValueEnum, Clone, Debug, Copy)]
 pub enum InstallScope {
+    /// The current user's scope.
     User,
+    /// The system-wide scope.
     System,
+    /// The current project's scope.
     Project,
 }
 
+/// The available subcommands for Zoi.
 #[derive(Subcommand)]
 enum Commands {
     /// Generates shell completion scripts
@@ -156,6 +175,7 @@ enum Commands {
         long_about = "Clones the official package database from GitLab to your local machine (~/.zoi/pkgs/db). If the database already exists, it verifies the remote URL and pulls the latest changes."
     )]
     Sync {
+        /// The sync subcommand to execute.
         #[command(subcommand)]
         command: Option<SyncCommands>,
 
@@ -222,6 +242,7 @@ enum Commands {
 
     /// Shows detailed information about a package
     Show {
+        /// The package identifier.
         #[arg(value_name = "ALL_PACKAGES", help = PKG_SOURCE_HELP)]
         package_name: String,
         /// Display the raw, unformatted package file
@@ -234,6 +255,7 @@ enum Commands {
 
     /// Pin a package to a specific version
     Pin {
+        /// The package identifier.
         #[arg(value_name = "INST_PACKAGES", help = PKG_SOURCE_HELP)]
         package: String,
         /// The version to pin the package to
@@ -248,12 +270,14 @@ enum Commands {
 
     /// Visualize the dependency tree of a package
     Tree {
+        /// The package identifier(s).
         #[arg(value_name = "ALL_PACKAGES", required = true, help = PKG_SOURCE_HELP)]
         packages: Vec<String>,
     },
 
     /// Unpin a package, allowing it to be updated
     Unpin {
+        /// The package identifier.
         #[arg(value_name = "INST_PACKAGES", help = PKG_SOURCE_HELP)]
         package: String,
     },
@@ -265,6 +289,7 @@ enum Commands {
         group(clap::ArgGroup::new("mode").required(true).args(["as_dependency", "as_explicit"]))
     )]
     Mark {
+        /// The package identifier(s).
         #[arg(value_name = "INST_PACKAGES", required = true, help = PKG_SOURCE_HELP)]
         packages: Vec<String>,
 
@@ -284,6 +309,7 @@ enum Commands {
         group(clap::ArgGroup::new("target").required(true).args(["package_names", "all"]))
     )]
     Update {
+        /// The package names to update.
         #[arg(value_name = "INST_PACKAGES", help = PKG_SOURCE_HELP)]
         package_names: Vec<String>,
 
@@ -308,6 +334,7 @@ enum Commands {
     /// Installs one or more packages from a name, local file, URL, or git repository
     #[command(aliases = ["i", "in", "add"])]
     Install {
+        /// The package source identifier(s).
         #[arg(value_name = "ALL_SOURCES", help = PKG_SOURCE_HELP)]
         sources: Vec<String>,
         /// Install from a git repository (e.g. 'Zillowe/Hello', 'gl:Zillowe/Hello')
@@ -385,6 +412,7 @@ enum Commands {
         long_about = "Removes one or more packages' files from the Zoi store and deletes their symlinks from the bin directory. This command will fail if a package was not installed by Zoi."
     )]
     Uninstall {
+        /// The package identifier(s).
         #[arg(value_name = "INST_PACKAGES", required = true, help = PKG_SOURCE_HELP)]
         packages: Vec<String>,
         /// The scope to uninstall the package from
@@ -482,6 +510,7 @@ enum Commands {
 
     /// Explains why a package is installed
     Why {
+        /// The package identifier.
         #[arg(value_name = "INST_PACKAGES", help = PKG_SOURCE_HELP)]
         package_name: String,
     },
@@ -496,6 +525,7 @@ enum Commands {
 
     /// List all files owned by a package
     Files {
+        /// The package identifier.
         #[arg(value_name = "INST_PACKAGES", help = PKG_SOURCE_HELP)]
         package: String,
     },
@@ -581,6 +611,7 @@ enum Commands {
         long_about = "Resolves a package and its dependencies, installs them if needed, then runs the requested binary directly. By default runs the first binary the package provides. Uses bwrap for sandboxed packages."
     )]
     Exec {
+        /// The package source identifier.
         #[arg(value_name = "ALL_SOURCES", help = PKG_SOURCE_HELP)]
         source: String,
 
@@ -616,6 +647,7 @@ enum Commands {
 
     /// Manage Zoi's local cache
     Cache {
+        /// The cache subcommand to execute.
         #[command(subcommand)]
         command: CacheCommands,
     },
@@ -623,6 +655,7 @@ enum Commands {
     /// Inspect recorded transactions
     #[command(alias = "tx")]
     Transaction {
+        /// The transaction subcommand to execute.
         #[command(subcommand)]
         command: TransactionCommands,
     },
@@ -649,12 +682,14 @@ enum Commands {
         long_about = "Manage opt-in anonymous telemetry used to understand package popularity. Default is disabled."
     )]
     Telemetry {
+        /// The telemetry action to perform.
         #[arg(value_enum)]
         action: TelemetryAction,
     },
 
     /// Create an application using a package template
     Create {
+        /// The package source identifier.
         #[arg(value_name = "ALL_SOURCES", help = PKG_SOURCE_HELP)]
         source: String,
         /// The application name to substitute into template commands
@@ -667,6 +702,7 @@ enum Commands {
         long_about = "Interactively choose and install an older version of a package from the local store or archive cache. This is useful if a recent update has introduced bugs or compatibility issues."
     )]
     Downgrade {
+        /// The package identifier.
         #[arg(value_name = "INST_PACKAGES", help = PKG_SOURCE_HELP)]
         package: String,
     },
@@ -677,6 +713,7 @@ enum Commands {
 
     /// Rollback a package to the previously installed version
     Rollback {
+        /// The package identifier.
         #[arg(value_name = "INST_PACKAGES", required_unless_present = "last_transaction", help = PKG_SOURCE_HELP)]
         package: Option<String>,
 
@@ -687,6 +724,7 @@ enum Commands {
 
     /// Shows a package's manual
     Man {
+        /// The package identifier.
         #[arg(value_name = "ALL_PACKAGES", help = PKG_SOURCE_HELP)]
         package_name: String,
         /// Always look at the upstream manual even if it's downloaded
@@ -726,16 +764,20 @@ enum Commands {
         repo: Option<String>,
     },
 
+    /// Execute an external subcommand.
     #[command(external_subcommand)]
     External(Vec<String>),
 }
 
+/// The extension management command.
 #[derive(clap::Parser, Debug)]
 pub struct ExtensionCommand {
+    /// The extension subcommand to execute.
     #[command(subcommand)]
     pub command: ExtensionCommands,
 }
 
+/// The available extension subcommands.
 #[derive(clap::Subcommand, Debug)]
 pub enum ExtensionCommands {
     /// Add an extension
@@ -752,6 +794,7 @@ pub enum ExtensionCommands {
     },
 }
 
+/// The available sync subcommands.
 #[derive(clap::Subcommand, Clone)]
 pub enum SyncCommands {
     /// Add a new registry
@@ -774,6 +817,7 @@ pub enum SyncCommands {
     },
 }
 
+/// The available cache management subcommands.
 #[derive(clap::Subcommand)]
 pub enum CacheCommands {
     /// Add package archive(s) to the local cache
@@ -794,11 +838,13 @@ pub enum CacheCommands {
     List,
     /// Manage cache mirrors used for archive downloads
     Mirror {
+        /// The cache mirror subcommand to execute.
         #[command(subcommand)]
         command: CacheMirrorCommands,
     },
 }
 
+/// The available cache mirror management subcommands.
 #[derive(clap::Subcommand)]
 pub enum CacheMirrorCommands {
     /// Add a cache mirror base URL
@@ -816,6 +862,7 @@ pub enum CacheMirrorCommands {
     List,
 }
 
+/// The available transaction management subcommands.
 #[derive(clap::Subcommand)]
 pub enum TransactionCommands {
     /// List known transaction logs
@@ -833,13 +880,18 @@ pub enum TransactionCommands {
     },
 }
 
+/// The available actions for telemetry.
 #[derive(clap::ValueEnum, Clone)]
 enum TelemetryAction {
+    /// Show the current telemetry status.
     Status,
+    /// Enable anonymous telemetry.
     Enable,
+    /// Disable anonymous telemetry.
     Disable,
 }
 
+/// The main entry point for the Zoi CLI.
 pub fn run() -> anyhow::Result<()> {
     let styles = styling::Styles::styled()
         .header(styling::AnsiColor::Yellow.on_default() | styling::Effects::BOLD)

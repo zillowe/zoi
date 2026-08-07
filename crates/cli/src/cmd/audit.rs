@@ -1,9 +1,11 @@
+//! The audit command checks for vulnerabilities in installed or available packages.
 use crate::pkg::{config, db, local, types};
 use anyhow::Result;
 use colored::*;
 use comfy_table::{Attribute, Cell, ContentArrangement, Table, presets::UTF8_FULL};
 use semver::{Version, VersionReq};
 
+/// Executes the audit command.
 pub fn run(all: bool, registry_filter: Option<String>, repo_filter: Option<String>) -> Result<()> {
     if !all {
         println!(
@@ -104,6 +106,7 @@ pub fn run(all: bool, registry_filter: Option<String>, repo_filter: Option<Strin
     Ok(())
 }
 
+/// Prints a table of all matching advisories.
 fn print_advisories_table(advisories: Vec<(types::Advisory, String, String)>) -> Result<()> {
     let mut table = Table::new();
     table
@@ -149,6 +152,7 @@ fn print_advisories_table(advisories: Vec<(types::Advisory, String, String)>) ->
     Ok(())
 }
 
+/// Prints a table of vulnerabilities found in installed packages.
 fn print_vulnerable_table(
     vulnerable: Vec<(types::Advisory, types::InstallManifest)>,
 ) -> Result<()> {

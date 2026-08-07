@@ -1,8 +1,14 @@
+//! Command for displaying system and configuration information.
+
 use crate::pkg;
 use crate::utils;
 use anyhow::Result;
 use colored::*;
 
+/// Runs the 'info' command.
+///
+/// Displays detailed information about the system, platform,
+/// package managers, and Zoi configuration.
 pub fn run(branch: &str, status: &str, number: &str, commit: &str) -> Result<()> {
     let _branch_short = if branch == "Production" {
         "Prod."

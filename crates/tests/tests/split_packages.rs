@@ -1,3 +1,5 @@
+//! Integration tests for split package resolution and installation.
+
 use std::path::PathBuf;
 use tempfile::tempdir;
 use zoi::pkg::{config, db, install, resolve, types};

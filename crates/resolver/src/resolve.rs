@@ -1,3 +1,9 @@
+//! Main dependency resolution logic.
+//!
+//! This module implements the core resolution algorithm for Zoi, handling
+//! various source types (registries, local files, URLs, Git repositories)
+//! and version specifications.
+
 use anyhow::{Result, anyhow};
 use colored::*;
 use comfy_table::{Table, presets::UTF8_FULL};
@@ -13,40 +19,60 @@ use walkdir::WalkDir;
 use zoi_core::types::SourceType;
 use zoi_core::{cache, config, pin, types};
 
+/// Represents a source that has been resolved to a local path.
 #[derive(Debug)]
 pub struct ResolvedSource {
+    /// The path to the resolved `.pkg.lua` or manifest file.
     pub path: PathBuf,
+    /// The type of the source.
     pub source_type: SourceType,
+    /// The name of the repository, if applicable.
     pub repo_name: Option<String>,
+    /// The type of the repository (e.g., official, unofficial).
     pub repo_type: Option<String>,
+    /// The handle of the registry.
     pub registry_handle: Option<String>,
+    /// An optional sharable manifest associated with the source.
     pub sharable_manifest: Option<types::SharableInstallManifest>,
+    /// The Git SHA if the source is from a Git repository.
     pub git_sha: Option<String>,
 }
 
+/// Represents a request for a package, parsed from a source string.
 #[derive(Debug, Default)]
 pub struct PackageRequest {
+    /// The registry handle (e.g., 'zoidberg').
     pub handle: Option<String>,
+    /// The repository name (e.g., 'core').
     pub repo: Option<String>,
+    /// The name of the package.
     pub name: String,
+    /// The sub-package name, if any.
     pub sub_package: Option<String>,
+    /// The version or channel specification.
     pub version_spec: Option<String>,
 }
 
 use std::sync::LazyLock;
 use std::sync::Mutex;
 
+/// Regex for parsing the registry handle from a source string.
 static HANDLE_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^(?:#(?P<handle>[^@]+))?(?P<main_part>.*)$")
         .expect("Static HANDLE_RE regex is valid")
 });
+
+/// Regex for parsing the repository, package name, and version from a source string.
 static MAIN_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^@?(?P<repo_and_name>[^@]+)(?:@(?P<version>.+))?$")
         .expect("Static MAIN_RE regex is valid")
 });
+
+/// A set of untrusted sources that have been confirmed by the user in the current session.
 static CONFIRMED_UNTRUSTED_SOURCES: LazyLock<Mutex<std::collections::HashSet<String>>> =
     LazyLock::new(|| Mutex::new(std::collections::HashSet::new()));
 
+/// Splits a source string that explicitly points to a file into its components.
 fn split_explicit_file_source(source_str: &str) -> Option<(&str, Option<String>, Option<String>)> {
     let (main_part, version_spec) = if let Some((base, version)) = source_str.rsplit_once('@') {
         let base_path = if let Some((path, sub)) = base.rsplit_once(':') {
@@ -103,10 +129,12 @@ fn split_explicit_file_source(source_str: &str) -> Option<(&str, Option<String>,
     }
 }
 
+/// Returns the original source or the path part if available.
 fn download_source_for_explicit_path<'a>(source: &'a str, path_part: Option<&'a str>) -> &'a str {
     path_part.unwrap_or(source)
 }
 
+/// Returns the HEAD SHA of a local Git repository.
 fn get_git_head_sha(repo_path: &Path) -> Option<String> {
     let repo = git2::Repository::open(repo_path).ok()?;
     let head = repo.head().ok()?;
@@ -114,6 +142,7 @@ fn get_git_head_sha(repo_path: &Path) -> Option<String> {
     Some(target.to_string())
 }
 
+/// Returns the root directory of the package database.
 pub fn get_db_root() -> Result<PathBuf> {
     if let Ok(path) = std::env::var("ZOI_DB_DIR") {
         return Ok(PathBuf::from(path));
@@ -131,12 +160,14 @@ pub fn get_db_root() -> Result<PathBuf> {
     zoi_core::utils::get_db_base_dir(zoi_core::types::Scope::User)
 }
 
+/// Returns the root directory of the package database on the host system.
 pub fn get_host_db_root() -> Result<PathBuf> {
     let home_dir = zoi_core::utils::get_user_home()
         .ok_or_else(|| anyhow!("Could not find home directory."))?;
     Ok(home_dir.join(".zoi").join("pkgs").join("db"))
 }
 
+/// Parses a source string into a `PackageRequest`.
 pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
     if let Some((path_part, sub_package_from_path, version_spec)) =
         split_explicit_file_source(source_str)
@@ -218,6 +249,7 @@ pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
     })
 }
 
+/// Searches for a package in the synced package database.
 fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedSource> {
     let db_root = get_db_root()?;
     let config = config::read_config()?;
@@ -357,6 +389,7 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
         search_repos
     };
 
+    /// Internal structure to hold metadata of a found package during resolution.
     struct FoundPackage {
         path: PathBuf,
         source_type: SourceType,
@@ -367,6 +400,7 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
         size: Option<u64>,
     }
 
+    /// Processes a `.pkg.lua` file to extract its metadata.
     fn process_found_package(
         path: PathBuf,
         repo_name: &str,
@@ -594,6 +628,7 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
     }
 }
 
+/// Downloads a package definition from a URL and caches it locally.
 fn download_from_url(url: &str) -> Result<ResolvedSource> {
     let (base_url, expected_hash) = if let Some((base, hash_part)) = url.split_once('#') {
         if hash_part.starts_with("sha256-") || hash_part.starts_with("sha512-") {
@@ -719,6 +754,7 @@ fn download_from_url(url: &str) -> Result<ResolvedSource> {
     })
 }
 
+/// Verifies the hash of the given content against a hash specification.
 fn verify_content_hash(content: &[u8], hash_spec: &str) -> Result<bool> {
     let (algo, expected_hex) = hash_spec
         .split_once('-')
@@ -740,6 +776,7 @@ fn verify_content_hash(content: &[u8], hash_spec: &str) -> Result<bool> {
     Ok(actual_hex.eq_ignore_ascii_case(expected_hex))
 }
 
+/// Downloads content from a URL as a string.
 fn download_content_from_url(url: &str) -> Result<String> {
     println!("Downloading from: {}", url.cyan());
     let client = zoi_core::utils::get_http_client()?;
@@ -783,6 +820,7 @@ fn download_content_from_url(url: &str) -> Result<String> {
     Ok(response.text()?)
 }
 
+/// Resolves a version from a JSON URL for a given channel.
 pub fn resolve_version_from_url(url: &str, channel: &str) -> Result<String> {
     println!(
         "Resolving version for channel '{}' from {}",
@@ -836,6 +874,7 @@ pub fn resolve_version_from_url(url: &str, channel: &str) -> Result<String> {
     ))
 }
 
+/// Resolves a channel name to a concrete version.
 pub fn resolve_channel(versions: &HashMap<String, String>, channel: &str) -> Result<String> {
     if let Some(url_or_version) = versions.get(channel) {
         if url_or_version.starts_with("http") {
@@ -848,6 +887,7 @@ pub fn resolve_channel(versions: &HashMap<String, String>, channel: &str) -> Res
     }
 }
 
+/// Returns the default version for a package.
 pub fn get_default_version(pkg: &types::Package, registry_handle: Option<&str>) -> Result<String> {
     if let Some(handle) = registry_handle {
         let source = format!("#{}@{}", handle, pkg.repo);
@@ -968,6 +1008,7 @@ pub fn get_default_version(pkg: &types::Package, registry_handle: Option<&str>) 
     ))
 }
 
+/// Returns the specific version to install based on a version specification.
 fn get_version_for_install(
     pkg: &types::Package,
     version_spec: &Option<String>,
@@ -999,6 +1040,7 @@ fn get_version_for_install(
     get_default_version(pkg, registry_handle)
 }
 
+/// Resolves the requested version specification from a source string.
 pub fn resolve_requested_version_spec(
     source_str: &str,
     scope: Option<types::Scope>,
@@ -1099,6 +1141,7 @@ pub fn resolve_source(
     Ok(resolved)
 }
 
+/// Resolves a package and its version from a source string.
 pub fn resolve_package_and_version(
     source_str: &str,
     scope: Option<types::Scope>,
@@ -1172,6 +1215,7 @@ pub fn resolve_package_and_version(
     ))
 }
 
+/// Recursively resolves a source identifier.
 fn resolve_source_recursive(
     source: &str,
     depth: u8,

@@ -1,3 +1,5 @@
+//! Implementation of the `downgrade` command for switching to older package versions.
+
 use crate::pkg::{cache, local, resolve, types};
 use anyhow::{Result, anyhow};
 use colored::*;
@@ -6,6 +8,7 @@ use semver::Version;
 use std::collections::HashSet;
 use std::fs;
 
+/// Runs the `downgrade` command to switch to an older version of a package.
 pub fn run(
     package_name: &str,
     yes: bool,

@@ -7,17 +7,25 @@ use zoi_core::types;
 
 use std::path::PathBuf;
 
+/// Details about a pre-built package available for download.
 #[derive(Clone)]
 pub struct PrebuiltDetails {
+    /// Information about the pre-built archive.
     pub info: types::PrebuiltInfo,
+    /// The size of the archive to be downloaded, in bytes.
     pub download_size: u64,
+    /// The estimated size of the package once installed, in bytes.
     pub installed_size: u64,
 }
 
+/// Represents the action to be taken for installing a package.
 #[derive(Clone)]
 pub enum InstallAction {
+    /// Download the pre-built archive and install it.
     DownloadAndInstall(PrebuiltDetails),
+    /// Install from a local archive file.
     InstallFromArchive(PathBuf),
+    /// Build the package from source and install it.
     BuildAndInstall,
 }
 
