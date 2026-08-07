@@ -22,6 +22,7 @@ use zoi_core::utils;
 use zoi_resolver::local;
 use zoi_resolver::resolve;
 
+/// Returns the root directory for binary shims for a given scope.
 fn get_bin_root(scope: Scope) -> Result<PathBuf> {
     match scope {
         Scope::User => {
@@ -45,6 +46,9 @@ fn get_bin_root(scope: Scope) -> Result<PathBuf> {
     }
 }
 
+/// Checks for broken symlinks in all binary shim directories.
+///
+/// Returns a list of paths to symlinks that point to non-existent locations.
 pub fn check_broken_symlinks() -> Result<Vec<PathBuf>> {
     let scopes = [Scope::User, Scope::System, Scope::Project];
 
@@ -75,6 +79,9 @@ pub fn check_broken_symlinks() -> Result<Vec<PathBuf>> {
     Ok(broken_links)
 }
 
+/// Checks if Zoi's binary directory is in the system PATH.
+///
+/// Returns a warning message if the directory is missing from PATH.
 pub fn check_path_configuration() -> Result<Option<String>> {
     if let Some(home) = utils::get_user_home() {
         let zoi_bin_dir = sysroot::apply_sysroot(home.join(".zoi").join("pkgs").join("bin"));
@@ -94,6 +101,9 @@ pub fn check_path_configuration() -> Result<Option<String>> {
     Ok(None)
 }
 
+/// Checks if any repositories are significantly out of date.
+///
+/// Returns a warning message if the default registry hasn't been synced in over a week.
 pub fn check_outdated_repos() -> Result<Option<String>> {
     let db_root = sysroot::apply_sysroot(resolve::get_db_root()?);
     let config = config::read_config()?;
@@ -124,6 +134,9 @@ pub fn check_outdated_repos() -> Result<Option<String>> {
     Ok(None)
 }
 
+/// Finds packages that are defined in multiple registries.
+///
+/// Returns a list of package IDs and the registries they are defined in.
 pub fn check_duplicate_packages() -> Result<Vec<(String, Vec<String>)>> {
     let db_root = sysroot::apply_sysroot(resolve::get_db_root()?);
     if !db_root.exists() {
@@ -168,6 +181,9 @@ pub fn check_duplicate_packages() -> Result<Vec<(String, Vec<String>)>> {
     Ok(duplicates)
 }
 
+/// Checks if PGP keys required by security policy are present in the keyring.
+///
+/// Returns a list of missing key fingerprints.
 pub fn check_pgp_configuration() -> Result<Vec<String>> {
     let config = config::read_config()?;
     let mut missing_keys = Vec::new();
@@ -191,6 +207,9 @@ pub fn check_pgp_configuration() -> Result<Vec<String>> {
     Ok(missing_keys)
 }
 
+/// Validates that all packages recorded in the lockfile are actually installed.
+///
+/// Returns a list of names for missing packages.
 pub fn validate_lockfile_integrity() -> Result<Vec<String>> {
     let recorded_packages = recorder::get_recorded_packages()?;
 
@@ -239,6 +258,9 @@ pub fn validate_lockfile_integrity() -> Result<Vec<String>> {
     Ok(missing_packages)
 }
 
+/// Finds orphaned packages (dependencies no longer required by any package).
+///
+/// Returns a list of names for orphaned packages.
 pub fn check_orphaned_packages() -> Result<Vec<String>> {
     let all_installed = local::get_installed_packages()?;
 
@@ -275,6 +297,9 @@ pub fn check_orphaned_packages() -> Result<Vec<String>> {
     Ok(orphaned)
 }
 
+/// Finds "ghost" dependent links (links from packages that are no longer installed).
+///
+/// Returns a list of (path, parent_id) pairs for stale dependent links.
 pub fn check_ghost_dependents() -> Result<Vec<(PathBuf, String)>> {
     let scopes = [Scope::User, Scope::System, Scope::Project];
     let mut ghost_links = Vec::new();
@@ -327,6 +352,7 @@ pub fn check_ghost_dependents() -> Result<Vec<(PathBuf, String)>> {
     Ok(ghost_links)
 }
 
+/// Removes stale dependent links identified by `check_ghost_dependents`.
 pub fn prune_ghost_dependents(ghost_links: &[(PathBuf, String)]) -> Result<()> {
     for (path, _) in ghost_links {
         fs::remove_file(path)?;
@@ -334,11 +360,15 @@ pub fn prune_ghost_dependents(ghost_links: &[(PathBuf, String)]) -> Result<()> {
     Ok(())
 }
 
+/// Result of checking for external tool dependencies.
 pub struct ToolCheckResult {
+    /// List of essential tools (e.g., git) that are missing.
     pub essential_missing: Vec<String>,
+    /// List of recommended tools (e.g., bwrap) that are missing.
     pub recommended_missing: Vec<String>,
 }
 
+/// Checks if essential and recommended external tools are available in PATH.
 pub fn check_external_tools() -> ToolCheckResult {
     let mut essential_missing = Vec::new();
     let mut recommended_missing = Vec::new();

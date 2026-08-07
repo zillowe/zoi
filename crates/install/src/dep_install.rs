@@ -1,3 +1,5 @@
+//! Dependency installation logic.
+
 use anyhow::{Result, anyhow};
 use colored::*;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -201,6 +203,7 @@ pub fn install_dependency(
     }
 }
 
+/// Installs a dependency from the Arch User Repository (AUR).
 fn install_aur_dependency(dep: &Dependency, yes: bool) -> Result<()> {
     if !utils::command_exists("git") {
         return Err(anyhow!(
@@ -246,6 +249,7 @@ fn install_aur_dependency(dep: &Dependency, yes: bool) -> Result<()> {
     Ok(())
 }
 
+/// Installs a Zoi-native dependency.
 fn install_zoi_dependency(
     dep: &Dependency,
     parent_id: &str,

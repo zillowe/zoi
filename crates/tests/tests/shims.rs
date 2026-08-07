@@ -1,3 +1,5 @@
+//! Integration tests for package shim generation and management.
+
 use std::fs;
 use tempfile::tempdir;
 use zoi::pkg::plugin::PluginManager;

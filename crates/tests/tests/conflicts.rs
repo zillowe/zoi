@@ -1,3 +1,5 @@
+//! Integration tests for package conflict detection and resolution.
+
 use std::fs;
 use tempfile::tempdir;
 use zoi::pkg::install::util::get_conflicts_from_list;

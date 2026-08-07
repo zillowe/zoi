@@ -1,3 +1,5 @@
+//! Integration tests for user experience (UX) helpers and source classification.
+
 use zoi::cmd::ux::{InstallOrigin, classify_source_origin, with_failure_hint};
 
 #[test]

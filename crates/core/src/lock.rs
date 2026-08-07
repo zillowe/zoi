@@ -5,6 +5,7 @@ use std::fs;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 
+/// Returns the path to the system-wide lock file.
 fn get_lock_path() -> Result<PathBuf> {
     let home_dir =
         crate::utils::get_user_home().ok_or_else(|| anyhow!("Could not find home directory."))?;
@@ -80,6 +81,7 @@ pub fn acquire_lock() -> Result<LockGuard> {
     })
 }
 
+/// Releases the system-wide lock if it exists.
 pub fn release_lock() -> Result<()> {
     let lock_path = get_lock_path()?;
     if lock_path.exists() {
@@ -88,12 +90,16 @@ pub fn release_lock() -> Result<()> {
     Ok(())
 }
 
+/// A guard that releases the system-wide lock when dropped.
 pub struct LockGuard {
+    /// The path to the lock file.
     path: Option<PathBuf>,
+    /// The file handle holding the lock.
     _file: Option<fs::File>,
 }
 
 impl LockGuard {
+    /// Creates a no-op lock guard that does not hold any lock.
     pub fn noop() -> Self {
         Self {
             path: None,

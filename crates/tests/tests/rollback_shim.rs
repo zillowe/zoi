@@ -1,3 +1,5 @@
+//! Integration tests for shim-related rollback operations.
+
 use std::fs;
 use tempfile::tempdir;
 use zoi::pkg::{local, shim, transaction, types};

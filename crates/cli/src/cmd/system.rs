@@ -1,3 +1,8 @@
+//! Logic for the `system` command.
+//!
+//! This module provides commands for managing ZoiOS systems, including declarative
+//! configuration, system generations, secrets management, and distribution building.
+
 use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
 use colored::*;
@@ -10,12 +15,15 @@ use zoi_system::client::send_request;
 #[cfg(unix)]
 use zoi_system::protocol::{Request, Response};
 
+/// The root system management command.
 #[derive(Parser, Debug)]
 pub struct SystemCommand {
+    /// The specific system subcommand to execute.
     #[command(subcommand)]
     pub command: SystemSubcommands,
 }
 
+/// Available system subcommands.
 #[derive(Subcommand, Debug)]
 pub enum SystemSubcommands {
     /// Apply a declarative system configuration from system.lua
@@ -35,16 +43,19 @@ pub enum SystemSubcommands {
     },
     /// Manage secrets (hashes and encrypted strings)
     Secret {
+        /// Secret subcommands.
         #[command(subcommand)]
         command: SecretSubcommands,
     },
     /// Commands for building and managing ZoiOS distributions
     Distro {
+        /// Distro subcommands.
         #[command(subcommand)]
         command: DistroSubcommands,
     },
 }
 
+/// Commands for building and managing ZoiOS distributions.
 #[derive(Subcommand, Debug)]
 pub enum DistroSubcommands {
     /// Build a new ZoiOS distribution image or install to a disk
@@ -72,6 +83,7 @@ pub enum DistroSubcommands {
     },
 }
 
+/// Commands for managing secrets like password hashes and encrypted strings.
 #[derive(Subcommand, Debug)]
 pub enum SecretSubcommands {
     /// Generate a one-way hash of a password for use in system.lua
@@ -91,6 +103,7 @@ pub enum SecretSubcommands {
     },
 }
 
+/// Run the system management command.
 pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
     let is_secret = matches!(args.command, SystemSubcommands::Secret { .. });
     let is_distro = matches!(args.command, SystemSubcommands::Distro { .. });
@@ -534,10 +547,12 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
     Ok(())
 }
 
+/// Prints a summary of the system build plan.
 fn print_build_summary(target: &str, config: &zoi_system::config::SystemConfig, dry_run: bool) {
     use comfy_table::modifiers::UTF8_ROUND_CORNERS;
     use comfy_table::presets::UTF8_FULL_CONDENSED;
     use comfy_table::{Cell, Color, Table};
+
 
     println!("\n{}", " ZoiOS Build Plan ".bold().on_blue().white());
     if dry_run {
@@ -622,6 +637,7 @@ fn print_build_summary(target: &str, config: &zoi_system::config::SystemConfig, 
     println!("{}\n", pkg_list);
 }
 
+/// Handles the response from the system daemon.
 #[cfg(unix)]
 fn handle_response(response: Response) -> Result<()> {
     match response {

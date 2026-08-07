@@ -1,6 +1,9 @@
+//! Utility functions for CLI commands.
+
 use crate::pkg::{local, resolve};
 use anyhow::Result;
 
+/// Expands split packages into their individual sub-packages if they are installed.
 pub fn expand_split_packages(package_names: &[String], action: &str) -> Result<Vec<String>> {
     let mut expanded_names = Vec::new();
     let installed_packages = local::get_installed_packages()?;

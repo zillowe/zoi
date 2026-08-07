@@ -1,3 +1,5 @@
+//! Integration tests for CLI argument parsing and versioning.
+
 use clap::CommandFactory;
 use zoi::cli::Cli;
 

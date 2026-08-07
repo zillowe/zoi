@@ -38,6 +38,10 @@ pub fn ensure_builtin_keys() -> Result<()> {
     Ok(())
 }
 
+/// Returns a human-readable string representing the status of a PGP certificate.
+///
+/// The status can be "Valid", "Revoked", "Expired", or "Invalid" with additional details
+/// like expiration dates where applicable.
 pub fn get_cert_status(cert: &Cert) -> String {
     let policy = StandardPolicy::new();
     let now = SystemTime::now();
@@ -64,6 +68,10 @@ pub fn get_cert_status(cert: &Cert) -> String {
     }
 }
 
+/// Validates a PGP certificate, checking for revocation and expiration.
+///
+/// Returns `Ok(())` if the certificate is valid, or an error if it is revoked,
+/// expired, or otherwise invalid under the standard policy.
 pub fn validate_cert(cert: &Cert) -> Result<()> {
     let policy = StandardPolicy::new();
     let now = SystemTime::now();
@@ -87,6 +95,9 @@ pub fn validate_cert(cert: &Cert) -> Result<()> {
     }
 }
 
+/// Returns the path to the local PGP keyring directory.
+///
+/// This usually resides at `~/.zoi/pgps/`. The directory is created if it does not exist.
 pub fn get_pgp_dir() -> Result<PathBuf> {
     let home_dir =
         crate::utils::get_user_home().ok_or_else(|| anyhow!("Could not find home directory."))?;
@@ -95,6 +106,10 @@ pub fn get_pgp_dir() -> Result<PathBuf> {
     Ok(pgp_dir)
 }
 
+/// Adds a PGP key from a byte slice to the local keyring.
+///
+/// The key is saved as `<name>.asc` in the PGP directory. If a key with the same name
+/// exists but has different content, it will be overwritten (with a warning if `quiet` is false).
 pub fn add_key_from_bytes(key_bytes: &[u8], name: &str, quiet: bool) -> Result<()> {
     let pgp_dir = get_pgp_dir()?;
     let dest_path = pgp_dir.join(format!("{}.asc", name));
@@ -124,6 +139,10 @@ pub fn add_key_from_bytes(key_bytes: &[u8], name: &str, quiet: bool) -> Result<(
     Ok(())
 }
 
+/// Imports a PGP key from a file path into the local keyring.
+///
+/// If `name` is provided, it is used as the key's name in the store.
+/// Otherwise, the file stem of the path is used.
 pub fn add_key_from_path(path: &str, name: Option<&str>, quiet: bool) -> Result<()> {
     let key_path = Path::new(path);
     if !key_path.exists() {
@@ -148,6 +167,9 @@ pub fn add_key_from_path(path: &str, name: Option<&str>, quiet: bool) -> Result<
     add_key_from_bytes(&key_bytes, key_name, quiet)
 }
 
+/// Fetches a PGP key from a keyserver by fingerprint and adds it to the local keyring.
+///
+/// Currently uses `keys.openpgp.org` as the keyserver.
 pub fn add_key_from_fingerprint(fingerprint: &str, name: &str, quiet: bool) -> Result<()> {
     let url = format!(
         "https://keys.openpgp.org/vks/v1/by-fingerprint/{}",
@@ -182,6 +204,7 @@ pub fn add_key_from_fingerprint(fingerprint: &str, name: &str, quiet: bool) -> R
     add_key_from_bytes(&key_bytes, name, quiet)
 }
 
+/// Downloads a PGP key from a URL and adds it to the local keyring.
 pub fn add_key_from_url(url: &str, name: &str, quiet: bool) -> Result<()> {
     if !quiet {
         println!(
@@ -213,6 +236,7 @@ pub fn add_key_from_url(url: &str, name: &str, quiet: bool) -> Result<()> {
     add_key_from_bytes(&key_bytes, name, quiet)
 }
 
+/// Removes a PGP key from the local keyring by its name.
 pub fn remove_key_by_name(name: &str) -> Result<()> {
     let pgp_dir = get_pgp_dir()?;
     let key_path = pgp_dir.join(format!("{}.asc", name));
@@ -227,6 +251,7 @@ pub fn remove_key_by_name(name: &str) -> Result<()> {
     Ok(())
 }
 
+/// Searches for and removes a PGP key from the local keyring by its fingerprint.
 pub fn remove_key_by_fingerprint(fingerprint: &str) -> Result<()> {
     let pgp_dir = get_pgp_dir()?;
     let fingerprint_upper = fingerprint.to_uppercase();
@@ -252,6 +277,7 @@ pub fn remove_key_by_fingerprint(fingerprint: &str) -> Result<()> {
     Err(anyhow!("Key with fingerprint '{}' not found.", fingerprint))
 }
 
+/// Prints a formatted list of all PGP keys stored in the local keyring.
 pub fn list_keys() -> Result<()> {
     let keys = get_all_local_keys_info()?;
 
@@ -291,6 +317,7 @@ pub fn list_keys() -> Result<()> {
     Ok(())
 }
 
+/// Searches for PGP keys in the local keyring by name, fingerprint, or UserID (name/email).
 pub fn search_keys(term: &str) -> Result<()> {
     let keys = get_all_local_keys_info()?;
     let term_lower = term.to_lowercase();
@@ -371,6 +398,7 @@ pub fn search_keys(term: &str) -> Result<()> {
     Ok(())
 }
 
+/// Prints the ASCII-armored content of a PGP key from the local keyring.
 pub fn show_key(name: &str) -> Result<()> {
     let pgp_dir = get_pgp_dir()?;
     let key_path = pgp_dir.join(format!("{}.asc", name));
@@ -385,11 +413,15 @@ pub fn show_key(name: &str) -> Result<()> {
     Ok(())
 }
 
+/// A structure holding a PGP key's name and its parsed certificate.
 pub struct KeyInfo {
+    /// The name of the key (usually its filename without extension).
     pub name: String,
+    /// The parsed PGP certificate.
     pub cert: Cert,
 }
 
+/// Retrieves information for all PGP keys stored in the local keyring.
 pub fn get_all_local_keys_info() -> Result<Vec<KeyInfo>> {
     let pgp_dir = get_pgp_dir()?;
     let mut keys = Vec::new();
@@ -416,6 +448,7 @@ pub fn get_all_local_keys_info() -> Result<Vec<KeyInfo>> {
     Ok(keys)
 }
 
+/// Retrieves all PGP certificates stored in the local keyring.
 pub fn get_all_local_certs() -> Result<Vec<Cert>> {
     let pgp_dir = get_pgp_dir()?;
     let mut certs = Vec::new();
@@ -441,7 +474,9 @@ use sequoia_openpgp::{
     parse::stream::{DetachedVerifierBuilder, MessageLayer, MessageStructure, VerificationHelper},
 };
 
+/// A Sequoia verification helper that allows verification against multiple trusted certificates.
 struct MultiCertHelper {
+    /// The list of trusted certificates to use for verification.
     certs: Vec<Cert>,
 }
 
@@ -473,7 +508,9 @@ impl VerificationHelper for MultiCertHelper {
     }
 }
 
+/// A Sequoia verification helper that allows verification against a single trusted certificate.
 struct OneCertHelper {
+    /// The trusted certificate to use for verification.
     cert: Cert,
 }
 
@@ -499,6 +536,7 @@ impl VerificationHelper for OneCertHelper {
     }
 }
 
+/// A CLI-friendly wrapper for verifying a file's signature using a named key from the local keyring.
 pub fn cli_verify_signature(file_path: &str, sig_path: &str, key_name: &str) -> Result<()> {
     println!(
         "Verifying {} with signature {} using key '{}'",
@@ -519,6 +557,7 @@ pub fn cli_verify_signature(file_path: &str, sig_path: &str, key_name: &str) -> 
     Ok(())
 }
 
+/// Verifies a detached PGP signature for a file using a specific certificate.
 pub fn verify_detached_signature(
     data_path: &Path,
     signature_path: &Path,
@@ -529,6 +568,7 @@ pub fn verify_detached_signature(
     verify_detached_signature_raw(&data, &signature, cert)
 }
 
+/// Verifies a detached PGP signature for raw data using a specific certificate.
 pub fn verify_detached_signature_raw(data: &[u8], signature: &[u8], cert: &Cert) -> Result<()> {
     let policy = &StandardPolicy::new();
     let helper = OneCertHelper { cert: cert.clone() };
@@ -541,6 +581,10 @@ pub fn verify_detached_signature_raw(data: &[u8], signature: &[u8], cert: &Cert)
     Ok(())
 }
 
+/// Signs a file using GnuPG.
+///
+/// This function calls the external `gpg` command to create a detached signature.
+/// It can take an optional `GPG_PASSWORD` environment variable for password-protected keys.
 pub fn sign_detached(data_path: &Path, signature_path: &Path, key_id: &str) -> Result<()> {
     if !crate::utils::command_exists("gpg") {
         return Err(anyhow!(
@@ -604,6 +648,7 @@ pub fn sign_detached(data_path: &Path, signature_path: &Path, key_id: &str) -> R
     Ok(())
 }
 
+/// Resolves a list of names or fingerprints to PGP certificates from the local keyring.
 pub fn get_certs_by_name_or_fingerprint(identifiers: &[String]) -> Result<Vec<Cert>> {
     let all_keys = get_all_local_keys_info()?;
     let mut found_certs = Vec::new();
@@ -629,6 +674,9 @@ pub fn get_certs_by_name_or_fingerprint(identifiers: &[String]) -> Result<Vec<Ce
     Ok(found_certs)
 }
 
+/// Verifies a detached PGP signature for a file against a set of trusted certificates.
+///
+/// Returns `Ok(())` if at least one trusted certificate successfully verifies the signature.
 pub fn verify_detached_signature_multi_key(
     data_path: &Path,
     signature_path: &Path,

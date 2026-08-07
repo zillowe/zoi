@@ -1,1 +1,4 @@
-// This crate exists to house integration tests for the Zoi workspace.
+//! Integration tests for the Zoi workspace.
+//!
+//! This crate exists solely to house integration tests.
+

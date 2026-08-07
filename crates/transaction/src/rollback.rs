@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use zoi_core::{sysroot, types, utils as core_utils};
 use zoi_resolver::{local, resolve};
 
+/// Rolls back a package to its previous version.
 pub fn run(package_name: &str, yes: bool) -> Result<()> {
     println!("Attempting to roll back '{}'...", package_name.cyan());
 
@@ -177,6 +178,7 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
     Ok(())
 }
 
+/// Returns the binary installation directory for a given scope.
 fn get_bin_root(scope: types::Scope) -> Result<PathBuf> {
     match scope {
         types::Scope::User => {
@@ -200,6 +202,7 @@ fn get_bin_root(scope: types::Scope) -> Result<PathBuf> {
     }
 }
 
+/// Ensures a shim or binary entry exists at the given path.
 fn create_shim(path: &std::path::Path) -> Result<()> {
     if cfg!(target_os = "windows") {
         let binary_path = path.with_extension("exe");

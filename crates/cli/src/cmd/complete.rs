@@ -1,8 +1,11 @@
+//! Implementation of the `complete` command for shell autocompletion.
+
 use crate::utils;
 use anyhow::Result;
 use clap_complete::Shell;
 use zoi_resolver::local;
 
+/// Runs the `complete` command to provide shell autocompletion suggestions.
 pub fn run(shell: Shell, index: usize, words: Vec<String>) -> Result<()> {
     if index <= 1 {
         return Ok(());

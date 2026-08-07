@@ -1,3 +1,5 @@
+//! Utilities for selecting from multiple installed versions of a package.
+
 use crate::pkg::{db, local, types};
 use anyhow::{Result, anyhow};
 use colored::*;
@@ -5,12 +7,16 @@ use comfy_table::{Table, presets::UTF8_FULL};
 use dialoguer::{Select, theme::ColorfulTheme};
 use std::collections::HashMap;
 
+/// Represents a package candidate for display in the selection UI.
 #[derive(Clone)]
 struct CandidateDisplay {
+    /// The manifest of the installed package.
     manifest: types::InstallManifest,
+    /// The description of the package.
     description: String,
 }
 
+/// Returns a human-readable label for a package scope.
 fn scope_label(scope: types::Scope) -> &'static str {
     match scope {
         types::Scope::User => "user",
@@ -19,6 +25,7 @@ fn scope_label(scope: types::Scope) -> &'static str {
     }
 }
 
+/// Looks up descriptions for all locally registered packages.
 fn lookup_descriptions() -> HashMap<(String, String, Option<String>, &'static str, String), String>
 {
     let mut descriptions = HashMap::new();
@@ -37,6 +44,7 @@ fn lookup_descriptions() -> HashMap<(String, String, Option<String>, &'static st
     descriptions
 }
 
+/// Builds a list of display objects for the given package candidates.
 fn build_candidate_displays(candidates: &[types::InstallManifest]) -> Vec<CandidateDisplay> {
     let descriptions = lookup_descriptions();
     candidates
@@ -74,6 +82,7 @@ fn build_candidate_displays(candidates: &[types::InstallManifest]) -> Vec<Candid
         .collect()
 }
 
+/// Prompts the user to select an installed manifest from a list of candidates.
 pub fn choose_installed_manifest(
     package_name: &str,
     candidates: &[types::InstallManifest],

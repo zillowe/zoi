@@ -1,6 +1,14 @@
+//! Linux isolation using Bubblewrap.
+//!
+//! This module provides a way to run Zoi package builds inside a
+//! Bubblewrap (`bwrap`) sandbox on Linux. This ensures that the build
+//! process is isolated from the host system and has restricted access
+//! to the filesystem and network.
+
 use anyhow::{Result, anyhow};
 use std::path::Path;
 
+/// Runs the package build process inside a Bubblewrap sandbox.
 pub fn run(
     package_file: &Path,
     build_type: Option<&str>,

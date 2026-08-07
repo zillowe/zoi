@@ -1,3 +1,5 @@
+//! Integration tests for security advisory management and checking.
+
 use tempfile::tempdir;
 use zoi::pkg::{db, types};
 

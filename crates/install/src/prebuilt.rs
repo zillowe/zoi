@@ -8,6 +8,13 @@ use zoi_deps as dependencies;
 
 use std::path::PathBuf;
 
+/// Builds a package archive from source.
+///
+/// This function:
+/// 1. Resolves the appropriate build type for the current platform.
+/// 2. Resolves and installs any required build-time dependencies.
+/// 3. Spawns a build thread to execute the build process defined in the `.pkg.lua`.
+/// 4. Returns the path to the resulting `.zpa` (Zoi Package Archive) file.
 pub fn build_archive(
     pkg_lua_path: &std::path::Path,
     pkg: &types::Package,

@@ -1,6 +1,12 @@
+//! Running tests for packages.
+
 use super::build;
 use anyhow::Result;
 
+/// Runs tests for a package.
+///
+/// This command builds the package and runs its defined tests.
+/// If `install_deps` is set, it will also install necessary build dependencies.
 pub fn run(args: build::BuildCommand) -> Result<()> {
     if args.install_deps {
         build::install_dependencies_for_build(&args, true)?;

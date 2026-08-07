@@ -1,3 +1,8 @@
+//! File download utilities with progress reporting for the Lua environment.
+//!
+//! This module provides functions to download files from URLs, including
+//! support for progress bars and hash verification of downloaded files.
+
 use colored::*;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::fs;
@@ -5,6 +10,7 @@ use std::io::{Read, Write};
 use std::path::Path;
 use zoi_core::utils;
 
+/// Downloads a file from the given URL to the destination path with a progress bar.
 pub fn download_with_progress(url: &str, dest_path: &Path, quiet: bool) -> Result<(), mlua::Error> {
     if url.starts_with("http://") && !quiet {
         println!(
@@ -86,6 +92,7 @@ pub fn download_with_progress(url: &str, dest_path: &Path, quiet: bool) -> Resul
     Ok(())
 }
 
+/// Registers the `UTILS.DOWNLOAD` function in the Lua environment.
 pub fn add_download_util(lua: &mlua::Lua, quiet: bool) -> Result<(), mlua::Error> {
     let download_fn = lua.create_function(
         move |lua, (url, out_name, hash): (String, Option<String>, Option<String>)| {

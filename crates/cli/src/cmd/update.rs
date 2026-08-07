@@ -63,6 +63,7 @@ pub fn run(
     Ok(())
 }
 
+/// Logic for updating a single package.
 fn run_update_single_logic(
     package_name: &str,
     yes: bool,
@@ -423,6 +424,7 @@ fn run_update_single_logic(
     }
 }
 
+/// Logic for updating all installed packages.
 fn run_update_all_logic(
     yes: bool,
     dry_run: bool,
@@ -1076,6 +1078,7 @@ fn run_update_all_logic(
     Ok(())
 }
 
+/// Calculates the number of security advisories for a package at two different versions.
 fn advisory_counts(
     registry_handle: &str,
     package: &str,
@@ -1104,6 +1107,7 @@ fn advisory_counts(
     Ok((old_count, new_count))
 }
 
+/// Removes old versions of a package, keeping a limited number for potential rollbacks.
 fn cleanup_old_versions(
     package_name: &str,
     scope: types::Scope,

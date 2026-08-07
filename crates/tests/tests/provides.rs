@@ -1,3 +1,5 @@
+//! Integration tests for package "provides" functionality and virtual packages.
+
 use tempfile::tempdir;
 use zoi::pkg::{db, types};
 

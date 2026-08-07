@@ -2,10 +2,12 @@ use anyhow::{Result, anyhow};
 use std::fs;
 use zoi_core::types;
 
+/// Returns the path to the project's lockfile (`zoi.lock`).
 fn get_lockfile_path() -> Result<std::path::PathBuf> {
     Ok(std::env::current_dir()?.join("zoi.lock"))
 }
 
+/// Reads and parses a lockfile from the specified path.
 fn read_lockfile_from(path: &std::path::Path) -> Result<Option<types::ZoiLockV2>> {
     if !path.exists() {
         return Ok(None);
@@ -23,6 +25,7 @@ fn read_lockfile_from(path: &std::path::Path) -> Result<Option<types::ZoiLockV2>
     })
 }
 
+/// Checks if the lockfile is compatible with the current platform.
 fn is_lockfile_compatible(lockfile: &types::ZoiLockV2) -> bool {
     let current_platform = zoi_core::utils::get_platform().unwrap_or_default();
     if lockfile.installed_packages.is_empty() {
@@ -38,6 +41,7 @@ fn is_lockfile_compatible(lockfile: &types::ZoiLockV2) -> bool {
     })
 }
 
+/// Reads the project's `zoi.lock` file, falling back to platform-specific lockfiles if necessary.
 pub fn read_zoi_lock() -> Result<types::ZoiLockV2> {
     let path = get_lockfile_path()?;
 
@@ -65,6 +69,7 @@ pub fn read_zoi_lock() -> Result<types::ZoiLockV2> {
     })
 }
 
+/// Writes the project's lockfile to disk, updating hashes for the package store and registries.
 pub fn write_zoi_lock(lockfile: &mut types::ZoiLockV2) -> Result<()> {
     if zoi_core::frozen::is_frozen() {
         return Ok(());
@@ -95,17 +100,26 @@ pub fn write_zoi_lock(lockfile: &mut types::ZoiLockV2) -> Result<()> {
     Ok(())
 }
 
+/// Represents a package in a frozen lockfile state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FrozenLockPackage {
+    /// The package source string (e.g., `name@version`).
     pub source: String,
+    /// The specific revision or commit.
     pub revision: String,
+    /// Whether this was a direct project dependency.
     pub direct: bool,
+    /// List of enabled build/install options.
     pub chosen_options: Vec<String>,
+    /// List of enabled optional features.
     pub chosen_optionals: Vec<String>,
+    /// Dependencies for this frozen package.
     pub dependencies: Option<types::DependenciesV2>,
+    /// Optional Git SHA if applicable.
     pub git_sha: Option<String>,
 }
 
+/// Returns a list of all packages currently recorded in the lockfile.
 pub fn locked_packages(lockfile: &types::ZoiLockV2) -> Vec<FrozenLockPackage> {
     let mut packages = Vec::new();
 
@@ -125,6 +139,7 @@ pub fn locked_packages(lockfile: &types::ZoiLockV2) -> Vec<FrozenLockPackage> {
     packages
 }
 
+/// Returns a list of all package source strings from the lockfile.
 pub fn sources_from_lock(lockfile: &types::ZoiLockV2) -> Vec<String> {
     locked_packages(lockfile)
         .into_iter()

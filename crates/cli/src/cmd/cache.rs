@@ -1,9 +1,12 @@
+//! Implementation of the `cache` command for managing the local package cache.
+
 use crate::pkg::cache;
 use anyhow::{Result, anyhow};
 use colored::*;
 use std::fs;
 use std::path::PathBuf;
 
+/// Adds files to the local archive cache.
 pub fn add(files: &[PathBuf]) -> Result<()> {
     let archive_cache_root = cache::get_archive_cache_root()?;
     fs::create_dir_all(&archive_cache_root)?;
@@ -34,10 +37,12 @@ pub fn add(files: &[PathBuf]) -> Result<()> {
     Ok(())
 }
 
+/// Clears the local archive cache.
 pub fn clear(dry_run: bool) -> Result<()> {
     crate::cmd::clean::run(dry_run)
 }
 
+/// Lists files in the local archive cache.
 pub fn list() -> Result<()> {
     let archive_cache_root = cache::get_archive_cache_root()?;
     if !archive_cache_root.exists() {
@@ -78,18 +83,21 @@ Total: {} archives",
     Ok(())
 }
 
+/// Adds a new cache mirror URL.
 pub fn add_mirror(url: &str) -> Result<()> {
     crate::pkg::config::add_cache_mirror(url)?;
     println!("Added cache mirror '{}'.", url.cyan());
     Ok(())
 }
 
+/// Removes a cache mirror URL.
 pub fn remove_mirror(url: &str) -> Result<()> {
     crate::pkg::config::remove_cache_mirror(url)?;
     println!("Removed cache mirror '{}'.", url.cyan());
     Ok(())
 }
 
+/// Lists all configured cache mirror URLs.
 pub fn list_mirrors() -> Result<()> {
     let config = crate::pkg::config::read_config()?;
     if config.cache_mirrors.is_empty() {

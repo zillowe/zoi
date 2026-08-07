@@ -6,6 +6,11 @@ use walkdir::WalkDir;
 use zoi_core::hash::{HashAlgorithm, calculate_file_hash};
 use zoi_core::types::{MappedDir, MappedFile, MappedSymlink, PoolFileEntry, ScopeMapping};
 
+/// Deduplicates and pools files from a staging directory into a central pool.
+///
+/// This function walks the `virtual_staging_dir`, calculates hashes for all files,
+/// copies unique files to the `pool_dir`, and populates the `scope_mapping` with
+/// metadata (permissions, ownership, destinations) for files, directories, and symlinks.
 pub fn pool_files(
     virtual_staging_dir: &Path,
     pool_dir: &Path,

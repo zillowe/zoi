@@ -1,8 +1,14 @@
+//! Logic for the `sync` command.
+//!
+//! This module provides commands for syncing package databases from registries,
+//! and managing the list of configured registries.
+
 use crate::cli::SetupScope;
 use crate::pkg;
 use anyhow::Result;
 use colored::*;
 
+/// Run the sync command to update package databases.
 pub fn run(
     verbose: bool,
     fallback: bool,
@@ -31,6 +37,7 @@ pub fn run(
     Ok(())
 }
 
+/// Run a project-local sync command.
 pub fn run_local(verbose: bool, fallback: bool, force: bool, frozen: bool) -> Result<()> {
     if frozen {
         crate::pkg::frozen::set_frozen(true);
@@ -46,6 +53,7 @@ pub fn run_local(verbose: bool, fallback: bool, force: bool, frozen: bool) -> Re
     Ok(())
 }
 
+/// Set the default registry URL or use a pre-defined keyword.
 pub fn set_registry(url_or_keyword: &str) -> Result<()> {
     let url_storage;
     let url = match url_or_keyword {
@@ -65,6 +73,7 @@ pub fn set_registry(url_or_keyword: &str) -> Result<()> {
     Ok(())
 }
 
+/// Add a new registry URL to the list of tracked registries.
 pub fn add_registry(url: &str) -> Result<()> {
     let mut final_url = url.to_string();
     let path = std::path::Path::new(url);
@@ -78,12 +87,14 @@ pub fn add_registry(url: &str) -> Result<()> {
     Ok(())
 }
 
+/// Remove a registry by its handle or URL.
 pub fn remove_registry(handle: &str) -> Result<()> {
     pkg::config::remove_added_registry(handle)?;
     println!("Registry '{}' removed.", handle.cyan());
     Ok(())
 }
 
+/// List all configured and tracked registries.
 pub fn list_registries() -> Result<()> {
     let config = crate::pkg::config::read_config()?;
     let db_root = crate::pkg::resolve::get_db_root()?;
@@ -104,7 +115,10 @@ pub fn list_registries() -> Result<()> {
         } else {
             handle.cyan().to_string()
         };
-        println!("[Set] {}: {}{}", handle_str, default.url, desc);
+        println!("[Set] {}: {}{}", handle_str, default.url, default.url.cyan());
+        if !desc.is_empty() {
+            println!("      {}", desc.dimmed());
+        }
     } else {
         println!("[Set]: <not set>");
     }
@@ -125,7 +139,10 @@ pub fn list_registries() -> Result<()> {
             } else {
                 handle.cyan().to_string()
             };
-            println!("[Add] {}: {}{}", handle_str, reg.url, desc);
+            println!("[Add] {}: {}{}", handle_str, reg.url, reg.url.cyan());
+            if !desc.is_empty() {
+                println!("      {}", desc.dimmed());
+            }
         }
     }
     Ok(())

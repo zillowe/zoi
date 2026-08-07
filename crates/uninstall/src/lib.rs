@@ -1,3 +1,9 @@
+//! Uninstallation logic for Zoi packages.
+//!
+//! This crate handles the safe removal of packages, including cleaning up binaries,
+//! completion scripts, service units, and dependency management.
+
+/// Logic for automatically removing unused dependencies.
 pub mod autoremove;
 
 use anyhow::anyhow;
@@ -12,6 +18,7 @@ use zoi_hooks as hooks;
 use zoi_resolver::{local, resolve};
 use zoi_telemetry as telemetry;
 
+/// Gets the root directory for binaries based on the installation scope.
 fn get_bin_root(scope: types::Scope) -> anyhow::Result<PathBuf> {
     match scope {
         types::Scope::User => {
@@ -35,6 +42,7 @@ fn get_bin_root(scope: types::Scope) -> anyhow::Result<PathBuf> {
     }
 }
 
+/// Gets the root directory for shell completions based on the scope and shell type.
 fn get_completions_root(scope: types::Scope, shell: &str) -> anyhow::Result<PathBuf> {
     match scope {
         types::Scope::User => {
@@ -72,6 +80,7 @@ fn get_completions_root(scope: types::Scope, shell: &str) -> anyhow::Result<Path
     }
 }
 
+/// Cleans up service unit files or Windows services associated with a package.
 fn cleanup_service(package_name: &str, scope: types::Scope) -> anyhow::Result<()> {
     let service_name = format!("zoi-{}", package_name);
     let is_user = scope != types::Scope::System;
@@ -156,6 +165,7 @@ fn cleanup_service(package_name: &str, scope: types::Scope) -> anyhow::Result<()
     Ok(())
 }
 
+/// Uninstalls a collection and its associated dependencies.
 fn uninstall_collection(
     pkg: &types::Package,
     manifest: &types::InstallManifest,
@@ -279,6 +289,7 @@ fn uninstall_collection(
     Ok(manifest.clone())
 }
 
+/// Finds an installed manifest matching the given package request.
 fn find_installed_manifest(
     request: &resolve::PackageRequest,
     scope_override: Option<types::Scope>,
@@ -321,6 +332,7 @@ fn find_installed_manifest(
     }
 }
 
+/// Loads an installed package definition and its Lua source path from a manifest.
 fn load_installed_package(
     manifest: &types::InstallManifest,
     yes: bool,

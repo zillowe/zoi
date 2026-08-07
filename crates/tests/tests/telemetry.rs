@@ -1,3 +1,5 @@
+//! Integration tests for Zoi telemetry and usage reporting.
+
 use tempfile::tempdir;
 use zoi::pkg::{config, telemetry, types};
 

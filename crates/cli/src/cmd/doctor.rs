@@ -1,7 +1,10 @@
+//! Implementation of the `doctor` command for diagnosing system issues.
+
 use crate::pkg;
 use anyhow::Result;
 use colored::*;
 
+/// Runs the `doctor` command to diagnose system issues.
 pub fn run() -> Result<()> {
     println!("{} Running Zoi doctor...", "::".bold().blue());
     println!("Checking your system for potential issues...");

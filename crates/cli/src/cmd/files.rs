@@ -1,7 +1,12 @@
+//! Command for listing files associated with an installed package.
+
 use crate::pkg::{local, resolve};
 use anyhow::{Result, anyhow};
 use colored::*;
 
+/// Runs the 'files' command.
+///
+/// Lists all files installed as part of the specified package.
 pub fn run(package_name: &str) -> Result<()> {
     let (pkg_meta, _, _, _, _, _, _) =
         resolve::resolve_package_and_version(package_name, None, false, false)?;

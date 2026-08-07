@@ -61,10 +61,16 @@ pub struct DependencyGraph {
 }
 
 impl DependencyGraph {
+    /// Creates a new, empty `DependencyGraph`.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Performs a topological sort of the graph, returning packages grouped into installation stages.
+    ///
+    /// Packages with no dependencies (leaf nodes) appear in the first stage, followed by packages
+    /// that only depend on those in the first stage, and so on. This ensures that dependencies
+    /// are always installed before their dependents.
     pub fn toposort(&self) -> Result<Vec<Vec<String>>> {
         let mut in_degree: HashMap<String, usize> =
             self.nodes.keys().map(|id| (id.clone(), 0)).collect();
@@ -123,6 +129,7 @@ impl DependencyGraph {
     }
 }
 
+/// Extracts Zoi-specific dependencies from a `DependenciesV2` struct.
 fn extract_zoi_dependencies(deps: &types::DependenciesV2) -> Vec<String> {
     let mut zoi_deps = Vec::new();
 
@@ -141,6 +148,7 @@ fn extract_zoi_dependencies(deps: &types::DependenciesV2) -> Vec<String> {
     zoi_deps
 }
 
+/// Builds a dependency graph from a list of locked packages.
 pub fn build_graph_from_locked_packages(
     locked_packages: &[FrozenLockPackage],
     scope_override: Option<types::Scope>,
@@ -316,6 +324,7 @@ pub fn build_graph_from_locked_packages(
     Ok((graph, Vec::new()))
 }
 
+/// Helper function to return a reference to a string.
 fn pkg_key_as_str(s: &String) -> &String {
     s
 }

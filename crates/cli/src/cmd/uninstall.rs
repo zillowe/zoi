@@ -1,3 +1,5 @@
+//! Logic for the `uninstall` command.
+
 use crate::cmd::utils;
 use crate::cmd::ux;
 use crate::pkg::{self, lock, transaction, types};
@@ -9,6 +11,7 @@ use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
 
+/// Runs the `uninstall` command to remove one or more packages.
 pub fn run(
     package_names: &[String],
     scope: Option<crate::cli::InstallScope>,
@@ -455,6 +458,7 @@ pub fn run(
     Ok(())
 }
 
+/// Generates a unique string identity for a package to be removed.
 fn removal_identity(manifest: &types::InstallManifest) -> String {
     if let Some(sub) = &manifest.sub_package {
         format!("{}@{}:{}", manifest.name, manifest.version, sub)
@@ -463,6 +467,7 @@ fn removal_identity(manifest: &types::InstallManifest) -> String {
     }
 }
 
+/// Returns a rank for the scope to prioritize removal order.
 fn scope_rank(scope: types::Scope) -> u8 {
     match scope {
         types::Scope::Project => 0,
@@ -471,6 +476,7 @@ fn scope_rank(scope: types::Scope) -> u8 {
     }
 }
 
+/// Filters a list of dependents to find those that are NOT part of the current removal set.
 fn collect_external_dependents(
     removal_ids: &std::collections::HashSet<String>,
     dependents: Vec<String>,
@@ -483,6 +489,7 @@ fn collect_external_dependents(
     external
 }
 
+/// Resolves a package source string and adds the matching installed manifest to the removal list.
 fn resolve_and_add_manifest(
     name: &str,
     installed_packages: &[types::InstallManifest],
@@ -548,6 +555,7 @@ fn resolve_and_add_manifest(
     }
 }
 
+/// Recursively finds dependency-reason packages that would become orphaned if the target packages were removed.
 fn collect_recursive_uninstalls(
     manifests_to_uninstall: &mut Vec<types::InstallManifest>,
     installed_packages: &[types::InstallManifest],

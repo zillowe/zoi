@@ -1,3 +1,9 @@
+//! Transaction management for Zoi package operations.
+//!
+//! This crate provides the mechanism for recording and rolling back package
+//! operations (install, uninstall, upgrade) to ensure system consistency.
+
+/// Rollback logic for Zoi transactions.
 pub mod rollback;
 
 use anyhow::{Result, anyhow};
@@ -13,12 +19,14 @@ use zoi_install as install;
 use zoi_resolver::local;
 use zoi_uninstall as uninstall;
 
+/// Creates a shim for the Zoi executable.
 fn create_shim(link_path: &std::path::Path) -> Result<()> {
     let zoi_exe = std::env::current_exe()?;
     zoi_core::utils::symlink_file(&zoi_exe, link_path)
         .map_err(|e| anyhow!("Failed to create shim: {}", e))
 }
 
+/// Gets the root directory for shell completions based on scope and shell.
 pub(crate) fn get_completions_root(scope: types::Scope, shell: &str) -> Result<std::path::PathBuf> {
     match scope {
         types::Scope::User => {
@@ -57,6 +65,7 @@ pub(crate) fn get_completions_root(scope: types::Scope, shell: &str) -> Result<s
     }
 }
 
+/// Creates a symlink for a shell completion file.
 pub(crate) fn create_completion_symlink(
     source: &std::path::Path,
     link: &std::path::Path,
@@ -91,6 +100,7 @@ pub struct TransactionMetadata {
     pub operation_count: usize,
 }
 
+/// Gets the directory where transaction logs are stored.
 fn get_transactions_dir() -> Result<PathBuf> {
     let home_dir = zoi_core::utils::get_user_home()
         .ok_or_else(|| anyhow!("Could not find home directory."))?;
@@ -99,6 +109,7 @@ fn get_transactions_dir() -> Result<PathBuf> {
     Ok(dir)
 }
 
+/// Gets the path to a specific transaction log file.
 fn get_transaction_path(id: &str) -> Result<PathBuf> {
     let dir = get_transactions_dir()?;
     let active_path = dir.join(format!("{}.json", id));
@@ -127,6 +138,7 @@ pub fn begin() -> Result<types::Transaction> {
     })
 }
 
+/// Reads a transaction from a log file.
 pub fn read_transaction(transaction_id: &str) -> Result<types::Transaction> {
     let path = get_transaction_path(transaction_id)?;
     if !path.exists() {
@@ -139,6 +151,7 @@ pub fn read_transaction(transaction_id: &str) -> Result<types::Transaction> {
     Ok(serde_json::from_str(&content)?)
 }
 
+/// Records a package operation in the current transaction.
 pub fn record_operation(
     transaction: &mut types::Transaction,
     operation: types::TransactionOperation,
@@ -166,6 +179,7 @@ pub fn record_operation(
     Ok(())
 }
 
+/// Commits a transaction by moving it to the history directory.
 pub fn commit(transaction_id: &str) -> Result<()> {
     let dir = get_transactions_dir()?;
     let path = dir.join(format!("{}.json", transaction_id));
@@ -180,6 +194,7 @@ pub fn commit(transaction_id: &str) -> Result<()> {
     Ok(())
 }
 
+/// Returns a list of all files modified during a transaction.
 pub fn get_modified_files(transaction_id: &str) -> Result<Vec<String>> {
     let path = get_transaction_path(transaction_id)?;
     if !path.exists() {
@@ -217,6 +232,7 @@ pub fn get_modified_files(transaction_id: &str) -> Result<Vec<String>> {
     Ok(files.into_iter().collect())
 }
 
+/// Returns a list of all packages modified during a transaction.
 pub fn get_modified_packages(transaction_id: &str) -> Result<Vec<String>> {
     let path = get_transaction_path(transaction_id)?;
     if !path.exists() {
@@ -246,6 +262,7 @@ pub fn get_modified_packages(transaction_id: &str) -> Result<Vec<String>> {
     Ok(packages.into_iter().collect())
 }
 
+/// Deletes a transaction log file.
 pub fn delete_log(transaction_id: &str) -> Result<()> {
     let path = get_transaction_path(transaction_id)?;
     if path.exists() {
@@ -254,6 +271,7 @@ pub fn delete_log(transaction_id: &str) -> Result<()> {
     Ok(())
 }
 
+/// Lists all completed and in-progress transactions.
 pub fn list_transactions() -> Result<Vec<TransactionMetadata>> {
     let dir = get_transactions_dir()?;
     if !dir.exists() {
@@ -281,6 +299,7 @@ pub fn list_transactions() -> Result<Vec<TransactionMetadata>> {
     Ok(transactions)
 }
 
+/// Checks if a package has installed files outside of the Zoi store.
 fn has_files_outside_store(manifest: &types::InstallManifest) -> bool {
     if let Ok(store_base) = local::get_store_base_dir(manifest.scope) {
         for file in &manifest.installed_files {
@@ -293,10 +312,12 @@ fn has_files_outside_store(manifest: &types::InstallManifest) -> bool {
     false
 }
 
+/// Generates an installation source string for a manifest.
 fn install_source_for_manifest(manifest: &types::InstallManifest) -> String {
     local::installed_manifest_source(manifest)
 }
 
+/// Restores shims for a package.
 fn restore_shims(manifest: &types::InstallManifest) -> Result<()> {
     if let Some(bins) = &manifest.bins {
         let bin_root = match manifest.scope {
@@ -636,6 +657,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
     Ok(())
 }
 
+/// Returns the ID of the most recently created transaction, if any.
 pub fn get_last_transaction_id() -> Result<Option<String>> {
     let dir = get_transactions_dir()?;
     let mut last_modified_time = None;

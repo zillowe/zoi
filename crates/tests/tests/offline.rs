@@ -1,3 +1,5 @@
+//! Integration tests for offline mode and package directory management.
+
 use std::fs;
 use tempfile::tempdir;
 use zoi::pkg::{offline, pkgdir};

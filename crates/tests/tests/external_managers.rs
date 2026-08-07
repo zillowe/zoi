@@ -1,3 +1,5 @@
+//! Integration tests for external package manager integration.
+
 use zoi::pkg::dependencies::parse_dependency_string;
 use zoi::pkg::pm;
 

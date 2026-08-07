@@ -1,19 +1,35 @@
+//! Package development and maintenance commands.
+//!
+//! This module provides tools for package maintainers to build, test, bundle,
+//! and validate Zoi packages.
+
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+
+/// Build command module.
 pub mod build;
+/// Bundle command module.
 pub mod bundle;
+/// Doctor command module.
 pub mod doctor;
+/// Init-LSP command module.
 pub mod init_lsp;
+/// Inspect command module.
 pub mod inspect;
+/// Install command module.
 pub mod install;
+/// Test command module.
 pub mod test;
 
+/// Arguments for the `package` command.
 #[derive(Parser, Debug)]
 pub struct PackageCommand {
+    /// The package sub-command to run.
     #[command(subcommand)]
     command: Commands,
 }
 
+/// Available package sub-commands.
 #[derive(Subcommand, Debug)]
 enum Commands {
     /// Build a package from a pkg.lua file
@@ -32,6 +48,7 @@ enum Commands {
     Inspect(inspect::InspectCommand),
 }
 
+/// Runs the `package` command.
 pub fn run(args: PackageCommand) -> Result<()> {
     match args.command {
         Commands::Build(cmd) => build::run(cmd),

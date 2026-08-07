@@ -1,3 +1,5 @@
+//! Integration tests for package uninstallation logic.
+
 use std::fs;
 use std::path::Path;
 use tempfile::tempdir;

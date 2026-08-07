@@ -1,3 +1,5 @@
+//! Integration tests for package revision management.
+
 use tempfile::tempdir;
 use zoi::pkg::{config, db, local, types};
 

@@ -1,3 +1,5 @@
+//! General integration tests, including Lua API interactions.
+
 use mlua::{Lua, Table};
 use zoi::pkg::lua::functions;
 

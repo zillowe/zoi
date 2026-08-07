@@ -1,3 +1,5 @@
+//! Integration tests for 3-way merge operations.
+
 use std::fs;
 use std::process::Command;
 use tempfile::tempdir;

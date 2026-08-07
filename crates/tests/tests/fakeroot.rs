@@ -1,3 +1,5 @@
+//! Integration tests for fakeroot-based package building.
+
 use std::fs;
 use tar::Archive;
 use tempfile::tempdir;

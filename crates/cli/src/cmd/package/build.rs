@@ -1,8 +1,14 @@
+//! Logic for the `package build` command.
+//!
+//! This module provides the functionality to build Zoi packages from their
+//! definition files, handling dependencies, platforms, and isolation.
+
 use anyhow::Result;
 use clap::Parser;
 use colored::*;
 use std::path::PathBuf;
 
+/// Arguments for the `package build` command.
 #[derive(Parser, Debug)]
 pub struct BuildCommand {
     /// Path to the package file (e.g. path/to/name.pkg.lua)
@@ -64,6 +70,7 @@ pub struct BuildCommand {
     pub root_package: String,
 }
 
+/// Run the package build command.
 pub fn run(mut args: BuildCommand) -> Result<()> {
     let mut _temp_root = None;
 
@@ -132,6 +139,7 @@ pub fn run(mut args: BuildCommand) -> Result<()> {
     )
 }
 
+/// Install dependencies required for building the package.
 pub fn install_dependencies_for_build(args: &BuildCommand, include_test: bool) -> Result<()> {
     for platform in &args.platform {
         let current_platform = if platform == "current" {

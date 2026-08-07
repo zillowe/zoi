@@ -1,6 +1,9 @@
+//! Logic for the `version` command.
+
 use crate::utils;
 use colored::*;
 
+/// Run the version command.
 pub fn run(branch: &str, status: &str, number: &str, commit: &str) {
     println!("{} Zoi version information", "::".bold().blue());
     utils::print_info("Branch", branch);

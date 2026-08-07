@@ -1,3 +1,5 @@
+//! Integration tests for PubGrub-based dependency resolution.
+
 use rustc_hash::FxHashMap;
 use zoi::pkg::install::pubgrub;
 use zoi::pkg::install::pubgrub::PkgName;

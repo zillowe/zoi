@@ -1,7 +1,12 @@
+//! Rolling back packages and transactions.
+
 use crate::pkg::{self, transaction};
 use crate::utils;
 use anyhow::{Result, anyhow};
 
+/// Rolls back a specific package to its previous state.
+///
+/// This looks for an installed package matching the name and triggers a rollback operation.
 pub fn run(
     package_name: &str,
     yes: bool,
@@ -31,6 +36,9 @@ pub fn run(
     pkg::rollback::run(&pkg::local::installed_manifest_source(&chosen), yes)
 }
 
+/// Rolls back the most recent transaction.
+///
+/// This reverts all changes made in the last recorded transaction.
 pub fn run_transaction_rollback(
     yes: bool,
     plugin_manager: Option<&crate::pkg::plugin::PluginManager>,

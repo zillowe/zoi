@@ -1,3 +1,5 @@
+//! Integration tests for stateful shell environments and Lua integration.
+
 use mlua::Lua;
 use std::fs;
 use tempfile::tempdir;

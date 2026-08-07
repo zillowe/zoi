@@ -1,3 +1,5 @@
+//! Integration tests for package-specific doctor checks.
+
 use std::fs;
 use tempfile::tempdir;
 use zoi::pkg::package::doctor;

@@ -47,6 +47,8 @@ impl TestContextGuard {
             self.previous_env
                 .push((key.to_string(), std::env::var_os(key)));
         }
+        // SAFETY: This is used in a test environment where we ensure thread safety
+        // through other means or by running tests sequentially.
         unsafe { std::env::set_var(key, value.as_ref()) };
     }
 
@@ -77,8 +79,10 @@ impl Drop for TestContextGuard {
         }
         for (key, value) in self.previous_env.iter().rev() {
             if let Some(previous) = value {
+                // SAFETY: Restoring environment variables in a controlled test environment.
                 unsafe { std::env::set_var(key, previous) };
             } else {
+                // SAFETY: Removing temporary environment variables in a controlled test environment.
                 unsafe { std::env::remove_var(key) };
             }
         }

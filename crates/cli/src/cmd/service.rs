@@ -1,16 +1,24 @@
+//! Logic for the `service` command.
+//!
+//! This module provides commands for managing background services associated
+//! with installed packages, allowing users to start, stop, enable, and monitor them.
+
 use crate::pkg::service::{self, ServiceAction};
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use colored::*;
 use comfy_table::{Table, presets::UTF8_FULL};
 
+/// The root service management command.
 #[derive(Parser, Debug)]
 #[command(long_about = "Manages background services for installed packages.")]
 pub struct ServiceCommand {
+    /// The specific service subcommand to execute.
     #[command(subcommand)]
     pub command: ServiceCommands,
 }
 
+/// Available service subcommands.
 #[derive(Subcommand, Debug)]
 pub enum ServiceCommands {
     /// Start a service
@@ -48,6 +56,7 @@ pub enum ServiceCommands {
     List,
 }
 
+/// Run the service management command.
 pub fn run(args: ServiceCommand) -> Result<()> {
     match args.command {
         ServiceCommands::Start { package } => {

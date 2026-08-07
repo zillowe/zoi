@@ -1,3 +1,5 @@
+//! Integration tests for Zoi package registry operations.
+
 use anyhow::Result;
 use chrono::Datelike;
 use std::fs;

@@ -1,3 +1,5 @@
+//! Integration tests for Lua-based package specification parsing.
+
 use zoi::pkg::lua::parser;
 
 #[test]

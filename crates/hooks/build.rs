@@ -1,8 +1,14 @@
+//! Build script for zoi-hooks.
+//!
+//! This script reads all YAML hook definitions from the `builtin/hooks` directory
+//! and generates a Rust source file containing them as static strings.
+
 use std::env;
 use std::error::Error;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+/// Reads and sorts the paths of files with the specified extension in a directory.
 fn read_sorted_paths(dir: &Path, extension: &str) -> Result<Vec<PathBuf>, Box<dyn Error>> {
     let mut paths = Vec::new();
     if dir.exists() {
@@ -26,7 +32,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let dest_path = out_dir.join("generated_builtin_hooks.rs");
     let mut file = std::fs::File::create(dest_path)?;
 
-    writeln!(&mut file, "pub static BUILTIN_HOOKS: &[(&str, &str)] = &[")?;
+    writeln!(
+        &mut file,
+        "/// A list of built-in transaction hooks.\n///\n/// Each entry is a tuple of (hook_name, raw_yaml_content).\npub static BUILTIN_HOOKS: &[(&str, &str)] = &["
+    )?;
     for path in read_sorted_paths(&hooks_dir, "yaml")? {
         let name = path
             .file_stem()

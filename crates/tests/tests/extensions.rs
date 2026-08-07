@@ -1,3 +1,5 @@
+//! Integration tests for Zoi extensions and plugin integration.
+
 use std::fs;
 use tempfile::tempdir;
 use zoi::pkg::{config, extension, local, plugin, types};

@@ -1,3 +1,8 @@
+//! Local package management and store interaction.
+//!
+//! This module provides functions for interacting with the local package store,
+//! listing installed packages, and managing package manifests and dependencies.
+
 use crate::resolve::{PackageRequest, get_db_root};
 use anyhow::Result;
 use std::fs;
@@ -7,10 +12,12 @@ use zoi_core::config;
 use zoi_core::types::{self, InstallManifest, Scope};
 use zoi_core::utils;
 
+/// Returns the base directory of the package store for a given scope.
 pub fn get_store_base_dir(scope: Scope) -> Result<PathBuf> {
     utils::get_store_base_dir(scope)
 }
 
+/// Returns the directory for a specific package in the store.
 pub fn get_package_dir(
     scope: Scope,
     registry_handle: &str,
@@ -23,6 +30,7 @@ pub fn get_package_dir(
     Ok(base_dir.join(package_dir_name))
 }
 
+/// Returns the directory for a specific version of a package in the store.
 pub fn get_package_version_dir(
     scope: Scope,
     registry_handle: &str,
@@ -36,6 +44,7 @@ pub fn get_package_version_dir(
 
 use rayon::prelude::*;
 
+/// Returns a list of all installed packages across all scopes.
 pub fn get_installed_packages() -> Result<Vec<InstallManifest>> {
     let scopes = [Scope::User, Scope::System, Scope::Project];
 
@@ -82,15 +91,22 @@ pub fn get_installed_packages() -> Result<Vec<InstallManifest>> {
     Ok(sorted_installed)
 }
 
+/// Represents an installed package with basic metadata.
 #[derive(Debug)]
 pub struct InstalledPackage {
+    /// The name of the package.
     pub name: String,
+    /// The sub-package name, if any.
     pub sub_package: Option<String>,
+    /// The installed version.
     pub version: String,
+    /// The repository the package was installed from.
     pub repo: String,
+    /// The type of package.
     pub package_type: zoi_core::types::PackageType,
 }
 
+/// Returns a list of all installed packages with their basic metadata.
 pub fn get_installed_packages_with_type() -> Result<Vec<InstalledPackage>> {
     let manifests = get_installed_packages()?;
     Ok(manifests
@@ -105,6 +121,7 @@ pub fn get_installed_packages_with_type() -> Result<Vec<InstalledPackage>> {
         .collect())
 }
 
+/// Checks if a package is installed in a given scope and returns its manifest if found.
 pub fn is_package_installed(
     package_name: &str,
     sub_package_name: Option<&str>,
@@ -152,6 +169,7 @@ pub fn is_package_installed(
     Ok(None)
 }
 
+/// Returns all installed manifests in a specific scope.
 pub fn get_installed_manifests_in_scope(scope: Scope) -> Result<Vec<InstallManifest>> {
     let store_root = get_store_base_dir(scope)?;
     if !store_root.exists() {
@@ -195,6 +213,7 @@ pub fn get_installed_manifests_in_scope(scope: Scope) -> Result<Vec<InstallManif
     Ok(manifests)
 }
 
+/// Finds installed manifests matching a package request in a specific scope.
 pub fn find_installed_manifests_matching(
     request: &PackageRequest,
     scope: Scope,
@@ -221,6 +240,7 @@ pub fn find_installed_manifests_matching(
         .collect())
 }
 
+/// Formats a package source string from its components.
 pub fn package_source_string(
     registry_handle: &str,
     repo: &str,
@@ -247,6 +267,7 @@ pub fn package_source_string(
     }
 }
 
+/// Returns the source string for an installed manifest.
 pub fn installed_manifest_source(manifest: &InstallManifest) -> String {
     package_source_string(
         &manifest.registry_handle,
@@ -257,6 +278,7 @@ pub fn installed_manifest_source(manifest: &InstallManifest) -> String {
     )
 }
 
+/// Returns all available packages from a list of repositories.
 pub fn get_packages_from_repos(repos: &[String]) -> Result<Vec<zoi_core::types::Package>> {
     let db_root = get_db_root()?;
     if !db_root.exists() {
@@ -311,6 +333,7 @@ pub fn get_packages_from_repos(repos: &[String]) -> Result<Vec<zoi_core::types::
     Ok(available)
 }
 
+/// Returns all available packages in the default registry.
 pub fn get_all_available_packages() -> Result<Vec<zoi_core::types::Package>> {
     let config = config::read_config()?;
     if let Some(handle) = config
@@ -330,6 +353,7 @@ pub fn get_all_available_packages() -> Result<Vec<zoi_core::types::Package>> {
     }
 }
 
+/// Adds a dependent ID to a package's dependents list.
 pub fn add_dependent(package_dir: &Path, dependent_id: &str) -> Result<()> {
     let dependents_dir = package_dir.join("dependents");
     fs::create_dir_all(&dependents_dir)?;
@@ -338,6 +362,7 @@ pub fn add_dependent(package_dir: &Path, dependent_id: &str) -> Result<()> {
     Ok(())
 }
 
+/// Removes a dependent ID from a package's dependents list.
 pub fn remove_dependent(package_dir: &Path, dependent_id: &str) -> Result<()> {
     let dependents_dir = package_dir.join("dependents");
     if dependents_dir.exists() {
@@ -355,6 +380,7 @@ pub fn remove_dependent(package_dir: &Path, dependent_id: &str) -> Result<()> {
     Ok(())
 }
 
+/// Returns a list of all dependent IDs for a package.
 pub fn get_dependents(package_dir: &Path) -> Result<Vec<String>> {
     let dependents_dir = package_dir.join("dependents");
     let mut dependents = Vec::new();
@@ -374,6 +400,7 @@ pub fn get_dependents(package_dir: &Path) -> Result<Vec<String>> {
     Ok(dependents)
 }
 
+/// Writes an installation manifest to the store and updates the 'latest' symlink.
 pub fn write_manifest(manifest: &InstallManifest) -> Result<()> {
     let version_dir = get_package_version_dir(
         manifest.scope,
@@ -406,6 +433,7 @@ pub fn write_manifest(manifest: &InstallManifest) -> Result<()> {
     Ok(())
 }
 
+/// Returns the path where the package source file should be stored.
 pub fn get_package_source_path(manifest: &InstallManifest) -> Result<PathBuf> {
     let version_dir = get_package_version_dir(
         manifest.scope,
@@ -417,6 +445,7 @@ pub fn get_package_source_path(manifest: &InstallManifest) -> Result<PathBuf> {
     Ok(version_dir.join("package.pkg.lua"))
 }
 
+/// Persists the package source file to the store.
 pub fn persist_package_source(manifest: &InstallManifest, source_path: &Path) -> Result<()> {
     let stored_source_path = get_package_source_path(manifest)?;
     if let Some(parent) = stored_source_path.parent() {
@@ -426,6 +455,7 @@ pub fn persist_package_source(manifest: &InstallManifest, source_path: &Path) ->
     Ok(())
 }
 
+/// Updates the installation reason in a package's manifest.
 pub fn update_manifest_reason(
     manifest: &InstallManifest,
     new_reason: types::InstallReason,

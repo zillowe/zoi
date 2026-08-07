@@ -1,3 +1,5 @@
+//! Integration tests for `.zoiignore` file handling.
+
 use std::fs;
 use tempfile::tempdir;
 

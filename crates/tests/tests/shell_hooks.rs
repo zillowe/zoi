@@ -1,3 +1,5 @@
+//! Integration tests for shell environment hooks and completion.
+
 use clap_complete::Shell;
 use std::fs;
 use tempfile::tempdir;

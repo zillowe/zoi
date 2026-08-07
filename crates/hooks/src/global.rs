@@ -23,41 +23,59 @@ include!(concat!(env!("OUT_DIR"), "/generated_builtin_hooks.rs"));
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GlobalHook {
+    /// The unique name of the hook.
     pub name: String,
+    /// A human-readable description of what the hook does.
     pub description: String,
+    /// Optional list of compatible platforms (e.g., ["linux", "macos"]).
     pub platforms: Option<Vec<String>>,
+    /// The conditions that trigger this hook.
     pub trigger: HookTrigger,
+    /// The action to perform when the hook is triggered.
     pub action: HookAction,
+    /// Whether this is a builtin hook provided by Zoi.
     #[serde(skip)]
     pub is_builtin: bool,
 }
 
+/// Defines when a global hook should be triggered.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct HookTrigger {
+    /// Glob patterns for file paths that trigger the hook.
     #[serde(default)]
     pub paths: Vec<String>,
+    /// Directories that trigger the hook if any file within them is modified.
     #[serde(default)]
     pub dirs: Vec<String>,
+    /// The operation types (e.g., "install", "upgrade", "remove") that trigger the hook.
     #[serde(default)]
     pub operation: Vec<String>,
+    /// Specific package names that trigger the hook when modified.
     #[serde(default)]
     pub packages: Vec<String>,
 }
 
+/// Defines the action to take when a global hook is triggered.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct HookAction {
+    /// When the hook should run relative to the transaction.
     pub when: HookWhen,
+    /// The shell command to execute.
     pub exec: String,
 }
 
+/// When a global hook should run.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum HookWhen {
+    /// Runs before any package operations in the transaction.
     #[serde(rename = "PreTransaction")]
     PreTransaction,
+    /// Runs after all package operations in the transaction have completed.
     #[serde(rename = "PostTransaction")]
     PostTransaction,
 }
 
+/// Gets the directory where user-specific hooks are stored.
 pub fn get_user_hooks_dir() -> Result<PathBuf> {
     let home = utils::get_user_home().ok_or_else(|| anyhow!("Could not find home directory"))?;
     let dir = home.join(".zoi").join("hooks");
@@ -67,6 +85,7 @@ pub fn get_user_hooks_dir() -> Result<PathBuf> {
     Ok(dir)
 }
 
+/// Gets the directory where system-wide hooks are stored.
 pub fn get_system_hooks_dir() -> Result<PathBuf> {
     if cfg!(windows) {
         Ok(sysroot::apply_sysroot(PathBuf::from(
@@ -77,6 +96,7 @@ pub fn get_system_hooks_dir() -> Result<PathBuf> {
     }
 }
 
+/// Loads all available global hooks from builtin, system, user, and package store locations.
 pub fn load_all_hooks() -> Result<Vec<GlobalHook>> {
     let mut hook_map = HashMap::new();
 
@@ -166,6 +186,7 @@ pub fn load_all_hooks() -> Result<Vec<GlobalHook>> {
     Ok(hooks)
 }
 
+/// Normalizes a file path to be relative to the sysroot and uses forward slashes.
 fn normalized_relative_path(file: &str, sysroot: Option<&Path>) -> String {
     let file_path = Path::new(file);
     let relative_file = if let Some(root) = sysroot {
@@ -186,6 +207,7 @@ fn normalized_relative_path(file: &str, sysroot: Option<&Path>) -> String {
         .to_string()
 }
 
+/// Normalizes a hook trigger path.
 fn normalized_hook_path(path: &str) -> String {
     path.replace('\\', "/")
         .trim_start_matches("./")
@@ -194,6 +216,7 @@ fn normalized_hook_path(path: &str) -> String {
         .to_string()
 }
 
+/// Checks if a modified file matches a trigger directory.
 fn matches_trigger_dir(dir: &str, modified_file: &str) -> bool {
     let dir = normalized_hook_path(dir);
     !dir.is_empty()
@@ -203,6 +226,7 @@ fn matches_trigger_dir(dir: &str, modified_file: &str) -> bool {
                 .is_some_and(|suffix| suffix.starts_with('/')))
 }
 
+/// Checks if a hook trigger matches any of the modified files or packages.
 pub fn trigger_matches_modified_files(
     trigger: &HookTrigger,
     modified_files: &[String],
@@ -260,6 +284,7 @@ pub fn trigger_matches_modified_files(
     false
 }
 
+/// Checks if a hook is trusted by comparing its hash against the trusted database.
 fn is_hook_trusted(hook: &GlobalHook) -> Result<bool> {
     let mut hasher = Sha256::new();
     hasher.update(hook.action.exec.as_bytes());
@@ -298,6 +323,15 @@ fn is_hook_trusted(hook: &GlobalHook) -> Result<bool> {
     }
 }
 
+/// Runs all global hooks that match the given criteria.
+///
+/// # Arguments
+///
+/// * `when` - Whether to run pre-transaction or post-transaction hooks.
+/// * `modified_files` - List of files modified during the transaction.
+/// * `modified_packages` - List of packages modified during the transaction.
+/// * `operation` - The type of operation being performed (e.g., "install").
+/// * `scope` - The installation scope.
 pub fn run_global_hooks(
     when: HookWhen,
     modified_files: &[String],

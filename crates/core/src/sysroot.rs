@@ -11,6 +11,7 @@
 use std::path::PathBuf;
 use std::sync::{OnceLock, RwLock};
 
+/// Provides thread-safe access to the optional global sysroot path.
 fn sysroot_store() -> &'static RwLock<Option<PathBuf>> {
     static SYSROOT: OnceLock<RwLock<Option<PathBuf>>> = OnceLock::new();
     SYSROOT.get_or_init(|| RwLock::new(None))

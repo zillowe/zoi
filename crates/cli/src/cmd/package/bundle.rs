@@ -1,7 +1,10 @@
+//! Implementation of the `package bundle` command.
+
 use anyhow::Result;
 use clap::Parser;
 use std::path::PathBuf;
 
+/// Arguments for the `package bundle` command.
 #[derive(Parser, Debug)]
 pub struct BundleCommand {
     /// Path to the package file (e.g. path/to/name.pkg.lua)
@@ -25,6 +28,7 @@ pub struct BundleCommand {
     pub build_type: Option<String>,
 }
 
+/// Runs the `package bundle` command.
 pub fn run(args: BundleCommand) -> Result<()> {
     crate::pkg::package::bundle::run(
         &args.package_file,

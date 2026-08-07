@@ -1,3 +1,10 @@
+//! Plugin management system for Zoi.
+//!
+//! This crate provides the `PluginManager` which handles loading and executing
+//! Lua plugins that extend Zoi's functionality. It also includes support for
+//! extensions that can modify registry configurations.
+
+/// Registry extension management.
 pub mod extension;
 
 use anyhow::{Result, anyhow};
@@ -13,6 +20,7 @@ use zoi_core::{types, utils};
 use zoi_project as project;
 use zoi_resolver::{local, resolve};
 
+/// Key used in the Lua globals to store environment variable overrides.
 const PLUGIN_ENV_OVERRIDES_KEY: &str = "__ZOI_ENV_OVERRIDES";
 
 /// Orchestrates Zoi's extensibility via global Lua plugins.
@@ -42,6 +50,7 @@ impl PluginManager {
         Ok(manager)
     }
 
+    /// Sets up the global `zoi` API in the Lua environment.
     fn setup_api(&self) -> Result<()> {
         let zoi = self
             .lua
@@ -800,6 +809,7 @@ impl PluginManager {
         Ok(())
     }
 
+    /// Sets the operational scope for plugins.
     pub fn set_context(&self, scope: types::Scope) -> Result<()> {
         let zoi: Table = self
             .lua
@@ -812,6 +822,7 @@ impl PluginManager {
         Ok(())
     }
 
+    /// Loads and executes all trusted Lua plugins from the plugin directory.
     pub fn load_all(&self, yes: bool) -> Result<()> {
         let plugin_dir = get_plugin_dir()?;
         if !plugin_dir.exists() {
@@ -901,6 +912,7 @@ impl PluginManager {
         Ok(())
     }
 
+    /// Triggers a lifecycle hook, executing all registered callbacks.
     pub fn trigger_hook(&self, hook_name: &str, arg: Option<Value>) -> Result<()> {
         let registry: Table = self
             .lua
@@ -924,6 +936,7 @@ impl PluginManager {
         Ok(())
     }
 
+    /// Triggers a lifecycle hook but ignores errors, printing a warning instead.
     pub fn trigger_hook_nonfatal(&self, hook_name: &str, arg: Option<Value>) {
         if let Err(error) = self.trigger_hook(hook_name, arg) {
             eprintln!(
@@ -933,6 +946,7 @@ impl PluginManager {
         }
     }
 
+    /// Triggers the shim version resolution hook.
     pub fn trigger_resolve_shim_version(&self, bin_name: &str) -> Result<Option<String>> {
         let registry: Table = self
             .lua
@@ -954,6 +968,7 @@ impl PluginManager {
         Ok(None)
     }
 
+    /// Triggers the project installation hook.
     pub fn trigger_project_install_hook(&self) -> Result<bool> {
         let registry: Table = self
             .lua
@@ -973,6 +988,7 @@ impl PluginManager {
         Ok(false)
     }
 
+    /// Executes a custom command registered by a plugin.
     pub fn run_command(&self, name: &str, args: Vec<String>) -> Result<bool> {
         let registry: Table = self
             .lua
@@ -988,6 +1004,7 @@ impl PluginManager {
         }
     }
 
+    /// Lists all custom commands registered by plugins.
     pub fn list_commands(&self) -> Result<Vec<(String, String)>> {
         let registry: Table = self
             .lua
@@ -1011,6 +1028,7 @@ impl PluginManager {
     }
 }
 
+/// Returns the path to the Zoi plugin directory.
 pub fn get_plugin_dir() -> Result<PathBuf> {
     let home_dir =
         utils::get_user_home().ok_or_else(|| anyhow!("Could not find home directory."))?;
@@ -1021,6 +1039,7 @@ pub fn get_plugin_dir() -> Result<PathBuf> {
     Ok(plugin_dir)
 }
 
+/// Reads the persistent state for plugins from state.json.
 fn read_plugin_state() -> Result<HashMap<String, serde_json::Value>> {
     let path = get_plugin_dir()?.join("state.json");
     if !path.exists() {
@@ -1030,6 +1049,7 @@ fn read_plugin_state() -> Result<HashMap<String, serde_json::Value>> {
     Ok(serde_json::from_str(&content).unwrap_or_default())
 }
 
+/// Writes the persistent state for plugins to state.json.
 fn write_plugin_state(state: &HashMap<String, serde_json::Value>) -> Result<()> {
     let path = get_plugin_dir()?.join("state.json");
     let content = serde_json::to_string_pretty(state)?;

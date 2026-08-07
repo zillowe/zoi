@@ -1,3 +1,5 @@
+//! Integration tests for man page generation and management.
+
 use std::fs;
 use tempfile::tempdir;
 use zoi::cmd::man;

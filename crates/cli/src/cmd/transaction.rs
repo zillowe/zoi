@@ -1,12 +1,16 @@
+//! Logic for the `transaction` command.
+
 use crate::pkg::{local, transaction, types};
 use anyhow::Result;
 use colored::*;
 use comfy_table::{ContentArrangement, Table, presets::UTF8_FULL};
 
+/// Returns the source of the installed manifest.
 fn manifest_source(manifest: &types::InstallManifest) -> String {
     local::installed_manifest_source(manifest)
 }
 
+/// List all transaction logs.
 pub fn list() -> Result<()> {
     let transactions = transaction::list_transactions()?;
     if transactions.is_empty() {
@@ -32,6 +36,7 @@ pub fn list() -> Result<()> {
     Ok(())
 }
 
+/// List modified files for a specific transaction.
 pub fn files(transaction_id: &str) -> Result<()> {
     let mut modified_files = transaction::get_modified_files(transaction_id)?;
     modified_files.sort();
@@ -55,6 +60,7 @@ pub fn files(transaction_id: &str) -> Result<()> {
     Ok(())
 }
 
+/// Show details for a specific transaction.
 pub fn show(transaction_id: &str) -> Result<()> {
     let transaction = transaction::read_transaction(transaction_id)?;
 

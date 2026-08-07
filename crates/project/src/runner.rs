@@ -100,6 +100,7 @@ pub fn run(cmd_alias: Option<&str>, args: &[String], config: &config::ProjectCon
     Ok(())
 }
 
+/// Recursively resolves task dependencies and produces a topologically sorted list.
 fn resolve_task_dependencies(
     alias: &str,
     config: &config::ProjectConfig,
@@ -134,6 +135,7 @@ fn resolve_task_dependencies(
     Ok(())
 }
 
+/// Groups tasks into execution stages where tasks in each stage can run in parallel.
 fn group_tasks_into_stages(
     resolved_tasks: &[String],
     config: &config::ProjectConfig,
@@ -200,6 +202,7 @@ fn group_tasks_into_stages(
     Ok(stages)
 }
 
+/// Executes a single task command, appending any extra arguments if it is the target task.
 fn run_single_command(
     command_to_run: &config::CommandSpec,
     args: &[String],
@@ -241,6 +244,7 @@ fn run_single_command(
     executor::run_shell_command(&full_command, &env_vars)
 }
 
+/// Returns the path to the task cache file.
 fn get_task_cache_path() -> Result<PathBuf> {
     let current_dir = std::env::current_dir()?;
     let cache_dir = current_dir.join(".zoi").join("cache");
@@ -248,6 +252,7 @@ fn get_task_cache_path() -> Result<PathBuf> {
     Ok(cache_dir.join("tasks.json"))
 }
 
+/// Reads the task cache from disk.
 fn read_task_cache() -> Result<HashMap<String, String>> {
     let path = get_task_cache_path()?;
     if !path.exists() {
@@ -257,11 +262,13 @@ fn read_task_cache() -> Result<HashMap<String, String>> {
     Ok(serde_json::from_str(&content).unwrap_or_default())
 }
 
+/// Checks if a task is already cached with the given hash.
 fn is_task_cached(alias: &str, current_hash: &str) -> Result<bool> {
     let cache = read_task_cache()?;
     Ok(cache.get(alias).is_some_and(|h| h == current_hash))
 }
 
+/// Updates the task cache with a new hash for the specified task.
 fn update_task_cache(alias: &str, hash: &str) -> Result<()> {
     let mut cache = read_task_cache()?;
     cache.insert(alias.to_string(), hash.to_string());
@@ -271,6 +278,7 @@ fn update_task_cache(alias: &str, hash: &str) -> Result<()> {
     Ok(())
 }
 
+/// Calculates a SHA-256 hash of all files matching the provided glob patterns.
 fn calculate_files_hash(files: &[String]) -> Result<String> {
     use sha2::Digest;
     let mut hasher = sha2::Sha256::new();

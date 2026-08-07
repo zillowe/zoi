@@ -1,3 +1,5 @@
+//! Integration tests for `.tool-versions` file support and plugin integration.
+
 use std::fs;
 use tempfile::tempdir;
 use zoi::pkg::plugin::PluginManager;

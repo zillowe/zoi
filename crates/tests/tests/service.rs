@@ -1,3 +1,5 @@
+//! Integration tests for Zoi service management and system integration.
+
 use std::fs;
 use tempfile::tempdir;
 use zoi::pkg::{db, local, service, sysroot, types};

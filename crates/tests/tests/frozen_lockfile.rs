@@ -1,3 +1,5 @@
+//! Integration tests for frozen lockfile verification and management.
+
 use tempfile::tempdir;
 use zoi::cli::InstallScope;
 use zoi::cmd;

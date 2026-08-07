@@ -1,6 +1,9 @@
+//! Installation manifest creation logic.
+
 use anyhow::{Result, anyhow};
 use zoi_core::types;
 
+/// Creates an installation manifest for a package.
 pub fn create_manifest(
     pkg: &types::Package,
     reason: types::InstallReason,

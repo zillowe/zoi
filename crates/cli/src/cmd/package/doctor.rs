@@ -1,8 +1,11 @@
+//! Implementation of the `package doctor` command, which validates package specification files.
+
 use anyhow::{Result, anyhow};
 use clap::Parser;
 use colored::Colorize;
 use std::path::PathBuf;
 
+/// Arguments for the `package doctor` command.
 #[derive(Parser, Debug)]
 pub struct DoctorCommand {
     /// Path to the package file (e.g. path/to/name.pkg.lua)
@@ -18,6 +21,7 @@ pub struct DoctorCommand {
     pub version_override: Option<String>,
 }
 
+/// Runs the `package doctor` command.
 pub fn run(args: DoctorCommand) -> Result<()> {
     println!(
         "{} Running package doctor for {}",

@@ -2,8 +2,12 @@ use anyhow::{Result, anyhow};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// The content of the Zoi Lua API definitions for LSP.
 const ZOI_LUA_DEFINITIONS: &str = include_str!("./builtin/lsp/zoi.lua");
 
+/// Sets up the LSP workspace for Zoi package development.
+///
+/// This creates the necessary Lua definitions and a `.luarc.json` file in the given path.
 pub fn setup_lsp_workspace(path: &Path) -> Result<()> {
     let lsp_dir = get_lsp_definitions_dir()?;
     fs::create_dir_all(&lsp_dir)?;
@@ -20,12 +24,14 @@ pub fn setup_lsp_workspace(path: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Returns the directory where Zoi LSP definitions are stored.
 pub fn get_lsp_definitions_dir() -> Result<PathBuf> {
     let home_dir = zoi_core::utils::get_user_home()
         .ok_or_else(|| anyhow!("Could not find home directory."))?;
     Ok(home_dir.join(".zoi").join("lsp"))
 }
 
+/// Generates the content for a `.luarc.json` file that includes Zoi definitions.
 fn generate_luarc_json(lsp_dir: &Path) -> Result<String> {
     let lsp_dir_str = lsp_dir.to_string_lossy().replace('\\', "/");
 

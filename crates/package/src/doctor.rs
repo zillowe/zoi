@@ -1,3 +1,10 @@
+//! Package health and metadata validation.
+//!
+//! This module implements the `zoi package doctor` command, which performs
+//! static analysis on a `.pkg.lua` file to identify potential issues,
+//! such as missing metadata, invalid dependency strings, or missing
+//! lifecycle functions.
+
 use anyhow::{Result, anyhow};
 use regex::Regex;
 use std::collections::HashSet;
@@ -6,12 +13,16 @@ use zoi_core::types;
 use zoi_deps as dependencies;
 use zoi_lua;
 
+/// A report containing errors and warnings found during package validation.
 #[derive(Debug, Default)]
 pub struct DoctorReport {
+    /// List of critical issues that prevent the package from being built or used correctly.
     pub errors: Vec<String>,
+    /// List of non-critical issues or suggestions for improvement.
     pub warnings: Vec<String>,
 }
 
+/// Runs a health check on a Zoi package definition.
 pub fn run(
     package_file: &Path,
     platform_override: Option<&str>,
@@ -155,6 +166,7 @@ pub fn run(
     Ok(report)
 }
 
+/// Validates a dependency group, ensuring all dependency strings are well-formed and consistent.
 fn validate_dependency_group(
     group: &types::DependencyGroup,
     context: &str,
@@ -201,6 +213,7 @@ fn validate_dependency_group(
     }
 }
 
+/// Validates an individual dependency string.
 fn validate_dependency_string(dep: &str, context: &str, bucket: &str, report: &mut DoctorReport) {
     if let Err(err) = dependencies::parse_dependency_string(dep) {
         report.errors.push(format!(
@@ -210,6 +223,7 @@ fn validate_dependency_string(dep: &str, context: &str, bucket: &str, report: &m
     }
 }
 
+/// Scans Lua code for expected lifecycle functions and reports missing ones as warnings.
 fn validate_lua_functions(lua_code: &str, report: &mut DoctorReport) {
     let has_prepare = Regex::new(r"(?m)\bfunction\s+prepare\s*\(")
         .map(|re| re.is_match(lua_code))
@@ -239,6 +253,7 @@ fn validate_lua_functions(lua_code: &str, report: &mut DoctorReport) {
     }
 }
 
+/// Ensures that the package's declared repo matches its filesystem location within a registry.
 fn validate_path_consistency(
     package_file: &Path,
     package: &types::Package,

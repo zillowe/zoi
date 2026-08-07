@@ -1,3 +1,5 @@
+//! Tests for various dependency group types and structures.
+
 use zoi::pkg::types::{ComplexDependencyGroup, DependencyGroup};
 
 #[test]

@@ -1,3 +1,10 @@
+//! Command for searching packages or files in registries.
+//!
+//! This module provides functionality to search for packages by name,
+//! description, or tags, as well as searching for specific files
+//! within packages. It supports both a standard table output and
+//! an interactive TUI.
+
 use crate::pkg::{config, local, types::Package, types::PackageType};
 use anyhow::{Result, anyhow};
 use colored::Colorize;
@@ -19,6 +26,7 @@ use std::io::{self};
 
 use rayon::prelude::*;
 
+/// Runs the search command with the provided terms and options.
 pub fn run(
     search_term: String,
     registry_filter: Option<String>,
@@ -278,6 +286,7 @@ pub fn run(
     Ok(())
 }
 
+/// Searches for files matching the given term.
 fn run_file_search(
     term: String,
     registry_filter: Option<String>,
@@ -359,6 +368,7 @@ fn run_file_search(
     Ok(())
 }
 
+/// Runs the interactive TUI for package search results.
 fn run_tui(packages: Vec<Package>, handle_for_version: Option<&str>) -> Result<()> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -386,6 +396,7 @@ fn run_tui(packages: Vec<Package>, handle_for_version: Option<&str>) -> Result<(
     Ok(())
 }
 
+/// Main loop for the search TUI.
 fn run_tui_loop(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     packages: Vec<Package>,

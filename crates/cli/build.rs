@@ -1,7 +1,13 @@
+//! Build script for zoi-cli.
+//!
+//! This script passes necessary environment variables, such as default registry URLs
+//! and commit hashes, to the compiler so they can be embedded in the CLI binary.
+
 use std::env;
 use std::error::Error;
 use std::path::Path;
 
+/// Environment variables that should trigger a rebuild if changed.
 const BUILD_ENV_VARS: &[&str] = &[
     "ZOI_COMMIT_HASH",
     "POSTHOG_API_KEY",
@@ -11,9 +17,12 @@ const BUILD_ENV_VARS: &[&str] = &[
     "ZOI_ABOUT_PACKAGER_HOMEPAGE",
     "ZOI_DEFAULT_REGISTRY",
 ];
+/// The default Git registry URL used if none is specified in the environment.
 const DEFAULT_REGISTRY: &str = "https://gitlab.com/zillowe/zillwen/zusty/zoidberg.git";
+/// The range of indices used for built-in authority environment variables.
 const AUTHORITIES_KEY_RANGE: std::ops::Range<usize> = 1..10;
 
+/// Forwards an environment variable from the build environment to the `rustc` compiler.
 fn forward_env_var(var: &str) {
     if let Ok(val) = env::var(var) {
         println!("cargo:rustc-env={var}={val}");

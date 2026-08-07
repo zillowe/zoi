@@ -4,8 +4,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex};
 
+/// Global mutex for recording package changes to prevent concurrent writes to the lockfile.
 static RECORD_MUTEX: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
+/// Returns the path to the lockfile for the given scope.
 fn get_lockfile_path(scope: types::Scope) -> Result<PathBuf> {
     let path = if scope == types::Scope::Project {
         std::env::current_dir()?.join("zoi.lock")
@@ -21,6 +23,7 @@ fn get_lockfile_path(scope: types::Scope) -> Result<PathBuf> {
     Ok(path)
 }
 
+/// Reads and parses the lockfile for the given scope.
 fn read_lockfile(scope: types::Scope) -> Result<types::ZoiLockV2> {
     let path = get_lockfile_path(scope)?;
     if !path.exists() || fs::read_to_string(&path)?.trim().is_empty() {
@@ -78,6 +81,7 @@ fn write_lockfile(lockfile: &mut types::ZoiLockV2, scope: types::Scope) -> Resul
     Ok(())
 }
 
+/// Records a package installation or update in the lockfile.
 pub fn record_package(
     pkg: &types::Package,
     reason: &types::InstallReason,
@@ -175,6 +179,7 @@ fn compute_package_hash(pkg: &types::Package, registry_handle: &str) -> String {
     }
 }
 
+/// Resolves the registry information for a given registry handle.
 fn resolve_registry_info(registry_handle: &str) -> Option<types::LockRegistryV2> {
     let Ok(config) = crate::config::read_config() else {
         return None;
@@ -200,6 +205,7 @@ fn resolve_registry_info(registry_handle: &str) -> Option<types::LockRegistryV2>
     })
 }
 
+/// Resolves the current Git HEAD revision for a repository.
 fn resolve_git_head(repo_path: &Path) -> Option<String> {
     let head_file = repo_path.join(".git").join("HEAD");
     let content = fs::read_to_string(&head_file).ok()?;
@@ -214,6 +220,7 @@ fn resolve_git_head(repo_path: &Path) -> Option<String> {
     }
 }
 
+/// Updates the installation reason for a package in the lockfile.
 pub fn update_package_reason(
     manifest: &types::InstallManifest,
     new_reason: types::InstallReason,
@@ -244,6 +251,7 @@ pub fn update_package_reason(
     }
 }
 
+/// Removes a package from the lockfile record.
 pub fn remove_package_from_record(manifest: &types::InstallManifest) -> Result<()> {
     let _lock = RECORD_MUTEX
         .lock()
@@ -266,6 +274,7 @@ pub fn remove_package_from_record(manifest: &types::InstallManifest) -> Result<(
     Ok(())
 }
 
+/// Returns all recorded packages across all scopes.
 pub fn get_recorded_packages() -> Result<Vec<types::LockPackageDetailV2>> {
     let mut all_packages = Vec::new();
     for scope in [

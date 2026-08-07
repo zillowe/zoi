@@ -1,3 +1,5 @@
+//! Integration tests for hashing, PGP signatures, and security verification.
+
 use std::fs;
 use tempfile::tempdir;
 use zoi::pkg::{hash, helper, pgp};

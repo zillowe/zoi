@@ -1,3 +1,5 @@
+//! Integration tests for Zoi Storage Architecture (ZSA) and scoping.
+
 use std::fs;
 use tempfile::tempdir;
 use zoi::Scope;

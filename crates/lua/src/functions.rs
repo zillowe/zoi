@@ -1,3 +1,9 @@
+//! High-level Lua environment setup and execution functions.
+//!
+//! This module provides the `setup_lua_environment` function, which is responsible
+//! for initializing the Lua state with all the necessary globals, tables, and
+//! utility functions required by Zoi package scripts.
+
 use crate::api;
 use mlua::Lua;
 use zoi_core::utils;

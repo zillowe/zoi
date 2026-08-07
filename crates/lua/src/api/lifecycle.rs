@@ -12,6 +12,7 @@ use std::path::Path;
 /// - `IMPORT`/`INCLUDE`: Helpers for modular package definitions.
 ///
 /// These functions bridge the declarative metadata and the imperative build logic.
+/// Adds the `IMPORT` function to the Lua environment for importing data from other files.
 pub fn add_import_util(lua: &Lua, current_path: &Path) -> Result<(), mlua::Error> {
     let current_path_buf = current_path.to_path_buf();
     let import_fn = lua.create_function(move |lua, file_name: String| {
@@ -56,6 +57,7 @@ pub fn add_import_util(lua: &Lua, current_path: &Path) -> Result<(), mlua::Error
     Ok(())
 }
 
+/// Adds the `INCLUDE` function to the Lua environment for executing other Lua files.
 pub fn add_include_util(lua: &Lua, current_path: &Path) -> Result<(), mlua::Error> {
     let current_path_buf = current_path.to_path_buf();
     let include_fn =
@@ -78,6 +80,7 @@ pub fn add_include_util(lua: &Lua, current_path: &Path) -> Result<(), mlua::Erro
     Ok(())
 }
 
+/// Adds core lifecycle functions (`metadata`, `dependencies`, `hooks`, etc.) to the Lua environment.
 pub fn add_package_lifecycle_functions(lua: &Lua) -> Result<(), mlua::Error> {
     let metadata_fn = lua.create_function(move |lua, pkg_def: Table| {
         if let Ok(meta_table) = lua.globals().get::<Table>("__ZoiPackageMeta")

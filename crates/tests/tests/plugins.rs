@@ -1,3 +1,5 @@
+//! Integration tests for Zoi plugin management and verification.
+
 use sha2::Digest;
 use std::fs;
 use tempfile::tempdir;

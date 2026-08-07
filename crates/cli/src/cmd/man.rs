@@ -1,3 +1,9 @@
+//! Command for displaying manual pages for packages.
+//!
+//! This module provides a TUI (Terminal User Interface) and a pager-based
+//! way to view manual pages, supporting both locally installed pages
+//! and fetching pages from upstream registries.
+
 use crate::pkg::{
     db, local, resolve,
     types::{self},
@@ -30,14 +36,20 @@ use syntect::{
 };
 use walkdir::WalkDir;
 
+/// State for the manual page viewer TUI.
 struct App<'a> {
+    /// The manual pages to display, parsed as TUI lines.
     pages: Vec<(String, Vec<Line<'a>>)>,
+    /// Index of the currently displayed page.
     current_page: usize,
+    /// Vertical scroll position.
     scroll: u16,
+    /// Total height of the current page's content.
     content_height: u16,
 }
 
 impl<'a> App<'a> {
+    /// Tries to create a new TUI app from a map of page names to content.
     fn try_new(pages: BTreeMap<String, String>) -> Result<Self> {
         let mut parsed_pages = Vec::new();
         for (name, content) in pages {
@@ -59,6 +71,7 @@ impl<'a> App<'a> {
     }
 }
 
+/// Runs the manual page viewer for the specified package.
 pub fn run(package_name: &str, upstream: bool, raw: bool, no_tui: bool) -> Result<()> {
     let (pkg, registry_handle) = resolve_package_for_man(package_name)?;
 
@@ -119,6 +132,7 @@ pub fn run(package_name: &str, upstream: bool, raw: bool, no_tui: bool) -> Resul
     Ok(())
 }
 
+/// Runs a pager to display the given content.
 fn run_pager(content: &str) -> Result<()> {
     let pager = std::env::var("PAGER").ok();
 
@@ -140,6 +154,7 @@ fn run_pager(content: &str) -> Result<()> {
     Ok(())
 }
 
+/// Spawns a specific pager process and writes content to its stdin.
 fn spawn_pager(pager: &str, content: &str) -> Result<()> {
     let mut child = std::process::Command::new(pager)
         .stdin(std::process::Stdio::piped())
@@ -159,6 +174,7 @@ fn spawn_pager(pager: &str, content: &str) -> Result<()> {
     Ok(())
 }
 
+/// Resolves a package and optional registry handle for a given search term.
 pub fn resolve_package_for_man(term: &str) -> Result<(types::Package, Option<String>)> {
     if let Ok((pkg, _, _, _, registry_handle, _, _)) =
         resolve::resolve_package_and_version(term, None, false, false)
@@ -189,6 +205,7 @@ pub fn resolve_package_for_man(term: &str) -> Result<(types::Package, Option<Str
     ))
 }
 
+/// Gathers manual pages for a package, checking locally and then upstream.
 pub fn gather_manual_pages(
     pkg: &types::Package,
     registry_handle: &Option<String>,
@@ -251,6 +268,7 @@ pub fn gather_manual_pages(
     Ok(pages)
 }
 
+/// Recursively finds manual pages in a directory hierarchy.
 fn find_man_pages_in_hierarchy(root: &Path, term: &str) -> Result<BTreeMap<String, String>> {
     let mut pages = BTreeMap::new();
     if !root.exists() {
@@ -277,6 +295,7 @@ fn find_man_pages_in_hierarchy(root: &Path, term: &str) -> Result<BTreeMap<Strin
     Ok(pages)
 }
 
+/// Fetches manual pages for a package from the upstream registry.
 fn gather_manual_pages_from_upstream(
     pkg: &types::Package,
     registry_handle: &Option<String>,
@@ -386,6 +405,7 @@ fn gather_manual_pages_from_upstream(
     Ok(pages)
 }
 
+/// Finds manual pages in a package's installation directory.
 fn find_local_man_pages(latest_dir: &Path) -> Result<BTreeMap<String, String>> {
     let mut pages = BTreeMap::new();
 
@@ -427,6 +447,7 @@ fn find_local_man_pages(latest_dir: &Path) -> Result<BTreeMap<String, String>> {
     Ok(pages)
 }
 
+/// Parses a ROFF-formatted string (traditional man page) into a simplified Markdown string.
 pub fn parse_roff(content: &str) -> String {
     let mut md = String::new();
     for line in content.lines() {
@@ -465,6 +486,7 @@ pub fn parse_roff(content: &str) -> String {
     md
 }
 
+/// Main loop for the TUI application.
 fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) -> io::Result<()> {
     loop {
         terminal.draw(|f| ui(f, &mut app))?;
@@ -512,6 +534,7 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) 
     }
 }
 
+/// Renders the TUI.
 fn ui(f: &mut Frame, app: &mut App) {
     let size = f.area();
 
@@ -580,6 +603,7 @@ fn ui(f: &mut Frame, app: &mut App) {
     );
 }
 
+/// Parses Markdown content into TUI lines.
 fn parse_markdown(content: &str) -> Result<Vec<Line<'static>>> {
     let mut options = Options::empty();
     options.insert(Options::ENABLE_STRIKETHROUGH);

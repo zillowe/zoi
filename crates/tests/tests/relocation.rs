@@ -1,3 +1,5 @@
+//! Integration tests for package relocation and path adjustment.
+
 use std::fs;
 use tempfile::tempdir;
 use zoi::pkg::package::relocate;

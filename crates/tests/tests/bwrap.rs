@@ -1,3 +1,5 @@
+//! Integration tests for Bubblewrap sandbox integration.
+
 use std::fs;
 use tempfile::tempdir;
 use zoi::pkg::package::bwrap;

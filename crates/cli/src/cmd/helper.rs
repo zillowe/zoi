@@ -1,12 +1,20 @@
+//! Helper commands for the Zoi CLI.
+//!
+//! These commands are primarily used for internal operations, debugging, or
+//! utility tasks like hashing files and validating configuration.
+
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
+/// The root helper command.
 #[derive(Parser, Debug)]
 pub struct HelperCommand {
+    /// The specific helper subcommand to execute.
     #[command(subcommand)]
     pub command: HelperCommands,
 }
 
+/// Available helper subcommands.
 #[derive(Subcommand, Debug)]
 pub enum HelperCommands {
     /// Get a hash of a local file or a file from a URL
@@ -25,6 +33,7 @@ pub enum HelperCommands {
     ElevateUninstall(ElevateUninstallCommand),
 }
 
+/// Arguments for the escalated install-node command.
 #[derive(Parser, Debug)]
 pub struct ElevateInstallNodeCommand {
     /// Path to the JSON file containing the serialized InstallNode
@@ -44,6 +53,7 @@ pub struct ElevateInstallNodeCommand {
     pub link_bins: bool,
 }
 
+/// Arguments for the escalated uninstall command.
 #[derive(Parser, Debug)]
 pub struct ElevateUninstallCommand {
     /// Path to the JSON file containing the serialized InstallManifest
@@ -54,6 +64,7 @@ pub struct ElevateUninstallCommand {
     pub yes: bool,
 }
 
+/// Arguments for the get-hash command.
 #[derive(Parser, Debug)]
 pub struct GetHashCommand {
     /// The local file path or URL to hash
@@ -65,6 +76,7 @@ pub struct GetHashCommand {
     pub hash: HashAlgorithm,
 }
 
+/// Arguments for the validate command.
 #[derive(Parser, Debug)]
 pub struct ValidateCommand {
     /// The local file path to validate
@@ -72,12 +84,16 @@ pub struct ValidateCommand {
     pub file: std::path::PathBuf,
 }
 
+/// Supported hash algorithms for the get-hash command.
 #[derive(clap::ValueEnum, Clone, Debug, Copy)]
 pub enum HashAlgorithm {
+    /// SHA-512 algorithm.
     Sha512,
+    /// SHA-256 algorithm.
     Sha256,
 }
 
+/// Run the helper command.
 pub fn run(args: HelperCommand) -> Result<()> {
     match args.command {
         HelperCommands::GetHash(cmd) => {

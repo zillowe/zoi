@@ -1,5 +1,6 @@
 use std::sync::{OnceLock, RwLock};
 
+/// Returns the global store for the offline mode flag.
 fn offline_mode_store() -> &'static RwLock<bool> {
     static OFFLINE_MODE: OnceLock<RwLock<bool>> = OnceLock::new();
     OFFLINE_MODE.get_or_init(|| RwLock::new(false))

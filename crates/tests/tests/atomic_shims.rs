@@ -1,3 +1,5 @@
+//! Integration tests for atomic shim updates and management.
+
 use std::fs;
 use tempfile::tempdir;
 use zoi::pkg::{local, package, types};
