@@ -27,7 +27,7 @@ pub struct RegistrySpec {
     pub url: String,
     /// The git revision of the registry.
     pub revision: Option<String>,
-    /// The type of registry (e.g., "git").
+    /// The type of registry (e.g. "git").
     #[serde(rename = "type")]
     pub registry_type: Option<String>,
 }

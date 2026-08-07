@@ -6,7 +6,7 @@ use std::path::PathBuf;
 /// Represents a package pinned to a specific version from a specific source.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PinnedPackage {
-    /// The source of the package (e.g., its PURL or name).
+    /// The source of the package (e.g. its PURL or name).
     pub source: String,
     /// The specific version the package is pinned to.
     pub version: String,

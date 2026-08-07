@@ -208,7 +208,7 @@ pub fn download_and_cache_archive(
 pub struct PreparedNode {
     /// Path to the downloaded or built archive.
     pub archive_path: PathBuf,
-    /// The method used for installation (e.g., "pre-compiled", "source").
+    /// The method used for installation (e.g. "pre-compiled", "source").
     pub install_method: String,
     /// Whether the archive was built from source.
     pub is_build: bool,

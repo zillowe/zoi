@@ -67,7 +67,7 @@ struct BinMapping {
 /// Represents a download specification for a package.
 #[derive(Debug, Clone)]
 struct DownloadSpec {
-    /// The architecture key (e.g., "64bit", "arm64", "default").
+    /// The architecture key (e.g. "64bit", "arm64", "default").
     arch_key: String,
     /// The download URLs.
     urls: Vec<String>,

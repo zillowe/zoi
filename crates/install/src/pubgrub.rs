@@ -34,7 +34,7 @@ pub struct PkgName {
     pub sub_package: Option<String>,
     /// The repository name where the package is hosted.
     pub repo: String,
-    /// The registry handle (e.g., "zoidberg").
+    /// The registry handle (e.g. "zoidberg").
     pub registry: String,
     /// An explicit source URL, file path, or git reference, if provided.
     pub explicit_source: Option<String>,
@@ -72,7 +72,7 @@ impl SemVersion {
 
     /// Parses a version string into a `SemVersion`.
     ///
-    /// Handles epoch prefixes (e.g., "1:1.2.3") and sanitizes non-standard strings.
+    /// Handles epoch prefixes (e.g. "1:1.2.3") and sanitizes non-standard strings.
     pub fn parse(v: &str) -> Result<Self, anyhow::Error> {
         let (epoch, version_str) = if let Some((e_str, v_str)) = v.split_once(':') {
             if let Ok(e) = e_str.parse::<u32>() {

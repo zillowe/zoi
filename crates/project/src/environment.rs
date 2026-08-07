@@ -112,7 +112,7 @@ fn check_packages(config: &config::ProjectConfig) -> Result<()> {
 
 /// Exports environment variables to the shell.
 ///
-/// This prints shell-specific commands (e.g., `export` for Bash/Zsh) that can be
+/// This prints shell-specific commands (e.g. `export` for Bash/Zsh) that can be
 /// evaluated to set up the environment variables for the current project.
 pub fn export_shell(
     env_alias: Option<&str>,

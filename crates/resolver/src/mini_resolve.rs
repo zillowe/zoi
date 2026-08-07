@@ -22,7 +22,7 @@ fn default_revision() -> String {
 pub struct MiniPackageIndex {
     /// The repository where the package is located.
     pub repo: String,
-    /// The type of repository (e.g., official, unofficial).
+    /// The type of repository (e.g. official, unofficial).
     pub repo_type: String,
     /// The current version of the package.
     pub version: String,
