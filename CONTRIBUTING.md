@@ -1,6 +1,8 @@
 # Contributing
 
-First of all, thank you for considering contributing to Zoi! We're excited to have you on board and appreciate your help in making our project better. Every contribution, no matter how small, is valuable to us.
+First of all, thank you for considering contributing to Zoi!
+We're excited to have you on board and appreciate your help in
+making our project better. Every contribution, no matter how small, is valuable to us.
 
 <details>
 <summary>Table of Contents</summary>
@@ -24,16 +26,21 @@ First of all, thank you for considering contributing to Zoi! We're excited to ha
 
 ## How to Contribute
 
-We welcome contributions in many forms, including bug reports, feature requests, documentation improvements, and code contributions.
+We welcome contributions in many forms, including bug reports, feature requests,
+documentation improvements, and code contributions.
 
 You can use two of our [mirrors](/README.md#-repositories-mirrors) for contributions.
 
 - [GitLab](https://gitlab.com/zillowe/zillwen/zusty/zoi): Main & Preferred
-- [GitHub](https://github.com/zillowe/zoi) or [Codeberg](https://codeberg.org/zillowe/zoi): Issues and PRs are welcomed if you don't want to use GitLab.
+- [GitHub](https://github.com/zillowe/zoi) or
+[Codeberg](https://codeberg.org/zillowe/zoi): Issues and PRs are welcomed if
+you don't want to use GitLab.
 
 ### Reporting Bugs or Requesting Features
 
-If you find a bug or have an idea for a new feature, please check our [**issue tracker**](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/issues) to see if it has already been reported. If not, feel free to open a new issue.
+If you find a bug or have an idea for a new feature, please check our
+[**issue tracker**](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/issues) to
+see if it has already been reported. If not, feel free to open a new issue.
 
 - [Report a Bug](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/issues/new?issuable_template=Bug%20Report)
 - [Request a Feature](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/issues/new?issuable_template=Feature%20Request)
@@ -61,12 +68,15 @@ To get started with developing Zoi, you'll need to set up your local environment
 
 ### Prerequisites
 
-- **Rust:** Make sure you have the latest version of Rust and Cargo installed. You can find instructions at [rust-lang.org](https://www.rust-lang.org/tools/install).
+- **Rust:** Make sure you have the latest version of Rust and Cargo installed.
+You can find instructions at [rust-lang.org](https://www.rust-lang.org/tools/install).
 - **Just:** The `just` command is required for our Justfile-based build process.
 
 ### First-Time Setup
 
-Because Zoi is used to manage its own development, you must first build and install it manually using `just` (Or you can install [pre-compiled binaries](/README.md#-installation) instead):
+Because Zoi is used to manage its own development, you must first build and
+install it manually using `just` (Or you can install
+[pre-compiled binaries](/README.md#-installation) instead):
 
 1. **Configure the build:**
 
@@ -87,11 +97,14 @@ Once you have a working `zoi` command, you can use it for all other development 
 
 ### Development with Docker
 
-While a local Rust installation is recommended for active development, you can use Docker to develop and build Zoi without polluting your local machine.
+While a local Rust installation is recommended for active development,
+you can use Docker to develop and build Zoi without polluting your local machine.
 
 #### Using the Official Zoi CLI Docker Image
 
-For quick development or testing, you can pull and use the official Zoi CLI Docker image directly from the GitLab Container Registry. This image contains the `zoi` binary and its runtime dependencies.
+For quick development or testing, you can pull and use the official Zoi CLI
+Docker image directly from the GitLab Container Registry.
+This image contains the `zoi` binary and its runtime dependencies.
 
 ```sh
 # Pull the latest Zoi CLI image
@@ -103,7 +116,8 @@ docker run --rm registry.gitlab.com/zillowe/zillwen/zusty/zoi/zoi:latest zoi --v
 
 #### Building the Docker Image Locally
 
-If you need to build the Docker image locally (e.g. for custom configurations or testing changes to the `Dockerfile`), you can do so:
+If you need to build the Docker image locally (e.g. for custom configurations or
+testing changes to the `Dockerfile`), you can do so:
 
 1. **Build the image:**
    The following command builds the final, lightweight Docker image containing the `zoi` binary.
@@ -113,7 +127,8 @@ If you need to build the Docker image locally (e.g. for custom configurations or
    ```
 
 2. **Extract the binary:**
-   If you want to get the compiled `zoi` binary from the image to use on your host system, run these commands:
+   If you want to get the compiled `zoi` binary from the image to use on your
+host system, run these commands:
 
    ```sh
    docker create --name zoi-container zoi
@@ -125,22 +140,29 @@ If you need to build the Docker image locally (e.g. for custom configurations or
 
 ### Development Workflow with Zoi
 
-We use `zoi` itself to manage project tasks, which are defined in the `zoi.lua` file. You can run tasks using `zoi run <command>` or set up environments with `zoi env <environment>`.
+We use `zoi` itself to manage project tasks, which are defined in the `zoi.lua`
+file. You can run tasks using `zoi run <command>` or set up environments
+with `zoi env <environment>`.
 
-If you run `zoi run` or `zoi env` without arguments, you'll get an interactive list of available commands.
+If you run `zoi run` or `zoi env` without arguments, you'll get an interactive
+list of available commands.
 
 #### The `zoi.lua` file
 
 The `zoi.lua` file is the heart of our project-specific workflow. It defines:
 
-- `commands`: Aliases for longer shell commands, e.g. `zoi run lint`. These can be platform-specific.
-- `environments`: Groups of commands to set up a development environment, e.g. `zoi env pre`.
+- `commands`: Aliases for longer shell commands, e.g. `zoi run lint`.
+These can be platform-specific.
+- `environments`: Groups of commands to set up a development environment,
+e.g. `zoi env pre`.
 
-When adding a new build step or a useful script, you should add it to the `commands` section in `zoi.lua`.
+When adding a new build step or a useful script, you should add it to the
+`commands` section in `zoi.lua`.
 
 #### Passing Arguments to Commands
 
-To pass arguments to the underlying script, add them after the command alias. Use `--` to separate the arguments from Zoi's own options if needed.
+To pass arguments to the underlying script, add them after the command alias.
+Use `--` to separate the arguments from Zoi's own options if needed.
 
 ```sh
 # This runs 'cargo check --tests'
@@ -149,13 +171,16 @@ zoi run check -- --tests
 
 #### Environment Preparation
 
-Before you commit changes, run the `pre` environment to ensure your changes meet our quality standards. It will check for unused dependencies, format your code, and run lints and other checks.
+Before you commit changes, run the `pre` environment to ensure your changes
+meet our quality standards. It will check for unused dependencies,
+format your code, and run lints and other checks.
 
 ```sh
 zoi env pre
 ```
 
-This single command is equivalent to running `zoi run deps`, `zoi run lint`, `zoi run fmt`, `zoi run check`, and `zoi run test` in sequence.
+This single command is equivalent to running `zoi run deps`, `zoi run lint`,
+`zoi run fmt`, `zoi run check`, and `zoi run test` in sequence.
 
 #### Development Commands
 
@@ -217,12 +242,18 @@ Here are the most common commands defined in `zoi.lua`:
 
 ## Commit Messages
 
-Please write clear and descriptive commit messages. A good commit message should explain the "what" and "why" of your changes.
+Please write clear and descriptive commit messages. A good commit message
+should explain the "what" and "why" of your changes.
 
-We mostly use [ZFGM Commits](https://zillowe.qzz.io/docs/methods/zfgm/commits) when creating our commit messages, to use it with [GCT](https://gitlab.com/zillowe/zillwen/zusty/gct) follow [GCT Docs](https://zillowe.qzz.io/docs/zds/gct).
+We mostly use [ZFGM Commits](https://zillowe.qzz.io/docs/methods/zfgm/commits)
+when creating our commit messages, to use it with
+[GCT](https://gitlab.com/zillowe/zillwen/zusty/gct) follow
+[GCT Docs](https://zillowe.qzz.io/docs/zds/gct).
 
 ## Code of Conduct
 
-By contributing to Zoi, you agree to abide by our [Code of Conduct](./CODE_OF_CONDUCT.md). Please read it to understand our community standards.
+By contributing to Zoi, you agree to abide by our
+[Code of Conduct](./CODE_OF_CONDUCT.md).
+Please read it to understand our community standards.
 
 Thank you again for your interest in contributing to Zoi! We look forward to your contributions.

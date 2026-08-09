@@ -1,6 +1,7 @@
-# Security Policy
+# Security
 
-The Security Policy can be found online at [zillowe.qzz.io/docs/book/guidelines/security](https://zillowe.qzz.io/docs/book/guidelines/security).
+The Security Policy can be found online at
+[zillowe.qzz.io/docs/book/guidelines/security](https://zillowe.qzz.io/docs/book/guidelines/security).
 
 ## Supported Versions
 
@@ -26,7 +27,8 @@ The Security Policy can be found online at [zillowe.qzz.io/docs/book/guidelines/
 
 The NPM package just runs the installer script.
 
-Fedora package is from an external [Terra](https://terra.fyralabs.com/) repo and is not maintained by us, updates can be late.
+Fedora package is from an external [Terra](https://terra.fyralabs.com/) repo
+and is not maintained by us, updates can be late.
 
 Meanings:
 
@@ -36,9 +38,11 @@ Meanings:
 
 ## Security Updates
 
-We take security seriously. Security updates are released as soon as possible after a vulnerability is discovered and verified.
+We take security seriously. Security updates are released as soon as possible
+after a vulnerability is discovered and verified.
 
-Always make sure you have the latest Zoi version, to get the latest Zoi version install/update it from supported packages or by running this command:
+Always make sure you have the latest Zoi version, to get the latest Zoi version
+install/update it from supported packages or by running this command:
 
 ```sh
 zoi upgrade
@@ -55,4 +59,5 @@ If you discover a security vulnerability, please follow these steps:
    - Steps to reproduce the issue
    - Potential impact
 4. If you're creating a GitLab issue make sure you turn on confidentiality.
-5. If you're sending an email make sure to encrypt your email with our [public PGP key](https://zillowe.pages.dev/keys/zillowe-main.asc) and link your public key.
+5. If you're sending an email make sure to encrypt your email with our
+[public PGP key](https://zillowe.pages.dev/keys/zillowe-main.asc) and link your public key.

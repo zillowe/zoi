@@ -67,48 +67,76 @@
 
 </details>
 
-Zoi is an advanced package manager and environment orchestrator, designed to simplify package management and environment configuration across multiple operating systems.
+Zoi is an advanced package manager and environment orchestrator, designed to
+simplify package management and environment configuration across multiple
+operating systems.
 
 ## Features
 
 - **Cross-Platform:** Works seamlessly on Linux, macOS, and Windows.
-- **Just-in-Time Privilege Escalation:** Automatically prompts for `sudo` or `doas` only when system-wide operations are required, keeping your environment and caches cleanly in user-space.
-- **Dynamic Package Definitions:** Define packages with dynamic Lua scripts (`.pkg.lua`) for maximum flexibility.
-- **ZoiOS Distro Engine:** Bootstrap and manage entire Linux distributions declaratively.
-- **Extensive Dependency Management:** Integrates with over 40 system and language package managers (`apt`, `brew`, `cargo`, `npm`, `pip`, `go`, `bun`, etc.).
-- **Version Multiplexing via Intelligent Shims:** Automatically switch between different versions of the same tool (e.g. Node.js 18 vs 20) based on your project context (`zoi.lua`) or legacy configuration files (`.nvmrc`) through its extensible Lua plugin system.
-- **Rich Dependencies:** Define runtime and build dependencies with required, optional, and selectable options.
-- **Project Environments:** Manage project-specific commands and environments using a local `zoi.yaml` or a `zoi.lua` file.
-- **Repository-Based:** Use official, community, or your own private/public Git-based repositories.
-- **Secure & Verifiable:** Verifies package integrity with checksums and authenticity with GPG signatures. Supports Git commit signature verification for entire registries (Chain of Trust) and includes a built-in PGP keyring for out-of-the-box security.
-- **Decentralized Security Advisories:** Automated vulnerability tracking via `.sec.yaml` files co-located with packages. Zoi proactively warns you during installation or upgrades if a package has known security issues.
-- **Compliance & Audit Logging:** Maintain a persistent, tamper-evident audit log of all package operations (install, uninstall, upgrade), viewable via the `zoi history` command.
-- **Advanced Dependencies:** Supports virtual packages (`provides`) and package replacement (`replaces`).
+- **Just-in-Time Privilege Escalation:** Automatically prompts for `sudo` or
+`doas` only when system-wide operations are required, keeping your environment
+and caches cleanly in user-space.
+- **Dynamic Package Definitions:** Define packages with dynamic Lua scripts
+(`.pkg.lua`) for maximum flexibility.
+- **ZoiOS Distro Engine:** Bootstrap and manage entire Linux distributions
+declaratively.
+- **Extensive Dependency Management:** Integrates with over 40 system and
+language package managers (`apt`, `brew`, `cargo`, `npm`, `pip`, `go`,
+`bun`, etc.).
+- **Version Multiplexing via Intelligent Shims:** Automatically switch between
+different versions of the same tool (e.g. Node.js 18 vs 20) based on your
+project context (`zoi.lua`) or legacy configuration files (`.nvmrc`) through
+its extensible Lua plugin system.
+- **Rich Dependencies:** Define runtime and build dependencies with required,
+optional, and selectable options.
+- **Project Environments:** Manage project-specific commands and environments
+using a local `zoi.yaml` or a `zoi.lua` file.
+- **Repository-Based:** Use official, community, or your own private/public
+Git-based repositories.
+- **Secure & Verifiable:** Verifies package integrity with checksums and
+authenticity with GPG signatures. Supports Git commit signature verification
+for entire registries (Chain of Trust) and includes a built-in PGP keyring for
+out-of-the-box security.
+- **Decentralized Security Advisories:** Automated vulnerability tracking via
+`.sec.yaml` files co-located with packages. Zoi proactively warns you during
+installation or upgrades if a package has known security issues.
+- **Compliance & Audit Logging:** Maintain a persistent, tamper-evident audit
+log of all package operations (install, uninstall, upgrade), viewable via the
+`zoi history` command.
+- **Advanced Dependencies:** Supports virtual packages (`provides`) and
+package replacement (`replaces`).
 - **Versatile Package Types:** Supports different types of packages:
   - `Package`: A standard software package.
   - `Collection`: A meta-package that groups other packages together.
   - `App`: A template for bootstrapping new projects (`zoi create`).
   - `Extension`: A package to extend Zoi's own functionality or configuration.
-- **Local Package Development:** A dedicated `zoi package` command set (`build`, `bundle`, `install`, `doctor`, `init-lsp`) to streamline creating, linting, and testing packages locally.
+- **Local Package Development:** A dedicated `zoi package` command set
+(`build`, `bundle`, `install`, `doctor`, `init-lsp`) to streamline creating,
+linting, and testing packages locally.
 - **Advanced CLI Tools:**
   - `zoi man`: Read package manuals in the terminal.
   - `zoi audit`: Scan installed packages for known security vulnerabilities.
   - `zoi clone`: Clone a package's git repository.
   - `zoi download`: Download a package archive (.zpa) or source bundle (.zsa).
   - `zoi why`: Understand why a package is installed.
-  - `zoi rollback`: Revert a package to its previous version or roll back the newest remaining transaction log.
+  - `zoi rollback`: Revert a package to its previous version or roll back the
+  newest remaining transaction log.
   - `zoi pin`: Pin a package to a specific version.
   - `zoi exec`: Run a package's binary without installing it.
   - `zoi dev`: Enter a project-specific development shell with all dependencies.
-- **Zoi Mini:** A lightweight, zero-sync version for quick, one-off installations via `zm.sh` or `zm.ps1`. Supports `install`, `update`, `uninstall`, and `list` commands.
-- **Library Support:** Core functionality is available as a Rust library to be integrated into other applications.
+- **Zoi Mini:** A lightweight, zero-sync version for quick, one-off installations
+via `zm.sh` or `zm.ps1`. Supports `install`, `update`, `uninstall`, and `list` commands.
+- **Library Support:** Core functionality is available as a Rust library to be
+integrated into other applications.
 
 ## Special Thanks
 
 Thanks you all for helping with developing Zoi.
 
 - [GitLab](https://gitlab.com): For offering their Ultimate plan for OSS projects.
-- [Cloudflare](https://cloudflare.com): For offering their Pro plan through [Project Alexandria](https://www.cloudflare.com/lp/project-alexandria).
+- [Cloudflare](https://cloudflare.com): For offering their Pro plan through
+[Project Alexandria](https://www.cloudflare.com/lp/project-alexandria).
 
 ## Getting Started
 
@@ -133,7 +161,8 @@ Getting started with Zoi is simple. Just follow these three steps:
 
 ## Installation
 
-You can install Zoi using a package manager, an installer script, or by building it from source.
+You can install Zoi using a package manager, an installer script, or by
+building it from source.
 
 ### Scripts
 
@@ -145,7 +174,8 @@ You can use our installer scripts for a quick setup.
 curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash
 ```
 
-Or if you want a truly safe way to run this script use [ZSM](https://zillowe.qzz.io/docs/zds/zsm).
+Or if you want a truly safe way to run this script use
+[ZSM](https://zillowe.qzz.io/docs/zds/zsm).
 
 ```sh
 curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.zsm | zsm
@@ -157,11 +187,13 @@ curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.zsm | zsm
 powershell -c "irm zillowe.pages.dev/scripts/zoi/install.ps1|iex"
 ```
 
-Don't see your preferred installation method here? It's probably in [`INSTALL.md`](./INSTALL.md).
+Don't see your preferred installation method here? It's probably in
+[`INSTALL.md`](./INSTALL.md).
 
 ### Build from Source
 
-If you prefer, you can build Zoi from source. You'll need [Rust](https://www.rust-lang.org) installed.
+If you prefer, you can build Zoi from source. You'll need
+[Rust](https://www.rust-lang.org) installed.
 
 **Build the release binary:**
 
@@ -178,7 +210,10 @@ sudo just install
 
 ### Zoi Mini
 
-Zoi Mini is a lightweight, zero-sync version of Zoi that allows you to install packages from the official Zoidberg registry without installing the full Zoi suite. It's designed for quick, one-off installations and supports basic management commands: `install`, `update`, `uninstall`, and `list`.
+Zoi Mini is a lightweight, zero-sync version of Zoi that allows you to install
+packages from the official Zoidberg registry without installing the full Zoi
+suite. It's designed for quick, one-off installations and supports basic
+management commands: `install`, `update`, `uninstall`, and `list`.
 
 #### Quick Start (Zero-Install)
 
@@ -196,7 +231,8 @@ curl -fsSL https://zillowe.pages.dev/zm.sh | sh -s -- i @zillowe/hello
 powershell -c "irm zillowe.pages.dev/zm.ps1 | iex" -args "i @zillowe/hello"
 ```
 
-This will download the `zoi-mini` binary to a temporary location, resolve the package metadata dynamically, and perform the installation.
+This will download the `zoi-mini` binary to a temporary location, resolve the
+package metadata dynamically, and perform the installation.
 
 ## Usage
 
@@ -309,11 +345,13 @@ Here are some common commands to get you started.
   zoi upgrade
   ```
 
-For more detailed information, please refer to the [Docs](https://zillowe.qzz.io/docs/zds/zoi).
+For more detailed information, please refer to the
+[Docs](https://zillowe.qzz.io/docs/zds/zoi).
 
 ## Contributing
 
-We welcome contributions from the community! If you'd like to contribute, please read our [Contributing Guidelines](./CONTRIBUTING.md) for more information.
+We welcome contributions from the community! If you'd like to contribute,
+please read our [Contributing Guidelines](./CONTRIBUTING.md) for more information.
 
 New features, enhancements and bug reports are welcome.
 
@@ -329,7 +367,8 @@ Zoi is hosted on multiple forges. The primary locations and mirrors are:
   - Primary: [GitLab](https://gitlab.com/zillowe/zillwen/zusty/zoidberg)
   - Mirrors: [GitHub](https://github.com/zillowe/zoidberg), [Codeberg](https://codeberg.org/Zillowe/Zoidberg)
 
-For details and CLI usage examples about Zoidberg registry, see the docs page: [Zoidberg](https://zillowe.qzz.io/docs/zds/zoi/zoidberg).
+For details and CLI usage examples about Zoidberg registry, see the docs page:
+[Zoidberg](https://zillowe.qzz.io/docs/zds/zoi/zoidberg).
 
 ## License
 
