@@ -31,14 +31,15 @@ pub enum InstallOrigin {
 
 impl InstallOrigin {
     /// Returns the string representation of the install origin.
-    pub fn as_str(self) -> &'static str {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
         match self {
-            InstallOrigin::RegistryPrebuilt => "registry-prebuilt",
-            InstallOrigin::RegistrySource => "registry-source",
-            InstallOrigin::LocalArchive => "local-archive",
-            InstallOrigin::LocalPackage => "local-package",
-            InstallOrigin::RemoteUrl => "url",
-            InstallOrigin::Unknown => "unknown",
+            Self::RegistryPrebuilt => "registry-prebuilt",
+            Self::RegistrySource => "registry-source",
+            Self::LocalArchive => "local-archive",
+            Self::LocalPackage => "local-package",
+            Self::RemoteUrl => "url",
+            Self::Unknown => "unknown",
         }
     }
 }
@@ -84,6 +85,7 @@ impl PreflightSummary {
     }
 
     /// Adds a row to the summary.
+    #[must_use]
     pub fn row(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
         self.rows.push(PreflightRow {
             key: key.into(),
@@ -124,6 +126,7 @@ impl ExplainReport {
     }
 
     /// Adds an item to the report.
+    #[must_use]
     pub fn item(
         mut self,
         subject: impl Into<String>,
@@ -150,7 +153,7 @@ pub struct PlanJsonV1 {
     pub schema: String,
     /// The command that generated this plan (e.g. "install", "update").
     pub command: String,
-    /// Command-specific fields (e.g. "packages", "totals", "dry_run").
+    /// Command-specific fields (e.g. "packages", "totals", "`dry_run`").
     #[serde(flatten)]
     pub fields: BTreeMap<String, Value>,
 }
@@ -168,32 +171,42 @@ impl PlanJsonV1 {
 
 /// Prints a preflight summary to the console.
 pub fn print_preflight(summary: &PreflightSummary) {
-    println!("\n{} {}", "::".bold().blue(), summary.title.bold());
+    let title = summary.title.bold();
+    println!("\n{} {title}", "::".bold().blue());
     for row in &summary.rows {
-        println!("  {:<24}{}", format!("{}:", row.key).cyan(), row.value);
+        let key = format!("{}:", row.key).cyan();
+        println!("  {:<24}{}", key, row.value);
     }
 }
 
 /// Prints a transaction summary to the console.
 pub fn print_transaction_summary(summary: &TransactionSummary) {
+    let command = &summary.command;
+    let success = summary.success.to_string().green();
+    let failed = summary.failed.to_string().red();
+    let skipped = summary.skipped.to_string().yellow();
     println!(
-        "\n{} {} summary: success={}, failed={}, skipped={}",
-        "::".bold().blue(),
-        summary.command,
-        summary.success.to_string().green(),
-        summary.failed.to_string().red(),
-        summary.skipped.to_string().yellow()
+        "\n{} {command} summary: success={success}, failed={failed}, skipped={skipped}",
+        "::".bold().blue()
     );
 }
 
 /// Emits a plan in JSON format to stdout.
+///
+/// # Errors
+///
+/// Returns an error if the plan cannot be serialized to JSON.
 pub fn emit_plan_json<T: Serialize>(plan: &T) -> anyhow::Result<()> {
     let json = serde_json::to_string_pretty(plan)?;
-    println!("{}", json);
+    println!("{json}");
     Ok(())
 }
 
 /// Emits a version 1 plan in JSON format to stdout.
+///
+/// # Errors
+///
+/// Returns an error if the plan cannot be serialized to JSON.
 pub fn emit_plan_json_v1(command: &str, payload: Value) -> anyhow::Result<()> {
     let mut fields = BTreeMap::new();
     match payload {
@@ -212,26 +225,34 @@ pub fn emit_plan_json_v1(command: &str, payload: Value) -> anyhow::Result<()> {
 
 /// Prints an explanation report to the console.
 pub fn print_explain(report: &ExplainReport) {
-    println!("\n{} {}", "::".bold().blue(), report.title);
+    let title = &report.title;
+    println!("\n{} {title}", "::".bold().blue());
     for item in &report.items {
-        println!("  - {} {}", item.subject.cyan(), item.reason);
+        let subject = item.subject.cyan();
+        let reason = &item.reason;
+        println!("  - {subject} {reason}");
         for detail in &item.details {
-            println!("    {}", detail.dimmed());
+            let detail = detail.dimmed();
+            println!("    {detail}");
         }
     }
 }
 
 /// Classifies the origin of a package based on its source string and the action being performed.
+#[must_use]
 pub fn classify_source_origin(source: &str, action_name: &str) -> InstallOrigin {
     if source.starts_with("http://") || source.starts_with("https://") {
         return InstallOrigin::RemoteUrl;
     }
-    if source.ends_with(".zpa") || source.ends_with(".pkg.tar.zst") || source.ends_with(".zsa") {
+    let path = std::path::Path::new(source);
+    if path.extension().is_some_and(|ext| {
+        ext.eq_ignore_ascii_case("zpa")
+            || ext.eq_ignore_ascii_case("zsa")
+            || source.ends_with(".pkg.tar.zst")
+    }) {
         return InstallOrigin::LocalArchive;
     }
-    if (source.ends_with(".pkg.lua") || source.ends_with(".manifest.yaml"))
-        && std::path::Path::new(source).exists()
-    {
+    if (source.ends_with(".pkg.lua") || source.ends_with(".manifest.yaml")) && path.exists() {
         return InstallOrigin::LocalPackage;
     }
     if action_name == "download" {
@@ -244,14 +265,11 @@ pub fn classify_source_origin(source: &str, action_name: &str) -> InstallOrigin 
 }
 
 /// Wraps an error with a user-friendly hint if one is available for the given error message and command.
+#[must_use]
 pub fn with_failure_hint(command: &str, err: anyhow::Error) -> anyhow::Error {
     let msg = err.to_string();
     let hint = failure_hint(&msg, command);
-    if let Some(hint_text) = hint {
-        anyhow!("{}\nHint: {}", msg, hint_text)
-    } else {
-        err
-    }
+    hint.map_or(err, |hint_text| anyhow!("{msg}\nHint: {hint_text}"))
 }
 
 /// Returns a user-friendly hint for a given error message and command.
@@ -322,7 +340,11 @@ mod tests {
             .row("Scope", "User")
             .row("Retry attempts", "3");
         assert_eq!(summary.rows.len(), 2);
-        assert_eq!(summary.rows[0].key, "Scope");
-        assert_eq!(summary.rows[1].value, "3");
+        if let Some(row) = summary.rows.first() {
+            assert_eq!(row.key, "Scope");
+        }
+        if let Some(row) = summary.rows.get(1) {
+            assert_eq!(row.value, "3");
+        }
     }
 }

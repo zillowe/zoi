@@ -36,7 +36,7 @@ pub enum HelperCommands {
 /// Arguments for the escalated install-node command.
 #[derive(Parser, Debug)]
 pub struct ElevateInstallNodeCommand {
-    /// Path to the JSON file containing the serialized InstallNode
+    /// Path to the JSON file containing the serialized `InstallNode`
     #[arg(long)]
     pub node_json: std::path::PathBuf,
     /// Path to the package archive (.zpa)
@@ -56,7 +56,7 @@ pub struct ElevateInstallNodeCommand {
 /// Arguments for the escalated uninstall command.
 #[derive(Parser, Debug)]
 pub struct ElevateUninstallCommand {
-    /// Path to the JSON file containing the serialized InstallManifest
+    /// Path to the JSON file containing the serialized `InstallManifest`
     #[arg(long)]
     pub manifest_json: std::path::PathBuf,
     /// Automatically answer yes to prompts
@@ -94,6 +94,10 @@ pub enum HashAlgorithm {
 }
 
 /// Run the helper command.
+///
+/// # Errors
+///
+/// Returns an error if any of the subcommands fail.
 pub fn run(args: HelperCommand) -> Result<()> {
     match args.command {
         HelperCommands::GetHash(cmd) => {
@@ -102,7 +106,7 @@ pub fn run(args: HelperCommand) -> Result<()> {
                 HashAlgorithm::Sha256 => crate::pkg::helper::HashType::Sha256,
             };
             let hash = crate::pkg::helper::get_hash(&cmd.source, hash_type)?;
-            println!("{}", hash);
+            println!("{hash}");
             Ok(())
         }
         HelperCommands::Validate(cmd) => crate::pkg::helper::validate::run(&cmd.file),

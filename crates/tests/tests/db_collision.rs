@@ -54,7 +54,7 @@ fn test_db_unique_constraint_includes_registry() {
             [],
             |row| row.get(0),
         )
-        .unwrap();
+        .expect("unwrap failed");
 
     assert_eq!(count, 2, "Both packages should exist in the database");
 }

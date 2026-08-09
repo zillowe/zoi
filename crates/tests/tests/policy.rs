@@ -11,17 +11,17 @@ fn graph_with_package(
     sub_package: Option<&str>,
 ) -> DependencyGraph {
     let mut graph = DependencyGraph::new();
-    let sub_package_owned = sub_package.map(|s| s.to_string());
+    let sub_package_owned = sub_package.map(std::string::ToString::to_string);
     let id = if let Some(sub) = sub_package {
-        format!("{}@1.0.0:{}", name, sub)
+        format!("{name}@1.0.0:{sub}")
     } else {
-        format!("{}@1.0.0", name)
+        format!("{name}@1.0.0")
     };
 
     graph.nodes.insert(
         id,
         InstallNode {
-            description: "".to_string(),
+            description: String::new(),
             repo_type: "official".to_string(),
             pkg: Package {
                 name: name.to_string(),

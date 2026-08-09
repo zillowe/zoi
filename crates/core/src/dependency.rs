@@ -43,10 +43,15 @@ static VER_RE: LazyLock<Regex> = LazyLock::new(|| {
 /// Arguments:
 /// - `dep_str`: The raw dependency string from a package definition.
 /// - `is_known_manager`: A closure that determines if a prefix should be treated as a manager name.
-pub fn parse_dependency_string<'a>(
-    dep_str: &'a str,
+///
+/// # Errors
+///
+/// Returns an error if the dependency string is invalid, the package name is missing,
+/// or if the version requirement is malformed for the "zoi" manager.
+pub fn parse_dependency_string(
+    dep_str: &str,
     is_known_manager: impl Fn(&str) -> bool,
-) -> Result<Dependency<'a>> {
+) -> Result<Dependency<'_>> {
     let (manager, rest) = match dep_str.split_once(':') {
         Some((m, r)) if !m.is_empty() && is_known_manager(m) => (m, r),
         _ => ("zoi", dep_str),
@@ -54,39 +59,28 @@ pub fn parse_dependency_string<'a>(
 
     let rest = rest.trim();
     if rest.is_empty() {
-        return Err(anyhow!("Invalid dependency string: {}", dep_str));
+        return Err(anyhow!("Invalid dependency string: {dep_str}"));
     }
 
     let caps = DEP_RE
         .captures(rest)
-        .ok_or_else(|| anyhow!("Failed to parse dependency string: {}", rest))?;
+        .ok_or_else(|| anyhow!("Failed to parse dependency string: {rest}"))?;
 
     let package_and_version = caps
         .name("pkg_and_ver")
-        .ok_or_else(|| {
-            anyhow!(
-                "Regex matched but pkg_and_ver group not found in '{}'",
-                rest
-            )
-        })?
+        .ok_or_else(|| anyhow!("Regex matched but pkg_and_ver group not found in '{rest}'"))?
         .as_str()
         .trim();
     let description = caps.name("desc").map(|m| m.as_str().trim());
 
     let ver_caps = VER_RE.captures(package_and_version).ok_or_else(|| {
-        anyhow!(
-            "Failed to parse package and version from: {}",
-            package_and_version
-        )
+        anyhow!("Failed to parse package and version from: {package_and_version}")
     })?;
 
     let package = ver_caps
         .name("pkg")
         .ok_or_else(|| {
-            anyhow!(
-                "Regex matched but pkg group not found in '{}'",
-                package_and_version
-            )
+            anyhow!("Regex matched but pkg group not found in '{package_and_version}'")
         })?
         .as_str()
         .trim();
@@ -105,9 +99,9 @@ pub fn parse_dependency_string<'a>(
             .ok_or_else(|| anyhow!("Empty version string"))?
             .is_ascii_digit()
         {
-            format!("={}", v_str)
+            format!("={v_str}")
         } else {
-            v_str.to_string()
+            v_str.clone()
         };
 
         if manager == "zoi" && VersionReq::parse(&req_parse_str).is_err() {

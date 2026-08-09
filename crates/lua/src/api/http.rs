@@ -11,6 +11,10 @@ use serde::Deserialize;
 ///
 /// All network requests respect Zoi's global `--offline` and timeout settings.
 /// Adds basic HTTP fetching utilities to the `UTILS.FETCH` table.
+///
+/// # Errors
+///
+/// Returns an error if the `UTILS` table cannot be found or if setting the `FETCH` table fails.
 pub fn add_fetch_util(lua: &Lua) -> Result<(), mlua::Error> {
     let fetch_table = lua.create_table()?;
 
@@ -39,7 +43,7 @@ pub fn add_fetch_util(lua: &Lua) -> Result<(), mlua::Error> {
 struct GitArgs {
     /// The Git repository in "owner/repo" format.
     repo: String,
-    /// The optional domain for the Git forge (e.g. "https://api.github.com").
+    /// The optional domain for the Git forge (e.g. `<https://api.github.com>`).
     domain: Option<String>,
     /// The optional branch to fetch from.
     branch: Option<String>,
@@ -56,8 +60,7 @@ fn fetch_json(url: &str) -> Result<serde_json::Value, mlua::Error> {
 
     if !response.status().is_success() {
         return Err(mlua::Error::RuntimeError(format!(
-            "Request to {} failed with status: {} and body: {}",
-            url,
+            "Request to {url} failed with status: {} and body: {}",
             response.status(),
             response.text().unwrap_or_else(|_| "N/A".to_string())
         )));
@@ -70,6 +73,10 @@ fn fetch_json(url: &str) -> Result<serde_json::Value, mlua::Error> {
 }
 
 /// Adds Git-forge specific fetching utilities (GitHub, GitLab, Gitea, Forgejo) to the `UTILS.FETCH` table.
+///
+/// # Errors
+///
+/// Returns an error if the `UTILS` or `FETCH` tables cannot be found, or if creating/setting provider tables fails.
 pub fn add_git_fetch_util(lua: &Lua) -> Result<(), mlua::Error> {
     let utils_table: Table = lua.globals().get("UTILS")?;
     let fetch_table: Table = utils_table.get("FETCH")?;
@@ -82,7 +89,7 @@ pub fn add_git_fetch_util(lua: &Lua) -> Result<(), mlua::Error> {
             let get_latest_fn = lua.create_function(move |lua, args: Table| {
                 let git_args: GitArgs = lua
                     .from_value(Value::Table(args))
-                    .map_err(|e| mlua::Error::RuntimeError(format!("Invalid arguments: {}", e)))?;
+                    .map_err(|e| mlua::Error::RuntimeError(format!("Invalid arguments: {e}")))?;
 
                 let base_url = match provider {
                     "GITHUB" => git_args
@@ -101,46 +108,38 @@ pub fn add_git_fetch_util(lua: &Lua) -> Result<(), mlua::Error> {
                 };
 
                 let url = match (provider, what) {
-                    ("GITHUB", "tag") => format!("{}/repos/{}/tags", base_url, git_args.repo),
+                    ("GITHUB", "tag") => format!("{base_url}/repos/{}/tags", git_args.repo),
                     ("GITHUB", "release") => {
-                        format!("{}/repos/{}/releases/latest", base_url, git_args.repo)
+                        format!("{base_url}/repos/{}/releases/latest", git_args.repo)
                     }
                     ("GITHUB", "commit") => format!(
-                        "{}/repos/{}/commits?sha={}",
-                        base_url,
+                        "{base_url}/repos/{}/commits?sha={}",
                         git_args.repo,
                         git_args.branch.as_deref().unwrap_or("HEAD")
                     ),
 
                     ("GITLAB", "tag") => format!(
-                        "{}/api/v4/projects/{}/repository/tags",
-                        base_url,
+                        "{base_url}/api/v4/projects/{}/repository/tags",
                         urlencoding::encode(&git_args.repo)
                     ),
                     ("GITLAB", "release") => format!(
-                        "{}/api/v4/projects/{}/releases",
-                        base_url,
+                        "{base_url}/api/v4/projects/{}/releases",
                         urlencoding::encode(&git_args.repo)
                     ),
                     ("GITLAB", "commit") => format!(
-                        "{}/api/v4/projects/{}/repository/commits?ref_name={}",
-                        base_url,
+                        "{base_url}/api/v4/projects/{}/repository/commits?ref_name={}",
                         urlencoding::encode(&git_args.repo),
                         git_args.branch.as_deref().unwrap_or("HEAD")
                     ),
 
                     ("GITEA" | "FORGEJO", "tag") => {
-                        format!("{}/api/v1/repos/{}/tags", base_url, git_args.repo)
+                        format!("{base_url}/api/v1/repos/{}/tags", git_args.repo)
                     }
                     ("GITEA" | "FORGEJO", "release") => {
-                        format!(
-                            "{}/api/v1/repos/{}/releases/latest",
-                            base_url, git_args.repo
-                        )
+                        format!("{base_url}/api/v1/repos/{}/releases/latest", git_args.repo)
                     }
                     ("GITEA" | "FORGEJO", "commit") => format!(
-                        "{}/api/v1/repos/{}/commits?sha={}",
-                        base_url,
+                        "{base_url}/api/v1/repos/{}/commits?sha={}",
                         git_args.repo,
                         git_args.branch.as_deref().unwrap_or("HEAD")
                     ),
@@ -150,34 +149,39 @@ pub fn add_git_fetch_util(lua: &Lua) -> Result<(), mlua::Error> {
                 let json = fetch_json(&url)?;
 
                 let result = match (provider, what) {
-                    ("GITHUB", "tag") | ("GITEA", "tag") | ("FORGEJO", "tag") => json
+                    ("GITHUB" | "GITEA" | "FORGEJO", "tag") => json
                         .as_array()
                         .and_then(|a| a.first())
-                        .and_then(|t| t["name"].as_str()),
-                    ("GITHUB", "release") | ("GITEA", "release") | ("FORGEJO", "release") => {
-                        json["tag_name"].as_str()
+                        .and_then(|t| t.get("name"))
+                        .and_then(|v| v.as_str()),
+                    ("GITHUB" | "GITEA" | "FORGEJO", "release") => {
+                        json.get("tag_name").and_then(|v| v.as_str())
                     }
-                    ("GITHUB", "commit") | ("GITEA", "commit") | ("FORGEJO", "commit") => json
+                    ("GITHUB" | "GITEA" | "FORGEJO", "commit") => json
                         .as_array()
                         .and_then(|a| a.first())
-                        .and_then(|c| c["sha"].as_str()),
+                        .and_then(|c| c.get("sha"))
+                        .and_then(|v| v.as_str()),
 
                     ("GITLAB", "tag") => json
                         .as_array()
                         .and_then(|a| a.first())
-                        .and_then(|t| t["name"].as_str()),
+                        .and_then(|t| t.get("name"))
+                        .and_then(|v| v.as_str()),
                     ("GITLAB", "release") => json
                         .as_array()
                         .and_then(|a| a.first())
-                        .and_then(|r| r["tag_name"].as_str()),
+                        .and_then(|r| r.get("tag_name"))
+                        .and_then(|v| v.as_str()),
                     ("GITLAB", "commit") => json
                         .as_array()
                         .and_then(|a| a.first())
-                        .and_then(|c| c["id"].as_str()),
+                        .and_then(|c| c.get("id"))
+                        .and_then(|v| v.as_str()),
                     _ => unreachable!(),
                 };
 
-                result.map(|s| s.to_string()).ok_or_else(|| {
+                result.map(std::string::ToString::to_string).ok_or_else(|| {
                     mlua::Error::RuntimeError(
                         "Could not extract value from API response".to_string(),
                     )

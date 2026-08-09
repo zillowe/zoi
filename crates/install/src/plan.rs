@@ -39,25 +39,34 @@ pub enum InstallAction {
 ///
 /// It utilizes `rayon` for parallel evaluation of pre-built availability across
 /// mirrors and registries.
-pub fn create_install_plan(
-    graph: &HashMap<String, InstallNode>,
+///
+/// # Errors
+///
+/// Returns an error if the plan cannot be created.
+pub fn create_install_plan<S: std::hash::BuildHasher + Sync>(
+    graph: &HashMap<String, InstallNode, S>,
     build_type: Option<&str>,
     build: bool,
 ) -> Result<HashMap<String, InstallAction>> {
     let plan: HashMap<String, InstallAction> = graph
         .par_iter()
         .map(|(id, node)| {
+            let is_archive = std::path::Path::new(&node.source)
+                .extension()
+                .is_some_and(|ext| {
+                    ext.eq_ignore_ascii_case("zpa") || ext.eq_ignore_ascii_case("zsa")
+                });
+
             if (build
                 || (build_type.is_some()
                     && build_type != Some("pre-compiled")
                     && build_type != Some("pre-built")))
-                && !node.source.ends_with(".zpa")
-                && !node.source.ends_with(".zsa")
+                && !is_archive
             {
                 return (id.clone(), InstallAction::BuildAndInstall);
             }
 
-            if node.source.ends_with(".zpa") || node.source.ends_with(".zsa") {
+            if is_archive {
                 return (
                     id.clone(),
                     InstallAction::InstallFromArchive(PathBuf::from(&node.source)),

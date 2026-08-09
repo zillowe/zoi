@@ -2,7 +2,7 @@ use crate::sysroot::apply_sysroot;
 use crate::types::{Config, Registry, RepoConfig};
 use crate::utils::{get_db_root, get_user_home};
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use serde_yaml::Value;
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -24,18 +24,18 @@ pub fn get_builtin_authorities() -> Vec<String> {
     if auth_str.is_empty() {
         Vec::new()
     } else {
-        auth_str.split(',').map(|s| s.to_string()).collect()
+        auth_str.split(',').map(ToString::to_string).collect()
     }
 }
 
 /// Returns the path to the system-wide configuration file.
-fn get_system_config_path() -> Result<PathBuf> {
+fn get_system_config_path() -> PathBuf {
     if cfg!(target_os = "windows") {
-        Ok(apply_sysroot(PathBuf::from(
+        apply_sysroot(PathBuf::from(
             "C:\\ProgramData\\zoi\\config.yaml",
-        )))
+        ))
     } else {
-        Ok(apply_sysroot(PathBuf::from("/etc/zoi/config.yaml")))
+        apply_sysroot(PathBuf::from("/etc/zoi/config.yaml"))
     }
 }
 
@@ -64,13 +64,13 @@ fn get_git_root() -> Result<PathBuf> {
 }
 
 /// Returns the path to the remote policy cache file.
-fn get_remote_policy_cache_path() -> Result<PathBuf> {
+fn get_remote_policy_cache_path() -> PathBuf {
     if cfg!(target_os = "windows") {
-        Ok(apply_sysroot(PathBuf::from(
+        apply_sysroot(PathBuf::from(
             "C:\\ProgramData\\zoi\\policy.cache.yaml",
-        )))
+        ))
     } else {
-        Ok(apply_sysroot(PathBuf::from("/etc/zoi/policy.cache.yaml")))
+        apply_sysroot(PathBuf::from("/etc/zoi/policy.cache.yaml"))
     }
 }
 
@@ -101,8 +101,12 @@ fn read_config_from_path(path: &Path) -> Result<Config> {
 ///
 /// Policy Enforcement: If a field is marked as `unoverridable` in the
 /// system-level policy, Zoi will ignore any overrides found in user or project configs.
+///
+/// # Errors
+///
+/// Returns an error if any of the configuration files cannot be read or parsed.
 pub fn read_config() -> Result<Config> {
-    let system_val = read_yaml_value(&get_system_config_path()?)?;
+    let system_val = read_yaml_value(&get_system_config_path())?;
     let user_val = read_yaml_value(&get_user_config_path()?)?;
     let project_val = read_yaml_value(&get_project_config_path()?)?;
 
@@ -110,8 +114,8 @@ pub fn read_config() -> Result<Config> {
     let user_cfg: Config = serde_yaml::from_value(user_val.clone()).unwrap_or_default();
     let project_cfg: Config = serde_yaml::from_value(project_val.clone()).unwrap_or_default();
 
-    if let Ok(cache_path) = get_remote_policy_cache_path()
-        && cache_path.exists()
+    let cache_path = get_remote_policy_cache_path();
+    if cache_path.exists()
         && let Ok(cache_content) = fs::read_to_string(&cache_path)
         && let Ok(remote_policy) = serde_yaml::from_str::<crate::types::Policy>(&cache_content)
     {
@@ -355,7 +359,7 @@ pub fn read_config() -> Result<Config> {
         });
     } else if let Some(ref mut reg) = merged_cfg.default_registry
         && reg.url == get_default_registry()
-        && reg.authorities.as_ref().is_none_or(|a| a.is_empty())
+        && reg.authorities.as_ref().is_none_or(Vec::is_empty)
     {
         let builtin = get_builtin_authorities();
         if !builtin.is_empty() {
@@ -397,6 +401,10 @@ pub fn read_config() -> Result<Config> {
 }
 
 /// Writes the user-specific configuration to disk.
+///
+/// # Errors
+///
+/// Returns an error if the configuration directory cannot be created or the file cannot be written.
 pub fn write_user_config(config: &Config) -> Result<()> {
     let config_path = get_user_config_path()?;
     let parent_dir = config_path
@@ -409,25 +417,29 @@ pub fn write_user_config(config: &Config) -> Result<()> {
 }
 
 /// Verifies a remote file against a set of trusted PGP keys.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The file or its signature cannot be fetched.
+/// - The signature is invalid or not signed by a trusted key.
 pub fn verify_remote_file(url: &str, trusted_keys: &[String]) -> Result<Vec<u8>> {
     let client = crate::utils::get_http_client()?;
 
     let response = client.get(url).send()?;
     if !response.status().is_success() {
         return Err(anyhow!(
-            "Failed to fetch remote file '{}': {}",
-            url,
+            "Failed to fetch remote file '{url}': {}",
             response.status()
         ));
     }
     let data = response.bytes()?;
 
-    let sig_url = format!("{}.sig", url);
+    let sig_url = format!("{url}.sig");
     let sig_response = client.get(&sig_url).send()?;
     if !sig_response.status().is_success() {
         return Err(anyhow!(
-            "Failed to fetch signature for '{}': {}",
-            url,
+            "Failed to fetch signature for '{url}': {}",
             sig_response.status()
         ));
     }
@@ -448,13 +460,16 @@ pub fn verify_remote_file(url: &str, trusted_keys: &[String]) -> Result<Vec<u8>>
 }
 
 /// Adds a repository to the user-specific configuration.
+///
+/// # Errors
+///
+/// Returns an error if the repository already exists or if the configuration cannot be written.
 pub fn add_repo(repo_name: &str) -> Result<()> {
     let mut config = read_config_from_path(&get_user_config_path()?)?;
     let lower_repo_name = repo_name.to_lowercase();
     if config.repos.contains(&lower_repo_name) {
         return Err(anyhow!(
-            "Repository '{}' already exists in user config.",
-            repo_name
+            "Repository '{repo_name}' already exists in user config."
         ));
     }
     config.repos.push(lower_repo_name);
@@ -462,6 +477,10 @@ pub fn add_repo(repo_name: &str) -> Result<()> {
 }
 
 /// Removes a repository from the user-specific configuration.
+///
+/// # Errors
+///
+/// Returns an error if the repository is not found or if the configuration cannot be written.
 pub fn remove_repo(repo_name: &str) -> Result<()> {
     let mut config = read_config_from_path(&get_user_config_path()?)?;
     let lower_repo_name = repo_name.to_lowercase();
@@ -469,14 +488,18 @@ pub fn remove_repo(repo_name: &str) -> Result<()> {
         config.repos.remove(pos);
         write_user_config(&config)
     } else {
-        Err(anyhow!(
-            "Repository '{}' not found in user config.",
-            repo_name
-        ))
+        Err(anyhow!("Repository '{repo_name}' not found in user config."))
     }
 }
 
 /// Prompts the user to interactively add a repository.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Input/output operations fail.
+/// - The user provides invalid input.
+/// - The repository cannot be added.
 pub fn interactive_add_repo() -> Result<()> {
     let config = read_config()?;
     let all_repos = get_all_repos()?;
@@ -517,7 +540,9 @@ pub fn interactive_add_repo() -> Result<()> {
     };
 
     if choice > 0 && choice <= available_repos.len() {
-        let repo_to_add = &available_repos[choice - 1];
+        let repo_to_add = available_repos
+            .get(choice - 1)
+            .ok_or_else(|| anyhow!("Invalid choice"))?;
         add_repo(repo_to_add)?;
         println!("Repository '{}' added successfully.", repo_to_add.green());
     } else {
@@ -528,6 +553,10 @@ pub fn interactive_add_repo() -> Result<()> {
 }
 
 /// Returns a list of all available repositories from the default registry.
+///
+/// # Errors
+///
+/// Returns an error if the repository configuration cannot be read.
 pub fn get_all_repos() -> Result<Vec<String>> {
     let db_root = get_db_root()?;
     let config = read_config()?;
@@ -546,6 +575,13 @@ pub fn get_all_repos() -> Result<Vec<String>> {
 }
 
 /// Clones a git repository into the local git root.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The target directory already exists.
+/// - The `git clone` command fails.
+/// - The user configuration cannot be updated.
 pub fn clone_git_repo(url: &str) -> Result<()> {
     let git_root = get_git_root()?;
     fs::create_dir_all(&git_root)?;
@@ -558,8 +594,7 @@ pub fn clone_git_repo(url: &str) -> Result<()> {
     let target = git_root.join(repo_name);
     if target.exists() {
         return Err(anyhow!(
-            "Git repo '{}' already exists at {}",
-            repo_name,
+            "Git repo '{repo_name}' already exists at {}",
             target.display()
         ));
     }
@@ -589,6 +624,10 @@ pub fn clone_git_repo(url: &str) -> Result<()> {
 }
 
 /// Lists all cloned git repositories.
+///
+/// # Errors
+///
+/// Returns an error if the git root directory cannot be read.
 pub fn list_git_repos() -> Result<Vec<String>> {
     let git_root = get_git_root()?;
     if !git_root.exists() {
@@ -607,11 +646,15 @@ pub fn list_git_repos() -> Result<Vec<String>> {
 }
 
 /// Removes a cloned git repository.
+///
+/// # Errors
+///
+/// Returns an error if the repository is not found or cannot be removed.
 pub fn remove_git_repo(repo_name: &str) -> Result<()> {
     let git_root = get_git_root()?;
     let target = git_root.join(repo_name);
     if !target.exists() {
-        return Err(anyhow!("Git repository '{}' not found.", repo_name));
+        return Err(anyhow!("Git repository '{repo_name}' not found."));
     }
 
     let mut config = read_config_from_path(&get_user_config_path()?)?;
@@ -645,16 +688,24 @@ pub fn remove_git_repo(repo_name: &str) -> Result<()> {
 }
 
 /// Adds a cache mirror URL to the user-specific configuration.
+///
+/// # Errors
+///
+/// Returns an error if the mirror already exists or the configuration cannot be written.
 pub fn add_cache_mirror(url: &str) -> Result<()> {
     let mut config = read_config_from_path(&get_user_config_path()?)?;
     if config.cache_mirrors.iter().any(|existing| existing == url) {
-        return Err(anyhow!("Cache mirror '{}' already exists.", url));
+        return Err(anyhow!("Cache mirror '{url}' already exists."));
     }
     config.cache_mirrors.push(url.to_string());
     write_user_config(&config)
 }
 
 /// Removes a cache mirror URL from the user-specific configuration.
+///
+/// # Errors
+///
+/// Returns an error if the mirror is not found or the configuration cannot be written.
 pub fn remove_cache_mirror(url: &str) -> Result<()> {
     let mut config = read_config_from_path(&get_user_config_path()?)?;
     if let Some(pos) = config
@@ -665,11 +716,15 @@ pub fn remove_cache_mirror(url: &str) -> Result<()> {
         config.cache_mirrors.remove(pos);
         write_user_config(&config)
     } else {
-        Err(anyhow!("Cache mirror '{}' not found.", url))
+        Err(anyhow!("Cache mirror '{url}' not found."))
     }
 }
 
 /// Sets the default registry URL in the user-specific configuration.
+///
+/// # Errors
+///
+/// Returns an error if the configuration cannot be written.
 pub fn set_default_registry(url: &str) -> Result<()> {
     let mut config = read_config_from_path(&get_user_config_path()?)?;
     config.default_registry = Some(Registry {
@@ -682,6 +737,10 @@ pub fn set_default_registry(url: &str) -> Result<()> {
 }
 
 /// Sets the default registry in the user-specific configuration.
+///
+/// # Errors
+///
+/// Returns an error if the configuration cannot be written.
 pub fn set_user_default_registry(default_registry: Option<Registry>) -> Result<()> {
     let mut config = read_config_from_path(&get_user_config_path()?)?;
     config.default_registry = default_registry;
@@ -689,10 +748,14 @@ pub fn set_user_default_registry(default_registry: Option<Registry>) -> Result<(
 }
 
 /// Adds a registry URL to the list of added registries in the user-specific configuration.
+///
+/// # Errors
+///
+/// Returns an error if the registry already exists or the configuration cannot be written.
 pub fn add_added_registry(url: &str) -> Result<()> {
     let mut config = read_config_from_path(&get_user_config_path()?)?;
     if config.added_registries.iter().any(|r| r.url == url) {
-        return Err(anyhow!("Registry with URL '{}' already exists.", url));
+        return Err(anyhow!("Registry with URL '{url}' already exists."));
     }
     config.added_registries.push(Registry {
         handle: String::new(),
@@ -704,6 +767,10 @@ pub fn add_added_registry(url: &str) -> Result<()> {
 }
 
 /// Removes an added registry by its handle or URL.
+///
+/// # Errors
+///
+/// Returns an error if the registry is not found or the configuration cannot be updated.
 pub fn remove_added_registry(handle_or_url: &str) -> Result<()> {
     let mut config = read_config_from_path(&get_user_config_path()?)?;
     if let Some(pos) = config
@@ -722,13 +789,16 @@ pub fn remove_added_registry(handle_or_url: &str) -> Result<()> {
         write_user_config(&config)
     } else {
         Err(anyhow!(
-            "Added registry with handle or URL '{}' not found.",
-            handle_or_url
+            "Added registry with handle or URL '{handle_or_url}' not found."
         ))
     }
 }
 
 /// Reads the repository configuration from the specified database path.
+///
+/// # Errors
+///
+/// Returns an error if `repo.yaml` is not found or cannot be parsed.
 pub fn read_repo_config(db_path: &Path) -> Result<RepoConfig> {
     let config_path = db_path.join("repo.yaml");
     if !config_path.exists() {
@@ -742,12 +812,22 @@ pub fn read_repo_config(db_path: &Path) -> Result<RepoConfig> {
 }
 
 /// Reads the user-specific configuration.
+///
+/// # Errors
+///
+/// Returns an error if the configuration cannot be read or parsed.
 pub fn read_user_config() -> Result<Config> {
     read_config_from_path(&get_user_config_path()?)
 }
 
 /// Updates the global package versions in the user-specific configuration.
-pub fn update_global_versions(versions: HashMap<String, String>) -> Result<()> {
+///
+/// # Errors
+///
+/// Returns an error if the configuration cannot be read or written.
+pub fn update_global_versions<S: ::std::hash::BuildHasher>(
+    versions: HashMap<String, String, S>,
+) -> Result<()> {
     let mut config = read_user_config()?;
     config.versions.extend(versions);
     write_user_config(&config)
@@ -757,6 +837,14 @@ pub fn update_global_versions(versions: HashMap<String, String>) -> Result<()> {
 ///
 /// This allows organizations to manage security constraints (allowed/denied lists)
 /// centrally. It verifies the policy's PGP signature before caching it locally.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The configuration cannot be read.
+/// - The system is in offline mode and a sync is required.
+/// - The remote policy or its signature cannot be downloaded.
+/// - The signature verification fails.
 pub fn sync_remote_policy() -> Result<()> {
     let config = read_config()?;
     let Some(remote_cfg) = &config.remote_policy else {
@@ -789,7 +877,7 @@ pub fn sync_remote_policy() -> Result<()> {
         trusted_certs,
     )?;
 
-    let cache_path = get_remote_policy_cache_path()?;
+    let cache_path = get_remote_policy_cache_path();
     if let Some(parent) = cache_path.parent() {
         fs::create_dir_all(parent)?;
     }

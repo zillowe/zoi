@@ -29,7 +29,7 @@ fn resolves_dependency_graph_for_local_pkg_lua_source_in_test_assets() {
     let root = tmp.path().to_path_buf();
 
     ctx.set_env_var("HOME", &root);
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
     let source = test_pkg_source();
     let (graph, non_zoi_deps) = install::resolver::resolve_dependency_graph(
@@ -64,7 +64,7 @@ fn resolves_dependency_graph_for_versioned_local_pkg_lua_source() {
     let root = tmp.path().to_path_buf();
 
     ctx.set_env_var("HOME", &root);
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
     let source = format!("{}@1.0.0", test_pkg_source());
     let (graph, non_zoi_deps) = install::resolver::resolve_dependency_graph(
@@ -106,7 +106,7 @@ fn resolves_dependency_graph_for_local_pkg_lua_stable_channel() {
     let root = tmp.path().to_path_buf();
 
     ctx.set_env_var("HOME", &root);
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
     let source = format!("{}@stable", test_channels_source());
     let (graph, non_zoi_deps) = install::resolver::resolve_dependency_graph(
@@ -137,7 +137,7 @@ fn resolves_dependency_graph_for_local_pkg_lua_alpha_channel() {
     let root = tmp.path().to_path_buf();
 
     ctx.set_env_var("HOME", &root);
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
     let source = format!("{}@alpha", test_channels_source());
     let (graph, non_zoi_deps) = install::resolver::resolve_dependency_graph(

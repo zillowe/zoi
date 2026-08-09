@@ -9,7 +9,7 @@ mod common;
 
 #[test]
 fn test_parse_source_string_basic() {
-    let req = resolve::parse_source_string("hello").unwrap();
+    let req = resolve::parse_source_string("hello").expect("unwrap failed");
     assert_eq!(req.name, "hello");
     assert_eq!(req.repo, None);
     assert_eq!(req.handle, None);
@@ -18,7 +18,7 @@ fn test_parse_source_string_basic() {
 
 #[test]
 fn test_parse_source_string_repo() {
-    let req = resolve::parse_source_string("@community/hello").unwrap();
+    let req = resolve::parse_source_string("@community/hello").expect("unwrap failed");
     assert_eq!(req.name, "hello");
     assert_eq!(req.repo, Some("community".to_string()));
     assert_eq!(req.handle, None);
@@ -26,7 +26,7 @@ fn test_parse_source_string_repo() {
 
 #[test]
 fn test_parse_source_string_handle() {
-    let req = resolve::parse_source_string("#zoidberg@core/hello").unwrap();
+    let req = resolve::parse_source_string("#zoidberg@core/hello").expect("unwrap failed");
     assert_eq!(req.name, "hello");
     assert_eq!(req.repo, Some("core".to_string()));
     assert_eq!(req.handle, Some("zoidberg".to_string()));
@@ -34,21 +34,21 @@ fn test_parse_source_string_handle() {
 
 #[test]
 fn test_parse_source_string_version() {
-    let req = resolve::parse_source_string("hello@1.2.3").unwrap();
+    let req = resolve::parse_source_string("hello@1.2.3").expect("unwrap failed");
     assert_eq!(req.name, "hello");
     assert_eq!(req.version_spec, Some("1.2.3".to_string()));
 }
 
 #[test]
 fn test_parse_source_string_subpackage() {
-    let req = resolve::parse_source_string("linux:headers").unwrap();
+    let req = resolve::parse_source_string("linux:headers").expect("unwrap failed");
     assert_eq!(req.name, "linux");
     assert_eq!(req.sub_package, Some("headers".to_string()));
 }
 
 #[test]
 fn test_parse_source_string_complex() {
-    let req = resolve::parse_source_string("#my-reg@extra/pkg:sub@v2.0.0").unwrap();
+    let req = resolve::parse_source_string("#my-reg@extra/pkg:sub@v2.0.0").expect("unwrap failed");
     assert_eq!(req.handle, Some("my-reg".to_string()));
     assert_eq!(req.repo, Some("extra".to_string()));
     assert_eq!(req.name, "pkg");
@@ -58,7 +58,7 @@ fn test_parse_source_string_complex() {
 
 #[test]
 fn test_parse_source_string_local_file_with_relative_prefix() {
-    let req = resolve::parse_source_string("./athas.pkg.lua").unwrap();
+    let req = resolve::parse_source_string("./athas.pkg.lua").expect("unwrap failed");
     assert_eq!(req.name, "athas");
     assert_eq!(req.repo, None);
     assert_eq!(req.handle, None);
@@ -67,7 +67,7 @@ fn test_parse_source_string_local_file_with_relative_prefix() {
 
 #[test]
 fn test_parse_source_string_local_file_with_version_and_subpackage() {
-    let req = resolve::parse_source_string("athas.pkg.lua:dev@1.2.3").unwrap();
+    let req = resolve::parse_source_string("athas.pkg.lua:dev@1.2.3").expect("unwrap failed");
     assert_eq!(req.name, "athas");
     assert_eq!(req.sub_package, Some("dev".to_string()));
     assert_eq!(req.version_spec, Some("1.2.3".to_string()));
@@ -75,7 +75,7 @@ fn test_parse_source_string_local_file_with_version_and_subpackage() {
 
 #[test]
 fn test_parse_source_string_nested_local_file_with_version() {
-    let req = resolve::parse_source_string("tests/assets/test.pkg.lua@1.0.0").unwrap();
+    let req = resolve::parse_source_string("tests/assets/test.pkg.lua@1.0.0").expect("unwrap failed");
     assert_eq!(req.name, "test");
     assert_eq!(req.sub_package, None);
     assert_eq!(req.version_spec, Some("1.0.0".to_string()));
@@ -89,7 +89,7 @@ fn test_resolve_requested_version_spec_local_channel_stable() {
         true,
         true,
     )
-    .unwrap();
+    .expect("unwrap failed");
     assert_eq!(version, Some("1.0.0".to_string()));
 }
 
@@ -101,7 +101,7 @@ fn test_resolve_requested_version_spec_local_channel_alpha() {
         true,
         true,
     )
-    .unwrap();
+    .expect("unwrap failed");
     assert_eq!(version, Some("1.1.0-alpha".to_string()));
 }
 
@@ -128,7 +128,7 @@ fn test_resolve_requested_version_spec_registry_channel_and_exact() {
     let db_dir = root.join("db");
     ctx.set_env_var("HOME", &home);
     ctx.set_env_var("ZOI_DB_DIR", &db_dir);
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
     let cfg = types::Config {
         default_registry: Some(types::Registry {

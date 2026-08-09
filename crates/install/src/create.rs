@@ -1,7 +1,7 @@
 //! App creation logic.
 
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use mlua::LuaSerdeExt;
 use std::fs;
 use std::path::Path;
@@ -81,6 +81,14 @@ fn install_app_from_archive(archive_path: &Path, destination_dir: &Path) -> Resu
 ///
 /// This involves resolving the package, building it as an app template,
 /// and then installing it to the target directory.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The package cannot be resolved.
+/// - The package type is not 'app'.
+/// - The build process fails.
+/// - The installation to the target directory fails.
 pub fn run(
     source: &str,
     app_name: Option<String>,
@@ -103,7 +111,7 @@ pub fn run(
             .lua
             .to_value(&pkg)
             .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
-        pm.trigger_hook("on_pre_create", Some(v.clone()))?;
+        pm.trigger_hook("on_pre_create", Some(&v.clone()))?;
         pkg_val = Some(v);
     }
 
@@ -116,8 +124,7 @@ pub fn run(
                 println!(
                     "{}",
                     format!(
-                        "Warning: Directory '{}' already exists and is not empty.",
-                        dest_name
+                        "Warning: Directory '{dest_name}' already exists and is not empty."
                     )
                     .yellow()
                 );
@@ -127,8 +134,7 @@ pub fn run(
             }
         } else {
             return Err(anyhow!(
-                "A file with the name '{}' already exists.",
-                dest_name
+                "A file with the name '{dest_name}' already exists."
             ));
         }
     }
@@ -172,7 +178,7 @@ pub fn run(
     install_app_from_archive(&archive_path, app_dir)?;
 
     if let (Some(pm), Some(v)) = (plugin_manager, pkg_val) {
-        pm.trigger_hook_nonfatal("on_post_create", Some(v));
+        pm.trigger_hook_nonfatal("on_post_create", Some(&v));
     }
 
     println!("\n{}", "App created successfully.".green());

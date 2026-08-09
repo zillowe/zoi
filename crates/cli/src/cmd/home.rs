@@ -5,7 +5,7 @@
 
 use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
-use colored::*;
+use colored::Colorize;
 use zoi_core::utils::is_zoios;
 use zoi_system::home::{apply_home_config, load_home_lua};
 
@@ -29,6 +29,11 @@ pub enum HomeSubcommands {
 }
 
 /// Run the home management command.
+///
+/// # Errors
+///
+/// Returns an error if not on a `ZoiOS` system, if the home configuration cannot be
+/// loaded or applied, or if user packages fail to install.
 pub fn run(args: HomeCommand) -> Result<()> {
     if !is_zoios() {
         return Err(anyhow!(
@@ -38,11 +43,14 @@ pub fn run(args: HomeCommand) -> Result<()> {
 
     match args.command {
         HomeSubcommands::Apply { file } => {
-            let config_path = file.unwrap_or_else(|| {
-                let mut p = crate::pkg::utils::get_user_home().unwrap();
+            let config_path = if let Some(f) = file {
+                f
+            } else {
+                let mut p = crate::pkg::utils::get_user_home()
+                    .ok_or_else(|| anyhow!("Could not determine user home directory."))?;
                 p.push(".config/zoi/home.lua");
                 p.to_string_lossy().to_string()
-            });
+            };
 
             println!("Reading user configuration from {}...", config_path.cyan());
             let config = load_home_lua(&config_path)?;

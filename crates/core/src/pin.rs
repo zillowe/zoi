@@ -24,6 +24,11 @@ fn get_pinned_json_path() -> Result<PathBuf, io::Error> {
 }
 
 /// Loads the list of pinned packages from `pinned.json`.
+///
+/// # Errors
+///
+/// Returns an `io::Error` if the home directory cannot be found, if creating the
+/// `.zoi` directory fails, or if reading the `pinned.json` file fails.
 pub fn get_pinned_packages() -> Result<Vec<PinnedPackage>, io::Error> {
     let path = get_pinned_json_path()?;
     if !path.exists() {
@@ -40,6 +45,11 @@ pub fn get_pinned_packages() -> Result<Vec<PinnedPackage>, io::Error> {
 }
 
 /// Saves the list of pinned packages to `pinned.json`.
+///
+/// # Errors
+///
+/// Returns an `io::Error` if the home directory cannot be found, if creating the
+/// `.zoi` directory fails, or if writing to `pinned.json` fails.
 pub fn write_pinned_packages(packages: &[PinnedPackage]) -> Result<(), io::Error> {
     let path = get_pinned_json_path()?;
     let mut file = File::create(path)?;
@@ -49,6 +59,10 @@ pub fn write_pinned_packages(packages: &[PinnedPackage]) -> Result<(), io::Error
 }
 
 /// Retrieves the pinned version for a given source, if it exists.
+///
+/// # Errors
+///
+/// Returns an `io::Error` if loading the pinned packages fails.
 pub fn get_pinned_version(source: &str) -> Result<Option<String>, io::Error> {
     let pinned_packages = get_pinned_packages()?;
     Ok(pinned_packages
@@ -58,6 +72,10 @@ pub fn get_pinned_version(source: &str) -> Result<Option<String>, io::Error> {
 }
 
 /// Checks if a source has a pinned version.
+///
+/// # Errors
+///
+/// Returns an `io::Error` if loading the pinned packages fails.
 pub fn is_pinned(source: &str) -> Result<bool, io::Error> {
     let pinned_packages = get_pinned_packages()?;
     Ok(pinned_packages.iter().any(|p| p.source == source))

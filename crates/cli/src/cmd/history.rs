@@ -2,7 +2,7 @@
 
 use crate::pkg::audit;
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use comfy_table::{Cell, Color, ContentArrangement, Table, presets::UTF8_FULL};
 use std::path::PathBuf;
 
@@ -10,6 +10,10 @@ use std::path::PathBuf;
 ///
 /// Displays the audit history in a table, exports it to a file,
 /// or verifies the cryptographic integrity of the history chain.
+///
+/// # Errors
+///
+/// Returns an error if the history cannot be retrieved, exported, or verified.
 pub fn run(verify: bool, export: Option<PathBuf>, ndjson: bool) -> Result<()> {
     if verify {
         let report = audit::verify_chain()?;

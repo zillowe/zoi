@@ -7,8 +7,8 @@ mod common;
 
 #[test]
 fn test_sysroot_functionality() {
-    let ctx = common::TestContextGuard::acquire();
-    ctx.set_sysroot(PathBuf::from("/mnt/new-disk"));
+    let _ctx = common::TestContextGuard::acquire();
+    common::TestContextGuard::set_sysroot(PathBuf::from("/mnt/new-disk"));
 
     let path_abs = PathBuf::from("/etc/zoi/config.yaml");
     let applied_abs = sysroot::apply_sysroot(path_abs);
@@ -24,13 +24,13 @@ fn test_sysroot_functionality() {
 
 #[test]
 fn test_sysroot_can_be_replaced() {
-    let ctx = common::TestContextGuard::acquire();
-    ctx.set_sysroot(PathBuf::from("/mnt/first"));
+    let _ctx = common::TestContextGuard::acquire();
+    common::TestContextGuard::set_sysroot(PathBuf::from("/mnt/first"));
     assert_eq!(
         sysroot::apply_sysroot(PathBuf::from("/etc/hosts")),
         PathBuf::from("/mnt/first/etc/hosts")
     );
-    ctx.set_sysroot(PathBuf::from("/mnt/second"));
+    common::TestContextGuard::set_sysroot(PathBuf::from("/mnt/second"));
     assert_eq!(
         sysroot::apply_sysroot(PathBuf::from("/etc/hosts")),
         PathBuf::from("/mnt/second/etc/hosts")

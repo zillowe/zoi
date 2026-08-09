@@ -13,6 +13,10 @@ use std::path::Path;
 ///
 /// These functions bridge the declarative metadata and the imperative build logic.
 /// Adds the `IMPORT` function to the Lua environment for importing data from other files.
+///
+/// # Errors
+///
+/// Returns an error if the `IMPORT` function cannot be set in the global environment.
 pub fn add_import_util(lua: &Lua, current_path: &Path) -> Result<(), mlua::Error> {
     let current_path_buf = current_path.to_path_buf();
     let import_fn = lua.create_function(move |lua, file_name: String| {
@@ -58,6 +62,10 @@ pub fn add_import_util(lua: &Lua, current_path: &Path) -> Result<(), mlua::Error
 }
 
 /// Adds the `INCLUDE` function to the Lua environment for executing other Lua files.
+///
+/// # Errors
+///
+/// Returns an error if the `INCLUDE` function cannot be set in the global environment.
 pub fn add_include_util(lua: &Lua, current_path: &Path) -> Result<(), mlua::Error> {
     let current_path_buf = current_path.to_path_buf();
     let include_fn =
@@ -81,6 +89,10 @@ pub fn add_include_util(lua: &Lua, current_path: &Path) -> Result<(), mlua::Erro
 }
 
 /// Adds core lifecycle functions (`metadata`, `dependencies`, `hooks`, etc.) to the Lua environment.
+///
+/// # Errors
+///
+/// Returns an error if any of the lifecycle functions cannot be set in the global environment.
 pub fn add_package_lifecycle_functions(lua: &Lua) -> Result<(), mlua::Error> {
     let metadata_fn = lua.create_function(move |lua, pkg_def: Table| {
         if let Ok(meta_table) = lua.globals().get::<Table>("__ZoiPackageMeta")

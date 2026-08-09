@@ -50,6 +50,14 @@ pub enum RegistryCommands {
 }
 
 /// Run the registry management command.
+///
+/// # Errors
+///
+/// This function returns an error if any of the underlying registry operations
+/// (initialization, metadata generation, checking, or adding packages/advisories) fail.
+/// # Errors
+///
+/// Returns an error if the registry operation fails.
 pub fn run(args: RegistryCommand) -> Result<()> {
     let registry_root = std::path::Path::new(".");
     match args.command {

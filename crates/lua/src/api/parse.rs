@@ -10,6 +10,10 @@ use mlua::{self, Lua, LuaSerdeExt, Table};
 /// These utilities return native Lua tables, allowing for idiomatic manipulation
 /// of complex data within the package script.
 /// Adds data parsing utilities (JSON, YAML, TOML, checksum files) to the `UTILS.PARSE` table.
+///
+/// # Errors
+///
+/// Returns an error if the `UTILS` table cannot be found or if setting the `PARSE` table fails.
 pub fn add_parse_util(lua: &Lua) -> Result<(), mlua::Error> {
     let parse_table = lua.create_table()?;
 
@@ -37,8 +41,8 @@ pub fn add_parse_util(lua: &Lua) -> Result<(), mlua::Error> {
     let checksum_fn = lua.create_function(|_, (content, file_name): (String, String)| {
         for line in content.lines() {
             let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.len() == 2 && parts[1] == file_name {
-                return Ok(Some(parts[0].to_string()));
+            if parts.len() == 2 && parts.get(1) == Some(&file_name.as_str()) {
+                return Ok(parts.first().map(ToString::to_string));
             }
         }
         Ok(None)

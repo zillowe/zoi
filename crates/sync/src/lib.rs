@@ -1,10 +1,10 @@
 //! Registry and repository synchronization logic for Zoi.
 //!
 //! This crate handles cloning and updating package registries, rebuilding the
-//! local SQLite metadata cache, and synchronizing external Git repositories.
+//! local `SQLite` metadata cache, and synchronizing external Git repositories.
 
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use git2::{
     FetchOptions, RemoteCallbacks, Repository, ResetType,
     build::{CheckoutBuilder, RepoBuilder},
@@ -23,14 +23,14 @@ use zoi_db as db;
 use zoi_install::util as install_util;
 use zoi_lua::parser as lua_parser;
 
-/// Rebuilds the SQLite metadata database from the raw registry files.
+/// Rebuilds the `SQLite` metadata database from the raw registry files.
 ///
 /// This is the "Indexing Phase" of a sync. It:
 /// - Scans the local Git clone for all `.pkg.lua` and `.sec.yaml` files.
 /// - Parses each file (using the Lua VM where needed) to extract version info,
 ///   descriptions, dependencies, and security advisories.
 /// - Fetches remote metadata (sizes and file lists) if configured in `repo.yaml`.
-/// - Atomic Commit: Updates the SQLite tables within a single transaction.
+/// - Atomic Commit: Updates the `SQLite` tables within a single transaction.
 fn refresh_registry_db(
     registry_handle: &str,
     registry_path: &Path,
@@ -46,7 +46,7 @@ fn refresh_registry_db(
         if let Some(m_ref) = m {
             let _ = m_ref.println(&msg);
         } else {
-            println!("{}", msg);
+            println!("{msg}");
         }
     }
 
@@ -57,7 +57,7 @@ fn refresh_registry_db(
     let mut sec_files = Vec::new();
     for entry in WalkDir::new(registry_path)
         .into_iter()
-        .filter_map(|e| e.ok())
+        .filter_map(std::result::Result::ok)
     {
         if entry.file_type().is_file() {
             let name = entry.file_name().to_string_lossy();
@@ -321,16 +321,16 @@ fn verify_registry_signature(
     }
 
     let repo = Repository::open(repo_path)
-        .map_err(|e| anyhow!("Failed to open registry repository: {}", e))?;
+        .map_err(|e| anyhow!("Failed to open registry repository: {e}"))?;
     let head = repo
         .head()
-        .map_err(|e| anyhow!("Failed to get repository HEAD: {}", e))?;
+        .map_err(|e| anyhow!("Failed to get repository HEAD: {e}"))?;
     let target = head
         .target()
         .ok_or_else(|| anyhow!("HEAD is not a direct reference"))?;
     let commit = repo
         .find_commit(target)
-        .map_err(|e| anyhow!("Failed to find HEAD commit: {}", e))?;
+        .map_err(|e| anyhow!("Failed to find HEAD commit: {e}"))?;
 
     let (sig, data) = repo
         .extract_signature(&commit.id(), None)
@@ -576,7 +576,7 @@ fn run_non_verbose_at_path(
 
         if analysis.0.is_up_to_date() {
         } else if analysis.0.is_fast_forward() {
-            let refname = format!("refs/heads/{}", short_branch_name);
+            let refname = format!("refs/heads/{short_branch_name}");
             let mut reference = repo.find_reference(&refname)?;
             reference.set_target(fetch_commit.id(), "Fast-forwarding")?;
             repo.set_head(&refname)?;
@@ -651,16 +651,13 @@ fn try_sync_at_path(
             if let Some(m_ref) = m {
                 let _ = m_ref.println(&msg);
             } else {
-                println!("{}", msg);
+                println!("{msg}");
             }
         }
 
         // For local registries, we ensure db_path is a symlink to the local_path
         if db_path.exists() {
-            if !db_path.is_symlink() {
-                // If it's a directory (from a previous git sync), remove it
-                fs::remove_dir_all(db_path)?;
-            } else {
+            if db_path.is_symlink() {
                 // It's already a symlink, check if it points to the right place
                 if let Ok(target) = fs::read_link(db_path)
                     && target == local_path
@@ -668,6 +665,9 @@ fn try_sync_at_path(
                     return Ok(());
                 }
                 fs::remove_file(db_path)?;
+            } else {
+                // If it's a directory (from a previous git sync), remove it
+                fs::remove_dir_all(db_path)?;
             }
         }
 
@@ -676,7 +676,7 @@ fn try_sync_at_path(
         }
 
         return core_utils::symlink_dir(local_path, db_path)
-            .map_err(|e| anyhow!("Failed to symlink local registry: {}", e));
+            .map_err(|e| anyhow!("Failed to symlink local registry: {e}"));
     }
 
     if offline::is_offline() {
@@ -688,15 +688,13 @@ fn try_sync_at_path(
             if let Some(m_ref) = m {
                 let _ = m_ref.println(&msg);
             } else {
-                println!("{}", msg);
+                println!("{msg}");
             }
             return Ok(());
-        } else {
-            return Err(anyhow!(
-                "Cannot sync registry '{}': Zoi is offline and registry is not cloned.",
-                db_url
-            ));
         }
+        return Err(anyhow!(
+            "Cannot sync registry '{db_url}': Zoi is offline and registry is not cloned."
+        ));
     }
     if db_path.exists()
         && let Ok(repo) = Repository::open(db_path)
@@ -712,7 +710,7 @@ fn try_sync_at_path(
         if let Some(m_ref) = m {
             m_ref.println(&msg)?;
         } else {
-            println!("{}", msg);
+            println!("{msg}");
         }
         repo.remote_set_url("origin", db_url)?;
     }
@@ -733,7 +731,7 @@ fn try_sync_at_path(
                 } else if let Some(m_ref) = m {
                     m_ref.println(msg)?;
                 } else {
-                    eprintln!("{}", msg);
+                    eprintln!("{msg}");
                 }
                 run_quiet_git_at_path(db_url, db_path)
             }
@@ -773,7 +771,7 @@ fn sync_pgp_keys_at_path(db_path: &Path, verbose: bool, pb: Option<&ProgressBar>
         let key_name = &key_info.name;
 
         if let Some(p) = pb {
-            p.set_message(format!("PGP Key: {}", key_name));
+            p.set_message(format!("PGP Key: {key_name}"));
         }
 
         let result = if key_source.starts_with("http") {
@@ -782,8 +780,7 @@ fn sync_pgp_keys_at_path(db_path: &Path, verbose: bool, pb: Option<&ProgressBar>
             pgp::add_key_from_fingerprint(key_source, key_name, !verbose)
         } else {
             Err(anyhow!(
-                "Invalid key source '{}': must be a URL or a 40-character fingerprint.",
-                key_source
+                "Invalid key source '{key_source}': must be a URL or a 40-character fingerprint."
             ))
         };
 
@@ -797,7 +794,7 @@ fn sync_pgp_keys_at_path(db_path: &Path, verbose: bool, pb: Option<&ProgressBar>
             if let Some(p) = pb {
                 p.println(err_msg);
             } else {
-                eprintln!("{}", err_msg);
+                eprintln!("{err_msg}");
             }
         }
         if let Some(p) = pb {
@@ -861,16 +858,13 @@ fn fetch_repo_yaml_content(url: &str) -> Result<String> {
     for branch in &branches {
         let repo_yaml_url = match provider.as_str() {
             "github" => format!(
-                "https://raw.githubusercontent.com/{}/{}/repo.yaml",
-                repo_path, branch
+                "https://raw.githubusercontent.com/{repo_path}/{branch}/repo.yaml"
             ),
             "gitlab" => format!(
-                "https://gitlab.com/{}/-/raw/{}/repo.yaml",
-                repo_path, branch
+                "https://gitlab.com/{repo_path}/-/raw/{branch}/repo.yaml"
             ),
             "codeberg" => format!(
-                "https://codeberg.org/{}/raw/branch/{}/repo.yaml",
-                repo_path, branch
+                "https://codeberg.org/{repo_path}/raw/branch/{branch}/repo.yaml"
             ),
             _ => continue,
         };
@@ -886,8 +880,7 @@ fn fetch_repo_yaml_content(url: &str) -> Result<String> {
     }
 
     Err(anyhow!(
-        "Could not find 'repo.yaml' in repo '{}' on branches main or master.",
-        repo_path
+        "Could not find 'repo.yaml' in repo '{repo_path}' on branches main or master."
     ))
 }
 
@@ -939,7 +932,7 @@ fn fetch_handle_for_url(url: &str, verbose: bool) -> Result<String> {
 /// - Signature Verification: If `authorities` are configured, it verifies the
 ///   signature of the latest commit to ensure the entire registry state is trusted.
 /// - Key Sync: Automatically imports PGP keys defined in the registry's `repo.yaml`.
-/// - Indexing: Triggers `refresh_registry_db` to update the local SQLite cache.
+/// - Indexing: Triggers `refresh_registry_db` to update the local `SQLite` cache.
 fn sync_registry(
     mut reg: types::Registry,
     db_root: &Path,
@@ -1007,7 +1000,7 @@ fn sync_registry(
             } else if let Some(m_ref) = m {
                 let _ = m_ref.println(&msg);
             } else {
-                eprintln!("{}", msg);
+                eprintln!("{msg}");
             }
             last_error = Some(e);
         } else {
@@ -1022,13 +1015,7 @@ fn sync_registry(
 
     let is_local = Path::new(&reg.url).is_dir();
 
-    if !sync_success {
-        let e = last_error.unwrap_or_else(|| anyhow!("All sync candidates failed."));
-        if let Some(p) = &pb {
-            p.abandon_with_message("Sync failed.".red().to_string());
-        }
-        return Err(e);
-    } else {
+    if sync_success {
         if !is_local
             && let Some(authorities) = &reg.authorities
             && let Err(e) = verify_registry_signature(&target_dir, authorities, verbose)
@@ -1067,7 +1054,7 @@ fn sync_registry(
             if let Some(m_ref) = m {
                 m_ref.println(&msg)?;
             } else {
-                eprintln!("{}", msg);
+                eprintln!("{msg}");
             }
             return Err(e);
         }
@@ -1089,7 +1076,7 @@ fn sync_registry(
                 if let Some(p) = pb.as_ref() {
                     p.set_message("Downloading pre-indexed DB...");
                 } else if verbose {
-                    println!("Downloading pre-indexed DB from {}...", db_url);
+                    println!("Downloading pre-indexed DB from {db_url}...");
                 }
                 if let Some(parent) = db_path.parent() {
                     let _ = fs::create_dir_all(parent);
@@ -1130,6 +1117,12 @@ fn sync_registry(
         if let Some(p) = pb {
             p.finish_with_message(format!("Synced {}", reg.handle.cyan()));
         }
+    } else {
+        let e = last_error.unwrap_or_else(|| anyhow!("All sync candidates failed."));
+        if let Some(p) = &pb {
+            p.abandon_with_message("Sync failed.".red().to_string());
+        }
+        return Err(e);
     }
 
     Ok((reg, reg_changed))
@@ -1140,6 +1133,9 @@ fn sync_registry(
 /// In Specification v2, projects can have their own isolated package databases
 /// stored in `./.zoi/pkgs/db`. This ensures that a project's dependencies
 /// are reproducible and independent of the user's global registry state.
+/// # Errors
+///
+/// Returns an error if the sync process fails.
 pub fn run_local(verbose: bool, _fallback: bool, force: bool, frozen: bool) -> Result<()> {
     let local_db_root = zoi_core::sysroot::apply_sysroot(
         std::env::current_dir()?
@@ -1157,7 +1153,7 @@ pub fn run_local(verbose: bool, _fallback: bool, force: bool, frozen: bool) -> R
             .map(|(handle, lr)| (handle, lr.url, lr.revision))
             .collect()
     } else {
-        let project = zoi_project::config::load_with_env(HashMap::new())?;
+        let project = zoi_project::config::load_with_env(&HashMap::new())?;
 
         project
             .registries
@@ -1194,8 +1190,7 @@ pub fn run_local(verbose: bool, _fallback: bool, force: bool, frozen: bool) -> R
             if !revision.is_empty() {
                 if verbose {
                     println!(
-                        "  Checking out revision '{}' for registry '{}'...",
-                        revision, handle
+                        "  Checking out revision '{revision}' for registry '{handle}'..."
                     );
                 }
                 let status = Command::new("git")
@@ -1214,12 +1209,10 @@ pub fn run_local(verbose: bool, _fallback: bool, force: bool, frozen: bool) -> R
                         Stdio::null()
                     })
                     .status()
-                    .map_err(|e| anyhow!("Failed to run git checkout: {}", e))?;
+                    .map_err(|e| anyhow!("Failed to run git checkout: {e}"))?;
                 if !status.success() {
                     return Err(anyhow!(
-                        "Failed to checkout revision '{}' for registry '{}'",
-                        revision,
-                        handle
+                        "Failed to checkout revision '{revision}' for registry '{handle}'"
                     ));
                 }
             }
@@ -1260,9 +1253,12 @@ pub fn run_local(verbose: bool, _fallback: bool, force: bool, frozen: bool) -> R
 ///
 /// This function:
 /// - Synchronizes all configured global registries.
-/// - Updates local SQLite indexes.
+/// - Updates local `SQLite` indexes.
 /// - Detects and records available native package managers.
 /// - Synchronizes the remote security policy if configured.
+/// # Errors
+///
+/// Returns an error if the sync process fails.
 pub fn run(
     verbose: bool,
     fallback: bool,
@@ -1293,7 +1289,7 @@ pub fn run(
                 println!("Making package database writable...");
             }
             if let Err(e) = core_utils::set_path_writable(&db_root) {
-                eprintln!("Warning: could not make db writable: {}", e);
+                eprintln!("Warning: could not make db writable: {e}");
             }
         }
     }
@@ -1397,7 +1393,7 @@ pub fn run(
                 println!("Making package database read-only...");
             }
             if let Err(e) = core_utils::set_path_read_only(&db_root) {
-                eprintln!("Warning: could not make db read-only: {}", e);
+                eprintln!("Warning: could not make db read-only: {e}");
             }
         }
     }

@@ -447,9 +447,9 @@ pub struct Package {
     /// Files or directories that should be backed up during upgrades.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub backup: Option<Vec<String>>,
-    /// Restricts installation to ZoiOS or non-ZoiOS systems.
+    /// Restricts installation to `ZoiOS` or non-ZoiOS systems.
     /// None (default): Works on both.
-    /// Some(true): ZoiOS only.
+    /// Some(true): `ZoiOS` only.
     /// Some(false): Non-ZoiOS only.
     pub zoios: Option<bool>,
 
@@ -1004,7 +1004,7 @@ pub struct Transaction {
 
 /// Helper function for serde to skip serializing empty authorities.
 fn skip_authorities(a: &Option<Vec<String>>) -> bool {
-    a.as_ref().is_none_or(|v| v.is_empty())
+    a.as_ref().is_none_or(std::vec::Vec::is_empty)
 }
 
 /// Configuration for a package registry.
@@ -1229,9 +1229,11 @@ pub struct SignatureEnforcementPolicy {
 }
 
 /// Helper function for serde to skip serializing false booleans.
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn is_false(b: &bool) -> bool {
     !*b
 }
+
 
 /// A simplified version of an install manifest that can be easily shared or compared.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]

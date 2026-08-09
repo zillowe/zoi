@@ -78,7 +78,7 @@ fn test_sandbox_system_isolation() -> Result<()> {
     )?;
 
     let status = cmd.status();
-    assert!(status.is_err() || !status.unwrap().success());
+    assert!(status.is_err() || !status.expect("unwrap failed").success());
 
     Ok(())
 }

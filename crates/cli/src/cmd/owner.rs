@@ -2,10 +2,15 @@
 
 use crate::pkg::local;
 use anyhow::Result;
-use colored::*;
+use colored::Colorize;
 use std::path::Path;
 
-/// Runs the `owner` command.
+/// Runs the owner command.
+///
+/// # Errors
+///
+/// Returns an error if the path does not exist, or if there is an error querying the
+/// package database or ownership information.
 pub fn run(path: &Path) -> Result<()> {
     let absolute_path = match path.canonicalize() {
         Ok(p) => p,

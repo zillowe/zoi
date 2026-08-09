@@ -2,9 +2,13 @@
 
 use crate::pkg;
 use anyhow::Result;
-use colored::*;
+use colored::Colorize;
 
 /// Runs the `doctor` command to diagnose system issues.
+///
+/// # Errors
+///
+/// Returns an error if any system check fails or if pruning ghost dependents fails.
 pub fn run() -> Result<()> {
     println!("{} Running Zoi doctor...", "::".bold().blue());
     println!("Checking your system for potential issues...");
@@ -264,7 +268,7 @@ pub fn run() -> Result<()> {
             "Zoi is looking healthy! No issues found.".green().bold()
         );
     } else {
-        println!("\nFound {} potential issues.", issues_found);
+        println!("\nFound {issues_found} potential issues.");
     }
 
     Ok(())

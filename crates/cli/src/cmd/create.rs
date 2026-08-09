@@ -14,6 +14,9 @@ pub struct CreateCommand {
 }
 
 /// Runs the `create` command.
+/// # Errors
+///
+/// Returns an error if the application cannot be created or dependencies cannot be resolved.
 pub fn run(
     args: CreateCommand,
     yes: bool,

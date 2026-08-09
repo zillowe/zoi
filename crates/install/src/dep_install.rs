@@ -1,7 +1,7 @@
 //! Dependency installation logic.
 
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use std::collections::HashSet;
 use std::sync::Mutex;
@@ -24,13 +24,21 @@ use zoi_resolver::resolve;
 /// Important: External package managers are not atomic within Zoi's
 /// transaction system. Zoi will try to uninstall them on failure, but
 /// cannot guarantee a clean revert of the host's state.
-pub fn install_dependency(
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The mutex is poisoned.
+/// - The package manager is not found or fails to install the package.
+/// - The installation command is not configured.
+/// - Root privileges are required but not available.
+pub fn install_dependency<S: std::hash::BuildHasher>(
     dep: &Dependency,
     parent_id: &str,
     scope: types::Scope,
     yes: bool,
     all_optional: bool,
-    processed_deps: &Mutex<HashSet<String>>,
+    processed_deps: &Mutex<HashSet<String, S>>,
     installed_deps: &mut Vec<String>,
     m: Option<&MultiProgress>,
 ) -> Result<()> {
@@ -38,7 +46,7 @@ pub fn install_dependency(
     {
         let mut lock = processed_deps
             .lock()
-            .map_err(|e| anyhow!("Mutex poisoned: {}", e))?;
+            .map_err(|e| anyhow!("Mutex poisoned: {e}"))?;
         if !lock.insert(dep_id.clone()) {
             return Ok(());
         }
@@ -54,14 +62,14 @@ pub fn install_dependency(
         let version_info = dep
             .version_str
             .as_ref()
-            .map_or("any".to_string(), |r| r.to_string());
+            .map_or("any".to_string(), std::clone::Clone::clone);
         pb.set_message(format!("{}: {}:{}", dep.manager, dep.package, version_info));
         Some(pb)
     } else {
         let version_info = dep
             .version_str
             .as_ref()
-            .map_or("any".to_string(), |r| r.to_string());
+            .map_or("any".to_string(), std::clone::Clone::clone);
         println!(
             "-> Checking dependency: {} (version: {}) via {}",
             dep.package.cyan(),
@@ -155,7 +163,7 @@ pub fn install_dependency(
 
         if pm_commands.sudo_install && !utils::is_admin() {
             if let Some(escalator) = utils::get_privilege_escalator() {
-                install_cmd = format!("{} {}", escalator, install_cmd);
+                install_cmd = format!("{escalator} {install_cmd}");
             } else {
                 eprintln!(
                     "{}: root privileges are required for '{}' but neither 'sudo' nor 'doas' was found. Attempting to run without escalation...",
@@ -250,13 +258,13 @@ fn install_aur_dependency(dep: &Dependency, yes: bool) -> Result<()> {
 }
 
 /// Installs a Zoi-native dependency.
-fn install_zoi_dependency(
+fn install_zoi_dependency<S: std::hash::BuildHasher>(
     dep: &Dependency,
     parent_id: &str,
     scope: types::Scope,
     yes: bool,
     all_optional: bool,
-    _processed_deps: &Mutex<HashSet<String>>,
+    _processed_deps: &Mutex<HashSet<String, S>>,
     m: Option<&MultiProgress>,
 ) -> Result<()> {
     let zoi_dep_name = if let Some(v) = &dep.version_str {
@@ -300,9 +308,7 @@ fn install_zoi_dependency(
         Ok(res) => res,
         Err(e) => {
             return Err(anyhow!(
-                "Failed to resolve dependency graph for '{}': {}",
-                zoi_dep_name,
-                e
+                "Failed to resolve dependency graph for '{zoi_dep_name}': {e}"
             ));
         }
     };
@@ -315,9 +321,7 @@ fn install_zoi_dependency(
         Ok(plan) => plan,
         Err(e) => {
             return Err(anyhow!(
-                "Failed to create install plan for '{}': {}",
-                zoi_dep_name,
-                e
+                "Failed to create install plan for '{zoi_dep_name}': {e}"
             ));
         }
     };
@@ -328,10 +332,10 @@ fn install_zoi_dependency(
             let node = graph
                 .nodes
                 .get(&id)
-                .ok_or_else(|| anyhow!("Package not found in graph: {}", id))?;
+                .ok_or_else(|| anyhow!("Package not found in graph: {id}"))?;
             let action = install_plan
                 .get(&id)
-                .ok_or_else(|| anyhow!("Could not find install action for {}", id))?;
+                .ok_or_else(|| anyhow!("Could not find install action for {id}"))?;
             crate::installer::install_node(node, action, m, None, yes, true, true, false)?;
         }
     }

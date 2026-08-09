@@ -6,16 +6,18 @@ use clap_complete::Shell;
 use zoi_resolver::local;
 
 /// Runs the `complete` command to provide shell autocompletion suggestions.
-pub fn run(shell: Shell, index: usize, words: Vec<String>) -> Result<()> {
+///
+/// # Errors
+///
+/// This function is currently infallible but returns `Result` for consistency.
+pub fn run(shell: Shell, index: usize, words: &[String]) -> Result<()> {
     if index <= 1 {
         return Ok(());
     }
 
-    if words.len() < 2 {
+    let Some(subcmd) = words.get(1) else {
         return Ok(());
-    }
-
-    let subcmd = &words[1];
+    };
 
     match subcmd.as_str() {
         "install" | "i" | "in" | "add" | "show" | "exec" | "x" | "create" | "clone" | "use"
@@ -37,7 +39,7 @@ pub fn run(shell: Shell, index: usize, words: Vec<String>) -> Result<()> {
                     if shell == Shell::Zsh {
                         println!("{}:{}", display, pkg.description);
                     } else {
-                        println!("{}", display);
+                        println!("{display}");
                     }
                 }
             }

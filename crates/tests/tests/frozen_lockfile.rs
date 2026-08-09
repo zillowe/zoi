@@ -62,8 +62,8 @@ fn test_sources_from_lock_uses_packages_map() {
     sources.sort();
 
     assert_eq!(sources.len(), 2);
-    assert_eq!(sources[0], "@community/tools/fd:docs@9.0.0");
-    assert_eq!(sources[1], "@core/hello@1.2.3");
+    assert_eq!(sources.first().expect("Value should exist in test"), "@community/tools/fd:docs@9.0.0");
+    assert_eq!(sources.get(1).expect("Value should exist in test"), "@core/hello@1.2.3");
 }
 
 #[test]
@@ -129,7 +129,7 @@ fn test_locked_packages_preserve_direct_flags_and_metadata() {
         .expect("app entry should exist");
     assert!(app.direct);
     assert_eq!(
-        app.dependencies.as_ref().unwrap().runtime,
+        app.dependencies.as_ref().expect("unwrap failed").runtime,
         vec!["zoi:@core/lib@2.0.0"]
     );
 

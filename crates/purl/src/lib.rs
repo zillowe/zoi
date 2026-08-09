@@ -89,9 +89,7 @@ pub fn fetch_central_db() -> Result<HashMap<String, RegistryInfo>> {
         .unwrap_or_else(|_| "https://zillowe.pages.dev/zoi/registries.json".to_string());
 
     let is_test = std::env::var("ZOI_TEST").is_ok();
-    let data = if !url.starts_with("http") {
-        std::fs::read(&url).map_err(|e| anyhow!("Failed to read central DB from {}: {}", url, e))?
-    } else {
+    let data = if url.starts_with("http") {
         let trusted_keys = zoi_core::config::get_builtin_authorities();
         if !trusted_keys.is_empty() && !is_test {
             zoi_core::config::verify_remote_file(&url, &trusted_keys)?
@@ -106,6 +104,8 @@ pub fn fetch_central_db() -> Result<HashMap<String, RegistryInfo>> {
             }
             response.bytes()?.to_vec()
         }
+    } else {
+        std::fs::read(&url).map_err(|e| anyhow!("Failed to read central DB from {url}: {e}"))?
     };
 
     let spec: CentralDbSpec = serde_json::from_slice(&data)?;
@@ -123,23 +123,19 @@ pub fn construct_raw_url(git_url: &str, branch: &str, file_path: &str) -> Result
 
     if let Some(path) = url.strip_prefix("https://github.com/") {
         Ok(format!(
-            "https://raw.githubusercontent.com/{}/{}/{}",
-            path, branch, file_path
+            "https://raw.githubusercontent.com/{path}/{branch}/{file_path}"
         ))
     } else if let Some(path) = url.strip_prefix("https://gitlab.com/") {
         Ok(format!(
-            "https://gitlab.com/{}/-/raw/{}/{}",
-            path, branch, file_path
+            "https://gitlab.com/{path}/-/raw/{branch}/{file_path}"
         ))
     } else if let Some(path) = url.strip_prefix("https://codeberg.org/") {
         Ok(format!(
-            "https://codeberg.org/{}/raw/branch/{}/{}",
-            path, branch, file_path
+            "https://codeberg.org/{path}/raw/branch/{branch}/{file_path}"
         ))
     } else {
         Err(anyhow!(
-            "Unsupported git provider for PURL resolution: {}",
-            git_url
+            "Unsupported git provider for PURL resolution: {git_url}"
         ))
     }
 }
@@ -149,16 +145,7 @@ pub fn construct_raw_url(git_url: &str, branch: &str, file_path: &str) -> Result
 /// # Errors
 /// Returns an error if the index cannot be fetched or parsed.
 pub fn fetch_registry_index(registry: &RegistryInfo) -> Result<RegistryIndex> {
-    let data = if !registry.git.starts_with("http") {
-        let path = Path::new(&registry.git).join("packages.json");
-        std::fs::read(&path).map_err(|e| {
-            anyhow!(
-                "Failed to read registry index from {}: {}",
-                path.display(),
-                e
-            )
-        })?
-    } else {
+    let data = if registry.git.starts_with("http") {
         let url = construct_raw_url(&registry.git, &registry.branch, "packages.json")?;
         let client = zoi_core::utils::get_http_client()?;
         let response = client.get(url).send()?;
@@ -171,6 +158,15 @@ pub fn fetch_registry_index(registry: &RegistryInfo) -> Result<RegistryIndex> {
             ));
         }
         response.bytes()?.to_vec()
+    } else {
+        let path = Path::new(&registry.git).join("packages.json");
+        std::fs::read(&path).map_err(|e| {
+            anyhow!(
+                "Failed to read registry index from {}: {}",
+                path.display(),
+                e
+            )
+        })?
     };
 
     Ok(serde_json::from_slice(&data)?)
@@ -182,9 +178,9 @@ pub fn fetch_registry_index(registry: &RegistryInfo) -> Result<RegistryIndex> {
 /// Returns an error if the file cannot be fetched or read.
 pub fn fetch_package_lua(registry: &RegistryInfo, repo: &str, name: &str) -> Result<String> {
     let file_path = if repo.is_empty() {
-        format!("{}/{}.pkg.lua", name, name)
+        format!("{name}/{name}.pkg.lua")
     } else {
-        format!("{}/{}/{}.pkg.lua", repo, name, name)
+        format!("{repo}/{name}/{name}.pkg.lua")
     };
 
     if !registry.git.starts_with("http") {
@@ -235,7 +231,7 @@ pub struct ResolvedPurl {
 pub fn resolve_purl(purl_str: &str) -> Result<ResolvedPurl> {
     let purl: GenericPurl<String> = purl_str
         .parse()
-        .map_err(|e| anyhow!("Invalid PURL: {}", e))?;
+        .map_err(|e| anyhow!("Invalid PURL: {e}"))?;
 
     if purl.package_type() != "zoi" {
         return Err(anyhow!(
@@ -265,20 +261,16 @@ pub fn resolve_purl(purl_str: &str) -> Result<ResolvedPurl> {
     let central_db = fetch_central_db()?;
     let registry = central_db.get(registry_handle).ok_or_else(|| {
         anyhow!(
-            "Registry handle '{}' not found in central database",
-            registry_handle
+            "Registry handle '{registry_handle}' not found in central database"
         )
     })?;
 
     let index = fetch_registry_index(registry)?;
 
-    let packages_key = format!("@{}/{}", expected_repo, package_path);
+    let packages_key = format!("@{expected_repo}/{package_path}");
     let package_info = index.packages.get(&packages_key).ok_or_else(|| {
         anyhow!(
-            "Package '{}' not found in registry '{}' within repository '{}'",
-            package_path,
-            registry_handle,
-            expected_repo
+            "Package '{package_path}' not found in registry '{registry_handle}' within repository '{expected_repo}'"
         )
     })?;
 
@@ -343,9 +335,7 @@ fn fetch_and_store_recursive(
 
     let pkg_info = index.packages.get(packages_key).ok_or_else(|| {
         anyhow!(
-            "Dependency '{}' not found in registry '{}'",
-            packages_key,
-            registry_handle
+            "Dependency '{packages_key}' not found in registry '{registry_handle}'"
         )
     })?;
 
@@ -360,7 +350,7 @@ fn fetch_and_store_recursive(
     dest_dir = dest_dir.join(package_name);
 
     std::fs::create_dir_all(&dest_dir)?;
-    let dest_file = dest_dir.join(format!("{}.pkg.lua", package_name));
+    let dest_file = dest_dir.join(format!("{package_name}.pkg.lua"));
     std::fs::write(&dest_file, lua_content)?;
 
     if let Some(deps) = &pkg_info.dependencies {
@@ -381,8 +371,7 @@ fn fetch_and_store_recursive(
         let current_repo = packages_key
             .strip_prefix('@')
             .and_then(|k| k.split_once('/'))
-            .map(|(repo, _)| repo)
-            .unwrap_or("");
+            .map_or("", |(repo, _)| repo);
 
         for dep_str in to_fetch {
             if let Some(zoi_dep) = dep_str.strip_prefix("zoi:") {
@@ -394,7 +383,7 @@ fn fetch_and_store_recursive(
                     }
                 } else {
                     let dep_pkg_name = zoi_dep.split('@').next().unwrap_or(zoi_dep);
-                    let scoped = format!("@{}/{}", current_repo, dep_pkg_name);
+                    let scoped = format!("@{current_repo}/{dep_pkg_name}");
 
                     if index.packages.contains_key(&scoped) {
                         Some(scoped)
@@ -402,7 +391,7 @@ fn fetch_and_store_recursive(
                         index
                             .packages
                             .keys()
-                            .find(|k| k.ends_with(&format!("/{}", dep_pkg_name)))
+                            .find(|k| k.ends_with(&format!("/{dep_pkg_name}")))
                             .cloned()
                     }
                 };

@@ -4,7 +4,6 @@
 //! and commit hashes, to the compiler so they can be embedded in the CLI binary.
 
 use std::env;
-use std::error::Error;
 use std::path::Path;
 
 /// Environment variables that should trigger a rebuild if changed.
@@ -29,7 +28,7 @@ fn forward_env_var(var: &str) {
     }
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() {
     for var in BUILD_ENV_VARS {
         println!("cargo:rerun-if-env-changed={var}");
     }
@@ -75,6 +74,4 @@ fn main() -> Result<(), Box<dyn Error>> {
         "cargo:rustc-env=ZOI_BUILTIN_AUTHORITIES={}",
         authorities.join(",")
     );
-
-    Ok(())
 }

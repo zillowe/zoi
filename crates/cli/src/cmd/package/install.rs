@@ -25,6 +25,11 @@ pub struct InstallCommand {
 /// Runs the package installation command.
 ///
 /// This installs a package from a local `.zpa` archive into the specified scope.
+///
+/// # Errors
+///
+/// Returns an error if the package file cannot be read, if dependencies cannot be
+/// resolved, or if the installation fails.
 pub fn run(args: InstallCommand) -> Result<()> {
     let scope = match args.scope {
         SetupScope::User => crate::pkg::types::Scope::User,

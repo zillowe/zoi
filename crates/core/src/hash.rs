@@ -35,9 +35,13 @@ impl HashAlgorithm {
 }
 
 /// Calculates the cryptographic hash of a single file.
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be opened or read.
 pub fn calculate_file_hash(path: &Path, algo: HashAlgorithm) -> Result<String> {
-    let mut file =
-        fs::File::open(path).map_err(|e| anyhow!("Failed to open file {:?}: {}", path, e))?;
+    let mut file = fs::File::open(path)
+        .map_err(|e| anyhow!("Failed to open file {}: {e}", path.display()))?;
 
     match algo {
         HashAlgorithm::Sha512 => {
@@ -48,7 +52,11 @@ pub fn calculate_file_hash(path: &Path, algo: HashAlgorithm) -> Result<String> {
                 if bytes_read == 0 {
                     break;
                 }
-                hasher.update(&buffer[..bytes_read]);
+                hasher.update(
+                    buffer
+                        .get(..bytes_read)
+                        .ok_or_else(|| anyhow!("Buffer overflow"))?,
+                );
             }
             Ok(hex::encode(hasher.finalize()))
         }
@@ -60,7 +68,11 @@ pub fn calculate_file_hash(path: &Path, algo: HashAlgorithm) -> Result<String> {
                 if bytes_read == 0 {
                     break;
                 }
-                hasher.update(&buffer[..bytes_read]);
+                hasher.update(
+                    buffer
+                        .get(..bytes_read)
+                        .ok_or_else(|| anyhow!("Buffer overflow"))?,
+                );
             }
             Ok(hex::encode(hasher.finalize()))
         }
@@ -76,6 +88,12 @@ pub fn calculate_file_hash(path: &Path, algo: HashAlgorithm) -> Result<String> {
 ///
 /// This provides a single SHA-512 "Snapshot" hash that represents the exact state
 /// of the directory, used for bit-for-bit reproducibility checks in Specification v2.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The path is not a directory.
+/// - Any file within the directory cannot be read.
 pub fn calculate_dir_hash(path: &Path) -> Result<String> {
     if !path.is_dir() {
         return Err(anyhow!("Path is not a directory"));
@@ -84,7 +102,7 @@ pub fn calculate_dir_hash(path: &Path) -> Result<String> {
     let mut hasher = Sha512::new();
     let mut paths = Vec::new();
 
-    for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new(path).into_iter().filter_map(std::result::Result::ok) {
         if entry.file_type().is_file() {
             paths.push(entry.path().to_path_buf());
         }
@@ -110,7 +128,11 @@ pub fn calculate_dir_hash(path: &Path) -> Result<String> {
             if bytes_read == 0 {
                 break;
             }
-            hasher.update(&buffer[..bytes_read]);
+            hasher.update(
+                buffer
+                    .get(..bytes_read)
+                    .ok_or_else(|| anyhow!("Buffer overflow"))?,
+            );
         }
     }
 

@@ -1,4 +1,4 @@
-//! Integration tests for ZoiOS system detection logic.
+//! Integration tests for `ZoiOS` system detection logic.
 
 use std::fs;
 use tempfile::tempdir;
@@ -8,26 +8,26 @@ mod common;
 
 #[test]
 fn test_is_zoios_detection() {
-    let ctx = common::TestContextGuard::acquire();
+    let _ctx = common::TestContextGuard::acquire();
     let tmp = tempdir().expect("failed to create temp dir");
     let root = tmp.path().to_path_buf();
 
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
     let os_release_dir = root.join("etc");
-    fs::create_dir_all(&os_release_dir).unwrap();
+    fs::create_dir_all(&os_release_dir).expect("unwrap failed");
     let os_release_path = os_release_dir.join("os-release");
 
     // Test 1: Not ZoiOS
-    fs::write(&os_release_path, "ID=fedora\nID_LIKE=rhel fedora\n").unwrap();
+    fs::write(&os_release_path, "ID=fedora\nID_LIKE=rhel fedora\n").expect("unwrap failed");
     assert!(!utils::is_zoios());
 
     // Test 2: Parlex (ID)
-    fs::write(&os_release_path, "ID=parlex\n").unwrap();
+    fs::write(&os_release_path, "ID=parlex\n").expect("unwrap failed");
     assert!(utils::is_zoios());
 
     // Test 3: ZoiOS (ID)
-    fs::write(&os_release_path, "ID=zoios\n").unwrap();
+    fs::write(&os_release_path, "ID=zoios\n").expect("unwrap failed");
     assert!(utils::is_zoios());
 
     // Test 4: ZoiOS (ID_LIKE)
@@ -35,7 +35,7 @@ fn test_is_zoios_detection() {
         &os_release_path,
         "ID=custom-distro\nID_LIKE=\"zoios debian\"\n",
     )
-    .unwrap();
+    .expect("unwrap failed");
     assert!(utils::is_zoios());
 }
 
@@ -78,7 +78,7 @@ fn test_scope_compliance_validation() {
     assert!(result.is_err(), "Should fail when scope is not allowed");
     assert!(
         result
-            .unwrap_err()
+            .expect_err("unwrap_err failed")
             .to_string()
             .contains("not allowed to be installed in scope User")
     );

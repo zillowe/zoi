@@ -2,10 +2,14 @@
 
 use crate::pkg::install::resolver;
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use std::collections::HashSet;
 
 /// Runs the `tree` command to display the dependency tree of one or more packages.
+///
+/// # Errors
+///
+/// Returns an error if the dependency tree cannot be resolved.
 pub fn run(package_names: &[String]) -> Result<()> {
     if package_names.is_empty() {
         println!("{}", "Please specify at least one package name.".yellow());
@@ -65,7 +69,7 @@ fn print_node(
     let node = graph
         .nodes
         .get(pkg_id)
-        .ok_or_else(|| anyhow!("Package not found in graph: {}", pkg_id))?;
+        .ok_or_else(|| anyhow!("Package not found in graph: {pkg_id}"))?;
     let is_repeated = visited.contains(pkg_id);
 
     let connector = if is_last { "└── " } else { "├── " };
@@ -84,8 +88,7 @@ fn print_node(
     };
 
     println!(
-        "{}{}{}{} {}",
-        prefix, connector, pkg_display, repeated_mark, version_display
+        "{prefix}{connector}{pkg_display}{repeated_mark} {version_display}"
     );
 
     if is_repeated {

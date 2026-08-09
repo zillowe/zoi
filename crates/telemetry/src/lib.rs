@@ -8,7 +8,7 @@ use serde::Serialize;
 use std::{error::Error, fs};
 use uuid::Timestamp;
 
-/// Represents an anonymous telemetry event sent to PostHog.
+/// Represents an anonymous telemetry event sent to `PostHog`.
 #[derive(Debug, Serialize)]
 pub struct PackageEvent<'a> {
     /// Unique anonymous identifier for the client.
@@ -99,7 +99,7 @@ fn ensure_client_id() -> Result<String, Box<dyn Error>> {
         let id = {
             let ts = Timestamp::from_unix(
                 uuid::NoContext,
-                chrono::Utc::now().timestamp_millis() as u64,
+                chrono::Utc::now().timestamp_millis().cast_unsigned(),
                 0,
             );
             uuid::Uuid::new_v7(ts).to_string()
@@ -109,7 +109,29 @@ fn ensure_client_id() -> Result<String, Box<dyn Error>> {
     }
 }
 
-/// Securely captures an anonymous event and sends it to PostHog.
+/// A single event formatted for the `PostHog` API.
+#[derive(Serialize)]
+struct PosthogEvent<'a> {
+    /// Name of the event.
+    event: &'a str,
+    /// Unique identifier for the user/client.
+    distinct_id: &'a str,
+    /// The event properties (telemetry data).
+    properties: &'a PackageEvent<'a>,
+    /// RFC3339 formatted timestamp.
+    timestamp: &'a str,
+}
+
+/// A batch of events to be sent to the `PostHog` API.
+#[derive(Serialize)]
+struct Batch<'a> {
+    /// The `PostHog` project API key.
+    api_key: &'a str,
+    /// List of events to capture.
+    batch: Vec<PosthogEvent<'a>>,
+}
+
+/// Securely captures an anonymous event and sends it to `PostHog`.
 ///
 /// Privacy Guarantee:
 /// - No IP addresses, hostnames, or personal data are ever collected.
@@ -119,6 +141,14 @@ fn ensure_client_id() -> Result<String, Box<dyn Error>> {
 ///
 /// Data collected is limited to: event type (install/uninstall), package metadata
 /// (name, version, license), and basic environment info (OS, Arch, Shell).
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The Zoi configuration cannot be read.
+/// - The anonymous client ID cannot be ensured.
+/// - `POSTHOG_API_KEY` is not set.
+/// - The network request to `PostHog` fails.
 pub fn posthog_capture_event(
     event_name: &str,
     pkg: &zoi_core::types::Package,
@@ -151,7 +181,7 @@ pub fn posthog_capture_event(
     let reason_str = match &pkg.reason {
         Some(zoi_core::types::InstallReason::Direct) => "direct".to_string(),
         Some(zoi_core::types::InstallReason::Dependency { parent }) => {
-            format!("dependency:{}", parent)
+            format!("dependency:{parent}")
         }
         None => "unknown".to_string(),
     };
@@ -202,7 +232,7 @@ pub fn posthog_capture_event(
         package_type: package_type_str,
         scope: scope_str,
         reason: reason_str,
-        install_type: install_type.map(|s| s.to_string()),
+        install_type: install_type.map(std::string::ToString::to_string),
     };
 
     let ph_host = option_env!("POSTHOG_API_HOST").unwrap_or("https://eu.i.posthog.com");
@@ -215,18 +245,7 @@ pub fn posthog_capture_event(
         .timeout(std::time::Duration::from_secs(4))
         .use_rustls_tls()
         .build()?;
-    #[derive(Serialize)]
-    struct PosthogEvent<'a> {
-        event: &'a str,
-        distinct_id: &'a str,
-        properties: &'a PackageEvent<'a>,
-        timestamp: &'a str,
-    }
-    #[derive(Serialize)]
-    struct Batch<'a> {
-        api_key: &'a str,
-        batch: Vec<PosthogEvent<'a>>,
-    }
+
     let payload = Batch {
         api_key: ph_key,
         batch: vec![PosthogEvent {
@@ -239,7 +258,7 @@ pub fn posthog_capture_event(
     let url = format!("{}/batch", ph_host.trim_end_matches('/'));
     let resp = client.post(url).json(&payload).send()?;
     if !resp.status().is_success() {
-        return Err(format!("PostHog HTTP {}", resp.status()).into());
+        return Err(format!("`PostHog` HTTP {}", resp.status()).into());
     }
     Ok(true)
 }

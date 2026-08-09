@@ -2,9 +2,13 @@
 
 use crate::pkg;
 use anyhow::Result;
-use colored::*;
+use colored::Colorize;
 
 /// Run the upgrade command.
+///
+/// # Errors
+///
+/// Returns an error if the upgrade fails.
 pub fn run(
     branch: &str,
     status: &str,

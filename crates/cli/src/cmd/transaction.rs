@@ -2,7 +2,7 @@
 
 use crate::pkg::{local, transaction, types};
 use anyhow::Result;
-use colored::*;
+use colored::Colorize;
 use comfy_table::{ContentArrangement, Table, presets::UTF8_FULL};
 
 /// Returns the source of the installed manifest.
@@ -11,6 +11,10 @@ fn manifest_source(manifest: &types::InstallManifest) -> String {
 }
 
 /// List all transaction logs.
+///
+/// # Errors
+///
+/// Returns an error if the transaction list cannot be retrieved.
 pub fn list() -> Result<()> {
     let transactions = transaction::list_transactions()?;
     if transactions.is_empty() {
@@ -37,14 +41,17 @@ pub fn list() -> Result<()> {
 }
 
 /// List modified files for a specific transaction.
+///
+/// # Errors
+///
+/// Returns an error if the modified files for the given transaction ID cannot be retrieved.
 pub fn files(transaction_id: &str) -> Result<()> {
     let mut modified_files = transaction::get_modified_files(transaction_id)?;
     modified_files.sort();
 
     if modified_files.is_empty() {
         println!(
-            "No modified files recorded for transaction '{}'.",
-            transaction_id
+            "No modified files recorded for transaction '{transaction_id}'."
         );
         return Ok(());
     }
@@ -55,12 +62,16 @@ pub fn files(transaction_id: &str) -> Result<()> {
         transaction_id.cyan()
     );
     for path in modified_files {
-        println!("  - {}", path);
+        println!("  - {path}");
     }
     Ok(())
 }
 
 /// Show details for a specific transaction.
+///
+/// # Errors
+///
+/// Returns an error if the transaction with the given ID cannot be read.
 pub fn show(transaction_id: &str) -> Result<()> {
     let transaction = transaction::read_transaction(transaction_id)?;
 

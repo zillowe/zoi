@@ -8,7 +8,7 @@ mod common;
 
 fn setup_purl_test() -> (common::TestContextGuard, tempfile::TempDir) {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().unwrap();
+    let tmp = tempdir().expect("unwrap failed");
     let reg_json = tmp.path().join("registries.json");
     let assets_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/assets");
 
@@ -22,10 +22,10 @@ fn setup_purl_test() -> (common::TestContextGuard, tempfile::TempDir) {
         "branch": "main"
       }}
     }}"#,
-        assets_path.to_string_lossy().replace("\\", "/")
+        assets_path.to_string_lossy().replace('\\', "/")
     );
-    fs::write(&reg_json, registries).unwrap();
-    ctx.set_env_var("ZOI_PURL_DB_URL", reg_json.to_str().unwrap());
+    fs::write(&reg_json, registries).expect("unwrap failed");
+    ctx.set_env_var("ZOI_PURL_DB_URL", reg_json.to_str().expect("unwrap failed"));
     (ctx, tmp)
 }
 
@@ -34,11 +34,10 @@ fn test_purl_missing_repo() {
     let _ctx = common::TestContextGuard::acquire();
     let result = resolve_purl("pkg:zoi/zoidberg/hello@4.0.0");
     assert!(result.is_err(), "Expected resolve_purl to fail");
-    let err = result.unwrap_err().to_string();
+    let err = result.expect_err("unwrap_err failed").to_string();
     assert!(
         err.contains("PURL missing repository path"),
-        "Expected error message for missing repo. stderr: {}",
-        err
+        "Expected error message for missing repo. stderr: {err}"
     );
 }
 
@@ -48,11 +47,10 @@ fn test_purl_repo_mismatch() {
 
     let result = resolve_purl("pkg:zoi/zoidberg/asadasd/hello@4.0.0");
     assert!(result.is_err(), "Expected resolve_purl to fail");
-    let err = result.unwrap_err().to_string();
+    let err = result.expect_err("unwrap_err failed").to_string();
     assert!(
         err.contains("Repository mismatch in PURL") || err.contains("not found in registry"),
-        "Expected error message for repo mismatch. err: {}",
-        err
+        "Expected error message for repo mismatch. err: {err}"
     );
 }
 
@@ -63,7 +61,7 @@ fn test_purl_unsupported_type() {
     assert!(result.is_err());
     assert!(
         result
-            .unwrap_err()
+            .expect_err("unwrap_err failed")
             .to_string()
             .contains("Unsupported PURL type")
     );
@@ -79,7 +77,7 @@ fn test_purl_successful_resolution() {
         "Expected resolve_purl to succeed. err: {:?}",
         result.err()
     );
-    let resolved = result.unwrap();
+    let resolved = result.expect("unwrap failed");
     assert_eq!(resolved.registry_handle, "zoidberg");
     assert_eq!(resolved.package_path, "hello");
     assert_eq!(resolved.package_info.repo, "zillowe");
@@ -88,16 +86,16 @@ fn test_purl_successful_resolution() {
 #[test]
 fn test_fetch_and_store_purl_package() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().unwrap();
+    let tmp = tempdir().expect("unwrap failed");
 
     let assets_dir = tmp.path().join("assets");
-    fs::create_dir_all(assets_dir.join("zillowe/hello")).unwrap();
-    fs::write(assets_dir.join("zillowe/hello/hello.pkg.lua"), "metadata({name='hello', version='4.0.0', repo='zillowe', types={'source'}, maintainer={name='test', email='test'}})").unwrap();
+    fs::create_dir_all(assets_dir.join("zillowe/hello")).expect("unwrap failed");
+    fs::write(assets_dir.join("zillowe/hello/hello.pkg.lua"), "metadata({name='hello', version='4.0.0', repo='zillowe', types={'source'}, maintainer={name='test', email='test'}})").expect("unwrap failed");
     fs::copy(
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/assets/packages.json"),
         assets_dir.join("packages.json"),
     )
-    .unwrap();
+    .expect("unwrap failed");
 
     let reg_json = tmp.path().join("registries.json");
     let registries = format!(
@@ -110,14 +108,14 @@ fn test_fetch_and_store_purl_package() {
         "branch": "main"
       }}
     }}"#,
-        assets_dir.to_string_lossy().replace("\\", "/")
+        assets_dir.to_string_lossy().replace('\\', "/")
     );
-    fs::write(&reg_json, registries).unwrap();
-    ctx.set_env_var("ZOI_PURL_DB_URL", reg_json.to_str().unwrap());
+    fs::write(&reg_json, registries).expect("unwrap failed");
+    ctx.set_env_var("ZOI_PURL_DB_URL", reg_json.to_str().expect("unwrap failed"));
 
     let db_root = tmp.path().join("db");
-    fs::create_dir_all(&db_root).unwrap();
-    ctx.set_env_var("ZOI_DB_DIR", db_root.to_str().unwrap());
+    fs::create_dir_all(&db_root).expect("unwrap failed");
+    ctx.set_env_var("ZOI_DB_DIR", db_root.to_str().expect("unwrap failed"));
 
     let result =
         zoi::pkg::purl::fetch_and_store_purl_package("pkg:zoi/zoidberg/zillowe/hello@4.0.0");
@@ -126,7 +124,7 @@ fn test_fetch_and_store_purl_package() {
         "Expected fetch_and_store_purl_package to succeed. err: {:?}",
         result.err()
     );
-    let ident = result.unwrap();
+    let ident = result.expect("unwrap failed");
     assert_eq!(ident, "#zoidberg@zillowe/hello@4.0.0");
 
     let pkg_path = db_root

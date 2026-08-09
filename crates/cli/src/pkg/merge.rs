@@ -1,5 +1,5 @@
 use anyhow::Result;
-use colored::*;
+use colored::Colorize;
 use diffy::merge;
 use std::fs;
 use std::path::Path;
@@ -17,6 +17,12 @@ use std::path::Path;
 /// - If both changed: Perform 3-way merge.
 ///   - Clean merge: Write result to Theirs.
 ///   - Conflict: Write result with markers to Theirs, save Theirs as `.zoinew`.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Placeholders in the backup file path cannot be expanded.
+/// - The configuration file directory cannot be created.
 pub fn handle_backup_files(
     old_version_dir: &Path,
     new_version_dir: &Path,
@@ -37,8 +43,7 @@ pub fn handle_backup_files(
         let ext = old_orig_path
             .extension()
             .and_then(|s| s.to_str())
-            .map(|s| format!("{}.zoiorig", s))
-            .unwrap_or_else(|| "zoiorig".to_string());
+            .map_or_else(|| "zoiorig".to_string(), |s| format!("{s}.zoiorig"));
         old_orig_path.set_extension(ext);
 
         if old_path.exists() {
@@ -59,7 +64,7 @@ pub fn handle_backup_files(
                 if theirs == base {
                     // Case B: Upstream unchanged. Keep user's changes.
                     if let Err(e) = fs::copy(&old_path, &new_path) {
-                        eprintln!("Warning: failed to restore user config: {}", e);
+                        eprintln!("Warning: failed to restore user config: {e}");
                     }
                     continue;
                 }
@@ -74,7 +79,7 @@ pub fn handle_backup_files(
                     Ok(merged) => {
                         println!("   {} Automatically merged.", "Success:".green());
                         if let Err(e) = fs::write(&new_path, merged) {
-                            eprintln!("Warning: failed to write merged config: {}", e);
+                            eprintln!("Warning: failed to write merged config: {e}");
                         }
                     }
                     Err(conflicted) => {
@@ -94,7 +99,7 @@ pub fn handle_backup_files(
                         let _ = fs::copy(&new_path, &zoinew_path);
 
                         if let Err(e) = fs::write(&new_path, conflicted) {
-                            eprintln!("Warning: failed to write conflicted config: {}", e);
+                            eprintln!("Warning: failed to write conflicted config: {e}");
                         }
                     }
                 }
@@ -115,7 +120,7 @@ pub fn handle_backup_files(
                     new_path.display()
                 );
                 if let Err(e) = fs::rename(&new_path, &zoinew_path) {
-                    eprintln!("Warning: failed to rename to .zoinew: {}", e);
+                    eprintln!("Warning: failed to rename to .zoinew: {e}");
                     continue;
                 }
             }
@@ -123,7 +128,7 @@ pub fn handle_backup_files(
                 fs::create_dir_all(p)?;
             }
             if let Err(e) = fs::rename(&old_path, &new_path) {
-                eprintln!("Warning: failed to restore backup file: {}", e);
+                eprintln!("Warning: failed to restore backup file: {e}");
             }
         }
     }
@@ -137,18 +142,18 @@ mod tests {
 
     #[test]
     fn test_merge_case_a_unmodified() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("Failed to create temp dir");
         let old_dir = dir.path().join("1.0.0");
         let new_dir = dir.path().join("1.1.0");
-        fs::create_dir_all(&old_dir).unwrap();
-        fs::create_dir_all(&new_dir).unwrap();
+        fs::create_dir_all(&old_dir).expect("Failed to create old dir");
+        fs::create_dir_all(&new_dir).expect("Failed to create new dir");
 
-        let _config_rel = "config.txt";
         let base = "line1\nline2\n";
 
-        fs::write(old_dir.join("config.txt.zoiorig"), base).unwrap();
-        fs::write(old_dir.join("config.txt"), base).unwrap();
-        fs::write(new_dir.join("config.txt"), "line1\nline2\nline3\n").unwrap();
+        fs::write(old_dir.join("config.txt.zoiorig"), base).expect("Failed to write base");
+        fs::write(old_dir.join("config.txt"), base).expect("Failed to write yours");
+        fs::write(new_dir.join("config.txt"), "line1\nline2\nline3\n")
+            .expect("Failed to write theirs");
 
         handle_backup_files(
             &old_dir,
@@ -156,27 +161,28 @@ mod tests {
             &["config.txt".to_string()],
             crate::pkg::types::Scope::User,
         )
-        .unwrap();
+        .expect("Failed to handle backup files");
 
         // Should keep new version
         assert_eq!(
-            fs::read_to_string(new_dir.join("config.txt")).unwrap(),
+            fs::read_to_string(new_dir.join("config.txt")).expect("Failed to read result"),
             "line1\nline2\nline3\n"
         );
     }
 
     #[test]
     fn test_merge_case_b_upstream_unchanged() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("Failed to create temp dir");
         let old_dir = dir.path().join("1.0.0");
         let new_dir = dir.path().join("1.1.0");
-        fs::create_dir_all(&old_dir).unwrap();
-        fs::create_dir_all(&new_dir).unwrap();
+        fs::create_dir_all(&old_dir).expect("Failed to create old dir");
+        fs::create_dir_all(&new_dir).expect("Failed to create new dir");
 
         let base = "line1\nline2\n";
-        fs::write(old_dir.join("config.txt.zoiorig"), base).unwrap();
-        fs::write(old_dir.join("config.txt"), "line1\nline2\nuser_mod\n").unwrap();
-        fs::write(new_dir.join("config.txt"), base).unwrap();
+        fs::write(old_dir.join("config.txt.zoiorig"), base).expect("Failed to write base");
+        fs::write(old_dir.join("config.txt"), "line1\nline2\nuser_mod\n")
+            .expect("Failed to write yours");
+        fs::write(new_dir.join("config.txt"), base).expect("Failed to write theirs");
 
         handle_backup_files(
             &old_dir,
@@ -184,27 +190,29 @@ mod tests {
             &["config.txt".to_string()],
             crate::pkg::types::Scope::User,
         )
-        .unwrap();
+        .expect("Failed to handle backup files");
 
         // Should keep user version
         assert_eq!(
-            fs::read_to_string(new_dir.join("config.txt")).unwrap(),
+            fs::read_to_string(new_dir.join("config.txt")).expect("Failed to read result"),
             "line1\nline2\nuser_mod\n"
         );
     }
 
     #[test]
     fn test_merge_case_c_clean_merge() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("Failed to create temp dir");
         let old_dir = dir.path().join("1.0.0");
         let new_dir = dir.path().join("1.1.0");
-        fs::create_dir_all(&old_dir).unwrap();
-        fs::create_dir_all(&new_dir).unwrap();
+        fs::create_dir_all(&old_dir).expect("Failed to create old dir");
+        fs::create_dir_all(&new_dir).expect("Failed to create new dir");
 
         let base = "common\n";
-        fs::write(old_dir.join("config.txt.zoiorig"), base).unwrap();
-        fs::write(old_dir.join("config.txt"), "user_pref\ncommon\n").unwrap();
-        fs::write(new_dir.join("config.txt"), "common\nupstream_add\n").unwrap();
+        fs::write(old_dir.join("config.txt.zoiorig"), base).expect("Failed to write base");
+        fs::write(old_dir.join("config.txt"), "user_pref\ncommon\n")
+            .expect("Failed to write yours");
+        fs::write(new_dir.join("config.txt"), "common\nupstream_add\n")
+            .expect("Failed to write theirs");
 
         handle_backup_files(
             &old_dir,
@@ -212,9 +220,9 @@ mod tests {
             &["config.txt".to_string()],
             crate::pkg::types::Scope::User,
         )
-        .unwrap();
+        .expect("Failed to handle backup files");
 
-        let result = fs::read_to_string(new_dir.join("config.txt")).unwrap();
+        let result = fs::read_to_string(new_dir.join("config.txt")).expect("Failed to read result");
         assert!(result.contains("user_pref"));
         assert!(result.contains("upstream_add"));
         assert!(result.contains("common"));
@@ -222,16 +230,16 @@ mod tests {
 
     #[test]
     fn test_merge_case_c_conflict() {
-        let dir = tempdir().unwrap();
+        let dir = tempdir().expect("Failed to create temp dir");
         let old_dir = dir.path().join("1.0.0");
         let new_dir = dir.path().join("1.1.0");
-        fs::create_dir_all(&old_dir).unwrap();
-        fs::create_dir_all(&new_dir).unwrap();
+        fs::create_dir_all(&old_dir).expect("Failed to create old dir");
+        fs::create_dir_all(&new_dir).expect("Failed to create new dir");
 
         let base = "line\n";
-        fs::write(old_dir.join("config.txt.zoiorig"), base).unwrap();
-        fs::write(old_dir.join("config.txt"), "user\n").unwrap();
-        fs::write(new_dir.join("config.txt"), "upstream\n").unwrap();
+        fs::write(old_dir.join("config.txt.zoiorig"), base).expect("Failed to write base");
+        fs::write(old_dir.join("config.txt"), "user\n").expect("Failed to write yours");
+        fs::write(new_dir.join("config.txt"), "upstream\n").expect("Failed to write theirs");
 
         handle_backup_files(
             &old_dir,
@@ -239,9 +247,9 @@ mod tests {
             &["config.txt".to_string()],
             crate::pkg::types::Scope::User,
         )
-        .unwrap();
+        .expect("Failed to handle backup files");
 
-        let result = fs::read_to_string(new_dir.join("config.txt")).unwrap();
+        let result = fs::read_to_string(new_dir.join("config.txt")).expect("Failed to read result");
         assert!(result.contains("<<<<<<<"));
         assert!(result.contains("user"));
         assert!(result.contains("upstream"));

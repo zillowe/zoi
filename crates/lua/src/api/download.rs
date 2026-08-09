@@ -3,7 +3,7 @@
 //! This module provides functions to download files from URLs, including
 //! support for progress bars and hash verification of downloaded files.
 
-use colored::*;
+use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::fs;
 use std::io::{Read, Write};
@@ -11,12 +11,16 @@ use std::path::Path;
 use zoi_core::utils;
 
 /// Downloads a file from the given URL to the destination path with a progress bar.
+///
+/// # Errors
+///
+/// Returns an `mlua::Error` if the download fails after several attempts or if there is an error
+/// creating the destination file.
 pub fn download_with_progress(url: &str, dest_path: &Path, quiet: bool) -> Result<(), mlua::Error> {
     if url.starts_with("http://") && !quiet {
         println!(
-            "{}: downloading over insecure HTTP: {}",
-            "Warning:".yellow(),
-            url
+            "{}: downloading over insecure HTTP: {url}",
+            "Warning:".yellow()
         );
     }
 
@@ -29,8 +33,7 @@ pub fn download_with_progress(url: &str, dest_path: &Path, quiet: bool) -> Resul
             Ok(resp) => {
                 if !resp.status().is_success() {
                     return Err(mlua::Error::RuntimeError(format!(
-                        "Failed to download {}: {}",
-                        url,
+                        "Failed to download {url}: {}",
                         resp.status()
                     )));
                 }
@@ -39,20 +42,21 @@ pub fn download_with_progress(url: &str, dest_path: &Path, quiet: bool) -> Resul
             Err(e) => {
                 if attempt < 3 {
                     if !quiet {
-                        eprintln!("Download failed ({}). Retrying...", e);
+                        eprintln!("Download failed ({e}). Retrying...");
                     }
                     zoi_core::utils::retry_backoff_sleep(attempt);
                     continue;
-                } else {
-                    return Err(mlua::Error::RuntimeError(e.to_string()));
                 }
+                return Err(mlua::Error::RuntimeError(e.to_string()));
             }
         }
     };
 
     let total_size = response.content_length().unwrap_or(0);
 
-    let pb = if !quiet {
+    let pb = if quiet {
+        None
+    } else {
         let pb = ProgressBar::new(total_size);
         pb.set_style(ProgressStyle::default_bar()
             .template("{spinner:.green} {msg:30.cyan} [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {elapsed_precise})")
@@ -60,10 +64,8 @@ pub fn download_with_progress(url: &str, dest_path: &Path, quiet: bool) -> Resul
             .progress_chars("=>-"));
 
         let filename = url.split('/').next_back().unwrap_or("file");
-        pb.set_message(format!("Downloading {}", filename));
+        pb.set_message(format!("Downloading {filename}"));
         Some(pb)
-    } else {
-        None
     };
 
     let mut dest_file =
@@ -77,7 +79,7 @@ pub fn download_with_progress(url: &str, dest_path: &Path, quiet: bool) -> Resul
             break;
         }
         dest_file
-            .write_all(&buffer[..n])
+            .write_all(buffer.get(..n).ok_or_else(|| mlua::Error::RuntimeError("buffer slice out of bounds".to_string()))?)
             .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
         downloaded += n as u64;
         if let Some(ref p) = pb {
@@ -93,6 +95,11 @@ pub fn download_with_progress(url: &str, dest_path: &Path, quiet: bool) -> Resul
 }
 
 /// Registers the `UTILS.DOWNLOAD` function in the Lua environment.
+///
+/// # Errors
+///
+/// Returns an `mlua::Error` if the `UTILS` table cannot be found or if there is an error
+/// setting the `DOWNLOAD` function.
 pub fn add_download_util(lua: &mlua::Lua, quiet: bool) -> Result<(), mlua::Error> {
     let download_fn = lua.create_function(
         move |lua, (url, out_name, hash): (String, Option<String>, Option<String>)| {
@@ -113,30 +120,25 @@ pub fn add_download_util(lua: &mlua::Lua, quiet: bool) -> Result<(), mlua::Error
             if let Some(hash_spec) = hash {
                 let parts: Vec<&str> = hash_spec.splitn(2, '-').collect();
                 let (algo, expected_hash) = if parts.len() == 2 {
-                    (parts[0], parts[1])
+                    (parts.first().copied().unwrap_or_default(), parts.get(1).copied().unwrap_or_default())
                 } else {
                     ("sha512", hash_spec.as_str())
                 };
 
-                let hash_algo = match zoi_core::hash::HashAlgorithm::from_name(algo) {
-                    Some(a) => a,
-                    None => {
-                        return Err(mlua::Error::RuntimeError(format!(
-                            "Unsupported hash algorithm: {}",
-                            algo
-                        )));
-                    }
+                let Some(hash_algo) = zoi_core::hash::HashAlgorithm::from_name(algo) else {
+                    return Err(mlua::Error::RuntimeError(format!(
+                        "Unsupported hash algorithm: {algo}"
+                    )));
                 };
 
                 let actual_hash = zoi_core::hash::calculate_file_hash(&dest_path, hash_algo)
                     .map_err(|e| {
-                        mlua::Error::RuntimeError(format!("Failed to calculate hash: {}", e))
+                        mlua::Error::RuntimeError(format!("Failed to calculate hash: {e}"))
                     })?;
 
                 if !actual_hash.eq_ignore_ascii_case(expected_hash) {
                     return Err(mlua::Error::RuntimeError(format!(
-                        "Hash mismatch for {}. Expected: {}-{}, Got: {}-{}",
-                        filename, algo, expected_hash, algo, actual_hash
+                        "Hash mismatch for {filename}. Expected: {algo}-{expected_hash}, Got: {algo}-{actual_hash}"
                     )));
                 }
             }

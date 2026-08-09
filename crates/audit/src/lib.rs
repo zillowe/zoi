@@ -184,6 +184,11 @@ fn write_audit_log(log: &AuditLog) -> Result<()> {
 }
 
 /// Logs a new event to the audit log.
+///
+/// # Errors
+///
+/// Returns an error if the configuration or audit log cannot be read,
+/// or if writing the updated log fails.
 pub fn log_event(action: AuditAction, manifest: &types::InstallManifest) -> Result<()> {
     let config = config::read_config()?;
     if !config.audit_log_enabled {
@@ -219,12 +224,21 @@ pub fn log_event(action: AuditAction, manifest: &types::InstallManifest) -> Resu
 }
 
 /// Returns the full audit history.
+///
+/// # Errors
+///
+/// Returns an error if the audit log cannot be read from disk.
 pub fn get_history() -> Result<Vec<AuditEntry>> {
     let log = read_audit_log()?;
     Ok(log.entries.into_iter().map(|l| l.entry).collect())
 }
 
 /// Exports the audit history to a file.
+///
+/// # Errors
+///
+/// Returns an error if the history is empty, the export path is invalid,
+/// or if writing to the export path fails.
 pub fn export_history(export_path: &Path, ndjson: bool) -> Result<usize> {
     let log = read_audit_log()?;
     if log.entries.is_empty() {
@@ -255,6 +269,10 @@ pub fn export_history(export_path: &Path, ndjson: bool) -> Result<usize> {
 }
 
 /// Verifies the integrity of the audit log hash chain.
+///
+/// # Errors
+///
+/// Returns an error if the audit log cannot be read from disk.
 pub fn verify_chain() -> Result<AuditVerification> {
     let log = read_audit_log()?;
     let mut total_entries = 0usize;

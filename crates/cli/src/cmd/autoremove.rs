@@ -2,9 +2,17 @@
 
 use crate::pkg;
 use anyhow::Result;
-use colored::*;
+use colored::Colorize;
 
 /// Runs the autoremove command.
+///
+/// # Errors
+///
+/// Returns an error if the autoremove operation fails.
+///
+/// # Panics
+///
+/// This function does not explicitly panic.
 pub fn run(yes: bool, dry_run: bool) -> Result<()> {
     if dry_run {
         println!(

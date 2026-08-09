@@ -25,7 +25,7 @@ fn parse_pkgs_v2_key(key: &str) -> (String, String) {
     }
 }
 
-/// Uniquely identifies a package within the PubGrub solver.
+/// Uniquely identifies a package within the `PubGrub` solver.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct PkgName {
     /// The name of the package.
@@ -43,7 +43,7 @@ pub struct PkgName {
 impl Display for PkgName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(source) = &self.explicit_source {
-            return write!(f, "{}", source);
+            return write!(f, "{source}");
         }
         if let Some(sub) = &self.sub_package {
             write!(f, "#{}@{}/{}:{}", self.registry, self.repo, self.name, sub)
@@ -73,6 +73,9 @@ impl SemVersion {
     /// Parses a version string into a `SemVersion`.
     ///
     /// Handles epoch prefixes (e.g. "1:1.2.3") and sanitizes non-standard strings.
+    /// # Errors
+    ///
+    /// Returns an error if the version string is not a valid semver.
     pub fn parse(v: &str) -> Result<Self, anyhow::Error> {
         let (epoch, version_str) = if let Some((e_str, v_str)) = v.split_once(':') {
             if let Ok(e) = e_str.parse::<u32>() {
@@ -123,7 +126,7 @@ impl Display for SemVersion {
     }
 }
 
-/// Sanitizes non-standard version strings into valid SemVer format.
+/// Sanitizes non-standard version strings into valid `SemVer` format.
 ///
 /// Logic:
 /// - Padds missing parts (e.g. "2.41" -> "2.41.0").
@@ -133,24 +136,34 @@ fn sanitize_version_string(v: &str) -> String {
     let v = v.trim_start_matches('v').replace('-', "+");
     let parts: Vec<&str> = v.split('.').collect();
 
-    if parts.len() == 1 {
-        format!("{}.0.0", parts[0])
-    } else if parts.len() == 2 {
-        format!("{}.{}.0", parts[0], parts[1])
-    } else if parts.len() > 3 {
-        format!(
-            "{}.{}.{}+{}",
-            parts[0],
-            parts[1],
-            parts[2],
-            parts[3..].join(".")
-        )
-    } else {
-        v.to_string()
+    match parts.len() {
+        1 => {
+            if let Some(p0) = parts.first() {
+                format!("{p0}.0.0")
+            } else {
+                "0.0.0".to_string()
+            }
+        }
+        2 => {
+            if let (Some(p0), Some(p1)) = (parts.first(), parts.get(1)) {
+                format!("{p0}.{p1}.0")
+            } else {
+                "0.0.0".to_string()
+            }
+        }
+        len if len > 3 => {
+            if let (Some(p0), Some(p1), Some(p2)) = (parts.first(), parts.get(1), parts.get(2)) {
+                let rest = parts.get(3..).unwrap_or(&[]).join(".");
+                format!("{p0}.{p1}.{p2}+{rest}")
+            } else {
+                v.clone()
+            }
+        }
+        _ => v.clone(),
     }
 }
 
-/// Errors that can occur during dependency resolution using the PubGrub solver.
+/// Errors that can occur during dependency resolution using the `PubGrub` solver.
 #[derive(Error, Debug)]
 pub enum ZoiSolverError {
     /// A general dependency error with a descriptive message.
@@ -167,7 +180,7 @@ pub enum ZoiSolverError {
     Other(String),
 }
 
-/// Adapts Zoi's package and registry model to the PubGrub SAT solver.
+/// Adapts Zoi's package and registry model to the `PubGrub` SAT solver.
 ///
 /// This is the most performance-critical part of the resolution logic.
 /// It implements the `DependencyProvider` trait, which allows the solver
@@ -175,7 +188,7 @@ pub enum ZoiSolverError {
 /// - "What versions are available for this package?"
 /// - "What are the dependencies for this specific version?"
 ///
-/// The adapter handles querying the local SQLite index, remote registries,
+/// The adapter handles querying the local `SQLite` index, remote registries,
 /// and project-local `zoi.lua` overrides in a unified way.
 pub struct ZoiDependencyProvider {
     /// The initial set of direct dependencies requested by the user.
@@ -199,7 +212,7 @@ pub struct ZoiDependencyProvider {
     /// Build type used for selecting typed build dependencies.
     pub build_type: Option<String>,
     /// Memoization cache mapping a package+version to its resolved dependency requirements.
-    /// The `RefCell` allows interior mutability since the PubGrub solver requires `&self`.
+    /// The `RefCell` allows interior mutability since the `PubGrub` solver requires `&self`.
     pub deps_cache:
         RefCell<FxHashMap<(PkgName, SemVersion), FxHashMap<PkgName, Ranges<SemVersion>>>>,
     /// Memoization cache storing the explicit options and optional dependencies chosen by the user.
@@ -207,7 +220,7 @@ pub struct ZoiDependencyProvider {
         RefCell<FxHashMap<(PkgName, SemVersion), (Vec<String>, Vec<String>, Vec<String>)>>,
 }
 
-/// Converts a SemVer requirement string into a PubGrub version range.
+/// Converts a `SemVer` requirement string into a `PubGrub` version range.
 ///
 /// This function bridges the gap between the `semver` crate's flexible requirement
 /// strings and `pubgrub`'s mathematical version ranges.
@@ -218,7 +231,7 @@ pub struct ZoiDependencyProvider {
 /// - `~1.2.3` -> `[1.2.3, 1.3.0)` (Tilde: patch-level updates)
 /// - `>=1.0.0, <2.0.0` -> `[1.0.0, 2.0.0)` (Intersection of ranges)
 ///
-/// If a version string is not a valid SemVer requirement (e.g. a channel name like
+/// If a version string is not a valid `SemVer` requirement (e.g. a channel name like
 /// `@stable`), it is treated as a `Ranges::full()` to let Zoi's higher-level
 /// resolver handle the channel-to-version mapping.
 pub fn semver_to_range(req_str: &str) -> Ranges<SemVersion> {
@@ -325,6 +338,10 @@ pub fn semver_to_range(req_str: &str) -> Ranges<SemVersion> {
 
 impl ZoiDependencyProvider {
     /// Creates a new `ZoiDependencyProvider`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the registry index cannot be fetched in mini mode.
     pub fn new(
         root_deps: FxHashMap<PkgName, Ranges<SemVersion>>,
         initial_sources: Vec<String>,
@@ -372,8 +389,8 @@ impl ZoiDependencyProvider {
         })
     }
 
-    /// Internal helper to convert a requirement string to a PubGrub range.
-    fn semver_to_range(&self, req_str: &str) -> Ranges<SemVersion> {
+    /// Internal helper to convert a requirement string to a `PubGrub` range.
+    fn semver_to_range(req_str: &str) -> Ranges<SemVersion> {
         semver_to_range(req_str)
     }
 
@@ -382,12 +399,10 @@ impl ZoiDependencyProvider {
         if let Some(explicit_source) = &package.explicit_source {
             let explicit_base = explicit_source
                 .rsplit_once('@')
-                .map(|(base, _)| base)
-                .unwrap_or(explicit_source.as_str());
+                .map_or(explicit_source.as_str(), |(base, _)| base);
             let source_base = source
                 .rsplit_once('@')
-                .map(|(base, _)| base)
-                .unwrap_or(source);
+                .map_or(source, |(base, _)| base);
             return explicit_base == source_base;
         }
 
@@ -411,6 +426,10 @@ impl ZoiDependencyProvider {
     }
 
     /// Retrieves all available versions for a given package from registries and sources.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ZoiSolverError` if database queries fail.
     pub fn get_versions(&self, package: &PkgName) -> Result<Vec<SemVersion>, ZoiSolverError> {
         let mut all_versions = Vec::new();
 
@@ -654,7 +673,7 @@ impl DependencyProvider for ZoiDependencyProvider {
             for group_pkgs in groups {
                 for dep_str in group_pkgs {
                     let dep_req = zoi_deps::parse_dependency_string(dep_str).map_err(|e| {
-                        ZoiSolverError::Dependency(format!("parse fail for '{}': {}", dep_str, e))
+                        ZoiSolverError::Dependency(format!("parse fail for '{dep_str}': {e}"))
                     })?;
 
                     if dep_req.manager == "zoi" {
@@ -719,7 +738,7 @@ impl DependencyProvider for ZoiDependencyProvider {
                                 false,
                                 true,
                             ) {
-                                Ok(Some(v)) => self.semver_to_range(&v),
+                                Ok(Some(v)) => Self::semver_to_range(&v),
                                 Ok(None) => Ranges::full(),
                                 Err(e) => {
                                     println!(
@@ -742,7 +761,7 @@ impl DependencyProvider for ZoiDependencyProvider {
                     }
                 }
             }
-            all_req = dependencies.runtime.clone();
+            all_req.clone_from(&dependencies.runtime);
         }
 
         self.deps_cache

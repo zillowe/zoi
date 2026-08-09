@@ -1,10 +1,11 @@
 use crate::resolver::InstallNode;
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use semver::{Version, VersionReq};
 use std::collections::HashSet;
+use std::fmt::Write as _;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -54,6 +55,11 @@ pub fn send_telemetry(
 }
 
 /// Displays important updates from the package metadata to the user.
+///
+/// # Errors
+///
+/// Returns an error if the user chooses not to continue or if
+/// confirmation input fails.
 pub fn display_updates(pkg: &types::Package, yes: bool) -> Result<bool> {
     if let Some(updates) = &pkg.updates {
         if updates.is_empty() {
@@ -82,6 +88,10 @@ pub fn display_updates(pkg: &types::Package, yes: bool) -> Result<bool> {
 /// - Explicit Conflicts: Packages listed in the `conflicts` metadata field.
 /// - Binary Collisions: Binary names (`bins`) already provided by other packages.
 /// - Virtual Collisions: Virtual packages (`provides`) already provided.
+///
+/// # Errors
+///
+/// Returns an error if installed packages cannot be retrieved.
 pub fn get_conflicts(
     pkg: &types::Package,
     installed_packages: &[types::InstallManifest],
@@ -152,6 +162,10 @@ pub fn get_conflicts(
 ///
 /// If a package definition includes a `scopes` list, Zoi will block
 /// installation if the target scope is not present in that list.
+///
+/// # Errors
+///
+/// Returns an error if any package in the graph is not allowed in its target scope.
 pub fn check_scope_compliance(graph: &super::resolver::DependencyGraph) -> Result<()> {
     for node in graph.nodes.values() {
         if let Some(allowed_scopes) = &node.pkg.scopes
@@ -168,7 +182,11 @@ pub fn check_scope_compliance(graph: &super::resolver::DependencyGraph) -> Resul
     Ok(())
 }
 
-/// Enforces ZoiOS-only or non-ZoiOS-only package constraints.
+/// Enforces `ZoiOS`-only or non-`ZoiOS`-only package constraints.
+///
+/// # Errors
+///
+/// Returns an error if any package in the graph violates `ZoiOS` compliance.
 pub fn check_zoios_compliance(graph: &super::resolver::DependencyGraph) -> Result<()> {
     let is_currently_zoios = zoi_core::utils::is_zoios();
 
@@ -191,6 +209,11 @@ pub fn check_zoios_compliance(graph: &super::resolver::DependencyGraph) -> Resul
 }
 
 /// Checks for conflicts between packages to be installed and existing ones.
+///
+/// # Errors
+///
+/// Returns an error if installed packages cannot be retrieved or if
+/// the operation is aborted due to conflicts.
 pub fn check_for_conflicts(packages_to_install: &[&types::Package], yes: bool) -> Result<()> {
     let installed_packages = zoi_resolver::local::get_installed_packages()?;
     let mut all_conflict_messages = HashSet::new();
@@ -203,7 +226,7 @@ pub fn check_for_conflicts(packages_to_install: &[&types::Package], yes: bool) -
     if !all_conflict_messages.is_empty() {
         println!("\n{}", "Conflict Detected:".red().bold());
         for msg in &all_conflict_messages {
-            println!("- {}", msg);
+            println!("- {msg}");
         }
         if !utils::ask_for_confirmation(
             "\nDo you want to continue with the installation anyway?",
@@ -233,12 +256,12 @@ fn package_match_candidates(node: &InstallNode) -> Vec<String> {
 
     if let Some(sub) = &node.sub_package {
         let sub = sub.to_ascii_lowercase();
-        values.push(format!("{}:{}", name, sub));
+        values.push(format!("{name}:{sub}"));
     }
 
     if !node.pkg.repo.is_empty() {
         let repo = node.pkg.repo.to_ascii_lowercase();
-        values.push(format!("@{}/{}", repo, name));
+        values.push(format!("@{repo}/{name}"));
         if let Some(sub) = &node.sub_package {
             values.push(format!("@{}/{}:{}", repo, name, sub.to_ascii_lowercase()));
         }
@@ -332,6 +355,10 @@ fn license_matches_allowed(license: &str, allowed: &HashSet<String>) -> bool {
 }
 
 /// Checks if the dependency graph complies with a specific policy.
+///
+/// # Errors
+///
+/// Returns an error if the graph violates the provided policy.
 pub fn check_policy_compliance_with_policy(
     graph: &super::resolver::DependencyGraph,
     policy: &types::Policy,
@@ -387,14 +414,14 @@ pub fn check_policy_compliance_with_policy(
         if let Some(rules) = &denied_packages
             && rules.iter().any(|rule| rule_matches_package(rule, node))
         {
-            violations.push(format!("{} blocked by denied package policy.", pkg_display));
+            violations.push(format!("{pkg_display} blocked by denied package policy."));
         }
 
         if let Some(rules) = &allowed_packages
             && !rules.is_empty()
             && !rules.iter().any(|rule| rule_matches_package(rule, node))
         {
-            violations.push(format!("{} is not in allowed package policy.", pkg_display));
+            violations.push(format!("{pkg_display} is not in allowed package policy."));
         }
 
         if let Some(rules) = &denied_repos
@@ -442,7 +469,7 @@ pub fn check_policy_compliance_with_policy(
     if !violations.is_empty() {
         println!("\n{}", "POLICY VIOLATION".red().bold());
         for message in &violations {
-            println!("- {}", message);
+            println!("- {message}");
         }
         return Err(anyhow!(
             "Installation blocked by security/compliance policy."
@@ -453,12 +480,22 @@ pub fn check_policy_compliance_with_policy(
 }
 
 /// Checks if the dependency graph complies with the system-wide policy.
+///
+/// # Errors
+///
+/// Returns an error if the configuration cannot be read or if the graph
+/// violates the system-wide policy.
 pub fn check_policy_compliance(graph: &super::resolver::DependencyGraph) -> Result<()> {
     let config = zoi_core::config::read_config()?;
     check_policy_compliance_with_policy(graph, &config.policy)
 }
 
 /// Checks the dependency graph for known security vulnerabilities.
+///
+/// # Errors
+///
+/// Returns an error if any package is vulnerable and the policy blocks it,
+/// or if the operation is aborted by the user.
 pub fn check_for_vulnerabilities(
     graph: &super::resolver::DependencyGraph,
     yes: bool,
@@ -491,7 +528,7 @@ pub fn check_for_vulnerabilities(
         println!("\n{}", "SECURITY WARNING".red().bold());
         for (adv, version, pkg_name, sub_pkg) in &all_vulnerabilities {
             let display_name = if let Some(sub) = sub_pkg {
-                format!("{}:{}", pkg_name, sub)
+                format!("{pkg_name}:{sub}")
             } else {
                 pkg_name.clone()
             };
@@ -552,9 +589,9 @@ fn get_text_from_candidate_urls(urls: &[String], resource_name: &str) -> Result<
         match client.get(candidate_url).send() {
             Ok(response) => match response.text() {
                 Ok(text) => return Ok(text),
-                Err(e) => last_error = Some(format!("{} ({})", candidate_url, e)),
+                Err(e) => last_error = Some(format!("{candidate_url} ({e})")),
             },
-            Err(e) => last_error = Some(format!("{} ({})", candidate_url, e)),
+            Err(e) => last_error = Some(format!("{candidate_url} ({e})")),
         }
     }
 
@@ -566,6 +603,11 @@ fn get_text_from_candidate_urls(urls: &[String], resource_name: &str) -> Result<
 }
 
 /// Downloads a file from a URL with progress reporting.
+///
+/// # Errors
+///
+/// Returns an error if the download fails after all retry attempts,
+/// if the destination file cannot be created, or if the progress bar fails.
 pub fn download_file_with_progress(
     url: &str,
     dest_path: &Path,
@@ -573,7 +615,7 @@ pub fn download_file_with_progress(
     expected_size: Option<u64>,
 ) -> Result<()> {
     if url.starts_with("http://") {
-        let msg = format!("downloading over insecure HTTP: {}", url);
+        let msg = format!("downloading over insecure HTTP: {url}");
         if pb_override.is_none() {
             println!("{}: {}", "Warning:".yellow(), msg);
         }
@@ -609,9 +651,9 @@ pub fn download_file_with_progress(
 
     let mut request = client.get(url);
     if partial_size > 0 {
-        let msg = format!("Resuming download from byte {}", partial_size);
+        let msg = format!("Resuming download from byte {partial_size}");
         pb.set_message(msg);
-        request = request.header("Range", format!("bytes={}-", partial_size));
+        request = request.header("Range", format!("bytes={partial_size}-"));
     }
 
     let max_attempts = get_download_retry_attempts();
@@ -625,18 +667,14 @@ pub fn download_file_with_progress(
             Ok(resp) => break resp,
             Err(e) => {
                 if attempt < max_attempts {
-                    let msg = format!("Download failed ({}). Retrying...", e);
+                    let msg = format!("Download failed ({e}). Retrying...");
                     pb.set_message(msg);
                     zoi_core::utils::retry_backoff_sleep(attempt);
                     continue;
-                } else {
-                    return Err(anyhow!(
-                        "Failed to download '{}' after {} attempts: {}",
-                        url,
-                        attempt,
-                        e
-                    ));
                 }
+                return Err(anyhow!(
+                    "Failed to download '{url}' after {attempt} attempts: {e}"
+                ));
             }
         }
     };
@@ -677,7 +715,11 @@ pub fn download_file_with_progress(
         if bytes_read == 0 {
             break;
         }
-        dest_file.write_all(&buffer[..bytes_read])?;
+        dest_file.write_all(
+            buffer
+                .get(..bytes_read)
+                .ok_or_else(|| anyhow!("buffer slice out of bounds"))?,
+        )?;
         pb.inc(bytes_read as u64);
     }
 
@@ -689,20 +731,22 @@ pub fn download_file_with_progress(
 }
 
 /// Verifies the hash of a file against an expected hash.
+///
+/// # Errors
+///
+/// Returns an error if the hash algorithm is unsupported or if the file
+/// cannot be read to calculate its hash.
 pub fn verify_file_hash(
     file_path: &Path,
     expected_hash: &str,
     pb: Option<&ProgressBar>,
 ) -> Result<bool> {
     let expected_clean = expected_hash.trim().to_lowercase();
-    let algo = match zoi_core::hash::HashAlgorithm::from_len(expected_clean.len()) {
-        Some(a) => a,
-        None => {
-            return Err(anyhow!(
-                "Unsupported hash length: {}. Expected 128 (SHA-512), 64 (SHA-256), or 32 (MD5).",
-                expected_clean.len()
-            ));
-        }
+    let Some(algo) = zoi_core::hash::HashAlgorithm::from_len(expected_clean.len()) else {
+        return Err(anyhow!(
+            "Unsupported hash length: {}. Expected 128 (SHA-512), 64 (SHA-256), or 32 (MD5).",
+            expected_clean.len()
+        ));
     };
 
     let actual_hash = zoi_core::hash::calculate_file_hash(file_path, algo)?;
@@ -718,28 +762,33 @@ pub fn verify_file_hash(
         if let Some(p) = pb {
             p.println(msg);
         } else {
-            println!("{}", msg);
+            println!("{msg}");
         }
     } else {
         let mut msg = format!("{}\n", "Hash verification failed!".red().bold());
-        msg.push_str(&format!("  Expected: {}\n", expected_clean.yellow()));
-        msg.push_str(&format!("  Actual:   {}\n", actual_clean.cyan()));
-        msg.push_str(&format!(
+        let _ = writeln!(msg, "  Expected: {}", expected_clean.yellow());
+        let _ = writeln!(msg, "  Actual:   {}", actual_clean.cyan());
+        let _ = write!(
+            msg,
             "  Lengths:  Expected={}, Actual={}",
             expected_clean.len(),
             actual_clean.len()
-        ));
+        );
 
         if let Some(p) = pb {
             p.println(msg);
         } else {
-            println!("{}", msg);
+            println!("{msg}");
         }
     }
     Ok(result)
 }
 
 /// Fetches a list of files from a remote registry.
+///
+/// # Errors
+///
+/// Returns an error if the remote list cannot be fetched.
 pub fn get_remote_file_list(url: &str) -> Result<Vec<String>> {
     if zoi_core::offline::is_offline() {
         return Ok(Vec::new());
@@ -762,6 +811,15 @@ pub fn get_remote_file_list(url: &str) -> Result<Vec<String>> {
 /// - Ignore files already owned by the same package (enabling safe upgrades).
 ///
 /// This saves bandwidth and prevents partial installation failures.
+///
+/// # Errors
+///
+/// Returns an error if installed packages cannot be retrieved or if
+/// the operation is aborted by the user.
+///
+/// # Panics
+///
+/// Panics if the internal mutex is poisoned.
 pub fn check_file_conflicts(
     graph: &super::resolver::DependencyGraph,
     yes: bool,
@@ -804,9 +862,8 @@ pub fn check_file_conflicts(
                 }
             } else {
                 let archive_filename = info.final_url.split('/').next_back().unwrap_or_default();
-                let archive_cache_root = match cache::get_archive_cache_root() {
-                    Ok(path) => path,
-                    Err(_) => return Ok(()),
+                let Ok(archive_cache_root) = cache::get_archive_cache_root() else {
+                    return Ok(());
                 };
                 let archive_path = archive_cache_root.join(archive_filename);
 
@@ -824,21 +881,26 @@ pub fn check_file_conflicts(
 
         for conflict in conflicts_for_this_pkg {
             if !owned_files.contains(&conflict) {
-                all_conflicts.lock().unwrap().insert(format!(
-                    "File '{}' from package '{}' already exists on filesystem.",
-                    conflict, node.pkg.name
-                ));
+                all_conflicts
+                    .lock()
+                    .expect("Failed to lock all_conflicts Mutex")
+                    .insert(format!(
+                        "File '{}' from package '{}' already exists on filesystem.",
+                        conflict, node.pkg.name
+                    ));
             }
         }
 
         Ok::<(), anyhow::Error>(())
     })?;
 
-    let conflicts = all_conflicts.into_inner().unwrap();
+    let conflicts = all_conflicts
+        .into_inner()
+        .expect("Failed to get inner value from Mutex");
     if !conflicts.is_empty() {
         m.println(format!("\n{}", "File Conflict Detected:".red().bold()))?;
         for msg in &conflicts {
-            m.println(format!("- {}", msg))?;
+            m.println(format!("- {msg}"))?;
         }
         if !utils::ask_for_confirmation(
             "\nDo you want to overwrite these files and continue with the installation?",
@@ -852,6 +914,11 @@ pub fn check_file_conflicts(
 }
 
 /// Identifies file conflicts from a list of files to be installed.
+///
+/// # Errors
+///
+/// This function currently always returns `Ok`, but is kept as `Result`
+/// for future compatibility.
 pub fn get_conflicts_from_list(
     list: Vec<String>,
     pkg: &types::Package,
@@ -859,7 +926,7 @@ pub fn get_conflicts_from_list(
 ) -> Result<Vec<String>> {
     let mut conflicts = Vec::new();
     let sub_prefix = if let Some(sub) = sub_package_to_check {
-        format!("data/{}/", sub)
+        format!("data/{sub}/")
     } else {
         "data/".to_string()
     };
@@ -895,6 +962,11 @@ pub fn get_conflicts_from_list(
 }
 
 /// Identifies file conflicts by inspecting a package archive.
+///
+/// # Errors
+///
+/// Returns an error if the archive cannot be opened or decoded, or if
+/// unpacking fails.
 pub fn get_file_conflicts_from_archive(
     archive_path: &Path,
     pkg: &types::Package,
@@ -915,7 +987,7 @@ pub fn get_file_conflicts_from_archive(
     let subs_to_check = if let Some(sub) = sub_package_to_check {
         vec![sub.to_string()]
     } else {
-        vec!["".to_string()]
+        vec![String::new()]
     };
 
     for sub in subs_to_check {
@@ -934,7 +1006,7 @@ pub fn get_file_conflicts_from_archive(
             let root_dest = zoi_core::sysroot::apply_sysroot(PathBuf::from("/"));
             for entry in WalkDir::new(&usrroot_src)
                 .into_iter()
-                .filter_map(|e| e.ok())
+                .filter_map(std::result::Result::ok)
                 .skip(1)
             {
                 if entry.file_type().is_file() {
@@ -953,7 +1025,7 @@ pub fn get_file_conflicts_from_archive(
         {
             for entry in WalkDir::new(&usrhome_src)
                 .into_iter()
-                .filter_map(|e| e.ok())
+                .filter_map(std::result::Result::ok)
                 .skip(1)
             {
                 if entry.file_type().is_file() {
@@ -971,6 +1043,10 @@ pub fn get_file_conflicts_from_archive(
 }
 
 /// Fetches the expected hash for a file from a remote source.
+///
+/// # Errors
+///
+/// Returns an error if the hash file cannot be fetched from any remote source.
 pub fn get_expected_hash(hash_url: &str, filename: Option<&str>) -> Result<String> {
     if zoi_core::offline::is_offline() {
         return Ok(String::new());
@@ -1007,6 +1083,10 @@ pub fn get_expected_hash(hash_url: &str, filename: Option<&str>) -> Result<Strin
 }
 
 /// Fetches the expected download and installed sizes for a package.
+///
+/// # Errors
+///
+/// Returns an error if the size file cannot be fetched from any remote source.
 pub fn get_expected_size(size_url: &str) -> Result<(u64, u64)> {
     if zoi_core::offline::is_offline() {
         return Ok((0, 0));
@@ -1071,6 +1151,11 @@ pub fn resolve_url_placeholders(
 }
 
 /// Finds prebuilt info for a package in the registry.
+///
+/// # Errors
+///
+/// Returns an error if the platform information cannot be retrieved
+/// or if the database root cannot be resolved.
 pub fn find_registry_info_for_package(
     pkg: &types::Package,
     registry_handle: &str,
@@ -1125,11 +1210,9 @@ pub fn find_registry_info_for_package(
             let pgp_url = Some(
                 pkg_link
                     .pgp
-                    .as_ref()
-                    .map(|url| {
+                    .as_ref().map_or_else(|| format!("{final_url}.sig"), |url| {
                         resolve_url_placeholders(url, &pkg.name, &pkg.repo, version, &platform)
-                    })
-                    .unwrap_or_else(|| format!("{final_url}.sig")),
+                    }),
             );
             let hash_url = pkg_link
                 .hash
@@ -1158,6 +1241,10 @@ pub fn find_registry_info_for_package(
 }
 
 /// Finds prebuilt info for a prebuilt package.
+///
+/// # Errors
+///
+/// Returns an error if the registry information cannot be retrieved.
 pub fn find_prebuilt_info_for_package(
     pkg: &types::Package,
     registry_handle: &str,
@@ -1167,6 +1254,10 @@ pub fn find_prebuilt_info_for_package(
 }
 
 /// Finds info for a source bundle package.
+///
+/// # Errors
+///
+/// Returns an error if the registry information cannot be retrieved.
 pub fn find_source_bundle_info_for_package(
     pkg: &types::Package,
     registry_handle: &str,
@@ -1176,11 +1267,19 @@ pub fn find_source_bundle_info_for_package(
 }
 
 /// Finds prebuilt info for an install node.
+///
+/// # Errors
+///
+/// Returns an error if the registry information cannot be retrieved.
 pub fn find_prebuilt_info(node: &InstallNode) -> Result<Option<types::PrebuiltInfo>> {
     find_prebuilt_info_for_package(&node.pkg, &node.registry_handle, &node.version)
 }
 
 /// Finds source bundle info for an install node.
+///
+/// # Errors
+///
+/// Returns an error if the registry information cannot be retrieved.
 pub fn find_source_bundle_info(node: &InstallNode) -> Result<Option<types::PrebuiltInfo>> {
     find_source_bundle_info_for_package(&node.pkg, &node.registry_handle, &node.version)
 }

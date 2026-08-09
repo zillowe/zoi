@@ -25,16 +25,16 @@ action:
   exec: echo "triggered"
 "#;
 
-    let hook: GlobalHook = serde_yaml::from_str(hook_yaml).unwrap();
+    let hook: GlobalHook = serde_yaml::from_str(hook_yaml).expect("unwrap failed");
     assert_eq!(hook.name, "test-hook");
-    assert_eq!(hook.trigger.dirs[0], "usr/share/icons");
-    assert_eq!(hook.trigger.paths[0], "usr/share/fonts/**");
+    assert_eq!(hook.trigger.dirs.first().expect("Value should exist in test"), "usr/share/icons");
+    assert_eq!(hook.trigger.paths.first().expect("Value should exist in test"), "usr/share/fonts/**");
     assert_eq!(hook.action.when, HookWhen::PostTransaction);
 }
 
 #[test]
 fn test_hook_loading_dirs() {
-    let dir = tempdir().unwrap();
+    let dir = tempdir().expect("unwrap failed");
     let hook_path = dir.path().join("test.hook.yaml");
 
     let content = r#"
@@ -46,9 +46,9 @@ action:
   when: PostTransaction
   exec: ls
 "#;
-    fs::write(&hook_path, content).unwrap();
+    fs::write(&hook_path, content).expect("unwrap failed");
 
-    let loaded: GlobalHook = serde_yaml::from_str(&fs::read_to_string(hook_path).unwrap()).unwrap();
+    let loaded: GlobalHook = serde_yaml::from_str(&fs::read_to_string(hook_path).expect("unwrap failed")).expect("unwrap failed");
     assert_eq!(loaded.name, "dynamic-hook");
 }
 
@@ -91,10 +91,10 @@ fn test_hook_dir_trigger_does_not_match_similar_prefix() {
 
 #[test]
 fn test_hook_trigger_matches_sysroot_relative_dir() {
-    let ctx = common::TestContextGuard::acquire();
+    let _ctx = common::TestContextGuard::acquire();
     let tmp = tempdir().expect("tempdir should be created");
     let root = tmp.path().to_path_buf();
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
     let trigger = HookTrigger {
         paths: Vec::new(),
@@ -140,7 +140,7 @@ fn test_hook_loading_is_deterministic_by_name() {
     let home = root.join("home");
     fs::create_dir_all(&home).expect("home dir should be created");
     ctx.set_env_var("HOME", &home);
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
     let user_hooks = home.join(".zoi").join("hooks");
     let system_hooks = root.join("etc").join("zoi").join("hooks");
@@ -197,7 +197,7 @@ fn test_hook_loading_precedence_and_builtin_flag() {
     fs::create_dir_all(&home).expect("home dir should be created");
 
     ctx.set_env_var("HOME", &home);
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
     let user_hooks_dir = home.join(".zoi").join("hooks");
     let system_hooks_dir = root.join("etc").join("zoi").join("hooks");
@@ -211,7 +211,7 @@ fn test_hook_loading_precedence_and_builtin_flag() {
         "builtin font-cache hook should be present"
     );
     assert!(
-        font_cache_hook.unwrap().is_builtin,
+        font_cache_hook.expect("unwrap failed").is_builtin,
         "builtin hook should have is_builtin = true"
     );
 
@@ -225,7 +225,7 @@ fn test_hook_loading_precedence_and_builtin_flag() {
     let font_cache_hook = hooks
         .iter()
         .find(|h| h.name == "update-font-cache")
-        .unwrap();
+        .expect("unwrap failed");
     assert_eq!(font_cache_hook.description, "system-override");
     assert!(
         !font_cache_hook.is_builtin,
@@ -242,7 +242,7 @@ fn test_hook_loading_precedence_and_builtin_flag() {
     let font_cache_hook = hooks
         .iter()
         .find(|h| h.name == "update-font-cache")
-        .unwrap();
+        .expect("unwrap failed");
     assert_eq!(font_cache_hook.description, "user-override");
     assert!(
         !font_cache_hook.is_builtin,

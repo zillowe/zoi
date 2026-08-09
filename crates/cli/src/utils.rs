@@ -2,7 +2,7 @@
 
 use crate::pkg::types::Scope;
 use anyhow::anyhow;
-use colored::*;
+use colored::Colorize;
 use crossterm::tty::IsTty;
 use std::fmt::Display;
 use std::fs;
@@ -12,7 +12,7 @@ use std::process::Command;
 
 /// Prints information with a key and value.
 pub fn print_info<T: Display>(key: &str, value: T) {
-    println!("{}: {}", key, value);
+    println!("{key}: {value}");
 }
 
 /// Formats a version summary with branch, status, and number.
@@ -47,7 +47,7 @@ pub fn format_version_full(branch: &str, status: &str, number: &str, commit: &st
 
 /// Prints information aligned with a fixed width for the key.
 pub fn print_aligned_info(key: &str, value: &str) {
-    let key_with_colon = format!("{}:", key);
+    let key_with_colon = format!("{key}:");
     println!("{:<18}{}", key_with_colon.cyan(), value);
 }
 
@@ -111,9 +111,7 @@ pub fn print_repo_warning(repo_name: &str) {
 /// Gets all packages for shell completion.
 pub fn get_all_packages_for_completion() -> Vec<PackageCompletion> {
     let mut completions = Vec::new();
-    let config = if let Ok(cfg) = crate::pkg::config::read_config() {
-        cfg
-    } else {
+    let Ok(config) = crate::pkg::config::read_config() else {
         return completions;
     };
 
@@ -141,7 +139,7 @@ pub fn get_all_packages_for_completion() -> Vec<PackageCompletion> {
                 };
 
                 let display = if let Some(sub) = entry.sub_package {
-                    format!("{}:{}", base_name, sub)
+                    format!("{base_name}:{sub}")
                 } else {
                     base_name
                 };
@@ -170,6 +168,12 @@ pub struct PackageCompletion {
 }
 
 /// Creates a symlink to a file, replacing any existing file or symlink.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The existing file or symlink cannot be removed.
+/// - The symlink, hard link, or file copy fails.
 pub fn symlink_file(target: &Path, link: &Path) -> std::io::Result<()> {
     if link.exists() || link.is_symlink() {
         fs::remove_file(link)?;
@@ -312,6 +316,15 @@ pub fn ask_for_confirmation(prompt: &str, yes: bool) -> bool {
 }
 
 /// Sets up the PATH environment variable for the given scope.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The home directory cannot be found for the user scope.
+/// - The directory for binaries cannot be created.
+/// - The shell configuration file cannot be read, created, or written to.
+/// - On Windows, the registry key for environment variables cannot be opened or modified.
+/// - Administrator privileges are missing for system scope on Windows.
 pub fn setup_path(scope: Scope) -> anyhow::Result<()> {
     if scope == Scope::Project {
         return Ok(());
@@ -373,7 +386,7 @@ pub fn setup_path(scope: Scope) -> anyhow::Result<()> {
             (path, cmd)
         } else if shell_name.contains("fish") {
             let path = home.join(".config/fish/config.fish");
-            let cmd = format!("\n# Added by Zoi\nfish_add_path \"{}\"\n", zoi_bin_str);
+            let cmd = format!("\n# Added by Zoi\nfish_add_path \"{zoi_bin_str}\"\n");
             (path, cmd)
         } else if shell_name.contains("elvish") {
             let path = home.join(".config/elvish/rc.elv");

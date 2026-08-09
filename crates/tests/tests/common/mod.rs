@@ -11,7 +11,7 @@ fn test_context_mutex() -> &'static Mutex<()> {
     LOCK.get_or_init(|| Mutex::new(()))
 }
 
-pub struct TestContextGuard {
+pub(crate) struct TestContextGuard {
     _lock: MutexGuard<'static, ()>,
     previous_env: Vec<(String, Option<OsString>)>,
     captured_keys: HashSet<String>,
@@ -22,7 +22,7 @@ pub struct TestContextGuard {
 }
 
 impl TestContextGuard {
-    pub fn acquire() -> Self {
+    pub(crate) fn acquire() -> Self {
         let lock = test_context_mutex()
             .lock()
             .expect("test context lock should not be poisoned");
@@ -42,7 +42,7 @@ impl TestContextGuard {
         guard
     }
 
-    pub fn set_env_var(&mut self, key: &str, value: impl AsRef<OsStr>) {
+    pub(crate) fn set_env_var(&mut self, key: &str, value: impl AsRef<OsStr>) {
         if self.captured_keys.insert(key.to_string()) {
             self.previous_env
                 .push((key.to_string(), std::env::var_os(key)));
@@ -52,22 +52,22 @@ impl TestContextGuard {
         unsafe { std::env::set_var(key, value.as_ref()) };
     }
 
-    pub fn set_sysroot(&self, path: std::path::PathBuf) {
+    pub(crate) fn set_sysroot(path: std::path::PathBuf) {
         sysroot::set_sysroot(path);
     }
 
-    pub fn set_current_dir(&mut self, path: &Path) {
+    pub(crate) fn set_current_dir(&mut self, path: &Path) {
         if self.previous_cwd.is_none() {
             self.previous_cwd = std::env::current_dir().ok();
         }
         std::env::set_current_dir(path).expect("test cwd should be set");
     }
 
-    pub fn set_offline(&self, enabled: bool) {
+    pub(crate) fn set_offline(enabled: bool) {
         offline::set_offline(enabled);
     }
 
-    pub fn set_pkg_dirs(&self, dirs: Vec<PathBuf>) {
+    pub(crate) fn set_pkg_dirs(dirs: Vec<PathBuf>) {
         pkgdir::set_pkg_dirs(dirs);
     }
 }

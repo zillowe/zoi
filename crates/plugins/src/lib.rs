@@ -8,7 +8,7 @@
 pub mod extension;
 
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use comfy_table::{Table as ComfyTable, presets::UTF8_FULL};
 use dialoguer::{Confirm, Select, theme::ColorfulTheme};
 use mlua::{Function, Lua, LuaSerdeExt, Table, Value};
@@ -38,11 +38,16 @@ pub struct PluginManager {
 }
 
 impl PluginManager {
-    /// Initializes a new PluginManager and sets up the global Lua API.
+    /// Initializes a new `PluginManager` and sets up the global Lua API.
     ///
     /// This injects the entire `zoi.*` API surface into the Lua environment,
     /// enabling plugins to interact with the filesystem, HTTP, archives,
     /// the UI, and the hook registry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the Lua VM cannot be initialized or if the `zoi` API
+    /// fails to be injected.
     pub fn new() -> Result<Self> {
         let lua = Lua::new();
         let manager = Self { lua };
@@ -82,7 +87,7 @@ impl PluginManager {
             match arg {
                 Value::Table(t) => {
                     let name: String = t.get("name")?;
-                    let desc: String = t.get("description").unwrap_or_else(|_| "".to_string());
+                    let desc: String = t.get("description").unwrap_or_else(|_| String::new());
                     let callback: Function = t.get("callback")?;
                     registry.set(name.clone(), callback)?;
                     help_registry.set(name, desc)?;
@@ -146,13 +151,12 @@ impl PluginManager {
                 .lua
                 .create_function(move |lua, callback: Function| {
                     let registry: Table = lua.globals().get("__ZOI_HOOKS")?;
-                    let hook_list: Table = match registry.get(hook_name.as_str()) {
-                        Ok(t) => t,
-                        Err(_) => {
-                            let t = lua.create_table()?;
-                            registry.set(hook_name.as_str(), t.clone())?;
-                            t
-                        }
+                    let hook_list: Table = if let Ok(t) = registry.get(hook_name.as_str()) {
+                        t
+                    } else {
+                        let t = lua.create_table()?;
+                        registry.set(hook_name.as_str(), t.clone())?;
+                        t
                     };
                     hook_list.push(callback)?;
                     Ok(())
@@ -208,7 +212,7 @@ impl PluginManager {
 
         let list_installed = self
             .lua
-            .create_function(|lua, _: ()| {
+            .create_function(|lua, ()| {
                 let installed = local::get_installed_packages()
                     .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
                 lua.to_value(&installed)
@@ -260,7 +264,7 @@ impl PluginManager {
                     Some("magenta") => text.magenta(),
                     _ => text.normal(),
                 };
-                println!("{}", colored_text);
+                println!("{colored_text}");
                 Ok(())
             })
             .map_err(|e| anyhow!(e.to_string()))?;
@@ -302,7 +306,7 @@ impl PluginManager {
                 for row in rows {
                     table.add_row(row);
                 }
-                println!("{}", table);
+                println!("{table}");
                 Ok(())
             })
             .map_err(|e| anyhow!(e.to_string()))?;
@@ -372,7 +376,7 @@ impl PluginManager {
 
                 let status = command.status();
                 match status {
-                    Ok(s) => Ok(s.code().unwrap_or(if s.success() { 0 } else { 1 })),
+                    Ok(s) => Ok(s.code().unwrap_or(i32::from(!s.success()))),
                     Err(e) => Err(mlua::Error::RuntimeError(e.to_string())),
                 }
             })
@@ -483,19 +487,6 @@ impl PluginManager {
             .lua
             .create_function(
                 |_, (source, dest, strip): (String, String, Option<usize>)| {
-                    let src_path = Path::new(&source);
-                    let dest_path = Path::new(&dest);
-
-                    if !dest_path.exists() {
-                        let _ = fs::create_dir_all(dest_path);
-                    }
-
-                    let file = fs::File::open(src_path)
-                        .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-                    let archive_path_str = source.to_lowercase();
-
-                    let strip_val = strip.unwrap_or(0);
-
                     fn safe_stripped_relative_path(
                         path: &Path,
                         strip: usize,
@@ -544,7 +535,23 @@ impl PluginManager {
                         Ok(())
                     }
 
-                    if archive_path_str.ends_with(".zip") {
+                    let src_path = Path::new(&source);
+                    let dest_path = Path::new(&dest);
+
+                    if !dest_path.exists() {
+                        let _ = fs::create_dir_all(dest_path);
+                    }
+
+                    let file = fs::File::open(src_path)
+                        .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                    let archive_path_str = source.to_lowercase();
+
+                    let strip_val = strip.unwrap_or(0);
+
+                    if std::path::Path::new(&archive_path_str)
+                        .extension()
+                        .is_some_and(|ext| ext.eq_ignore_ascii_case("zip"))
+                    {
                         let mut archive = zip::ZipArchive::new(file)
                             .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
                         if strip_val > 0 {
@@ -581,7 +588,9 @@ impl PluginManager {
                                 .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
                         }
                     } else if archive_path_str.ends_with(".tar.gz")
-                        || archive_path_str.ends_with(".tgz")
+                        || std::path::Path::new(&archive_path_str)
+                            .extension()
+                            .is_some_and(|ext| ext.eq_ignore_ascii_case("tgz"))
                     {
                         let tar_gz = flate2::read::GzDecoder::new(file);
                         let archive = tar::Archive::new(tar_gz);
@@ -621,8 +630,7 @@ impl PluginManager {
                         }
                     } else {
                         return Err(mlua::Error::RuntimeError(format!(
-                            "Unsupported archive format: {}",
-                            source
+                            "Unsupported archive format: {source}"
                         )));
                     }
                     Ok(true)
@@ -810,19 +818,29 @@ impl PluginManager {
     }
 
     /// Sets the operational scope for plugins.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the `zoi` global table cannot be accessed or if the
+    /// scope cannot be set.
     pub fn set_context(&self, scope: types::Scope) -> Result<()> {
         let zoi: Table = self
             .lua
             .globals()
             .get("zoi")
             .map_err(|e| anyhow!(e.to_string()))?;
-        let scope_str = format!("{:?}", scope).to_lowercase();
+        let scope_str = format!("{scope:?}").to_lowercase();
         zoi.set("scope", scope_str)
             .map_err(|e| anyhow!(e.to_string()))?;
         Ok(())
     }
 
     /// Loads and executes all trusted Lua plugins from the plugin directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the plugin directory cannot be read, if a plugin
+    /// script cannot be loaded, or if a plugin execution fails.
     pub fn load_all(&self, yes: bool) -> Result<()> {
         let plugin_dir = get_plugin_dir()?;
         if !plugin_dir.exists() {
@@ -860,11 +878,7 @@ impl PluginManager {
                 .to_string_lossy()
                 .to_string();
 
-            let is_trusted = if let Some(known_hash) = trusted.get(&plugin_name) {
-                known_hash == &hash
-            } else {
-                false
-            };
+            let is_trusted = trusted.get(&plugin_name).is_some_and(|known_hash| known_hash == &hash);
 
             if !is_trusted {
                 if yes {
@@ -873,30 +887,30 @@ impl PluginManager {
                         "Warning".yellow().bold(),
                         plugin_name.cyan()
                     );
+
                     continue;
+                }
+
+                println!(
+                    "\n{}: Untrusted plugin detected: {}",
+                    "SECURITY WARNING".yellow().bold(),
+                    plugin_name.cyan()
+                );
+                println!("Plugins can execute arbitrary commands and modify your system.");
+                if utils::ask_for_confirmation(
+                    "Do you trust this plugin and want to execute it?",
+                    false,
+                ) {
+                    trusted.insert(plugin_name.clone(), hash);
+                    trusted_changed = true;
                 } else {
-                    println!(
-                        "\n{}: Untrusted plugin detected: {}",
-                        "SECURITY WARNING".yellow().bold(),
-                        plugin_name.cyan()
-                    );
-                    println!("Plugins can execute arbitrary commands and modify your system.");
-                    if utils::ask_for_confirmation(
-                        "Do you trust this plugin and want to execute it?",
-                        false,
-                    ) {
-                        trusted.insert(plugin_name.clone(), hash);
-                        trusted_changed = true;
-                    } else {
-                        println!("Skipping untrusted plugin: {}", plugin_name);
-                        continue;
-                    }
+                    println!("Skipping untrusted plugin: {plugin_name}");
+                    continue;
                 }
             }
 
             let script_wrapper = format!(
-                "local old_reg = zoi.register_command; zoi.register_command = function(a, b) if type(a) == 'string' then zoi.register_command_simple(a, b) else old_reg(a) end end; {}",
-                script
+                "local old_reg = zoi.register_command; zoi.register_command = function(a, b) if type(a) == 'string' then zoi.register_command_simple(a, b) else old_reg(a) end end; {script}"
             );
             self.lua
                 .load(&script_wrapper)
@@ -913,7 +927,12 @@ impl PluginManager {
     }
 
     /// Triggers a lifecycle hook, executing all registered callbacks.
-    pub fn trigger_hook(&self, hook_name: &str, arg: Option<Value>) -> Result<()> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the hook registry cannot be accessed or if any
+    /// callback execution fails.
+    pub fn trigger_hook(&self, hook_name: &str, arg: Option<&Value>) -> Result<()> {
         let registry: Table = self
             .lua
             .globals()
@@ -922,7 +941,7 @@ impl PluginManager {
         if let Ok(hook_list) = registry.get::<Table>(hook_name) {
             for callback in hook_list.sequence_values::<Function>() {
                 let callback = callback.map_err(|e| anyhow!(e.to_string()))?;
-                if let Some(a) = &arg {
+                if let Some(a) = arg {
                     callback
                         .call::<()>(a.clone())
                         .map_err(|e| anyhow!(e.to_string()))?;
@@ -937,16 +956,20 @@ impl PluginManager {
     }
 
     /// Triggers a lifecycle hook but ignores errors, printing a warning instead.
-    pub fn trigger_hook_nonfatal(&self, hook_name: &str, arg: Option<Value>) {
+    pub fn trigger_hook_nonfatal(&self, hook_name: &str, arg: Option<&Value>) {
         if let Err(error) = self.trigger_hook(hook_name, arg) {
             eprintln!(
-                "Warning: hook '{}' failed after the operation completed: {}",
-                hook_name, error
+                "Warning: hook '{hook_name}' failed after the operation completed: {error}"
             );
         }
     }
 
     /// Triggers the shim version resolution hook.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the hook registry cannot be accessed or if any
+    /// callback execution fails.
     pub fn trigger_resolve_shim_version(&self, bin_name: &str) -> Result<Option<String>> {
         let registry: Table = self
             .lua
@@ -969,6 +992,11 @@ impl PluginManager {
     }
 
     /// Triggers the project installation hook.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the hook registry cannot be accessed or if any
+    /// callback execution fails.
     pub fn trigger_project_install_hook(&self) -> Result<bool> {
         let registry: Table = self
             .lua
@@ -989,6 +1017,11 @@ impl PluginManager {
     }
 
     /// Executes a custom command registered by a plugin.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the command registry cannot be accessed or if the
+    /// command execution fails.
     pub fn run_command(&self, name: &str, args: Vec<String>) -> Result<bool> {
         let registry: Table = self
             .lua
@@ -1005,6 +1038,10 @@ impl PluginManager {
     }
 
     /// Lists all custom commands registered by plugins.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the command registry cannot be accessed.
     pub fn list_commands(&self) -> Result<Vec<(String, String)>> {
         let registry: Table = self
             .lua
@@ -1021,7 +1058,7 @@ impl PluginManager {
             let (name, _) = pair.map_err(|e| anyhow!(e.to_string()))?;
             let desc: String = help_registry
                 .get(name.clone())
-                .unwrap_or_else(|_| "".to_string());
+                .unwrap_or_else(|_| String::new());
             commands.push((name, desc));
         }
         Ok(commands)
@@ -1029,6 +1066,11 @@ impl PluginManager {
 }
 
 /// Returns the path to the Zoi plugin directory.
+///
+/// # Errors
+///
+/// Returns an error if the user home directory cannot be found or if the
+/// plugin directory cannot be created.
 pub fn get_plugin_dir() -> Result<PathBuf> {
     let home_dir =
         utils::get_user_home().ok_or_else(|| anyhow!("Could not find home directory."))?;

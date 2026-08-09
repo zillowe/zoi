@@ -7,9 +7,13 @@ use anyhow::Result;
 ///
 /// This command builds the package and runs its defined tests.
 /// If `install_deps` is set, it will also install necessary build dependencies.
-pub fn run(args: build::BuildCommand) -> Result<()> {
+///
+/// # Errors
+///
+/// Returns an error if the tests fail or dependencies cannot be installed.
+pub fn run(args: &build::BuildCommand) -> Result<()> {
     if args.install_deps {
-        build::install_dependencies_for_build(&args, true)?;
+        build::install_dependencies_for_build(args, true)?;
     }
-    crate::pkg::package::test::run(&args)
+    crate::pkg::package::test::run(args)
 }

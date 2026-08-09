@@ -2,9 +2,13 @@
 
 use crate::pkg::{pin, resolve};
 use anyhow::Result;
-use colored::*;
+use colored::Colorize;
 
 /// Run the unpin command.
+///
+/// # Errors
+///
+/// Returns an error if the package cannot be resolved or if updating the pin configuration fails.
 pub fn run(source: &str) -> Result<()> {
     let (pkg, _, _, _, _registry_handle, _, _) =
         resolve::resolve_package_and_version(source, None, false, false)?;

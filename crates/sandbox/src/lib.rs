@@ -19,6 +19,13 @@ use zoi_core::types::SandboxConfig;
 ///
 /// This prevents malicious or buggy applications from accessing sensitive
 /// user data like SSH keys or personal documents.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Bubblewrap (`bwrap`) is not installed on the system.
+/// - The `SandboxConfig` contains invalid home directory expansions.
+/// - Required system resources cannot be accessed or created.
 pub fn wrap_command(
     original_exe: &Path,
     args: &[String],
@@ -164,11 +171,18 @@ pub fn wrap_command(
 ///
 /// This binds the host's sysroot directory to '/' in the sandbox,
 /// and provides access to essential system devices and kernels (/dev, /proc, /sys).
-pub fn wrap_command_in_root(
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Bubblewrap (`bwrap`) is not found.
+/// - The sysroot path cannot be canonicalized.
+/// - Essential directories cannot be created in the sysroot.
+pub fn wrap_command_in_root<S: std::hash::BuildHasher>(
     sysroot: &Path,
     exe_inside_root: &Path,
     args: &[String],
-    env: &std::collections::HashMap<String, String>,
+    env: &std::collections::HashMap<String, String, S>,
     extra_binds: &[(PathBuf, PathBuf)],
     fakeroot: bool,
 ) -> Result<Command> {
@@ -287,7 +301,7 @@ pub fn wrap_command_in_root(
 fn expand_home(path: &str) -> Result<PathBuf> {
     if let Some(stripped) = path.strip_prefix("~/") {
         let home = zoi_core::utils::get_user_home()
-            .ok_or_else(|| anyhow!("Could not find home directory for expansion: {}", path))?;
+            .ok_or_else(|| anyhow!("Could not find home directory for expansion: {path}"))?;
         Ok(home.join(stripped))
     } else {
         Ok(PathBuf::from(path))

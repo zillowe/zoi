@@ -7,7 +7,11 @@ use zoi_project::{config, runner};
 ///
 /// This loads the project configuration and executes the requested command or alias
 /// with the provided arguments.
-pub fn run(cmd_alias: Option<String>, args: Vec<String>) -> Result<()> {
+///
+/// # Errors
+///
+/// Returns an error if the project configuration cannot be loaded or if the command execution fails.
+pub fn run(cmd_alias: Option<&str>, args: &[String]) -> Result<()> {
     let config = config::load()?;
-    runner::run(cmd_alias.as_deref(), &args, &config)
+    runner::run(cmd_alias, args, &config)
 }

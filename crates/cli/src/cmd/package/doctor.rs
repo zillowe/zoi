@@ -22,7 +22,11 @@ pub struct DoctorCommand {
 }
 
 /// Runs the `package doctor` command.
-pub fn run(args: DoctorCommand) -> Result<()> {
+///
+/// # Errors
+///
+/// Returns an error if the doctor check fails.
+pub fn run(args: &DoctorCommand) -> Result<()> {
     println!(
         "{} Running package doctor for {}",
         "::".bold().blue(),

@@ -14,6 +14,11 @@ use zoi_resolver::{local, resolve};
 use zoi_sandbox as sandbox;
 
 /// Runs a binary through the Zoi shim mechanism.
+///
+/// # Errors
+///
+/// Returns an error if the binary cannot be resolved, if sandboxing fails,
+/// or if execution of the binary fails.
 pub fn run_shim(
     bin_name: &str,
     args: Vec<String>,
@@ -33,7 +38,11 @@ pub fn run_shim(
             if let Ok(entries) = fs::read_dir(path) {
                 for entry in entries.flatten() {
                     let name = entry.file_name().to_string_lossy().to_string();
-                    if name.starts_with("manifest") && name.ends_with(".yaml") {
+                    if name.starts_with("manifest")
+                        && std::path::Path::new(&name)
+                            .extension()
+                            .is_some_and(|ext| ext.eq_ignore_ascii_case("yaml"))
+                    {
                         manifest_path = Some(entry.path());
                         break;
                     }
@@ -56,13 +65,11 @@ pub fn run_shim(
             && sandbox.enabled
             && let Some(version_dir) = pkg_version_dir
         {
-            let mut cmd = sandbox::wrap_command(&bin_path, &args, &sandbox, &version_dir)?;
             use std::os::unix::process::CommandExt;
+            let mut cmd = sandbox::wrap_command(&bin_path, &args, &sandbox, &version_dir)?;
             let err = cmd.exec();
             return Err(anyhow!(
-                "Failed to execute sandboxed binary '{}': {}",
-                bin_name,
-                err
+                "Failed to execute sandboxed binary '{bin_name}': {err}"
             ));
         }
     }
@@ -74,7 +81,7 @@ pub fn run_shim(
     {
         use std::os::unix::process::CommandExt;
         let err = cmd.exec();
-        Err(anyhow!("Failed to execute binary '{}': {}", bin_name, err))
+        Err(anyhow!("Failed to execute binary '{bin_name}': {err}"))
     }
 
     #[cfg(windows)]
@@ -86,6 +93,11 @@ pub fn run_shim(
 }
 
 /// Resolves a binary name to its installed path in the Zoi store.
+///
+/// # Errors
+///
+/// Returns an error if the binary cannot be found in the store, if the
+/// desired version cannot be determined, or if automatic installation fails.
 pub fn resolve_to_installed_bin(
     bin_name: &str,
     plugin_manager: Option<&PluginManager>,
@@ -105,8 +117,7 @@ pub fn resolve_to_installed_bin(
         if let Some(install) = auto_install
             && ask_for_confirmation(
                 &format!(
-                    "Binary '{}' v{} is required but not installed. Install it now?",
-                    bin_name, version
+                    "Binary '{bin_name}' v{version} is required but not installed. Install it now?"
                 ),
                 false,
             )
@@ -123,9 +134,7 @@ pub fn resolve_to_installed_bin(
 
     if providers.is_empty() {
         return Err(anyhow!(
-            "No installed package provides binary '{}'. Run 'zoi provides {}' to find providers.",
-            bin_name,
-            bin_name
+            "No installed package provides binary '{bin_name}'. Run 'zoi provides {bin_name}' to find providers."
         ));
     }
 
@@ -137,7 +146,11 @@ pub fn resolve_to_installed_bin(
         }
     }
 
-    let (pkg, _) = &providers[0];
+    let Some((pkg, _)) = providers.first() else {
+        return Err(anyhow!(
+            "No installed package provides binary '{bin_name}'."
+        ));
+    };
 
     if let Some(path) = search_store_for_version(&pkg.name, "latest", bin_name)? {
         return Ok(path);
@@ -179,8 +192,7 @@ pub fn resolve_to_installed_bin(
     }
 
     Err(anyhow!(
-        "Could not locate binary '{}' in the Zoi store. Try reinstalling the provider package.",
-        bin_name
+        "Could not locate binary '{bin_name}' in the Zoi store. Try reinstalling the provider package."
     ))
 }
 
@@ -196,9 +208,11 @@ fn find_tool_versions_version(bin_name: &str) -> Result<Option<String>> {
                 if line.is_empty() || line.starts_with('#') {
                     continue;
                 }
-                let parts: Vec<&str> = line.split_whitespace().collect();
-                if parts.len() >= 2 && parts[0] == bin_name {
-                    return Ok(Some(parts[1].to_string()));
+                let mut parts = line.split_whitespace();
+                if let (Some(p0), Some(p1)) = (parts.next(), parts.next())
+                    && p0 == bin_name
+                {
+                    return Ok(Some(p1.to_string()));
                 }
             }
         }
@@ -275,7 +289,7 @@ fn search_store_for_version(
             }
 
             if let Some(dir_name) = path.file_name().and_then(|s| s.to_str())
-                && dir_name.ends_with(&format!("-{}", pkg_name))
+                && dir_name.ends_with(&format!("-{pkg_name}"))
             {
                 let latest_dir = path.join("latest");
                 if latest_dir.exists()
@@ -320,7 +334,7 @@ fn find_bin_in_dir(dir: &std::path::Path, bin_name: &str) -> Option<PathBuf> {
         return Some(bin_path);
     }
 
-    for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new(dir).into_iter().filter_map(std::result::Result::ok) {
         if entry.file_type().is_file() && entry.file_name().to_string_lossy() == bin_name {
             return Some(entry.path().to_path_buf());
         }
@@ -329,8 +343,13 @@ fn find_bin_in_dir(dir: &std::path::Path, bin_name: &str) -> Option<PathBuf> {
 }
 
 /// Creates a shim for the current Zoi executable at the specified path.
+///
+/// # Errors
+///
+/// Returns an error if the current executable path cannot be determined
+/// or if creating the symbolic link fails.
 pub fn create_shim(link_path: &std::path::Path) -> Result<()> {
     let zoi_exe = env::current_exe()?;
-    symlink_file(&zoi_exe, link_path).map_err(|e| anyhow!("Failed to create shim: {}", e))
+    symlink_file(&zoi_exe, link_path).map_err(|e| anyhow!("Failed to create shim: {e}"))
 }
 

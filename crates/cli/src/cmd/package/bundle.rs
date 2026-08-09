@@ -29,12 +29,17 @@ pub struct BundleCommand {
 }
 
 /// Runs the `package bundle` command.
+///
+/// # Errors
+///
+/// Returns an error if the package cannot be bundled, if there are missing
+/// dependencies, or if there is an error writing the bundle file.
 pub fn run(args: BundleCommand) -> Result<()> {
     crate::pkg::package::bundle::run(
         &args.package_file,
         args.output_dir.as_deref(),
         args.sign,
         args.version_override.as_deref(),
-        args.build_type,
+        args.build_type.as_deref(),
     )
 }

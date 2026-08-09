@@ -7,9 +7,10 @@
 pub mod autoremove;
 
 use anyhow::anyhow;
-use colored::*;
+use colored::Colorize;
 use mlua::Lua;
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
 use zoi_core::{recorder, sysroot, types, utils as core_utils};
 use zoi_db as db;
@@ -55,8 +56,7 @@ fn get_completions_root(scope: types::Scope, shell: &str) -> anyhow::Result<Path
         types::Scope::System => {
             if cfg!(target_os = "windows") {
                 Ok(sysroot::apply_sysroot(PathBuf::from(format!(
-                    "C:\\ProgramData\\zoi\\pkgs\\shell\\{}",
-                    shell
+                    "C:\\ProgramData\\zoi\\pkgs\\shell\\{shell}",
                 ))))
             } else {
                 let base = match shell {
@@ -82,7 +82,7 @@ fn get_completions_root(scope: types::Scope, shell: &str) -> anyhow::Result<Path
 
 /// Cleans up service unit files or Windows services associated with a package.
 fn cleanup_service(package_name: &str, scope: types::Scope) -> anyhow::Result<()> {
-    let service_name = format!("zoi-{}", package_name);
+    let service_name = format!("zoi-{package_name}");
     let is_user = scope != types::Scope::System;
 
     match std::env::consts::OS {
@@ -92,12 +92,11 @@ fn cleanup_service(package_name: &str, scope: types::Scope) -> anyhow::Result<()
                     .ok_or_else(|| anyhow!("Could not find home directory"))?;
                 sysroot::apply_sysroot(
                     home.join(".config/systemd/user")
-                        .join(format!("{}.service", service_name)),
+                        .join(format!("{service_name}.service")),
                 )
             } else {
                 sysroot::apply_sysroot(PathBuf::from(format!(
-                    "/etc/systemd/system/{}.service",
-                    service_name
+                    "/etc/systemd/system/{service_name}.service",
                 )))
             };
             if unit_path.exists() {
@@ -112,7 +111,7 @@ fn cleanup_service(package_name: &str, scope: types::Scope) -> anyhow::Result<()
                     }
                     cmd.arg("daemon-reload")
                         .status()
-                        .map_err(|e| anyhow!("Failed to run systemctl daemon-reload: {}", e))?;
+                        .map_err(|e| anyhow!("Failed to run systemctl daemon-reload: {e}"))?;
                 }
             }
         }
@@ -122,12 +121,11 @@ fn cleanup_service(package_name: &str, scope: types::Scope) -> anyhow::Result<()
                     .ok_or_else(|| anyhow!("Could not find home directory"))?;
                 sysroot::apply_sysroot(
                     home.join("Library/LaunchAgents")
-                        .join(format!("{}.plist", service_name)),
+                        .join(format!("{service_name}.plist")),
                 )
             } else {
                 sysroot::apply_sysroot(PathBuf::from(format!(
-                    "/Library/LaunchDaemons/{}.plist",
-                    service_name
+                    "/Library/LaunchDaemons/{service_name}.plist",
                 )))
             };
             if plist_path.exists() {
@@ -147,16 +145,16 @@ fn cleanup_service(package_name: &str, scope: types::Scope) -> anyhow::Result<()
                     .arg("query")
                     .arg(&service_name)
                     .output()
-                    .map_err(|e| anyhow!("Failed to run sc query: {}", e))?;
+                    .map_err(|e| anyhow!("Failed to run sc query: {e}"))?;
                 output.status.success()
             };
             if std::env::var("ZOI_TEST_SKIP_SERVICE_COMMANDS").is_err() && exists {
-                println!("Removing Windows service: {}", service_name);
+                println!("Removing Windows service: {service_name}");
                 std::process::Command::new("sc")
                     .arg("delete")
                     .arg(&service_name)
                     .status()
-                    .map_err(|e| anyhow!("Failed to run sc delete: {}", e))?;
+                    .map_err(|e| anyhow!("Failed to run sc delete: {e}"))?;
             }
         }
         _ => {}
@@ -170,7 +168,7 @@ fn uninstall_collection(
     pkg: &types::Package,
     manifest: &types::InstallManifest,
     scope: types::Scope,
-    registry_handle: Option<String>,
+    registry_handle: Option<&str>,
     yes: bool,
     quiet: bool,
     dry_run: bool,
@@ -196,7 +194,15 @@ fn uninstall_collection(
         for dep_str in dependencies_to_uninstall {
             let dep = dependencies::parse_dependency_string(dep_str)?;
 
-            if dep.manager != "zoi" {
+            if dep.manager == "zoi" {
+                if !quiet {
+                    println!(
+                        "\n{} Uninstalling zoi dependency: {}...",
+                        "::".bold().blue(),
+                        dep_str.bold()
+                    );
+                }
+            } else {
                 let prompt = format!(
                     "Uninstall native dependency '{}' ({})?",
                     dep.package.cyan(),
@@ -233,29 +239,18 @@ fn uninstall_collection(
                     }
                     continue;
                 }
-            } else {
-                if !quiet {
-                    println!(
-                        "\n{} Uninstalling zoi dependency: {}...",
-                        "::".bold().blue(),
-                        dep_str.bold()
-                    );
-                }
             }
 
             if let Err(e) = dependencies::uninstall_dependency(dep_str, &move |name| {
                 run(name, Some(scope), yes, quiet, dry_run).map(|_| ())
             }) && !quiet
             {
-                eprintln!(
-                    "Warning: Could not uninstall dependency '{}': {}",
-                    dep_str, e
-                );
+                eprintln!("Warning: Could not uninstall dependency '{dep_str}': {e}");
             }
         }
     }
 
-    let handle = registry_handle.as_deref().unwrap_or("local");
+    let handle = registry_handle.unwrap_or("local");
     let package_dir = local::get_package_dir(scope, handle, &pkg.repo, &pkg.name)?;
     if package_dir.exists() {
         let _ = cleanup_service(&pkg.name, scope);
@@ -279,7 +274,7 @@ fn uninstall_collection(
         "uninstall",
         pkg,
         env!("CARGO_PKG_VERSION"),
-        registry_handle.as_deref().unwrap_or("local"),
+        registry_handle.unwrap_or("local"),
         None,
     ) && !quiet
     {
@@ -307,7 +302,7 @@ fn find_installed_manifest(
     for scope in scopes {
         let mut matches = local::find_installed_manifests_matching(request, scope)?;
         match matches.len() {
-            0 => continue,
+            0 => {}
             1 => return Ok((matches.remove(0), scope)),
             _ => {
                 return Err(anyhow!(
@@ -348,10 +343,10 @@ fn load_installed_package(
             Some(manifest.scope),
             true,
         )?;
-        pkg.repo = manifest.repo.clone();
+        pkg.repo.clone_from(&manifest.repo);
         pkg.scope = manifest.scope;
         pkg.registry_handle = Some(manifest.registry_handle.clone());
-        pkg.sub_package = manifest.sub_package.clone();
+        pkg.sub_package.clone_from(&manifest.sub_package);
         return Ok((pkg, installed_source_path));
     }
 
@@ -359,7 +354,7 @@ fn load_installed_package(
     let (mut pkg, _, _, pkg_lua_path, _, _, _) =
         resolve::resolve_package_and_version(&source, Some(manifest.scope), true, yes)?;
     pkg.scope = manifest.scope;
-    pkg.sub_package = manifest.sub_package.clone();
+    pkg.sub_package.clone_from(&manifest.sub_package);
     Ok((pkg, pkg_lua_path))
 }
 
@@ -376,6 +371,19 @@ fn load_installed_package(
 ///
 /// If `recursive` is true, Zoi also attempts to uninstall any dependencies
 /// that are no longer needed by any other package.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The package is not found or is ambiguous.
+/// - The package has dependents that must be uninstalled first.
+/// - Hook execution fails.
+/// - File system operations (removal, backup) fail.
+/// - Escalation to root fails.
+///
+/// # Panics
+///
+/// Panics if internal dependency consistency checks fail.
 pub fn run(
     package_name: &str,
     scope_override: Option<types::Scope>,
@@ -394,7 +402,7 @@ pub fn run(
             &pkg,
             &manifest,
             scope,
-            registry_handle.clone(),
+            registry_handle.as_deref(),
             yes,
             quiet,
             dry_run,
@@ -433,7 +441,6 @@ pub fn run(
         }
         let manifest_json = serde_json::to_string(&manifest)?;
         let mut temp_file = tempfile::NamedTempFile::new()?;
-        use std::io::Write;
         temp_file.write_all(manifest_json.as_bytes())?;
         let temp_path = temp_file.path();
 
@@ -447,7 +454,7 @@ pub fn run(
 
         let status = cmd
             .status()
-            .map_err(|e| anyhow::anyhow!("Failed to spawn privilege escalator: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to spawn privilege escalator: {e}"))?;
         if !status.success() {
             return Err(anyhow::anyhow!("Escalated uninstallation failed."));
         }
@@ -455,7 +462,7 @@ pub fn run(
         if let Some(hooks) = &pkg.hooks
             && let Err(e) = hooks::run_hooks(hooks, hooks::HookType::PreRemove, scope)
         {
-            return Err(anyhow::anyhow!("Pre-remove hook failed: {}", e));
+            return Err(anyhow::anyhow!("Pre-remove hook failed: {e}"));
         }
 
         let lua = Lua::new();
@@ -543,7 +550,7 @@ pub fn run(
                     let backup_dest = version_dir
                         .parent()
                         .ok_or_else(|| anyhow!("version_dir should have a parent (package_dir)"))?
-                        .join(format!("{}.zoisave", backup_filename));
+                        .join(format!("{backup_filename}.zoisave"));
 
                     if let Some(p) = backup_dest.parent()
                         && let Err(e) = fs::create_dir_all(p)
@@ -602,7 +609,14 @@ pub fn run(
                         p.name != pkg.name || (p.sub_package != manifest.sub_package)
                     });
 
-                    if !still_provided {
+                    if still_provided {
+                        if !quiet {
+                            println!(
+                                "Keeping shim for {} as it is still provided by other packages.",
+                                bin.cyan()
+                            );
+                        }
+                    } else {
                         if !quiet {
                             println!(
                                 "Removing shim for {} from {}...",
@@ -611,13 +625,6 @@ pub fn run(
                             );
                         }
                         fs::remove_file(&symlink_path)?;
-                    } else {
-                        if !quiet {
-                            println!(
-                                "Keeping shim for {} as it is still provided by other packages.",
-                                bin.cyan()
-                            );
-                        }
                     }
                 }
             }
@@ -679,10 +686,9 @@ pub fn run(
             for shell_name in shells {
                 let pkg_dir = get_completions_root(scope, &shell_name)?.join(&pkg.name);
                 if pkg_dir.exists()
-                    && fs::read_dir(&pkg_dir)
-                        .map(|mut e| e.next().is_none())
-                        .unwrap_or(false)
+                    && fs::read_dir(&pkg_dir).is_ok_and(|mut e| e.next().is_none())
                 {
+
                     let _ = fs::remove_dir(&pkg_dir);
                 }
             }
@@ -721,23 +727,22 @@ pub fn run(
             if file_path.exists() {
                 if file_path.is_dir() {
                     // Only remove if empty to be safe
-                    if fs::read_dir(&file_path)
-                        .map(|mut e| e.next().is_none())
-                        .unwrap_or(false)
-                    {
-                        let _ = fs::remove_dir_all(&file_path);
+                    if fs::read_dir(&file_path).is_ok_and(|mut e| e.next().is_none()) {
+                        let _ = fs::remove_dir(&file_path);
                     }
+
                 } else {
                     let _ = fs::remove_file(&file_path);
                 }
             }
         }
 
-        let manifest_filename = if let Some(sub) = &manifest.sub_package {
-            format!("manifest-{}.yaml", sub)
+        let manifest_filename = if let Some(sub) = &sub_package_to_uninstall {
+            format!("manifest-{sub}.yaml")
         } else {
             "manifest.yaml".to_string()
         };
+
         let manifest_path = version_dir.join(manifest_filename);
         if manifest_path.exists() {
             fs::remove_file(manifest_path)?;
@@ -748,7 +753,11 @@ pub fn run(
             if let Ok(entries) = fs::read_dir(&version_dir) {
                 for entry in entries.flatten() {
                     let name = entry.file_name().to_string_lossy().to_string();
-                    if name.starts_with("manifest") && name.ends_with(".yaml") {
+                    if name.starts_with("manifest")
+                        && std::path::Path::new(&name)
+                            .extension()
+                            .is_some_and(|ext| ext.eq_ignore_ascii_case("yaml"))
+                    {
                         has_other_manifests = true;
                         break;
                     }
@@ -796,7 +805,7 @@ pub fn run(
                 let dep_req = resolve::parse_source_string(dep.package)?;
                 let dep_matches = local::find_installed_manifests_matching(&dep_req, scope)?;
                 if dep_matches.len() == 1 {
-                    let dep_manifest = &dep_matches[0];
+                    let dep_manifest = dep_matches.first().expect("Already checked length");
                     match local::get_package_dir(
                         dep_manifest.scope,
                         &dep_manifest.registry_handle,

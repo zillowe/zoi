@@ -2,11 +2,16 @@
 
 use crate::pkg::{pin, resolve};
 use anyhow::Result;
-use colored::*;
+use colored::Colorize;
 
 /// Pins a package to a specific version.
 ///
 /// This prevents the package from being updated to a newer version during general upgrades.
+///
+/// # Errors
+///
+/// Returns an error if the package cannot be resolved or if the pinned packages
+/// file cannot be read or written.
 pub fn run(source: &str, version: &str) -> Result<()> {
     let (pkg, _, _, _, _registry_handle, _, _) =
         resolve::resolve_package_and_version(source, None, false, false)?;

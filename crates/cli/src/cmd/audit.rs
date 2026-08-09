@@ -1,20 +1,29 @@
 //! The audit command checks for vulnerabilities in installed or available packages.
 use crate::pkg::{config, db, local, types};
 use anyhow::Result;
-use colored::*;
+use colored::Colorize;
 use comfy_table::{Attribute, Cell, ContentArrangement, Table, presets::UTF8_FULL};
 use semver::{Version, VersionReq};
 
 /// Executes the audit command.
-pub fn run(all: bool, registry_filter: Option<String>, repo_filter: Option<String>) -> Result<()> {
-    if !all {
+///
+/// # Errors
+///
+/// Returns an error if the configuration cannot be read, if the database cannot be accessed,
+/// or if local package information cannot be retrieved.
+///
+/// # Panics
+///
+/// This function does not explicitly panic, but underlying library calls might.
+pub fn run(all: bool, registry_filter: Option<String>, repo_filter: Option<&str>) -> Result<()> {
+    if all {
         println!(
-            "{} Auditing installed packages for vulnerabilities...",
+            "{} Listing all known vulnerabilities...",
             "::".bold().blue()
         );
     } else {
         println!(
-            "{} Listing all known vulnerabilities...",
+            "{} Auditing installed packages for vulnerabilities...",
             "::".bold().blue()
         );
     }
@@ -41,7 +50,7 @@ pub fn run(all: bool, registry_filter: Option<String>, repo_filter: Option<Strin
         }
     }
 
-    if let Some(rf) = &repo_filter {
+    if let Some(rf) = repo_filter {
         all_advisories.retain(|(_, repo, _)| {
             if rf.contains('/') {
                 repo == rf
@@ -60,7 +69,7 @@ pub fn run(all: bool, registry_filter: Option<String>, repo_filter: Option<Strin
     }
 
     if all {
-        print_advisories_table(all_advisories)?;
+        print_advisories_table(&all_advisories);
     } else {
         let installed = local::get_installed_packages()?;
         let mut vulnerable_installed = Vec::new();
@@ -94,12 +103,12 @@ pub fn run(all: bool, registry_filter: Option<String>, repo_filter: Option<Strin
                 "No vulnerabilities found in installed packages.".green()
             );
         } else {
+            let count = vulnerable_installed.len();
             println!(
-                "\n{} Found {} vulnerabilities in installed packages:",
+                "\n{} Found {count} vulnerabilities in installed packages:",
                 "Warning".red().bold(),
-                vulnerable_installed.len()
             );
-            print_vulnerable_table(vulnerable_installed)?;
+            print_vulnerable_table(&vulnerable_installed);
         }
     }
 
@@ -107,7 +116,7 @@ pub fn run(all: bool, registry_filter: Option<String>, repo_filter: Option<Strin
 }
 
 /// Prints a table of all matching advisories.
-fn print_advisories_table(advisories: Vec<(types::Advisory, String, String)>) -> Result<()> {
+fn print_advisories_table(advisories: &[(types::Advisory, String, String)]) {
     let mut table = Table::new();
     table
         .load_preset(UTF8_FULL)
@@ -131,31 +140,29 @@ fn print_advisories_table(advisories: Vec<(types::Advisory, String, String)>) ->
                 .add_attribute(Attribute::Bold),
         };
 
-        let package_display = if let Some(sub) = &adv.sub_package {
-            format!("{}:{}", adv.package, sub)
-        } else {
-            adv.package.clone()
-        };
+        let package_display = adv.sub_package.as_ref().map_or_else(
+            || adv.package.clone(),
+            |sub| {
+                let pkg = &adv.package;
+                format!("{pkg}:{sub}")
+            },
+        );
 
         table.add_row(vec![
-            Cell::new(adv.id).fg(comfy_table::Color::Cyan),
+            Cell::new(&adv.id).fg(comfy_table::Color::Cyan),
             Cell::new(package_display),
             severity_cell,
-            Cell::new(adv.affected_range),
-            Cell::new(adv.fixed_in.unwrap_or_else(|| "N/A".to_string()))
-                .fg(comfy_table::Color::Green),
-            Cell::new(adv.summary),
+            Cell::new(&adv.affected_range),
+            Cell::new(adv.fixed_in.as_deref().unwrap_or("N/A")).fg(comfy_table::Color::Green),
+            Cell::new(&adv.summary),
         ]);
     }
 
     println!("{table}");
-    Ok(())
 }
 
 /// Prints a table of vulnerabilities found in installed packages.
-fn print_vulnerable_table(
-    vulnerable: Vec<(types::Advisory, types::InstallManifest)>,
-) -> Result<()> {
+fn print_vulnerable_table(vulnerable: &[(types::Advisory, types::InstallManifest)]) {
     let mut table = Table::new();
     table
         .load_preset(UTF8_FULL)
@@ -179,23 +186,23 @@ fn print_vulnerable_table(
                 .add_attribute(Attribute::Bold),
         };
 
-        let package_display = if let Some(sub) = &manifest.sub_package {
-            format!("{}:{}", manifest.name, sub)
-        } else {
-            manifest.name.clone()
-        };
+        let package_display = manifest.sub_package.as_ref().map_or_else(
+            || manifest.name.clone(),
+            |sub| {
+                let name = &manifest.name;
+                format!("{name}:{sub}")
+            },
+        );
 
         table.add_row(vec![
             Cell::new(package_display).fg(comfy_table::Color::Cyan),
-            Cell::new(manifest.version).fg(comfy_table::Color::Red),
-            Cell::new(adv.id).fg(comfy_table::Color::DarkGrey),
+            Cell::new(&manifest.version).fg(comfy_table::Color::Red),
+            Cell::new(&adv.id).fg(comfy_table::Color::DarkGrey),
             severity_cell,
-            Cell::new(adv.fixed_in.unwrap_or_else(|| "N/A".to_string()))
-                .fg(comfy_table::Color::Green),
-            Cell::new(adv.summary),
+            Cell::new(adv.fixed_in.as_deref().unwrap_or("N/A")).fg(comfy_table::Color::Green),
+            Cell::new(&adv.summary),
         ]);
     }
 
     println!("{table}");
-    Ok(())
 }

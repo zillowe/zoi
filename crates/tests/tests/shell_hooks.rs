@@ -33,9 +33,9 @@ environments:
     env:
       FOO: BAR
 "#;
-    fs::write(root.join("zoi.yaml"), yaml).unwrap();
+    fs::write(root.join("zoi.yaml"), yaml).expect("unwrap failed");
 
-    let cfg = config::load().unwrap();
+    let cfg = config::load().expect("unwrap failed");
 
     assert!(environment::export_shell(Some("test"), &cfg, Shell::Bash).is_ok());
 }
@@ -48,16 +48,16 @@ fn test_env_export_shell_local_bin_path() {
     ctx.set_current_dir(&root);
 
     let bin_dir = root.join(".zoi/pkgs/bin");
-    fs::create_dir_all(&bin_dir).unwrap();
+    fs::create_dir_all(&bin_dir).expect("unwrap failed");
 
-    let yaml = r#"
+    let yaml = r"
 name: test-local-bin
 config:
   local: true
-"#;
-    fs::write(root.join("zoi.yaml"), yaml).unwrap();
+";
+    fs::write(root.join("zoi.yaml"), yaml).expect("unwrap failed");
 
-    let cfg = config::load().unwrap();
+    let cfg = config::load().expect("unwrap failed");
 
     assert!(environment::export_shell(None, &cfg, Shell::Bash).is_ok());
 }

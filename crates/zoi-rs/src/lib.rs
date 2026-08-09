@@ -91,7 +91,7 @@ pub struct BuildOptions<'a> {
     pub fakeroot: bool,
 }
 
-impl<'a> Default for BuildOptions<'a> {
+impl Default for BuildOptions<'_> {
     fn default() -> Self {
         Self {
             build_type: None,
@@ -218,6 +218,10 @@ fn to_install_scope(scope: Scope) -> zoi_cli::cli::InstallScope {
 }
 
 /// Builds a Zoi package from a `.pkg.lua` definition using the provided options.
+///
+/// # Errors
+///
+/// Returns an error if the build fails.
 pub fn build_with_options(package_file: &Path, options: &BuildOptions<'_>) -> Result<()> {
     if options.install_deps {
         for platform in &options.platforms {
@@ -273,6 +277,10 @@ pub fn build_with_options(package_file: &Path, options: &BuildOptions<'_>) -> Re
 }
 
 /// Installs a local `.zpa` package archive using the provided options.
+///
+/// # Errors
+///
+/// Returns an error if the installation fails.
 pub fn install_package_with_options(
     package_file: &Path,
     options: &PackageInstallOptions,
@@ -292,6 +300,10 @@ pub fn install_package_with_options(
 /// Installs one or more package sources using the provided options.
 ///
 /// Sources can be registry package names, local `.pkg.lua` files, URLs, or local manifests.
+///
+/// # Errors
+///
+/// Returns an error if the installation fails.
 pub fn install_sources(sources: &[String], options: &SourceInstallOptions) -> Result<()> {
     let plugin_manager = if zoi_core::utils::is_mini_mode() {
         None
@@ -313,7 +325,7 @@ pub fn install_sources(sources: &[String], options: &SourceInstallOptions) -> Re
         false,
         false,
         options.save,
-        options.build_type.clone(),
+        options.build_type.as_deref(),
         options.dry_run,
         pm_ptr,
         options.build,
@@ -331,11 +343,19 @@ pub fn install_sources(sources: &[String], options: &SourceInstallOptions) -> Re
 ///
 /// This function checks for updates in the configured registries and performs
 /// a transactional upgrade if a newer version is available.
+///
+/// # Errors
+///
+/// Returns an error if the update fails.
 pub fn update_packages(all: bool, package_names: &[String], yes: bool) -> Result<()> {
     zoi_cli::cmd::update::run(all, package_names, yes, false, false, false, false)
 }
 
 /// Resolves a single source string into a package and its origin metadata.
+///
+/// # Errors
+///
+/// Returns an error if resolution fails.
 pub fn resolve_package(source: &str, yes: bool) -> Result<ResolvedPackage> {
     let (package, version, sharable_manifest, source_path, registry_handle, repo_type, git_sha) =
         zoi_resolver::resolve::resolve_package_and_version(source, None, true, yes)?;
@@ -351,6 +371,10 @@ pub fn resolve_package(source: &str, yes: bool) -> Result<ResolvedPackage> {
 }
 
 /// Resolves the dependency graph for one or more package sources.
+///
+/// # Errors
+///
+/// Returns an error if resolution fails.
 pub fn resolve_dependency_graph(
     sources: &[String],
     options: &DependencyResolutionOptions,
@@ -375,15 +399,26 @@ pub fn resolve_dependency_graph(
 ///
 /// This function intelligently parses the `.pkg.lua` file to identify and
 /// include only the necessary local files.
+///
+/// # Errors
+///
+/// Returns an error if bundling fails.
 pub fn bundle_package(
     package_file: &Path,
     output_dir: Option<&Path>,
     sign: Option<String>,
     version_override: Option<&str>,
-    build_type: Option<String>,
-) -> Result<()> {
-    zoi_package::bundle::run(package_file, output_dir, sign, version_override, build_type)
-}
+    build_type: Option<&str>,
+    ) -> Result<()> {
+    zoi_package::bundle::run(
+        package_file,
+        output_dir,
+        sign,
+        version_override,
+        build_type,
+    )
+    }
+
 
 /// Builds a Zoi package from a local `.pkg.lua` file.
 ///
@@ -451,7 +486,7 @@ pub fn build(
 /// # Arguments
 ///
 /// * `package_file`: Path to the local package archive.
-/// * *scope_override*: Optionally override the installation scope (`User`, `System`, `Project`).
+/// * *`scope_override`*: Optionally override the installation scope (`User`, `System`, `Project`).
 /// * `registry_handle`: The handle of the registry this package belongs to (e.g. "zoidberg", or "local").
 /// * `yes`: Automatically answer "yes" to any confirmation prompts (e.g. file conflicts).
 /// * `sub_packages`: For split packages, optionally specify which sub-packages to install.

@@ -1,6 +1,7 @@
 use mlua::{self, Lua, Table, Value};
+use std::fmt::Write as _;
 use std::fs;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Write as _};
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::Mutex;
@@ -39,7 +40,7 @@ impl ShellSession {
     /// Creates a new `ShellSession` within the specified build directory.
     fn new(lua: &Lua, build_dir: &str) -> Result<Self, anyhow::Error> {
         let sentinel = format!("---ZOI_CMD_COMPLETE_{}---", uuid::Uuid::new_v4());
-        let stderr_path = PathBuf::from(build_dir).join(format!(".zoi_stderr_{}", sentinel));
+        let stderr_path = PathBuf::from(build_dir).join(format!(".zoi_stderr_{sentinel}"));
 
         let mut child = if cfg!(target_os = "windows") {
             Command::new("pwsh")
@@ -80,13 +81,13 @@ impl ShellSession {
         for (lua_name, env_name) in vars {
             if let Ok(val) = globals.get::<String>(lua_name) {
                 if cfg!(target_os = "windows") {
-                    env_cmds.push_str(&format!(
-                        "$env:{} = '{}'\n",
-                        env_name,
-                        val.replace("'", "''")
-                    ));
+                    let _ = writeln!(
+                        env_cmds,
+                        "$env:{env_name} = '{}'",
+                        val.replace('\'', "''")
+                    );
                 } else {
-                    env_cmds.push_str(&format!("export {}={:?}\n", env_name, val));
+                    let _ = writeln!(env_cmds, "export {env_name}={val:?}");
                 }
             }
         }
@@ -106,20 +107,15 @@ impl ShellSession {
                         Value::Boolean(b) => b.to_string(),
                         _ => continue,
                     };
+                    let k_upper = k.to_uppercase();
                     if cfg!(target_os = "windows") {
-                        env_cmds.push_str(&format!(
-                            "$env:{}{} = '{}'\n",
-                            prefix,
-                            k.to_uppercase(),
-                            val_str.replace("'", "''")
-                        ));
+                        let _ = writeln!(
+                            env_cmds,
+                            "$env:{prefix}{k_upper} = '{}'",
+                            val_str.replace('\'', "''")
+                        );
                     } else {
-                        env_cmds.push_str(&format!(
-                            "export {}{}={:?}\n",
-                            prefix,
-                            k.to_uppercase(),
-                            val_str
-                        ));
+                        let _ = writeln!(env_cmds, "export {prefix}{k_upper}={val_str:?}");
                     }
                 }
             }
@@ -149,13 +145,21 @@ impl ShellSession {
 /// All commands are executed relative to the `BUILD_DIR` and respect the
 /// user's environment and Zoi's quiet/verbose settings.
 /// Adds the `cmd` function to the Lua environment for executing shell commands.
+///
+/// # Errors
+///
+/// Returns an error if the `BUILD_DIR` cannot be found or if the shell session fails to initialize.
+///
+/// # Panics
+///
+/// Panics if the shell session mutex is poisoned.
 pub fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let cmd_fn = lua.create_function(move |lua, command: String| {
         let build_dir: String = lua.globals().get("BUILD_DIR")?;
 
         let session_is_dead = if let Some(session) = lua.app_data_ref::<ShellSession>() {
-            let mut inner = session.inner.lock().unwrap();
-            inner.child.try_wait().map(|s| s.is_some()).unwrap_or(true)
+            let mut inner = session.inner.lock().expect("lock poisoned");
+            inner.child.try_wait().map_or(true, |s| s.is_some())
         } else {
             true
         };
@@ -169,19 +173,18 @@ pub fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
         let session = lua
             .app_data_ref::<ShellSession>()
             .expect("ShellSession missing from app_data");
-        let mut inner = session.inner.lock().unwrap();
+        let mut inner = session.inner.lock().expect("lock poisoned");
 
         if !quiet {
-            println!("Executing: {}", command);
+            println!("Executing: {command}");
         }
 
         let sentinel = inner.sentinel.clone();
 
         if cfg!(target_os = "windows") {
-            let stderr_path_str = inner.stderr_path.to_string_lossy().replace("'", "''");
+            let stderr_path_str = inner.stderr_path.to_string_lossy().replace('\'', "''");
             let cmd_text = format!(
-                "$ErrorActionPreference = 'Continue'; & {{ {} }} 2> '{}'; \"{} $LASTEXITCODE\"\n",
-                command, stderr_path_str, sentinel
+                "$ErrorActionPreference = 'Continue'; & {{ {command} }} 2> '{stderr_path_str}'; \"{sentinel} $LASTEXITCODE\"\n"
             );
             inner
                 .stdin
@@ -192,9 +195,9 @@ pub fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                 .flush()
                 .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
         } else {
+            let stderr_display = inner.stderr_path.display();
             let cmd_text = format!(
-                "{{ {} ; }} 2>{:?} ; printf \"\\n%s %d\\n\" {:?} $?\n",
-                command, inner.stderr_path, sentinel
+                "{{ {command} ; }} 2>{stderr_display:?} ; printf \"\\n%s %d\\n\" {sentinel:?} $?\n"
             );
             inner
                 .stdin
@@ -226,7 +229,10 @@ pub fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                 let out_part = &line[..idx];
                 stdout_accum.push_str(out_part);
 
-                let rest = line[idx..].strip_prefix(&sentinel).unwrap().trim();
+                let rest = line[idx..]
+                    .strip_prefix(&sentinel)
+                    .expect("sentinel missing")
+                    .trim();
                 exit_code = rest.parse::<i32>().unwrap_or(0);
                 break;
             }
@@ -239,7 +245,7 @@ pub fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
         }
 
         if exit_code != 0 && !quiet {
-            eprintln!("[cmd] {}", stderr);
+            eprintln!("[cmd] {stderr}");
         }
 
         Ok((stdout_accum.trim_end().to_string(), stderr, exit_code))
@@ -249,6 +255,10 @@ pub fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
 }
 
 /// Adds the `zpatch` function to the Lua environment for applying patches.
+///
+/// # Errors
+///
+/// Returns an error if the `BUILD_DIR` cannot be found or if the patch command fails.
 pub fn add_zpatch(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let zpatch_fn =
         lua.create_function(move |lua, (patch_file, strip): (String, Option<u32>)| {
@@ -256,11 +266,11 @@ pub fn add_zpatch(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
             let strip_level = strip.unwrap_or(1);
 
             if !quiet {
-                println!("Applying patch: {}", patch_file);
+                println!("Applying patch: {patch_file}");
             }
 
             let output = std::process::Command::new("patch")
-                .arg(format!("-p{}", strip_level))
+                .arg(format!("-p{strip_level}"))
                 .arg("-i")
                 .arg(&patch_file)
                 .current_dir(&build_dir)
@@ -271,18 +281,16 @@ pub fn add_zpatch(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                     if !out.status.success() {
                         let stderr = String::from_utf8_lossy(&out.stderr).to_string();
                         return Err(mlua::Error::RuntimeError(format!(
-                            "patch failed: {}",
-                            stderr
+                            "patch failed: {stderr}"
                         )));
                     }
                     if !quiet {
-                        println!("Successfully applied patch {}", patch_file);
+                        println!("Successfully applied patch {patch_file}");
                     }
                     Ok(())
                 }
                 Err(e) => Err(mlua::Error::RuntimeError(format!(
-                    "Failed to execute patch command: {}",
-                    e
+                    "Failed to execute patch command: {e}"
                 ))),
             }
         })?;

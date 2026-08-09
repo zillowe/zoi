@@ -5,7 +5,8 @@
 
 use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
-use colored::*;
+use colored::Colorize;
+use std::fmt::Write as _;
 use std::io::Read;
 use zoi_core::utils::is_zoios;
 use zoi_system::config::load_system_lua;
@@ -47,7 +48,7 @@ pub enum SystemSubcommands {
         #[command(subcommand)]
         command: SecretSubcommands,
     },
-    /// Commands for building and managing ZoiOS distributions
+    /// Commands for building and managing `ZoiOS` distributions
     Distro {
         /// Distro subcommands.
         #[command(subcommand)]
@@ -55,10 +56,10 @@ pub enum SystemSubcommands {
     },
 }
 
-/// Commands for building and managing ZoiOS distributions.
+/// Commands for building and managing `ZoiOS` distributions.
 #[derive(Subcommand, Debug)]
 pub enum DistroSubcommands {
-    /// Build a new ZoiOS distribution image or install to a disk
+    /// Build a new `ZoiOS` distribution image or install to a disk
     Build {
         /// The target device or image path (e.g. /dev/sdb)
         #[arg(short, long)]
@@ -70,9 +71,9 @@ pub enum DistroSubcommands {
         #[arg(long)]
         dry_run: bool,
     },
-    /// Enter a ZoiOS sysroot (chroot) with automatic device mounting
+    /// Enter a `ZoiOS` sysroot (chroot) with automatic device mounting
     Chroot {
-        /// Path to the ZoiOS root directory
+        /// Path to the `ZoiOS` root directory
         target: String,
         /// Command to run inside the chroot (defaults to /bin/bash)
         #[arg(short, long)]
@@ -104,6 +105,17 @@ pub enum SecretSubcommands {
 }
 
 /// Run the system management command.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The command is not run on `ZoiOS` (except for secrets and distro commands).
+/// - Package validation fails during a distro build.
+/// - The user aborts a build.
+/// - Any OS management daemon request fails.
+/// # Errors
+///
+/// Returns an error if the system operation fails.
 pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
     let is_secret = matches!(args.command, SystemSubcommands::Secret { .. });
     let is_distro = matches!(args.command, SystemSubcommands::Distro { .. });
@@ -157,7 +169,7 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
                 for pkg_id in &config.packages {
                     if let Err(e) = zoi_resolver::resolve::resolve_source(pkg_id, None, true, true)
                     {
-                        return Err(anyhow!("Package validation failed for '{}': {}", pkg_id, e));
+                        return Err(anyhow!("Package validation failed for '{pkg_id}': {e}"));
                     }
                 }
 
@@ -262,14 +274,13 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
             } => {
                 let target_path = std::path::Path::new(&target);
                 if !target_path.exists() {
-                    return Err(anyhow!("Target path '{}' does not exist.", target));
+                    return Err(anyhow!("Target path '{target}' does not exist."));
                 }
 
                 let os_release = target_path.join("etc/os-release");
                 if !os_release.exists() {
                     return Err(anyhow!(
-                        "Target path '{}' is not a valid ZoiOS root (missing /etc/os-release).",
-                        target
+                        "Target path '{target}' is not a valid ZoiOS root (missing /etc/os-release)."
                     ));
                 }
 
@@ -589,7 +600,7 @@ fn print_build_summary(target: &str, config: &zoi_system::config::SystemConfig, 
         ]);
     }
     println!("{}", " 1. Filesystem & Partitioning ".bold().underline());
-    println!("{}\n", fs_table);
+    println!("{fs_table}\n");
 
     // System Info
     let mut sys_table = Table::new();
@@ -615,7 +626,7 @@ fn print_build_summary(target: &str, config: &zoi_system::config::SystemConfig, 
     ]);
 
     println!("{}", " 2. System Configuration ".bold().underline());
-    println!("{}\n", sys_table);
+    println!("{sys_table}\n");
 
     // Packages
     println!("{}", " 3. Packages ".bold().underline());
@@ -626,7 +637,7 @@ fn print_build_summary(target: &str, config: &zoi_system::config::SystemConfig, 
 
     let mut pkg_list = String::new();
     for (i, pkg) in config.packages.iter().enumerate() {
-        pkg_list.push_str(&format!("{}", pkg.cyan()));
+        let _ = write!(pkg_list, "{}", pkg.cyan());
         if i < config.packages.len() - 1 {
             pkg_list.push_str(", ");
         }
@@ -634,7 +645,7 @@ fn print_build_summary(target: &str, config: &zoi_system::config::SystemConfig, 
             pkg_list.push('\n');
         }
     }
-    println!("{}\n", pkg_list);
+    println!("{pkg_list}\n");
 }
 
 /// Handles the response from the system daemon.
@@ -644,8 +655,8 @@ fn handle_response(response: Response) -> Result<()> {
         Response::Ok => println!("{}", "Operation successful.".green()),
         Response::Success(msg) => println!("{} {}", "Success:".green(), msg),
         Response::Status(msg) => println!("Daemon status: {}", msg.cyan()),
-        Response::Error(err) => return Err(anyhow!("Daemon error: {}", err)),
-        _ => return Err(anyhow!("Unexpected response from daemon")),
+        Response::Error(err) => return Err(anyhow!("Daemon error: {err}")),
+        Response::Generations(_) => return Err(anyhow!("Unexpected response from daemon")),
     }
     Ok(())
 }

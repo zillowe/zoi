@@ -6,9 +6,17 @@
 //! to the filesystem and network.
 
 use anyhow::{Result, anyhow};
+use std::fmt::Write;
 use std::path::Path;
 
 /// Runs the package build process inside a Bubblewrap sandbox.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Not running on Linux.
+/// - Bubblewrap is not installed.
+/// - The build process fails inside the sandbox.
 pub fn run(
     package_file: &Path,
     build_type: Option<&str>,
@@ -40,7 +48,7 @@ pub fn run(
 
     #[cfg(target_os = "linux")]
     {
-        use colored::*;
+        use colored::Colorize;
         use std::path::PathBuf;
         use std::process::Command;
         use zoi_core::utils;
@@ -90,29 +98,28 @@ pub fn run(
 
         // Construct the inner zoi command
         let mut inner_cmd = format!(
-            "zoi package build {} --output-dir {} --method native",
-            package_filename, container_output_dir
+            "zoi package build {package_filename} --output-dir {container_output_dir} --method native"
         );
 
         if let Some(bt) = build_type {
-            inner_cmd.push_str(&format!(" --type {}", bt));
+            let _ = write!(inner_cmd, " --type {bt}");
         }
 
         for p in platforms {
-            inner_cmd.push_str(&format!(" --platform {}", p));
+            let _ = write!(inner_cmd, " --platform {p}");
         }
 
         if let Some(sk) = sign_key {
-            inner_cmd.push_str(&format!(" --sign {}", sk));
+            let _ = write!(inner_cmd, " --sign {sk}");
         }
 
         if let Some(v) = version_override {
-            inner_cmd.push_str(&format!(" --version-override {}", v));
+            let _ = write!(inner_cmd, " --version-override {v}");
         }
 
         if let Some(subs) = sub_packages {
             for s in subs {
-                inner_cmd.push_str(&format!(" --sub {}", s));
+                let _ = write!(inner_cmd, " --sub {s}");
             }
         }
 

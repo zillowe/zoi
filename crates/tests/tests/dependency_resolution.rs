@@ -7,32 +7,32 @@ use zoi::pkg::install::pubgrub::PkgName;
 #[test]
 fn test_semver_to_range_exact() {
     let range = pubgrub::semver_to_range("1.2.3");
-    assert!(range.contains(&pubgrub::SemVersion::parse("1.2.3").unwrap()));
-    assert!(!range.contains(&pubgrub::SemVersion::parse("1.2.4").unwrap()));
+    assert!(range.contains(&pubgrub::SemVersion::parse("1.2.3").expect("unwrap failed")));
+    assert!(!range.contains(&pubgrub::SemVersion::parse("1.2.4").expect("unwrap failed")));
 }
 
 #[test]
 fn test_semver_to_range_caret() {
     let range = pubgrub::semver_to_range("^1.2.3");
-    assert!(range.contains(&pubgrub::SemVersion::parse("1.2.3").unwrap()));
-    assert!(range.contains(&pubgrub::SemVersion::parse("1.9.9").unwrap()));
-    assert!(!range.contains(&pubgrub::SemVersion::parse("2.0.0").unwrap()));
+    assert!(range.contains(&pubgrub::SemVersion::parse("1.2.3").expect("unwrap failed")));
+    assert!(range.contains(&pubgrub::SemVersion::parse("1.9.9").expect("unwrap failed")));
+    assert!(!range.contains(&pubgrub::SemVersion::parse("2.0.0").expect("unwrap failed")));
 }
 
 #[test]
 fn test_semver_to_range_tilde() {
     let range = pubgrub::semver_to_range("~1.2.3");
-    assert!(range.contains(&pubgrub::SemVersion::parse("1.2.3").unwrap()));
-    assert!(range.contains(&pubgrub::SemVersion::parse("1.2.9").unwrap()));
-    assert!(!range.contains(&pubgrub::SemVersion::parse("1.3.0").unwrap()));
+    assert!(range.contains(&pubgrub::SemVersion::parse("1.2.3").expect("unwrap failed")));
+    assert!(range.contains(&pubgrub::SemVersion::parse("1.2.9").expect("unwrap failed")));
+    assert!(!range.contains(&pubgrub::SemVersion::parse("1.3.0").expect("unwrap failed")));
 }
 
 #[test]
 fn test_semver_to_range_comparison() {
     let range = pubgrub::semver_to_range(">=1.0.0, <2.0.0");
-    assert!(range.contains(&pubgrub::SemVersion::parse("1.0.0").unwrap()));
-    assert!(range.contains(&pubgrub::SemVersion::parse("1.5.0").unwrap()));
-    assert!(!range.contains(&pubgrub::SemVersion::parse("2.0.0").unwrap()));
+    assert!(range.contains(&pubgrub::SemVersion::parse("1.0.0").expect("unwrap failed")));
+    assert!(range.contains(&pubgrub::SemVersion::parse("1.5.0").expect("unwrap failed")));
+    assert!(!range.contains(&pubgrub::SemVersion::parse("2.0.0").expect("unwrap failed")));
 }
 
 #[test]
@@ -62,12 +62,12 @@ fn test_get_versions_does_not_leak_across_distinct_explicit_sources() {
         .get_versions(&PkgName {
             name: "shared".to_string(),
             sub_package: None,
-            repo: "".to_string(),
+            repo: String::new(),
             registry: "local".to_string(),
             explicit_source: Some(source_a),
         })
         .expect("versions should resolve");
 
     assert_eq!(versions.len(), 1);
-    assert_eq!(versions[0], pubgrub::SemVersion::parse("1.0.0").unwrap());
+    assert_eq!(versions.first().expect("Value should exist in test"), &pubgrub::SemVersion::parse("1.0.0").expect("unwrap failed"));
 }

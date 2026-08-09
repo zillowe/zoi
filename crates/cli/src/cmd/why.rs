@@ -2,9 +2,13 @@
 
 use crate::pkg::{local, resolve, types};
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 
 /// Run the why command.
+///
+/// # Errors
+///
+/// Returns an error if the package is not installed or if there is an error reading the package metadata or dependents.
 pub fn run(package_name: &str) -> Result<()> {
     let request = resolve::parse_source_string(package_name)?;
     let mut candidates = Vec::new();
@@ -16,7 +20,7 @@ pub fn run(package_name: &str) -> Result<()> {
         candidates.extend(local::find_installed_manifests_matching(&request, scope)?);
     }
     if candidates.is_empty() {
-        return Err(anyhow!("Package '{}' is not installed.", package_name));
+        return Err(anyhow!("Package '{package_name}' is not installed."));
     }
     let manifest =
         crate::cmd::installed_select::choose_installed_manifest(package_name, &candidates, false)?;

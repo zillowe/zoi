@@ -1,7 +1,7 @@
 //! Logic for the `version` command.
 
 use crate::utils;
-use colored::*;
+use colored::Colorize;
 
 /// Run the version command.
 pub fn run(branch: &str, status: &str, number: &str, commit: &str) {

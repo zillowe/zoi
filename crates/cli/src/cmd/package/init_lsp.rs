@@ -16,7 +16,11 @@ pub struct InitLspCommand {
 ///
 /// This setup creates necessary configuration files (like `.luarc.json`) and
 /// downloads type definitions to enable better development experience in LSP-supported editors.
-pub fn run(args: InitLspCommand) -> Result<()> {
+///
+/// # Errors
+///
+/// Returns an error if the LSP workspace setup fails.
+pub fn run(args: &InitLspCommand) -> Result<()> {
     println!(
         "{} Initializing LSP support in {}...",
         "::".bold().blue(),

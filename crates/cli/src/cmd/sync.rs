@@ -6,9 +6,13 @@
 use crate::cli::SetupScope;
 use crate::pkg;
 use anyhow::Result;
-use colored::*;
+use colored::Colorize;
 
 /// Run the sync command to update package databases.
+///
+/// # Errors
+///
+/// Returns an error if the sync process fails.
 pub fn run(
     verbose: bool,
     fallback: bool,
@@ -38,6 +42,10 @@ pub fn run(
 }
 
 /// Run a project-local sync command.
+///
+/// # Errors
+///
+/// Returns an error if the project-local sync process fails.
 pub fn run_local(verbose: bool, fallback: bool, force: bool, frozen: bool) -> Result<()> {
     if frozen {
         crate::pkg::frozen::set_frozen(true);
@@ -54,6 +62,10 @@ pub fn run_local(verbose: bool, fallback: bool, force: bool, frozen: bool) -> Re
 }
 
 /// Set the default registry URL or use a pre-defined keyword.
+///
+/// # Errors
+///
+/// Returns an error if the configuration cannot be updated.
 pub fn set_registry(url_or_keyword: &str) -> Result<()> {
     let url_storage;
     let url = match url_or_keyword {
@@ -68,12 +80,17 @@ pub fn set_registry(url_or_keyword: &str) -> Result<()> {
     };
 
     pkg::config::set_default_registry(url)?;
-    println!("Default registry set to: {}", url.cyan());
+    let url_cyan = url.cyan();
+    println!("Default registry set to: {url_cyan}");
     println!("The new registry will be used the next time you run 'zoi sync'");
     Ok(())
 }
 
 /// Add a new registry URL to the list of tracked registries.
+///
+/// # Errors
+///
+/// Returns an error if the directory path is invalid or if the configuration cannot be updated.
 pub fn add_registry(url: &str) -> Result<()> {
     let mut final_url = url.to_string();
     let path = std::path::Path::new(url);
@@ -82,19 +99,29 @@ pub fn add_registry(url: &str) -> Result<()> {
     }
 
     pkg::config::add_added_registry(&final_url)?;
-    println!("Registry '{}' added.", final_url.cyan());
+    let url_cyan = final_url.cyan();
+    println!("Registry '{url_cyan}' added.");
     println!("It will be synced on the next 'zoi sync' run.");
     Ok(())
 }
 
 /// Remove a registry by its handle or URL.
+///
+/// # Errors
+///
+/// Returns an error if the registry cannot be removed from the configuration.
 pub fn remove_registry(handle: &str) -> Result<()> {
     pkg::config::remove_added_registry(handle)?;
-    println!("Registry '{}' removed.", handle.cyan());
+    let handle_cyan = handle.cyan();
+    println!("Registry '{handle_cyan}' removed.");
     Ok(())
 }
 
 /// List all configured and tracked registries.
+///
+/// # Errors
+///
+/// Returns an error if the configuration cannot be read.
 pub fn list_registries() -> Result<()> {
     let config = crate::pkg::config::read_config()?;
     let db_root = crate::pkg::resolve::get_db_root()?;
@@ -103,11 +130,12 @@ pub fn list_registries() -> Result<()> {
 
     if let Some(default) = config.default_registry {
         let handle = &default.handle;
-        let mut desc = "".to_string();
+        let mut desc = String::new();
         if !handle.is_empty() {
             let repo_path = db_root.join(handle);
             if let Ok(repo_config) = crate::pkg::config::read_repo_config(&repo_path) {
-                desc = format!(" - {}", repo_config.description);
+                let repo_desc = &repo_config.description;
+                desc = format!(" - {repo_desc}");
             }
         }
         let handle_str = if handle.is_empty() {
@@ -115,9 +143,12 @@ pub fn list_registries() -> Result<()> {
         } else {
             handle.cyan().to_string()
         };
-        println!("[Set] {}: {}{}", handle_str, default.url, default.url.cyan());
+        let url_cyan = default.url.cyan();
+        let url = &default.url;
+        println!("[Set] {handle_str}: {url}{url_cyan}");
         if !desc.is_empty() {
-            println!("      {}", desc.dimmed());
+            let desc_dimmed = desc.dimmed();
+            println!("      {desc_dimmed}");
         }
     } else {
         println!("[Set]: <not set>");
@@ -127,11 +158,12 @@ pub fn list_registries() -> Result<()> {
         println!();
         for reg in config.added_registries {
             let handle = &reg.handle;
-            let mut desc = "".to_string();
+            let mut desc = String::new();
             if !handle.is_empty() {
                 let repo_path = db_root.join(handle);
                 if let Ok(repo_config) = crate::pkg::config::read_repo_config(&repo_path) {
-                    desc = format!(" - {}", repo_config.description);
+                    let repo_desc = &repo_config.description;
+                    desc = format!(" - {repo_desc}");
                 }
             }
             let handle_str = if handle.is_empty() {
@@ -139,9 +171,12 @@ pub fn list_registries() -> Result<()> {
             } else {
                 handle.cyan().to_string()
             };
-            println!("[Add] {}: {}{}", handle_str, reg.url, reg.url.cyan());
+            let url_cyan = reg.url.cyan();
+            let url = &reg.url;
+            println!("[Add] {handle_str}: {url}{url_cyan}");
             if !desc.is_empty() {
-                println!("      {}", desc.dimmed());
+                let desc_dimmed = desc.dimmed();
+                println!("      {desc_dimmed}");
             }
         }
     }

@@ -82,6 +82,12 @@ fn write_lockfile(lockfile: &mut types::ZoiLockV2, scope: types::Scope) -> Resul
 }
 
 /// Records a package installation or update in the lockfile.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The lockfile cannot be read or written.
+/// - The lockfile mutex is poisoned.
 pub fn record_package(
     pkg: &types::Package,
     reason: &types::InstallReason,
@@ -90,14 +96,14 @@ pub fn record_package(
     repo_type: &str,
     _chosen_options: &[String],
     _chosen_optionals: &[String],
-    sub_package: Option<String>,
+    sub_package: Option<&str>,
 ) -> Result<()> {
     let _lock = RECORD_MUTEX
         .lock()
-        .map_err(|e| anyhow!("Mutex poisoned: {}", e))?;
+        .map_err(|e| anyhow!("Mutex poisoned: {e}"))?;
     let mut lockfile = read_lockfile(pkg.scope)?;
 
-    let package_key = if let Some(sub) = &sub_package {
+    let package_key = if let Some(sub) = sub_package {
         format!("@{}/{}:{}", pkg.repo.trim(), pkg.name.trim(), sub.trim())
     } else {
         format!("@{}/{}", pkg.repo.trim(), pkg.name.trim())
@@ -109,13 +115,13 @@ pub fn record_package(
         "aarch64" => "arm64",
         other => other,
     };
-    let platform = format!("{}-{}", os, arch);
+    let platform = format!("{os}-{arch}");
 
     let hash = compute_package_hash(pkg, registry_handle);
 
     let detail = types::LockPackageDetailV2 {
         name: pkg.name.clone(),
-        sub_package: sub_package.clone(),
+        sub_package: sub_package.map(ToString::to_string),
         repo: pkg.repo.clone(),
         repo_type: repo_type.to_string(),
         version: pkg.version.clone().unwrap_or_default(),
@@ -135,7 +141,7 @@ pub fn record_package(
         } else {
             "pre-compiled".to_string()
         },
-        installed_sub_packages: sub_package.clone().map(|s| vec![s]).unwrap_or_default(),
+        installed_sub_packages: sub_package.map(|s| vec![s.to_string()]).unwrap_or_default(),
         platform,
         hash,
         dependencies: pkg.dependencies.clone().map(types::to_dependencies_v2),
@@ -221,13 +227,20 @@ fn resolve_git_head(repo_path: &Path) -> Option<String> {
 }
 
 /// Updates the installation reason for a package in the lockfile.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The lockfile cannot be read or written.
+/// - The lockfile mutex is poisoned.
+/// - The package is not found in the lockfile.
 pub fn update_package_reason(
     manifest: &types::InstallManifest,
-    new_reason: types::InstallReason,
+    new_reason: &types::InstallReason,
 ) -> Result<()> {
     let _lock = RECORD_MUTEX
         .lock()
-        .map_err(|e| anyhow!("Mutex poisoned: {}", e))?;
+        .map_err(|e| anyhow!("Mutex poisoned: {e}"))?;
     let mut lockfile = read_lockfile(manifest.scope)?;
     let repo = manifest.repo.trim();
     let name = manifest.name.trim();
@@ -235,7 +248,7 @@ pub fn update_package_reason(
     let package_key = if let Some(sub) = &manifest.sub_package {
         format!("@{}/{}:{}", repo, name, sub.trim())
     } else {
-        format!("@{}/{}", repo, name)
+        format!("@{repo}/{name}")
     };
 
     if let Some(pkg) = lockfile.installed_packages.get_mut(&package_key) {
@@ -252,10 +265,15 @@ pub fn update_package_reason(
 }
 
 /// Removes a package from the lockfile record.
+///
+/// # Errors
+///
+/// Returns an error if the lockfile cannot be read or written, or if the
+/// lockfile mutex is poisoned.
 pub fn remove_package_from_record(manifest: &types::InstallManifest) -> Result<()> {
     let _lock = RECORD_MUTEX
         .lock()
-        .map_err(|e| anyhow!("Mutex poisoned: {}", e))?;
+        .map_err(|e| anyhow!("Mutex poisoned: {e}"))?;
     let mut lockfile = read_lockfile(manifest.scope)?;
     let repo = manifest.repo.trim();
     let name = manifest.name.trim();
@@ -263,7 +281,7 @@ pub fn remove_package_from_record(manifest: &types::InstallManifest) -> Result<(
     let package_key = if let Some(sub) = &manifest.sub_package {
         format!("@{}/{}:{}", repo, name, sub.trim())
     } else {
-        format!("@{}/{}", repo, name)
+        format!("@{repo}/{name}")
     };
 
     if lockfile.installed_packages.remove(&package_key).is_some() {
@@ -275,6 +293,10 @@ pub fn remove_package_from_record(manifest: &types::InstallManifest) -> Result<(
 }
 
 /// Returns all recorded packages across all scopes.
+///
+/// # Errors
+///
+/// Returns an error if reading the lockfile for any scope fails.
 pub fn get_recorded_packages() -> Result<Vec<types::LockPackageDetailV2>> {
     let mut all_packages = Vec::new();
     for scope in [

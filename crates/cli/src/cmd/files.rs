@@ -2,11 +2,16 @@
 
 use crate::pkg::{local, resolve};
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 
 /// Runs the 'files' command.
 ///
 /// Lists all files installed as part of the specified package.
+///
+/// # Errors
+///
+/// Returns an error if the package is not installed or if there is an issue
+/// resolving the package metadata or files.
 pub fn run(package_name: &str) -> Result<()> {
     let (pkg_meta, _, _, _, _, _, _) =
         resolve::resolve_package_and_version(package_name, None, false, false)?;
@@ -14,7 +19,7 @@ pub fn run(package_name: &str) -> Result<()> {
     let installed_packages = local::get_installed_packages()?;
 
     let Some(pkg) = installed_packages.iter().find(|p| p.name == pkg_meta.name) else {
-        return Err(anyhow!("Package '{}' is not installed.", package_name));
+        return Err(anyhow!("Package '{package_name}' is not installed."));
     };
 
     println!("Files for {} {}:", pkg.name.cyan(), pkg.version.yellow());
@@ -34,7 +39,7 @@ pub fn run(package_name: &str) -> Result<()> {
         sorted_files.sort();
         for file in &sorted_files {
             let expanded = crate::pkg::utils::expand_placeholders(file, &version_dir, pkg.scope)?;
-            println!("{}", expanded);
+            println!("{expanded}");
         }
     }
 

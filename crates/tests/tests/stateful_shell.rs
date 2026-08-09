@@ -13,7 +13,7 @@ fn test_cmd_is_stateful_across_calls() {
     let tmp = tempdir().expect("failed to create temp dir");
     let root = tmp.path().to_path_buf();
     let build_dir = root.join("build");
-    fs::create_dir(&build_dir).unwrap();
+    fs::create_dir(&build_dir).expect("unwrap failed");
 
     let lua = Lua::new();
     functions::setup_lua_environment(
@@ -22,43 +22,42 @@ fn test_cmd_is_stateful_across_calls() {
         None,
         None,
         None,
-        Some(build_dir.to_str().unwrap()),
+        Some(build_dir.to_str().expect("unwrap failed")),
         None,
         None,
         None,
         None,
         true,
     )
-    .unwrap();
+    .expect("unwrap failed");
 
     // Test directory persistence
     let sub_dir = build_dir.join("stateful_test");
-    fs::create_dir(&sub_dir).unwrap();
+    fs::create_dir(&sub_dir).expect("unwrap failed");
 
-    lua.load(r#"cmd("cd stateful_test")"#).exec().unwrap();
+    lua.load(r#"cmd("cd stateful_test")"#).exec().expect("unwrap failed");
 
     let (stdout, _, _) = lua
         .load(r#"return cmd("pwd")"#)
         .eval::<(String, String, i32)>()
-        .unwrap();
+        .expect("unwrap failed");
 
     // Normalize paths for comparison (especially on Windows)
     let actual_pwd = std::path::PathBuf::from(stdout.trim());
     assert!(
         actual_pwd.ends_with("stateful_test"),
-        "PWD should persist across cmd() calls. Got: {:?}",
-        actual_pwd
+        "PWD should persist across cmd() calls. Got: {actual_pwd:?}"
     );
 
     // Test environment variable persistence
     lua.load(r#"cmd("export ZOI_STATE_TEST=persistent_value")"#)
         .exec()
-        .unwrap();
+        .expect("unwrap failed");
 
     let (stdout_env, _, _) = lua
         .load(r#"return cmd("echo $ZOI_STATE_TEST")"#)
         .eval::<(String, String, i32)>()
-        .unwrap();
+        .expect("unwrap failed");
     assert_eq!(
         stdout_env.trim(),
         "persistent_value",
@@ -72,7 +71,7 @@ fn test_cmd_handles_stderr_independently() {
     let tmp = tempdir().expect("failed to create temp dir");
     let root = tmp.path().to_path_buf();
     let build_dir = root.join("build_stderr");
-    fs::create_dir(&build_dir).unwrap();
+    fs::create_dir(&build_dir).expect("unwrap failed");
 
     let lua = Lua::new();
     functions::setup_lua_environment(
@@ -81,20 +80,20 @@ fn test_cmd_handles_stderr_independently() {
         None,
         None,
         None,
-        Some(build_dir.to_str().unwrap()),
+        Some(build_dir.to_str().expect("unwrap failed")),
         None,
         None,
         None,
         None,
         true,
     )
-    .unwrap();
+    .expect("unwrap failed");
 
     // Call 1: Success, no stderr
     let (_, stderr1, _) = lua
         .load(r#"return cmd("echo hello")"#)
         .eval::<(String, String, i32)>()
-        .unwrap();
+        .expect("unwrap failed");
     assert!(
         stderr1.is_empty(),
         "Successful command should have empty stderr"
@@ -104,7 +103,7 @@ fn test_cmd_handles_stderr_independently() {
     let (_, stderr2, exit_code2) = lua
         .load(r#"return cmd("ls /nonexistent_path_018e6e5a2e6b")"#)
         .eval::<(String, String, i32)>()
-        .unwrap();
+        .expect("unwrap failed");
     assert!(
         !stderr2.is_empty(),
         "Failing command should have non-empty stderr"
@@ -118,11 +117,10 @@ fn test_cmd_handles_stderr_independently() {
     let (_, stderr3, _) = lua
         .load(r#"return cmd("echo world")"#)
         .eval::<(String, String, i32)>()
-        .unwrap();
+        .expect("unwrap failed");
     assert!(
         stderr3.is_empty(),
-        "Subsequent successful command should have empty stderr again. Got: {:?}",
-        stderr3
+        "Subsequent successful command should have empty stderr again. Got: {stderr3:?}"
     );
 }
 
@@ -132,7 +130,7 @@ fn test_shell_recovers_if_killed() {
     let tmp = tempdir().expect("failed to create temp dir");
     let root = tmp.path().to_path_buf();
     let build_dir = root.join("build_recovery");
-    fs::create_dir(&build_dir).unwrap();
+    fs::create_dir(&build_dir).expect("unwrap failed");
 
     let lua = Lua::new();
     functions::setup_lua_environment(
@@ -141,17 +139,17 @@ fn test_shell_recovers_if_killed() {
         None,
         None,
         None,
-        Some(build_dir.to_str().unwrap()),
+        Some(build_dir.to_str().expect("unwrap failed")),
         None,
         None,
         None,
         None,
         true,
     )
-    .unwrap();
+    .expect("unwrap failed");
 
     // Call 1: Works
-    lua.load(r#"cmd("echo alive")"#).exec().unwrap();
+    lua.load(r#"cmd("echo alive")"#).exec().expect("unwrap failed");
 
     // Call 2: Kill the shell
     // We expect this to return an error because the sentinel will never be printed as the shell dies
@@ -161,7 +159,7 @@ fn test_shell_recovers_if_killed() {
     let (stdout, _, _) = lua
         .load(r#"return cmd("echo back_from_the_dead")"#)
         .eval::<(String, String, i32)>()
-        .unwrap();
+        .expect("unwrap failed");
     assert_eq!(
         stdout.trim(),
         "back_from_the_dead",

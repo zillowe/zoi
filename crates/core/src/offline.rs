@@ -15,5 +15,5 @@ pub fn set_offline(offline: bool) {
 
 /// Returns true if Zoi is in offline mode.
 pub fn is_offline() -> bool {
-    offline_mode_store().read().map(|g| *g).unwrap_or(false)
+    offline_mode_store().read().is_ok_and(|g| *g)
 }

@@ -6,12 +6,15 @@
 //! distributions from a single host.
 
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use zoi_core::utils;
 
 /// Runs the package build process inside a Docker container.
+/// # Errors
+///
+/// Returns an error if the Docker image cannot be built or the container fails to run.
 pub fn run(
     package_file: &Path,
     build_type: Option<&str>,
@@ -67,35 +70,29 @@ pub fn run(
         if let Ok(group_id) = Command::new("id").arg("-g").output() {
             let gid = String::from_utf8_lossy(&group_id.stdout).trim().to_string();
             docker_args.push("--user".to_string());
-            docker_args.push(format!("{}:{}", uid, gid));
+            docker_args.push(format!("{uid}:{gid}"));
         }
     }
 
     if sign_key.is_some() {
-        let host_gpg_home = std::env::var("GNUPGHOME")
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| {
-                utils::get_user_home()
-                    .map(|h| h.join(".gnupg"))
-                    .unwrap_or_default()
-            });
+        let host_gpg_home = std::env::var("GNUPGHOME").map_or_else(|_| {
+            utils::get_user_home()
+                .map(|h| h.join(".gnupg"))
+                .unwrap_or_default()
+        }, PathBuf::from);
 
         if host_gpg_home.exists() {
             let container_gpg_home = "/gpg_home";
             docker_args.push("-v".to_string());
-            docker_args.push(format!(
-                "{}:{}",
-                host_gpg_home.display(),
-                container_gpg_home
-            ));
+            docker_args.push(format!("{}:{}", host_gpg_home.display(), container_gpg_home));
             docker_args.push("-e".to_string());
-            docker_args.push(format!("GNUPGHOME={}", container_gpg_home));
+            docker_args.push(format!("GNUPGHOME={container_gpg_home}"));
         }
     }
 
     if let Ok(password) = std::env::var("GPG_PASSWORD") {
         docker_args.push("-e".to_string());
-        docker_args.push(format!("GPG_PASSWORD={}", password));
+        docker_args.push(format!("GPG_PASSWORD={password}"));
     }
 
     docker_args.push(image.to_string());
@@ -119,29 +116,33 @@ pub fn run(
          curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash && \
          export PATH=\"$HOME/.local/bin:$PATH\" && \
          zoi sync && \
-         zoi package build {} --output-dir {}",
-        package_filename, container_output_dir
+         zoi package build {package_filename} --output-dir {container_output_dir}",
     );
 
     if let Some(bt) = build_type {
-        inner_cmd.push_str(&format!(" --type {}", bt));
+        use std::fmt::Write;
+        let _ = write!(inner_cmd, " --type {bt}");
     }
 
     for p in platforms {
-        inner_cmd.push_str(&format!(" --platform {}", p));
+        use std::fmt::Write;
+        let _ = write!(inner_cmd, " --platform {p}");
     }
 
     if let Some(sk) = sign_key {
-        inner_cmd.push_str(&format!(" --sign {}", sk));
+        use std::fmt::Write;
+        let _ = write!(inner_cmd, " --sign {sk}");
     }
 
     if let Some(v) = version_override {
-        inner_cmd.push_str(&format!(" --version-override {}", v));
+        use std::fmt::Write;
+        let _ = write!(inner_cmd, " --version-override {v}");
     }
 
     if let Some(subs) = sub_packages {
         for s in subs {
-            inner_cmd.push_str(&format!(" --sub {}", s));
+            use std::fmt::Write;
+            let _ = write!(inner_cmd, " --sub {s}");
         }
     }
 

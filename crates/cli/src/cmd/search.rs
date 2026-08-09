@@ -27,13 +27,28 @@ use std::io::{self};
 use rayon::prelude::*;
 
 /// Runs the search command with the provided terms and options.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - File search fails.
+/// - Configuration reading fails.
+/// - Database search fails.
+/// - Package resolution fails.
+///
+/// # Panics
+///
+/// Panics if the interactive TUI fails to initialize or if layout calculations fail.
+/// # Errors
+///
+/// Returns an error if the search operation fails.
 pub fn run(
-    search_term: String,
-    registry_filter: Option<String>,
-    repo: Option<String>,
-    package_type: Option<String>,
+    search_term: &str,
+    registry_filter: Option<&str>,
+    repo: Option<&str>,
+    package_type: Option<&str>,
     tags: Option<Vec<String>>,
-    sort_by: String,
+    sort_by: &str,
     files: bool,
     interactive: bool,
 ) -> Result<()> {
@@ -61,8 +76,8 @@ pub fn run(
     let mut all_packages = Vec::new();
     let mut db_failed = false;
 
-    if let Some(reg_handle) = &registry_filter {
-        match crate::pkg::db::search_packages(reg_handle, &search_term) {
+    if let Some(reg_handle) = registry_filter {
+        match crate::pkg::db::search_packages(reg_handle, search_term) {
             Ok(pkgs) => all_packages.extend(pkgs),
             Err(_) => db_failed = true,
         }
@@ -77,28 +92,25 @@ pub fn run(
 
         let results: Vec<Result<Vec<Package>>> = registries
             .into_par_iter()
-            .map(|handle| crate::pkg::db::search_packages(&handle, &search_term))
+            .map(|handle| crate::pkg::db::search_packages(&handle, search_term))
             .collect();
 
         for res in results {
-            match res {
-                Ok(pkgs) => all_packages.extend(pkgs),
-                Err(_) => {
-                    db_failed = true;
-                    break;
-                }
+            if let Ok(pkgs) = res { all_packages.extend(pkgs) } else {
+                db_failed = true;
+                break;
             }
         }
     }
 
     let packages = if db_failed || (all_packages.is_empty() && registry_filter.is_none()) {
-        if let Some(reg_handle) = &registry_filter {
+        if let Some(reg_handle) = registry_filter {
             let all_repo_names = config::get_all_repos()?;
             let full_repos: Vec<String> = all_repo_names
                 .into_iter()
-                .map(|r_name| format!("{}/{}", reg_handle, r_name))
+                .map(|r_name| format!("{reg_handle}/{r_name}"))
                 .filter(|full_repo_name| {
-                    if let Some(repo_f) = &repo {
+                    if let Some(repo_f) = repo {
                         if repo_f.contains('/') {
                             full_repo_name == repo_f
                         } else {
@@ -110,7 +122,7 @@ pub fn run(
                 })
                 .collect();
             local::get_packages_from_repos(&full_repos)
-        } else if let Some(repo_filter) = &repo {
+        } else if let Some(repo_filter) = repo {
             let handle = if let Some(reg) = &config.default_registry {
                 reg.handle.clone()
             } else {
@@ -124,7 +136,7 @@ pub fn run(
             let all_repo_names = config::get_all_repos()?;
             let repos_to_search: Vec<String> = all_repo_names
                 .into_iter()
-                .map(|r_name| format!("{}/{}", handle, r_name))
+                .map(|r_name| format!("{handle}/{r_name}"))
                 .filter(|full_repo_name| {
                     if repo_filter.contains('/') {
                         full_repo_name == repo_filter
@@ -141,7 +153,7 @@ pub fn run(
         Ok(all_packages)
     };
 
-    let handle_for_version = registry_filter.as_deref().or(config
+    let handle_for_version = registry_filter.or(config
         .default_registry
         .as_ref()
         .map(|reg| reg.handle.as_str()));
@@ -211,7 +223,7 @@ pub fn run(
                 return Ok(());
             }
 
-            match sort_by.as_str() {
+            match sort_by {
                 "name" => matches.sort_by(|a, b| a.name.cmp(&b.name)),
                 "repo" => matches.sort_by(|a, b| a.repo.cmp(&b.repo)),
                 "type" => matches.sort_by(|a, b| {
@@ -221,7 +233,7 @@ pub fn run(
             }
 
             if interactive {
-                return run_tui(matches, handle_for_version);
+                return run_tui(&matches, handle_for_version);
             }
 
             let mut table = Table::new();
@@ -247,21 +259,22 @@ pub fn run(
                 let version = crate::pkg::resolve::get_default_version(&pkg, handle_for_version)
                     .unwrap_or_else(|_| "N/A".to_string());
 
-                let version_display = if pkg.revision != "1" {
-                    format!("{}-{}", version, pkg.revision)
-                } else {
+                let version_display = if pkg.revision == "1" {
                     version.clone()
+                } else {
+                    format!("{}-{}", version, pkg.revision)
                 };
 
                 let repo_display = &pkg.repo;
 
                 let tags_display = if pkg.tags.is_empty() {
-                    String::from("")
+                    String::new()
                 } else {
                     let mut tags = pkg.tags.clone();
                     tags.sort();
                     if tags.len() > 4 {
-                        format!("{}…", tags[..4].join(", "))
+                        let first_four: Vec<_> = tags.iter().take(4).map(std::string::String::as_str).collect();
+                        format!("{}…", first_four.join(", "))
                     } else {
                         tags.join(", ")
                     }
@@ -277,7 +290,7 @@ pub fn run(
                 ]);
             }
 
-            println!("{}", table);
+            println!("{table}");
         }
         Err(e) => {
             return Err(e);
@@ -288,15 +301,15 @@ pub fn run(
 
 /// Searches for files matching the given term.
 fn run_file_search(
-    term: String,
-    registry_filter: Option<String>,
-    repo: Option<String>,
-    package_type: Option<String>,
+    term: &str,
+    registry_filter: Option<&str>,
+    repo: Option<&str>,
+    package_type: Option<&str>,
 ) -> Result<()> {
     let config = config::read_config()?;
     let mut registries = Vec::new();
     if let Some(reg) = registry_filter {
-        registries.push(reg);
+        registries.push(reg.to_string());
     } else {
         if let Some(default) = &config.default_registry {
             registries.push(default.handle.clone());
@@ -308,7 +321,7 @@ fn run_file_search(
 
     let mut results = Vec::new();
     for handle in registries {
-        if let Ok(res) = crate::pkg::db::search_files(&handle, &term) {
+        if let Ok(res) = crate::pkg::db::search_files(&handle, term) {
             results.extend(res);
         }
     }
@@ -332,7 +345,7 @@ fn run_file_search(
                 if pkg.repo != *rf {
                     return false;
                 }
-            } else if !pkg.repo.split('/').any(|part| part == rf) {
+            } else if !pkg.repo.split('/').any(|part| part == *rf) {
                 return false;
             }
         }
@@ -364,12 +377,12 @@ fn run_file_search(
         ]);
     }
 
-    println!("{}", table);
+    println!("{table}");
     Ok(())
 }
 
 /// Runs the interactive TUI for package search results.
-fn run_tui(packages: Vec<Package>, handle_for_version: Option<&str>) -> Result<()> {
+fn run_tui(packages: &[Package], handle_for_version: Option<&str>) -> Result<()> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
@@ -390,7 +403,7 @@ fn run_tui(packages: Vec<Package>, handle_for_version: Option<&str>) -> Result<(
     terminal.show_cursor()?;
 
     if let Err(err) = res {
-        eprintln!("{:?}", err)
+        eprintln!("{err:?}");
     }
 
     Ok(())
@@ -399,7 +412,7 @@ fn run_tui(packages: Vec<Package>, handle_for_version: Option<&str>) -> Result<(
 /// Main loop for the search TUI.
 fn run_tui_loop(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-    packages: Vec<Package>,
+    packages: &[Package],
     state: &mut ListState,
     handle_for_version: Option<&str>,
 ) -> Result<()> {
@@ -413,7 +426,7 @@ fn run_tui_loop(
             let chunks = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([Constraint::Percentage(30), Constraint::Percentage(70)])
-                .split(layout[0]);
+                .split(*layout.first().expect("layout should have at least one chunk"));
 
             let items: Vec<ListItem> = packages
                 .iter()
@@ -434,17 +447,23 @@ fn run_tui_loop(
                 )
                 .highlight_symbol(">> ");
 
-            f.render_stateful_widget(list, chunks[0], state);
+            f.render_stateful_widget(
+                list,
+                *chunks.first().expect("chunks should have at least one item"),
+                state,
+            );
 
             if let Some(selected) = state.selected() {
-                let pkg = &packages[selected];
+                let pkg = packages
+                    .get(selected)
+                    .expect("selected index should be within bounds");
                 let version = crate::pkg::resolve::get_default_version(pkg, handle_for_version)
                     .unwrap_or_else(|_| "N/A".to_string());
 
-                let version_display = if pkg.revision != "1" {
-                    format!("{}-{}", version, pkg.revision)
-                } else {
+                let version_display = if pkg.revision == "1" {
                     version
+                } else {
+                    format!("{}-{}", version, pkg.revision)
                 };
 
                 let details = vec![
@@ -511,7 +530,10 @@ fn run_tui_loop(
                     .block(Block::default().borders(Borders::ALL).title("Details"))
                     .wrap(Wrap { trim: true });
 
-                f.render_widget(details_paragraph, chunks[1]);
+                f.render_widget(
+                    details_paragraph,
+                    *chunks.get(1).expect("chunks should have a second item"),
+                );
             }
 
             let help_text = Line::from(vec![
@@ -522,7 +544,10 @@ fn run_tui_loop(
                 Span::styled("k/↑", RatatuiStyle::default().add_modifier(Modifier::BOLD)),
                 Span::raw(": up"),
             ]);
-            f.render_widget(Paragraph::new(help_text), layout[1]);
+            f.render_widget(
+                Paragraph::new(help_text),
+                *layout.get(1).expect("layout should have a second chunk"),
+            );
         })?;
 
         if event::poll(std::time::Duration::from_millis(100))?

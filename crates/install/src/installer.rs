@@ -11,6 +11,7 @@ use zoi_core::{cache, config, pgp, pkgdir, recorder, types};
 use zoi_db as db;
 use zoi_hooks as hooks;
 use zoi_resolver::local;
+use std::io::Write;
 
 /// Downloads and caches a package archive.
 ///
@@ -18,8 +19,18 @@ use zoi_resolver::local;
 /// - Checking pkg-dirs and the archive cache.
 /// - Downloading from mirrors if not found locally.
 /// - Verifying hashes and PGP signatures.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The configuration cannot be read.
+/// - The archive cache directory cannot be created.
+/// - Zoi is offline and the archive is missing.
+/// - The download fails.
+/// - Hash verification fails.
+/// - Signature verification fails.
 pub fn download_and_cache_archive(
-    _node: &InstallNode,
+    node: &InstallNode,
     details: &plan::PrebuiltDetails,
     pb: Option<&ProgressBar>,
     verbose: bool,
@@ -37,7 +48,7 @@ pub fn download_and_cache_archive(
         .next_back()
         .unwrap_or("archive.zpa");
     let cached_archive_path = archive_cache_root.join(archive_filename);
-    let sig_filename = format!("{}.sig", archive_filename);
+    let sig_filename = format!("{archive_filename}.sig");
     let cached_sig_path = archive_cache_root.join(&sig_filename);
 
     let archive_path = if let Some(path) = pkgdir::find_in_pkg_dirs(archive_filename) {
@@ -53,11 +64,10 @@ pub fn download_and_cache_archive(
     } else {
         if zoi_core::offline::is_offline() {
             return Err(anyhow!(
-                "Archive not found in cache and cannot download: Zoi is in offline mode. Missing: {}",
-                archive_filename
+                "Archive not found in cache and cannot download: Zoi is in offline mode. Missing: {archive_filename}"
             ));
         }
-        let part_path = archive_cache_root.join(format!("{}.part", archive_filename));
+        let part_path = archive_cache_root.join(format!("{archive_filename}.part"));
 
         if part_path.exists() && pb.is_none() {
             println!("Resuming partial download: {}", part_path.display());
@@ -84,9 +94,7 @@ pub fn download_and_cache_archive(
             let (url, error) = last_error
                 .ok_or_else(|| anyhow!("archive download failed but no error recorded"))?;
             return Err(anyhow!(
-                "Failed to download package archive from {}: {}",
-                url,
-                error
+                "Failed to download package archive from {url}: {error}"
             ));
         }
 
@@ -96,10 +104,10 @@ pub fn download_and_cache_archive(
 
     if let Some(hash_url) = &details.info.hash_url {
         let hash = db::get_package_hash_from_db(
-            &_node.registry_handle,
-            &_node.pkg.name,
-            _node.sub_package.as_deref(),
-            &_node.pkg.repo,
+            &node.registry_handle,
+            &node.pkg.name,
+            node.sub_package.as_deref(),
+            &node.pkg.repo,
         )
         .unwrap_or(None)
         .filter(|h| !h.is_empty())
@@ -115,13 +123,13 @@ pub fn download_and_cache_archive(
     let authorities = config
         .default_registry
         .as_ref()
-        .filter(|r| r.handle == _node.registry_handle)
+        .filter(|r| r.handle == node.registry_handle)
         .and_then(|r| r.authorities.as_ref())
         .or_else(|| {
             config
                 .added_registries
                 .iter()
-                .find(|r| r.handle == _node.registry_handle)
+                .find(|r| r.handle == node.registry_handle)
                 .and_then(|r| r.authorities.as_ref())
         });
     let has_authorities = authorities.is_some_and(|a| !a.is_empty());
@@ -165,9 +173,7 @@ pub fn download_and_cache_archive(
                         anyhow!("signature download failed but no error recorded")
                     })?;
                     return Err(anyhow!(
-                        "Failed to download signature from {}: {}",
-                        url,
-                        error
+                        "Failed to download signature from {url}: {error}"
                     ));
                 }
                 fs::copy(&temp_sig_path, &cached_sig_path)?;
@@ -186,7 +192,7 @@ pub fn download_and_cache_archive(
     } else if has_authorities {
         let msg = format!(
             "Warning: Installing unsigned package '{}' from a registry that claims to be secure.",
-            _node.pkg.name
+            node.pkg.name
         );
         if let Some(p) = pb {
             p.println(msg.yellow().to_string());
@@ -223,6 +229,12 @@ pub struct PreparedNode {
 ///
 /// This phase always runs in user-space and does not modify the system state
 /// or the package store.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The archive cannot be downloaded or built.
+/// - The progress bar style cannot be created.
 pub fn prepare_node(
     node: &InstallNode,
     action: &plan::InstallAction,
@@ -246,12 +258,12 @@ pub fn prepare_node(
     } else {
         pkg.name.clone()
     };
-    let version_display = if node.revision != "1" {
-        format!("{}-{}", version, node.revision)
-    } else {
+    let version_display = if node.revision == "1" {
         version.clone()
+    } else {
+        format!("{}-{}", version, node.revision)
     };
-    let message = format!("zoi:{}@{}", display_name, version_display);
+    let message = format!("zoi:{display_name}@{version_display}");
 
     let pb = if let Some(m_inner) = m {
         let pb = m_inner.add(ProgressBar::new(100));
@@ -275,7 +287,7 @@ pub fn prepare_node(
                 if let Some(p) = &pb {
                     p.set_style(spinner_style);
                     p.enable_steady_tick(std::time::Duration::from_millis(100));
-                    p.set_message(format!("Building {}...", display_name));
+                    p.set_message(format!("Building {display_name}..."));
                 }
                 let archive_path = prebuilt::build_archive(
                     archive_path,
@@ -301,7 +313,7 @@ pub fn prepare_node(
             if let Some(p) = &pb {
                 p.set_style(spinner_style);
                 p.enable_steady_tick(std::time::Duration::from_millis(100));
-                p.set_message(format!("Building {}...", display_name));
+                p.set_message(format!("Building {display_name}..."));
             }
             let pkg_lua_path = Path::new(&node.source);
             let archive_path = prebuilt::build_archive(
@@ -341,6 +353,15 @@ pub fn prepare_node(
 /// Just-in-Time Escalation: If the target scope is `system`, this function
 /// will spawn a privileged sub-process (`sudo zoi helper elevate-install-node`)
 /// to perform the final file moves, keeping the main CLI unprivileged.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Hooks fail to run.
+/// - Privilege escalation fails.
+/// - The archive cannot be unpacked.
+/// - The manifest cannot be created or written.
+/// - The package cannot be recorded in the database.
 pub fn install_prepared_node(
     node: &InstallNode,
     prepared: &PreparedNode,
@@ -360,7 +381,9 @@ pub fn install_prepared_node(
         .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ ");
 
     let main_pb = if let Some(m_inner) = m {
-        if !is_direct {
+        if is_direct {
+            None
+        } else {
             let pb = m_inner.add(ProgressBar::new_spinner());
             pb.set_style(pb_style.clone());
             let name = if let Some(sub) = &node.sub_package {
@@ -368,16 +391,14 @@ pub fn install_prepared_node(
             } else {
                 pkg.name.clone()
             };
-            let version_display = if node.revision != "1" {
-                format!("{}-{}", version, node.revision)
-            } else {
+            let version_display = if node.revision == "1" {
                 version.clone()
+            } else {
+                format!("{}-{}", version, node.revision)
             };
-            pb.set_message(format!("zoi:{}@{}", name, version_display));
+            pb.set_message(format!("zoi:{name}@{version_display}"));
             pb.enable_steady_tick(std::time::Duration::from_millis(100));
             Some(pb)
-        } else {
-            None
         }
     } else {
         None
@@ -413,14 +434,12 @@ pub fn install_prepared_node(
 
         if let Some(pb) = step_pb.as_ref().or(main_pb.as_ref()) {
             pb.set_message(format!(
-                "Waiting for {} privileges to install system package...",
-                escalator
+                "Waiting for {escalator} privileges to install system package..."
             ));
         }
 
         let node_json = serde_json::to_string(node)?;
         let mut temp_file = tempfile::NamedTempFile::new()?;
-        use std::io::Write;
         temp_file.write_all(node_json.as_bytes())?;
         let temp_path = temp_file.path();
 
@@ -439,7 +458,7 @@ pub fn install_prepared_node(
 
         let status = cmd
             .status()
-            .map_err(|e| anyhow!("Failed to spawn privilege escalator: {}", e))?;
+            .map_err(|e| anyhow!("Failed to spawn privilege escalator: {e}"))?;
         if !status.success() {
             return Err(anyhow!("Escalated installation failed."));
         }
@@ -452,7 +471,7 @@ pub fn install_prepared_node(
             &node.version,
         )?;
         let manifest_filename = if let Some(sub) = &node.sub_package {
-            format!("manifest-{}.yaml", sub)
+            format!("manifest-{sub}.yaml")
         } else {
             "manifest.yaml".to_string()
         };
@@ -530,7 +549,7 @@ pub fn install_prepared_node(
             &node.repo_type,
             &node.chosen_options,
             &node.chosen_optionals,
-            sub_package_to_install.clone(),
+            sub_package_to_install.as_deref(),
         ) {
             eprintln!(
                 "Warning: failed to record package installation for '{}': {}",
@@ -559,6 +578,10 @@ pub fn install_prepared_node(
 }
 
 /// Performs both preparation and execution phases for an install node.
+///
+/// # Errors
+///
+/// Returns an error if preparation or execution fails.
 pub fn install_node(
     node: &InstallNode,
     action: &plan::InstallAction,

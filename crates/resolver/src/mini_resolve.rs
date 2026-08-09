@@ -4,7 +4,7 @@
 //! pre-compiled JSON index instead of full registry checkouts.
 
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 pub use zoi_core::types::MiniVulnerability;
@@ -62,6 +62,10 @@ pub struct MiniRegistryIndex {
 ///
 /// This index is the backbone of Zoi Mini, providing a pre-resolved mapping
 /// of package names to their current versions and metadata.
+///
+/// # Errors
+///
+/// Returns an error if the index cannot be fetched or parsed.
 pub fn fetch_registry_index() -> Result<MiniRegistryIndex> {
     let url = "https://gitlab.com/zillowe/zillwen/zusty/zoidberg/-/raw/main/packages.json";
     let client = zoi_core::utils::get_http_client()?;
@@ -77,6 +81,10 @@ pub fn fetch_registry_index() -> Result<MiniRegistryIndex> {
 }
 
 /// Fetches the repository configuration from the official Zoidberg registry.
+///
+/// # Errors
+///
+/// Returns an error if the configuration cannot be fetched or parsed.
 pub fn fetch_registry_config() -> Result<zoi_core::types::RepoConfig> {
     let url = "https://gitlab.com/zillowe/zillwen/zusty/zoidberg/-/raw/main/repo.yaml";
     let client = zoi_core::utils::get_http_client()?;
@@ -95,8 +103,7 @@ pub fn fetch_registry_config() -> Result<zoi_core::types::RepoConfig> {
 /// Returns the URL to download a package's `.pkg.lua` file from the official registry.
 pub fn get_package_lua_url(repo: &str, name: &str) -> String {
     format!(
-        "https://gitlab.com/zillowe/zillwen/zusty/zoidberg/-/raw/main/{}/{}/{}.pkg.lua",
-        repo, name, name
+        "https://gitlab.com/zillowe/zillwen/zusty/zoidberg/-/raw/main/{repo}/{name}/{name}.pkg.lua"
     )
 }
 
@@ -104,6 +111,10 @@ pub fn get_package_lua_url(repo: &str, name: &str) -> String {
 ///
 /// Returns `true` if the package is safe to install, or if the user
 /// explicitly chooses to bypass a security warning.
+///
+/// # Errors
+///
+/// Returns an error if the version cannot be parsed or if the user confirmation fails.
 pub fn check_vulnerabilities(
     pkg_name: &str,
     pkg_index: &MiniPackageIndex,
@@ -114,7 +125,7 @@ pub fn check_vulnerabilities(
     };
 
     let target_version = semver::Version::parse(version.trim_start_matches('v'))
-        .map_err(|e| anyhow!("Failed to parse version {}: {}", version, e))?;
+        .map_err(|e| anyhow!("Failed to parse version {version}: {e}"))?;
 
     let mut affected = Vec::new();
 

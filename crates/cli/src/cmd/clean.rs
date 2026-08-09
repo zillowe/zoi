@@ -2,9 +2,17 @@
 
 use crate::pkg;
 use anyhow::Result;
-use colored::*;
+use colored::Colorize;
 
 /// Runs the clean command.
+///
+/// # Errors
+///
+/// Returns an error if the cache clearing operation fails.
+///
+/// # Panics
+///
+/// This function does not explicitly panic.
 pub fn run(dry_run: bool) -> Result<()> {
     if dry_run {
         println!("{} Cleaning cache (Dry-run)...", "::".bold().yellow());

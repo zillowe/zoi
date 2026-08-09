@@ -19,7 +19,7 @@ pub mod pkg_install;
 pub mod plan;
 /// Module for handling prebuilt packages.
 pub mod prebuilt;
-/// Module for the PubGrub dependency resolver.
+/// Module for the `PubGrub` dependency resolver.
 pub mod pubgrub;
 /// Module for resolving dependencies.
 pub mod resolver;

@@ -20,7 +20,7 @@ fn test_manifest(name: &str, version: &str) -> InstallManifest {
         repo_type: "official".to_string(),
         registry_handle: "zoidberg".to_string(),
         package_type: PackageType::Package,
-        description: "".to_string(),
+        description: String::new(),
         reason: InstallReason::Direct,
         scope: Scope::User,
         bins: None,
@@ -58,7 +58,7 @@ fn test_audit_entry_serialization() {
         registry: manifest.registry_handle.clone(),
     };
 
-    let json = serde_json::to_string(&entry).unwrap();
+    let json = serde_json::to_string(&entry).expect("unwrap failed");
     assert!(json.contains("audit-test"));
     assert!(json.contains("test-user"));
     assert!(json.contains("Install"));
@@ -91,8 +91,8 @@ fn test_audit_hash_chain_verification_and_tamper_detection() {
     let content = fs::read_to_string(&log_path).expect("audit log should exist");
     let mut log: audit::AuditLog =
         serde_json::from_str(&content).expect("audit log should be valid JSON");
-    log.entries[0].entry.package_name = "tampered-package".to_string();
-    fs::write(&log_path, serde_json::to_string_pretty(&log).unwrap())
+    log.entries.first_mut().expect("Value should exist in test").entry.package_name = "tampered-package".to_string();
+    fs::write(&log_path, serde_json::to_string_pretty(&log).expect("unwrap failed"))
         .expect("tampered log should write");
 
     let tamper_report = audit::verify_chain().expect("tampered chain should still parse");
@@ -139,7 +139,7 @@ fn test_audit_export_json_and_ndjson() {
         .expect("json export should be an array");
     assert_eq!(arr.len(), 2);
     assert!(
-        arr[0].get("hash").is_some(),
+        arr.first().expect("Value should exist in test").get("hash").is_some(),
         "json export should include hash field"
     );
 

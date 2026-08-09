@@ -1,6 +1,6 @@
 use crate::dep_install;
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use std::thread;
 use zoi_core::types;
 use zoi_core::utils;
@@ -15,6 +15,9 @@ use std::path::PathBuf;
 /// 2. Resolves and installs any required build-time dependencies.
 /// 3. Spawns a build thread to execute the build process defined in the `.pkg.lua`.
 /// 4. Returns the path to the resulting `.zpa` (Zoi Package Archive) file.
+/// # Errors
+///
+/// Returns an error if the build fails, or if build-time dependencies cannot be resolved.
 pub fn build_archive(
     pkg_lua_path: &std::path::Path,
     pkg: &types::Package,
@@ -23,26 +26,22 @@ pub fn build_archive(
     pb: Option<&indicatif::ProgressBar>,
     quiet: bool,
 ) -> Result<Option<PathBuf>> {
-    let build_type =
-        match zoi_package::build::resolve_build_type(build_type_override, &pkg.types, &pkg.name)? {
-            Some(t) => t,
-            None => {
-                if let Some(p) = pb {
-                    p.finish_with_message(format!(
-                        "{} Skipping build for '{}': no build types supported.",
-                        "::".bold().yellow(),
-                        pkg.name
-                    ));
-                } else if !quiet {
-                    println!(
-                        "{} Skipping build for '{}': no build types supported.",
-                        "::".bold().yellow(),
-                        pkg.name
-                    );
-                }
-                return Ok(None);
-            }
-        };
+    let Some(build_type) = zoi_package::build::resolve_build_type(build_type_override, &pkg.types, &pkg.name)? else {
+        if let Some(p) = pb {
+            p.finish_with_message(format!(
+                "{} Skipping build for '{}': no build types supported.",
+                "::".bold().yellow(),
+                pkg.name
+            ));
+        } else if !quiet {
+            println!(
+                "{} Skipping build for '{}': no build types supported.",
+                "::".bold().yellow(),
+                pkg.name
+            );
+        }
+        return Ok(None);
+    };
 
     let current_platform = utils::get_platform()?;
     let version = pkg.version.as_deref().ok_or_else(|| {
@@ -113,7 +112,7 @@ pub fn build_archive(
     }
 
     let pkg_lua_path_clone = pkg_lua_path.to_path_buf();
-    let build_type_clone = build_type.to_string();
+    let build_type_clone = build_type.clone();
     let current_platform_clone = current_platform.clone();
     let version_clone = version.to_string();
     let sub_packages = sub_package.map(|s| vec![s.to_string()]);
@@ -154,7 +153,7 @@ pub fn build_archive(
     let archive_filename = format!("{}-{}-{}.zpa", pkg.name, version, current_platform);
     let archive_path = pkg_lua_path
         .parent()
-        .ok_or_else(|| anyhow!("pkg_lua_path should have a parent: {:?}", pkg_lua_path))?
+        .ok_or_else(|| anyhow!("pkg_lua_path should have a parent: {}", pkg_lua_path.display()))?
         .join(archive_filename);
     if !archive_path.exists() {
         return Err(anyhow!(

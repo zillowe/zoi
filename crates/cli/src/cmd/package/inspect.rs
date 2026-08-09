@@ -28,6 +28,10 @@ pub struct InspectCommand {
 ///
 /// This parses the package's Lua definition and displays metadata such as name,
 /// version, repository, and description. It can also output the metadata in JSON format.
+///
+/// # Errors
+///
+/// Returns an error if the package definition cannot be parsed or the platform is invalid.
 pub fn run(args: InspectCommand) -> Result<()> {
     let platform = match args.platform {
         Some(p) => p,
@@ -36,8 +40,8 @@ pub fn run(args: InspectCommand) -> Result<()> {
 
     let file_path = args.package_file.to_str().ok_or_else(|| {
         anyhow!(
-            "Path contains invalid UTF-8 characters: {:?}",
-            args.package_file
+            "Path contains invalid UTF-8 characters: {}",
+            args.package_file.display()
         )
     })?;
 
@@ -51,7 +55,7 @@ pub fn run(args: InspectCommand) -> Result<()> {
 
     if args.json {
         let json = serde_json::to_string_pretty(&package)?;
-        println!("{}", json);
+        println!("{json}");
     } else {
         println!(
             "{} {} - {}",

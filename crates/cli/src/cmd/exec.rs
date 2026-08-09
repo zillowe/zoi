@@ -5,7 +5,7 @@
 
 use crate::pkg::{install, local};
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use indicatif::MultiProgress;
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
@@ -18,7 +18,19 @@ use std::sync::Mutex;
 ///
 /// Temporarily installs a package if necessary and executes a binary from it.
 /// Ephemeral packages are cleaned up after execution.
-pub fn run(source: String, bin: Option<String>, args: Vec<String>, verbose: bool) -> Result<()> {
+///
+/// # Panics
+///
+/// This function may panic if internal mutexes are poisoned.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Package resolution fails.
+/// - Installation of temporary packages fails.
+/// - Execution of the binary fails.
+/// - Cleanup of ephemeral packages fails.
+pub fn run(source: &str, bin: Option<String>, args: &[String], verbose: bool) -> Result<()> {
     if verbose {
         println!("{} Resolving package...", "::".bold().blue());
     }
@@ -29,7 +41,7 @@ pub fn run(source: String, bin: Option<String>, args: Vec<String>, verbose: bool
         .collect();
 
     let (graph, _non_zoi_deps) = install::resolver::resolve_dependency_graph(
-        &[source],
+        &[source.to_string()],
         None,
         false,
         true,
@@ -59,14 +71,12 @@ pub fn run(source: String, bin: Option<String>, args: Vec<String>, verbose: bool
             .try_for_each(|pkg_id| -> Result<()> {
                 let node = graph.nodes.get(pkg_id).ok_or_else(|| {
                     anyhow!(
-                        "Package node missing from graph for '{}' during preparation",
-                        pkg_id
+                        "Package node missing from graph for '{pkg_id}' during preparation"
                     )
                 })?;
                 let action = install_plan.get(pkg_id).ok_or_else(|| {
                     anyhow!(
-                        "Install action missing for package '{}' during preparation",
-                        pkg_id
+                        "Install action missing for package '{pkg_id}' during preparation"
                     )
                 })?;
 
@@ -74,7 +84,7 @@ pub fn run(source: String, bin: Option<String>, args: Vec<String>, verbose: bool
                     install::installer::prepare_node(node, action, Some(&m_prep), None, verbose)?;
 
                 let mut lock = prepared_nodes.lock().map_err(|e| {
-                    anyhow!("Prepared nodes mutex poisoned during preparation: {}", e)
+                    anyhow!("Prepared nodes mutex poisoned during preparation: {e}")
                 })?;
                 lock.insert(pkg_id.clone(), prepared);
                 Ok(())
@@ -98,15 +108,15 @@ pub fn run(source: String, bin: Option<String>, args: Vec<String>, verbose: bool
                 let node = graph
                     .nodes
                     .get(&pkg_id)
-                    .ok_or_else(|| anyhow!("Package node missing from graph for '{}'", pkg_id))?;
+                    .ok_or_else(|| anyhow!("Package node missing from graph for '{pkg_id}'"))?;
 
                 let prepared = {
                     let lock = prepared_nodes.lock().map_err(|e| {
-                        anyhow!("Prepared nodes mutex poisoned during install: {}", e)
+                        anyhow!("Prepared nodes mutex poisoned during install: {e}")
                     })?;
                     lock.get(&pkg_id)
                         .cloned()
-                        .ok_or_else(|| anyhow!("Prepared node missing for: {}", pkg_id))?
+                        .ok_or_else(|| anyhow!("Prepared node missing for: {pkg_id}"))?
                 };
 
                 let manifest = install::installer::install_prepared_node(
@@ -119,12 +129,16 @@ pub fn run(source: String, bin: Option<String>, args: Vec<String>, verbose: bool
                     verbose,
                 )?;
 
-                let mut session_lock = session_installed_mutex.lock().unwrap();
+                let mut session_lock = session_installed_mutex.lock().map_err(|e| {
+                    anyhow!("Session installed mutex poisoned: {e}")
+                })?;
                 session_lock.push(manifest);
                 Ok(())
             })?;
         }
-        session_installed = session_installed_mutex.into_inner().unwrap();
+        session_installed = session_installed_mutex.into_inner().map_err(|e| {
+            anyhow!("Session installed mutex poisoned: {e}")
+        })?;
     }
 
     let root_ids: Vec<&String> = graph
@@ -140,23 +154,22 @@ pub fn run(source: String, bin: Option<String>, args: Vec<String>, verbose: bool
         .get(*root_id)
         .ok_or_else(|| anyhow!("Root package node not found"))?;
 
-    let bin_name = match bin {
-        Some(name) => name,
-        None => {
-            let bins = node
-                .pkg
-                .bins
-                .as_ref()
-                .ok_or_else(|| anyhow!("Package '{}' provides no binaries", node.pkg.name))?;
-            if bins.len() == 1 {
-                bins[0].clone()
-            } else {
-                return Err(anyhow!(
-                    "Package '{}' provides multiple binaries ({}). Use --bin to specify which to run.",
-                    node.pkg.name,
-                    bins.join(", ")
-                ));
-            }
+    let bin_name = if let Some(name) = bin { name } else {
+        let bins = node
+            .pkg
+            .bins
+            .as_ref()
+            .ok_or_else(|| anyhow!("Package '{}' provides no binaries", node.pkg.name))?;
+        if bins.len() == 1 {
+            bins.first()
+                .ok_or_else(|| anyhow!("Package '{}' binaries list is empty", node.pkg.name))?
+                .clone()
+        } else {
+            return Err(anyhow!(
+                "Package '{}' provides multiple binaries ({}). Use --bin to specify which to run.",
+                node.pkg.name,
+                bins.join(", ")
+            ));
         }
     };
 
@@ -251,7 +264,7 @@ pub fn run(source: String, bin: Option<String>, args: Vec<String>, verbose: bool
             crate::sandbox::wrap_command_in_root(
                 &root,
                 &exe_inside_root,
-                &args,
+                args,
                 &envs,
                 &extra_binds,
                 false,
@@ -262,10 +275,10 @@ pub fn run(source: String, bin: Option<String>, args: Vec<String>, verbose: bool
             if verbose {
                 println!("{} Sandboxing with bwrap.", "::".bold().yellow());
             }
-            crate::sandbox::wrap_command(&actual_bin_path, &args, sandbox_config, &version_dir)?
+            crate::sandbox::wrap_command(&actual_bin_path, args, sandbox_config, &version_dir)?
         } else {
             let mut c = Command::new(&actual_bin_path);
-            c.args(&args);
+            c.args(args);
             c.envs(&envs);
             c
         }
@@ -293,7 +306,7 @@ pub fn run(source: String, bin: Option<String>, args: Vec<String>, verbose: bool
             let version_dir = match get_version_dir_from_manifest(&manifest) {
                 Ok(d) => d,
                 Err(e) => {
-                    eprintln!("Warning: failed to resolve path for {}: {}", ident, e);
+                    eprintln!("Warning: failed to resolve path for {ident}: {e}");
                     continue;
                 }
             };
@@ -301,11 +314,13 @@ pub fn run(source: String, bin: Option<String>, args: Vec<String>, verbose: bool
                 && let Err(e) = fs::remove_dir_all(&version_dir)
             {
                 eprintln!(
-                    "Warning: failed to cleanup ephemeral package {}: {}",
-                    ident, e
+                    "Warning: failed to cleanup ephemeral package {ident}: {e}"
                 );
             }
-            let package_dir = version_dir.parent().unwrap().to_path_buf();
+            let package_dir = version_dir
+                .parent()
+                .expect("Version directory must have a parent")
+                .to_path_buf();
             if let Ok(mut entries) = fs::read_dir(&package_dir) {
                 let has_other_entries = entries.any(|e| {
                     e.as_ref()
