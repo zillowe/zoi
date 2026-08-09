@@ -48,8 +48,12 @@ struct App<'a> {
     content_height: u16,
 }
 
-impl<'a> App<'a> {
+impl App<'_> {
     /// Tries to create a new TUI app from a map of page names to content.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if parsing any page fails or if no pages are provided.
     fn try_new(pages: BTreeMap<String, String>) -> Result<Self> {
         let mut parsed_pages = Vec::new();
         for (name, content) in pages {
@@ -61,7 +65,7 @@ impl<'a> App<'a> {
             return Err(anyhow!("No manual pages found."));
         }
 
-        let content_height = parsed_pages[0].1.len() as u16;
+        let content_height = u16::try_from(parsed_pages.first().map_or(0, |p| p.1.len())).unwrap_or(u16::MAX);
         Ok(Self {
             pages: parsed_pages,
             current_page: 0,
@@ -72,10 +76,17 @@ impl<'a> App<'a> {
 }
 
 /// Runs the manual page viewer for the specified package.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The package cannot be resolved.
+/// - Manual pages cannot be gathered.
+/// - The terminal cannot be initialized.
 pub fn run(package_name: &str, upstream: bool, raw: bool, no_tui: bool) -> Result<()> {
     let (pkg, registry_handle) = resolve_package_for_man(package_name)?;
 
-    let pages = gather_manual_pages(&pkg, &registry_handle, upstream, raw)?;
+    let pages = gather_manual_pages(&pkg, registry_handle.as_deref(), upstream, raw)?;
 
     if pages.is_empty() {
         return Err(anyhow!(
@@ -88,24 +99,26 @@ pub fn run(package_name: &str, upstream: bool, raw: bool, no_tui: bool) -> Resul
         let multi = pages.len() > 1;
         for (name, content) in pages {
             if multi {
-                println!("--- {} ---", name);
+                println!("--- {name} ---");
             }
-            println!("{}", content);
+            println!("{content}");
         }
         return Ok(());
     }
 
     if no_tui {
+        use std::fmt::Write;
         let mut full_content = String::new();
         let multi = pages.len() > 1;
         for (name, content) in pages {
             if multi {
-                full_content.push_str(&format!("--- {} ---\n\n", name));
+                let _ = writeln!(full_content, "--- {name} ---\n");
             }
             full_content.push_str(&content);
             full_content.push('\n');
         }
-        return run_pager(&full_content);
+        run_pager(&full_content);
+        return Ok(());
     }
 
     enable_raw_mode()?;
@@ -126,48 +139,50 @@ pub fn run(package_name: &str, upstream: bool, raw: bool, no_tui: bool) -> Resul
     terminal.show_cursor()?;
 
     if let Err(err) = res {
-        eprintln!("{:?}", err)
+        eprintln!("{err:?}");
     }
 
     Ok(())
 }
 
 /// Runs a pager to display the given content.
-fn run_pager(content: &str) -> Result<()> {
+fn run_pager(content: &str) {
     let pager = std::env::var("PAGER").ok();
 
     if let Some(p) = pager
         && spawn_pager(&p, content).is_ok()
     {
-        return Ok(());
+        return;
     }
 
     if spawn_pager("less", content).is_ok() {
-        return Ok(());
+        return;
     }
 
     if spawn_pager("more", content).is_ok() {
-        return Ok(());
+        return;
     }
 
-    println!("{}", content);
-    Ok(())
+    println!("{content}");
 }
 
 /// Spawns a specific pager process and writes content to its stdin.
+///
+/// # Errors
+///
+/// Returns an error if the pager fails to spawn or if writing to its stdin fails.
 fn spawn_pager(pager: &str, content: &str) -> Result<()> {
     let mut child = std::process::Command::new(pager)
         .stdin(std::process::Stdio::piped())
         .spawn()
-        .map_err(|e| anyhow!("Failed to spawn pager '{}': {}", pager, e))?;
+        .map_err(|e| anyhow!("Failed to spawn pager '{pager}': {e}"))?;
 
     let mut stdin = child
         .stdin
         .take()
         .ok_or_else(|| anyhow!("Failed to open stdin for pager"))?;
 
-    use std::io::Write;
-    stdin.write_all(content.as_bytes())?;
+    io::Write::write_all(&mut stdin, content.as_bytes())?;
     drop(stdin);
 
     child.wait()?;
@@ -175,6 +190,12 @@ fn spawn_pager(pager: &str, content: &str) -> Result<()> {
 }
 
 /// Resolves a package and optional registry handle for a given search term.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The package or binary cannot be found.
+/// - The project configuration cannot be read.
 pub fn resolve_package_for_man(term: &str) -> Result<(types::Package, Option<String>)> {
     if let Ok((pkg, _, _, _, registry_handle, _, _)) =
         resolve::resolve_package_and_version(term, None, false, false)
@@ -193,29 +214,34 @@ pub fn resolve_package_for_man(term: &str) -> Result<(types::Package, Option<Str
 
     for handle in registries {
         if let Ok(results) = db::find_provides(&handle, term)
-            && !results.is_empty()
+            && let Some(result) = results.first()
         {
-            return Ok((results[0].0.clone(), Some(handle)));
+            return Ok((result.0.clone(), Some(handle)));
         }
     }
 
     Err(anyhow!(
-        "Could not find package or binary named '{}'.",
-        term
+        "Could not find package or binary named '{term}'."
     ))
 }
 
 /// Gathers manual pages for a package, checking locally and then upstream.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Local manual pages cannot be found.
+/// - Upstream manual pages cannot be gathered.
 pub fn gather_manual_pages(
     pkg: &types::Package,
-    registry_handle: &Option<String>,
+    registry_handle: Option<&str>,
     upstream: bool,
     raw: bool,
 ) -> Result<BTreeMap<String, String>> {
     let mut pages = BTreeMap::new();
 
     if !upstream {
-        let handle = registry_handle.as_deref().unwrap_or("local");
+        let handle = registry_handle.unwrap_or("local");
         let scopes_to_check = [
             types::Scope::Project,
             types::Scope::User,
@@ -230,8 +256,7 @@ pub fn gather_manual_pages(
                     if !local_pages.is_empty() {
                         if !raw {
                             println!(
-                                "Displaying locally installed manual from {:?} scope...",
-                                scope
+                                "Displaying locally installed manual from {scope:?} scope..."
                             );
                         }
                         pages.extend(local_pages);
@@ -269,6 +294,10 @@ pub fn gather_manual_pages(
 }
 
 /// Recursively finds manual pages in a directory hierarchy.
+///
+/// # Errors
+///
+/// Returns an error if directory traversal or file reading fails.
 fn find_man_pages_in_hierarchy(root: &Path, term: &str) -> Result<BTreeMap<String, String>> {
     let mut pages = BTreeMap::new();
     if !root.exists() {
@@ -296,16 +325,26 @@ fn find_man_pages_in_hierarchy(root: &Path, term: &str) -> Result<BTreeMap<Strin
 }
 
 /// Fetches manual pages for a package from the upstream registry.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Dependency resolution fails.
+/// - The package archive cannot be downloaded or extracted.
+/// - File reading fails.
+///
+/// # Panics
+///
+/// Panics if the internal dependency graph is inconsistent.
 fn gather_manual_pages_from_upstream(
     pkg: &types::Package,
-    registry_handle: &Option<String>,
+    registry_handle: Option<&str>,
 ) -> Result<BTreeMap<String, String>> {
     // Resolve the package to get its archive source
-    let source = if let Some(handle) = registry_handle {
-        format!("#{}@{}", handle, pkg.name)
-    } else {
-        pkg.name.clone()
-    };
+    let source = registry_handle.map_or_else(
+        || pkg.name.clone(),
+        |handle| format!("#{}@{}", handle, pkg.name),
+    );
 
     let (mut graph, _) = crate::pkg::install::resolver::resolve_dependency_graph(
         &[source],
@@ -322,8 +361,16 @@ fn gather_manual_pages_from_upstream(
         return Ok(BTreeMap::new());
     }
 
-    let node_id = graph.nodes.keys().next().unwrap().clone();
-    let node = graph.nodes.remove(&node_id).unwrap();
+    let node_id = graph
+        .nodes
+        .keys()
+        .next()
+        .expect("Graph should not be empty")
+        .clone();
+    let node = graph
+        .nodes
+        .remove(&node_id)
+        .expect("Node should exist in graph");
 
     let install_plan = crate::pkg::install::plan::create_install_plan(
         &HashMap::from([(node_id.clone(), node.clone())]),
@@ -376,12 +423,11 @@ fn gather_manual_pages_from_upstream(
                         let pool_file = pool_dir.join(&file.hash);
                         if pool_file.exists() {
                             let content = fs::read_to_string(pool_file)?;
-                            let display_name = format!(
-                                "{}[{}:{:?}]",
-                                Path::new(&file.dest).file_name().unwrap().to_string_lossy(),
-                                sub_name,
-                                scope
-                            );
+                            let file_name = Path::new(&file.dest)
+                                .file_name()
+                                .expect("Dest should have a file name")
+                                .to_string_lossy();
+                            let display_name = format!("{file_name}[{sub_name}:{scope:?}]");
                             pages.insert(
                                 display_name,
                                 if content.starts_with('.') {
@@ -430,9 +476,13 @@ fn find_local_man_pages(latest_dir: &Path) -> Result<BTreeMap<String, String>> {
                 let entry = entry?;
                 if entry.file_type().is_file() {
                     let path = entry.path();
-                    let name = path.file_name().unwrap().to_string_lossy().to_string();
+                    let name = path
+                        .file_name()
+                        .expect("Path should have a file name")
+                        .to_string_lossy()
+                        .to_string();
                     let content = fs::read_to_string(path)?;
-                    if name.ends_with(".md") {
+                    if name.to_lowercase().ends_with(".md") {
                         pages.insert(name, content);
                     } else if content.starts_with('.') {
                         pages.insert(name, parse_roff(&content));
@@ -448,31 +498,33 @@ fn find_local_man_pages(latest_dir: &Path) -> Result<BTreeMap<String, String>> {
 }
 
 /// Parses a ROFF-formatted string (traditional man page) into a simplified Markdown string.
+#[must_use]
 pub fn parse_roff(content: &str) -> String {
+    use std::fmt::Write;
     let mut md = String::new();
     for line in content.lines() {
         let line = line.trim();
         if line.starts_with(".TH") {
             let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.len() > 1 {
-                md.push_str(&format!("# {}\n\n", parts[1]));
+            if let Some(part) = parts.get(1) {
+                let _ = writeln!(md, "# {part}\n");
             }
         } else if line.starts_with(".SH") {
             let title = line.trim_start_matches(".SH").trim();
-            md.push_str(&format!("## {}\n\n", title));
+            let _ = writeln!(md, "## {title}\n");
         } else if line.starts_with(".SS") {
             let title = line.trim_start_matches(".SS").trim();
-            md.push_str(&format!("### {}\n\n", title));
+            let _ = writeln!(md, "### {title}\n");
         } else if line.starts_with(".PP") || line.starts_with(".P") || line.starts_with(".LP") {
             md.push_str("\n\n");
         } else if line.starts_with(".B ") {
-            md.push_str(&format!("**{}**", line.trim_start_matches(".B ").trim()));
+            let _ = write!(md, "**{}**", line.trim_start_matches(".B ").trim());
         } else if line.starts_with(".I ") {
-            md.push_str(&format!("*{}*", line.trim_start_matches(".I ").trim()));
+            let _ = write!(md, "*{}*", line.trim_start_matches(".I ").trim());
         } else if line.starts_with(".BR ") {
             let parts: Vec<&str> = line.split_whitespace().skip(1).collect();
-            if !parts.is_empty() {
-                md.push_str(&format!("**{}**", parts[0]));
+            if let Some(first) = parts.first() {
+                let _ = write!(md, "**{first}**");
                 for p in parts.iter().skip(1) {
                     md.push_str(p);
                 }
@@ -511,7 +563,12 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) 
                 KeyCode::Tab => {
                     app.current_page = (app.current_page + 1) % app.pages.len();
                     app.scroll = 0;
-                    app.content_height = app.pages[app.current_page].1.len() as u16;
+                    app.content_height = u16::try_from(
+                        app.pages
+                            .get(app.current_page)
+                            .map_or(0, |p| p.1.len()),
+                    )
+                    .unwrap_or(u16::MAX);
                 }
                 KeyCode::BackTab => {
                     app.current_page = if app.current_page == 0 {
@@ -520,7 +577,12 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) 
                         app.current_page - 1
                     };
                     app.scroll = 0;
-                    app.content_height = app.pages[app.current_page].1.len() as u16;
+                    app.content_height = u16::try_from(
+                        app.pages
+                            .get(app.current_page)
+                            .map_or(0, |p| p.1.len()),
+                    )
+                    .unwrap_or(u16::MAX);
                 }
                 _ => {}
             },
@@ -566,20 +628,24 @@ fn ui(f: &mut Frame, app: &mut App) {
             .highlight_style(Style::default().add_modifier(Modifier::BOLD))
             .highlight_symbol("> ");
 
-        f.render_widget(list, chunks[0]);
-        chunks[1]
+        if let Some(sidebar_chunk) = chunks.first() {
+            f.render_widget(list, *sidebar_chunk);
+        }
+        chunks.get(1).copied().unwrap_or(size)
     } else {
         size
     };
 
-    let (name, lines) = &app.pages[app.current_page];
+    let Some((name, lines)) = app.pages.get(app.current_page) else {
+        return;
+    };
     let text = Text::from(lines.clone());
 
     let paragraph = Paragraph::new(text)
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(format!("Manual: {}", name)),
+                .title(format!("Manual: {name}")),
         )
         .wrap(Wrap { trim: true })
         .scroll((app.scroll, 0));
@@ -604,6 +670,16 @@ fn ui(f: &mut Frame, app: &mut App) {
 }
 
 /// Parses Markdown content into TUI lines.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - A style stack underflow occurs.
+/// - Syntax highlighting fails.
+///
+/// # Panics
+///
+/// Panics if a style stack invariant is violated.
 fn parse_markdown(content: &str) -> Result<Vec<Line<'static>>> {
     let mut options = Options::empty();
     options.insert(Options::ENABLE_STRIKETHROUGH);
@@ -622,7 +698,6 @@ fn parse_markdown(content: &str) -> Result<Vec<Line<'static>>> {
     for event in parser {
         match event {
             CmarkEvent::Start(tag) => match tag {
-                Tag::Paragraph => {}
                 Tag::Heading { level, .. } => {
                     style_stack.push(
                         Style::default()
@@ -655,10 +730,11 @@ fn parse_markdown(content: &str) -> Result<Vec<Line<'static>>> {
                         "text".to_string()
                     };
                     if let Some(syntax) = ss.find_syntax_by_extension(&lang) {
-                        highlighter = Some((
-                            HighlightLines::new(syntax, &ts.themes["base16-ocean.dark"]),
-                            String::new(),
-                        ));
+                        if let Some(theme) = ts.themes.get("base16-ocean.dark") {
+                            highlighter = Some((HighlightLines::new(syntax, theme), String::new()));
+                        } else {
+                            highlighter = None;
+                        }
                     } else {
                         highlighter = None;
                     }
@@ -670,7 +746,7 @@ fn parse_markdown(content: &str) -> Result<Vec<Line<'static>>> {
                     let list_len = list_stack.len();
                     if let Some((index, _)) = list_stack.last_mut() {
                         let marker = if *index > 0 {
-                            format!("{}. ", index)
+                            format!("{index}. ")
                         } else {
                             "* ".to_string()
                         };
@@ -727,7 +803,7 @@ fn parse_markdown(content: &str) -> Result<Vec<Line<'static>>> {
                             for line in LinesWithEndings::from(&code) {
                                 let ranges: Vec<(SyntectStyle, &str)> = h
                                     .highlight_line(line, &ss)
-                                    .map_err(|e| anyhow!("Syntax highlighting failed: {}", e))?;
+                                    .map_err(|e| anyhow!("Syntax highlighting failed: {e}"))?;
                                 let spans: Vec<Span<'static>> = ranges
                                     .into_iter()
                                     .map(|(style, text)| {
@@ -758,7 +834,7 @@ fn parse_markdown(content: &str) -> Result<Vec<Line<'static>>> {
                     TagEnd::Link => {
                         style_stack.pop();
                         current_line.push(Span::styled(
-                            format!("]({})", link_url),
+                            format!("]({link_url})"),
                             Style::default().fg(Color::DarkGray),
                         ));
                         link_url.clear();

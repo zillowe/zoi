@@ -8,6 +8,13 @@ const ZOI_LUA_DEFINITIONS: &str = include_str!("./builtin/lsp/zoi.lua");
 /// Sets up the LSP workspace for Zoi package development.
 ///
 /// This creates the necessary Lua definitions and a `.luarc.json` file in the given path.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The LSP definitions directory cannot be created.
+/// - The `zoi.lua` definition file cannot be written.
+/// - The `.luarc.json` file cannot be written.
 pub fn setup_lsp_workspace(path: &Path) -> Result<()> {
     let lsp_dir = get_lsp_definitions_dir()?;
     fs::create_dir_all(&lsp_dir)?;
@@ -25,6 +32,10 @@ pub fn setup_lsp_workspace(path: &Path) -> Result<()> {
 }
 
 /// Returns the directory where Zoi LSP definitions are stored.
+///
+/// # Errors
+///
+/// Returns an error if the user's home directory cannot be found.
 pub fn get_lsp_definitions_dir() -> Result<PathBuf> {
     let home_dir = zoi_core::utils::get_user_home()
         .ok_or_else(|| anyhow!("Could not find home directory."))?;

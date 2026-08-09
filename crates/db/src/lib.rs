@@ -10,14 +10,18 @@ use zoi_core::types;
 use zoi_resolver::resolve::{get_db_root, get_host_db_root};
 
 /// Gets the path to the database for a specific registry.
+///
+/// # Errors
+///
+/// Returns an error if the database root directory cannot be determined.
 pub fn get_db_path(registry_handle: &str) -> Result<PathBuf> {
     let target_root = get_db_root()?;
-    let target_path = target_root.join(format!("{}.db", registry_handle));
+    let target_path = target_root.join(format!("{registry_handle}.db"));
 
     if !target_path.exists() && zoi_core::sysroot::get_sysroot().is_some() {
         // Fallback to host metadata for bootstrapping
         let host_root = get_host_db_root()?;
-        let host_path = host_root.join(format!("{}.db", registry_handle));
+        let host_path = host_root.join(format!("{registry_handle}.db"));
 
         if host_path.exists() {
             if let Some(parent) = target_path.parent() {
@@ -32,17 +36,25 @@ pub fn get_db_path(registry_handle: &str) -> Result<PathBuf> {
 }
 
 /// Opens a connection to the registry database and ensures the schema is set up.
+///
+/// # Errors
+///
+/// Returns an error if the database cannot be opened or if the schema setup fails.
 pub fn open_connection(registry_handle: &str) -> Result<Connection> {
     let conn = open_connection_no_setup(registry_handle)?;
     setup_schema(&conn)?;
     Ok(conn)
 }
 
-/// Opens a raw SQLite connection and configures high-performance pragmas.
+/// Opens a raw `SQLite` connection and configures high-performance pragmas.
 ///
 /// Performance Tuning:
 /// - `WAL` (Write-Ahead Logging): Allows concurrent readers and a single writer.
 /// - `NORMAL` Synchronous: Balanced safety and speed for registry metadata.
+///
+/// # Errors
+///
+/// Returns an error if the database cannot be opened or if PRAGMA configuration fails.
 pub fn open_connection_no_setup(registry_handle: &str) -> Result<Connection> {
     let db_path = get_db_path(registry_handle)?;
     if let Some(parent) = db_path.parent() {
@@ -69,7 +81,7 @@ pub fn open_connection_no_setup(registry_handle: &str) -> Result<Connection> {
 /// - `package_files`: Index of every file path provided by every package (used by `zoi provides`).
 /// - `package_advisories`: Security vulnerability database.
 ///
-/// FTS5 Search: Uses SQLite's virtual tables for sub-millisecond full-text
+/// FTS5 Search: Uses `SQLite`'s virtual tables for sub-millisecond full-text
 /// search across thousands of package descriptions and tags.
 fn setup_schema(conn: &Connection) -> Result<()> {
     conn.execute(
@@ -351,6 +363,10 @@ fn setup_schema(conn: &Connection) -> Result<()> {
 }
 
 /// Updates or inserts a package in the database.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or if the database execution fails.
 pub fn update_package(
     conn: &Connection,
     pkg: &types::Package,
@@ -363,10 +379,10 @@ pub fn update_package(
     let bins_json =
         serde_json::to_string(&pkg.bins.as_ref().unwrap_or(&vec![])).unwrap_or_default();
     let pkg_type = format!("{:?}", pkg.package_type).to_lowercase();
-    let scope_str = scope.map(|s| format!("{:?}", s).to_lowercase());
+    let scope_str = scope.map(|s| format!("{s:?}").to_lowercase());
     let reason_str = reason.map(|r| match r {
         types::InstallReason::Direct => "direct".to_string(),
-        types::InstallReason::Dependency { parent } => format!("dependency:{}", parent),
+        types::InstallReason::Dependency { parent } => format!("dependency:{parent}"),
     });
 
     let deps_json = if let Some(deps) = &pkg.dependencies {
@@ -418,6 +434,10 @@ pub fn update_package(
 }
 
 /// Retrieves the internal database ID for a package.
+///
+/// # Errors
+///
+/// Returns an error if the query fails or if the package is not found.
 pub fn get_package_id(
     conn: &Connection,
     name: &str,
@@ -434,6 +454,10 @@ pub fn get_package_id(
 }
 
 /// Updates the archive and installed sizes for a package.
+///
+/// # Errors
+///
+/// Returns an error if the database update fails.
 pub fn set_package_sizes(
     conn: &Connection,
     package_id: i64,
@@ -442,12 +466,20 @@ pub fn set_package_sizes(
 ) -> Result<()> {
     conn.execute(
         "UPDATE packages SET archive_size = ?1, installed_size = ?2 WHERE id = ?3",
-        params![archive_size as i64, installed_size as i64, package_id],
+        params![
+            archive_size as i64,
+            installed_size as i64,
+            package_id
+        ],
     )?;
     Ok(())
 }
 
 /// Updates the archive hash for a package.
+///
+/// # Errors
+///
+/// Returns an error if the database update fails.
 pub fn set_package_hash(conn: &Connection, package_id: i64, hash: &str) -> Result<()> {
     conn.execute(
         "UPDATE packages SET archive_hash = ?1 WHERE id = ?2",
@@ -457,6 +489,10 @@ pub fn set_package_hash(conn: &Connection, package_id: i64, hash: &str) -> Resul
 }
 
 /// Retrieves the archive hash for a package from the database.
+///
+/// # Errors
+///
+/// Returns an error if the database connection cannot be opened.
 pub fn get_package_hash_from_db(
     registry_handle: &str,
     name: &str,
@@ -478,6 +514,10 @@ pub fn get_package_hash_from_db(
 }
 
 /// Retrieves the archive and installed sizes for a package from the database.
+///
+/// # Errors
+///
+/// Returns an error if the database connection cannot be opened or the query fails.
 pub fn get_package_sizes_from_db(
     registry_handle: &str,
     name: &str,
@@ -492,7 +532,7 @@ pub fn get_package_sizes_from_db(
         let archive: Option<i64> = row.get(0)?;
         let installed: Option<i64> = row.get(1)?;
         match (archive, installed) {
-            (Some(a), Some(i)) => Ok(Some((a as u64, i as u64))),
+            (Some(a), Some(i)) => Ok(Some((a.cast_unsigned(), i.cast_unsigned()))),
             _ => Ok(None),
         }
     } else {
@@ -501,6 +541,10 @@ pub fn get_package_sizes_from_db(
 }
 
 /// Retrieves the list of files associated with a package from the database.
+///
+/// # Errors
+///
+/// Returns an error if the database connection cannot be opened or the query fails.
 pub fn get_package_files_from_db(
     registry_handle: &str,
     name: &str,
@@ -538,6 +582,10 @@ pub struct CompletionEntry {
 }
 
 /// Retrieves a list of packages suitable for shell completion.
+///
+/// # Errors
+///
+/// Returns an error if the database connection cannot be opened or the query fails.
 pub fn get_packages_for_completion(registry_handle: &str) -> Result<Vec<CompletionEntry>> {
     let conn = open_connection(registry_handle)?;
     let mut stmt =
@@ -560,6 +608,10 @@ pub fn get_packages_for_completion(registry_handle: &str) -> Result<Vec<Completi
 }
 
 /// Updates or inserts a security advisory in the database.
+///
+/// # Errors
+///
+/// Returns an error if serialization fails or if the database execution fails.
 pub fn update_advisory(
     conn: &Connection,
     advisory: &types::Advisory,
@@ -603,6 +655,10 @@ pub fn update_advisory(
 }
 
 /// Lists all security advisories in the database.
+///
+/// # Errors
+///
+/// Returns an error if the database connection cannot be opened or the query fails.
 pub fn list_all_advisories(registry_handle: &str) -> Result<Vec<(types::Advisory, String)>> {
     let conn = open_connection(registry_handle)?;
     let mut stmt = conn.prepare(
@@ -646,6 +702,10 @@ pub fn list_all_advisories(registry_handle: &str) -> Result<Vec<(types::Advisory
 }
 
 /// Retrieves all security advisories for a specific package.
+///
+/// # Errors
+///
+/// Returns an error if the database connection cannot be opened or the query fails.
 pub fn get_advisories_for_package(
     registry_handle: &str,
     package_name: &str,
@@ -704,6 +764,10 @@ pub fn get_advisories_for_package(
 }
 
 /// Indexes the files provided by a package.
+///
+/// # Errors
+///
+/// Returns an error if the database execution fails.
 pub fn index_package_files(conn: &Connection, package_id: i64, files: &[String]) -> Result<()> {
     let mut stmt = conn.prepare("INSERT INTO package_files (package_id, path) VALUES (?1, ?2)")?;
     for file in files {
@@ -713,6 +777,10 @@ pub fn index_package_files(conn: &Connection, package_id: i64, files: &[String])
 }
 
 /// Clears the file index for a specific package.
+///
+/// # Errors
+///
+/// Returns an error if the database execution fails.
 pub fn clear_package_files(conn: &Connection, package_id: i64) -> Result<()> {
     conn.execute(
         "DELETE FROM package_files WHERE package_id = ?1",
@@ -722,6 +790,10 @@ pub fn clear_package_files(conn: &Connection, package_id: i64) -> Result<()> {
 }
 
 /// Checks if a file path is owned by any package other than the specified one.
+///
+/// # Errors
+///
+/// Returns an error if the query fails.
 pub fn has_other_owners(conn: &Connection, path: &str, current_package_id: i64) -> Result<bool> {
     let count: i64 = conn.query_row(
         "SELECT count(*) FROM package_files WHERE path = ?1 AND package_id != ?2",
@@ -732,6 +804,10 @@ pub fn has_other_owners(conn: &Connection, path: &str, current_package_id: i64) 
 }
 
 /// Deletes a package from the database.
+///
+/// # Errors
+///
+/// Returns an error if the database execution fails.
 pub fn delete_package(
     conn: &Connection,
     name: &str,
@@ -739,7 +815,7 @@ pub fn delete_package(
     repo: &str,
     scope: Option<types::Scope>,
 ) -> Result<()> {
-    let scope_str = scope.map(|s| format!("{:?}", s).to_lowercase());
+    let scope_str = scope.map(|s| format!("{s:?}").to_lowercase());
     conn.execute(
         "DELETE FROM packages WHERE name = ?1 AND (sub_package IS ?2) AND repo = ?3 AND (scope IS ?4 OR scope IS NULL)",
         params![name, sub_package, repo, scope_str],
@@ -748,6 +824,10 @@ pub fn delete_package(
 }
 
 /// Clears all package and advisory data from the database.
+///
+/// # Errors
+///
+/// Returns an error if the database execution fails.
 pub fn clear_registry(conn: &Connection) -> Result<()> {
     conn.execute("DELETE FROM packages", [])?;
     conn.execute("DELETE FROM package_advisories", [])?;
@@ -755,7 +835,12 @@ pub fn clear_registry(conn: &Connection) -> Result<()> {
 }
 
 /// Finds packages that provide a specific command or file.
+///
+/// # Errors
+///
+/// Returns an error if the database connection or query fails.
 pub fn find_provides(registry_handle: &str, term: &str) -> Result<Vec<(types::Package, String)>> {
+
     let conn = open_connection(registry_handle)?;
 
     let mut stmt = conn.prepare(
@@ -803,12 +888,12 @@ pub fn find_provides(registry_handle: &str, term: &str) -> Result<Vec<(types::Pa
     let mut results = Vec::new();
     for row in rows {
         let (pkg, bins) = row?;
-        if !bins.is_empty() {
-            for bin in &bins {
-                results.push((pkg.clone(), format!("bin/{}", bin)));
-            }
+        if bins.is_empty() {
+            results.push((pkg, format!("bin/{term}")));
         } else {
-            results.push((pkg, format!("bin/{}", term)));
+            for bin in &bins {
+                results.push((pkg.clone(), format!("bin/{bin}")));
+            }
         }
     }
 
@@ -856,7 +941,7 @@ pub fn find_provides(registry_handle: &str, term: &str) -> Result<Vec<(types::Pa
         if let Some(bins) = &pkg.bins {
             for bin in bins {
                 if bin == term || bin.contains(term) {
-                    results.push((pkg.clone(), format!("bin/{}", bin)));
+                    results.push((pkg.clone(), format!("bin/{bin}")));
                 }
             }
         }
@@ -869,7 +954,7 @@ pub fn find_provides(registry_handle: &str, term: &str) -> Result<Vec<(types::Pa
          WHERE pf.path LIKE ?1 OR pf.path LIKE ?2",
     )?;
 
-    let path_like_query = format!("%/{}", term);
+    let path_like_query = format!("%/{term}");
     let exact_path_query = term.to_string();
 
     let rows = stmt.query_map(params![path_like_query, exact_path_query], |row| {
@@ -910,11 +995,9 @@ pub fn find_provides(registry_handle: &str, term: &str) -> Result<Vec<(types::Pa
     for row in rows {
         let (pkg, mut path): (types::Package, String) = row?;
         if let Some(stripped) = path.strip_prefix("data/pkgstore/") {
-            path = stripped.to_string();
-        } else if let Some(stripped) = path.strip_prefix("data/usrroot/") {
-            path = format!("/{}", stripped);
-        } else if let Some(stripped) = path.strip_prefix("data/usrhome/") {
-            path = format!("~/{}", stripped);
+            path = format!("/{stripped}");
+        } else if let Some(stripped) = path.strip_prefix("data/home/") {
+            path = format!("~/{stripped}");
         }
 
         results.push((pkg, path));
@@ -932,6 +1015,10 @@ pub fn find_provides(registry_handle: &str, term: &str) -> Result<Vec<(types::Pa
 }
 
 /// Searches for packages matching a search term.
+///
+/// # Errors
+///
+/// Returns an error if the database connection cannot be opened or the query fails.
 pub fn search_packages(registry_handle: &str, term: &str) -> Result<Vec<types::Package>> {
     let conn = open_connection(registry_handle)?;
     let mut stmt = conn.prepare(
@@ -941,8 +1028,8 @@ pub fn search_packages(registry_handle: &str, term: &str) -> Result<Vec<types::P
          OR name LIKE ?2",
     )?;
 
-    let search_query = format!("{}*", term);
-    let like_query = format!("%{}%", term);
+    let search_query = format!("{term}*");
+    let like_query = format!("%{term}%");
 
     let rows = stmt.query_map(params![search_query, like_query], |row| {
         let tags_raw: String = row.get(5)?;
@@ -986,9 +1073,13 @@ pub fn search_packages(registry_handle: &str, term: &str) -> Result<Vec<types::P
 }
 
 /// Searches for files matching a search term.
+///
+/// # Errors
+///
+/// Returns an error if the database connection cannot be opened or the query fails.
 pub fn search_files(registry_handle: &str, term: &str) -> Result<Vec<(types::Package, String)>> {
     let conn = open_connection(registry_handle)?;
-    let like_query = format!("%{}%", term);
+    let like_query = format!("%{term}%");
 
     let has_fts = conn
         .prepare("SELECT 1 FROM package_files_fts LIMIT 0")
@@ -1066,6 +1157,10 @@ pub fn search_files(registry_handle: &str, term: &str) -> Result<Vec<(types::Pac
 }
 
 /// Lists all packages in the database.
+///
+/// # Errors
+///
+/// Returns an error if the database connection cannot be opened or the query fails.
 pub fn list_all_packages(registry_handle: &str) -> Result<Vec<types::Package>> {
     let conn = open_connection(registry_handle)?;
     let mut stmt = conn.prepare(
@@ -1142,6 +1237,10 @@ pub fn list_all_packages(registry_handle: &str) -> Result<Vec<types::Package>> {
 }
 
 /// Retrieves all versions of a specific package from the database.
+///
+/// # Errors
+///
+/// Returns an error if the database connection cannot be opened or the query fails.
 pub fn get_all_versions(registry_handle: &str, name: &str, repo: &str) -> Result<Vec<String>> {
     let conn = open_connection(registry_handle)?;
     let mut stmt = conn.prepare("SELECT version FROM packages WHERE name = ?1 AND repo = ?2")?;
@@ -1154,6 +1253,10 @@ pub fn get_all_versions(registry_handle: &str, name: &str, repo: &str) -> Result
 }
 
 /// Retrieves the dependencies of a specific package version.
+///
+/// # Errors
+///
+/// Returns an error if the database connection cannot be opened or the query fails.
 pub fn get_package_dependencies(
     registry_handle: &str,
     name: &str,

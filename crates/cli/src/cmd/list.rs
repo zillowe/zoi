@@ -6,25 +6,38 @@
 use crate::pkg::{config, local, types};
 use anyhow::{Result, anyhow};
 use comfy_table::{Attribute, Cell, Color, ContentArrangement, Table, presets::UTF8_FULL};
+use rayon::prelude::*;
 use std::collections::HashSet;
 
 /// Runs the list command with the provided filters and options.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The package type filter is invalid.
+/// - The `--foreign` flag is used with `--all`.
+/// - There is an error reading the configuration or interacting with the database.
+/// - There is an error fetching installed or available packages.
+///
+/// # Panics
+///
+/// Panics if the `type_filter` is missing despite being set, which should not happen.
 pub fn run(
     all: bool,
     outdated: bool,
-    registry_filter: Option<String>,
-    repo_filter: Option<String>,
-    type_filter: Option<String>,
+    registry_filter: Option<&str>,
+    repo_filter: Option<&str>,
+    type_filter: Option<&str>,
     foreign: bool,
     names_only: bool,
     completion: bool,
 ) -> Result<()> {
-    let package_type = match type_filter.as_deref() {
+    let package_type = match type_filter {
         Some("package") => Some(types::PackageType::Package),
         Some("collection") => Some(types::PackageType::Collection),
         Some("app") => Some(types::PackageType::App),
         Some("extension") => Some(types::PackageType::Extension),
-        Some(other) => return Err(anyhow!("Invalid package type: {}", other)),
+        Some(other) => return Err(anyhow!("Invalid package type: {other}")),
         None => None,
     };
 
@@ -49,8 +62,8 @@ pub fn run(
 
 /// Lists outdated packages.
 fn run_list_outdated(
-    registry_filter: Option<String>,
-    repo_filter: Option<String>,
+    registry_filter: Option<&str>,
+    repo_filter: Option<&str>,
     type_filter: Option<types::PackageType>,
 ) -> Result<()> {
     let installed_packages = local::get_installed_packages()?;
@@ -70,17 +83,17 @@ fn run_list_outdated(
     let mut found_outdated = false;
 
     for manifest in installed_packages {
-        if let Some(registry_f) = &registry_filter
-            && manifest.registry_handle != *registry_f
+        if let Some(registry_f) = registry_filter
+            && manifest.registry_handle != registry_f
         {
             continue;
         }
 
-        if let Some(repo_f) = &repo_filter {
+        if let Some(repo_f) = repo_filter {
             let repo_matches = if repo_f.contains('/') {
-                manifest.repo == *repo_f
+                manifest.repo == repo_f
             } else {
-                manifest.repo.split('/').any(|part| part == *repo_f)
+                manifest.repo.split('/').any(|part| part == repo_f)
             };
             if !repo_matches {
                 continue;
@@ -109,16 +122,16 @@ fn run_list_outdated(
             crate::pkg::resolve::resolve_package_and_version(&source, None, true, false)
             && (manifest.version != new_version || manifest.revision != pkg.revision)
         {
-            let current_display = if manifest.revision != "1" {
-                format!("{}-{}", manifest.version, manifest.revision)
-            } else {
+            let current_display = if manifest.revision == "1" {
                 manifest.version.clone()
+            } else {
+                format!("{}-{}", manifest.version, manifest.revision)
             };
 
-            let latest_display = if pkg.revision != "1" {
-                format!("{}-{}", new_version, pkg.revision)
-            } else {
+            let latest_display = if pkg.revision == "1" {
                 new_version
+            } else {
+                format!("{}-{}", new_version, pkg.revision)
             };
 
             table.add_row(vec![
@@ -132,10 +145,10 @@ fn run_list_outdated(
         }
     }
 
-    if !found_outdated {
-        println!("No outdated packages found.");
+    if found_outdated {
+        println!("{table}");
     } else {
-        println!("{}", table);
+        println!("No outdated packages found.");
     }
 
     Ok(())
@@ -143,8 +156,8 @@ fn run_list_outdated(
 
 /// Lists installed packages.
 fn run_list_installed(
-    registry_filter: Option<String>,
-    repo_filter: Option<String>,
+    registry_filter: Option<&str>,
+    repo_filter: Option<&str>,
     type_filter: Option<types::PackageType>,
     foreign: bool,
 ) -> Result<()> {
@@ -158,12 +171,9 @@ fn run_list_installed(
     }
 
     let mut db_failed = false;
-    let packages_from_db = match crate::pkg::db::list_all_packages("local") {
-        Ok(pkgs) => pkgs,
-        Err(_) => {
-            db_failed = true;
-            Vec::new()
-        }
+    let packages_from_db = if let Ok(pkgs) = crate::pkg::db::list_all_packages("local") { pkgs } else {
+        db_failed = true;
+        Vec::new()
     };
 
     let mut table = Table::new();
@@ -189,17 +199,17 @@ fn run_list_installed(
                 continue;
             }
 
-            if let Some(registry_filter) = &registry_filter
-                && pkg.registry_handle.as_deref() != Some(registry_filter)
+            if let Some(reg_f) = registry_filter
+                && pkg.registry_handle.as_deref() != Some(reg_f)
             {
                 continue;
             }
 
-            if let Some(repo_filter) = &repo_filter {
-                let repo_matches = if repo_filter.contains('/') {
-                    pkg.repo == *repo_filter
+            if let Some(repo_f) = repo_filter {
+                let repo_matches = if repo_f.contains('/') {
+                    pkg.repo == repo_f
                 } else {
-                    pkg.repo.split('/').any(|part| part == *repo_filter)
+                    pkg.repo.split('/').any(|part| part == repo_f)
                 };
                 if !repo_matches {
                     continue;
@@ -219,14 +229,14 @@ fn run_list_installed(
                 pkg.name
             };
 
-            let version_display = if pkg.revision != "1" {
+            let version_display = if pkg.revision == "1" {
+                pkg.version.unwrap_or_else(|| "N/A".to_string())
+            } else {
                 format!(
                     "{}-{}",
                     pkg.version.as_deref().unwrap_or("N/A"),
                     pkg.revision
                 )
-            } else {
-                pkg.version.unwrap_or_else(|| "N/A".to_string())
             };
 
             let repo_display = &pkg.repo;
@@ -234,7 +244,7 @@ fn run_list_installed(
             table.add_row(vec![
                 Cell::new(package_display).fg(Color::Cyan),
                 Cell::new(version_display).fg(Color::Yellow),
-                Cell::new(repo_display.to_string()).fg(Color::Green),
+                Cell::new(repo_display.clone()).fg(Color::Green),
                 Cell::new(pkg.registry_handle.unwrap_or_else(|| "none".to_string()))
                     .fg(Color::DarkGrey),
                 Cell::new(format!("{:?}", pkg.package_type)).fg(Color::DarkGrey),
@@ -271,16 +281,16 @@ fn run_list_installed(
                 continue;
             }
 
-            if let Some(registry_filter) = &registry_filter
-                && m.registry_handle != *registry_filter
+            if let Some(reg_f) = registry_filter
+                && m.registry_handle != reg_f
             {
                 continue;
             }
-            if let Some(repo_filter) = &repo_filter {
-                let repo_matches = if repo_filter.contains('/') {
-                    pkg.repo == *repo_filter
+            if let Some(repo_f) = repo_filter {
+                let repo_matches = if repo_f.contains('/') {
+                    pkg.repo == repo_f
                 } else {
-                    pkg.repo.split('/').any(|part| part == *repo_filter)
+                    pkg.repo.split('/').any(|part| part == repo_f)
                 };
                 if !repo_matches {
                     continue;
@@ -300,10 +310,10 @@ fn run_list_installed(
                 pkg.name
             };
 
-            let version_display = if m.revision != "1" {
-                format!("{}-{}", pkg.version, m.revision)
-            } else {
+            let version_display = if m.revision == "1" {
                 pkg.version
+            } else {
+                format!("{}-{}", pkg.version, m.revision)
             };
 
             let repo_display = &pkg.repo;
@@ -311,7 +321,7 @@ fn run_list_installed(
             table.add_row(vec![
                 Cell::new(package_display).fg(Color::Cyan),
                 Cell::new(version_display).fg(Color::Yellow),
-                Cell::new(repo_display.to_string()).fg(Color::Green),
+                Cell::new(repo_display.clone()).fg(Color::Green),
                 Cell::new(m.registry_handle).fg(Color::DarkGrey),
                 Cell::new(format!("{:?}", pkg.package_type)).fg(Color::DarkGrey),
             ]);
@@ -319,10 +329,10 @@ fn run_list_installed(
         }
     }
 
-    if !found_packages {
-        println!("No installed packages match your criteria.");
+    if found_packages {
+        println!("{table}");
     } else {
-        println!("{}", table);
+        println!("No installed packages match your criteria.");
     }
 
     Ok(())
@@ -331,8 +341,8 @@ fn run_list_installed(
 /// Lists package names for completion or simple output.
 fn run_list_names(
     all: bool,
-    registry_filter: Option<String>,
-    repo_filter: Option<String>,
+    registry_filter: Option<&str>,
+    repo_filter: Option<&str>,
     type_filter: Option<types::PackageType>,
     completion: bool,
 ) -> Result<()> {
@@ -342,7 +352,7 @@ fn run_list_names(
     if all {
         let mut registries = Vec::new();
         if let Some(reg) = registry_filter {
-            registries.push(reg);
+            registries.push(reg.to_string());
         } else {
             if let Some(default) = &config.default_registry {
                 registries.push(default.handle.clone());
@@ -358,7 +368,7 @@ fn run_list_names(
             if let Ok(pkgs) = crate::pkg::db::get_packages_for_completion(&handle) {
                 let is_default = default_handle == Some(&handle);
                 for pkg in pkgs {
-                    if let Some(repo_f) = &repo_filter
+                    if let Some(repo_f) = repo_filter
                         && !pkg.repo.contains(repo_f)
                     {
                         continue;
@@ -371,7 +381,7 @@ fn run_list_names(
                     };
 
                     let name_with_sub = if let Some(sub) = &pkg.sub_package {
-                        format!("{}:{}", base_name, sub)
+                        format!("{base_name}:{sub}")
                     } else {
                         base_name
                     };
@@ -390,7 +400,7 @@ fn run_list_names(
             crate::pkg::db::list_all_packages("local")?
         } else {
             local::get_installed_packages()
-                .map(|v| v.into_iter().map(|m| m.into_package()).collect())?
+                .map(|v| v.into_iter().map(zoi_core::types::InstallManifest::into_package).collect())?
         };
 
         for pkg in installed {
@@ -400,14 +410,14 @@ fn run_list_names(
                 continue;
             }
 
-            if let Some(registry_f) = &registry_filter
-                && pkg.registry_handle.as_ref() != Some(registry_f)
+            if let Some(reg_f) = registry_filter
+                && pkg.registry_handle.as_deref() != Some(reg_f)
             {
                 continue;
             }
 
-            if let Some(repo_f) = &repo_filter
-                && pkg.repo != *repo_f
+            if let Some(repo_f) = repo_filter
+                && pkg.repo != repo_f
             {
                 continue;
             }
@@ -430,7 +440,7 @@ fn run_list_names(
     entries.sort();
     entries.dedup();
     for entry in entries {
-        println!("{}", entry);
+        println!("{entry}");
     }
 
     Ok(())
@@ -438,8 +448,8 @@ fn run_list_names(
 
 /// Lists all available packages from all active registries.
 fn run_list_all(
-    registry_filter: Option<String>,
-    repo_filter: Option<String>,
+    registry_filter: Option<&str>,
+    repo_filter: Option<&str>,
     type_filter: Option<types::PackageType>,
 ) -> Result<()> {
     let installed_pkgs = local::get_installed_packages()?
@@ -458,7 +468,7 @@ fn run_list_all(
     let mut all_available = Vec::new();
     let mut db_failed = false;
 
-    if let Some(reg_handle) = &registry_filter {
+    if let Some(reg_handle) = registry_filter {
         match crate::pkg::db::list_all_packages(reg_handle) {
             Ok(pkgs) => all_available.extend(pkgs),
             Err(_) => db_failed = true,
@@ -472,7 +482,6 @@ fn run_list_all(
             registries.push(reg.handle.clone());
         }
 
-        use rayon::prelude::*;
         let results: Vec<Result<Vec<types::Package>>> = registries
             .into_par_iter()
             .filter(|h| !h.is_empty())
@@ -480,12 +489,9 @@ fn run_list_all(
             .collect();
 
         for res in results {
-            match res {
-                Ok(pkgs) => all_available.extend(pkgs),
-                Err(_) => {
-                    db_failed = true;
-                    break;
-                }
+            if let Ok(pkgs) = res { all_available.extend(pkgs) } else {
+                db_failed = true;
+                break;
             }
         }
     }
@@ -493,13 +499,13 @@ fn run_list_all(
     let available_pkgs = if db_failed
         || (all_available.is_empty() && repo_filter.is_none() && registry_filter.is_none())
     {
-        if let Some(reg_handle) = &registry_filter {
+        if let Some(reg_handle) = registry_filter {
             let all_repo_names = config::get_all_repos()?;
             let full_repos: Vec<String> = all_repo_names
                 .into_iter()
-                .map(|r_name| format!("{}/{}", reg_handle, r_name))
+                .map(|r_name| format!("{reg_handle}/{r_name}"))
                 .filter(|full_repo_name| {
-                    if let Some(repo_f) = &repo_filter {
+                    if let Some(repo_f) = repo_filter {
                         if repo_f.contains('/') {
                             full_repo_name == repo_f
                         } else {
@@ -511,7 +517,7 @@ fn run_list_all(
                 })
                 .collect();
             local::get_packages_from_repos(&full_repos)?
-        } else if let Some(repo_filter) = &repo_filter {
+        } else if let Some(repo_f) = repo_filter {
             let handle = if let Some(reg) = &config.default_registry {
                 reg.handle.clone()
             } else {
@@ -525,12 +531,12 @@ fn run_list_all(
             let all_repo_names = config::get_all_repos()?;
             let repos_to_search: Vec<String> = all_repo_names
                 .into_iter()
-                .map(|r_name| format!("{}/{}", handle, r_name))
+                .map(|r_name| format!("{handle}/{r_name}"))
                 .filter(|full_repo_name| {
-                    if repo_filter.contains('/') {
-                        full_repo_name == repo_filter
+                    if repo_f.contains('/') {
+                        full_repo_name == repo_f
                     } else {
-                        full_repo_name.split('/').any(|part| part == repo_filter)
+                        full_repo_name.split('/').any(|part| part == repo_f)
                     }
                 })
                 .collect();
@@ -539,10 +545,10 @@ fn run_list_all(
             local::get_all_available_packages()?
         }
     } else {
-        if let Some(rf) = &repo_filter {
+        if let Some(rf) = repo_filter {
             all_available.retain(|p| {
                 if rf.contains('/') {
-                    p.repo == *rf
+                    p.repo == rf
                 } else {
                     p.repo.split('/').any(|part| part == rf)
                 }
@@ -551,14 +557,14 @@ fn run_list_all(
         all_available
     };
 
-    let handle_for_version = registry_filter.as_deref().or(config
+    let handle_for_version = registry_filter.or(config
         .default_registry
         .as_ref()
         .map(|reg| reg.handle.as_str()));
 
     if available_pkgs.is_empty() {
         if let Some(repo) = repo_filter {
-            println!("No packages found in repo '{}'.", repo);
+            println!("No packages found in repo '{repo}'.");
         } else {
             println!("No packages found in active repositories.");
         }
@@ -588,13 +594,13 @@ fn run_list_all(
         let version = crate::pkg::resolve::get_default_version(&pkg, handle_for_version)
             .unwrap_or_else(|_| "N/A".to_string());
 
-        let version_display = if pkg.revision != "1" {
-            format!("{}-{}", version, pkg.revision)
-        } else {
+        let version_display = if pkg.revision == "1" {
             version.clone()
+        } else {
+            format!("{}-{}", version, pkg.revision)
         };
 
-        let repo_display = pkg.repo.split_once('/').map(|x| x.1).unwrap_or(&pkg.repo);
+        let repo_display = pkg.repo.split_once('/').map_or(pkg.repo.as_str(), |x| x.1);
 
         let full_name = if let Some(sub) = &pkg.sub_package {
             format!("{}:{}", pkg.name, sub)
@@ -634,6 +640,6 @@ fn run_list_all(
         }
     }
 
-    println!("{}", table);
+    println!("{table}");
     Ok(())
 }

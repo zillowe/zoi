@@ -5,7 +5,7 @@ mod mini_resolve;
 
 use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
-use colored::*;
+use colored::Colorize;
 use zoi_core::types::Scope;
 use zoi_resolver::resolve::parse_source_string;
 
@@ -63,15 +63,18 @@ enum MiniCommands {
 /// Execution Model:
 /// Zoi Mini is designed for one-off installations. It sets `ZOI_MINI_MODE=1`,
 /// which tells the underlying Zoi engine to:
-/// - Bypass Local DB: Instead of querying the SQLite cache, it fetches
+/// - Bypass Local DB: Instead of querying the `SQLite` cache, it fetches
 ///   metadata and vulnerabilities directly from the registry over HTTP.
 /// - Skip Registry Sync: It does not require a local Git clone of the registry.
-fn main() -> Result<()> {
+fn main() {
     #[cfg(windows)]
     colored::control::set_virtual_terminal(true).ok();
 
     let args: Vec<String> = std::env::args().collect();
-    let program_name = std::path::Path::new(&args[0])
+    if args.is_empty() {
+        return;
+    }
+    let program_name = std::path::Path::new(args.first().expect("Args should not be empty"))
         .file_name()
         .and_then(|s| s.to_str())
         .unwrap_or_default();
@@ -81,11 +84,12 @@ fn main() -> Result<()> {
         && !program_name.starts_with("zoi-")
         && !program_name.contains("target")
     {
-        if let Err(e) = zoi_cli::pkg::shim::run_shim(program_name, args[1..].to_vec(), None, None) {
+        let shim_args = args.get(1..).unwrap_or(&[]).to_vec();
+        if let Err(e) = zoi_cli::pkg::shim::run_shim(program_name, shim_args, None, None) {
             eprintln!("{}: {}", "Shim Error".red().bold(), e);
             std::process::exit(1);
         }
-        return Ok(());
+        return;
     }
 
     let cli = MiniCli::parse();
@@ -109,7 +113,6 @@ fn main() -> Result<()> {
         );
         std::process::exit(1);
     }
-    Ok(())
 }
 
 /// Resolves and installs a package from the central registry.
@@ -136,7 +139,7 @@ fn install(package_spec: &str, yes: bool) -> Result<()> {
         let pkg_info = index
             .packages
             .get(&pkg_name)
-            .ok_or_else(|| anyhow!("Package '{}' not found in Zoidberg registry", pkg_name))?;
+            .ok_or_else(|| anyhow!("Package '{pkg_name}' not found in Zoidberg registry"))?;
 
         let is_repo_active = repo_config
             .repos
@@ -197,7 +200,7 @@ fn update(package_name: &str, yes: bool) -> Result<()> {
         let pkg_info = index
             .packages
             .get(&pkg_name)
-            .ok_or_else(|| anyhow!("Package '{}' not found in Zoidberg registry", pkg_name))?;
+            .ok_or_else(|| anyhow!("Package '{pkg_name}' not found in Zoidberg registry"))?;
 
         let is_repo_active = repo_config
             .repos

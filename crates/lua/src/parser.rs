@@ -57,7 +57,7 @@ pub fn parse_lua_package_from_archive_for_platform(
     let mut pkg_lua = None;
     for entry in WalkDir::new(temp_dir.path())
         .into_iter()
-        .filter_map(|e| e.ok())
+        .filter_map(Result::ok)
     {
         if entry.file_name().to_string_lossy().ends_with(".pkg.lua") {
             pkg_lua = Some(entry.path().to_path_buf());
@@ -88,9 +88,12 @@ pub fn parse_lua_package_for_platform(
     scope: Option<types::Scope>,
     quiet: bool,
 ) -> Result<types::Package> {
-    if file_path.ends_with(".zpa") || file_path.ends_with(".zsa") {
+    let path = Path::new(file_path);
+    if path.extension().is_some_and(|ext| {
+        ext.eq_ignore_ascii_case("zpa") || ext.eq_ignore_ascii_case("zsa")
+    }) {
         return parse_lua_package_from_archive_for_platform(
-            Path::new(file_path),
+            path,
             platform,
             version_override,
             scope,
@@ -127,14 +130,12 @@ fn parse_lua_package_from_file_for_platform(
         None,
         quiet,
     )
-    .map_err(|e| anyhow!("Failed to setup Lua environment for '{}': {}", file_path, e))?;
+    .map_err(|e| anyhow!("Failed to setup Lua environment for '{file_path}': {e}"))?;
 
     lua.load(&lua_code).exec().map_err(|e| {
         anyhow!(
-            "Failed to execute Lua package file '{}':
-{}",
-            file_path,
-            e
+            "Failed to execute Lua package file '{file_path}':
+{e}"
         )
     })?;
 
@@ -162,11 +163,7 @@ fn parse_lua_package_from_file_for_platform(
     let mut package: types::Package = lua
         .from_value(Value::Table(final_pkg_meta.clone()))
         .map_err(|e| {
-            anyhow!(
-                "Failed to parse 'metadata' block in package file '{}':\n{}",
-                file_path,
-                e
-            )
+            anyhow!("Failed to parse 'metadata' block in package file '{file_path}':\n{e}")
         })?;
 
     // Manually extract zoios field to handle boolean/nil correctly if needed,
@@ -177,11 +174,7 @@ fn parse_lua_package_from_file_for_platform(
         None
     } else {
         Some(lua.from_value(Value::Table(final_pkg_deps)).map_err(|e| {
-            anyhow!(
-                "Failed to parse 'dependencies' block in package file '{}':\n{}",
-                file_path,
-                e
-            )
+            anyhow!("Failed to parse 'dependencies' block in package file '{file_path}':\n{e}")
         })?)
     };
 
@@ -192,10 +185,8 @@ fn parse_lua_package_from_file_for_platform(
             lua.from_value(Value::Table(final_pkg_updates))
                 .map_err(|e| {
                     anyhow!(
-                        "Failed to parse 'updates' block in package file '{}':
-{}",
-                        file_path,
-                        e
+                        "Failed to parse 'updates' block in package file '{file_path}':
+{e}"
                     )
                 })?,
         )
@@ -206,10 +197,8 @@ fn parse_lua_package_from_file_for_platform(
     } else {
         Some(lua.from_value(Value::Table(final_pkg_hooks)).map_err(|e| {
             anyhow!(
-                "Failed to parse 'hooks' block in package file '{}':
-{}",
-                file_path,
-                e
+                "Failed to parse 'hooks' block in package file '{file_path}':
+{e}"
             )
         })?)
     };
@@ -221,10 +210,8 @@ fn parse_lua_package_from_file_for_platform(
             lua.from_value(Value::Table(final_pkg_service))
                 .map_err(|e| {
                     anyhow!(
-                        "Failed to parse 'service' block in package file '{}':
-{}",
-                        file_path,
-                        e
+                        "Failed to parse 'service' block in package file '{file_path}':
+{e}"
                     )
                 })?,
         )

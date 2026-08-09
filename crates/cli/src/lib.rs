@@ -74,6 +74,12 @@ fn to_install_scope(scope: Scope) -> cli::InstallScope {
 }
 
 /// Installs one or more packages from source strings (PURLs or names).
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The plugin manager fails to initialize.
+/// - The installation process fails.
 pub fn install_sources(sources: &[String], options: &SourceInstallOptions) -> Result<()> {
     let plugin_manager = if crate::pkg::utils::is_mini_mode() {
         None
@@ -95,7 +101,7 @@ pub fn install_sources(sources: &[String], options: &SourceInstallOptions) -> Re
         false,
         false,
         options.save,
-        options.build_type.clone(),
+        options.build_type.as_deref(),
         options.dry_run,
         pm_ptr,
         options.build,
@@ -110,6 +116,10 @@ pub fn install_sources(sources: &[String], options: &SourceInstallOptions) -> Re
 }
 
 /// Uninstalls a package by name.
+///
+/// # Errors
+///
+/// Returns an error if the uninstallation process fails.
 pub fn uninstall_package(package_name: &str, scope_override: Option<Scope>) -> Result<()> {
     zoi_uninstall::run(package_name, scope_override, false, false, false).map(|_| ())
 }

@@ -14,17 +14,17 @@ fn test_zoiignore_bundle() {
     ctx.set_env_var("HOME", &root);
 
     let pkg_dir = root.join("my-pkg");
-    fs::create_dir_all(&pkg_dir).unwrap();
+    fs::create_dir_all(&pkg_dir).expect("unwrap failed");
 
     let pkg_lua = pkg_dir.join("my-pkg.pkg.lua");
     let asset_file = pkg_dir.join("hello.txt");
     let ignore_file = pkg_dir.join("secret.txt");
     let zoiignore = pkg_dir.join(".zoiignore");
 
-    fs::write(&asset_file, "hello from asset").unwrap();
-    fs::write(&ignore_file, "top secret").unwrap();
-    fs::write(&zoiignore, "secret.txt\n*.tmp\n").unwrap();
-    fs::write(pkg_dir.join("temp.tmp"), "trash").unwrap();
+    fs::write(&asset_file, "hello from asset").expect("unwrap failed");
+    fs::write(&ignore_file, "top secret").expect("unwrap failed");
+    fs::write(&zoiignore, "secret.txt\n*.tmp\n").expect("unwrap failed");
+    fs::write(pkg_dir.join("temp.tmp"), "trash").expect("unwrap failed");
 
     let lua_code = r#"
 metadata({
@@ -42,7 +42,7 @@ function package()
     zcp("${pkgluadir}/temp.tmp", "${pkgstore}/temp.tmp")
 end
 "#;
-    fs::write(&pkg_lua, lua_code).unwrap();
+    fs::write(&pkg_lua, lua_code).expect("unwrap failed");
 
     // Bundle
     zoi::bundle_package(&pkg_lua, Some(&root), None, None, None).expect("bundling failed");
@@ -50,17 +50,17 @@ end
     assert!(zsa_path.exists(), ".zsa bundle should exist");
 
     // Inspect bundle contents
-    let file = fs::File::open(&zsa_path).unwrap();
-    let decoder = zstd::stream::read::Decoder::new(file).unwrap();
+    let file = fs::File::open(&zsa_path).expect("unwrap failed");
+    let decoder = zstd::stream::read::Decoder::new(file).expect("unwrap failed");
     let mut archive = tar::Archive::new(decoder);
 
     let mut found_hello = false;
     let mut found_secret = false;
     let mut found_temp = false;
 
-    for entry in archive.entries().unwrap() {
-        let entry = entry.unwrap();
-        let path = entry.path().unwrap();
+    for entry in archive.entries().expect("unwrap failed") {
+        let entry = entry.expect("unwrap failed");
+        let path = entry.path().expect("unwrap failed");
         let path_str = path.to_string_lossy();
 
         if path_str == "hello.txt" {

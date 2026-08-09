@@ -7,20 +7,27 @@ use tempfile::NamedTempFile;
 use zoi_core::types;
 
 /// Processes a lockfile and prepares a list of sources to install.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The lockfile cannot be read or parsed.
+/// - A temporary file cannot be created or written to.
+/// - The temporary file path contains invalid UTF-8.
 pub fn process_lockfile(
     lockfile_path: &str,
     sources_to_process: &mut Vec<String>,
     temp_files: &mut Vec<NamedTempFile>,
     scope: types::Scope,
 ) -> Result<()> {
-    println!("=> Installing packages from lockfile: {}", lockfile_path);
+    println!("=> Installing packages from lockfile: {lockfile_path}");
     let content = fs::read_to_string(lockfile_path)?;
     let lockfile: types::ZoiLockV2 = serde_json::from_str(&content)?;
 
     for (pkg_key, pkg) in lockfile.installed_packages {
         let name_with_sub = pkg_key.split('/').next_back().unwrap_or(&pkg_key);
         let name = name_with_sub.split(':').next().unwrap_or(name_with_sub);
-        let sub_package = name_with_sub.split(':').nth(1).map(|s| s.to_string());
+        let sub_package = name_with_sub.split(':').nth(1).map(std::string::ToString::to_string);
 
         let manifest = types::SharableInstallManifest {
             name: name.to_string(),

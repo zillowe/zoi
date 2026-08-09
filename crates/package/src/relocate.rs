@@ -5,7 +5,7 @@
 //! allowing them to find their shared libraries regardless of their install location.
 
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use elb::{DynamicTag, Elf, ElfPatcher};
 use std::ffi::CString;
 use std::fs::{self, OpenOptions};
@@ -18,6 +18,10 @@ use walkdir::WalkDir;
 ///
 /// This ensures that Zoi packages are "Relocatable": they can find their internal
 /// shared libraries regardless of where they are symlinked (e.g. system vs user scope).
+///
+/// # Errors
+///
+/// Returns an error if the staging directory cannot be walked or if ELF magic bytes cannot be read.
 pub fn relocate_elfs(staging_dir: &Path, quiet: bool) -> Result<()> {
     if !quiet {
         println!("{} Relocating ELF binaries...", "::".bold().blue());
@@ -25,7 +29,7 @@ pub fn relocate_elfs(staging_dir: &Path, quiet: bool) -> Result<()> {
 
     let mut relocated_count = 0;
 
-    for entry in WalkDir::new(staging_dir).into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new(staging_dir).into_iter().filter_map(Result::ok) {
         if !entry.file_type().is_file() {
             continue;
         }
@@ -42,10 +46,9 @@ pub fn relocate_elfs(staging_dir: &Path, quiet: bool) -> Result<()> {
                 Ok(false) => {}
                 Err(e) => {
                     eprintln!(
-                        "{} Failed to relocate {}: {}",
+                        "{} Failed to relocate {}: {e}",
                         "Warning:".yellow(),
                         path.display(),
-                        e
                     );
                 }
             }
@@ -54,9 +57,8 @@ pub fn relocate_elfs(staging_dir: &Path, quiet: bool) -> Result<()> {
 
     if !quiet && relocated_count > 0 {
         println!(
-            "{} Successfully relocated {} ELF file(s).",
+            "{} Successfully relocated {relocated_count} ELF file(s).",
             "::".bold().green(),
-            relocated_count
         );
     }
 
@@ -80,24 +82,24 @@ fn relocate_file(path: &Path, staging_dir: &Path) -> Result<bool> {
         .read(true)
         .write(true)
         .open(path)
-        .map_err(|e| anyhow!("Failed to open ELF for writing: {}", e))?;
+        .map_err(|e| anyhow!("Failed to open ELF for writing: {e}"))?;
 
     let page_size = 4096;
-    let elf = Elf::read(&mut file, page_size).map_err(|e| anyhow!("Failed to read ELF: {}", e))?;
+    let elf = Elf::read(&mut file, page_size).map_err(|e| anyhow!("Failed to read ELF: {e}"))?;
     let mut patcher = ElfPatcher::new(elf, file);
 
     let rpaths = calculate_rpaths(path, staging_dir);
     let rpath_string = rpaths.join(":");
-    let c_rpath = CString::new(rpath_string).map_err(|e| anyhow!("Invalid RPATH string: {}", e))?;
+    let c_rpath = CString::new(rpath_string).map_err(|e| anyhow!("Invalid RPATH string: {e}"))?;
 
     // MODERN: We set RUNPATH (DT_RUNPATH) which is preferred over RPATH.
     patcher
         .set_dynamic_tag(DynamicTag::Runpath, c_rpath.as_c_str())
-        .map_err(|e| anyhow!("Failed to set RUNPATH: {}", e))?;
+        .map_err(|e| anyhow!("Failed to set RUNPATH: {e}"))?;
 
     patcher
         .finish()
-        .map_err(|e| anyhow!("Failed to write relocated ELF: {}", e))?;
+        .map_err(|e| anyhow!("Failed to write relocated ELF: {e}"))?;
 
     Ok(true)
 }
@@ -133,7 +135,7 @@ fn find_rel_to_pkgstore(path: &Path, staging_dir: &Path) -> Option<std::path::Pa
     let mut current = path;
     while let Some(parent) = current.parent() {
         if parent.file_name().and_then(|s| s.to_str()) == Some("pkgstore") {
-            return path.strip_prefix(parent).ok().map(|p| p.to_path_buf());
+            return path.strip_prefix(parent).ok().map(std::path::Path::to_path_buf);
         }
         if parent == staging_dir {
             break;

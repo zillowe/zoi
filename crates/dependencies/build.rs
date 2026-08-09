@@ -76,7 +76,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     writeln!(
         &mut file,
-        "/// A map of supported package managers and their associated commands.\npub static MANAGERS: phf::Map<&'static str, ManagerCommands> = {};",
+        "/// A map of supported package managers and their associated commands.\n#[allow(clippy::unreadable_literal)]\npub static MANAGERS: phf::Map<&'static str, ManagerCommands> = {};",
         map.build()
     )?;
 

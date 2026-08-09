@@ -1,7 +1,7 @@
 //! Implementation of the `download` command for downloading package archives.
 
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use std::path::PathBuf;
 use zoi_core::cache;
 use zoi_install::resolver::resolve_dependency_graph;
@@ -17,8 +17,15 @@ pub enum DownloadType {
 }
 
 /// Runs the `download` command to download a package archive or source bundle.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The package cannot be resolved.
+/// - The requested download type (Archive or Source) is not available for the package.
+/// - The download fails or file system operations fail.
 pub fn run(
-    package_source: String,
+    package_source: &str,
     download_type: DownloadType,
     output_dir: Option<PathBuf>,
 ) -> Result<()> {
@@ -29,7 +36,7 @@ pub fn run(
     );
 
     let (graph, _) = resolve_dependency_graph(
-        std::slice::from_ref(&package_source),
+        &[package_source.to_string()],
         None,
         false,
         true,
@@ -40,7 +47,7 @@ pub fn run(
     )?;
 
     if graph.nodes.is_empty() {
-        return Err(anyhow!("Could not resolve package '{}'", package_source));
+        return Err(anyhow!("Could not resolve package '{package_source}'"));
     }
 
     // Find the direct package node

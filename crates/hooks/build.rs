@@ -34,7 +34,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     writeln!(
         &mut file,
-        "/// A list of built-in transaction hooks.\n///\n/// Each entry is a tuple of (hook_name, raw_yaml_content).\npub static BUILTIN_HOOKS: &[(&str, &str)] = &["
+        "/// A list of built-in transaction hooks.\n///\n/// Each entry is a tuple of (`hook_name`, `raw_yaml_content`).\npub static BUILTIN_HOOKS: &[(&str, &str)] = &["
     )?;
     for path in read_sorted_paths(&hooks_dir, "yaml")? {
         let name = path
@@ -42,7 +42,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .and_then(|s| s.to_str())
             .unwrap_or_default();
         let content = std::fs::read_to_string(&path)?;
-        writeln!(&mut file, "    ({:?}, {:?}),", name, content)?;
+        writeln!(&mut file, "    ({name:?}, {content:?}),")?;
     }
     writeln!(&mut file, "];")?;
 

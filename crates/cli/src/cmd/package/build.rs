@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use clap::Parser;
-use colored::*;
+use colored::Colorize;
 use std::path::PathBuf;
 
 /// Arguments for the `package build` command.
@@ -71,6 +71,10 @@ pub struct BuildCommand {
 }
 
 /// Run the package build command.
+///
+/// # Errors
+///
+/// Returns an error if the build fails, dependencies cannot be installed, or the pure environment cannot be initialized.
 pub fn run(mut args: BuildCommand) -> Result<()> {
     let mut _temp_root = None;
 
@@ -140,6 +144,10 @@ pub fn run(mut args: BuildCommand) -> Result<()> {
 }
 
 /// Install dependencies required for building the package.
+///
+/// # Errors
+///
+/// Returns an error if dependency installation fails or the platform cannot be determined.
 pub fn install_dependencies_for_build(args: &BuildCommand, include_test: bool) -> Result<()> {
     for platform in &args.platform {
         let current_platform = if platform == "current" {

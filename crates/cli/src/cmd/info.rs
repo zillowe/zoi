@@ -3,14 +3,18 @@
 use crate::pkg;
 use crate::utils;
 use anyhow::Result;
-use colored::*;
+use colored::Colorize;
 
 /// Runs the 'info' command.
 ///
 /// Displays detailed information about the system, platform,
 /// package managers, and Zoi configuration.
+///
+/// # Errors
+///
+/// Returns an error if the platform information or configuration cannot be retrieved.
 pub fn run(branch: &str, status: &str, number: &str, commit: &str) -> Result<()> {
-    let _branch_short = if branch == "Production" {
+    let branch_short = if branch == "Production" {
         "Prod."
     } else if branch == "Development" {
         "Dev."
@@ -26,8 +30,8 @@ pub fn run(branch: &str, status: &str, number: &str, commit: &str) -> Result<()>
 
     let platform = crate::pkg::utils::get_platform()?;
     let parts: Vec<&str> = platform.split('-').collect();
-    let os = parts.first().cloned().unwrap_or("unknown");
-    let arch = parts.get(1).cloned().unwrap_or("unknown");
+    let os = parts.first().copied().unwrap_or("unknown");
+    let arch = parts.get(1).copied().unwrap_or("unknown");
 
     utils::print_aligned_info("OS", os);
     utils::print_aligned_info("Architecture", arch);
@@ -42,7 +46,9 @@ pub fn run(branch: &str, status: &str, number: &str, commit: &str) -> Result<()>
     let native_pm = config.native_package_manager;
     let all_pms = config.package_managers.unwrap_or_default();
 
-    if !all_pms.is_empty() {
+    if all_pms.is_empty() {
+        utils::print_aligned_info("Package Managers", "Not available (run 'zoi sync')");
+    } else {
         let pm_list: Vec<String> = all_pms
             .into_iter()
             .map(|pm| {
@@ -55,8 +61,6 @@ pub fn run(branch: &str, status: &str, number: &str, commit: &str) -> Result<()>
             .collect();
         let pm_list_str = pm_list.join(", ");
         utils::print_aligned_info("Package Managers", &pm_list_str);
-    } else {
-        utils::print_aligned_info("Package Managers", "Not available (run 'zoi sync')");
     }
 
     let tel = if config.telemetry_enabled {
@@ -70,7 +74,7 @@ pub fn run(branch: &str, status: &str, number: &str, commit: &str) -> Result<()>
     println!(
         "{:<18}{} {} {} {}",
         key_with_colon.cyan(),
-        _branch_short,
+        branch_short,
         status,
         number,
         commit.green()

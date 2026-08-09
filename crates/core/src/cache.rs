@@ -3,6 +3,10 @@ use std::fs;
 use std::path::PathBuf;
 
 /// Returns the root directory for Zoi's cache.
+///
+/// # Errors
+///
+/// Returns an error if the user's home directory cannot be determined.
 pub fn get_cache_root() -> Result<PathBuf> {
     let home_dir =
         crate::utils::get_user_home().ok_or_else(|| anyhow!("Could not find home directory."))?;
@@ -10,12 +14,20 @@ pub fn get_cache_root() -> Result<PathBuf> {
 }
 
 /// Returns the root directory for Zoi's archive cache.
+///
+/// # Errors
+///
+/// Returns an error if the cache root directory cannot be determined.
 pub fn get_archive_cache_root() -> Result<PathBuf> {
     let cache_root = get_cache_root()?;
     Ok(cache_root.join("archives"))
 }
 
 /// Returns the root directory for Zoi's package definition cache.
+///
+/// # Errors
+///
+/// Returns an error if the cache root directory cannot be determined.
 pub fn get_pkgdef_cache_root() -> Result<PathBuf> {
     let cache_root = get_cache_root()?;
     Ok(cache_root.join("pkgdefs"))
@@ -40,6 +52,10 @@ pub fn mirror_candidate_urls(url: &str) -> Vec<String> {
 }
 
 /// Clears the entire Zoi cache.
+///
+/// # Errors
+///
+/// Returns an error if the cache directory cannot be removed.
 pub fn clear(dry_run: bool) -> Result<()> {
     let cache_dir = get_cache_root()?;
     if cache_dir.exists() {
@@ -59,6 +75,10 @@ pub fn clear(dry_run: bool) -> Result<()> {
 }
 
 /// Clears only the archive cache.
+///
+/// # Errors
+///
+/// Returns an error if the archive cache directory cannot be removed.
 pub fn clear_archives(dry_run: bool) -> Result<()> {
     let archive_cache_dir = get_archive_cache_root()?;
     if archive_cache_dir.exists() {

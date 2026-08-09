@@ -18,15 +18,15 @@ commands:
   - cmd: build
     run: echo "hello" > built.txt
 "#;
-    fs::write(root.join("zoi.yaml"), yaml).unwrap();
+    fs::write(root.join("zoi.yaml"), yaml).expect("unwrap failed");
 
     ctx.set_current_dir(&root);
 
-    let cfg = config::load().unwrap();
-    runner::run(Some("build"), &[], &cfg).unwrap();
+    let cfg = config::load().expect("unwrap failed");
+    runner::run(Some("build"), &[], &cfg).expect("unwrap failed");
 
     let out_file = root.join("built.txt");
     assert!(out_file.exists());
-    let content = fs::read_to_string(out_file).unwrap();
+    let content = fs::read_to_string(out_file).expect("unwrap failed");
     assert_eq!(content.trim(), "hello");
 }

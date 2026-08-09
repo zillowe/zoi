@@ -2,11 +2,19 @@
 
 use crate::pkg::cache;
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use std::fs;
 use std::path::PathBuf;
 
 /// Adds files to the local archive cache.
+///
+/// # Errors
+///
+/// Returns an error if the archive cache root cannot be determined or if copying files fails.
+///
+/// # Panics
+///
+/// This function does not explicitly panic.
 pub fn add(files: &[PathBuf]) -> Result<()> {
     let archive_cache_root = cache::get_archive_cache_root()?;
     fs::create_dir_all(&archive_cache_root)?;
@@ -38,11 +46,27 @@ pub fn add(files: &[PathBuf]) -> Result<()> {
 }
 
 /// Clears the local archive cache.
+///
+/// # Errors
+///
+/// Returns an error if the cache clearing operation fails.
+///
+/// # Panics
+///
+/// This function does not explicitly panic.
 pub fn clear(dry_run: bool) -> Result<()> {
     crate::cmd::clean::run(dry_run)
 }
 
 /// Lists files in the local archive cache.
+///
+/// # Errors
+///
+/// Returns an error if the archive cache root cannot be determined or if reading the directory fails.
+///
+/// # Panics
+///
+/// This function does not explicitly panic.
 pub fn list() -> Result<()> {
     let archive_cache_root = cache::get_archive_cache_root()?;
     if !archive_cache_root.exists() {
@@ -58,7 +82,10 @@ pub fn list() -> Result<()> {
         if path.is_file() {
             let filename = path
                 .file_name()
-                .ok_or_else(|| anyhow!("Path from read_dir has no file name: {:?}", path))?
+                .ok_or_else(|| {
+                    let p = path.display();
+                    anyhow!("Path from read_dir has no file name: {p}")
+                })?
                 .to_string_lossy();
             let size = fs::metadata(&path)?.len();
             println!(
@@ -75,8 +102,7 @@ pub fn list() -> Result<()> {
     } else {
         println!(
             "
-Total: {} archives",
-            count
+Total: {count} archives"
         );
     }
 
@@ -84,6 +110,14 @@ Total: {} archives",
 }
 
 /// Adds a new cache mirror URL.
+///
+/// # Errors
+///
+/// Returns an error if the mirror cannot be added to the configuration.
+///
+/// # Panics
+///
+/// This function does not explicitly panic.
 pub fn add_mirror(url: &str) -> Result<()> {
     crate::pkg::config::add_cache_mirror(url)?;
     println!("Added cache mirror '{}'.", url.cyan());
@@ -91,6 +125,14 @@ pub fn add_mirror(url: &str) -> Result<()> {
 }
 
 /// Removes a cache mirror URL.
+///
+/// # Errors
+///
+/// Returns an error if the mirror cannot be removed from the configuration.
+///
+/// # Panics
+///
+/// This function does not explicitly panic.
 pub fn remove_mirror(url: &str) -> Result<()> {
     crate::pkg::config::remove_cache_mirror(url)?;
     println!("Removed cache mirror '{}'.", url.cyan());
@@ -98,6 +140,14 @@ pub fn remove_mirror(url: &str) -> Result<()> {
 }
 
 /// Lists all configured cache mirror URLs.
+///
+/// # Errors
+///
+/// Returns an error if the configuration cannot be read.
+///
+/// # Panics
+///
+/// This function does not explicitly panic.
 pub fn list_mirrors() -> Result<()> {
     let config = crate::pkg::config::read_config()?;
     if config.cache_mirrors.is_empty() {
@@ -106,7 +156,7 @@ pub fn list_mirrors() -> Result<()> {
     }
 
     println!("{} Configured cache mirrors:", "::".bold().blue());
-    for mirror in config.cache_mirrors {
+    for mirror in &config.cache_mirrors {
         println!("  - {}", mirror.cyan());
     }
     Ok(())

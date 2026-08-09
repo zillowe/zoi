@@ -110,6 +110,10 @@ pub struct VerifySig {
 }
 
 /// Run the PGP management command.
+///
+/// # Errors
+///
+/// Returns an error if the PGP operation (key generation, signing, etc.) fails.
 pub fn run(args: PgpCommand) -> Result<()> {
     match args.command {
         PgpCommands::Add(add_args) => {

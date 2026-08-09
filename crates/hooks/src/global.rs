@@ -1,5 +1,5 @@
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use glob::Pattern;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -27,7 +27,7 @@ pub struct GlobalHook {
     pub name: String,
     /// A human-readable description of what the hook does.
     pub description: String,
-    /// Optional list of compatible platforms (e.g. ["linux", "macos"]).
+    /// Optional list of compatible platforms (e.g. `["linux", "macos"]`).
     pub platforms: Option<Vec<String>>,
     /// The conditions that trigger this hook.
     pub trigger: HookTrigger,
@@ -65,7 +65,7 @@ pub struct HookAction {
 }
 
 /// When a global hook should run.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
 pub enum HookWhen {
     /// Runs before any package operations in the transaction.
     #[serde(rename = "PreTransaction")]
@@ -76,6 +76,11 @@ pub enum HookWhen {
 }
 
 /// Gets the directory where user-specific hooks are stored.
+///
+/// # Errors
+///
+/// Returns an error if the user home directory cannot be found or if creating the hooks
+/// directory fails.
 pub fn get_user_hooks_dir() -> Result<PathBuf> {
     let home = utils::get_user_home().ok_or_else(|| anyhow!("Could not find home directory"))?;
     let dir = home.join(".zoi").join("hooks");
@@ -86,6 +91,10 @@ pub fn get_user_hooks_dir() -> Result<PathBuf> {
 }
 
 /// Gets the directory where system-wide hooks are stored.
+///
+/// # Errors
+///
+/// This function is currently infallible but returns a `Result` for consistency.
 pub fn get_system_hooks_dir() -> Result<PathBuf> {
     if cfg!(windows) {
         Ok(sysroot::apply_sysroot(PathBuf::from(
@@ -97,6 +106,10 @@ pub fn get_system_hooks_dir() -> Result<PathBuf> {
 }
 
 /// Loads all available global hooks from builtin, system, user, and package store locations.
+///
+/// # Errors
+///
+/// Returns an error if loading hooks from system, user, or package store directories fails.
 pub fn load_all_hooks() -> Result<Vec<GlobalHook>> {
     let mut hook_map = HashMap::new();
 
@@ -267,9 +280,8 @@ pub fn trigger_matches_modified_files(
                 }
             }
 
-            let pattern = match Pattern::new(path_pattern) {
-                Ok(p) => p,
-                Err(_) => continue,
+            let Ok(pattern) = Pattern::new(path_pattern) else {
+                continue;
             };
 
             if pattern.matches_path(Path::new(&relative_file))
@@ -332,6 +344,10 @@ fn is_hook_trusted(hook: &GlobalHook) -> Result<bool> {
 /// * `modified_packages` - List of packages modified during the transaction.
 /// * `operation` - The type of operation being performed (e.g. "install").
 /// * `scope` - The installation scope.
+///
+/// # Errors
+///
+/// Returns an error if loading hooks, getting the current platform, or executing a hook command fails.
 pub fn run_global_hooks(
     when: HookWhen,
     modified_files: &[String],
@@ -343,7 +359,7 @@ pub fn run_global_hooks(
     let mut triggered_hooks = HashSet::new();
     let current_platform = utils::get_platform()?;
 
-    let scope_str = format!("{:?}", scope).to_lowercase();
+    let scope_str = format!("{scope:?}").to_lowercase();
 
     for hook in all_hooks {
         if hook.action.when != when {
@@ -397,7 +413,7 @@ pub fn run_global_hooks(
                             .exec
                             .split_whitespace()
                             .skip(1)
-                            .map(|s| s.to_string())
+                            .map(std::string::ToString::to_string)
                             .collect::<Vec<_>>(),
                         &envs,
                         &[], // No extra binds for standard hooks

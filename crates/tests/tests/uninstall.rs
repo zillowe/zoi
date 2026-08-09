@@ -20,7 +20,7 @@ fn sample_manifest(name: &str, repo: &str) -> types::InstallManifest {
         repo_type: "official".to_string(),
         registry_handle: "local".to_string(),
         package_type: types::PackageType::Package,
-        description: "".to_string(),
+        description: String::new(),
         reason: types::InstallReason::Direct,
         scope: types::Scope::User,
         bins: None,
@@ -85,26 +85,26 @@ end
 "#
         ),
     )
-    .unwrap();
+    .expect("unwrap failed");
 }
 
 #[test]
 fn test_uninstall_uses_stored_package_source_over_registry_drift() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().unwrap();
+    let tmp = tempdir().expect("unwrap failed");
     let root = tmp.path().to_path_buf();
     let db_root = root.join("db");
     ctx.set_env_var("HOME", &root);
     ctx.set_env_var("ZOI_DB_DIR", &db_root);
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
     let manifest = sample_manifest("test-pkg", "core");
-    local::write_manifest(&manifest).unwrap();
+    local::write_manifest(&manifest).expect("unwrap failed");
 
     let stored_hit = root.join("stored-hit");
     let db_hit = root.join("db-hit");
-    fs::write(&stored_hit, "stored").unwrap();
-    fs::write(&db_hit, "db").unwrap();
+    fs::write(&stored_hit, "stored").expect("unwrap failed");
+    fs::write(&db_hit, "db").expect("unwrap failed");
 
     let stored_source = root.join("stored.pkg.lua");
     write_package_source(
@@ -114,10 +114,10 @@ fn test_uninstall_uses_stored_package_source_over_registry_drift() {
         "1.0.0",
         Some("${usrhome}/stored-hit"),
     );
-    local::persist_package_source(&manifest, &stored_source).unwrap();
+    local::persist_package_source(&manifest, &stored_source).expect("unwrap failed");
 
     let db_pkg_dir = db_root.join("local").join("core").join("test-pkg");
-    fs::create_dir_all(&db_pkg_dir).unwrap();
+    fs::create_dir_all(&db_pkg_dir).expect("unwrap failed");
     write_package_source(
         &db_pkg_dir.join("test-pkg.pkg.lua"),
         "test-pkg",
@@ -126,7 +126,7 @@ fn test_uninstall_uses_stored_package_source_over_registry_drift() {
         Some("${usrhome}/db-hit"),
     );
 
-    uninstall::run("test-pkg", Some(types::Scope::User), true, false, false).unwrap();
+    uninstall::run("test-pkg", Some(types::Scope::User), true, false, false).expect("unwrap failed");
 
     assert!(
         !stored_hit.exists(),
@@ -141,38 +141,38 @@ fn test_uninstall_uses_stored_package_source_over_registry_drift() {
 #[test]
 fn test_uninstall_requires_explicit_source_for_ambiguous_name_matches() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().unwrap();
+    let tmp = tempdir().expect("unwrap failed");
     let root = tmp.path().to_path_buf();
     ctx.set_env_var("HOME", &root);
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
-    local::write_manifest(&sample_manifest("shared", "core")).unwrap();
-    local::write_manifest(&sample_manifest("shared", "extra")).unwrap();
+    local::write_manifest(&sample_manifest("shared", "core")).expect("unwrap failed");
+    local::write_manifest(&sample_manifest("shared", "extra")).expect("unwrap failed");
 
-    let err = uninstall::run("shared", Some(types::Scope::User), true, false, false).unwrap_err();
+    let err = uninstall::run("shared", Some(types::Scope::User), true, false, false).expect_err("unwrap_err failed");
     assert!(err.to_string().contains("ambiguous"));
 }
 
 #[test]
 fn test_uninstall_explicit_source_removes_only_matching_install() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().unwrap();
+    let tmp = tempdir().expect("unwrap failed");
     let root = tmp.path().to_path_buf();
     ctx.set_env_var("HOME", &root);
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
     let core_manifest = sample_manifest("shared", "core");
     let extra_manifest = sample_manifest("shared", "extra");
-    local::write_manifest(&core_manifest).unwrap();
-    local::write_manifest(&extra_manifest).unwrap();
+    local::write_manifest(&core_manifest).expect("unwrap failed");
+    local::write_manifest(&extra_manifest).expect("unwrap failed");
 
     let core_source = root.join("core.pkg.lua");
     write_package_source(&core_source, "shared", "core", "1.0.0", None);
-    local::persist_package_source(&core_manifest, &core_source).unwrap();
+    local::persist_package_source(&core_manifest, &core_source).expect("unwrap failed");
 
     let extra_source = root.join("extra.pkg.lua");
     write_package_source(&extra_source, "shared", "extra", "1.0.0", None);
-    local::persist_package_source(&extra_manifest, &extra_source).unwrap();
+    local::persist_package_source(&extra_manifest, &extra_source).expect("unwrap failed");
 
     uninstall::run(
         "#local@extra/shared@1.0.0",
@@ -181,20 +181,20 @@ fn test_uninstall_explicit_source_removes_only_matching_install() {
         false,
         false,
     )
-    .unwrap();
+    .expect("unwrap failed");
 
-    let core_request = resolve::parse_source_string("#local@core/shared@1.0.0").unwrap();
-    let extra_request = resolve::parse_source_string("#local@extra/shared@1.0.0").unwrap();
+    let core_request = resolve::parse_source_string("#local@core/shared@1.0.0").expect("unwrap failed");
+    let extra_request = resolve::parse_source_string("#local@extra/shared@1.0.0").expect("unwrap failed");
 
     assert_eq!(
         local::find_installed_manifests_matching(&core_request, types::Scope::User)
-            .unwrap()
+            .expect("unwrap failed")
             .len(),
         1
     );
     assert!(
         local::find_installed_manifests_matching(&extra_request, types::Scope::User)
-            .unwrap()
+            .expect("unwrap failed")
             .is_empty()
     );
 }
@@ -202,25 +202,25 @@ fn test_uninstall_explicit_source_removes_only_matching_install() {
 #[test]
 fn test_cmd_uninstall_respects_scope_override_when_names_overlap() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().unwrap();
+    let tmp = tempdir().expect("unwrap failed");
     let root = tmp.path().to_path_buf();
     ctx.set_env_var("HOME", &root);
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
     let user_manifest = sample_manifest_in_scope("shared", "core", types::Scope::User);
     let system_manifest = sample_manifest_in_scope("shared", "core", types::Scope::System);
-    local::write_manifest(&user_manifest).unwrap();
-    local::write_manifest(&system_manifest).unwrap();
+    local::write_manifest(&user_manifest).expect("unwrap failed");
+    local::write_manifest(&system_manifest).expect("unwrap failed");
 
     let user_source = root.join("user.pkg.lua");
     write_package_source(&user_source, "shared", "core", "1.0.0", None);
-    local::persist_package_source(&user_manifest, &user_source).unwrap();
+    local::persist_package_source(&user_manifest, &user_source).expect("unwrap failed");
 
     let system_source = root.join("system.pkg.lua");
     write_package_source(&system_source, "shared", "core", "1.0.0", None);
-    local::persist_package_source(&system_manifest, &system_source).unwrap();
+    local::persist_package_source(&system_manifest, &system_source).expect("unwrap failed");
 
-    let plugin_manager = plugin::PluginManager::new().unwrap();
+    let plugin_manager = plugin::PluginManager::new().expect("unwrap failed");
     cmd::uninstall::run(
         &[String::from("shared")],
         Some(InstallScope::User),
@@ -234,16 +234,16 @@ fn test_cmd_uninstall_respects_scope_override_when_names_overlap() {
         false,
         false,
     )
-    .unwrap();
+    .expect("unwrap failed");
 
     assert!(
         local::is_package_installed("shared", None, types::Scope::User)
-            .unwrap()
+            .expect("unwrap failed")
             .is_none()
     );
     assert!(
         local::is_package_installed("shared", None, types::Scope::System)
-            .unwrap()
+            .expect("unwrap failed")
             .is_some()
     );
 }

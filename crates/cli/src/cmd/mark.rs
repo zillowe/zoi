@@ -2,9 +2,16 @@
 
 use crate::pkg::{db, local, recorder, resolve, types};
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 
 /// Runs the `mark` command.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Neither `--as-dependency` nor `--as-explicit` is provided.
+/// - Package name parsing or resolution fails.
+/// - Updating the manifest reason or database fails.
 pub fn run(package_names: &[String], as_dependency: bool, as_explicit: bool) -> Result<()> {
     let new_reason = if as_dependency {
         types::InstallReason::Dependency {
@@ -76,9 +83,9 @@ pub fn run(package_names: &[String], as_dependency: bool, as_explicit: bool) -> 
             .as_deref()
             .unwrap_or(&manifest.registry_handle);
         let mut db_pkg = pkg.clone();
-        db_pkg.repo = manifest.repo.clone();
+        db_pkg.repo.clone_from(&manifest.repo);
         db_pkg.scope = manifest.scope;
-        db_pkg.sub_package = manifest.sub_package.clone();
+        db_pkg.sub_package.clone_from(&manifest.sub_package);
         if let Ok(conn) = db::open_connection("local") {
             let _ = db::update_package(
                 &conn,
@@ -90,7 +97,7 @@ pub fn run(package_names: &[String], as_dependency: bool, as_explicit: bool) -> 
             );
         }
 
-        let _ = recorder::update_package_reason(&manifest, new_reason.clone());
+        let _ = recorder::update_package_reason(&manifest, &new_reason);
 
         println!(
             "Successfully marked '{}' as {}.",

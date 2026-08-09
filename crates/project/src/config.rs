@@ -166,12 +166,21 @@ pub struct EnvironmentSpec {
 }
 
 /// Loads the project configuration from the current directory.
+///
+/// # Errors
+///
+/// Returns an error if no configuration file is found or if the configuration is invalid.
 pub fn load() -> Result<ProjectConfig> {
-    load_with_env(std::env::vars().collect())
+    let env: HashMap<String, String> = std::env::vars().collect();
+    load_with_env(&env)
 }
 
 /// Loads the project configuration with a custom set of environment variables.
-pub fn load_with_env(env: HashMap<String, String>) -> Result<ProjectConfig> {
+///
+/// # Errors
+///
+/// Returns an error if no configuration file is found or if the configuration is invalid.
+pub fn load_with_env<S: ::std::hash::BuildHasher>(env: &HashMap<String, String, S>) -> Result<ProjectConfig> {
     let lua_path = Path::new("zoi.lua");
     if lua_path.exists() {
         return crate::lua_config::load_zoi_lua(lua_path, env);
@@ -190,6 +199,11 @@ pub fn load_with_env(env: HashMap<String, String>) -> Result<ProjectConfig> {
 }
 
 /// Adds packages to the `zoi.yaml` configuration file.
+///
+/// # Errors
+///
+/// Returns an error if the project uses `zoi.lua`, the `zoi.yaml` file is missing,
+/// or if there is an error reading or writing the file.
 pub fn add_packages_to_config(packages: &[String]) -> Result<()> {
     if Path::new("zoi.lua").exists() {
         return Err(anyhow!(
@@ -229,6 +243,10 @@ pub fn add_packages_to_config(packages: &[String]) -> Result<()> {
 }
 
 /// Removes packages from the `zoi.yaml` configuration file.
+///
+/// # Errors
+///
+/// Returns an error if there is an issue reading or writing the `zoi.yaml` file.
 pub fn remove_packages_from_config(packages_to_remove: &[String]) -> Result<()> {
     if Path::new("zoi.lua").exists() {
         return Ok(());
@@ -248,9 +266,7 @@ pub fn remove_packages_from_config(packages_to_remove: &[String]) -> Result<()> 
         let packages_to_remove_names: Vec<_> = packages_to_remove
             .iter()
             .map(|p| {
-                zoi_resolver::resolve::parse_source_string(p)
-                    .map(|req| req.name)
-                    .unwrap_or_else(|_| p.to_string())
+                zoi_resolver::resolve::parse_source_string(p).map_or_else(|_| p.clone(), |req| req.name)
             })
             .collect();
 

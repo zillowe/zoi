@@ -15,5 +15,5 @@ pub fn set_frozen(frozen: bool) {
 
 /// Returns true if Zoi is in frozen mode.
 pub fn is_frozen() -> bool {
-    frozen_mode_store().read().map(|g| *g).unwrap_or(false)
+    frozen_mode_store().read().is_ok_and(|g| *g)
 }

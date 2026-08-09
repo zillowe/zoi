@@ -21,7 +21,7 @@ use zoi_resolver::resolve;
 pub struct InstallNode {
     /// The core metadata definition for the package.
     pub pkg: Package,
-    /// The exact resolved SemVer version.
+    /// The exact resolved `SemVer` version.
     pub version: String,
     /// The package revision number (used for packaging updates).
     pub revision: String,
@@ -71,6 +71,11 @@ impl DependencyGraph {
     /// Packages with no dependencies (leaf nodes) appear in the first stage, followed by packages
     /// that only depend on those in the first stage, and so on. This ensures that dependencies
     /// are always installed before their dependents.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a cycle is detected in the dependency graph or if there's an internal
+    /// inconsistency in the graph structure.
     pub fn toposort(&self) -> Result<Vec<Vec<String>>> {
         let mut in_degree: HashMap<String, usize> =
             self.nodes.keys().map(|id| (id.clone(), 0)).collect();
@@ -108,7 +113,7 @@ impl DependencyGraph {
                     for v_id in neighbors {
                         let degree = in_degree
                             .get_mut(v_id)
-                            .ok_or_else(|| anyhow!("v_id '{}' missing from in_degree", v_id))?;
+                            .ok_or_else(|| anyhow!("v_id '{v_id}' missing from in_degree"))?;
                         *degree -= 1;
                         if *degree == 0 {
                             queue.push_back(v_id.clone());
@@ -149,6 +154,11 @@ fn extract_zoi_dependencies(deps: &types::DependenciesV2) -> Vec<String> {
 }
 
 /// Builds a dependency graph from a list of locked packages.
+///
+/// # Errors
+///
+/// Returns an error if any package in the lockfile cannot be resolved or if
+/// there are issues parsing dependency strings.
 pub fn build_graph_from_locked_packages(
     locked_packages: &[FrozenLockPackage],
     scope_override: Option<types::Scope>,
@@ -332,18 +342,23 @@ fn pkg_key_as_str(s: &String) -> &String {
 /// Computes the complete dependency graph for a set of input sources.
 ///
 /// This is the core "Resolution Engine" of Zoi. It:
-/// - Maps each source string to a `PkgName` in the PubGrub solver.
-/// - Uses the PubGrub SAT algorithm to find a set of versions that satisfy all
-///   SemVer requirements and constraints.
+/// - Maps each source string to a `PkgName` in the `PubGrub` solver.
+/// - Uses the `PubGrub` SAT algorithm to find a set of versions that satisfy all
+///   `SemVer` requirements and constraints.
 /// - Handles backtracking and human-readable error reporting on failure.
 /// - Returns a `DependencyGraph` containing all nodes (packages) and edges (dependencies).
+///
+/// # Errors
+///
+/// Returns an error if dependency resolution fails, if any source strings are invalid,
+/// or if version requirements cannot be satisfied.
 pub fn resolve_dependency_graph(
     initial_sources: &[String],
     scope_override: Option<types::Scope>,
     _force: bool,
     yes: bool,
     all_optional: bool,
-    _build_type: Option<&str>,
+    build_type: Option<&str>,
     quiet: bool,
     project_config: Option<zoi_project::config::ProjectConfig>,
 ) -> Result<(DependencyGraph, Vec<String>)> {
@@ -386,7 +401,7 @@ pub fn resolve_dependency_graph(
             let resolved_version =
                 resolve::resolve_requested_version_spec(source, scope_override, true, true)?
                     .ok_or_else(|| {
-                        anyhow!("version spec missing despite check for '{}'", source)
+                        anyhow!("version spec missing despite check for '{source}'")
                     })?;
             crate::pubgrub::semver_to_range(&resolved_version)
         } else {
@@ -406,13 +421,13 @@ pub fn resolve_dependency_graph(
         yes,
         all_optional,
         project_config,
-        _build_type.map(|s| s.to_string()),
+        build_type.map(std::string::ToString::to_string),
     )?;
     let root_pkg = PkgName {
         name: "$root".to_string(),
         sub_package: None,
-        repo: "".to_string(),
-        registry: "".to_string(),
+        repo: String::new(),
+        registry: String::new(),
         explicit_source: None,
     };
     let root_version = SemVersion {
@@ -434,7 +449,7 @@ pub fn resolve_dependency_graph(
                 let source = name
                     .explicit_source
                     .clone()
-                    .unwrap_or_else(|| format!("{}@{}", name, version));
+                    .unwrap_or_else(|| format!("{name}@{version}"));
                 let (pkg, version_str, _, pkg_lua_path, handle, repo_type, git_sha) =
                     resolve::resolve_package_and_version(&source, scope_override, quiet, yes)?;
 
@@ -509,7 +524,7 @@ pub fn resolve_dependency_graph(
             }
             let mut direct_ids = HashSet::new();
             if let Some(root_children) = final_adj.get("$root") {
-                direct_ids = root_children.clone();
+                direct_ids.clone_from(root_children);
             }
 
             let mut parent_map = HashMap::new();
@@ -554,7 +569,7 @@ pub fn resolve_dependency_graph(
                 })
                 .collect();
 
-            for (pkg_id, node) in final_nodes.iter_mut() {
+            for (pkg_id, node) in &mut final_nodes {
                 let child_sources = resolved_child_sources
                     .get(pkg_id)
                     .cloned()
@@ -582,11 +597,11 @@ pub fn resolve_dependency_graph(
             }
         }
         Err(e) => {
-            let error_msg = format!("{:?}", e);
+            let error_msg = format!("{e:?}");
             if error_msg.contains("DependencyProviderError") {
-                return Err(anyhow!("Dependency resolution failed: {}", error_msg));
+                return Err(anyhow!("Dependency resolution failed: {error_msg}"));
             }
-            return Err(anyhow!("Dependency resolution failed: {}", e));
+            return Err(anyhow!("Dependency resolution failed: {e}"));
         }
     }
 

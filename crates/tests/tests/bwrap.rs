@@ -14,7 +14,7 @@ fn test_bwrap_build_checks_command_existence() {
     let root = tmp.path().to_path_buf();
 
     let pkg_lua_path = root.join("test.pkg.lua");
-    fs::write(&pkg_lua_path, "metadata({ name = 'test', repo = 'core', types = {'source'}, maintainer = {name='test', email='test'} })").unwrap();
+    fs::write(&pkg_lua_path, "metadata({ name = 'test', repo = 'core', types = {'source'}, maintainer = {name='test', email='test'} })").expect("unwrap failed");
 
     // If bwrap doesn't exist, it should return an error
     if !utils::command_exists("bwrap") {
@@ -33,7 +33,7 @@ fn test_bwrap_build_checks_command_existence() {
         assert!(result.is_err());
         assert!(
             result
-                .unwrap_err()
+                .expect_err("unwrap_err failed")
                 .to_string()
                 .contains("Bubblewrap ('bwrap') is not installed")
         );

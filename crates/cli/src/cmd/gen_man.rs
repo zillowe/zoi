@@ -13,6 +13,11 @@ use std::path::{Path, PathBuf};
 /// Runs the 'gen-man' command.
 ///
 /// Generates man pages for the Zoi CLI and all its subcommands in the 'manuals' directory.
+///
+/// # Errors
+///
+/// Returns an error if the 'manuals' directory cannot be created or if there is
+/// an issue generating the man pages.
 pub fn run() -> io::Result<()> {
     let out_dir = env::var("OUT_DIR").unwrap_or_else(|_| "manuals".to_string());
     let out_path = PathBuf::from(out_dir);
@@ -59,7 +64,7 @@ fn generate_man_pages_recursive(
 /// Generates a single man page for a command.
 fn generate_man_page(app: &Command, out_path: &Path) -> io::Result<()> {
     let name = app.get_name();
-    let out_file = out_path.join(format!("{}.1", name));
+    let out_file = out_path.join(format!("{name}.1"));
 
     let man = Man::new(app.clone());
     let mut buffer = Vec::<u8>::new();

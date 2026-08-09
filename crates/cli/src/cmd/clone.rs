@@ -2,10 +2,19 @@
 
 use crate::pkg::{resolve, types};
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use std::process::Command;
 
 /// Runs the `clone` command to clone a package's git repository.
+///
+/// # Errors
+///
+/// Returns an error if the package cannot be resolved, if its metadata cannot be parsed,
+/// if it has no git repository defined, or if the `git clone` command fails.
+///
+/// # Panics
+///
+/// This function does not explicitly panic.
 pub fn run(package_name: &str, location: Option<String>, yes: bool) -> Result<()> {
     println!(
         "{} Resolving package '{}' for cloning...",
@@ -17,10 +26,8 @@ pub fn run(package_name: &str, location: Option<String>, yes: bool) -> Result<()
 
     let pkg: types::Package = crate::pkg::lua::parser::parse_lua_package(
         resolved_source.path.to_str().ok_or_else(|| {
-            anyhow!(
-                "Path contains invalid UTF-8 characters: {:?}",
-                resolved_source.path
-            )
+            let p = resolved_source.path.display();
+            anyhow!("Path contains invalid UTF-8 characters: {p}")
         })?,
         None,
         None,
@@ -35,7 +42,7 @@ pub fn run(package_name: &str, location: Option<String>, yes: bool) -> Result<()
     }
 
     let git_url = &pkg.git;
-    let target_location = location.unwrap_or_else(|| pkg.name.clone());
+    let target_location = location.unwrap_or(pkg.name);
 
     println!(
         "{} Cloning {} into {}...",
@@ -53,15 +60,15 @@ pub fn run(package_name: &str, location: Option<String>, yes: bool) -> Result<()
 
     let status = git_cmd
         .status()
-        .map_err(|e| anyhow!("Failed to execute git clone: {}", e))?;
+        .map_err(|e| anyhow!("Failed to execute git clone: {e}"))?;
 
     if status.success() {
         println!("\n{}", "Successfully cloned repository.".green());
     } else {
-        return Err(anyhow!(
-            "git clone failed with exit code {:?}",
-            status.code()
-        ));
+        let code = status
+            .code()
+            .map_or_else(|| "unknown".to_string(), |c| c.to_string());
+        return Err(anyhow!("git clone failed with exit code {code}"));
     }
 
     Ok(())

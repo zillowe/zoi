@@ -17,7 +17,7 @@ fn test_cli_parsing_help() {
     let mut cmd = Cli::command();
     let err = cmd
         .try_get_matches_from_mut(vec!["zoi", "--help"])
-        .unwrap_err();
+        .expect_err("unwrap_err failed");
     assert_eq!(err.kind(), clap::error::ErrorKind::DisplayHelp);
     let help_text = err.to_string();
     assert!(help_text.contains("Advanced Package Manager"));
@@ -30,7 +30,7 @@ fn test_cli_parsing_install_flags() {
         .try_get_matches_from_mut(vec!["zoi", "install", "--local", "--frozen", "--yes"])
         .expect("Parsing install flags failed");
 
-    let (subcommand, sub_matches) = matches.subcommand().unwrap();
+    let (subcommand, sub_matches) = matches.subcommand().expect("unwrap failed");
     assert_eq!(subcommand, "install");
 
     assert!(sub_matches.get_flag("local"));
@@ -44,6 +44,6 @@ fn test_cli_parsing_conflicting_flags() {
     let mut cmd = Cli::command();
     let err = cmd
         .try_get_matches_from_mut(vec!["zoi", "install", "--local", "--global"])
-        .unwrap_err();
+        .expect_err("unwrap_err failed");
     assert_eq!(err.kind(), clap::error::ErrorKind::ArgumentConflict);
 }

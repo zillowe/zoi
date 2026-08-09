@@ -19,6 +19,15 @@ use zoi_project as project;
 /// - Safety Checks: Validates policy compliance, security advisories, and file conflicts.
 /// - Transactional Execution: Executes the install plan within an atomic transaction.
 /// - Lockfile Updates: Synchronizes `zoi.lock` for project-local installations.
+///
+/// # Errors
+///
+/// Returns an error if dependency resolution fails, if there are policy conflicts,
+/// or if the installation process encounters an I/O error or transaction failure.
+///
+/// # Panics
+///
+/// May panic if internal mutexes are poisoned or if certain invariants are violated.
 pub fn run(
     sources: &[String],
     repo: Option<String>,
@@ -29,7 +38,7 @@ pub fn run(
     local: bool,
     global: bool,
     save: bool,
-    build_type: Option<String>,
+    build_type: Option<&str>,
     dry_run: bool,
     plugin_manager: Option<&crate::pkg::plugin::PluginManager>,
     build: bool,
@@ -139,7 +148,7 @@ pub fn run(
                         config_file
                     );
                 }
-                sources_to_process = config.pkgs.clone();
+                sources_to_process.clone_from(&config.pkgs);
                 if scope_override.is_none() {
                     scope_override = Some(types::Scope::Project);
                 }
@@ -214,7 +223,10 @@ pub fn run(
     let mut final_sources = Vec::new();
 
     for source in &sources_to_process {
-        if source.ends_with(".lock") {
+        if std::path::Path::new(source)
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("lock"))
+        {
             install::lockfile::process_lockfile(
                 source,
                 &mut final_sources,
@@ -222,7 +234,7 @@ pub fn run(
                 scope_override.unwrap_or(types::Scope::User),
             )?;
         } else {
-            final_sources.push(source.to_string());
+            final_sources.push(source.clone());
         }
     }
 
@@ -246,7 +258,7 @@ pub fn run(
             force,
             yes,
             all_optional,
-            build_type.as_deref(),
+            build_type,
             false,
             project_config,
         )?
@@ -332,7 +344,7 @@ pub fn run(
                     .lua
                     .to_value(&node.pkg)
                     .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
-                pm.trigger_hook("on_pre_install", Some(pkg_val))?;
+                pm.trigger_hook("on_pre_install", Some(&pkg_val))?;
             }
         }
     }
@@ -379,7 +391,7 @@ pub fn run(
 
     println!("{} Checking available disk space...", "::".bold().blue());
     let install_plan =
-        install::plan::create_install_plan(&graph.nodes, build_type.as_deref(), build)?;
+        install::plan::create_install_plan(&graph.nodes, build_type, build)?;
 
     let mut total_download_size: u64 = 0;
     let mut total_installed_size: u64 = 0;
@@ -407,30 +419,29 @@ pub fn run(
     let default_handle = config
         .default_registry
         .as_ref()
-        .map(|r| r.handle.as_str())
-        .unwrap_or("");
+        .map_or("", |r| r.handle.as_str());
     let active_repos = &config.repos;
 
     let format_display_name = |registry: &str, repo: &str, name: &str, sub: Option<&str>| {
         let base_name = if let Some(s) = sub {
-            format!("{}:{}", name, s)
+            format!("{name}:{s}")
         } else {
             name.to_string()
         };
 
         if registry == "local" && repo.starts_with("git/") {
             let repo_name = &repo[4..];
-            return format!("#git@{}/{}", repo_name, base_name);
+            return format!("#git@{repo_name}/{base_name}");
         }
 
         if registry == default_handle || registry == "local" || registry.is_empty() {
             if active_repos.contains(&repo.to_string()) || repo.is_empty() {
                 base_name
             } else {
-                format!("@{}/{}", repo, base_name)
+                format!("@{repo}/{base_name}")
             }
         } else {
-            format!("#{}@{}/{}", registry, repo, base_name)
+            format!("#{registry}@{repo}/{base_name}")
         }
     };
 
@@ -448,12 +459,12 @@ pub fn run(
                 &n.pkg.name,
                 n.sub_package.as_deref(),
             );
-            let version_display = if n.revision != "1" {
-                format!("{}-{}", n.version, n.revision)
-            } else {
+            let version_display = if n.revision == "1" {
                 n.version.clone()
+            } else {
+                format!("{}-{}", n.version, n.revision)
             };
-            format!("{}@{}", display_name, version_display)
+            format!("{display_name}@{version_display}")
                 .cyan()
                 .to_string()
         })
@@ -482,10 +493,10 @@ pub fn run(
                 &node.pkg.name,
                 node.sub_package.as_deref(),
             );
-            let version_display = if node.revision != "1" {
-                format!("{}-{}", node.version, node.revision)
-            } else {
+            let version_display = if node.revision == "1" {
                 node.version.clone()
+            } else {
+                format!("{}-{}", node.version, node.revision)
             };
             println!(
                 "  - {}@{} -> {} ({})",
@@ -511,13 +522,13 @@ pub fn run(
                 &n.pkg.name,
                 n.sub_package.as_deref(),
             );
-            let version_display = if n.revision != "1" {
-                format!("{}-{}", n.version, n.revision)
-            } else {
+            let version_display = if n.revision == "1" {
                 n.version.clone()
+            } else {
+                format!("{}-{}", n.version, n.revision)
             };
             dep_list.push(
-                format!("zoi:{}@{}", display_name, version_display)
+                format!("zoi:{display_name}@{version_display}")
                     .dimmed()
                     .to_string(),
             );
@@ -579,17 +590,17 @@ pub fn run(
             let reason = match &node.reason {
                 types::InstallReason::Direct => "direct request".to_string(),
                 types::InstallReason::Dependency { parent } => {
-                    format!("dependency of {}", parent)
+                    format!("dependency of {parent}")
                 }
             };
-            let version_display = if node.revision != "1" {
-                format!("{} (rev {})", node.version, node.revision)
-            } else {
+            let version_display = if node.revision == "1" {
                 node.version.clone()
+            } else {
+                format!("{} (rev {})", node.version, node.revision)
             };
             report = report.item(
                 format!("{}@{}", node.pkg.name, version_display),
-                format!("[{}]", reason),
+                format!("[{reason}]"),
                 vec![format!(
                     "via {} ({})",
                     action_name,
@@ -613,7 +624,7 @@ pub fn run(
             };
             let reason = match &node.reason {
                 types::InstallReason::Direct => "direct".to_string(),
-                types::InstallReason::Dependency { parent } => format!("dependency:{}", parent),
+                types::InstallReason::Dependency { parent } => format!("dependency:{parent}"),
             };
             packages.push(json!({
                 "id": id,
@@ -679,7 +690,7 @@ pub fn run(
 
     let stages = graph.toposort()?;
     let transaction = Mutex::new(transaction::begin()?);
-    let transaction_id = transaction.lock().unwrap().id.clone();
+    let transaction_id = transaction.lock().expect("Transaction mutex poisoned").id.clone();
     let dependency_installed_count = AtomicUsize::new(0);
 
     println!("\n{} Preparing packages...", "::".bold().blue());
@@ -692,14 +703,12 @@ pub fn run(
         .try_for_each(|pkg_id| -> Result<()> {
             let node = graph.nodes.get(pkg_id).ok_or_else(|| {
                 anyhow!(
-                    "Package node '{}' missing from graph during preparation",
-                    pkg_id
+                    "Package node '{pkg_id}' missing from graph during preparation"
                 )
             })?;
             let action = install_plan.get(pkg_id).ok_or_else(|| {
                 anyhow!(
-                    "Install action missing for package '{}' during preparation",
-                    pkg_id
+                    "Install action missing for package '{pkg_id}' during preparation"
                 )
             })?;
 
@@ -707,13 +716,13 @@ pub fn run(
                 node,
                 action,
                 Some(&m_prep),
-                build_type.as_deref(),
+                build_type,
                 verbose,
             )?;
 
             let mut lock = prepared_nodes
                 .lock()
-                .map_err(|e| anyhow!("Prepared nodes mutex poisoned during preparation: {}", e))?;
+                .map_err(|e| anyhow!("Prepared nodes mutex poisoned during preparation: {e}"))?;
             lock.insert(pkg_id.clone(), prepared);
             Ok(())
         })?;
@@ -729,7 +738,7 @@ pub fn run(
                 let dep = match crate::pkg::dependencies::parse_dependency_string(dep_str) {
                     Ok(d) => d,
                     Err(e) => {
-                        eprintln!("Error parsing dependency {}: {}", dep_str, e);
+                        eprintln!("Error parsing dependency {dep_str}: {e}");
                         continue;
                     }
                 };
@@ -744,7 +753,7 @@ pub fn run(
                     &mut installed_deps_ext,
                     Some(&m_deps),
                 ) {
-                    eprintln!("Failed to install dependency {}: {}", dep_str, e);
+                    eprintln!("Failed to install dependency {dep_str}: {e}");
                 }
             }
         }
@@ -753,8 +762,7 @@ pub fn run(
             stage.par_iter().try_for_each(|pkg_id| -> Result<()> {
                 let node = graph.nodes.get(pkg_id).ok_or_else(|| {
                     anyhow!(
-                        "Package node '{}' missing from graph during installation",
-                        pkg_id
+                        "Package node '{pkg_id}' missing from graph during installation"
                     )
                 })?;
                 if matches!(node.reason, types::InstallReason::Direct) {
@@ -764,13 +772,12 @@ pub fn run(
                 let prepared = {
                     let lock = prepared_nodes.lock().map_err(|e| {
                         anyhow!(
-                            "Prepared nodes mutex poisoned during dependency install: {}",
-                            e
+                            "Prepared nodes mutex poisoned during dependency install: {e}"
                         )
                     })?;
                     lock.get(pkg_id)
                         .cloned()
-                        .ok_or_else(|| anyhow!("Prepared node missing for: {}", pkg_id))?
+                        .ok_or_else(|| anyhow!("Prepared node missing for: {pkg_id}"))?
                 };
 
                 match install::installer::install_prepared_node(
@@ -785,7 +792,7 @@ pub fn run(
                     Ok(manifest) => {
                         dependency_installed_count.fetch_add(1, Ordering::Relaxed);
                         let mut tx_lock = transaction.lock().map_err(|e| {
-                            anyhow!("Transaction mutex poisoned during installation: {}", e)
+                            anyhow!("Transaction mutex poisoned during installation: {e}")
                         })?;
                         if let Err(e) = transaction::record_operation(
                             &mut tx_lock,
@@ -793,15 +800,15 @@ pub fn run(
                                 manifest: Box::new(manifest),
                             },
                         ) {
-                            eprintln!("Failed to record transaction operation: {}", e);
-                            return Err(anyhow!("Transaction recording failed: {}", e));
+                            eprintln!("Failed to record transaction operation: {e}");
+                            return Err(anyhow!("Transaction recording failed: {e}"));
                         }
                     }
                     Err(e) => {
                         failed_packages
                             .lock()
                             .map_err(|e| {
-                                anyhow!("Failed packages mutex poisoned during installation: {}", e)
+                                anyhow!("Failed packages mutex poisoned during installation: {e}")
                             })?
                             .push(node.pkg.name.clone());
                         eprintln!("Error installing {}: {}", node.pkg.name, e);
@@ -837,12 +844,12 @@ pub fn run(
                 } else {
                     node.pkg.name.clone()
                 };
-                let version_display = if node.revision != "1" {
-                    format!("{}-{}", node.version, node.revision)
-                } else {
+                let version_display = if node.revision == "1" {
                     node.version.clone()
+                } else {
+                    format!("{}-{}", node.version, node.revision)
                 };
-                println!("@{}:{}", name, version_display);
+                println!("@{name}:{version_display}");
                 stage_direct_ids.push(pkg_id.clone());
             }
         }
@@ -856,21 +863,19 @@ pub fn run(
             .try_for_each(|pkg_id| -> Result<()> {
                 let node = graph.nodes.get(pkg_id).ok_or_else(|| {
                     anyhow!(
-                        "Package node '{}' missing from graph during final installation",
-                        pkg_id
+                        "Package node '{pkg_id}' missing from graph during final installation"
                     )
                 })?;
 
                 let prepared = {
                     let lock = prepared_nodes.lock().map_err(|e| {
                         anyhow!(
-                            "Prepared nodes mutex poisoned during package install: {}",
-                            e
+                            "Prepared nodes mutex poisoned during package install: {e}"
                         )
                     })?;
                     lock.get(pkg_id)
                         .cloned()
-                        .ok_or_else(|| anyhow!("Prepared node missing for: {}", pkg_id))?
+                        .ok_or_else(|| anyhow!("Prepared node missing for: {pkg_id}"))?
                 };
 
                 match install::installer::install_prepared_node(
@@ -885,12 +890,11 @@ pub fn run(
                     Ok(manifest) => {
                         installed_manifests
                             .lock()
-                            .map_err(|e| anyhow!("Installed manifests mutex poisoned: {}", e))?
+                            .map_err(|e| anyhow!("Installed manifests mutex poisoned: {e}"))?
                             .push(manifest.clone());
                         let mut tx_lock = transaction.lock().map_err(|e| {
                             anyhow!(
-                                "Transaction mutex poisoned during direct package installation: {}",
-                                e
+                                "Transaction mutex poisoned during direct package installation: {e}"
                             )
                         })?;
                         transaction::record_operation(
@@ -902,7 +906,7 @@ pub fn run(
                         successfully_installed_sources
                             .lock()
                             .map_err(|e| {
-                                anyhow!("Successfully installed sources mutex poisoned: {}", e)
+                                anyhow!("Successfully installed sources mutex poisoned: {e}")
                             })?
                             .push(node.source.clone());
                         Ok(())
@@ -910,7 +914,7 @@ pub fn run(
                     Err(e) => {
                         failed_packages
                             .lock()
-                            .map_err(|e| anyhow!("Failed packages mutex poisoned: {}", e))?
+                            .map_err(|e| anyhow!("Failed packages mutex poisoned: {e}"))?
                             .push(node.pkg.name.clone());
                         eprintln!("Error installing {}: {}", node.pkg.name, e);
                         Err(e)
@@ -927,7 +931,7 @@ pub fn run(
 
     let failed = failed_packages
         .lock()
-        .map_err(|e| anyhow!("Failed packages mutex poisoned during finalization: {}", e))?;
+        .map_err(|e| anyhow!("Failed packages mutex poisoned during finalization: {e}"))?;
     if !failed.is_empty() {
         println!("\n{} Rolling back changes...", "::".bold().yellow());
         transaction::rollback(&transaction_id)?;
@@ -953,15 +957,14 @@ pub fn run(
     }
 
     if let Err(e) = transaction::commit(&transaction_id) {
-        eprintln!("Warning: Failed to commit transaction: {}", e);
+        eprintln!("Warning: Failed to commit transaction: {e}");
     }
 
     let installed_manifests_vec = installed_manifests
         .lock()
         .map_err(|e| {
             anyhow!(
-                "Installed manifests mutex poisoned during finalization: {}",
-                e
+                "Installed manifests mutex poisoned during finalization: {e}"
             )
         })?
         .clone();
@@ -971,7 +974,7 @@ pub fn run(
                 .lua
                 .to_value(manifest)
                 .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
-            pm.trigger_hook_nonfatal("on_post_install", Some(pkg_val));
+            pm.trigger_hook_nonfatal("on_post_install", Some(&pkg_val));
         }
     }
 
@@ -1013,8 +1016,7 @@ pub fn run(
 
         let just_installed = installed_manifests.into_inner().map_err(|e| {
             anyhow!(
-                "Installed manifests mutex poisoned during lockfile update: {}",
-                e
+                "Installed manifests mutex poisoned during lockfile update: {e}"
             )
         })?;
         all_final_manifests.extend(just_installed);
@@ -1128,7 +1130,7 @@ pub fn run(
                     .map(|s| vec![s])
                     .unwrap_or_default(),
                 platform: manifest.platform.clone(),
-                hash: format!("sha512-{}", integrity),
+                hash: format!("sha512-{integrity}"),
                 dependencies: manifest.dependencies_v2.clone(),
             };
 
@@ -1136,15 +1138,14 @@ pub fn run(
         }
 
         if let Err(e) = project::lockfile::write_zoi_lock(&mut lockfile) {
-            eprintln!("Warning: Failed to write zoi.lock file: {}", e);
+            eprintln!("Warning: Failed to write zoi.lock file: {e}");
         }
     }
 
     if save && scope_override == Some(types::Scope::Project) {
         let successfully_installed = successfully_installed_sources.into_inner().map_err(|e| {
             anyhow!(
-                "Successfully installed sources mutex poisoned during finalization: {}",
-                e
+                "Successfully installed sources mutex poisoned during finalization: {e}"
             )
         })?;
 
@@ -1156,7 +1157,7 @@ pub fn run(
                 );
                 println!("   Please add the following to your packages() block in zoi.lua:");
                 for pkg in &successfully_installed {
-                    println!("   - \"{}\"", pkg);
+                    println!("   - \"{pkg}\"");
                 }
             } else if let Err(e) = project::config::add_packages_to_config(&successfully_installed)
             {

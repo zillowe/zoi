@@ -1,8 +1,8 @@
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use std::collections::HashSet;
 use std::fs::{self, File};
-use std::io::Read;
+use std::io::{Read, Seek};
 use std::path::{Path, PathBuf};
 use tar::Archive;
 use tempfile::Builder;
@@ -55,8 +55,7 @@ fn get_completions_root(scope: types::Scope, shell: &str) -> Result<PathBuf> {
         types::Scope::System => {
             if cfg!(target_os = "windows") {
                 Ok(zoi_core::sysroot::apply_sysroot(PathBuf::from(format!(
-                    "C:\\ProgramData\\zoi\\pkgs\\shell\\{}",
-                    shell
+                    "C:\\ProgramData\\zoi\\pkgs\\shell\\{shell}"
                 ))))
             } else if zoi_core::utils::is_zoios() {
                 let base = match shell {
@@ -100,7 +99,7 @@ fn create_completion_symlink(source: &Path, link: &Path) -> Result<()> {
     #[cfg(unix)]
     {
         std::os::unix::fs::symlink(source, link)
-            .map_err(|e| anyhow!("Failed to create completion symlink: {}", e))?;
+            .map_err(|e| anyhow!("Failed to create completion symlink: {e}"))?;
     }
     #[cfg(windows)]
     {
@@ -122,7 +121,7 @@ fn check_and_handle_file_conflicts(
 
     for entry in WalkDir::new(source_dir)
         .into_iter()
-        .filter_map(|e| e.ok())
+        .filter_map(std::result::Result::ok)
         .skip(1)
     {
         if entry.file_type().is_file() {
@@ -169,6 +168,16 @@ fn check_and_handle_file_conflicts(
 ///
 /// This ensures that a crash, power loss, or network failure during extraction
 /// never leaves a partially-installed or broken package in the Zoi store.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The archive file cannot be opened or read.
+/// - The archive format is invalid.
+/// - Extraction fails.
+/// - Metadata parsing fails.
+/// - Required permissions are missing.
+/// - Filesystem operations (copying, directory creation) fail.
 pub fn run(
     package_file: &Path,
     scope_override: Option<types::Scope>,
@@ -197,7 +206,7 @@ pub fn run(
     }
 
     let file_metadata =
-        fs::metadata(package_file).map_err(|e| anyhow!("Failed to get archive metadata: {}", e))?;
+        fs::metadata(package_file).map_err(|e| anyhow!("Failed to get archive metadata: {e}"))?;
     let file_size = file_metadata.len();
 
     if pb.is_none() {
@@ -205,21 +214,20 @@ pub fn run(
     }
 
     let mut file =
-        File::open(package_file).map_err(|e| anyhow!("Failed to open package archive: {}", e))?;
+        File::open(package_file).map_err(|e| anyhow!("Failed to open package archive: {e}"))?;
 
     let mut magic = [0u8; 4];
     if file.read_exact(&mut magic).is_ok() && magic != [0x28, 0xB5, 0x2F, 0xFD] {
         return Err(anyhow!(
-            "Invalid archive format: expected zstd magic number 28 B5 2F FD, but found {:02X?}. This file is likely not a valid .zst archive.",
-            magic
+            "Invalid archive format: expected zstd magic number 28 B5 2F FD, but found {magic:02X?}. This file is likely not a valid .zst archive."
         ));
     }
-    use std::io::Seek;
+
     file.rewind()
-        .map_err(|e| anyhow!("Failed to rewind archive file: {}", e))?;
+        .map_err(|e| anyhow!("Failed to rewind archive file: {e}"))?;
 
     let decoder =
-        ZstdDecoder::new(file).map_err(|e| anyhow!("Failed to initialize zstd decoder: {}", e))?;
+        ZstdDecoder::new(file).map_err(|e| anyhow!("Failed to initialize zstd decoder: {e}"))?;
     let mut archive = Archive::new(decoder);
 
     #[cfg(target_os = "linux")]
@@ -230,17 +238,16 @@ pub fn run(
 
     for entry_res in archive
         .entries()
-        .map_err(|e| anyhow!("Failed to read archive entries: {}", e))?
+        .map_err(|e| anyhow!("Failed to read archive entries: {e}"))?
     {
         let mut entry = entry_res.map_err(|e| {
             anyhow!(
-                "Failed to process archive entry: {}. The archive may be truncated or corrupted.",
-                e
+                "Failed to process archive entry: {e}. The archive may be truncated or corrupted."
             )
         })?;
         let path = entry
             .path()
-            .map_err(|e| anyhow!("Failed to get entry path: {}", e))?
+            .map_err(|e| anyhow!("Failed to get entry path: {e}"))?
             .to_path_buf();
         entry
             .unpack_in(&unpack_path)
@@ -250,7 +257,7 @@ pub fn run(
     let mut pkg_lua_path = None;
     for entry in WalkDir::new(temp_dir.path())
         .into_iter()
-        .filter_map(|e| e.ok())
+        .filter_map(std::result::Result::ok)
     {
         if entry.file_name().to_string_lossy().ends_with(".pkg.lua") {
             pkg_lua_path = Some(entry.path().to_path_buf());
@@ -268,7 +275,7 @@ pub fn run(
     let metadata = zoi_lua::parser::parse_lua_package_for_platform(
         pkg_lua_path
             .to_str()
-            .ok_or_else(|| anyhow!("Path contains invalid UTF-8 characters: {:?}", pkg_lua_path))?,
+            .ok_or_else(|| anyhow!("Path contains invalid UTF-8 characters: {}", pkg_lua_path.display()))?,
         &platform,
         version_override,
         Some(scope),
@@ -333,12 +340,12 @@ pub fn run(
             if let Some(main_subs) = &metadata.main_subs {
                 main_subs.clone()
             } else {
-                let mut all = vec!["".to_string()];
+                let mut all = vec![String::new()];
                 all.extend(subs.clone());
                 all
             }
         } else {
-            vec!["".to_string()]
+            vec![String::new()]
         };
 
         for sub in subs_to_install {
@@ -354,8 +361,7 @@ pub fn run(
             if !sub_data_dir.exists() {
                 if pb.is_none() {
                     eprintln!(
-                        "Warning: sub-package '{}' not found in archive, skipping.",
-                        sub
+                        "Warning: sub-package '{sub}' not found in archive, skipping."
                     );
                 }
                 continue;
@@ -389,7 +395,7 @@ pub fn run(
                 copy_dir_all(&usrroot_src, &root_dest)?;
                 for entry in WalkDir::new(&usrroot_src)
                     .into_iter()
-                    .filter_map(|e| e.ok())
+                    .filter_map(std::result::Result::ok)
                 {
                     if entry.file_type().is_file() {
                         let rel_to_root = entry.path().strip_prefix(&usrroot_src)?;
@@ -409,7 +415,7 @@ pub fn run(
                 copy_dir_all(&usrhome_src, &home_dest)?;
                 for entry in WalkDir::new(&usrhome_src)
                     .into_iter()
-                    .filter_map(|e| e.ok())
+                    .filter_map(std::result::Result::ok)
                 {
                     if entry.file_type().is_file() {
                         let rel_to_home = entry.path().strip_prefix(&usrhome_src)?;
@@ -429,7 +435,7 @@ pub fn run(
 
     for entry in WalkDir::new(staging_dir.path())
         .into_iter()
-        .filter_map(|e| e.ok())
+        .filter_map(std::result::Result::ok)
     {
         if entry.file_type().is_file() {
             let rel_path = entry.path().strip_prefix(staging_dir.path())?;
@@ -479,9 +485,7 @@ fn finalize_installation(
                 let mut orig_path = backup_src.clone();
                 let ext = orig_path
                     .extension()
-                    .and_then(|s| s.to_str())
-                    .map(|s| format!("{}.zoiorig", s))
-                    .unwrap_or_else(|| "zoiorig".to_string());
+                    .and_then(|s| s.to_str()).map_or_else(|| "zoiorig".to_string(), |s| format!("{s}.zoiorig"));
                 orig_path.set_extension(ext);
 
                 if let Err(e) = fs::copy(&backup_src, &orig_path)
@@ -506,7 +510,7 @@ fn finalize_installation(
 
         for bin_name in bins {
             let mut found_bin = false;
-            for entry in WalkDir::new(version_dir).into_iter().filter_map(|e| e.ok()) {
+            for entry in WalkDir::new(version_dir).into_iter().filter_map(std::result::Result::ok) {
                 if entry.file_type().is_file() && entry.file_name().to_string_lossy() == *bin_name {
                     let link_path = bin_root.join(bin_name);
 
@@ -539,14 +543,14 @@ fn finalize_installation(
             for shim in created_shims {
                 let _ = fs::remove_file(shim);
             }
-            return Err(anyhow!("Failed to create shims: {}", e));
+            return Err(anyhow!("Failed to create shims: {e}"));
         }
     }
 
     let shell_dir = version_dir.join("shell");
     if shell_dir.exists() {
         for shell_entry in fs::read_dir(&shell_dir)
-            .map_err(|e| anyhow!("Failed to read shell completions directory: {}", e))?
+            .map_err(|e| anyhow!("Failed to read shell completions directory: {e}"))?
         {
             let shell_entry = shell_entry?;
             if !shell_entry.file_type()?.is_dir() {
@@ -558,7 +562,7 @@ fn finalize_installation(
             fs::create_dir_all(&pkg_completions_dir)?;
 
             for file_entry in fs::read_dir(shell_entry.path())
-                .map_err(|e| anyhow!("Failed to read shell/{}/ directory: {}", shell_name, e))?
+                .map_err(|e| anyhow!("Failed to read shell/{shell_name}/ directory: {e}"))?
             {
                 let file_entry = file_entry?;
                 if !file_entry.file_type()?.is_file() {
@@ -693,7 +697,7 @@ fn extract_pooled_zpa(
             subs.clone()
         }
     } else {
-        vec!["".to_string()]
+        vec![String::new()]
     };
 
     let pool_dir = unpack_path.join("pool");
@@ -749,30 +753,22 @@ fn extract_pooled_zpa(
     }
 
     for sub in subs_to_install {
-        let sub_mapping = match pooled_manifest.mappings.get(&sub) {
-            Some(m) => m,
-            None => {
-                if pb.is_none() {
-                    eprintln!(
-                        "Warning: mapping for sub-package '{}' not found in archive, skipping.",
-                        sub
-                    );
-                }
-                continue;
+        let Some(sub_mapping) = pooled_manifest.mappings.get(&sub) else {
+            if pb.is_none() {
+                eprintln!(
+                    "Warning: mapping for sub-package '{sub}' not found in archive, skipping."
+                );
             }
+            continue;
         };
 
-        let scope_mapping = match sub_mapping.scopes.get(&scope) {
-            Some(m) => m,
-            None => {
-                if pb.is_none() {
-                    eprintln!(
-                        "Warning: mapping for scope {:?} not found for sub-package '{}', skipping.",
-                        scope, sub
-                    );
-                }
-                continue;
+        let Some(scope_mapping) = sub_mapping.scopes.get(&scope) else {
+            if pb.is_none() {
+                eprintln!(
+                    "Warning: mapping for scope {scope:?} not found for sub-package '{sub}', skipping."
+                );
             }
+            continue;
         };
 
         // Step 1: Create directories
@@ -874,6 +870,6 @@ fn expand_pooled_path(path: &str, staging_path: &Path, _scope: types::Scope) -> 
     } else if let Some(rel) = path.strip_prefix("${createpkgdir}/") {
         Ok(std::env::current_dir()?.join(rel))
     } else {
-        Err(anyhow!("Invalid pooled path placeholder: {}", path))
+        Err(anyhow!("Invalid pooled path placeholder: {path}"))
     }
 }

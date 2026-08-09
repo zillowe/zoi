@@ -4,6 +4,13 @@ use crate::pkg::{local, resolve};
 use anyhow::Result;
 
 /// Expands split packages into their individual sub-packages if they are installed.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The list of installed packages cannot be retrieved.
+/// - A package name cannot be parsed.
+/// - A package cannot be resolved to a specific version.
 pub fn expand_split_packages(package_names: &[String], action: &str) -> Result<Vec<String>> {
     let mut expanded_names = Vec::new();
     let installed_packages = local::get_installed_packages()?;
@@ -34,7 +41,7 @@ pub fn expand_split_packages(package_names: &[String], action: &str) -> Result<V
                     installed_subs.join(", ")
                 );
                 for sub in installed_subs {
-                    expanded_names.push(format!("{}:{}", name, sub));
+                    expanded_names.push(format!("{name}:{sub}"));
                 }
                 was_expanded = true;
             }

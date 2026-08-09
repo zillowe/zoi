@@ -5,7 +5,7 @@
 //! and version specifications.
 
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use comfy_table::{Table, presets::UTF8_FULL};
 use dialoguer::{Select, theme::ColorfulTheme};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -78,8 +78,12 @@ fn split_explicit_file_source(source_str: &str) -> Option<(&str, Option<String>,
         let base_path = if let Some((path, sub)) = base.rsplit_once(':') {
             if (path.ends_with(".pkg.lua")
                 || path.ends_with(".manifest.yaml")
-                || path.ends_with(".zpa")
-                || path.ends_with(".zsa"))
+                || std::path::Path::new(path)
+                    .extension()
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("zpa"))
+                || std::path::Path::new(path)
+                    .extension()
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("zsa")))
                 && !sub.contains('/')
             {
                 path
@@ -92,8 +96,12 @@ fn split_explicit_file_source(source_str: &str) -> Option<(&str, Option<String>,
 
         if base_path.ends_with(".pkg.lua")
             || base_path.ends_with(".manifest.yaml")
-            || base_path.ends_with(".zpa")
-            || base_path.ends_with(".zsa")
+            || std::path::Path::new(base_path)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("zpa"))
+            || std::path::Path::new(base_path)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("zsa"))
         {
             (base, Some(version.to_string()))
         } else {
@@ -106,8 +114,12 @@ fn split_explicit_file_source(source_str: &str) -> Option<(&str, Option<String>,
     let (path_part, sub_package) = if let Some((base, sub)) = main_part.rsplit_once(':') {
         if (base.ends_with(".pkg.lua")
             || base.ends_with(".manifest.yaml")
-            || base.ends_with(".zpa")
-            || base.ends_with(".zsa"))
+            || std::path::Path::new(base)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("zpa"))
+            || std::path::Path::new(base)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("zsa")))
             && !sub.contains('/')
         {
             (base, Some(sub.to_string()))
@@ -120,8 +132,12 @@ fn split_explicit_file_source(source_str: &str) -> Option<(&str, Option<String>,
 
     if path_part.ends_with(".pkg.lua")
         || path_part.ends_with(".manifest.yaml")
-        || path_part.ends_with(".zpa")
-        || path_part.ends_with(".zsa")
+        || std::path::Path::new(path_part)
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("zpa"))
+        || std::path::Path::new(path_part)
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("zsa"))
     {
         Some((path_part, sub_package, version_spec))
     } else {
@@ -143,6 +159,10 @@ fn get_git_head_sha(repo_path: &Path) -> Option<String> {
 }
 
 /// Returns the root directory of the package database.
+///
+/// # Errors
+///
+/// Returns an error if the current directory cannot be retrieved.
 pub fn get_db_root() -> Result<PathBuf> {
     if let Ok(path) = std::env::var("ZOI_DB_DIR") {
         return Ok(PathBuf::from(path));
@@ -161,6 +181,10 @@ pub fn get_db_root() -> Result<PathBuf> {
 }
 
 /// Returns the root directory of the package database on the host system.
+///
+/// # Errors
+///
+/// Returns an error if the home directory cannot be found.
 pub fn get_host_db_root() -> Result<PathBuf> {
     let home_dir = zoi_core::utils::get_user_home()
         .ok_or_else(|| anyhow!("Could not find home directory."))?;
@@ -168,6 +192,10 @@ pub fn get_host_db_root() -> Result<PathBuf> {
 }
 
 /// Parses a source string into a `PackageRequest`.
+///
+/// # Errors
+///
+/// Returns an error if the source string format is invalid.
 pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
     if let Some((path_part, sub_package_from_path, version_spec)) =
         split_explicit_file_source(source_str)
@@ -198,22 +226,20 @@ pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
         .name("main_part")
         .ok_or_else(|| {
             anyhow!(
-                "Regex matched but main_part group not found in '{}'",
-                source_str
+                "Regex matched but main_part group not found in '{source_str}'"
             )
         })?
         .as_str();
 
     let caps_main = MAIN_RE
         .captures(main_part)
-        .ok_or_else(|| anyhow!("Invalid source string format in '{}'", main_part))?;
+        .ok_or_else(|| anyhow!("Invalid source string format in '{main_part}'"))?;
 
     let repo_and_name = caps_main
         .name("repo_and_name")
         .ok_or_else(|| {
             anyhow!(
-                "Regex matched but repo_and_name group not found in '{}'",
-                main_part
+                "Regex matched but repo_and_name group not found in '{main_part}'"
             )
         })?
         .as_str();
@@ -251,6 +277,69 @@ pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
 
 /// Searches for a package in the synced package database.
 fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedSource> {
+    /// Internal structure to hold metadata of a found package during resolution.
+    struct FoundPackage {
+        path: PathBuf,
+        source_type: SourceType,
+        repo_name: String,
+        repo_type: String,
+        description: String,
+        license: String,
+        size: Option<u64>,
+    }
+
+    /// Processes a `.pkg.lua` file to extract its metadata.
+    fn process_found_package(
+        path: PathBuf,
+        repo_name: &str,
+        is_default_registry: bool,
+        registry_db_path: &Path,
+        quiet: bool,
+    ) -> Result<FoundPackage> {
+        let pkg: types::Package = zoi_lua::parser::parse_lua_package(
+            path.to_str().ok_or_else(|| {
+                anyhow!(
+                    "Path contains invalid UTF-8 characters: {}",
+                    path.display()
+                )
+            })?,
+            None,
+            None,
+            quiet,
+        )?;
+        let major_repo = repo_name
+            .split('/')
+            .next()
+            .unwrap_or_default()
+            .to_lowercase();
+
+        let repo_config = config::read_repo_config(registry_db_path).ok();
+        let repo_type = if let Some(ref cfg) = repo_config {
+            cfg.repos
+                .iter()
+                .find(|r| r.name == major_repo)
+                .map_or_else(|| "unofficial".to_string(), |r| r.repo_type.clone())
+        } else {
+            "unofficial".to_string()
+        };
+
+        let source_type = if is_default_registry && repo_type == "official" {
+            SourceType::OfficialRepo
+        } else {
+            SourceType::UntrustedRepo(repo_name.to_string())
+        };
+
+        Ok(FoundPackage {
+            path,
+            source_type,
+            repo_name: pkg.repo.clone(),
+            repo_type,
+            description: pkg.description,
+            license: pkg.license,
+            size: pkg.installed_size,
+        })
+    }
+
     let db_root = get_db_root()?;
     let config = config::read_config()?;
 
@@ -301,7 +390,7 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
                 Some(registry.handle.clone()),
             )
         } else {
-            return Err(anyhow!("Registry with handle '{}' not found.", h));
+            return Err(anyhow!("Registry with handle '{h}' not found."));
         }
     } else {
         let default_registry = config
@@ -389,66 +478,6 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
         search_repos
     };
 
-    /// Internal structure to hold metadata of a found package during resolution.
-    struct FoundPackage {
-        path: PathBuf,
-        source_type: SourceType,
-        repo_name: String,
-        repo_type: String,
-        description: String,
-        license: String,
-        size: Option<u64>,
-    }
-
-    /// Processes a `.pkg.lua` file to extract its metadata.
-    fn process_found_package(
-        path: PathBuf,
-        repo_name: &str,
-        is_default_registry: bool,
-        registry_db_path: &Path,
-        quiet: bool,
-    ) -> Result<FoundPackage> {
-        let pkg: types::Package = zoi_lua::parser::parse_lua_package(
-            path.to_str()
-                .ok_or_else(|| anyhow!("Path contains invalid UTF-8 characters: {:?}", path))?,
-            None,
-            None,
-            quiet,
-        )?;
-        let major_repo = repo_name
-            .split('/')
-            .next()
-            .unwrap_or_default()
-            .to_lowercase();
-
-        let repo_config = config::read_repo_config(registry_db_path).ok();
-        let repo_type = if let Some(ref cfg) = repo_config {
-            cfg.repos
-                .iter()
-                .find(|r| r.name == major_repo)
-                .map(|r| r.repo_type.clone())
-                .unwrap_or_else(|| "unofficial".to_string())
-        } else {
-            "unofficial".to_string()
-        };
-
-        let source_type = if is_default_registry && repo_type == "official" {
-            SourceType::OfficialRepo
-        } else {
-            SourceType::UntrustedRepo(repo_name.to_string())
-        };
-
-        Ok(FoundPackage {
-            path,
-            source_type,
-            repo_name: pkg.repo.clone(),
-            repo_type,
-            description: pkg.description,
-            license: pkg.license,
-            size: pkg.installed_size,
-        })
-    }
-
     let mut found_packages = Vec::new();
 
     if request.name.contains('/') {
@@ -461,7 +490,7 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
             let path = registry_db_path
                 .join(repo_name)
                 .join(&request.name)
-                .join(format!("{}.pkg.lua", pkg_name));
+                .join(format!("{pkg_name}.pkg.lua"));
 
             if path.exists()
                 && let Ok(found) = process_found_package(
@@ -502,14 +531,17 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
             }
             for entry in WalkDir::new(&repo_path)
                 .into_iter()
-                .filter_map(|e| e.ok())
+                .filter_map(std::result::Result::ok)
                 .filter(|e| {
                     e.file_type().is_file() && e.file_name().to_string_lossy().ends_with(".pkg.lua")
                 })
             {
                 if let Ok(pkg) = zoi_lua::parser::parse_lua_package(
                     entry.path().to_str().ok_or_else(|| {
-                        anyhow!("Path contains invalid UTF-8 characters: {:?}", entry.path())
+                        anyhow!(
+                            "Path contains invalid UTF-8 characters: {}",
+                            entry.path().display()
+                        )
                     })?,
                     None,
                     None,
@@ -527,8 +559,7 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
                         cfg.repos
                             .iter()
                             .find(|r| r.name == major_repo)
-                            .map(|r| r.repo_type.clone())
-                            .unwrap_or_else(|| "unofficial".to_string())
+                            .map_or_else(|| "unofficial".to_string(), |r| r.repo_type.clone())
                     } else {
                         "unofficial".to_string()
                     };
@@ -565,7 +596,9 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
             ))
         }
     } else if found_packages.len() == 1 {
-        let chosen = &found_packages[0];
+        let chosen = found_packages
+            .first()
+            .ok_or_else(|| anyhow!("Found packages list is unexpectedly empty"))?;
 
         Ok(ResolvedSource {
             path: chosen.path.clone(),
@@ -591,9 +624,7 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
                 (i + 1).to_string(),
                 p.repo_name.clone(),
                 p.license.clone(),
-                p.size
-                    .map(zoi_core::utils::format_bytes)
-                    .unwrap_or_else(|| "unknown".to_string()),
+                p.size.map_or_else(|| "unknown".to_string(), zoi_core::utils::format_bytes),
                 p.description.clone(),
             ]);
         }
@@ -610,7 +641,9 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
             .default(0)
             .interact()?;
 
-        let chosen = &found_packages[selection];
+        let chosen = found_packages
+            .get(selection)
+            .ok_or_else(|| anyhow!("Invalid selection"))?;
         println!(
             "Selected package '{}' from repo '{}'",
             request.name, chosen.repo_name
@@ -646,7 +679,7 @@ fn download_from_url(url: &str) -> Result<ResolvedSource> {
     let mut hasher = Sha256::new();
     hasher.update(base_url.as_bytes());
     let url_hash = hex::encode(hasher.finalize());
-    let cache_path = cache_dir.join(format!("{}.pkg.lua", url_hash));
+    let cache_path = cache_dir.join(format!("{url_hash}.pkg.lua"));
 
     if cache_path.exists() {
         if let Some(hash) = expected_hash {
@@ -663,10 +696,9 @@ fn download_from_url(url: &str) -> Result<ResolvedSource> {
                     sharable_manifest: None,
                     git_sha: None,
                 });
-            } else {
-                println!("Cached definition hash mismatch, re-downloading...");
-                fs::remove_file(&cache_path)?;
             }
+            println!("Cached definition hash mismatch, re-downloading...");
+            fs::remove_file(&cache_path)?;
         } else {
             return Ok(ResolvedSource {
                 path: cache_path,
@@ -696,13 +728,10 @@ fn download_from_url(url: &str) -> Result<ResolvedSource> {
                     );
                     zoi_core::utils::retry_backoff_sleep(attempt);
                     continue;
-                } else {
-                    return Err(anyhow!(
-                        "Failed to download file after {} attempts: {}",
-                        attempt,
-                        e
-                    ));
                 }
+                return Err(anyhow!(
+                    "Failed to download file after {attempt} attempts: {e}"
+                ));
             }
         }
     };
@@ -727,7 +756,11 @@ fn download_from_url(url: &str) -> Result<ResolvedSource> {
         if bytes_read == 0 {
             break;
         }
-        downloaded_bytes.extend_from_slice(&buffer[..bytes_read]);
+        downloaded_bytes.extend_from_slice(
+            buffer
+                .get(..bytes_read)
+                .ok_or_else(|| anyhow!("Buffer slice out of bounds"))?,
+        );
         pb.inc(bytes_read as u64);
     }
     pb.finish_with_message("Download complete.");
@@ -770,7 +803,7 @@ fn verify_content_hash(content: &[u8], hash_spec: &str) -> Result<bool> {
             hasher.update(content);
             hex::encode(hasher.finalize())
         }
-        _ => return Err(anyhow!("Unsupported hash algorithm: {}", algo)),
+        _ => return Err(anyhow!("Unsupported hash algorithm: {algo}")),
     };
 
     Ok(actual_hex.eq_ignore_ascii_case(expected_hex))
@@ -794,14 +827,10 @@ fn download_content_from_url(url: &str) -> Result<String> {
                     );
                     zoi_core::utils::retry_backoff_sleep(attempt);
                     continue;
-                } else {
-                    return Err(anyhow!(
-                        "Failed to download from {} after {} attempts: {}",
-                        url,
-                        attempt,
-                        e
-                    ));
                 }
+                return Err(anyhow!(
+                    "Failed to download from {url} after {attempt} attempts: {e}"
+                ));
             }
         }
     };
@@ -821,6 +850,10 @@ fn download_content_from_url(url: &str) -> Result<String> {
 }
 
 /// Resolves a version from a JSON URL for a given channel.
+///
+/// # Errors
+///
+/// Returns an error if the request fails or the response cannot be parsed.
 pub fn resolve_version_from_url(url: &str, channel: &str) -> Result<String> {
     println!(
         "Resolving version for channel '{}' from {}",
@@ -839,13 +872,10 @@ pub fn resolve_version_from_url(url: &str, channel: &str) -> Result<String> {
                         eprintln!("{}: read failed ({}). Retrying...", "Network".yellow(), e);
                         zoi_core::utils::retry_backoff_sleep(attempt);
                         continue;
-                    } else {
-                        return Err(anyhow!(
-                            "Failed to read response after {} attempts: {}",
-                            attempt,
-                            e
-                        ));
                     }
+                    return Err(anyhow!(
+                        "Failed to read response after {attempt} attempts: {e}"
+                    ));
                 }
             },
             Err(e) => {
@@ -853,9 +883,8 @@ pub fn resolve_version_from_url(url: &str, channel: &str) -> Result<String> {
                     eprintln!("{}: fetch failed ({}). Retrying...", "Network".yellow(), e);
                     zoi_core::utils::retry_backoff_sleep(attempt);
                     continue;
-                } else {
-                    return Err(anyhow!("Failed to fetch after {} attempts: {}", attempt, e));
                 }
+                return Err(anyhow!("Failed to fetch after {attempt} attempts: {e}"));
             }
         }
     };
@@ -875,7 +904,14 @@ pub fn resolve_version_from_url(url: &str, channel: &str) -> Result<String> {
 }
 
 /// Resolves a channel name to a concrete version.
-pub fn resolve_channel(versions: &HashMap<String, String>, channel: &str) -> Result<String> {
+///
+/// # Errors
+///
+/// Returns an error if the channel name is not found in the versions map.
+pub fn resolve_channel<S: ::std::hash::BuildHasher>(
+    versions: &HashMap<String, String, S>,
+    channel: &str,
+) -> Result<String> {
     if let Some(url_or_version) = versions.get(channel) {
         if url_or_version.starts_with("http") {
             resolve_version_from_url(url_or_version, channel)
@@ -883,11 +919,15 @@ pub fn resolve_channel(versions: &HashMap<String, String>, channel: &str) -> Res
             Ok(url_or_version.clone())
         }
     } else {
-        Err(anyhow!("Channel '@{}' not found in versions map.", channel))
+        Err(anyhow!("Channel '@{channel}' not found in versions map."))
     }
 }
 
 /// Returns the default version for a package.
+///
+/// # Errors
+///
+/// Returns an error if the version cannot be determined.
 pub fn get_default_version(pkg: &types::Package, registry_handle: Option<&str>) -> Result<String> {
     if let Some(handle) = registry_handle {
         let source = format!("#{}@{}", handle, pkg.repo);
@@ -950,13 +990,10 @@ pub fn get_default_version(pkg: &types::Package, registry_handle: Option<&str>) 
                                 );
                                 zoi_core::utils::retry_backoff_sleep(attempt);
                                 continue;
-                            } else {
-                                return Err(anyhow!(
-                                    "Failed to read response after {} attempts: {}",
-                                    attempt,
-                                    e
-                                ));
                             }
+                            return Err(anyhow!(
+                                "Failed to read response after {attempt} attempts: {e}"
+                            ));
                         }
                     },
                     Err(e) => {
@@ -964,13 +1001,10 @@ pub fn get_default_version(pkg: &types::Package, registry_handle: Option<&str>) 
                             eprintln!("{}: fetch failed ({}). Retrying...", "Network".yellow(), e);
                             zoi_core::utils::retry_backoff_sleep(attempt);
                             continue;
-                        } else {
-                            return Err(anyhow!(
-                                "Failed to fetch after {} attempts: {}",
-                                attempt,
-                                e
-                            ));
                         }
+                        return Err(anyhow!(
+                            "Failed to fetch after {attempt} attempts: {e}"
+                        ));
                     }
                 }
             };
@@ -992,14 +1026,12 @@ pub fn get_default_version(pkg: &types::Package, registry_handle: Option<&str>) 
                     return Ok(tag.to_string());
                 }
                 return Err(anyhow!(
-                    "Could not determine a version from the JSON content at {}",
-                    ver
+                    "Could not determine a version from the JSON content at {ver}"
                 ));
             }
             return Ok(resp.trim().to_string());
-        } else {
-            return Ok(ver.clone());
         }
+        return Ok(ver.clone());
     }
 
     Err(anyhow!(
@@ -1011,7 +1043,7 @@ pub fn get_default_version(pkg: &types::Package, registry_handle: Option<&str>) 
 /// Returns the specific version to install based on a version specification.
 fn get_version_for_install(
     pkg: &types::Package,
-    version_spec: &Option<String>,
+    version_spec: Option<&String>,
     registry_handle: Option<&str>,
 ) -> Result<String> {
     if let Some(spec) = version_spec {
@@ -1041,6 +1073,10 @@ fn get_version_for_install(
 }
 
 /// Resolves the requested version specification from a source string.
+///
+/// # Errors
+///
+/// Returns an error if the source string format is invalid or if resolution fails.
 pub fn resolve_requested_version_spec(
     source_str: &str,
     scope: Option<types::Scope>,
@@ -1056,8 +1092,8 @@ pub fn resolve_requested_version_spec(
     let mut pkg = zoi_lua::parser::parse_lua_package(
         resolved_source.path.to_str().ok_or_else(|| {
             anyhow!(
-                "Path contains invalid UTF-8 characters: {:?}",
-                resolved_source.path
+                "Path contains invalid UTF-8 characters: {}",
+                resolved_source.path.display()
             )
         })?,
         None,
@@ -1071,7 +1107,7 @@ pub fn resolve_requested_version_spec(
 
     get_version_for_install(
         &pkg,
-        &request.version_spec,
+        request.version_spec.as_ref(),
         resolved_source.registry_handle.as_deref(),
     )
     .map(Some)
@@ -1084,6 +1120,10 @@ pub fn resolve_requested_version_spec(
 /// - Deciding if the source is a local file, a URL, or a registry-backed package.
 /// - Recursively following 'alt' references if the package definition points elsewhere.
 /// - Confirming trust for untrusted sources (URLs/local files).
+///
+/// # Errors
+///
+/// Returns an error if resolution fails or if an untrusted source is rejected.
 pub fn resolve_source(
     source: &str,
     scope: Option<types::Scope>,
@@ -1111,7 +1151,7 @@ pub fn resolve_source(
         let confirmation_key = if let Some(key) = confirmation_key {
             let confirmed = CONFIRMED_UNTRUSTED_SOURCES
                 .lock()
-                .map_err(|e| anyhow!("Failed to lock trust confirmation cache: {}", e))?;
+                .map_err(|e| anyhow!("Failed to lock trust confirmation cache: {e}"))?;
             if confirmed.contains(&key) {
                 None
             } else {
@@ -1125,7 +1165,7 @@ pub fn resolve_source(
             zoi_core::utils::confirm_untrusted_source(&resolved.source_type, yes)?;
             let mut confirmed = CONFIRMED_UNTRUSTED_SOURCES
                 .lock()
-                .map_err(|e| anyhow!("Failed to lock trust confirmation cache: {}", e))?;
+                .map_err(|e| anyhow!("Failed to lock trust confirmation cache: {e}"))?;
             confirmed.insert(key);
         }
     }
@@ -1142,6 +1182,10 @@ pub fn resolve_source(
 }
 
 /// Resolves a package and its version from a source string.
+///
+/// # Errors
+///
+/// Returns an error if parsing or resolution fails.
 pub fn resolve_package_and_version(
     source_str: &str,
     scope: Option<types::Scope>,
@@ -1166,8 +1210,8 @@ pub fn resolve_package_and_version(
     let pkg_template = zoi_lua::parser::parse_lua_package(
         resolved_source.path.to_str().ok_or_else(|| {
             anyhow!(
-                "Path contains invalid UTF-8 characters: {:?}",
-                resolved_source.path
+                "Path contains invalid UTF-8 characters: {}",
+                resolved_source.path.display()
             )
         })?,
         None,
@@ -1182,15 +1226,15 @@ pub fn resolve_package_and_version(
 
     let version_string = get_version_for_install(
         &pkg_with_repo,
-        &request.version_spec,
+        request.version_spec.as_ref(),
         registry_handle.as_deref(),
     )?;
 
     let mut pkg = zoi_lua::parser::parse_lua_package(
         resolved_source.path.to_str().ok_or_else(|| {
             anyhow!(
-                "Path contains invalid UTF-8 characters: {:?}",
-                resolved_source.path
+                "Path contains invalid UTF-8 characters: {}",
+                resolved_source.path.display()
             )
         })?,
         Some(&version_string),
@@ -1225,11 +1269,10 @@ fn resolve_source_recursive(
 ) -> Result<ResolvedSource> {
     if max_depth > 0 && depth > max_depth {
         let msg = format!(
-            "Resolution depth {} exceeds limit {}. Potential circular 'alt' reference.",
-            depth, max_depth
+            "Resolution depth {depth} exceeds limit {max_depth}. Potential circular 'alt' reference."
         );
         if quiet
-            || !zoi_core::utils::ask_for_confirmation(&format!("{} Continue anyway?", msg), false)
+            || !zoi_core::utils::ask_for_confirmation(&format!("{msg} Continue anyway?"), false)
         {
             return Err(anyhow!("Exceeded max resolution depth."));
         }
@@ -1265,13 +1308,12 @@ fn resolve_source_recursive(
     {
         if zoi_core::offline::is_offline() {
             return Err(anyhow!(
-                "Cannot resolve remote git repo '{}': Zoi is in offline mode.",
-                handle
+                "Cannot resolve remote git repo '{handle}': Zoi is in offline mode."
             ));
         }
         let git_source = handle
             .strip_prefix("git:")
-            .ok_or_else(|| anyhow!("Handle '{}' unexpectedly missing 'git:' prefix", handle))?;
+            .ok_or_else(|| anyhow!("Handle '{handle}' unexpectedly missing 'git:' prefix"))?;
         println!(
             "Warning: using remote git repo '{}' not from official Zoi database.",
             git_source.yellow()
@@ -1283,22 +1325,22 @@ fn resolve_source_recursive(
 
         let (base_url, branch_sep) = match host {
             "github.com" => (
-                format!("https://raw.githubusercontent.com/{}", repo_path),
+                format!("https://raw.githubusercontent.com/{repo_path}"),
                 "/",
             ),
-            "gitlab.com" => (format!("https://gitlab.com/{}/-/raw", repo_path), "/"),
+            "gitlab.com" => (format!("https://gitlab.com/{repo_path}/-/raw"), "/"),
             "codeberg.org" => (
-                format!("https://codeberg.org/{}/raw/branch", repo_path),
+                format!("https://codeberg.org/{repo_path}/raw/branch"),
                 "/",
             ),
-            _ => return Err(anyhow!("Unsupported git host: {}", host)),
+            _ => return Err(anyhow!("Unsupported git host: {host}")),
         };
 
         let (_, branch) = {
             let mut last_error = None;
             let mut content = None;
             for b in ["main", "master"] {
-                let repo_yaml_url = format!("{}{}{}/repo.yaml", base_url, branch_sep, b);
+                let repo_yaml_url = format!("{base_url}{branch_sep}{b}/repo.yaml");
                 match download_content_from_url(&repo_yaml_url) {
                     Ok(c) => {
                         content = Some((c, b.to_string()));
@@ -1323,10 +1365,10 @@ fn resolve_source_recursive(
 
         let pkg_name = Path::new(&full_pkg_path)
             .file_name()
-            .ok_or_else(|| anyhow!("Invalid package path: {}", full_pkg_path))?
+            .ok_or_else(|| anyhow!("Invalid package path: {full_pkg_path}"))?
             .to_str()
-            .ok_or_else(|| anyhow!("Package name contains invalid UTF-8: {}", full_pkg_path))?;
-        let pkg_lua_filename = format!("{}.pkg.lua", pkg_name);
+            .ok_or_else(|| anyhow!("Package name contains invalid UTF-8: {full_pkg_path}"))?;
+        let pkg_lua_filename = format!("{pkg_name}.pkg.lua");
         let pkg_lua_path_in_repo = Path::new(&full_pkg_path).join(pkg_lua_filename);
 
         let pkg_lua_url = format!(
@@ -1348,11 +1390,11 @@ fn resolve_source_recursive(
         let mut hasher = Sha256::new();
         hasher.update(pkg_lua_url.as_bytes());
         let hash = hex::encode(hasher.finalize());
-        let cache_path = cache_dir.join(format!("{}.pkg.lua", hash));
+        let cache_path = cache_dir.join(format!("{hash}.pkg.lua"));
 
         fs::write(&cache_path, pkg_lua_content.as_bytes())?;
 
-        let repo_name = format!("git:{}", git_source);
+        let repo_name = format!("git:{git_source}");
 
         return Ok(ResolvedSource {
             path: cache_path,
@@ -1375,8 +1417,12 @@ fn resolve_source_recursive(
             ));
         }
 
-        let repo_name = parts[0];
-        let nested_path_parts = &parts[1..];
+        let repo_name = parts
+            .first()
+            .ok_or_else(|| anyhow!("Invalid git source"))?;
+        let nested_path_parts = parts
+            .get(1..)
+            .ok_or_else(|| anyhow!("Invalid git source path"))?;
         let pkg_name = nested_path_parts
             .last()
             .ok_or_else(|| anyhow!("Empty path in git source"))?;
@@ -1393,7 +1439,7 @@ fn resolve_source_recursive(
             path = path.join(part);
         }
 
-        path = path.join(format!("{}.pkg.lua", pkg_name));
+        path = path.join(format!("{pkg_name}.pkg.lua"));
 
         if !path.exists() {
             let nested_path_str = nested_path_parts.join("/");
@@ -1419,7 +1465,7 @@ fn resolve_source_recursive(
         ResolvedSource {
             path,
             source_type: SourceType::GitRepo(repo_name.to_string()),
-            repo_name: Some(format!("git/{}", repo_name)),
+            repo_name: Some(format!("git/{repo_name}")),
             repo_type: Some("unofficial".to_string()),
             registry_handle: Some("local".to_string()),
             sharable_manifest: None,
@@ -1428,15 +1474,14 @@ fn resolve_source_recursive(
     } else if source.starts_with("http://") || source.starts_with("https://") {
         if zoi_core::offline::is_offline() {
             return Err(anyhow!(
-                "Cannot download package definition from URL '{}': Zoi is in offline mode.",
-                source
+                "Cannot download package definition from URL '{source}': Zoi is in offline mode."
             ));
         }
         download_from_url(download_source_for_explicit_path(source, path_part))?
     } else if let Some(path_part) = path_part {
         let path = zoi_core::utils::expand_tilde(path_part);
         if !path.exists() {
-            return Err(anyhow!("Local file not found at '{:?}'", path));
+            return Err(anyhow!("Local file not found at '{}'", path.display()));
         }
         ResolvedSource {
             path,
@@ -1454,9 +1499,7 @@ fn resolve_source_recursive(
             let r_type = index
                 .packages
                 .get(&request.name)
-                .filter(|p| &p.repo == r)
-                .map(|p| p.repo_type.clone())
-                .unwrap_or_else(|| "unofficial".to_string());
+                .filter(|p| &p.repo == r).map_or_else(|| "unofficial".to_string(), |p| p.repo_type.clone());
             (r.clone(), r_type)
         } else {
             let pkg_info = index.packages.get(&request.name).ok_or_else(|| {
@@ -1487,8 +1530,8 @@ fn resolve_source_recursive(
     let pkg_for_alt_check = zoi_lua::parser::parse_lua_package(
         resolved_source.path.to_str().ok_or_else(|| {
             anyhow!(
-                "Path contains invalid UTF-8 characters: {:?}",
-                resolved_source.path
+                "Path contains invalid UTF-8 characters: {}",
+                resolved_source.path.display()
             )
         })?,
         None,
@@ -1517,13 +1560,10 @@ fn resolve_source_recursive(
                                 );
                                 zoi_core::utils::retry_backoff_sleep(attempt);
                                 continue;
-                            } else {
-                                return Err(anyhow!(
-                                    "Failed to download file after {} attempts: {}",
-                                    attempt,
-                                    e
-                                ));
                             }
+                            return Err(anyhow!(
+                                "Failed to download file after {attempt} attempts: {e}"
+                            ));
                         }
                     }
                 };
@@ -1543,15 +1583,15 @@ fn resolve_source_recursive(
                 let mut hasher = Sha256::new();
                 hasher.update(alt_source.as_bytes());
                 let hash = hex::encode(hasher.finalize());
-                let cache_path = cache_dir.join(format!("{}.pkg.lua", hash));
+                let cache_path = cache_dir.join(format!("{hash}.pkg.lua"));
 
                 fs::write(&cache_path, content.as_bytes())?;
 
                 resolve_source_recursive(
                     cache_path.to_str().ok_or_else(|| {
                         anyhow!(
-                            "Cache path contains invalid UTF-8 characters: {:?}",
-                            cache_path
+                            "Cache path contains invalid UTF-8 characters: {}",
+                            cache_path.display()
                         )
                     })?,
                     depth + 1,

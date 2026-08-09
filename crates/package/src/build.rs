@@ -9,7 +9,7 @@
 //! - Handles optional PGP signing of the resulting archive.
 
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use mlua::{Lua, LuaSerdeExt, Table};
 use std::collections::BTreeMap;
 use std::fs::{self, File};
@@ -27,6 +27,10 @@ use zstd::stream::read::Decoder as ZstdDecoder;
 use zstd::stream::write::Encoder as ZstdEncoder;
 
 /// Resolves the build type to use based on requested type and supported types.
+///
+/// # Errors
+///
+/// Returns an error if the requested build type is not supported by the package.
 pub fn resolve_build_type(
     requested: Option<&str>,
     supported: &[String],
@@ -35,10 +39,7 @@ pub fn resolve_build_type(
     if let Some(t) = requested {
         if !supported.iter().any(|s| s == t) {
             return Err(anyhow!(
-                "Build type '{}' not supported by package '{}'. Supported types: {:?}",
-                t,
-                pkg_name,
-                supported
+                "Build type '{t}' not supported by package '{pkg_name}'. Supported types: {supported:?}",
             ));
         }
         return Ok(Some(t.to_string()));
@@ -56,6 +57,11 @@ pub fn resolve_build_type(
 }
 
 /// Retrieves build-time dependencies for a package on a specific platform.
+///
+/// # Errors
+///
+/// Returns an error if the package file path contains invalid UTF-8 characters,
+/// or if parsing the Lua package definition fails.
 pub fn get_build_dependencies(
     package_file: &Path,
     build_type: Option<&str>,
@@ -66,18 +72,16 @@ pub fn get_build_dependencies(
     let pkg_for_meta = zoi_lua::parser::parse_lua_package_for_platform(
         package_file
             .to_str()
-            .ok_or_else(|| anyhow!("Path contains invalid UTF-8 characters: {:?}", package_file))?,
+            .ok_or_else(|| anyhow!("Path contains invalid UTF-8 characters: {}", package_file.display()))?,
         platform,
         version_override,
         None,
         quiet,
     )?;
 
-    let resolved_build_type =
-        match resolve_build_type(build_type, &pkg_for_meta.types, &pkg_for_meta.name)? {
-            Some(t) => t,
-            None => return Ok(None),
-        };
+    let Some(resolved_build_type) = resolve_build_type(build_type, &pkg_for_meta.types, &pkg_for_meta.name)? else {
+        return Ok(None);
+    };
 
     if let Some(deps) = &pkg_for_meta.dependencies
         && let Some(build_deps) = &deps.build
@@ -98,6 +102,11 @@ pub fn get_build_dependencies(
 }
 
 /// Retrieves test-time dependencies for a package on a specific platform.
+///
+/// # Errors
+///
+/// Returns an error if the package file path contains invalid UTF-8 characters,
+/// or if parsing the Lua package definition fails.
 pub fn get_test_dependencies(
     package_file: &Path,
     platform: &str,
@@ -107,7 +116,7 @@ pub fn get_test_dependencies(
     let pkg_for_meta = zoi_lua::parser::parse_lua_package_for_platform(
         package_file
             .to_str()
-            .ok_or_else(|| anyhow!("Path contains invalid UTF-8 characters: {:?}", package_file))?,
+            .ok_or_else(|| anyhow!("Path contains invalid UTF-8 characters: {}", package_file.display()))?,
         platform,
         version_override,
         None,
@@ -193,10 +202,7 @@ fn process_build_operations(
                     let dest_rel = resolve_dest(destination);
 
                     if !utils::is_safe_path(target_staging_dir, Path::new(&dest_rel)) {
-                        return Err(anyhow!(
-                            "Path traversal detected in zcp destination: {}",
-                            dest_rel
-                        ));
+                        return Err(anyhow!("Path traversal detected in zcp destination: {dest_rel}"));
                     }
 
                     let dest_path = target_staging_dir.join(&dest_rel);
@@ -206,19 +212,16 @@ fn process_build_operations(
                         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
                             if !quiet {
                                 println!(
-                                    "{} Skipping missing zcp source: '{}' (not found in build dir or package dir)",
+                                    "{} Skipping missing zcp source: '{source}' (not found in build dir or package dir)",
                                     "::".bold().yellow(),
-                                    source
                                 );
                             }
                             continue;
                         }
                         Err(e) => {
                             return Err(anyhow!(
-                                "Failed to get metadata for '{}' (resolved from '{}'): {}",
+                                "Failed to get metadata for '{}' (resolved from '{source}'): {e}",
                                 source_path.display(),
-                                source,
-                                e
                             ));
                         }
                     };
@@ -226,14 +229,13 @@ fn process_build_operations(
                     if source_metadata.is_dir() {
                         for entry in WalkDir::new(&source_path)
                             .into_iter()
-                            .filter_map(|e| e.ok())
+                            .filter_map(Result::ok)
                         {
                             let rel_entry = entry.path().strip_prefix(&source_path)?;
                             let target_path = dest_path.join(rel_entry);
 
-                            let metadata = match entry.path().symlink_metadata() {
-                                Ok(m) => m,
-                                Err(_) => continue, // Skip entries we can't read
+                            let Ok(metadata) = entry.path().symlink_metadata() else {
+                                continue; // Skip entries we can't read
                             };
 
                             if metadata.is_dir() {
@@ -267,7 +269,7 @@ fn process_build_operations(
                     }
 
                     if !quiet {
-                        println!("Staged '{}' to '{}'", source, dest_rel);
+                        println!("Staged '{source}' to '{dest_rel}'");
                     }
                 }
                 "zln" => {
@@ -283,7 +285,7 @@ fn process_build_operations(
                     target = target.replace("${usrhome}", "usrhome");
 
                     if !utils::is_safe_path(target_staging_dir, Path::new(&dest_rel)) {
-                        return Err(anyhow!("Path traversal detected in zln link: {}", dest_rel));
+                        return Err(anyhow!("Path traversal detected in zln link: {dest_rel}"));
                     }
 
                     let link_path = target_staging_dir.join(&dest_rel);
@@ -293,7 +295,7 @@ fn process_build_operations(
 
                     utils::symlink_file(Path::new(&target), &link_path)?;
                     if !quiet {
-                        println!("Created symlink '{}' -> '{}'", dest_rel, target);
+                        println!("Created symlink '{dest_rel}' -> '{target}'");
                     }
                 }
                 "zchmod" => {
@@ -303,20 +305,17 @@ fn process_build_operations(
                     let dest_rel = resolve_dest(path);
 
                     if !utils::is_safe_path(target_staging_dir, Path::new(&dest_rel)) {
-                        return Err(anyhow!(
-                            "Path traversal detected in zchmod path: {}",
-                            dest_rel
-                        ));
+                        return Err(anyhow!("Path traversal detected in zchmod path: {dest_rel}"));
                     }
 
                     #[cfg(unix)]
                     {
-                        let full_path = target_staging_dir.join(&dest_rel);
                         use std::os::unix::fs::PermissionsExt;
+                        let full_path = target_staging_dir.join(&dest_rel);
                         fs::set_permissions(full_path, fs::Permissions::from_mode(mode))?;
                     }
                     if !quiet {
-                        println!("Set permissions {} on '{}'", mode, dest_rel);
+                        println!("Set permissions {mode} on '{dest_rel}'");
                     }
                 }
                 "zchown" => {
@@ -327,10 +326,7 @@ fn process_build_operations(
                     let dest_rel = resolve_dest(path);
 
                     if !utils::is_safe_path(target_staging_dir, Path::new(&dest_rel)) {
-                        return Err(anyhow!(
-                            "Path traversal detected in zchown path: {}",
-                            dest_rel
-                        ));
+                        return Err(anyhow!("Path traversal detected in zchown path: {dest_rel}"));
                     }
 
                     #[cfg(unix)]
@@ -339,7 +335,7 @@ fn process_build_operations(
                         utils::set_path_owner(&full_path, &owner, &group)?;
                     }
                     if !quiet {
-                        println!("Set ownership {}:{} on '{}'", owner, group, dest_rel);
+                        println!("Set ownership {owner}:{group} on '{dest_rel}'");
                     }
                 }
                 "zmkdir" => {
@@ -348,16 +344,13 @@ fn process_build_operations(
                     let dest_rel = resolve_dest(path);
 
                     if !utils::is_safe_path(target_staging_dir, Path::new(&dest_rel)) {
-                        return Err(anyhow!(
-                            "Path traversal detected in zmkdir path: {}",
-                            dest_rel
-                        ));
+                        return Err(anyhow!("Path traversal detected in zmkdir path: {dest_rel}"));
                     }
 
                     let full_path = target_staging_dir.join(&dest_rel);
                     fs::create_dir_all(full_path)?;
                     if !quiet {
-                        println!("Created directory '{}'", dest_rel);
+                        println!("Created directory '{dest_rel}'");
                     }
                 }
                 _ => {}
@@ -372,7 +365,7 @@ fn build_for_platform(
     package_file: &Path,
     build_type: Option<&str>,
     platform: &str,
-    sign_key: &Option<String>,
+    sign_key: Option<&String>,
     output_dir: Option<&Path>,
     version_override: Option<&str>,
     sub_packages: Option<&Vec<String>>,
@@ -391,7 +384,7 @@ fn build_for_platform(
     let pkg_for_meta = zoi_lua::parser::parse_lua_package_for_platform(
         package_file
             .to_str()
-            .ok_or_else(|| anyhow!("Path contains invalid UTF-8 characters: {:?}", package_file))?,
+            .ok_or_else(|| anyhow!("Path contains invalid UTF-8 characters: {}", package_file.display()))?,
         platform,
         version_override,
         None,
@@ -403,31 +396,27 @@ fn build_for_platform(
     {
         if !quiet {
             println!(
-                "{} Skipping build for platform {}: package only supports {:?}",
+                "{} Skipping build for platform {}: package only supports {allowed_platforms:?}",
                 "::".bold().yellow(),
                 platform.cyan(),
-                allowed_platforms
             );
         }
         return Ok(());
     }
 
-    let resolved_build_type = match resolve_build_type(
+    let Some(resolved_build_type) = resolve_build_type(
         build_type,
         &pkg_for_meta.types,
         &pkg_for_meta.name,
-    )? {
-        Some(t) => t,
-        None => {
-            if !quiet {
-                println!(
-                    "{} Skipping build for package '{}': no build types supported (likely a collection or template).",
-                    "::".bold().yellow(),
-                    pkg_for_meta.name
-                );
-            }
-            return Ok(());
+    )? else {
+        if !quiet {
+            println!(
+                "{} Skipping build for package '{}': no build types supported (likely a collection or template).",
+                "::".bold().yellow(),
+                pkg_for_meta.name
+            );
         }
+        return Ok(());
     };
 
     let version = if let Some(v) = version_override {
@@ -437,7 +426,7 @@ fn build_for_platform(
     };
 
     let build_dir = Builder::new()
-        .prefix(&format!("zoi-build-{}-{}", pkg_for_meta.name, platform))
+        .prefix(&format!("zoi-build-{}-{platform}", pkg_for_meta.name))
         .tempdir()?;
     if !quiet {
         println!("Using build directory: {}", build_dir.path().display());
@@ -469,15 +458,15 @@ fn build_for_platform(
     let subs_to_build = if let Some(subs) = sub_packages {
         subs.clone()
     } else if let Some(subs) = &pkg_for_meta.sub_packages {
-        if subs.contains(&"".to_string()) || subs.contains(&"main".to_string()) {
+        if subs.contains(&String::new()) || subs.contains(&"main".to_string()) {
             subs.clone()
         } else {
-            let mut all_subs = vec!["".to_string()];
+            let mut all_subs = vec![String::new()];
             all_subs.extend(subs.clone());
             all_subs
         }
     } else {
-        vec!["".to_string()]
+        vec![String::new()]
     };
 
     let scopes_to_process =
@@ -560,7 +549,7 @@ fn build_for_platform(
 
         for scope in &scopes_to_process {
             if !quiet {
-                println!("  {} Staging for scope: {:?}", "::".bold().blue(), scope);
+                println!("  {} Staging for scope: {scope:?}", "::".bold().blue());
             }
 
             let lua = Lua::new();
@@ -631,7 +620,7 @@ fn build_for_platform(
                         match verify_fn.call::<mlua::Value>(args.clone()) {
                             Ok(mlua::Value::Boolean(b)) => b,
                             Ok(_) => true, // Legacy behavior
-                            Err(e) => return Err(anyhow!("Verification failed: {}", e)),
+                            Err(e) => return Err(anyhow!("Verification failed: {e}")),
                         };
                     if !verification_passed {
                         return Err(anyhow!("Package verification failed."));
@@ -646,9 +635,8 @@ fn build_for_platform(
         && let Err(e) = super::relocate::relocate_elfs(&pool_dir, quiet)
     {
         eprintln!(
-            "{} Failed to relocate ELF binaries in pool: {}",
+            "{} Failed to relocate ELF binaries in pool: {e}",
             "Warning:".yellow(),
-            e
         );
     }
 
@@ -670,7 +658,7 @@ fn build_for_platform(
         ),
     )?;
 
-    let output_filename = format!("{}-{}-{}.zpa", pkg_for_meta.name, version, platform);
+    let output_filename = format!("{}-{version}-{platform}.zpa", pkg_for_meta.name);
     let output_base = if let Some(dir) = output_dir {
         dir.to_path_buf()
     } else {
@@ -755,7 +743,7 @@ fn build_for_platform(
     let hash_path = PathBuf::from(format!("{}.hash", output_path.display()));
     let output_path_str = output_path
         .to_str()
-        .ok_or_else(|| anyhow!("Output path contains invalid UTF-8: {:?}", output_path))?;
+        .ok_or_else(|| anyhow!("Output path contains invalid UTF-8: {}", output_path.display()))?;
     let hash = zoi_core::hash::calculate_file_hash(
         Path::new(output_path_str),
         zoi_core::hash::HashAlgorithm::Sha512,
@@ -763,8 +751,7 @@ fn build_for_platform(
     fs::write(
         &hash_path,
         format!(
-            "{}  {}\n",
-            hash,
+            "{hash}  {}\n",
             output_path
                 .file_name()
                 .ok_or_else(|| anyhow!("output_path should have a name"))?
@@ -777,15 +764,14 @@ fn build_for_platform(
     let compressed_size = fs::metadata(&output_path)?.len();
     let uncompressed_size: u64 = WalkDir::new(&staging_dir)
         .into_iter()
-        .filter_map(|e| e.ok())
+        .filter_map(Result::ok)
         .filter(|e| e.file_type().is_file())
-        .map(|e| e.metadata().map(|m| m.len()).unwrap_or(0))
+        .map(|e| e.metadata().map_or(0, |m| m.len()))
         .sum();
     fs::write(
         &size_path,
         format!(
-            "down: {}\ninstall: {}\n",
-            compressed_size, uncompressed_size
+            "down: {compressed_size}\ninstall: {uncompressed_size}\n",
         ),
     )?;
 
@@ -821,6 +807,14 @@ fn build_for_platform(
 }
 
 /// Executes the build process for one or more platforms.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - A .zsa bundle cannot be extracted.
+/// - The required image is not specified for Docker builds.
+/// - Building for 'all' platforms is requested.
+/// - One or more platform builds fail.
 pub fn run(
     package_file: &Path,
     build_type: Option<&str>,
@@ -850,7 +844,7 @@ pub fn run(
         }
 
         if output_dir.is_none() {
-            default_output_dir = package_file.parent().map(|p| p.to_path_buf());
+            default_output_dir = package_file.parent().map(Path::to_path_buf);
         }
 
         let temp_dir = Builder::new().prefix("zoi-zsa-extract-").tempdir()?;
@@ -863,7 +857,7 @@ pub fn run(
         let mut pkg_lua = None;
         for entry in WalkDir::new(temp_dir.path())
             .into_iter()
-            .filter_map(|e| e.ok())
+            .filter_map(Result::ok)
         {
             if entry.file_name().to_string_lossy().ends_with(".pkg.lua") {
                 pkg_lua = Some(entry.path().to_path_buf());
@@ -946,7 +940,7 @@ pub fn run(
             package_file,
             build_type,
             platform,
-            &sign_key,
+            sign_key.as_ref(),
             output_dir,
             version_override,
             sub_packages.as_ref(),
@@ -956,10 +950,9 @@ pub fn run(
             test,
         ) {
             eprintln!(
-                "{}: Failed to build for platform {}: {}",
+                "{}: Failed to build for platform {}: {e}",
                 "Error".red().bold(),
                 platform.red(),
-                e
             );
             any_failed = true;
         }

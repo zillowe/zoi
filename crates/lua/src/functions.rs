@@ -14,6 +14,10 @@ use zoi_core::utils;
 /// directory paths, and utility functions that the `.pkg.lua` script
 /// expects to have available. It effectively creates the "sandbox" where
 /// package builds and installations are defined.
+///
+/// # Errors
+///
+/// Returns an error if the Lua environment cannot be properly initialized.
 pub fn setup_lua_environment(
     lua: &Lua,
     platform: &str,
@@ -126,7 +130,7 @@ pub fn setup_lua_environment(
     }
 
     if let Some(s) = scope {
-        let scope_str = format!("{:?}", s).to_lowercase();
+        let scope_str = format!("{s:?}").to_lowercase();
         zoi_table.set("scope", scope_str)?;
     }
 

@@ -1,6 +1,6 @@
 use super::{config, executor};
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use dialoguer::{Select, theme::ColorfulTheme};
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
@@ -16,27 +16,36 @@ use zoi_core::utils;
 /// - Parallel Execution: Uses `rayon` to execute stages concurrently.
 /// - Incremental Builds: Uses file-based hashing (`cache_files`) to skip
 ///   tasks if their inputs haven't changed.
+///
+/// # Errors
+///
+/// Returns an error if no commands are defined, task dependencies cannot be resolved,
+/// or if any task execution fails.
 pub fn run(cmd_alias: Option<&str>, args: &[String], config: &config::ProjectConfig) -> Result<()> {
     if config.commands.is_empty() {
         return Err(anyhow!("No commands defined in zoi.yaml"));
     }
 
-    let target_alias = match cmd_alias {
-        Some(alias) => alias.to_string(),
-        None => {
-            if !args.is_empty() {
-                return Err(anyhow!("Cannot pass arguments when in interactive mode."));
-            }
-            let selections: Vec<&str> = config.commands.iter().map(|c| c.cmd.as_str()).collect();
-            let selection = Select::with_theme(&ColorfulTheme::default())
-                .with_prompt("Choose a command to run")
-                .items(&selections)
-                .default(0)
-                .interact_opt()?
-                .ok_or(anyhow!("No command chosen."))?;
-
-            config.commands[selection].cmd.clone()
+    let target_alias = if let Some(alias) = cmd_alias {
+        alias.to_string()
+    } else {
+        if !args.is_empty() {
+            return Err(anyhow!("Cannot pass arguments when in interactive mode."));
         }
+        let selections: Vec<&str> = config.commands.iter().map(|c| c.cmd.as_str()).collect();
+        let selection = Select::with_theme(&ColorfulTheme::default())
+            .with_prompt("Choose a command to run")
+            .items(&selections)
+            .default(0)
+            .interact_opt()?
+            .ok_or(anyhow!("No command chosen."))?;
+
+        config
+            .commands
+            .get(selection)
+            .ok_or_else(|| anyhow!("Invalid selection"))?
+            .cmd
+            .clone()
     };
 
     let platform = utils::get_platform()?;
@@ -60,7 +69,7 @@ pub fn run(cmd_alias: Option<&str>, args: &[String], config: &config::ProjectCon
                 .commands
                 .iter()
                 .find(|c| c.cmd == task_alias)
-                .ok_or_else(|| anyhow!("Task '{}' not found", task_alias))?;
+                .ok_or_else(|| anyhow!("Task '{task_alias}' not found"))?;
 
             let current_hash = if let Some(files) = &cmd_spec.cache_files {
                 Some(calculate_files_hash(files)?)
@@ -109,7 +118,7 @@ fn resolve_task_dependencies(
     stack: &mut HashSet<String>,
 ) -> Result<()> {
     if stack.contains(alias) {
-        return Err(anyhow!("Circular dependency detected in tasks: {}", alias));
+        return Err(anyhow!("Circular dependency detected in tasks: {alias}"));
     }
     if visited.contains(alias) {
         return Ok(());
@@ -121,7 +130,7 @@ fn resolve_task_dependencies(
         .commands
         .iter()
         .find(|c| c.cmd == alias)
-        .ok_or_else(|| anyhow!("Command alias '{}' not found in zoi.yaml", alias))?;
+        .ok_or_else(|| anyhow!("Command alias '{alias}' not found in zoi.yaml"))?;
 
     if let Some(deps) = &cmd_spec.depends_on {
         for dep in deps {
@@ -154,8 +163,7 @@ fn group_tasks_into_stages(
             .find(|c| c.cmd == *alias)
             .ok_or_else(|| {
                 anyhow!(
-                    "Command spec for '{}' disappeared during task grouping",
-                    alias
+                    "Command spec for '{alias}' disappeared during task grouping"
                 )
             })?;
         if let Some(deps) = &cmd_spec.depends_on {
@@ -166,7 +174,7 @@ fn group_tasks_into_stages(
                         .push(alias.clone());
                     let degree = in_degree
                         .get_mut(alias)
-                        .ok_or_else(|| anyhow!("Task '{}' missing from in_degree map", alias))?;
+                        .ok_or_else(|| anyhow!("Task '{alias}' missing from in_degree map"))?;
                     *degree += 1;
                 }
             }
@@ -186,7 +194,7 @@ fn group_tasks_into_stages(
             if let Some(neighbors) = adj.get(task) {
                 for neighbor in neighbors {
                     let degree = in_degree.get_mut(neighbor).ok_or_else(|| {
-                        anyhow!("Neighbor task '{}' missing from in_degree map", neighbor)
+                        anyhow!("Neighbor task '{neighbor}' missing from in_degree map")
                     })?;
                     *degree -= 1;
                     if *degree == 0 {
@@ -216,8 +224,7 @@ fn run_single_command(
             .cloned()
             .ok_or_else(|| {
                 anyhow!(
-                    "No command found for platform '{}' and no default specified",
-                    platform
+                    "No command found for platform '{platform}' and no default specified"
                 )
             })?,
     };

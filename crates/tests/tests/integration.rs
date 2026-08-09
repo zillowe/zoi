@@ -19,15 +19,15 @@ fn test_lua_zcp_records_operation() {
         None,
         true,
     )
-    .unwrap();
+    .expect("unwrap failed");
 
-    lua.load(r#"zcp("src", "dest")"#).exec().unwrap();
+    lua.load(r#"zcp("src", "dest")"#).exec().expect("unwrap failed");
 
-    let ops: Table = lua.globals().get("__ZoiBuildOperations").unwrap();
-    let op: Table = ops.get(1).unwrap();
-    let op_type: String = op.get("op").unwrap();
-    let source: String = op.get("source").unwrap();
-    let dest: String = op.get("destination").unwrap();
+    let ops: Table = lua.globals().get("__ZoiBuildOperations").expect("unwrap failed");
+    let op: Table = ops.get(1).expect("unwrap failed");
+    let op_type: String = op.get("op").expect("unwrap failed");
+    let source: String = op.get("source").expect("unwrap failed");
+    let dest: String = op.get("destination").expect("unwrap failed");
 
     assert_eq!(op_type, "zcp");
     assert_eq!(source, "src");
@@ -50,16 +50,16 @@ fn test_lua_zlicense_records_zcp_operation() {
         None,
         true,
     )
-    .unwrap();
+    .expect("unwrap failed");
 
-    lua.load(r#"zlicense("LICENSE.txt")"#).exec().unwrap();
+    lua.load(r#"zlicense("LICENSE.txt")"#).exec().expect("unwrap failed");
 
-    let ops: Table = lua.globals().get("__ZoiBuildOperations").unwrap();
-    let op: Table = ops.get(1).unwrap();
-    assert_eq!(op.get::<String>("op").unwrap(), "zcp");
-    assert_eq!(op.get::<String>("source").unwrap(), "LICENSE.txt");
+    let ops: Table = lua.globals().get("__ZoiBuildOperations").expect("unwrap failed");
+    let op: Table = ops.get(1).expect("unwrap failed");
+    assert_eq!(op.get::<String>("op").expect("unwrap failed"), "zcp");
+    assert_eq!(op.get::<String>("source").expect("unwrap failed"), "LICENSE.txt");
     assert_eq!(
-        op.get::<String>("destination").unwrap(),
+        op.get::<String>("destination").expect("unwrap failed"),
         "${pkgstore}/LICENSE"
     );
 }
@@ -80,16 +80,16 @@ fn test_lua_zdoc_records_zcp_operation() {
         None,
         true,
     )
-    .unwrap();
+    .expect("unwrap failed");
 
-    lua.load(r#"zdoc("docs/README.md")"#).exec().unwrap();
+    lua.load(r#"zdoc("docs/README.md")"#).exec().expect("unwrap failed");
 
-    let ops: Table = lua.globals().get("__ZoiBuildOperations").unwrap();
-    let op: Table = ops.get(1).unwrap();
-    assert_eq!(op.get::<String>("op").unwrap(), "zcp");
-    assert_eq!(op.get::<String>("source").unwrap(), "docs/README.md");
+    let ops: Table = lua.globals().get("__ZoiBuildOperations").expect("unwrap failed");
+    let op: Table = ops.get(1).expect("unwrap failed");
+    assert_eq!(op.get::<String>("op").expect("unwrap failed"), "zcp");
+    assert_eq!(op.get::<String>("source").expect("unwrap failed"), "docs/README.md");
     assert_eq!(
-        op.get::<String>("destination").unwrap(),
+        op.get::<String>("destination").expect("unwrap failed"),
         "${pkgstore}/doc/README.md"
     );
 }
@@ -110,15 +110,15 @@ fn test_lua_zln_records_operation() {
         None,
         true,
     )
-    .unwrap();
+    .expect("unwrap failed");
 
-    lua.load(r#"zln("target", "link")"#).exec().unwrap();
+    lua.load(r#"zln("target", "link")"#).exec().expect("unwrap failed");
 
-    let ops: Table = lua.globals().get("__ZoiBuildOperations").unwrap();
-    let op: Table = ops.get(1).unwrap();
-    assert_eq!(op.get::<String>("op").unwrap(), "zln");
-    assert_eq!(op.get::<String>("target").unwrap(), "target");
-    assert_eq!(op.get::<String>("link").unwrap(), "link");
+    let ops: Table = lua.globals().get("__ZoiBuildOperations").expect("unwrap failed");
+    let op: Table = ops.get(1).expect("unwrap failed");
+    assert_eq!(op.get::<String>("op").expect("unwrap failed"), "zln");
+    assert_eq!(op.get::<String>("target").expect("unwrap failed"), "target");
+    assert_eq!(op.get::<String>("link").expect("unwrap failed"), "link");
 }
 
 #[test]

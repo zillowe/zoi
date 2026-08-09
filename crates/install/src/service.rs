@@ -1,4 +1,5 @@
 use anyhow::{Context, Result, anyhow};
+use std::fmt::Write as _;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
@@ -6,6 +7,7 @@ use zoi_core::{sysroot, types, utils};
 use zoi_resolver::local;
 
 /// Actions that can be performed on a background service.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ServiceAction {
     /// Start the service.
     Start,
@@ -22,17 +24,21 @@ pub enum ServiceAction {
 }
 
 /// Manages a service for a given package.
+///
+/// # Errors
+///
+/// Returns an error if the package is not installed, if it does not define
+/// a background service, or if the service management command fails.
 pub fn manage_service(package_name: &str, action: ServiceAction) -> Result<()> {
     let installed_packages = local::get_installed_packages()?;
     let manifest = installed_packages
         .iter()
         .find(|p| p.name == package_name)
-        .ok_or_else(|| anyhow!("Package '{}' is not installed.", package_name))?;
+        .ok_or_else(|| anyhow!("Package '{package_name}' is not installed."))?;
 
     let service = manifest.service.as_ref().ok_or_else(|| {
         anyhow!(
-            "Package '{}' does not define a background service.",
-            package_name
+            "Package '{package_name}' does not define a background service."
         )
     })?;
 
@@ -47,6 +53,11 @@ pub fn manage_service(package_name: &str, action: ServiceAction) -> Result<()> {
 }
 
 /// Lists all installed services and their current status.
+///
+/// # Errors
+///
+/// Returns an error if installed packages cannot be retrieved or if
+/// querying service status fails.
 pub fn list_services() -> Result<Vec<(String, String)>> {
     let installed_packages = local::get_installed_packages()?;
     let mut services = Vec::new();
@@ -62,8 +73,13 @@ pub fn list_services() -> Result<Vec<(String, String)>> {
 }
 
 /// Cleans up service files for a given package.
+///
+/// # Errors
+///
+/// Returns an error if service files cannot be removed or if
+/// the service manager cannot be reloaded.
 pub fn cleanup_service(package_name: &str, scope: types::Scope) -> Result<()> {
-    let service_name = format!("zoi-{}", package_name);
+    let service_name = format!("zoi-{package_name}");
     let is_user = scope != types::Scope::System;
 
     match std::env::consts::OS {
@@ -73,12 +89,11 @@ pub fn cleanup_service(package_name: &str, scope: types::Scope) -> Result<()> {
                     .ok_or_else(|| anyhow!("Could not find home directory"))?;
                 sysroot::apply_sysroot(
                     home.join(".config/systemd/user")
-                        .join(format!("{}.service", service_name)),
+                        .join(format!("{service_name}.service")),
                 )
             } else {
                 sysroot::apply_sysroot(PathBuf::from(format!(
-                    "/etc/systemd/system/{}.service",
-                    service_name
+                    "/etc/systemd/system/{service_name}.service"
                 )))
             };
             if unit_path.exists() {
@@ -103,12 +118,11 @@ pub fn cleanup_service(package_name: &str, scope: types::Scope) -> Result<()> {
                     .ok_or_else(|| anyhow!("Could not find home directory"))?;
                 sysroot::apply_sysroot(
                     home.join("Library/LaunchAgents")
-                        .join(format!("{}.plist", service_name)),
+                        .join(format!("{service_name}.plist")),
                 )
             } else {
                 sysroot::apply_sysroot(PathBuf::from(format!(
-                    "/Library/LaunchDaemons/{}.plist",
-                    service_name
+                    "/Library/LaunchDaemons/{service_name}.plist"
                 )))
             };
             if plist_path.exists() {
@@ -122,7 +136,7 @@ pub fn cleanup_service(package_name: &str, scope: types::Scope) -> Result<()> {
             if std::env::var("ZOI_TEST_SKIP_SERVICE_COMMANDS").is_err()
                 && service_exists_windows(&service_name)? =>
         {
-            println!("Removing Windows service: {}", service_name);
+            println!("Removing Windows service: {service_name}");
             Command::new("sc")
                 .arg("delete")
                 .arg(&service_name)
@@ -232,9 +246,9 @@ fn manage_linux_service(
 
     let status = cmd
         .status()
-        .with_context(|| format!("Failed to run systemctl for action {:?}", name))?;
+        .with_context(|| format!("Failed to run systemctl for action {name:?}"))?;
     if !status.success() {
-        return Err(anyhow!("Failed to perform service action on '{}'.", name));
+        return Err(anyhow!("Failed to perform service action on '{name}'."));
     }
 
     Ok(())
@@ -248,11 +262,10 @@ fn ensure_linux_unit_file(name: &str, service: &types::Service, is_user: bool) -
         let path = sysroot::apply_sysroot(home.join(".config/systemd/user"));
         fs::create_dir_all(&path)
             .with_context(|| format!("Failed to create directory: {}", path.display()))?;
-        path.join(format!("{}.service", name))
+        path.join(format!("{name}.service"))
     } else {
         sysroot::apply_sysroot(PathBuf::from(format!(
-            "/etc/systemd/system/{}.service",
-            name
+            "/etc/systemd/system/{name}.service"
         )))
     };
 
@@ -283,7 +296,7 @@ WorkingDirectory=",
 
     if let Some(envs) = &service.env {
         for (k, v) in envs {
-            content.push_str(&format!("\nEnvironment=\"{}={}\"", k, v));
+            let _ = write!(content, "\nEnvironment=\"{k}={v}\"");
         }
     }
 
@@ -375,11 +388,10 @@ fn ensure_macos_plist(name: &str, service: &types::Service, is_user: bool) -> Re
         let path = sysroot::apply_sysroot(home.join("Library/LaunchAgents"));
         fs::create_dir_all(&path)
             .with_context(|| format!("Failed to create directory: {}", path.display()))?;
-        path.join(format!("{}.plist", name))
+        path.join(format!("{name}.plist"))
     } else {
         sysroot::apply_sysroot(PathBuf::from(format!(
-            "/Library/LaunchDaemons/{}.plist",
-            name
+            "/Library/LaunchDaemons/{name}.plist"
         )))
     };
 
@@ -393,70 +405,47 @@ fn ensure_macos_plist(name: &str, service: &types::Service, is_user: bool) -> Re
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>{}</string>
+    <string>{name}</string>
     <key>ProgramArguments</key>
     <array>
-"#,
-        name
+"#
     );
 
     for part in service.run.split_whitespace() {
-        content.push_str(&format!(
-            "        <string>{}</string>
-",
-            part
-        ));
+        let _ = writeln!(content, "        <string>{part}</string>");
     }
 
     content.push_str(
-        "    </array>
-",
+        "    </array>\n",
     );
 
     if let Some(dir) = &service.working_dir {
-        content.push_str(&format!(
-            "    <key>WorkingDirectory</key>
-    <string>{}</string>
-",
-            dir
-        ));
+        let _ = write!(
+            content,
+            "    <key>WorkingDirectory</key>\n    <string>{dir}</string>\n"
+        );
     }
 
     if let Some(envs) = &service.env {
         content.push_str(
-            "    <key>EnvironmentVariables</key>
-    <dict>
-",
+            "    <key>EnvironmentVariables</key>\n    <dict>\n",
         );
         for (k, v) in envs {
-            content.push_str(&format!(
-                "        <key>{}</key>
-        <string>{}</string>
-",
-                k, v
-            ));
+            let _ = write!(content, "        <key>{k}</key>\n        <string>{v}</string>\n");
         }
         content.push_str(
-            "    </dict>
-",
+            "    </dict>\n",
         );
     }
 
     if let Some(log) = &service.log_path {
-        content.push_str(&format!(
-            "    <key>StandardOutPath</key>
-    <string>{}</string>
-",
-            log
-        ));
+        let _ = write!(content, "    <key>StandardOutPath</key>\n    <string>{log}</string>\n");
     }
     if let Some(err_log) = &service.error_log_path {
-        content.push_str(&format!(
-            "    <key>StandardErrorPath</key>
-    <string>{}</string>
-",
-            err_log
-        ));
+        let _ = write!(
+            content,
+            "    <key>StandardErrorPath</key>\n    <string>{err_log}</string>\n"
+        );
     }
 
     if service.run_at_load {
@@ -572,7 +561,7 @@ fn create_windows_service(name: &str, service: &types::Service) -> Result<()> {
 
     let status = cmd.status().context("Failed to run sc create")?;
     if !status.success() {
-        return Err(anyhow!("Failed to create Windows service '{}'.", name));
+        return Err(anyhow!("Failed to create Windows service '{name}'."));
     }
     Ok(())
 }

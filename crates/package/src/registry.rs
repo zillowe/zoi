@@ -7,7 +7,7 @@ use crate::doctor as pkg_doctor;
 use crate::init_lsp;
 use anyhow::{Result, anyhow};
 use chrono::Datelike;
-use colored::*;
+use colored::Colorize;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -19,6 +19,13 @@ use zoi_lua;
 ///
 /// This creates the necessary directory structure, `repo.yaml`, `packages.json`,
 /// and `advisories.json`, and sets up LSP support.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The registry directory or its subdirectories cannot be created.
+/// - LSP workspace setup fails.
+/// - Any of the initial configuration files cannot be written.
 pub fn init(path: &Path) -> Result<()> {
     println!(
         "{} Initializing new Zoi registry at {}...",
@@ -106,9 +113,8 @@ repos:
   "version": "2",
   "advisories": {{}},
   "last_id": 0,
-  "year": {}
+  "year": {current_year}
 }}"#,
-            current_year
         );
         fs::write(advisories_json_path, content)?;
     }
@@ -125,16 +131,25 @@ repos:
 ///
 /// This creates a new directory for the package and a template `.pkg.lua` file.
 /// If `name` or `repo` are not provided, it prompts the user for input.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The path is not a Zoi registry.
+/// - Package name or repository tier are not provided.
+/// - The package directory cannot be created.
+/// - The package already exists.
 pub fn add_package(registry_root: &Path, name: Option<&str>, repo: Option<&str>) -> Result<()> {
+    use std::io::{Write, stdin, stdout};
+
     if !registry_root.join("repo.yaml").exists() {
         return Err(anyhow!(
             "Not a Zoi registry (missing repo.yaml). Run 'zoi reg init' first."
         ));
     }
 
-    use std::io::{Write, stdin, stdout};
     let get_input = |prompt: &str| -> String {
-        print!("{}: ", prompt);
+        print!("{prompt}: ");
         let _ = stdout().flush();
         let mut input = String::new();
         let _ = stdin().read_line(&mut input);
@@ -158,12 +173,10 @@ pub fn add_package(registry_root: &Path, name: Option<&str>, repo: Option<&str>)
     let pkg_dir = registry_root.join(&repo).join(&name);
     fs::create_dir_all(&pkg_dir)?;
 
-    let pkg_lua_path = pkg_dir.join(format!("{}.pkg.lua", name));
+    let pkg_lua_path = pkg_dir.join(format!("{name}.pkg.lua"));
     if pkg_lua_path.exists() {
         return Err(anyhow!(
-            "Package '{}' already exists in repo '{}'.",
-            name,
-            repo
+            "Package '{name}' already exists in repo '{repo}'.",
         ));
     }
 
@@ -219,8 +232,6 @@ function uninstall()
   -- Cleanup outside the package store
 end
 "#,
-        name = name,
-        repo = repo
     );
 
     fs::write(pkg_lua_path, content)?;
@@ -238,20 +249,28 @@ end
 ///
 /// This creates a temporary `.sec.yaml` file for the given package.
 /// The ID will be automatically assigned during `generate_metadata`.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The path is not a Zoi registry.
+/// - The package is not found in the registry.
+/// - A temporary advisory already exists.
 pub fn add_advisory(
     registry_root: &Path,
     package_name: Option<&str>,
     repo: Option<&str>,
 ) -> Result<()> {
+    use std::io::{Write, stdin, stdout};
+
     if !registry_root.join("repo.yaml").exists() {
         return Err(anyhow!(
             "Not a Zoi registry (missing repo.yaml). Run 'zoi reg init' first."
         ));
     }
 
-    use std::io::{Write, stdin, stdout};
     let get_input = |prompt: &str| -> String {
-        print!("{}: ", prompt);
+        print!("{prompt}: ");
         let _ = stdout().flush();
         let mut input = String::new();
         let _ = stdin().read_line(&mut input);
@@ -267,11 +286,9 @@ pub fn add_advisory(
 
     let pkg_dir = if let Some(r) = repo {
         let dir = registry_root.join(r).join(package_name_str);
-        if !dir.join(format!("{}.pkg.lua", package_name_str)).exists() {
+        if !dir.join(format!("{package_name_str}.pkg.lua")).exists() {
             return Err(anyhow!(
-                "Package '{}' not found in repo '{}'.",
-                package_name_str,
-                r
+                "Package '{package_name_str}' not found in repo '{r}'.",
             ));
         }
         dir
@@ -279,13 +296,13 @@ pub fn add_advisory(
         let mut found = None;
         for entry in WalkDir::new(registry_root)
             .into_iter()
-            .filter_map(|e| e.ok())
+            .filter_map(Result::ok)
         {
             if entry.file_type().is_dir()
                 && entry.file_name().to_string_lossy() == package_name_str
                 && entry
                     .path()
-                    .join(format!("{}.pkg.lua", package_name_str))
+                    .join(format!("{package_name_str}.pkg.lua"))
                     .exists()
             {
                 found = Some(entry.path().to_path_buf());
@@ -294,8 +311,7 @@ pub fn add_advisory(
         }
         found.ok_or_else(|| {
             anyhow!(
-                "Package '{}' not found in registry. Try specifying --repo.",
-                package_name_str
+                "Package '{package_name_str}' not found in registry. Try specifying --repo.",
             )
         })?
     };
@@ -307,7 +323,7 @@ pub fn add_advisory(
         .unwrap_or_else(|| "ZSA".to_string());
 
     let current_year = chrono::Utc::now().year();
-    let adv_file_path = pkg_dir.join(format!("{}-{}-TEMP.sec.yaml", prefix, current_year));
+    let adv_file_path = pkg_dir.join(format!("{prefix}-{current_year}-TEMP.sec.yaml"));
 
     if adv_file_path.exists() {
         return Err(anyhow!(
@@ -335,7 +351,7 @@ pub fn add_advisory(
         r#"# Zoi Security Advisory
 # For schema details: https://zillowe.qzz.io/docs/zds/zoi/guides/security-advisories#advisory-schema
 
-id: "{prefix}-{year}-TEMP"
+id: "{prefix}-{current_year}-TEMP"
 package: "{package_name}"
 summary: "{summary}"
 severity: "{severity}"
@@ -346,15 +362,6 @@ description: |
 references:
   - "{reference}"
 "#,
-        prefix = prefix,
-        year = current_year,
-        package_name = package_name_str,
-        summary = summary,
-        severity = severity,
-        affected_range = affected_range,
-        fixed_in = fixed_in,
-        description = description,
-        reference = reference
     );
 
     fs::write(&adv_file_path, content)?;
@@ -379,6 +386,13 @@ references:
 /// - Populates `packages.json` (the primary index) and `advisories.json`.
 /// - Enables clients to resolve packages and vulnerabilities without cloning
 ///   the entire Git repository or parsing thousands of Lua scripts.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The path is not a Zoi registry.
+/// - The registry index files cannot be written.
+/// - Any package or advisory definition is malformed.
 pub fn generate_metadata(registry_root: &Path) -> Result<()> {
     if !registry_root.join("repo.yaml").exists() {
         return Err(anyhow!(
@@ -403,14 +417,15 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
     };
 
     let current_year = chrono::Utc::now().year();
-    if adv_registry.year != current_year as u32 {
-        adv_registry.year = current_year as u32;
+    let current_year_u32 = u32::try_from(current_year).unwrap_or(0);
+    if adv_registry.year != current_year_u32 {
+        adv_registry.year = current_year_u32;
         adv_registry.last_id = 0;
     }
 
     for entry in WalkDir::new(registry_root)
         .into_iter()
-        .filter_map(|e| e.ok())
+        .filter_map(Result::ok)
     {
         let file_name = entry.file_name().to_string_lossy();
         if file_name.ends_with("-TEMP.sec.yaml") {
@@ -423,7 +438,6 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
                 .unwrap_or("low")
                 .to_lowercase();
             let sev_char = match severity.as_str() {
-                "low" => "A",
                 "medium" => "B",
                 "high" => "C",
                 "critical" => "D",
@@ -432,8 +446,8 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
 
             adv_registry.last_id += 1;
             let final_id = format!(
-                "{}-{}-{}{:04}",
-                advisory_prefix, current_year, sev_char, adv_registry.last_id
+                "{advisory_prefix}-{current_year}-{sev_char}{:04}",
+                adv_registry.last_id
             );
 
             if let Some(mapping) = content.as_mapping_mut() {
@@ -443,7 +457,7 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
                 );
             }
 
-            let final_path = path.with_file_name(format!("{}.sec.yaml", final_id));
+            let final_path = path.with_file_name(format!("{final_id}.sec.yaml"));
             fs::write(&final_path, serde_yaml::to_string(&content)?)?;
             fs::remove_file(path)?;
             println!("Assigned ID {} to {}", final_id.green(), path.display());
@@ -455,7 +469,7 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
 
     for entry in WalkDir::new(registry_root)
         .into_iter()
-        .filter_map(|e| e.ok())
+        .filter_map(Result::ok)
     {
         let file_name = entry.file_name().to_string_lossy();
         if file_name.ends_with(".sec.yaml") && !file_name.ends_with("-TEMP.sec.yaml") {
@@ -496,7 +510,7 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
 
     for entry in WalkDir::new(registry_root)
         .into_iter()
-        .filter_map(|e| e.ok())
+        .filter_map(Result::ok)
     {
         if entry.file_type().is_file() && entry.file_name().to_string_lossy().ends_with(".pkg.lua")
         {
@@ -551,7 +565,7 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
                     }
                 }
 
-                let packages_key = format!("@{}/{}", repo_path, pkg.name);
+                let packages_key = format!("@{repo_path}/{name}", name = pkg.name);
 
                 let dependencies_v2 = pkg.dependencies.map(|deps| {
                     let mut runtime = Vec::new();
@@ -671,6 +685,10 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
 /// Checks the integrity of all package definitions in the registry.
 ///
 /// This runs `zoi doctor` on every `.pkg.lua` file in the registry.
+///
+/// # Errors
+///
+/// Returns an error if any package fails the health check.
 pub fn check(registry_root: &Path) -> Result<()> {
     if !registry_root.join("repo.yaml").exists() {
         return Err(anyhow!(
@@ -685,7 +703,7 @@ pub fn check(registry_root: &Path) -> Result<()> {
 
     for entry in WalkDir::new(registry_root)
         .into_iter()
-        .filter_map(|e| e.ok())
+        .filter_map(Result::ok)
     {
         if entry.file_type().is_file() && entry.file_name().to_string_lossy().ends_with(".pkg.lua")
         {
@@ -696,19 +714,18 @@ pub fn check(registry_root: &Path) -> Result<()> {
             match pkg_doctor::run(entry.path(), None, None) {
                 Ok(report) => {
                     for error in &report.errors {
-                        eprintln!("    {} {}", "Error:".red().bold(), error);
+                        eprintln!("    {} {error}", "Error:".red().bold());
                         errors += 1;
                     }
                     for warning in &report.warnings {
-                        println!("    {} {}", "Warning:".yellow().bold(), warning);
+                        println!("    {} {warning}", "Warning:".yellow().bold());
                         warnings += 1;
                     }
                 }
                 Err(e) => {
                     eprintln!(
-                        "    {} Failed to parse package: {}",
+                        "    {} Failed to parse package: {e}",
                         "Error:".red().bold(),
-                        e
                     );
                     errors += 1;
                 }
@@ -718,9 +735,7 @@ pub fn check(registry_root: &Path) -> Result<()> {
 
     if errors > 0 {
         return Err(anyhow!(
-            "Registry check failed with {} error(s) and {} warning(s).",
-            errors,
-            warnings
+            "Registry check failed with {errors} error(s) and {warnings} warning(s).",
         ));
     }
 

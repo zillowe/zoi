@@ -14,14 +14,14 @@ fn test_relocation_engine_identifies_elf_files() {
 
     let pkgstore = staging.join("data/pkgstore");
     let bin_dir = pkgstore.join("bin");
-    fs::create_dir_all(&bin_dir).unwrap();
+    fs::create_dir_all(&bin_dir).expect("unwrap failed");
 
     let elf_path = bin_dir.join("my-bin");
     // Write ELF magic number
-    fs::write(&elf_path, b"\x7fELF some other content").unwrap();
+    fs::write(&elf_path, b"\x7fELF some other content").expect("unwrap failed");
 
     let non_elf_path = bin_dir.join("README.txt");
-    fs::write(&non_elf_path, b"Just text").unwrap();
+    fs::write(&non_elf_path, b"Just text").expect("unwrap failed");
 
     // relocate_elfs will fail when trying to parse the mock ELF with arwen,
     // but it should at least try to relocate it and log a warning.
@@ -39,10 +39,10 @@ fn test_relocation_engine_complex_depth() {
 
     let pkgstore = staging.join("data/pkgstore");
     let plugin_dir = pkgstore.join("lib/plugins/extra");
-    fs::create_dir_all(&plugin_dir).unwrap();
+    fs::create_dir_all(&plugin_dir).expect("unwrap failed");
 
     let plugin_path = plugin_dir.join("my-plugin.so");
-    fs::write(&plugin_path, b"\x7fELF plugin content").unwrap();
+    fs::write(&plugin_path, b"\x7fELF plugin content").expect("unwrap failed");
 
     // The relocation engine should identify this and try to apply RPATHs.
     // Since it's depth 3 from pkgstore (lib/plugins/extra/), it should include $ORIGIN/../../..

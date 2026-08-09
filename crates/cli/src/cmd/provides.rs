@@ -11,6 +11,15 @@ use rayon::prelude::*;
 ///
 /// This queries the configured registries to find which packages contain the given term
 /// in their file lists.
+///
+/// # Errors
+///
+/// This function will return an error if:
+/// - It fails to read the Zoi configuration.
+/// - It fails to connect to the package database or execute the query.
+/// # Errors
+///
+/// Returns an error if the provides search fails.
 pub fn run(term: &str) -> Result<()> {
     println!(
         "{} Searching for packages providing '{}'...",
@@ -67,7 +76,7 @@ pub fn run(term: &str) -> Result<()> {
         ]);
     }
 
-    println!("{}", table);
+    println!("{table}");
 
     Ok(())
 }

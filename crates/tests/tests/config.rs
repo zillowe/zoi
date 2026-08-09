@@ -18,15 +18,15 @@ fn test_config_default_values() {
 #[test]
 fn test_get_builtin_authorities() {
     let auths = config::get_builtin_authorities();
-    assert!(auths.is_empty() || !auths[0].is_empty());
+    assert!(auths.is_empty() || !auths.first().expect("Value should exist in test").is_empty());
 }
 
 #[test]
 fn test_jobs_policy_field_deserializes() {
     let policy: Policy = serde_yaml::from_str(
-        r#"
+        r"
 jobs_unoverridable: true
-"#,
+",
     )
     .expect("policy should deserialize");
 
@@ -69,30 +69,30 @@ fn test_cache_mirror_config_roundtrip_and_candidates() {
 
 #[test]
 fn test_remote_policy_merging() {
-    let ctx = common::TestContextGuard::acquire();
+    let _ctx = common::TestContextGuard::acquire();
     let tmp = tempdir().expect("tempdir should be created");
     let root = tmp.path().to_path_buf();
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
     let policy_dir = if cfg!(windows) {
         root.join("ProgramData/zoi")
     } else {
         root.join("etc/zoi")
     };
-    std::fs::create_dir_all(&policy_dir).unwrap();
+    std::fs::create_dir_all(&policy_dir).expect("unwrap failed");
 
-    let remote_policy_yaml = r#"
+    let remote_policy_yaml = r"
 denied_packages:
   - evil-pkg
 allow_deny_lists_unoverridable: true
-"#;
-    std::fs::write(policy_dir.join("policy.cache.yaml"), remote_policy_yaml).unwrap();
+";
+    std::fs::write(policy_dir.join("policy.cache.yaml"), remote_policy_yaml).expect("unwrap failed");
 
     let cfg = config::read_config().expect("config should read with remote policy");
 
     assert!(cfg.policy.allow_deny_lists_unoverridable);
     assert_eq!(
-        cfg.policy.denied_packages.unwrap(),
+        cfg.policy.denied_packages.expect("unwrap failed"),
         vec!["evil-pkg".to_string()]
     );
 }

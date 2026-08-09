@@ -3,7 +3,7 @@
 //! This crate provides the logic for executing package-specific and global hooks.
 
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use std::process::Command;
 use zoi_core::types::{self, Hooks, PlatformOrStringVec};
 use zoi_core::utils;
@@ -12,6 +12,7 @@ use zoi_core::utils;
 pub mod global;
 
 /// The type of hook being executed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HookType {
     /// Runs before a package is installed.
     PreInstall,
@@ -29,7 +30,7 @@ pub enum HookType {
 
 /// Executes a list of shell commands within a specific scope.
 fn execute_commands(commands: &[String], scope: types::Scope) -> Result<()> {
-    let scope_str = format!("{:?}", scope).to_lowercase();
+    let scope_str = format!("{scope:?}").to_lowercase();
     for cmd_str in commands {
         println!("> {}", cmd_str.cyan());
         let mut command = if cfg!(target_os = "windows") {
@@ -47,7 +48,7 @@ fn execute_commands(commands: &[String], scope: types::Scope) -> Result<()> {
         let status = command.status()?;
 
         if !status.success() {
-            return Err(anyhow!("Hook command failed: {}", cmd_str));
+            return Err(anyhow!("Hook command failed: {cmd_str}"));
         }
     }
     Ok(())
@@ -60,6 +61,10 @@ fn execute_commands(commands: &[String], scope: types::Scope) -> Result<()> {
 /// * `hooks` - The hooks configuration from the package.
 /// * `hook_type` - The type of hook to run.
 /// * `scope` - The installation scope (System, User, or Project).
+///
+/// # Errors
+///
+/// Returns an error if getting the current platform or executing a hook command fails.
 pub fn run_hooks(hooks: &Hooks, hook_type: HookType, scope: types::Scope) -> Result<()> {
     let platform = utils::get_platform()?;
 

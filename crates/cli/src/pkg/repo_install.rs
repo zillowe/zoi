@@ -7,7 +7,7 @@
 /// - Resolves and installs the specific package defined in the project.
 use crate::pkg::types;
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use serde::Deserialize;
 use std::env;
 use std::fs;
@@ -21,6 +21,17 @@ struct RepoFile {
 }
 
 /// Installs a package directly from a Git repository using its `zoi.yaml` or `zoi.lua`.
+///
+/// # Errors
+///
+/// This function will return an error if:
+/// - The repository specification is invalid.
+/// - The repository does not contain a supported project file (`zoi.yaml`).
+/// - The package installation fails.
+/// - Network issues occur while fetching repository content.
+/// # Errors
+///
+/// Returns an error if the repository installation fails.
 pub fn run(
     repo_spec: &str,
     force: bool,
@@ -44,7 +55,7 @@ pub fn run(
 
     for file_name in &repo_file_names {
         if let Ok(url) = get_repo_file_url(&provider, &repo_path, file_name) {
-            println!("Attempting to fetch repo config from: {}", url);
+            println!("Attempting to fetch repo config from: {url}");
             let client = crate::pkg::utils::get_http_client().ok();
             if let Some(c) = client
                 && let Ok(content_res) = c.get(&url).send()
@@ -110,7 +121,7 @@ pub fn run(
             "Package source is a package name: {}",
             package_source.cyan()
         );
-        package_source.to_string()
+        package_source.clone()
     };
 
     crate::cmd::install::run(
@@ -150,7 +161,7 @@ fn parse_repo_spec(spec: &str) -> Result<(String, String)> {
             "gh" | "github" => "github",
             "gl" | "gitlab" => "gitlab",
             "cb" | "codeberg" => "codeberg",
-            _ => return Err(anyhow!("Unknown provider alias: {}", provider_alias)),
+            _ => return Err(anyhow!("Unknown provider alias: {provider_alias}")),
         };
         Ok((provider.to_string(), path.to_string()))
     } else {
@@ -165,16 +176,13 @@ fn get_repo_file_url(provider: &str, repo_path: &str, file_path: &str) -> Result
     for branch in &branches {
         let url = match provider {
             "github" => format!(
-                "https://raw.githubusercontent.com/{}/refs/heads/{}/{}",
-                repo_path, branch, file_path
+                "https://raw.githubusercontent.com/{repo_path}/refs/heads/{branch}/{file_path}"
             ),
             "gitlab" => format!(
-                "https://gitlab.com/{}/-/raw/{}/{}",
-                repo_path, branch, file_path
+                "https://gitlab.com/{repo_path}/-/raw/{branch}/{file_path}"
             ),
             "codeberg" => format!(
-                "https://codeberg.org/{}/raw/branch/{}/{}",
-                repo_path, branch, file_path
+                "https://codeberg.org/{repo_path}/raw/branch/{branch}/{file_path}"
             ),
             _ => return Err(anyhow!("Unknown provider")),
         };
@@ -187,8 +195,6 @@ fn get_repo_file_url(provider: &str, repo_path: &str, file_path: &str) -> Result
         }
     }
     Err(anyhow!(
-        "Could not find '{}' in repo '{}' on branches main or master.",
-        file_path,
-        repo_path
+        "Could not find '{file_path}' in repo '{repo_path}' on branches main or master."
     ))
 }

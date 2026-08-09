@@ -48,15 +48,19 @@ enum Commands {
     Inspect(inspect::InspectCommand),
 }
 
-/// Runs the `package` command.
+/// Runs the package command.
+///
+/// # Errors
+///
+/// Returns an error if the subcommand execution fails.
 pub fn run(args: PackageCommand) -> Result<()> {
     match args.command {
         Commands::Build(cmd) => build::run(cmd),
         Commands::Bundle(cmd) => bundle::run(cmd),
-        Commands::Test(cmd) => test::run(cmd),
+        Commands::Test(cmd) => test::run(&cmd),
         Commands::Install(cmd) => install::run(cmd),
-        Commands::Doctor(cmd) => doctor::run(cmd),
-        Commands::InitLsp(cmd) => init_lsp::run(cmd),
+        Commands::Doctor(cmd) => doctor::run(&cmd),
+        Commands::InitLsp(cmd) => init_lsp::run(&cmd),
         Commands::Inspect(cmd) => inspect::run(cmd),
     }
 }

@@ -3,7 +3,8 @@
 use crate::pkg::{local, resolve, types};
 use crate::utils;
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
+use std::fmt::Write;
 use std::fs;
 
 /// Prints a dependency group with the specified indentation.
@@ -14,7 +15,7 @@ fn print_dependency_group(group: &types::DependencyGroup, indent: usize) {
     let required = group.required();
     if !required.is_empty() {
         for dep in required {
-            println!("{}- {} (required)", prefix, dep);
+            println!("{prefix}- {dep} (required)");
             count += 1;
         }
     }
@@ -30,7 +31,7 @@ fn print_dependency_group(group: &types::DependencyGroup, indent: usize) {
                 if opt_group.all { "any" } else { "one" }
             );
             for dep in &opt_group.depends {
-                println!("{}  - {}", prefix, dep);
+                println!("{prefix}  - {dep}");
                 count += 1;
             }
         }
@@ -39,7 +40,7 @@ fn print_dependency_group(group: &types::DependencyGroup, indent: usize) {
     let optional = group.optional();
     if !optional.is_empty() {
         for dep in optional {
-            println!("{}- {} (optional)", prefix, dep);
+            println!("{prefix}- {dep} (optional)");
             count += 1;
         }
     }
@@ -63,6 +64,13 @@ fn print_dependency_group(group: &types::DependencyGroup, indent: usize) {
 ///
 /// This command fetches and parses the package definition (possibly from a PURL),
 /// and prints metadata such as description, version, dependencies, and installation status.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - PURL fetching fails.
+/// - The package source cannot be resolved.
+/// - The package definition cannot be parsed.
 pub fn run(source: &str, raw: bool, purl: bool) -> Result<()> {
     let mut source_str = source.trim().to_string();
     if purl {
@@ -84,8 +92,8 @@ pub fn run(source: &str, raw: bool, purl: bool) -> Result<()> {
     let mut pkg: types::Package = crate::pkg::lua::parser::parse_lua_package(
         resolved_source.path.to_str().ok_or_else(|| {
             anyhow!(
-                "Path contains invalid UTF-8 characters: {:?}",
-                resolved_source.path
+                "Path contains invalid UTF-8 characters: {}",
+                resolved_source.path.display()
             )
         })?,
         None,
@@ -104,7 +112,7 @@ pub fn run(source: &str, raw: bool, purl: bool) -> Result<()> {
     let installed_manifest = match find_installed_manifest(&request) {
         Ok(manifest) => manifest,
         Err(e) => {
-            eprintln!("Warning: could not check installation status: {}", e);
+            eprintln!("Warning: could not check installation status: {e}");
             None
         }
     };
@@ -186,15 +194,15 @@ fn print_beautiful(
 
     if let Some(manifest) = installed_manifest {
         let status_text = if let Some(sub) = &manifest.sub_package {
-            format!("Installed ({})", sub)
+            format!("Installed ({sub})")
         } else {
             "Installed".to_string()
         };
 
-        let installed_version_display = if manifest.revision != "1" {
-            format!("{}-{}", manifest.version, manifest.revision)
-        } else {
+        let installed_version_display = if manifest.revision == "1" {
             manifest.version.clone()
+        } else {
+            format!("{}-{}", manifest.version, manifest.revision)
         };
 
         println!(
@@ -219,19 +227,19 @@ fn print_beautiful(
         pkg.maintainer.email
     );
     if let Some(website) = &pkg.maintainer.website {
-        maintainer_line.push_str(&format!(" - {}", website.cyan().underline()));
+        let _ = write!(maintainer_line, " - {}", website.cyan().underline());
     }
-    println!("{}", maintainer_line);
+    println!("{maintainer_line}");
 
     if let Some(author) = &pkg.author {
         let mut author_line = format!("{}: {}", "Author".bold(), author.name);
         if let Some(email) = &author.email {
-            author_line.push_str(&format!(" <{}>", email));
+            let _ = write!(author_line, " <{email}>");
         }
         if let Some(website) = &author.website {
-            author_line.push_str(&format!(" - {}", website.cyan().underline()));
+            let _ = write!(author_line, " - {}", website.cyan().underline());
         }
-        println!("{}", author_line);
+        println!("{author_line}");
     }
 
     let type_display = match pkg.package_type {

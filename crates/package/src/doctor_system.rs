@@ -49,6 +49,10 @@ fn get_bin_root(scope: Scope) -> Result<PathBuf> {
 /// Checks for broken symlinks in all binary shim directories.
 ///
 /// Returns a list of paths to symlinks that point to non-existent locations.
+///
+/// # Errors
+///
+/// Returns an error if any of the binary shim directories cannot be read.
 pub fn check_broken_symlinks() -> Result<Vec<PathBuf>> {
     let scopes = [Scope::User, Scope::System, Scope::Project];
 
@@ -82,6 +86,10 @@ pub fn check_broken_symlinks() -> Result<Vec<PathBuf>> {
 /// Checks if Zoi's binary directory is in the system PATH.
 ///
 /// Returns a warning message if the directory is missing from PATH.
+///
+/// # Errors
+///
+/// Returns an error if the user's home directory cannot be found.
 pub fn check_path_configuration() -> Result<Option<String>> {
     if let Some(home) = utils::get_user_home() {
         let zoi_bin_dir = sysroot::apply_sysroot(home.join(".zoi").join("pkgs").join("bin"));
@@ -104,6 +112,10 @@ pub fn check_path_configuration() -> Result<Option<String>> {
 /// Checks if any repositories are significantly out of date.
 ///
 /// Returns a warning message if the default registry hasn't been synced in over a week.
+///
+/// # Errors
+///
+/// Returns an error if the database root cannot be resolved or if the repository metadata cannot be read.
 pub fn check_outdated_repos() -> Result<Option<String>> {
     let db_root = sysroot::apply_sysroot(resolve::get_db_root()?);
     let config = config::read_config()?;
@@ -119,9 +131,9 @@ pub fn check_outdated_repos() -> Result<Option<String>> {
                 && let Ok(since_modified) = SystemTime::now().duration_since(modified)
                 && since_modified.as_secs() > 60 * 60 * 24 * 7
             {
+                let days = since_modified.as_secs() / (60 * 60 * 24);
                 return Ok(Some(format!(
-                    "Default repository has not been synced in over a week (last sync: {} days ago).",
-                    since_modified.as_secs() / (60 * 60 * 24)
+                    "Default repository has not been synced in over a week (last sync: {days} days ago)."
                 )));
             }
         } else if repo_path.join(".git").exists() {
@@ -137,6 +149,10 @@ pub fn check_outdated_repos() -> Result<Option<String>> {
 /// Finds packages that are defined in multiple registries.
 ///
 /// Returns a list of package IDs and the registries they are defined in.
+///
+/// # Errors
+///
+/// Returns an error if the database root cannot be resolved or if the registry directories cannot be read.
 pub fn check_duplicate_packages() -> Result<Vec<(String, Vec<String>)>> {
     let db_root = sysroot::apply_sysroot(resolve::get_db_root()?);
     if !db_root.exists() {
@@ -157,7 +173,7 @@ pub fn check_duplicate_packages() -> Result<Vec<(String, Vec<String>)>> {
 
             for pkg_entry in WalkDir::new(entry.path())
                 .into_iter()
-                .filter_map(|e| e.ok())
+                .filter_map(Result::ok)
                 .filter(|e| e.file_name().to_string_lossy().ends_with(".pkg.lua"))
             {
                 let pkg_path = pkg_entry.path();
@@ -184,6 +200,10 @@ pub fn check_duplicate_packages() -> Result<Vec<(String, Vec<String>)>> {
 /// Checks if PGP keys required by security policy are present in the keyring.
 ///
 /// Returns a list of missing key fingerprints.
+///
+/// # Errors
+///
+/// Returns an error if the configuration cannot be read.
 pub fn check_pgp_configuration() -> Result<Vec<String>> {
     let config = config::read_config()?;
     let mut missing_keys = Vec::new();
@@ -210,6 +230,10 @@ pub fn check_pgp_configuration() -> Result<Vec<String>> {
 /// Validates that all packages recorded in the lockfile are actually installed.
 ///
 /// Returns a list of names for missing packages.
+///
+/// # Errors
+///
+/// Returns an error if the lockfile cannot be read.
 pub fn validate_lockfile_integrity() -> Result<Vec<String>> {
     let recorded_packages = recorder::get_recorded_packages()?;
 
@@ -261,6 +285,10 @@ pub fn validate_lockfile_integrity() -> Result<Vec<String>> {
 /// Finds orphaned packages (dependencies no longer required by any package).
 ///
 /// Returns a list of names for orphaned packages.
+///
+/// # Errors
+///
+/// Returns an error if the installed packages cannot be retrieved.
 pub fn check_orphaned_packages() -> Result<Vec<String>> {
     let all_installed = local::get_installed_packages()?;
 
@@ -299,7 +327,11 @@ pub fn check_orphaned_packages() -> Result<Vec<String>> {
 
 /// Finds "ghost" dependent links (links from packages that are no longer installed).
 ///
-/// Returns a list of (path, parent_id) pairs for stale dependent links.
+/// Returns a list of (path, `parent_id`) pairs for stale dependent links.
+///
+/// # Errors
+///
+/// Returns an error if the store directories or dependent files cannot be read.
 pub fn check_ghost_dependents() -> Result<Vec<(PathBuf, String)>> {
     let scopes = [Scope::User, Scope::System, Scope::Project];
     let mut ghost_links = Vec::new();
@@ -353,6 +385,10 @@ pub fn check_ghost_dependents() -> Result<Vec<(PathBuf, String)>> {
 }
 
 /// Removes stale dependent links identified by `check_ghost_dependents`.
+///
+/// # Errors
+///
+/// Returns an error if any of the ghost links cannot be removed.
 pub fn prune_ghost_dependents(ghost_links: &[(PathBuf, String)]) -> Result<()> {
     for (path, _) in ghost_links {
         fs::remove_file(path)?;

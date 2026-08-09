@@ -16,14 +16,14 @@ fn test_split_source() -> String {
 
 #[test]
 fn parse_source_with_sub_package() {
-    let req = resolve::parse_source_string("linux:headers").unwrap();
+    let req = resolve::parse_source_string("linux:headers").expect("unwrap failed");
     assert_eq!(req.name, "linux");
     assert_eq!(req.sub_package, Some("headers".to_string()));
 }
 
 #[test]
 fn parse_source_with_sub_package_and_version() {
-    let req = resolve::parse_source_string("pkg:sub@1.0.0").unwrap();
+    let req = resolve::parse_source_string("pkg:sub@1.0.0").expect("unwrap failed");
     assert_eq!(req.name, "pkg");
     assert_eq!(req.sub_package, Some("sub".to_string()));
     assert_eq!(req.version_spec, Some("1.0.0".to_string()));
@@ -31,7 +31,7 @@ fn parse_source_with_sub_package_and_version() {
 
 #[test]
 fn parse_source_with_sub_package_full_spec() {
-    let req = resolve::parse_source_string("#handle@repo/pkg:sub@1.0.0").unwrap();
+    let req = resolve::parse_source_string("#handle@repo/pkg:sub@1.0.0").expect("unwrap failed");
     assert_eq!(req.name, "pkg");
     assert_eq!(req.sub_package, Some("sub".to_string()));
     assert_eq!(req.handle, Some("handle".to_string()));
@@ -40,7 +40,7 @@ fn parse_source_with_sub_package_full_spec() {
 
 #[test]
 fn parse_source_base_package_has_no_sub_package() {
-    let req = resolve::parse_source_string("linux").unwrap();
+    let req = resolve::parse_source_string("linux").expect("unwrap failed");
     assert_eq!(req.name, "linux");
     assert_eq!(req.sub_package, None);
 }
@@ -52,7 +52,7 @@ fn resolver_install_node_has_sub_package_from_source() {
     let root = tmp.path().to_path_buf();
 
     ctx.set_env_var("HOME", &root);
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
     let source = format!("{}:dev", test_split_source());
     let (graph, non_zoi_deps) = install::resolver::resolve_dependency_graph(
@@ -87,7 +87,7 @@ fn resolver_install_node_base_has_no_sub_package() {
     let root = tmp.path().to_path_buf();
 
     ctx.set_env_var("HOME", &root);
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
     let source = test_split_source();
     let (graph, non_zoi_deps) = install::resolver::resolve_dependency_graph(
@@ -113,7 +113,7 @@ fn resolver_install_node_base_has_no_sub_package() {
     assert_eq!(node.pkg.name, "test-split");
     assert_eq!(node.sub_package, None);
     assert!(node.pkg.sub_packages.is_some());
-    let subs = node.pkg.sub_packages.as_ref().unwrap();
+    let subs = node.pkg.sub_packages.as_ref().expect("unwrap failed");
     assert!(subs.contains(&"dev".to_string()));
     assert!(subs.contains(&"lib".to_string()));
 }
@@ -126,7 +126,7 @@ fn db_update_and_query_sub_package() {
 
     ctx.set_env_var("HOME", &root);
     ctx.set_env_var("ZOI_DB_DIR", root.join("db"));
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
     let cfg = types::Config {
         added_registries: vec![types::Registry {
@@ -136,9 +136,9 @@ fn db_update_and_query_sub_package() {
         }],
         ..Default::default()
     };
-    config::write_user_config(&cfg).unwrap();
+    config::write_user_config(&cfg).expect("unwrap failed");
 
-    let conn = db::open_connection("testreg").unwrap();
+    let conn = db::open_connection("testreg").expect("unwrap failed");
 
     let base_pkg = types::Package {
         name: "split-pkg".to_string(),
@@ -149,36 +149,36 @@ fn db_update_and_query_sub_package() {
         ..Default::default()
     };
 
-    db::update_package(&conn, &base_pkg, "testreg", None, None, None).unwrap();
-    db::update_package(&conn, &base_pkg, "testreg", None, Some("dev"), None).unwrap();
-    db::update_package(&conn, &base_pkg, "testreg", None, Some("lib"), None).unwrap();
+    db::update_package(&conn, &base_pkg, "testreg", None, None, None).expect("unwrap failed");
+    db::update_package(&conn, &base_pkg, "testreg", None, Some("dev"), None).expect("unwrap failed");
+    db::update_package(&conn, &base_pkg, "testreg", None, Some("lib"), None).expect("unwrap failed");
 
-    let all_pkgs = db::list_all_packages("testreg").unwrap();
+    let all_pkgs = db::list_all_packages("testreg").expect("unwrap failed");
     let split_pkgs: Vec<&types::Package> =
         all_pkgs.iter().filter(|p| p.name == "split-pkg").collect();
     assert_eq!(split_pkgs.len(), 3, "should have base + 2 sub-packages");
 
-    let base = split_pkgs.iter().find(|p| p.sub_package.is_none()).unwrap();
+    let base = split_pkgs.iter().find(|p| p.sub_package.is_none()).expect("unwrap failed");
     assert_eq!(base.name, "split-pkg");
     assert_eq!(base.sub_package, None);
 
     let dev = split_pkgs
         .iter()
         .find(|p| p.sub_package == Some("dev".to_string()))
-        .unwrap();
+        .expect("unwrap failed");
     assert_eq!(dev.sub_package, Some("dev".to_string()));
 
     let lib = split_pkgs
         .iter()
         .find(|p| p.sub_package == Some("lib".to_string()))
-        .unwrap();
+        .expect("unwrap failed");
     assert_eq!(lib.sub_package, Some("lib".to_string()));
 }
 
 #[test]
 fn local_file_source_with_sub_package_parses_correctly() {
     let source = format!("{}:dev", test_split_source());
-    let req = resolve::parse_source_string(&source).unwrap();
+    let req = resolve::parse_source_string(&source).expect("unwrap failed");
     assert_eq!(req.name, "test-split");
     assert_eq!(req.sub_package, Some("dev".to_string()));
 }

@@ -1,5 +1,5 @@
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use dirs;
 use hex;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -31,8 +31,7 @@ struct GitLabRelease {
 fn get_latest_tag(branch_prefix: &str) -> Result<String> {
     println!("Fetching latest release information from GitLab...");
     let api_url = format!(
-        "https://gitlab.com/api/v4/projects/{}/releases",
-        GITLAB_PROJECT_ID
+        "https://gitlab.com/api/v4/projects/{GITLAB_PROJECT_ID}/releases"
     );
     let client = reqwest::blocking::Client::builder()
         .user_agent("Zoi-Upgrader")
@@ -44,7 +43,7 @@ fn get_latest_tag(branch_prefix: &str) -> Result<String> {
         .into_iter()
         .find(|r| r.tag_name.starts_with(branch_prefix))
         .map(|r| r.tag_name)
-        .ok_or_else(|| anyhow!("No release found with prefix '{}'", branch_prefix))?;
+        .ok_or_else(|| anyhow!("No release found with prefix '{branch_prefix}'"))?;
 
     println!(
         "Found latest tag for branch prefix '{}': {}",
@@ -78,7 +77,11 @@ fn download_file(url: &str, path: &Path) -> Result<()> {
         if bytes_read == 0 {
             break;
         }
-        dest.write_all(&buffer[..bytes_read])?;
+        dest.write_all(
+            buffer
+                .get(..bytes_read)
+                .ok_or_else(|| anyhow!("Buffer overflow during write"))?,
+        )?;
         pb.inc(bytes_read as u64);
     }
 
@@ -104,12 +107,12 @@ fn extract_archive(archive_path: &Path, target_dir: &Path) -> Result<()> {
 
 /// Verifies the SHA-512 checksum of a file against expected content.
 fn verify_checksum(file_path: &Path, checksums_content: &str, filename: &str) -> Result<()> {
-    println!("Verifying checksum for {}...", filename);
+    println!("Verifying checksum for {filename}...");
     let expected_hash = checksums_content
         .lines()
         .find(|line| line.contains(filename))
         .and_then(|line| line.split_whitespace().next())
-        .ok_or(anyhow!("Checksum not found for {}.", filename))?;
+        .ok_or(anyhow!("Checksum not found for {filename}."))?;
 
     let mut file = File::open(file_path)?;
     let mut hasher = Sha512::new();
@@ -119,14 +122,17 @@ fn verify_checksum(file_path: &Path, checksums_content: &str, filename: &str) ->
         if bytes_read == 0 {
             break;
         }
-        hasher.update(&buffer[..bytes_read]);
+        hasher.update(
+            buffer
+                .get(..bytes_read)
+                .ok_or_else(|| anyhow!("Buffer overflow during hash update"))?,
+        );
     }
     let actual_hash = hex::encode(hasher.finalize());
 
     if actual_hash != expected_hash {
         return Err(anyhow!(
-            "Checksum mismatch for {}! The file may be corrupt.",
-            filename
+            "Checksum mismatch for {filename}! The file may be corrupt."
         ));
     }
     println!("Checksum verified successfully for {}.", filename.green());
@@ -232,6 +238,14 @@ fn try_delta_upgrade(
 }
 
 /// Runs the upgrade process for Zoi.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Zoi is in offline mode.
+/// - The GitLab API cannot be reached.
+/// - The download fails or the checksum is invalid.
+/// - The binary replacement fails.
 pub fn run(
     branch: &str,
     status: &str,
@@ -247,8 +261,7 @@ pub fn run(
     let path_str = current_exe_path.to_string_lossy();
 
     let is_cargo_install = dirs::home_dir()
-        .map(|home| current_exe_path.starts_with(home.join(".cargo").join("bin")))
-        .unwrap_or(false);
+        .is_some_and(|home| current_exe_path.starts_with(home.join(".cargo").join("bin")));
 
     let pkg_manager = if path_str.contains("/Cellar/") {
         Some("Homebrew")
@@ -289,13 +302,13 @@ pub fn run(
                 "--force".cyan()
             );
             return Err(anyhow!("managed_by_package_manager"));
-        } else {
-            println!(
-                "{}{}",
-                "Warning: ".yellow().bold(),
-                "Forcing self-upgrade on a package-manager-controlled installation.".yellow()
-            );
         }
+
+        println!(
+            "{}{}",
+            "Warning: ".yellow().bold(),
+            "Forcing self-upgrade on a package-manager-controlled installation.".yellow()
+        );
     }
 
     let current_version = if status.is_empty()
@@ -313,7 +326,7 @@ pub fn run(
     } else {
         let branch_prefix = if let Some(b) = custom_branch {
             println!("Upgrading to latest release from branch: {}", b.green());
-            format!("{}-", b)
+            format!("{b}-")
         } else if branch.eq_ignore_ascii_case("public") {
             "Pub-".to_string()
         } else {
@@ -324,7 +337,10 @@ pub fn run(
 
     let parts: Vec<&str> = latest_tag.split('-').collect();
     let latest_version_num = if parts.len() >= 3 {
-        parts[2]
+        parts
+            .get(2)
+            .copied()
+            .ok_or_else(|| anyhow!("Missing version number in tag parts"))?
     } else {
         parts
             .last()
@@ -332,11 +348,15 @@ pub fn run(
     };
 
     let latest_version_str = if parts.len() >= 3 {
-        let prerelease = parts[1].to_lowercase();
+        let prerelease = parts
+            .get(1)
+            .copied()
+            .ok_or_else(|| anyhow!("Missing prerelease label in tag parts"))?
+            .to_lowercase();
         if prerelease == "release" || prerelease == "stable" {
             latest_version_num.to_string()
         } else {
-            format!("{}-{}", latest_version_num, prerelease)
+            format!("{latest_version_num}-{prerelease}")
         }
     } else {
         latest_version_num.to_string()
@@ -358,12 +378,13 @@ pub fn run(
     let checksums_txt_url = format!("{base_url}/checksums.txt");
 
     println!(
-        "Downloading archive and checksums from: {}",
-        checksums_txt_url
+        "Downloading archive and checksums from: {checksums_txt_url}"
     );
     let checksums_txt_content = reqwest::blocking::get(&checksums_txt_url)?.text()?;
 
-    let (new_binary_path, _temp_dir_guard) = if !force {
+    let (new_binary_path, _temp_dir_guard) = if force {
+        fallback_full_upgrade(&base_url, &checksums_txt_content, os, arch)?
+    } else {
         match try_delta_upgrade(
             &base_url,
             &checksums_txt_content,
@@ -374,12 +395,10 @@ pub fn run(
         ) {
             Ok(res) => res,
             Err(e) => {
-                println!("Delta upgrade failed: {}. Falling back to full upgrade.", e);
+                println!("Delta upgrade failed: {e}. Falling back to full upgrade.");
                 fallback_full_upgrade(&base_url, &checksums_txt_content, os, arch)?
             }
         }
-    } else {
-        fallback_full_upgrade(&base_url, &checksums_txt_content, os, arch)?
     };
 
     println!("Replacing current executable...");

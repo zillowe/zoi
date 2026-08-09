@@ -42,6 +42,10 @@ fn is_lockfile_compatible(lockfile: &types::ZoiLockV2) -> bool {
 }
 
 /// Reads the project's `zoi.lock` file, falling back to platform-specific lockfiles if necessary.
+///
+/// # Errors
+///
+/// Returns an error if there is an issue reading or parsing the lockfile.
 pub fn read_zoi_lock() -> Result<types::ZoiLockV2> {
     let path = get_lockfile_path()?;
 
@@ -51,15 +55,14 @@ pub fn read_zoi_lock() -> Result<types::ZoiLockV2> {
         }
 
         let platform = zoi_core::utils::get_platform().unwrap_or_default();
-        let platform_path = path.with_file_name(format!("zoi.{}.lock", platform));
+        let platform_path = path.with_file_name(format!("zoi.{platform}.lock"));
         if let Some(platform_lock) = read_lockfile_from(&platform_path)? {
             return Ok(platform_lock);
         }
 
         eprintln!(
             "Warning: zoi.lock has packages targeting a different platform \
-             and no zoi.{}.lock was found, falling back to unconstrained resolution",
-            platform
+             and no zoi.{platform}.lock was found, falling back to unconstrained resolution"
         );
     }
 
@@ -70,6 +73,10 @@ pub fn read_zoi_lock() -> Result<types::ZoiLockV2> {
 }
 
 /// Writes the project's lockfile to disk, updating hashes for the package store and registries.
+///
+/// # Errors
+///
+/// Returns an error if there is an issue writing the lockfile to disk.
 pub fn write_zoi_lock(lockfile: &mut types::ZoiLockV2) -> Result<()> {
     if zoi_core::frozen::is_frozen() {
         return Ok(());

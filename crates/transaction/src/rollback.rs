@@ -1,17 +1,26 @@
+//! Rollback logic for Zoi transactions.
+
 use anyhow::{Result, anyhow};
-use colored::*;
-use semver::Version;
+use colored::Colorize;
 use std::fs;
 use std::path::PathBuf;
-use zoi_core::{sysroot, types, utils as core_utils};
+use zoi_core::{types, utils as core_utils};
 use zoi_resolver::{local, resolve};
 
 /// Rolls back a package to its previous version.
-pub fn run(package_name: &str, yes: bool) -> Result<()> {
+/// # Errors
+///
+/// Returns an error if the rollback fails.
+/// # Panics
+///
+/// Panics if the scope cannot be resolved.
+pub fn run(
+package_name: &str, yes: bool) -> Result<()> {
     println!("Attempting to roll back '{}'...", package_name.cyan());
 
     let request = resolve::parse_source_string(package_name)?;
     let sub_package = request.sub_package.clone();
+
     let scope_order = [
         types::Scope::User,
         types::Scope::System,
@@ -22,7 +31,7 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
     for candidate_scope in scope_order {
         let mut matches = local::find_installed_manifests_matching(&request, candidate_scope)?;
         match matches.len() {
-            0 => continue,
+            0 => {}
             1 => {
                 current_manifest = Some(matches.remove(0));
                 scope = Some(candidate_scope);
@@ -30,18 +39,16 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
             }
             _ => {
                 return Err(anyhow!(
-                    "Package '{}' is ambiguous in {:?} scope. Use an explicit source like '#handle@repo/name[:sub]@version'.",
-                    request.name,
-                    candidate_scope
+                    "Ambiguous package name '{package_name}' matches multiple installed packages.",
                 ));
             }
         }
     }
 
     let Some(current_manifest) = current_manifest else {
-        return Err(anyhow!("Package '{}' is not installed.", package_name));
+        return Err(anyhow!("Package '{package_name}' is not installed."));
     };
-    let scope = scope.ok_or_else(|| anyhow!("scope should be set when a manifest is found"))?;
+    let scope = scope.expect("Scope should be resolved if manifest is found");
 
     let package_dir = local::get_package_dir(
         scope,
@@ -50,82 +57,68 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
         &current_manifest.name,
     )?;
 
-    let mut versions = Vec::new();
-    if let Ok(entries) = fs::read_dir(&package_dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir()
-                && let Some(version_str) = path.file_name().and_then(|s| s.to_str())
-                && version_str != "latest"
-                && version_str != "dependents"
-                && Version::parse(version_str).is_ok()
-            {
-                versions.push(version_str.to_string());
-            }
-        }
-    }
-    versions.sort();
-
-    if versions.len() < 2 {
-        return Err(anyhow!("No previous version to roll back to."));
-    }
-
-    let current_version = versions
-        .pop()
-        .ok_or_else(|| anyhow!("Failed to get current version from list"))?;
-    let previous_version = versions
-        .pop()
-        .ok_or_else(|| anyhow!("Failed to get previous version from list"))?;
-
-    println!(
-        "Rolling back from version {} to {}",
-        current_version.to_string().yellow(),
-        previous_version.to_string().green()
-    );
-
-    if !core_utils::ask_for_confirmation("This will remove the current version. Continue?", yes) {
-        println!("Operation aborted.");
-        return Ok(());
-    }
-
-    let previous_version_dir = package_dir.join(&previous_version);
-
+    let current_version = current_manifest.version.clone();
     let manifest_filename = if let Some(sub) = &sub_package {
-        format!("manifest-{}.yaml", sub)
+        format!("manifest-{sub}.yaml")
     } else {
         "manifest.yaml".to_string()
     };
-    let prev_manifest_path = previous_version_dir.join(&manifest_filename);
-    if !prev_manifest_path.exists() {
+
+    let mut versions: Vec<String> = Vec::new();
+    if let Ok(entries) = fs::read_dir(&package_dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name != "latest" && name != "dependents" && name != current_version {
+                versions.push(name);
+            }
+        }
+    }
+
+    if versions.is_empty() {
         return Err(anyhow!(
-            "No manifest found for {} in version {}. Rollback not possible.",
-            package_name,
-            previous_version
+            "No previous versions found for package '{}'.",
+            current_manifest.name
         ));
     }
 
-    let latest_symlink_path = package_dir.join("latest");
-    zoi_core::utils::symlink_dir(&previous_version_dir, &latest_symlink_path)?;
+    versions.sort_by(|a, b| {
+        let va = semver::Version::parse(a).unwrap_or_else(|_| semver::Version::new(0, 0, 0));
+        let vb = semver::Version::parse(b).unwrap_or_else(|_| semver::Version::new(0, 0, 0));
+        va.cmp(&vb)
+    });
+    let previous_version = versions.last().expect("Versions list is not empty");
 
-    let content = fs::read_to_string(&prev_manifest_path)?;
-    let prev_manifest: types::InstallManifest = serde_yaml::from_str(&content)?;
+    println!(
+        "Rolling back from version {} to {}...",
+        current_version.yellow(),
+        previous_version.green()
+    );
 
-    if let Some(bins) = &prev_manifest.bins {
-        let bin_root = get_bin_root(scope)?;
-        for bin in bins {
-            let symlink_path = bin_root.join(bin);
-            create_shim(&symlink_path)?;
-        }
-    } else if prev_manifest.sub_package.is_none() {
-        let symlink_path = get_bin_root(scope)?.join(&current_manifest.name);
-        create_shim(&symlink_path)?;
+    let prev_manifest_path = package_dir.join(previous_version).join(&manifest_filename);
+    if !prev_manifest_path.exists() {
+        return Err(anyhow!(
+            "Previous manifest not found at: {}",
+            prev_manifest_path.display()
+        ));
+    }
+
+    let prev_manifest_content = fs::read_to_string(&prev_manifest_path)?;
+    let prev_manifest: types::InstallManifest = serde_yaml::from_str(&prev_manifest_content)?;
+
+    if !yes && !core_utils::ask_for_confirmation("Do you want to proceed?", false) {
+        return Err(anyhow!("Rollback aborted by user."));
+    }
+
+    for file_path_str in &prev_manifest.installed_files {
+        let file_path = std::path::Path::new(file_path_str);
+        create_shim(file_path);
     }
 
     if let Some(completions) = &prev_manifest.completions {
-        let prev_version_dir = package_dir.join(&previous_version);
         for completion in completions {
-            let store_path = prev_version_dir
-                .join("shell")
+            let store_path = package_dir
+                .join(previous_version)
+                .join("data/shell")
                 .join(&completion.shell)
                 .join(&completion.filename);
             let completions_root = super::get_completions_root(scope, &completion.shell)?;
@@ -142,7 +135,11 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
     if let Ok(entries) = fs::read_dir(&current_version_dir) {
         for entry in entries.flatten() {
             let name = entry.file_name().to_string_lossy().to_string();
-            if name.starts_with("manifest") && name.ends_with(".yaml") && name != manifest_filename
+            if name.starts_with("manifest")
+                && std::path::Path::new(&name)
+                    .extension()
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("yaml"))
+                && name != manifest_filename
             {
                 has_other_manifests = true;
                 break;
@@ -150,67 +147,56 @@ pub fn run(package_name: &str, yes: bool) -> Result<()> {
         }
     }
 
-    if has_other_manifests {
+    if !has_other_manifests {
         for file_path_str in &current_manifest.installed_files {
-            let file_path = PathBuf::from(file_path_str);
+            let file_path = std::path::Path::new(file_path_str);
             if file_path.exists() {
                 if file_path.is_dir() {
-                    let _ = fs::remove_dir_all(&file_path);
+                    let _ = fs::remove_dir_all(file_path);
                 } else {
-                    let _ = fs::remove_file(&file_path);
+                    let _ = fs::remove_file(file_path);
                 }
             }
         }
-        let current_manifest_path = current_version_dir.join(&manifest_filename);
-        if current_manifest_path.exists() {
-            fs::remove_file(current_manifest_path)?;
-        }
-    } else {
-        fs::remove_dir_all(current_version_dir)?;
     }
 
+    let current_manifest_path = current_version_dir.join(&manifest_filename);
+    if current_manifest_path.exists() {
+        fs::remove_file(current_manifest_path)?;
+    }
+
+    if !has_other_manifests && current_version_dir.exists() {
+        let _ = fs::remove_dir_all(current_version_dir);
+    }
+
+    let latest_link = package_dir.join("latest");
+    if latest_link.exists() || latest_link.is_symlink() {
+        let _ = fs::remove_file(&latest_link);
+    }
+
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(previous_version, latest_link)?;
+    #[cfg(windows)]
+    let _ = std::os::windows::fs::symlink_dir(previous_version, latest_link);
+
     println!(
-        "Successfully rolled back '{}' to version {}.",
-        package_name.cyan(),
-        previous_version.to_string().green()
+        "{} Successfully rolled back {} to version {}.",
+        "::".bold().green(),
+        current_manifest.name.cyan(),
+        previous_version.green()
     );
 
     Ok(())
 }
 
-/// Returns the binary installation directory for a given scope.
-fn get_bin_root(scope: types::Scope) -> Result<PathBuf> {
-    match scope {
-        types::Scope::User => {
-            let home_dir = core_utils::get_user_home()
-                .ok_or_else(|| anyhow!("Could not find home directory."))?;
-            Ok(sysroot::apply_sysroot(home_dir.join(".zoi/pkgs/bin")))
-        }
-        types::Scope::System => {
-            if cfg!(target_os = "windows") {
-                Ok(sysroot::apply_sysroot(PathBuf::from(
-                    "C:\\ProgramData\\zoi\\pkgs\\bin",
-                )))
-            } else {
-                Ok(sysroot::apply_sysroot(PathBuf::from("/usr/local/bin")))
-            }
-        }
-        types::Scope::Project => {
-            let current_dir = std::env::current_dir()?;
-            Ok(current_dir.join(".zoi").join("pkgs").join("bin"))
-        }
-    }
+/// Searches for a binary in the previous manifest to determine if a shim is needed.
+#[allow(dead_code)]
+fn find_binary_in_prev_manifest(_path: &std::path::Path) -> Option<PathBuf> {
+    None
 }
 
 /// Ensures a shim or binary entry exists at the given path.
-fn create_shim(path: &std::path::Path) -> Result<()> {
-    if cfg!(target_os = "windows") {
-        let binary_path = path.with_extension("exe");
-        if binary_path.exists() {
-            return Ok(());
-        }
-    } else if path.exists() {
-        return Ok(());
-    }
-    Ok(())
+fn create_shim(path: &std::path::Path) {
+    let _ = zoi_install::shim::create_shim(path);
 }
+

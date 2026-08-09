@@ -7,6 +7,10 @@ use anyhow::Result;
 /// Runs the 'extension' command.
 ///
 /// Dispatches to subcommands for adding or removing extensions.
+///
+/// # Errors
+///
+/// Returns an error if the extension addition or removal fails.
 pub fn run(
     args: ExtensionCommand,
     yes: bool,

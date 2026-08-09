@@ -23,6 +23,22 @@ use zstd::stream::read::Decoder as ZstdDecoder;
 /// - Error Propagation: Any failure (network, filesystem, or corruption) is converted
 ///   into an `mlua::Error::RuntimeError`, which halts the Lua execution and is
 ///   caught by the Rust build engine to trigger a rollback.
+///
+/// # Errors
+///
+/// Returns an `mlua::Error` if:
+/// - The `UTILS` table cannot be found.
+/// - The output directory is invalid (not a subdirectory of `BUILD_DIR`).
+/// - Filesystem operations (create dir, open file, copy, remove) fail.
+/// - Network download fails.
+/// - Archive extraction fails.
+/// - The archive format is unsupported.
+///
+/// # Panics
+///
+/// This function may panic if:
+/// - Parsing the source URL fails to yield a filename.
+/// - Executing external commands (`hdiutil`, `pkgutil`, `unrar`) fails or their output cannot be parsed.
 pub fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let extract_fn =
         lua.create_function(move |lua, (source, out_name): (String, Option<String>)| {
@@ -44,8 +60,7 @@ pub fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
 
             if !out_dir.starts_with(build_dir) || out_dir == build_dir {
                 return Err(mlua::Error::RuntimeError(format!(
-                    "Invalid output directory: {}. Extraction must be into a subdirectory of the build directory.",
-                    out_dir_name
+                    "Invalid output directory: {out_dir_name}. Extraction must be into a subdirectory of the build directory."
                 )));
             }
 
@@ -62,23 +77,24 @@ pub fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
             let file = fs::File::open(&archive_file)
                 .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
 
+            let archive_path = Path::new(&archive_file);
             let archive_path_str = archive_file.to_string_lossy();
 
-            if archive_path_str.ends_with(".zip") {
+            if archive_path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("zip")) {
                 let mut archive =
                     ZipArchive::new(file).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
                 archive
                     .extract(&out_dir)
                     .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-            } else if archive_path_str.ends_with(".tar.gz") || archive_path_str.ends_with(".tgz") {
+            } else if archive_path_str.ends_with(".tar.gz") || archive_path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("tgz")) {
                 let tar_gz = GzDecoder::new(file);
                 let mut archive = tar::Archive::new(tar_gz);
                 archive
                     .unpack(&out_dir)
                     .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
             } else if archive_path_str.ends_with(".tar.zst")
-                || archive_path_str.ends_with(".zpa")
-                || archive_path_str.ends_with(".zsa")
+                || archive_path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("zpa"))
+                || archive_path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("zsa"))
             {
                 let tar_zst =
                     ZstdDecoder::new(file).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
@@ -92,10 +108,10 @@ pub fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                 archive
                     .unpack(&out_dir)
                     .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-            } else if archive_path_str.ends_with(".7z") {
+            } else if archive_path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("7z")) {
                 sevenz_rust::decompress_file(&archive_file, &out_dir)
                     .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-            } else if archive_path_str.ends_with(".dmg") {
+            } else if archive_path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("dmg")) {
                 if !cfg!(target_os = "macos") {
                     return Err(mlua::Error::RuntimeError(
                         "Extracting .dmg files is only supported on macOS.".to_string(),
@@ -107,10 +123,10 @@ pub fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                     .arg("-readonly")
                     .arg(&archive_file)
                     .output()
-                    .map_err(|e| mlua::Error::RuntimeError(format!("Failed to execute hdiutil: {}", e)))?;
+                    .map_err(|e| mlua::Error::RuntimeError(format!("Failed to execute hdiutil: {e}")))?;
                 if !output.status.success() {
                     let stderr = String::from_utf8_lossy(&output.stderr);
-                    return Err(mlua::Error::RuntimeError(format!("hdiutil failed: {}", stderr)));
+                    return Err(mlua::Error::RuntimeError(format!("hdiutil failed: {stderr}")));
                 }
                 let output_str = String::from_utf8_lossy(&output.stdout);
                 let mut mount_point = None;
@@ -127,17 +143,17 @@ pub fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                 let mount_path = std::path::Path::new(&mount_point);
                 if let Err(e) = zoi_core::utils::copy_dir_all(mount_path, &out_dir) {
                     let _ = std::process::Command::new("hdiutil").arg("detach").arg(&mount_point).status();
-                    return Err(mlua::Error::RuntimeError(format!("Failed to copy contents from dmg: {}", e)));
+                    return Err(mlua::Error::RuntimeError(format!("Failed to copy contents from dmg: {e}")));
                 }
                 let detach_status = std::process::Command::new("hdiutil")
                     .arg("detach")
                     .arg(&mount_point)
                     .status()
-                    .map_err(|e| mlua::Error::RuntimeError(format!("Failed to execute hdiutil detach: {}", e)))?;
+                    .map_err(|e| mlua::Error::RuntimeError(format!("Failed to execute hdiutil detach: {e}")))?;
                 if !detach_status.success() {
-                    eprintln!("Warning: failed to detach dmg volume at {}", mount_point);
+                    eprintln!("Warning: failed to detach dmg volume at {mount_point}");
                 }
-            } else if archive_path_str.ends_with(".pkg") {
+            } else if archive_path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("pkg")) {
                 if !cfg!(target_os = "macos") {
                     return Err(mlua::Error::RuntimeError(
                         "Extracting .pkg files natively is only supported on macOS.".to_string(),
@@ -149,15 +165,15 @@ pub fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                     .arg(&archive_file)
                     .arg(&temp_extract_dir)
                     .status()
-                    .map_err(|e| mlua::Error::RuntimeError(format!("Failed to execute pkgutil: {}", e)))?;
+                    .map_err(|e| mlua::Error::RuntimeError(format!("Failed to execute pkgutil: {e}")))?;
                 if !status.success() {
                     return Err(mlua::Error::RuntimeError("pkgutil failed to expand the package.".to_string()));
                 }
                 zoi_core::utils::copy_dir_all(&temp_extract_dir, &out_dir)
-                    .map_err(|e| mlua::Error::RuntimeError(format!("Failed to copy pkg contents: {}", e)))?;
+                    .map_err(|e| mlua::Error::RuntimeError(format!("Failed to copy pkg contents: {e}")))?;
                 let _ = fs::remove_dir_all(&temp_extract_dir);
 
-            } else if archive_path_str.ends_with(".rar") {
+            } else if archive_path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("rar")) {
                 if zoi_core::utils::command_exists("unrar") {
                     let status = std::process::Command::new("unrar")
                         .arg("x")
@@ -175,7 +191,7 @@ pub fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                             .to_string(),
                     ));
                 }
-            } else if archive_path_str.ends_with(".deb") {
+            } else if archive_path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("deb")) {
                 let mut ar = ArArchive::new(file);
                 while let Some(entry_result) = ar.next_entry() {
                     let mut entry =
@@ -187,38 +203,38 @@ pub fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                     if name.starts_with("data.tar") {
                         let temp_data_path = build_dir.join(&name);
                         let mut temp_file = fs::File::create(&temp_data_path)
-                            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to create temp file for {}: {}", name, e)))?;
+                            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to create temp file for {name}: {e}")))?;
                         std::io::copy(&mut entry, &mut temp_file)
-                            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to copy entry data for {}: {}", name, e)))?;
+                            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to copy entry data for {name}: {e}")))?;
 
                         let data_file = fs::File::open(&temp_data_path)
-                            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to reopen temp file for {}: {}", name, e)))?;
-                        if name.ends_with(".gz") {
+                            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to reopen temp file for {name}: {e}")))?;
+                        let data_path = Path::new(&name);
+                        if data_path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("gz")) {
                             let mut archive = tar::Archive::new(GzDecoder::new(data_file));
                             archive
                                 .unpack(&out_dir)
-                                .map_err(|e| mlua::Error::RuntimeError(format!("Failed to unpack {}: {}", name, e)))?;
-                        } else if name.ends_with(".xz") {
+                                .map_err(|e| mlua::Error::RuntimeError(format!("Failed to unpack {name}: {e}")))?;
+                        } else if data_path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("xz")) {
                             let mut archive = tar::Archive::new(XzDecoder::new(data_file));
                             archive
                                 .unpack(&out_dir)
-                                .map_err(|e| mlua::Error::RuntimeError(format!("Failed to unpack {}: {}", name, e)))?;
-                        } else if name.ends_with(".zst") {
+                                .map_err(|e| mlua::Error::RuntimeError(format!("Failed to unpack {name}: {e}")))?;
+                        } else if data_path.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("zst")) {
                             let mut archive = tar::Archive::new(
                                 ZstdDecoder::new(data_file)
-                                    .map_err(|e| mlua::Error::RuntimeError(format!("Failed to initialize zstd for {}: {}", name, e)))?,
+                                    .map_err(|e| mlua::Error::RuntimeError(format!("Failed to initialize zstd for {name}: {e}")))?,
                             );
                             archive
                                 .unpack(&out_dir)
-                                .map_err(|e| mlua::Error::RuntimeError(format!("Failed to unpack {}: {}", name, e)))?;
+                                .map_err(|e| mlua::Error::RuntimeError(format!("Failed to unpack {name}: {e}")))?;
                         }
                         fs::remove_file(temp_data_path).ok();
                     }
                 }
             } else {
                 return Err(mlua::Error::RuntimeError(format!(
-                    "Unsupported archive format for file: {}",
-                    archive_path_str
+                    "Unsupported archive format for file: {archive_path_str}"
                 )));
             }
 
@@ -237,6 +253,20 @@ pub fn add_extract_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
 /// - `list(path)`: Lists the contents of an archive.
 ///
 /// `UTILS.MAKE_ARCHIVE(source, output, algorithm)`: Creates an archive from a source path.
+///
+/// # Errors
+///
+/// Returns an `mlua::Error` if:
+/// - The `UTILS` table cannot be found.
+/// - Filesystem operations (open, create, metadata, read, write) fail.
+/// - Archive processing (zip, tar, etc.) fails.
+/// - Unsupported archive format or algorithm is provided.
+///
+/// # Panics
+///
+/// This function may panic if:
+/// - Stripping path prefixes fails during ZIP creation.
+/// - The parent of a source path cannot be determined.
 pub fn add_archive_util(lua: &Lua) -> Result<(), mlua::Error> {
     let archive_table = lua.create_table()?;
 
@@ -251,11 +281,12 @@ pub fn add_archive_util(lua: &Lua) -> Result<(), mlua::Error> {
         };
 
         let file = fs::File::open(&actual_path).map_err(|e| {
-            mlua::Error::RuntimeError(format!("Failed to open archive {:?}: {}", actual_path, e))
+            mlua::Error::RuntimeError(format!("Failed to open archive {}: {e}", actual_path.display()))
         })?;
         let mut files = Vec::new();
 
-        if path.ends_with(".zip") {
+        let path_obj = Path::new(&path);
+        if path_obj.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("zip")) {
             let mut archive =
                 ZipArchive::new(file).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
             for i in 0..archive.len() {
@@ -264,7 +295,7 @@ pub fn add_archive_util(lua: &Lua) -> Result<(), mlua::Error> {
                     .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
                 files.push(file.name().to_string());
             }
-        } else if path.ends_with(".tar.gz") || path.ends_with(".tgz") {
+        } else if path.ends_with(".tar.gz") || path_obj.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("tgz")) {
             let tar_gz = GzDecoder::new(file);
             let mut archive = tar::Archive::new(tar_gz);
             for entry in archive
@@ -280,7 +311,10 @@ pub fn add_archive_util(lua: &Lua) -> Result<(), mlua::Error> {
                         .to_string(),
                 );
             }
-        } else if path.ends_with(".tar.zst") || path.ends_with(".zpa") || path.ends_with(".zsa") {
+        } else if path.ends_with(".tar.zst")
+            || path_obj.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("zpa"))
+            || path_obj.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("zsa"))
+        {
             let tar_zst =
                 ZstdDecoder::new(file).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
             let mut archive = tar::Archive::new(tar_zst);
@@ -313,7 +347,7 @@ pub fn add_archive_util(lua: &Lua) -> Result<(), mlua::Error> {
                         .to_string(),
                 );
             }
-        } else if path.ends_with(".7z") {
+        } else if path_obj.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("7z")) {
             let file =
                 fs::File::open(&path).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
             let len = file
@@ -323,9 +357,9 @@ pub fn add_archive_util(lua: &Lua) -> Result<(), mlua::Error> {
             let reader = sevenz_rust::SevenZReader::new(file, len, sevenz_rust::Password::empty())
                 .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
             for entry in &reader.archive().files {
-                files.push(entry.name.to_string());
+                files.push(entry.name.clone());
             }
-        } else if path.ends_with(".rar") {
+        } else if path_obj.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("rar")) {
             if zoi_core::utils::command_exists("unrar") {
                 let output = std::process::Command::new("unrar")
                     .arg("lb")
@@ -339,7 +373,7 @@ pub fn add_archive_util(lua: &Lua) -> Result<(), mlua::Error> {
                     }
                 }
             }
-        } else if path.ends_with(".deb") {
+        } else if path_obj.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("deb")) {
             let mut ar = ArArchive::new(file);
             while let Some(entry_result) = ar.next_entry() {
                 let entry = entry_result.map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
@@ -348,8 +382,7 @@ pub fn add_archive_util(lua: &Lua) -> Result<(), mlua::Error> {
             }
         } else {
             return Err(mlua::Error::RuntimeError(format!(
-                "Unsupported archive format: {}",
-                path
+                "Unsupported archive format: {path}"
             )));
         }
 
@@ -378,16 +411,16 @@ pub fn add_archive_util(lua: &Lua) -> Result<(), mlua::Error> {
             let mut source_paths = Vec::new();
             match source {
                 mlua::Value::String(s) => {
-                    let s_str = s.to_str()?;
-                    let p = build_dir.join(&*s_str);
+                    let s_borrowed = s.to_str()?;
+                    let s_str_ref = s_borrowed.as_ref();
+                    let p = build_dir.join(s_str_ref);
                     if p.exists() {
-                        source_paths.push((p, s_str.to_string()));
-                    } else if Path::new(&*s_str).exists() {
-                        source_paths.push((PathBuf::from(s_str.to_string()), s_str.to_string()));
+                        source_paths.push((p, s_str_ref.to_string()));
+                    } else if Path::new(s_str_ref).exists() {
+                        source_paths.push((PathBuf::from(s_str_ref), s_str_ref.to_string()));
                     } else {
                         return Err(mlua::Error::RuntimeError(format!(
-                            "MAKE_ARCHIVE: source path does not exist: {}",
-                            &*s_str
+                            "MAKE_ARCHIVE: source path does not exist: {s_str_ref}"
                         )));
                     }
                 }
@@ -396,13 +429,12 @@ pub fn add_archive_util(lua: &Lua) -> Result<(), mlua::Error> {
                         let s_str = val?;
                         let p = build_dir.join(&s_str);
                         if p.exists() {
-                            source_paths.push((p, s_str.to_string()));
+                            source_paths.push((p, s_str.clone()));
                         } else if Path::new(&s_str).exists() {
-                            source_paths.push((PathBuf::from(&s_str), s_str.to_string()));
+                            source_paths.push((PathBuf::from(&s_str), s_str.clone()));
                         } else {
                             return Err(mlua::Error::RuntimeError(format!(
-                                "MAKE_ARCHIVE: source path does not exist: {}",
-                                s_str
+                                "MAKE_ARCHIVE: source path does not exist: {s_str}"
                             )));
                         }
                     }
@@ -438,12 +470,13 @@ pub fn add_archive_util(lua: &Lua) -> Result<(), mlua::Error> {
 
                     for (path, rel_name) in source_paths {
                         if path.is_dir() {
+                            let parent = path.parent().expect("source path should have a parent");
                             for entry in walkdir::WalkDir::new(&path)
                                 .into_iter()
-                                .filter_map(|e| e.ok())
+                                .filter_map(Result::ok)
                             {
                                 let rel =
-                                    entry.path().strip_prefix(path.parent().unwrap()).unwrap();
+                                    entry.path().strip_prefix(parent).expect("entry path should be within source path");
                                 if entry.file_type().is_dir() {
                                     zip.add_directory(rel.to_string_lossy(), options)
                                         .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
@@ -499,8 +532,7 @@ pub fn add_archive_util(lua: &Lua) -> Result<(), mlua::Error> {
                 }
                 _ => {
                     return Err(mlua::Error::RuntimeError(format!(
-                        "MAKE_ARCHIVE: unsupported algorithm: {}",
-                        algo
+                        "MAKE_ARCHIVE: unsupported algorithm: {algo}"
                     )));
                 }
             }

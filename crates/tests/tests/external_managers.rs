@@ -14,7 +14,7 @@ fn test_external_manager_command_construction() {
         .get(dep.manager)
         .expect("apt should be configured");
 
-    let package_with_version = format!("{}={}", dep.package, dep.version_str.as_ref().unwrap());
+    let package_with_version = format!("{}={}", dep.package, dep.version_str.as_ref().expect("unwrap failed"));
 
     let install_cmd = pm_commands
         .install

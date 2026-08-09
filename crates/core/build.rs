@@ -4,12 +4,11 @@
 //! and generating Rust code that includes the built-in PGP keys for signature verification.
 
 use std::env;
-use std::error::Error;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() {
     println!("cargo:rerun-if-env-changed=ZOI_COMMIT_HASH");
     println!("cargo:rerun-if-env-changed=ZOI_DEFAULT_REGISTRY");
     println!("cargo:rerun-if-env-changed=ZOI_BUILTIN_AUTHORITIES");
@@ -41,18 +40,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         authorities.join(",")
     );
 
-    let out_dir = env::var_os("OUT_DIR").unwrap();
+    let out_dir = env::var_os("OUT_DIR").expect("OUT_DIR should be set by cargo");
     let dest_path = Path::new(&out_dir).join("generated_pgp_keys.rs");
     generate_pgp_keys(&dest_path);
-
-    Ok(())
 }
 
 /// Reads PGP key files from the `src/builtin/pgp` directory and generates a Rust source
 /// file containing the keys as static byte arrays.
 fn generate_pgp_keys(dest_path: &Path) {
+    use std::fmt::Write;
     let pgp_dir = PathBuf::from("src/builtin/pgp");
-    let mut output = String::from("/// A list of built-in PGP keys for registry and package verification.\n///\n/// Each entry is a tuple of (key_name, raw_key_bytes).\npub static BUILTIN_KEYS: &[(&str, &[u8])] = &[\n");
+    let mut output = String::from("/// A list of built-in PGP keys for registry and package verification.\n///\n/// Each entry is a tuple of (`key_name`, `raw_key_bytes`).\npub static BUILTIN_KEYS: &[(&str, &[u8])] = &[\n");
 
     if pgp_dir.exists()
         && let Ok(entries) = fs::read_dir(&pgp_dir)
@@ -66,7 +64,7 @@ fn generate_pgp_keys(dest_path: &Path) {
                     .file_stem()
                     .and_then(|s| s.to_str())
                     .unwrap_or("unknown");
-                output.push_str(&format!("    (\"{}\", &{:?}),\n", name, data));
+                let _ = writeln!(output, "    (\"{name}\", &{data:?}),");
             }
         }
     }

@@ -69,7 +69,7 @@ metadata({
 
     let result = registry::check(reg_path);
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("error(s)"));
+    assert!(result.expect_err("unwrap_err failed").to_string().contains("error(s)"));
 
     Ok(())
 }
@@ -85,7 +85,7 @@ fn test_registry_advisory_id_assignment() -> Result<()> {
     let current_year = chrono::Utc::now().year();
     let temp_adv_path = reg_path
         .join("core/vuln-pkg")
-        .join(format!("ZSA-{}-TEMP.sec.yaml", current_year));
+        .join(format!("ZSA-{current_year}-TEMP.sec.yaml"));
 
     let adv_content = r#"
 package: "vuln-pkg"
@@ -115,10 +115,10 @@ repos:
 
     registry::generate_metadata(reg_path)?;
 
-    let expected_id = format!("TEST-{}-C0001", current_year);
+    let expected_id = format!("TEST-{current_year}-C0001");
     let final_adv_path = reg_path
         .join("core/vuln-pkg")
-        .join(format!("{}.sec.yaml", expected_id));
+        .join(format!("{expected_id}.sec.yaml"));
 
     assert!(
         final_adv_path.exists(),
@@ -126,7 +126,7 @@ repos:
     );
 
     let final_content = fs::read_to_string(final_adv_path)?;
-    assert!(final_content.contains(&format!("id: {}", expected_id)));
+    assert!(final_content.contains(&format!("id: {expected_id}")));
 
     let advisories_json = fs::read_to_string(reg_path.join("advisories.json"))?;
     assert!(advisories_json.contains("\"0001\": \"vuln-pkg\""));

@@ -4,7 +4,7 @@ use crate::utils;
 use anyhow::{Result, anyhow};
 use clap::CommandFactory;
 use clap_complete::{Shell, generate};
-use colored::*;
+use colored::Colorize;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::Write;
@@ -79,8 +79,8 @@ fn install_completions(shell: Shell, scope: SetupScope, cmd: &mut clap::Command)
             post_process_completions(shell, String::from_utf8_lossy(&script_buf).to_string());
         file.write_all(script.as_bytes())?;
         println!(
-            "PowerShell completion script appended to your profile: {:?}",
-            path
+            "PowerShell completion script appended to your profile: {}",
+            path.display()
         );
         println!("Please restart your shell or run '. $PROFILE' to activate it.");
     } else {
@@ -90,15 +90,16 @@ fn install_completions(shell: Shell, scope: SetupScope, cmd: &mut clap::Command)
             post_process_completions(shell, String::from_utf8_lossy(&script_buf).to_string());
         let mut file = fs::File::create(&path)?;
         file.write_all(script.as_bytes())?;
-        println!("{} completions installed in: {:?}", shell, path);
+        println!("{shell} completions installed in: {}", path.display());
     }
 
     if shell == Shell::Zsh && scope == SetupScope::User {
         println!("Ensure the directory is in your $fpath. Add this to your .zshrc if it's not:");
         println!(
-            "  fpath=({:?} $fpath)",
+            "  fpath=({} $fpath)",
             path.parent()
-                .ok_or_else(|| anyhow!("Path should have a parent directory: {:?}", path))?
+                .ok_or_else(|| anyhow!("Path should have a parent directory: {}", path.display()))?
+                .display()
         );
     }
 
@@ -132,7 +133,7 @@ _zoi_installed_packages() {
             let header = parts.next().unwrap_or("");
             let body = parts.next().unwrap_or("");
 
-            script = format!("{}\n{}\n{}", header, helper, body);
+            script = format!("{header}\n{helper}\n{body}");
 
             script = script.replace("':ALL_SOURCES: '", "':package:(_zoi_packages)'");
             script = script.replace("':ALL_PACKAGES: '", "':package:(_zoi_packages)'");
@@ -189,7 +190,7 @@ _zoi_wrapper() {
 }
 complete -F _zoi_wrapper zoi
 "#;
-            script = format!("{}\n{}", script, helpers);
+            script = format!("{script}\n{helpers}");
         }
         _ => {}
     }
@@ -197,6 +198,13 @@ complete -F _zoi_wrapper zoi
 }
 
 /// Runs the shell setup command.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Root privileges are required for system-wide setup but elevation fails.
+/// - The shell completion installation fails.
+/// - The system path setup fails.
 pub fn run(shell: Shell, scope: SetupScope) -> Result<()> {
     if scope == SetupScope::System && !utils::is_admin() {
         let exe = std::env::current_exe()?;
@@ -206,9 +214,9 @@ pub fn run(shell: Shell, scope: SetupScope) -> Result<()> {
 
         let status = Command::new(escalator)
             .arg(&exe)
-            .args(&args[1..])
+            .args(args.get(1..).unwrap_or(&[]))
             .status()
-            .map_err(|e| anyhow!("Failed to elevate privileges: {}", e))?;
+            .map_err(|e| anyhow!("Failed to elevate privileges: {e}"))?;
         std::process::exit(status.code().unwrap_or(1));
     }
 
@@ -243,8 +251,7 @@ fn get_completions_dir(scope: SetupScope, shell: &str) -> Result<PathBuf> {
         SetupScope::System => {
             if cfg!(target_os = "windows") {
                 Ok(PathBuf::from(format!(
-                    "C:\\ProgramData\\zoi\\pkgs\\shell\\{}",
-                    shell
+                    "C:\\ProgramData\\zoi\\pkgs\\shell\\{shell}"
                 )))
             } else {
                 let base = match shell {
@@ -280,7 +287,7 @@ fn install_package_completions(shell: Shell, scope: SetupScope) -> Result<()> {
                 "{} Add this to your .zshrc to load package completions:",
                 "::".bold().blue()
             );
-            println!("  fpath=({:?} $fpath)", fpath_entry);
+            println!("  fpath=({fpath_entry:?} $fpath)");
             println!("  autoload -Uz compinit && compinit");
         }
         Shell::Bash => {
@@ -294,18 +301,18 @@ fn install_package_completions(shell: Shell, scope: SetupScope) -> Result<()> {
             };
             if bash_completion_dir.exists() {
                 println!(
-                    "{} Package completions directory: {:?}",
+                    "{} Package completions directory: {}",
                     "::".bold().blue(),
-                    completions_dir
+                    completions_dir.display()
                 );
                 println!("  Completions from installed packages will be available automatically.");
             }
         }
         Shell::Fish => {
             println!(
-                "{} Package completions directory: {:?}",
+                "{} Package completions directory: {}",
                 "::".bold().blue(),
-                completions_dir
+                completions_dir.display()
             );
             println!("  Completions from installed packages will be available automatically.");
         }
@@ -316,6 +323,10 @@ fn install_package_completions(shell: Shell, scope: SetupScope) -> Result<()> {
 }
 
 /// Prints the shell hook script for a given shell.
+///
+/// # Errors
+///
+/// Returns an error if the shell hook is not supported for the given shell.
 pub fn print_hook(shell: Shell) -> Result<()> {
     match shell {
         Shell::Bash => {
@@ -351,19 +362,32 @@ fi
         }
         Shell::Fish => {
             println!(
-                r#"
+                r"
 function _zoi_hook --on-variable PWD
   zoi env --export-shell fish | source
 end
-"#
+"
             );
         }
-        _ => return Err(anyhow!("Shell hook not supported for {:?}", shell)),
+        _ => return Err(anyhow!("Shell hook not supported for {shell:?}")),
     }
     Ok(())
 }
 
 /// Enters an ephemeral shell with the given packages installed.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Dependency resolution fails.
+/// - Package installation fails.
+/// - Temporary directory creation fails.
+/// - Symlinking binary files fails.
+/// - Executing the shell command fails.
+///
+/// # Panics
+///
+/// Panics if a mutex lock is poisoned.
 pub fn enter_ephemeral_shell(
     package_sources: &[String],
     run_cmd: Option<String>,
@@ -415,10 +439,10 @@ pub fn enter_ephemeral_shell(
                 let node = graph
                     .nodes
                     .get(&pkg_id)
-                    .ok_or_else(|| anyhow!("Package node missing from graph for '{}'", pkg_id))?;
+                    .ok_or_else(|| anyhow!("Package node missing from graph for '{pkg_id}'"))?;
                 let action = install_plan
                     .get(&pkg_id)
-                    .ok_or_else(|| anyhow!("Install action missing for package '{}'", pkg_id))?;
+                    .ok_or_else(|| anyhow!("Install action missing for package '{pkg_id}'"))?;
 
                 let manifest = install::installer::install_node(
                     node,
@@ -431,12 +455,16 @@ pub fn enter_ephemeral_shell(
                     verbose,
                 )?;
 
-                let mut session_lock = session_installed_mutex.lock().unwrap();
+                let mut session_lock = session_installed_mutex
+                    .lock()
+                    .expect("failed to lock session_installed_mutex");
                 session_lock.push(manifest);
                 Ok(())
             })?;
         }
-        session_installed = session_installed_mutex.into_inner().unwrap();
+        session_installed = session_installed_mutex
+            .into_inner()
+            .expect("failed to get session_installed_mutex inner value");
     }
 
     let temp_dir = tempfile::Builder::new().prefix("zoi-shell-").tempdir()?;
@@ -458,7 +486,7 @@ pub fn enter_ephemeral_shell(
                 if path.is_file() || path.is_symlink() {
                     let file_name = path
                         .file_name()
-                        .ok_or_else(|| anyhow!("Path has no file name: {:?}", path))?;
+                        .ok_or_else(|| anyhow!("Path has no file name: {}", path.display()))?;
                     let dest = temp_bin_dir.join(file_name);
                     utils::symlink_file(&path, &dest)?;
                 }
@@ -469,7 +497,7 @@ pub fn enter_ephemeral_shell(
     let sep = if cfg!(windows) { ";" } else { ":" };
     let mut new_path = temp_bin_dir.to_string_lossy().to_string();
     if let Ok(old_path) = std::env::var("PATH") {
-        new_path = format!("{}{}{}", new_path, sep, old_path);
+        new_path = format!("{new_path}{sep}{old_path}");
     }
 
     let package_list = package_sources.join(",");
@@ -531,10 +559,10 @@ pub fn enter_ephemeral_shell(
             } else {
                 Command::new("bash")
             };
-            if !cfg!(windows) {
-                c.arg("-c");
-            } else {
+            if cfg!(windows) {
                 c.arg("-Command");
+            } else {
+                c.arg("-c");
             }
             c.arg(&cmd_str);
             c.envs(&envs);
@@ -598,7 +626,7 @@ pub fn enter_ephemeral_shell(
             let version_dir = match get_version_dir_from_manifest(&manifest) {
                 Ok(d) => d,
                 Err(e) => {
-                    eprintln!("Warning: failed to resolve path for {}: {}", ident, e);
+                    eprintln!("Warning: failed to resolve path for {ident}: {e}");
                     continue;
                 }
             };
@@ -606,18 +634,19 @@ pub fn enter_ephemeral_shell(
                 && let Err(e) = fs::remove_dir_all(&version_dir)
             {
                 eprintln!(
-                    "Warning: failed to cleanup ephemeral package {}: {}",
-                    ident, e
+                    "Warning: failed to cleanup ephemeral package {ident}: {e}"
                 );
             }
-            let package_dir = version_dir.parent().unwrap().to_path_buf();
-            if let Ok(mut entries) = fs::read_dir(&package_dir) {
+            let package_dir = version_dir
+                .parent()
+                .expect("version directory should have a parent");
+            if let Ok(mut entries) = fs::read_dir(package_dir) {
                 let has_other_entries = entries.any(|e| {
                     e.as_ref()
                         .is_ok_and(|e| e.file_name() != "latest" && e.file_name() != "dependents")
                 });
                 if !has_other_entries {
-                    let _ = fs::remove_dir_all(&package_dir);
+                    let _ = fs::remove_dir_all(package_dir);
                 }
             }
         }

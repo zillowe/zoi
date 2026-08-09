@@ -13,9 +13,9 @@ fn test_extension_add_reverts_cleanly() {
     let root = tmp.path().to_path_buf();
 
     ctx.set_env_var("HOME", root.clone());
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
-    let pm = plugin::PluginManager::new().unwrap();
+    let pm = plugin::PluginManager::new().expect("unwrap failed");
 
     let pkg_lua_content = r#"
 metadata({
@@ -35,9 +35,9 @@ metadata({
 })
 "#;
     let pkg_lua_path = root.join("test-ext.pkg.lua");
-    fs::write(&pkg_lua_path, pkg_lua_content).unwrap();
+    fs::write(&pkg_lua_path, pkg_lua_content).expect("unwrap failed");
 
-    extension::add(pkg_lua_path.to_str().unwrap(), true, Some(&pm)).unwrap();
+    extension::add(pkg_lua_path.to_str().expect("unwrap failed"), true, Some(&pm)).expect("unwrap failed");
 
     let plugin_path = root.join(".zoi/plugins/my-plugin.lua");
     let hook_path = root.join(".zoi/hooks/my-hook.hook.yaml");
@@ -45,7 +45,7 @@ metadata({
     assert!(plugin_path.exists(), "Plugin file should be created");
     assert!(hook_path.exists(), "Hook file should be created");
 
-    extension::remove(pkg_lua_path.to_str().unwrap(), true, Some(&pm)).unwrap();
+    extension::remove(pkg_lua_path.to_str().expect("unwrap failed"), true, Some(&pm)).expect("unwrap failed");
 
     assert!(!plugin_path.exists(), "Plugin file should be removed");
     assert!(!hook_path.exists(), "Hook file should be removed");
@@ -58,7 +58,7 @@ fn test_extension_remove_restores_previous_default_registry() {
     let root = tmp.path().to_path_buf();
 
     ctx.set_env_var("HOME", root.clone());
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
     config::write_user_config(&types::Config {
         default_registry: Some(types::Registry {
@@ -69,9 +69,9 @@ fn test_extension_remove_restores_previous_default_registry() {
         }),
         ..Default::default()
     })
-    .unwrap();
+    .expect("unwrap failed");
 
-    let pm = plugin::PluginManager::new().unwrap();
+    let pm = plugin::PluginManager::new().expect("unwrap failed");
     let pkg_lua_content = r#"
 metadata({
     name = "registry-ext",
@@ -89,21 +89,21 @@ metadata({
 })
 "#;
     let pkg_lua_path = root.join("registry-ext.pkg.lua");
-    fs::write(&pkg_lua_path, pkg_lua_content).unwrap();
+    fs::write(&pkg_lua_path, pkg_lua_content).expect("unwrap failed");
 
-    extension::add(pkg_lua_path.to_str().unwrap(), true, Some(&pm)).unwrap();
+    extension::add(pkg_lua_path.to_str().expect("unwrap failed"), true, Some(&pm)).expect("unwrap failed");
     let active_registry = config::read_user_config()
-        .unwrap()
+        .expect("unwrap failed")
         .default_registry
-        .unwrap()
+        .expect("unwrap failed")
         .url;
     assert_eq!(active_registry, "https://example.com/override.git");
 
-    extension::remove(pkg_lua_path.to_str().unwrap(), true, Some(&pm)).unwrap();
+    extension::remove(pkg_lua_path.to_str().expect("unwrap failed"), true, Some(&pm)).expect("unwrap failed");
     let restored_registry = config::read_user_config()
-        .unwrap()
+        .expect("unwrap failed")
         .default_registry
-        .unwrap()
+        .expect("unwrap failed")
         .url;
     assert_eq!(restored_registry, "https://example.com/original.git");
 }
@@ -115,7 +115,7 @@ fn test_extension_add_failure_restores_previous_default_registry() {
     let root = tmp.path().to_path_buf();
 
     ctx.set_env_var("HOME", root.clone());
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
     ctx.set_current_dir(&root);
 
     config::write_user_config(&types::Config {
@@ -127,11 +127,11 @@ fn test_extension_add_failure_restores_previous_default_registry() {
         }),
         ..Default::default()
     })
-    .unwrap();
+    .expect("unwrap failed");
 
-    fs::write(root.join("zoi.yaml"), "name: existing-project\n").unwrap();
+    fs::write(root.join("zoi.yaml"), "name: existing-project\n").expect("unwrap failed");
 
-    let pm = plugin::PluginManager::new().unwrap();
+    let pm = plugin::PluginManager::new().expect("unwrap failed");
     let pkg_lua_content = r#"
 metadata({
     name = "broken-registry-ext",
@@ -150,23 +150,23 @@ metadata({
 })
 "#;
     let pkg_lua_path = root.join("broken-registry-ext.pkg.lua");
-    fs::write(&pkg_lua_path, pkg_lua_content).unwrap();
+    fs::write(&pkg_lua_path, pkg_lua_content).expect("unwrap failed");
 
-    let result = extension::add(pkg_lua_path.to_str().unwrap(), true, Some(&pm));
+    let result = extension::add(pkg_lua_path.to_str().expect("unwrap failed"), true, Some(&pm));
     assert!(
         result.is_err(),
         "extension add should fail after the registry change"
     );
 
     let restored_registry = config::read_user_config()
-        .unwrap()
+        .expect("unwrap failed")
         .default_registry
-        .unwrap()
+        .expect("unwrap failed")
         .url;
     assert_eq!(restored_registry, "https://example.com/original.git");
     assert!(
         local::is_package_installed("broken-registry-ext", None, types::Scope::User)
-            .unwrap()
+            .expect("unwrap failed")
             .is_none(),
         "failed extension add should not leave an installed manifest behind"
     );
@@ -179,12 +179,12 @@ fn test_extension_add_failure_rolls_back_created_plugin() {
     let root = tmp.path().to_path_buf();
 
     ctx.set_env_var("HOME", root.clone());
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
     ctx.set_current_dir(&root);
 
-    fs::write(root.join("zoi.yaml"), "name: existing-project\n").unwrap();
+    fs::write(root.join("zoi.yaml"), "name: existing-project\n").expect("unwrap failed");
 
-    let pm = plugin::PluginManager::new().unwrap();
+    let pm = plugin::PluginManager::new().expect("unwrap failed");
     let pkg_lua_content = r#"
 metadata({
     name = "broken-plugin-ext",
@@ -203,9 +203,9 @@ metadata({
 })
 "#;
     let pkg_lua_path = root.join("broken-plugin-ext.pkg.lua");
-    fs::write(&pkg_lua_path, pkg_lua_content).unwrap();
+    fs::write(&pkg_lua_path, pkg_lua_content).expect("unwrap failed");
 
-    let result = extension::add(pkg_lua_path.to_str().unwrap(), true, Some(&pm));
+    let result = extension::add(pkg_lua_path.to_str().expect("unwrap failed"), true, Some(&pm));
     assert!(
         result.is_err(),
         "extension add should fail after creating the plugin"
@@ -224,13 +224,13 @@ fn test_extension_remove_project_uses_original_install_directory() {
     let install_dir = root.join("install-dir");
     let other_dir = root.join("other-dir");
 
-    fs::create_dir_all(&install_dir).unwrap();
-    fs::create_dir_all(&other_dir).unwrap();
+    fs::create_dir_all(&install_dir).expect("unwrap failed");
+    fs::create_dir_all(&other_dir).expect("unwrap failed");
 
     ctx.set_env_var("HOME", root.clone());
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
-    let pm = plugin::PluginManager::new().unwrap();
+    let pm = plugin::PluginManager::new().expect("unwrap failed");
     let pkg_lua_content = r#"
 metadata({
     name = "project-ext",
@@ -248,16 +248,16 @@ metadata({
 })
 "#;
     let pkg_lua_path = root.join("project-ext.pkg.lua");
-    fs::write(&pkg_lua_path, pkg_lua_content).unwrap();
+    fs::write(&pkg_lua_path, pkg_lua_content).expect("unwrap failed");
 
     ctx.set_current_dir(&install_dir);
-    extension::add(pkg_lua_path.to_str().unwrap(), true, Some(&pm)).unwrap();
+    extension::add(pkg_lua_path.to_str().expect("unwrap failed"), true, Some(&pm)).expect("unwrap failed");
     assert!(install_dir.join("zoi.yaml").exists());
 
-    fs::write(other_dir.join("zoi.yaml"), "name: keep-me\n").unwrap();
+    fs::write(other_dir.join("zoi.yaml"), "name: keep-me\n").expect("unwrap failed");
     ctx.set_current_dir(&other_dir);
 
-    extension::remove(pkg_lua_path.to_str().unwrap(), true, Some(&pm)).unwrap();
+    extension::remove(pkg_lua_path.to_str().expect("unwrap failed"), true, Some(&pm)).expect("unwrap failed");
 
     assert!(
         !install_dir.join("zoi.yaml").exists(),
@@ -276,9 +276,9 @@ fn test_extension_remove_uses_installed_extension_metadata() {
     let root = tmp.path().to_path_buf();
 
     ctx.set_env_var("HOME", root.clone());
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
-    let pm = plugin::PluginManager::new().unwrap();
+    let pm = plugin::PluginManager::new().expect("unwrap failed");
     let pkg_lua_path = root.join("drifting-ext.pkg.lua");
     fs::write(
         &pkg_lua_path,
@@ -299,9 +299,9 @@ metadata({
 })
 "#,
     )
-    .unwrap();
+    .expect("unwrap failed");
 
-    extension::add(pkg_lua_path.to_str().unwrap(), true, Some(&pm)).unwrap();
+    extension::add(pkg_lua_path.to_str().expect("unwrap failed"), true, Some(&pm)).expect("unwrap failed");
     assert!(root.join(".zoi/plugins/original-plugin.lua").exists());
 
     fs::write(
@@ -323,9 +323,9 @@ metadata({
 })
 "#,
     )
-    .unwrap();
+    .expect("unwrap failed");
 
-    extension::remove(pkg_lua_path.to_str().unwrap(), true, Some(&pm)).unwrap();
+    extension::remove(pkg_lua_path.to_str().expect("unwrap failed"), true, Some(&pm)).expect("unwrap failed");
     assert!(
         !root.join(".zoi/plugins/original-plugin.lua").exists(),
         "remove should revert the installed extension metadata, not the current source metadata"
@@ -339,9 +339,9 @@ fn test_extension_post_hooks_are_nonfatal() {
     let root = tmp.path().to_path_buf();
 
     ctx.set_env_var("HOME", root.clone());
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
-    let pm = plugin::PluginManager::new().unwrap();
+    let pm = plugin::PluginManager::new().expect("unwrap failed");
     pm.lua
         .load(
             r#"
@@ -354,7 +354,7 @@ fn test_extension_post_hooks_are_nonfatal() {
     "#,
         )
         .exec()
-        .unwrap();
+        .expect("unwrap failed");
 
     let pkg_lua_path = root.join("hook-ext.pkg.lua");
     fs::write(
@@ -376,11 +376,11 @@ metadata({
 })
 "#,
     )
-    .unwrap();
+    .expect("unwrap failed");
 
-    extension::add(pkg_lua_path.to_str().unwrap(), true, Some(&pm)).unwrap();
+    extension::add(pkg_lua_path.to_str().expect("unwrap failed"), true, Some(&pm)).expect("unwrap failed");
     assert!(root.join(".zoi/plugins/hook-plugin.lua").exists());
 
-    extension::remove(pkg_lua_path.to_str().unwrap(), true, Some(&pm)).unwrap();
+    extension::remove(pkg_lua_path.to_str().expect("unwrap failed"), true, Some(&pm)).expect("unwrap failed");
     assert!(!root.join(".zoi/plugins/hook-plugin.lua").exists());
 }

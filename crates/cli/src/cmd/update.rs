@@ -3,7 +3,7 @@ use crate::cmd::ux;
 use crate::pkg::merge::handle_backup_files;
 use crate::pkg::{config, db, hooks, install, local, pin, resolve, transaction, types};
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use dialoguer::{MultiSelect, theme::ColorfulTheme};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
@@ -20,6 +20,10 @@ use std::sync::Mutex;
 /// - Advisory Deltas: Calculates and displays changes in security vulnerabilities.
 /// - Cleanup: Automatically removes old versions after a successful upgrade
 ///   (if rollbacks are not required).
+///
+/// # Errors
+///
+/// Returns an error if the update process fails for any package.
 pub fn run(
     all: bool,
     package_names: &[String],
@@ -303,7 +307,7 @@ fn run_update_single_logic(
     for stage in stages {
         for pkg_id in stage {
             let node = graph.nodes.get(&pkg_id).ok_or_else(|| {
-                anyhow!("Package node '{}' missing from graph during update", pkg_id)
+                anyhow!("Package node '{pkg_id}' missing from graph during update")
             })?;
             if let Some(action) = install_plan.get(&pkg_id) {
                 match install::installer::install_node(
@@ -323,7 +327,7 @@ fn run_update_single_logic(
                             failed: 1,
                             skipped: 0,
                         });
-                        return Err(anyhow!("Update failed: {}", e));
+                        return Err(anyhow!("Update failed: {e}"));
                     }
                 }
             }
@@ -338,7 +342,7 @@ fn run_update_single_logic(
                 new_manifest: Box::new(new_manifest.clone()),
             },
         ) {
-            eprintln!("Warning: Failed to record transaction for update: {}", e);
+            eprintln!("Warning: Failed to record transaction for update: {e}");
             transaction::delete_log(&transaction.id)?;
         } else {
             if let Ok(modified_files) = transaction::get_modified_files(&transaction.id) {
@@ -494,7 +498,7 @@ fn run_update_all_logic(
                         source,
                         e
                     );
-                    skipped_sources.push(format!("{} ({})", source, e));
+                    skipped_sources.push(format!("{source} ({e})"));
                     pb.inc(1);
                     continue;
                 }
@@ -548,27 +552,25 @@ fn run_update_all_logic(
         println!("\n{} Upgrade candidates", "::".bold().blue());
         for candidate in &packages_to_upgrade {
             let delta = candidate.new_advisories as i64 - candidate.old_advisories as i64;
-            let advisory_suffix = if delta > 0 {
-                format!(" (advisories +{})", delta).red().to_string()
-            } else if delta < 0 {
-                format!(" (advisories {})", delta).green().to_string()
-            } else {
-                String::new()
+            let advisory_suffix = match delta.cmp(&0) {
+                std::cmp::Ordering::Greater => format!(" (advisories +{delta})").red().to_string(),
+                std::cmp::Ordering::Less => format!(" (advisories {delta})").green().to_string(),
+                std::cmp::Ordering::Equal => String::new(),
             };
 
-            let old_display = if candidate.old_manifest.revision != "1" {
+            let old_display = if candidate.old_manifest.revision == "1" {
+                candidate.old_manifest.version.clone()
+            } else {
                 format!(
                     "{}-{}",
                     candidate.old_manifest.version, candidate.old_manifest.revision
                 )
-            } else {
-                candidate.old_manifest.version.clone()
             };
 
-            let new_display = if candidate.new_pkg.revision != "1" {
-                format!("{}-{}", candidate.new_version, candidate.new_pkg.revision)
-            } else {
+            let new_display = if candidate.new_pkg.revision == "1" {
                 candidate.new_version.clone()
+            } else {
+                format!("{}-{}", candidate.new_version, candidate.new_pkg.revision)
             };
 
             println!(
@@ -623,7 +625,7 @@ fn run_update_all_logic(
             .with_prompt("Select packages to update")
             .items(&items)
             .interact()
-            .map_err(|e| anyhow!("Interactive selection failed: {}", e))?;
+            .map_err(|e| anyhow!("Interactive selection failed: {e}"))?;
 
         if selected.is_empty() {
             println!("No packages selected.");
@@ -741,7 +743,11 @@ fn run_update_all_logic(
     // We execute the upgrade plan. Each package is processed in parallel
     // where possible, but all are wrapped in a single machine-wide transaction.
     let transaction = Mutex::new(transaction::begin()?);
-    let transaction_id = transaction.lock().unwrap().id.clone();
+    let transaction_id = transaction
+        .lock()
+        .expect("failed to lock transaction")
+        .id
+        .clone();
     let failed_updates = Mutex::new(Vec::new());
     let successful_upgrades = Mutex::new(Vec::new());
 
@@ -785,7 +791,7 @@ fn run_update_all_logic(
                     );
                     failed_updates
                         .lock()
-                        .map_err(|e| anyhow!("mutex poisoned: {}", e))?
+                        .map_err(|e| anyhow!("mutex poisoned: {e}"))?
                         .push(candidate.source.clone());
                     return Ok(());
                 }
@@ -800,7 +806,7 @@ fn run_update_all_logic(
                 );
                 failed_updates
                     .lock()
-                    .map_err(|e| anyhow!("mutex poisoned: {}", e))?
+                    .map_err(|e| anyhow!("mutex poisoned: {e}"))?
                     .push(candidate.source.clone());
                 return Ok(());
             }
@@ -814,7 +820,7 @@ fn run_update_all_logic(
                 );
                 failed_updates
                     .lock()
-                    .map_err(|e| anyhow!("mutex poisoned: {}", e))?
+                    .map_err(|e| anyhow!("mutex poisoned: {e}"))?
                     .push(candidate.source.clone());
                 return Ok(());
             }
@@ -828,7 +834,7 @@ fn run_update_all_logic(
                 );
                 failed_updates
                     .lock()
-                    .map_err(|e| anyhow!("mutex poisoned: {}", e))?
+                    .map_err(|e| anyhow!("mutex poisoned: {e}"))?
                     .push(candidate.source.clone());
                 return Ok(());
             }
@@ -842,7 +848,7 @@ fn run_update_all_logic(
                 );
                 failed_updates
                     .lock()
-                    .map_err(|e| anyhow!("mutex poisoned: {}", e))?
+                    .map_err(|e| anyhow!("mutex poisoned: {e}"))?
                     .push(candidate.source.clone());
                 return Ok(());
             }
@@ -858,7 +864,7 @@ fn run_update_all_logic(
                     );
                     failed_updates
                         .lock()
-                        .map_err(|e| anyhow!("mutex poisoned: {}", e))?
+                        .map_err(|e| anyhow!("mutex poisoned: {e}"))?
                         .push(candidate.source.clone());
                     return Ok(());
                 }
@@ -875,7 +881,7 @@ fn run_update_all_logic(
                     );
                     failed_updates
                         .lock()
-                        .map_err(|e| anyhow!("mutex poisoned: {}", e))?
+                        .map_err(|e| anyhow!("mutex poisoned: {e}"))?
                         .push(candidate.source.clone());
                     return Ok(());
                 }
@@ -885,7 +891,7 @@ fn run_update_all_logic(
             for stage in stages {
                 for pkg_id in stage {
                     let node = graph.nodes.get(&pkg_id).ok_or_else(|| {
-                        anyhow!("Package node '{}' missing from graph during update", pkg_id)
+                        anyhow!("Package node '{pkg_id}' missing from graph during update")
                     })?;
                     if let Some(action) = install_plan.get(&pkg_id) {
                         match install::installer::install_node(
@@ -914,7 +920,7 @@ fn run_update_all_logic(
                                 );
                                 failed_updates
                                     .lock()
-                                    .map_err(|e| anyhow!("mutex poisoned: {}", e))?
+                                    .map_err(|e| anyhow!("mutex poisoned: {e}"))?
                                     .push(candidate.source.clone());
                                 return Ok(());
                             }
@@ -926,7 +932,7 @@ fn run_update_all_logic(
             if let Some(new_manifest) = new_manifest_option {
                 let mut tx_lock = transaction
                     .lock()
-                    .map_err(|e| anyhow!("mutex poisoned: {}", e))?;
+                    .map_err(|e| anyhow!("mutex poisoned: {e}"))?;
                 if let Err(e) = transaction::record_operation(
                     &mut tx_lock,
                     types::TransactionOperation::Upgrade {
@@ -940,12 +946,12 @@ fn run_update_all_logic(
                     );
                     failed_updates
                         .lock()
-                        .map_err(|e| anyhow!("mutex poisoned: {}", e))?
+                        .map_err(|e| anyhow!("mutex poisoned: {e}"))?
                         .push(candidate.source.clone());
                 } else {
                     successful_upgrades
                         .lock()
-                        .map_err(|e| anyhow!("mutex poisoned: {}", e))?
+                        .map_err(|e| anyhow!("mutex poisoned: {e}"))?
                         .push((
                             candidate.old_manifest.clone(),
                             new_manifest.clone(),
@@ -956,7 +962,7 @@ fn run_update_all_logic(
                 eprintln!("Failed to get new manifest for {}", candidate.source);
                 failed_updates
                     .lock()
-                    .map_err(|e| anyhow!("mutex poisoned: {}", e))?
+                    .map_err(|e| anyhow!("mutex poisoned: {e}"))?
                     .push(candidate.source.clone());
             }
             Ok(())
@@ -964,11 +970,11 @@ fn run_update_all_logic(
 
     let failed = failed_updates
         .into_inner()
-        .map_err(|e| anyhow!("mutex poisoned: {}", e))?;
+        .map_err(|e| anyhow!("mutex poisoned: {e}"))?;
     if !failed.is_empty() {
         eprintln!("\nError: Some packages failed to upgrade. Rolling back all changes...");
         for pkg in &failed {
-            eprintln!("  - {}", pkg);
+            eprintln!("  - {pkg}");
         }
         transaction::rollback(&transaction_id)?;
         ux::print_transaction_summary(&ux::TransactionSummary {
@@ -985,11 +991,10 @@ fn run_update_all_logic(
             transaction::get_modified_packages(&transaction_id).unwrap_or_default();
         let upgrades_lock = successful_upgrades
             .lock()
-            .map_err(|e| anyhow!("mutex poisoned: {}", e))?;
+            .map_err(|e| anyhow!("mutex poisoned: {e}"))?;
         let first_scope = upgrades_lock
             .first()
-            .map(|(old, _, _)| old.scope)
-            .unwrap_or(types::Scope::User);
+            .map_or(types::Scope::User, |(old, _, _)| old.scope);
         let _ = crate::pkg::hooks::global::run_global_hooks(
             crate::pkg::hooks::global::HookWhen::PostTransaction,
             &modified_files,
@@ -1003,7 +1008,7 @@ fn run_update_all_logic(
     println!("\n{}", "Success:".green());
     let successful_upgrades = successful_upgrades
         .into_inner()
-        .map_err(|e| anyhow!("mutex poisoned: {}", e))?;
+        .map_err(|e| anyhow!("mutex poisoned: {e}"))?;
     for (old_manifest, new_manifest, new_pkg) in &successful_upgrades {
         if let Some(backup_files) = &old_manifest.backup {
             println!(
@@ -1088,9 +1093,9 @@ fn advisory_counts(
 ) -> Result<(usize, usize)> {
     let advisories = db::get_advisories_for_package(registry_handle, package, sub_package)?;
     let old_ver = Version::parse(old_version)
-        .map_err(|e| anyhow!("failed to parse old version '{}': {}", old_version, e))?;
+        .map_err(|e| anyhow!("failed to parse old version '{old_version}': {e}"))?;
     let new_ver = Version::parse(new_version)
-        .map_err(|e| anyhow!("failed to parse new version '{}': {}", new_version, e))?;
+        .map_err(|e| anyhow!("failed to parse new version '{new_version}': {e}"))?;
 
     let mut old_count = 0usize;
     let mut new_count = 0usize;
@@ -1143,7 +1148,9 @@ fn cleanup_old_versions(
 
     if versions.len() > versions_to_keep {
         let num_to_delete = versions.len() - versions_to_keep;
-        let versions_to_delete = &versions[..num_to_delete];
+        let Some(versions_to_delete) = versions.get(..num_to_delete) else {
+            return Ok(());
+        };
 
         println!("Cleaning up old versions...");
         for version in versions_to_delete {

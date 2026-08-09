@@ -2,7 +2,7 @@
 
 use crate::pkg::{db, local, types};
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use comfy_table::{Table, presets::UTF8_FULL};
 use dialoguer::{Select, theme::ColorfulTheme};
 use std::collections::HashMap;
@@ -83,21 +83,31 @@ fn build_candidate_displays(candidates: &[types::InstallManifest]) -> Vec<Candid
 }
 
 /// Prompts the user to select an installed manifest from a list of candidates.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The candidates list is empty.
+/// - Multiple candidates exist and `yes` is true (non-interactive mode).
+/// - User interaction fails.
+///
+/// # Panics
+///
+/// Panics if the candidates list is empty after the check, which should not happen.
 pub fn choose_installed_manifest(
     package_name: &str,
     candidates: &[types::InstallManifest],
     yes: bool,
 ) -> Result<types::InstallManifest> {
     if candidates.is_empty() {
-        return Err(anyhow!("Package '{}' is not installed.", package_name));
+        return Err(anyhow!("Package '{package_name}' is not installed."));
     }
     if candidates.len() == 1 {
-        return Ok(candidates[0].clone());
+        return Ok(candidates.first().expect("should have at least one candidate").clone());
     }
     if yes {
         return Err(anyhow!(
-            "Package '{}' matches multiple installed packages. Use an explicit source like '#handle@repo/name[:sub]@version'.",
-            package_name
+            "Package '{package_name}' matches multiple installed packages. Use an explicit source like '#handle@repo/name[:sub]@version'."
         ));
     }
 
@@ -141,5 +151,9 @@ pub fn choose_installed_manifest(
         .default(0)
         .interact()?;
 
-    Ok(displays[selection].manifest.clone())
+    Ok(displays
+        .get(selection)
+        .ok_or_else(|| anyhow!("Invalid selection"))?
+        .manifest
+        .clone())
 }

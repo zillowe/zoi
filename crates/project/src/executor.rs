@@ -1,10 +1,17 @@
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use std::collections::HashMap;
 use std::process::Command;
 
 /// Runs a shell command with the provided environment variables.
-pub fn run_shell_command(command_str: &str, envs: &HashMap<String, String>) -> Result<()> {
+///
+/// # Errors
+///
+/// Returns an error if the command fails to start or if it returns a non-zero exit code.
+pub fn run_shell_command<S: ::std::hash::BuildHasher>(
+    command_str: &str,
+    envs: &HashMap<String, String, S>,
+) -> Result<()> {
     println!("> {}", command_str.cyan());
     let status = get_shell_command(command_str).envs(envs).status()?;
 

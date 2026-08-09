@@ -17,7 +17,7 @@ fn test_linux_service_lifecycle() {
 
     ctx.set_env_var("HOME", home.clone());
     ctx.set_env_var("ZOI_TEST_SKIP_SERVICE_COMMANDS", "1");
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
     let pkg_name = "test-service";
     let version = "1.0.0";
@@ -57,7 +57,7 @@ fn test_linux_service_lifecycle() {
         repo_type: "official".to_string(),
         registry_handle: handle.to_string(),
         package_type: types::PackageType::Package,
-        description: "".to_string(),
+        description: String::new(),
         reason: types::InstallReason::Direct,
         scope: types::Scope::User,
         bins: None,
@@ -79,7 +79,7 @@ fn test_linux_service_lifecycle() {
     };
 
     let manifest_path = version_path.join("manifest.yaml");
-    fs::write(&manifest_path, serde_yaml::to_string(&manifest).unwrap())
+    fs::write(&manifest_path, serde_yaml::to_string(&manifest).expect("unwrap failed"))
         .expect("Failed to write manifest");
 
     #[cfg(unix)]
@@ -112,7 +112,7 @@ fn test_linux_service_lifecycle() {
     #[cfg(target_os = "linux")]
     {
         let unit_path = sysroot::apply_sysroot(home.join(".config/systemd/user"))
-            .join(format!("zoi-{}.service", pkg_name));
+            .join(format!("zoi-{pkg_name}.service"));
         assert!(
             unit_path.exists(),
             "Unit file should be created at {}",

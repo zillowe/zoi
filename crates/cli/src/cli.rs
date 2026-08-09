@@ -664,10 +664,10 @@ enum Commands {
     #[command(alias = "reg")]
     Registry(cmd::registry::RegistryCommand),
 
-    /// Manage declarative user environments (ZoiOS only)
+    /// Manage declarative user environments (`ZoiOS` only)
     Home(cmd::home::HomeCommand),
 
-    /// Manage the underlying ZoiOS system (ZoiOS only)
+    /// Manage the underlying `ZoiOS` system (`ZoiOS` only)
     System(cmd::system::SystemCommand),
 
     /// Manage package repositories
@@ -892,6 +892,10 @@ enum TelemetryAction {
 }
 
 /// The main entry point for the Zoi CLI.
+///
+/// # Errors
+///
+/// Returns an error if argument parsing fails, plugin loading fails, or if any subcommand fails.
 pub fn run() -> anyhow::Result<()> {
     let styles = styling::Styles::styled()
         .header(styling::AnsiColor::Yellow.on_default() | styling::Effects::BOLD)
@@ -976,7 +980,7 @@ pub fn run() -> anyhow::Result<()> {
                 shell,
                 index,
                 words,
-            } => cmd::complete::run(shell, index, words),
+            } => cmd::complete::run(shell, index, &words),
             Commands::GenerateManual => cmd::gen_man::run().map_err(Into::into),
             Commands::Version => {
                 cmd::version::run(BRANCH, STATUS, NUMBER, commit);
@@ -1029,9 +1033,9 @@ pub fn run() -> anyhow::Result<()> {
             } => cmd::list::run(
                 all,
                 outdated,
-                registry,
-                repo,
-                package_type,
+                registry.as_deref(),
+                repo.as_deref(),
+                package_type.as_deref(),
                 foreign,
                 names,
                 completion,
@@ -1095,7 +1099,7 @@ pub fn run() -> anyhow::Result<()> {
                 local,
                 global,
                 save,
-                r#type,
+                r#type.as_deref(),
                 dry_run,
                 Some(&plugin_manager),
                 build,
@@ -1108,7 +1112,7 @@ pub fn run() -> anyhow::Result<()> {
                 None,
             )
             .map_err(|e| cmd::ux::with_failure_hint("install", e)),
-            Commands::Use { packages, global } => cmd::use_cmd::run(packages, global),
+            Commands::Use { packages, global } => cmd::use_cmd::run(&packages, global),
             Commands::Uninstall {
                 packages,
                 scope,
@@ -1133,11 +1137,11 @@ pub fn run() -> anyhow::Result<()> {
                 dry_run,
             )
             .map_err(|e| cmd::ux::with_failure_hint("uninstall", e)),
-            Commands::Run { cmd_alias, args } => cmd::run::run(cmd_alias, args),
+            Commands::Run { cmd_alias, args } => cmd::run::run(cmd_alias.as_deref(), &args),
             Commands::Env {
                 env_alias,
                 export_shell,
-            } => cmd::env::run(env_alias, export_shell),
+            } => cmd::env::run(env_alias.as_deref(), export_shell),
             Commands::Dev { run, repo } => cmd::dev::run(run, repo),
             Commands::Upgrade { force, tag, branch } => {
                 match cmd::upgrade::run(BRANCH, STATUS, NUMBER, force, tag, branch) {
@@ -1181,12 +1185,12 @@ pub fn run() -> anyhow::Result<()> {
                 files,
                 interactive,
             } => cmd::search::run(
-                search_term,
-                registry,
-                repo,
-                package_type,
+                &search_term,
+                registry.as_deref(),
+                repo.as_deref(),
+                package_type.as_deref(),
                 tags,
-                sort,
+                &sort,
                 files,
                 interactive,
             ),
@@ -1220,7 +1224,7 @@ pub fn run() -> anyhow::Result<()> {
                 bin,
                 verbose,
                 args,
-            } => cmd::exec::run(source, bin, args, verbose),
+            } => cmd::exec::run(&source, bin, &args, verbose),
             Commands::Download {
                 package,
                 archive: _,
@@ -1232,7 +1236,7 @@ pub fn run() -> anyhow::Result<()> {
                 } else {
                     cmd::download::DownloadType::Archive
                 };
-                cmd::download::run(package, download_type, output_dir)
+                cmd::download::run(&package, download_type, output_dir)
             }
             Commands::Clean { dry_run } => cmd::clean::run(dry_run),
             Commands::Clone { package, location } => cmd::clone::run(&package, location, cli.yes),
@@ -1299,12 +1303,12 @@ pub fn run() -> anyhow::Result<()> {
                 all,
                 registry,
                 repo,
-            } => cmd::audit::run(all, registry, repo),
+            } => cmd::audit::run(all, registry, repo.as_deref()),
             Commands::External(args) => {
-                let (cmd_name, cmd_args) = if args.is_empty() {
-                    return Err(anyhow::anyhow!("No command specified"));
+                let (cmd_name, cmd_args) = if let Some((first, rest)) = args.split_first() {
+                    (first, rest.to_vec())
                 } else {
-                    (&args[0], args[1..].to_vec())
+                    return Err(anyhow::anyhow!("No command specified"));
                 };
 
                 match plugin_manager.run_command(cmd_name, cmd_args) {
@@ -1320,7 +1324,7 @@ pub fn run() -> anyhow::Result<()> {
                             .unwrap_or_else(|| {
                                 shadow_cmd.error(
                                     clap::error::ErrorKind::InvalidSubcommand,
-                                    format!("unrecognized subcommand '{}'", cmd_name),
+                                    format!("unrecognized subcommand '{cmd_name}'"),
                                 )
                             });
 
@@ -1329,7 +1333,7 @@ pub fn run() -> anyhow::Result<()> {
                             eprintln!("{}:", "Available Plugin Commands".cyan().bold());
                             for (pcmd, pdesc) in plugin_cmds {
                                 if pdesc.is_empty() {
-                                    eprintln!("  {}", pcmd);
+                                    eprintln!("  {pcmd}");
                                 } else {
                                     eprintln!("  {:<12} {}", pcmd, pdesc.dimmed());
                                 }
@@ -1345,7 +1349,7 @@ pub fn run() -> anyhow::Result<()> {
         };
 
         if let Err(e) = result {
-            eprintln!("Error: {}", e);
+            eprintln!("Error: {e}");
             std::process::exit(1);
         }
     }

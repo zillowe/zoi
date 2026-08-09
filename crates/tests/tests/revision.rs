@@ -12,7 +12,7 @@ fn test_package_outdated_on_revision_bump() {
     let root = tmp.path().to_path_buf();
 
     ctx.set_env_var("HOME", root.clone());
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
     ctx.set_env_var("ZOI_DB_DIR", root.join("db"));
 
     let pkg_name = "rev-test";
@@ -28,20 +28,20 @@ fn test_package_outdated_on_revision_bump() {
         }],
         ..Default::default()
     };
-    config::write_user_config(&cfg).unwrap();
+    config::write_user_config(&cfg).expect("unwrap failed");
 
     let db_root = root.join("db");
     let reg_root = db_root.join(handle);
-    std::fs::create_dir_all(reg_root.join(repo).join(pkg_name)).unwrap();
+    std::fs::create_dir_all(reg_root.join(repo).join(pkg_name)).expect("unwrap failed");
     std::fs::write(
         reg_root.join("repo.yaml"),
         "name: testreg\nrepos: [{name: core, type: official, active: true}]",
     )
-    .unwrap();
+    .expect("unwrap failed");
     std::fs::write(
-        reg_root.join(repo).join(pkg_name).join(format!("{}.pkg.lua", pkg_name)),
-        format!("metadata({{ name = '{}', repo = '{}', version = '{}', revision = '2', description = 'test', maintainer = {{ name = 'test', email = 'test' }}, types = {{ 'source' }} }})", pkg_name, repo, version)
-    ).unwrap();
+        reg_root.join(repo).join(pkg_name).join(format!("{pkg_name}.pkg.lua")),
+        format!("metadata({{ name = '{pkg_name}', repo = '{repo}', version = '{version}', revision = '2', description = 'test', maintainer = {{ name = 'test', email = 'test' }}, types = {{ 'source' }} }})")
+    ).expect("unwrap failed");
 
     let manifest = types::InstallManifest {
         name: "test-rev".to_string(),
@@ -53,7 +53,7 @@ fn test_package_outdated_on_revision_bump() {
         repo_type: "official".to_string(),
         registry_handle: handle.to_string(),
         package_type: types::PackageType::Package,
-        description: "".to_string(),
+        description: String::new(),
         reason: types::InstallReason::Direct,
         scope: types::Scope::User,
         bins: None,
@@ -73,9 +73,9 @@ fn test_package_outdated_on_revision_bump() {
         sandbox: None,
         completions: None,
     };
-    local::write_manifest(&manifest).unwrap();
+    local::write_manifest(&manifest).expect("unwrap failed");
 
-    let conn = db::open_connection(handle).unwrap();
+    let conn = db::open_connection(handle).expect("unwrap failed");
     let pkg_meta = types::Package {
         name: pkg_name.to_string(),
         repo: repo.to_string(),
@@ -83,9 +83,9 @@ fn test_package_outdated_on_revision_bump() {
         revision: "2".to_string(),
         ..Default::default()
     };
-    db::update_package(&conn, &pkg_meta, handle, None, None, None).unwrap();
+    db::update_package(&conn, &pkg_meta, handle, None, None, None).expect("unwrap failed");
 
-    let source = format!("#{}@{}/{}", handle, repo, pkg_name);
+    let source = format!("#{handle}@{repo}/{pkg_name}");
     let (resolved_pkg, new_version, _, _, _, _, _) =
         zoi::pkg::resolve::resolve_package_and_version(
             &source,
@@ -93,7 +93,7 @@ fn test_package_outdated_on_revision_bump() {
             true,
             true,
         )
-        .unwrap();
+        .expect("unwrap failed");
 
     assert_eq!(new_version, version);
     assert_eq!(resolved_pkg.revision, "2");

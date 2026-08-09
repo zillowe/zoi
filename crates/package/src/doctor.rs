@@ -7,7 +7,7 @@
 
 use anyhow::{Result, anyhow};
 use regex::Regex;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use zoi_core::types;
 use zoi_deps as dependencies;
@@ -23,21 +23,30 @@ pub struct DoctorReport {
 }
 
 /// Runs a health check on a Zoi package definition.
+///
+/// # Errors
+///
+/// Returns an error if the package file path contains invalid UTF-8 characters,
+/// or if parsing the Lua package definition fails.
+/// # Errors
+///
+/// Returns an error if the package file cannot be read or parsed.
 pub fn run(
     package_file: &Path,
     platform_override: Option<&str>,
     version_override: Option<&str>,
 ) -> Result<DoctorReport> {
-    let file_path = package_file
+    let package_path_str = package_file
         .to_str()
-        .ok_or_else(|| anyhow!("Path contains invalid UTF-8 characters: {:?}", package_file))?;
+        .ok_or_else(|| anyhow!("Path contains invalid UTF-8 characters: {}", package_file.display()))?;
+
     let platform = match platform_override {
         Some(p) => p.to_string(),
         None => zoi_core::utils::get_platform()?,
     };
 
     let package = zoi_lua::parser::parse_lua_package_for_platform(
-        file_path,
+        package_path_str,
         &platform,
         version_override,
         None,
@@ -73,7 +82,7 @@ pub fn run(
             .push("metadata.maintainer.email is empty.".to_string());
     }
 
-    if package.version.is_none() && package.versions.as_ref().is_none_or(|m| m.is_empty()) {
+    if package.version.is_none() && package.versions.as_ref().is_none_or(HashMap::is_empty) {
         report.errors.push(
             "Package has no version information. Set metadata.version or metadata.versions."
                 .to_string(),
@@ -89,8 +98,7 @@ pub fn run(
         for t in &package.types {
             if !known.contains(&t.as_str()) {
                 report.warnings.push(format!(
-                    "Build type '{}' is custom. Ensure your pipeline supports it.",
-                    t
+                    "Build type '{t}' is custom. Ensure your pipeline supports it.",
                 ));
             }
         }
@@ -101,8 +109,7 @@ pub fn run(
         for sub in subs {
             if !seen.insert(sub.clone()) {
                 report.errors.push(format!(
-                    "Duplicate sub-package '{}' in metadata.sub_packages.",
-                    sub
+                    "Duplicate sub-package '{sub}' in metadata.sub_packages.",
                 ));
             }
         }
@@ -117,8 +124,7 @@ pub fn run(
         for sub in main_subs {
             if !allowed.contains(sub) {
                 report.errors.push(format!(
-                    "main_subs contains '{}' but it is missing from sub_packages.",
-                    sub
+                    "main_subs contains '{sub}' but it is missing from sub_packages.",
                 ));
             }
         }
@@ -142,13 +148,12 @@ pub fn run(
                     for (build_type, group) in &typed.types {
                         if !package.types.contains(build_type) {
                             report.warnings.push(format!(
-                                "dependencies.build.types has '{}' but metadata.types does not list it.",
-                                build_type
+                                "dependencies.build.types has '{build_type}' but metadata.types does not list it.",
                             ));
                         }
                         validate_dependency_group(
                             group,
-                            &format!("build.type={}", build_type),
+                            &format!("build.type={build_type}"),
                             &package,
                             &mut report,
                         );
@@ -199,13 +204,12 @@ fn validate_dependency_group(
         for (sub_name, sub_group) in subs {
             if !declared_subs.is_empty() && !declared_subs.contains(sub_name) {
                 report.warnings.push(format!(
-                    "Dependency group for sub-package '{}' is declared, but metadata.sub_packages does not include it.",
-                    sub_name
+                    "Dependency group for sub-package '{sub_name}' is declared, but metadata.sub_packages does not include it.",
                 ));
             }
             validate_dependency_group(
                 sub_group,
-                &format!("{}.sub_package={}", context, sub_name),
+                &format!("{context}.sub_package={sub_name}"),
                 package,
                 report,
             );
@@ -217,8 +221,7 @@ fn validate_dependency_group(
 fn validate_dependency_string(dep: &str, context: &str, bucket: &str, report: &mut DoctorReport) {
     if let Err(err) = dependencies::parse_dependency_string(dep) {
         report.errors.push(format!(
-            "Invalid dependency '{}' in {}.{}: {}",
-            dep, context, bucket, err
+            "Invalid dependency '{dep}' in {context}.{bucket}: {err}",
         ));
     }
 }
@@ -226,14 +229,11 @@ fn validate_dependency_string(dep: &str, context: &str, bucket: &str, report: &m
 /// Scans Lua code for expected lifecycle functions and reports missing ones as warnings.
 fn validate_lua_functions(lua_code: &str, report: &mut DoctorReport) {
     let has_prepare = Regex::new(r"(?m)\bfunction\s+prepare\s*\(")
-        .map(|re| re.is_match(lua_code))
-        .unwrap_or(false);
+        .is_ok_and(|re| re.is_match(lua_code));
     let has_package = Regex::new(r"(?m)\bfunction\s+package\s*\(")
-        .map(|re| re.is_match(lua_code))
-        .unwrap_or(false);
+        .is_ok_and(|re| re.is_match(lua_code));
     let has_test = Regex::new(r"(?m)\bfunction\s+test\s*\(")
-        .map(|re| re.is_match(lua_code))
-        .unwrap_or(false);
+        .is_ok_and(|re| re.is_match(lua_code));
 
     if !has_prepare {
         report.warnings.push(
@@ -259,9 +259,8 @@ fn validate_path_consistency(
     package: &types::Package,
     report: &mut DoctorReport,
 ) {
-    let abs_path = match std::fs::canonicalize(package_file) {
-        Ok(p) => p,
-        Err(_) => return,
+    let Ok(abs_path) = std::fs::canonicalize(package_file) else {
+        return;
     };
 
     let mut current = abs_path.parent();
@@ -278,7 +277,7 @@ fn validate_path_consistency(
         && let Ok(rel_path) = abs_path.strip_prefix(&root)
     {
         let rel_dir = rel_path.parent().unwrap_or(Path::new(""));
-        let rel_dir_str = rel_dir.to_string_lossy().replace("\\", "/");
+        let rel_dir_str = rel_dir.to_string_lossy().replace('\\', "/");
 
         let mut parts: Vec<&str> = rel_dir_str.split('/').collect();
         if !parts.is_empty() {
@@ -288,8 +287,8 @@ fn validate_path_consistency(
 
         if !expected_repo.is_empty() && package.repo != expected_repo {
             report.errors.push(format!(
-                    "Path-Repo mismatch: metadata.repo is '{}' but file is located in registry tier '{}'.",
-                    package.repo, expected_repo
+                    "Path-Repo mismatch: metadata.repo is '{}' but file is located in registry tier '{expected_repo}'.",
+                    package.repo
                 ));
         } else if expected_repo.is_empty() && !package.repo.is_empty() {
             report.errors.push(format!(

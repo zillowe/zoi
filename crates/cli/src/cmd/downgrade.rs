@@ -2,13 +2,18 @@
 
 use crate::pkg::{cache, local, resolve, types};
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use dialoguer::{Select, theme::ColorfulTheme};
 use semver::Version;
 use std::collections::HashSet;
 use std::fs;
 
 /// Runs the `downgrade` command to switch to an older version of a package.
+///
+/// # Errors
+///
+/// Returns an error if the package cannot be resolved, no other versions are found,
+/// or the installation of the selected version fails.
 pub fn run(
     package_name: &str,
     yes: bool,
@@ -49,14 +54,16 @@ pub fn run(
     {
         for entry in entries.flatten() {
             let filename = entry.file_name().to_string_lossy().to_string();
-            if filename.starts_with(&pkg.name) && filename.ends_with(".zpa") {
+            if filename.starts_with(&pkg.name)
+                && std::path::Path::new(&filename)
+                    .extension()
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("zpa"))
+            {
                 let parts: Vec<&str> = filename.split('-').collect();
-                if parts.len() >= 2 {
-                    let v_str = parts[1];
-                    if Version::parse(v_str).is_ok() {
-                        versions.insert(v_str.to_string());
+                if let Some(v_str) = parts.get(1)
+                    && Version::parse(v_str).is_ok() {
+                        versions.insert((*v_str).to_string());
                     }
-                }
             }
         }
     }
@@ -64,7 +71,7 @@ pub fn run(
     if let Some(versions_map) = &pkg.versions {
         for channel in versions_map.keys() {
             if channel != "stable" {
-                versions.insert(format!("@{}", channel));
+                versions.insert(format!("@{channel}"));
             }
         }
     }
@@ -100,12 +107,14 @@ pub fn run(
         .items(&sorted_versions)
         .default(0)
         .interact_opt()?
-        .ok_or(anyhow!("No version selected."))?;
+        .ok_or_else(|| anyhow!("No version selected."))?;
 
-    let selected_version = &sorted_versions[selection];
+    let selected_version = sorted_versions
+        .get(selection)
+        .ok_or_else(|| anyhow!("Invalid selection index"))?;
 
     if selected_version == &current_version {
-        println!("Version {} is already installed.", selected_version);
+        println!("Version {selected_version} is already installed.");
         return Ok(());
     }
 
@@ -114,7 +123,7 @@ pub fn run(
         package_name
             .split('@')
             .next()
-            .ok_or_else(|| anyhow!("Invalid package name: '{}'", package_name))?,
+            .ok_or_else(|| anyhow!("Invalid package name: '{package_name}'"))?,
         selected_version
     );
 

@@ -2,7 +2,7 @@ use crate::pkg::config;
 use anyhow::Result;
 use anyhow::anyhow;
 use clap::{Parser, Subcommand};
-use colored::*;
+use colored::Colorize;
 use comfy_table::{Table, presets::UTF8_FULL};
 use std::collections::HashSet;
 
@@ -50,6 +50,16 @@ enum Commands {
 }
 
 /// Runs the `repo` command.
+///
+/// # Errors
+///
+/// This function returns an error if:
+/// - A repository name or URL is missing when running non-interactively with `--yes`.
+/// - Adding, cloning, or removing a repository fails.
+/// - The configuration file cannot be read or modified.
+/// # Errors
+///
+/// Returns an error if the repository operation fails.
 pub fn run(args: RepoCommand) -> Result<()> {
     let yes = args.yes;
     match args.command {
@@ -57,7 +67,9 @@ pub fn run(args: RepoCommand) -> Result<()> {
             if let Some(val) = repo_or_url {
                 if val.starts_with("http://")
                     || val.starts_with("https://")
-                    || val.ends_with(".git")
+                    || std::path::Path::new(&val)
+                        .extension()
+                        .is_some_and(|ext| ext.eq_ignore_ascii_case("git"))
                 {
                     config::clone_git_repo(&val)?;
                 } else {

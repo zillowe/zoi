@@ -70,8 +70,7 @@ fn restore_default_registry(
     let should_clear = user_config
         .default_registry
         .as_ref()
-        .map(|registry| registry.url == added_registry_url)
-        .unwrap_or(false);
+        .is_some_and(|registry| registry.url == added_registry_url);
     if should_clear {
         config::set_user_default_registry(None)?;
     }
@@ -133,14 +132,14 @@ fn revert_extension_change(
         }
         types::ExtensionChange::Plugin { name, script: _ } => {
             let plugin_dir = crate::get_plugin_dir()?;
-            let plugin_path = plugin_dir.join(format!("{}.lua", name));
+            let plugin_path = plugin_dir.join(format!("{name}.lua"));
             if plugin_path.exists() {
                 fs::remove_file(plugin_path)?;
             }
         }
         types::ExtensionChange::Hook { name, content: _ } => {
             let hooks_dir = hooks::global::get_user_hooks_dir()?;
-            let hook_path = hooks_dir.join(format!("{}.hook.yaml", name));
+            let hook_path = hooks_dir.join(format!("{name}.hook.yaml"));
             if hook_path.exists() {
                 fs::remove_file(hook_path)?;
             }
@@ -150,14 +149,19 @@ fn revert_extension_change(
 }
 
 /// Installs an extension, applying its declared changes to the system and registry configuration.
+///
+/// # Errors
+///
+/// Returns an error if the extension package cannot be resolved, if it's not an extension package,
+/// or if applying any of the changes fails.
 pub fn add(ext_name: &str, yes: bool, plugin_manager: Option<&PluginManager>) -> Result<()> {
-    println!("Adding extension: {}", ext_name);
+    println!("Adding extension: {ext_name}");
 
     let (pkg, _, _, pkg_lua_path, registry_handle, repo_type, _) =
         resolve::resolve_package_and_version(ext_name, None, false, yes)?;
 
     if pkg.package_type != types::PackageType::Extension {
-        return Err(anyhow!("'{}' is not an extension package.", ext_name));
+        return Err(anyhow!("'{ext_name}' is not an extension package."));
     }
 
     let mut pkg_val = None;
@@ -166,16 +170,13 @@ pub fn add(ext_name: &str, yes: bool, plugin_manager: Option<&PluginManager>) ->
             .lua
             .to_value(&pkg)
             .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
-        pm.trigger_hook("on_pre_extension_add", Some(v.clone()))?;
+        pm.trigger_hook("on_pre_extension_add", Some(&v.clone()))?;
         pkg_val = Some(v);
     }
 
-    let extension_info = if let Some(extension_info) = pkg.extension {
-        extension_info
-    } else {
+    let Some(extension_info) = pkg.extension else {
         return Err(anyhow!(
-            "'{}' is an extension package but contains no extension data.",
-            ext_name
+            "'{ext_name}' is an extension package but contains no extension data."
         ));
     };
     if extension_info.extension_type != "zoi" {
@@ -252,19 +253,19 @@ pub fn add(ext_name: &str, yes: bool, plugin_manager: Option<&PluginManager>) ->
         for change in &extension_info.changes {
             match change {
                 types::ExtensionChange::RepoGit { add } => {
-                    println!("Adding git repository: {}", add);
+                    println!("Adding git repository: {add}");
                     config::clone_git_repo(add)?;
                 }
                 types::ExtensionChange::RegistryRepo { add } => {
-                    println!("Setting registry to: {}", add);
+                    println!("Setting registry to: {add}");
                     config::set_default_registry(add)?;
                 }
                 types::ExtensionChange::RegistryAdd { add } => {
-                    println!("Adding registry: {}", add);
+                    println!("Adding registry: {add}");
                     config::add_added_registry(add)?;
                 }
                 types::ExtensionChange::RepoAdd { add } => {
-                    println!("Adding repository: {}", add);
+                    println!("Adding repository: {add}");
                     config::add_repo(add)?;
                 }
                 types::ExtensionChange::Project { add } => {
@@ -279,7 +280,7 @@ pub fn add(ext_name: &str, yes: bool, plugin_manager: Option<&PluginManager>) ->
                     fs::write(&project_file_path, add)?;
                 }
                 types::ExtensionChange::Pgp { name, key } => {
-                    println!("Adding PGP key: {} from {}", name, key);
+                    println!("Adding PGP key: {name} from {key}");
                     if key.starts_with("http") {
                         pgp::add_key_from_url(key, name, false)?;
                     } else {
@@ -287,15 +288,15 @@ pub fn add(ext_name: &str, yes: bool, plugin_manager: Option<&PluginManager>) ->
                     }
                 }
                 types::ExtensionChange::Plugin { name, script } => {
-                    println!("Adding plugin: {}", name);
+                    println!("Adding plugin: {name}");
                     let plugin_dir = crate::get_plugin_dir()?;
-                    let plugin_path = plugin_dir.join(format!("{}.lua", name));
+                    let plugin_path = plugin_dir.join(format!("{name}.lua"));
                     fs::write(plugin_path, script)?;
                 }
                 types::ExtensionChange::Hook { name, content } => {
-                    println!("Adding global hook: {}", name);
+                    println!("Adding global hook: {name}");
                     let hooks_dir = hooks::global::get_user_hooks_dir()?;
-                    let hook_path = hooks_dir.join(format!("{}.hook.yaml", name));
+                    let hook_path = hooks_dir.join(format!("{name}.hook.yaml"));
                     fs::write(hook_path, content)?;
                 }
             }
@@ -312,8 +313,7 @@ pub fn add(ext_name: &str, yes: bool, plugin_manager: Option<&PluginManager>) ->
         for change in applied_changes.iter().rev() {
             if let Err(rollback_error) = revert_extension_change(change, Some(&extension_state)) {
                 eprintln!(
-                    "Warning: failed to roll back extension change {:?}: {}",
-                    change, rollback_error
+                    "Warning: failed to roll back extension change {change:?}: {rollback_error}"
                 );
             }
         }
@@ -331,17 +331,22 @@ pub fn add(ext_name: &str, yes: bool, plugin_manager: Option<&PluginManager>) ->
     }
 
     if let (Some(pm), Some(v)) = (plugin_manager, pkg_val) {
-        pm.trigger_hook_nonfatal("on_post_extension_add", Some(v));
+        pm.trigger_hook_nonfatal("on_post_extension_add", Some(&v));
     }
 
-    println!("Successfully added extension '{}'.", ext_name);
+    println!("Successfully added extension '{ext_name}'.");
 
     Ok(())
 }
 
 /// Uninstalls an extension and reverts all changes it made to the system and configuration.
+///
+/// # Errors
+///
+/// Returns an error if the extension is not installed, if it's not an extension package,
+/// or if reverting any of the changes fails.
 pub fn remove(ext_name: &str, yes: bool, plugin_manager: Option<&PluginManager>) -> Result<()> {
-    println!("Removing extension: {}", ext_name);
+    println!("Removing extension: {ext_name}");
 
     let request = resolve::parse_source_string(ext_name)?;
     let mut candidates = Vec::new();
@@ -354,7 +359,7 @@ pub fn remove(ext_name: &str, yes: bool, plugin_manager: Option<&PluginManager>)
     }
 
     if candidates.is_empty() {
-        return Err(anyhow!("Extension '{}' is not installed.", ext_name));
+        return Err(anyhow!("Extension '{ext_name}' is not installed."));
     }
 
     let manifest = select_candidate(ext_name, candidates, yes)?;
@@ -366,12 +371,12 @@ pub fn remove(ext_name: &str, yes: bool, plugin_manager: Option<&PluginManager>)
             .lua
             .to_value(&manifest)
             .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
-        pm.trigger_hook("on_pre_extension_remove", Some(v.clone()))?;
+        pm.trigger_hook("on_pre_extension_remove", Some(&v.clone()))?;
         manifest_val = Some(v);
     }
 
     if manifest.package_type != types::PackageType::Extension {
-        return Err(anyhow!("'{}' is not an extension package.", ext_name));
+        return Err(anyhow!("'{ext_name}' is not an extension package."));
     }
 
     let installed_source_path = local::get_package_source_path(&manifest)?;
@@ -412,28 +417,28 @@ pub fn remove(ext_name: &str, yes: bool, plugin_manager: Option<&PluginManager>)
                 types::ExtensionChange::RepoGit { add } => {
                     let repo_name = get_repo_name_from_url(add);
                     if !repo_name.is_empty() {
-                        println!("Removing git repository: {}", repo_name);
+                        println!("Removing git repository: {repo_name}");
                         if let Err(e) = revert_extension_change(change, extension_state.as_ref()) {
-                            eprintln!("Warning: failed to remove git repo '{}': {}", repo_name, e);
+                            eprintln!("Warning: failed to remove git repo '{repo_name}': {e}");
                         }
                     }
                 }
                 types::ExtensionChange::RegistryRepo { add: _ } => {
                     println!("Restoring previous default registry");
                     if let Err(e) = revert_extension_change(change, extension_state.as_ref()) {
-                        eprintln!("Warning: failed to restore default registry: {}", e);
+                        eprintln!("Warning: failed to restore default registry: {e}");
                     }
                 }
                 types::ExtensionChange::RegistryAdd { add } => {
-                    println!("Removing registry: {}", add);
+                    println!("Removing registry: {add}");
                     if let Err(e) = revert_extension_change(change, extension_state.as_ref()) {
-                        eprintln!("Warning: failed to remove registry '{}': {}", add, e);
+                        eprintln!("Warning: failed to remove registry '{add}': {e}");
                     }
                 }
                 types::ExtensionChange::RepoAdd { add } => {
-                    println!("Removing repository: {}", add);
+                    println!("Removing repository: {add}");
                     if let Err(e) = revert_extension_change(change, extension_state.as_ref()) {
-                        eprintln!("Warning: failed to remove repo '{}': {}", add, e);
+                        eprintln!("Warning: failed to remove repo '{add}': {e}");
                     }
                 }
                 types::ExtensionChange::Project { add: _ } => {
@@ -441,36 +446,34 @@ pub fn remove(ext_name: &str, yes: bool, plugin_manager: Option<&PluginManager>)
                     println!("Removing {}...", project_file_path.display());
                     if let Err(e) = revert_extension_change(change, extension_state.as_ref()) {
                         eprintln!(
-                            "Warning: failed to remove '{}': {}",
-                            project_file_path.display(),
-                            e
+                            "Warning: failed to remove '{}': {e}",
+                            project_file_path.display()
                         );
                     }
                 }
                 types::ExtensionChange::Pgp { name, key: _ } => {
-                    println!("Removing PGP key: {}", name);
+                    println!("Removing PGP key: {name}");
                     if let Err(e) = revert_extension_change(change, extension_state.as_ref()) {
-                        eprintln!("Warning: failed to remove PGP key '{}': {}", name, e);
+                        eprintln!("Warning: failed to remove PGP key '{name}': {e}");
                     }
                 }
                 types::ExtensionChange::Plugin { name, script: _ } => {
-                    println!("Removing plugin: {}", name);
+                    println!("Removing plugin: {name}");
                     if let Err(e) = revert_extension_change(change, extension_state.as_ref()) {
-                        eprintln!("Warning: failed to remove plugin '{}': {}", name, e);
+                        eprintln!("Warning: failed to remove plugin '{name}': {e}");
                     }
                 }
                 types::ExtensionChange::Hook { name, content: _ } => {
-                    println!("Removing global hook: {}", name);
+                    println!("Removing global hook: {name}");
                     if let Err(e) = revert_extension_change(change, extension_state.as_ref()) {
-                        eprintln!("Warning: failed to remove global hook '{}': {}", name, e);
+                        eprintln!("Warning: failed to remove global hook '{name}': {e}");
                     }
                 }
             }
         }
     } else {
         return Err(anyhow!(
-            "'{}' is an extension package but contains no extension data.",
-            ext_name
+            "'{ext_name}' is an extension package but contains no extension data."
         ));
     }
 
@@ -486,10 +489,10 @@ pub fn remove(ext_name: &str, yes: bool, plugin_manager: Option<&PluginManager>)
     }
 
     if let (Some(pm), Some(v)) = (plugin_manager, manifest_val) {
-        pm.trigger_hook_nonfatal("on_post_extension_remove", Some(v));
+        pm.trigger_hook_nonfatal("on_post_extension_remove", Some(&v));
     }
 
-    println!("Successfully removed extension '{}'.", ext_name);
+    println!("Successfully removed extension '{ext_name}'.");
 
     Ok(())
 }
@@ -500,22 +503,21 @@ fn select_candidate(
     candidates: Vec<types::InstallManifest>,
     yes: bool,
 ) -> Result<types::InstallManifest> {
+    use colored::Colorize;
+    use comfy_table::{Table, presets::UTF8_FULL};
+    use dialoguer::{Select, theme::ColorfulTheme};
+
     if candidates.is_empty() {
-        return Err(anyhow!("Package '{}' is not installed.", package_name));
+        return Err(anyhow!("Package '{package_name}' is not installed."));
     }
     if candidates.len() == 1 {
-        return Ok(candidates.into_iter().next().unwrap());
+        return Ok(candidates.into_iter().next().expect("Already checked length"));
     }
     if yes {
         return Err(anyhow!(
-            "Package '{}' matches multiple installed packages. Use an explicit source like '#handle@repo/name[:sub]@version'.",
-            package_name
+            "Package '{package_name}' matches multiple installed packages. Use an explicit source like '#handle@repo/name[:sub]@version'."
         ));
     }
-
-    use colored::*;
-    use comfy_table::{Table, presets::UTF8_FULL};
-    use dialoguer::{Select, theme::ColorfulTheme};
 
     let displays: Vec<_> = candidates
         .iter()
@@ -552,5 +554,5 @@ fn select_candidate(
         .default(0)
         .interact()?;
 
-    Ok(candidates[selection].clone())
+    Ok(candidates.get(selection).cloned().expect("Invalid selection"))
 }

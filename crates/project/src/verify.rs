@@ -20,6 +20,11 @@ use zoi_resolver::local;
 ///
 /// If any file in the store has been tampered with or if a manual change was made
 /// that isn't reflected in the lockfile, this function will return an error.
+///
+/// # Errors
+///
+/// Returns an error if there is an integrity mismatch, a package is missing,
+/// or if an installed package is not present in the lockfile.
 pub fn run() -> Result<()> {
     println!("Verifying project integrity with zoi.lock...");
 
@@ -73,8 +78,7 @@ pub fn run() -> Result<()> {
             let version_dir = package_dir.join(&lock_detail.version);
             if !version_dir.exists() {
                 return Err(anyhow!(
-                    "Package '{}' is missing from the project's .zoi directory, though it is in the manifest.",
-                    pkg_key
+                    "Package '{pkg_key}' is missing from the project's .zoi directory, though it is in the manifest."
                 ));
             }
             let integrity = hash::calculate_dir_hash(&version_dir)?;
@@ -84,7 +88,7 @@ pub fn run() -> Result<()> {
                 .unwrap_or(&lock_detail.hash);
             if integrity != lock_hash_only {
                 let manifest_filename = if let Some(sub) = &lock_detail.sub_package {
-                    format!("manifest-{}.yaml", sub)
+                    format!("manifest-{sub}.yaml")
                 } else {
                     "manifest.yaml".to_string()
                 };
@@ -103,16 +107,13 @@ pub fn run() -> Result<()> {
                 ));
             }
         } else {
-            let hex_key = pkg_key
-                .as_bytes()
-                .iter()
-                .map(|b| format!("{:02x}", b))
-                .collect::<Vec<_>>()
-                .join("");
+            use std::fmt::Write;
+            let hex_key = pkg_key.as_bytes().iter().fold(String::new(), |mut acc, b| {
+                let _ = write!(acc, "{b:02x}");
+                acc
+            });
             return Err(anyhow!(
-                "Package '{}' (hex: {}) from zoi.lock is not installed.",
-                pkg_key,
-                hex_key
+                "Package '{pkg_key}' (hex: {hex_key}) from zoi.lock is not installed."
             ));
         }
     }
@@ -120,8 +121,7 @@ pub fn run() -> Result<()> {
     for pkg_key in installed_pkgs_map.keys() {
         if !lockfile_pkgs_map.contains_key(pkg_key) {
             return Err(anyhow!(
-                "Package '{}' is installed in the project but is not in zoi.lock.",
-                pkg_key
+                "Package '{pkg_key}' is installed in the project but is not in zoi.lock."
             ));
         }
     }

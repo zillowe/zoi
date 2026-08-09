@@ -4,6 +4,10 @@ use anyhow::{Result, anyhow};
 use zoi_core::types;
 
 /// Creates an installation manifest for a package.
+///
+/// # Errors
+///
+/// Returns an error if the package version is missing.
 pub fn create_manifest(
     pkg: &types::Package,
     reason: types::InstallReason,

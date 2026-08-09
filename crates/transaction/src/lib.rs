@@ -8,7 +8,7 @@ pub mod rollback;
 
 use anyhow::{Result, anyhow};
 use chrono::Utc;
-use colored::*;
+use colored::Colorize;
 use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
@@ -23,7 +23,7 @@ use zoi_uninstall as uninstall;
 fn create_shim(link_path: &std::path::Path) -> Result<()> {
     let zoi_exe = std::env::current_exe()?;
     zoi_core::utils::symlink_file(&zoi_exe, link_path)
-        .map_err(|e| anyhow!("Failed to create shim: {}", e))
+        .map_err(|e| anyhow!("Failed to create shim: {e}"))
 }
 
 /// Gets the root directory for shell completions based on scope and shell.
@@ -39,7 +39,7 @@ pub(crate) fn get_completions_root(scope: types::Scope, shell: &str) -> Result<s
         types::Scope::System => {
             if cfg!(target_os = "windows") {
                 Ok(zoi_core::sysroot::apply_sysroot(std::path::PathBuf::from(
-                    format!("C:\\ProgramData\\zoi\\pkgs\\shell\\{}", shell),
+                    format!("C:\\ProgramData\\zoi\\pkgs\\shell\\{shell}"),
                 )))
             } else {
                 let base = match shell {
@@ -79,7 +79,7 @@ pub(crate) fn create_completion_symlink(
     #[cfg(unix)]
     {
         std::os::unix::fs::symlink(source, link)
-            .map_err(|e| anyhow!("Failed to create completion symlink: {}", e))?;
+            .map_err(|e| anyhow!("Failed to create completion symlink: {e}"))?;
     }
     #[cfg(windows)]
     {
@@ -112,11 +112,11 @@ fn get_transactions_dir() -> Result<PathBuf> {
 /// Gets the path to a specific transaction log file.
 fn get_transaction_path(id: &str) -> Result<PathBuf> {
     let dir = get_transactions_dir()?;
-    let active_path = dir.join(format!("{}.json", id));
+    let active_path = dir.join(format!("{id}.json"));
     if active_path.exists() {
         return Ok(active_path);
     }
-    let history_path = dir.join("history").join(format!("{}.json", id));
+    let history_path = dir.join("history").join(format!("{id}.json"));
     Ok(history_path)
 }
 
@@ -125,11 +125,15 @@ fn get_transaction_path(id: &str) -> Result<PathBuf> {
 /// Returns a `Transaction` object with a UUID v7 ID, which provides both
 /// uniqueness and chronological sorting. No log file is written until the
 /// first operation is recorded.
+///
+/// # Errors
+///
+/// Returns an error if the home directory cannot be found.
 pub fn begin() -> Result<types::Transaction> {
     Ok(types::Transaction {
         id: Uuid::new_v7(Timestamp::from_unix(
             uuid::NoContext,
-            Utc::now().timestamp_millis() as u64,
+            Utc::now().timestamp_millis().cast_unsigned(),
             0,
         ))
         .to_string(),
@@ -139,12 +143,16 @@ pub fn begin() -> Result<types::Transaction> {
 }
 
 /// Reads a transaction from a log file.
+///
+/// # Errors
+///
+/// Returns an error if the transaction log file does not exist or cannot be read,
+/// or if the content is not valid JSON.
 pub fn read_transaction(transaction_id: &str) -> Result<types::Transaction> {
     let path = get_transaction_path(transaction_id)?;
     if !path.exists() {
         return Err(anyhow!(
-            "Transaction log not found for ID: {}",
-            transaction_id
+            "Transaction log not found for ID: {transaction_id}"
         ));
     }
     let content = fs::read_to_string(path)?;
@@ -152,6 +160,11 @@ pub fn read_transaction(transaction_id: &str) -> Result<types::Transaction> {
 }
 
 /// Records a package operation in the current transaction.
+///
+/// # Errors
+///
+/// Returns an error if the audit event cannot be logged or if the transaction
+/// log file cannot be written.
 pub fn record_operation(
     transaction: &mut types::Transaction,
     operation: types::TransactionOperation,
@@ -180,21 +193,31 @@ pub fn record_operation(
 }
 
 /// Commits a transaction by moving it to the history directory.
+///
+/// # Errors
+///
+/// Returns an error if the transaction directory cannot be accessed or if
+/// the log file cannot be moved to the history directory.
 pub fn commit(transaction_id: &str) -> Result<()> {
     let dir = get_transactions_dir()?;
-    let path = dir.join(format!("{}.json", transaction_id));
+    let path = dir.join(format!("{transaction_id}.json"));
     if !path.exists() {
         return Ok(());
     }
 
     let history_dir = dir.join("history");
     fs::create_dir_all(&history_dir)?;
-    let dest = history_dir.join(format!("{}.json", transaction_id));
+    let dest = history_dir.join(format!("{transaction_id}.json"));
     fs::rename(path, dest)?;
     Ok(())
 }
 
 /// Returns a list of all files modified during a transaction.
+///
+/// # Errors
+///
+/// Returns an error if the transaction log file cannot be read or if the
+/// content is not valid JSON.
 pub fn get_modified_files(transaction_id: &str) -> Result<Vec<String>> {
     let path = get_transaction_path(transaction_id)?;
     if !path.exists() {
@@ -206,12 +229,8 @@ pub fn get_modified_files(transaction_id: &str) -> Result<Vec<String>> {
     let mut files = HashSet::new();
     for op in transaction.operations {
         match op {
-            types::TransactionOperation::Install { manifest } => {
-                for file in manifest.installed_files {
-                    files.insert(file);
-                }
-            }
-            types::TransactionOperation::Uninstall { manifest } => {
+            types::TransactionOperation::Install { manifest }
+            | types::TransactionOperation::Uninstall { manifest } => {
                 for file in manifest.installed_files {
                     files.insert(file);
                 }
@@ -233,6 +252,11 @@ pub fn get_modified_files(transaction_id: &str) -> Result<Vec<String>> {
 }
 
 /// Returns a list of all packages modified during a transaction.
+///
+/// # Errors
+///
+/// Returns an error if the transaction log file cannot be read or if the
+/// content is not valid JSON.
 pub fn get_modified_packages(transaction_id: &str) -> Result<Vec<String>> {
     let path = get_transaction_path(transaction_id)?;
     if !path.exists() {
@@ -244,10 +268,8 @@ pub fn get_modified_packages(transaction_id: &str) -> Result<Vec<String>> {
     let mut packages = HashSet::new();
     for op in transaction.operations {
         match op {
-            types::TransactionOperation::Install { manifest } => {
-                packages.insert(manifest.name);
-            }
-            types::TransactionOperation::Uninstall { manifest } => {
+            types::TransactionOperation::Install { manifest }
+            | types::TransactionOperation::Uninstall { manifest } => {
                 packages.insert(manifest.name);
             }
             types::TransactionOperation::Upgrade {
@@ -263,6 +285,10 @@ pub fn get_modified_packages(transaction_id: &str) -> Result<Vec<String>> {
 }
 
 /// Deletes a transaction log file.
+///
+/// # Errors
+///
+/// Returns an error if the transaction log file cannot be deleted.
 pub fn delete_log(transaction_id: &str) -> Result<()> {
     let path = get_transaction_path(transaction_id)?;
     if path.exists() {
@@ -272,6 +298,10 @@ pub fn delete_log(transaction_id: &str) -> Result<()> {
 }
 
 /// Lists all completed and in-progress transactions.
+///
+/// # Errors
+///
+/// Returns an error if the transaction directory cannot be read.
 pub fn list_transactions() -> Result<Vec<TransactionMetadata>> {
     let dir = get_transactions_dir()?;
     if !dir.exists() {
@@ -357,6 +387,11 @@ fn restore_shims(manifest: &types::InstallManifest) -> Result<()> {
 /// - Installs are uninstalled.
 /// - Uninstalls are re-installed (either from local store or registry).
 /// - Upgrades are reverted to the previous version.
+///
+/// # Errors
+///
+/// Returns an error if the transaction log file cannot be read, if the content is
+/// not valid JSON, or if the rollback operation fails.
 pub fn rollback(transaction_id: &str) -> Result<()> {
     let path = get_transaction_path(transaction_id)?;
     if !path.exists() {
@@ -411,7 +446,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                 };
 
                 let manifest_filename = if let Some(sub) = &manifest.sub_package {
-                    format!("manifest-{}.yaml", sub)
+                    format!("manifest-{sub}.yaml")
                 } else {
                     "manifest.yaml".to_string()
                 };
@@ -549,7 +584,7 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
                 };
 
                 let manifest_filename = if let Some(sub) = &old_manifest.sub_package {
-                    format!("manifest-{}.yaml", sub)
+                    format!("manifest-{sub}.yaml")
                 } else {
                     "manifest.yaml".to_string()
                 };
@@ -658,6 +693,10 @@ pub fn rollback(transaction_id: &str) -> Result<()> {
 }
 
 /// Returns the ID of the most recently created transaction, if any.
+///
+/// # Errors
+///
+/// Returns an error if the transaction directory cannot be read.
 pub fn get_last_transaction_id() -> Result<Option<String>> {
     let dir = get_transactions_dir()?;
     let mut last_modified_time = None;

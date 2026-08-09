@@ -6,7 +6,7 @@
 use crate::pkg::service::{self, ServiceAction};
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use colored::*;
+use colored::Colorize;
 use comfy_table::{Table, presets::UTF8_FULL};
 
 /// The root service management command.
@@ -57,6 +57,10 @@ pub enum ServiceCommands {
 }
 
 /// Run the service management command.
+///
+/// # Errors
+///
+/// Returns an error if the service action fails.
 pub fn run(args: ServiceCommand) -> Result<()> {
     match args.command {
         ServiceCommands::Start { package } => {
@@ -108,7 +112,7 @@ pub fn run(args: ServiceCommand) -> Result<()> {
                 table.add_row(vec![pkg.cyan(), status_cell.to_string().into()]);
             }
 
-            println!("{}", table);
+            println!("{table}");
         }
     }
     Ok(())

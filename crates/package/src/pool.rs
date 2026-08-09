@@ -11,6 +11,14 @@ use zoi_core::types::{MappedDir, MappedFile, MappedSymlink, PoolFileEntry, Scope
 /// This function walks the `virtual_staging_dir`, calculates hashes for all files,
 /// copies unique files to the `pool_dir`, and populates the `scope_mapping` with
 /// metadata (permissions, ownership, destinations) for files, directories, and symlinks.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The staging directory cannot be walked.
+/// - File metadata cannot be retrieved.
+/// - A file hash cannot be calculated.
+/// - A unique file cannot be copied to the pool.
 pub fn pool_files(
     virtual_staging_dir: &Path,
     pool_dir: &Path,
@@ -47,7 +55,7 @@ pub fn pool_files(
             ("${pkgstore}", rel_path_str.as_str())
         };
 
-        let dest = format!("{}/{}", dest_prefix, dest_rel.replace('\\', "/"));
+        let dest = format!("{dest_prefix}/{}", dest_rel.replace('\\', "/"));
 
         #[cfg(unix)]
         let (owner, group) = {
@@ -101,7 +109,7 @@ pub fn pool_files(
             });
         } else {
             let hash = calculate_file_hash(path, HashAlgorithm::Sha256)?;
-            let hash_key = format!("sha256-{}", hash);
+            let hash_key = format!("sha256-{hash}");
 
             if !pool.contains_key(&hash_key) {
                 let pool_path = pool_dir.join(&hash_key);

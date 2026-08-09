@@ -2,13 +2,16 @@
 
 use crate::pkg::{install, local, resolve, types};
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use indicatif::MultiProgress;
 use std::collections::HashMap;
 use std::process::Command;
 use zoi_project::config as project_config;
 
 /// Runs the `dev` command to enter a development shell for a project.
+/// # Errors
+///
+/// Returns an error if the development shell cannot be entered or dependencies cannot be resolved.
 pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
     let is_repo = repo.is_some();
     let _temp_dir = if let Some(repo_url) = repo {
@@ -16,13 +19,13 @@ pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
             repo_url
         } else if let Some((provider, path)) = repo_url.split_once(':') {
             match provider {
-                "gh" | "github" => format!("https://github.com/{}.git", path),
-                "gl" | "gitlab" => format!("https://gitlab.com/{}.git", path),
-                "cb" | "codeberg" => format!("https://codeberg.org/{}.git", path),
-                _ => return Err(anyhow!("Unknown provider: {}", provider)),
+                "gh" | "github" => format!("https://github.com/{path}.git"),
+                "gl" | "gitlab" => format!("https://gitlab.com/{path}.git"),
+                "cb" | "codeberg" => format!("https://codeberg.org/{path}.git"),
+                _ => return Err(anyhow!("Unknown provider: {provider}")),
             }
         } else {
-            format!("https://github.com/{}.git", repo_url)
+            format!("https://github.com/{repo_url}.git")
         };
 
         println!(
@@ -51,7 +54,7 @@ pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
     };
 
     let config = if is_repo {
-        project_config::load_with_env(HashMap::new())?
+        project_config::load_with_env(&HashMap::new())?
     } else {
         project_config::load()?
     };
@@ -99,13 +102,13 @@ pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
 
     let install_plan = install::plan::create_install_plan(&missing_nodes, None, false)?;
     if !install_plan.is_empty() {
+        use rayon::prelude::*;
+        use std::sync::Mutex;
+
         println!(
             "{} Ensuring project dependencies are installed...",
             "::".bold().blue()
         );
-
-        use rayon::prelude::*;
-        use std::sync::Mutex;
 
         let m_prep = MultiProgress::new();
         let prepared_nodes = Mutex::new(HashMap::new());
@@ -115,13 +118,13 @@ pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
             .try_for_each(|(pkg_id, node)| -> Result<()> {
                 let action = install_plan
                     .get(pkg_id)
-                    .ok_or_else(|| anyhow!("Install action not found for: {}", pkg_id))?;
+                    .ok_or_else(|| anyhow!("Install action not found for: {pkg_id}"))?;
 
                 let prepared =
                     install::installer::prepare_node(node, action, Some(&m_prep), None, false)?;
 
                 let mut lock = prepared_nodes.lock().map_err(|e| {
-                    anyhow!("Prepared nodes mutex poisoned during preparation: {}", e)
+                    anyhow!("Prepared nodes mutex poisoned during preparation: {e}")
                 })?;
                 lock.insert(pkg_id.clone(), prepared);
                 Ok(())
@@ -133,7 +136,7 @@ pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
             stage.into_par_iter().try_for_each(|pkg_id| -> Result<()> {
                 let prepared = {
                     let lock = prepared_nodes.lock().map_err(|e| {
-                        anyhow!("Prepared nodes mutex poisoned during install: {}", e)
+                        anyhow!("Prepared nodes mutex poisoned during install: {e}")
                     })?;
                     lock.get(&pkg_id).cloned()
                 };
@@ -142,7 +145,7 @@ pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
                     let node = graph
                         .nodes
                         .get(&pkg_id)
-                        .ok_or_else(|| anyhow!("Package not found in graph: {}", pkg_id))?;
+                        .ok_or_else(|| anyhow!("Package not found in graph: {pkg_id}"))?;
 
                     install::installer::install_prepared_node(
                         node,
@@ -209,7 +212,7 @@ pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
             .collect::<Vec<_>>()
             .join(sep);
         if let Ok(old_path) = std::env::var("PATH") {
-            path = format!("{}{}{}", path, sep, old_path);
+            path = format!("{path}{sep}{old_path}");
         }
         env_vars.insert("PATH".to_string(), path);
     }
@@ -226,7 +229,7 @@ pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
             .collect::<Vec<_>>()
             .join(sep);
         if let Ok(old_path) = std::env::var(lib_path_var) {
-            path = format!("{}{}{}", path, sep, old_path);
+            path = format!("{path}{sep}{old_path}");
         }
         env_vars.insert(lib_path_var.to_string(), path);
     }
@@ -240,7 +243,7 @@ pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
         for var in &["CPATH", "C_INCLUDE_PATH", "CPLUS_INCLUDE_PATH"] {
             let mut full_path = path.clone();
             if let Ok(old_path) = std::env::var(var) {
-                full_path = format!("{}{}{}", full_path, sep, old_path);
+                full_path = format!("{full_path}{sep}{old_path}");
             }
             env_vars.insert(var.to_string(), full_path);
         }
@@ -253,7 +256,7 @@ pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
             .collect::<Vec<_>>()
             .join(sep);
         if let Ok(old_path) = std::env::var("PKG_CONFIG_PATH") {
-            path = format!("{}{}{}", path, sep, old_path);
+            path = format!("{path}{sep}{old_path}");
         }
         env_vars.insert("PKG_CONFIG_PATH".to_string(), path);
     }

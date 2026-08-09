@@ -1,9 +1,10 @@
 //! Telemetry command implementation.
 
 use anyhow::Result;
-use colored::*;
+use colored::Colorize;
 
 /// Telemetry subcommands.
+#[derive(Debug, Clone, Copy)]
 pub enum TelemetryCommand {
     /// Show telemetry status.
     Status,
@@ -14,6 +15,10 @@ pub enum TelemetryCommand {
 }
 
 /// Run the telemetry command.
+///
+/// # Errors
+///
+/// Returns an error if the configuration cannot be read or written.
 pub fn run(cmd: TelemetryCommand) -> Result<()> {
     match cmd {
         TelemetryCommand::Status => {

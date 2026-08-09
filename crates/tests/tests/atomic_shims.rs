@@ -13,49 +13,48 @@ fn test_atomic_shim_creation_rollback() {
     let root = tmp.path().to_path_buf();
 
     ctx.set_env_var("HOME", root.clone());
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
     let pkg_name = "shim-test";
     let version = "1.0.0";
     let handle = "local";
     let repo = "core";
 
-    let store_base = local::get_store_base_dir(types::Scope::User).unwrap();
+    let store_base = local::get_store_base_dir(types::Scope::User).expect("unwrap failed");
     let pkg_id = zoi::pkg::utils::generate_package_id(handle, repo, pkg_name);
     let pkg_dir_name = zoi::pkg::utils::get_package_dir_name(&pkg_id, pkg_name);
     let pkg_path = store_base.join(&pkg_dir_name);
     let version_dir = pkg_path.join(version);
     let bin_dir = version_dir.join("bin");
-    fs::create_dir_all(&bin_dir).unwrap();
+    fs::create_dir_all(&bin_dir).expect("unwrap failed");
 
-    fs::write(bin_dir.join("bin1"), "echo 1").unwrap();
-    fs::write(bin_dir.join("bin2"), "echo 2").unwrap();
+    fs::write(bin_dir.join("bin1"), "echo 1").expect("unwrap failed");
+    fs::write(bin_dir.join("bin2"), "echo 2").expect("unwrap failed");
 
     let pkg_lua_content = format!(
         r#"
 metadata({{
-    name = "{}",
+    name = "{pkg_name}",
     repo = "core",
-    version = "{}",
+    version = "{version}",
     description = "test",
     maintainer = {{ name = "test", email = "test" }},
     bins = {{ "bin1", "bin2", "nonexistent" }}, -- 'nonexistent' will cause failure if we force it
     types = {{ "pre-compiled" }}
 }})
-"#,
-        pkg_name, version
+"#
     );
-    let pkg_lua_path = version_dir.join(format!("{}.pkg.lua", pkg_name));
-    fs::write(&pkg_lua_path, pkg_lua_content).unwrap();
+    let pkg_lua_path = version_dir.join(format!("{pkg_name}.pkg.lua"));
+    fs::write(&pkg_lua_path, pkg_lua_content).expect("unwrap failed");
 
     let archive_path = root.join("dummy.zpa");
-    fs::write(&archive_path, "").unwrap();
+    fs::write(&archive_path, "").expect("unwrap failed");
 
     let bin_root = root.join(".zoi/pkgs/bin");
-    fs::create_dir_all(&bin_root).unwrap();
+    fs::create_dir_all(&bin_root).expect("unwrap failed");
 
     let shim2_path = bin_root.join("bin2");
-    fs::create_dir(&shim2_path).unwrap();
+    fs::create_dir(&shim2_path).expect("unwrap failed");
 
     let result = package::install::run(
         &archive_path,

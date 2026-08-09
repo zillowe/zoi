@@ -8,7 +8,7 @@ use zoi::pkg::helper;
 fn test_helper_get_hash_sha256() {
     let mut temp_file = tempfile::NamedTempFile::new().expect("Failed to create temp file");
     write!(temp_file, "hello world").expect("Failed to write");
-    let file_path = temp_file.path().to_str().unwrap();
+    let file_path = temp_file.path().to_str().expect("unwrap failed");
 
     let hash = helper::get_hash(file_path, helper::HashType::Sha256).expect("get_hash failed");
     assert_eq!(
@@ -21,7 +21,7 @@ fn test_helper_get_hash_sha256() {
 fn test_helper_get_hash_sha512() {
     let mut temp_file = tempfile::NamedTempFile::new().expect("Failed to create temp file");
     write!(temp_file, "hello world").expect("Failed to write");
-    let file_path = temp_file.path().to_str().unwrap();
+    let file_path = temp_file.path().to_str().expect("unwrap failed");
 
     let hash = helper::get_hash(file_path, helper::HashType::Sha512).expect("get_hash failed");
     assert_eq!(
@@ -33,31 +33,31 @@ fn test_helper_get_hash_sha512() {
 #[test]
 fn test_helper_validate_registries_json() {
     let res = helper::validate::run(&PathBuf::from("tests/assets/registries.json"));
-    assert!(res.is_ok(), "Validation failed: {:?}", res);
+    assert!(res.is_ok(), "Validation failed: {res:?}");
 }
 
 #[test]
 fn test_helper_validate_packages_json() {
     let res = helper::validate::run(&PathBuf::from("tests/assets/packages.json"));
-    assert!(res.is_ok(), "Validation failed: {:?}", res);
+    assert!(res.is_ok(), "Validation failed: {res:?}");
 }
 
 #[test]
 fn test_helper_validate_repo_yaml() {
     let res = helper::validate::run(&PathBuf::from("tests/assets/repo.yaml"));
-    assert!(res.is_ok(), "Validation failed: {:?}", res);
+    assert!(res.is_ok(), "Validation failed: {res:?}");
 }
 
 #[test]
 fn test_helper_validate_advisories_json() {
     let res = helper::validate::run(&PathBuf::from("tests/assets/advisories.json"));
-    assert!(res.is_ok(), "Validation failed: {:?}", res);
+    assert!(res.is_ok(), "Validation failed: {res:?}");
 }
 
 #[test]
 fn test_helper_validate_sec_yaml() {
     let res = helper::validate::run(&PathBuf::from("tests/assets/ZSA-2026-D0042.sec.yaml"));
-    assert!(res.is_ok(), "Validation failed: {:?}", res);
+    assert!(res.is_ok(), "Validation failed: {res:?}");
 }
 
 #[test]
@@ -68,7 +68,7 @@ fn test_helper_validate_invalid_file() {
     let res = helper::validate::run(temp_file.path());
     assert!(res.is_err(), "Expected validation to fail");
     assert!(
-        res.unwrap_err()
+        res.expect_err("unwrap_err failed")
             .to_string()
             .contains("Unsupported file extension")
     );

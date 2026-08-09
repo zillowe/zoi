@@ -16,6 +16,10 @@ use walkdir::WalkDir;
 /// operations into `__ZoiBuildOperations` for the Rust engine to execute atomically
 /// during the staging-to-store move.
 /// Adds file downloading utilities to the Lua environment.
+///
+/// # Errors
+///
+/// Returns an error if the `UTILS` table cannot be found or if setting the `FILE` function fails.
 pub fn add_file_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let file_fn = lua.create_function(
         move |_, (url, path): (String, String)| -> Result<(), mlua::Error> {
@@ -30,15 +34,18 @@ pub fn add_file_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
 }
 
 /// Adds the `zcp` function to the Lua environment for staging files.
+///
+/// # Errors
+///
+/// Returns an error if the `zcp` function cannot be set in the global environment.
 pub fn add_zcp(lua: &Lua) -> Result<(), mlua::Error> {
     let zcp_fn = lua.create_function(|lua, (source, destination): (String, String)| {
-        let ops_table: Table = match lua.globals().get("__ZoiBuildOperations") {
-            Ok(t) => t,
-            Err(_) => {
-                let new_t = lua.create_table()?;
-                lua.globals().set("__ZoiBuildOperations", new_t.clone())?;
-                new_t
-            }
+        let ops_table: Table = if let Ok(t) = lua.globals().get("__ZoiBuildOperations") {
+            t
+        } else {
+            let new_t = lua.create_table()?;
+            lua.globals().set("__ZoiBuildOperations", new_t.clone())?;
+            new_t
         };
         let op = lua.create_table()?;
         op.set("op", "zcp")?;
@@ -52,6 +59,10 @@ pub fn add_zcp(lua: &Lua) -> Result<(), mlua::Error> {
 }
 
 /// Adds the `zlicense` function to the Lua environment for staging licenses.
+///
+/// # Errors
+///
+/// Returns an error if the `zlicense` function cannot be set in the global environment.
 pub fn add_zlicense(lua: &Lua) -> Result<(), mlua::Error> {
     let zlicense_fn = lua.create_function(|lua, source: String| {
         let zoi_table: Table = lua.globals().get("ZOI")?;
@@ -69,9 +80,9 @@ pub fn add_zlicense(lua: &Lua) -> Result<(), mlua::Error> {
             .unwrap_or("LICENSE");
 
         let destination = if scope == "system" {
-            format!("${{usrroot}}/usr/share/licenses/{}/{}", pkg_name, filename)
+            format!("${{usrroot}}/usr/share/licenses/{pkg_name}/{filename}")
         } else {
-            format!("${{pkgstore}}/{}", filename)
+            format!("${{pkgstore}}/{filename}")
         };
 
         let zcp: mlua::Function = lua.globals().get("zcp")?;
@@ -83,6 +94,10 @@ pub fn add_zlicense(lua: &Lua) -> Result<(), mlua::Error> {
 }
 
 /// Adds the `zdoc` function to the Lua environment for staging documentation files.
+///
+/// # Errors
+///
+/// Returns an error if the `zdoc` function cannot be set in the global environment.
 pub fn add_zdoc(lua: &Lua) -> Result<(), mlua::Error> {
     let zdoc_fn = lua.create_function(|lua, source: String| {
         let zoi_table: Table = lua.globals().get("ZOI")?;
@@ -100,9 +115,9 @@ pub fn add_zdoc(lua: &Lua) -> Result<(), mlua::Error> {
             .ok_or_else(|| mlua::Error::RuntimeError("Invalid source path".to_string()))?;
 
         let destination = if scope == "system" {
-            format!("${{usrroot}}/usr/share/doc/{}/{}", pkg_name, filename)
+            format!("${{usrroot}}/usr/share/doc/{pkg_name}/{filename}")
         } else {
-            format!("${{pkgstore}}/doc/{}", filename)
+            format!("${{pkgstore}}/doc/{filename}")
         };
 
         let zcp: mlua::Function = lua.globals().get("zcp")?;
@@ -114,6 +129,10 @@ pub fn add_zdoc(lua: &Lua) -> Result<(), mlua::Error> {
 }
 
 /// Adds the `zman` function to the Lua environment for staging manual pages.
+///
+/// # Errors
+///
+/// Returns an error if the `zman` function cannot be set in the global environment.
 pub fn add_zman(lua: &Lua) -> Result<(), mlua::Error> {
     let zman_fn = lua.create_function(|lua, (source, section): (String, Option<String>)| {
         let zoi_table: Table = lua.globals().get("ZOI")?;
@@ -168,11 +187,10 @@ pub fn add_zman(lua: &Lua) -> Result<(), mlua::Error> {
 
             let destination = if scope == "system" {
                 format!(
-                    "${{usrroot}}/usr/share/man/man{}/{}",
-                    inferred_section, filename
+                    "${{usrroot}}/usr/share/man/man{inferred_section}/{filename}"
                 )
             } else {
-                format!("${{pkgstore}}/man/man{}/{}", inferred_section, filename)
+                format!("${{pkgstore}}/man/man{inferred_section}/{filename}")
             };
 
             let zcp: mlua::Function = lua.globals().get("zcp")?;
@@ -185,6 +203,10 @@ pub fn add_zman(lua: &Lua) -> Result<(), mlua::Error> {
 }
 
 /// Adds the `zshell` function to the Lua environment for staging shell completions.
+///
+/// # Errors
+///
+/// Returns an error if the `zshell` function cannot be set in the global environment.
 pub fn add_zshell(lua: &Lua) -> Result<(), mlua::Error> {
     let zshell_fn = lua.create_function(|lua, (source, shell): (String, String)| {
         let filename = Path::new(&source)
@@ -193,17 +215,16 @@ pub fn add_zshell(lua: &Lua) -> Result<(), mlua::Error> {
             .ok_or_else(|| mlua::Error::RuntimeError("Invalid source path for zshell".to_string()))?
             .to_string();
 
-        let destination = format!("${{pkgstore}}/shell/{}/{}", shell, filename);
+        let destination = format!("${{pkgstore}}/shell/{shell}/{filename}");
         let zcp: mlua::Function = lua.globals().get("zcp")?;
         zcp.call::<()>((source, destination.clone()))?;
 
-        let shells_table: Table = match lua.globals().get("__ZoiPackageShells") {
-            Ok(t) => t,
-            Err(_) => {
-                let new_t = lua.create_table()?;
-                lua.globals().set("__ZoiPackageShells", new_t.clone())?;
-                new_t
-            }
+        let shells_table: Table = if let Ok(t) = lua.globals().get("__ZoiPackageShells") {
+            t
+        } else {
+            let new_t = lua.create_table()?;
+            lua.globals().set("__ZoiPackageShells", new_t.clone())?;
+            new_t
         };
 
         let shell_files: Vec<String> = shells_table.get(&*shell).unwrap_or_default();
@@ -218,6 +239,10 @@ pub fn add_zshell(lua: &Lua) -> Result<(), mlua::Error> {
 }
 
 /// Adds the `zsed` function to the Lua environment for text replacements in files.
+///
+/// # Errors
+///
+/// Returns an error if the `zsed` function cannot be set in the global environment.
 pub fn add_zsed(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let zsed_fn = lua.create_function(
         move |lua, (pattern, replacement, file): (String, String, String)| {
@@ -225,21 +250,21 @@ pub fn add_zsed(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
             let path = Path::new(&build_dir_str).join(&file);
 
             let content = std::fs::read_to_string(&path).map_err(|e| {
-                mlua::Error::RuntimeError(format!("Failed to read {}: {}", file, e))
+                mlua::Error::RuntimeError(format!("Failed to read {file}: {e}"))
             })?;
 
             let re = regex::Regex::new(&pattern).map_err(|e| {
-                mlua::Error::RuntimeError(format!("Invalid regex '{}': {}", pattern, e))
+                mlua::Error::RuntimeError(format!("Invalid regex '{pattern}': {e}"))
             })?;
 
             let new_content = re.replace_all(&content, replacement.as_str());
 
             std::fs::write(&path, new_content.as_bytes()).map_err(|e| {
-                mlua::Error::RuntimeError(format!("Failed to write {}: {}", file, e))
+                mlua::Error::RuntimeError(format!("Failed to write {file}: {e}"))
             })?;
 
             if !quiet {
-                println!("Applied sed replacement to {}", file);
+                println!("Applied sed replacement to {file}");
             }
 
             Ok(())
@@ -250,15 +275,18 @@ pub fn add_zsed(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
 }
 
 /// Adds the `zln` function to the Lua environment for creating symbolic links.
+///
+/// # Errors
+///
+/// Returns an error if the `zln` function cannot be set in the global environment.
 pub fn add_zln(lua: &Lua) -> Result<(), mlua::Error> {
     let zln_fn = lua.create_function(|lua, (target, link): (String, String)| {
-        let ops_table: Table = match lua.globals().get("__ZoiBuildOperations") {
-            Ok(t) => t,
-            Err(_) => {
-                let new_t = lua.create_table()?;
-                lua.globals().set("__ZoiBuildOperations", new_t.clone())?;
-                new_t
-            }
+        let ops_table: Table = if let Ok(t) = lua.globals().get("__ZoiBuildOperations") {
+            t
+        } else {
+            let new_t = lua.create_table()?;
+            lua.globals().set("__ZoiBuildOperations", new_t.clone())?;
+            new_t
         };
         let op = lua.create_table()?;
         op.set("op", "zln")?;
@@ -272,15 +300,18 @@ pub fn add_zln(lua: &Lua) -> Result<(), mlua::Error> {
 }
 
 /// Adds the `zchmod` function to the Lua environment for changing file permissions.
+///
+/// # Errors
+///
+/// Returns an error if the `zchmod` function cannot be set in the global environment.
 pub fn add_zchmod(lua: &Lua) -> Result<(), mlua::Error> {
     let zchmod_fn = lua.create_function(|lua, (path, mode): (String, u32)| {
-        let ops_table: Table = match lua.globals().get("__ZoiBuildOperations") {
-            Ok(t) => t,
-            Err(_) => {
-                let new_t = lua.create_table()?;
-                lua.globals().set("__ZoiBuildOperations", new_t.clone())?;
-                new_t
-            }
+        let ops_table: Table = if let Ok(t) = lua.globals().get("__ZoiBuildOperations") {
+            t
+        } else {
+            let new_t = lua.create_table()?;
+            lua.globals().set("__ZoiBuildOperations", new_t.clone())?;
+            new_t
         };
         let op = lua.create_table()?;
         op.set("op", "zchmod")?;
@@ -294,16 +325,19 @@ pub fn add_zchmod(lua: &Lua) -> Result<(), mlua::Error> {
 }
 
 /// Adds the `zchown` function to the Lua environment for changing file ownership.
+///
+/// # Errors
+///
+/// Returns an error if the `zchown` function cannot be set in the global environment.
 pub fn add_zchown(lua: &Lua) -> Result<(), mlua::Error> {
     let zchown_fn =
         lua.create_function(|lua, (path, owner, group): (String, String, String)| {
-            let ops_table: Table = match lua.globals().get("__ZoiBuildOperations") {
-                Ok(t) => t,
-                Err(_) => {
-                    let new_t = lua.create_table()?;
-                    lua.globals().set("__ZoiBuildOperations", new_t.clone())?;
-                    new_t
-                }
+            let ops_table: Table = if let Ok(t) = lua.globals().get("__ZoiBuildOperations") {
+                t
+            } else {
+                let new_t = lua.create_table()?;
+                lua.globals().set("__ZoiBuildOperations", new_t.clone())?;
+                new_t
             };
             let op = lua.create_table()?;
             op.set("op", "zchown")?;
@@ -318,15 +352,18 @@ pub fn add_zchown(lua: &Lua) -> Result<(), mlua::Error> {
 }
 
 /// Adds the `zmkdir` function to the Lua environment for creating directories.
+///
+/// # Errors
+///
+/// Returns an error if the `zmkdir` function cannot be set in the global environment.
 pub fn add_zmkdir(lua: &Lua) -> Result<(), mlua::Error> {
     let zmkdir_fn = lua.create_function(|lua, path: String| {
-        let ops_table: Table = match lua.globals().get("__ZoiBuildOperations") {
-            Ok(t) => t,
-            Err(_) => {
-                let new_t = lua.create_table()?;
-                lua.globals().set("__ZoiBuildOperations", new_t.clone())?;
-                new_t
-            }
+        let ops_table: Table = if let Ok(t) = lua.globals().get("__ZoiBuildOperations") {
+            t
+        } else {
+            let new_t = lua.create_table()?;
+            lua.globals().set("__ZoiBuildOperations", new_t.clone())?;
+            new_t
         };
         let op = lua.create_table()?;
         op.set("op", "zmkdir")?;
@@ -339,16 +376,19 @@ pub fn add_zmkdir(lua: &Lua) -> Result<(), mlua::Error> {
 }
 
 /// Adds the `zrm` function to the Lua environment for removing files during uninstallation.
+///
+/// # Errors
+///
+/// Returns an error if the `zrm` function cannot be set in the global environment.
 pub fn add_zrm(lua: &Lua) -> Result<(), mlua::Error> {
     let zrm_fn = lua.create_function(|lua, path: String| {
-        let ops_table: Table = match lua.globals().get("__ZoiUninstallOperations") {
-            Ok(t) => t,
-            Err(_) => {
-                let new_t = lua.create_table()?;
-                lua.globals()
-                    .set("__ZoiUninstallOperations", new_t.clone())?;
-                new_t
-            }
+        let ops_table: Table = if let Ok(t) = lua.globals().get("__ZoiUninstallOperations") {
+            t
+        } else {
+            let new_t = lua.create_table()?;
+            lua.globals()
+                .set("__ZoiUninstallOperations", new_t.clone())?;
+            new_t
         };
         let op = lua.create_table()?;
         op.set("op", "zrm")?;
@@ -361,6 +401,10 @@ pub fn add_zrm(lua: &Lua) -> Result<(), mlua::Error> {
 }
 
 /// Adds general filesystem utilities to the `UTILS.FS` table.
+///
+/// # Errors
+///
+/// Returns an error if the `UTILS` table cannot be found or if setting the `FS` table fails.
 pub fn add_fs_util(lua: &Lua) -> Result<(), mlua::Error> {
     let fs_table = lua.create_table()?;
 
@@ -419,6 +463,10 @@ pub fn add_fs_util(lua: &Lua) -> Result<(), mlua::Error> {
 }
 
 /// Adds file finding utilities to the `UTILS.FIND` table.
+///
+/// # Errors
+///
+/// Returns an error if the `UTILS` table cannot be found or if setting the `FIND` table fails.
 pub fn add_find_util(lua: &Lua) -> Result<(), mlua::Error> {
     let find_table = lua.create_table()?;
 
@@ -431,8 +479,8 @@ pub fn add_find_util(lua: &Lua) -> Result<(), mlua::Error> {
                 let path = entry.path();
                 let relative_path = path.strip_prefix(Path::new(&build_dir_str)).map_err(|e| {
                     mlua::Error::RuntimeError(format!(
-                        "Failed to determine relative path for {:?}: {}",
-                        path, e
+                        "Failed to determine relative path for {}: {e}",
+                        path.display()
                     ))
                 })?;
                 return Ok(Some(relative_path.to_string_lossy().to_string()));

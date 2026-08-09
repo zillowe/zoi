@@ -15,20 +15,20 @@ fn test_shim_resolves_version_from_tool_versions() {
 
     ctx.set_current_dir(&root);
 
-    fs::write(root.join(".tool-versions"), "node 20.0.0\npython 3.12.0").unwrap();
+    fs::write(root.join(".tool-versions"), "node 20.0.0\npython 3.12.0").expect("unwrap failed");
 
-    let pm = PluginManager::new().unwrap();
+    let pm = PluginManager::new().expect("unwrap failed");
 
     let db_dir = root.join("db");
     ctx.set_env_var("ZOI_DB_DIR", &db_dir);
-    let conn = zoi::pkg::db::open_connection("local").unwrap();
+    let conn = zoi::pkg::db::open_connection("local").expect("unwrap failed");
     let pkg = zoi::pkg::types::Package {
         name: "node".to_string(),
         repo: "core".to_string(),
         bins: Some(vec!["node".to_string()]),
         ..Default::default()
     };
-    zoi::pkg::db::update_package(&conn, &pkg, "local", None, None, None).unwrap();
+    zoi::pkg::db::update_package(&conn, &pkg, "local", None, None, None).expect("unwrap failed");
 
     let res = shim::resolve_to_installed_bin("node", Some(&pm), None);
 
@@ -46,24 +46,24 @@ fn test_tool_versions_traversal() {
     let tmp = tempdir().expect("Failed to create temp dir");
     let root = tmp.path().to_path_buf();
     let sub = root.join("sub/dir");
-    fs::create_dir_all(&sub).unwrap();
+    fs::create_dir_all(&sub).expect("unwrap failed");
 
-    fs::write(root.join(".tool-versions"), "node 18.0.0").unwrap();
+    fs::write(root.join(".tool-versions"), "node 18.0.0").expect("unwrap failed");
 
     ctx.set_current_dir(&sub);
 
-    let pm = PluginManager::new().unwrap();
+    let pm = PluginManager::new().expect("unwrap failed");
 
     let db_dir = root.join("db");
     ctx.set_env_var("ZOI_DB_DIR", &db_dir);
-    let conn = zoi::pkg::db::open_connection("local").unwrap();
+    let conn = zoi::pkg::db::open_connection("local").expect("unwrap failed");
     let pkg = zoi::pkg::types::Package {
         name: "node".to_string(),
         repo: "core".to_string(),
         bins: Some(vec!["node".to_string()]),
         ..Default::default()
     };
-    zoi::pkg::db::update_package(&conn, &pkg, "local", None, None, None).unwrap();
+    zoi::pkg::db::update_package(&conn, &pkg, "local", None, None, None).expect("unwrap failed");
 
     let res = shim::resolve_to_installed_bin("node", Some(&pm), None);
 

@@ -19,6 +19,10 @@ use std::fs;
 ///
 /// This provides the "Chain of Trust" within the package build process, ensuring
 /// that downloaded assets have not been tampered with.
+///
+/// # Errors
+///
+/// Returns an error if the cryptographic utilities cannot be added to the Lua environment.
 pub fn add_verify_hash(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let verify_hash_fn = lua.create_function(move |lua, args: mlua::MultiValue| {
         let mut args_iter = args.into_iter();
@@ -47,8 +51,8 @@ pub fn add_verify_hash(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                 "Invalid hash format. Expected 'algo-hash'".to_string(),
             ));
         }
-        let algo = parts[0];
-        let expected_hash = parts[1];
+        let algo = parts.first().copied().unwrap_or_default();
+        let expected_hash = parts.get(1).copied().unwrap_or_default();
 
         let p = Path::new(&file_path);
         let actual_path = if p.exists() {
@@ -59,22 +63,17 @@ pub fn add_verify_hash(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
             p.to_path_buf()
         };
 
-        let hash_algo = match zoi_core::hash::HashAlgorithm::from_name(algo) {
-            Some(a) => a,
-            None => {
-                return Err(mlua::Error::RuntimeError(format!(
-                    "Unsupported hash algorithm: {}",
-                    algo
-                )));
-            }
+        let Some(hash_algo) = zoi_core::hash::HashAlgorithm::from_name(algo) else {
+            return Err(mlua::Error::RuntimeError(format!(
+                "Unsupported hash algorithm: {algo}"
+            )));
         };
 
         let actual_hash = match zoi_core::hash::calculate_file_hash(&actual_path, hash_algo) {
             Ok(h) => h,
             Err(e) => {
                 return Err(mlua::Error::RuntimeError(format!(
-                    "Failed to calculate hash: {}",
-                    e
+                    "Failed to calculate hash: {e}"
                 )));
             }
         };
@@ -88,8 +87,8 @@ pub fn add_verify_hash(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                     "Error".red().bold(),
                     file_path.cyan()
                 );
-                println!("  specified: {}-{}", algo, expected_hash.yellow());
-                println!("       got:    {}-{}", algo, actual_hash.green());
+                println!("  specified: {algo}-{expected_hash}");
+                println!("       got:    {algo}-{actual_hash}");
             }
             Ok(false)
         }
@@ -101,6 +100,10 @@ pub fn add_verify_hash(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
 /// Adds the `verifySignature` function to the Lua global environment.
 ///
 /// This function allows package scripts to validate detached PGP signatures.
+///
+/// # Errors
+///
+/// Returns an error if the `verifySignature` function cannot be added to the Lua environment.
 pub fn add_verify_signature(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let verify_sig_fn = lua.create_function(move |lua, args: mlua::MultiValue| {
         let mut args_iter = args.into_iter();
@@ -146,12 +149,12 @@ pub fn add_verify_signature(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
         let key_bytes: Vec<u8> = if key_source.starts_with("http") {
             let client =
                 utils::get_http_client().map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+            #[allow(clippy::redundant_closure_for_method_calls)]
             match client.get(&key_source).send().and_then(|r| r.bytes()) {
                 Ok(b) => b.to_vec(),
                 Err(e) => {
                     return Err(mlua::Error::RuntimeError(format!(
-                        "Failed to download key: {}",
-                        e
+                        "Failed to download key: {e}"
                     )));
                 }
             }
@@ -162,8 +165,8 @@ pub fn add_verify_signature(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                     Ok(b) => b,
                     Err(e) => {
                         return Err(mlua::Error::RuntimeError(format!(
-                            "Failed to read key file {:?}: {}",
-                            resolved_key_path, e
+                            "Failed to read key file {}: {e}",
+                            resolved_key_path.display()
                         )));
                     }
                 }
@@ -172,24 +175,23 @@ pub fn add_verify_signature(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                     Ok(dir) => dir,
                     Err(e) => {
                         return Err(mlua::Error::RuntimeError(format!(
-                            "Failed to get PGP dir: {}",
-                            e
+                            "Failed to get PGP dir: {e}"
                         )));
                     }
                 };
-                let key_path = pgp_dir.join(format!("{}.asc", key_source));
+                let key_path = pgp_dir.join(format!("{key_source}.asc"));
                 if !key_path.exists() {
                     return Err(mlua::Error::RuntimeError(format!(
-                        "Key with name '{}' not found (checked locally and at {:?}).",
-                        key_source, resolved_key_path
+                        "Key with name '{key_source}' not found (checked locally and at {}).",
+                        resolved_key_path.display()
                     )));
                 }
                 match fs::read(&key_path) {
                     Ok(b) => b,
                     Err(e) => {
                         return Err(mlua::Error::RuntimeError(format!(
-                            "Failed to read key file {:?}: {}",
-                            key_path, e
+                            "Failed to read key file {}: {e}",
+                            key_path.display()
                         )));
                     }
                 }
@@ -198,7 +200,7 @@ pub fn add_verify_signature(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
 
         let cert = match Cert::from_bytes(&key_bytes) {
             Ok(c) => c,
-            Err(e) => return Err(mlua::Error::RuntimeError(format!("Invalid PGP key: {}", e))),
+            Err(e) => return Err(mlua::Error::RuntimeError(format!("Invalid PGP key: {e}"))),
         };
 
         let final_file_path = resolve_path(&file_path);
@@ -208,10 +210,10 @@ pub fn add_verify_signature(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
             zoi_core::pgp::verify_detached_signature(&final_file_path, &final_sig_path, &cert);
 
         match result {
-            Ok(_) => Ok(true),
+            Ok(()) => Ok(true),
             Err(e) => {
                 if !quiet {
-                    eprintln!("Signature verification failed: {}", e);
+                    eprintln!("Signature verification failed: {e}");
                 }
                 Ok(false)
             }
@@ -224,6 +226,10 @@ pub fn add_verify_signature(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
 /// Adds the `addPgpKey` function to the Lua global environment.
 ///
 /// This function allows package scripts to import trusted PGP keys.
+///
+/// # Errors
+///
+/// Returns an error if the `addPgpKey` function cannot be added to the Lua environment.
 pub fn add_add_pgp_key(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let add_pgp_key_fn = lua.create_function(move |lua, args: mlua::MultiValue| {
         let mut args_iter = args.into_iter();
@@ -266,7 +272,7 @@ pub fn add_add_pgp_key(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
 
         if let Err(e) = result {
             if !quiet {
-                eprintln!("Failed to add PGP key '{}': {}", name, e);
+                eprintln!("Failed to add PGP key '{name}': {e}");
             }
             return Ok(false);
         }

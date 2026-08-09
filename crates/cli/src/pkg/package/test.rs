@@ -1,9 +1,14 @@
 use crate::{cmd, pkg};
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use mlua::{Lua, LuaSerdeExt};
 
 /// Runs tests for a Zoi package defined in a `.pkg.lua` file.
+///
+/// # Errors
+///
+/// Returns an error if the package file cannot be parsed, if the build environment cannot be set up,
+/// or if the package tests fail.
 pub fn run(args: &cmd::package::build::BuildCommand) -> Result<()> {
     println!("Testing package from: {}", args.package_file.display());
 
@@ -16,8 +21,8 @@ pub fn run(args: &cmd::package::build::BuildCommand) -> Result<()> {
     let pkg_for_meta = pkg::lua::parser::parse_lua_package_for_platform(
         args.package_file.to_str().ok_or_else(|| {
             anyhow!(
-                "Path contains invalid UTF-8 characters: {:?}",
-                args.package_file
+                "Path contains invalid UTF-8 characters: {}",
+                args.package_file.display()
             )
         })?,
         &platform,
@@ -32,20 +37,17 @@ pub fn run(args: &cmd::package::build::BuildCommand) -> Result<()> {
         pkg::resolve::get_default_version(&pkg_for_meta, None)?
     };
 
-    let resolved_build_type = match crate::pkg::package::build::resolve_build_type(
+    let Some(resolved_build_type) = crate::pkg::package::build::resolve_build_type(
         args.r#type.as_deref(),
         &pkg_for_meta.types,
         &pkg_for_meta.name,
-    )? {
-        Some(t) => t,
-        None => {
-            println!(
-                "{} Skipping tests for package '{}': no build types supported.",
-                "::".bold().yellow(),
-                pkg_for_meta.name
-            );
-            return Ok(());
-        }
+    )? else {
+        println!(
+            "{} Skipping tests for package '{}': no build types supported.",
+            "::".bold().yellow(),
+            pkg_for_meta.name
+        );
+        return Ok(());
     };
 
     let build_dir = tempfile::Builder::new()
@@ -60,7 +62,7 @@ pub fn run(args: &cmd::package::build::BuildCommand) -> Result<()> {
     } else if let Some(subs) = &pkg_for_meta.sub_packages {
         subs.clone()
     } else {
-        vec!["".to_string()]
+        vec![String::new()]
     };
 
     for sub_package in subs_to_test {
@@ -148,14 +150,12 @@ pub fn run(args: &cmd::package::build::BuildCommand) -> Result<()> {
             };
             if !success {
                 return Err(anyhow!(
-                    "Package tests failed for sub-package '{}'.",
-                    sub_package
+                    "Package tests failed for sub-package '{sub_package}'."
                 ));
             }
         } else if !sub_package.is_empty() {
             println!(
-                "No test() function found for sub-package '{}', skipping.",
-                sub_package
+                "No test() function found for sub-package '{sub_package}', skipping."
             );
         }
     }

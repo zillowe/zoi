@@ -13,7 +13,7 @@ fn test_transaction_rollback_uninstall() {
     let root = tmp.path().to_path_buf();
 
     ctx.set_env_var("HOME", root.clone());
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
     let pkg_name = "test-pkg";
     let version = "1.0.0";
@@ -22,8 +22,8 @@ fn test_transaction_rollback_uninstall() {
 
     let version_dir =
         local::get_package_version_dir(types::Scope::User, handle, repo, pkg_name, version)
-            .unwrap();
-    fs::create_dir_all(&version_dir).unwrap();
+            .expect("unwrap failed");
+    fs::create_dir_all(&version_dir).expect("unwrap failed");
 
     let manifest = types::InstallManifest {
         name: "test-pkg".to_string(),
@@ -35,7 +35,7 @@ fn test_transaction_rollback_uninstall() {
         repo_type: "official".to_string(),
         registry_handle: handle.to_string(),
         package_type: types::PackageType::Package,
-        description: "".to_string(),
+        description: String::new(),
         reason: types::InstallReason::Direct,
         scope: types::Scope::User,
         bins: None,
@@ -57,9 +57,9 @@ fn test_transaction_rollback_uninstall() {
     };
 
     let manifest_path = version_dir.join("manifest.yaml");
-    fs::write(&manifest_path, serde_yaml::to_string(&manifest).unwrap()).unwrap();
+    fs::write(&manifest_path, serde_yaml::to_string(&manifest).expect("unwrap failed")).expect("unwrap failed");
 
-    let mut trans = transaction::begin().unwrap();
+    let mut trans = transaction::begin().expect("unwrap failed");
     let id = trans.id.clone();
     transaction::record_operation(
         &mut trans,
@@ -67,13 +67,13 @@ fn test_transaction_rollback_uninstall() {
             manifest: Box::new(manifest),
         },
     )
-    .unwrap();
+    .expect("unwrap failed");
 
-    transaction::rollback(&id).unwrap();
+    transaction::rollback(&id).expect("unwrap failed");
 
-    let installed = local::is_package_installed(pkg_name, None, types::Scope::User).unwrap();
+    let installed = local::is_package_installed(pkg_name, None, types::Scope::User).expect("unwrap failed");
     assert!(installed.is_some());
-    assert_eq!(installed.unwrap().version, version);
+    assert_eq!(installed.expect("unwrap failed").version, version);
 }
 
 #[test]
@@ -83,7 +83,7 @@ fn test_package_rollback_requires_explicit_source_for_ambiguous_name_matches() {
     let root = tmp.path().to_path_buf();
 
     ctx.set_env_var("HOME", root.clone());
-    ctx.set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
     let base_manifest = types::InstallManifest {
         name: "shared".to_string(),
@@ -95,7 +95,7 @@ fn test_package_rollback_requires_explicit_source_for_ambiguous_name_matches() {
         repo_type: "official".to_string(),
         registry_handle: "local".to_string(),
         package_type: types::PackageType::Package,
-        description: "".to_string(),
+        description: String::new(),
         reason: types::InstallReason::Direct,
         scope: types::Scope::User,
         bins: None,
@@ -119,9 +119,9 @@ fn test_package_rollback_requires_explicit_source_for_ambiguous_name_matches() {
     let mut extra_manifest = base_manifest.clone();
     extra_manifest.repo = "extra".to_string();
 
-    local::write_manifest(&base_manifest).unwrap();
-    local::write_manifest(&extra_manifest).unwrap();
+    local::write_manifest(&base_manifest).expect("unwrap failed");
+    local::write_manifest(&extra_manifest).expect("unwrap failed");
 
-    let err = rollback::run("shared", true).unwrap_err();
+    let err = rollback::run("shared", true).expect_err("unwrap_err failed");
     assert!(err.to_string().contains("ambiguous"));
 }

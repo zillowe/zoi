@@ -15,22 +15,26 @@ use std::time::Duration;
 use nix;
 
 /// Creates an HTTP client with Zoi's default configuration.
+///
+/// # Errors
+///
+/// Returns an error if Zoi is in offline mode or if the HTTP client cannot be built.
 pub fn get_http_client() -> Result<&'static reqwest::blocking::Client> {
+    static HTTP_CLIENT: OnceLock<reqwest::blocking::Client> = OnceLock::new();
     if crate::offline::is_offline() {
         return Err(anyhow!(
             "Cannot create HTTP client: Zoi is in offline mode."
         ));
     }
-    static HTTP_CLIENT: OnceLock<reqwest::blocking::Client> = OnceLock::new();
     if let Some(client) = HTTP_CLIENT.get() {
         return Ok(client);
     }
     let client = reqwest::blocking::Client::builder()
         .user_agent("zoi")
-        .timeout(Duration::from_secs(60))
+        .timeout(Duration::from_mins(1))
         .use_rustls_tls()
         .build()
-        .map_err(|e| anyhow!("Failed to build HTTP client: {}", e))?;
+        .map_err(|e| anyhow!("Failed to build HTTP client: {e}"))?;
     let _ = HTTP_CLIENT.set(client);
     HTTP_CLIENT
         .get()
@@ -38,6 +42,10 @@ pub fn get_http_client() -> Result<&'static reqwest::blocking::Client> {
 }
 
 /// Builds a blocking HTTP client with a custom timeout.
+///
+/// # Errors
+///
+/// Returns an error if Zoi is in offline mode or if the HTTP client cannot be built.
 pub fn build_blocking_http_client(timeout_secs: u64) -> Result<reqwest::blocking::Client> {
     if crate::offline::is_offline() {
         return Err(anyhow!(
@@ -53,6 +61,10 @@ pub fn build_blocking_http_client(timeout_secs: u64) -> Result<reqwest::blocking
 }
 
 /// Creates a symbolic link for a directory, handling platform-specific requirements.
+///
+/// # Errors
+///
+/// Returns an error if the symlink or directory operations fail.
 pub fn symlink_dir(target: &Path, link: &Path) -> std::io::Result<()> {
     if link.exists() || link.is_symlink() {
         if link.is_dir() && !link.is_symlink() {
@@ -88,7 +100,7 @@ pub fn command_exists(command: &str) -> bool {
     } else {
         Command::new("bash")
             .arg("-c")
-            .arg(format!("command -v {}", command))
+            .arg(format!("command -v {command}"))
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .status()
@@ -100,20 +112,24 @@ pub fn command_exists(command: &str) -> bool {
 ///
 /// This string is used extensively in registries and package definitions to
 /// handle platform-specific dependencies and build artifacts.
+///
+/// # Errors
+///
+/// Returns an error if the current operating system or architecture is unsupported.
 pub fn get_platform() -> Result<String> {
     let os = match std::env::consts::OS {
         "linux" => "linux",
         "macos" | "darwin" => "macos",
         "windows" => "windows",
-        unsupported_os => return Err(anyhow!("Unsupported operating system: {}", unsupported_os)),
+        unsupported_os => return Err(anyhow!("Unsupported operating system: {unsupported_os}")),
     };
     let arch = match std::env::consts::ARCH {
         "x86_64" | "amd64" => "amd64",
         "aarch64" | "arm64" => "arm64",
         "x86" | "i386" | "i686" => "386",
-        unsupported_arch => return Err(anyhow!("Unsupported architecture: {}", unsupported_arch)),
+        unsupported_arch => return Err(anyhow!("Unsupported architecture: {unsupported_arch}")),
     };
-    Ok(format!("{}-{}", os, arch))
+    Ok(format!("{os}-{arch}"))
 }
 
 /// Returns the home directory of the current user, or the original user if run via sudo or doas.
@@ -133,6 +149,10 @@ pub fn get_user_home() -> Option<PathBuf> {
 }
 
 /// Returns the root directory for the package database.
+///
+/// # Errors
+///
+/// Returns an error if the home directory cannot be determined.
 pub fn get_db_root() -> Result<std::path::PathBuf> {
     if let Ok(path) = std::env::var("ZOI_DB_DIR") {
         return Ok(std::path::PathBuf::from(path));
@@ -147,6 +167,10 @@ pub fn get_db_root() -> Result<std::path::PathBuf> {
 /// - `User`: `~/.zoi/pkgs/store/`
 /// - `System`: `/var/lib/zoi/pkgs/store/` (Linux) or `C:\ProgramData\zoi\pkgs\store` (Windows)
 /// - `Project`: `./.zoi/pkgs/store/` (Relative to current project root)
+///
+/// # Errors
+///
+/// Returns an error if the home directory or current directory cannot be determined.
 pub fn get_store_base_dir(scope: crate::types::Scope) -> Result<PathBuf> {
     match scope {
         crate::types::Scope::User => {
@@ -175,6 +199,10 @@ pub fn get_store_base_dir(scope: crate::types::Scope) -> Result<PathBuf> {
 }
 
 /// Returns the root directory of the package database for a given scope.
+///
+/// # Errors
+///
+/// Returns an error if the home directory or current directory cannot be determined.
 pub fn get_db_base_dir(scope: crate::types::Scope) -> Result<PathBuf> {
     match scope {
         crate::types::Scope::User => {
@@ -203,6 +231,10 @@ pub fn get_db_base_dir(scope: crate::types::Scope) -> Result<PathBuf> {
 }
 
 /// Returns the root directory for Git repositories for a given scope.
+///
+/// # Errors
+///
+/// Returns an error if the home directory or current directory cannot be determined.
 pub fn get_git_base_dir(scope: crate::types::Scope) -> Result<PathBuf> {
     match scope {
         crate::types::Scope::User => {
@@ -238,7 +270,7 @@ pub fn get_git_base_dir(scope: crate::types::Scope) -> Result<PathBuf> {
 /// ID Format: `#{registry-handle}@{repo-path}/{package-name}`
 /// Hashed Result: First 32 characters of the SHA-512 hash of the ID string.
 pub fn generate_package_id(registry_handle: &str, repo_path: &str, package_name: &str) -> String {
-    let format_string = format!("#{}@{}/{}", registry_handle, repo_path, package_name);
+    let format_string = format!("#{registry_handle}@{repo_path}/{package_name}");
     let mut hasher = Sha512::new();
     hasher.update(format_string.as_bytes());
     let result = hasher.finalize();
@@ -254,8 +286,7 @@ pub fn generate_versioned_package_id(
     version: &str,
 ) -> String {
     let format_string = format!(
-        "#{}@{}/{}@{}",
-        registry_handle, repo_path, package_name, version
+        "#{registry_handle}@{repo_path}/{package_name}@{version}"
     );
     let mut hasher = Sha512::new();
     hasher.update(format_string.as_bytes());
@@ -267,10 +298,14 @@ pub fn generate_versioned_package_id(
 /// Creates the directory name for the package in the store.
 /// Format: `{hash}-{name}`
 pub fn get_package_dir_name(package_id: &str, package_name: &str) -> String {
-    format!("{}-{}", package_id, package_name)
+    format!("{package_id}-{package_name}")
 }
 
 /// Recursively copies all files and subdirectories from source to destination.
+///
+/// # Errors
+///
+/// Returns an error if the directory creation or file copy operation fails.
 pub fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
     let src = if src.as_os_str().is_empty() {
         Path::new(".")
@@ -296,11 +331,10 @@ pub fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
 /// improve reliability on unstable connections.
 pub fn retry_backoff_sleep(attempt: u32) {
     let base_ms = 500u64.saturating_mul(1u64 << (attempt.saturating_sub(1)));
-    let jitter = (std::time::SystemTime::now()
+    let jitter = u64::from(std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or(Duration::from_secs(0))
-        .subsec_millis()
-        % 200) as u64;
+        .subsec_millis() % 200);
     let sleep_ms = (base_ms + jitter).min(8000);
     std::thread::sleep(Duration::from_millis(sleep_ms));
 }
@@ -334,11 +368,11 @@ pub fn get_linux_distribution_info() -> Option<HashMap<String, String>> {
 /// and standard filesystem locations.
 ///
 /// Strategy:
-/// - ID_LIKE Check: We first check the `ID_LIKE` field in `/etc/os-release`.
+/// - `ID_LIKE` Check: We first check the `ID_LIKE` field in `/etc/os-release`.
 ///   This is the most reliable way to identify derivatives (e.g. Ubuntu is `debian`).
 /// - Direct ID Match: If `ID_LIKE` is missing, we fall back to the primary `ID`.
 /// - Normalization: We group similar distros under a common "family" key
-///   to simplify downstream logic (e.g. Rocky, Alma, and CentOS all map to `fedora`
+///   to simplify downstream logic (e.g. Rocky, Alma, and `CentOS` all map to `fedora`
 ///   because they share the DNF/RPM ecosystem).
 pub fn get_linux_distro_family() -> Option<String> {
     if is_zoios() {
@@ -725,7 +759,7 @@ pub fn format_bytes(bytes: u64) -> String {
     } else if bytes >= KIB {
         format!("{:.2} KiB", bytes as f64 / KIB as f64)
     } else {
-        format!("{} B", bytes)
+        format!("{bytes} B")
     }
 }
 
@@ -753,8 +787,9 @@ pub fn is_safe_path(base: &Path, path: &Path) -> bool {
     let mut normalized = PathBuf::new();
     for component in joined.components() {
         match component {
-            std::path::Component::Prefix(_) => normalized.push(component),
-            std::path::Component::RootDir => normalized.push(component),
+            std::path::Component::Prefix(_) | std::path::Component::RootDir => {
+                normalized.push(component);
+            }
             std::path::Component::CurDir => {}
             std::path::Component::ParentDir => {
                 if !normalized.pop() {
@@ -768,6 +803,10 @@ pub fn is_safe_path(base: &Path, path: &Path) -> bool {
 }
 
 /// Creates a symbolic link for a file, handling platform-specific requirements.
+///
+/// # Errors
+///
+/// Returns an error if the symlink operation fails.
 pub fn symlink_file(target: &Path, link: &Path) -> std::io::Result<()> {
     if link.exists() || link.is_symlink() {
         fs::remove_file(link)?;
@@ -800,6 +839,10 @@ pub fn is_admin() -> bool {
 }
 
 /// Executes a shell command and returns an error if it fails.
+///
+/// # Errors
+///
+/// Returns an error if the command fails to execute or returns a non-zero exit status.
 pub fn run_shell_command(command_str: &str) -> anyhow::Result<()> {
     let status = if cfg!(target_os = "windows") {
         Command::new("pwsh")
@@ -810,12 +853,16 @@ pub fn run_shell_command(command_str: &str) -> anyhow::Result<()> {
         Command::new("bash").arg("-c").arg(command_str).status()?
     };
     if !status.success() {
-        return Err(anyhow!("Command failed: {}", command_str));
+        return Err(anyhow!("Command failed: {command_str}"));
     }
     Ok(())
 }
 
 /// Executes a shell command quietly (suppressing output) and returns an error if it fails.
+///
+/// # Errors
+///
+/// Returns an error if the command fails to execute or returns a non-zero exit status.
 pub fn run_shell_command_quietly(command_str: &str) -> anyhow::Result<()> {
     let status = if cfg!(target_os = "windows") {
         Command::new("pwsh")
@@ -833,7 +880,7 @@ pub fn run_shell_command_quietly(command_str: &str) -> anyhow::Result<()> {
             .status()?
     };
     if !status.success() {
-        return Err(anyhow!("Command failed: {}", command_str));
+        return Err(anyhow!("Command failed: {command_str}"));
     }
     Ok(())
 }
@@ -851,7 +898,7 @@ pub fn ask_for_confirmation(prompt: &str, yes: bool) -> bool {
     if std::env::var("ZOI_TEST").is_ok() || !stdin().is_tty() {
         return false;
     }
-    print!("{} [y/N]: ", prompt);
+    print!("{prompt} [y/N]: ");
     let _ = stdout().flush();
     let mut input = String::new();
     if stdin().read_line(&mut input).is_err() {
@@ -861,6 +908,10 @@ pub fn ask_for_confirmation(prompt: &str, yes: bool) -> bool {
 }
 
 /// Recursively sets a directory and its contents to be read-only.
+///
+/// # Errors
+///
+/// Returns an error if the permission change fails.
 pub fn set_path_read_only(path: &Path) -> anyhow::Result<()> {
     if !path.exists() {
         return Ok(());
@@ -877,6 +928,10 @@ pub fn set_path_read_only(path: &Path) -> anyhow::Result<()> {
 }
 
 /// Recursively ensures a directory and its contents are writable.
+///
+/// # Errors
+///
+/// Returns an error if the permission change fails.
 pub fn set_path_writable(path: &Path) -> anyhow::Result<()> {
     if !path.exists() {
         return Ok(());
@@ -902,6 +957,10 @@ pub fn set_path_writable(path: &Path) -> anyhow::Result<()> {
 }
 
 /// Sets the owner and group for a file or directory (Unix only).
+///
+/// # Errors
+///
+/// Returns an error if the owner or group lookup fails, or if the chown operation fails.
 #[cfg(unix)]
 pub fn set_path_owner(path: &Path, owner: &str, group: &str) -> anyhow::Result<()> {
     use nix::unistd::{Gid, Group, Uid, User, chown};
@@ -910,8 +969,8 @@ pub fn set_path_owner(path: &Path, owner: &str, group: &str) -> anyhow::Result<(
     } else if !owner.is_empty() {
         Some(
             User::from_name(owner)
-                .map_err(|e| anyhow!("Error looking up user '{}': {}", owner, e))?
-                .ok_or_else(|| anyhow!("User not found: {}", owner))?
+                .map_err(|e| anyhow!("Error looking up user '{owner}': {e}"))?
+                .ok_or_else(|| anyhow!("User not found: {owner}"))?
                 .uid,
         )
     } else {
@@ -922,8 +981,8 @@ pub fn set_path_owner(path: &Path, owner: &str, group: &str) -> anyhow::Result<(
     } else if !group.is_empty() {
         Some(
             Group::from_name(group)
-                .map_err(|e| anyhow!("Error looking up group '{}': {}", group, e))?
-                .ok_or_else(|| anyhow!("Group not found: {}", group))?
+                .map_err(|e| anyhow!("Error looking up group '{group}': {e}"))?
+                .ok_or_else(|| anyhow!("Group not found: {group}"))?
                 .gid,
         )
     } else {
@@ -971,6 +1030,10 @@ pub fn check_license(license: &str) {
 }
 
 /// Prompts the user to confirm installation from an untrusted (non-official) source.
+///
+/// # Errors
+///
+/// Returns an error if the user aborts the operation.
 pub fn confirm_untrusted_source(
     source_type: &crate::types::SourceType,
     yes: bool,
@@ -984,14 +1047,13 @@ pub fn confirm_untrusted_source(
     let warning_message = match source_type {
         crate::types::SourceType::UntrustedRepo(repo) => {
             format!(
-                "The package from repository '@{}' is not an official Zoi repository.",
-                repo
+                "The package from repository '@{repo}' is not an official Zoi repository."
             )
         }
         crate::types::SourceType::LocalFile => "You are installing from a local file.".to_string(),
         crate::types::SourceType::Url => "You are installing from a remote URL. This script will be executed with your user's permissions, which could lead to remote code execution if the source is malicious.".to_string(),
-        crate::types::SourceType::GitRepo(repo) => format!("You are installing from an external git repository '{}'. This script will be executed with your user's permissions.", repo),
-        _ => return Ok(()),
+        crate::types::SourceType::GitRepo(repo) => format!("You are installing from an external git repository '{repo}'. This script will be executed with your user's permissions."),
+        crate::types::SourceType::OfficialRepo => return Ok(()),
     };
     println!(
         "\n{}: {}",
@@ -1009,6 +1071,10 @@ pub fn confirm_untrusted_source(
 }
 
 /// Expands standard Zoi path placeholders (e.g. `${pkgstore}`, `${usrhome}`) in a string.
+///
+/// # Errors
+///
+/// Returns an error if the current directory cannot be determined.
 pub fn expand_placeholders(
     path: &str,
     version_dir: &Path,
@@ -1026,9 +1092,7 @@ pub fn expand_placeholders(
 
     let applications_dir = match scope {
         crate::types::Scope::System => PathBuf::from("/Applications"),
-        crate::types::Scope::User => get_user_home()
-            .map(|h| h.join("Applications"))
-            .unwrap_or_else(|| PathBuf::from("/Applications")),
+        crate::types::Scope::User => get_user_home().map_or_else(|| PathBuf::from("/Applications"), |h| h.join("Applications")),
         crate::types::Scope::Project => std::env::current_dir()
             .unwrap_or_default()
             .join("Applications"),

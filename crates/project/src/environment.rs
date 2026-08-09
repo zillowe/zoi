@@ -1,7 +1,7 @@
 use super::{config, executor};
 use anyhow::{Result, anyhow};
 use clap_complete::Shell;
-use colored::*;
+use colored::Colorize;
 use dialoguer::{Select, theme::ColorfulTheme};
 use std::collections::HashMap;
 use std::io::{self, Write};
@@ -12,33 +12,41 @@ use zoi_core::utils;
 ///
 /// If `env_alias` is provided, it tries to find and setup that specific environment.
 /// Otherwise, it prompts the user to choose an environment interactively.
+///
+/// # Errors
+///
+/// Returns an error if no environments are defined, the specified environment is not found,
+/// if package checks fail, or if executing setup commands fails.
 pub fn setup(env_alias: Option<&str>, config: &config::ProjectConfig) -> Result<()> {
     if config.environments.is_empty() {
         return Err(anyhow!("No environments defined in zoi.yaml"));
     }
 
-    let env_to_setup = match env_alias {
-        Some(alias) => config
+    let env_to_setup = if let Some(alias) = env_alias {
+        config
             .environments
             .iter()
             .find(|e| e.cmd == alias)
             .ok_or_else(|| anyhow!("Environment '{alias}' not found in zoi.yaml"))?
-            .clone(),
-        None => {
-            let selections: Vec<&str> = config
-                .environments
-                .iter()
-                .map(|e| e.name.as_str())
-                .collect();
-            let selection = Select::with_theme(&ColorfulTheme::default())
-                .with_prompt("Choose an environment to set up")
-                .items(&selections)
-                .default(0)
-                .interact_opt()?
-                .ok_or(anyhow!("No environment chosen."))?;
+            .clone()
+    } else {
+        let selections: Vec<&str> = config
+            .environments
+            .iter()
+            .map(|e| e.name.as_str())
+            .collect();
+        let selection = Select::with_theme(&ColorfulTheme::default())
+            .with_prompt("Choose an environment to set up")
+            .items(&selections)
+            .default(0)
+            .interact_opt()?
+            .ok_or(anyhow!("No environment chosen."))?;
 
-            config.environments[selection].clone()
-        }
+        config
+            .environments
+            .get(selection)
+            .cloned()
+            .ok_or_else(|| anyhow!("Invalid selection"))?
     };
 
     println!(
@@ -59,8 +67,7 @@ pub fn setup(env_alias: Option<&str>, config: &config::ProjectConfig) -> Result<
             .cloned()
             .ok_or_else(|| {
                 anyhow!(
-                    "No commands found for platform '{}' and no default specified",
-                    platform
+                    "No commands found for platform '{platform}' and no default specified"
                 )
             })?,
     };
@@ -114,6 +121,11 @@ fn check_packages(config: &config::ProjectConfig) -> Result<()> {
 ///
 /// This prints shell-specific commands (e.g. `export` for Bash/Zsh) that can be
 /// evaluated to set up the environment variables for the current project.
+///
+/// # Errors
+///
+/// Returns an error if the specified environment is not found or if there is
+/// an issue determining the current platform or directory.
 pub fn export_shell(
     env_alias: Option<&str>,
     config: &config::ProjectConfig,
@@ -162,16 +174,16 @@ pub fn export_shell(
     for (k, v) in env_vars {
         match shell {
             Shell::Bash | Shell::Zsh => {
-                println!("export {}=\"{}\"", k, v);
+                println!("export {k}=\"{v}\"");
             }
             Shell::Fish => {
-                println!("set -gx {} \"{}\"", k, v);
+                println!("set -gx {k} \"{v}\"");
             }
             Shell::PowerShell => {
-                println!("$env:{} = \"{}\"", k, v);
+                println!("$env:{k} = \"{v}\"");
             }
             Shell::Elvish => {
-                println!("set E:{} = \"{}\"", k, v);
+                println!("set E:{k} = \"{v}\"");
             }
             _ => {}
         }

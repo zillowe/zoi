@@ -6,7 +6,7 @@
 //! and for distributing source code along with build instructions.
 
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use ignore::gitignore::GitignoreBuilder;
 use mlua::{Lua, LuaSerdeExt, Table, Value};
 use std::collections::HashSet;
@@ -18,12 +18,19 @@ use walkdir::WalkDir;
 use zstd::stream::write::Encoder as ZstdEncoder;
 
 /// Bundles a package and its dependencies into a `.zsa` archive.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Parsing the `.pkg.lua` file fails.
+/// - Upstream sources cannot be fetched.
+/// - The archive cannot be created or signed.
 pub fn run(
     package_file: &Path,
     output_dir: Option<&Path>,
     sign: Option<String>,
     version_override: Option<&str>,
-    build_type: Option<String>,
+    build_type: Option<&str>,
 ) -> Result<()> {
     let pkg_dir = package_file
         .parent()
@@ -60,7 +67,7 @@ pub fn run(
     // Setup a mocked environment for metadata and asset discovery
     // We run it twice: once to find local assets, and once to actually run prepare() if needed.
 
-    let bundle_type = build_type.as_deref().unwrap_or("source");
+    let bundle_type = build_type.unwrap_or("source");
 
     // Phase 1: Metadata & Local Asset Discovery
     zoi_lua::functions::setup_lua_environment(
@@ -276,13 +283,11 @@ pub fn run(
         .map_err(|e| anyhow!(e.to_string()))?;
 
     let version = version_override
-        .map(|v| v.to_string())
+        .map(ToString::to_string)
         .or(pkg_meta.version)
         .unwrap_or_else(|| "unknown".to_string());
     let output_filename = format!("{}-{}.zsa", pkg_meta.name, version);
-    let output_base = output_dir
-        .map(|d| d.to_path_buf())
-        .unwrap_or_else(|| pkg_dir.to_path_buf());
+    let output_base = output_dir.map_or_else(|| pkg_dir.to_path_buf(), Path::to_path_buf);
     let output_path = output_base.join(output_filename);
 
     let file = File::create(&output_path)?;
@@ -299,7 +304,7 @@ pub fn run(
         let is_dir = abs_path.is_dir();
 
         if is_ignored(rel_path, is_dir) {
-            println!("  Ignored: {}", rel_path_str);
+            println!("  Ignored: {rel_path_str}");
             continue;
         }
 
@@ -329,7 +334,7 @@ pub fn run(
                 }
             } else {
                 tar_builder.append_path_with_name(&abs_path, &rel_path_str)?;
-                println!("  Included local: {}", rel_path_str);
+                println!("  Included local: {rel_path_str}");
             }
         }
     }
@@ -355,7 +360,7 @@ pub fn run(
             if is_dir {
                 it.skip_current_dir();
             }
-            println!("  Ignored fetch: {}", rel_path_str);
+            println!("  Ignored fetch: {rel_path_str}");
             continue;
         }
 
@@ -365,7 +370,7 @@ pub fn run(
         }
 
         tar_builder.append_path_with_name(entry.path(), rel_path)?;
-        println!("  Included fetch: {}", rel_path_str);
+        println!("  Included fetch: {rel_path_str}");
     }
 
     // Mark as a full bundle so build knows to skip prepare

@@ -22,10 +22,10 @@ commands:
     run: echo "2" > second.txt
     depends_on: ["first"]
 "#;
-    fs::write(root.join("zoi.yaml"), yaml).unwrap();
+    fs::write(root.join("zoi.yaml"), yaml).expect("unwrap failed");
 
-    let cfg = config::load().unwrap();
-    runner::run(Some("second"), &[], &cfg).unwrap();
+    let cfg = config::load().expect("unwrap failed");
+    runner::run(Some("second"), &[], &cfg).expect("unwrap failed");
 
     assert!(
         root.join("first.txt").exists(),
@@ -51,29 +51,29 @@ commands:
     run: echo "running" >> output.txt
     cache_files: ["input.txt"]
 "#;
-    fs::write(root.join("zoi.yaml"), yaml).unwrap();
-    fs::write(root.join("input.txt"), "input-v1").unwrap();
+    fs::write(root.join("zoi.yaml"), yaml).expect("unwrap failed");
+    fs::write(root.join("input.txt"), "input-v1").expect("unwrap failed");
 
-    let cfg = config::load().unwrap();
+    let cfg = config::load().expect("unwrap failed");
 
-    runner::run(Some("cached-task"), &[], &cfg).unwrap();
+    runner::run(Some("cached-task"), &[], &cfg).expect("unwrap failed");
     let count1 = fs::read_to_string(root.join("output.txt"))
-        .unwrap()
+        .expect("unwrap failed")
         .lines()
         .count();
     assert_eq!(count1, 1);
 
-    runner::run(Some("cached-task"), &[], &cfg).unwrap();
+    runner::run(Some("cached-task"), &[], &cfg).expect("unwrap failed");
     let count2 = fs::read_to_string(root.join("output.txt"))
-        .unwrap()
+        .expect("unwrap failed")
         .lines()
         .count();
     assert_eq!(count2, 1, "Should have been skipped due to caching");
 
-    fs::write(root.join("input.txt"), "input-v2").unwrap();
-    runner::run(Some("cached-task"), &[], &cfg).unwrap();
+    fs::write(root.join("input.txt"), "input-v2").expect("unwrap failed");
+    runner::run(Some("cached-task"), &[], &cfg).expect("unwrap failed");
     let count3 = fs::read_to_string(root.join("output.txt"))
-        .unwrap()
+        .expect("unwrap failed")
         .lines()
         .count();
     assert_eq!(count3, 2, "Should have run again after input changed");
@@ -96,11 +96,11 @@ commands:
     run: echo b
     depends_on: ["a"]
 "#;
-    fs::write(root.join("zoi.yaml"), yaml).unwrap();
+    fs::write(root.join("zoi.yaml"), yaml).expect("unwrap failed");
 
-    let cfg = config::load().unwrap();
+    let cfg = config::load().expect("unwrap failed");
     let res = runner::run(Some("a"), &[], &cfg);
 
     assert!(res.is_err(), "Should detect circular dependency");
-    assert!(res.unwrap_err().to_string().contains("Circular dependency"));
+    assert!(res.expect_err("unwrap_err failed").to_string().contains("Circular dependency"));
 }

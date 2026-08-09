@@ -13,6 +13,11 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 /// Installs a package with elevated privileges.
+///
+/// # Errors
+///
+/// Returns an error if the node JSON file cannot be read, if the node JSON is invalid,
+/// or if the installation process fails.
 pub fn elevate_install_node(cmd: &crate::cmd::helper::ElevateInstallNodeCommand) -> Result<()> {
     let content = std::fs::read_to_string(&cmd.node_json)?;
     let node: InstallNode = serde_json::from_str(&content)?;
@@ -57,6 +62,11 @@ pub fn elevate_install_node(cmd: &crate::cmd::helper::ElevateInstallNodeCommand)
 }
 
 /// Uninstalls a package with elevated privileges.
+///
+/// # Errors
+///
+/// Returns an error if the manifest JSON file cannot be read, if the manifest JSON is invalid,
+/// or if the uninstallation process fails.
 pub fn elevate_uninstall(cmd: &crate::cmd::helper::ElevateUninstallCommand) -> Result<()> {
     let content = std::fs::read_to_string(&cmd.manifest_json)?;
     let manifest: types::InstallManifest = serde_json::from_str(&content)?;
@@ -176,7 +186,7 @@ pub fn elevate_uninstall(cmd: &crate::cmd::helper::ElevateUninstallCommand) -> R
     }
 
     let manifest_filename = if let Some(sub) = &manifest.sub_package {
-        format!("manifest-{}.yaml", sub)
+        format!("manifest-{sub}.yaml")
     } else {
         "manifest.yaml".to_string()
     };
@@ -209,16 +219,16 @@ pub fn elevate_uninstall(cmd: &crate::cmd::helper::ElevateUninstallCommand) -> R
             let dep_req = crate::pkg::resolve::parse_source_string(dep.package)?;
             let dep_matches =
                 crate::pkg::local::find_installed_manifests_matching(&dep_req, scope)?;
-            if dep_matches.len() == 1 {
-                let dep_manifest = &dep_matches[0];
-                if let Ok(dep_pkg_dir) = crate::pkg::local::get_package_dir(
+            if dep_matches.len() == 1
+                && let Some(dep_manifest) = dep_matches.first()
+                && let Ok(dep_pkg_dir) = crate::pkg::local::get_package_dir(
                     dep_manifest.scope,
                     &dep_manifest.registry_handle,
                     &dep_manifest.repo,
                     &dep_manifest.name,
-                ) {
-                    let _ = crate::pkg::local::remove_dependent(&dep_pkg_dir, &parent_id);
-                }
+                )
+            {
+                let _ = crate::pkg::local::remove_dependent(&dep_pkg_dir, &parent_id);
             }
         }
     }
@@ -237,6 +247,7 @@ pub fn elevate_uninstall(cmd: &crate::cmd::helper::ElevateUninstallCommand) -> R
 }
 
 /// Supported hash types for file verification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HashType {
     /// SHA-512 hash.
     Sha512,
@@ -252,12 +263,19 @@ fn update_digest_from_reader<R: Read, D: Digest>(reader: &mut R, hasher: &mut D)
         if bytes_read == 0 {
             break;
         }
-        hasher.update(&buffer[..bytes_read]);
+        if let Some(chunk) = buffer.get(..bytes_read) {
+            hasher.update(chunk);
+        }
     }
     Ok(())
 }
 
 /// Calculates the hash of a file or remote URL.
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be opened or read, or if the remote URL
+/// cannot be downloaded.
 pub fn get_hash(source: &str, hash_type: HashType) -> Result<String> {
     let mut hasher_sha512 = Sha512::new();
     let mut hasher_sha256 = Sha256::new();
@@ -266,10 +284,8 @@ pub fn get_hash(source: &str, hash_type: HashType) -> Result<String> {
         let client = crate::pkg::utils::get_http_client()?;
         let mut response = client.get(source).send()?;
         if !response.status().is_success() {
-            return Err(anyhow!(
-                "Failed to download file from URL: {}",
-                response.status()
-            ));
+            let status = response.status();
+            return Err(anyhow!("Failed to download file from URL: {status}"));
         }
         match hash_type {
             HashType::Sha512 => {
@@ -289,7 +305,7 @@ pub fn get_hash(source: &str, hash_type: HashType) -> Result<String> {
                 update_digest_from_reader(&mut file, &mut hasher_sha256)?;
             }
         }
-    };
+    }
 
     let hash = match hash_type {
         HashType::Sha512 => hex::encode(hasher_sha512.finalize()),
@@ -306,9 +322,15 @@ pub mod validate {
     use std::path::Path;
 
     /// Validates a Zoi specification file (e.g. registries.json, repo.yaml).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file does not exist, cannot be read, or if the
+    /// file content does not match any known Zoi specification.
     pub fn run(file: &Path) -> Result<()> {
         if !file.exists() {
-            return Err(anyhow!("File does not exist: {}", file.display()));
+            let path = file.display();
+            return Err(anyhow!("File does not exist: {path}"));
         }
 
         let content = std::fs::read_to_string(file)?;
@@ -317,70 +339,69 @@ pub mod validate {
             .and_then(|n| n.to_str())
             .unwrap_or_default();
 
-        println!("{} Validating {}...", "::".bold().blue(), file.display());
+        let path = file.display();
+        println!("{} Validating {path}...", "::".bold().blue());
 
         if file_name == "registries.json" {
             let _: crate::pkg::purl::CentralDbSpec = serde_json::from_str(&content)
-                .map_err(|e| anyhow!("Invalid registries.json spec: {}", e))?;
+                .map_err(|e| anyhow!("Invalid registries.json spec: {e}"))?;
             println!(
                 "{} file is a valid registries.json spec.",
                 "OK".bold().green()
             );
         } else if file_name == "repo.yaml" || file_name == "repo.yml" {
             let _: crate::pkg::types::RepoConfig = serde_yaml::from_str(&content)
-                .map_err(|e| anyhow!("Invalid repo.yaml spec: {}", e))?;
+                .map_err(|e| anyhow!("Invalid repo.yaml spec: {e}"))?;
             println!("{} file is a valid repo.yaml spec.", "OK".bold().green());
         } else if file_name == "advisories.json" {
             let _: crate::pkg::types::AdvisoryRegistry = serde_json::from_str(&content)
-                .map_err(|e| anyhow!("Invalid advisories.json spec: {}", e))?;
+                .map_err(|e| anyhow!("Invalid advisories.json spec: {e}"))?;
             println!(
                 "{} file is a valid advisories.json spec.",
                 "OK".bold().green()
             );
         } else if file_name == "packages.json" {
             let _: crate::pkg::purl::RegistryIndex = serde_json::from_str(&content)
-                .map_err(|e| anyhow!("Invalid packages.json spec: {}", e))?;
+                .map_err(|e| anyhow!("Invalid packages.json spec: {e}"))?;
             println!(
                 "{} file is a valid packages.json spec.",
                 "OK".bold().green()
             );
         } else if file_name.ends_with(".sec.yaml") || file_name.ends_with(".sec.yml") {
             let _: crate::pkg::types::Advisory = serde_yaml::from_str(&content)
-                .map_err(|e| anyhow!("Invalid security advisory (.sec.yaml) spec: {}", e))?;
+                .map_err(|e| anyhow!("Invalid security advisory (.sec.yaml) spec: {e}"))?;
             println!("{} file is a valid .sec.yaml spec.", "OK".bold().green());
-        } else {
-            if file.extension().and_then(|e| e.to_str()) == Some("json") {
-                if serde_json::from_str::<crate::pkg::purl::CentralDbSpec>(&content).is_ok() {
-                    println!("{} file matches registries.json spec.", "OK".bold().green());
-                } else if serde_json::from_str::<crate::pkg::types::AdvisoryRegistry>(&content)
-                    .is_ok()
-                {
-                    println!("{} file matches advisories.json spec.", "OK".bold().green());
-                } else if serde_json::from_str::<crate::pkg::purl::RegistryIndex>(&content).is_ok()
-                {
-                    println!("{} file matches packages.json spec.", "OK".bold().green());
-                } else {
-                    return Err(anyhow!(
-                        "File does not match any known Zoi JSON spec (registries.json, advisories.json, or packages.json)"
-                    ));
-                }
-            } else if file.extension().and_then(|e| e.to_str()) == Some("yaml")
-                || file.extension().and_then(|e| e.to_str()) == Some("yml")
+        } else if file.extension().and_then(|e| e.to_str()) == Some("json") {
+            if serde_json::from_str::<crate::pkg::purl::CentralDbSpec>(&content).is_ok() {
+                println!("{} file matches registries.json spec.", "OK".bold().green());
+            } else if serde_json::from_str::<crate::pkg::types::AdvisoryRegistry>(&content)
+                .is_ok()
             {
-                if serde_yaml::from_str::<crate::pkg::types::RepoConfig>(&content).is_ok() {
-                    println!("{} file matches repo.yaml spec.", "OK".bold().green());
-                } else if serde_yaml::from_str::<crate::pkg::types::Advisory>(&content).is_ok() {
-                    println!("{} file matches .sec.yaml spec.", "OK".bold().green());
-                } else {
-                    return Err(anyhow!(
-                        "File does not match any known Zoi YAML spec (repo.yaml or .sec.yaml)"
-                    ));
-                }
+                println!("{} file matches advisories.json spec.", "OK".bold().green());
+            } else if serde_json::from_str::<crate::pkg::purl::RegistryIndex>(&content).is_ok()
+            {
+                println!("{} file matches packages.json spec.", "OK".bold().green());
             } else {
                 return Err(anyhow!(
-                    "Unsupported file extension. Please provide a .json or .yaml file"
+                    "File does not match any known Zoi JSON spec (registries.json, advisories.json, or packages.json)"
                 ));
             }
+        } else if file.extension().and_then(|e| e.to_str()) == Some("yaml")
+            || file.extension().and_then(|e| e.to_str()) == Some("yml")
+        {
+            if serde_yaml::from_str::<crate::pkg::types::RepoConfig>(&content).is_ok() {
+                println!("{} file matches repo.yaml spec.", "OK".bold().green());
+            } else if serde_yaml::from_str::<crate::pkg::types::Advisory>(&content).is_ok() {
+                println!("{} file matches .sec.yaml spec.", "OK".bold().green());
+            } else {
+                return Err(anyhow!(
+                    "File does not match any known Zoi YAML spec (repo.yaml or .sec.yaml)"
+                ));
+            }
+        } else {
+            return Err(anyhow!(
+                "Unsupported file extension. Please provide a .json or .yaml file"
+            ));
         }
 
         Ok(())

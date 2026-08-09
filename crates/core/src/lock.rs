@@ -1,5 +1,5 @@
 use anyhow::{Result, anyhow};
-use colored::*;
+use colored::Colorize;
 use fs2::FileExt;
 use std::fs;
 use std::io::{Read, Seek, SeekFrom, Write};
@@ -22,6 +22,10 @@ fn get_lock_path() -> Result<PathBuf> {
 ///
 /// This ensures that operations like `install`, `uninstall`, and `update` never
 /// run simultaneously, preventing database and filesystem corruption.
+///
+/// # Errors
+///
+/// Returns an error if the lock cannot be acquired or if file operations fail.
 pub fn acquire_lock() -> Result<LockGuard> {
     if std::env::var("ZOI_SKIP_LOCK").is_ok_and(|v| v == "1") {
         return Ok(LockGuard::noop());
@@ -51,10 +55,10 @@ pub fn acquire_lock() -> Result<LockGuard> {
             let _ = f.read_to_string(&mut content);
         }
 
-        let pid_info = if !content.trim().is_empty() {
-            format!(" (held by PID {})", content.trim())
-        } else {
+        let pid_info = if content.trim().is_empty() {
             String::new()
+        } else {
+            format!(" (held by PID {})", content.trim())
         };
 
         eprintln!(
@@ -77,11 +81,15 @@ pub fn acquire_lock() -> Result<LockGuard> {
 
     Ok(LockGuard {
         path: Some(lock_path),
-        _file: Some(file),
+        file: Some(file),
     })
 }
 
 /// Releases the system-wide lock if it exists.
+///
+/// # Errors
+///
+/// Returns an error if the lock path cannot be determined.
 pub fn release_lock() -> Result<()> {
     let lock_path = get_lock_path()?;
     if lock_path.exists() {
@@ -95,7 +103,7 @@ pub struct LockGuard {
     /// The path to the lock file.
     path: Option<PathBuf>,
     /// The file handle holding the lock.
-    _file: Option<fs::File>,
+    file: Option<fs::File>,
 }
 
 impl LockGuard {
@@ -103,7 +111,7 @@ impl LockGuard {
     pub fn noop() -> Self {
         Self {
             path: None,
-            _file: None,
+            file: None,
         }
     }
 }
@@ -111,12 +119,12 @@ impl LockGuard {
 impl Drop for LockGuard {
     fn drop(&mut self) {
         if let Some(path) = self.path.take() {
-            self._file.take();
+            self.file.take();
 
             if path.exists()
                 && let Err(e) = fs::remove_file(&path)
             {
-                debug_assert!(false, "Failed to remove lock file: {}", e);
+                debug_assert!(false, "Failed to remove lock file: {e}");
             }
         }
     }

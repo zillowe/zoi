@@ -15,10 +15,10 @@ fn test_config_3way_merge_integration() {
 
     // Set up a local Zoi registry
     let reg_dir = root.join("my-registry");
-    fs::create_dir_all(&reg_dir).unwrap();
+    fs::create_dir_all(&reg_dir).expect("unwrap failed");
 
     // Initialize registry metadata
-    zoi::pkg::registry::init(&reg_dir).unwrap();
+    zoi::pkg::registry::init(&reg_dir).expect("unwrap failed");
 
     let pkg_name = "test-merge";
     let version_v1 = "1.0.0";
@@ -27,40 +27,39 @@ fn test_config_3way_merge_integration() {
 
     // Add package v1
     let pkg_repo_dir = reg_dir.join("main").join(pkg_name);
-    fs::create_dir_all(&pkg_repo_dir).unwrap();
+    fs::create_dir_all(&pkg_repo_dir).expect("unwrap failed");
 
     let base_config_content = "setting_a = 10\nsetting_b = 20\n";
-    fs::write(pkg_repo_dir.join("config.txt"), base_config_content).unwrap();
+    fs::write(pkg_repo_dir.join("config.txt"), base_config_content).expect("unwrap failed");
 
     let lua_v1 = format!(
         r#"
 metadata({{
-    name = "{}",
+    name = "{pkg_name}",
     repo = "main",
-    version = "{}",
+    version = "{version_v1}",
     description = "test merge",
     maintainer = {{ name = "test", email = "test@example.com" }},
     types = {{ "source" }},
-    backup = {{ "{}" }}
+    backup = {{ "{config_rel}" }}
 }})
 
 function package()
-    zcp("${{pkgluadir}}/config.txt", "${{pkgstore}}/{}")
+    zcp("${{pkgluadir}}/config.txt", "${{pkgstore}}/{config_rel}")
 end
-"#,
-        pkg_name, version_v1, config_rel, config_rel
+"#
     );
-    fs::write(pkg_repo_dir.join(format!("{}.pkg.lua", pkg_name)), lua_v1).unwrap();
+    fs::write(pkg_repo_dir.join(format!("{pkg_name}.pkg.lua")), lua_v1).expect("unwrap failed");
 
     // Generate metadata and commit to make it a valid git repo
-    zoi::pkg::registry::generate_metadata(&reg_dir).unwrap();
+    zoi::pkg::registry::generate_metadata(&reg_dir).expect("unwrap failed");
 
     let run_git = |args: &[&str], dir: &std::path::Path| {
         let status = Command::new("git")
             .args(args)
             .current_dir(dir)
             .status()
-            .unwrap();
+            .expect("unwrap failed");
         assert!(status.success());
     };
 
@@ -74,11 +73,11 @@ end
 
     // Set up Sysroot and isolated Config
     let sysroot = root.join("sysroot");
-    fs::create_dir_all(&sysroot).unwrap();
-    ctx.set_sysroot(sysroot.clone());
+    fs::create_dir_all(&sysroot).expect("unwrap failed");
+    common::TestContextGuard::set_sysroot(sysroot.clone());
 
     let system_config_dir = sysroot.join("etc").join("zoi");
-    fs::create_dir_all(&system_config_dir).unwrap();
+    fs::create_dir_all(&system_config_dir).expect("unwrap failed");
     fs::write(
         system_config_dir.join("config.yaml"),
         format!(
@@ -95,13 +94,13 @@ policy:
             reg_dir.to_string_lossy()
         ),
     )
-    .unwrap();
+    .expect("unwrap failed");
 
     ctx.set_env_var("HOME", root.join("home"));
     ctx.set_current_dir(&root);
 
     // Sync and Install v1
-    zoi::cmd::sync::run(false, false, false, false, None).unwrap();
+    zoi::cmd::sync::run(false, false, false, false, None).expect("unwrap failed");
 
     zoi::install_sources(
         &[pkg_name.to_string()],
@@ -121,7 +120,7 @@ policy:
         pkg_name,
         version_v1,
     )
-    .unwrap();
+    .expect("unwrap failed");
     let config_path_v1 = store_dir.join(config_rel);
     let orig_path_v1 = config_path_v1.with_extension("txt.zoiorig");
     assert!(
@@ -131,38 +130,37 @@ policy:
 
     // User modifies config
     let user_modified_content = "setting_a = 99\nsetting_b = 20\n";
-    fs::write(&config_path_v1, user_modified_content).unwrap();
+    fs::write(&config_path_v1, user_modified_content).expect("unwrap failed");
 
     // Update registry to v2
     let upstream_v2_content = "setting_a = 10\nsetting_b = 20\nsetting_c = 30\n";
-    fs::write(pkg_repo_dir.join("config.txt"), upstream_v2_content).unwrap();
+    fs::write(pkg_repo_dir.join("config.txt"), upstream_v2_content).expect("unwrap failed");
 
     let lua_v2 = format!(
         r#"
 metadata({{
-    name = "{}",
+    name = "{pkg_name}",
     repo = "main",
-    version = "{}",
+    version = "{version_v2}",
     description = "test merge",
     maintainer = {{ name = "test", email = "test@example.com" }},
     types = {{ "source" }},
-    backup = {{ "{}" }}
+    backup = {{ "{config_rel}" }}
 }})
 
 function package()
-    zcp("${{pkgluadir}}/config.txt", "${{pkgstore}}/{}")
+    zcp("${{pkgluadir}}/config.txt", "${{pkgstore}}/{config_rel}")
 end
-"#,
-        pkg_name, version_v2, config_rel, config_rel
+"#
     );
-    fs::write(pkg_repo_dir.join(format!("{}.pkg.lua", pkg_name)), lua_v2).unwrap();
+    fs::write(pkg_repo_dir.join(format!("{pkg_name}.pkg.lua")), lua_v2).expect("unwrap failed");
 
-    zoi::pkg::registry::generate_metadata(&reg_dir).unwrap();
+    zoi::pkg::registry::generate_metadata(&reg_dir).expect("unwrap failed");
     run_git(&["add", "."], &reg_dir);
     run_git(&["commit", "-m", "v2"], &reg_dir);
 
     // Sync and Update
-    zoi::cmd::sync::run(false, false, false, false, None).unwrap();
+    zoi::cmd::sync::run(false, false, false, false, None).expect("unwrap failed");
     zoi::update_packages(true, &[], true).expect("v2 upgrade failed");
 
     // Verify result
@@ -173,10 +171,10 @@ end
         pkg_name,
         version_v2,
     )
-    .unwrap();
+    .expect("unwrap failed");
     let config_path_v2 = store_dir_v2.join(config_rel);
 
-    let actual_content = fs::read_to_string(&config_path_v2).unwrap();
+    let actual_content = fs::read_to_string(&config_path_v2).expect("unwrap failed");
     let expected_content = "setting_a = 99\nsetting_b = 20\nsetting_c = 30\n";
     assert_eq!(
         actual_content, expected_content,

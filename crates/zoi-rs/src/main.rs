@@ -1,6 +1,6 @@
 //! The primary executable for the Zoi package manager.
 
-use colored::*;
+use colored::Colorize;
 
 /// The primary entry point for the Zoi CLI and its intelligent shims.
 ///
@@ -15,8 +15,9 @@ fn main() {
     colored::control::set_virtual_terminal(true).ok();
 
     let args: Vec<String> = std::env::args().collect();
-    let program_name = std::path::Path::new(&args[0])
-        .file_name()
+    let program_name = args
+        .first()
+        .and_then(|path| std::path::Path::new(path).file_name())
         .and_then(|s| s.to_str())
         .unwrap_or_default();
 
@@ -50,7 +51,7 @@ fn main() {
         // - Install it into the appropriate store scope.
         // - Seamlessly continue the original execution.
         let auto_install = |name: &str, version: &str| -> anyhow::Result<()> {
-            let spec = format!("{}@{}", name, version);
+            let spec = format!("{name}@{version}");
             let scope = if std::path::Path::new("zoi.yaml").exists() {
                 zoi_cli::pkg::types::Scope::Project
             } else {
@@ -87,7 +88,7 @@ fn main() {
 
         if let Err(e) = zoi_cli::pkg::shim::run_shim(
             program_name,
-            args[1..].to_vec(),
+            args.get(1..).unwrap_or_default().to_vec(),
             Some(&plugin_manager),
             Some(&auto_install),
         ) {

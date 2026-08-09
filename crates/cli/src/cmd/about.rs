@@ -1,6 +1,6 @@
 //! The about command displays information about Zoi.
 use crate::utils;
-use colored::*;
+use colored::Colorize;
 
 /// The description of the application.
 const DESCRIPTION: &str = "Zoi - Advanced Package Manager & Environment Orchestrator.\n  Part of the Zillowe Development Suite (ZDS)";
