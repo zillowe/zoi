@@ -1,19 +1,26 @@
 # Packaging
 
-This document provides guidance for packagers on how to build and package Zoi for various distributions and package managers.
+This document provides guidance for packagers on how to build and package Zoi
+for various distributions and package managers.
 
 ## Dependencies
 
-Zoi has several dependencies that need to be installed for building from source and for full functionality at runtime.
+Zoi has several dependencies that need to be installed for building from source
+and for full functionality at runtime.
 
-#### Build-time Dependencies
+### Build-time Dependencies
 
 These are required to compile Zoi from source.
 
-- **Rust**: Current minimum version is `1.92.0` 2024 edition from the stable channel (see [`rust-toolchain.toml`](./rust-toolchain.toml) for the channel and [`Cargo.toml`](./Cargo.toml) for the Rust version and edition).
-- **C Compiler**: A C compiler like `gcc` is required. Packages like `build-essential` (Debian/Ubuntu) or `base-devel` (Arch Linux) usually provide this.
-- **Clang/LLVM**: `clang` and `libclang-dev` (Debian/Ubuntu) or `clang-devel` (Fedora) are required for `bindgen` (used by `openssl-sys` and other crates).
-- **OpenSSL**: The development libraries for OpenSSL are required. This is usually `libssl-dev` (Debian/Ubuntu) or `openssl-devel` (Fedora/CentOS).
+- **Rust**: Current minimum version is `1.92.0` 2024 edition from the stable
+channel (see [`rust-toolchain.toml`](./rust-toolchain.toml) for the channel and
+[`Cargo.toml`](./Cargo.toml) for the Rust version and edition).
+- **C Compiler**: A C compiler like `gcc` is required. Packages like
+`build-essential` (Debian/Ubuntu) or `base-devel` (Arch Linux) usually provide this.
+- **Clang/LLVM**: `clang` and `libclang-dev` (Debian/Ubuntu) or `clang-devel`
+(Fedora) are required for `bindgen` (used by `openssl-sys` and other crates).
+- **OpenSSL**: The development libraries for OpenSSL are required. This is
+usually `libssl-dev` (Debian/Ubuntu) or `openssl-devel` (Fedora/CentOS).
 - **pkg-config**: The `pkg-config` utility is needed to locate libraries.
 - **liblzma**: The development libraries for lzma (`liblzma-dev`).
 - **Git**: Required to embed the commit hash in the binary version information.
@@ -23,7 +30,8 @@ These are required to compile Zoi from source.
 These are required for Zoi to run correctly after installation.
 
 - **Essential:**
-  - `git`: Required for interacting with git repositories (e.g. cloning packages, syncing the database).
+  - `git`: Required for interacting with git repositories
+  (e.g. cloning packages, syncing the database).
 
 ## Build Process
 
@@ -31,7 +39,8 @@ Zoi can be built from source using several methods.
 
 ### Using Cargo
 
-This is the standard way to build Rust projects. The build process can be influenced by environment variables (see [Environment Variables](#environment-variables)).
+This is the standard way to build Rust projects. The build process can be
+influenced by environment variables (see [Environment Variables](#environment-variables)).
 
 ```sh
 # Build zoi in release mode
@@ -48,7 +57,8 @@ This will produce the `zoi`, `zoi-mini`, and `zoid` binaries in `target/release/
 
 ### Using the Justfile
 
-The project provides a `Justfile` for convenience, which simplifies building and installing.
+The project provides a `Justfile` for convenience, which simplifies building
+and installing.
 
 ```sh
 # Configure build paths (creates config.just)
@@ -64,17 +74,22 @@ sudo just install
 
 ### Using Build Scripts
 
-The `scripts/` directory contains scripts for creating release builds for different platforms. These are used in our CI/CD pipeline.
+The `scripts/` directory contains scripts for creating release builds for
+different platforms. These are used in our CI/CD pipeline.
 
-- `scripts/build-linux.sh`: Builds for Linux (amd64, arm64) and cross-compiles for Windows (amd64).
+- `scripts/build-linux.sh`: Builds for Linux (amd64, arm64) and cross-compiles
+for Windows (amd64).
 - `scripts/build-macos.sh`: Builds for macOS (amd64, arm64).
-- `scripts/build-release.sh` & `build-release.ps1`: Helper scripts for creating a single release build on the current platform.
+- `scripts/build-release.sh` & `build-release.ps1`: Helper scripts for creating
+a single release build on the current platform.
 
-These scripts embed the current git commit hash into the binary via the `ZOI_COMMIT_HASH` environment variable.
+These scripts embed the current git commit hash into the binary via the
+`ZOI_COMMIT_HASH` environment variable.
 
 ### Building .deb and .rpm Packages
 
-Zoi supports generating `.deb` and `.rpm` packages for Linux distributions using `cargo-deb` and `cargo-generate-rpm`.
+Zoi supports generating `.deb` and `.rpm` packages for Linux distributions
+using `cargo-deb` and `cargo-generate-rpm`.
 
 #### Debian/Ubuntu (.deb)
 
@@ -100,7 +115,8 @@ The resulting package will be located in `target/generate-rpm/`.
 
 ### Building the Docker Image Locally
 
-A `Dockerfile` is provided to build Zoi in a containerized environment. This is useful for creating reproducible builds or for custom image configurations.
+A `Dockerfile` is provided to build Zoi in a containerized environment.
+This is useful for creating reproducible builds or for custom image configurations.
 
 ```sh
 # Build the docker image
@@ -117,9 +133,13 @@ docker build \
 
 ### Using the Official Zoi CLI Docker Image
 
-For CI/CD pipelines or environments where you need a pre-built Zoi CLI, an official Docker image is available on the GitLab Container Registry. This image contains the `zoi` binary and its runtime dependencies, making it suitable for tasks like building Zoi packages.
+For CI/CD pipelines or environments where you need a pre-built Zoi CLI, an
+official Docker image is available on the GitLab Container Registry.
+This image contains the `zoi` binary and its runtime dependencies,
+making it suitable for tasks like building Zoi packages.
 
-The image is tagged with both the specific release version (e.g. `zoi:Prod-Release-1.16.1`) and `zoi:latest`.
+The image is tagged with both the specific release version
+(e.g. `zoi:Prod-Release-1.16.1`) and `zoi:latest`.
 
 ```sh
 # Pull the latest Zoi CLI image
@@ -136,30 +156,53 @@ my-job:
 
 Zoi uses a few environment variables at build time.
 
-- **`ZOI_COMMIT_HASH`**: Embeds the git commit hash into the binary. This is used by the `zoi version` command. The build scripts in `scripts/` set this automatically.
-- **`POSTHOG_API_KEY`** & **`POSTHOG_API_HOST`**: These are used to configure the optional, opt-in telemetry feature. They can be set in a `.env` file at the root of the project or passed as build arguments to Docker. The `.env.example` file shows the format.
-- **`ZOI_DEFAULT_REGISTRY`**: Sets the default package registry URL. This is used when no registry is configured by the user. It can be set in a `.env` file or as a build argument to Docker.
-- **`ZOI_AUTHORITIES_KEY_1`** to **`ZOI_AUTHORITIES_KEY_9`**: Sets the trusted PGP fingerprints or key names for the default registry. These define the "Root of Trust" for verifying Git commit signatures during `zoi sync`.
-- **`ZOI_ABOUT_PACKAGER_AUTHOR`**, **`ZOI_ABOUT_PACKAGER_EMAIL`**, **`ZOI_ABOUT_PACKAGER_HOMEPAGE`**: Allows a packager to embed their own contact details into the binary. This information is displayed in the `zoi about` command output, which is useful for users of a specific package to identify the package maintainer.
+- **`ZOI_COMMIT_HASH`**: Embeds the git commit hash into the binary.
+This is used by the `zoi version` command. The build scripts in `scripts/`
+set this automatically.
+- **`POSTHOG_API_KEY`** & **`POSTHOG_API_HOST`**: These are used to configure
+the optional, opt-in telemetry feature. They can be set in a `.env` file at
+the root of the project or passed as build arguments to Docker.
+The `.env.example` file shows the format.
+- **`ZOI_DEFAULT_REGISTRY`**: Sets the default package registry URL.
+This is used when no registry is configured by the user.
+It can be set in a `.env` file or as a build argument to Docker.
+- **`ZOI_AUTHORITIES_KEY_1`** to **`ZOI_AUTHORITIES_KEY_9`**: Sets the trusted
+PGP fingerprints or key names for the default registry.
+These define the "Root of Trust" for verifying Git commit signatures during `zoi sync`.
+- **`ZOI_ABOUT_PACKAGER_AUTHOR`**, **`ZOI_ABOUT_PACKAGER_EMAIL`**,
+**`ZOI_ABOUT_PACKAGER_HOMEPAGE`**: Allows a packager to embed their own contact
+details into the binary. This information is displayed in the `zoi about`
+command output, which is useful for users of a specific package to identify
+the package maintainer.
 
 ## Built-in PGP Keyring
 
-Zoi supports baking trusted PGP public keys directly into the binary. Any `.asc` file placed in the `crates/core/src/builtin/pgp/` directory will be embedded at build time.
+Zoi supports baking trusted PGP public keys directly into the binary.
+Any `.asc` file placed in the `crates/core/src/builtin/pgp/` directory will
+be embedded at build time.
 
-On startup, Zoi automatically imports these embedded keys into the user's local keyring (`~/.zoi/pgps/`). This is the recommended way to distribute "Root of Trust" keys for custom or internal registries.
+On startup, Zoi automatically imports these embedded keys into the user's
+local keyring (`~/.zoi/pgps/`). This is the recommended way to distribute
+"Root of Trust" keys for custom or internal registries.
 
 ## Embedding Global Hooks
 
-Similar to PGP keys, Zoi can embed global transaction hooks directly into the binary. These hooks are YAML files that define system-wide maintenance tasks triggered by file modifications.
+Similar to PGP keys, Zoi can embed global transaction hooks directly into
+the binary. These hooks are YAML files that define system-wide maintenance
+tasks triggered by file modifications.
 
-1. Place your hook definition files (`.hook.yaml`) in the `crates/core/src/builtin/hooks/` directory.
+1. Place your hook definition files (`.hook.yaml`) in the
+`crates/core/src/builtin/hooks/` directory.
 2. Build Zoi as usual.
 
-The build system will automatically embed these hooks. They are loaded on every transaction and can be overridden by users in `~/.zoi/hooks/` if they use the same name.
+The build system will automatically embed these hooks.
+They are loaded on every transaction and can be overridden by users in
+`~/.zoi/hooks/` if they use the same name.
 
 ## Completions and Man Pages
 
-Zoi provides commands to generate shell completions and man pages. These should be included in the package.
+Zoi provides commands to generate shell completions and man pages.
+These should be included in the package.
 
 - **Shell Completions:**
   Completions can be generated for various shells using the `shell` command:
@@ -175,7 +218,9 @@ Zoi provides commands to generate shell completions and man pages. These should 
   Where `<shell>` can be `bash`, `fish`, `zsh`, etc.
 
 - **Man Pages:**
-  The man pages can be generated using the `generate-manual` command. This will create a `manuals/` directory containing man pages for `zoi` and all of its subcommands.
+  The man pages can be generated using the `generate-manual` command.
+This will create a `manuals/` directory containing man pages for `zoi` and
+all of its subcommands.
 
   ```sh
   ./target/release/zoi generate-manual
@@ -184,11 +229,13 @@ Zoi provides commands to generate shell completions and man pages. These should 
   # This creates `zoi.1`, `zoi-install.1`, etc. in `dist/man/`
   ```
 
-  These files should be installed to the appropriate man page directory (e.g. `/usr/share/man/man1`).
+  These files should be installed to the appropriate man page directory
+  (e.g. `/usr/share/man/man1`).
 
 ## Existing Packaging Files
 
-We maintain packaging files for several package managers in the `packages/` directory. These can be used as a reference.
+We maintain packaging files for several package managers in the `packages/`
+directory. These can be used as a reference.
 
 ### Arch Linux (AUR)
 

@@ -1,10 +1,10 @@
-# Install Zoi on your system
+# Install
 
 You can install Zoi using a package manager, an installer script, or by building it from source.
 
 ## Scripts
 
-You can also use our installer scripts for a quick setup.
+You can use our installer scripts for a quick setup.
 
 **Linux / macOS :**
 
@@ -32,7 +32,9 @@ Install Zoi on Linux distros.
 
 #### Arch Linux (AUR)
 
-Install [`zoi-bin`](https://aur.archlinux.org/packages/zoi-bin) (Pre-compiled binary) or [`zoi`](https://aur.archlinux.org/packages/zoi) (built from source) from the AUR using your favorite helper (e.g. `yay`, `paru`):
+Install [`zoi-bin`](https://aur.archlinux.org/packages/zoi-bin)
+(Pre-compiled binary) or [`zoi`](https://aur.archlinux.org/packages/zoi)
+(built from source) from the AUR using your favorite helper (e.g. `yay`, `paru`):
 
 ```sh
 paru -S zoi-bin
@@ -48,7 +50,9 @@ makepkg -si
 
 #### Debian / Ubuntu (.deb)
 
-Download the `.deb` package for your architecture from the [latest release](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases) and install it using `apt` or `dpkg`:
+Download the `.deb` package for your architecture from the
+[latest release](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases)
+and install it using `apt` or `dpkg`:
 
 ```sh
 # Using apt (recommended, handles dependencies)
@@ -60,7 +64,9 @@ sudo dpkg -i zoi-*.deb
 
 #### Fedora / RHEL (.rpm)
 
-Download the `.rpm` package for your architecture from the [latest release](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases) and install it using `dnf` or `rpm`:
+Download the `.rpm` package for your architecture from the
+[latest release](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases)
+and install it using `dnf` or `rpm`:
 
 ```sh
 # Using dnf (recommended)
@@ -70,18 +76,16 @@ sudo dnf install ./zoi-*.rpm
 sudo rpm -i zoi-*.rpm
 ```
 
-#### Fedora (COPR)
-
-Install `zoi` from Fedora [COPR](https://copr.fedorainfracloud.org/coprs/zillowez/zoi/) (Supports Fedora 43, 44, Rawhide, CentOS Stream 9/10, EPEL 9, and openSUSE Tumbleweed):
+Or you can install Zoi from Fedora
+[COPR](https://copr.fedorainfracloud.org/coprs/zillowez/zoi/)
+(Supports Fedora 43, 44, Rawhide, CentOS Stream 9/10, EPEL 9, and openSUSE Tumbleweed):
 
 ```sh
 sudo dnf copr enable zillowez/zoi
 sudo dnf install zoi
 ```
 
-#### Fedora (Terra)
-
-Install `zoi-rs` on Fedora from [Terra](https://terra.fyralabs.com) repo (not maintained by us so updates can be late, uses [Crates.io](#cratesio) version):
+Or you can install `zoi-rs` on Fedora from [Terra](https://terra.fyralabs.com) repo:
 
 ```sh
 # add terra repo
@@ -90,7 +94,8 @@ dnf install --nogpgcheck --repofrompath 'terra,https://repos.fyralabs.com/terra$
 sudo dnf install zoi-rs
 ```
 
-More information and instructions for using Terra are available [here](https://developer.fyralabs.com/terra/installing).
+More information and instructions for using Terra are available
+[here](https://developer.fyralabs.com/terra/installing).
 
 ### macOS
 
@@ -138,7 +143,8 @@ yarn dlx @zillowe/zoi
 
 ## Build from Source
 
-If you prefer, you can build Zoi from source. You'll need [Rust](https://www.rust-lang.org) installed.
+If you prefer, you can build Zoi from source.
+You'll need [Rust](https://www.rust-lang.org) installed.
 
 **Build the release binary:**
 
