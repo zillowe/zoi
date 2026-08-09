@@ -1,8 +1,3 @@
-use anyhow::{Result, anyhow};
-use clap_complete::Shell;
-use colored::Colorize;
-use crossterm::tty::IsTty;
-use sha2::{Digest, Sha512};
 use std::collections::HashMap;
 use std::fs;
 use std::io::{Write, stdin, stdout};
@@ -11,135 +6,158 @@ use std::process::Command;
 use std::sync::OnceLock;
 use std::time::Duration;
 
+use anyhow::{Result, anyhow};
+use clap_complete::Shell;
+use colored::Colorize;
+use crossterm::tty::IsTty;
 #[cfg(unix)]
 use nix;
+use sha2::{Digest, Sha512};
 
 /// Creates an HTTP client with Zoi's default configuration.
 ///
 /// # Errors
 ///
-/// Returns an error if Zoi is in offline mode or if the HTTP client cannot be built.
-pub fn get_http_client() -> Result<&'static reqwest::blocking::Client> {
-    static HTTP_CLIENT: OnceLock<reqwest::blocking::Client> = OnceLock::new();
+/// Returns an error if Zoi is in offline mode or if the HTTP client cannot be
+/// built.
+pub fn get_http_client() -> Result<&'static reqwest::blocking::Client,> {
+    static HTTP_CLIENT: OnceLock<reqwest::blocking::Client,> = OnceLock::new();
     if crate::offline::is_offline() {
         return Err(anyhow!(
             "Cannot create HTTP client: Zoi is in offline mode."
-        ));
+        ),);
     }
-    if let Some(client) = HTTP_CLIENT.get() {
-        return Ok(client);
+    if let Some(client,) = HTTP_CLIENT.get() {
+        return Ok(client,);
     }
     let client = reqwest::blocking::Client::builder()
-        .user_agent("zoi")
-        .timeout(Duration::from_mins(1))
+        .user_agent("zoi",)
+        .timeout(Duration::from_mins(1,),)
         .use_rustls_tls()
         .build()
-        .map_err(|e| anyhow!("Failed to build HTTP client: {e}"))?;
-    let _ = HTTP_CLIENT.set(client);
+        .map_err(|e| anyhow!("Failed to build HTTP client: {e}"),)?;
+    let _ = HTTP_CLIENT.set(client,);
     HTTP_CLIENT
         .get()
-        .ok_or_else(|| anyhow!("HTTP_CLIENT should be set but was missing"))
+        .ok_or_else(|| anyhow!("HTTP_CLIENT should be set but was missing"),)
 }
 
 /// Builds a blocking HTTP client with a custom timeout.
 ///
 /// # Errors
 ///
-/// Returns an error if Zoi is in offline mode or if the HTTP client cannot be built.
-pub fn build_blocking_http_client(timeout_secs: u64) -> Result<reqwest::blocking::Client> {
+/// Returns an error if Zoi is in offline mode or if the HTTP client cannot be
+/// built.
+pub fn build_blocking_http_client(
+    timeout_secs: u64,
+) -> Result<reqwest::blocking::Client,> {
     if crate::offline::is_offline() {
         return Err(anyhow!(
             "Cannot create HTTP client: Zoi is in offline mode."
-        ));
+        ),);
     }
     let client = reqwest::blocking::Client::builder()
-        .user_agent("zoi")
-        .timeout(Duration::from_secs(timeout_secs))
+        .user_agent("zoi",)
+        .timeout(Duration::from_secs(timeout_secs,),)
         .use_rustls_tls()
         .build()?;
-    Ok(client)
+    Ok(client,)
 }
 
-/// Creates a symbolic link for a directory, handling platform-specific requirements.
+/// Creates a symbolic link for a directory, handling platform-specific
+/// requirements.
 ///
 /// # Errors
 ///
 /// Returns an error if the symlink or directory operations fail.
-pub fn symlink_dir(target: &Path, link: &Path) -> std::io::Result<()> {
+pub fn symlink_dir(target: &Path, link: &Path,) -> std::io::Result<(),> {
     if link.exists() || link.is_symlink() {
         if link.is_dir() && !link.is_symlink() {
-            fs::remove_dir_all(link)?;
+            fs::remove_dir_all(link,)?;
         } else {
-            fs::remove_file(link)?;
+            fs::remove_file(link,)?;
         }
     }
     #[cfg(unix)]
     {
-        std::os::unix::fs::symlink(target, link)?;
+        std::os::unix::fs::symlink(target, link,)?;
     }
     #[cfg(windows)]
     {
-        if std::os::windows::fs::symlink_dir(target, link).is_err() {
-            if junction::create(target, link).is_err() {
-                copy_dir_all(target, link)?;
+        if std::os::windows::fs::symlink_dir(target, link,).is_err() {
+            if junction::create(target, link,).is_err() {
+                copy_dir_all(target, link,)?;
             }
         }
     }
-    Ok(())
+    Ok((),)
 }
 
 /// Checks if a command exists in the system's PATH.
-pub fn command_exists(command: &str) -> bool {
+pub fn command_exists(command: &str,) -> bool {
     if cfg!(target_os = "windows") {
-        Command::new("where")
-            .arg(command)
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
+        Command::new("where",)
+            .arg(command,)
+            .stdout(std::process::Stdio::null(),)
+            .stderr(std::process::Stdio::null(),)
             .status()
-            .is_ok_and(|status| status.success())
+            .is_ok_and(|status| status.success(),)
     } else {
-        Command::new("bash")
-            .arg("-c")
-            .arg(format!("command -v {command}"))
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
+        Command::new("bash",)
+            .arg("-c",)
+            .arg(format!("command -v {command}"),)
+            .stdout(std::process::Stdio::null(),)
+            .stderr(std::process::Stdio::null(),)
             .status()
-            .is_ok_and(|status| status.success())
+            .is_ok_and(|status| status.success(),)
     }
 }
 
-/// Returns a standard Zoi platform identifier (e.g. "linux-amd64", "windows-arm64").
+/// Returns a standard Zoi platform identifier (e.g. "linux-amd64",
+/// "windows-arm64").
 ///
 /// This string is used extensively in registries and package definitions to
 /// handle platform-specific dependencies and build artifacts.
 ///
 /// # Errors
 ///
-/// Returns an error if the current operating system or architecture is unsupported.
-pub fn get_platform() -> Result<String> {
+/// Returns an error if the current operating system or architecture is
+/// unsupported.
+pub fn get_platform() -> Result<String,> {
     let os = match std::env::consts::OS {
         "linux" => "linux",
         "macos" | "darwin" => "macos",
         "windows" => "windows",
-        unsupported_os => return Err(anyhow!("Unsupported operating system: {unsupported_os}")),
+        unsupported_os => {
+            return Err(anyhow!(
+                "Unsupported operating system: {unsupported_os}"
+            ),);
+        }
     };
     let arch = match std::env::consts::ARCH {
         "x86_64" | "amd64" => "amd64",
         "aarch64" | "arm64" => "arm64",
         "x86" | "i386" | "i686" => "386",
-        unsupported_arch => return Err(anyhow!("Unsupported architecture: {unsupported_arch}")),
+        unsupported_arch => {
+            return Err(anyhow!(
+                "Unsupported architecture: {unsupported_arch}"
+            ),);
+        }
     };
-    Ok(format!("{os}-{arch}"))
+    Ok(format!("{os}-{arch}"),)
 }
 
-/// Returns the home directory of the current user, or the original user if run via sudo or doas.
-pub fn get_user_home() -> Option<PathBuf> {
-    if let Ok(user_var) = std::env::var("SUDO_USER").or_else(|_| std::env::var("DOAS_USER")) {
+/// Returns the home directory of the current user, or the original user if run
+/// via sudo or doas.
+pub fn get_user_home() -> Option<PathBuf,> {
+    if let Ok(user_var,) =
+        std::env::var("SUDO_USER",).or_else(|_| std::env::var("DOAS_USER",),)
+    {
         #[cfg(unix)]
         {
             use nix::unistd::User;
-            if let Ok(Some(user)) = User::from_name(&user_var) {
-                return Some(user.dir);
+            if let Ok(Some(user,),) = User::from_name(&user_var,) {
+                return Some(user.dir,);
             }
         }
         #[cfg(not(unix))]
@@ -153,47 +171,50 @@ pub fn get_user_home() -> Option<PathBuf> {
 /// # Errors
 ///
 /// Returns an error if the home directory cannot be determined.
-pub fn get_db_root() -> Result<std::path::PathBuf> {
-    if let Ok(path) = std::env::var("ZOI_DB_DIR") {
-        return Ok(std::path::PathBuf::from(path));
+pub fn get_db_root() -> Result<std::path::PathBuf,> {
+    if let Ok(path,) = std::env::var("ZOI_DB_DIR",) {
+        return Ok(std::path::PathBuf::from(path,),);
     }
-    let home_dir = get_user_home().ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(home_dir.join(".zoi").join("pkgs").join("db"))
+    let home_dir = get_user_home()
+        .ok_or_else(|| anyhow!("Could not find home directory."),)?;
+    Ok(home_dir.join(".zoi",).join("pkgs",).join("db",),)
 }
 
 /// Returns the root directory of the package store for a given scope.
 ///
 /// Store Locations:
 /// - `User`: `~/.zoi/pkgs/store/`
-/// - `System`: `/var/lib/zoi/pkgs/store/` (Linux) or `C:\ProgramData\zoi\pkgs\store` (Windows)
+/// - `System`: `/var/lib/zoi/pkgs/store/` (Linux) or
+///   `C:\ProgramData\zoi\pkgs\store` (Windows)
 /// - `Project`: `./.zoi/pkgs/store/` (Relative to current project root)
 ///
 /// # Errors
 ///
-/// Returns an error if the home directory or current directory cannot be determined.
-pub fn get_store_base_dir(scope: crate::types::Scope) -> Result<PathBuf> {
+/// Returns an error if the home directory or current directory cannot be
+/// determined.
+pub fn get_store_base_dir(scope: crate::types::Scope,) -> Result<PathBuf,> {
     match scope {
         crate::types::Scope::User => {
-            let home_dir =
-                get_user_home().ok_or_else(|| anyhow!("Could not find home directory."))?;
+            let home_dir = get_user_home()
+                .ok_or_else(|| anyhow!("Could not find home directory."),)?;
             Ok(crate::sysroot::apply_sysroot(
-                home_dir.join(".zoi").join("pkgs").join("store"),
-            ))
+                home_dir.join(".zoi",).join("pkgs",).join("store",),
+            ),)
         }
         crate::types::Scope::System => {
             if cfg!(target_os = "windows") {
                 Ok(crate::sysroot::apply_sysroot(PathBuf::from(
                     "C:\\ProgramData\\zoi\\pkgs\\store",
-                )))
+                ),),)
             } else {
                 Ok(crate::sysroot::apply_sysroot(PathBuf::from(
                     "/var/lib/zoi/pkgs/store",
-                )))
+                ),),)
             }
         }
         crate::types::Scope::Project => {
             let current_dir = std::env::current_dir()?;
-            Ok(current_dir.join(".zoi").join("pkgs").join("store"))
+            Ok(current_dir.join(".zoi",).join("pkgs",).join("store",),)
         }
     }
 }
@@ -202,30 +223,31 @@ pub fn get_store_base_dir(scope: crate::types::Scope) -> Result<PathBuf> {
 ///
 /// # Errors
 ///
-/// Returns an error if the home directory or current directory cannot be determined.
-pub fn get_db_base_dir(scope: crate::types::Scope) -> Result<PathBuf> {
+/// Returns an error if the home directory or current directory cannot be
+/// determined.
+pub fn get_db_base_dir(scope: crate::types::Scope,) -> Result<PathBuf,> {
     match scope {
         crate::types::Scope::User => {
-            let home_dir =
-                get_user_home().ok_or_else(|| anyhow!("Could not find home directory."))?;
+            let home_dir = get_user_home()
+                .ok_or_else(|| anyhow!("Could not find home directory."),)?;
             Ok(crate::sysroot::apply_sysroot(
-                home_dir.join(".zoi").join("pkgs").join("db"),
-            ))
+                home_dir.join(".zoi",).join("pkgs",).join("db",),
+            ),)
         }
         crate::types::Scope::System => {
             if cfg!(target_os = "windows") {
                 Ok(crate::sysroot::apply_sysroot(PathBuf::from(
                     "C:\\ProgramData\\zoi\\pkgs\\db",
-                )))
+                ),),)
             } else {
                 Ok(crate::sysroot::apply_sysroot(PathBuf::from(
                     "/var/lib/zoi/pkgs/db",
-                )))
+                ),),)
             }
         }
         crate::types::Scope::Project => {
             let current_dir = std::env::current_dir()?;
-            Ok(current_dir.join(".zoi").join("pkgs").join("db"))
+            Ok(current_dir.join(".zoi",).join("pkgs",).join("db",),)
         }
     }
 }
@@ -234,30 +256,31 @@ pub fn get_db_base_dir(scope: crate::types::Scope) -> Result<PathBuf> {
 ///
 /// # Errors
 ///
-/// Returns an error if the home directory or current directory cannot be determined.
-pub fn get_git_base_dir(scope: crate::types::Scope) -> Result<PathBuf> {
+/// Returns an error if the home directory or current directory cannot be
+/// determined.
+pub fn get_git_base_dir(scope: crate::types::Scope,) -> Result<PathBuf,> {
     match scope {
         crate::types::Scope::User => {
-            let home_dir =
-                get_user_home().ok_or_else(|| anyhow!("Could not find home directory."))?;
+            let home_dir = get_user_home()
+                .ok_or_else(|| anyhow!("Could not find home directory."),)?;
             Ok(crate::sysroot::apply_sysroot(
-                home_dir.join(".zoi").join("pkgs").join("git"),
-            ))
+                home_dir.join(".zoi",).join("pkgs",).join("git",),
+            ),)
         }
         crate::types::Scope::System => {
             if cfg!(target_os = "windows") {
                 Ok(crate::sysroot::apply_sysroot(PathBuf::from(
                     "C:\\ProgramData\\zoi\\pkgs\\git",
-                )))
+                ),),)
             } else {
                 Ok(crate::sysroot::apply_sysroot(PathBuf::from(
                     "/var/lib/zoi/pkgs/git",
-                )))
+                ),),)
             }
         }
         crate::types::Scope::Project => {
             let current_dir = std::env::current_dir()?;
-            Ok(current_dir.join(".zoi").join("pkgs").join("git"))
+            Ok(current_dir.join(".zoi",).join("pkgs",).join("git",),)
         }
     }
 }
@@ -269,12 +292,17 @@ pub fn get_git_base_dir(scope: crate::types::Scope) -> Result<PathBuf> {
 ///
 /// ID Format: `#{registry-handle}@{repo-path}/{package-name}`
 /// Hashed Result: First 32 characters of the SHA-512 hash of the ID string.
-pub fn generate_package_id(registry_handle: &str, repo_path: &str, package_name: &str) -> String {
-    let format_string = format!("#{registry_handle}@{repo_path}/{package_name}");
+pub fn generate_package_id(
+    registry_handle: &str,
+    repo_path: &str,
+    package_name: &str,
+) -> String {
+    let format_string =
+        format!("#{registry_handle}@{repo_path}/{package_name}");
     let mut hasher = Sha512::new();
-    hasher.update(format_string.as_bytes());
+    hasher.update(format_string.as_bytes(),);
     let result = hasher.finalize();
-    let hex_string = hex::encode(result);
+    let hex_string = hex::encode(result,);
     hex_string[..32].to_string()
 }
 
@@ -285,19 +313,18 @@ pub fn generate_versioned_package_id(
     package_name: &str,
     version: &str,
 ) -> String {
-    let format_string = format!(
-        "#{registry_handle}@{repo_path}/{package_name}@{version}"
-    );
+    let format_string =
+        format!("#{registry_handle}@{repo_path}/{package_name}@{version}");
     let mut hasher = Sha512::new();
-    hasher.update(format_string.as_bytes());
+    hasher.update(format_string.as_bytes(),);
     let result = hasher.finalize();
-    let hex_string = hex::encode(result);
+    let hex_string = hex::encode(result,);
     hex_string[..32].to_string()
 }
 
 /// Creates the directory name for the package in the store.
 /// Format: `{hash}-{name}`
-pub fn get_package_dir_name(package_id: &str, package_name: &str) -> String {
+pub fn get_package_dir_name(package_id: &str, package_name: &str,) -> String {
     format!("{package_id}-{package_name}")
 }
 
@@ -306,114 +333,126 @@ pub fn get_package_dir_name(package_id: &str, package_name: &str) -> String {
 /// # Errors
 ///
 /// Returns an error if the directory creation or file copy operation fails.
-pub fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
+pub fn copy_dir_all(src: &Path, dst: &Path,) -> std::io::Result<(),> {
     let src = if src.as_os_str().is_empty() {
-        Path::new(".")
+        Path::new(".",)
     } else {
         src
     };
-    fs::create_dir_all(dst)?;
-    for entry in fs::read_dir(src)? {
+    fs::create_dir_all(dst,)?;
+    for entry in fs::read_dir(src,)? {
         let entry = entry?;
         let ty = entry.file_type()?;
         if ty.is_dir() {
-            copy_dir_all(&entry.path(), &dst.join(entry.file_name()))?;
+            copy_dir_all(&entry.path(), &dst.join(entry.file_name(),),)?;
         } else {
-            fs::copy(entry.path(), dst.join(entry.file_name()))?;
+            fs::copy(entry.path(), dst.join(entry.file_name(),),)?;
         }
     }
-    Ok(())
+    Ok((),)
 }
 
 /// Performs a jittered exponential backoff sleep.
 ///
 /// Used during network retries to prevent thundering herd problems and
 /// improve reliability on unstable connections.
-pub fn retry_backoff_sleep(attempt: u32) {
-    let base_ms = 500u64.saturating_mul(1u64 << (attempt.saturating_sub(1)));
-    let jitter = u64::from(std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or(Duration::from_secs(0))
-        .subsec_millis() % 200);
-    let sleep_ms = (base_ms + jitter).min(8000);
-    std::thread::sleep(Duration::from_millis(sleep_ms));
+pub fn retry_backoff_sleep(attempt: u32,) {
+    let base_ms = 500u64.saturating_mul(1u64 << (attempt.saturating_sub(1,)),);
+    let jitter = u64::from(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH,)
+            .unwrap_or(Duration::from_secs(0,),)
+            .subsec_millis()
+            % 200,
+    );
+    let sleep_ms = (base_ms + jitter).min(8000,);
+    std::thread::sleep(Duration::from_millis(sleep_ms,),);
 }
 
-/// Retrieves information about the current Linux distribution from /etc/os-release.
-pub fn get_linux_distribution_info() -> Option<HashMap<String, String>> {
-    let path = crate::sysroot::apply_sysroot("/etc/os-release");
-    if let Ok(contents) = fs::read_to_string(path) {
-        let info: HashMap<String, String> = contents
+/// Retrieves information about the current Linux distribution from
+/// /etc/os-release.
+pub fn get_linux_distribution_info() -> Option<HashMap<String, String,>,> {
+    let path = crate::sysroot::apply_sysroot("/etc/os-release",);
+    if let Ok(contents,) = fs::read_to_string(path,) {
+        let info: HashMap<String, String,> = contents
             .lines()
             .filter_map(|line| {
-                let mut parts = line.splitn(2, '=');
+                let mut parts = line.splitn(2, '=',);
                 let key = parts.next()?;
-                let value = parts.next()?.trim_matches('"').to_string();
+                let value = parts.next()?.trim_matches('"',).to_string();
                 if key.is_empty() {
                     None
                 } else {
-                    Some((key.to_string(), value))
+                    Some((key.to_string(), value,),)
                 }
-            })
+            },)
             .collect();
-        if info.is_empty() { None } else { Some(info) }
+        if info.is_empty() { None } else { Some(info,) }
     } else {
         None
     }
 }
 
-/// Detects the general family of a Linux distribution (e.g. "debian", "arch", "fedora").
+/// Detects the general family of a Linux distribution (e.g. "debian", "arch",
+/// "fedora").
 ///
 /// This is used to map specific distributions to their primary package manager
 /// and standard filesystem locations.
 ///
 /// Strategy:
 /// - `ID_LIKE` Check: We first check the `ID_LIKE` field in `/etc/os-release`.
-///   This is the most reliable way to identify derivatives (e.g. Ubuntu is `debian`).
-/// - Direct ID Match: If `ID_LIKE` is missing, we fall back to the primary `ID`.
-/// - Normalization: We group similar distros under a common "family" key
-///   to simplify downstream logic (e.g. Rocky, Alma, and `CentOS` all map to `fedora`
-///   because they share the DNF/RPM ecosystem).
-pub fn get_linux_distro_family() -> Option<String> {
+///   This is the most reliable way to identify derivatives (e.g. Ubuntu is
+///   `debian`).
+/// - Direct ID Match: If `ID_LIKE` is missing, we fall back to the primary
+///   `ID`.
+/// - Normalization: We group similar distros under a common "family" key to
+///   simplify downstream logic (e.g. Rocky, Alma, and `CentOS` all map to
+///   `fedora` because they share the DNF/RPM ecosystem).
+pub fn get_linux_distro_family() -> Option<String,> {
     if is_zoios() {
-        return Some("zoios".to_string());
+        return Some("zoios".to_string(),);
     }
-    if let Some(info) = get_linux_distribution_info() {
-        if let Some(id_like) = info.get("ID_LIKE") {
-            let families: Vec<&str> = id_like.split_whitespace().collect();
-            if families.contains(&"debian") {
-                return Some("debian".to_string());
+    if let Some(info,) = get_linux_distribution_info() {
+        if let Some(id_like,) = info.get("ID_LIKE",) {
+            let families: Vec<&str,> = id_like.split_whitespace().collect();
+            if families.contains(&"debian",) {
+                return Some("debian".to_string(),);
             }
-            if families.contains(&"arch") {
-                return Some("arch".to_string());
+            if families.contains(&"arch",) {
+                return Some("arch".to_string(),);
             }
-            if families.contains(&"fedora") {
-                return Some("fedora".to_string());
+            if families.contains(&"fedora",) {
+                return Some("fedora".to_string(),);
             }
-            if families.contains(&"rhel") {
-                return Some("fedora".to_string());
+            if families.contains(&"rhel",) {
+                return Some("fedora".to_string(),);
             }
-            if families.contains(&"suse") {
-                return Some("suse".to_string());
+            if families.contains(&"suse",) {
+                return Some("suse".to_string(),);
             }
-            if families.contains(&"gentoo") {
-                return Some("gentoo".to_string());
+            if families.contains(&"gentoo",) {
+                return Some("gentoo".to_string(),);
             }
         }
-        if let Some(id) = info.get("ID") {
+        if let Some(id,) = info.get("ID",) {
             return match id.as_str() {
-                "debian" | "ubuntu" | "linuxmint" | "pop" | "kali" | "kubuntu" | "lubuntu"
-                | "xubuntu" | "zorin" | "elementary" => Some("debian".to_string()),
+                "debian" | "ubuntu" | "linuxmint" | "pop" | "kali"
+                | "kubuntu" | "lubuntu" | "xubuntu" | "zorin"
+                | "elementary" => Some("debian".to_string(),),
                 "arch" | "manjaro" | "cachyos" | "endeavouros" | "garuda" => {
-                    Some("arch".to_string())
+                    Some("arch".to_string(),)
                 }
-                "fedora" | "centos" | "rhel" | "rocky" | "almalinux" => Some("fedora".to_string()),
-                "opensuse" | "opensuse-tumbleweed" | "opensuse-leap" => Some("suse".to_string()),
-                "gentoo" => Some("gentoo".to_string()),
-                "alpine" => Some("alpine".to_string()),
-                "void" => Some("void".to_string()),
-                "solus" => Some("solus".to_string()),
-                "guix" => Some("guix".to_string()),
+                "fedora" | "centos" | "rhel" | "rocky" | "almalinux" => {
+                    Some("fedora".to_string(),)
+                }
+                "opensuse" | "opensuse-tumbleweed" | "opensuse-leap" => {
+                    Some("suse".to_string(),)
+                }
+                "gentoo" => Some("gentoo".to_string(),),
+                "alpine" => Some("alpine".to_string(),),
+                "void" => Some("void".to_string(),),
+                "solus" => Some("solus".to_string(),),
+                "guix" => Some("guix".to_string(),),
                 _ => None,
             };
         }
@@ -422,20 +461,21 @@ pub fn get_linux_distro_family() -> Option<String> {
 }
 
 /// Returns the ID of the current Linux distribution (e.g. "debian", "fedora").
-pub fn get_linux_distribution() -> Option<String> {
-    get_linux_distribution_info().and_then(|info| info.get("ID").cloned())
+pub fn get_linux_distribution() -> Option<String,> {
+    get_linux_distribution_info().and_then(|info| info.get("ID",).cloned(),)
 }
 
-/// Returns true if the current system is a ZoiOS-based distribution (like Parlex).
+/// Returns true if the current system is a ZoiOS-based distribution (like
+/// Parlex).
 pub fn is_zoios() -> bool {
-    if let Some(info) = get_linux_distribution_info() {
-        if let Some(id) = info.get("ID")
+    if let Some(info,) = get_linux_distribution_info() {
+        if let Some(id,) = info.get("ID",)
             && (id == "zoios" || id == "parlex")
         {
             return true;
         }
-        if let Some(id_like) = info.get("ID_LIKE")
-            && id_like.split_whitespace().any(|s| s == "zoios")
+        if let Some(id_like,) = info.get("ID_LIKE",)
+            && id_like.split_whitespace().any(|s| s == "zoios",)
         {
             return true;
         }
@@ -445,7 +485,9 @@ pub fn is_zoios() -> bool {
 
 /// Resolves the default installation scope based on the current environment.
 pub fn resolve_fallback_scope() -> crate::types::Scope {
-    if std::path::Path::new("zoi.lua").exists() || std::path::Path::new("zoi.yaml").exists() {
+    if std::path::Path::new("zoi.lua",).exists()
+        || std::path::Path::new("zoi.yaml",).exists()
+    {
         crate::types::Scope::Project
     } else if is_zoios() {
         crate::types::Scope::System
@@ -455,201 +497,220 @@ pub fn resolve_fallback_scope() -> crate::types::Scope {
 }
 
 /// Returns the name of the current desktop environment (e.g. "gnome", "kde").
-pub fn get_desktop_environment() -> Option<String> {
+pub fn get_desktop_environment() -> Option<String,> {
     if cfg!(target_os = "windows") {
-        return Some("windows".to_string());
+        return Some("windows".to_string(),);
     }
-    if let Ok(de) = std::env::var("XDG_CURRENT_DESKTOP")
+    if let Ok(de,) = std::env::var("XDG_CURRENT_DESKTOP",)
         && !de.is_empty()
     {
-        return Some(de.to_lowercase());
+        return Some(de.to_lowercase(),);
     }
-    if let Ok(ds) = std::env::var("DESKTOP_SESSION")
+    if let Ok(ds,) = std::env::var("DESKTOP_SESSION",)
         && !ds.is_empty()
     {
-        return Some(ds.to_lowercase());
+        return Some(ds.to_lowercase(),);
     }
     None
 }
 
 /// Returns the name of the current display server (e.g. "wayland", "x11").
-pub fn get_display_server() -> Option<String> {
+pub fn get_display_server() -> Option<String,> {
     if cfg!(target_os = "windows") {
-        return Some("windows".to_string());
+        return Some("windows".to_string(),);
     }
     if cfg!(target_os = "macos") {
-        return Some("quartz".to_string());
+        return Some("quartz".to_string(),);
     }
-    if let Ok(st) = std::env::var("XDG_SESSION_TYPE")
+    if let Ok(st,) = std::env::var("XDG_SESSION_TYPE",)
         && !st.is_empty()
     {
-        return Some(st.to_lowercase());
+        return Some(st.to_lowercase(),);
     }
     None
 }
 
 /// Returns the version of the operating system kernel.
-pub fn get_kernel_version() -> Option<String> {
+pub fn get_kernel_version() -> Option<String,> {
     if cfg!(unix) {
-        let output = Command::new("uname").arg("-r").output().ok()?;
+        let output = Command::new("uname",).arg("-r",).output().ok()?;
         if output.status.success() {
-            return Some(String::from_utf8_lossy(&output.stdout).trim().to_string());
+            return Some(
+                String::from_utf8_lossy(&output.stdout,).trim().to_string(),
+            );
         }
     } else if cfg!(target_os = "windows") {
-        let output = Command::new("pwsh")
-            .arg("-Command")
-            .arg("(Get-CimInstance Win32_OperatingSystem).Version")
+        let output = Command::new("pwsh",)
+            .arg("-Command",)
+            .arg("(Get-CimInstance Win32_OperatingSystem).Version",)
             .output()
             .ok()?;
         if output.status.success() {
-            return Some(String::from_utf8_lossy(&output.stdout).trim().to_string());
+            return Some(
+                String::from_utf8_lossy(&output.stdout,).trim().to_string(),
+            );
         }
     }
     None
 }
 
 /// Returns the name of the system's init system (e.g. "systemd", "openrc").
-pub fn get_init_system() -> Option<String> {
-    if let Ok(val) = std::env::var("ZOI_INIT") {
-        return Some(val.to_lowercase());
+pub fn get_init_system() -> Option<String,> {
+    if let Ok(val,) = std::env::var("ZOI_INIT",) {
+        return Some(val.to_lowercase(),);
     }
 
-    let run_systemd = crate::sysroot::apply_sysroot(PathBuf::from("/run/systemd/system"));
+    let run_systemd =
+        crate::sysroot::apply_sysroot(PathBuf::from("/run/systemd/system",),);
     if run_systemd.exists() {
-        return Some("systemd".to_string());
+        return Some("systemd".to_string(),);
     }
 
-    let run_openrc = crate::sysroot::apply_sysroot(PathBuf::from("/run/openrc"));
+    let run_openrc =
+        crate::sysroot::apply_sysroot(PathBuf::from("/run/openrc",),);
     if run_openrc.exists() {
-        return Some("openrc".to_string());
+        return Some("openrc".to_string(),);
     }
 
-    let sbin_init = crate::sysroot::apply_sysroot(PathBuf::from("/sbin/init"));
-    if let Ok(target) = std::fs::read_link(&sbin_init) {
+    let sbin_init =
+        crate::sysroot::apply_sysroot(PathBuf::from("/sbin/init",),);
+    if let Ok(target,) = std::fs::read_link(&sbin_init,) {
         let target_str = target.to_string_lossy();
-        if target_str.contains("systemd") {
-            return Some("systemd".to_string());
-        } else if target_str.contains("openrc") {
-            return Some("openrc".to_string());
-        } else if target_str.contains("busybox") {
-            return Some("busybox".to_string());
+        if target_str.contains("systemd",) {
+            return Some("systemd".to_string(),);
+        } else if target_str.contains("openrc",) {
+            return Some("openrc".to_string(),);
+        } else if target_str.contains("busybox",) {
+            return Some("busybox".to_string(),);
         }
     }
 
     None
 }
 
-/// Returns the name of the available privilege escalation tool (e.g. "sudo", "doas").
-pub fn get_privilege_escalator() -> Option<String> {
-    if command_exists("sudo") {
-        Some("sudo".to_string())
-    } else if command_exists("doas") {
-        Some("doas".to_string())
+/// Returns the name of the available privilege escalation tool (e.g. "sudo",
+/// "doas").
+pub fn get_privilege_escalator() -> Option<String,> {
+    if command_exists("sudo",) {
+        Some("sudo".to_string(),)
+    } else if command_exists("doas",) {
+        Some("doas".to_string(),)
     } else {
         None
     }
 }
 
 /// Returns the version of the current distribution.
-pub fn get_distro_version() -> Option<String> {
-    if let Some(info) = get_linux_distribution_info()
-        && let Some(vid) = info.get("VERSION_ID")
+pub fn get_distro_version() -> Option<String,> {
+    if let Some(info,) = get_linux_distribution_info()
+        && let Some(vid,) = info.get("VERSION_ID",)
     {
-        return Some(vid.clone());
+        return Some(vid.clone(),);
     }
     if cfg!(target_os = "macos") {
-        let output = Command::new("sw_vers")
-            .arg("-productVersion")
+        let output = Command::new("sw_vers",)
+            .arg("-productVersion",)
             .output()
             .ok()?;
         if output.status.success() {
-            return Some(String::from_utf8_lossy(&output.stdout).trim().to_string());
+            return Some(
+                String::from_utf8_lossy(&output.stdout,).trim().to_string(),
+            );
         }
     } else if cfg!(target_os = "windows") {
-        let output = Command::new("pwsh")
-            .arg("-Command")
-            .arg("(Get-CimInstance Win32_OperatingSystem).Version")
+        let output = Command::new("pwsh",)
+            .arg("-Command",)
+            .arg("(Get-CimInstance Win32_OperatingSystem).Version",)
             .output()
             .ok()?;
         if output.status.success() {
-            return Some(String::from_utf8_lossy(&output.stdout).trim().to_string());
+            return Some(
+                String::from_utf8_lossy(&output.stdout,).trim().to_string(),
+            );
         }
     }
     None
 }
 
 /// Returns a short description of the system's CPU.
-pub fn get_cpu_info() -> Option<String> {
+pub fn get_cpu_info() -> Option<String,> {
     if cfg!(target_os = "linux") {
-        if let Ok(cpuinfo) = fs::read_to_string("/proc/cpuinfo") {
+        if let Ok(cpuinfo,) = fs::read_to_string("/proc/cpuinfo",) {
             for line in cpuinfo.lines() {
-                if line.starts_with("model name")
-                    && let Some((_, model)) = line.split_once(':')
+                if line.starts_with("model name",)
+                    && let Some((_, model,),) = line.split_once(':',)
                 {
-                    return Some(model.trim().to_string());
+                    return Some(model.trim().to_string(),);
                 }
             }
         }
     } else if cfg!(target_os = "macos") {
-        let output = Command::new("sysctl")
-            .arg("-n")
-            .arg("machdep.cpu.brand_string")
+        let output = Command::new("sysctl",)
+            .arg("-n",)
+            .arg("machdep.cpu.brand_string",)
             .output()
             .ok()?;
         if output.status.success() {
-            return Some(String::from_utf8_lossy(&output.stdout).trim().to_string());
+            return Some(
+                String::from_utf8_lossy(&output.stdout,).trim().to_string(),
+            );
         }
     } else if cfg!(target_os = "windows") {
-        let output = Command::new("pwsh")
-            .arg("-Command")
-            .arg("(Get-CimInstance Win32_Processor).Name")
+        let output = Command::new("pwsh",)
+            .arg("-Command",)
+            .arg("(Get-CimInstance Win32_Processor).Name",)
             .output()
             .ok()?;
         if output.status.success() {
-            return Some(String::from_utf8_lossy(&output.stdout).trim().to_string());
+            return Some(
+                String::from_utf8_lossy(&output.stdout,).trim().to_string(),
+            );
         }
     }
     None
 }
 
 /// Returns a short description of the system's GPU.
-pub fn get_gpu_info() -> Option<String> {
+pub fn get_gpu_info() -> Option<String,> {
     if cfg!(target_os = "linux") {
-        if let Ok(output) = Command::new("lspci").output()
+        if let Ok(output,) = Command::new("lspci",).output()
             && output.status.success()
         {
-            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stdout = String::from_utf8_lossy(&output.stdout,);
             for line in stdout.lines() {
-                if (line.contains("VGA compatible controller") || line.contains("3D controller"))
-                    && let Some((_, model)) = line.split_once(": ")
+                if (line.contains("VGA compatible controller",)
+                    || line.contains("3D controller",))
+                    && let Some((_, model,),) = line.split_once(": ",)
                 {
-                    return Some(model.trim().to_string());
+                    return Some(model.trim().to_string(),);
                 }
             }
         }
     } else if cfg!(target_os = "macos") {
-        let output = Command::new("system_profiler")
-            .arg("SPDisplaysDataType")
+        let output = Command::new("system_profiler",)
+            .arg("SPDisplaysDataType",)
             .output()
             .ok()?;
         if output.status.success() {
-            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stdout = String::from_utf8_lossy(&output.stdout,);
             for line in stdout.lines() {
-                if line.trim().starts_with("Chipset Model:")
-                    && let Some((_, model)) = line.split_once(':')
+                if line.trim().starts_with("Chipset Model:",)
+                    && let Some((_, model,),) = line.split_once(':',)
                 {
-                    return Some(model.trim().to_string());
+                    return Some(model.trim().to_string(),);
                 }
             }
         }
     } else if cfg!(target_os = "windows") {
-        let output = Command::new("pwsh")
-            .arg("-Command")
-            .arg("(Get-CimInstance Win32_VideoController).Name")
+        let output = Command::new("pwsh",)
+            .arg("-Command",)
+            .arg("(Get-CimInstance Win32_VideoController).Name",)
             .output()
             .ok()?;
         if output.status.success() {
-            return Some(String::from_utf8_lossy(&output.stdout).trim().to_string());
+            return Some(
+                String::from_utf8_lossy(&output.stdout,).trim().to_string(),
+            );
         }
     }
     None
@@ -658,7 +719,7 @@ pub fn get_gpu_info() -> Option<String> {
 /// Identifies the primary package manager for the current operating system.
 ///
 /// This is used to resolve `native:` dependencies.
-pub fn get_native_package_manager() -> Option<String> {
+pub fn get_native_package_manager() -> Option<String,> {
     let os = std::env::consts::OS;
     match os {
         "linux" => get_linux_distro_family()
@@ -677,24 +738,24 @@ pub fn get_native_package_manager() -> Option<String> {
                     _ => "unknown",
                 }
                 .to_string()
-            })
-            .filter(|s| s != "unknown"),
+            },)
+            .filter(|s| s != "unknown",),
         "macos" => {
-            if command_exists("brew") {
-                Some("brew".to_string())
-            } else if command_exists("port") {
-                Some("macports".to_string())
+            if command_exists("brew",) {
+                Some("brew".to_string(),)
+            } else if command_exists("port",) {
+                Some("macports".to_string(),)
             } else {
                 None
             }
         }
         "windows" => {
-            if command_exists("scoop") {
-                Some("scoop".to_string())
-            } else if command_exists("choco") {
-                Some("choco".to_string())
-            } else if command_exists("winget") {
-                Some("winget".to_string())
+            if command_exists("scoop",) {
+                Some("scoop".to_string(),)
+            } else if command_exists("choco",) {
+                Some("choco".to_string(),)
+            } else if command_exists("winget",) {
+                Some("winget".to_string(),)
             } else {
                 None
             }
@@ -707,7 +768,7 @@ pub fn get_native_package_manager() -> Option<String> {
 ///
 /// This provides the list of available managers shown in `zoi info` and
 /// used to validate `manager:` prefixes in dependency strings.
-pub fn get_all_available_package_managers() -> Vec<String> {
+pub fn get_all_available_package_managers() -> Vec<String,> {
     let mut managers = Vec::new();
     let all_possible_managers = [
         "apt",
@@ -738,8 +799,8 @@ pub fn get_all_available_package_managers() -> Vec<String> {
     ];
 
     for manager in &all_possible_managers {
-        if command_exists(manager) {
-            managers.push(manager.to_string());
+        if command_exists(manager,) {
+            managers.push(manager.to_string(),);
         }
     }
     managers.sort();
@@ -748,7 +809,7 @@ pub fn get_all_available_package_managers() -> Vec<String> {
 }
 
 /// Formats a byte count into a human-readable string (e.g. "1.24 MiB").
-pub fn format_bytes(bytes: u64) -> String {
+pub fn format_bytes(bytes: u64,) -> String {
     const KIB: u64 = 1024;
     const MIB: u64 = 1024 * KIB;
     const GIB: u64 = 1024 * MIB;
@@ -763,8 +824,9 @@ pub fn format_bytes(bytes: u64) -> String {
     }
 }
 
-/// Formats a size difference into a signed human-readable string (e.g. "+50 B").
-pub fn format_size_diff(diff: i64) -> String {
+/// Formats a size difference into a signed human-readable string (e.g. "+50
+/// B").
+pub fn format_size_diff(diff: i64,) -> String {
     if diff == 0 {
         return "0 B".to_string();
     }
@@ -773,22 +835,24 @@ pub fn format_size_diff(diff: i64) -> String {
     format!("{} {}", sign, format_bytes(bytes))
 }
 
-/// Verifies that a given path is "Safe" and doesn't attempt to escape the base directory.
+/// Verifies that a given path is "Safe" and doesn't attempt to escape the base
+/// directory.
 ///
 /// This is a critical security check against "Path Traversal" attacks in
 /// package archives or Lua scripts.
-pub fn is_safe_path(base: &Path, path: &Path) -> bool {
-    let base = base.canonicalize().unwrap_or_else(|_| base.to_path_buf());
+pub fn is_safe_path(base: &Path, path: &Path,) -> bool {
+    let base = base.canonicalize().unwrap_or_else(|_| base.to_path_buf(),);
     let joined = if path.is_absolute() {
         path.to_path_buf()
     } else {
-        base.join(path)
+        base.join(path,)
     };
     let mut normalized = PathBuf::new();
     for component in joined.components() {
         match component {
-            std::path::Component::Prefix(_) | std::path::Component::RootDir => {
-                normalized.push(component);
+            std::path::Component::Prefix(_,)
+            | std::path::Component::RootDir => {
+                normalized.push(component,);
             }
             std::path::Component::CurDir => {}
             std::path::Component::ParentDir => {
@@ -796,10 +860,10 @@ pub fn is_safe_path(base: &Path, path: &Path) -> bool {
                     return false;
                 }
             }
-            std::path::Component::Normal(p) => normalized.push(p),
+            std::path::Component::Normal(p,) => normalized.push(p,),
         }
     }
-    normalized.starts_with(&base)
+    normalized.starts_with(&base,)
 }
 
 /// Creates a symbolic link for a file, handling platform-specific requirements.
@@ -807,22 +871,22 @@ pub fn is_safe_path(base: &Path, path: &Path) -> bool {
 /// # Errors
 ///
 /// Returns an error if the symlink operation fails.
-pub fn symlink_file(target: &Path, link: &Path) -> std::io::Result<()> {
+pub fn symlink_file(target: &Path, link: &Path,) -> std::io::Result<(),> {
     if link.exists() || link.is_symlink() {
-        fs::remove_file(link)?;
+        fs::remove_file(link,)?;
     }
     #[cfg(unix)]
     {
-        std::os::unix::fs::symlink(target, link)
+        std::os::unix::fs::symlink(target, link,)
     }
     #[cfg(windows)]
     {
-        if std::os::windows::fs::symlink_file(target, link).is_err() {
-            if fs::hard_link(target, link).is_err() {
-                fs::copy(target, link)?;
+        if std::os::windows::fs::symlink_file(target, link,).is_err() {
+            if fs::hard_link(target, link,).is_err() {
+                fs::copy(target, link,)?;
             }
         }
-        Ok(())
+        Ok((),)
     }
 }
 
@@ -842,69 +906,75 @@ pub fn is_admin() -> bool {
 ///
 /// # Errors
 ///
-/// Returns an error if the command fails to execute or returns a non-zero exit status.
-pub fn run_shell_command(command_str: &str) -> anyhow::Result<()> {
+/// Returns an error if the command fails to execute or returns a non-zero exit
+/// status.
+pub fn run_shell_command(command_str: &str,) -> anyhow::Result<(),> {
     let status = if cfg!(target_os = "windows") {
-        Command::new("pwsh")
-            .arg("-Command")
-            .arg(command_str)
+        Command::new("pwsh",)
+            .arg("-Command",)
+            .arg(command_str,)
             .status()?
     } else {
-        Command::new("bash").arg("-c").arg(command_str).status()?
+        Command::new("bash",)
+            .arg("-c",)
+            .arg(command_str,)
+            .status()?
     };
     if !status.success() {
-        return Err(anyhow!("Command failed: {command_str}"));
+        return Err(anyhow!("Command failed: {command_str}"),);
     }
-    Ok(())
+    Ok((),)
 }
 
-/// Executes a shell command quietly (suppressing output) and returns an error if it fails.
+/// Executes a shell command quietly (suppressing output) and returns an error
+/// if it fails.
 ///
 /// # Errors
 ///
-/// Returns an error if the command fails to execute or returns a non-zero exit status.
-pub fn run_shell_command_quietly(command_str: &str) -> anyhow::Result<()> {
+/// Returns an error if the command fails to execute or returns a non-zero exit
+/// status.
+pub fn run_shell_command_quietly(command_str: &str,) -> anyhow::Result<(),> {
     let status = if cfg!(target_os = "windows") {
-        Command::new("pwsh")
-            .arg("-Command")
-            .arg(command_str)
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
+        Command::new("pwsh",)
+            .arg("-Command",)
+            .arg(command_str,)
+            .stdout(std::process::Stdio::null(),)
+            .stderr(std::process::Stdio::null(),)
             .status()?
     } else {
-        Command::new("bash")
-            .arg("-c")
-            .arg(command_str)
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
+        Command::new("bash",)
+            .arg("-c",)
+            .arg(command_str,)
+            .stdout(std::process::Stdio::null(),)
+            .stderr(std::process::Stdio::null(),)
             .status()?
     };
     if !status.success() {
-        return Err(anyhow!("Command failed: {command_str}"));
+        return Err(anyhow!("Command failed: {command_str}"),);
     }
-    Ok(())
+    Ok((),)
 }
 
 /// Returns true if Zoi is running in "Mini" mode (lightweight, zero-sync).
 pub fn is_mini_mode() -> bool {
-    std::env::var("ZOI_MINI_MODE").is_ok_and(|v| v == "1")
+    std::env::var("ZOI_MINI_MODE",).is_ok_and(|v| v == "1",)
 }
 
 /// Prompts the user for confirmation (y/N) unless the `yes` flag is set.
-pub fn ask_for_confirmation(prompt: &str, yes: bool) -> bool {
+pub fn ask_for_confirmation(prompt: &str, yes: bool,) -> bool {
     if yes {
         return true;
     }
-    if std::env::var("ZOI_TEST").is_ok() || !stdin().is_tty() {
+    if std::env::var("ZOI_TEST",).is_ok() || !stdin().is_tty() {
         return false;
     }
     print!("{prompt} [y/N]: ");
     let _ = stdout().flush();
     let mut input = String::new();
-    if stdin().read_line(&mut input).is_err() {
+    if stdin().read_line(&mut input,).is_err() {
         return false;
     }
-    input.trim().eq_ignore_ascii_case("y")
+    input.trim().eq_ignore_ascii_case("y",)
 }
 
 /// Recursively sets a directory and its contents to be read-only.
@@ -912,19 +982,19 @@ pub fn ask_for_confirmation(prompt: &str, yes: bool) -> bool {
 /// # Errors
 ///
 /// Returns an error if the permission change fails.
-pub fn set_path_read_only(path: &Path) -> anyhow::Result<()> {
+pub fn set_path_read_only(path: &Path,) -> anyhow::Result<(),> {
     if !path.exists() {
-        return Ok(());
+        return Ok((),);
     }
-    for entry in walkdir::WalkDir::new(path) {
+    for entry in walkdir::WalkDir::new(path,) {
         let entry = entry?;
-        let mut perms = fs::metadata(entry.path())?.permissions();
+        let mut perms = fs::metadata(entry.path(),)?.permissions();
         if !perms.readonly() {
-            perms.set_readonly(true);
-            fs::set_permissions(entry.path(), perms)?;
+            perms.set_readonly(true,);
+            fs::set_permissions(entry.path(), perms,)?;
         }
     }
-    Ok(())
+    Ok((),)
 }
 
 /// Recursively ensures a directory and its contents are writable.
@@ -932,104 +1002,116 @@ pub fn set_path_read_only(path: &Path) -> anyhow::Result<()> {
 /// # Errors
 ///
 /// Returns an error if the permission change fails.
-pub fn set_path_writable(path: &Path) -> anyhow::Result<()> {
+pub fn set_path_writable(path: &Path,) -> anyhow::Result<(),> {
     if !path.exists() {
-        return Ok(());
+        return Ok((),);
     }
-    for entry in walkdir::WalkDir::new(path) {
+    for entry in walkdir::WalkDir::new(path,) {
         let entry = entry?;
-        let mut perms = fs::metadata(entry.path())?.permissions();
+        let mut perms = fs::metadata(entry.path(),)?.permissions();
         if perms.readonly() {
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
                 let mode = perms.mode();
-                perms.set_mode(mode | 0o200);
+                perms.set_mode(mode | 0o200,);
             }
             #[cfg(not(unix))]
             {
-                perms.set_readonly(false);
+                perms.set_readonly(false,);
             }
-            fs::set_permissions(entry.path(), perms)?;
+            fs::set_permissions(entry.path(), perms,)?;
         }
     }
-    Ok(())
+    Ok((),)
 }
 
 /// Sets the owner and group for a file or directory (Unix only).
 ///
 /// # Errors
 ///
-/// Returns an error if the owner or group lookup fails, or if the chown operation fails.
+/// Returns an error if the owner or group lookup fails, or if the chown
+/// operation fails.
 #[cfg(unix)]
-pub fn set_path_owner(path: &Path, owner: &str, group: &str) -> anyhow::Result<()> {
+pub fn set_path_owner(
+    path: &Path,
+    owner: &str,
+    group: &str,
+) -> anyhow::Result<(),> {
     use nix::unistd::{Gid, Group, Uid, User, chown};
-    let uid = if let Ok(u) = owner.parse::<u32>() {
-        Some(Uid::from_raw(u))
+    let uid = if let Ok(u,) = owner.parse::<u32>() {
+        Some(Uid::from_raw(u,),)
     } else if !owner.is_empty() {
         Some(
-            User::from_name(owner)
-                .map_err(|e| anyhow!("Error looking up user '{owner}': {e}"))?
-                .ok_or_else(|| anyhow!("User not found: {owner}"))?
+            User::from_name(owner,)
+                .map_err(|e| anyhow!("Error looking up user '{owner}': {e}"),)?
+                .ok_or_else(|| anyhow!("User not found: {owner}"),)?
                 .uid,
         )
     } else {
         None
     };
-    let gid = if let Ok(g) = group.parse::<u32>() {
-        Some(Gid::from_raw(g))
+    let gid = if let Ok(g,) = group.parse::<u32>() {
+        Some(Gid::from_raw(g,),)
     } else if !group.is_empty() {
         Some(
-            Group::from_name(group)
-                .map_err(|e| anyhow!("Error looking up group '{group}': {e}"))?
-                .ok_or_else(|| anyhow!("Group not found: {group}"))?
+            Group::from_name(group,)
+                .map_err(|e| anyhow!("Error looking up group '{group}': {e}"),)?
+                .ok_or_else(|| anyhow!("Group not found: {group}"),)?
                 .gid,
         )
     } else {
         None
     };
-    chown(path, uid, gid).map_err(|e| anyhow!("Failed to chown '{}': {}", path.display(), e))?;
-    Ok(())
+    chown(path, uid, gid,)
+        .map_err(|e| anyhow!("Failed to chown '{}': {}", path.display(), e),)?;
+    Ok((),)
 }
 
 /// Checks if a target platform is compatible with a list of allowed platforms.
-pub fn is_platform_compatible(current_platform: &str, allowed_platforms: &[String]) -> bool {
+pub fn is_platform_compatible(
+    current_platform: &str,
+    allowed_platforms: &[String],
+) -> bool {
     let os_part = current_platform
-        .split('-')
+        .split('-',)
         .next()
-        .unwrap_or(current_platform);
+        .unwrap_or(current_platform,);
     let os = match os_part {
         "darwin" => "macos",
         other => other,
     };
     allowed_platforms.iter().any(|p| {
-        if let Some(rest) = p.strip_prefix("ci:") {
-            let target = rest.split(':').next().unwrap_or_default();
+        if let Some(rest,) = p.strip_prefix("ci:",) {
+            let target = rest.split(':',).next().unwrap_or_default();
             target == current_platform || target == os
         } else {
             let p_norm = if p == "darwin" { "macos" } else { p };
             p_norm == "all" || p_norm == os || p_norm == current_platform
         }
-    })
+    },)
 }
 
 /// Validates a package license against SPDX and organizational policies.
-pub fn check_license(license: &str) {
-    if license.is_empty() || license.eq_ignore_ascii_case("None") {
+pub fn check_license(license: &str,) {
+    if license.is_empty() || license.eq_ignore_ascii_case("None",) {
         return;
     }
-    if license.eq_ignore_ascii_case("Proprietary") || license.eq_ignore_ascii_case("Unknown") {
+    if license.eq_ignore_ascii_case("Proprietary",)
+        || license.eq_ignore_ascii_case("Unknown",)
+    {
         return;
     }
-    if let Ok(expr) = spdx::Expression::parse(license)
+    if let Ok(expr,) = spdx::Expression::parse(license,)
         && !expr.evaluate(|req| match req.license {
             spdx::LicenseItem::Spdx { id, .. } => id.is_osi_approved(),
             spdx::LicenseItem::Other { .. } => false,
-        })
+        },)
     {}
 }
 
-/// Prompts the user to confirm installation from an untrusted (non-official) source.
+/// Prompts the user to confirm installation from an untrusted (non-official)
+/// source.
 ///
 /// # Errors
 ///
@@ -1037,23 +1119,34 @@ pub fn check_license(license: &str) {
 pub fn confirm_untrusted_source(
     source_type: &crate::types::SourceType,
     yes: bool,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<(),> {
     if is_mini_mode() {
-        return Ok(());
+        return Ok((),);
     }
     if source_type == &crate::types::SourceType::OfficialRepo {
-        return Ok(());
+        return Ok((),);
     }
     let warning_message = match source_type {
-        crate::types::SourceType::UntrustedRepo(repo) => {
+        crate::types::SourceType::UntrustedRepo(repo,) => {
             format!(
-                "The package from repository '@{repo}' is not an official Zoi repository."
+                "The package from repository '@{repo}' is not an official Zoi \
+                 repository."
             )
         }
-        crate::types::SourceType::LocalFile => "You are installing from a local file.".to_string(),
-        crate::types::SourceType::Url => "You are installing from a remote URL. This script will be executed with your user's permissions, which could lead to remote code execution if the source is malicious.".to_string(),
-        crate::types::SourceType::GitRepo(repo) => format!("You are installing from an external git repository '{repo}'. This script will be executed with your user's permissions."),
-        crate::types::SourceType::OfficialRepo => return Ok(()),
+        crate::types::SourceType::LocalFile => {
+            "You are installing from a local file.".to_string()
+        }
+        crate::types::SourceType::Url => {
+            "You are installing from a remote URL. This script will be \
+             executed with your user's permissions, which could lead to remote \
+             code execution if the source is malicious."
+                .to_string()
+        }
+        crate::types::SourceType::GitRepo(repo,) => format!(
+            "You are installing from an external git repository '{repo}'. \
+             This script will be executed with your user's permissions."
+        ),
+        crate::types::SourceType::OfficialRepo => return Ok((),),
     };
     println!(
         "\n{}: {}",
@@ -1064,13 +1157,14 @@ pub fn confirm_untrusted_source(
         "This source is not trusted. Are you sure you want to continue?",
         yes,
     ) {
-        Ok(())
+        Ok((),)
     } else {
-        Err(anyhow!("Operation aborted by user."))
+        Err(anyhow!("Operation aborted by user."),)
     }
 }
 
-/// Expands standard Zoi path placeholders (e.g. `${pkgstore}`, `${usrhome}`) in a string.
+/// Expands standard Zoi path placeholders (e.g. `${pkgstore}`, `${usrhome}`) in
+/// a string.
 ///
 /// # Errors
 ///
@@ -1079,63 +1173,66 @@ pub fn expand_placeholders(
     path: &str,
     version_dir: &Path,
     scope: crate::types::Scope,
-) -> Result<String> {
+) -> Result<String,> {
     let mut expanded = path.to_string();
-    expanded = expanded.replace("${pkgstore}", &version_dir.to_string_lossy());
+    expanded = expanded.replace("${pkgstore}", &version_dir.to_string_lossy(),);
     expanded = expanded.replace(
         "${usrroot}",
-        &crate::sysroot::apply_sysroot(PathBuf::from("/")).to_string_lossy(),
+        &crate::sysroot::apply_sysroot(PathBuf::from("/",),).to_string_lossy(),
     );
-    if let Some(home_dir) = get_user_home() {
-        expanded = expanded.replace("${usrhome}", &home_dir.to_string_lossy());
+    if let Some(home_dir,) = get_user_home() {
+        expanded = expanded.replace("${usrhome}", &home_dir.to_string_lossy(),);
     }
 
     let applications_dir = match scope {
-        crate::types::Scope::System => PathBuf::from("/Applications"),
-        crate::types::Scope::User => get_user_home().map_or_else(|| PathBuf::from("/Applications"), |h| h.join("Applications")),
+        crate::types::Scope::System => PathBuf::from("/Applications",),
+        crate::types::Scope::User => get_user_home().map_or_else(
+            || PathBuf::from("/Applications",),
+            |h| h.join("Applications",),
+        ),
         crate::types::Scope::Project => std::env::current_dir()
             .unwrap_or_default()
-            .join("Applications"),
+            .join("Applications",),
     };
-    expanded = expanded.replace("${applications}", &applications_dir.to_string_lossy());
+    expanded = expanded
+        .replace("${applications}", &applications_dir.to_string_lossy(),);
 
-    Ok(expanded)
+    Ok(expanded,)
 }
 
 /// Expands the `~` character to the user's home directory.
-pub fn expand_tilde<P: AsRef<Path>>(path: P) -> PathBuf {
+pub fn expand_tilde<P: AsRef<Path,>,>(path: P,) -> PathBuf {
     let path = path.as_ref();
-    if !path.starts_with("~") {
+    if !path.starts_with("~",) {
         return path.to_path_buf();
     }
-    if let Some(home_dir) = get_user_home() {
-        if path == Path::new("~") {
+    if let Some(home_dir,) = get_user_home() {
+        if path == Path::new("~",) {
             return home_dir;
         }
-        if let Ok(stripped) = path.strip_prefix("~/") {
-            return home_dir.join(stripped);
+        if let Ok(stripped,) = path.strip_prefix("~/",) {
+            return home_dir.join(stripped,);
         }
     }
     path.to_path_buf()
 }
 
 /// Detects and returns the current shell being used.
-pub fn get_current_shell() -> Option<Shell> {
+pub fn get_current_shell() -> Option<Shell,> {
     if cfg!(windows) {
-        return Some(Shell::PowerShell);
+        return Some(Shell::PowerShell,);
     }
-    if let Ok(shell_path) = std::env::var("SHELL") {
-        let shell_name = Path::new(&shell_path).file_name()?.to_str()?;
+    if let Ok(shell_path,) = std::env::var("SHELL",) {
+        let shell_name = Path::new(&shell_path,).file_name()?.to_str()?;
         match shell_name {
-            "bash" => Some(Shell::Bash),
-            "zsh" => Some(Shell::Zsh),
-            "fish" => Some(Shell::Fish),
-            "elvish" => Some(Shell::Elvish),
-            "pwsh" => Some(Shell::PowerShell),
+            "bash" => Some(Shell::Bash,),
+            "zsh" => Some(Shell::Zsh,),
+            "fish" => Some(Shell::Fish,),
+            "elvish" => Some(Shell::Elvish,),
+            "pwsh" => Some(Shell::PowerShell,),
             _ => None,
         }
     } else {
         None
     }
 }
-

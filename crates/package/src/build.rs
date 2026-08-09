@@ -3,22 +3,26 @@
 //! This module is responsible for turning a `.pkg.lua` definition into a
 //! distributable `.zpa` archive. It:
 //! - Executes the `prepare()`, `build()`, and `package()` Lua functions.
-//! - Manages the staging area where files are organized into Zoi's data structure.
+//! - Manages the staging area where files are organized into Zoi's data
+//!   structure.
 //! - Generates accompanying metadata: `.hash` (SHA-512), `.size`, and `.files`.
-//! - Supports native builds, Docker-based builds, and cross-compilation via CI tags.
+//! - Supports native builds, Docker-based builds, and cross-compilation via CI
+//!   tags.
 //! - Handles optional PGP signing of the resulting archive.
+
+use std::collections::BTreeMap;
+use std::fs::{self, File};
+use std::path::{Path, PathBuf};
 
 use anyhow::{Result, anyhow};
 use colored::Colorize;
 use mlua::{Lua, LuaSerdeExt, Table};
-use std::collections::BTreeMap;
-use std::fs::{self, File};
-use std::path::{Path, PathBuf};
 use tar::{Archive, Builder as TarBuilder};
 use tempfile::Builder;
 use walkdir::WalkDir;
 use zoi_core::types::{
-    self, PoolFileEntry, PooledZpaManifest, Scope, ScopeMapping, SubPackageMapping,
+    self, PoolFileEntry, PooledZpaManifest, Scope, ScopeMapping,
+    SubPackageMapping,
 };
 use zoi_core::utils;
 use zoi_lua;
@@ -30,29 +34,31 @@ use zstd::stream::write::Encoder as ZstdEncoder;
 ///
 /// # Errors
 ///
-/// Returns an error if the requested build type is not supported by the package.
+/// Returns an error if the requested build type is not supported by the
+/// package.
 pub fn resolve_build_type(
-    requested: Option<&str>,
+    requested: Option<&str,>,
     supported: &[String],
     pkg_name: &str,
-) -> Result<Option<String>> {
-    if let Some(t) = requested {
-        if !supported.iter().any(|s| s == t) {
+) -> Result<Option<String,>,> {
+    if let Some(t,) = requested {
+        if !supported.iter().any(|s| s == t,) {
             return Err(anyhow!(
-                "Build type '{t}' not supported by package '{pkg_name}'. Supported types: {supported:?}",
-            ));
+                "Build type '{t}' not supported by package '{pkg_name}'. \
+                 Supported types: {supported:?}",
+            ),);
         }
-        return Ok(Some(t.to_string()));
+        return Ok(Some(t.to_string(),),);
     }
 
-    if supported.iter().any(|t| t == "pre-compiled") {
-        Ok(Some("pre-compiled".to_string()))
-    } else if supported.iter().any(|t| t == "source") {
-        Ok(Some("source".to_string()))
-    } else if let Some(first) = supported.first() {
-        Ok(Some(first.clone()))
+    if supported.iter().any(|t| t == "pre-compiled",) {
+        Ok(Some("pre-compiled".to_string(),),)
+    } else if supported.iter().any(|t| t == "source",) {
+        Ok(Some("source".to_string(),),)
+    } else if let Some(first,) = supported.first() {
+        Ok(Some(first.clone(),),)
     } else {
-        Ok(None)
+        Ok(None,)
     }
 }
 
@@ -64,41 +70,51 @@ pub fn resolve_build_type(
 /// or if parsing the Lua package definition fails.
 pub fn get_build_dependencies(
     package_file: &Path,
-    build_type: Option<&str>,
+    build_type: Option<&str,>,
     platform: &str,
-    version_override: Option<&str>,
+    version_override: Option<&str,>,
     quiet: bool,
-) -> Result<Option<Vec<String>>> {
+) -> Result<Option<Vec<String,>,>,> {
     let pkg_for_meta = zoi_lua::parser::parse_lua_package_for_platform(
-        package_file
-            .to_str()
-            .ok_or_else(|| anyhow!("Path contains invalid UTF-8 characters: {}", package_file.display()))?,
+        package_file.to_str().ok_or_else(|| {
+            anyhow!(
+                "Path contains invalid UTF-8 characters: {}",
+                package_file.display()
+            )
+        },)?,
         platform,
         version_override,
         None,
         quiet,
     )?;
 
-    let Some(resolved_build_type) = resolve_build_type(build_type, &pkg_for_meta.types, &pkg_for_meta.name)? else {
-        return Ok(None);
+    let Some(resolved_build_type,) = resolve_build_type(
+        build_type,
+        &pkg_for_meta.types,
+        &pkg_for_meta.name,
+    )?
+    else {
+        return Ok(None,);
     };
 
-    if let Some(deps) = &pkg_for_meta.dependencies
-        && let Some(build_deps) = &deps.build
+    if let Some(deps,) = &pkg_for_meta.dependencies
+        && let Some(build_deps,) = &deps.build
     {
         let group = match build_deps {
-            types::BuildDependencies::Group(g) => Some(g),
-            types::BuildDependencies::Typed(t) => t.types.get(&resolved_build_type),
+            types::BuildDependencies::Group(g,) => Some(g,),
+            types::BuildDependencies::Typed(t,) => {
+                t.types.get(&resolved_build_type,)
+            }
         };
 
-        if let Some(g) = group {
+        if let Some(g,) = group {
             let mut all_deps = Vec::new();
-            collect_deps_from_group_no_prompt(g, &mut all_deps);
-            return Ok(Some(all_deps));
+            collect_deps_from_group_no_prompt(g, &mut all_deps,);
+            return Ok(Some(all_deps,),);
         }
     }
 
-    Ok(None)
+    Ok(None,)
 }
 
 /// Retrieves test-time dependencies for a package on a specific platform.
@@ -110,56 +126,64 @@ pub fn get_build_dependencies(
 pub fn get_test_dependencies(
     package_file: &Path,
     platform: &str,
-    version_override: Option<&str>,
+    version_override: Option<&str,>,
     quiet: bool,
-) -> Result<Option<Vec<String>>> {
+) -> Result<Option<Vec<String,>,>,> {
     let pkg_for_meta = zoi_lua::parser::parse_lua_package_for_platform(
-        package_file
-            .to_str()
-            .ok_or_else(|| anyhow!("Path contains invalid UTF-8 characters: {}", package_file.display()))?,
+        package_file.to_str().ok_or_else(|| {
+            anyhow!(
+                "Path contains invalid UTF-8 characters: {}",
+                package_file.display()
+            )
+        },)?,
         platform,
         version_override,
         None,
         quiet,
     )?;
 
-    if let Some(deps) = &pkg_for_meta.dependencies
-        && let Some(test_deps) = &deps.test
+    if let Some(deps,) = &pkg_for_meta.dependencies
+        && let Some(test_deps,) = &deps.test
     {
         let mut all_deps = Vec::new();
-        collect_deps_from_group_no_prompt(test_deps, &mut all_deps);
-        return Ok(Some(all_deps));
+        collect_deps_from_group_no_prompt(test_deps, &mut all_deps,);
+        return Ok(Some(all_deps,),);
     }
 
-    Ok(None)
+    Ok(None,)
 }
 
-/// Recursively collects dependencies from a dependency group without prompting the user.
-fn collect_deps_from_group_no_prompt(group: &types::DependencyGroup, deps: &mut Vec<String>) {
+/// Recursively collects dependencies from a dependency group without prompting
+/// the user.
+fn collect_deps_from_group_no_prompt(
+    group: &types::DependencyGroup,
+    deps: &mut Vec<String,>,
+) {
     match group {
-        types::DependencyGroup::Simple(d) => {
-            deps.extend(d.clone());
+        types::DependencyGroup::Simple(d,) => {
+            deps.extend(d.clone(),);
         }
-        types::DependencyGroup::Complex(g) => {
-            deps.extend(g.required.clone());
-            deps.extend(g.optional.clone());
+        types::DependencyGroup::Complex(g,) => {
+            deps.extend(g.required.clone(),);
+            deps.extend(g.optional.clone(),);
             for option_group in &g.options {
                 if option_group.all {
-                    deps.extend(option_group.depends.clone());
-                } else if let Some(dep) = option_group.depends.first() {
-                    deps.push(dep.clone());
+                    deps.extend(option_group.depends.clone(),);
+                } else if let Some(dep,) = option_group.depends.first() {
+                    deps.push(dep.clone(),);
                 }
             }
-            if let Some(sub_deps_map) = &g.sub_packages {
+            if let Some(sub_deps_map,) = &g.sub_packages {
                 for sub_group in sub_deps_map.values() {
-                    collect_deps_from_group_no_prompt(sub_group, deps);
+                    collect_deps_from_group_no_prompt(sub_group, deps,);
                 }
             }
         }
     }
 }
 
-/// Processes build operations defined in the Lua environment and stages them into the target directory.
+/// Processes build operations defined in the Lua environment and stages them
+/// into the target directory.
 fn process_build_operations(
     lua: &Lua,
     _sub_package: &str,
@@ -167,105 +191,132 @@ fn process_build_operations(
     build_dir_path: &Path,
     target_staging_dir: &Path,
     quiet: bool,
-) -> Result<()> {
-    if let Ok(build_ops) = lua.globals().get::<Table>("__ZoiBuildOperations") {
+) -> Result<(),> {
+    if let Ok(build_ops,) = lua.globals().get::<Table>("__ZoiBuildOperations",)
+    {
         for op in build_ops.sequence_values::<Table>() {
-            let op = op.map_err(|e| anyhow!(e.to_string()))?;
-            let op_type: String = op.get("op").map_err(|e| anyhow!(e.to_string()))?;
+            let op = op.map_err(|e| anyhow!(e.to_string()),)?;
+            let op_type: String =
+                op.get("op",).map_err(|e| anyhow!(e.to_string()),)?;
 
             let resolve_dest = |dest: String| -> String {
-                dest.replace("${pkgstore}", "pkgstore")
-                    .replace("${createpkgdir}", "createpkgdir")
-                    .replace("${usrroot}", "usrroot")
-                    .replace("${usrhome}", "usrhome")
+                dest.replace("${pkgstore}", "pkgstore",)
+                    .replace("${createpkgdir}", "createpkgdir",)
+                    .replace("${usrroot}", "usrroot",)
+                    .replace("${usrhome}", "usrhome",)
             };
 
             match op_type.as_str() {
                 "zcp" => {
-                    let source: String = op.get("source").map_err(|e| anyhow!(e.to_string()))?;
-                    let destination: String =
-                        op.get("destination").map_err(|e| anyhow!(e.to_string()))?;
+                    let source: String = op
+                        .get("source",)
+                        .map_err(|e| anyhow!(e.to_string()),)?;
+                    let destination: String = op
+                        .get("destination",)
+                        .map_err(|e| anyhow!(e.to_string()),)?;
 
-                    let mut source_path = if source.contains("${pkgluadir}") {
-                        Path::new(&source.replace("${pkgluadir}", pkg_lua_dir_str)).to_path_buf()
+                    let mut source_path = if source.contains("${pkgluadir}",) {
+                        Path::new(
+                            &source.replace("${pkgluadir}", pkg_lua_dir_str,),
+                        )
+                        .to_path_buf()
                     } else {
-                        build_dir_path.join(&source)
+                        build_dir_path.join(&source,)
                     };
 
-                    if !source_path.exists() && !source.contains("${pkgluadir}") {
-                        let fallback = Path::new(pkg_lua_dir_str).join(&source);
+                    if !source_path.exists()
+                        && !source.contains("${pkgluadir}",)
+                    {
+                        let fallback =
+                            Path::new(pkg_lua_dir_str,).join(&source,);
                         if fallback.exists() {
                             source_path = fallback;
                         }
                     }
 
-                    let dest_rel = resolve_dest(destination);
+                    let dest_rel = resolve_dest(destination,);
 
-                    if !utils::is_safe_path(target_staging_dir, Path::new(&dest_rel)) {
-                        return Err(anyhow!("Path traversal detected in zcp destination: {dest_rel}"));
+                    if !utils::is_safe_path(
+                        target_staging_dir,
+                        Path::new(&dest_rel,),
+                    ) {
+                        return Err(anyhow!(
+                            "Path traversal detected in zcp destination: \
+                             {dest_rel}"
+                        ),);
                     }
 
-                    let dest_path = target_staging_dir.join(&dest_rel);
+                    let dest_path = target_staging_dir.join(&dest_rel,);
 
                     let source_metadata = match source_path.symlink_metadata() {
-                        Ok(m) => m,
-                        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                        Ok(m,) => m,
+                        Err(e,) if e.kind() == std::io::ErrorKind::NotFound => {
                             if !quiet {
                                 println!(
-                                    "{} Skipping missing zcp source: '{source}' (not found in build dir or package dir)",
+                                    "{} Skipping missing zcp source: \
+                                     '{source}' (not found in build dir or \
+                                     package dir)",
                                     "::".bold().yellow(),
                                 );
                             }
                             continue;
                         }
-                        Err(e) => {
+                        Err(e,) => {
                             return Err(anyhow!(
-                                "Failed to get metadata for '{}' (resolved from '{source}'): {e}",
+                                "Failed to get metadata for '{}' (resolved \
+                                 from '{source}'): {e}",
                                 source_path.display(),
-                            ));
+                            ),);
                         }
                     };
 
                     if source_metadata.is_dir() {
-                        for entry in WalkDir::new(&source_path)
+                        for entry in WalkDir::new(&source_path,)
                             .into_iter()
-                            .filter_map(Result::ok)
+                            .filter_map(Result::ok,)
                         {
-                            let rel_entry = entry.path().strip_prefix(&source_path)?;
-                            let target_path = dest_path.join(rel_entry);
+                            let rel_entry =
+                                entry.path().strip_prefix(&source_path,)?;
+                            let target_path = dest_path.join(rel_entry,);
 
-                            let Ok(metadata) = entry.path().symlink_metadata() else {
+                            let Ok(metadata,) = entry.path().symlink_metadata()
+                            else {
                                 continue; // Skip entries we can't read
                             };
 
                             if metadata.is_dir() {
-                                fs::create_dir_all(&target_path)?;
+                                fs::create_dir_all(&target_path,)?;
                             } else if metadata.is_symlink() {
-                                if let Some(p) = target_path.parent() {
-                                    fs::create_dir_all(p)?;
+                                if let Some(p,) = target_path.parent() {
+                                    fs::create_dir_all(p,)?;
                                 }
-                                if let Ok(link_target) = fs::read_link(entry.path()) {
-                                    utils::symlink_file(&link_target, &target_path)?;
+                                if let Ok(link_target,) =
+                                    fs::read_link(entry.path(),)
+                                {
+                                    utils::symlink_file(
+                                        &link_target,
+                                        &target_path,
+                                    )?;
                                 }
                             } else {
-                                if let Some(p) = target_path.parent() {
-                                    fs::create_dir_all(p)?;
+                                if let Some(p,) = target_path.parent() {
+                                    fs::create_dir_all(p,)?;
                                 }
-                                let _ = fs::copy(entry.path(), &target_path);
+                                let _ = fs::copy(entry.path(), &target_path,);
                             }
                         }
                     } else if source_metadata.is_symlink() {
-                        if let Some(parent) = dest_path.parent() {
-                            fs::create_dir_all(parent)?;
+                        if let Some(parent,) = dest_path.parent() {
+                            fs::create_dir_all(parent,)?;
                         }
-                        if let Ok(link_target) = fs::read_link(&source_path) {
-                            utils::symlink_file(&link_target, &dest_path)?;
+                        if let Ok(link_target,) = fs::read_link(&source_path,) {
+                            utils::symlink_file(&link_target, &dest_path,)?;
                         }
                     } else {
-                        if let Some(parent) = dest_path.parent() {
-                            fs::create_dir_all(parent)?;
+                        if let Some(parent,) = dest_path.parent() {
+                            fs::create_dir_all(parent,)?;
                         }
-                        fs::copy(&source_path, &dest_path)?;
+                        fs::copy(&source_path, &dest_path,)?;
                     }
 
                     if !quiet {
@@ -273,82 +324,118 @@ fn process_build_operations(
                     }
                 }
                 "zln" => {
-                    let mut target: String =
-                        op.get("target").map_err(|e| anyhow!(e.to_string()))?;
-                    let link: String = op.get("link").map_err(|e| anyhow!(e.to_string()))?;
+                    let mut target: String = op
+                        .get("target",)
+                        .map_err(|e| anyhow!(e.to_string()),)?;
+                    let link: String =
+                        op.get("link",).map_err(|e| anyhow!(e.to_string()),)?;
 
-                    let dest_rel = resolve_dest(link);
+                    let dest_rel = resolve_dest(link,);
 
-                    target = target.replace("${pkgstore}", "pkgstore");
-                    target = target.replace("${createpkgdir}", "createpkgdir");
-                    target = target.replace("${usrroot}", "usrroot");
-                    target = target.replace("${usrhome}", "usrhome");
+                    target = target.replace("${pkgstore}", "pkgstore",);
+                    target = target.replace("${createpkgdir}", "createpkgdir",);
+                    target = target.replace("${usrroot}", "usrroot",);
+                    target = target.replace("${usrhome}", "usrhome",);
 
-                    if !utils::is_safe_path(target_staging_dir, Path::new(&dest_rel)) {
-                        return Err(anyhow!("Path traversal detected in zln link: {dest_rel}"));
+                    if !utils::is_safe_path(
+                        target_staging_dir,
+                        Path::new(&dest_rel,),
+                    ) {
+                        return Err(anyhow!(
+                            "Path traversal detected in zln link: {dest_rel}"
+                        ),);
                     }
 
-                    let link_path = target_staging_dir.join(&dest_rel);
-                    if let Some(parent) = link_path.parent() {
-                        fs::create_dir_all(parent)?;
+                    let link_path = target_staging_dir.join(&dest_rel,);
+                    if let Some(parent,) = link_path.parent() {
+                        fs::create_dir_all(parent,)?;
                     }
 
-                    utils::symlink_file(Path::new(&target), &link_path)?;
+                    utils::symlink_file(Path::new(&target,), &link_path,)?;
                     if !quiet {
                         println!("Created symlink '{dest_rel}' -> '{target}'");
                     }
                 }
                 "zchmod" => {
-                    let path: String = op.get("path").map_err(|e| anyhow!(e.to_string()))?;
-                    let mode: u32 = op.get("mode").map_err(|e| anyhow!(e.to_string()))?;
+                    let path: String =
+                        op.get("path",).map_err(|e| anyhow!(e.to_string()),)?;
+                    let mode: u32 =
+                        op.get("mode",).map_err(|e| anyhow!(e.to_string()),)?;
 
-                    let dest_rel = resolve_dest(path);
+                    let dest_rel = resolve_dest(path,);
 
-                    if !utils::is_safe_path(target_staging_dir, Path::new(&dest_rel)) {
-                        return Err(anyhow!("Path traversal detected in zchmod path: {dest_rel}"));
+                    if !utils::is_safe_path(
+                        target_staging_dir,
+                        Path::new(&dest_rel,),
+                    ) {
+                        return Err(anyhow!(
+                            "Path traversal detected in zchmod path: \
+                             {dest_rel}"
+                        ),);
                     }
 
                     #[cfg(unix)]
                     {
                         use std::os::unix::fs::PermissionsExt;
-                        let full_path = target_staging_dir.join(&dest_rel);
-                        fs::set_permissions(full_path, fs::Permissions::from_mode(mode))?;
+                        let full_path = target_staging_dir.join(&dest_rel,);
+                        fs::set_permissions(
+                            full_path,
+                            fs::Permissions::from_mode(mode,),
+                        )?;
                     }
                     if !quiet {
                         println!("Set permissions {mode} on '{dest_rel}'");
                     }
                 }
                 "zchown" => {
-                    let path: String = op.get("path").map_err(|e| anyhow!(e.to_string()))?;
-                    let owner: String = op.get("owner").map_err(|e| anyhow!(e.to_string()))?;
-                    let group: String = op.get("group").map_err(|e| anyhow!(e.to_string()))?;
+                    let path: String =
+                        op.get("path",).map_err(|e| anyhow!(e.to_string()),)?;
+                    let owner: String =
+                        op.get("owner",).map_err(|e| anyhow!(e.to_string()),)?;
+                    let group: String =
+                        op.get("group",).map_err(|e| anyhow!(e.to_string()),)?;
 
-                    let dest_rel = resolve_dest(path);
+                    let dest_rel = resolve_dest(path,);
 
-                    if !utils::is_safe_path(target_staging_dir, Path::new(&dest_rel)) {
-                        return Err(anyhow!("Path traversal detected in zchown path: {dest_rel}"));
+                    if !utils::is_safe_path(
+                        target_staging_dir,
+                        Path::new(&dest_rel,),
+                    ) {
+                        return Err(anyhow!(
+                            "Path traversal detected in zchown path: \
+                             {dest_rel}"
+                        ),);
                     }
 
                     #[cfg(unix)]
                     {
-                        let full_path = target_staging_dir.join(&dest_rel);
-                        utils::set_path_owner(&full_path, &owner, &group)?;
+                        let full_path = target_staging_dir.join(&dest_rel,);
+                        utils::set_path_owner(&full_path, &owner, &group,)?;
                     }
                     if !quiet {
-                        println!("Set ownership {owner}:{group} on '{dest_rel}'");
+                        println!(
+                            "Set ownership {owner}:{group} on '{dest_rel}'"
+                        );
                     }
                 }
                 "zmkdir" => {
-                    let path: String = op.get("path").map_err(|e| anyhow!(e.to_string()))?;
+                    let path: String =
+                        op.get("path",).map_err(|e| anyhow!(e.to_string()),)?;
 
-                    let dest_rel = resolve_dest(path);
+                    let dest_rel = resolve_dest(path,);
 
-                    if !utils::is_safe_path(target_staging_dir, Path::new(&dest_rel)) {
-                        return Err(anyhow!("Path traversal detected in zmkdir path: {dest_rel}"));
+                    if !utils::is_safe_path(
+                        target_staging_dir,
+                        Path::new(&dest_rel,),
+                    ) {
+                        return Err(anyhow!(
+                            "Path traversal detected in zmkdir path: \
+                             {dest_rel}"
+                        ),);
                     }
 
-                    let full_path = target_staging_dir.join(&dest_rel);
-                    fs::create_dir_all(full_path)?;
+                    let full_path = target_staging_dir.join(&dest_rel,);
+                    fs::create_dir_all(full_path,)?;
                     if !quiet {
                         println!("Created directory '{dest_rel}'");
                     }
@@ -357,84 +444,90 @@ fn process_build_operations(
             }
         }
     }
-    Ok(())
+    Ok((),)
 }
 
 /// Core implementation of the build process for a single platform.
 fn build_for_platform(
     package_file: &Path,
-    build_type: Option<&str>,
+    build_type: Option<&str,>,
     platform: &str,
-    sign_key: Option<&String>,
-    output_dir: Option<&Path>,
-    version_override: Option<&str>,
-    sub_packages: Option<&Vec<String>>,
+    sign_key: Option<&String,>,
+    output_dir: Option<&Path,>,
+    version_override: Option<&str,>,
+    sub_packages: Option<&Vec<String,>,>,
     quiet: bool,
     fakeroot: bool,
     _install_deps: bool,
     _test: bool,
-) -> Result<()> {
+) -> Result<(),> {
     let pkg_lua_dir = package_file
         .parent()
-        .filter(|p| !p.as_os_str().is_empty())
-        .unwrap_or(Path::new("."));
-    let pkg_lua_dir_str = pkg_lua_dir
-        .to_str()
-        .ok_or_else(|| anyhow!("Could not get parent directory of package file"))?;
+        .filter(|p| !p.as_os_str().is_empty(),)
+        .unwrap_or(Path::new(".",),);
+    let pkg_lua_dir_str = pkg_lua_dir.to_str().ok_or_else(|| {
+        anyhow!("Could not get parent directory of package file")
+    },)?;
     let pkg_for_meta = zoi_lua::parser::parse_lua_package_for_platform(
-        package_file
-            .to_str()
-            .ok_or_else(|| anyhow!("Path contains invalid UTF-8 characters: {}", package_file.display()))?,
+        package_file.to_str().ok_or_else(|| {
+            anyhow!(
+                "Path contains invalid UTF-8 characters: {}",
+                package_file.display()
+            )
+        },)?,
         platform,
         version_override,
         None,
         quiet,
     )?;
 
-    if let Some(allowed_platforms) = &pkg_for_meta.platforms
-        && !utils::is_platform_compatible(platform, allowed_platforms)
+    if let Some(allowed_platforms,) = &pkg_for_meta.platforms
+        && !utils::is_platform_compatible(platform, allowed_platforms,)
     {
         if !quiet {
             println!(
-                "{} Skipping build for platform {}: package only supports {allowed_platforms:?}",
+                "{} Skipping build for platform {}: package only supports \
+                 {allowed_platforms:?}",
                 "::".bold().yellow(),
                 platform.cyan(),
             );
         }
-        return Ok(());
+        return Ok((),);
     }
 
-    let Some(resolved_build_type) = resolve_build_type(
+    let Some(resolved_build_type,) = resolve_build_type(
         build_type,
         &pkg_for_meta.types,
         &pkg_for_meta.name,
-    )? else {
+    )?
+    else {
         if !quiet {
             println!(
-                "{} Skipping build for package '{}': no build types supported (likely a collection or template).",
+                "{} Skipping build for package '{}': no build types supported \
+                 (likely a collection or template).",
                 "::".bold().yellow(),
                 pkg_for_meta.name
             );
         }
-        return Ok(());
+        return Ok((),);
     };
 
-    let version = if let Some(v) = version_override {
+    let version = if let Some(v,) = version_override {
         v.to_string()
     } else {
-        resolve::get_default_version(&pkg_for_meta, None)?
+        resolve::get_default_version(&pkg_for_meta, None,)?
     };
 
     let build_dir = Builder::new()
-        .prefix(&format!("zoi-build-{}-{platform}", pkg_for_meta.name))
+        .prefix(&format!("zoi-build-{}-{platform}", pkg_for_meta.name),)
         .tempdir()?;
     if !quiet {
         println!("Using build directory: {}", build_dir.path().display());
     }
 
     let mut skip_prepare = false;
-    if let Some(parent) = package_file.parent()
-        && parent.join(".zoi-prepared").exists()
+    if let Some(parent,) = package_file.parent()
+        && parent.join(".zoi-prepared",).exists()
     {
         if !quiet {
             println!(
@@ -442,49 +535,50 @@ fn build_for_platform(
                 "::".bold().blue()
             );
         }
-        utils::copy_dir_all(parent, build_dir.path())?;
+        utils::copy_dir_all(parent, build_dir.path(),)?;
         skip_prepare = true;
     }
 
-    let staging_dir = build_dir.path().join("staging");
-    fs::create_dir_all(&staging_dir)?;
+    let staging_dir = build_dir.path().join("staging",);
+    fs::create_dir_all(&staging_dir,)?;
 
-    let pool_dir = staging_dir.join("pool");
-    fs::create_dir_all(&pool_dir)?;
+    let pool_dir = staging_dir.join("pool",);
+    fs::create_dir_all(&pool_dir,)?;
 
-    let mut pool: BTreeMap<String, PoolFileEntry> = BTreeMap::new();
-    let mut mappings: BTreeMap<String, SubPackageMapping> = BTreeMap::new();
+    let mut pool: BTreeMap<String, PoolFileEntry,> = BTreeMap::new();
+    let mut mappings: BTreeMap<String, SubPackageMapping,> = BTreeMap::new();
 
-    let subs_to_build = if let Some(subs) = sub_packages {
+    let subs_to_build = if let Some(subs,) = sub_packages {
         subs.clone()
-    } else if let Some(subs) = &pkg_for_meta.sub_packages {
-        if subs.contains(&String::new()) || subs.contains(&"main".to_string()) {
+    } else if let Some(subs,) = &pkg_for_meta.sub_packages {
+        if subs.contains(&String::new(),) || subs.contains(&"main".to_string(),)
+        {
             subs.clone()
         } else {
             let mut all_subs = vec![String::new()];
-            all_subs.extend(subs.clone());
+            all_subs.extend(subs.clone(),);
             all_subs
         }
     } else {
         vec![String::new()]
     };
 
-    let scopes_to_process =
-        pkg_for_meta
-            .scopes
-            .clone()
-            .unwrap_or(vec![Scope::User, Scope::System, Scope::Project]);
+    let scopes_to_process = pkg_for_meta.scopes.clone().unwrap_or(vec![
+        Scope::User,
+        Scope::System,
+        Scope::Project,
+    ],);
 
-    let lua_code = fs::read_to_string(package_file)?;
+    let lua_code = fs::read_to_string(package_file,)?;
 
     for sub_package in subs_to_build {
         let sub_pkg_name = if sub_package.is_empty() {
             None
         } else {
-            Some(sub_package.as_str())
+            Some(sub_package.as_str(),)
         };
 
-        if !quiet && let Some(sub) = sub_pkg_name {
+        if !quiet && let Some(sub,) = sub_pkg_name {
             println!(
                 "{} Building sub-package: {}",
                 "::".bold().blue(),
@@ -498,48 +592,53 @@ fn build_for_platform(
             zoi_lua::functions::setup_lua_environment(
                 &lua_sub,
                 platform,
-                Some(&version),
+                Some(&version,),
                 package_file.to_str(),
                 None,
-                Some(build_dir.path().to_str().unwrap_or("")),
+                Some(build_dir.path().to_str().unwrap_or("",),),
                 None, // No staging dir for shared build
                 sub_pkg_name,
-                Some(pkg_for_meta.scope),
-                Some(resolved_build_type.as_str()),
+                Some(pkg_for_meta.scope,),
+                Some(resolved_build_type.as_str(),),
                 quiet,
             )
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
             lua_sub
-                .load(&lua_code)
+                .load(&lua_code,)
                 .exec()
-                .map_err(|e| anyhow!(e.to_string()))?;
+                .map_err(|e| anyhow!(e.to_string()),)?;
 
-            let args_sub = lua_sub.create_table().map_err(|e| anyhow!(e.to_string()))?;
-            if let Some(sub) = sub_pkg_name {
+            let args_sub = lua_sub
+                .create_table()
+                .map_err(|e| anyhow!(e.to_string()),)?;
+            if let Some(sub,) = sub_pkg_name {
                 args_sub
-                    .set("sub", sub)
-                    .map_err(|e| anyhow!(e.to_string()))?;
+                    .set("sub", sub,)
+                    .map_err(|e| anyhow!(e.to_string()),)?;
             }
 
             if !skip_prepare
-                && let Ok(prepare_fn) = lua_sub.globals().get::<mlua::Function>("prepare")
+                && let Ok(prepare_fn,) =
+                    lua_sub.globals().get::<mlua::Function>("prepare",)
             {
                 if !quiet {
                     println!("Running prepare()...");
                 }
                 prepare_fn
-                    .call::<()>(args_sub.clone())
-                    .map_err(|e| anyhow!(e.to_string()))?;
+                    .call::<()>(args_sub.clone(),)
+                    .map_err(|e| anyhow!(e.to_string()),)?;
             }
 
-            if let Ok(build_fn) = lua_sub.globals().get::<mlua::Function>("build") {
+            if let Ok(build_fn,) =
+                lua_sub.globals().get::<mlua::Function>("build",)
+            {
                 if !quiet {
                     println!("Running build()...");
                 }
                 build_fn
-                    .call::<()>(args_sub)
-                    .map_err(|e| anyhow!(e.to_string()))?;
+                    .call::<()>(args_sub,)
+                    .map_err(|e| anyhow!(e.to_string()),)?;
             }
         }
 
@@ -549,48 +648,54 @@ fn build_for_platform(
 
         for scope in &scopes_to_process {
             if !quiet {
-                println!("  {} Staging for scope: {scope:?}", "::".bold().blue());
+                println!(
+                    "  {} Staging for scope: {scope:?}",
+                    "::".bold().blue()
+                );
             }
 
             let lua = Lua::new();
-            let v_staging = Builder::new().prefix("zoi-vstage-").tempdir()?;
+            let v_staging = Builder::new().prefix("zoi-vstage-",).tempdir()?;
 
             zoi_lua::functions::setup_lua_environment(
                 &lua,
                 platform,
-                Some(&version),
+                Some(&version,),
                 package_file.to_str(),
                 None,
-                Some(build_dir.path().to_str().unwrap_or("")),
-                Some(v_staging.path().to_str().unwrap_or("")),
+                Some(build_dir.path().to_str().unwrap_or("",),),
+                Some(v_staging.path().to_str().unwrap_or("",),),
                 sub_pkg_name,
-                Some(*scope),
-                Some(resolved_build_type.as_str()),
+                Some(*scope,),
+                Some(resolved_build_type.as_str(),),
                 true, // Always quiet for scope loops
             )
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
             let pkg_table = lua
-                .to_value(&pkg_for_meta)
-                .map_err(|e| anyhow!(e.to_string()))?;
+                .to_value(&pkg_for_meta,)
+                .map_err(|e| anyhow!(e.to_string()),)?;
             lua.globals()
-                .set("PKG", pkg_table)
-                .map_err(|e| anyhow!(e.to_string()))?;
+                .set("PKG", pkg_table,)
+                .map_err(|e| anyhow!(e.to_string()),)?;
 
-            lua.load(&lua_code)
+            lua.load(&lua_code,)
                 .exec()
-                .map_err(|e| anyhow!(e.to_string()))?;
+                .map_err(|e| anyhow!(e.to_string()),)?;
 
-            let args = lua.create_table().map_err(|e| anyhow!(e.to_string()))?;
+            let args =
+                lua.create_table().map_err(|e| anyhow!(e.to_string()),)?;
             if !sub_package.is_empty() {
-                args.set("sub", sub_package.clone())
-                    .map_err(|e| anyhow!(e.to_string()))?;
+                args.set("sub", sub_package.clone(),)
+                    .map_err(|e| anyhow!(e.to_string()),)?;
             }
 
-            if let Ok(package_fn) = lua.globals().get::<mlua::Function>("package") {
+            if let Ok(package_fn,) =
+                lua.globals().get::<mlua::Function>("package",)
+            {
                 package_fn
-                    .call::<()>(args.clone())
-                    .map_err(|e| anyhow!(e.to_string()))?;
+                    .call::<()>(args.clone(),)
+                    .map_err(|e| anyhow!(e.to_string()),)?;
             }
 
             process_build_operations(
@@ -611,28 +716,33 @@ fn build_for_platform(
                 fakeroot,
             )?;
 
-            sub_mapping.scopes.insert(*scope, scope_mapping);
+            sub_mapping.scopes.insert(*scope, scope_mapping,);
 
             if *scope == pkg_for_meta.scope {
                 // Run verify and test only for default scope to ensure sanity
-                if let Ok(verify_fn) = lua.globals().get::<mlua::Function>("verify") {
-                    let verification_passed: bool =
-                        match verify_fn.call::<mlua::Value>(args.clone()) {
-                            Ok(mlua::Value::Boolean(b)) => b,
-                            Ok(_) => true, // Legacy behavior
-                            Err(e) => return Err(anyhow!("Verification failed: {e}")),
-                        };
+                if let Ok(verify_fn,) =
+                    lua.globals().get::<mlua::Function>("verify",)
+                {
+                    let verification_passed: bool = match verify_fn
+                        .call::<mlua::Value>(args.clone(),)
+                    {
+                        Ok(mlua::Value::Boolean(b,),) => b,
+                        Ok(_,) => true, // Legacy behavior
+                        Err(e,) => {
+                            return Err(anyhow!("Verification failed: {e}"),);
+                        }
+                    };
                     if !verification_passed {
-                        return Err(anyhow!("Package verification failed."));
+                        return Err(anyhow!("Package verification failed."),);
                     }
                 }
             }
         }
-        mappings.insert(sub_package, sub_mapping);
+        mappings.insert(sub_package, sub_mapping,);
     }
 
-    if platform.starts_with("linux")
-        && let Err(e) = super::relocate::relocate_elfs(&pool_dir, quiet)
+    if platform.starts_with("linux",)
+        && let Err(e,) = super::relocate::relocate_elfs(&pool_dir, quiet,)
     {
         eprintln!(
             "{} Failed to relocate ELF binaries in pool: {e}",
@@ -646,33 +756,36 @@ fn build_for_platform(
         mappings,
     };
 
-    let manifest_json = serde_json::to_string_pretty(&pooled_manifest)?;
-    fs::write(staging_dir.join("manifest.json"), manifest_json)?;
+    let manifest_json = serde_json::to_string_pretty(&pooled_manifest,)?;
+    fs::write(staging_dir.join("manifest.json",), manifest_json,)?;
 
     fs::copy(
         package_file,
         staging_dir.join(
             package_file
                 .file_name()
-                .ok_or_else(|| anyhow!("package_file should have a name"))?,
+                .ok_or_else(|| anyhow!("package_file should have a name"),)?,
         ),
     )?;
 
-    let output_filename = format!("{}-{version}-{platform}.zpa", pkg_for_meta.name);
-    let output_base = if let Some(dir) = output_dir {
+    let output_filename =
+        format!("{}-{version}-{platform}.zpa", pkg_for_meta.name);
+    let output_base = if let Some(dir,) = output_dir {
         dir.to_path_buf()
     } else {
         package_file
             .parent()
-            .ok_or_else(|| anyhow!("package_file should have a parent directory"))?
+            .ok_or_else(|| {
+                anyhow!("package_file should have a parent directory")
+            },)?
             .to_path_buf()
     };
-    let output_path = output_base.join(output_filename);
+    let output_path = output_base.join(output_filename,);
 
     {
-        let file = File::create(&output_path)?;
-        let encoder = ZstdEncoder::new(file, 0)?.auto_finish();
-        let mut tar_builder = TarBuilder::new(encoder);
+        let file = File::create(&output_path,)?;
+        let encoder = ZstdEncoder::new(file, 0,)?.auto_finish();
+        let mut tar_builder = TarBuilder::new(encoder,);
 
         if fakeroot {
             if !quiet {
@@ -681,32 +794,40 @@ fn build_for_platform(
                     "::".bold().blue()
                 );
             }
-            for entry in WalkDir::new(&staging_dir).min_depth(1) {
+            for entry in WalkDir::new(&staging_dir,).min_depth(1,) {
                 let entry = entry?;
                 let path = entry.path();
-                let rel_path = path.strip_prefix(&staging_dir)?;
+                let rel_path = path.strip_prefix(&staging_dir,)?;
 
                 let mut header = tar::Header::new_gnu();
-                let metadata = fs::symlink_metadata(path)?;
+                let metadata = fs::symlink_metadata(path,)?;
 
-                header.set_metadata(&metadata);
-                header.set_uid(0);
-                header.set_gid(0);
-                header.set_username("root")?;
-                header.set_groupname("root")?;
+                header.set_metadata(&metadata,);
+                header.set_uid(0,);
+                header.set_gid(0,);
+                header.set_username("root",)?;
+                header.set_groupname("root",)?;
 
                 if metadata.is_dir() {
-                    tar_builder.append_data(&mut header, rel_path, std::io::empty())?;
+                    tar_builder.append_data(
+                        &mut header,
+                        rel_path,
+                        std::io::empty(),
+                    )?;
                 } else if metadata.is_symlink() {
-                    let target = fs::read_link(path)?;
-                    tar_builder.append_link(&mut header, rel_path, target)?;
+                    let target = fs::read_link(path,)?;
+                    tar_builder.append_link(&mut header, rel_path, target,)?;
                 } else {
-                    let mut file = File::open(path)?;
-                    tar_builder.append_data(&mut header, rel_path, &mut file)?;
+                    let mut file = File::open(path,)?;
+                    tar_builder.append_data(
+                        &mut header,
+                        rel_path,
+                        &mut file,
+                    )?;
                 }
             }
         } else {
-            tar_builder.append_dir_all(".", &staging_dir)?;
+            tar_builder.append_dir_all(".", &staging_dir,)?;
         }
         tar_builder.finish()?;
     }
@@ -718,34 +839,38 @@ fn build_for_platform(
     for sub_pkg in pooled_manifest.mappings.values() {
         for scope_mapping in sub_pkg.scopes.values() {
             for f in &scope_mapping.files {
-                files_list.insert(f.dest.clone());
+                files_list.insert(f.dest.clone(),);
             }
             for s in &scope_mapping.symlinks {
-                files_list.insert(s.link.clone());
+                files_list.insert(s.link.clone(),);
             }
             for d in &scope_mapping.dirs {
                 // Ensure directories end with / to distinguish them in search
                 let mut dir_path = d.path.clone();
-                if !dir_path.ends_with('/') {
-                    dir_path.push('/');
+                if !dir_path.ends_with('/',) {
+                    dir_path.push('/',);
                 }
-                files_list.insert(dir_path);
+                files_list.insert(dir_path,);
             }
         }
     }
 
-    let mut sorted_files: Vec<_> = files_list.into_iter().collect();
+    let mut sorted_files: Vec<_,> = files_list.into_iter().collect();
     sorted_files.sort();
 
-    let files_manifest_path = PathBuf::from(format!("{}.files", output_path.display()));
-    fs::write(&files_manifest_path, sorted_files.join("\n"))?;
+    let files_manifest_path =
+        PathBuf::from(format!("{}.files", output_path.display()),);
+    fs::write(&files_manifest_path, sorted_files.join("\n",),)?;
 
-    let hash_path = PathBuf::from(format!("{}.hash", output_path.display()));
-    let output_path_str = output_path
-        .to_str()
-        .ok_or_else(|| anyhow!("Output path contains invalid UTF-8: {}", output_path.display()))?;
+    let hash_path = PathBuf::from(format!("{}.hash", output_path.display()),);
+    let output_path_str = output_path.to_str().ok_or_else(|| {
+        anyhow!(
+            "Output path contains invalid UTF-8: {}",
+            output_path.display()
+        )
+    },)?;
     let hash = zoi_core::hash::calculate_file_hash(
-        Path::new(output_path_str),
+        Path::new(output_path_str,),
         zoi_core::hash::HashAlgorithm::Sha512,
     )?;
     fs::write(
@@ -756,41 +881,43 @@ fn build_for_platform(
                 .file_name()
                 .ok_or_else(|| anyhow!("output_path should have a name"))?
                 .to_str()
-                .ok_or_else(|| anyhow!("output_filename should be valid UTF-8"))?
+                .ok_or_else(|| anyhow!(
+                    "output_filename should be valid UTF-8"
+                ))?
         ),
     )?;
 
-    let size_path = PathBuf::from(format!("{}.size", output_path.display()));
-    let compressed_size = fs::metadata(&output_path)?.len();
-    let uncompressed_size: u64 = WalkDir::new(&staging_dir)
+    let size_path = PathBuf::from(format!("{}.size", output_path.display()),);
+    let compressed_size = fs::metadata(&output_path,)?.len();
+    let uncompressed_size: u64 = WalkDir::new(&staging_dir,)
         .into_iter()
-        .filter_map(Result::ok)
-        .filter(|e| e.file_type().is_file())
-        .map(|e| e.metadata().map_or(0, |m| m.len()))
+        .filter_map(Result::ok,)
+        .filter(|e| e.file_type().is_file(),)
+        .map(|e| e.metadata().map_or(0, |m| m.len(),),)
         .sum();
     fs::write(
         &size_path,
-        format!(
-            "down: {compressed_size}\ninstall: {uncompressed_size}\n",
-        ),
+        format!("down: {compressed_size}\ninstall: {uncompressed_size}\n",),
     )?;
 
     if !quiet {
         println!(
             "{}",
-            format!("Successfully built package: {}", output_path.display()).green()
+            format!("Successfully built package: {}", output_path.display())
+                .green()
         );
     }
 
-    if let Some(key_id) = sign_key {
+    if let Some(key_id,) = sign_key {
         if !quiet {
             println!("Signing package with key '{}'...", key_id.cyan());
         }
-        let signature_path = PathBuf::from(format!("{}.sig", output_path.display()));
+        let signature_path =
+            PathBuf::from(format!("{}.sig", output_path.display()),);
         if signature_path.exists() {
-            fs::remove_file(&signature_path)?;
+            fs::remove_file(&signature_path,)?;
         }
-        zoi_core::pgp::sign_detached(&output_path, &signature_path, key_id)?;
+        zoi_core::pgp::sign_detached(&output_path, &signature_path, key_id,)?;
         if !quiet {
             println!(
                 "{}",
@@ -803,7 +930,7 @@ fn build_for_platform(
         }
     }
 
-    Ok(())
+    Ok((),)
 }
 
 /// Executes the build process for one or more platforms.
@@ -817,24 +944,24 @@ fn build_for_platform(
 /// - One or more platform builds fail.
 pub fn run(
     package_file: &Path,
-    build_type: Option<&str>,
+    build_type: Option<&str,>,
     platforms: &[String],
-    sign_key: Option<String>,
-    output_dir: Option<&Path>,
-    version_override: Option<&str>,
-    sub_packages: Option<Vec<String>>,
+    sign_key: Option<String,>,
+    output_dir: Option<&Path,>,
+    version_override: Option<&str,>,
+    sub_packages: Option<Vec<String,>,>,
     quiet: bool,
     method: &str,
-    image: Option<&str>,
+    image: Option<&str,>,
     fakeroot: bool,
     install_deps: bool,
     test: bool,
-) -> Result<()> {
+) -> Result<(),> {
     let mut _temp_zsa_dir = None;
     let mut actual_package_file = package_file.to_path_buf();
     let mut default_output_dir = None;
 
-    if package_file.to_string_lossy().ends_with(".zsa") {
+    if package_file.to_string_lossy().ends_with(".zsa",) {
         if !quiet {
             println!(
                 "{} Extracting source bundle: {}",
@@ -844,39 +971,43 @@ pub fn run(
         }
 
         if output_dir.is_none() {
-            default_output_dir = package_file.parent().map(Path::to_path_buf);
+            default_output_dir = package_file.parent().map(Path::to_path_buf,);
         }
 
-        let temp_dir = Builder::new().prefix("zoi-zsa-extract-").tempdir()?;
-        let file = File::open(package_file)?;
-        let decoder = ZstdDecoder::new(file)?;
-        let mut archive = Archive::new(decoder);
-        archive.unpack(temp_dir.path())?;
+        let temp_dir = Builder::new().prefix("zoi-zsa-extract-",).tempdir()?;
+        let file = File::open(package_file,)?;
+        let decoder = ZstdDecoder::new(file,)?;
+        let mut archive = Archive::new(decoder,);
+        archive.unpack(temp_dir.path(),)?;
 
         // Locate the .pkg.lua file inside the bundle
         let mut pkg_lua = None;
-        for entry in WalkDir::new(temp_dir.path())
+        for entry in WalkDir::new(temp_dir.path(),)
             .into_iter()
-            .filter_map(Result::ok)
+            .filter_map(Result::ok,)
         {
-            if entry.file_name().to_string_lossy().ends_with(".pkg.lua") {
-                pkg_lua = Some(entry.path().to_path_buf());
+            if entry.file_name().to_string_lossy().ends_with(".pkg.lua",) {
+                pkg_lua = Some(entry.path().to_path_buf(),);
                 break;
             }
         }
 
-        actual_package_file = pkg_lua
-            .ok_or_else(|| anyhow!("Could not find .pkg.lua file inside the .zsa bundle."))?;
-        _temp_zsa_dir = Some(temp_dir);
+        actual_package_file = pkg_lua.ok_or_else(|| {
+            anyhow!("Could not find .pkg.lua file inside the .zsa bundle.")
+        },)?;
+        _temp_zsa_dir = Some(temp_dir,);
     }
 
     let package_file = actual_package_file.as_path();
-    let output_dir = output_dir.or(default_output_dir.as_deref());
+    let output_dir = output_dir.or(default_output_dir.as_deref(),);
 
     if method == "docker" {
         let docker_image = image.ok_or_else(|| {
-            anyhow!("An image must be specified when using the 'docker' build method.")
-        })?;
+            anyhow!(
+                "An image must be specified when using the 'docker' build \
+                 method."
+            )
+        },)?;
         return super::docker::run(
             package_file,
             build_type,
@@ -911,19 +1042,21 @@ pub fn run(
         println!("Building package from: {}", package_file.display());
     }
 
-    let platforms_to_build: Vec<String> = if platforms.contains(&"current".to_string()) {
-        let mut p = platforms.to_vec();
-        p.retain(|x| x != "current");
-        p.push(utils::get_platform()?);
-        p
-    } else {
-        platforms.to_vec()
-    };
+    let platforms_to_build: Vec<String,> =
+        if platforms.contains(&"current".to_string(),) {
+            let mut p = platforms.to_vec();
+            p.retain(|x| x != "current",);
+            p.push(utils::get_platform()?,);
+            p
+        } else {
+            platforms.to_vec()
+        };
 
-    if platforms.contains(&"all".to_string()) {
+    if platforms.contains(&"all".to_string(),) {
         return Err(anyhow!(
-            "Building for 'all' platforms is not supported in this flow yet. Please specify platforms explicitly."
-        ));
+            "Building for 'all' platforms is not supported in this flow yet. \
+             Please specify platforms explicitly."
+        ),);
     }
 
     let mut any_failed = false;
@@ -936,7 +1069,7 @@ pub fn run(
                 platform.cyan()
             );
         }
-        if let Err(e) = build_for_platform(
+        if let Err(e,) = build_for_platform(
             package_file,
             build_type,
             platform,
@@ -959,8 +1092,8 @@ pub fn run(
     }
 
     if any_failed {
-        return Err(anyhow!("One or more platform builds failed"));
+        return Err(anyhow!("One or more platform builds failed"),);
     }
 
-    Ok(())
+    Ok((),)
 }

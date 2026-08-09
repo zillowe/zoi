@@ -1,8 +1,9 @@
 //! Command for listing files associated with an installed package.
 
-use crate::pkg::{local, resolve};
 use anyhow::{Result, anyhow};
 use colored::Colorize;
+
+use crate::pkg::{local, resolve};
 
 /// Runs the 'files' command.
 ///
@@ -12,14 +13,20 @@ use colored::Colorize;
 ///
 /// Returns an error if the package is not installed or if there is an issue
 /// resolving the package metadata or files.
-pub fn run(package_name: &str) -> Result<()> {
-    let (pkg_meta, _, _, _, _, _, _) =
-        resolve::resolve_package_and_version(package_name, None, false, false)?;
+pub fn run(package_name: &str,) -> Result<(),> {
+    let (pkg_meta, _, _, _, _, _, _,) = resolve::resolve_package_and_version(
+        package_name,
+        None,
+        false,
+        false,
+    )?;
 
     let installed_packages = local::get_installed_packages()?;
 
-    let Some(pkg) = installed_packages.iter().find(|p| p.name == pkg_meta.name) else {
-        return Err(anyhow!("Package '{package_name}' is not installed."));
+    let Some(pkg,) =
+        installed_packages.iter().find(|p| p.name == pkg_meta.name,)
+    else {
+        return Err(anyhow!("Package '{package_name}' is not installed."),);
     };
 
     println!("Files for {} {}:", pkg.name.cyan(), pkg.version.yellow());
@@ -38,10 +45,14 @@ pub fn run(package_name: &str) -> Result<()> {
         let mut sorted_files = pkg.installed_files.clone();
         sorted_files.sort();
         for file in &sorted_files {
-            let expanded = crate::pkg::utils::expand_placeholders(file, &version_dir, pkg.scope)?;
+            let expanded = crate::pkg::utils::expand_placeholders(
+                file,
+                &version_dir,
+                pkg.scope,
+            )?;
             println!("{expanded}");
         }
     }
 
-    Ok(())
+    Ok((),)
 }

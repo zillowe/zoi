@@ -1,11 +1,15 @@
-use crate::config::ServiceConfig;
-use anyhow::Result;
 use std::collections::HashMap;
 use std::process::Command;
+
+use anyhow::Result;
 use zoi_install::service::{ServiceAction, manage_service};
 
-pub fn apply_services(services: &HashMap<String, ServiceConfig>) -> Result<()> {
-    for (name, cfg) in services {
+use crate::config::ServiceConfig;
+
+pub fn apply_services(
+    services: &HashMap<String, ServiceConfig,>,
+) -> Result<(),> {
+    for (name, cfg,) in services {
         let action_str = if cfg.enable { "enable" } else { "disable" };
         let action = if cfg.enable {
             ServiceAction::Enable
@@ -20,24 +24,28 @@ pub fn apply_services(services: &HashMap<String, ServiceConfig>) -> Result<()> {
         );
 
         // Try using Zoi's native service manager first
-        if manage_service(name, action).is_ok() {
+        if manage_service(name, action,).is_ok() {
             continue;
         }
 
         // Fallback to standard systemctl for system services
-        let mut cmd = Command::new("systemctl");
-        cmd.arg(action_str).arg("--now").arg(name);
+        let mut cmd = Command::new("systemctl",);
+        cmd.arg(action_str,).arg("--now",).arg(name,);
 
         match cmd.status() {
-            Ok(status) if !status.success() => {
+            Ok(status,) if !status.success() => {
                 eprintln!(
-                    "Warning: Failed to {} service {}: systemctl exited with {}",
+                    "Warning: Failed to {} service {}: systemctl exited with \
+                     {}",
                     action_str, name, status
                 );
             }
-            Err(e) => eprintln!("Warning: Failed to {} service {}: {}", action_str, name, e),
+            Err(e,) => eprintln!(
+                "Warning: Failed to {} service {}: {}",
+                action_str, name, e
+            ),
             _ => {}
         }
     }
-    Ok(())
+    Ok((),)
 }

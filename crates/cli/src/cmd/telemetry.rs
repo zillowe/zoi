@@ -4,7 +4,7 @@ use anyhow::Result;
 use colored::Colorize;
 
 /// Telemetry subcommands.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy,)]
 pub enum TelemetryCommand {
     /// Show telemetry status.
     Status,
@@ -19,7 +19,7 @@ pub enum TelemetryCommand {
 /// # Errors
 ///
 /// Returns an error if the configuration cannot be read or written.
-pub fn run(cmd: TelemetryCommand) -> Result<()> {
+pub fn run(cmd: TelemetryCommand,) -> Result<(),> {
     match cmd {
         TelemetryCommand::Status => {
             let cfg = crate::pkg::config::read_config()?;
@@ -28,15 +28,23 @@ pub fn run(cmd: TelemetryCommand) -> Result<()> {
             } else {
                 "Disabled".yellow()
             };
-            println!("{} telemetry is currently {}.", "::".bold().blue(), status);
+            println!(
+                "{} telemetry is currently {}.",
+                "::".bold().blue(),
+                status
+            );
 
             if cfg.telemetry_enabled {
                 let id = crate::pkg::telemetry::get_anonymous_id();
                 println!("Anonymous Client ID: {}", id.cyan());
                 println!(
-                    "\nThank you for helping us improve Zoi! We collect minimal, anonymous data about:"
+                    "\nThank you for helping us improve Zoi! We collect \
+                     minimal, anonymous data about:"
                 );
-                println!("- {} (OS, Arch, Distro, Shell)", "Environment".bold());
+                println!(
+                    "- {} (OS, Arch, Distro, Shell)",
+                    "Environment".bold()
+                );
                 println!("- {} (Action, Scope, Reason)", "Operations".bold());
                 println!(
                     "- {} (Name, Version, Repo, License)",
@@ -44,7 +52,8 @@ pub fn run(cmd: TelemetryCommand) -> Result<()> {
                 );
             } else {
                 println!(
-                    "\nTelemetry is anonymous and helps us prioritize features and platforms."
+                    "\nTelemetry is anonymous and helps us prioritize \
+                     features and platforms."
                 );
                 println!("Run 'zoi telemetry enable' to help the project.");
             }
@@ -54,7 +63,8 @@ pub fn run(cmd: TelemetryCommand) -> Result<()> {
 
             println!(
                 "{}",
-                "Notice: Enabling telemetry shares anonymous usage data to help improve Zoi."
+                "Notice: Enabling telemetry shares anonymous usage data to \
+                 help improve Zoi."
                     .dimmed()
             );
             println!(
@@ -68,15 +78,15 @@ pub fn run(cmd: TelemetryCommand) -> Result<()> {
             );
 
             cfg.telemetry_enabled = true;
-            crate::pkg::config::write_user_config(&cfg)?;
+            crate::pkg::config::write_user_config(&cfg,)?;
             println!("{} telemetry enabled", "Success:".green());
         }
         TelemetryCommand::Disable => {
             let mut cfg = crate::pkg::config::read_user_config()?;
             cfg.telemetry_enabled = false;
-            crate::pkg::config::write_user_config(&cfg)?;
+            crate::pkg::config::write_user_config(&cfg,)?;
             println!("{} telemetry disabled", "Success:".green());
         }
     }
-    Ok(())
+    Ok((),)
 }

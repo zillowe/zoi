@@ -1,16 +1,19 @@
 //! Logic for the `service` command.
 //!
 //! This module provides commands for managing background services associated
-//! with installed packages, allowing users to start, stop, enable, and monitor them.
+//! with installed packages, allowing users to start, stop, enable, and monitor
+//! them.
 
-use crate::pkg::service::{self, ServiceAction};
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
-use comfy_table::{Table, presets::UTF8_FULL};
+use comfy_table::Table;
+use comfy_table::presets::UTF8_FULL;
+
+use crate::pkg::service::{self, ServiceAction};
 
 /// The root service management command.
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug,)]
 #[command(long_about = "Manages background services for installed packages.")]
 pub struct ServiceCommand {
     /// The specific service subcommand to execute.
@@ -19,7 +22,7 @@ pub struct ServiceCommand {
 }
 
 /// Available service subcommands.
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Debug,)]
 pub enum ServiceCommands {
     /// Start a service
     Start {
@@ -61,59 +64,60 @@ pub enum ServiceCommands {
 /// # Errors
 ///
 /// Returns an error if the service action fails.
-pub fn run(args: ServiceCommand) -> Result<()> {
+pub fn run(args: ServiceCommand,) -> Result<(),> {
     match args.command {
-        ServiceCommands::Start { package } => {
+        ServiceCommands::Start { package, } => {
             println!("Starting service for package '{}'...", package.cyan());
-            service::manage_service(&package, ServiceAction::Start)?;
+            service::manage_service(&package, ServiceAction::Start,)?;
             println!("{}", "Service started successfully.".green());
         }
-        ServiceCommands::Stop { package } => {
+        ServiceCommands::Stop { package, } => {
             println!("Stopping service for package '{}'...", package.cyan());
-            service::manage_service(&package, ServiceAction::Stop)?;
+            service::manage_service(&package, ServiceAction::Stop,)?;
             println!("{}", "Service stopped successfully.".green());
         }
-        ServiceCommands::Restart { package } => {
+        ServiceCommands::Restart { package, } => {
             println!("Restarting service for package '{}'...", package.cyan());
-            service::manage_service(&package, ServiceAction::Restart)?;
+            service::manage_service(&package, ServiceAction::Restart,)?;
             println!("{}", "Service restarted successfully.".green());
         }
-        ServiceCommands::Status { package } => {
-            service::manage_service(&package, ServiceAction::Status)?;
+        ServiceCommands::Status { package, } => {
+            service::manage_service(&package, ServiceAction::Status,)?;
         }
-        ServiceCommands::Enable { package } => {
+        ServiceCommands::Enable { package, } => {
             println!("Enabling service for package '{}'...", package.cyan());
-            service::manage_service(&package, ServiceAction::Enable)?;
+            service::manage_service(&package, ServiceAction::Enable,)?;
             println!("{}", "Service enabled successfully.".green());
         }
-        ServiceCommands::Disable { package } => {
+        ServiceCommands::Disable { package, } => {
             println!("Disabling service for package '{}'...", package.cyan());
-            service::manage_service(&package, ServiceAction::Disable)?;
+            service::manage_service(&package, ServiceAction::Disable,)?;
             println!("{}", "Service disabled successfully.".green());
         }
         ServiceCommands::List => {
             let services = service::list_services()?;
             if services.is_empty() {
                 println!("No installed packages define background services.");
-                return Ok(());
+                return Ok((),);
             }
 
             let mut table = Table::new();
             table
-                .load_preset(UTF8_FULL)
-                .set_header(vec!["Package", "Status"]);
+                .load_preset(UTF8_FULL,)
+                .set_header(vec!["Package", "Status"],);
 
-            for (pkg, status) in services {
+            for (pkg, status,) in services {
                 let status_cell = if status == "active" || status == "running" {
                     status.green()
                 } else {
                     status.yellow()
                 };
-                table.add_row(vec![pkg.cyan(), status_cell.to_string().into()]);
+                table
+                    .add_row(vec![pkg.cyan(), status_cell.to_string().into()],);
             }
 
             println!("{table}");
         }
     }
-    Ok(())
+    Ok((),)
 }

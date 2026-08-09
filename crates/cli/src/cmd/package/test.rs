@@ -1,7 +1,8 @@
 //! Running tests for packages.
 
-use super::build;
 use anyhow::Result;
+
+use super::build;
 
 /// Runs tests for a package.
 ///
@@ -11,9 +12,9 @@ use anyhow::Result;
 /// # Errors
 ///
 /// Returns an error if the tests fail or dependencies cannot be installed.
-pub fn run(args: &build::BuildCommand) -> Result<()> {
+pub fn run(args: &build::BuildCommand,) -> Result<(),> {
     if args.install_deps {
-        build::install_dependencies_for_build(args, true)?;
+        build::install_dependencies_for_build(args, true,)?;
     }
-    crate::pkg::package::test::run(args)
+    crate::pkg::package::test::run(args,)
 }

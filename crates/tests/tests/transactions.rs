@@ -1,14 +1,16 @@
 //! Integration tests for package transaction management and atomicity.
 
 use std::fs;
+
 use tempfile::tempdir;
-use zoi::pkg::resolve;
-use zoi::pkg::types::{InstallManifest, InstallReason, PackageType, Scope, TransactionOperation};
-use zoi::pkg::{local, transaction};
+use zoi::pkg::types::{
+    InstallManifest, InstallReason, PackageType, Scope, TransactionOperation,
+};
+use zoi::pkg::{local, resolve, transaction};
 
 mod common;
 
-fn sample_manifest(name: &str, files: Vec<&str>) -> InstallManifest {
+fn sample_manifest(name: &str, files: Vec<&str,>,) -> InstallManifest {
     InstallManifest {
         name: name.to_string(),
         version: "1.0.0".to_string(),
@@ -31,17 +33,22 @@ fn sample_manifest(name: &str, files: Vec<&str>) -> InstallManifest {
         dependencies_v2: None,
         chosen_options: vec![],
         chosen_optionals: vec![],
-        install_method: Some("test".to_string()),
+        install_method: Some("test".to_string(),),
         platform: zoi_core::utils::get_platform().unwrap_or_default(),
         service: None,
-        installed_files: files.into_iter().map(str::to_string).collect(),
+        installed_files: files.into_iter().map(str::to_string,).collect(),
         installed_size: None,
         sandbox: None,
         completions: None,
     }
 }
 
-fn write_package_source(path: &std::path::Path, name: &str, repo: &str, version: &str) {
+fn write_package_source(
+    path: &std::path::Path,
+    name: &str,
+    repo: &str,
+    version: &str,
+) {
     fs::write(
         path,
         format!(
@@ -59,21 +66,21 @@ end
 "#
         ),
     )
-    .expect("unwrap failed");
+    .expect("unwrap failed",);
 }
 
 #[test]
 fn test_transaction_lifecycle() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("unwrap failed");
-    ctx.set_env_var("HOME", tmp.path());
+    let tmp = tempdir().expect("unwrap failed",);
+    ctx.set_env_var("HOME", tmp.path(),);
 
-    let mut transaction = transaction::begin().expect("unwrap failed");
+    let mut transaction = transaction::begin().expect("unwrap failed",);
     let id = transaction.id.clone();
     let transaction_path = tmp
         .path()
-        .join(".zoi/transactions")
-        .join(format!("{id}.json"));
+        .join(".zoi/transactions",)
+        .join(format!("{id}.json"),);
 
     assert!(
         !transaction_path.exists(),
@@ -83,21 +90,28 @@ fn test_transaction_lifecycle() {
     transaction::record_operation(
         &mut transaction,
         TransactionOperation::Install {
-            manifest: Box::new(sample_manifest("test-pkg", vec!["/tmp/zoi-test-file"])),
+            manifest: Box::new(sample_manifest(
+                "test-pkg",
+                vec!["/tmp/zoi-test-file"],
+            ),),
         },
     )
-    .expect("unwrap failed");
+    .expect("unwrap failed",);
 
     assert!(
         transaction_path.exists(),
         "transaction log should exist after first operation"
     );
 
-    let modified = transaction::get_modified_files(&id).expect("unwrap failed");
+    let modified =
+        transaction::get_modified_files(&id,).expect("unwrap failed",);
     assert_eq!(modified.len(), 1);
-    assert_eq!(modified.first().expect("Value should exist in test"), "/tmp/zoi-test-file");
+    assert_eq!(
+        modified.first().expect("Value should exist in test"),
+        "/tmp/zoi-test-file"
+    );
 
-    transaction::commit(&id).expect("unwrap failed");
+    transaction::commit(&id,).expect("unwrap failed",);
     assert!(
         !transaction_path.exists(),
         "commit should remove the transaction log"
@@ -107,22 +121,29 @@ fn test_transaction_lifecycle() {
 #[test]
 fn test_transaction_get_modified_files_deduplicates_upgrade_paths() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("unwrap failed");
-    ctx.set_env_var("HOME", tmp.path());
+    let tmp = tempdir().expect("unwrap failed",);
+    ctx.set_env_var("HOME", tmp.path(),);
 
-    let mut transaction = transaction::begin().expect("unwrap failed");
+    let mut transaction = transaction::begin().expect("unwrap failed",);
     let id = transaction.id.clone();
 
     transaction::record_operation(
         &mut transaction,
         TransactionOperation::Upgrade {
-            old_manifest: Box::new(sample_manifest("test-pkg", vec!["/tmp/shared", "/tmp/old"])),
-            new_manifest: Box::new(sample_manifest("test-pkg", vec!["/tmp/shared", "/tmp/new"])),
+            old_manifest: Box::new(sample_manifest(
+                "test-pkg",
+                vec!["/tmp/shared", "/tmp/old"],
+            ),),
+            new_manifest: Box::new(sample_manifest(
+                "test-pkg",
+                vec!["/tmp/shared", "/tmp/new"],
+            ),),
         },
     )
-    .expect("unwrap failed");
+    .expect("unwrap failed",);
 
-    let mut modified = transaction::get_modified_files(&id).expect("unwrap failed");
+    let mut modified =
+        transaction::get_modified_files(&id,).expect("unwrap failed",);
     modified.sort();
     assert_eq!(
         modified,
@@ -137,14 +158,14 @@ fn test_transaction_get_modified_files_deduplicates_upgrade_paths() {
 #[test]
 fn test_transaction_begin_does_not_write_log_file() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("unwrap failed");
-    ctx.set_env_var("HOME", tmp.path());
+    let tmp = tempdir().expect("unwrap failed",);
+    ctx.set_env_var("HOME", tmp.path(),);
 
-    let transaction = transaction::begin().expect("unwrap failed");
+    let transaction = transaction::begin().expect("unwrap failed",);
     let transaction_path = tmp
         .path()
-        .join(".zoi/transactions")
-        .join(format!("{}.json", transaction.id));
+        .join(".zoi/transactions",)
+        .join(format!("{}.json", transaction.id),);
 
     assert!(
         !transaction_path.exists(),
@@ -155,32 +176,33 @@ fn test_transaction_begin_does_not_write_log_file() {
 #[test]
 fn test_transaction_read_and_list() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("unwrap failed");
-    ctx.set_env_var("HOME", tmp.path());
+    let tmp = tempdir().expect("unwrap failed",);
+    ctx.set_env_var("HOME", tmp.path(),);
 
-    let mut first = transaction::begin().expect("unwrap failed");
+    let mut first = transaction::begin().expect("unwrap failed",);
     transaction::record_operation(
         &mut first,
         TransactionOperation::Install {
-            manifest: Box::new(sample_manifest("alpha", vec!["/tmp/a"])),
+            manifest: Box::new(sample_manifest("alpha", vec!["/tmp/a"],),),
         },
     )
-    .expect("unwrap failed");
+    .expect("unwrap failed",);
 
-    let mut second = transaction::begin().expect("unwrap failed");
+    let mut second = transaction::begin().expect("unwrap failed",);
     transaction::record_operation(
         &mut second,
         TransactionOperation::Uninstall {
-            manifest: Box::new(sample_manifest("beta", vec!["/tmp/b"])),
+            manifest: Box::new(sample_manifest("beta", vec!["/tmp/b"],),),
         },
     )
-    .expect("unwrap failed");
+    .expect("unwrap failed",);
 
-    let read_back = transaction::read_transaction(&first.id).expect("unwrap failed");
+    let read_back =
+        transaction::read_transaction(&first.id,).expect("unwrap failed",);
     assert_eq!(read_back.id, first.id);
     assert_eq!(read_back.operations.len(), 1);
 
-    let listed = transaction::list_transactions().expect("unwrap failed");
+    let listed = transaction::list_transactions().expect("unwrap failed",);
     assert_eq!(listed.len(), 2);
     assert!(listed.iter().any(|entry| entry.id == first.id));
     assert!(listed.iter().any(|entry| entry.id == second.id));
@@ -190,35 +212,38 @@ fn test_transaction_read_and_list() {
 #[test]
 fn test_transaction_rollback_install_uses_exact_subpackage_source() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("unwrap failed");
+    let tmp = tempdir().expect("unwrap failed",);
     let root = tmp.path().to_path_buf();
-    ctx.set_env_var("HOME", &root);
-    common::TestContextGuard::set_sysroot(root.clone());
+    ctx.set_env_var("HOME", &root,);
+    common::TestContextGuard::set_sysroot(root.clone(),);
 
-    let mut manifest = sample_manifest("test-pkg", vec![]);
+    let mut manifest = sample_manifest("test-pkg", vec![],);
     manifest.repo = "core".to_string();
     manifest.registry_handle = "local".to_string();
-    manifest.sub_package = Some("cli".to_string());
+    manifest.sub_package = Some("cli".to_string(),);
 
-    local::write_manifest(&manifest).expect("unwrap failed");
+    local::write_manifest(&manifest,).expect("unwrap failed",);
 
-    let pkg_source = root.join("test.pkg.lua");
-    write_package_source(&pkg_source, "test-pkg", "core", "1.0.0");
-    local::persist_package_source(&manifest, &pkg_source).expect("unwrap failed");
+    let pkg_source = root.join("test.pkg.lua",);
+    write_package_source(&pkg_source, "test-pkg", "core", "1.0.0",);
+    local::persist_package_source(&manifest, &pkg_source,)
+        .expect("unwrap failed",);
 
-    let mut transaction = transaction::begin().expect("unwrap failed");
+    let mut transaction = transaction::begin().expect("unwrap failed",);
     let id = transaction.id.clone();
     transaction::record_operation(
         &mut transaction,
         TransactionOperation::Install {
-            manifest: Box::new(manifest.clone()),
+            manifest: Box::new(manifest.clone(),),
         },
     )
-    .expect("unwrap failed");
+    .expect("unwrap failed",);
 
-    transaction::rollback(&id).expect("unwrap failed");
+    transaction::rollback(&id,).expect("unwrap failed",);
 
-    let request = resolve::parse_source_string("#local@core/test-pkg:cli@1.0.0").expect("unwrap failed");
+    let request =
+        resolve::parse_source_string("#local@core/test-pkg:cli@1.0.0",)
+            .expect("unwrap failed",);
     assert!(
         local::find_installed_manifests_matching(&request, Scope::User)
             .expect("unwrap failed")

@@ -1,28 +1,33 @@
 //! Implementation of the `dev` command for project development environments.
 
-use crate::pkg::{install, local, resolve, types};
+use std::collections::HashMap;
+use std::process::Command;
+
 use anyhow::{Result, anyhow};
 use colored::Colorize;
 use indicatif::MultiProgress;
-use std::collections::HashMap;
-use std::process::Command;
 use zoi_project::config as project_config;
+
+use crate::pkg::{install, local, resolve, types};
 
 /// Runs the `dev` command to enter a development shell for a project.
 /// # Errors
 ///
-/// Returns an error if the development shell cannot be entered or dependencies cannot be resolved.
-pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
+/// Returns an error if the development shell cannot be entered or dependencies
+/// cannot be resolved.
+pub fn run(run_cmd: Option<String,>, repo: Option<String,>,) -> Result<(),> {
     let is_repo = repo.is_some();
-    let _temp_dir = if let Some(repo_url) = repo {
-        let full_url = if repo_url.starts_with("http") || repo_url.contains('@') {
+    let _temp_dir = if let Some(repo_url,) = repo {
+        let full_url = if repo_url.starts_with("http",)
+            || repo_url.contains('@',)
+        {
             repo_url
-        } else if let Some((provider, path)) = repo_url.split_once(':') {
+        } else if let Some((provider, path,),) = repo_url.split_once(':',) {
             match provider {
                 "gh" | "github" => format!("https://github.com/{path}.git"),
                 "gl" | "gitlab" => format!("https://gitlab.com/{path}.git"),
                 "cb" | "codeberg" => format!("https://codeberg.org/{path}.git"),
-                _ => return Err(anyhow!("Unknown provider: {provider}")),
+                _ => return Err(anyhow!("Unknown provider: {provider}"),),
             }
         } else {
             format!("https://github.com/{repo_url}.git")
@@ -34,27 +39,27 @@ pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
             full_url.cyan()
         );
 
-        let temp = tempfile::Builder::new().prefix("zoi-dev-").tempdir()?;
-        let status = Command::new("git")
-            .arg("clone")
-            .arg("--depth")
-            .arg("1")
-            .arg(full_url)
-            .arg(temp.path())
+        let temp = tempfile::Builder::new().prefix("zoi-dev-",).tempdir()?;
+        let status = Command::new("git",)
+            .arg("clone",)
+            .arg("--depth",)
+            .arg("1",)
+            .arg(full_url,)
+            .arg(temp.path(),)
             .status()?;
 
         if !status.success() {
-            return Err(anyhow!("Failed to clone repository."));
+            return Err(anyhow!("Failed to clone repository."),);
         }
 
-        std::env::set_current_dir(temp.path())?;
-        Some(temp)
+        std::env::set_current_dir(temp.path(),)?;
+        Some(temp,)
     } else {
         None
     };
 
     let config = if is_repo {
-        project_config::load_with_env(&HashMap::new())?
+        project_config::load_with_env(&HashMap::new(),)?
     } else {
         project_config::load()?
     };
@@ -64,19 +69,19 @@ pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
         config.name.cyan().bold()
     );
 
-    let (graph, _non_zoi_deps) = install::resolver::resolve_dependency_graph(
+    let (graph, _non_zoi_deps,) = install::resolver::resolve_dependency_graph(
         &config.pkgs,
-        Some(types::Scope::Project),
+        Some(types::Scope::Project,),
         false,
         true,
         true,
         None,
         true,
-        Some(config.clone()),
+        Some(config.clone(),),
     )?;
 
     let mut missing_nodes = HashMap::new();
-    for (id, node) in &graph.nodes {
+    for (id, node,) in &graph.nodes {
         let request_source = crate::pkg::local::package_source_string(
             &node.registry_handle,
             &node.pkg.repo,
@@ -84,26 +89,28 @@ pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
             node.sub_package.as_deref(),
             &node.version,
         );
-        if let Ok(request) = resolve::parse_source_string(&request_source) {
+        if let Ok(request,) = resolve::parse_source_string(&request_source,) {
             let matches = crate::pkg::local::find_installed_manifests_matching(
                 &request,
                 types::Scope::Project,
             )?;
             if !matches
                 .iter()
-                .any(|manifest| manifest.version == node.version)
+                .any(|manifest| manifest.version == node.version,)
             {
-                missing_nodes.insert(id.clone(), node.clone());
+                missing_nodes.insert(id.clone(), node.clone(),);
             }
         } else {
-            missing_nodes.insert(id.clone(), node.clone());
+            missing_nodes.insert(id.clone(), node.clone(),);
         }
     }
 
-    let install_plan = install::plan::create_install_plan(&missing_nodes, None, false)?;
+    let install_plan =
+        install::plan::create_install_plan(&missing_nodes, None, false,)?;
     if !install_plan.is_empty() {
-        use rayon::prelude::*;
         use std::sync::Mutex;
+
+        use rayon::prelude::*;
 
         println!(
             "{} Ensuring project dependencies are installed...",
@@ -111,58 +118,70 @@ pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
         );
 
         let m_prep = MultiProgress::new();
-        let prepared_nodes = Mutex::new(HashMap::new());
+        let prepared_nodes = Mutex::new(HashMap::new(),);
 
-        missing_nodes
-            .par_iter()
-            .try_for_each(|(pkg_id, node)| -> Result<()> {
-                let action = install_plan
-                    .get(pkg_id)
-                    .ok_or_else(|| anyhow!("Install action not found for: {pkg_id}"))?;
+        missing_nodes.par_iter().try_for_each(
+            |(pkg_id, node,)| -> Result<(),> {
+                let action = install_plan.get(pkg_id,).ok_or_else(|| {
+                    anyhow!("Install action not found for: {pkg_id}")
+                },)?;
 
-                let prepared =
-                    install::installer::prepare_node(node, action, Some(&m_prep), None, false)?;
+                let prepared = install::installer::prepare_node(
+                    node,
+                    action,
+                    Some(&m_prep,),
+                    None,
+                    false,
+                )?;
 
                 let mut lock = prepared_nodes.lock().map_err(|e| {
-                    anyhow!("Prepared nodes mutex poisoned during preparation: {e}")
-                })?;
-                lock.insert(pkg_id.clone(), prepared);
-                Ok(())
-            })?;
+                    anyhow!(
+                        "Prepared nodes mutex poisoned during preparation: {e}"
+                    )
+                },)?;
+                lock.insert(pkg_id.clone(), prepared,);
+                Ok((),)
+            },
+        )?;
 
         let m = indicatif::MultiProgress::new();
         let stages = graph.toposort()?;
         for stage in stages {
-            stage.into_par_iter().try_for_each(|pkg_id| -> Result<()> {
-                let prepared = {
-                    let lock = prepared_nodes.lock().map_err(|e| {
-                        anyhow!("Prepared nodes mutex poisoned during install: {e}")
-                    })?;
-                    lock.get(&pkg_id).cloned()
-                };
+            stage
+                .into_par_iter()
+                .try_for_each(|pkg_id| -> Result<(),> {
+                    let prepared = {
+                        let lock = prepared_nodes.lock().map_err(|e| {
+                            anyhow!(
+                                "Prepared nodes mutex poisoned during \
+                                 install: {e}"
+                            )
+                        },)?;
+                        lock.get(&pkg_id,).cloned()
+                    };
 
-                if let Some(prepared) = prepared {
-                    let node = graph
-                        .nodes
-                        .get(&pkg_id)
-                        .ok_or_else(|| anyhow!("Package not found in graph: {pkg_id}"))?;
+                    if let Some(prepared,) = prepared {
+                        let node =
+                            graph.nodes.get(&pkg_id,).ok_or_else(|| {
+                                anyhow!("Package not found in graph: {pkg_id}")
+                            },)?;
 
-                    install::installer::install_prepared_node(
-                        node,
-                        &prepared,
-                        Some(&m),
-                        true,
-                        true,
-                        true,
-                        false,
-                    )?;
-                }
-                Ok(())
-            })?;
+                        install::installer::install_prepared_node(
+                            node,
+                            &prepared,
+                            Some(&m,),
+                            true,
+                            true,
+                            true,
+                            false,
+                        )?;
+                    }
+                    Ok((),)
+                },)?;
         }
     }
 
-    let mut env_vars: HashMap<String, String> = HashMap::new();
+    let mut env_vars: HashMap<String, String,> = HashMap::new();
 
     let mut bin_paths = Vec::new();
     let mut lib_paths = Vec::new();
@@ -174,33 +193,34 @@ pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
     for node in graph.nodes.values() {
         let handle = &node.registry_handle;
         let pkg = &node.pkg;
-        let package_dir = local::get_package_dir(pkg.scope, handle, &pkg.repo, &pkg.name)?;
-        let version_dir = package_dir.join(&node.version);
+        let package_dir =
+            local::get_package_dir(pkg.scope, handle, &pkg.repo, &pkg.name,)?;
+        let version_dir = package_dir.join(&node.version,);
 
-        let bin_dir = version_dir.join("bin");
+        let bin_dir = version_dir.join("bin",);
         if bin_dir.exists() {
-            bin_paths.push(bin_dir);
+            bin_paths.push(bin_dir,);
         }
 
-        let lib_dir = version_dir.join("lib");
+        let lib_dir = version_dir.join("lib",);
         if lib_dir.exists() {
-            lib_paths.push(lib_dir.clone());
-            let pkgconfig_dir = lib_dir.join("pkgconfig");
+            lib_paths.push(lib_dir.clone(),);
+            let pkgconfig_dir = lib_dir.join("pkgconfig",);
             if pkgconfig_dir.exists() {
-                pkg_config_paths.push(pkgconfig_dir);
+                pkg_config_paths.push(pkgconfig_dir,);
             }
         }
 
-        let include_dir = version_dir.join("include");
+        let include_dir = version_dir.join("include",);
         if include_dir.exists() {
-            include_paths.push(include_dir);
+            include_paths.push(include_dir,);
         }
 
-        let share_dir = version_dir.join("share");
+        let share_dir = version_dir.join("share",);
         if share_dir.exists() {
-            let pkgconfig_dir = share_dir.join("pkgconfig");
+            let pkgconfig_dir = share_dir.join("pkgconfig",);
             if pkgconfig_dir.exists() {
-                pkg_config_paths.push(pkgconfig_dir);
+                pkg_config_paths.push(pkgconfig_dir,);
             }
         }
     }
@@ -208,13 +228,13 @@ pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
     if !bin_paths.is_empty() {
         let mut path = bin_paths
             .iter()
-            .map(|p| p.to_string_lossy().to_string())
-            .collect::<Vec<_>>()
-            .join(sep);
-        if let Ok(old_path) = std::env::var("PATH") {
+            .map(|p| p.to_string_lossy().to_string(),)
+            .collect::<Vec<_,>>()
+            .join(sep,);
+        if let Ok(old_path,) = std::env::var("PATH",) {
             path = format!("{path}{sep}{old_path}");
         }
-        env_vars.insert("PATH".to_string(), path);
+        env_vars.insert("PATH".to_string(), path,);
     }
 
     if !lib_paths.is_empty() {
@@ -225,98 +245,98 @@ pub fn run(run_cmd: Option<String>, repo: Option<String>) -> Result<()> {
         };
         let mut path = lib_paths
             .iter()
-            .map(|p| p.to_string_lossy().to_string())
-            .collect::<Vec<_>>()
-            .join(sep);
-        if let Ok(old_path) = std::env::var(lib_path_var) {
+            .map(|p| p.to_string_lossy().to_string(),)
+            .collect::<Vec<_,>>()
+            .join(sep,);
+        if let Ok(old_path,) = std::env::var(lib_path_var,) {
             path = format!("{path}{sep}{old_path}");
         }
-        env_vars.insert(lib_path_var.to_string(), path);
+        env_vars.insert(lib_path_var.to_string(), path,);
     }
 
     if !include_paths.is_empty() {
         let path = include_paths
             .iter()
-            .map(|p| p.to_string_lossy().to_string())
-            .collect::<Vec<_>>()
-            .join(sep);
-        for var in &["CPATH", "C_INCLUDE_PATH", "CPLUS_INCLUDE_PATH"] {
+            .map(|p| p.to_string_lossy().to_string(),)
+            .collect::<Vec<_,>>()
+            .join(sep,);
+        for var in &["CPATH", "C_INCLUDE_PATH", "CPLUS_INCLUDE_PATH",] {
             let mut full_path = path.clone();
-            if let Ok(old_path) = std::env::var(var) {
+            if let Ok(old_path,) = std::env::var(var,) {
                 full_path = format!("{full_path}{sep}{old_path}");
             }
-            env_vars.insert(var.to_string(), full_path);
+            env_vars.insert(var.to_string(), full_path,);
         }
     }
 
     if !pkg_config_paths.is_empty() {
         let mut path = pkg_config_paths
             .iter()
-            .map(|p| p.to_string_lossy().to_string())
-            .collect::<Vec<_>>()
-            .join(sep);
-        if let Ok(old_path) = std::env::var("PKG_CONFIG_PATH") {
+            .map(|p| p.to_string_lossy().to_string(),)
+            .collect::<Vec<_,>>()
+            .join(sep,);
+        if let Ok(old_path,) = std::env::var("PKG_CONFIG_PATH",) {
             path = format!("{path}{sep}{old_path}");
         }
-        env_vars.insert("PKG_CONFIG_PATH".to_string(), path);
+        env_vars.insert("PKG_CONFIG_PATH".to_string(), path,);
     }
 
-    if let Some(shell_spec) = &config.shell {
+    if let Some(shell_spec,) = &config.shell {
         let platform = crate::pkg::utils::get_platform()?;
         let extra_env = match &shell_spec.env {
-            project_config::PlatformOrEnvMap::EnvMap(m) => m.clone(),
-            project_config::PlatformOrEnvMap::Platform(p) => p
-                .get(&platform)
-                .or_else(|| p.get("default"))
+            project_config::PlatformOrEnvMap::EnvMap(m,) => m.clone(),
+            project_config::PlatformOrEnvMap::Platform(p,) => p
+                .get(&platform,)
+                .or_else(|| p.get("default",),)
                 .cloned()
                 .unwrap_or_default(),
         };
-        for (k, v) in extra_env {
-            env_vars.insert(k, v);
+        for (k, v,) in extra_env {
+            env_vars.insert(k, v,);
         }
     }
 
-    if let Some(cmd_str) = run_cmd {
+    if let Some(cmd_str,) = run_cmd {
         println!("{} Running: {}", "::".bold().blue(), cmd_str.cyan());
         let mut child = if cfg!(windows) {
-            Command::new("pwsh")
-                .arg("-Command")
-                .arg(&cmd_str)
-                .envs(&env_vars)
+            Command::new("pwsh",)
+                .arg("-Command",)
+                .arg(&cmd_str,)
+                .envs(&env_vars,)
                 .spawn()?
         } else {
-            Command::new("bash")
-                .arg("-c")
-                .arg(&cmd_str)
-                .envs(&env_vars)
+            Command::new("bash",)
+                .arg("-c",)
+                .arg(&cmd_str,)
+                .envs(&env_vars,)
                 .spawn()?
         };
         let status = child.wait()?;
         if !status.success() {
-            std::process::exit(status.code().unwrap_or(1));
+            std::process::exit(status.code().unwrap_or(1,),);
         }
     } else {
-        let shell_bin = std::env::var("SHELL").unwrap_or_else(|_| {
+        let shell_bin = std::env::var("SHELL",).unwrap_or_else(|_| {
             if cfg!(windows) {
                 "pwsh".to_string()
             } else {
                 "bash".to_string()
             }
-        });
+        },);
 
         println!(
             "{} Entering dev shell (type 'exit' to leave)...",
             "::".bold().green()
         );
 
-        let mut child = Command::new(&shell_bin)
-            .envs(&env_vars)
-            .env("ZOI_SHELL", "dev")
+        let mut child = Command::new(&shell_bin,)
+            .envs(&env_vars,)
+            .env("ZOI_SHELL", "dev",)
             .spawn()?;
 
         let _ = child.wait()?;
         println!("{} Exited dev shell.", "::".bold().blue());
     }
 
-    Ok(())
+    Ok((),)
 }

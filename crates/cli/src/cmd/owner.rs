@@ -1,20 +1,23 @@
-//! Implementation of the `owner` command, which finds the package that owns a given file.
+//! Implementation of the `owner` command, which finds the package that owns a
+//! given file.
 
-use crate::pkg::local;
+use std::path::Path;
+
 use anyhow::Result;
 use colored::Colorize;
-use std::path::Path;
+
+use crate::pkg::local;
 
 /// Runs the owner command.
 ///
 /// # Errors
 ///
-/// Returns an error if the path does not exist, or if there is an error querying the
-/// package database or ownership information.
-pub fn run(path: &Path) -> Result<()> {
+/// Returns an error if the path does not exist, or if there is an error
+/// querying the package database or ownership information.
+pub fn run(path: &Path,) -> Result<(),> {
     let absolute_path = match path.canonicalize() {
-        Ok(p) => p,
-        Err(_) => path.to_path_buf(),
+        Ok(p,) => p,
+        Err(_,) => path.to_path_buf(),
     };
 
     println!("Querying for file: {}", absolute_path.display());
@@ -25,7 +28,7 @@ pub fn run(path: &Path) -> Result<()> {
         if pkg
             .installed_files
             .iter()
-            .any(|f| Path::new(f) == absolute_path)
+            .any(|f| Path::new(f,) == absolute_path,)
         {
             println!(
                 "{} is owned by {} {}",
@@ -33,10 +36,10 @@ pub fn run(path: &Path) -> Result<()> {
                 pkg.name.cyan(),
                 pkg.version.yellow()
             );
-            return Ok(());
+            return Ok((),);
         }
     }
 
     println!("No package owns file: {}", absolute_path.display());
-    Ok(())
+    Ok((),)
 }

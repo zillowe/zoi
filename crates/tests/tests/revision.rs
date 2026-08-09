@@ -8,12 +8,12 @@ mod common;
 #[test]
 fn test_package_outdated_on_revision_bump() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("Failed to create temp dir");
+    let tmp = tempdir().expect("Failed to create temp dir",);
     let root = tmp.path().to_path_buf();
 
-    ctx.set_env_var("HOME", root.clone());
-    common::TestContextGuard::set_sysroot(root.clone());
-    ctx.set_env_var("ZOI_DB_DIR", root.join("db"));
+    ctx.set_env_var("HOME", root.clone(),);
+    common::TestContextGuard::set_sysroot(root.clone(),);
+    ctx.set_env_var("ZOI_DB_DIR", root.join("db",),);
 
     let pkg_name = "rev-test";
     let version = "1.0.0";
@@ -28,20 +28,29 @@ fn test_package_outdated_on_revision_bump() {
         }],
         ..Default::default()
     };
-    config::write_user_config(&cfg).expect("unwrap failed");
+    config::write_user_config(&cfg,).expect("unwrap failed",);
 
-    let db_root = root.join("db");
-    let reg_root = db_root.join(handle);
-    std::fs::create_dir_all(reg_root.join(repo).join(pkg_name)).expect("unwrap failed");
+    let db_root = root.join("db",);
+    let reg_root = db_root.join(handle,);
+    std::fs::create_dir_all(reg_root.join(repo,).join(pkg_name,),)
+        .expect("unwrap failed",);
     std::fs::write(
-        reg_root.join("repo.yaml"),
+        reg_root.join("repo.yaml",),
         "name: testreg\nrepos: [{name: core, type: official, active: true}]",
     )
-    .expect("unwrap failed");
+    .expect("unwrap failed",);
     std::fs::write(
-        reg_root.join(repo).join(pkg_name).join(format!("{pkg_name}.pkg.lua")),
-        format!("metadata({{ name = '{pkg_name}', repo = '{repo}', version = '{version}', revision = '2', description = 'test', maintainer = {{ name = 'test', email = 'test' }}, types = {{ 'source' }} }})")
-    ).expect("unwrap failed");
+        reg_root
+            .join(repo,)
+            .join(pkg_name,)
+            .join(format!("{pkg_name}.pkg.lua"),),
+        format!(
+            "metadata({{ name = '{pkg_name}', repo = '{repo}', version = \
+             '{version}', revision = '2', description = 'test', maintainer = \
+             {{ name = 'test', email = 'test' }}, types = {{ 'source' }} }})"
+        ),
+    )
+    .expect("unwrap failed",);
 
     let manifest = types::InstallManifest {
         name: "test-rev".to_string(),
@@ -65,7 +74,7 @@ fn test_package_outdated_on_revision_bump() {
         dependencies_v2: None,
         chosen_options: vec![],
         chosen_optionals: vec![],
-        install_method: Some("test".to_string()),
+        install_method: Some("test".to_string(),),
         platform: zoi_core::utils::get_platform().unwrap_or_default(),
         service: None,
         installed_files: vec![],
@@ -73,33 +82,35 @@ fn test_package_outdated_on_revision_bump() {
         sandbox: None,
         completions: None,
     };
-    local::write_manifest(&manifest).expect("unwrap failed");
+    local::write_manifest(&manifest,).expect("unwrap failed",);
 
-    let conn = db::open_connection(handle).expect("unwrap failed");
+    let conn = db::open_connection(handle,).expect("unwrap failed",);
     let pkg_meta = types::Package {
         name: pkg_name.to_string(),
         repo: repo.to_string(),
-        version: Some(version.to_string()),
+        version: Some(version.to_string(),),
         revision: "2".to_string(),
         ..Default::default()
     };
-    db::update_package(&conn, &pkg_meta, handle, None, None, None).expect("unwrap failed");
+    db::update_package(&conn, &pkg_meta, handle, None, None, None,)
+        .expect("unwrap failed",);
 
     let source = format!("#{handle}@{repo}/{pkg_name}");
-    let (resolved_pkg, new_version, _, _, _, _, _) =
+    let (resolved_pkg, new_version, _, _, _, _, _,) =
         zoi::pkg::resolve::resolve_package_and_version(
             &source,
-            Some(types::Scope::User),
+            Some(types::Scope::User,),
             true,
             true,
         )
-        .expect("unwrap failed");
+        .expect("unwrap failed",);
 
     assert_eq!(new_version, version);
     assert_eq!(resolved_pkg.revision, "2");
     assert_ne!(manifest.revision, resolved_pkg.revision);
 
-    let is_outdated = manifest.version != new_version || manifest.revision != resolved_pkg.revision;
+    let is_outdated = manifest.version != new_version
+        || manifest.revision != resolved_pkg.revision;
     assert!(
         is_outdated,
         "Package should be considered outdated due to revision bump"

@@ -1,17 +1,19 @@
 //! Integration tests for package-specific doctor checks.
 
 use std::fs;
+
 use tempfile::tempdir;
 use zoi::pkg::package::doctor;
 
 #[test]
 fn package_doctor_accepts_valid_minimal_file() {
-    let tmp = tempdir().expect("tempdir should be created");
-    let pkg_path = tmp.path().join("test.pkg.lua");
-    fs::copy("tests/assets/test.pkg.lua", &pkg_path).expect("failed to copy test asset");
+    let tmp = tempdir().expect("tempdir should be created",);
+    let pkg_path = tmp.path().join("test.pkg.lua",);
+    fs::copy("tests/assets/test.pkg.lua", &pkg_path,)
+        .expect("failed to copy test asset",);
 
-    let report = doctor::run(&pkg_path, Some("linux-amd64"), None)
-        .expect("doctor should parse minimal test package");
+    let report = doctor::run(&pkg_path, Some("linux-amd64",), None,)
+        .expect("doctor should parse minimal test package",);
 
     assert!(
         report.errors.is_empty(),
@@ -22,8 +24,8 @@ fn package_doctor_accepts_valid_minimal_file() {
 
 #[test]
 fn package_doctor_reports_invalid_dependency_and_main_subs() {
-    let tmp = tempdir().expect("tempdir should be created");
-    let pkg_path = tmp.path().join("broken.pkg.lua");
+    let tmp = tempdir().expect("tempdir should be created",);
+    let pkg_path = tmp.path().join("broken.pkg.lua",);
 
     let lua = r#"
 metadata({
@@ -49,10 +51,10 @@ function package()
 end
 "#;
 
-    fs::write(&pkg_path, lua).expect("test package should be written");
+    fs::write(&pkg_path, lua,).expect("test package should be written",);
 
-    let report = doctor::run(&pkg_path, Some("linux-amd64"), None)
-        .expect("doctor should return report for invalid package");
+    let report = doctor::run(&pkg_path, Some("linux-amd64",), None,)
+        .expect("doctor should return report for invalid package",);
 
     assert!(!report.errors.is_empty());
     assert!(

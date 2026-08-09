@@ -1,12 +1,14 @@
-//! Implementation of the `package doctor` command, which validates package specification files.
+//! Implementation of the `package doctor` command, which validates package
+//! specification files.
+
+use std::path::PathBuf;
 
 use anyhow::{Result, anyhow};
 use clap::Parser;
 use colored::Colorize;
-use std::path::PathBuf;
 
 /// Arguments for the `package doctor` command.
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug,)]
 pub struct DoctorCommand {
     /// Path to the package file (e.g. path/to/name.pkg.lua)
     #[arg(required = true)]
@@ -14,11 +16,11 @@ pub struct DoctorCommand {
 
     /// Validate as this target platform (defaults to current platform)
     #[arg(long)]
-    pub platform: Option<String>,
+    pub platform: Option<String,>,
 
     /// Override package version while validating
     #[arg(long)]
-    pub version_override: Option<String>,
+    pub version_override: Option<String,>,
 }
 
 /// Runs the `package doctor` command.
@@ -26,7 +28,7 @@ pub struct DoctorCommand {
 /// # Errors
 ///
 /// Returns an error if the doctor check fails.
-pub fn run(args: &DoctorCommand) -> Result<()> {
+pub fn run(args: &DoctorCommand,) -> Result<(),> {
     println!(
         "{} Running package doctor for {}",
         "::".bold().blue(),
@@ -53,11 +55,11 @@ pub fn run(args: &DoctorCommand) -> Result<()> {
             "::".bold().green(),
             report.warnings.len()
         );
-        Ok(())
+        Ok((),)
     } else {
         Err(anyhow!(
             "package doctor found {} error(s)",
             report.errors.len()
-        ))
+        ),)
     }
 }

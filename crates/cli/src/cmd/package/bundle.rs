@@ -1,11 +1,12 @@
 //! Implementation of the `package bundle` command.
 
-use anyhow::Result;
-use clap::Parser;
 use std::path::PathBuf;
 
+use anyhow::Result;
+use clap::Parser;
+
 /// Arguments for the `package bundle` command.
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug,)]
 pub struct BundleCommand {
     /// Path to the package file (e.g. path/to/name.pkg.lua)
     #[arg(required = true)]
@@ -13,19 +14,19 @@ pub struct BundleCommand {
 
     /// Directory to output the bundled package to
     #[arg(long, short = 'o')]
-    pub output_dir: Option<PathBuf>,
+    pub output_dir: Option<PathBuf,>,
 
     /// Sign the bundle with a PGP key
     #[arg(long)]
-    pub sign: Option<String>,
+    pub sign: Option<String,>,
 
     /// Override the package version
     #[arg(long)]
-    pub version_override: Option<String>,
+    pub version_override: Option<String,>,
 
     /// The build type to bundle (e.g. 'source', 'pre-compiled')
     #[arg(long, short = 't')]
-    pub build_type: Option<String>,
+    pub build_type: Option<String,>,
 }
 
 /// Runs the `package bundle` command.
@@ -34,7 +35,7 @@ pub struct BundleCommand {
 ///
 /// Returns an error if the package cannot be bundled, if there are missing
 /// dependencies, or if there is an error writing the bundle file.
-pub fn run(args: BundleCommand) -> Result<()> {
+pub fn run(args: BundleCommand,) -> Result<(),> {
     crate::pkg::package::bundle::run(
         &args.package_file,
         args.output_dir.as_deref(),

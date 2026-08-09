@@ -1,13 +1,15 @@
-use anyhow::{Result, anyhow};
 use std::fs;
 use std::path::{Path, PathBuf};
+
+use anyhow::{Result, anyhow};
 
 /// The content of the Zoi Lua API definitions for LSP.
 const ZOI_LUA_DEFINITIONS: &str = include_str!("./builtin/lsp/zoi.lua");
 
 /// Sets up the LSP workspace for Zoi package development.
 ///
-/// This creates the necessary Lua definitions and a `.luarc.json` file in the given path.
+/// This creates the necessary Lua definitions and a `.luarc.json` file in the
+/// given path.
 ///
 /// # Errors
 ///
@@ -15,20 +17,20 @@ const ZOI_LUA_DEFINITIONS: &str = include_str!("./builtin/lsp/zoi.lua");
 /// - The LSP definitions directory cannot be created.
 /// - The `zoi.lua` definition file cannot be written.
 /// - The `.luarc.json` file cannot be written.
-pub fn setup_lsp_workspace(path: &Path) -> Result<()> {
+pub fn setup_lsp_workspace(path: &Path,) -> Result<(),> {
     let lsp_dir = get_lsp_definitions_dir()?;
-    fs::create_dir_all(&lsp_dir)?;
+    fs::create_dir_all(&lsp_dir,)?;
 
-    let zoi_lua_path = lsp_dir.join("zoi.lua");
-    fs::write(&zoi_lua_path, ZOI_LUA_DEFINITIONS)?;
+    let zoi_lua_path = lsp_dir.join("zoi.lua",);
+    fs::write(&zoi_lua_path, ZOI_LUA_DEFINITIONS,)?;
 
-    let luarc_path = path.join(".luarc.json");
+    let luarc_path = path.join(".luarc.json",);
     if !luarc_path.exists() {
-        let luarc_content = generate_luarc_json(&lsp_dir)?;
-        fs::write(luarc_path, luarc_content)?;
+        let luarc_content = generate_luarc_json(&lsp_dir,)?;
+        fs::write(luarc_path, luarc_content,)?;
     }
 
-    Ok(())
+    Ok((),)
 }
 
 /// Returns the directory where Zoi LSP definitions are stored.
@@ -36,15 +38,16 @@ pub fn setup_lsp_workspace(path: &Path) -> Result<()> {
 /// # Errors
 ///
 /// Returns an error if the user's home directory cannot be found.
-pub fn get_lsp_definitions_dir() -> Result<PathBuf> {
+pub fn get_lsp_definitions_dir() -> Result<PathBuf,> {
     let home_dir = zoi_core::utils::get_user_home()
-        .ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(home_dir.join(".zoi").join("lsp"))
+        .ok_or_else(|| anyhow!("Could not find home directory."),)?;
+    Ok(home_dir.join(".zoi",).join("lsp",),)
 }
 
-/// Generates the content for a `.luarc.json` file that includes Zoi definitions.
-fn generate_luarc_json(lsp_dir: &Path) -> Result<String> {
-    let lsp_dir_str = lsp_dir.to_string_lossy().replace('\\', "/");
+/// Generates the content for a `.luarc.json` file that includes Zoi
+/// definitions.
+fn generate_luarc_json(lsp_dir: &Path,) -> Result<String,> {
+    let lsp_dir_str = lsp_dir.to_string_lossy().replace('\\', "/",);
 
     let json = serde_json::json!({
         "$schema": "https://raw.githubusercontent.com/sumneko/lua-language-server/master/setting/schema.json",
@@ -70,5 +73,5 @@ fn generate_luarc_json(lsp_dir: &Path) -> Result<String> {
         }
     });
 
-    Ok(serde_json::to_string_pretty(&json)?)
+    Ok(serde_json::to_string_pretty(&json,)?,)
 }

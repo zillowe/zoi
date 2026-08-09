@@ -1,16 +1,15 @@
 //! Dependency installation logic.
 
+use std::collections::HashSet;
+use std::sync::Mutex;
+
 use anyhow::{Result, anyhow};
 use colored::Colorize;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use std::collections::HashSet;
-use std::sync::Mutex;
 pub use zoi_core::dependency::Dependency;
-use zoi_core::types;
-use zoi_core::utils;
+use zoi_core::{types, utils};
 use zoi_deps::MANAGERS;
-use zoi_resolver::local;
-use zoi_resolver::resolve;
+use zoi_resolver::{local, resolve};
 
 /// Installs a dependency using the appropriate package manager.
 ///
@@ -32,44 +31,49 @@ use zoi_resolver::resolve;
 /// - The package manager is not found or fails to install the package.
 /// - The installation command is not configured.
 /// - Root privileges are required but not available.
-pub fn install_dependency<S: std::hash::BuildHasher>(
+pub fn install_dependency<S: std::hash::BuildHasher,>(
     dep: &Dependency,
     parent_id: &str,
     scope: types::Scope,
     yes: bool,
     all_optional: bool,
-    processed_deps: &Mutex<HashSet<String, S>>,
-    installed_deps: &mut Vec<String>,
-    m: Option<&MultiProgress>,
-) -> Result<()> {
+    processed_deps: &Mutex<HashSet<String, S,>,>,
+    installed_deps: &mut Vec<String,>,
+    m: Option<&MultiProgress,>,
+) -> Result<(),> {
     let dep_id = format!("{}:{}", dep.manager, dep.package);
     {
         let mut lock = processed_deps
             .lock()
-            .map_err(|e| anyhow!("Mutex poisoned: {e}"))?;
-        if !lock.insert(dep_id.clone()) {
-            return Ok(());
+            .map_err(|e| anyhow!("Mutex poisoned: {e}"),)?;
+        if !lock.insert(dep_id.clone(),) {
+            return Ok((),);
         }
     }
 
     let pb_style = ProgressStyle::default_bar()
-        .template("{spinner:.green} {msg:30.cyan} [{bar:40.cyan/blue}] {percent}%")?
-        .progress_chars("#>-");
+        .template(
+            "{spinner:.green} {msg:30.cyan} [{bar:40.cyan/blue}] {percent}%",
+        )?
+        .progress_chars("#>-",);
 
-    let pb = if let Some(m_inner) = m {
-        let pb = m_inner.add(ProgressBar::new(100));
-        pb.set_style(pb_style);
+    let pb = if let Some(m_inner,) = m {
+        let pb = m_inner.add(ProgressBar::new(100,),);
+        pb.set_style(pb_style,);
         let version_info = dep
             .version_str
             .as_ref()
-            .map_or("any".to_string(), std::clone::Clone::clone);
-        pb.set_message(format!("{}: {}:{}", dep.manager, dep.package, version_info));
-        Some(pb)
+            .map_or("any".to_string(), std::clone::Clone::clone,);
+        pb.set_message(format!(
+            "{}: {}:{}",
+            dep.manager, dep.package, version_info
+        ),);
+        Some(pb,)
     } else {
         let version_info = dep
             .version_str
             .as_ref()
-            .map_or("any".to_string(), std::clone::Clone::clone);
+            .map_or("any".to_string(), std::clone::Clone::clone,);
         println!(
             "-> Checking dependency: {} (version: {}) via {}",
             dep.package.cyan(),
@@ -79,67 +83,89 @@ pub fn install_dependency<S: std::hash::BuildHasher>(
         None
     };
 
-    installed_deps.push(dep_id.clone());
+    installed_deps.push(dep_id.clone(),);
 
     if dep.manager == "zoi" {
-        let res =
-            install_zoi_dependency(dep, parent_id, scope, yes, all_optional, processed_deps, m);
-        if let Some(p) = pb {
+        let res = install_zoi_dependency(
+            dep,
+            parent_id,
+            scope,
+            yes,
+            all_optional,
+            processed_deps,
+            m,
+        );
+        if let Some(p,) = pb {
             p.finish();
         }
         return res;
     }
 
-    if let Some(pm_commands) = MANAGERS.get(dep.manager) {
+    if let Some(pm_commands,) = MANAGERS.get(dep.manager,) {
         let is_available = match dep.manager {
-            "apt" | "apt-get" => utils::command_exists("apt-get") || utils::command_exists("apt"),
-            "dnf" | "yum" => utils::command_exists("dnf") || utils::command_exists("yum"),
-            "xbps" | "xbps-install" => utils::command_exists("xbps-install"),
-            "aur" => utils::command_exists("makepkg") && utils::command_exists("pacman"),
-            _ => utils::command_exists(dep.manager),
+            "apt" | "apt-get" => {
+                utils::command_exists("apt-get",)
+                    || utils::command_exists("apt",)
+            }
+            "dnf" | "yum" => {
+                utils::command_exists("dnf",) || utils::command_exists("yum",)
+            }
+            "xbps" | "xbps-install" => utils::command_exists("xbps-install",),
+            "aur" => {
+                utils::command_exists("makepkg",)
+                    && utils::command_exists("pacman",)
+            }
+            _ => utils::command_exists(dep.manager,),
         };
 
         if !is_available {
             let msg = format!(
-                "Package manager '{}' not found on this system. Skipping dependency '{}'.",
+                "Package manager '{}' not found on this system. Skipping \
+                 dependency '{}'.",
                 dep.manager, dep.package
             );
-            if let Some(p) = pb {
-                p.println(format!("{}: {}", "Warning".yellow(), msg));
+            if let Some(p,) = pb {
+                p.println(format!("{}: {}", "Warning".yellow(), msg),);
             } else {
                 println!("{}: {}", "Warning".yellow(), msg);
             }
-            return Ok(());
+            return Ok((),);
         }
 
-        if let Some(check_cmd_template) = pm_commands.is_installed {
-            let check_cmd = check_cmd_template.replace("{package}", dep.package);
-            if utils::run_shell_command_quietly(&check_cmd).is_ok() {
-                if let Some(p) = pb {
-                    p.set_message(format!("{} (already installed)", dep.package));
+        if let Some(check_cmd_template,) = pm_commands.is_installed {
+            let check_cmd =
+                check_cmd_template.replace("{package}", dep.package,);
+            if utils::run_shell_command_quietly(&check_cmd,).is_ok() {
+                if let Some(p,) = pb {
+                    p.set_message(format!(
+                        "{} (already installed)",
+                        dep.package
+                    ),);
                     p.finish();
                 } else {
                     println!("Already installed. Skipping.");
                 }
-                return Ok(());
+                return Ok((),);
             }
         }
 
-        if let Some(p) = &pb {
-            p.set_position(20);
+        if let Some(p,) = &pb {
+            p.set_position(20,);
         }
 
         if dep.manager == "aur" {
-            let res = install_aur_dependency(dep, yes);
-            if let Some(p) = pb {
+            let res = install_aur_dependency(dep, yes,);
+            if let Some(p,) = pb {
                 p.finish();
             }
             return res;
         }
 
-        let package_with_version = if let Some(v) = &dep.version_str {
+        let package_with_version = if let Some(v,) = &dep.version_str {
             match dep.manager {
-                "apt" | "apt-get" | "zypper" => format!("{}={}", dep.package, v),
+                "apt" | "apt-get" | "zypper" => {
+                    format!("{}={}", dep.package, v)
+                }
                 "dnf" | "yum" => format!("{}-{}", dep.package, v),
                 "pip" | "pipx" => format!("{}=={}", dep.package, v),
                 _ => format!("{}@{}", dep.package, v),
@@ -150,23 +176,25 @@ pub fn install_dependency<S: std::hash::BuildHasher>(
 
         let mut install_cmd = pm_commands
             .install
-            .replace("{package}", dep.package)
-            .replace("{package_with_version}", &package_with_version);
+            .replace("{package}", dep.package,)
+            .replace("{package_with_version}", &package_with_version,);
 
-        if install_cmd.starts_with('#') {
+        if install_cmd.starts_with('#',) {
             return Err(anyhow!(
                 "Installation command for '{}' is not configured: {}",
                 dep.manager,
                 install_cmd
-            ));
+            ),);
         }
 
         if pm_commands.sudo_install && !utils::is_admin() {
-            if let Some(escalator) = utils::get_privilege_escalator() {
+            if let Some(escalator,) = utils::get_privilege_escalator() {
                 install_cmd = format!("{escalator} {install_cmd}");
             } else {
                 eprintln!(
-                    "{}: root privileges are required for '{}' but neither 'sudo' nor 'doas' was found. Attempting to run without escalation...",
+                    "{}: root privileges are required for '{}' but neither \
+                     'sudo' nor 'doas' was found. Attempting to run without \
+                     escalation...",
                     "Warning".yellow(),
                     dep.manager
                 );
@@ -176,21 +204,22 @@ pub fn install_dependency<S: std::hash::BuildHasher>(
         if pb.is_none() {
             println!("Running install command: {}", install_cmd.italic());
         }
-        let res = utils::run_shell_command(&install_cmd);
-        if let Some(p) = pb {
-            p.set_position(100);
+        let res = utils::run_shell_command(&install_cmd,);
+        if let Some(p,) = pb {
+            p.set_position(100,);
             p.finish();
         }
         res
     } else if dep.manager == "native" {
-        let pm = utils::get_native_package_manager()
-            .ok_or_else(|| anyhow!("Native package manager not found for this OS"))?;
+        let pm = utils::get_native_package_manager().ok_or_else(|| {
+            anyhow!("Native package manager not found for this OS")
+        },)?;
         if pb.is_none() {
             println!("-> Using native package manager: {}", pm.cyan());
         }
         let native_dep_str = format!("{}:{}", pm, dep.package);
-        let native_dep = zoi_deps::parse_dependency_string(&native_dep_str)?;
-        if let Some(p) = pb {
+        let native_dep = zoi_deps::parse_dependency_string(&native_dep_str,)?;
+        if let Some(p,) = pb {
             p.finish_and_clear();
         }
         install_dependency(
@@ -207,75 +236,75 @@ pub fn install_dependency<S: std::hash::BuildHasher>(
         Err(anyhow!(
             "Unknown or unsupported package manager in dependency: {}",
             dep.manager
-        ))
+        ),)
     }
 }
 
 /// Installs a dependency from the Arch User Repository (AUR).
-fn install_aur_dependency(dep: &Dependency, yes: bool) -> Result<()> {
-    if !utils::command_exists("git") {
+fn install_aur_dependency(dep: &Dependency, yes: bool,) -> Result<(),> {
+    if !utils::command_exists("git",) {
         return Err(anyhow!(
             "'git' command not found. Needed for AUR installation."
-        ));
+        ),);
     }
-    if !utils::command_exists("makepkg") {
+    if !utils::command_exists("makepkg",) {
         return Err(anyhow!(
             "'makepkg' command not found. Are you on Arch Linux?"
-        ));
+        ),);
     }
 
-    let temp_dir = tempfile::Builder::new().prefix("zoi-aur-").tempdir()?;
+    let temp_dir = tempfile::Builder::new().prefix("zoi-aur-",).tempdir()?;
     let repo_url = format!("https://aur.archlinux.org/{}.git", dep.package);
 
     println!("-> Cloning {}...", repo_url.cyan());
-    let clone_status = std::process::Command::new("git")
-        .arg("clone")
-        .arg("--depth=1")
-        .arg(&repo_url)
-        .arg(temp_dir.path())
+    let clone_status = std::process::Command::new("git",)
+        .arg("clone",)
+        .arg("--depth=1",)
+        .arg(&repo_url,)
+        .arg(temp_dir.path(),)
         .status()?;
 
     if !clone_status.success() {
         return Err(anyhow!(
             "Failed to clone AUR repository for {}",
             dep.package
-        ));
+        ),);
     }
 
     println!("-> Building and installing with makepkg...");
-    let mut makepkg_cmd = std::process::Command::new("makepkg");
-    makepkg_cmd.arg("-si").current_dir(temp_dir.path());
+    let mut makepkg_cmd = std::process::Command::new("makepkg",);
+    makepkg_cmd.arg("-si",).current_dir(temp_dir.path(),);
     if yes {
-        makepkg_cmd.arg("--noconfirm");
+        makepkg_cmd.arg("--noconfirm",);
     }
 
     let install_status = makepkg_cmd.status()?;
     if !install_status.success() {
-        return Err(anyhow!("makepkg failed for {}", dep.package));
+        return Err(anyhow!("makepkg failed for {}", dep.package),);
     }
 
-    Ok(())
+    Ok((),)
 }
 
 /// Installs a Zoi-native dependency.
-fn install_zoi_dependency<S: std::hash::BuildHasher>(
+fn install_zoi_dependency<S: std::hash::BuildHasher,>(
     dep: &Dependency,
     parent_id: &str,
     scope: types::Scope,
     yes: bool,
     all_optional: bool,
-    _processed_deps: &Mutex<HashSet<String, S>>,
-    m: Option<&MultiProgress>,
-) -> Result<()> {
-    let zoi_dep_name = if let Some(v) = &dep.version_str {
+    _processed_deps: &Mutex<HashSet<String, S,>,>,
+    m: Option<&MultiProgress,>,
+) -> Result<(),> {
+    let zoi_dep_name = if let Some(v,) = &dep.version_str {
         format!("{}@{}", dep.package, v)
     } else {
         dep.package.to_string()
     };
-    let req = resolve::parse_source_string(&zoi_dep_name)?;
-    let mut manifests = local::find_installed_manifests_matching(&req, scope)?;
-    if let Some(manifest) = if manifests.len() == 1 {
-        Some(manifests.remove(0))
+    let req = resolve::parse_source_string(&zoi_dep_name,)?;
+    let mut manifests = local::find_installed_manifests_matching(&req, scope,)?;
+    if let Some(manifest,) = if manifests.len() == 1 {
+        Some(manifests.remove(0,),)
     } else {
         None
     } {
@@ -289,15 +318,15 @@ fn install_zoi_dependency<S: std::hash::BuildHasher>(
             &manifest.repo,
             &manifest.name,
         )?;
-        local::add_dependent(&package_dir, parent_id)?;
-        return Ok(());
+        local::add_dependent(&package_dir, parent_id,)?;
+        return Ok((),);
     }
 
     println!("Not installed. Proceeding with zoi installation...");
 
-    let (graph, _) = match crate::resolver::resolve_dependency_graph(
-        std::slice::from_ref(&zoi_dep_name),
-        Some(scope),
+    let (graph, _,) = match crate::resolver::resolve_dependency_graph(
+        std::slice::from_ref(&zoi_dep_name,),
+        Some(scope,),
         false,
         yes,
         all_optional,
@@ -305,40 +334,43 @@ fn install_zoi_dependency<S: std::hash::BuildHasher>(
         true,
         None,
     ) {
-        Ok(res) => res,
-        Err(e) => {
+        Ok(res,) => res,
+        Err(e,) => {
             return Err(anyhow!(
                 "Failed to resolve dependency graph for '{zoi_dep_name}': {e}"
-            ));
+            ),);
         }
     };
 
     if graph.nodes.is_empty() {
-        return Ok(());
+        return Ok((),);
     }
 
-    let install_plan = match crate::plan::create_install_plan(&graph.nodes, None, false) {
-        Ok(plan) => plan,
-        Err(e) => {
-            return Err(anyhow!(
-                "Failed to create install plan for '{zoi_dep_name}': {e}"
-            ));
-        }
-    };
+    let install_plan =
+        match crate::plan::create_install_plan(&graph.nodes, None, false,) {
+            Ok(plan,) => plan,
+            Err(e,) => {
+                return Err(anyhow!(
+                    "Failed to create install plan for '{zoi_dep_name}': {e}"
+                ),);
+            }
+        };
 
     let stages = graph.toposort()?;
     for stage in stages {
         for id in stage {
             let node = graph
                 .nodes
-                .get(&id)
-                .ok_or_else(|| anyhow!("Package not found in graph: {id}"))?;
-            let action = install_plan
-                .get(&id)
-                .ok_or_else(|| anyhow!("Could not find install action for {id}"))?;
-            crate::installer::install_node(node, action, m, None, yes, true, true, false)?;
+                .get(&id,)
+                .ok_or_else(|| anyhow!("Package not found in graph: {id}"),)?;
+            let action = install_plan.get(&id,).ok_or_else(|| {
+                anyhow!("Could not find install action for {id}")
+            },)?;
+            crate::installer::install_node(
+                node, action, m, None, yes, true, true, false,
+            )?;
         }
     }
 
-    Ok(())
+    Ok((),)
 }
