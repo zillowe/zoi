@@ -10,7 +10,7 @@ use zoi_core::utils::is_zoios;
 use zoi_system::home::{apply_home_config, load_home_lua};
 
 /// The root home management command.
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug,)]
 pub struct HomeCommand {
     /// The specific home subcommand to execute.
     #[command(subcommand)]
@@ -18,13 +18,13 @@ pub struct HomeCommand {
 }
 
 /// Available home subcommands.
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Debug,)]
 pub enum HomeSubcommands {
     /// Apply a declarative user configuration from home.lua
     Apply {
         /// Path to the home configuration file
         #[arg(short, long)]
-        file: Option<String>,
+        file: Option<String,>,
     },
 }
 
@@ -32,28 +32,33 @@ pub enum HomeSubcommands {
 ///
 /// # Errors
 ///
-/// Returns an error if not on a `ZoiOS` system, if the home configuration cannot be
-/// loaded or applied, or if user packages fail to install.
-pub fn run(args: HomeCommand) -> Result<()> {
+/// Returns an error if not on a `ZoiOS` system, if the home configuration
+/// cannot be loaded or applied, or if user packages fail to install.
+pub fn run(args: HomeCommand,) -> Result<(),> {
     if !is_zoios() {
         return Err(anyhow!(
             "'zoi home' features are only available on ZoiOS systems."
-        ));
+        ),);
     }
 
     match args.command {
-        HomeSubcommands::Apply { file } => {
-            let config_path = if let Some(f) = file {
+        HomeSubcommands::Apply { file, } => {
+            let config_path = if let Some(f,) = file {
                 f
             } else {
-                let mut p = crate::pkg::utils::get_user_home()
-                    .ok_or_else(|| anyhow!("Could not determine user home directory."))?;
-                p.push(".config/zoi/home.lua");
+                let mut p =
+                    crate::pkg::utils::get_user_home().ok_or_else(|| {
+                        anyhow!("Could not determine user home directory.")
+                    },)?;
+                p.push(".config/zoi/home.lua",);
                 p.to_string_lossy().to_string()
             };
 
-            println!("Reading user configuration from {}...", config_path.cyan());
-            let config = load_home_lua(&config_path)?;
+            println!(
+                "Reading user configuration from {}...",
+                config_path.cyan()
+            );
+            let config = load_home_lua(&config_path,)?;
 
             // Install user packages
             if !config.packages.is_empty() {
@@ -72,7 +77,7 @@ pub fn run(args: HomeCommand) -> Result<()> {
                     config: zoi_project::config::ProjectLocalConfig::default(),
                     commands: Vec::new(),
                     environments: Vec::new(),
-                    shell: Some(zoi_project::config::ShellSpec::default()),
+                    shell: Some(zoi_project::config::ShellSpec::default(),),
                 };
 
                 crate::cmd::install::run(
@@ -81,7 +86,7 @@ pub fn run(args: HomeCommand) -> Result<()> {
                     false,
                     false,
                     true, // yes
-                    Some(crate::cli::InstallScope::User),
+                    Some(crate::cli::InstallScope::User,),
                     false,
                     false,
                     false,
@@ -95,15 +100,15 @@ pub fn run(args: HomeCommand) -> Result<()> {
                     3,
                     false,
                     false,
-                    Some(project_config),
+                    Some(project_config,),
                 )?;
             }
 
             // Apply dotfiles and env
-            apply_home_config(&config)?;
+            apply_home_config(&config,)?;
             println!("{}", "User environment applied successfully.".green());
         }
     }
 
-    Ok(())
+    Ok((),)
 }

@@ -7,7 +7,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 /// The root registry management command.
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug,)]
 pub struct RegistryCommand {
     /// The specific registry subcommand to execute.
     #[command(subcommand)]
@@ -15,7 +15,7 @@ pub struct RegistryCommand {
 }
 
 /// Available registry subcommands.
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Debug,)]
 pub enum RegistryCommands {
     /// Initialize a new Zoi registry
     Init {
@@ -33,19 +33,19 @@ pub enum RegistryCommands {
     #[command(alias = "add-pkg")]
     AddPackage {
         /// Name of the package to add
-        name: Option<String>,
+        name: Option<String,>,
         /// Repository tier (e.g. community, main)
         #[arg(long, short)]
-        repo: Option<String>,
+        repo: Option<String,>,
     },
     /// Add a new security advisory for a package
     #[command(alias = "sec")]
     AddAdvisory {
         /// Package name to add an advisory for
-        package: Option<String>,
+        package: Option<String,>,
         /// Repository tier (e.g. community, main)
         #[arg(long, short)]
-        repo: Option<String>,
+        repo: Option<String,>,
     },
 }
 
@@ -54,23 +54,31 @@ pub enum RegistryCommands {
 /// # Errors
 ///
 /// This function returns an error if any of the underlying registry operations
-/// (initialization, metadata generation, checking, or adding packages/advisories) fail.
-/// # Errors
+/// (initialization, metadata generation, checking, or adding
+/// packages/advisories) fail. # Errors
 ///
 /// Returns an error if the registry operation fails.
-pub fn run(args: RegistryCommand) -> Result<()> {
-    let registry_root = std::path::Path::new(".");
+pub fn run(args: RegistryCommand,) -> Result<(),> {
+    let registry_root = std::path::Path::new(".",);
     match args.command {
-        RegistryCommands::Init { path } => crate::pkg::registry::init(&path),
+        RegistryCommands::Init { path, } => crate::pkg::registry::init(&path,),
         RegistryCommands::GenerateMetadata => {
-            crate::pkg::registry::generate_metadata(registry_root)
+            crate::pkg::registry::generate_metadata(registry_root,)
         }
-        RegistryCommands::Check => crate::pkg::registry::check(registry_root),
-        RegistryCommands::AddPackage { name, repo } => {
-            crate::pkg::registry::add_package(registry_root, name.as_deref(), repo.as_deref())
+        RegistryCommands::Check => crate::pkg::registry::check(registry_root,),
+        RegistryCommands::AddPackage { name, repo, } => {
+            crate::pkg::registry::add_package(
+                registry_root,
+                name.as_deref(),
+                repo.as_deref(),
+            )
         }
-        RegistryCommands::AddAdvisory { package, repo } => {
-            crate::pkg::registry::add_advisory(registry_root, package.as_deref(), repo.as_deref())
+        RegistryCommands::AddAdvisory { package, repo, } => {
+            crate::pkg::registry::add_advisory(
+                registry_root,
+                package.as_deref(),
+                repo.as_deref(),
+            )
         }
     }
 }

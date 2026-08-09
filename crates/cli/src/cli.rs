@@ -1,14 +1,15 @@
-use crate::cmd;
-use crate::pkg::lock;
-use crate::utils;
-use clap::{
-    ColorChoice, CommandFactory, FromArgMatches, Parser, Subcommand, ValueHint, builder::styling,
-};
-use clap_complete::Shell;
-use clap_complete::generate;
-use colored::Colorize;
 use std::io::{self};
 use std::path::PathBuf;
+
+use clap::builder::styling;
+use clap::{
+    ColorChoice, CommandFactory, FromArgMatches, Parser, Subcommand, ValueHint,
+};
+use clap_complete::{Shell, generate};
+use colored::Colorize;
+
+use crate::pkg::lock;
+use crate::{cmd, utils};
 
 // Development, Special, Public or Production
 /// The release branch of the current build.
@@ -18,13 +19,14 @@ const STATUS: &str = "Release";
 /// The version number of the current build.
 const NUMBER: &str = "1.24.7";
 /// Help text for package source identifiers.
-const PKG_SOURCE_HELP: &str = "Package identifier (e.g. @repo/name, #git@repo/name, path, or URL)";
+const PKG_SOURCE_HELP: &str =
+    "Package identifier (e.g. @repo/name, #git@repo/name, path, or URL)";
 
 /// Zoi - The Advanced Package Manager & Environment Orchestrator.
 ///
 /// Part of the Zillowe Development Suite (ZDS), Zoi is designed to streamline
 /// your development workflow by managing tools and project environments.
-#[derive(Parser)]
+#[derive(Parser,)]
 #[command(name = "zoi", author, about, long_about = None, disable_version_flag = true,
     trailing_var_arg = true,
     color = ColorChoice::Auto,
@@ -33,7 +35,7 @@ const PKG_SOURCE_HELP: &str = "Package identifier (e.g. @repo/name, #git@repo/na
 pub struct Cli {
     /// The subcommand to execute.
     #[command(subcommand)]
-    command: Option<Commands>,
+    command: Option<Commands,>,
 
     /// Print detailed version information.
     #[arg(
@@ -59,7 +61,7 @@ pub struct Cli {
         global = true,
         value_hint = ValueHint::DirPath
     )]
-    pub root: Option<std::path::PathBuf>,
+    pub root: Option<std::path::PathBuf,>,
 
     /// Do not attempt to connect to the network.
     #[arg(
@@ -77,11 +79,11 @@ pub struct Cli {
         value_hint = ValueHint::DirPath
     )]
     /// Additional directory to search for .zpa archives.
-    pub pkg_dirs: Vec<std::path::PathBuf>,
+    pub pkg_dirs: Vec<std::path::PathBuf,>,
 }
 
 /// The target scope for system-level operations.
-#[derive(clap::ValueEnum, Clone, Debug, Copy, PartialEq, Eq)]
+#[derive(clap::ValueEnum, Clone, Debug, Copy, PartialEq, Eq,)]
 pub enum SetupScope {
     /// The current user's scope.
     User,
@@ -90,7 +92,7 @@ pub enum SetupScope {
 }
 
 /// The target scope for package installation.
-#[derive(clap::ValueEnum, Clone, Debug, Copy)]
+#[derive(clap::ValueEnum, Clone, Debug, Copy,)]
 pub enum InstallScope {
     /// The current user's scope.
     User,
@@ -101,7 +103,7 @@ pub enum InstallScope {
 }
 
 /// The available subcommands for Zoi.
-#[derive(Subcommand)]
+#[derive(Subcommand,)]
 enum Commands {
     /// Generates shell completion scripts
     #[command(hide = true)]
@@ -120,7 +122,7 @@ enum Commands {
         /// Current word index (1-based)
         index: usize,
         /// All words in the command line
-        words: Vec<String>,
+        words: Vec<String,>,
     },
 
     /// Generates man pages for zoi
@@ -130,26 +132,30 @@ enum Commands {
     /// Prints concise version and build information
     #[command(
         alias = "v",
-        long_about = "Displays the version number, build status, branch, and commit hash. This is the same output provided by the -v and --version flags."
+        long_about = "Displays the version number, build status, branch, and \
+                      commit hash. This is the same output provided by the -v \
+                      and --version flags."
     )]
     Version,
 
     /// Shows detailed application information and credits
-    #[command(
-        long_about = "Displays the full application name, description, author, license, and homepage information."
-    )]
+    #[command(long_about = "Displays the full application name, description, \
+                            author, license, and homepage information.")]
     About,
 
     /// Displays detected operating system and architecture information
-    #[command(
-        long_about = "Detects and displays key system details, including the OS, CPU architecture, Linux distribution (if applicable), and available package managers."
-    )]
+    #[command(long_about = "Detects and displays key system details, \
+                            including the OS, CPU architecture, Linux \
+                            distribution (if applicable), and available \
+                            package managers.")]
     Info,
 
     /// Downloads a package archive or source bundle
     #[command(
         alias = "dl",
-        long_about = "Downloads the binary archive (.zpa) or source bundle (.zsa) for a package to the local cache or a specified directory."
+        long_about = "Downloads the binary archive (.zpa) or source bundle \
+                      (.zsa) for a package to the local cache or a specified \
+                      directory."
     )]
     Download {
         /// Package identifier (e.g. @repo/name, path, or URL)
@@ -166,18 +172,21 @@ enum Commands {
 
         /// Directory to output the downloaded file to
         #[arg(short, long)]
-        output_dir: Option<PathBuf>,
+        output_dir: Option<PathBuf,>,
     },
 
     /// Downloads or updates the package database from the remote repository
     #[command(
         alias = "sy",
-        long_about = "Clones the official package database from GitLab to your local machine (~/.zoi/pkgs/db). If the database already exists, it verifies the remote URL and pulls the latest changes."
+        long_about = "Clones the official package database from GitLab to \
+                      your local machine (~/.zoi/pkgs/db). If the database \
+                      already exists, it verifies the remote URL and pulls \
+                      the latest changes."
     )]
     Sync {
         /// The sync subcommand to execute.
         #[command(subcommand)]
-        command: Option<SyncCommands>,
+        command: Option<SyncCommands,>,
 
         /// Show the full git output
         #[arg(short, long)]
@@ -191,25 +200,28 @@ enum Commands {
         #[arg(long = "no-pm")]
         no_package_managers: bool,
 
-        /// Force re-sync by removing existing databases and re-cloning from scratch
+        /// Force re-sync by removing existing databases and re-cloning from
+        /// scratch
         #[arg(long)]
         force: bool,
 
-        /// Sync registries to the project's local .zoi/pkgs/db/ using revisions from zoi.lua
+        /// Sync registries to the project's local .zoi/pkgs/db/ using
+        /// revisions from zoi.lua
         #[arg(long)]
         local: bool,
 
-        /// When used with --local, sync using revisions from zoi.lock instead of zoi.lua
+        /// When used with --local, sync using revisions from zoi.lock instead
+        /// of zoi.lua
         #[arg(long)]
         frozen: bool,
 
         /// The scope to sync the registries to
         #[arg(long, value_enum, conflicts_with = "local")]
-        scope: Option<SetupScope>,
+        scope: Option<SetupScope,>,
     },
 
     /// Migration helpers for converting external manifests to Zoi package files
-    Migrate(cmd::migrate::MigrateCommand),
+    Migrate(cmd::migrate::MigrateCommand,),
 
     /// Lists installed or all available packages
     #[command(alias = "ls")]
@@ -222,13 +234,13 @@ enum Commands {
         outdated: bool,
         /// Filter by registry handle (e.g. 'zoidberg')
         #[arg(long)]
-        registry: Option<String>,
+        registry: Option<String,>,
         /// Filter by repository (e.g. 'main', 'extra')
         #[arg(long)]
-        repo: Option<String>,
+        repo: Option<String,>,
         /// Filter by package type (package, app, collection, extension)
         #[arg(short = 't', long = "type")]
-        package_type: Option<String>,
+        package_type: Option<String,>,
         /// List packages not found in any configured registry
         #[arg(short = 'm', long)]
         foreign: bool,
@@ -272,7 +284,7 @@ enum Commands {
     Tree {
         /// The package identifier(s).
         #[arg(value_name = "ALL_PACKAGES", required = true, help = PKG_SOURCE_HELP)]
-        packages: Vec<String>,
+        packages: Vec<String,>,
     },
 
     /// Unpin a package, allowing it to be updated
@@ -291,7 +303,7 @@ enum Commands {
     Mark {
         /// The package identifier(s).
         #[arg(value_name = "INST_PACKAGES", required = true, help = PKG_SOURCE_HELP)]
-        packages: Vec<String>,
+        packages: Vec<String,>,
 
         /// Mark packages as dependencies
         #[arg(long, aliases = ["asdeps"])]
@@ -311,7 +323,7 @@ enum Commands {
     Update {
         /// The package names to update.
         #[arg(value_name = "INST_PACKAGES", help = PKG_SOURCE_HELP)]
-        package_names: Vec<String>,
+        package_names: Vec<String,>,
 
         /// Update all installed packages
         #[arg(long, conflicts_with = "package_names")]
@@ -326,20 +338,23 @@ enum Commands {
         /// Emit machine-readable update plan JSON
         #[arg(long)]
         plan_json: bool,
-        /// Interactively choose which upgradable packages to update (with --all)
+        /// Interactively choose which upgradable packages to update (with
+        /// --all)
         #[arg(long, requires = "all")]
         interactive: bool,
     },
 
-    /// Installs one or more packages from a name, local file, URL, or git repository
+    /// Installs one or more packages from a name, local file, URL, or git
+    /// repository
     #[command(aliases = ["i", "in", "add"])]
     Install {
         /// The package source identifier(s).
         #[arg(value_name = "ALL_SOURCES", help = PKG_SOURCE_HELP)]
-        sources: Vec<String>,
-        /// Install from a git repository (e.g. 'Zillowe/Hello', 'gl:Zillowe/Hello')
+        sources: Vec<String,>,
+        /// Install from a git repository (e.g. 'Zillowe/Hello',
+        /// 'gl:Zillowe/Hello')
         #[arg(long, value_name = "REPO", conflicts_with = "sources")]
-        repo: Option<String>,
+        repo: Option<String,>,
         /// Force re-installation even if the package is already installed
         #[arg(long)]
         force: bool,
@@ -348,28 +363,33 @@ enum Commands {
         all_optional: bool,
         /// The scope to install the package to
         #[arg(long, value_enum, conflicts_with_all = &["local", "global"])]
-        scope: Option<InstallScope>,
+        scope: Option<InstallScope,>,
         /// Install packages to the current project (alias for --scope=project)
         #[arg(long, conflicts_with = "global")]
         local: bool,
-        /// Install packages globally for the current user (alias for --scope=user)
+        /// Install packages globally for the current user (alias for
+        /// --scope=user)
         #[arg(long)]
         global: bool,
         /// Save the package to the project's zoi.yaml
         #[arg(long)]
         save: bool,
-        /// The type of package to build if building from source (e.g. 'source', 'pre-compiled').
+        /// The type of package to build if building from source (e.g.
+        /// 'source', 'pre-compiled').
         #[arg(long)]
-        r#type: Option<String>,
-        /// Do not actually perform the installation, just show what would be done
+        r#type: Option<String,>,
+        /// Do not actually perform the installation, just show what would be
+        /// done
         #[arg(long)]
         dry_run: bool,
 
-        /// Force building from source even if a pre-compiled archive is available in the registry
+        /// Force building from source even if a pre-compiled archive is
+        /// available in the registry
         #[arg(long, short = 'b')]
         build: bool,
 
-        /// Enforce zoi.lock exactly (project install only, no lockfile updates)
+        /// Enforce zoi.lock exactly (project install only, no lockfile
+        /// updates)
         #[arg(long)]
         frozen: bool,
 
@@ -399,7 +419,7 @@ enum Commands {
     Use {
         /// Package(s) to use (e.g. node@20)
         #[arg(value_name = "ALL_PACKAGES", required = true, help = PKG_SOURCE_HELP)]
-        packages: Vec<String>,
+        packages: Vec<String,>,
 
         /// Add to global configuration instead of project
         #[arg(short, long)]
@@ -414,14 +434,16 @@ enum Commands {
     Uninstall {
         /// The package identifier(s).
         #[arg(value_name = "INST_PACKAGES", required = true, help = PKG_SOURCE_HELP)]
-        packages: Vec<String>,
+        packages: Vec<String,>,
         /// The scope to uninstall the package from
         #[arg(long, value_enum, conflicts_with_all = &["local", "global"])]
-        scope: Option<InstallScope>,
-        /// Uninstall packages from the current project (alias for --scope=project)
+        scope: Option<InstallScope,>,
+        /// Uninstall packages from the current project (alias for
+        /// --scope=project)
         #[arg(long, conflicts_with = "global")]
         local: bool,
-        /// Uninstall packages globally for the current user (alias for --scope=user)
+        /// Uninstall packages globally for the current user (alias for
+        /// --scope=user)
         #[arg(long)]
         global: bool,
         /// Remove the package from the project's zoi.yaml
@@ -445,47 +467,54 @@ enum Commands {
     },
 
     /// Execute a command defined in a local zoi.yaml file
-    #[command(
-        long_about = "Execute a command from zoi.yaml. If no command is specified, it will launch an interactive prompt to choose one."
-    )]
+    #[command(long_about = "Execute a command from zoi.yaml. If no command \
+                            is specified, it will launch an interactive \
+                            prompt to choose one.")]
     Run {
         /// The alias of the command to execute
-        cmd_alias: Option<String>,
+        cmd_alias: Option<String,>,
         /// Arguments to pass to the command
-        args: Vec<String>,
+        args: Vec<String,>,
     },
 
     /// Manage and set up project environments from a local zoi.yaml file
-    #[command(
-        long_about = "Checks for required packages and runs setup commands for a defined environment. If no environment is specified, it launches an interactive prompt."
-    )]
+    #[command(long_about = "Checks for required packages and runs setup \
+                            commands for a defined environment. If no \
+                            environment is specified, it launches an \
+                            interactive prompt.")]
     Env {
         /// The alias of the environment to set up
-        env_alias: Option<String>,
+        env_alias: Option<String,>,
 
         /// Export environment variables for the current shell
         #[arg(long, value_enum, hide = true)]
-        export_shell: Option<Shell>,
+        export_shell: Option<Shell,>,
     },
 
     /// Enter a development shell for the current project
     #[command(
         alias = "develop",
-        long_about = "Loads the project configuration from zoi.yaml, ensures all required packages are installed locally, sets up environment variables (PATH, LD_LIBRARY_PATH, etc.), and drops you into a subshell."
+        long_about = "Loads the project configuration from zoi.yaml, ensures \
+                      all required packages are installed locally, sets up \
+                      environment variables (PATH, LD_LIBRARY_PATH, etc.), \
+                      and drops you into a subshell."
     )]
     Dev {
         /// Command to run in the dev shell instead of an interactive shell
         #[arg(short, long)]
-        run: Option<String>,
+        run: Option<String,>,
         /// Temporary clone a repository and enter its development shell
         #[arg(long)]
-        repo: Option<String>,
+        repo: Option<String,>,
     },
 
     /// Upgrades the Zoi binary to the latest version
     #[command(
         alias = "ug",
-        long_about = "Upgrades Zoi to the latest version. By default, it attempts a delta upgrade (bsdiff) to minimize download size. If the delta upgrade is unavailable or fails, it automatically falls back to a full download."
+        long_about = "Upgrades Zoi to the latest version. By default, it \
+                      attempts a delta upgrade (bsdiff) to minimize download \
+                      size. If the delta upgrade is unavailable or fails, it \
+                      automatically falls back to a full download."
     )]
     Upgrade {
         /// Force a full download instead of a delta upgrade
@@ -494,14 +523,15 @@ enum Commands {
 
         /// Upgrade to a specific git tag
         #[arg(long)]
-        tag: Option<String>,
+        tag: Option<String,>,
 
         /// Upgrade to the latest release of a specific branch (e.g. Prod, Pub)
         #[arg(long)]
-        branch: Option<String>,
+        branch: Option<String,>,
     },
 
-    /// Removes packages that were installed as dependencies but are no longer needed
+    /// Removes packages that were installed as dependencies but are no longer
+    /// needed
     Autoremove {
         /// Do not actually remove packages, just show what would be done
         #[arg(long)]
@@ -532,12 +562,14 @@ enum Commands {
 
     /// Shows the history of package operations
     History {
-        /// Verify audit log chain integrity instead of printing history entries
+        /// Verify audit log chain integrity instead of printing history
+        /// entries
         #[arg(long, conflicts_with = "export")]
         verify: bool,
-        /// Export audit history to a file (default format: JSON array with chain fields)
+        /// Export audit history to a file (default format: JSON array with
+        /// chain fields)
         #[arg(long, value_hint = ValueHint::FilePath, conflicts_with = "verify")]
-        export: Option<std::path::PathBuf>,
+        export: Option<std::path::PathBuf,>,
         /// Export in newline-delimited JSON (ndjson) instead of a JSON array
         #[arg(long, requires = "export")]
         ndjson: bool,
@@ -546,23 +578,25 @@ enum Commands {
     /// Searches for packages by name or description
     #[command(
         alias = "s",
-        long_about = "Searches for a case-insensitive term in the name, description, and tags of all available packages in the database. Filter by repo, type, or tags."
+        long_about = "Searches for a case-insensitive term in the name, \
+                      description, and tags of all available packages in the \
+                      database. Filter by repo, type, or tags."
     )]
     Search {
         /// The term to search for (e.g. 'editor', 'cli')
         search_term: String,
         /// Filter by registry handle (e.g. 'zoidberg')
         #[arg(long)]
-        registry: Option<String>,
+        registry: Option<String,>,
         /// Filter by repository (e.g. 'main', 'extra')
         #[arg(long)]
-        repo: Option<String>,
+        repo: Option<String,>,
         /// Filter by package type (package, app, collection, extension)
         #[arg(long = "type")]
-        package_type: Option<String>,
+        package_type: Option<String,>,
         /// Filter by tags (any match). Multiple via comma or repeated -t
         #[arg(short = 't', long = "tag", value_delimiter = ',', num_args = 1..)]
-        tags: Option<Vec<String>>,
+        tags: Option<Vec<String,>,>,
         /// Sort results by field (name, repo, type)
         #[arg(long, default_value = "name")]
         sort: String,
@@ -576,9 +610,10 @@ enum Commands {
 
     /// Manage background services for installed packages
     #[command(alias = "svc")]
-    Service(cmd::service::ServiceCommand),
+    Service(cmd::service::ServiceCommand,),
 
-    /// Set up shell completions or enter an ephemeral environment with specific packages
+    /// Set up shell completions or enter an ephemeral environment with specific
+    /// packages
     #[command(
         long_about = "If a shell is provided, it installs completion scripts. If 'hook' is provided, it outputs shell-specific hook scripts for auto-activation. If packages are provided via --package/-p, it enters a temporary subshell with those packages available in PATH.",
         arg_required_else_help = true,
@@ -587,7 +622,7 @@ enum Commands {
     Shell {
         /// The shell to set up completions for
         #[arg(value_enum)]
-        shell: Option<Shell>,
+        shell: Option<Shell,>,
         /// Generate a shell hook for automatic environment activation
         #[arg(long)]
         hook: bool,
@@ -596,10 +631,11 @@ enum Commands {
         scope: SetupScope,
         /// Packages to include in the ephemeral environment
         #[arg(short, long = "package", value_name = "ALL_PACKAGES")]
-        packages: Vec<String>,
-        /// Command to run in the ephemeral environment instead of an interactive shell
+        packages: Vec<String,>,
+        /// Command to run in the ephemeral environment instead of an
+        /// interactive shell
         #[arg(short, long)]
-        run: Option<String>,
+        run: Option<String,>,
         /// Show additional details (resolution, installation progress, etc.)
         #[arg(long, short)]
         verbose: bool,
@@ -608,16 +644,20 @@ enum Commands {
     /// Execute a package binary directly with its dependencies resolved
     #[command(
         alias = "x",
-        long_about = "Resolves a package and its dependencies, installs them if needed, then runs the requested binary directly. By default runs the first binary the package provides. Uses bwrap for sandboxed packages."
+        long_about = "Resolves a package and its dependencies, installs them \
+                      if needed, then runs the requested binary directly. By \
+                      default runs the first binary the package provides. \
+                      Uses bwrap for sandboxed packages."
     )]
     Exec {
         /// The package source identifier.
         #[arg(value_name = "ALL_SOURCES", help = PKG_SOURCE_HELP)]
         source: String,
 
-        /// Specific binary to run (required if package provides multiple binaries)
+        /// Specific binary to run (required if package provides multiple
+        /// binaries)
         #[arg(long)]
-        bin: Option<String>,
+        bin: Option<String,>,
 
         /// Show additional execution details
         #[arg(long, short)]
@@ -625,7 +665,7 @@ enum Commands {
 
         /// Arguments to pass to the executed binary
         #[arg(value_name = "ARGS")]
-        args: Vec<String>,
+        args: Vec<String,>,
     },
 
     /// Clears the cache of downloaded package binaries
@@ -642,7 +682,7 @@ enum Commands {
         package: String,
         /// The location to clone the repository to
         #[arg(value_name = "LOCATION")]
-        location: Option<String>,
+        location: Option<String,>,
     },
 
     /// Manage Zoi's local cache
@@ -662,25 +702,25 @@ enum Commands {
 
     /// Manage and author Zoi registries
     #[command(alias = "reg")]
-    Registry(cmd::registry::RegistryCommand),
+    Registry(cmd::registry::RegistryCommand,),
 
     /// Manage declarative user environments (`ZoiOS` only)
-    Home(cmd::home::HomeCommand),
+    Home(cmd::home::HomeCommand,),
 
     /// Manage the underlying `ZoiOS` system (`ZoiOS` only)
-    System(cmd::system::SystemCommand),
+    System(cmd::system::SystemCommand,),
 
     /// Manage package repositories
     #[command(
         aliases = ["repositories"],
         long_about = "Manages the list of package repositories used by Zoi.\n\nCommands:\n- add (alias: a): Add an official repo by name or clone from a git URL.\n- remove|rm: Remove a repo from active list (repo rm <name>).\n- list|ls: Show active repositories by default; use 'list all' to show all available repositories.\n- git: Manage cloned git repositories (git ls, git rm <repo-name>)."
     )]
-    Repo(cmd::repo::RepoCommand),
+    Repo(cmd::repo::RepoCommand,),
 
     /// Manage telemetry settings (opt-in analytics)
-    #[command(
-        long_about = "Manage opt-in anonymous telemetry used to understand package popularity. Default is disabled."
-    )]
+    #[command(long_about = "Manage opt-in anonymous telemetry used to \
+                            understand package popularity. Default is \
+                            disabled.")]
     Telemetry {
         /// The telemetry action to perform.
         #[arg(value_enum)]
@@ -693,13 +733,16 @@ enum Commands {
         #[arg(value_name = "ALL_SOURCES", help = PKG_SOURCE_HELP)]
         source: String,
         /// The application name to substitute into template commands
-        app_name: Option<String>,
+        app_name: Option<String,>,
     },
 
     /// Downgrade a package to a specific version from local cache or store
     #[command(
         alias = "dg",
-        long_about = "Interactively choose and install an older version of a package from the local store or archive cache. This is useful if a recent update has introduced bugs or compatibility issues."
+        long_about = "Interactively choose and install an older version of a \
+                      package from the local store or archive cache. This is \
+                      useful if a recent update has introduced bugs or \
+                      compatibility issues."
     )]
     Downgrade {
         /// The package identifier.
@@ -709,13 +752,13 @@ enum Commands {
 
     /// Manage Zoi extensions
     #[command(alias = "ext")]
-    Extension(ExtensionCommand),
+    Extension(ExtensionCommand,),
 
     /// Rollback a package to the previously installed version
     Rollback {
         /// The package identifier.
         #[arg(value_name = "INST_PACKAGES", required_unless_present = "last_transaction", help = PKG_SOURCE_HELP)]
-        package: Option<String>,
+        package: Option<String,>,
 
         /// Rollback the last transaction
         #[arg(long, conflicts_with = "package")]
@@ -740,37 +783,38 @@ enum Commands {
 
     /// Build, create, and manage Zoi packages
     #[command(alias = "pkg")]
-    Package(cmd::package::PackageCommand),
+    Package(cmd::package::PackageCommand,),
 
     /// Manage PGP keys for package signature verification
-    Pgp(cmd::pgp::PgpCommand),
+    Pgp(cmd::pgp::PgpCommand,),
 
     /// Helper commands for various tasks
-    Helper(cmd::helper::HelperCommand),
+    Helper(cmd::helper::HelperCommand,),
 
     /// Checks for common issues and provides actionable suggestions
     Doctor,
 
     /// Audit installed or all packages for security vulnerabilities
     Audit {
-        /// Show all vulnerabilities from the database, not just for installed packages
+        /// Show all vulnerabilities from the database, not just for installed
+        /// packages
         #[arg(short, long)]
         all: bool,
         /// Filter by registry handle
         #[arg(long)]
-        registry: Option<String>,
+        registry: Option<String,>,
         /// Filter by repository
         #[arg(long)]
-        repo: Option<String>,
+        repo: Option<String,>,
     },
 
     /// Execute an external subcommand.
     #[command(external_subcommand)]
-    External(Vec<String>),
+    External(Vec<String,>,),
 }
 
 /// The extension management command.
-#[derive(clap::Parser, Debug)]
+#[derive(clap::Parser, Debug,)]
 pub struct ExtensionCommand {
     /// The extension subcommand to execute.
     #[command(subcommand)]
@@ -778,7 +822,7 @@ pub struct ExtensionCommand {
 }
 
 /// The available extension subcommands.
-#[derive(clap::Subcommand, Debug)]
+#[derive(clap::Subcommand, Debug,)]
 pub enum ExtensionCommands {
     /// Add an extension
     Add {
@@ -795,7 +839,7 @@ pub enum ExtensionCommands {
 }
 
 /// The available sync subcommands.
-#[derive(clap::Subcommand, Clone)]
+#[derive(clap::Subcommand, Clone,)]
 pub enum SyncCommands {
     /// Add a new registry
     Add {
@@ -818,13 +862,13 @@ pub enum SyncCommands {
 }
 
 /// The available cache management subcommands.
-#[derive(clap::Subcommand)]
+#[derive(clap::Subcommand,)]
 pub enum CacheCommands {
     /// Add package archive(s) to the local cache
     Add {
         /// Path to the .zpa archive(s)
         #[arg(required = true)]
-        files: Vec<std::path::PathBuf>,
+        files: Vec<std::path::PathBuf,>,
     },
     /// Clear the local cache
     #[command(alias = "clean")]
@@ -845,7 +889,7 @@ pub enum CacheCommands {
 }
 
 /// The available cache mirror management subcommands.
-#[derive(clap::Subcommand)]
+#[derive(clap::Subcommand,)]
 pub enum CacheMirrorCommands {
     /// Add a cache mirror base URL
     Add {
@@ -863,7 +907,7 @@ pub enum CacheMirrorCommands {
 }
 
 /// The available transaction management subcommands.
-#[derive(clap::Subcommand)]
+#[derive(clap::Subcommand,)]
 pub enum TransactionCommands {
     /// List known transaction logs
     #[command(alias = "ls")]
@@ -881,7 +925,7 @@ pub enum TransactionCommands {
 }
 
 /// The available actions for telemetry.
-#[derive(clap::ValueEnum, Clone)]
+#[derive(clap::ValueEnum, Clone,)]
 enum TelemetryAction {
     /// Show the current telemetry status.
     Status,
@@ -895,46 +939,49 @@ enum TelemetryAction {
 ///
 /// # Errors
 ///
-/// Returns an error if argument parsing fails, plugin loading fails, or if any subcommand fails.
-pub fn run() -> anyhow::Result<()> {
+/// Returns an error if argument parsing fails, plugin loading fails, or if any
+/// subcommand fails.
+pub fn run() -> anyhow::Result<(),> {
     let styles = styling::Styles::styled()
-        .header(styling::AnsiColor::Yellow.on_default() | styling::Effects::BOLD)
-        .usage(styling::AnsiColor::Green.on_default() | styling::Effects::BOLD)
-        .literal(styling::AnsiColor::Green.on_default())
-        .placeholder(styling::AnsiColor::Cyan.on_default());
+        .header(
+            styling::AnsiColor::Yellow.on_default() | styling::Effects::BOLD,
+        )
+        .usage(styling::AnsiColor::Green.on_default() | styling::Effects::BOLD,)
+        .literal(styling::AnsiColor::Green.on_default(),)
+        .placeholder(styling::AnsiColor::Cyan.on_default(),);
 
-    let commit: &str = option_env!("ZOI_COMMIT_HASH").unwrap_or("dev");
-    let cmd = Cli::command().styles(styles.clone());
+    let commit: &str = option_env!("ZOI_COMMIT_HASH").unwrap_or("dev",);
+    let cmd = Cli::command().styles(styles.clone(),);
     let matches = cmd.clone().get_matches();
-    let cli = match Cli::from_arg_matches(&matches) {
-        Ok(cli) => cli,
-        Err(err) => {
+    let cli = match Cli::from_arg_matches(&matches,) {
+        Ok(cli,) => cli,
+        Err(err,) => {
             err.print()?;
-            return Err(anyhow::anyhow!("Failed to parse arguments"));
+            return Err(anyhow::anyhow!("Failed to parse arguments"),);
         }
     };
 
-    if let Some(root) = cli.root {
-        crate::pkg::sysroot::set_sysroot(root);
+    if let Some(root,) = cli.root {
+        crate::pkg::sysroot::set_sysroot(root,);
     }
 
     let config = crate::pkg::config::read_config().unwrap_or_default();
 
     let is_offline = cli.offline || config.offline_mode;
-    crate::pkg::offline::set_offline(is_offline);
+    crate::pkg::offline::set_offline(is_offline,);
 
     let mut all_pkg_dirs = cli.pkg_dirs;
     for dir in config.pkg_dirs {
-        let path = std::path::PathBuf::from(dir);
-        if !all_pkg_dirs.contains(&path) {
-            all_pkg_dirs.push(path);
+        let path = std::path::PathBuf::from(dir,);
+        if !all_pkg_dirs.contains(&path,) {
+            all_pkg_dirs.push(path,);
         }
     }
-    crate::pkg::pkgdir::set_pkg_dirs(all_pkg_dirs);
+    crate::pkg::pkgdir::set_pkg_dirs(all_pkg_dirs,);
 
     utils::check_path();
 
-    if let Err(e) = crate::pkg::pgp::ensure_builtin_keys() {
+    if let Err(e,) = crate::pkg::pgp::ensure_builtin_keys() {
         eprintln!(
             "{}: Failed to ensure builtin PGP keys: {}",
             "Warning".yellow(),
@@ -943,16 +990,16 @@ pub fn run() -> anyhow::Result<()> {
     }
 
     let plugin_manager = crate::pkg::plugin::PluginManager::new()?;
-    if let Err(e) = plugin_manager.load_all(cli.yes) {
+    if let Err(e,) = plugin_manager.load_all(cli.yes,) {
         eprintln!("{}: Failed to load plugins: {}", "Warning".yellow(), e);
     }
 
     if cli.version_flag {
-        cmd::version::run(BRANCH, STATUS, NUMBER, commit);
-        return Ok(());
+        cmd::version::run(BRANCH, STATUS, NUMBER, commit,);
+        return Ok((),);
     }
 
-    if let Some(command) = cli.command {
+    if let Some(command,) = cli.command {
         let needs_lock = matches!(
             command,
             Commands::Install { .. }
@@ -964,33 +1011,35 @@ pub fn run() -> anyhow::Result<()> {
         );
 
         let _lock_guard = if needs_lock {
-            Some(lock::acquire_lock()?)
+            Some(lock::acquire_lock()?,)
         } else {
             None
         };
 
         let result = match command {
-            Commands::GenerateCompletions { shell } => {
+            Commands::GenerateCompletions { shell, } => {
                 let mut cmd = Cli::command();
                 let bin_name = cmd.get_name().to_string();
-                generate(shell, &mut cmd, bin_name, &mut io::stdout());
-                Ok(())
+                generate(shell, &mut cmd, bin_name, &mut io::stdout(),);
+                Ok((),)
             }
             Commands::Complete {
                 shell,
                 index,
                 words,
-            } => cmd::complete::run(shell, index, &words),
-            Commands::GenerateManual => cmd::gen_man::run().map_err(Into::into),
+            } => cmd::complete::run(shell, index, &words,),
+            Commands::GenerateManual => {
+                cmd::gen_man::run().map_err(Into::into,)
+            }
             Commands::Version => {
-                cmd::version::run(BRANCH, STATUS, NUMBER, commit);
-                Ok(())
+                cmd::version::run(BRANCH, STATUS, NUMBER, commit,);
+                Ok((),)
             }
             Commands::About => {
-                cmd::about::run(BRANCH, STATUS, NUMBER, commit);
-                Ok(())
+                cmd::about::run(BRANCH, STATUS, NUMBER, commit,);
+                Ok((),)
             }
-            Commands::Info => cmd::info::run(BRANCH, STATUS, NUMBER, commit),
+            Commands::Info => cmd::info::run(BRANCH, STATUS, NUMBER, commit,),
             Commands::Sync {
                 command,
                 verbose,
@@ -1001,26 +1050,39 @@ pub fn run() -> anyhow::Result<()> {
                 frozen,
                 scope,
             } => {
-                if let Some(cmd) = command {
+                if let Some(cmd,) = command {
                     match cmd {
-                        SyncCommands::Add { url } => cmd::sync::add_registry(&url),
-                        SyncCommands::Remove { handle } => cmd::sync::remove_registry(&handle),
+                        SyncCommands::Add { url, } => {
+                            cmd::sync::add_registry(&url,)
+                        }
+                        SyncCommands::Remove { handle, } => {
+                            cmd::sync::remove_registry(&handle,)
+                        }
                         SyncCommands::List => cmd::sync::list_registries(),
-                        SyncCommands::Set { url } => cmd::sync::set_registry(&url),
+                        SyncCommands::Set { url, } => {
+                            cmd::sync::set_registry(&url,)
+                        }
                     }
                 } else if local {
-                    plugin_manager.trigger_hook("on_pre_sync", None)?;
-                    let res = cmd::sync::run_local(verbose, fallback, force, frozen);
-                    plugin_manager.trigger_hook_nonfatal("on_post_sync", None);
+                    plugin_manager.trigger_hook("on_pre_sync", None,)?;
+                    let res =
+                        cmd::sync::run_local(verbose, fallback, force, frozen,);
+                    plugin_manager.trigger_hook_nonfatal("on_post_sync", None,);
                     res
                 } else {
-                    plugin_manager.trigger_hook("on_pre_sync", None)?;
-                    let res = cmd::sync::run(verbose, fallback, no_package_managers, force, scope);
-                    plugin_manager.trigger_hook_nonfatal("on_post_sync", None);
+                    plugin_manager.trigger_hook("on_pre_sync", None,)?;
+                    let res = cmd::sync::run(
+                        verbose,
+                        fallback,
+                        no_package_managers,
+                        force,
+                        scope,
+                    );
+                    plugin_manager.trigger_hook_nonfatal("on_post_sync", None,);
                     res
                 }
             }
-            Commands::Migrate(args) => cmd::migrate::run(args),
+            Commands::Migrate(args,) => cmd::migrate::run(args,),
             Commands::List {
                 all,
                 outdated,
@@ -1044,16 +1106,18 @@ pub fn run() -> anyhow::Result<()> {
                 package_name,
                 raw,
                 purl,
-            } => cmd::show::run(&package_name, raw, purl),
-            Commands::Pin { package, version } => cmd::pin::run(&package, &version),
-            Commands::Provides { term } => cmd::provides::run(&term),
-            Commands::Tree { packages } => cmd::tree::run(&packages),
-            Commands::Unpin { package } => cmd::unpin::run(&package),
+            } => cmd::show::run(&package_name, raw, purl,),
+            Commands::Pin { package, version, } => {
+                cmd::pin::run(&package, &version,)
+            }
+            Commands::Provides { term, } => cmd::provides::run(&term,),
+            Commands::Tree { packages, } => cmd::tree::run(&packages,),
+            Commands::Unpin { package, } => cmd::unpin::run(&package,),
             Commands::Mark {
                 packages,
                 as_dependency,
                 as_explicit,
-            } => cmd::mark::run(&packages, as_dependency, as_explicit),
+            } => cmd::mark::run(&packages, as_dependency, as_explicit,),
             Commands::Update {
                 package_names,
                 all,
@@ -1070,7 +1134,7 @@ pub fn run() -> anyhow::Result<()> {
                 plan_json,
                 interactive,
             )
-            .map_err(|e| cmd::ux::with_failure_hint("update", e)),
+            .map_err(|e| cmd::ux::with_failure_hint("update", e,),),
             Commands::Install {
                 sources,
                 repo,
@@ -1101,7 +1165,7 @@ pub fn run() -> anyhow::Result<()> {
                 save,
                 r#type.as_deref(),
                 dry_run,
-                Some(&plugin_manager),
+                Some(&plugin_manager,),
                 build,
                 frozen,
                 explain,
@@ -1111,8 +1175,10 @@ pub fn run() -> anyhow::Result<()> {
                 purl,
                 None,
             )
-            .map_err(|e| cmd::ux::with_failure_hint("install", e)),
-            Commands::Use { packages, global } => cmd::use_cmd::run(&packages, global),
+            .map_err(|e| cmd::ux::with_failure_hint("install", e,),),
+            Commands::Use { packages, global, } => {
+                cmd::use_cmd::run(&packages, global,)
+            }
             Commands::Uninstall {
                 packages,
                 scope,
@@ -1131,24 +1197,31 @@ pub fn run() -> anyhow::Result<()> {
                 save,
                 cli.yes,
                 recursive,
-                Some(&plugin_manager),
+                Some(&plugin_manager,),
                 explain,
                 plan_json,
                 dry_run,
             )
-            .map_err(|e| cmd::ux::with_failure_hint("uninstall", e)),
-            Commands::Run { cmd_alias, args } => cmd::run::run(cmd_alias.as_deref(), &args),
+            .map_err(|e| cmd::ux::with_failure_hint("uninstall", e,),),
+            Commands::Run { cmd_alias, args, } => {
+                cmd::run::run(cmd_alias.as_deref(), &args,)
+            }
             Commands::Env {
                 env_alias,
                 export_shell,
-            } => cmd::env::run(env_alias.as_deref(), export_shell),
-            Commands::Dev { run, repo } => cmd::dev::run(run, repo),
-            Commands::Upgrade { force, tag, branch } => {
-                match cmd::upgrade::run(BRANCH, STATUS, NUMBER, force, tag, branch) {
-                    Ok(()) => {
+            } => cmd::env::run(env_alias.as_deref(), export_shell,),
+            Commands::Dev { run, repo, } => cmd::dev::run(run, repo,),
+            Commands::Upgrade {
+                force, tag, branch,
+            } => {
+                match cmd::upgrade::run(
+                    BRANCH, STATUS, NUMBER, force, tag, branch,
+                ) {
+                    Ok((),) => {
                         println!(
                             "\n{}",
-                            "Zoi upgraded successfully! Please restart your shell for changes to take effect."
+                            "Zoi upgraded successfully! Please restart your \
+                             shell for changes to take effect."
                                 .green()
                         );
                         println!(
@@ -1156,25 +1229,29 @@ pub fn run() -> anyhow::Result<()> {
                             "Changelog".cyan().bold()
                         );
                         println!(
-                            "\n{}: To update shell completions, run 'zoi shell <your-shell>'.",
+                            "\n{}: To update shell completions, run 'zoi \
+                             shell <your-shell>'.",
                             "Hint".cyan().bold()
                         );
                     }
-                    Err(e) if e.to_string() == "already_on_latest" => {}
-                    Err(e) if e.to_string() == "managed_by_package_manager" => {}
-                    Err(e) => return Err(e),
+                    Err(e,) if e.to_string() == "already_on_latest" => {}
+                    Err(e,)
+                        if e.to_string() == "managed_by_package_manager" => {}
+                    Err(e,) => return Err(e,),
                 }
-                Ok(())
+                Ok((),)
             }
-            Commands::Autoremove { dry_run } => cmd::autoremove::run(cli.yes, dry_run),
-            Commands::Why { package_name } => cmd::why::run(&package_name),
-            Commands::Owner { path } => cmd::owner::run(&path),
-            Commands::Files { package } => cmd::files::run(&package),
+            Commands::Autoremove { dry_run, } => {
+                cmd::autoremove::run(cli.yes, dry_run,)
+            }
+            Commands::Why { package_name, } => cmd::why::run(&package_name,),
+            Commands::Owner { path, } => cmd::owner::run(&path,),
+            Commands::Files { package, } => cmd::files::run(&package,),
             Commands::History {
                 verify,
                 export,
                 ndjson,
-            } => cmd::history::run(verify, export, ndjson),
+            } => cmd::history::run(verify, export, ndjson,),
             Commands::Search {
                 search_term,
                 registry,
@@ -1194,7 +1271,7 @@ pub fn run() -> anyhow::Result<()> {
                 files,
                 interactive,
             ),
-            Commands::Service(args) => cmd::service::run(args),
+            Commands::Service(args,) => cmd::service::run(args,),
             Commands::Shell {
                 shell,
                 hook,
@@ -1204,19 +1281,19 @@ pub fn run() -> anyhow::Result<()> {
                 verbose,
             } => {
                 let target_shell = shell
-                    .or_else(crate::pkg::utils::get_current_shell)
-                    .unwrap_or(Shell::Bash);
+                    .or_else(crate::pkg::utils::get_current_shell,)
+                    .unwrap_or(Shell::Bash,);
                 if hook {
-                    cmd::shell::print_hook(target_shell)
+                    cmd::shell::print_hook(target_shell,)
                 } else if !packages.is_empty() {
                     cmd::shell::enter_ephemeral_shell(
                         &packages,
                         run,
                         verbose,
-                        Some(&plugin_manager),
+                        Some(&plugin_manager,),
                     )
                 } else {
-                    cmd::shell::run(target_shell, scope)
+                    cmd::shell::run(target_shell, scope,)
                 }
             }
             Commands::Exec {
@@ -1224,7 +1301,7 @@ pub fn run() -> anyhow::Result<()> {
                 bin,
                 verbose,
                 args,
-            } => cmd::exec::run(&source, bin, &args, verbose),
+            } => cmd::exec::run(&source, bin, &args, verbose,),
             Commands::Download {
                 package,
                 archive: _,
@@ -1236,57 +1313,74 @@ pub fn run() -> anyhow::Result<()> {
                 } else {
                     cmd::download::DownloadType::Archive
                 };
-                cmd::download::run(&package, download_type, output_dir)
+                cmd::download::run(&package, download_type, output_dir,)
             }
-            Commands::Clean { dry_run } => cmd::clean::run(dry_run),
-            Commands::Clone { package, location } => cmd::clone::run(&package, location, cli.yes),
-            Commands::Cache { command } => match command {
-                CacheCommands::Add { files } => cmd::cache::add(&files),
-                CacheCommands::Clear { dry_run } => cmd::cache::clear(dry_run),
+            Commands::Clean { dry_run, } => cmd::clean::run(dry_run,),
+            Commands::Clone { package, location, } => {
+                cmd::clone::run(&package, location, cli.yes,)
+            }
+            Commands::Cache { command, } => match command {
+                CacheCommands::Add { files, } => cmd::cache::add(&files,),
+                CacheCommands::Clear { dry_run, } => {
+                    cmd::cache::clear(dry_run,)
+                }
                 CacheCommands::List => cmd::cache::list(),
-                CacheCommands::Mirror { command } => match command {
-                    CacheMirrorCommands::Add { url } => cmd::cache::add_mirror(&url),
-                    CacheMirrorCommands::Remove { url } => cmd::cache::remove_mirror(&url),
+                CacheCommands::Mirror { command, } => match command {
+                    CacheMirrorCommands::Add { url, } => {
+                        cmd::cache::add_mirror(&url,)
+                    }
+                    CacheMirrorCommands::Remove { url, } => {
+                        cmd::cache::remove_mirror(&url,)
+                    }
                     CacheMirrorCommands::List => cmd::cache::list_mirrors(),
                 },
             },
-            Commands::Transaction { command } => match command {
+            Commands::Transaction { command, } => match command {
                 TransactionCommands::List => cmd::transaction::list(),
-                TransactionCommands::Show { id } => cmd::transaction::show(&id),
-                TransactionCommands::Files { id } => cmd::transaction::files(&id),
+                TransactionCommands::Show { id, } => {
+                    cmd::transaction::show(&id,)
+                }
+                TransactionCommands::Files { id, } => {
+                    cmd::transaction::files(&id,)
+                }
             },
-            Commands::Repo(args) => cmd::repo::run(args),
-            Commands::Registry(args) => cmd::registry::run(args),
-            Commands::Home(args) => cmd::home::run(args),
-            Commands::System(args) => cmd::system::run(args, cli.yes),
-            Commands::Telemetry { action } => {
+            Commands::Repo(args,) => cmd::repo::run(args,),
+            Commands::Registry(args,) => cmd::registry::run(args,),
+            Commands::Home(args,) => cmd::home::run(args,),
+            Commands::System(args,) => cmd::system::run(args, cli.yes,),
+            Commands::Telemetry { action, } => {
                 use cmd::telemetry::{TelemetryCommand, run};
                 let cmd = match action {
                     TelemetryAction::Status => TelemetryCommand::Status,
                     TelemetryAction::Enable => TelemetryCommand::Enable,
                     TelemetryAction::Disable => TelemetryCommand::Disable,
                 };
-                run(cmd)
+                run(cmd,)
             }
-            Commands::Create { source, app_name } => cmd::create::run(
-                cmd::create::CreateCommand { source, app_name },
+            Commands::Create { source, app_name, } => cmd::create::run(
+                cmd::create::CreateCommand { source, app_name, },
                 cli.yes,
-                Some(&plugin_manager),
+                Some(&plugin_manager,),
             ),
-            Commands::Downgrade { package } => {
-                cmd::downgrade::run(&package, cli.yes, Some(&plugin_manager))
+            Commands::Downgrade { package, } => {
+                cmd::downgrade::run(&package, cli.yes, Some(&plugin_manager,),)
             }
-            Commands::Extension(args) => cmd::extension::run(args, cli.yes, Some(&plugin_manager)),
+            Commands::Extension(args,) => {
+                cmd::extension::run(args, cli.yes, Some(&plugin_manager,),)
+            }
             Commands::Rollback {
                 package,
                 last_transaction,
             } => {
                 if last_transaction {
-                    cmd::rollback::run_transaction_rollback(cli.yes, Some(&plugin_manager))
-                } else if let Some(pkg) = package {
-                    cmd::rollback::run(&pkg, cli.yes, Some(&plugin_manager))
+                    cmd::rollback::run_transaction_rollback(
+                        cli.yes,
+                        Some(&plugin_manager,),
+                    )
+                } else if let Some(pkg,) = package {
+                    cmd::rollback::run(&pkg, cli.yes, Some(&plugin_manager,),)
                 } else {
-                    Ok(())
+                    Ok((),)
                 }
             }
             Commands::Man {
@@ -1294,48 +1388,59 @@ pub fn run() -> anyhow::Result<()> {
                 upstream,
                 raw,
                 no_tui,
-            } => cmd::man::run(&package_name, upstream, raw, no_tui),
-            Commands::Package(args) => cmd::package::run(args),
-            Commands::Pgp(args) => cmd::pgp::run(args),
-            Commands::Helper(args) => cmd::helper::run(args),
+            } => cmd::man::run(&package_name, upstream, raw, no_tui,),
+            Commands::Package(args,) => cmd::package::run(args,),
+            Commands::Pgp(args,) => cmd::pgp::run(args,),
+            Commands::Helper(args,) => cmd::helper::run(args,),
             Commands::Doctor => cmd::doctor::run(),
             Commands::Audit {
                 all,
                 registry,
                 repo,
-            } => cmd::audit::run(all, registry, repo.as_deref()),
-            Commands::External(args) => {
-                let (cmd_name, cmd_args) = if let Some((first, rest)) = args.split_first() {
-                    (first, rest.to_vec())
-                } else {
-                    return Err(anyhow::anyhow!("No command specified"));
-                };
+            } => cmd::audit::run(all, registry, repo.as_deref(),),
+            Commands::External(args,) => {
+                let (cmd_name, cmd_args,) =
+                    if let Some((first, rest,),) = args.split_first() {
+                        (first, rest.to_vec(),)
+                    } else {
+                        return Err(anyhow::anyhow!("No command specified"),);
+                    };
 
-                match plugin_manager.run_command(cmd_name, cmd_args) {
-                    Ok(true) => Ok(()),
-                    Ok(false) => {
-                        let mut shadow_cmd = Cli::command().styles(styles);
-                        shadow_cmd = shadow_cmd.allow_external_subcommands(false);
+                match plugin_manager.run_command(cmd_name, cmd_args,) {
+                    Ok(true,) => Ok((),),
+                    Ok(false,) => {
+                        let mut shadow_cmd = Cli::command().styles(styles,);
+                        shadow_cmd =
+                            shadow_cmd.allow_external_subcommands(false,);
 
                         let err = shadow_cmd
                             .clone()
-                            .try_get_matches_from(std::env::args())
+                            .try_get_matches_from(std::env::args(),)
                             .err()
                             .unwrap_or_else(|| {
                                 shadow_cmd.error(
                                     clap::error::ErrorKind::InvalidSubcommand,
-                                    format!("unrecognized subcommand '{cmd_name}'"),
+                                    format!(
+                                        "unrecognized subcommand '{cmd_name}'"
+                                    ),
                                 )
-                            });
+                            },);
 
                         let plugin_cmds = plugin_manager.list_commands()?;
                         if !plugin_cmds.is_empty() {
-                            eprintln!("{}:", "Available Plugin Commands".cyan().bold());
-                            for (pcmd, pdesc) in plugin_cmds {
+                            eprintln!(
+                                "{}:",
+                                "Available Plugin Commands".cyan().bold()
+                            );
+                            for (pcmd, pdesc,) in plugin_cmds {
                                 if pdesc.is_empty() {
                                     eprintln!("  {pcmd}");
                                 } else {
-                                    eprintln!("  {:<12} {}", pcmd, pdesc.dimmed());
+                                    eprintln!(
+                                        "  {:<12} {}",
+                                        pcmd,
+                                        pdesc.dimmed()
+                                    );
                                 }
                             }
                             eprintln!();
@@ -1343,15 +1448,15 @@ pub fn run() -> anyhow::Result<()> {
 
                         err.exit();
                     }
-                    Err(e) => Err(e),
+                    Err(e,) => Err(e,),
                 }
             }
         };
 
-        if let Err(e) = result {
+        if let Err(e,) = result {
             eprintln!("Error: {e}");
-            std::process::exit(1);
+            std::process::exit(1,);
         }
     }
-    Ok(())
+    Ok((),)
 }

@@ -1,17 +1,18 @@
 //! Integration tests for Zoi package registry operations.
 
+use std::fs;
+
 use anyhow::Result;
 use chrono::Datelike;
-use std::fs;
 use tempfile::TempDir;
 use zoi::pkg::registry;
 
 #[test]
-fn test_registry_init() -> Result<()> {
+fn test_registry_init() -> Result<(),> {
     let temp_dir = TempDir::new()?;
-    let path = temp_dir.path().join("my-reg");
+    let path = temp_dir.path().join("my-reg",);
 
-    registry::init(&path)?;
+    registry::init(&path,)?;
 
     assert!(path.join("repo.yaml").exists());
     assert!(path.join("packages.json").exists());
@@ -19,43 +20,45 @@ fn test_registry_init() -> Result<()> {
     assert!(path.join("core").is_dir());
     assert!(path.join("main").is_dir());
 
-    let repo_yaml = fs::read_to_string(path.join("repo.yaml"))?;
+    let repo_yaml = fs::read_to_string(path.join("repo.yaml",),)?;
     assert!(repo_yaml.contains("My-Registry"));
-    assert!(repo_yaml.contains("zillowe.qzz.io/docs/zds/zoi/repositories#the-repoyaml-file"));
+    assert!(repo_yaml.contains(
+        "zillowe.qzz.io/docs/zds/zoi/repositories#the-repoyaml-file"
+    ));
 
-    Ok(())
+    Ok((),)
 }
 
 #[test]
-fn test_registry_add_package() -> Result<()> {
+fn test_registry_add_package() -> Result<(),> {
     let temp_dir = TempDir::new()?;
     let reg_path = temp_dir.path();
 
-    registry::init(reg_path)?;
-    registry::add_package(reg_path, Some("test-pkg"), Some("community"))?;
+    registry::init(reg_path,)?;
+    registry::add_package(reg_path, Some("test-pkg",), Some("community",),)?;
 
-    let pkg_lua_path = reg_path.join("community/test-pkg/test-pkg.pkg.lua");
+    let pkg_lua_path = reg_path.join("community/test-pkg/test-pkg.pkg.lua",);
     assert!(pkg_lua_path.exists());
 
-    let content = fs::read_to_string(pkg_lua_path)?;
+    let content = fs::read_to_string(pkg_lua_path,)?;
     assert!(content.contains("name = \"test-pkg\""));
     assert!(content.contains("repo = \"community\""));
     assert!(content.contains("zillowe.qzz.io/docs/zds/zoi/creating-packages"));
 
-    Ok(())
+    Ok((),)
 }
 
 #[test]
-fn test_registry_check() -> Result<()> {
+fn test_registry_check() -> Result<(),> {
     let temp_dir = TempDir::new()?;
     let reg_path = temp_dir.path();
 
-    registry::init(reg_path)?;
+    registry::init(reg_path,)?;
 
-    registry::add_package(reg_path, Some("valid"), Some("core"))?;
+    registry::add_package(reg_path, Some("valid",), Some("core",),)?;
 
-    let broken_pkg_dir = reg_path.join("core/broken");
-    fs::create_dir_all(&broken_pkg_dir)?;
+    let broken_pkg_dir = reg_path.join("core/broken",);
+    fs::create_dir_all(&broken_pkg_dir,)?;
     let broken_lua = r#"
 metadata({
   name = "broken",
@@ -65,27 +68,32 @@ metadata({
   types = { "source" }
 })
 "#;
-    fs::write(broken_pkg_dir.join("broken.pkg.lua"), broken_lua)?;
+    fs::write(broken_pkg_dir.join("broken.pkg.lua",), broken_lua,)?;
 
-    let result = registry::check(reg_path);
+    let result = registry::check(reg_path,);
     assert!(result.is_err());
-    assert!(result.expect_err("unwrap_err failed").to_string().contains("error(s)"));
+    assert!(
+        result
+            .expect_err("unwrap_err failed")
+            .to_string()
+            .contains("error(s)")
+    );
 
-    Ok(())
+    Ok((),)
 }
 
 #[test]
-fn test_registry_advisory_id_assignment() -> Result<()> {
+fn test_registry_advisory_id_assignment() -> Result<(),> {
     let temp_dir = TempDir::new()?;
     let reg_path = temp_dir.path();
 
-    registry::init(reg_path)?;
-    registry::add_package(reg_path, Some("vuln-pkg"), Some("core"))?;
+    registry::init(reg_path,)?;
+    registry::add_package(reg_path, Some("vuln-pkg",), Some("core",),)?;
 
     let current_year = chrono::Utc::now().year();
     let temp_adv_path = reg_path
-        .join("core/vuln-pkg")
-        .join(format!("ZSA-{current_year}-TEMP.sec.yaml"));
+        .join("core/vuln-pkg",)
+        .join(format!("ZSA-{current_year}-TEMP.sec.yaml"),);
 
     let adv_content = r#"
 package: "vuln-pkg"
@@ -96,7 +104,7 @@ fixed_in: "1.0.0"
 description: "Test"
 "#
     .to_string();
-    fs::write(&temp_adv_path, adv_content)?;
+    fs::write(&temp_adv_path, adv_content,)?;
 
     let repo_yaml_content = r#"
 name: "Test-Reg"
@@ -111,26 +119,27 @@ repos:
     type: official
     active: true
 "#;
-    fs::write(reg_path.join("repo.yaml"), repo_yaml_content)?;
+    fs::write(reg_path.join("repo.yaml",), repo_yaml_content,)?;
 
-    registry::generate_metadata(reg_path)?;
+    registry::generate_metadata(reg_path,)?;
 
     let expected_id = format!("TEST-{current_year}-C0001");
     let final_adv_path = reg_path
-        .join("core/vuln-pkg")
-        .join(format!("{expected_id}.sec.yaml"));
+        .join("core/vuln-pkg",)
+        .join(format!("{expected_id}.sec.yaml"),);
 
     assert!(
         final_adv_path.exists(),
         "Advisory file should be renamed to its ID"
     );
 
-    let final_content = fs::read_to_string(final_adv_path)?;
+    let final_content = fs::read_to_string(final_adv_path,)?;
     assert!(final_content.contains(&format!("id: {expected_id}")));
 
-    let advisories_json = fs::read_to_string(reg_path.join("advisories.json"))?;
+    let advisories_json =
+        fs::read_to_string(reg_path.join("advisories.json",),)?;
     assert!(advisories_json.contains("\"0001\": \"vuln-pkg\""));
     assert!(advisories_json.contains("\"version\": \"1\""));
 
-    Ok(())
+    Ok((),)
 }

@@ -1,19 +1,8 @@
-pub use zoi_core::config;
-pub use zoi_core::dependency;
-pub use zoi_core::frozen;
-pub use zoi_core::hash;
-pub use zoi_core::lock;
-pub use zoi_core::offline;
-pub use zoi_core::pgp;
-pub use zoi_core::pin;
-pub use zoi_core::pkgdir;
-pub use zoi_core::recorder;
-pub use zoi_core::sysroot;
-pub use zoi_core::types;
-pub use zoi_core::utils;
-
 pub use zoi_audit as audit;
-pub use zoi_core::cache;
+pub use zoi_core::{
+    cache, config, dependency, frozen, hash, lock, offline, pgp, pin, pkgdir,
+    recorder, sysroot, types, utils,
+};
 pub use zoi_db as db;
 pub use zoi_deps as dependencies;
 pub use zoi_plugins::extension;
@@ -52,17 +41,18 @@ pub mod doctor {
 /// Package resolution utilities.
 pub mod resolve {
     pub use zoi_resolver::resolve::{
-        PackageRequest, ResolvedSource, get_db_root, get_default_version, parse_source_string,
-        resolve_channel, resolve_package_and_version, resolve_requested_version_spec,
-        resolve_source, resolve_version_from_url,
+        PackageRequest, ResolvedSource, get_db_root, get_default_version,
+        parse_source_string, resolve_channel, resolve_package_and_version,
+        resolve_requested_version_spec, resolve_source,
+        resolve_version_from_url,
     };
 }
 /// Minimal package resolution utilities.
 pub mod mini_resolve {
     pub use zoi_core::types::MiniVulnerability;
     pub use zoi_resolver::mini_resolve::{
-        MiniPackageIndex, MiniRegistryIndex, check_vulnerabilities, fetch_registry_config,
-        fetch_registry_index, get_package_lua_url,
+        MiniPackageIndex, MiniRegistryIndex, check_vulnerabilities,
+        fetch_registry_config, fetch_registry_index, get_package_lua_url,
     };
 }
 #[cfg(target_os = "linux")]

@@ -1,23 +1,27 @@
-use anyhow::{Result, anyhow};
-use colored::Colorize;
-use fs2::FileExt;
 use std::fs;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 
+use anyhow::{Result, anyhow};
+use colored::Colorize;
+use fs2::FileExt;
+
 /// Returns the path to the system-wide lock file.
-fn get_lock_path() -> Result<PathBuf> {
-    let home_dir =
-        crate::utils::get_user_home().ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(home_dir.join(".zoi").join("pkgs").join("lock"))
+fn get_lock_path() -> Result<PathBuf,> {
+    let home_dir = crate::utils::get_user_home()
+        .ok_or_else(|| anyhow!("Could not find home directory."),)?;
+    Ok(home_dir.join(".zoi",).join("pkgs",).join("lock",),)
 }
 
-/// Acquires a system-wide lock to prevent concurrent modifications to the Zoi store.
+/// Acquires a system-wide lock to prevent concurrent modifications to the Zoi
+/// store.
 ///
 /// Locking Mechanism:
 /// - Attempts to open/create `~/.zoi/pkgs/lock`.
-/// - Uses `flock` (via `fs2`) to acquire an exclusive advisory lock on the file.
-/// - If busy, reads the file to display the PID of the process currently holding the lock.
+/// - Uses `flock` (via `fs2`) to acquire an exclusive advisory lock on the
+///   file.
+/// - If busy, reads the file to display the PID of the process currently
+///   holding the lock.
 /// - Once acquired, writes the current process PID to the lock file.
 ///
 /// This ensures that operations like `install`, `uninstall`, and `update` never
@@ -26,14 +30,14 @@ fn get_lock_path() -> Result<PathBuf> {
 /// # Errors
 ///
 /// Returns an error if the lock cannot be acquired or if file operations fail.
-pub fn acquire_lock() -> Result<LockGuard> {
-    if std::env::var("ZOI_SKIP_LOCK").is_ok_and(|v| v == "1") {
-        return Ok(LockGuard::noop());
+pub fn acquire_lock() -> Result<LockGuard,> {
+    if std::env::var("ZOI_SKIP_LOCK",).is_ok_and(|v| v == "1",) {
+        return Ok(LockGuard::noop(),);
     }
     let lock_path = get_lock_path()?;
 
-    if let Some(parent) = lock_path.parent()
-        && let Err(e) = fs::create_dir_all(parent)
+    if let Some(parent,) = lock_path.parent()
+        && let Err(e,) = fs::create_dir_all(parent,)
     {
         eprintln!(
             "Warning: could not create lock directory {}: {}",
@@ -43,16 +47,16 @@ pub fn acquire_lock() -> Result<LockGuard> {
     }
 
     let file = fs::OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .truncate(false)
-        .open(&lock_path)?;
+        .read(true,)
+        .write(true,)
+        .create(true,)
+        .truncate(false,)
+        .open(&lock_path,)?;
 
     if file.try_lock_exclusive().is_err() {
         let mut content = String::new();
-        if let Ok(mut f) = fs::File::open(&lock_path) {
-            let _ = f.read_to_string(&mut content);
+        if let Ok(mut f,) = fs::File::open(&lock_path,) {
+            let _ = f.read_to_string(&mut content,);
         }
 
         let pid_info = if content.trim().is_empty() {
@@ -67,22 +71,23 @@ pub fn acquire_lock() -> Result<LockGuard> {
             pid_info
         );
         eprintln!(
-            "If you are absolutely sure no other Zoi process is running, you can manually remove the lock file:"
+            "If you are absolutely sure no other Zoi process is running, you \
+             can manually remove the lock file:"
         );
         eprintln!("  {}", lock_path.display());
-        return Err(anyhow!("Could not acquire lock."));
+        return Err(anyhow!("Could not acquire lock."),);
     }
 
     let mut file = file;
-    let _ = file.set_len(0);
-    let _ = file.seek(SeekFrom::Start(0));
+    let _ = file.set_len(0,);
+    let _ = file.seek(SeekFrom::Start(0,),);
     let _ = write!(file, "{}", std::process::id());
     let _ = file.flush();
 
     Ok(LockGuard {
-        path: Some(lock_path),
-        file: Some(file),
-    })
+        path: Some(lock_path,),
+        file: Some(file,),
+    },)
 }
 
 /// Releases the system-wide lock if it exists.
@@ -90,20 +95,20 @@ pub fn acquire_lock() -> Result<LockGuard> {
 /// # Errors
 ///
 /// Returns an error if the lock path cannot be determined.
-pub fn release_lock() -> Result<()> {
+pub fn release_lock() -> Result<(),> {
     let lock_path = get_lock_path()?;
     if lock_path.exists() {
-        let _ = fs::remove_file(lock_path);
+        let _ = fs::remove_file(lock_path,);
     }
-    Ok(())
+    Ok((),)
 }
 
 /// A guard that releases the system-wide lock when dropped.
 pub struct LockGuard {
     /// The path to the lock file.
-    path: Option<PathBuf>,
+    path: Option<PathBuf,>,
     /// The file handle holding the lock.
-    file: Option<fs::File>,
+    file: Option<fs::File,>,
 }
 
 impl LockGuard {
@@ -117,12 +122,12 @@ impl LockGuard {
 }
 
 impl Drop for LockGuard {
-    fn drop(&mut self) {
-        if let Some(path) = self.path.take() {
+    fn drop(&mut self,) {
+        if let Some(path,) = self.path.take() {
             self.file.take();
 
             if path.exists()
-                && let Err(e) = fs::remove_file(&path)
+                && let Err(e,) = fs::remove_file(&path,)
             {
                 debug_assert!(false, "Failed to remove lock file: {e}");
             }

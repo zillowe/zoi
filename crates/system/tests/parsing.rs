@@ -1,4 +1,5 @@
 use std::io::Write;
+
 use tempfile::NamedTempFile;
 use zoi_system::config::load_system_lua;
 
@@ -31,9 +32,9 @@ filesystems({
     },
 })
 "#;
-    file.write_all(content.as_bytes()).unwrap();
+    file.write_all(content.as_bytes(),).unwrap();
 
-    let config = load_system_lua(file.path()).unwrap();
+    let config = load_system_lua(file.path(),).unwrap();
 
     assert_eq!(config.system.hostname, Some("test-host".to_string()));
     assert_eq!(config.system.timezone, Some("UTC".to_string()));

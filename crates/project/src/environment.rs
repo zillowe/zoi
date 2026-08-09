@@ -1,52 +1,61 @@
-use super::{config, executor};
-use anyhow::{Result, anyhow};
-use clap_complete::Shell;
-use colored::Colorize;
-use dialoguer::{Select, theme::ColorfulTheme};
 use std::collections::HashMap;
 use std::io::{self, Write};
 use std::process::Stdio;
+
+use anyhow::{Result, anyhow};
+use clap_complete::Shell;
+use colored::Colorize;
+use dialoguer::Select;
+use dialoguer::theme::ColorfulTheme;
 use zoi_core::utils;
+
+use super::{config, executor};
 
 /// Sets up a project environment by running its specified commands.
 ///
-/// If `env_alias` is provided, it tries to find and setup that specific environment.
-/// Otherwise, it prompts the user to choose an environment interactively.
+/// If `env_alias` is provided, it tries to find and setup that specific
+/// environment. Otherwise, it prompts the user to choose an environment
+/// interactively.
 ///
 /// # Errors
 ///
-/// Returns an error if no environments are defined, the specified environment is not found,
-/// if package checks fail, or if executing setup commands fails.
-pub fn setup(env_alias: Option<&str>, config: &config::ProjectConfig) -> Result<()> {
+/// Returns an error if no environments are defined, the specified environment
+/// is not found, if package checks fail, or if executing setup commands fails.
+pub fn setup(
+    env_alias: Option<&str,>,
+    config: &config::ProjectConfig,
+) -> Result<(),> {
     if config.environments.is_empty() {
-        return Err(anyhow!("No environments defined in zoi.yaml"));
+        return Err(anyhow!("No environments defined in zoi.yaml"),);
     }
 
-    let env_to_setup = if let Some(alias) = env_alias {
+    let env_to_setup = if let Some(alias,) = env_alias {
         config
             .environments
             .iter()
-            .find(|e| e.cmd == alias)
-            .ok_or_else(|| anyhow!("Environment '{alias}' not found in zoi.yaml"))?
+            .find(|e| e.cmd == alias,)
+            .ok_or_else(|| {
+                anyhow!("Environment '{alias}' not found in zoi.yaml")
+            },)?
             .clone()
     } else {
-        let selections: Vec<&str> = config
+        let selections: Vec<&str,> = config
             .environments
             .iter()
-            .map(|e| e.name.as_str())
+            .map(|e| e.name.as_str(),)
             .collect();
-        let selection = Select::with_theme(&ColorfulTheme::default())
-            .with_prompt("Choose an environment to set up")
-            .items(&selections)
-            .default(0)
+        let selection = Select::with_theme(&ColorfulTheme::default(),)
+            .with_prompt("Choose an environment to set up",)
+            .items(&selections,)
+            .default(0,)
             .interact_opt()?
-            .ok_or(anyhow!("No environment chosen."))?;
+            .ok_or(anyhow!("No environment chosen."),)?;
 
         config
             .environments
-            .get(selection)
+            .get(selection,)
             .cloned()
-            .ok_or_else(|| anyhow!("Invalid selection"))?
+            .ok_or_else(|| anyhow!("Invalid selection"),)?
     };
 
     println!(
@@ -55,43 +64,45 @@ pub fn setup(env_alias: Option<&str>, config: &config::ProjectConfig) -> Result<
         env_to_setup.name.bold()
     );
 
-    check_packages(config)?;
+    check_packages(config,)?;
 
     let platform = utils::get_platform()?;
 
     let run_cmds = match &env_to_setup.run {
-        config::PlatformOrStringVec::StringVec(v) => v.clone(),
-        config::PlatformOrStringVec::Platform(p) => p
-            .get(&platform)
-            .or_else(|| p.get("default"))
+        config::PlatformOrStringVec::StringVec(v,) => v.clone(),
+        config::PlatformOrStringVec::Platform(p,) => p
+            .get(&platform,)
+            .or_else(|| p.get("default",),)
             .cloned()
             .ok_or_else(|| {
                 anyhow!(
-                    "No commands found for platform '{platform}' and no default specified"
+                    "No commands found for platform '{platform}' and no \
+                     default specified"
                 )
-            })?,
+            },)?,
     };
 
     let env_vars = match &env_to_setup.env {
-        config::PlatformOrEnvMap::EnvMap(m) => m.clone(),
-        config::PlatformOrEnvMap::Platform(p) => p
-            .get(&platform)
-            .or_else(|| p.get("default"))
+        config::PlatformOrEnvMap::EnvMap(m,) => m.clone(),
+        config::PlatformOrEnvMap::Platform(p,) => p
+            .get(&platform,)
+            .or_else(|| p.get("default",),)
             .cloned()
             .unwrap_or_default(),
     };
 
     for cmd_str in &run_cmds {
-        executor::run_shell_command(cmd_str, &env_vars)?;
+        executor::run_shell_command(cmd_str, &env_vars,)?;
     }
 
-    Ok(())
+    Ok((),)
 }
 
-/// Checks if all required packages defined in the configuration are present on the system.
-fn check_packages(config: &config::ProjectConfig) -> Result<()> {
+/// Checks if all required packages defined in the configuration are present on
+/// the system.
+fn check_packages(config: &config::ProjectConfig,) -> Result<(),> {
     if config.packages.is_empty() {
-        return Ok(());
+        return Ok((),);
     }
     println!("\nChecking required packages...");
     let mut all_ok = true;
@@ -99,9 +110,9 @@ fn check_packages(config: &config::ProjectConfig) -> Result<()> {
         print!("- Checking for '{}': ", package.name.cyan());
         let _ = io::stdout().flush();
 
-        let status = executor::get_shell_command(&package.check)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
+        let status = executor::get_shell_command(&package.check,)
+            .stdout(Stdio::null(),)
+            .stderr(Stdio::null(),)
             .status()?;
 
         if status.success() {
@@ -112,9 +123,9 @@ fn check_packages(config: &config::ProjectConfig) -> Result<()> {
         }
     }
     if !all_ok {
-        return Err(anyhow!("One or more required packages are missing."));
+        return Err(anyhow!("One or more required packages are missing."),);
     }
-    Ok(())
+    Ok((),)
 }
 
 /// Exports environment variables to the shell.
@@ -127,39 +138,39 @@ fn check_packages(config: &config::ProjectConfig) -> Result<()> {
 /// Returns an error if the specified environment is not found or if there is
 /// an issue determining the current platform or directory.
 pub fn export_shell(
-    env_alias: Option<&str>,
+    env_alias: Option<&str,>,
     config: &config::ProjectConfig,
     shell: Shell,
-) -> Result<()> {
+) -> Result<(),> {
     let platform = utils::get_platform()?;
     let mut env_vars = HashMap::new();
 
-    if let Some(alias) = env_alias {
+    if let Some(alias,) = env_alias {
         let env_spec = config
             .environments
             .iter()
-            .find(|e| e.cmd == alias)
-            .ok_or_else(|| anyhow!("Environment '{alias}' not found"))?;
+            .find(|e| e.cmd == alias,)
+            .ok_or_else(|| anyhow!("Environment '{alias}' not found"),)?;
 
         let extra_env = match &env_spec.env {
-            config::PlatformOrEnvMap::EnvMap(m) => m.clone(),
-            config::PlatformOrEnvMap::Platform(p) => p
-                .get(&platform)
-                .or_else(|| p.get("default"))
+            config::PlatformOrEnvMap::EnvMap(m,) => m.clone(),
+            config::PlatformOrEnvMap::Platform(p,) => p
+                .get(&platform,)
+                .or_else(|| p.get("default",),)
                 .cloned()
                 .unwrap_or_default(),
         };
-        env_vars.extend(extra_env);
+        env_vars.extend(extra_env,);
     }
 
     if config.config.local {
         let bin_dir = std::env::current_dir()?
-            .join(".zoi")
-            .join("pkgs")
-            .join("bin");
+            .join(".zoi",)
+            .join("pkgs",)
+            .join("bin",);
         if bin_dir.exists() {
             let mut path = bin_dir.to_string_lossy().to_string();
-            if let Ok(old_path) = std::env::var("PATH") {
+            if let Ok(old_path,) = std::env::var("PATH",) {
                 path = format!(
                     "{}{}{}",
                     path,
@@ -167,11 +178,11 @@ pub fn export_shell(
                     old_path
                 );
             }
-            env_vars.insert("PATH".to_string(), path);
+            env_vars.insert("PATH".to_string(), path,);
         }
     }
 
-    for (k, v) in env_vars {
+    for (k, v,) in env_vars {
         match shell {
             Shell::Bash | Shell::Zsh => {
                 println!("export {k}=\"{v}\"");
@@ -189,5 +200,5 @@ pub fn export_shell(
         }
     }
 
-    Ok(())
+    Ok((),)
 }

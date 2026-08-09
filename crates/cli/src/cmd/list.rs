@@ -3,11 +3,14 @@
 //! This module provides functionality to list packages based on various
 //! filters like registry, repository, package type, and outdated status.
 
-use crate::pkg::{config, local, types};
-use anyhow::{Result, anyhow};
-use comfy_table::{Attribute, Cell, Color, ContentArrangement, Table, presets::UTF8_FULL};
-use rayon::prelude::*;
 use std::collections::HashSet;
+
+use anyhow::{Result, anyhow};
+use comfy_table::presets::UTF8_FULL;
+use comfy_table::{Attribute, Cell, Color, ContentArrangement, Table};
+use rayon::prelude::*;
+
+use crate::pkg::{config, local, types};
 
 /// Runs the list command with the provided filters and options.
 ///
@@ -16,97 +19,112 @@ use std::collections::HashSet;
 /// Returns an error if:
 /// - The package type filter is invalid.
 /// - The `--foreign` flag is used with `--all`.
-/// - There is an error reading the configuration or interacting with the database.
+/// - There is an error reading the configuration or interacting with the
+///   database.
 /// - There is an error fetching installed or available packages.
 ///
 /// # Panics
 ///
-/// Panics if the `type_filter` is missing despite being set, which should not happen.
+/// Panics if the `type_filter` is missing despite being set, which should not
+/// happen.
 pub fn run(
     all: bool,
     outdated: bool,
-    registry_filter: Option<&str>,
-    repo_filter: Option<&str>,
-    type_filter: Option<&str>,
+    registry_filter: Option<&str,>,
+    repo_filter: Option<&str,>,
+    type_filter: Option<&str,>,
     foreign: bool,
     names_only: bool,
     completion: bool,
-) -> Result<()> {
+) -> Result<(),> {
     let package_type = match type_filter {
-        Some("package") => Some(types::PackageType::Package),
-        Some("collection") => Some(types::PackageType::Collection),
-        Some("app") => Some(types::PackageType::App),
-        Some("extension") => Some(types::PackageType::Extension),
-        Some(other) => return Err(anyhow!("Invalid package type: {other}")),
+        Some("package",) => Some(types::PackageType::Package,),
+        Some("collection",) => Some(types::PackageType::Collection,),
+        Some("app",) => Some(types::PackageType::App,),
+        Some("extension",) => Some(types::PackageType::Extension,),
+        Some(other,) => return Err(anyhow!("Invalid package type: {other}"),),
         None => None,
     };
 
     if outdated {
-        return run_list_outdated(registry_filter, repo_filter, package_type);
+        return run_list_outdated(registry_filter, repo_filter, package_type,);
     }
 
     if names_only || completion {
-        return run_list_names(all, registry_filter, repo_filter, package_type, completion);
+        return run_list_names(
+            all,
+            registry_filter,
+            repo_filter,
+            package_type,
+            completion,
+        );
     }
 
     if all {
         if foreign {
-            return Err(anyhow!("The --foreign flag cannot be used with --all."));
+            return Err(anyhow!(
+                "The --foreign flag cannot be used with --all."
+            ),);
         }
-        run_list_all(registry_filter, repo_filter, package_type)?;
+        run_list_all(registry_filter, repo_filter, package_type,)?;
     } else {
-        run_list_installed(registry_filter, repo_filter, package_type, foreign)?;
+        run_list_installed(
+            registry_filter,
+            repo_filter,
+            package_type,
+            foreign,
+        )?;
     }
-    Ok(())
+    Ok((),)
 }
 
 /// Lists outdated packages.
 fn run_list_outdated(
-    registry_filter: Option<&str>,
-    repo_filter: Option<&str>,
-    type_filter: Option<types::PackageType>,
-) -> Result<()> {
+    registry_filter: Option<&str,>,
+    repo_filter: Option<&str,>,
+    type_filter: Option<types::PackageType,>,
+) -> Result<(),> {
     let installed_packages = local::get_installed_packages()?;
 
     let mut table = Table::new();
     table
-        .load_preset(UTF8_FULL)
-        .set_content_arrangement(ContentArrangement::Dynamic)
+        .load_preset(UTF8_FULL,)
+        .set_content_arrangement(ContentArrangement::Dynamic,)
         .set_header(vec![
-            Cell::new("Package").add_attribute(Attribute::Bold),
-            Cell::new("Current").add_attribute(Attribute::Bold),
-            Cell::new("Latest").add_attribute(Attribute::Bold),
-            Cell::new("Repo").add_attribute(Attribute::Bold),
-            Cell::new("Registry").add_attribute(Attribute::Bold),
-        ]);
+            Cell::new("Package",).add_attribute(Attribute::Bold,),
+            Cell::new("Current",).add_attribute(Attribute::Bold,),
+            Cell::new("Latest",).add_attribute(Attribute::Bold,),
+            Cell::new("Repo",).add_attribute(Attribute::Bold,),
+            Cell::new("Registry",).add_attribute(Attribute::Bold,),
+        ],);
 
     let mut found_outdated = false;
 
     for manifest in installed_packages {
-        if let Some(registry_f) = registry_filter
+        if let Some(registry_f,) = registry_filter
             && manifest.registry_handle != registry_f
         {
             continue;
         }
 
-        if let Some(repo_f) = repo_filter {
-            let repo_matches = if repo_f.contains('/') {
+        if let Some(repo_f,) = repo_filter {
+            let repo_matches = if repo_f.contains('/',) {
                 manifest.repo == repo_f
             } else {
-                manifest.repo.split('/').any(|part| part == repo_f)
+                manifest.repo.split('/',).any(|part| part == repo_f,)
             };
             if !repo_matches {
                 continue;
             }
         }
 
-        if let Some(type_f) = type_filter
+        if let Some(type_f,) = type_filter
             && manifest.package_type != type_f
         {
             continue;
         }
 
-        let source = if let Some(sub) = &manifest.sub_package {
+        let source = if let Some(sub,) = &manifest.sub_package {
             format!(
                 "#{}@{}/{}:{}",
                 manifest.registry_handle, manifest.repo, manifest.name, sub
@@ -118,9 +136,12 @@ fn run_list_outdated(
             )
         };
 
-        if let Ok((pkg, new_version, _, _, _, _, _)) =
-            crate::pkg::resolve::resolve_package_and_version(&source, None, true, false)
-            && (manifest.version != new_version || manifest.revision != pkg.revision)
+        if let Ok((pkg, new_version, _, _, _, _, _,),) =
+            crate::pkg::resolve::resolve_package_and_version(
+                &source, None, true, false,
+            )
+            && (manifest.version != new_version
+                || manifest.revision != pkg.revision)
         {
             let current_display = if manifest.revision == "1" {
                 manifest.version.clone()
@@ -135,12 +156,13 @@ fn run_list_outdated(
             };
 
             table.add_row(vec![
-                Cell::new(manifest.name.clone()).fg(Color::Cyan),
-                Cell::new(current_display).fg(Color::Yellow),
-                Cell::new(latest_display).fg(Color::Green),
-                Cell::new(manifest.repo.clone()).fg(Color::DarkGrey),
-                Cell::new(manifest.registry_handle.clone()).fg(Color::DarkGrey),
-            ]);
+                Cell::new(manifest.name.clone(),).fg(Color::Cyan,),
+                Cell::new(current_display,).fg(Color::Yellow,),
+                Cell::new(latest_display,).fg(Color::Green,),
+                Cell::new(manifest.repo.clone(),).fg(Color::DarkGrey,),
+                Cell::new(manifest.registry_handle.clone(),)
+                    .fg(Color::DarkGrey,),
+            ],);
             found_outdated = true;
         }
     }
@@ -151,65 +173,68 @@ fn run_list_outdated(
         println!("No outdated packages found.");
     }
 
-    Ok(())
+    Ok((),)
 }
 
 /// Lists installed packages.
 fn run_list_installed(
-    registry_filter: Option<&str>,
-    repo_filter: Option<&str>,
-    type_filter: Option<types::PackageType>,
+    registry_filter: Option<&str,>,
+    repo_filter: Option<&str,>,
+    type_filter: Option<types::PackageType,>,
     foreign: bool,
-) -> Result<()> {
+) -> Result<(),> {
     let config = config::read_config()?;
     let mut active_registries = HashSet::new();
-    if let Some(default) = &config.default_registry {
-        active_registries.insert(default.handle.clone());
+    if let Some(default,) = &config.default_registry {
+        active_registries.insert(default.handle.clone(),);
     }
     for reg in &config.added_registries {
-        active_registries.insert(reg.handle.clone());
+        active_registries.insert(reg.handle.clone(),);
     }
 
     let mut db_failed = false;
-    let packages_from_db = if let Ok(pkgs) = crate::pkg::db::list_all_packages("local") { pkgs } else {
-        db_failed = true;
-        Vec::new()
-    };
+    let packages_from_db =
+        if let Ok(pkgs,) = crate::pkg::db::list_all_packages("local",) {
+            pkgs
+        } else {
+            db_failed = true;
+            Vec::new()
+        };
 
     let mut table = Table::new();
     table
-        .load_preset(UTF8_FULL)
-        .set_content_arrangement(ContentArrangement::Dynamic)
+        .load_preset(UTF8_FULL,)
+        .set_content_arrangement(ContentArrangement::Dynamic,)
         .set_header(vec![
-            Cell::new("Package").add_attribute(Attribute::Bold),
-            Cell::new("Version").add_attribute(Attribute::Bold),
-            Cell::new("Repo").add_attribute(Attribute::Bold),
-            Cell::new("Registry").add_attribute(Attribute::Bold),
-            Cell::new("Type").add_attribute(Attribute::Bold),
-        ]);
+            Cell::new("Package",).add_attribute(Attribute::Bold,),
+            Cell::new("Version",).add_attribute(Attribute::Bold,),
+            Cell::new("Repo",).add_attribute(Attribute::Bold,),
+            Cell::new("Registry",).add_attribute(Attribute::Bold,),
+            Cell::new("Type",).add_attribute(Attribute::Bold,),
+        ],);
 
     let mut found_packages = false;
 
     if !db_failed && !packages_from_db.is_empty() {
         for pkg in packages_from_db {
             if foreign
-                && let Some(reg) = &pkg.registry_handle
-                && active_registries.contains(reg)
+                && let Some(reg,) = &pkg.registry_handle
+                && active_registries.contains(reg,)
             {
                 continue;
             }
 
-            if let Some(reg_f) = registry_filter
-                && pkg.registry_handle.as_deref() != Some(reg_f)
+            if let Some(reg_f,) = registry_filter
+                && pkg.registry_handle.as_deref() != Some(reg_f,)
             {
                 continue;
             }
 
-            if let Some(repo_f) = repo_filter {
-                let repo_matches = if repo_f.contains('/') {
+            if let Some(repo_f,) = repo_filter {
+                let repo_matches = if repo_f.contains('/',) {
                     pkg.repo == repo_f
                 } else {
-                    pkg.repo.split('/').any(|part| part == repo_f)
+                    pkg.repo.split('/',).any(|part| part == repo_f,)
                 };
                 if !repo_matches {
                     continue;
@@ -217,20 +242,21 @@ fn run_list_installed(
             }
             if type_filter.is_some()
                 && pkg.package_type
-                    != type_filter
-                        .ok_or_else(|| anyhow!("type_filter missing despite being set"))?
+                    != type_filter.ok_or_else(|| {
+                        anyhow!("type_filter missing despite being set")
+                    },)?
             {
                 continue;
             }
 
-            let package_display = if let Some(sub) = &pkg.sub_package {
+            let package_display = if let Some(sub,) = &pkg.sub_package {
                 format!("{}:{}", pkg.name, sub)
             } else {
                 pkg.name
             };
 
             let version_display = if pkg.revision == "1" {
-                pkg.version.unwrap_or_else(|| "N/A".to_string())
+                pkg.version.unwrap_or_else(|| "N/A".to_string(),)
             } else {
                 format!(
                     "{}-{}",
@@ -242,20 +268,23 @@ fn run_list_installed(
             let repo_display = &pkg.repo;
 
             table.add_row(vec![
-                Cell::new(package_display).fg(Color::Cyan),
-                Cell::new(version_display).fg(Color::Yellow),
-                Cell::new(repo_display.clone()).fg(Color::Green),
-                Cell::new(pkg.registry_handle.unwrap_or_else(|| "none".to_string()))
-                    .fg(Color::DarkGrey),
-                Cell::new(format!("{:?}", pkg.package_type)).fg(Color::DarkGrey),
-            ]);
+                Cell::new(package_display,).fg(Color::Cyan,),
+                Cell::new(version_display,).fg(Color::Yellow,),
+                Cell::new(repo_display.clone(),).fg(Color::Green,),
+                Cell::new(
+                    pkg.registry_handle.unwrap_or_else(|| "none".to_string(),),
+                )
+                .fg(Color::DarkGrey,),
+                Cell::new(format!("{:?}", pkg.package_type),)
+                    .fg(Color::DarkGrey,),
+            ],);
             found_packages = true;
         }
     } else {
         let packages = local::get_installed_packages_with_type()?;
         if packages.is_empty() {
             println!("No packages installed by Zoi.");
-            return Ok(());
+            return Ok((),);
         }
 
         for pkg in packages {
@@ -268,29 +297,29 @@ fn run_list_installed(
                 &pkg.name,
                 pkg.sub_package.as_deref(),
                 types::Scope::System,
-            )?)
+            )?,)
             .or(local::is_package_installed(
                 &pkg.name,
                 pkg.sub_package.as_deref(),
                 types::Scope::Project,
-            )?);
+            )?,);
 
-            let Some(m) = manifest else { continue };
+            let Some(m,) = manifest else { continue };
 
-            if foreign && active_registries.contains(&m.registry_handle) {
+            if foreign && active_registries.contains(&m.registry_handle,) {
                 continue;
             }
 
-            if let Some(reg_f) = registry_filter
+            if let Some(reg_f,) = registry_filter
                 && m.registry_handle != reg_f
             {
                 continue;
             }
-            if let Some(repo_f) = repo_filter {
-                let repo_matches = if repo_f.contains('/') {
+            if let Some(repo_f,) = repo_filter {
+                let repo_matches = if repo_f.contains('/',) {
                     pkg.repo == repo_f
                 } else {
-                    pkg.repo.split('/').any(|part| part == repo_f)
+                    pkg.repo.split('/',).any(|part| part == repo_f,)
                 };
                 if !repo_matches {
                     continue;
@@ -298,13 +327,14 @@ fn run_list_installed(
             }
             if type_filter.is_some()
                 && pkg.package_type
-                    != type_filter
-                        .ok_or_else(|| anyhow!("type_filter missing despite being set"))?
+                    != type_filter.ok_or_else(|| {
+                        anyhow!("type_filter missing despite being set")
+                    },)?
             {
                 continue;
             }
 
-            let package_display = if let Some(sub) = pkg.sub_package {
+            let package_display = if let Some(sub,) = pkg.sub_package {
                 format!("{}:{}", pkg.name, sub)
             } else {
                 pkg.name
@@ -319,12 +349,13 @@ fn run_list_installed(
             let repo_display = &pkg.repo;
 
             table.add_row(vec![
-                Cell::new(package_display).fg(Color::Cyan),
-                Cell::new(version_display).fg(Color::Yellow),
-                Cell::new(repo_display.clone()).fg(Color::Green),
-                Cell::new(m.registry_handle).fg(Color::DarkGrey),
-                Cell::new(format!("{:?}", pkg.package_type)).fg(Color::DarkGrey),
-            ]);
+                Cell::new(package_display,).fg(Color::Cyan,),
+                Cell::new(version_display,).fg(Color::Yellow,),
+                Cell::new(repo_display.clone(),).fg(Color::Green,),
+                Cell::new(m.registry_handle,).fg(Color::DarkGrey,),
+                Cell::new(format!("{:?}", pkg.package_type),)
+                    .fg(Color::DarkGrey,),
+            ],);
             found_packages = true;
         }
     }
@@ -335,41 +366,44 @@ fn run_list_installed(
         println!("No installed packages match your criteria.");
     }
 
-    Ok(())
+    Ok((),)
 }
 
 /// Lists package names for completion or simple output.
 fn run_list_names(
     all: bool,
-    registry_filter: Option<&str>,
-    repo_filter: Option<&str>,
-    type_filter: Option<types::PackageType>,
+    registry_filter: Option<&str,>,
+    repo_filter: Option<&str,>,
+    type_filter: Option<types::PackageType,>,
     completion: bool,
-) -> Result<()> {
+) -> Result<(),> {
     let mut entries = Vec::new();
     let config = config::read_config()?;
 
     if all {
         let mut registries = Vec::new();
-        if let Some(reg) = registry_filter {
-            registries.push(reg.to_string());
+        if let Some(reg,) = registry_filter {
+            registries.push(reg.to_string(),);
         } else {
-            if let Some(default) = &config.default_registry {
-                registries.push(default.handle.clone());
+            if let Some(default,) = &config.default_registry {
+                registries.push(default.handle.clone(),);
             }
             for reg in &config.added_registries {
-                registries.push(reg.handle.clone());
+                registries.push(reg.handle.clone(),);
             }
         }
 
-        let default_handle = config.default_registry.as_ref().map(|r| &r.handle);
+        let default_handle =
+            config.default_registry.as_ref().map(|r| &r.handle,);
 
         for handle in registries {
-            if let Ok(pkgs) = crate::pkg::db::get_packages_for_completion(&handle) {
-                let is_default = default_handle == Some(&handle);
+            if let Ok(pkgs,) =
+                crate::pkg::db::get_packages_for_completion(&handle,)
+            {
+                let is_default = default_handle == Some(&handle,);
                 for pkg in pkgs {
-                    if let Some(repo_f) = repo_filter
-                        && !pkg.repo.contains(repo_f)
+                    if let Some(repo_f,) = repo_filter
+                        && !pkg.repo.contains(repo_f,)
                     {
                         continue;
                     }
@@ -380,49 +414,56 @@ fn run_list_names(
                         format!("#{}@{}/{}", handle, pkg.repo, pkg.name)
                     };
 
-                    let name_with_sub = if let Some(sub) = &pkg.sub_package {
+                    let name_with_sub = if let Some(sub,) = &pkg.sub_package {
                         format!("{base_name}:{sub}")
                     } else {
                         base_name
                     };
 
                     let entry = if completion {
-                        format!("{}:{}", name_with_sub, pkg.description.replace(':', " "))
+                        format!(
+                            "{}:{}",
+                            name_with_sub,
+                            pkg.description.replace(':', " ")
+                        )
                     } else {
                         name_with_sub
                     };
-                    entries.push(entry);
+                    entries.push(entry,);
                 }
             }
         }
     } else {
         let installed = if completion {
-            crate::pkg::db::list_all_packages("local")?
+            crate::pkg::db::list_all_packages("local",)?
         } else {
-            local::get_installed_packages()
-                .map(|v| v.into_iter().map(zoi_core::types::InstallManifest::into_package).collect())?
+            local::get_installed_packages().map(|v| {
+                v.into_iter()
+                    .map(zoi_core::types::InstallManifest::into_package,)
+                    .collect()
+            },)?
         };
 
         for pkg in installed {
-            if let Some(type_f) = type_filter
+            if let Some(type_f,) = type_filter
                 && pkg.package_type != type_f
             {
                 continue;
             }
 
-            if let Some(reg_f) = registry_filter
-                && pkg.registry_handle.as_deref() != Some(reg_f)
+            if let Some(reg_f,) = registry_filter
+                && pkg.registry_handle.as_deref() != Some(reg_f,)
             {
                 continue;
             }
 
-            if let Some(repo_f) = repo_filter
+            if let Some(repo_f,) = repo_filter
                 && pkg.repo != repo_f
             {
                 continue;
             }
 
-            let name = if let Some(sub) = pkg.sub_package {
+            let name = if let Some(sub,) = pkg.sub_package {
                 format!("{}:{}", pkg.name, sub)
             } else {
                 pkg.name
@@ -433,7 +474,7 @@ fn run_list_names(
             } else {
                 name
             };
-            entries.push(entry);
+            entries.push(entry,);
         }
     }
 
@@ -443,53 +484,55 @@ fn run_list_names(
         println!("{entry}");
     }
 
-    Ok(())
+    Ok((),)
 }
 
 /// Lists all available packages from all active registries.
 fn run_list_all(
-    registry_filter: Option<&str>,
-    repo_filter: Option<&str>,
-    type_filter: Option<types::PackageType>,
-) -> Result<()> {
+    registry_filter: Option<&str,>,
+    repo_filter: Option<&str,>,
+    type_filter: Option<types::PackageType,>,
+) -> Result<(),> {
     let installed_pkgs = local::get_installed_packages()?
         .into_iter()
         .map(|p| {
-            if let Some(sub) = p.sub_package {
+            if let Some(sub,) = p.sub_package {
                 format!("{}:{}", p.name, sub)
             } else {
                 p.name
             }
-        })
-        .collect::<HashSet<_>>();
+        },)
+        .collect::<HashSet<_,>>();
 
     let config = config::read_config()?;
 
     let mut all_available = Vec::new();
     let mut db_failed = false;
 
-    if let Some(reg_handle) = registry_filter {
-        match crate::pkg::db::list_all_packages(reg_handle) {
-            Ok(pkgs) => all_available.extend(pkgs),
-            Err(_) => db_failed = true,
+    if let Some(reg_handle,) = registry_filter {
+        match crate::pkg::db::list_all_packages(reg_handle,) {
+            Ok(pkgs,) => all_available.extend(pkgs,),
+            Err(_,) => db_failed = true,
         }
     } else {
         let mut registries = Vec::new();
-        if let Some(default) = &config.default_registry {
-            registries.push(default.handle.clone());
+        if let Some(default,) = &config.default_registry {
+            registries.push(default.handle.clone(),);
         }
         for reg in &config.added_registries {
-            registries.push(reg.handle.clone());
+            registries.push(reg.handle.clone(),);
         }
 
-        let results: Vec<Result<Vec<types::Package>>> = registries
+        let results: Vec<Result<Vec<types::Package,>,>,> = registries
             .into_par_iter()
-            .filter(|h| !h.is_empty())
-            .map(|handle| crate::pkg::db::list_all_packages(&handle))
+            .filter(|h| !h.is_empty(),)
+            .map(|handle| crate::pkg::db::list_all_packages(&handle,),)
             .collect();
 
         for res in results {
-            if let Ok(pkgs) = res { all_available.extend(pkgs) } else {
+            if let Ok(pkgs,) = res {
+                all_available.extend(pkgs,)
+            } else {
                 db_failed = true;
                 break;
             }
@@ -497,62 +540,67 @@ fn run_list_all(
     }
 
     let available_pkgs = if db_failed
-        || (all_available.is_empty() && repo_filter.is_none() && registry_filter.is_none())
+        || (all_available.is_empty()
+            && repo_filter.is_none()
+            && registry_filter.is_none())
     {
-        if let Some(reg_handle) = registry_filter {
+        if let Some(reg_handle,) = registry_filter {
             let all_repo_names = config::get_all_repos()?;
-            let full_repos: Vec<String> = all_repo_names
+            let full_repos: Vec<String,> = all_repo_names
                 .into_iter()
-                .map(|r_name| format!("{reg_handle}/{r_name}"))
+                .map(|r_name| format!("{reg_handle}/{r_name}"),)
                 .filter(|full_repo_name| {
-                    if let Some(repo_f) = repo_filter {
-                        if repo_f.contains('/') {
+                    if let Some(repo_f,) = repo_filter {
+                        if repo_f.contains('/',) {
                             full_repo_name == repo_f
                         } else {
-                            full_repo_name.split('/').any(|part| part == repo_f)
+                            full_repo_name
+                                .split('/',)
+                                .any(|part| part == repo_f,)
                         }
                     } else {
                         true
                     }
-                })
+                },)
                 .collect();
-            local::get_packages_from_repos(&full_repos)?
-        } else if let Some(repo_f) = repo_filter {
-            let handle = if let Some(reg) = &config.default_registry {
+            local::get_packages_from_repos(&full_repos,)?
+        } else if let Some(repo_f,) = repo_filter {
+            let handle = if let Some(reg,) = &config.default_registry {
                 reg.handle.clone()
             } else {
-                return Err(anyhow!("Default registry not configured."));
+                return Err(anyhow!("Default registry not configured."),);
             };
             if handle.is_empty() {
                 return Err(anyhow!(
-                    "Default registry handle is not set. Please run 'zoi sync'.."
-                ));
+                    "Default registry handle is not set. Please run 'zoi \
+                     sync'.."
+                ),);
             }
             let all_repo_names = config::get_all_repos()?;
-            let repos_to_search: Vec<String> = all_repo_names
+            let repos_to_search: Vec<String,> = all_repo_names
                 .into_iter()
-                .map(|r_name| format!("{handle}/{r_name}"))
+                .map(|r_name| format!("{handle}/{r_name}"),)
                 .filter(|full_repo_name| {
-                    if repo_f.contains('/') {
+                    if repo_f.contains('/',) {
                         full_repo_name == repo_f
                     } else {
-                        full_repo_name.split('/').any(|part| part == repo_f)
+                        full_repo_name.split('/',).any(|part| part == repo_f,)
                     }
-                })
+                },)
                 .collect();
-            local::get_packages_from_repos(&repos_to_search)?
+            local::get_packages_from_repos(&repos_to_search,)?
         } else {
             local::get_all_available_packages()?
         }
     } else {
-        if let Some(rf) = repo_filter {
+        if let Some(rf,) = repo_filter {
             all_available.retain(|p| {
-                if rf.contains('/') {
+                if rf.contains('/',) {
                     p.repo == rf
                 } else {
-                    p.repo.split('/').any(|part| part == rf)
+                    p.repo.split('/',).any(|part| part == rf,)
                 }
-            });
+            },);
         }
         all_available
     };
@@ -560,39 +608,42 @@ fn run_list_all(
     let handle_for_version = registry_filter.or(config
         .default_registry
         .as_ref()
-        .map(|reg| reg.handle.as_str()));
+        .map(|reg| reg.handle.as_str(),),);
 
     if available_pkgs.is_empty() {
-        if let Some(repo) = repo_filter {
+        if let Some(repo,) = repo_filter {
             println!("No packages found in repo '{repo}'.");
         } else {
             println!("No packages found in active repositories.");
         }
-        return Ok(());
+        return Ok((),);
     }
 
     let mut table = Table::new();
     table
-        .load_preset(UTF8_FULL)
-        .set_content_arrangement(ContentArrangement::Dynamic)
+        .load_preset(UTF8_FULL,)
+        .set_content_arrangement(ContentArrangement::Dynamic,)
         .set_header(vec![
-            Cell::new("Status").add_attribute(Attribute::Bold),
-            Cell::new("Package").add_attribute(Attribute::Bold),
-            Cell::new("Version").add_attribute(Attribute::Bold),
-            Cell::new("Repo").add_attribute(Attribute::Bold),
-            Cell::new("Type").add_attribute(Attribute::Bold),
-        ]);
+            Cell::new("Status",).add_attribute(Attribute::Bold,),
+            Cell::new("Package",).add_attribute(Attribute::Bold,),
+            Cell::new("Version",).add_attribute(Attribute::Bold,),
+            Cell::new("Repo",).add_attribute(Attribute::Bold,),
+            Cell::new("Type",).add_attribute(Attribute::Bold,),
+        ],);
 
     for pkg in available_pkgs {
         if type_filter.is_some()
             && pkg.package_type
-                != type_filter.ok_or_else(|| anyhow!("type_filter missing despite being set"))?
+                != type_filter.ok_or_else(|| {
+                    anyhow!("type_filter missing despite being set")
+                },)?
         {
             continue;
         }
 
-        let version = crate::pkg::resolve::get_default_version(&pkg, handle_for_version)
-            .unwrap_or_else(|_| "N/A".to_string());
+        let version =
+            crate::pkg::resolve::get_default_version(&pkg, handle_for_version,)
+                .unwrap_or_else(|_| "N/A".to_string(),);
 
         let version_display = if pkg.revision == "1" {
             version.clone()
@@ -600,46 +651,53 @@ fn run_list_all(
             format!("{}-{}", version, pkg.revision)
         };
 
-        let repo_display = pkg.repo.split_once('/').map_or(pkg.repo.as_str(), |x| x.1);
+        let repo_display = pkg
+            .repo
+            .split_once('/',)
+            .map_or(pkg.repo.as_str(), |x| x.1,);
 
-        let full_name = if let Some(sub) = &pkg.sub_package {
+        let full_name = if let Some(sub,) = &pkg.sub_package {
             format!("{}:{}", pkg.name, sub)
         } else {
             pkg.name.clone()
         };
 
-        if let Some(subs) = &pkg.sub_packages {
+        if let Some(subs,) = &pkg.sub_packages {
             for sub in subs {
                 let full_name_sub = format!("{}:{}", pkg.name, sub);
-                let (status_str, status_color) = if installed_pkgs.contains(&full_name_sub) {
-                    ("✓", Color::Green)
-                } else {
-                    ("", Color::Reset)
-                };
+                let (status_str, status_color,) =
+                    if installed_pkgs.contains(&full_name_sub,) {
+                        ("✓", Color::Green,)
+                    } else {
+                        ("", Color::Reset,)
+                    };
                 table.add_row(vec![
-                    Cell::new(status_str).fg(status_color),
-                    Cell::new(full_name_sub).fg(Color::Cyan),
-                    Cell::new(version_display.clone()).fg(Color::Yellow),
-                    Cell::new(repo_display.to_string()).fg(Color::Green),
-                    Cell::new(format!("{:?}", pkg.package_type)).fg(Color::DarkGrey),
-                ]);
+                    Cell::new(status_str,).fg(status_color,),
+                    Cell::new(full_name_sub,).fg(Color::Cyan,),
+                    Cell::new(version_display.clone(),).fg(Color::Yellow,),
+                    Cell::new(repo_display.to_string(),).fg(Color::Green,),
+                    Cell::new(format!("{:?}", pkg.package_type),)
+                        .fg(Color::DarkGrey,),
+                ],);
             }
         } else {
-            let (status_str, status_color) = if installed_pkgs.contains(&full_name) {
-                ("✓", Color::Green)
-            } else {
-                ("", Color::Reset)
-            };
+            let (status_str, status_color,) =
+                if installed_pkgs.contains(&full_name,) {
+                    ("✓", Color::Green,)
+                } else {
+                    ("", Color::Reset,)
+                };
             table.add_row(vec![
-                Cell::new(status_str).fg(status_color),
-                Cell::new(full_name).fg(Color::Cyan),
-                Cell::new(version_display).fg(Color::Yellow),
-                Cell::new(repo_display.to_string()).fg(Color::Green),
-                Cell::new(format!("{:?}", pkg.package_type)).fg(Color::DarkGrey),
-            ]);
+                Cell::new(status_str,).fg(status_color,),
+                Cell::new(full_name,).fg(Color::Cyan,),
+                Cell::new(version_display,).fg(Color::Yellow,),
+                Cell::new(repo_display.to_string(),).fg(Color::Green,),
+                Cell::new(format!("{:?}", pkg.package_type),)
+                    .fg(Color::DarkGrey,),
+            ],);
         }
     }
 
     println!("{table}");
-    Ok(())
+    Ok((),)
 }

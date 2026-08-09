@@ -1,6 +1,7 @@
 //! Integration tests for `.zoiignore` file handling.
 
 use std::fs;
+
 use tempfile::tempdir;
 
 mod common;
@@ -8,23 +9,23 @@ mod common;
 #[test]
 fn test_zoiignore_bundle() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("failed to create temp dir");
+    let tmp = tempdir().expect("failed to create temp dir",);
     let root = tmp.path().to_path_buf();
-    ctx.set_current_dir(&root);
-    ctx.set_env_var("HOME", &root);
+    ctx.set_current_dir(&root,);
+    ctx.set_env_var("HOME", &root,);
 
-    let pkg_dir = root.join("my-pkg");
-    fs::create_dir_all(&pkg_dir).expect("unwrap failed");
+    let pkg_dir = root.join("my-pkg",);
+    fs::create_dir_all(&pkg_dir,).expect("unwrap failed",);
 
-    let pkg_lua = pkg_dir.join("my-pkg.pkg.lua");
-    let asset_file = pkg_dir.join("hello.txt");
-    let ignore_file = pkg_dir.join("secret.txt");
-    let zoiignore = pkg_dir.join(".zoiignore");
+    let pkg_lua = pkg_dir.join("my-pkg.pkg.lua",);
+    let asset_file = pkg_dir.join("hello.txt",);
+    let ignore_file = pkg_dir.join("secret.txt",);
+    let zoiignore = pkg_dir.join(".zoiignore",);
 
-    fs::write(&asset_file, "hello from asset").expect("unwrap failed");
-    fs::write(&ignore_file, "top secret").expect("unwrap failed");
-    fs::write(&zoiignore, "secret.txt\n*.tmp\n").expect("unwrap failed");
-    fs::write(pkg_dir.join("temp.tmp"), "trash").expect("unwrap failed");
+    fs::write(&asset_file, "hello from asset",).expect("unwrap failed",);
+    fs::write(&ignore_file, "top secret",).expect("unwrap failed",);
+    fs::write(&zoiignore, "secret.txt\n*.tmp\n",).expect("unwrap failed",);
+    fs::write(pkg_dir.join("temp.tmp",), "trash",).expect("unwrap failed",);
 
     let lua_code = r#"
 metadata({
@@ -42,25 +43,27 @@ function package()
     zcp("${pkgluadir}/temp.tmp", "${pkgstore}/temp.tmp")
 end
 "#;
-    fs::write(&pkg_lua, lua_code).expect("unwrap failed");
+    fs::write(&pkg_lua, lua_code,).expect("unwrap failed",);
 
     // Bundle
-    zoi::bundle_package(&pkg_lua, Some(&root), None, None, None).expect("bundling failed");
-    let zsa_path = root.join("my-pkg-1.0.0.zsa");
+    zoi::bundle_package(&pkg_lua, Some(&root,), None, None, None,)
+        .expect("bundling failed",);
+    let zsa_path = root.join("my-pkg-1.0.0.zsa",);
     assert!(zsa_path.exists(), ".zsa bundle should exist");
 
     // Inspect bundle contents
-    let file = fs::File::open(&zsa_path).expect("unwrap failed");
-    let decoder = zstd::stream::read::Decoder::new(file).expect("unwrap failed");
-    let mut archive = tar::Archive::new(decoder);
+    let file = fs::File::open(&zsa_path,).expect("unwrap failed",);
+    let decoder =
+        zstd::stream::read::Decoder::new(file,).expect("unwrap failed",);
+    let mut archive = tar::Archive::new(decoder,);
 
     let mut found_hello = false;
     let mut found_secret = false;
     let mut found_temp = false;
 
-    for entry in archive.entries().expect("unwrap failed") {
-        let entry = entry.expect("unwrap failed");
-        let path = entry.path().expect("unwrap failed");
+    for entry in archive.entries().expect("unwrap failed",) {
+        let entry = entry.expect("unwrap failed",);
+        let path = entry.path().expect("unwrap failed",);
         let path_str = path.to_string_lossy();
 
         if path_str == "hello.txt" {

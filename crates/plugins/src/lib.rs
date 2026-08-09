@@ -7,15 +7,18 @@
 /// Registry extension management.
 pub mod extension;
 
-use anyhow::{Result, anyhow};
-use colored::Colorize;
-use comfy_table::{Table as ComfyTable, presets::UTF8_FULL};
-use dialoguer::{Confirm, Select, theme::ColorfulTheme};
-use mlua::{Function, Lua, LuaSerdeExt, Table, Value};
-use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+use anyhow::{Result, anyhow};
+use colored::Colorize;
+use comfy_table::Table as ComfyTable;
+use comfy_table::presets::UTF8_FULL;
+use dialoguer::theme::ColorfulTheme;
+use dialoguer::{Confirm, Select};
+use mlua::{Function, Lua, LuaSerdeExt, Table, Value};
+use sha2::{Digest, Sha256};
 use zoi_core::{types, utils};
 use zoi_project as project;
 use zoi_resolver::{local, resolve};
@@ -48,19 +51,19 @@ impl PluginManager {
     ///
     /// Returns an error if the Lua VM cannot be initialized or if the `zoi` API
     /// fails to be injected.
-    pub fn new() -> Result<Self> {
+    pub fn new() -> Result<Self,> {
         let lua = Lua::new();
-        let manager = Self { lua };
+        let manager = Self { lua, };
         manager.setup_api()?;
-        Ok(manager)
+        Ok(manager,)
     }
 
     /// Sets up the global `zoi` API in the Lua environment.
-    fn setup_api(&self) -> Result<()> {
+    fn setup_api(&self,) -> Result<(),> {
         let zoi = self
             .lua
             .create_table()
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
         self.lua
             .globals()
@@ -68,47 +71,59 @@ impl PluginManager {
                 "__ZOI_COMMANDS",
                 self.lua
                     .create_table()
-                    .map_err(|e| anyhow!(e.to_string()))?,
+                    .map_err(|e| anyhow!(e.to_string()),)?,
             )
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .map_err(|e| anyhow!(e.to_string()),)?;
         self.lua
             .globals()
             .set(
                 "__ZOI_COMMAND_HELP",
                 self.lua
                     .create_table()
-                    .map_err(|e| anyhow!(e.to_string()))?,
+                    .map_err(|e| anyhow!(e.to_string()),)?,
             )
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
-        let register_command = self.lua.create_function(|lua, arg: Value| {
-            let registry: Table = lua.globals().get("__ZOI_COMMANDS")?;
-            let help_registry: Table = lua.globals().get("__ZOI_COMMAND_HELP")?;
-            match arg {
-                Value::Table(t) => {
-                    let name: String = t.get("name")?;
-                    let desc: String = t.get("description").unwrap_or_else(|_| String::new());
-                    let callback: Function = t.get("callback")?;
-                    registry.set(name.clone(), callback)?;
-                    help_registry.set(name, desc)?;
-                },
-                _ => return Err(mlua::Error::RuntimeError("Invalid argument to register_command. Expected a table {name, description, callback}".to_string())),
-            }
-            Ok(())
-        }).map_err(|e| anyhow!(e.to_string()))?;
-        zoi.set("register_command", register_command)
-            .map_err(|e| anyhow!(e.to_string()))?;
+        let register_command = self
+            .lua
+            .create_function(|lua, arg: Value| {
+                let registry: Table = lua.globals().get("__ZOI_COMMANDS",)?;
+                let help_registry: Table =
+                    lua.globals().get("__ZOI_COMMAND_HELP",)?;
+                match arg {
+                    Value::Table(t,) => {
+                        let name: String = t.get("name",)?;
+                        let desc: String = t
+                            .get("description",)
+                            .unwrap_or_else(|_| String::new(),);
+                        let callback: Function = t.get("callback",)?;
+                        registry.set(name.clone(), callback,)?;
+                        help_registry.set(name, desc,)?;
+                    }
+                    _ => {
+                        return Err(mlua::Error::RuntimeError(
+                            "Invalid argument to register_command. Expected a \
+                             table {name, description, callback}"
+                                .to_string(),
+                        ),);
+                    }
+                }
+                Ok((),)
+            },)
+            .map_err(|e| anyhow!(e.to_string()),)?;
+        zoi.set("register_command", register_command,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
         let register_command_simple = self
             .lua
-            .create_function(|lua, (name, callback): (String, Function)| {
-                let registry: Table = lua.globals().get("__ZOI_COMMANDS")?;
-                registry.set(name, callback)?;
-                Ok(())
-            })
-            .map_err(|e| anyhow!(e.to_string()))?;
-        zoi.set("register_command_simple", register_command_simple)
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .create_function(|lua, (name, callback,): (String, Function,)| {
+                let registry: Table = lua.globals().get("__ZOI_COMMANDS",)?;
+                registry.set(name, callback,)?;
+                Ok((),)
+            },)
+            .map_err(|e| anyhow!(e.to_string()),)?;
+        zoi.set("register_command_simple", register_command_simple,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
         self.lua
             .globals()
@@ -116,18 +131,18 @@ impl PluginManager {
                 "__ZOI_HOOKS",
                 self.lua
                     .create_table()
-                    .map_err(|e| anyhow!(e.to_string()))?,
+                    .map_err(|e| anyhow!(e.to_string()),)?,
             )
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .map_err(|e| anyhow!(e.to_string()),)?;
         self.lua
             .globals()
             .set(
                 PLUGIN_ENV_OVERRIDES_KEY,
                 self.lua
                     .create_table()
-                    .map_err(|e| anyhow!(e.to_string()))?,
+                    .map_err(|e| anyhow!(e.to_string()),)?,
             )
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .map_err(|e| anyhow!(e.to_string()),)?;
         let hooks = [
             "on_pre_install",
             "on_post_install",
@@ -150,197 +165,212 @@ impl PluginManager {
             let register_hook = self
                 .lua
                 .create_function(move |lua, callback: Function| {
-                    let registry: Table = lua.globals().get("__ZOI_HOOKS")?;
-                    let hook_list: Table = if let Ok(t) = registry.get(hook_name.as_str()) {
-                        t
-                    } else {
-                        let t = lua.create_table()?;
-                        registry.set(hook_name.as_str(), t.clone())?;
-                        t
-                    };
-                    hook_list.push(callback)?;
-                    Ok(())
-                })
-                .map_err(|e| anyhow!(e.to_string()))?;
-            zoi.set(hook, register_hook)
-                .map_err(|e| anyhow!(e.to_string()))?;
+                    let registry: Table = lua.globals().get("__ZOI_HOOKS",)?;
+                    let hook_list: Table =
+                        if let Ok(t,) = registry.get(hook_name.as_str(),) {
+                            t
+                        } else {
+                            let t = lua.create_table()?;
+                            registry.set(hook_name.as_str(), t.clone(),)?;
+                            t
+                        };
+                    hook_list.push(callback,)?;
+                    Ok((),)
+                },)
+                .map_err(|e| anyhow!(e.to_string()),)?;
+            zoi.set(hook, register_hook,)
+                .map_err(|e| anyhow!(e.to_string()),)?;
         }
 
         let set_data = self
             .lua
-            .create_function(|_, (key, value): (String, Value)| {
+            .create_function(|_, (key, value,): (String, Value,)| {
                 let mut state = read_plugin_state().unwrap_or_default();
                 let json_val: serde_json::Value = match value {
-                    Value::String(s) => serde_json::Value::String(s.to_str()?.to_string()),
-                    Value::Integer(i) => serde_json::Value::Number(i.into()),
-                    Value::Number(n) => {
-                        let Some(num) = serde_json::Number::from_f64(n) else {
-                            return Err(mlua::Error::RuntimeError(
-                                "Non-finite numbers are not supported for set_data".to_string(),
-                            ));
-                        };
-                        serde_json::Value::Number(num)
+                    Value::String(s,) => {
+                        serde_json::Value::String(s.to_str()?.to_string(),)
                     }
-                    Value::Boolean(b) => serde_json::Value::Bool(b),
+                    Value::Integer(i,) => serde_json::Value::Number(i.into(),),
+                    Value::Number(n,) => {
+                        let Some(num,) = serde_json::Number::from_f64(n,)
+                        else {
+                            return Err(mlua::Error::RuntimeError(
+                                "Non-finite numbers are not supported for \
+                                 set_data"
+                                    .to_string(),
+                            ),);
+                        };
+                        serde_json::Value::Number(num,)
+                    }
+                    Value::Boolean(b,) => serde_json::Value::Bool(b,),
                     _ => {
                         return Err(mlua::Error::RuntimeError(
                             "Unsupported value type for set_data".to_string(),
-                        ));
+                        ),);
                     }
                 };
-                state.insert(key, json_val);
-                write_plugin_state(&state).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-                Ok(())
-            })
-            .map_err(|e| anyhow!(e.to_string()))?;
-        zoi.set("set_data", set_data)
-            .map_err(|e| anyhow!(e.to_string()))?;
+                state.insert(key, json_val,);
+                write_plugin_state(&state,)
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string(),),)?;
+                Ok((),)
+            },)
+            .map_err(|e| anyhow!(e.to_string()),)?;
+        zoi.set("set_data", set_data,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
         let get_data = self
             .lua
             .create_function(|lua, key: String| {
                 let state = read_plugin_state().unwrap_or_default();
-                if let Some(val) = state.get(&key) {
-                    lua.to_value(val)
+                if let Some(val,) = state.get(&key,) {
+                    lua.to_value(val,)
                 } else {
-                    Ok(Value::Nil)
+                    Ok(Value::Nil,)
                 }
-            })
-            .map_err(|e| anyhow!(e.to_string()))?;
-        zoi.set("get_data", get_data)
-            .map_err(|e| anyhow!(e.to_string()))?;
+            },)
+            .map_err(|e| anyhow!(e.to_string()),)?;
+        zoi.set("get_data", get_data,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
         let list_installed = self
             .lua
             .create_function(|lua, ()| {
                 let installed = local::get_installed_packages()
-                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-                lua.to_value(&installed)
-            })
-            .map_err(|e| anyhow!(e.to_string()))?;
-        zoi.set("list_installed", list_installed)
-            .map_err(|e| anyhow!(e.to_string()))?;
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string(),),)?;
+                lua.to_value(&installed,)
+            },)
+            .map_err(|e| anyhow!(e.to_string()),)?;
+        zoi.set("list_installed", list_installed,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
         let get_package = self
             .lua
             .create_function(|lua, name: String| {
-                let (pkg, _, _, _, _, _, _) =
-                    resolve::resolve_package_and_version(&name, None, true, false)
-                        .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-                lua.to_value(&pkg)
-            })
-            .map_err(|e| anyhow!(e.to_string()))?;
-        zoi.set("get_package", get_package)
-            .map_err(|e| anyhow!(e.to_string()))?;
+                let (pkg, _, _, _, _, _, _,) =
+                    resolve::resolve_package_and_version(
+                        &name, None, true, false,
+                    )
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string(),),)?;
+                lua.to_value(&pkg,)
+            },)
+            .map_err(|e| anyhow!(e.to_string()),)?;
+        zoi.set("get_package", get_package,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
-        if let Ok(config) = project::config::load() {
+        if let Ok(config,) = project::config::load() {
             let project_table = self
                 .lua
                 .create_table()
-                .map_err(|e| anyhow!(e.to_string()))?;
+                .map_err(|e| anyhow!(e.to_string()),)?;
             project_table
-                .set("name", config.name)
-                .map_err(|e| anyhow!(e.to_string()))?;
+                .set("name", config.name,)
+                .map_err(|e| anyhow!(e.to_string()),)?;
             project_table
-                .set("packages", config.pkgs)
-                .map_err(|e| anyhow!(e.to_string()))?;
-            zoi.set("project", project_table)
-                .map_err(|e| anyhow!(e.to_string()))?;
+                .set("packages", config.pkgs,)
+                .map_err(|e| anyhow!(e.to_string()),)?;
+            zoi.set("project", project_table,)
+                .map_err(|e| anyhow!(e.to_string()),)?;
         }
 
         let ui = self
             .lua
             .create_table()
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .map_err(|e| anyhow!(e.to_string()),)?;
         let ui_print = self
             .lua
-            .create_function(|_, (text, color): (String, Option<String>)| {
+            .create_function(|_, (text, color,): (String, Option<String,>,)| {
                 let colored_text = match color.as_deref() {
-                    Some("red") => text.red(),
-                    Some("green") => text.green(),
-                    Some("yellow") => text.yellow(),
-                    Some("blue") => text.blue(),
-                    Some("cyan") => text.cyan(),
-                    Some("magenta") => text.magenta(),
+                    Some("red",) => text.red(),
+                    Some("green",) => text.green(),
+                    Some("yellow",) => text.yellow(),
+                    Some("blue",) => text.blue(),
+                    Some("cyan",) => text.cyan(),
+                    Some("magenta",) => text.magenta(),
                     _ => text.normal(),
                 };
                 println!("{colored_text}");
-                Ok(())
-            })
-            .map_err(|e| anyhow!(e.to_string()))?;
-        ui.set("print", ui_print)
-            .map_err(|e| anyhow!(e.to_string()))?;
+                Ok((),)
+            },)
+            .map_err(|e| anyhow!(e.to_string()),)?;
+        ui.set("print", ui_print,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
         let ui_confirm = self
             .lua
             .create_function(|_, prompt: String| {
-                Ok(Confirm::with_theme(&ColorfulTheme::default())
-                    .with_prompt(prompt)
+                Ok(Confirm::with_theme(&ColorfulTheme::default(),)
+                    .with_prompt(prompt,)
                     .interact()
-                    .unwrap_or(false))
-            })
-            .map_err(|e| anyhow!(e.to_string()))?;
-        ui.set("confirm", ui_confirm)
-            .map_err(|e| anyhow!(e.to_string()))?;
+                    .unwrap_or(false,),)
+            },)
+            .map_err(|e| anyhow!(e.to_string()),)?;
+        ui.set("confirm", ui_confirm,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
         let ui_select = self
             .lua
-            .create_function(|_, (prompt, options): (String, Vec<String>)| {
-                let selection = Select::with_theme(&ColorfulTheme::default())
-                    .with_prompt(prompt)
-                    .items(&options)
-                    .default(0)
-                    .interact_opt()
-                    .unwrap_or(None);
-                Ok(selection.map(|s| s + 1))
-            })
-            .map_err(|e| anyhow!(e.to_string()))?;
-        ui.set("select", ui_select)
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .create_function(
+                |_, (prompt, options,): (String, Vec<String,>,)| {
+                    let selection =
+                        Select::with_theme(&ColorfulTheme::default(),)
+                            .with_prompt(prompt,)
+                            .items(&options,)
+                            .default(0,)
+                            .interact_opt()
+                            .unwrap_or(None,);
+                    Ok(selection.map(|s| s + 1,),)
+                },
+            )
+            .map_err(|e| anyhow!(e.to_string()),)?;
+        ui.set("select", ui_select,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
         let ui_table = self
             .lua
-            .create_function(|_, (headers, rows): (Vec<String>, Vec<Vec<String>>)| {
-                let mut table = ComfyTable::new();
-                table.load_preset(UTF8_FULL).set_header(headers);
-                for row in rows {
-                    table.add_row(row);
-                }
-                println!("{table}");
-                Ok(())
-            })
-            .map_err(|e| anyhow!(e.to_string()))?;
-        ui.set("table", ui_table)
-            .map_err(|e| anyhow!(e.to_string()))?;
-        zoi.set("ui", ui).map_err(|e| anyhow!(e.to_string()))?;
+            .create_function(
+                |_, (headers, rows,): (Vec<String,>, Vec<Vec<String,>,>,)| {
+                    let mut table = ComfyTable::new();
+                    table.load_preset(UTF8_FULL,).set_header(headers,);
+                    for row in rows {
+                        table.add_row(row,);
+                    }
+                    println!("{table}");
+                    Ok((),)
+                },
+            )
+            .map_err(|e| anyhow!(e.to_string()),)?;
+        ui.set("table", ui_table,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
+        zoi.set("ui", ui,).map_err(|e| anyhow!(e.to_string()),)?;
 
         let system = self
             .lua
             .create_table()
-            .map_err(|e| anyhow!(e.to_string()))?;
-        let platform = utils::get_platform().unwrap_or_else(|_| "unknown-unknown".to_string());
-        let parts: Vec<&str> = platform.split('-').collect();
+            .map_err(|e| anyhow!(e.to_string()),)?;
+        let platform = utils::get_platform()
+            .unwrap_or_else(|_| "unknown-unknown".to_string(),);
+        let parts: Vec<&str,> = platform.split('-',).collect();
         system
-            .set("os", parts.first().unwrap_or(&"unknown").to_string())
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .set("os", parts.first().unwrap_or(&"unknown",).to_string(),)
+            .map_err(|e| anyhow!(e.to_string()),)?;
         system
-            .set("arch", parts.get(1).unwrap_or(&"unknown").to_string())
-            .map_err(|e| anyhow!(e.to_string()))?;
-        if let Some(distro) = utils::get_linux_distribution() {
+            .set("arch", parts.get(1,).unwrap_or(&"unknown",).to_string(),)
+            .map_err(|e| anyhow!(e.to_string()),)?;
+        if let Some(distro,) = utils::get_linux_distribution() {
             system
-                .set("distro", distro)
-                .map_err(|e| anyhow!(e.to_string()))?;
+                .set("distro", distro,)
+                .map_err(|e| anyhow!(e.to_string()),)?;
         }
-        if let Some(dv) = utils::get_distro_version() {
+        if let Some(dv,) = utils::get_distro_version() {
             system
-                .set("distro_ver", dv)
-                .map_err(|e| anyhow!(e.to_string()))?;
+                .set("distro_ver", dv,)
+                .map_err(|e| anyhow!(e.to_string()),)?;
         }
 
-        zoi.set("system", system)
-            .map_err(|e| anyhow!(e.to_string()))?;
-        zoi.set("version", env!("CARGO_PKG_VERSION"))
-            .map_err(|e| anyhow!(e.to_string()))?;
+        zoi.set("system", system,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
+        zoi.set("version", env!("CARGO_PKG_VERSION"),)
+            .map_err(|e| anyhow!(e.to_string()),)?;
         zoi.set("scope", "user") // Default
             .map_err(|e| anyhow!(e.to_string()))?;
 
@@ -349,140 +379,153 @@ impl PluginManager {
             .create_function(|lua, cmd: String| {
                 let env_overrides: Table = lua
                     .globals()
-                    .get(PLUGIN_ENV_OVERRIDES_KEY)
-                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                    .get(PLUGIN_ENV_OVERRIDES_KEY,)
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string(),),)?;
 
                 let mut command = if cfg!(target_os = "windows") {
-                    let mut c = std::process::Command::new("pwsh");
-                    c.arg("-Command").arg(&cmd);
+                    let mut c = std::process::Command::new("pwsh",);
+                    c.arg("-Command",).arg(&cmd,);
                     c
                 } else {
-                    let mut c = std::process::Command::new("bash");
-                    c.arg("-c").arg(&cmd);
+                    let mut c = std::process::Command::new("bash",);
+                    c.arg("-c",).arg(&cmd,);
                     c
                 };
 
                 for pair in env_overrides.pairs::<String, String>() {
-                    let (key, value) =
-                        pair.map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-                    command.env(key, value);
+                    let (key, value,) = pair.map_err(|e| {
+                        mlua::Error::RuntimeError(e.to_string(),)
+                    },)?;
+                    command.env(key, value,);
                 }
 
-                if let Ok(zoi_table) = lua.globals().get::<Table>("zoi")
-                    && let Ok(scope_str) = zoi_table.get::<String>("scope")
+                if let Ok(zoi_table,) = lua.globals().get::<Table>("zoi",)
+                    && let Ok(scope_str,) = zoi_table.get::<String>("scope",)
                 {
-                    command.env("ZOI_SCOPE", scope_str);
+                    command.env("ZOI_SCOPE", scope_str,);
                 }
 
                 let status = command.status();
                 match status {
-                    Ok(s) => Ok(s.code().unwrap_or(i32::from(!s.success()))),
-                    Err(e) => Err(mlua::Error::RuntimeError(e.to_string())),
+                    Ok(s,) => {
+                        Ok(s.code().unwrap_or(i32::from(!s.success(),),),)
+                    }
+                    Err(e,) => Err(mlua::Error::RuntimeError(e.to_string(),),),
                 }
-            })
-            .map_err(|e| anyhow!(e.to_string()))?;
-        zoi.set("sh", shell).map_err(|e| anyhow!(e.to_string()))?;
+            },)
+            .map_err(|e| anyhow!(e.to_string()),)?;
+        zoi.set("sh", shell,).map_err(|e| anyhow!(e.to_string()),)?;
 
         let fs_table = self
             .lua
             .create_table()
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .map_err(|e| anyhow!(e.to_string()),)?;
         let fs_read = self
             .lua
-            .create_function(|_, path: String| Ok(fs::read_to_string(path).ok()))
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .create_function(|_, path: String| {
+                Ok(fs::read_to_string(path,).ok(),)
+            },)
+            .map_err(|e| anyhow!(e.to_string()),)?;
         fs_table
-            .set("read", fs_read)
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .set("read", fs_read,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
         let fs_write = self
             .lua
-            .create_function(|_, (path, content): (String, String)| {
-                Ok(fs::write(path, content).is_ok())
-            })
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .create_function(|_, (path, content,): (String, String,)| {
+                Ok(fs::write(path, content,).is_ok(),)
+            },)
+            .map_err(|e| anyhow!(e.to_string()),)?;
         fs_table
-            .set("write", fs_write)
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .set("write", fs_write,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
         let fs_exists = self
             .lua
-            .create_function(|_, path: String| Ok(PathBuf::from(path).exists()))
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .create_function(|_, path: String| {
+                Ok(PathBuf::from(path,).exists(),)
+            },)
+            .map_err(|e| anyhow!(e.to_string()),)?;
         fs_table
-            .set("exists", fs_exists)
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .set("exists", fs_exists,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
         let fs_list = self
             .lua
             .create_function(|lua, path: String| {
                 let mut entries = Vec::new();
-                if let Ok(read_dir) = fs::read_dir(path) {
+                if let Ok(read_dir,) = fs::read_dir(path,) {
                     for entry in read_dir.flatten() {
-                        entries.push(entry.file_name().to_string_lossy().to_string());
+                        entries.push(
+                            entry.file_name().to_string_lossy().to_string(),
+                        );
                     }
                 }
-                lua.to_value(&entries)
-            })
-            .map_err(|e| anyhow!(e.to_string()))?;
+                lua.to_value(&entries,)
+            },)
+            .map_err(|e| anyhow!(e.to_string()),)?;
         fs_table
-            .set("list", fs_list)
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .set("list", fs_list,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
         let fs_delete = self
             .lua
             .create_function(|_, path: String| {
-                let p = PathBuf::from(path);
+                let p = PathBuf::from(path,);
                 if p.is_dir() {
-                    Ok(fs::remove_dir_all(p).is_ok())
+                    Ok(fs::remove_dir_all(p,).is_ok(),)
                 } else {
-                    Ok(fs::remove_file(p).is_ok())
+                    Ok(fs::remove_file(p,).is_ok(),)
                 }
-            })
-            .map_err(|e| anyhow!(e.to_string()))?;
+            },)
+            .map_err(|e| anyhow!(e.to_string()),)?;
         fs_table
-            .set("delete", fs_delete)
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .set("delete", fs_delete,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
         let fs_symlink = self
             .lua
-            .create_function(|_, (target, link, is_dir): (String, String, bool)| {
-                let target_path = PathBuf::from(target);
-                let link_path = PathBuf::from(link);
-                if is_dir {
-                    Ok(utils::symlink_dir(&target_path, &link_path).is_ok())
-                } else {
-                    Ok(utils::symlink_file(&target_path, &link_path).is_ok())
-                }
-            })
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .create_function(
+                |_, (target, link, is_dir,): (String, String, bool,)| {
+                    let target_path = PathBuf::from(target,);
+                    let link_path = PathBuf::from(link,);
+                    if is_dir {
+                        Ok(utils::symlink_dir(&target_path, &link_path,)
+                            .is_ok(),)
+                    } else {
+                        Ok(utils::symlink_file(&target_path, &link_path,)
+                            .is_ok(),)
+                    }
+                },
+            )
+            .map_err(|e| anyhow!(e.to_string()),)?;
         fs_table
-            .set("symlink", fs_symlink)
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .set("symlink", fs_symlink,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
         let fs_copy = self
             .lua
-            .create_function(|_, (src, dest): (String, String)| {
-                let src_path = Path::new(&src);
-                let dest_path = Path::new(&dest);
+            .create_function(|_, (src, dest,): (String, String,)| {
+                let src_path = Path::new(&src,);
+                let dest_path = Path::new(&dest,);
                 if src_path.is_dir() {
-                    Ok(utils::copy_dir_all(src_path, dest_path).is_ok())
+                    Ok(utils::copy_dir_all(src_path, dest_path,).is_ok(),)
                 } else {
-                    Ok(fs::copy(src_path, dest_path).is_ok())
+                    Ok(fs::copy(src_path, dest_path,).is_ok(),)
                 }
-            })
-            .map_err(|e| anyhow!(e.to_string()))?;
+            },)
+            .map_err(|e| anyhow!(e.to_string()),)?;
         fs_table
-            .set("copy", fs_copy)
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .set("copy", fs_copy,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
-        zoi.set("fs", fs_table)
-            .map_err(|e| anyhow!(e.to_string()))?;
+        zoi.set("fs", fs_table,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
         let archive_table = self
             .lua
             .create_table()
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .map_err(|e| anyhow!(e.to_string()),)?;
         let archive_extract = self
             .lua
             .create_function(
@@ -638,183 +681,189 @@ impl PluginManager {
             )
             .map_err(|e| anyhow!(e.to_string()))?;
         archive_table
-            .set("extract", archive_extract)
-            .map_err(|e| anyhow!(e.to_string()))?;
-        zoi.set("archive", archive_table)
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .set("extract", archive_extract,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
+        zoi.set("archive", archive_table,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
         let http_table = self
             .lua
             .create_table()
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .map_err(|e| anyhow!(e.to_string()),)?;
         let http_get = self
             .lua
             .create_function(|_, url: String| {
                 let client = reqwest::blocking::Client::builder()
-                    .user_agent("zoi-plugin")
+                    .user_agent("zoi-plugin",)
                     .build()
-                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-                match client.get(&url).send() {
-                    Ok(resp) => Ok(resp.text().ok()),
-                    Err(_) => Ok(None),
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string(),),)?;
+                match client.get(&url,).send() {
+                    Ok(resp,) => Ok(resp.text().ok(),),
+                    Err(_,) => Ok(None,),
                 }
-            })
-            .map_err(|e| anyhow!(e.to_string()))?;
+            },)
+            .map_err(|e| anyhow!(e.to_string()),)?;
         http_table
-            .set("get", http_get)
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .set("get", http_get,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
         let http_download = self
             .lua
-            .create_function(|_, (url, dest): (String, String)| {
-                let mut response = reqwest::blocking::get(&url)
-                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+            .create_function(|_, (url, dest,): (String, String,)| {
+                let mut response = reqwest::blocking::get(&url,)
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string(),),)?;
                 if !response.status().is_success() {
-                    return Ok(false);
+                    return Ok(false,);
                 }
-                let mut dest_file =
-                    fs::File::create(dest).map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-                std::io::copy(&mut response, &mut dest_file)
-                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-                Ok(true)
-            })
-            .map_err(|e| anyhow!(e.to_string()))?;
+                let mut dest_file = fs::File::create(dest,)
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string(),),)?;
+                std::io::copy(&mut response, &mut dest_file,)
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string(),),)?;
+                Ok(true,)
+            },)
+            .map_err(|e| anyhow!(e.to_string()),)?;
         http_table
-            .set("download", http_download)
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .set("download", http_download,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
         let http_post = self
             .lua
-            .create_function(|_, (url, body): (String, String)| {
+            .create_function(|_, (url, body,): (String, String,)| {
                 let client = reqwest::blocking::Client::builder()
-                    .user_agent("zoi-plugin")
+                    .user_agent("zoi-plugin",)
                     .build()
-                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-                match client.post(&url).body(body).send() {
-                    Ok(resp) => Ok(resp.text().ok()),
-                    Err(_) => Ok(None),
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string(),),)?;
+                match client.post(&url,).body(body,).send() {
+                    Ok(resp,) => Ok(resp.text().ok(),),
+                    Err(_,) => Ok(None,),
                 }
-            })
-            .map_err(|e| anyhow!(e.to_string()))?;
+            },)
+            .map_err(|e| anyhow!(e.to_string()),)?;
         http_table
-            .set("post", http_post)
-            .map_err(|e| anyhow!(e.to_string()))?;
-        zoi.set("http", http_table)
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .set("post", http_post,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
+        zoi.set("http", http_table,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
         let json_table = self
             .lua
             .create_table()
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .map_err(|e| anyhow!(e.to_string()),)?;
         let json_parse = self
             .lua
             .create_function(|lua, json_str: String| {
-                let parsed: serde_json::Value = serde_json::from_str(&json_str)
-                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-                lua.to_value(&parsed)
-            })
-            .map_err(|e| anyhow!(e.to_string()))?;
+                let parsed: serde_json::Value =
+                    serde_json::from_str(&json_str,).map_err(|e| {
+                        mlua::Error::RuntimeError(e.to_string(),)
+                    },)?;
+                lua.to_value(&parsed,)
+            },)
+            .map_err(|e| anyhow!(e.to_string()),)?;
         json_table
-            .set("parse", json_parse)
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .set("parse", json_parse,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
         let json_stringify = self
             .lua
             .create_function(|lua, value: Value| {
                 let json_val: serde_json::Value = lua
-                    .from_value(value)
-                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-                Ok(serde_json::to_string(&json_val).unwrap_or_default())
-            })
-            .map_err(|e| anyhow!(e.to_string()))?;
+                    .from_value(value,)
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string(),),)?;
+                Ok(serde_json::to_string(&json_val,).unwrap_or_default(),)
+            },)
+            .map_err(|e| anyhow!(e.to_string()),)?;
         json_table
-            .set("stringify", json_stringify)
-            .map_err(|e| anyhow!(e.to_string()))?;
-        zoi.set("json", json_table)
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .set("stringify", json_stringify,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
+        zoi.set("json", json_table,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
         let env_table = self
             .lua
             .create_table()
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .map_err(|e| anyhow!(e.to_string()),)?;
         let env_get = self
             .lua
             .create_function(|lua, name: String| {
                 let env_overrides: Table = lua
                     .globals()
-                    .get(PLUGIN_ENV_OVERRIDES_KEY)
-                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                    .get(PLUGIN_ENV_OVERRIDES_KEY,)
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string(),),)?;
 
-                if let Some(value) = env_overrides
-                    .get::<Option<String>>(name.as_str())
-                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?
+                if let Some(value,) = env_overrides
+                    .get::<Option<String,>>(name.as_str(),)
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string(),),)?
                 {
-                    return Ok(Some(value));
+                    return Ok(Some(value,),);
                 }
 
-                Ok(std::env::var(name).ok())
-            })
-            .map_err(|e| anyhow!(e.to_string()))?;
+                Ok(std::env::var(name,).ok(),)
+            },)
+            .map_err(|e| anyhow!(e.to_string()),)?;
         env_table
-            .set("get", env_get)
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .set("get", env_get,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
         let env_set = self
             .lua
-            .create_function(|lua, (name, value): (String, String)| {
+            .create_function(|lua, (name, value,): (String, String,)| {
                 let env_overrides: Table = lua
                     .globals()
-                    .get(PLUGIN_ENV_OVERRIDES_KEY)
-                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                    .get(PLUGIN_ENV_OVERRIDES_KEY,)
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string(),),)?;
                 env_overrides
-                    .set(name, value)
-                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-                Ok(())
-            })
-            .map_err(|e| anyhow!(e.to_string()))?;
+                    .set(name, value,)
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string(),),)?;
+                Ok((),)
+            },)
+            .map_err(|e| anyhow!(e.to_string()),)?;
         env_table
-            .set("set", env_set)
-            .map_err(|e| anyhow!(e.to_string()))?;
-        zoi.set("env", env_table)
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .set("set", env_set,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
+        zoi.set("env", env_table,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
         self.lua
             .globals()
-            .set("zoi", zoi)
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .set("zoi", zoi,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
         let plugin_dir = get_plugin_dir()?;
         let import_fn = self
             .lua
             .create_function(move |lua, file_name: String| {
-                let path = plugin_dir.join(&file_name);
+                let path = plugin_dir.join(&file_name,);
                 if !path.exists() {
                     return Err(mlua::Error::RuntimeError(format!(
                         "File not found: {}",
                         path.display()
-                    )));
+                    ),),);
                 }
-                let content = fs::read_to_string(&path)
-                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-                if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
+                let content = fs::read_to_string(&path,)
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string(),),)?;
+                if let Some(ext,) = path.extension().and_then(|s| s.to_str(),) {
                     match ext {
                         "json" => {
-                            let val: serde_json::Value = serde_json::from_str(&content)
-                                .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
-                            return lua.to_value(&val);
+                            let val: serde_json::Value = serde_json::from_str(
+                                &content,
+                            )
+                            .map_err(|e| {
+                                mlua::Error::RuntimeError(e.to_string(),)
+                            },)?;
+                            return lua.to_value(&val,);
                         }
-                        _ => return lua.to_value(&content),
+                        _ => return lua.to_value(&content,),
                     }
                 }
-                lua.to_value(&content)
-            })
-            .map_err(|e| anyhow!(e.to_string()))?;
+                lua.to_value(&content,)
+            },)
+            .map_err(|e| anyhow!(e.to_string()),)?;
         self.lua
             .globals()
-            .set("IMPORT", import_fn)
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .set("IMPORT", import_fn,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
-        Ok(())
+        Ok((),)
     }
 
     /// Sets the operational scope for plugins.
@@ -823,16 +872,16 @@ impl PluginManager {
     ///
     /// Returns an error if the `zoi` global table cannot be accessed or if the
     /// scope cannot be set.
-    pub fn set_context(&self, scope: types::Scope) -> Result<()> {
+    pub fn set_context(&self, scope: types::Scope,) -> Result<(),> {
         let zoi: Table = self
             .lua
             .globals()
-            .get("zoi")
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .get("zoi",)
+            .map_err(|e| anyhow!(e.to_string()),)?;
         let scope_str = format!("{scope:?}").to_lowercase();
-        zoi.set("scope", scope_str)
-            .map_err(|e| anyhow!(e.to_string()))?;
-        Ok(())
+        zoi.set("scope", scope_str,)
+            .map_err(|e| anyhow!(e.to_string()),)?;
+        Ok((),)
     }
 
     /// Loads and executes all trusted Lua plugins from the plugin directory.
@@ -841,36 +890,36 @@ impl PluginManager {
     ///
     /// Returns an error if the plugin directory cannot be read, if a plugin
     /// script cannot be loaded, or if a plugin execution fails.
-    pub fn load_all(&self, yes: bool) -> Result<()> {
+    pub fn load_all(&self, yes: bool,) -> Result<(),> {
         let plugin_dir = get_plugin_dir()?;
         if !plugin_dir.exists() {
-            return Ok(());
+            return Ok((),);
         }
         let mut plugin_paths = Vec::new();
-        for entry in fs::read_dir(plugin_dir)? {
+        for entry in fs::read_dir(plugin_dir,)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) == Some("lua") {
-                plugin_paths.push(path);
+            if path.extension().and_then(|s| s.to_str(),) == Some("lua",) {
+                plugin_paths.push(path,);
             }
         }
         plugin_paths.sort();
 
-        let trusted_path = get_plugin_dir()?.join("trusted_hashes.json");
-        let mut trusted: HashMap<String, String> = if trusted_path.exists() {
-            let content = fs::read_to_string(&trusted_path)?;
-            serde_json::from_str(&content).unwrap_or_default()
+        let trusted_path = get_plugin_dir()?.join("trusted_hashes.json",);
+        let mut trusted: HashMap<String, String,> = if trusted_path.exists() {
+            let content = fs::read_to_string(&trusted_path,)?;
+            serde_json::from_str(&content,).unwrap_or_default()
         } else {
             HashMap::new()
         };
         let mut trusted_changed = false;
 
         for path in plugin_paths {
-            let script = fs::read_to_string(&path)?;
+            let script = fs::read_to_string(&path,)?;
 
             let mut hasher = Sha256::new();
-            hasher.update(script.as_bytes());
-            let hash = hex::encode(hasher.finalize());
+            hasher.update(script.as_bytes(),);
+            let hash = hex::encode(hasher.finalize(),);
 
             let plugin_name = path
                 .file_name()
@@ -878,12 +927,15 @@ impl PluginManager {
                 .to_string_lossy()
                 .to_string();
 
-            let is_trusted = trusted.get(&plugin_name).is_some_and(|known_hash| known_hash == &hash);
+            let is_trusted = trusted
+                .get(&plugin_name,)
+                .is_some_and(|known_hash| known_hash == &hash,);
 
             if !is_trusted {
                 if yes {
                     println!(
-                        "\n{}: Skipping untrusted plugin: {}. Run Zoi interactively to trust it.",
+                        "\n{}: Skipping untrusted plugin: {}. Run Zoi \
+                         interactively to trust it.",
                         "Warning".yellow().bold(),
                         plugin_name.cyan()
                     );
@@ -896,12 +948,15 @@ impl PluginManager {
                     "SECURITY WARNING".yellow().bold(),
                     plugin_name.cyan()
                 );
-                println!("Plugins can execute arbitrary commands and modify your system.");
+                println!(
+                    "Plugins can execute arbitrary commands and modify your \
+                     system."
+                );
                 if utils::ask_for_confirmation(
                     "Do you trust this plugin and want to execute it?",
                     false,
                 ) {
-                    trusted.insert(plugin_name.clone(), hash);
+                    trusted.insert(plugin_name.clone(), hash,);
                     trusted_changed = true;
                 } else {
                     println!("Skipping untrusted plugin: {plugin_name}");
@@ -910,20 +965,22 @@ impl PluginManager {
             }
 
             let script_wrapper = format!(
-                "local old_reg = zoi.register_command; zoi.register_command = function(a, b) if type(a) == 'string' then zoi.register_command_simple(a, b) else old_reg(a) end end; {script}"
+                "local old_reg = zoi.register_command; zoi.register_command = \
+                 function(a, b) if type(a) == 'string' then \
+                 zoi.register_command_simple(a, b) else old_reg(a) end end; \
+                 {script}"
             );
-            self.lua
-                .load(&script_wrapper)
-                .exec()
-                .map_err(|e| anyhow!("Plugin error in {}: {}", path.display(), e))?;
+            self.lua.load(&script_wrapper,).exec().map_err(|e| {
+                anyhow!("Plugin error in {}: {}", path.display(), e)
+            },)?;
         }
 
         if trusted_changed {
-            let content = serde_json::to_string_pretty(&trusted)?;
-            fs::write(trusted_path, content)?;
+            let content = serde_json::to_string_pretty(&trusted,)?;
+            fs::write(trusted_path, content,)?;
         }
 
-        Ok(())
+        Ok((),)
     }
 
     /// Triggers a lifecycle hook, executing all registered callbacks.
@@ -932,34 +989,42 @@ impl PluginManager {
     ///
     /// Returns an error if the hook registry cannot be accessed or if any
     /// callback execution fails.
-    pub fn trigger_hook(&self, hook_name: &str, arg: Option<&Value>) -> Result<()> {
+    pub fn trigger_hook(
+        &self,
+        hook_name: &str,
+        arg: Option<&Value,>,
+    ) -> Result<(),> {
         let registry: Table = self
             .lua
             .globals()
-            .get("__ZOI_HOOKS")
-            .map_err(|e| anyhow!(e.to_string()))?;
-        if let Ok(hook_list) = registry.get::<Table>(hook_name) {
+            .get("__ZOI_HOOKS",)
+            .map_err(|e| anyhow!(e.to_string()),)?;
+        if let Ok(hook_list,) = registry.get::<Table>(hook_name,) {
             for callback in hook_list.sequence_values::<Function>() {
-                let callback = callback.map_err(|e| anyhow!(e.to_string()))?;
-                if let Some(a) = arg {
+                let callback = callback.map_err(|e| anyhow!(e.to_string()),)?;
+                if let Some(a,) = arg {
                     callback
-                        .call::<()>(a.clone())
-                        .map_err(|e| anyhow!(e.to_string()))?;
+                        .call::<()>(a.clone(),)
+                        .map_err(|e| anyhow!(e.to_string()),)?;
                 } else {
                     callback
-                        .call::<()>(())
-                        .map_err(|e| anyhow!(e.to_string()))?;
+                        .call::<()>((),)
+                        .map_err(|e| anyhow!(e.to_string()),)?;
                 }
             }
         }
-        Ok(())
+        Ok((),)
     }
 
-    /// Triggers a lifecycle hook but ignores errors, printing a warning instead.
-    pub fn trigger_hook_nonfatal(&self, hook_name: &str, arg: Option<&Value>) {
-        if let Err(error) = self.trigger_hook(hook_name, arg) {
+    /// Triggers a lifecycle hook but ignores errors, printing a warning
+    /// instead.
+    pub fn trigger_hook_nonfatal(
+        &self, hook_name: &str, arg: Option<&Value,>,
+    ) {
+        if let Err(error,) = self.trigger_hook(hook_name, arg,) {
             eprintln!(
-                "Warning: hook '{hook_name}' failed after the operation completed: {error}"
+                "Warning: hook '{hook_name}' failed after the operation \
+                 completed: {error}"
             );
         }
     }
@@ -970,25 +1035,30 @@ impl PluginManager {
     ///
     /// Returns an error if the hook registry cannot be accessed or if any
     /// callback execution fails.
-    pub fn trigger_resolve_shim_version(&self, bin_name: &str) -> Result<Option<String>> {
+    pub fn trigger_resolve_shim_version(
+        &self,
+        bin_name: &str,
+    ) -> Result<Option<String,>,> {
         let registry: Table = self
             .lua
             .globals()
-            .get("__ZOI_HOOKS")
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .get("__ZOI_HOOKS",)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
-        if let Ok(hook_list) = registry.get::<Table>("on_resolve_shim_version") {
+        if let Ok(hook_list,) =
+            registry.get::<Table>("on_resolve_shim_version",)
+        {
             for callback in hook_list.sequence_values::<Function>() {
-                let callback = callback.map_err(|e| anyhow!(e.to_string()))?;
-                let result: Option<String> = callback
-                    .call(bin_name)
-                    .map_err(|e| anyhow!(e.to_string()))?;
+                let callback = callback.map_err(|e| anyhow!(e.to_string()),)?;
+                let result: Option<String,> = callback
+                    .call(bin_name,)
+                    .map_err(|e| anyhow!(e.to_string()),)?;
                 if result.is_some() {
-                    return Ok(result);
+                    return Ok(result,);
                 }
             }
         }
-        Ok(None)
+        Ok(None,)
     }
 
     /// Triggers the project installation hook.
@@ -997,23 +1067,24 @@ impl PluginManager {
     ///
     /// Returns an error if the hook registry cannot be accessed or if any
     /// callback execution fails.
-    pub fn trigger_project_install_hook(&self) -> Result<bool> {
+    pub fn trigger_project_install_hook(&self,) -> Result<bool,> {
         let registry: Table = self
             .lua
             .globals()
-            .get("__ZOI_HOOKS")
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .get("__ZOI_HOOKS",)
+            .map_err(|e| anyhow!(e.to_string()),)?;
 
-        if let Ok(hook_list) = registry.get::<Table>("on_project_install") {
+        if let Ok(hook_list,) = registry.get::<Table>("on_project_install",) {
             for callback in hook_list.sequence_values::<Function>() {
-                let callback = callback.map_err(|e| anyhow!(e.to_string()))?;
-                let handled: bool = callback.call(()).map_err(|e| anyhow!(e.to_string()))?;
+                let callback = callback.map_err(|e| anyhow!(e.to_string()),)?;
+                let handled: bool =
+                    callback.call((),).map_err(|e| anyhow!(e.to_string()),)?;
                 if handled {
-                    return Ok(true);
+                    return Ok(true,);
                 }
             }
         }
-        Ok(false)
+        Ok(false,)
     }
 
     /// Executes a custom command registered by a plugin.
@@ -1022,18 +1093,22 @@ impl PluginManager {
     ///
     /// Returns an error if the command registry cannot be accessed or if the
     /// command execution fails.
-    pub fn run_command(&self, name: &str, args: Vec<String>) -> Result<bool> {
+    pub fn run_command(
+        &self, name: &str, args: Vec<String,>,
+    ) -> Result<bool,> {
         let registry: Table = self
             .lua
             .globals()
-            .get("__ZOI_COMMANDS")
-            .map_err(|e| anyhow!(e.to_string()))?;
-        let callback: Value = registry.get(name).map_err(|e| anyhow!(e.to_string()))?;
-        if let Value::Function(func) = callback {
-            func.call::<()>(args).map_err(|e| anyhow!(e.to_string()))?;
-            Ok(true)
+            .get("__ZOI_COMMANDS",)
+            .map_err(|e| anyhow!(e.to_string()),)?;
+        let callback: Value =
+            registry.get(name,).map_err(|e| anyhow!(e.to_string()),)?;
+        if let Value::Function(func,) = callback {
+            func.call::<()>(args,)
+                .map_err(|e| anyhow!(e.to_string()),)?;
+            Ok(true,)
         } else {
-            Ok(false)
+            Ok(false,)
         }
     }
 
@@ -1042,26 +1117,26 @@ impl PluginManager {
     /// # Errors
     ///
     /// Returns an error if the command registry cannot be accessed.
-    pub fn list_commands(&self) -> Result<Vec<(String, String)>> {
+    pub fn list_commands(&self,) -> Result<Vec<(String, String,),>,> {
         let registry: Table = self
             .lua
             .globals()
-            .get("__ZOI_COMMANDS")
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .get("__ZOI_COMMANDS",)
+            .map_err(|e| anyhow!(e.to_string()),)?;
         let help_registry: Table = self
             .lua
             .globals()
-            .get("__ZOI_COMMAND_HELP")
-            .map_err(|e| anyhow!(e.to_string()))?;
+            .get("__ZOI_COMMAND_HELP",)
+            .map_err(|e| anyhow!(e.to_string()),)?;
         let mut commands = Vec::new();
         for pair in registry.pairs::<String, Value>() {
-            let (name, _) = pair.map_err(|e| anyhow!(e.to_string()))?;
+            let (name, _,) = pair.map_err(|e| anyhow!(e.to_string()),)?;
             let desc: String = help_registry
-                .get(name.clone())
-                .unwrap_or_else(|_| String::new());
-            commands.push((name, desc));
+                .get(name.clone(),)
+                .unwrap_or_else(|_| String::new(),);
+            commands.push((name, desc,),);
         }
-        Ok(commands)
+        Ok(commands,)
     }
 }
 
@@ -1071,30 +1146,32 @@ impl PluginManager {
 ///
 /// Returns an error if the user home directory cannot be found or if the
 /// plugin directory cannot be created.
-pub fn get_plugin_dir() -> Result<PathBuf> {
-    let home_dir =
-        utils::get_user_home().ok_or_else(|| anyhow!("Could not find home directory."))?;
-    let plugin_dir = home_dir.join(".zoi").join("plugins");
+pub fn get_plugin_dir() -> Result<PathBuf,> {
+    let home_dir = utils::get_user_home()
+        .ok_or_else(|| anyhow!("Could not find home directory."),)?;
+    let plugin_dir = home_dir.join(".zoi",).join("plugins",);
     if !plugin_dir.exists() {
-        fs::create_dir_all(&plugin_dir)?;
+        fs::create_dir_all(&plugin_dir,)?;
     }
-    Ok(plugin_dir)
+    Ok(plugin_dir,)
 }
 
 /// Reads the persistent state for plugins from state.json.
-fn read_plugin_state() -> Result<HashMap<String, serde_json::Value>> {
-    let path = get_plugin_dir()?.join("state.json");
+fn read_plugin_state() -> Result<HashMap<String, serde_json::Value,>,> {
+    let path = get_plugin_dir()?.join("state.json",);
     if !path.exists() {
-        return Ok(HashMap::new());
+        return Ok(HashMap::new(),);
     }
-    let content = fs::read_to_string(path)?;
-    Ok(serde_json::from_str(&content).unwrap_or_default())
+    let content = fs::read_to_string(path,)?;
+    Ok(serde_json::from_str(&content,).unwrap_or_default(),)
 }
 
 /// Writes the persistent state for plugins to state.json.
-fn write_plugin_state(state: &HashMap<String, serde_json::Value>) -> Result<()> {
-    let path = get_plugin_dir()?.join("state.json");
-    let content = serde_json::to_string_pretty(state)?;
-    fs::write(path, content)?;
-    Ok(())
+fn write_plugin_state(
+    state: &HashMap<String, serde_json::Value,>,
+) -> Result<(),> {
+    let path = get_plugin_dir()?.join("state.json",);
+    let content = serde_json::to_string_pretty(state,)?;
+    fs::write(path, content,)?;
+    Ok((),)
 }

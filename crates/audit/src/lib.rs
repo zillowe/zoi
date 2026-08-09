@@ -5,24 +5,24 @@
 //! The use of SHA-256 hashes ensures the integrity and chronological
 //! order of the log entries.
 
+use std::fs;
+use std::path::{Path, PathBuf};
+
 use anyhow::{Result, anyhow};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::fs;
-use std::path::Path;
-use std::path::PathBuf;
 use zoi_core::{config, types, utils};
 
 /// Manages Zoi's tamper-evident audit log.
 ///
-/// The audit log records all state-changing operations (Install, Uninstall, Upgrade).
-/// It uses a "Hash Chain" mechanism where each new entry contains a SHA-256 hash
-/// of its contents PLUS the hash of the previous entry. This makes it
-/// mathematically impossible to modify or delete a historical entry without
+/// The audit log records all state-changing operations (Install, Uninstall,
+/// Upgrade). It uses a "Hash Chain" mechanism where each new entry contains a
+/// SHA-256 hash of its contents PLUS the hash of the previous entry. This makes
+/// it mathematically impossible to modify or delete a historical entry without
 /// breaking the chain.
 /// The type of action recorded in the audit log.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone,)]
 pub enum AuditAction {
     /// A package was installed.
     Install,
@@ -33,10 +33,10 @@ pub enum AuditAction {
 }
 
 /// A single entry in the audit log.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone,)]
 pub struct AuditEntry {
     /// When the action occurred.
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: DateTime<Utc,>,
     /// The user who performed the action.
     pub user: String,
     /// The action performed.
@@ -56,30 +56,30 @@ pub struct AuditEntry {
 }
 
 /// The complete audit log structure.
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default,)]
 pub struct AuditLog {
     /// Version of the audit log format.
     pub version: String,
     /// List of audit log lines.
-    pub entries: Vec<AuditLogLine>,
+    pub entries: Vec<AuditLogLine,>,
 }
 
 /// A single line in the audit log, including cryptographic hashes.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone,)]
 pub struct AuditLogLine {
     /// The core audit entry data.
     #[serde(flatten)]
     pub entry: AuditEntry,
     /// SHA-256 hash of the previous entry.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub prev_hash: Option<String>,
+    pub prev_hash: Option<String,>,
     /// SHA-256 hash of the current entry (including `prev_hash`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub hash: Option<String>,
+    pub hash: Option<String,>,
 }
 
 /// Result of an audit log verification.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone,)]
 pub struct AuditVerification {
     /// Whether the audit chain is valid.
     pub valid: bool,
@@ -94,71 +94,74 @@ pub struct AuditVerification {
 }
 
 /// Returns the path to the audit log file.
-fn get_audit_log_path() -> Result<PathBuf> {
-    let home_dir =
-        utils::get_user_home().ok_or_else(|| anyhow!("Could not find home directory."))?;
-    let zoi_dir = zoi_core::sysroot::apply_sysroot(home_dir.join(".zoi"));
+fn get_audit_log_path() -> Result<PathBuf,> {
+    let home_dir = utils::get_user_home()
+        .ok_or_else(|| anyhow!("Could not find home directory."),)?;
+    let zoi_dir = zoi_core::sysroot::apply_sysroot(home_dir.join(".zoi",),);
     if !zoi_dir.exists() {
-        fs::create_dir_all(&zoi_dir)?;
+        fs::create_dir_all(&zoi_dir,)?;
     }
-    Ok(zoi_dir.join("audit.json"))
+    Ok(zoi_dir.join("audit.json",),)
 }
 
 /// Returns the current user's name.
 fn get_username() -> String {
     #[cfg(unix)]
     {
-        std::env::var("USER").unwrap_or_else(|_| "unknown".to_string())
+        std::env::var("USER",).unwrap_or_else(|_| "unknown".to_string(),)
     }
     #[cfg(windows)]
     {
-        std::env::var("USERNAME").unwrap_or_else(|_| "unknown".to_string())
+        std::env::var("USERNAME",).unwrap_or_else(|_| "unknown".to_string(),)
     }
 }
 
 /// Calculates the SHA-256 hash for an audit entry.
-fn calculate_entry_hash(entry: &AuditEntry, prev_hash: Option<&str>) -> Result<String> {
-    #[derive(Serialize)]
-    struct HashPayload<'a> {
+fn calculate_entry_hash(
+    entry: &AuditEntry,
+    prev_hash: Option<&str,>,
+) -> Result<String,> {
+    #[derive(Serialize,)]
+    struct HashPayload<'a,> {
         entry: &'a AuditEntry,
-        prev_hash: Option<&'a str>,
+        prev_hash: Option<&'a str,>,
     }
 
-    let payload = HashPayload { entry, prev_hash };
-    let json = serde_json::to_string(&payload)?;
+    let payload = HashPayload { entry, prev_hash, };
+    let json = serde_json::to_string(&payload,)?;
     let mut hasher = Sha256::new();
-    hasher.update(json.as_bytes());
-    Ok(hex::encode(hasher.finalize()))
+    hasher.update(json.as_bytes(),);
+    Ok(hex::encode(hasher.finalize(),),)
 }
 
 /// Reads the audit log from disk.
-fn read_audit_log() -> Result<AuditLog> {
+fn read_audit_log() -> Result<AuditLog,> {
     let path = get_audit_log_path()?;
     if !path.exists() {
         return Ok(AuditLog {
             version: env!("CARGO_PKG_VERSION").to_string(),
             entries: Vec::new(),
-        });
+        },);
     }
 
-    let content = fs::read_to_string(&path)?;
+    let content = fs::read_to_string(&path,)?;
     if content.trim().is_empty() {
         return Ok(AuditLog {
             version: env!("CARGO_PKG_VERSION").to_string(),
             entries: Vec::new(),
-        });
+        },);
     }
 
-    if let Ok(log) = serde_json::from_str::<AuditLog>(&content) {
-        return Ok(log);
+    if let Ok(log,) = serde_json::from_str::<AuditLog,>(&content,) {
+        return Ok(log,);
     }
 
     let mut entries = Vec::new();
     for line in content.lines() {
         if !line.trim().is_empty()
-            && let Ok(parsed) = serde_json::from_str::<AuditLogLine>(line)
+            && let Ok(parsed,) = serde_json::from_str::<AuditLogLine,>(line,)
         {
-            entries.push(parsed);
+            entries.push(parsed,);
         }
     }
 
@@ -166,21 +169,21 @@ fn read_audit_log() -> Result<AuditLog> {
         return Ok(AuditLog {
             version: env!("CARGO_PKG_VERSION").to_string(),
             entries,
-        });
+        },);
     }
 
     Ok(AuditLog {
         version: env!("CARGO_PKG_VERSION").to_string(),
         entries: Vec::new(),
-    })
+    },)
 }
 
 /// Writes the audit log to disk.
-fn write_audit_log(log: &AuditLog) -> Result<()> {
+fn write_audit_log(log: &AuditLog,) -> Result<(),> {
     let path = get_audit_log_path()?;
-    let content = serde_json::to_string_pretty(log)?;
-    fs::write(path, content)?;
-    Ok(())
+    let content = serde_json::to_string_pretty(log,)?;
+    fs::write(path, content,)?;
+    Ok((),)
 }
 
 /// Logs a new event to the audit log.
@@ -189,14 +192,17 @@ fn write_audit_log(log: &AuditLog) -> Result<()> {
 ///
 /// Returns an error if the configuration or audit log cannot be read,
 /// or if writing the updated log fails.
-pub fn log_event(action: AuditAction, manifest: &types::InstallManifest) -> Result<()> {
+pub fn log_event(
+    action: AuditAction,
+    manifest: &types::InstallManifest,
+) -> Result<(),> {
     let config = config::read_config()?;
     if !config.audit_log_enabled {
-        return Ok(());
+        return Ok((),);
     }
 
     let mut log = read_audit_log()?;
-    let prev_hash = log.entries.last().and_then(|l| l.hash.clone());
+    let prev_hash = log.entries.last().and_then(|l| l.hash.clone(),);
 
     let user = get_username();
     let entry = AuditEntry {
@@ -211,16 +217,16 @@ pub fn log_event(action: AuditAction, manifest: &types::InstallManifest) -> Resu
         registry: manifest.registry_handle.clone(),
     };
 
-    let hash = Some(calculate_entry_hash(&entry, prev_hash.as_deref())?);
+    let hash = Some(calculate_entry_hash(&entry, prev_hash.as_deref(),)?,);
     log.entries.push(AuditLogLine {
         entry,
         prev_hash,
         hash,
-    });
+    },);
     log.version = env!("CARGO_PKG_VERSION").to_string();
 
-    write_audit_log(&log)?;
-    Ok(())
+    write_audit_log(&log,)?;
+    Ok((),)
 }
 
 /// Returns the full audit history.
@@ -228,9 +234,9 @@ pub fn log_event(action: AuditAction, manifest: &types::InstallManifest) -> Resu
 /// # Errors
 ///
 /// Returns an error if the audit log cannot be read from disk.
-pub fn get_history() -> Result<Vec<AuditEntry>> {
+pub fn get_history() -> Result<Vec<AuditEntry,>,> {
     let log = read_audit_log()?;
-    Ok(log.entries.into_iter().map(|l| l.entry).collect())
+    Ok(log.entries.into_iter().map(|l| l.entry,).collect(),)
 }
 
 /// Exports the audit history to a file.
@@ -239,33 +245,33 @@ pub fn get_history() -> Result<Vec<AuditEntry>> {
 ///
 /// Returns an error if the history is empty, the export path is invalid,
 /// or if writing to the export path fails.
-pub fn export_history(export_path: &Path, ndjson: bool) -> Result<usize> {
+pub fn export_history(export_path: &Path, ndjson: bool,) -> Result<usize,> {
     let log = read_audit_log()?;
     if log.entries.is_empty() {
         return Err(anyhow!(
             "No history recorded. Audit logging might be disabled."
-        ));
+        ),);
     }
 
-    if let Some(parent) = export_path.parent()
+    if let Some(parent,) = export_path.parent()
         && !parent.as_os_str().is_empty()
     {
-        fs::create_dir_all(parent)?;
+        fs::create_dir_all(parent,)?;
     }
 
     if ndjson {
         let mut content = String::new();
         for entry in &log.entries {
-            content.push_str(&serde_json::to_string(entry)?);
-            content.push('\n');
+            content.push_str(&serde_json::to_string(entry,)?,);
+            content.push('\n',);
         }
-        fs::write(export_path, content)?;
+        fs::write(export_path, content,)?;
     } else {
-        let json = serde_json::to_string_pretty(&log.entries)?;
-        fs::write(export_path, json)?;
+        let json = serde_json::to_string_pretty(&log.entries,)?;
+        fs::write(export_path, json,)?;
     }
 
-    Ok(log.entries.len())
+    Ok(log.entries.len(),)
 }
 
 /// Verifies the integrity of the audit log hash chain.
@@ -273,18 +279,18 @@ pub fn export_history(export_path: &Path, ndjson: bool) -> Result<usize> {
 /// # Errors
 ///
 /// Returns an error if the audit log cannot be read from disk.
-pub fn verify_chain() -> Result<AuditVerification> {
+pub fn verify_chain() -> Result<AuditVerification,> {
     let log = read_audit_log()?;
     let mut total_entries = 0usize;
     let mut hashed_entries = 0usize;
     let mut legacy_entries = 0usize;
-    let mut previous_hash: Option<String> = None;
+    let mut previous_hash: Option<String,> = None;
     let mut seen_hashed = false;
 
-    for (index, parsed) in log.entries.iter().enumerate() {
+    for (index, parsed,) in log.entries.iter().enumerate() {
         total_entries += 1;
 
-        if let Some(stored_hash) = parsed.hash.as_deref() {
+        if let Some(stored_hash,) = parsed.hash.as_deref() {
             seen_hashed = true;
             hashed_entries += 1;
 
@@ -295,13 +301,17 @@ pub fn verify_chain() -> Result<AuditVerification> {
                     hashed_entries,
                     legacy_entries,
                     message: format!(
-                        "Audit hash chain is broken at entry {} (prev_hash mismatch).",
+                        "Audit hash chain is broken at entry {} (prev_hash \
+                         mismatch).",
                         index + 1
                     ),
-                });
+                },);
             }
 
-            let expected_hash = calculate_entry_hash(&parsed.entry, parsed.prev_hash.as_deref())?;
+            let expected_hash = calculate_entry_hash(
+                &parsed.entry,
+                parsed.prev_hash.as_deref(),
+            )?;
             if stored_hash != expected_hash {
                 return Ok(AuditVerification {
                     valid: false,
@@ -309,13 +319,14 @@ pub fn verify_chain() -> Result<AuditVerification> {
                     hashed_entries,
                     legacy_entries,
                     message: format!(
-                        "Audit hash mismatch at entry {} (entry appears modified).",
+                        "Audit hash mismatch at entry {} (entry appears \
+                         modified).",
                         index + 1
                     ),
-                });
+                },);
             }
 
-            previous_hash = Some(stored_hash.to_string());
+            previous_hash = Some(stored_hash.to_string(),);
         } else {
             legacy_entries += 1;
             if seen_hashed {
@@ -325,10 +336,11 @@ pub fn verify_chain() -> Result<AuditVerification> {
                     hashed_entries,
                     legacy_entries,
                     message: format!(
-                        "Legacy audit entry detected after chained entries at entry {}.",
+                        "Legacy audit entry detected after chained entries at \
+                         entry {}.",
                         index + 1
                     ),
-                });
+                },);
             }
         }
     }
@@ -347,5 +359,5 @@ pub fn verify_chain() -> Result<AuditVerification> {
         hashed_entries,
         legacy_entries,
         message,
-    })
+    },)
 }

@@ -2,6 +2,7 @@
 
 use std::fs;
 use std::process::Command;
+
 use tempfile::tempdir;
 use zoi::Scope;
 
@@ -10,15 +11,15 @@ mod common;
 #[test]
 fn test_config_3way_merge_integration() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("failed to create temp dir");
+    let tmp = tempdir().expect("failed to create temp dir",);
     let root = tmp.path().to_path_buf();
 
     // Set up a local Zoi registry
-    let reg_dir = root.join("my-registry");
-    fs::create_dir_all(&reg_dir).expect("unwrap failed");
+    let reg_dir = root.join("my-registry",);
+    fs::create_dir_all(&reg_dir,).expect("unwrap failed",);
 
     // Initialize registry metadata
-    zoi::pkg::registry::init(&reg_dir).expect("unwrap failed");
+    zoi::pkg::registry::init(&reg_dir,).expect("unwrap failed",);
 
     let pkg_name = "test-merge";
     let version_v1 = "1.0.0";
@@ -26,11 +27,12 @@ fn test_config_3way_merge_integration() {
     let config_rel = "etc/config.txt";
 
     // Add package v1
-    let pkg_repo_dir = reg_dir.join("main").join(pkg_name);
-    fs::create_dir_all(&pkg_repo_dir).expect("unwrap failed");
+    let pkg_repo_dir = reg_dir.join("main",).join(pkg_name,);
+    fs::create_dir_all(&pkg_repo_dir,).expect("unwrap failed",);
 
     let base_config_content = "setting_a = 10\nsetting_b = 20\n";
-    fs::write(pkg_repo_dir.join("config.txt"), base_config_content).expect("unwrap failed");
+    fs::write(pkg_repo_dir.join("config.txt",), base_config_content,)
+        .expect("unwrap failed",);
 
     let lua_v1 = format!(
         r#"
@@ -49,37 +51,38 @@ function package()
 end
 "#
     );
-    fs::write(pkg_repo_dir.join(format!("{pkg_name}.pkg.lua")), lua_v1).expect("unwrap failed");
+    fs::write(pkg_repo_dir.join(format!("{pkg_name}.pkg.lua"),), lua_v1,)
+        .expect("unwrap failed",);
 
     // Generate metadata and commit to make it a valid git repo
-    zoi::pkg::registry::generate_metadata(&reg_dir).expect("unwrap failed");
+    zoi::pkg::registry::generate_metadata(&reg_dir,).expect("unwrap failed",);
 
     let run_git = |args: &[&str], dir: &std::path::Path| {
-        let status = Command::new("git")
-            .args(args)
-            .current_dir(dir)
+        let status = Command::new("git",)
+            .args(args,)
+            .current_dir(dir,)
             .status()
-            .expect("unwrap failed");
+            .expect("unwrap failed",);
         assert!(status.success());
     };
 
-    run_git(&["init"], &reg_dir);
-    run_git(&["config", "user.email", "test@example.com"], &reg_dir);
-    run_git(&["config", "user.name", "test"], &reg_dir);
-    run_git(&["config", "commit.gpgsign", "false"], &reg_dir);
-    run_git(&["config", "init.defaultBranch", "main"], &reg_dir);
-    run_git(&["add", "."], &reg_dir);
-    run_git(&["commit", "-m", "v1"], &reg_dir);
+    run_git(&["init",], &reg_dir,);
+    run_git(&["config", "user.email", "test@example.com",], &reg_dir,);
+    run_git(&["config", "user.name", "test",], &reg_dir,);
+    run_git(&["config", "commit.gpgsign", "false",], &reg_dir,);
+    run_git(&["config", "init.defaultBranch", "main",], &reg_dir,);
+    run_git(&["add", ".",], &reg_dir,);
+    run_git(&["commit", "-m", "v1",], &reg_dir,);
 
     // Set up Sysroot and isolated Config
-    let sysroot = root.join("sysroot");
-    fs::create_dir_all(&sysroot).expect("unwrap failed");
-    common::TestContextGuard::set_sysroot(sysroot.clone());
+    let sysroot = root.join("sysroot",);
+    fs::create_dir_all(&sysroot,).expect("unwrap failed",);
+    common::TestContextGuard::set_sysroot(sysroot.clone(),);
 
-    let system_config_dir = sysroot.join("etc").join("zoi");
-    fs::create_dir_all(&system_config_dir).expect("unwrap failed");
+    let system_config_dir = sysroot.join("etc",).join("zoi",);
+    fs::create_dir_all(&system_config_dir,).expect("unwrap failed",);
     fs::write(
-        system_config_dir.join("config.yaml"),
+        system_config_dir.join("config.yaml",),
         format!(
             "default_registry:
   handle: my-registry
@@ -94,23 +97,24 @@ policy:
             reg_dir.to_string_lossy()
         ),
     )
-    .expect("unwrap failed");
+    .expect("unwrap failed",);
 
-    ctx.set_env_var("HOME", root.join("home"));
-    ctx.set_current_dir(&root);
+    ctx.set_env_var("HOME", root.join("home",),);
+    ctx.set_current_dir(&root,);
 
     // Sync and Install v1
-    zoi::cmd::sync::run(false, false, false, false, None).expect("unwrap failed");
+    zoi::cmd::sync::run(false, false, false, false, None,)
+        .expect("unwrap failed",);
 
     zoi::install_sources(
-        &[pkg_name.to_string()],
+        &[pkg_name.to_string(),],
         &zoi::SourceInstallOptions {
-            scope_override: Some(Scope::User),
+            scope_override: Some(Scope::User,),
             yes: true,
             ..Default::default()
         },
     )
-    .expect("v1 install failed");
+    .expect("v1 install failed",);
 
     // Verify .zoiorig exists
     let store_dir = zoi_resolver::local::get_package_version_dir(
@@ -120,9 +124,9 @@ policy:
         pkg_name,
         version_v1,
     )
-    .expect("unwrap failed");
-    let config_path_v1 = store_dir.join(config_rel);
-    let orig_path_v1 = config_path_v1.with_extension("txt.zoiorig");
+    .expect("unwrap failed",);
+    let config_path_v1 = store_dir.join(config_rel,);
+    let orig_path_v1 = config_path_v1.with_extension("txt.zoiorig",);
     assert!(
         orig_path_v1.exists(),
         ".zoiorig should be created on install"
@@ -130,11 +134,13 @@ policy:
 
     // User modifies config
     let user_modified_content = "setting_a = 99\nsetting_b = 20\n";
-    fs::write(&config_path_v1, user_modified_content).expect("unwrap failed");
+    fs::write(&config_path_v1, user_modified_content,).expect("unwrap failed",);
 
     // Update registry to v2
-    let upstream_v2_content = "setting_a = 10\nsetting_b = 20\nsetting_c = 30\n";
-    fs::write(pkg_repo_dir.join("config.txt"), upstream_v2_content).expect("unwrap failed");
+    let upstream_v2_content =
+        "setting_a = 10\nsetting_b = 20\nsetting_c = 30\n";
+    fs::write(pkg_repo_dir.join("config.txt",), upstream_v2_content,)
+        .expect("unwrap failed",);
 
     let lua_v2 = format!(
         r#"
@@ -153,15 +159,17 @@ function package()
 end
 "#
     );
-    fs::write(pkg_repo_dir.join(format!("{pkg_name}.pkg.lua")), lua_v2).expect("unwrap failed");
+    fs::write(pkg_repo_dir.join(format!("{pkg_name}.pkg.lua"),), lua_v2,)
+        .expect("unwrap failed",);
 
-    zoi::pkg::registry::generate_metadata(&reg_dir).expect("unwrap failed");
-    run_git(&["add", "."], &reg_dir);
-    run_git(&["commit", "-m", "v2"], &reg_dir);
+    zoi::pkg::registry::generate_metadata(&reg_dir,).expect("unwrap failed",);
+    run_git(&["add", ".",], &reg_dir,);
+    run_git(&["commit", "-m", "v2",], &reg_dir,);
 
     // Sync and Update
-    zoi::cmd::sync::run(false, false, false, false, None).expect("unwrap failed");
-    zoi::update_packages(true, &[], true).expect("v2 upgrade failed");
+    zoi::cmd::sync::run(false, false, false, false, None,)
+        .expect("unwrap failed",);
+    zoi::update_packages(true, &[], true,).expect("v2 upgrade failed",);
 
     // Verify result
     let store_dir_v2 = zoi_resolver::local::get_package_version_dir(
@@ -171,10 +179,11 @@ end
         pkg_name,
         version_v2,
     )
-    .expect("unwrap failed");
-    let config_path_v2 = store_dir_v2.join(config_rel);
+    .expect("unwrap failed",);
+    let config_path_v2 = store_dir_v2.join(config_rel,);
 
-    let actual_content = fs::read_to_string(&config_path_v2).expect("unwrap failed");
+    let actual_content =
+        fs::read_to_string(&config_path_v2,).expect("unwrap failed",);
     let expected_content = "setting_a = 99\nsetting_b = 20\nsetting_c = 30\n";
     assert_eq!(
         actual_content, expected_content,

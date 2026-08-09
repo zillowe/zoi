@@ -1,95 +1,96 @@
-use crate::sysroot::apply_sysroot;
-use crate::types::{Config, Registry, RepoConfig};
-use crate::utils::{get_db_root, get_user_home};
-use anyhow::{Result, anyhow};
-use colored::Colorize;
-use serde_yaml::Value;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
+use anyhow::{Result, anyhow};
+use colored::Colorize;
+use serde_yaml::Value;
+
+use crate::sysroot::apply_sysroot;
+use crate::types::{Config, Registry, RepoConfig};
+use crate::utils::{get_db_root, get_user_home};
+
 /// Returns the default registry URL for Zoi.
 ///
-/// This is typically hardcoded or provided via an environment variable during the build.
+/// This is typically hardcoded or provided via an environment variable during
+/// the build.
 pub fn get_default_registry() -> String {
     option_env!("ZOI_DEFAULT_REGISTRY")
-        .unwrap_or("community")
+        .unwrap_or("community",)
         .to_string()
 }
 
 /// Returns the built-in PGP authorities for the default registry.
-pub fn get_builtin_authorities() -> Vec<String> {
+pub fn get_builtin_authorities() -> Vec<String,> {
     let auth_str = option_env!("ZOI_BUILTIN_AUTHORITIES").unwrap_or_default();
     if auth_str.is_empty() {
         Vec::new()
     } else {
-        auth_str.split(',').map(ToString::to_string).collect()
+        auth_str.split(',',).map(ToString::to_string,).collect()
     }
 }
 
 /// Returns the path to the system-wide configuration file.
 fn get_system_config_path() -> PathBuf {
     if cfg!(target_os = "windows") {
-        apply_sysroot(PathBuf::from(
-            "C:\\ProgramData\\zoi\\config.yaml",
-        ))
+        apply_sysroot(PathBuf::from("C:\\ProgramData\\zoi\\config.yaml",),)
     } else {
-        apply_sysroot(PathBuf::from("/etc/zoi/config.yaml"))
+        apply_sysroot(PathBuf::from("/etc/zoi/config.yaml",),)
     }
 }
 
 /// Returns the path to the user-specific configuration file.
-fn get_user_config_path() -> Result<PathBuf> {
-    let home_dir = get_user_home().ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(apply_sysroot(home_dir.join(".zoi"))
-        .join("pkgs")
-        .join("config.yaml"))
+fn get_user_config_path() -> Result<PathBuf,> {
+    let home_dir = get_user_home()
+        .ok_or_else(|| anyhow!("Could not find home directory."),)?;
+    Ok(apply_sysroot(home_dir.join(".zoi",),)
+        .join("pkgs",)
+        .join("config.yaml",),)
 }
 
 /// Returns the path to the project-local configuration file.
-fn get_project_config_path() -> Result<PathBuf> {
+fn get_project_config_path() -> Result<PathBuf,> {
     let current_dir = std::env::current_dir()?;
-    Ok(apply_sysroot(current_dir.join(".zoi"))
-        .join("pkgs")
-        .join("config.yaml"))
+    Ok(apply_sysroot(current_dir.join(".zoi",),)
+        .join("pkgs",)
+        .join("config.yaml",),)
 }
 
 /// Returns the path to the directory where git repositories are cloned.
-fn get_git_root() -> Result<PathBuf> {
-    let home_dir = get_user_home().ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(apply_sysroot(home_dir.join(".zoi"))
-        .join("pkgs")
-        .join("git"))
+fn get_git_root() -> Result<PathBuf,> {
+    let home_dir = get_user_home()
+        .ok_or_else(|| anyhow!("Could not find home directory."),)?;
+    Ok(apply_sysroot(home_dir.join(".zoi",),)
+        .join("pkgs",)
+        .join("git",),)
 }
 
 /// Returns the path to the remote policy cache file.
 fn get_remote_policy_cache_path() -> PathBuf {
     if cfg!(target_os = "windows") {
-        apply_sysroot(PathBuf::from(
-            "C:\\ProgramData\\zoi\\policy.cache.yaml",
-        ))
+        apply_sysroot(PathBuf::from("C:\\ProgramData\\zoi\\policy.cache.yaml",),)
     } else {
-        apply_sysroot(PathBuf::from("/etc/zoi/policy.cache.yaml"))
+        apply_sysroot(PathBuf::from("/etc/zoi/policy.cache.yaml",),)
     }
 }
 
 /// Reads a YAML value from the specified path.
-fn read_yaml_value(path: &Path) -> Result<Value> {
+fn read_yaml_value(path: &Path,) -> Result<Value,> {
     if !path.exists() {
-        return Ok(Value::Null);
+        return Ok(Value::Null,);
     }
-    let content = fs::read_to_string(path)?;
-    serde_yaml::from_str(&content).map_err(Into::into)
+    let content = fs::read_to_string(path,)?;
+    serde_yaml::from_str(&content,).map_err(Into::into,)
 }
 
 /// Reads a Zoi configuration from the specified path.
-fn read_config_from_path(path: &Path) -> Result<Config> {
+fn read_config_from_path(path: &Path,) -> Result<Config,> {
     if !path.exists() {
-        return Ok(Config::default());
+        return Ok(Config::default(),);
     }
-    let content = fs::read_to_string(path)?;
-    serde_yaml::from_str(&content).map_err(Into::into)
+    let content = fs::read_to_string(path,)?;
+    serde_yaml::from_str(&content,).map_err(Into::into,)
 }
 
 /// Loads and merges configuration from system, user, and project-local paths.
@@ -97,29 +98,35 @@ fn read_config_from_path(path: &Path) -> Result<Config> {
 /// Zoi uses a hierarchical configuration model with the following precedence:
 /// - System: (`/etc/zoi/config.yaml`) - Defines global machine policy.
 /// - User: (`~/.zoi/pkgs/config.yaml`) - Defines user preferences.
-/// - Project: (`./.zoi/pkgs/config.yaml`) - Local overrides for a specific project.
+/// - Project: (`./.zoi/pkgs/config.yaml`) - Local overrides for a specific
+///   project.
 ///
 /// Policy Enforcement: If a field is marked as `unoverridable` in the
-/// system-level policy, Zoi will ignore any overrides found in user or project configs.
+/// system-level policy, Zoi will ignore any overrides found in user or project
+/// configs.
 ///
 /// # Errors
 ///
 /// Returns an error if any of the configuration files cannot be read or parsed.
-pub fn read_config() -> Result<Config> {
-    let system_val = read_yaml_value(&get_system_config_path())?;
-    let user_val = read_yaml_value(&get_user_config_path()?)?;
-    let project_val = read_yaml_value(&get_project_config_path()?)?;
+pub fn read_config() -> Result<Config,> {
+    let system_val = read_yaml_value(&get_system_config_path(),)?;
+    let user_val = read_yaml_value(&get_user_config_path()?,)?;
+    let project_val = read_yaml_value(&get_project_config_path()?,)?;
 
-    let mut system_cfg: Config = serde_yaml::from_value(system_val.clone()).unwrap_or_default();
-    let user_cfg: Config = serde_yaml::from_value(user_val.clone()).unwrap_or_default();
-    let project_cfg: Config = serde_yaml::from_value(project_val.clone()).unwrap_or_default();
+    let mut system_cfg: Config =
+        serde_yaml::from_value(system_val.clone(),).unwrap_or_default();
+    let user_cfg: Config =
+        serde_yaml::from_value(user_val.clone(),).unwrap_or_default();
+    let project_cfg: Config =
+        serde_yaml::from_value(project_val.clone(),).unwrap_or_default();
 
     let cache_path = get_remote_policy_cache_path();
     if cache_path.exists()
-        && let Ok(cache_content) = fs::read_to_string(&cache_path)
-        && let Ok(remote_policy) = serde_yaml::from_str::<crate::types::Policy>(&cache_content)
+        && let Ok(cache_content,) = fs::read_to_string(&cache_path,)
+        && let Ok(remote_policy,) =
+            serde_yaml::from_str::<crate::types::Policy,>(&cache_content,)
     {
-        merge_policies(&mut system_cfg.policy, &remote_policy);
+        merge_policies(&mut system_cfg.policy, &remote_policy,);
     }
 
     let system_policy = system_cfg.policy.clone();
@@ -130,8 +137,8 @@ pub fn read_config() -> Result<Config> {
 
     merged_cfg.repos = system_cfg.repos;
     if !system_policy.repos_unoverridable {
-        merged_cfg.repos.extend(user_cfg.repos);
-        merged_cfg.repos.extend(project_cfg.repos);
+        merged_cfg.repos.extend(user_cfg.repos,);
+        merged_cfg.repos.extend(project_cfg.repos,);
     }
     merged_cfg.repos.sort();
     merged_cfg.repos.dedup();
@@ -140,44 +147,44 @@ pub fn read_config() -> Result<Config> {
     if !system_policy.added_registries_unoverridable {
         merged_cfg
             .added_registries
-            .extend(user_cfg.added_registries);
+            .extend(user_cfg.added_registries,);
         merged_cfg
             .added_registries
-            .extend(project_cfg.added_registries);
+            .extend(project_cfg.added_registries,);
     }
     let mut seen_registries = HashSet::new();
     merged_cfg
         .added_registries
-        .retain(|r| seen_registries.insert(r.url.clone()));
+        .retain(|r| seen_registries.insert(r.url.clone(),),);
 
     merged_cfg.git_repos = system_cfg.git_repos;
     if !system_policy.git_repos_unoverridable {
-        merged_cfg.git_repos.extend(user_cfg.git_repos);
-        merged_cfg.git_repos.extend(project_cfg.git_repos);
+        merged_cfg.git_repos.extend(user_cfg.git_repos,);
+        merged_cfg.git_repos.extend(project_cfg.git_repos,);
     }
     merged_cfg.git_repos.sort();
     merged_cfg.git_repos.dedup();
 
     merged_cfg.package_managers = project_cfg
         .package_managers
-        .or(user_cfg.package_managers)
-        .or(system_cfg.package_managers);
+        .or(user_cfg.package_managers,)
+        .or(system_cfg.package_managers,);
     merged_cfg.native_package_manager = project_cfg
         .native_package_manager
-        .or(user_cfg.native_package_manager)
-        .or(system_cfg.native_package_manager);
+        .or(user_cfg.native_package_manager,)
+        .or(system_cfg.native_package_manager,);
     merged_cfg.registry = project_cfg
         .registry
-        .or(user_cfg.registry)
-        .or(system_cfg.registry);
+        .or(user_cfg.registry,)
+        .or(system_cfg.registry,);
 
     merged_cfg.remote_policy = system_cfg.remote_policy;
 
-    if project_val.get("telemetry_enabled").is_some()
+    if project_val.get("telemetry_enabled",).is_some()
         && !system_policy.telemetry_enabled_unoverridable
     {
         merged_cfg.telemetry_enabled = project_cfg.telemetry_enabled;
-    } else if user_val.get("telemetry_enabled").is_some()
+    } else if user_val.get("telemetry_enabled",).is_some()
         && !system_policy.telemetry_enabled_unoverridable
     {
         merged_cfg.telemetry_enabled = user_cfg.telemetry_enabled;
@@ -185,11 +192,11 @@ pub fn read_config() -> Result<Config> {
         merged_cfg.telemetry_enabled = system_cfg.telemetry_enabled;
     }
 
-    if project_val.get("audit_log_enabled").is_some()
+    if project_val.get("audit_log_enabled",).is_some()
         && !system_policy.audit_log_enabled_unoverridable
     {
         merged_cfg.audit_log_enabled = project_cfg.audit_log_enabled;
-    } else if user_val.get("audit_log_enabled").is_some()
+    } else if user_val.get("audit_log_enabled",).is_some()
         && !system_policy.audit_log_enabled_unoverridable
     {
         merged_cfg.audit_log_enabled = user_cfg.audit_log_enabled;
@@ -197,11 +204,11 @@ pub fn read_config() -> Result<Config> {
         merged_cfg.audit_log_enabled = system_cfg.audit_log_enabled;
     }
 
-    if project_val.get("rollback_enabled").is_some()
+    if project_val.get("rollback_enabled",).is_some()
         && !system_policy.rollback_enabled_unoverridable
     {
         merged_cfg.rollback_enabled = project_cfg.rollback_enabled;
-    } else if user_val.get("rollback_enabled").is_some()
+    } else if user_val.get("rollback_enabled",).is_some()
         && !system_policy.rollback_enabled_unoverridable
     {
         merged_cfg.rollback_enabled = user_cfg.rollback_enabled;
@@ -209,11 +216,11 @@ pub fn read_config() -> Result<Config> {
         merged_cfg.rollback_enabled = system_cfg.rollback_enabled;
     }
 
-    if project_val.get("default_registry").is_some()
+    if project_val.get("default_registry",).is_some()
         && !system_policy.default_registry_unoverridable
     {
         merged_cfg.default_registry = project_cfg.default_registry;
-    } else if user_val.get("default_registry").is_some()
+    } else if user_val.get("default_registry",).is_some()
         && !system_policy.default_registry_unoverridable
     {
         merged_cfg.default_registry = user_cfg.default_registry;
@@ -221,27 +228,33 @@ pub fn read_config() -> Result<Config> {
         merged_cfg.default_registry = system_cfg.default_registry;
     }
 
-    if project_val.get("jobs").is_some() && !system_policy.jobs_unoverridable {
+    if project_val.get("jobs",).is_some() && !system_policy.jobs_unoverridable {
         merged_cfg.jobs = project_cfg.jobs;
-    } else if user_val.get("jobs").is_some() && !system_policy.jobs_unoverridable {
+    } else if user_val.get("jobs",).is_some()
+        && !system_policy.jobs_unoverridable
+    {
         merged_cfg.jobs = user_cfg.jobs;
     } else {
         merged_cfg.jobs = system_cfg.jobs;
     }
 
-    if project_val.get("protect_db").is_some() && !system_policy.protect_db_unoverridable {
+    if project_val.get("protect_db",).is_some()
+        && !system_policy.protect_db_unoverridable
+    {
         merged_cfg.protect_db = project_cfg.protect_db;
-    } else if user_val.get("protect_db").is_some() && !system_policy.protect_db_unoverridable {
+    } else if user_val.get("protect_db",).is_some()
+        && !system_policy.protect_db_unoverridable
+    {
         merged_cfg.protect_db = user_cfg.protect_db;
     } else {
         merged_cfg.protect_db = system_cfg.protect_db;
     }
 
-    if project_val.get("max_resolution_depth").is_some()
+    if project_val.get("max_resolution_depth",).is_some()
         && !system_policy.max_resolution_depth_unoverridable
     {
         merged_cfg.max_resolution_depth = project_cfg.max_resolution_depth;
-    } else if user_val.get("max_resolution_depth").is_some()
+    } else if user_val.get("max_resolution_depth",).is_some()
         && !system_policy.max_resolution_depth_unoverridable
     {
         merged_cfg.max_resolution_depth = user_cfg.max_resolution_depth;
@@ -249,25 +262,29 @@ pub fn read_config() -> Result<Config> {
         merged_cfg.max_resolution_depth = system_cfg.max_resolution_depth;
     }
 
-    if project_val.get("offline_mode").is_some() && !system_policy.offline_mode_unoverridable {
+    if project_val.get("offline_mode",).is_some()
+        && !system_policy.offline_mode_unoverridable
+    {
         merged_cfg.offline_mode = project_cfg.offline_mode;
-    } else if user_val.get("offline_mode").is_some() && !system_policy.offline_mode_unoverridable {
+    } else if user_val.get("offline_mode",).is_some()
+        && !system_policy.offline_mode_unoverridable
+    {
         merged_cfg.offline_mode = user_cfg.offline_mode;
     } else {
         merged_cfg.offline_mode = system_cfg.offline_mode;
     }
 
     if project_val
-        .get("policy")
-        .and_then(|p| p.get("advisory_enforcement_unoverridable"))
+        .get("policy",)
+        .and_then(|p| p.get("advisory_enforcement_unoverridable",),)
         .is_some()
         && !system_policy.advisory_enforcement_unoverridable
     {
         merged_cfg.policy.advisory_enforcement_unoverridable =
             project_cfg.policy.advisory_enforcement_unoverridable;
     } else if user_val
-        .get("policy")
-        .and_then(|p| p.get("advisory_enforcement_unoverridable"))
+        .get("policy",)
+        .and_then(|p| p.get("advisory_enforcement_unoverridable",),)
         .is_some()
         && !system_policy.advisory_enforcement_unoverridable
     {
@@ -279,43 +296,49 @@ pub fn read_config() -> Result<Config> {
     }
 
     merged_cfg.versions = system_cfg.versions;
-    merged_cfg.versions.extend(user_cfg.versions);
-    merged_cfg.versions.extend(project_cfg.versions);
+    merged_cfg.versions.extend(user_cfg.versions,);
+    merged_cfg.versions.extend(project_cfg.versions,);
 
     merged_cfg.pkg_dirs = system_cfg.pkg_dirs;
     if !system_policy.pkg_dirs_unoverridable {
-        merged_cfg.pkg_dirs.extend(user_cfg.pkg_dirs);
-        merged_cfg.pkg_dirs.extend(project_cfg.pkg_dirs);
+        merged_cfg.pkg_dirs.extend(user_cfg.pkg_dirs,);
+        merged_cfg.pkg_dirs.extend(project_cfg.pkg_dirs,);
     }
     merged_cfg.pkg_dirs.sort();
     merged_cfg.pkg_dirs.dedup();
 
     merged_cfg.cache_mirrors = system_cfg.cache_mirrors;
     if !system_policy.cache_mirrors_unoverridable {
-        merged_cfg.cache_mirrors.extend(user_cfg.cache_mirrors);
-        merged_cfg.cache_mirrors.extend(project_cfg.cache_mirrors);
+        merged_cfg.cache_mirrors.extend(user_cfg.cache_mirrors,);
+        merged_cfg.cache_mirrors.extend(project_cfg.cache_mirrors,);
     }
     merged_cfg.cache_mirrors.sort();
     merged_cfg.cache_mirrors.dedup();
 
     if !system_policy.allow_deny_lists_unoverridable {
         if project_cfg.policy.allowed_licenses.is_some() {
-            merged_cfg.policy.allowed_licenses = project_cfg.policy.allowed_licenses;
+            merged_cfg.policy.allowed_licenses =
+                project_cfg.policy.allowed_licenses;
         } else if user_cfg.policy.allowed_licenses.is_some() {
-            merged_cfg.policy.allowed_licenses = user_cfg.policy.allowed_licenses;
+            merged_cfg.policy.allowed_licenses =
+                user_cfg.policy.allowed_licenses;
         }
         if project_cfg.policy.denied_licenses.is_some() {
-            merged_cfg.policy.denied_licenses = project_cfg.policy.denied_licenses;
+            merged_cfg.policy.denied_licenses =
+                project_cfg.policy.denied_licenses;
         } else if user_cfg.policy.denied_licenses.is_some() {
             merged_cfg.policy.denied_licenses = user_cfg.policy.denied_licenses;
         }
         if project_cfg.policy.allowed_packages.is_some() {
-            merged_cfg.policy.allowed_packages = project_cfg.policy.allowed_packages;
+            merged_cfg.policy.allowed_packages =
+                project_cfg.policy.allowed_packages;
         } else if user_cfg.policy.allowed_packages.is_some() {
-            merged_cfg.policy.allowed_packages = user_cfg.policy.allowed_packages;
+            merged_cfg.policy.allowed_packages =
+                user_cfg.policy.allowed_packages;
         }
         if project_cfg.policy.denied_packages.is_some() {
-            merged_cfg.policy.denied_packages = project_cfg.policy.denied_packages;
+            merged_cfg.policy.denied_packages =
+                project_cfg.policy.denied_packages;
         } else if user_cfg.policy.denied_packages.is_some() {
             merged_cfg.policy.denied_packages = user_cfg.policy.denied_packages;
         }
@@ -333,13 +356,15 @@ pub fn read_config() -> Result<Config> {
 
     if !system_policy.signature_enforcement_unoverridable {
         if project_cfg.policy.signature_enforcement.is_some() {
-            merged_cfg.policy.signature_enforcement = project_cfg.policy.signature_enforcement;
+            merged_cfg.policy.signature_enforcement =
+                project_cfg.policy.signature_enforcement;
         } else if user_cfg.policy.signature_enforcement.is_some() {
-            merged_cfg.policy.signature_enforcement = user_cfg.policy.signature_enforcement;
+            merged_cfg.policy.signature_enforcement =
+                user_cfg.policy.signature_enforcement;
         }
     }
 
-    if let Some(url) = merged_cfg.registry.take()
+    if let Some(url,) = merged_cfg.registry.take()
         && merged_cfg.default_registry.is_none()
     {
         merged_cfg.default_registry = Some(Registry {
@@ -347,73 +372,76 @@ pub fn read_config() -> Result<Config> {
             url,
             advisory_prefix: None,
             authorities: None,
-        });
+        },);
     }
 
     if merged_cfg.default_registry.is_none() {
         merged_cfg.default_registry = Some(Registry {
             handle: "zoidberg".to_string(),
             url: get_default_registry(),
-            advisory_prefix: Some("ZSA".to_string()),
-            authorities: Some(get_builtin_authorities()),
-        });
-    } else if let Some(ref mut reg) = merged_cfg.default_registry
+            advisory_prefix: Some("ZSA".to_string(),),
+            authorities: Some(get_builtin_authorities(),),
+        },);
+    } else if let Some(ref mut reg,) = merged_cfg.default_registry
         && reg.url == get_default_registry()
-        && reg.authorities.as_ref().is_none_or(Vec::is_empty)
+        && reg.authorities.as_ref().is_none_or(Vec::is_empty,)
     {
         let builtin = get_builtin_authorities();
         if !builtin.is_empty() {
-            reg.authorities = Some(builtin);
+            reg.authorities = Some(builtin,);
         }
     }
 
     if merged_cfg.repos.is_empty()
-        && let Some(reg) = &merged_cfg.default_registry
+        && let Some(reg,) = &merged_cfg.default_registry
         && !reg.handle.is_empty()
     {
         let db_root = get_db_root()?;
-        let repo_path = db_root.join(&reg.handle);
-        if repo_path.join("repo.yaml").exists()
-            && let Ok(repo_config) = read_repo_config(&repo_path)
+        let repo_path = db_root.join(&reg.handle,);
+        if repo_path.join("repo.yaml",).exists()
+            && let Ok(repo_config,) = read_repo_config(&repo_path,)
         {
             merged_cfg.repos = repo_config
                 .repos
                 .into_iter()
-                .filter(|r| r.active)
-                .map(|r| r.name)
+                .filter(|r| r.active,)
+                .map(|r| r.name,)
                 .collect();
         }
     }
 
-    if project_val.get("system_generations_limit").is_some()
+    if project_val.get("system_generations_limit",).is_some()
         && !system_policy.system_generations_limit_unoverridable
     {
-        merged_cfg.system_generations_limit = project_cfg.system_generations_limit;
-    } else if user_val.get("system_generations_limit").is_some()
+        merged_cfg.system_generations_limit =
+            project_cfg.system_generations_limit;
+    } else if user_val.get("system_generations_limit",).is_some()
         && !system_policy.system_generations_limit_unoverridable
     {
         merged_cfg.system_generations_limit = user_cfg.system_generations_limit;
     } else {
-        merged_cfg.system_generations_limit = system_cfg.system_generations_limit;
+        merged_cfg.system_generations_limit =
+            system_cfg.system_generations_limit;
     }
 
-    Ok(merged_cfg)
+    Ok(merged_cfg,)
 }
 
 /// Writes the user-specific configuration to disk.
 ///
 /// # Errors
 ///
-/// Returns an error if the configuration directory cannot be created or the file cannot be written.
-pub fn write_user_config(config: &Config) -> Result<()> {
+/// Returns an error if the configuration directory cannot be created or the
+/// file cannot be written.
+pub fn write_user_config(config: &Config,) -> Result<(),> {
     let config_path = get_user_config_path()?;
     let parent_dir = config_path
         .parent()
-        .ok_or_else(|| anyhow!("Invalid config path"))?;
-    fs::create_dir_all(parent_dir)?;
-    let content = serde_yaml::to_string(config)?;
-    fs::write(config_path, content)?;
-    Ok(())
+        .ok_or_else(|| anyhow!("Invalid config path"),)?;
+    fs::create_dir_all(parent_dir,)?;
+    let content = serde_yaml::to_string(config,)?;
+    fs::write(config_path, content,)?;
+    Ok((),)
 }
 
 /// Verifies a remote file against a set of trusted PGP keys.
@@ -423,72 +451,85 @@ pub fn write_user_config(config: &Config) -> Result<()> {
 /// Returns an error if:
 /// - The file or its signature cannot be fetched.
 /// - The signature is invalid or not signed by a trusted key.
-pub fn verify_remote_file(url: &str, trusted_keys: &[String]) -> Result<Vec<u8>> {
+pub fn verify_remote_file(
+    url: &str,
+    trusted_keys: &[String],
+) -> Result<Vec<u8,>,> {
     let client = crate::utils::get_http_client()?;
 
-    let response = client.get(url).send()?;
+    let response = client.get(url,).send()?;
     if !response.status().is_success() {
         return Err(anyhow!(
             "Failed to fetch remote file '{url}': {}",
             response.status()
-        ));
+        ),);
     }
     let data = response.bytes()?;
 
     let sig_url = format!("{url}.sig");
-    let sig_response = client.get(&sig_url).send()?;
+    let sig_response = client.get(&sig_url,).send()?;
     if !sig_response.status().is_success() {
         return Err(anyhow!(
             "Failed to fetch signature for '{url}': {}",
             sig_response.status()
-        ));
+        ),);
     }
     let sig = sig_response.bytes()?;
 
-    let trusted_certs = crate::pgp::get_certs_by_name_or_fingerprint(trusted_keys)?;
+    let trusted_certs =
+        crate::pgp::get_certs_by_name_or_fingerprint(trusted_keys,)?;
 
-    let temp_dir = tempfile::Builder::new().prefix("zoi-verify-").tempdir()?;
-    let data_path = temp_dir.path().join("data");
-    let sig_path = temp_dir.path().join("sig");
+    let temp_dir = tempfile::Builder::new().prefix("zoi-verify-",).tempdir()?;
+    let data_path = temp_dir.path().join("data",);
+    let sig_path = temp_dir.path().join("sig",);
 
-    fs::write(&data_path, &data)?;
-    fs::write(&sig_path, &sig)?;
+    fs::write(&data_path, &data,)?;
+    fs::write(&sig_path, &sig,)?;
 
-    crate::pgp::verify_detached_signature_multi_key(&data_path, &sig_path, trusted_certs)?;
+    crate::pgp::verify_detached_signature_multi_key(
+        &data_path,
+        &sig_path,
+        trusted_certs,
+    )?;
 
-    Ok(data.to_vec())
+    Ok(data.to_vec(),)
 }
 
 /// Adds a repository to the user-specific configuration.
 ///
 /// # Errors
 ///
-/// Returns an error if the repository already exists or if the configuration cannot be written.
-pub fn add_repo(repo_name: &str) -> Result<()> {
-    let mut config = read_config_from_path(&get_user_config_path()?)?;
+/// Returns an error if the repository already exists or if the configuration
+/// cannot be written.
+pub fn add_repo(repo_name: &str,) -> Result<(),> {
+    let mut config = read_config_from_path(&get_user_config_path()?,)?;
     let lower_repo_name = repo_name.to_lowercase();
-    if config.repos.contains(&lower_repo_name) {
+    if config.repos.contains(&lower_repo_name,) {
         return Err(anyhow!(
             "Repository '{repo_name}' already exists in user config."
-        ));
+        ),);
     }
-    config.repos.push(lower_repo_name);
-    write_user_config(&config)
+    config.repos.push(lower_repo_name,);
+    write_user_config(&config,)
 }
 
 /// Removes a repository from the user-specific configuration.
 ///
 /// # Errors
 ///
-/// Returns an error if the repository is not found or if the configuration cannot be written.
-pub fn remove_repo(repo_name: &str) -> Result<()> {
-    let mut config = read_config_from_path(&get_user_config_path()?)?;
+/// Returns an error if the repository is not found or if the configuration
+/// cannot be written.
+pub fn remove_repo(repo_name: &str,) -> Result<(),> {
+    let mut config = read_config_from_path(&get_user_config_path()?,)?;
     let lower_repo_name = repo_name.to_lowercase();
-    if let Some(pos) = config.repos.iter().position(|r| r == &lower_repo_name) {
-        config.repos.remove(pos);
-        write_user_config(&config)
+    if let Some(pos,) = config.repos.iter().position(|r| r == &lower_repo_name,)
+    {
+        config.repos.remove(pos,);
+        write_user_config(&config,)
     } else {
-        Err(anyhow!("Repository '{repo_name}' not found in user config."))
+        Err(anyhow!(
+            "Repository '{repo_name}' not found in user config."
+        ),)
     }
 }
 
@@ -500,22 +541,22 @@ pub fn remove_repo(repo_name: &str) -> Result<()> {
 /// - Input/output operations fail.
 /// - The user provides invalid input.
 /// - The repository cannot be added.
-pub fn interactive_add_repo() -> Result<()> {
+pub fn interactive_add_repo() -> Result<(),> {
     let config = read_config()?;
     let all_repos = get_all_repos()?;
 
-    let available_repos: Vec<_> = all_repos
+    let available_repos: Vec<_,> = all_repos
         .into_iter()
-        .filter(|r| !config.repos.contains(&r.to_lowercase()))
+        .filter(|r| !config.repos.contains(&r.to_lowercase(),),)
         .collect();
 
     if available_repos.is_empty() {
         println!("{}", "No new repositories available to add.".yellow());
-        return Ok(());
+        return Ok((),);
     }
 
     println!("{}", "Available repositories to add:".green());
-    for (i, repo) in available_repos.iter().enumerate() {
+    for (i, repo,) in available_repos.iter().enumerate() {
         println!("[{}] {}", i + 1, repo);
     }
 
@@ -526,30 +567,30 @@ pub fn interactive_add_repo() -> Result<()> {
     io::stdout().flush()?;
 
     let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
+    io::stdin().read_line(&mut input,)?;
     let input = input.trim();
 
     if input == "q" {
         println!("Aborted.");
-        return Ok(());
+        return Ok((),);
     }
 
     let choice: usize = match input.parse() {
-        Ok(num) => num,
-        Err(_) => return Err(anyhow!("Invalid input.")),
+        Ok(num,) => num,
+        Err(_,) => return Err(anyhow!("Invalid input."),),
     };
 
     if choice > 0 && choice <= available_repos.len() {
         let repo_to_add = available_repos
-            .get(choice - 1)
-            .ok_or_else(|| anyhow!("Invalid choice"))?;
-        add_repo(repo_to_add)?;
+            .get(choice - 1,)
+            .ok_or_else(|| anyhow!("Invalid choice"),)?;
+        add_repo(repo_to_add,)?;
         println!("Repository '{}' added successfully.", repo_to_add.green());
     } else {
-        return Err(anyhow!("Invalid selection."));
+        return Err(anyhow!("Invalid selection."),);
     }
 
-    Ok(())
+    Ok((),)
 }
 
 /// Returns a list of all available repositories from the default registry.
@@ -557,21 +598,25 @@ pub fn interactive_add_repo() -> Result<()> {
 /// # Errors
 ///
 /// Returns an error if the repository configuration cannot be read.
-pub fn get_all_repos() -> Result<Vec<String>> {
+pub fn get_all_repos() -> Result<Vec<String,>,> {
     let db_root = get_db_root()?;
     let config = read_config()?;
 
-    if let Some(default_reg) = config.default_registry
+    if let Some(default_reg,) = config.default_registry
         && !default_reg.handle.is_empty()
     {
-        let default_reg_path = db_root.join(default_reg.handle);
-        if default_reg_path.join("repo.yaml").exists() {
-            let repo_config = read_repo_config(&default_reg_path)?;
-            return Ok(repo_config.repos.into_iter().map(|r| r.name).collect());
+        let default_reg_path = db_root.join(default_reg.handle,);
+        if default_reg_path.join("repo.yaml",).exists() {
+            let repo_config = read_repo_config(&default_reg_path,)?;
+            return Ok(repo_config
+                .repos
+                .into_iter()
+                .map(|r| r.name,)
+                .collect(),);
         }
     }
 
-    Ok(Vec::new())
+    Ok(Vec::new(),)
 }
 
 /// Clones a git repository into the local git root.
@@ -582,37 +627,37 @@ pub fn get_all_repos() -> Result<Vec<String>> {
 /// - The target directory already exists.
 /// - The `git clone` command fails.
 /// - The user configuration cannot be updated.
-pub fn clone_git_repo(url: &str) -> Result<()> {
+pub fn clone_git_repo(url: &str,) -> Result<(),> {
     let git_root = get_git_root()?;
-    fs::create_dir_all(&git_root)?;
+    fs::create_dir_all(&git_root,)?;
     let repo_name = url
-        .trim_end_matches('/')
-        .split('/')
+        .trim_end_matches('/',)
+        .split('/',)
         .next_back()
-        .unwrap_or("repo")
-        .trim_end_matches(".git");
-    let target = git_root.join(repo_name);
+        .unwrap_or("repo",)
+        .trim_end_matches(".git",);
+    let target = git_root.join(repo_name,);
     if target.exists() {
         return Err(anyhow!(
             "Git repo '{repo_name}' already exists at {}",
             target.display()
-        ));
+        ),);
     }
     println!("Cloning '{}' into {}...", url.cyan(), target.display());
-    let status = std::process::Command::new("git")
-        .arg("clone")
-        .arg("--depth=1")
-        .arg(url)
-        .arg(&target)
+    let status = std::process::Command::new("git",)
+        .arg("clone",)
+        .arg("--depth=1",)
+        .arg(url,)
+        .arg(&target,)
         .status()?;
     if !status.success() {
-        return Err(anyhow!("git clone failed"));
+        return Err(anyhow!("git clone failed"),);
     }
 
-    let mut config = read_config_from_path(&get_user_config_path()?)?;
-    if !config.git_repos.iter().any(|repo_url| repo_url == url) {
-        config.git_repos.push(url.to_string());
-        write_user_config(&config)?;
+    let mut config = read_config_from_path(&get_user_config_path()?,)?;
+    if !config.git_repos.iter().any(|repo_url| repo_url == url,) {
+        config.git_repos.push(url.to_string(),);
+        write_user_config(&config,)?;
     }
 
     println!(
@@ -620,7 +665,7 @@ pub fn clone_git_repo(url: &str) -> Result<()> {
         repo_name.green(),
         repo_name
     );
-    Ok(())
+    Ok((),)
 }
 
 /// Lists all cloned git repositories.
@@ -628,21 +673,21 @@ pub fn clone_git_repo(url: &str) -> Result<()> {
 /// # Errors
 ///
 /// Returns an error if the git root directory cannot be read.
-pub fn list_git_repos() -> Result<Vec<String>> {
+pub fn list_git_repos() -> Result<Vec<String,>,> {
     let git_root = get_git_root()?;
     if !git_root.exists() {
-        return Ok(Vec::new());
+        return Ok(Vec::new(),);
     }
 
     let mut repos = Vec::new();
-    for entry in fs::read_dir(git_root)? {
+    for entry in fs::read_dir(git_root,)? {
         let entry = entry?;
         if entry.path().is_dir() {
-            repos.push(entry.file_name().to_string_lossy().into_owned());
+            repos.push(entry.file_name().to_string_lossy().into_owned(),);
         }
     }
     repos.sort();
-    Ok(repos)
+    Ok(repos,)
 }
 
 /// Removes a cloned git repository.
@@ -650,73 +695,75 @@ pub fn list_git_repos() -> Result<Vec<String>> {
 /// # Errors
 ///
 /// Returns an error if the repository is not found or cannot be removed.
-pub fn remove_git_repo(repo_name: &str) -> Result<()> {
+pub fn remove_git_repo(repo_name: &str,) -> Result<(),> {
     let git_root = get_git_root()?;
-    let target = git_root.join(repo_name);
+    let target = git_root.join(repo_name,);
     if !target.exists() {
-        return Err(anyhow!("Git repository '{repo_name}' not found."));
+        return Err(anyhow!("Git repository '{repo_name}' not found."),);
     }
 
-    let mut config = read_config_from_path(&get_user_config_path()?)?;
+    let mut config = read_config_from_path(&get_user_config_path()?,)?;
     let mut removed = false;
     config.git_repos.retain(|url| {
         let name_from_url = url
-            .trim_end_matches('/')
-            .split('/')
+            .trim_end_matches('/',)
+            .split('/',)
             .next_back()
             .unwrap_or_default()
-            .trim_end_matches(".git");
+            .trim_end_matches(".git",);
         if name_from_url == repo_name {
             removed = true;
             false
         } else {
             true
         }
-    });
+    },);
 
     if removed {
-        write_user_config(&config)?;
+        write_user_config(&config,)?;
     }
 
-    fs::remove_dir_all(&target)?;
+    fs::remove_dir_all(&target,)?;
     println!(
         "Removed git repository '{}' from {}",
         repo_name.green(),
         target.display()
     );
-    Ok(())
+    Ok((),)
 }
 
 /// Adds a cache mirror URL to the user-specific configuration.
 ///
 /// # Errors
 ///
-/// Returns an error if the mirror already exists or the configuration cannot be written.
-pub fn add_cache_mirror(url: &str) -> Result<()> {
-    let mut config = read_config_from_path(&get_user_config_path()?)?;
-    if config.cache_mirrors.iter().any(|existing| existing == url) {
-        return Err(anyhow!("Cache mirror '{url}' already exists."));
+/// Returns an error if the mirror already exists or the configuration cannot be
+/// written.
+pub fn add_cache_mirror(url: &str,) -> Result<(),> {
+    let mut config = read_config_from_path(&get_user_config_path()?,)?;
+    if config.cache_mirrors.iter().any(|existing| existing == url,) {
+        return Err(anyhow!("Cache mirror '{url}' already exists."),);
     }
-    config.cache_mirrors.push(url.to_string());
-    write_user_config(&config)
+    config.cache_mirrors.push(url.to_string(),);
+    write_user_config(&config,)
 }
 
 /// Removes a cache mirror URL from the user-specific configuration.
 ///
 /// # Errors
 ///
-/// Returns an error if the mirror is not found or the configuration cannot be written.
-pub fn remove_cache_mirror(url: &str) -> Result<()> {
-    let mut config = read_config_from_path(&get_user_config_path()?)?;
-    if let Some(pos) = config
+/// Returns an error if the mirror is not found or the configuration cannot be
+/// written.
+pub fn remove_cache_mirror(url: &str,) -> Result<(),> {
+    let mut config = read_config_from_path(&get_user_config_path()?,)?;
+    if let Some(pos,) = config
         .cache_mirrors
         .iter()
-        .position(|existing| existing == url)
+        .position(|existing| existing == url,)
     {
-        config.cache_mirrors.remove(pos);
-        write_user_config(&config)
+        config.cache_mirrors.remove(pos,);
+        write_user_config(&config,)
     } else {
-        Err(anyhow!("Cache mirror '{url}' not found."))
+        Err(anyhow!("Cache mirror '{url}' not found."),)
     }
 }
 
@@ -725,15 +772,15 @@ pub fn remove_cache_mirror(url: &str) -> Result<()> {
 /// # Errors
 ///
 /// Returns an error if the configuration cannot be written.
-pub fn set_default_registry(url: &str) -> Result<()> {
-    let mut config = read_config_from_path(&get_user_config_path()?)?;
+pub fn set_default_registry(url: &str,) -> Result<(),> {
+    let mut config = read_config_from_path(&get_user_config_path()?,)?;
     config.default_registry = Some(Registry {
         handle: String::new(),
         url: url.to_string(),
         advisory_prefix: None,
         authorities: None,
-    });
-    write_user_config(&config)
+    },);
+    write_user_config(&config,)
 }
 
 /// Sets the default registry in the user-specific configuration.
@@ -741,56 +788,61 @@ pub fn set_default_registry(url: &str) -> Result<()> {
 /// # Errors
 ///
 /// Returns an error if the configuration cannot be written.
-pub fn set_user_default_registry(default_registry: Option<Registry>) -> Result<()> {
-    let mut config = read_config_from_path(&get_user_config_path()?)?;
+pub fn set_user_default_registry(
+    default_registry: Option<Registry,>,
+) -> Result<(),> {
+    let mut config = read_config_from_path(&get_user_config_path()?,)?;
     config.default_registry = default_registry;
-    write_user_config(&config)
+    write_user_config(&config,)
 }
 
-/// Adds a registry URL to the list of added registries in the user-specific configuration.
+/// Adds a registry URL to the list of added registries in the user-specific
+/// configuration.
 ///
 /// # Errors
 ///
-/// Returns an error if the registry already exists or the configuration cannot be written.
-pub fn add_added_registry(url: &str) -> Result<()> {
-    let mut config = read_config_from_path(&get_user_config_path()?)?;
-    if config.added_registries.iter().any(|r| r.url == url) {
-        return Err(anyhow!("Registry with URL '{url}' already exists."));
+/// Returns an error if the registry already exists or the configuration cannot
+/// be written.
+pub fn add_added_registry(url: &str,) -> Result<(),> {
+    let mut config = read_config_from_path(&get_user_config_path()?,)?;
+    if config.added_registries.iter().any(|r| r.url == url,) {
+        return Err(anyhow!("Registry with URL '{url}' already exists."),);
     }
     config.added_registries.push(Registry {
         handle: String::new(),
         url: url.to_string(),
         advisory_prefix: None,
         authorities: None,
-    });
-    write_user_config(&config)
+    },);
+    write_user_config(&config,)
 }
 
 /// Removes an added registry by its handle or URL.
 ///
 /// # Errors
 ///
-/// Returns an error if the registry is not found or the configuration cannot be updated.
-pub fn remove_added_registry(handle_or_url: &str) -> Result<()> {
-    let mut config = read_config_from_path(&get_user_config_path()?)?;
-    if let Some(pos) = config
+/// Returns an error if the registry is not found or the configuration cannot be
+/// updated.
+pub fn remove_added_registry(handle_or_url: &str,) -> Result<(),> {
+    let mut config = read_config_from_path(&get_user_config_path()?,)?;
+    if let Some(pos,) = config
         .added_registries
         .iter()
-        .position(|r| r.handle == handle_or_url || r.url == handle_or_url)
+        .position(|r| r.handle == handle_or_url || r.url == handle_or_url,)
     {
-        let removed_registry = config.added_registries.remove(pos);
+        let removed_registry = config.added_registries.remove(pos,);
         if !removed_registry.handle.is_empty() {
             let db_root = get_db_root()?;
-            let repo_path = db_root.join(removed_registry.handle);
+            let repo_path = db_root.join(removed_registry.handle,);
             if repo_path.exists() {
-                fs::remove_dir_all(repo_path)?;
+                fs::remove_dir_all(repo_path,)?;
             }
         }
-        write_user_config(&config)
+        write_user_config(&config,)
     } else {
         Err(anyhow!(
             "Added registry with handle or URL '{handle_or_url}' not found."
-        ))
+        ),)
     }
 }
 
@@ -799,16 +851,16 @@ pub fn remove_added_registry(handle_or_url: &str) -> Result<()> {
 /// # Errors
 ///
 /// Returns an error if `repo.yaml` is not found or cannot be parsed.
-pub fn read_repo_config(db_path: &Path) -> Result<RepoConfig> {
-    let config_path = db_path.join("repo.yaml");
+pub fn read_repo_config(db_path: &Path,) -> Result<RepoConfig,> {
+    let config_path = db_path.join("repo.yaml",);
     if !config_path.exists() {
         return Err(anyhow!(
             "repo.yaml not found in the root of the package database."
-        ));
+        ),);
     }
-    let content = fs::read_to_string(config_path)?;
-    let config: RepoConfig = serde_yaml::from_str(&content)?;
-    Ok(config)
+    let content = fs::read_to_string(config_path,)?;
+    let config: RepoConfig = serde_yaml::from_str(&content,)?;
+    Ok(config,)
 }
 
 /// Reads the user-specific configuration.
@@ -816,8 +868,8 @@ pub fn read_repo_config(db_path: &Path) -> Result<RepoConfig> {
 /// # Errors
 ///
 /// Returns an error if the configuration cannot be read or parsed.
-pub fn read_user_config() -> Result<Config> {
-    read_config_from_path(&get_user_config_path()?)
+pub fn read_user_config() -> Result<Config,> {
+    read_config_from_path(&get_user_config_path()?,)
 }
 
 /// Updates the global package versions in the user-specific configuration.
@@ -825,18 +877,20 @@ pub fn read_user_config() -> Result<Config> {
 /// # Errors
 ///
 /// Returns an error if the configuration cannot be read or written.
-pub fn update_global_versions<S: ::std::hash::BuildHasher>(
-    versions: HashMap<String, String, S>,
-) -> Result<()> {
+pub fn update_global_versions<S: ::std::hash::BuildHasher,>(
+    versions: HashMap<String, String, S,>,
+) -> Result<(),> {
     let mut config = read_user_config()?;
-    config.versions.extend(versions);
-    write_user_config(&config)
+    config.versions.extend(versions,);
+    write_user_config(&config,)
 }
 
-/// Synchronizes the remote security policy if configured in system `config.yaml`.
+/// Synchronizes the remote security policy if configured in system
+/// `config.yaml`.
 ///
-/// This allows organizations to manage security constraints (allowed/denied lists)
-/// centrally. It verifies the policy's PGP signature before caching it locally.
+/// This allows organizations to manage security constraints (allowed/denied
+/// lists) centrally. It verifies the policy's PGP signature before caching it
+/// locally.
 ///
 /// # Errors
 ///
@@ -845,31 +899,33 @@ pub fn update_global_versions<S: ::std::hash::BuildHasher>(
 /// - The system is in offline mode and a sync is required.
 /// - The remote policy or its signature cannot be downloaded.
 /// - The signature verification fails.
-pub fn sync_remote_policy() -> Result<()> {
+pub fn sync_remote_policy() -> Result<(),> {
     let config = read_config()?;
-    let Some(remote_cfg) = &config.remote_policy else {
-        return Ok(());
+    let Some(remote_cfg,) = &config.remote_policy else {
+        return Ok((),);
     };
 
     println!("{} Syncing remote security policy...", "::".bold().blue());
 
     if crate::offline::is_offline() {
-        return Err(anyhow!("Cannot sync remote policy in offline mode."));
+        return Err(anyhow!("Cannot sync remote policy in offline mode."),);
     }
 
     let client = crate::utils::get_http_client()?;
 
-    let policy_content = client.get(&remote_cfg.url).send()?.text()?;
-    let sig_content = client.get(&remote_cfg.signature_url).send()?.bytes()?;
+    let policy_content = client.get(&remote_cfg.url,).send()?.text()?;
+    let sig_content = client.get(&remote_cfg.signature_url,).send()?.bytes()?;
 
-    let trusted_certs = crate::pgp::get_certs_by_name_or_fingerprint(&remote_cfg.trusted_keys)?;
+    let trusted_certs = crate::pgp::get_certs_by_name_or_fingerprint(
+        &remote_cfg.trusted_keys,
+    )?;
 
-    let temp_dir = tempfile::Builder::new().prefix("zoi-policy-").tempdir()?;
-    let temp_policy_path = temp_dir.path().join("policy.yaml");
-    let temp_sig_path = temp_dir.path().join("policy.yaml.sig");
+    let temp_dir = tempfile::Builder::new().prefix("zoi-policy-",).tempdir()?;
+    let temp_policy_path = temp_dir.path().join("policy.yaml",);
+    let temp_sig_path = temp_dir.path().join("policy.yaml.sig",);
 
-    fs::write(&temp_policy_path, &policy_content)?;
-    fs::write(&temp_sig_path, &sig_content)?;
+    fs::write(&temp_policy_path, &policy_content,)?;
+    fs::write(&temp_sig_path, &sig_content,)?;
 
     crate::pgp::verify_detached_signature_multi_key(
         &temp_policy_path,
@@ -878,24 +934,27 @@ pub fn sync_remote_policy() -> Result<()> {
     )?;
 
     let cache_path = get_remote_policy_cache_path();
-    if let Some(parent) = cache_path.parent() {
-        fs::create_dir_all(parent)?;
+    if let Some(parent,) = cache_path.parent() {
+        fs::create_dir_all(parent,)?;
     }
-    fs::write(cache_path, policy_content)?;
+    fs::write(cache_path, policy_content,)?;
 
     println!(
         "{}",
         "Remote policy verified and cached successfully.".green()
     );
-    Ok(())
+    Ok((),)
 }
 
 /// Merges a remote security policy into the local machine policy.
 ///
-/// Precedence: If a field is already unoverridable in the base (machine) policy,
-/// it remains so. Otherwise, the remote policy's unoverridable flags and lists
-/// are added/merged into the local state.
-fn merge_policies(base: &mut crate::types::Policy, remote: &crate::types::Policy) {
+/// Precedence: If a field is already unoverridable in the base (machine)
+/// policy, it remains so. Otherwise, the remote policy's unoverridable flags
+/// and lists are added/merged into the local state.
+fn merge_policies(
+    base: &mut crate::types::Policy,
+    remote: &crate::types::Policy,
+) {
     if remote.repos_unoverridable {
         base.repos_unoverridable = true;
     }
@@ -945,49 +1004,49 @@ fn merge_policies(base: &mut crate::types::Policy, remote: &crate::types::Policy
         base.advisory_enforcement_unoverridable = true;
     }
 
-    if let Some(allowed) = &remote.allowed_licenses {
+    if let Some(allowed,) = &remote.allowed_licenses {
         base.allowed_licenses
-            .get_or_insert_with(Vec::new)
-            .extend(allowed.clone());
+            .get_or_insert_with(Vec::new,)
+            .extend(allowed.clone(),);
     }
-    if let Some(denied) = &remote.denied_licenses {
+    if let Some(denied,) = &remote.denied_licenses {
         base.denied_licenses
-            .get_or_insert_with(Vec::new)
-            .extend(denied.clone());
+            .get_or_insert_with(Vec::new,)
+            .extend(denied.clone(),);
     }
-    if let Some(allowed) = &remote.allowed_packages {
+    if let Some(allowed,) = &remote.allowed_packages {
         base.allowed_packages
-            .get_or_insert_with(Vec::new)
-            .extend(allowed.clone());
+            .get_or_insert_with(Vec::new,)
+            .extend(allowed.clone(),);
     }
-    if let Some(denied) = &remote.denied_packages {
+    if let Some(denied,) = &remote.denied_packages {
         base.denied_packages
-            .get_or_insert_with(Vec::new)
-            .extend(denied.clone());
+            .get_or_insert_with(Vec::new,)
+            .extend(denied.clone(),);
     }
-    if let Some(allowed) = &remote.allowed_repos {
+    if let Some(allowed,) = &remote.allowed_repos {
         base.allowed_repos
-            .get_or_insert_with(Vec::new)
-            .extend(allowed.clone());
+            .get_or_insert_with(Vec::new,)
+            .extend(allowed.clone(),);
     }
-    if let Some(denied) = &remote.denied_repos {
+    if let Some(denied,) = &remote.denied_repos {
         base.denied_repos
-            .get_or_insert_with(Vec::new)
-            .extend(denied.clone());
+            .get_or_insert_with(Vec::new,)
+            .extend(denied.clone(),);
     }
 
-    if let Some(remote_sig) = &remote.signature_enforcement {
-        if let Some(ref mut base_sig) = base.signature_enforcement {
+    if let Some(remote_sig,) = &remote.signature_enforcement {
+        if let Some(ref mut base_sig,) = base.signature_enforcement {
             if remote_sig.enable {
                 base_sig.enable = true;
             }
             base_sig
                 .trusted_keys
-                .extend(remote_sig.trusted_keys.clone());
+                .extend(remote_sig.trusted_keys.clone(),);
             base_sig.trusted_keys.sort();
             base_sig.trusted_keys.dedup();
         } else {
-            base.signature_enforcement = Some(remote_sig.clone());
+            base.signature_enforcement = Some(remote_sig.clone(),);
         }
     }
 }

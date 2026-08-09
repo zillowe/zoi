@@ -6,10 +6,10 @@
 
 use anyhow::{Result, anyhow};
 use colored::Colorize;
-use dialoguer::{Select, theme::ColorfulTheme};
+use dialoguer::Select;
+use dialoguer::theme::ColorfulTheme;
 pub use zoi_core::dependency::Dependency;
-use zoi_core::types;
-use zoi_core::utils;
+use zoi_core::{types, utils};
 
 include!(concat!(env!("OUT_DIR"), "/generated_managers.rs"));
 
@@ -20,15 +20,16 @@ include!(concat!(env!("OUT_DIR"), "/generated_managers.rs"));
 ///
 /// # Errors
 ///
-/// Returns an error if the dependency string is malformed or uses an unsupported manager.
-pub fn parse_dependency_string(dep_str: &str) -> Result<Dependency<'_>> {
+/// Returns an error if the dependency string is malformed or uses an
+/// unsupported manager.
+pub fn parse_dependency_string(dep_str: &str,) -> Result<Dependency<'_,>,> {
     zoi_core::dependency::parse_dependency_string(dep_str, |m| {
-        m == "zoi" || m == "native" || MANAGERS.contains_key(m)
-    })
+        m == "zoi" || m == "native" || MANAGERS.contains_key(m,)
+    },)
 }
 
 /// A callback function type for uninstalling a Zoi package by its name.
-type ZoiUninstaller = dyn Fn(&str) -> Result<()>;
+type ZoiUninstaller = dyn Fn(&str,) -> Result<(),>;
 
 /// Attempts to remove a dependency using its responsible package manager.
 ///
@@ -41,8 +42,11 @@ type ZoiUninstaller = dyn Fn(&str) -> Result<()>;
 /// - The dependency string cannot be parsed.
 /// - The package manager is not supported for uninstallation.
 /// - The uninstallation command fails to execute.
-pub fn uninstall_dependency(dep_str: &str, zoi_uninstaller: &ZoiUninstaller) -> Result<()> {
-    let dep = parse_dependency_string(dep_str)?;
+pub fn uninstall_dependency(
+    dep_str: &str,
+    zoi_uninstaller: &ZoiUninstaller,
+) -> Result<(),> {
+    let dep = parse_dependency_string(dep_str,)?;
     println!(
         "-> Attempting to uninstall dependency: {} via {}",
         dep.package.cyan(),
@@ -50,18 +54,21 @@ pub fn uninstall_dependency(dep_str: &str, zoi_uninstaller: &ZoiUninstaller) -> 
     );
 
     if dep.manager == "zoi" {
-        return zoi_uninstaller(dep.package);
+        return zoi_uninstaller(dep.package,);
     }
 
-    if let Some(pm_commands) = MANAGERS.get(dep.manager) {
-        let mut uninstall_cmd = pm_commands.uninstall.replace("{package}", dep.package);
+    if let Some(pm_commands,) = MANAGERS.get(dep.manager,) {
+        let mut uninstall_cmd =
+            pm_commands.uninstall.replace("{package}", dep.package,);
 
         if pm_commands.sudo_uninstall && !utils::is_admin() {
-            if let Some(escalator) = utils::get_privilege_escalator() {
+            if let Some(escalator,) = utils::get_privilege_escalator() {
                 uninstall_cmd = format!("{escalator} {uninstall_cmd}");
             } else {
                 eprintln!(
-                    "{}: root privileges are required for '{}' but neither 'sudo' nor 'doas' was found. Attempting to run without escalation...",
+                    "{}: root privileges are required for '{}' but neither \
+                     'sudo' nor 'doas' was found. Attempting to run without \
+                     escalation...",
                     "Warning".yellow(),
                     dep.manager
                 );
@@ -69,84 +76,94 @@ pub fn uninstall_dependency(dep_str: &str, zoi_uninstaller: &ZoiUninstaller) -> 
         }
 
         println!("Running uninstall command: {}", uninstall_cmd.italic());
-        utils::run_shell_command(&uninstall_cmd)
+        utils::run_shell_command(&uninstall_cmd,)
     } else {
         Err(anyhow!(
             "Unknown or unsupported package manager for uninstall: {}",
             dep.manager
-        ))
+        ),)
     }
 }
 
-/// Recursively collects all dependencies for a package, including sub-package specific ones.
+/// Recursively collects all dependencies for a package, including sub-package
+/// specific ones.
 ///
 /// This function handles the complex logic of:
 /// - Required Dependencies: Automatically added to the list.
-/// - Optional Dependencies: Prompts the user (unless `--all-optional` or `--yes` is used).
+/// - Optional Dependencies: Prompts the user (unless `--all-optional` or
+///   `--yes` is used).
 /// - Selectable Options: Prompts the user to choose between multiple providers.
-/// - Recursive Sub-packages: Follows `sub_packages` maps to pull in component-specific requirements.
+/// - Recursive Sub-packages: Follows `sub_packages` maps to pull in
+///   component-specific requirements.
 ///
 /// # Errors
 ///
-/// Returns an error if any of the underlying dependency collection or prompting operations fail.
+/// Returns an error if any of the underlying dependency collection or prompting
+/// operations fail.
 pub fn collect_dependencies_for_group(
     group: &types::DependencyGroup,
-    sub_package_name: Option<&str>,
-    dep_type: Option<&str>,
+    sub_package_name: Option<&str,>,
+    dep_type: Option<&str,>,
     yes: bool,
     all_optional: bool,
-) -> Result<(Vec<String>, Vec<String>, Vec<String>)> {
+) -> Result<(Vec<String,>, Vec<String,>, Vec<String,>,),> {
     let mut deps = Vec::new();
     let mut chosen_options = Vec::new();
     let mut chosen_optionals = Vec::new();
 
     match group {
-        types::DependencyGroup::Simple(d) => {
-            deps.extend(d.clone());
+        types::DependencyGroup::Simple(d,) => {
+            deps.extend(d.clone(),);
         }
-        types::DependencyGroup::Complex(g) => {
-            deps.extend(g.required.clone());
+        types::DependencyGroup::Complex(g,) => {
+            deps.extend(g.required.clone(),);
 
-            let options = prompt_for_options(&g.options, yes)?;
-            chosen_options.extend(options.clone());
-            deps.extend(options);
+            let options = prompt_for_options(&g.options, yes,)?;
+            chosen_options.extend(options.clone(),);
+            deps.extend(options,);
 
-            let optionals = prompt_for_optionals(&g.optional, dep_type, yes, all_optional)?;
-            chosen_optionals.extend(optionals.clone());
-            deps.extend(optionals);
+            let optionals = prompt_for_optionals(
+                &g.optional,
+                dep_type,
+                yes,
+                all_optional,
+            )?;
+            chosen_optionals.extend(optionals.clone(),);
+            deps.extend(optionals,);
 
-            if let Some(sub_name) = sub_package_name
-                && let Some(sub_deps_map) = &g.sub_packages
-                && let Some(sub_dep_group) = sub_deps_map.get(sub_name)
+            if let Some(sub_name,) = sub_package_name
+                && let Some(sub_deps_map,) = &g.sub_packages
+                && let Some(sub_dep_group,) = sub_deps_map.get(sub_name,)
             {
-                let (sub_d, sub_co, sub_coo) = collect_dependencies_for_group(
+                let (sub_d, sub_co, sub_coo,) = collect_dependencies_for_group(
                     sub_dep_group,
                     None,
                     dep_type,
                     yes,
                     all_optional,
                 )?;
-                deps.extend(sub_d);
-                chosen_options.extend(sub_co);
-                chosen_optionals.extend(sub_coo);
+                deps.extend(sub_d,);
+                chosen_options.extend(sub_co,);
+                chosen_optionals.extend(sub_coo,);
             }
         }
     }
-    Ok((deps, chosen_options, chosen_optionals))
+    Ok((deps, chosen_options, chosen_optionals,),)
 }
 
 /// Presents interactive choices for selectable dependency groups.
 ///
 /// # Errors
 ///
-/// Returns an error if user interaction via the terminal fails or if a dependency string is invalid.
+/// Returns an error if user interaction via the terminal fails or if a
+/// dependency string is invalid.
 pub fn prompt_for_options(
     option_groups: &[types::DependencyOptionGroup],
     yes: bool,
-) -> Result<Vec<String>> {
+) -> Result<Vec<String,>,> {
     let mut chosen = Vec::new();
     if option_groups.is_empty() {
-        return Ok(chosen);
+        return Ok(chosen,);
     }
 
     for group in option_groups {
@@ -157,30 +174,33 @@ pub fn prompt_for_options(
             group.desc.italic()
         );
 
-        let parsed_deps: Vec<_> = group
+        let parsed_deps: Vec<_,> = group
             .depends
             .iter()
-            .map(|d| parse_dependency_string(d))
-            .collect::<Result<_>>()?;
+            .map(|d| parse_dependency_string(d,),)
+            .collect::<Result<_,>>()?;
 
         if yes {
             if group.all {
-                println!("--yes provided, selecting all options for '{}'", group.name);
-                chosen.extend(group.depends.clone());
+                println!(
+                    "--yes provided, selecting all options for '{}'",
+                    group.name
+                );
+                chosen.extend(group.depends.clone(),);
             } else {
                 println!(
                     "--yes provided, selecting first option for '{}'",
                     group.name
                 );
-                if let Some(dep) = group.depends.first() {
-                    chosen.push(dep.clone());
+                if let Some(dep,) = group.depends.first() {
+                    chosen.push(dep.clone(),);
                 }
             }
             continue;
         }
 
         if group.all {
-            let items: Vec<_> = parsed_deps
+            let items: Vec<_,> = parsed_deps
                 .iter()
                 .map(|d| {
                     format!(
@@ -189,20 +209,24 @@ pub fn prompt_for_options(
                         d.package,
                         d.description.unwrap_or("No description")
                     )
-                })
+                },)
                 .collect();
-            let selections = dialoguer::MultiSelect::with_theme(&ColorfulTheme::default())
-                .with_prompt("Choose which to install (space to select, enter to confirm)")
-                .items(&items)
-                .interact()?;
+            let selections =
+                dialoguer::MultiSelect::with_theme(&ColorfulTheme::default(),)
+                    .with_prompt(
+                        "Choose which to install (space to select, enter to \
+                         confirm)",
+                    )
+                    .items(&items,)
+                    .interact()?;
 
             for i in selections {
-                if let Some(dep) = group.depends.get(i) {
-                    chosen.push(dep.clone());
+                if let Some(dep,) = group.depends.get(i,) {
+                    chosen.push(dep.clone(),);
                 }
             }
         } else {
-            let items: Vec<_> = parsed_deps
+            let items: Vec<_,> = parsed_deps
                 .iter()
                 .map(|d| {
                     format!(
@@ -211,37 +235,38 @@ pub fn prompt_for_options(
                         d.package,
                         d.description.unwrap_or("No description")
                     )
-                })
+                },)
                 .collect();
-            let selection = Select::with_theme(&ColorfulTheme::default())
-                .with_prompt("Choose one to install")
-                .items(&items)
-                .default(0)
+            let selection = Select::with_theme(&ColorfulTheme::default(),)
+                .with_prompt("Choose one to install",)
+                .items(&items,)
+                .default(0,)
                 .interact()?;
-            if let Some(dep) = group.depends.get(selection) {
-                chosen.push(dep.clone());
+            if let Some(dep,) = group.depends.get(selection,) {
+                chosen.push(dep.clone(),);
             }
         }
     }
-    Ok(chosen)
+    Ok(chosen,)
 }
 
 /// Prompts the user to install optional dependencies.
 ///
 /// # Errors
 ///
-/// Returns an error if user interaction via the terminal fails or if a dependency string is invalid.
+/// Returns an error if user interaction via the terminal fails or if a
+/// dependency string is invalid.
 pub fn prompt_for_optionals(
     deps: &[String],
-    dep_type: Option<&str>,
+    dep_type: Option<&str,>,
     yes: bool,
     all_optional: bool,
-) -> Result<Vec<String>> {
+) -> Result<Vec<String,>,> {
     if deps.is_empty() {
-        return Ok(Vec::new());
+        return Ok(Vec::new(),);
     }
 
-    let type_str = dep_type.map(|s| format!("{s} ")).unwrap_or_default();
+    let type_str = dep_type.map(|s| format!("{s} "),).unwrap_or_default();
 
     if all_optional {
         println!(
@@ -249,45 +274,47 @@ pub fn prompt_for_optionals(
             "::".bold().blue(),
             type_str
         );
-        return Ok(deps.to_vec());
+        return Ok(deps.to_vec(),);
     }
 
     if yes {
         println!(
-            "{} Skipping optional {}dependencies (--yes provided without --all-optional).",
+            "{} Skipping optional {}dependencies (--yes provided without \
+             --all-optional).",
             "::".bold().yellow(),
             type_str
         );
-        return Ok(Vec::new());
+        return Ok(Vec::new(),);
     }
 
-    let items: Vec<_> = deps
+    let items: Vec<_,> = deps
         .iter()
         .map(|d| {
-            parse_dependency_string(d).map(|dep| {
+            parse_dependency_string(d,).map(|dep| {
                 format!(
                     "{}:{} - {}",
                     dep.manager,
                     dep.package,
                     dep.description.unwrap_or("No description")
                 )
-            })
-        })
-        .collect::<Result<_>>()?;
+            },)
+        },)
+        .collect::<Result<_,>>()?;
 
-    let selections = dialoguer::MultiSelect::with_theme(&ColorfulTheme::default())
-        .with_prompt(format!(
-            "Select optional {type_str}dependencies to install"
-        ))
-        .items(&items)
-        .defaults(&vec![false; deps.len()])
-        .interact()?;
+    let selections =
+        dialoguer::MultiSelect::with_theme(&ColorfulTheme::default(),)
+            .with_prompt(format!(
+                "Select optional {type_str}dependencies to install"
+            ),)
+            .items(&items,)
+            .defaults(&vec![false; deps.len()],)
+            .interact()?;
 
     let mut chosen = Vec::new();
     for i in selections {
-        if let Some(dep) = deps.get(i) {
-            chosen.push(dep.clone());
+        if let Some(dep,) = deps.get(i,) {
+            chosen.push(dep.clone(),);
         }
     }
-    Ok(chosen)
+    Ok(chosen,)
 }

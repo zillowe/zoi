@@ -1,24 +1,26 @@
 //! Registry management and metadata generation.
 //!
-//! This module provides functions for initializing registries, adding packages and
-//! security advisories, and generating the optimized JSON index files used by Zoi.
+//! This module provides functions for initializing registries, adding packages
+//! and security advisories, and generating the optimized JSON index files used
+//! by Zoi.
 
-use crate::doctor as pkg_doctor;
-use crate::init_lsp;
-use anyhow::{Result, anyhow};
-use chrono::Datelike;
-use colored::Colorize;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+
+use anyhow::{Result, anyhow};
+use chrono::Datelike;
+use colored::Colorize;
 use walkdir::WalkDir;
 use zoi_core::types;
 use zoi_lua;
 
+use crate::{doctor as pkg_doctor, init_lsp};
+
 /// Initializes a new Zoi registry at the given path.
 ///
-/// This creates the necessary directory structure, `repo.yaml`, `packages.json`,
-/// and `advisories.json`, and sets up LSP support.
+/// This creates the necessary directory structure, `repo.yaml`,
+/// `packages.json`, and `advisories.json`, and sets up LSP support.
 ///
 /// # Errors
 ///
@@ -26,30 +28,30 @@ use zoi_lua;
 /// - The registry directory or its subdirectories cannot be created.
 /// - LSP workspace setup fails.
 /// - Any of the initial configuration files cannot be written.
-pub fn init(path: &Path) -> Result<()> {
+pub fn init(path: &Path,) -> Result<(),> {
     println!(
         "{} Initializing new Zoi registry at {}...",
         "::".bold().blue(),
         path.display()
     );
 
-    fs::create_dir_all(path)?;
+    fs::create_dir_all(path,)?;
 
-    let dirs = ["core", "main", "community", "test", "archive"];
+    let dirs = ["core", "main", "community", "test", "archive",];
     for dir in &dirs {
-        let dir_path = path.join(dir);
+        let dir_path = path.join(dir,);
         if !dir_path.exists() {
-            fs::create_dir_all(&dir_path)?;
+            fs::create_dir_all(&dir_path,)?;
         }
     }
 
-    init_lsp::setup_lsp_workspace(path)?;
+    init_lsp::setup_lsp_workspace(path,)?;
     println!(
         "{} LSP support initialized. Created .luarc.json and type definitions.",
         "::".bold().green()
     );
 
-    let repo_yaml_path = path.join("repo.yaml");
+    let repo_yaml_path = path.join("repo.yaml",);
     if !repo_yaml_path.exists() {
         let content = r#"# Zoi Registry Configuration
 # For detailed documentation, visit: https://zillowe.qzz.io/docs/zds/zoi/repositories#the-repoyaml-file
@@ -93,19 +95,19 @@ repos:
     type: archive
     active: false
 "#;
-        fs::write(repo_yaml_path, content)?;
+        fs::write(repo_yaml_path, content,)?;
     }
 
-    let packages_json_path = path.join("packages.json");
+    let packages_json_path = path.join("packages.json",);
     if !packages_json_path.exists() {
         let content = r#"{
   "version": "2",
   "packages": {}
 }"#;
-        fs::write(packages_json_path, content)?;
+        fs::write(packages_json_path, content,)?;
     }
 
-    let advisories_json_path = path.join("advisories.json");
+    let advisories_json_path = path.join("advisories.json",);
     if !advisories_json_path.exists() {
         let current_year = chrono::Utc::now().year();
         let content = format!(
@@ -116,15 +118,16 @@ repos:
   "year": {current_year}
 }}"#,
         );
-        fs::write(advisories_json_path, content)?;
+        fs::write(advisories_json_path, content,)?;
     }
 
     println!("{}", "Registry initialized successfully.".green());
     println!(
-        "{} Edit 'repo.yaml' to configure your registry mirrors and authorities.",
+        "{} Edit 'repo.yaml' to configure your registry mirrors and \
+         authorities.",
         "Note:".yellow()
     );
-    Ok(())
+    Ok((),)
 }
 
 /// Adds a new package definition to the registry.
@@ -139,45 +142,49 @@ repos:
 /// - Package name or repository tier are not provided.
 /// - The package directory cannot be created.
 /// - The package already exists.
-pub fn add_package(registry_root: &Path, name: Option<&str>, repo: Option<&str>) -> Result<()> {
+pub fn add_package(
+    registry_root: &Path,
+    name: Option<&str,>,
+    repo: Option<&str,>,
+) -> Result<(),> {
     use std::io::{Write, stdin, stdout};
 
-    if !registry_root.join("repo.yaml").exists() {
+    if !registry_root.join("repo.yaml",).exists() {
         return Err(anyhow!(
             "Not a Zoi registry (missing repo.yaml). Run 'zoi reg init' first."
-        ));
+        ),);
     }
 
     let get_input = |prompt: &str| -> String {
         print!("{prompt}: ");
         let _ = stdout().flush();
         let mut input = String::new();
-        let _ = stdin().read_line(&mut input);
+        let _ = stdin().read_line(&mut input,);
         input.trim().to_string()
     };
 
     let name = match name {
-        Some(n) => n.to_string(),
-        None => get_input("Package name"),
+        Some(n,) => n.to_string(),
+        None => get_input("Package name",),
     };
 
     let repo = match repo {
-        Some(r) => r.to_string(),
-        None => get_input("Repository tier (e.g. community, main)"),
+        Some(r,) => r.to_string(),
+        None => get_input("Repository tier (e.g. community, main)",),
     };
 
     if name.is_empty() || repo.is_empty() {
-        return Err(anyhow!("Package name and repository tier are required."));
+        return Err(anyhow!("Package name and repository tier are required."),);
     }
 
-    let pkg_dir = registry_root.join(&repo).join(&name);
-    fs::create_dir_all(&pkg_dir)?;
+    let pkg_dir = registry_root.join(&repo,).join(&name,);
+    fs::create_dir_all(&pkg_dir,)?;
 
-    let pkg_lua_path = pkg_dir.join(format!("{name}.pkg.lua"));
+    let pkg_lua_path = pkg_dir.join(format!("{name}.pkg.lua"),);
     if pkg_lua_path.exists() {
         return Err(anyhow!(
             "Package '{name}' already exists in repo '{repo}'.",
-        ));
+        ),);
     }
 
     let content = format!(
@@ -234,7 +241,7 @@ end
 "#,
     );
 
-    fs::write(pkg_lua_path, content)?;
+    fs::write(pkg_lua_path, content,)?;
     println!(
         "{} Package '{}' created in repo '{}'.",
         "::".bold().green(),
@@ -242,7 +249,7 @@ end
         repo.cyan()
     );
 
-    Ok(())
+    Ok((),)
 }
 
 /// Adds a new security advisory to the registry.
@@ -258,77 +265,81 @@ end
 /// - A temporary advisory already exists.
 pub fn add_advisory(
     registry_root: &Path,
-    package_name: Option<&str>,
-    repo: Option<&str>,
-) -> Result<()> {
+    package_name: Option<&str,>,
+    repo: Option<&str,>,
+) -> Result<(),> {
     use std::io::{Write, stdin, stdout};
 
-    if !registry_root.join("repo.yaml").exists() {
+    if !registry_root.join("repo.yaml",).exists() {
         return Err(anyhow!(
             "Not a Zoi registry (missing repo.yaml). Run 'zoi reg init' first."
-        ));
+        ),);
     }
 
     let get_input = |prompt: &str| -> String {
         print!("{prompt}: ");
         let _ = stdout().flush();
         let mut input = String::new();
-        let _ = stdin().read_line(&mut input);
+        let _ = stdin().read_line(&mut input,);
         input.trim().to_string()
     };
 
     let package_name = match package_name {
-        Some(n) => n.to_string(),
-        None => get_input("Package name"),
+        Some(n,) => n.to_string(),
+        None => get_input("Package name",),
     };
 
     let package_name_str = package_name.as_str();
 
-    let pkg_dir = if let Some(r) = repo {
-        let dir = registry_root.join(r).join(package_name_str);
-        if !dir.join(format!("{package_name_str}.pkg.lua")).exists() {
+    let pkg_dir = if let Some(r,) = repo {
+        let dir = registry_root.join(r,).join(package_name_str,);
+        if !dir.join(format!("{package_name_str}.pkg.lua"),).exists() {
             return Err(anyhow!(
                 "Package '{package_name_str}' not found in repo '{r}'.",
-            ));
+            ),);
         }
         dir
     } else {
         let mut found = None;
-        for entry in WalkDir::new(registry_root)
+        for entry in WalkDir::new(registry_root,)
             .into_iter()
-            .filter_map(Result::ok)
+            .filter_map(Result::ok,)
         {
             if entry.file_type().is_dir()
                 && entry.file_name().to_string_lossy() == package_name_str
                 && entry
                     .path()
-                    .join(format!("{package_name_str}.pkg.lua"))
+                    .join(format!("{package_name_str}.pkg.lua"),)
                     .exists()
             {
-                found = Some(entry.path().to_path_buf());
+                found = Some(entry.path().to_path_buf(),);
                 break;
             }
         }
         found.ok_or_else(|| {
             anyhow!(
-                "Package '{package_name_str}' not found in registry. Try specifying --repo.",
+                "Package '{package_name_str}' not found in registry. Try \
+                 specifying --repo.",
             )
-        })?
+        },)?
     };
 
-    let repo_config_str = fs::read_to_string(registry_root.join("repo.yaml"))?;
-    let repo_config: types::RepoConfig = serde_yaml::from_str(&repo_config_str)?;
+    let repo_config_str =
+        fs::read_to_string(registry_root.join("repo.yaml",),)?;
+    let repo_config: types::RepoConfig =
+        serde_yaml::from_str(&repo_config_str,)?;
     let prefix = repo_config
         .advisory_prefix
-        .unwrap_or_else(|| "ZSA".to_string());
+        .unwrap_or_else(|| "ZSA".to_string(),);
 
     let current_year = chrono::Utc::now().year();
-    let adv_file_path = pkg_dir.join(format!("{prefix}-{current_year}-TEMP.sec.yaml"));
+    let adv_file_path =
+        pkg_dir.join(format!("{prefix}-{current_year}-TEMP.sec.yaml"),);
 
     if adv_file_path.exists() {
         return Err(anyhow!(
             "A temporary advisory already exists for this package."
-        ));
+        ),);
     }
 
     println!(
@@ -340,12 +351,13 @@ pub fn add_advisory(
         "For detailed documentation, visit: https://zillowe.qzz.io/docs/zds/zoi/guides/security-advisories\n"
     );
 
-    let summary = get_input("Summary (short description)");
-    let severity = get_input("Severity (low, medium, high, critical)");
-    let affected_range = get_input("Affected version range (e.g. >=1.0.0, <1.2.3)");
-    let fixed_in = get_input("Fixed in version");
-    let description = get_input("Detailed description");
-    let reference = get_input("Reference URL (optional)");
+    let summary = get_input("Summary (short description)",);
+    let severity = get_input("Severity (low, medium, high, critical)",);
+    let affected_range =
+        get_input("Affected version range (e.g. >=1.0.0, <1.2.3)",);
+    let fixed_in = get_input("Fixed in version",);
+    let description = get_input("Detailed description",);
+    let reference = get_input("Reference URL (optional)",);
 
     let content = format!(
         r#"# Zoi Security Advisory
@@ -364,18 +376,19 @@ references:
 "#,
     );
 
-    fs::write(&adv_file_path, content)?;
+    fs::write(&adv_file_path, content,)?;
     println!(
         "\n{} Temporary advisory created: {}",
         "::".bold().green(),
         adv_file_path.display().to_string().cyan()
     );
     println!(
-        "{} ID will be automatically assigned during 'zoi reg gen-meta' or in CI.",
+        "{} ID will be automatically assigned during 'zoi reg gen-meta' or in \
+         CI.",
         "Note:".yellow()
     );
 
-    Ok(())
+    Ok((),)
 }
 
 /// Scans the entire registry to generate optimized JSON index files.
@@ -393,49 +406,53 @@ references:
 /// - The path is not a Zoi registry.
 /// - The registry index files cannot be written.
 /// - Any package or advisory definition is malformed.
-pub fn generate_metadata(registry_root: &Path) -> Result<()> {
-    if !registry_root.join("repo.yaml").exists() {
+pub fn generate_metadata(registry_root: &Path,) -> Result<(),> {
+    if !registry_root.join("repo.yaml",).exists() {
         return Err(anyhow!(
             "Not a Zoi registry (missing repo.yaml). Run 'zoi reg init' first."
-        ));
+        ),);
     }
 
     println!("{} Generating registry metadata...", "::".bold().blue());
 
-    let repo_config_str = fs::read_to_string(registry_root.join("repo.yaml"))?;
-    let repo_config: types::RepoConfig = serde_yaml::from_str(&repo_config_str)?;
+    let repo_config_str =
+        fs::read_to_string(registry_root.join("repo.yaml",),)?;
+    let repo_config: types::RepoConfig =
+        serde_yaml::from_str(&repo_config_str,)?;
     let advisory_prefix = repo_config
         .advisory_prefix
         .clone()
-        .unwrap_or_else(|| "ZSA".to_string());
+        .unwrap_or_else(|| "ZSA".to_string(),);
 
-    let advisories_json_path = registry_root.join("advisories.json");
-    let mut adv_registry: types::AdvisoryRegistry = if advisories_json_path.exists() {
-        serde_json::from_str(&fs::read_to_string(&advisories_json_path)?)?
-    } else {
-        types::AdvisoryRegistry::default()
-    };
+    let advisories_json_path = registry_root.join("advisories.json",);
+    let mut adv_registry: types::AdvisoryRegistry =
+        if advisories_json_path.exists() {
+            serde_json::from_str(&fs::read_to_string(&advisories_json_path,)?,)?
+        } else {
+            types::AdvisoryRegistry::default()
+        };
 
     let current_year = chrono::Utc::now().year();
-    let current_year_u32 = u32::try_from(current_year).unwrap_or(0);
+    let current_year_u32 = u32::try_from(current_year,).unwrap_or(0,);
     if adv_registry.year != current_year_u32 {
         adv_registry.year = current_year_u32;
         adv_registry.last_id = 0;
     }
 
-    for entry in WalkDir::new(registry_root)
+    for entry in WalkDir::new(registry_root,)
         .into_iter()
-        .filter_map(Result::ok)
+        .filter_map(Result::ok,)
     {
         let file_name = entry.file_name().to_string_lossy();
-        if file_name.ends_with("-TEMP.sec.yaml") {
+        if file_name.ends_with("-TEMP.sec.yaml",) {
             let path = entry.path();
-            let content_str = fs::read_to_string(path)?;
-            let mut content: serde_yaml::Value = serde_yaml::from_str(&content_str)?;
+            let content_str = fs::read_to_string(path,)?;
+            let mut content: serde_yaml::Value =
+                serde_yaml::from_str(&content_str,)?;
             let severity = content
-                .get("severity")
-                .and_then(|v| v.as_str())
-                .unwrap_or("low")
+                .get("severity",)
+                .and_then(|v| v.as_str(),)
+                .unwrap_or("low",)
                 .to_lowercase();
             let sev_char = match severity.as_str() {
                 "medium" => "B",
@@ -450,16 +467,17 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
                 adv_registry.last_id
             );
 
-            if let Some(mapping) = content.as_mapping_mut() {
+            if let Some(mapping,) = content.as_mapping_mut() {
                 mapping.insert(
-                    serde_yaml::Value::String("id".to_string()),
-                    serde_yaml::Value::String(final_id.clone()),
+                    serde_yaml::Value::String("id".to_string(),),
+                    serde_yaml::Value::String(final_id.clone(),),
                 );
             }
 
-            let final_path = path.with_file_name(format!("{final_id}.sec.yaml"));
-            fs::write(&final_path, serde_yaml::to_string(&content)?)?;
-            fs::remove_file(path)?;
+            let final_path =
+                path.with_file_name(format!("{final_id}.sec.yaml"),);
+            fs::write(&final_path, serde_yaml::to_string(&content,)?,)?;
+            fs::remove_file(path,)?;
             println!("Assigned ID {} to {}", final_id.green(), path.display());
         }
     }
@@ -467,27 +485,31 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
     let mut advisories_map = std::collections::BTreeMap::new();
     let mut max_id = adv_registry.last_id;
 
-    for entry in WalkDir::new(registry_root)
+    for entry in WalkDir::new(registry_root,)
         .into_iter()
-        .filter_map(Result::ok)
+        .filter_map(Result::ok,)
     {
         let file_name = entry.file_name().to_string_lossy();
-        if file_name.ends_with(".sec.yaml") && !file_name.ends_with("-TEMP.sec.yaml") {
-            let content_str = fs::read_to_string(entry.path())?;
-            let content: types::Advisory = serde_yaml::from_str(&content_str)?;
-            if let Some(last_part) = content.id.split('-').next_back() {
+        if file_name.ends_with(".sec.yaml",)
+            && !file_name.ends_with("-TEMP.sec.yaml",)
+        {
+            let content_str = fs::read_to_string(entry.path(),)?;
+            let content: types::Advisory = serde_yaml::from_str(&content_str,)?;
+            if let Some(last_part,) = content.id.split('-',).next_back() {
                 let id_num_str = if last_part.len() > 4 {
                     &last_part[1..]
                 } else {
                     last_part
                 };
-                if let Ok(id_num) = id_num_str.parse::<u32>() {
+                if let Ok(id_num,) = id_num_str.parse::<u32>() {
                     if id_num > max_id {
                         max_id = id_num;
                     }
-                    let rel_path = entry.path().strip_prefix(registry_root)?;
-                    advisories_map
-                        .insert(content.id.clone(), rel_path.to_string_lossy().to_string());
+                    let rel_path = entry.path().strip_prefix(registry_root,)?;
+                    advisories_map.insert(
+                        content.id.clone(),
+                        rel_path.to_string_lossy().to_string(),
+                    );
                 }
             }
         }
@@ -498,85 +520,100 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
     adv_registry.version = "2".to_string();
     fs::write(
         &advisories_json_path,
-        serde_json::to_string_pretty(&adv_registry)?,
+        serde_json::to_string_pretty(&adv_registry,)?,
     )?;
 
     let mut packages_map = std::collections::BTreeMap::new();
-    let repo_types: HashMap<String, String> = repo_config
+    let repo_types: HashMap<String, String,> = repo_config
         .repos
         .iter()
-        .map(|r| (r.name.clone(), r.repo_type.clone()))
+        .map(|r| (r.name.clone(), r.repo_type.clone(),),)
         .collect();
 
-    for entry in WalkDir::new(registry_root)
+    for entry in WalkDir::new(registry_root,)
         .into_iter()
-        .filter_map(Result::ok)
+        .filter_map(Result::ok,)
     {
-        if entry.file_type().is_file() && entry.file_name().to_string_lossy().ends_with(".pkg.lua")
+        if entry.file_type().is_file()
+            && entry.file_name().to_string_lossy().ends_with(".pkg.lua",)
         {
             let path = entry.path();
             let path_str = path.to_string_lossy();
-            if let Ok(pkg) = zoi_lua::parser::parse_lua_package(&path_str, None, None, true) {
-                let rel_path = path.strip_prefix(registry_root)?;
-                let mut repo_parts: Vec<_> = rel_path
+            if let Ok(pkg,) =
+                zoi_lua::parser::parse_lua_package(&path_str, None, None, true,)
+            {
+                let rel_path = path.strip_prefix(registry_root,)?;
+                let mut repo_parts: Vec<_,> = rel_path
                     .components()
-                    .map(|c| c.as_os_str().to_string_lossy().to_string())
+                    .map(|c| c.as_os_str().to_string_lossy().to_string(),)
                     .collect();
                 repo_parts.pop();
                 repo_parts.pop();
-                let repo_path = repo_parts.join("/");
+                let repo_path = repo_parts.join("/",);
 
-                let major_repo = repo_path.split('/').next().unwrap_or_default();
+                let major_repo =
+                    repo_path.split('/',).next().unwrap_or_default();
                 let repo_type = repo_types
-                    .get(major_repo)
+                    .get(major_repo,)
                     .cloned()
-                    .unwrap_or_else(|| "unofficial".to_string());
+                    .unwrap_or_else(|| "unofficial".to_string(),);
 
                 let version = pkg
                     .version
                     .clone()
-                    .or_else(|| pkg.versions.as_ref().and_then(|v| v.get("stable").cloned()))
-                    .unwrap_or_else(|| "unknown".to_string());
+                    .or_else(|| {
+                        pkg.versions
+                            .as_ref()
+                            .and_then(|v| v.get("stable",).cloned(),)
+                    },)
+                    .unwrap_or_else(|| "unknown".to_string(),);
 
                 let mut vulns = Vec::new();
-                let pkg_dir = path
-                    .parent()
-                    .ok_or_else(|| anyhow!("Package path has no parent directory"))?;
-                if let Ok(sec_entries) = fs::read_dir(pkg_dir) {
+                let pkg_dir = path.parent().ok_or_else(|| {
+                    anyhow!("Package path has no parent directory")
+                },)?;
+                if let Ok(sec_entries,) = fs::read_dir(pkg_dir,) {
                     for sec_entry in sec_entries.flatten() {
                         if sec_entry
                             .file_name()
                             .to_string_lossy()
-                            .ends_with(".sec.yaml")
+                            .ends_with(".sec.yaml",)
                         {
-                            let sec_content_str = fs::read_to_string(sec_entry.path())?;
-                            if let Ok(adv) =
-                                serde_yaml::from_str::<types::Advisory>(&sec_content_str)
+                            let sec_content_str =
+                                fs::read_to_string(sec_entry.path(),)?;
+                            if let Ok(adv,) =
+                                serde_yaml::from_str::<types::Advisory,>(
+                                    &sec_content_str,
+                                )
                             {
-                                vulns.push(zoi_core::types::MiniVulnerability {
-                                    id: adv.id,
-                                    severity: format!("{:?}", adv.severity).to_lowercase(),
-                                    affected_range: adv.affected_range,
-                                    fixed_in: adv.fixed_in,
-                                    summary: adv.summary,
-                                });
+                                vulns.push(
+                                    zoi_core::types::MiniVulnerability {
+                                        id: adv.id,
+                                        severity: format!("{:?}", adv.severity)
+                                            .to_lowercase(),
+                                        affected_range: adv.affected_range,
+                                        fixed_in: adv.fixed_in,
+                                        summary: adv.summary,
+                                    },
+                                );
                             }
                         }
                     }
                 }
 
-                let packages_key = format!("@{repo_path}/{name}", name = pkg.name);
+                let packages_key =
+                    format!("@{repo_path}/{name}", name = pkg.name);
 
                 let dependencies_v2 = pkg.dependencies.map(|deps| {
                     let mut runtime = Vec::new();
-                    if let Some(r) = deps.runtime {
+                    if let Some(r,) = deps.runtime {
                         runtime = match r {
-                            types::DependencyGroup::Simple(d) => d,
-                            types::DependencyGroup::Complex(c) => {
+                            types::DependencyGroup::Simple(d,) => d,
+                            types::DependencyGroup::Complex(c,) => {
                                 let mut all = c.required;
-                                all.extend(c.optional);
+                                all.extend(c.optional,);
                                 for opt in c.options {
-                                    all.extend(opt.depends);
+                                    all.extend(opt.depends,);
                                 }
                                 all
                             }
@@ -584,16 +621,16 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
                     }
 
                     let mut build = Vec::new();
-                    if let Some(b) = deps.build {
+                    if let Some(b,) = deps.build {
                         match b {
-                            types::BuildDependencies::Group(g) => {
+                            types::BuildDependencies::Group(g,) => {
                                 let packages = match g {
-                                    types::DependencyGroup::Simple(d) => d,
-                                    types::DependencyGroup::Complex(c) => {
+                                    types::DependencyGroup::Simple(d,) => d,
+                                    types::DependencyGroup::Complex(c,) => {
                                         let mut all = c.required;
-                                        all.extend(c.optional);
+                                        all.extend(c.optional,);
                                         for opt in c.options {
-                                            all.extend(opt.depends);
+                                            all.extend(opt.depends,);
                                         }
                                         all
                                     }
@@ -601,17 +638,17 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
                                 build.push(types::BuildDependencyV2 {
                                     build_type: "source".to_string(),
                                     packages,
-                                });
+                                },);
                             }
-                            types::BuildDependencies::Typed(t) => {
-                                for (bt, g) in t.types {
+                            types::BuildDependencies::Typed(t,) => {
+                                for (bt, g,) in t.types {
                                     let packages = match g {
-                                        types::DependencyGroup::Simple(d) => d,
-                                        types::DependencyGroup::Complex(c) => {
+                                        types::DependencyGroup::Simple(d,) => d,
+                                        types::DependencyGroup::Complex(c,) => {
                                             let mut all = c.required;
-                                            all.extend(c.optional);
+                                            all.extend(c.optional,);
                                             for opt in c.options {
-                                                all.extend(opt.depends);
+                                                all.extend(opt.depends,);
                                             }
                                             all
                                         }
@@ -619,21 +656,21 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
                                     build.push(types::BuildDependencyV2 {
                                         build_type: bt,
                                         packages,
-                                    });
+                                    },);
                                 }
                             }
                         }
                     }
 
                     let mut test = Vec::new();
-                    if let Some(t) = deps.test {
+                    if let Some(t,) = deps.test {
                         test = match t {
-                            types::DependencyGroup::Simple(d) => d,
-                            types::DependencyGroup::Complex(c) => {
+                            types::DependencyGroup::Simple(d,) => d,
+                            types::DependencyGroup::Complex(c,) => {
                                 let mut all = c.required;
-                                all.extend(c.optional);
+                                all.extend(c.optional,);
                                 for opt in c.options {
-                                    all.extend(opt.depends);
+                                    all.extend(opt.depends,);
                                 }
                                 all
                             }
@@ -645,7 +682,7 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
                         build,
                         test,
                     }
-                });
+                },);
 
                 packages_map.insert(
                     packages_key,
@@ -656,7 +693,7 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
                         epoch: pkg.epoch,
                         revision: pkg.revision.clone(),
                         description: pkg.description,
-                        scope: Some(pkg.scope),
+                        scope: Some(pkg.scope,),
                         scopes: pkg.scopes.clone(),
                         dependencies: dependencies_v2,
                         sub_packages: pkg.sub_packages.unwrap_or_default(),
@@ -673,13 +710,13 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
         packages: packages_map,
     };
     fs::write(
-        registry_root.join("packages.json"),
-        serde_json::to_string_pretty(&index)?,
+        registry_root.join("packages.json",),
+        serde_json::to_string_pretty(&index,)?,
     )?;
 
     println!("{}", "Metadata generation complete.".green());
 
-    Ok(())
+    Ok((),)
 }
 
 /// Checks the integrity of all package definitions in the registry.
@@ -689,11 +726,11 @@ pub fn generate_metadata(registry_root: &Path) -> Result<()> {
 /// # Errors
 ///
 /// Returns an error if any package fails the health check.
-pub fn check(registry_root: &Path) -> Result<()> {
-    if !registry_root.join("repo.yaml").exists() {
+pub fn check(registry_root: &Path,) -> Result<(),> {
+    if !registry_root.join("repo.yaml",).exists() {
         return Err(anyhow!(
             "Not a Zoi registry (missing repo.yaml). Run 'zoi reg init' first."
-        ));
+        ),);
     }
 
     println!("{} Checking registry integrity...", "::".bold().blue());
@@ -701,28 +738,32 @@ pub fn check(registry_root: &Path) -> Result<()> {
     let mut errors = 0;
     let mut warnings = 0;
 
-    for entry in WalkDir::new(registry_root)
+    for entry in WalkDir::new(registry_root,)
         .into_iter()
-        .filter_map(Result::ok)
+        .filter_map(Result::ok,)
     {
-        if entry.file_type().is_file() && entry.file_name().to_string_lossy().ends_with(".pkg.lua")
+        if entry.file_type().is_file()
+            && entry.file_name().to_string_lossy().ends_with(".pkg.lua",)
         {
             println!(
                 "  Checking {}...",
                 entry.path().display().to_string().cyan()
             );
-            match pkg_doctor::run(entry.path(), None, None) {
-                Ok(report) => {
+            match pkg_doctor::run(entry.path(), None, None,) {
+                Ok(report,) => {
                     for error in &report.errors {
                         eprintln!("    {} {error}", "Error:".red().bold());
                         errors += 1;
                     }
                     for warning in &report.warnings {
-                        println!("    {} {warning}", "Warning:".yellow().bold());
+                        println!(
+                            "    {} {warning}",
+                            "Warning:".yellow().bold()
+                        );
                         warnings += 1;
                     }
                 }
-                Err(e) => {
+                Err(e,) => {
                     eprintln!(
                         "    {} Failed to parse package: {e}",
                         "Error:".red().bold(),
@@ -735,8 +776,9 @@ pub fn check(registry_root: &Path) -> Result<()> {
 
     if errors > 0 {
         return Err(anyhow!(
-            "Registry check failed with {errors} error(s) and {warnings} warning(s).",
-        ));
+            "Registry check failed with {errors} error(s) and {warnings} \
+             warning(s).",
+        ),);
     }
 
     println!(
@@ -744,5 +786,5 @@ pub fn check(registry_root: &Path) -> Result<()> {
         "::".bold().green(),
         warnings
     );
-    Ok(())
+    Ok((),)
 }

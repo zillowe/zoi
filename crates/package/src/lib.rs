@@ -1,8 +1,8 @@
 //! Zoi package management, building, and registry operations.
 //!
-//! This crate provides the core logic for creating, building, and managing Zoi packages
-//! and registries. It handles the lifecycle of a package from its `.pkg.lua` definition
-//! to a distributable `.zpa` or `.zsa` archive.
+//! This crate provides the core logic for creating, building, and managing Zoi
+//! packages and registries. It handles the lifecycle of a package from its
+//! `.pkg.lua` definition to a distributable `.zpa` or `.zsa` archive.
 
 /// Package build orchestration.
 pub mod build;

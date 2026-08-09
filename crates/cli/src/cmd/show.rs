@@ -1,15 +1,17 @@
 //! Logic for the `show` command.
 
-use crate::pkg::{local, resolve, types};
-use crate::utils;
-use anyhow::{Result, anyhow};
-use colored::Colorize;
 use std::fmt::Write;
 use std::fs;
 
+use anyhow::{Result, anyhow};
+use colored::Colorize;
+
+use crate::pkg::{local, resolve, types};
+use crate::utils;
+
 /// Prints a dependency group with the specified indentation.
-fn print_dependency_group(group: &types::DependencyGroup, indent: usize) {
-    let prefix = " ".repeat(indent * 2);
+fn print_dependency_group(group: &types::DependencyGroup, indent: usize,) {
+    let prefix = " ".repeat(indent * 2,);
     let mut count = 0;
 
     let required = group.required();
@@ -45,12 +47,12 @@ fn print_dependency_group(group: &types::DependencyGroup, indent: usize) {
         }
     }
 
-    if let types::DependencyGroup::Complex(complex) = group
-        && let Some(subs) = &complex.sub_packages
+    if let types::DependencyGroup::Complex(complex,) = group
+        && let Some(subs,) = &complex.sub_packages
     {
-        for (sub_name, sub_group) in subs {
+        for (sub_name, sub_group,) in subs {
             println!("{}{}:", prefix, sub_name.bold().cyan());
-            print_dependency_group(sub_group, indent + 1);
+            print_dependency_group(sub_group, indent + 1,);
             count += 1;
         }
     }
@@ -62,8 +64,9 @@ fn print_dependency_group(group: &types::DependencyGroup, indent: usize) {
 
 /// Displays detailed information about a package.
 ///
-/// This command fetches and parses the package definition (possibly from a PURL),
-/// and prints metadata such as description, version, dependencies, and installation status.
+/// This command fetches and parses the package definition (possibly from a
+/// PURL), and prints metadata such as description, version, dependencies, and
+/// installation status.
 ///
 /// # Errors
 ///
@@ -71,7 +74,7 @@ fn print_dependency_group(group: &types::DependencyGroup, indent: usize) {
 /// - PURL fetching fails.
 /// - The package source cannot be resolved.
 /// - The package definition cannot be parsed.
-pub fn run(source: &str, raw: bool, purl: bool) -> Result<()> {
+pub fn run(source: &str, raw: bool, purl: bool,) -> Result<(),> {
     let mut source_str = source.trim().to_string();
     if purl {
         println!(
@@ -79,15 +82,16 @@ pub fn run(source: &str, raw: bool, purl: bool) -> Result<()> {
             "::".bold().blue(),
             source_str
         );
-        source_str = crate::pkg::purl::fetch_and_store_purl_package(&source_str)?;
+        source_str =
+            crate::pkg::purl::fetch_and_store_purl_package(&source_str,)?;
     }
     let source = source_str.as_str();
-    let resolved_source = resolve::resolve_source(source, None, false, false)?;
+    let resolved_source = resolve::resolve_source(source, None, false, false,)?;
 
     if raw {
-        let content = fs::read_to_string(&resolved_source.path)?;
+        let content = fs::read_to_string(&resolved_source.path,)?;
         println!("{content}");
-        return Ok(());
+        return Ok((),);
     }
     let mut pkg: types::Package = crate::pkg::lua::parser::parse_lua_package(
         resolved_source.path.to_str().ok_or_else(|| {
@@ -95,63 +99,71 @@ pub fn run(source: &str, raw: bool, purl: bool) -> Result<()> {
                 "Path contains invalid UTF-8 characters: {}",
                 resolved_source.path.display()
             )
-        })?,
+        },)?,
         None,
         None,
         false,
     )?;
-    if let Some(repo_name) = resolved_source.repo_name {
+    if let Some(repo_name,) = resolved_source.repo_name {
         pkg.repo = repo_name;
     }
     pkg.version = Some(
-        resolve::get_default_version(&pkg, resolved_source.registry_handle.as_deref())
-            .unwrap_or_else(|_| "N/A".to_string()),
+        resolve::get_default_version(
+            &pkg,
+            resolved_source.registry_handle.as_deref(),
+        )
+        .unwrap_or_else(|_| "N/A".to_string(),),
     );
 
-    let request = resolve::parse_source_string(source)?;
-    let installed_manifest = match find_installed_manifest(&request) {
-        Ok(manifest) => manifest,
-        Err(e) => {
+    let request = resolve::parse_source_string(source,)?;
+    let installed_manifest = match find_installed_manifest(&request,) {
+        Ok(manifest,) => manifest,
+        Err(e,) => {
             eprintln!("Warning: could not check installation status: {e}");
             None
         }
     };
 
-    print_beautiful(&pkg, installed_manifest.as_ref());
-    Ok(())
+    print_beautiful(&pkg, installed_manifest.as_ref(),);
+    Ok((),)
 }
 
 /// Finds the installed manifest for a package request.
 fn find_installed_manifest(
     request: &crate::pkg::resolve::PackageRequest,
-) -> Result<Option<types::InstallManifest>> {
+) -> Result<Option<types::InstallManifest,>,> {
     let mut candidates = Vec::new();
     for scope in [
         types::Scope::User,
         types::Scope::System,
         types::Scope::Project,
     ] {
-        candidates.extend(local::find_installed_manifests_matching(request, scope)?);
+        candidates
+            .extend(local::find_installed_manifests_matching(request, scope)?);
     }
 
     if candidates.is_empty() {
-        return Ok(None);
+        return Ok(None,);
     }
 
-    let package_name = if let Some(sub) = &request.sub_package {
+    let package_name = if let Some(sub,) = &request.sub_package {
         format!("{}:{}", request.name, sub)
     } else {
         request.name.clone()
     };
     Ok(Some(
-        crate::cmd::installed_select::choose_installed_manifest(&package_name, &candidates, false)?,
-    ))
+        crate::cmd::installed_select::choose_installed_manifest(
+            &package_name,
+            &candidates,
+            false,
+        )?,
+    ),)
 }
 
 /// Prints the package information in a beautiful format.
 fn print_beautiful(
     pkg: &crate::pkg::types::Package,
-    installed_manifest: Option<&types::InstallManifest>,
+    installed_manifest: Option<&types::InstallManifest,>,
 ) {
     let mut version_display = if pkg.epoch > 0 {
         format!("{}:", pkg.epoch)
@@ -159,13 +171,13 @@ fn print_beautiful(
         String::new()
     };
 
-    version_display.push_str(pkg.version.as_deref().unwrap_or("N/A"));
+    version_display.push_str(pkg.version.as_deref().unwrap_or("N/A",),);
 
     if pkg.revision != "1" {
         version_display = format!("{}-{}", version_display, pkg.revision);
     }
 
-    let repo_display = if pkg.repo.starts_with("git/") {
+    let repo_display = if pkg.repo.starts_with("git/",) {
         format!("#git@{}", &pkg.repo[4..])
     } else {
         pkg.repo.clone()
@@ -177,7 +189,7 @@ fn print_beautiful(
         version_display.dimmed(),
         repo_display
     );
-    if let Some(website) = &pkg.website {
+    if let Some(website,) = &pkg.website {
         println!("Website: {}", website.cyan().underline());
     }
     if !pkg.git.is_empty() {
@@ -185,15 +197,19 @@ fn print_beautiful(
     }
     println!("{}", pkg.description);
 
-    if let Some(subs) = &pkg.sub_packages {
+    if let Some(subs,) = &pkg.sub_packages {
         println!("{}: {}", "Sub-packages".bold(), subs.join(", "));
-        if let Some(main_subs) = &pkg.main_subs {
-            println!("{}: {}", "Main sub-packages".bold(), main_subs.join(", "));
+        if let Some(main_subs,) = &pkg.main_subs {
+            println!(
+                "{}: {}",
+                "Main sub-packages".bold(),
+                main_subs.join(", ")
+            );
         }
     }
 
-    if let Some(manifest) = installed_manifest {
-        let status_text = if let Some(sub) = &manifest.sub_package {
+    if let Some(manifest,) = installed_manifest {
+        let status_text = if let Some(sub,) = &manifest.sub_package {
             format!("Installed ({sub})")
         } else {
             "Installed".to_string()
@@ -217,7 +233,7 @@ fn print_beautiful(
 
     if !pkg.license.is_empty() {
         println!("{}: {}", "License".bold(), pkg.license);
-        utils::check_license(&pkg.license);
+        utils::check_license(&pkg.license,);
     }
 
     let mut maintainer_line = format!(
@@ -226,17 +242,17 @@ fn print_beautiful(
         pkg.maintainer.name,
         pkg.maintainer.email
     );
-    if let Some(website) = &pkg.maintainer.website {
+    if let Some(website,) = &pkg.maintainer.website {
         let _ = write!(maintainer_line, " - {}", website.cyan().underline());
     }
     println!("{maintainer_line}");
 
-    if let Some(author) = &pkg.author {
+    if let Some(author,) = &pkg.author {
         let mut author_line = format!("{}: {}", "Author".bold(), author.name);
-        if let Some(email) = &author.email {
+        if let Some(email,) = &author.email {
             let _ = write!(author_line, " <{email}>");
         }
-        if let Some(website) = &author.website {
+        if let Some(website,) = &author.website {
             let _ = write!(author_line, " - {}", website.cyan().underline());
         }
         println!("{author_line}");
@@ -261,13 +277,13 @@ fn print_beautiful(
         println!("{}: {}", "Tags".bold(), pkg.tags.join(", "));
     }
 
-    if let Some(bins) = &pkg.bins
+    if let Some(bins,) = &pkg.bins
         && !bins.is_empty()
     {
         println!("{}: {}", "Provides".bold(), bins.join(", ").green());
     }
 
-    if let Some(conflicts) = &pkg.conflicts
+    if let Some(conflicts,) = &pkg.conflicts
         && !conflicts.is_empty()
     {
         println!("{}: {}", "Conflicts".bold(), conflicts.join(", ").red());
@@ -277,7 +293,7 @@ fn print_beautiful(
         println!("{}: {}", "Available types".bold(), pkg.types.join(", "));
     }
 
-    if let Some(service) = &pkg.service {
+    if let Some(service,) = &pkg.service {
         println!("\n{}:", "Service".bold());
         println!("  Run: {}", service.run.cyan());
         println!(
@@ -290,32 +306,32 @@ fn print_beautiful(
         );
     }
 
-    if let Some(deps) = &pkg.dependencies {
+    if let Some(deps,) = &pkg.dependencies {
         println!("\n{}:", "Dependencies".bold());
 
-        if let Some(runtime) = &deps.runtime {
+        if let Some(runtime,) = &deps.runtime {
             println!("  Runtime:");
-            print_dependency_group(runtime, 2);
+            print_dependency_group(runtime, 2,);
         }
 
-        if let Some(build_deps) = &deps.build {
+        if let Some(build_deps,) = &deps.build {
             println!("  Build Dependencies:");
             match build_deps {
-                types::BuildDependencies::Group(group) => {
-                    print_dependency_group(group, 2);
+                types::BuildDependencies::Group(group,) => {
+                    print_dependency_group(group, 2,);
                 }
-                types::BuildDependencies::Typed(typed_build_deps) => {
-                    for (name, group) in &typed_build_deps.types {
+                types::BuildDependencies::Typed(typed_build_deps,) => {
+                    for (name, group,) in &typed_build_deps.types {
                         println!("    {}:", name.cyan());
-                        print_dependency_group(group, 3);
+                        print_dependency_group(group, 3,);
                     }
                 }
             }
         }
 
-        if let Some(test_deps) = &deps.test {
+        if let Some(test_deps,) = &deps.test {
             println!("  Test Dependencies:");
-            print_dependency_group(test_deps, 2);
+            print_dependency_group(test_deps, 2,);
         }
     }
 }

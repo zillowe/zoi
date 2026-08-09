@@ -5,46 +5,49 @@
 //! build environment, and for building packages for different Linux
 //! distributions from a single host.
 
-use anyhow::{Result, anyhow};
-use colored::Colorize;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+use anyhow::{Result, anyhow};
+use colored::Colorize;
 use zoi_core::utils;
 
 /// Runs the package build process inside a Docker container.
 /// # Errors
 ///
-/// Returns an error if the Docker image cannot be built or the container fails to run.
+/// Returns an error if the Docker image cannot be built or the container fails
+/// to run.
 pub fn run(
     package_file: &Path,
-    build_type: Option<&str>,
+    build_type: Option<&str,>,
     platforms: &[String],
-    sign_key: Option<String>,
-    output_dir: Option<&Path>,
-    version_override: Option<&str>,
-    sub_packages: Option<Vec<String>>,
+    sign_key: Option<String,>,
+    output_dir: Option<&Path,>,
+    version_override: Option<&str,>,
+    sub_packages: Option<Vec<String,>,>,
     image: &str,
     fakeroot: bool,
     install_deps: bool,
     test: bool,
-) -> Result<()> {
+) -> Result<(),> {
     println!("{} Building package using Docker...", "::".bold().blue());
     println!("Image: {}", image.cyan());
 
-    if !utils::command_exists("docker") {
+    if !utils::command_exists("docker",) {
         return Err(anyhow!(
-            "Docker is not installed or not in PATH. Please install Docker to use this method."
-        ));
+            "Docker is not installed or not in PATH. Please install Docker to \
+             use this method."
+        ),);
     }
 
     let abs_package_file = package_file.canonicalize()?;
-    let package_dir = abs_package_file
-        .parent()
-        .ok_or_else(|| anyhow!("Could not get parent directory of package file"))?;
+    let package_dir = abs_package_file.parent().ok_or_else(|| {
+        anyhow!("Could not get parent directory of package file")
+    },)?;
 
-    let abs_output_dir = if let Some(dir) = output_dir {
+    let abs_output_dir = if let Some(dir,) = output_dir {
         if !dir.exists() {
-            std::fs::create_dir_all(dir)?;
+            std::fs::create_dir_all(dir,)?;
         }
         dir.canonicalize()?
     } else {
@@ -65,41 +68,50 @@ pub fn run(
         container_workdir.to_string(),
     ];
 
-    if let Ok(user_id) = Command::new("id").arg("-u").output() {
-        let uid = String::from_utf8_lossy(&user_id.stdout).trim().to_string();
-        if let Ok(group_id) = Command::new("id").arg("-g").output() {
-            let gid = String::from_utf8_lossy(&group_id.stdout).trim().to_string();
-            docker_args.push("--user".to_string());
-            docker_args.push(format!("{uid}:{gid}"));
+    if let Ok(user_id,) = Command::new("id",).arg("-u",).output() {
+        let uid = String::from_utf8_lossy(&user_id.stdout,).trim().to_string();
+        if let Ok(group_id,) = Command::new("id",).arg("-g",).output() {
+            let gid = String::from_utf8_lossy(&group_id.stdout,)
+                .trim()
+                .to_string();
+            docker_args.push("--user".to_string(),);
+            docker_args.push(format!("{uid}:{gid}"),);
         }
     }
 
     if sign_key.is_some() {
-        let host_gpg_home = std::env::var("GNUPGHOME").map_or_else(|_| {
-            utils::get_user_home()
-                .map(|h| h.join(".gnupg"))
-                .unwrap_or_default()
-        }, PathBuf::from);
+        let host_gpg_home = std::env::var("GNUPGHOME",).map_or_else(
+            |_| {
+                utils::get_user_home()
+                    .map(|h| h.join(".gnupg",),)
+                    .unwrap_or_default()
+            },
+            PathBuf::from,
+        );
 
         if host_gpg_home.exists() {
             let container_gpg_home = "/gpg_home";
-            docker_args.push("-v".to_string());
-            docker_args.push(format!("{}:{}", host_gpg_home.display(), container_gpg_home));
-            docker_args.push("-e".to_string());
-            docker_args.push(format!("GNUPGHOME={container_gpg_home}"));
+            docker_args.push("-v".to_string(),);
+            docker_args.push(format!(
+                "{}:{}",
+                host_gpg_home.display(),
+                container_gpg_home
+            ),);
+            docker_args.push("-e".to_string(),);
+            docker_args.push(format!("GNUPGHOME={container_gpg_home}"),);
         }
     }
 
-    if let Ok(password) = std::env::var("GPG_PASSWORD") {
-        docker_args.push("-e".to_string());
-        docker_args.push(format!("GPG_PASSWORD={password}"));
+    if let Ok(password,) = std::env::var("GPG_PASSWORD",) {
+        docker_args.push("-e".to_string(),);
+        docker_args.push(format!("GPG_PASSWORD={password}"),);
     }
 
-    docker_args.push(image.to_string());
+    docker_args.push(image.to_string(),);
 
     let package_filename = abs_package_file
         .file_name()
-        .ok_or_else(|| anyhow!("Invalid package file name"))?
+        .ok_or_else(|| anyhow!("Invalid package file name"),)?
         .to_string_lossy();
 
     let mut inner_cmd = format!(
@@ -119,7 +131,7 @@ pub fn run(
          zoi package build {package_filename} --output-dir {container_output_dir}",
     );
 
-    if let Some(bt) = build_type {
+    if let Some(bt,) = build_type {
         use std::fmt::Write;
         let _ = write!(inner_cmd, " --type {bt}");
     }
@@ -129,17 +141,17 @@ pub fn run(
         let _ = write!(inner_cmd, " --platform {p}");
     }
 
-    if let Some(sk) = sign_key {
+    if let Some(sk,) = sign_key {
         use std::fmt::Write;
         let _ = write!(inner_cmd, " --sign {sk}");
     }
 
-    if let Some(v) = version_override {
+    if let Some(v,) = version_override {
         use std::fmt::Write;
         let _ = write!(inner_cmd, " --version-override {v}");
     }
 
-    if let Some(subs) = sub_packages {
+    if let Some(subs,) = sub_packages {
         for s in subs {
             use std::fmt::Write;
             let _ = write!(inner_cmd, " --sub {s}");
@@ -147,32 +159,32 @@ pub fn run(
     }
 
     if fakeroot {
-        inner_cmd.push_str(" --fakeroot");
+        inner_cmd.push_str(" --fakeroot",);
     }
 
     if install_deps {
-        inner_cmd.push_str(" --install-deps");
+        inner_cmd.push_str(" --install-deps",);
     }
 
     if test {
-        inner_cmd.push_str(" --test");
+        inner_cmd.push_str(" --test",);
     }
 
-    docker_args.push("bash".to_string());
-    docker_args.push("-c".to_string());
-    docker_args.push(inner_cmd);
+    docker_args.push("bash".to_string(),);
+    docker_args.push("-c".to_string(),);
+    docker_args.push(inner_cmd,);
 
     println!("Running docker command: {}", "docker".cyan());
-    let status = Command::new("docker").args(&docker_args).status()?;
+    let status = Command::new("docker",).args(&docker_args,).status()?;
 
     if !status.success() {
         return Err(anyhow!(
             "Docker build failed with exit code {:?}",
             status.code()
-        ));
+        ),);
     }
 
     println!("{}", "Docker build successful!".green());
 
-    Ok(())
+    Ok((),)
 }

@@ -1,40 +1,41 @@
 //! Integration tests for Linux-specific sandboxing.
 
 #![cfg(target_os = "linux")]
-use anyhow::Result;
 use std::path::Path;
+
+use anyhow::Result;
 use zoi::pkg::types::SandboxConfig;
 
 fn bwrap_exists() -> bool {
-    std::process::Command::new("bwrap")
-        .arg("--version")
+    std::process::Command::new("bwrap",)
+        .arg("--version",)
         .output()
         .is_ok()
 }
 
 #[test]
-fn test_sandbox_disabled() -> Result<()> {
+fn test_sandbox_disabled() -> Result<(),> {
     let config = SandboxConfig {
         enabled: false,
         ..Default::default()
     };
 
     let cmd = zoi::pkg::sandbox::wrap_command(
-        Path::new("echo"),
-        &["hello".to_string()],
+        Path::new("echo",),
+        &["hello".to_string(),],
         &config,
-        Path::new("/tmp"),
+        Path::new("/tmp",),
     )?;
 
     assert_eq!(cmd.get_program(), "echo");
-    Ok(())
+    Ok((),)
 }
 
 #[test]
-fn test_sandbox_network_isolation() -> Result<()> {
+fn test_sandbox_network_isolation() -> Result<(),> {
     if !bwrap_exists() {
         println!("Skipping test: bwrap not installed");
-        return Ok(());
+        return Ok((),);
     }
 
     let config = SandboxConfig {
@@ -45,23 +46,23 @@ fn test_sandbox_network_isolation() -> Result<()> {
     };
 
     let mut cmd = zoi::pkg::sandbox::wrap_command(
-        Path::new("/bin/ping"),
-        &["-c".to_string(), "1".to_string(), "1.1.1.1".to_string()],
+        Path::new("/bin/ping",),
+        &["-c".to_string(), "1".to_string(), "1.1.1.1".to_string(),],
         &config,
-        Path::new("/tmp"),
+        Path::new("/tmp",),
     )?;
 
     let status = cmd.status()?;
     assert!(!status.success());
 
-    Ok(())
+    Ok((),)
 }
 
 #[test]
-fn test_sandbox_system_isolation() -> Result<()> {
+fn test_sandbox_system_isolation() -> Result<(),> {
     if !bwrap_exists() {
         println!("Skipping test: bwrap not installed");
-        return Ok(());
+        return Ok((),);
     }
 
     let config = SandboxConfig {
@@ -71,23 +72,23 @@ fn test_sandbox_system_isolation() -> Result<()> {
     };
 
     let mut cmd = zoi::pkg::sandbox::wrap_command(
-        Path::new("/usr/bin/env"),
+        Path::new("/usr/bin/env",),
         &[],
         &config,
-        Path::new("/tmp"),
+        Path::new("/tmp",),
     )?;
 
     let status = cmd.status();
     assert!(status.is_err() || !status.expect("unwrap failed").success());
 
-    Ok(())
+    Ok((),)
 }
 
 #[test]
-fn test_sandbox_tmpfs_isolation() -> Result<()> {
+fn test_sandbox_tmpfs_isolation() -> Result<(),> {
     if !bwrap_exists() {
         println!("Skipping test: bwrap not installed");
-        return Ok(());
+        return Ok((),);
     }
 
     let config = SandboxConfig {
@@ -97,34 +98,34 @@ fn test_sandbox_tmpfs_isolation() -> Result<()> {
     };
 
     let host_tmp_file = "/tmp/zoi_sandbox_test_file";
-    std::fs::write(host_tmp_file, "secret")?;
+    std::fs::write(host_tmp_file, "secret",)?;
 
     let mut cmd = zoi::pkg::sandbox::wrap_command(
-        Path::new("/bin/cat"),
-        &[host_tmp_file.to_string()],
+        Path::new("/bin/cat",),
+        &[host_tmp_file.to_string(),],
         &config,
-        Path::new("/opt"),
+        Path::new("/opt",),
     )?;
 
     let output = cmd.output()?;
 
-    let _ = std::fs::remove_file(host_tmp_file);
+    let _ = std::fs::remove_file(host_tmp_file,);
 
     assert!(!output.status.success());
 
-    Ok(())
+    Ok((),)
 }
 
 #[test]
-fn test_sandbox_env_passthrough() -> Result<()> {
+fn test_sandbox_env_passthrough() -> Result<(),> {
     if !bwrap_exists() {
         println!("Skipping test: bwrap not installed");
-        return Ok(());
+        return Ok((),);
     }
 
     // SAFETY: This is a test environment where we ensure thread safety.
     unsafe {
-        std::env::set_var("ZOI_TEST_SECRET_ENV", "my_secret_value");
+        std::env::set_var("ZOI_TEST_SECRET_ENV", "my_secret_value",);
     }
 
     let config = SandboxConfig {
@@ -135,21 +136,21 @@ fn test_sandbox_env_passthrough() -> Result<()> {
     };
 
     let mut cmd = zoi::pkg::sandbox::wrap_command(
-        Path::new("/usr/bin/env"),
+        Path::new("/usr/bin/env",),
         &[],
         &config,
-        Path::new("/opt"),
+        Path::new("/opt",),
     )?;
 
     let output = cmd.output()?;
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stdout = String::from_utf8_lossy(&output.stdout,);
 
     assert!(stdout.contains("ZOI_TEST_SECRET_ENV=my_secret_value"));
 
     // SAFETY: Cleaning up the environment variable in a test.
     unsafe {
-        std::env::remove_var("ZOI_TEST_SECRET_ENV");
+        std::env::remove_var("ZOI_TEST_SECRET_ENV",);
     }
 
-    Ok(())
+    Ok((),)
 }

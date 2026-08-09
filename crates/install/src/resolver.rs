@@ -1,14 +1,16 @@
-use crate::pubgrub::{PkgName, SemVersion, ZoiDependencyProvider};
+use std::collections::{HashMap, HashSet, VecDeque};
+
 use anyhow::{Result, anyhow};
 use pubgrub::{DependencyProvider, Ranges, resolve as pubgrub_resolve};
 use rustc_hash::FxHashMap;
 use semver::Version;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet, VecDeque};
 use zoi_core::types::{self, InstallReason, Package};
 use zoi_deps as dependencies;
 use zoi_project::lockfile::FrozenLockPackage;
 use zoi_resolver::resolve;
+
+use crate::pubgrub::{PkgName, SemVersion, ZoiDependencyProvider};
 
 /// Represents a single package node within the resolved dependency graph.
 ///
@@ -17,7 +19,7 @@ use zoi_resolver::resolve;
 /// - The exact resolved version and sub-package selection.
 /// - The reason it was included (Direct request vs. Dependency).
 /// - The specific options and optionals chosen by the user/resolver.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize,)]
 pub struct InstallNode {
     /// The core metadata definition for the package.
     pub pkg: Package,
@@ -26,25 +28,29 @@ pub struct InstallNode {
     /// The package revision number (used for packaging updates).
     pub revision: String,
     /// The selected sub-package, if applicable (e.g. `Some("docs")`).
-    pub sub_package: Option<String>,
-    /// The tier of the repository this package belongs to (e.g. "official", "community").
+    pub sub_package: Option<String,>,
+    /// The tier of the repository this package belongs to (e.g. "official",
+    /// "community").
     pub repo_type: String,
     /// A short description of the package.
     pub description: String,
-    /// Why this package is being installed (e.g. Direct request vs Dependency).
+    /// Why this package is being installed (e.g. Direct request vs
+    /// Dependency).
     pub reason: InstallReason,
     /// The original source string used to request this package.
     pub source: String,
     /// The handle of the registry this package was resolved from.
     pub registry_handle: String,
     /// The names of explicit dependency options chosen by the user.
-    pub chosen_options: Vec<String>,
+    pub chosen_options: Vec<String,>,
     /// The names of optional dependencies chosen by the user.
-    pub chosen_optionals: Vec<String>,
-    /// The final list of runtime dependency source strings required by this node.
-    pub dependencies: Vec<String>,
-    /// The Git commit SHA of the repository when this package was resolved (used for lockfiles).
-    pub git_sha: Option<String>,
+    pub chosen_optionals: Vec<String,>,
+    /// The final list of runtime dependency source strings required by this
+    /// node.
+    pub dependencies: Vec<String,>,
+    /// The Git commit SHA of the repository when this package was resolved
+    /// (used for lockfiles).
+    pub git_sha: Option<String,>,
 }
 
 /// A Directed Acyclic Graph (DAG) representing the installation plan.
@@ -52,12 +58,13 @@ pub struct InstallNode {
 /// The graph ensures that dependencies are installed before the packages
 /// that require them. The `$root` node acts as the entry point linking
 /// all direct user requests.
-#[derive(Default, Debug)]
+#[derive(Default, Debug,)]
 pub struct DependencyGraph {
     /// A map of package IDs to their complete installation data.
-    pub nodes: HashMap<String, InstallNode>,
-    /// The adjacency list representing the directed edges (dependencies) between packages.
-    pub adj: HashMap<String, HashSet<String>>,
+    pub nodes: HashMap<String, InstallNode,>,
+    /// The adjacency list representing the directed edges (dependencies)
+    /// between packages.
+    pub adj: HashMap<String, HashSet<String,>,>,
 }
 
 impl DependencyGraph {
@@ -66,35 +73,37 @@ impl DependencyGraph {
         Self::default()
     }
 
-    /// Performs a topological sort of the graph, returning packages grouped into installation stages.
+    /// Performs a topological sort of the graph, returning packages grouped
+    /// into installation stages.
     ///
-    /// Packages with no dependencies (leaf nodes) appear in the first stage, followed by packages
-    /// that only depend on those in the first stage, and so on. This ensures that dependencies
-    /// are always installed before their dependents.
+    /// Packages with no dependencies (leaf nodes) appear in the first stage,
+    /// followed by packages that only depend on those in the first stage,
+    /// and so on. This ensures that dependencies are always installed
+    /// before their dependents.
     ///
     /// # Errors
     ///
-    /// Returns an error if a cycle is detected in the dependency graph or if there's an internal
-    /// inconsistency in the graph structure.
-    pub fn toposort(&self) -> Result<Vec<Vec<String>>> {
-        let mut in_degree: HashMap<String, usize> =
-            self.nodes.keys().map(|id| (id.clone(), 0)).collect();
+    /// Returns an error if a cycle is detected in the dependency graph or if
+    /// there's an internal inconsistency in the graph structure.
+    pub fn toposort(&self,) -> Result<Vec<Vec<String,>,>,> {
+        let mut in_degree: HashMap<String, usize,> =
+            self.nodes.keys().map(|id| (id.clone(), 0,),).collect();
 
-        for (from, to_set) in &self.adj {
+        for (from, to_set,) in &self.adj {
             if from == "$root" {
                 continue;
             }
             for to in to_set {
-                if let Some(degree) = in_degree.get_mut(to) {
+                if let Some(degree,) = in_degree.get_mut(to,) {
                     *degree += 1;
                 }
             }
         }
 
-        let mut queue: VecDeque<String> = in_degree
+        let mut queue: VecDeque<String,> = in_degree
             .iter()
-            .filter(|&(_, d)| *d == 0)
-            .map(|(id, _)| id.clone())
+            .filter(|&(_, d,)| *d == 0,)
+            .map(|(id, _,)| id.clone(),)
             .collect();
 
         let mut stages = Vec::new();
@@ -103,51 +112,52 @@ impl DependencyGraph {
         while !queue.is_empty() {
             let mut stage = Vec::new();
             for _ in 0..queue.len() {
-                let u = queue
-                    .pop_front()
-                    .ok_or_else(|| anyhow!("Queue length inconsistency in toposort"))?;
-                stage.push(u.clone());
+                let u = queue.pop_front().ok_or_else(|| {
+                    anyhow!("Queue length inconsistency in toposort")
+                },)?;
+                stage.push(u.clone(),);
                 count += 1;
 
-                if let Some(neighbors) = self.adj.get(&u) {
+                if let Some(neighbors,) = self.adj.get(&u,) {
                     for v_id in neighbors {
-                        let degree = in_degree
-                            .get_mut(v_id)
-                            .ok_or_else(|| anyhow!("v_id '{v_id}' missing from in_degree"))?;
+                        let degree =
+                            in_degree.get_mut(v_id,).ok_or_else(|| {
+                                anyhow!("v_id '{v_id}' missing from in_degree")
+                            },)?;
                         *degree -= 1;
                         if *degree == 0 {
-                            queue.push_back(v_id.clone());
+                            queue.push_back(v_id.clone(),);
                         }
                     }
                 }
             }
-            stages.push(stage);
+            stages.push(stage,);
         }
 
         if count != self.nodes.len() {
-            return Err(anyhow!("Cycle detected in dependency graph."));
+            return Err(anyhow!("Cycle detected in dependency graph."),);
         }
 
         stages.reverse();
 
-        Ok(stages)
+        Ok(stages,)
     }
 }
 
 /// Extracts Zoi-specific dependencies from a `DependenciesV2` struct.
-fn extract_zoi_dependencies(deps: &types::DependenciesV2) -> Vec<String> {
+fn extract_zoi_dependencies(deps: &types::DependenciesV2,) -> Vec<String,> {
     let mut zoi_deps = Vec::new();
 
     let mut to_process = deps.runtime.clone();
     for b in &deps.build {
-        to_process.extend(b.packages.clone());
+        to_process.extend(b.packages.clone(),);
     }
 
     for dep_str in to_process {
-        if let Ok(dep) = dependencies::parse_dependency_string(&dep_str)
+        if let Ok(dep,) = dependencies::parse_dependency_string(&dep_str,)
             && dep.manager == "zoi"
         {
-            zoi_deps.push(dep.package.to_string());
+            zoi_deps.push(dep.package.to_string(),);
         }
     }
     zoi_deps
@@ -161,50 +171,60 @@ fn extract_zoi_dependencies(deps: &types::DependenciesV2) -> Vec<String> {
 /// there are issues parsing dependency strings.
 pub fn build_graph_from_locked_packages(
     locked_packages: &[FrozenLockPackage],
-    scope_override: Option<types::Scope>,
+    scope_override: Option<types::Scope,>,
     quiet: bool,
     yes: bool,
-) -> Result<(DependencyGraph, Vec<String>)> {
+) -> Result<(DependencyGraph, Vec<String,>,),> {
     if !quiet {
         println!(":: Resolving dependencies from zoi.lock...");
     }
 
     let mut graph = DependencyGraph::new();
-    let mut reverse_deps: HashMap<String, Vec<String>> = HashMap::new();
-    let mut pkg_id_to_locked_deps: HashMap<String, Vec<String>> = HashMap::new();
-    let mut pkg_id_to_locked_deps_v2: HashMap<String, Option<types::DependenciesV2>> =
+    let mut reverse_deps: HashMap<String, Vec<String,>,> = HashMap::new();
+    let mut pkg_id_to_locked_deps: HashMap<String, Vec<String,>,> =
         HashMap::new();
+    let mut pkg_id_to_locked_deps_v2: HashMap<
+        String,
+        Option<types::DependenciesV2,>,
+    > = HashMap::new();
 
     for locked in locked_packages {
-        let request = resolve::parse_source_string(&locked.source)?;
-        let (pkg, version_str, _, pkg_lua_path, handle, repo_type, git_sha) =
-            resolve::resolve_package_and_version(&locked.source, scope_override, quiet, yes)?;
+        let request = resolve::parse_source_string(&locked.source,)?;
+        let (pkg, version_str, _, pkg_lua_path, handle, repo_type, git_sha,) =
+            resolve::resolve_package_and_version(
+                &locked.source,
+                scope_override,
+                quiet,
+                yes,
+            )?;
 
         let mut pkg = pkg;
-        if let Some(scope) = scope_override {
+        if let Some(scope,) = scope_override {
             pkg.scope = scope;
         }
 
-        let pkg_id = if let Some(sub) = &request.sub_package {
+        let pkg_id = if let Some(sub,) = &request.sub_package {
             format!("{}@{}:{}", pkg.name, version_str, sub)
         } else {
             format!("{}@{}", pkg.name, version_str)
         };
 
-        let flattened_deps = if let Some(deps) = &locked.dependencies {
-            extract_zoi_dependencies(deps)
+        let flattened_deps = if let Some(deps,) = &locked.dependencies {
+            extract_zoi_dependencies(deps,)
         } else {
             Vec::new()
         };
 
-        pkg_id_to_locked_deps.insert(pkg_id.clone(), flattened_deps.clone());
-        pkg_id_to_locked_deps_v2.insert(pkg_id.clone(), locked.dependencies.clone());
+        pkg_id_to_locked_deps.insert(pkg_id.clone(), flattened_deps.clone(),);
+        pkg_id_to_locked_deps_v2
+            .insert(pkg_id.clone(), locked.dependencies.clone(),);
 
         graph.nodes.insert(
             pkg_id.clone(),
             InstallNode {
                 description: pkg.description.clone(),
-                repo_type: repo_type.unwrap_or_else(|| "unofficial".to_string()),
+                repo_type: repo_type
+                    .unwrap_or_else(|| "unofficial".to_string(),),
                 pkg,
                 version: version_str,
                 revision: locked.revision.clone(),
@@ -217,57 +237,62 @@ pub fn build_graph_from_locked_packages(
                     }
                 },
                 source: pkg_lua_path.to_string_lossy().to_string(),
-                registry_handle: handle.unwrap_or_else(|| "zoidberg".to_string()),
+                registry_handle: handle
+                    .unwrap_or_else(|| "zoidberg".to_string(),),
                 chosen_options: locked.chosen_options.clone(),
                 chosen_optionals: locked.chosen_optionals.clone(),
                 dependencies: Vec::new(),
-                git_sha: locked.git_sha.clone().or(git_sha),
+                git_sha: locked.git_sha.clone().or(git_sha,),
             },
         );
     }
 
     for pkg_id in graph.nodes.keys() {
         let mut children = HashSet::new();
-        if let Some(locked_deps) = pkg_id_to_locked_deps.get(pkg_id) {
+        if let Some(locked_deps,) = pkg_id_to_locked_deps.get(pkg_id,) {
             for dep_pkg_source in locked_deps {
-                let dep_req = resolve::parse_source_string(dep_pkg_source)?;
-                let dep_version = dep_req.version_spec.as_deref().unwrap_or_default();
-                let dep_id = if let Some(sub) = dep_req.sub_package {
+                let dep_req = resolve::parse_source_string(dep_pkg_source,)?;
+                let dep_version =
+                    dep_req.version_spec.as_deref().unwrap_or_default();
+                let dep_id = if let Some(sub,) = dep_req.sub_package {
                     format!("{}@{}:{}", dep_req.name, dep_version, sub)
                 } else {
                     format!("{}@{}", dep_req.name, dep_version)
                 };
 
-                if graph.nodes.contains_key(&dep_id) {
-                    children.insert(dep_id.clone());
-                    reverse_deps.entry(dep_id).or_default().push(pkg_id.clone());
+                if graph.nodes.contains_key(&dep_id,) {
+                    children.insert(dep_id.clone(),);
+                    reverse_deps
+                        .entry(dep_id,)
+                        .or_default()
+                        .push(pkg_id.clone(),);
                 }
             }
         }
-        graph.adj.insert(pkg_id.clone(), children);
+        graph.adj.insert(pkg_id.clone(), children,);
     }
 
-    let direct_ids: Vec<String> = graph
+    let direct_ids: Vec<String,> = graph
         .nodes
         .iter()
-        .filter_map(|(pkg_id, node)| {
-            let is_direct =
-                matches!(node.reason, InstallReason::Direct) || !reverse_deps.contains_key(pkg_id);
-            is_direct.then(|| pkg_id.clone())
-        })
+        .filter_map(|(pkg_id, node,)| {
+            let is_direct = matches!(node.reason, InstallReason::Direct)
+                || !reverse_deps.contains_key(pkg_id,);
+            is_direct.then(|| pkg_id.clone(),)
+        },)
         .collect();
 
     graph
         .adj
-        .insert("$root".to_string(), direct_ids.iter().cloned().collect());
+        .insert("$root".to_string(), direct_ids.iter().cloned().collect(),);
 
-    let direct_id_set: HashSet<String> = direct_ids.iter().cloned().collect();
+    let direct_id_set: HashSet<String,> = direct_ids.iter().cloned().collect();
 
     let mut parent_map = HashMap::new();
-    for (pkg_id, parents) in &reverse_deps {
-        if !direct_id_set.contains(pkg_id)
-            && let Some(parent_id) = parents.first()
-            && let Some(parent_node) = graph.nodes.get(parent_id)
+    for (pkg_id, parents,) in &reverse_deps {
+        if !direct_id_set.contains(pkg_id,)
+            && let Some(parent_id,) = parents.first()
+            && let Some(parent_node,) = graph.nodes.get(parent_id,)
         {
             let parent_source = zoi_resolver::local::package_source_string(
                 &parent_node.registry_handle,
@@ -276,18 +301,18 @@ pub fn build_graph_from_locked_packages(
                 parent_node.sub_package.as_deref(),
                 &parent_node.version,
             );
-            parent_map.insert(pkg_id.clone(), parent_source);
+            parent_map.insert(pkg_id.clone(), parent_source,);
         }
     }
 
-    let resolved_child_sources: HashMap<String, Vec<String>> = graph
+    let resolved_child_sources: HashMap<String, Vec<String,>,> = graph
         .adj
         .iter()
-        .map(|(pkg_id, children)| {
+        .map(|(pkg_id, children,)| {
             let deps = children
                 .iter()
                 .filter_map(|child| {
-                    graph.nodes.get(child).map(|child_node| {
+                    graph.nodes.get(child,).map(|child_node| {
                         format!(
                             "zoi:{}",
                             zoi_resolver::local::package_source_string(
@@ -298,44 +323,47 @@ pub fn build_graph_from_locked_packages(
                                 &child_node.version,
                             )
                         )
-                    })
-                })
-                .collect::<Vec<_>>();
-            (pkg_id.clone(), deps)
-        })
+                    },)
+                },)
+                .collect::<Vec<_,>>();
+            (pkg_id.clone(), deps,)
+        },)
         .collect();
 
-    for (pkg_id, node) in &mut graph.nodes {
-        if direct_id_set.contains(pkg_id) {
+    for (pkg_id, node,) in &mut graph.nodes {
+        if direct_id_set.contains(pkg_id,) {
             node.reason = InstallReason::Direct;
-        } else if let Some(parent_source) = parent_map.get(pkg_key_as_str(pkg_id)) {
+        } else if let Some(parent_source,) =
+            parent_map.get(pkg_key_as_str(pkg_id,),)
+        {
             node.reason = InstallReason::Dependency {
                 parent: parent_source.clone(),
             };
         }
 
         let mut resolved_deps = resolved_child_sources
-            .get(pkg_id)
+            .get(pkg_id,)
             .cloned()
             .unwrap_or_default();
 
-        if let Some(Some(deps_v2)) = pkg_id_to_locked_deps_v2.get(pkg_id) {
+        if let Some(Some(deps_v2,),) = pkg_id_to_locked_deps_v2.get(pkg_id,) {
             for dep_str in &deps_v2.runtime {
-                if let Ok(dep_req) = dependencies::parse_dependency_string(dep_str)
+                if let Ok(dep_req,) =
+                    dependencies::parse_dependency_string(dep_str,)
                     && dep_req.manager != "zoi"
                 {
-                    resolved_deps.push(dep_str.clone());
+                    resolved_deps.push(dep_str.clone(),);
                 }
             }
         }
         node.dependencies = resolved_deps;
     }
 
-    Ok((graph, Vec::new()))
+    Ok((graph, Vec::new(),),)
 }
 
 /// Helper function to return a reference to a string.
-fn pkg_key_as_str(s: &String) -> &String {
+fn pkg_key_as_str(s: &String,) -> &String {
     s
 }
 
@@ -343,25 +371,26 @@ fn pkg_key_as_str(s: &String) -> &String {
 ///
 /// This is the core "Resolution Engine" of Zoi. It:
 /// - Maps each source string to a `PkgName` in the `PubGrub` solver.
-/// - Uses the `PubGrub` SAT algorithm to find a set of versions that satisfy all
-///   `SemVer` requirements and constraints.
+/// - Uses the `PubGrub` SAT algorithm to find a set of versions that satisfy
+///   all `SemVer` requirements and constraints.
 /// - Handles backtracking and human-readable error reporting on failure.
-/// - Returns a `DependencyGraph` containing all nodes (packages) and edges (dependencies).
+/// - Returns a `DependencyGraph` containing all nodes (packages) and edges
+///   (dependencies).
 ///
 /// # Errors
 ///
-/// Returns an error if dependency resolution fails, if any source strings are invalid,
-/// or if version requirements cannot be satisfied.
+/// Returns an error if dependency resolution fails, if any source strings are
+/// invalid, or if version requirements cannot be satisfied.
 pub fn resolve_dependency_graph(
     initial_sources: &[String],
-    scope_override: Option<types::Scope>,
+    scope_override: Option<types::Scope,>,
     _force: bool,
     yes: bool,
     all_optional: bool,
-    build_type: Option<&str>,
+    build_type: Option<&str,>,
     quiet: bool,
-    project_config: Option<zoi_project::config::ProjectConfig>,
-) -> Result<(DependencyGraph, Vec<String>)> {
+    project_config: Option<zoi_project::config::ProjectConfig,>,
+) -> Result<(DependencyGraph, Vec<String,>,),> {
     if !quiet {
         println!(":: Resolving dependencies...");
     }
@@ -370,16 +399,17 @@ pub fn resolve_dependency_graph(
     let mut root_deps = FxHashMap::default();
 
     for source in initial_sources {
-        let parse_result = dependencies::parse_dependency_string(source);
-        if let Ok(dep) = parse_result
+        let parse_result = dependencies::parse_dependency_string(source,);
+        if let Ok(dep,) = parse_result
             && dep.manager != "zoi"
         {
-            non_zoi_deps.push(source.clone());
+            non_zoi_deps.push(source.clone(),);
             continue;
         }
 
-        let request = resolve::parse_source_string(source)?;
-        let resolved = resolve::resolve_source(source, scope_override, quiet, yes)?;
+        let request = resolve::parse_source_string(source,)?;
+        let resolved =
+            resolve::resolve_source(source, scope_override, quiet, yes,)?;
 
         let pkg_name = PkgName {
             name: request.name,
@@ -387,31 +417,36 @@ pub fn resolve_dependency_graph(
             repo: resolved.repo_name.unwrap_or_default(),
             registry: resolved
                 .registry_handle
-                .unwrap_or_else(|| "zoidberg".to_string()),
+                .unwrap_or_else(|| "zoidberg".to_string(),),
             explicit_source: matches!(
                 resolved.source_type,
                 zoi_core::types::SourceType::LocalFile
                     | zoi_core::types::SourceType::Url
                     | zoi_core::types::SourceType::GitRepo(_)
             )
-            .then(|| source.clone()),
+            .then(|| source.clone(),),
         };
 
         let range = if request.version_spec.is_some() {
-            let resolved_version =
-                resolve::resolve_requested_version_spec(source, scope_override, true, true)?
-                    .ok_or_else(|| {
-                        anyhow!("version spec missing despite check for '{source}'")
-                    })?;
-            crate::pubgrub::semver_to_range(&resolved_version)
+            let resolved_version = resolve::resolve_requested_version_spec(
+                source,
+                scope_override,
+                true,
+                true,
+            )?
+            .ok_or_else(|| {
+                anyhow!("version spec missing despite check for '{source}'")
+            },)?;
+            crate::pubgrub::semver_to_range(&resolved_version,)
         } else {
             Ranges::full()
         };
 
-        root_deps.insert(pkg_name, range);
+        root_deps.insert(pkg_name, range,);
     }
 
-    let project_config = project_config.or_else(|| zoi_project::config::load().ok());
+    let project_config =
+        project_config.or_else(|| zoi_project::config::load().ok(),);
 
     let provider = ZoiDependencyProvider::new(
         root_deps,
@@ -421,7 +456,7 @@ pub fn resolve_dependency_graph(
         yes,
         all_optional,
         project_config,
-        build_type.map(std::string::ToString::to_string),
+        build_type.map(std::string::ToString::to_string,),
     )?;
     let root_pkg = PkgName {
         name: "$root".to_string(),
@@ -432,16 +467,20 @@ pub fn resolve_dependency_graph(
     };
     let root_version = SemVersion {
         epoch: 0,
-        v: Version::new(0, 0, 0),
+        v: Version::new(0, 0, 0,),
         original: "0.0.0".to_string(),
     };
 
     let mut final_nodes = HashMap::new();
-    let mut final_adj: HashMap<String, HashSet<String>> = HashMap::new();
+    let mut final_adj: HashMap<String, HashSet<String,>,> = HashMap::new();
 
-    match pubgrub_resolve::<ZoiDependencyProvider>(&provider, root_pkg, root_version) {
-        Ok(solution) => {
-            for (name, version) in solution.iter() {
+    match pubgrub_resolve::<ZoiDependencyProvider,>(
+        &provider,
+        root_pkg,
+        root_version,
+    ) {
+        Ok(solution,) => {
+            for (name, version,) in solution.iter() {
                 if name.name == "$root" {
                     continue;
                 }
@@ -449,88 +488,111 @@ pub fn resolve_dependency_graph(
                 let source = name
                     .explicit_source
                     .clone()
-                    .unwrap_or_else(|| format!("{name}@{version}"));
-                let (pkg, version_str, _, pkg_lua_path, handle, repo_type, git_sha) =
-                    resolve::resolve_package_and_version(&source, scope_override, quiet, yes)?;
+                    .unwrap_or_else(|| format!("{name}@{version}"),);
+                let (
+                    pkg,
+                    version_str,
+                    _,
+                    pkg_lua_path,
+                    handle,
+                    repo_type,
+                    git_sha,
+                ) = resolve::resolve_package_and_version(
+                    &source,
+                    scope_override,
+                    quiet,
+                    yes,
+                )?;
 
                 let mut pkg = pkg;
-                if let Some(s) = scope_override {
+                if let Some(s,) = scope_override {
                     pkg.scope = s;
                 }
 
-                let pkg_id = if let Some(sub) = &name.sub_package {
+                let pkg_id = if let Some(sub,) = &name.sub_package {
                     format!("{}@{}:{}", pkg.name, version_str, sub)
                 } else {
                     format!("{}@{}", pkg.name, version_str)
                 };
 
-                let cache_key = (name.clone(), version.clone());
-                let (chosen_options, chosen_optionals, all_req_deps) = provider
-                    .chosen_cache
-                    .borrow()
-                    .get(&cache_key)
-                    .cloned()
-                    .unwrap_or_default();
+                let cache_key = (name.clone(), version.clone(),);
+                let (chosen_options, chosen_optionals, all_req_deps,) =
+                    provider
+                        .chosen_cache
+                        .borrow()
+                        .get(&cache_key,)
+                        .cloned()
+                        .unwrap_or_default();
 
                 for dep_str in &all_req_deps {
-                    if let Ok(dep_req) = zoi_deps::parse_dependency_string(dep_str)
+                    if let Ok(dep_req,) =
+                        zoi_deps::parse_dependency_string(dep_str,)
                         && dep_req.manager != "zoi"
                     {
-                        non_zoi_deps.push(dep_str.clone());
+                        non_zoi_deps.push(dep_str.clone(),);
                     }
                 }
 
                 let node = InstallNode {
                     description: pkg.description.clone(),
-                    repo_type: repo_type.unwrap_or_else(|| "unofficial".to_string()),
+                    repo_type: repo_type
+                        .unwrap_or_else(|| "unofficial".to_string(),),
                     pkg: pkg.clone(),
                     version: version_str,
                     revision: pkg.revision.clone(),
                     sub_package: name.sub_package.clone(),
                     reason: InstallReason::Direct,
                     source: pkg_lua_path.to_string_lossy().to_string(),
-                    registry_handle: handle.unwrap_or_else(|| "zoidberg".to_string()),
+                    registry_handle: handle
+                        .unwrap_or_else(|| "zoidberg".to_string(),),
                     chosen_options,
                     chosen_optionals,
                     dependencies: all_req_deps,
                     git_sha,
                 };
-                final_nodes.insert(pkg_id, node);
+                final_nodes.insert(pkg_id, node,);
             }
 
-            for (name, version) in solution.iter() {
+            for (name, version,) in solution.iter() {
                 let from_id = if name.name == "$root" {
                     "$root".to_string()
-                } else if let Some(sub) = &name.sub_package {
+                } else if let Some(sub,) = &name.sub_package {
                     format!("{}@{}:{}", name.name, version, sub)
                 } else {
                     format!("{}@{}", name.name, version)
                 };
 
-                if let Ok(pubgrub::Dependencies::Available(deps)) =
-                    provider.get_dependencies(name, version)
+                if let Ok(pubgrub::Dependencies::Available(deps,),) =
+                    provider.get_dependencies(name, version,)
                 {
-                    for (dep_name, _) in deps {
-                        if let Some(dep_version) = solution.get(&dep_name) {
-                            let to_id = if let Some(sub) = &dep_name.sub_package {
-                                format!("{}@{}:{}", dep_name.name, dep_version, sub)
-                            } else {
-                                format!("{}@{}", dep_name.name, dep_version)
-                            };
-                            final_adj.entry(from_id.clone()).or_default().insert(to_id);
+                    for (dep_name, _,) in deps {
+                        if let Some(dep_version,) = solution.get(&dep_name,) {
+                            let to_id =
+                                if let Some(sub,) = &dep_name.sub_package {
+                                    format!(
+                                        "{}@{}:{}",
+                                        dep_name.name, dep_version, sub
+                                    )
+                                } else {
+                                    format!("{}@{}", dep_name.name, dep_version)
+                                };
+                            final_adj
+                                .entry(from_id.clone(),)
+                                .or_default()
+                                .insert(to_id,);
                         }
                     }
                 }
             }
             let mut direct_ids = HashSet::new();
-            if let Some(root_children) = final_adj.get("$root") {
-                direct_ids.clone_from(root_children);
+            if let Some(root_children,) = final_adj.get("$root",) {
+                direct_ids.clone_from(root_children,);
             }
 
             let mut parent_map = HashMap::new();
-            for (from, to_set) in &final_adj {
+            for (from, to_set,) in &final_adj {
                 if from != "$root"
-                    && let Some(parent_node) = final_nodes.get(from)
+                    && let Some(parent_node,) = final_nodes.get(from,)
                 {
                     let parent_id = format!(
                         "#{}@{}/{}@{}",
@@ -540,19 +602,22 @@ pub fn resolve_dependency_graph(
                         parent_node.version
                     );
                     for to in to_set {
-                        parent_map.entry(to.clone()).or_insert(parent_id.clone());
+                        parent_map
+                            .entry(to.clone(),)
+                            .or_insert(parent_id.clone(),);
                     }
                 }
             }
 
-            let resolved_child_sources: HashMap<String, Vec<String>> = final_adj
-                .iter()
-                .map(|(pkg_id, children)| {
-                    let deps = children
-                        .iter()
-                        .filter_map(|child| {
-                            final_nodes.get(child).map(|child_node| {
-                                format!(
+            let resolved_child_sources: HashMap<String, Vec<String,>,> =
+                final_adj
+                    .iter()
+                    .map(|(pkg_id, children,)| {
+                        let deps = children
+                            .iter()
+                            .filter_map(|child| {
+                                final_nodes.get(child,).map(|child_node| {
+                                    format!(
                                     "zoi:{}",
                                     zoi_resolver::local::package_source_string(
                                         &child_node.registry_handle,
@@ -562,46 +627,50 @@ pub fn resolve_dependency_graph(
                                         &child_node.version,
                                     )
                                 )
-                            })
-                        })
-                        .collect::<Vec<_>>();
-                    (pkg_id.clone(), deps)
-                })
-                .collect();
+                                },)
+                            },)
+                            .collect::<Vec<_,>>();
+                        (pkg_id.clone(), deps,)
+                    },)
+                    .collect();
 
-            for (pkg_id, node) in &mut final_nodes {
+            for (pkg_id, node,) in &mut final_nodes {
                 let child_sources = resolved_child_sources
-                    .get(pkg_id)
+                    .get(pkg_id,)
                     .cloned()
                     .unwrap_or_default();
 
-                if direct_ids.contains(pkg_id) {
+                if direct_ids.contains(pkg_id,) {
                     node.reason = InstallReason::Direct;
                 } else {
                     let parent_id = parent_map
-                        .get(pkg_id)
+                        .get(pkg_id,)
                         .cloned()
-                        .unwrap_or_else(|| "unknown".to_string());
-                    node.reason = InstallReason::Dependency { parent: parent_id };
+                        .unwrap_or_else(|| "unknown".to_string(),);
+                    node.reason =
+                        InstallReason::Dependency { parent: parent_id, };
                 }
 
                 let mut resolved_deps = child_sources;
                 for dep_str in &node.dependencies {
-                    if let Ok(dep_req) = zoi_deps::parse_dependency_string(dep_str)
+                    if let Ok(dep_req,) =
+                        zoi_deps::parse_dependency_string(dep_str,)
                         && dep_req.manager != "zoi"
                     {
-                        resolved_deps.push(dep_str.clone());
+                        resolved_deps.push(dep_str.clone(),);
                     }
                 }
                 node.dependencies = resolved_deps;
             }
         }
-        Err(e) => {
+        Err(e,) => {
             let error_msg = format!("{e:?}");
-            if error_msg.contains("DependencyProviderError") {
-                return Err(anyhow!("Dependency resolution failed: {error_msg}"));
+            if error_msg.contains("DependencyProviderError",) {
+                return Err(anyhow!(
+                    "Dependency resolution failed: {error_msg}"
+                ),);
             }
-            return Err(anyhow!("Dependency resolution failed: {e}"));
+            return Err(anyhow!("Dependency resolution failed: {e}"),);
         }
     }
 
@@ -611,5 +680,5 @@ pub fn resolve_dependency_graph(
             adj: final_adj,
         },
         non_zoi_deps,
-    ))
+    ),)
 }

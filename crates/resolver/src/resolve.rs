@@ -4,87 +4,96 @@
 //! various source types (registries, local files, URLs, Git repositories)
 //! and version specifications.
 
-use anyhow::{Result, anyhow};
-use colored::Colorize;
-use comfy_table::{Table, presets::UTF8_FULL};
-use dialoguer::{Select, theme::ColorfulTheme};
-use indicatif::{ProgressBar, ProgressStyle};
-use regex::Regex;
-use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+
+use anyhow::{Result, anyhow};
+use colored::Colorize;
+use comfy_table::Table;
+use comfy_table::presets::UTF8_FULL;
+use dialoguer::Select;
+use dialoguer::theme::ColorfulTheme;
+use indicatif::{ProgressBar, ProgressStyle};
+use regex::Regex;
+use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
 use zoi_core::types::SourceType;
 use zoi_core::{cache, config, pin, types};
 
 /// Represents a source that has been resolved to a local path.
-#[derive(Debug)]
+#[derive(Debug,)]
 pub struct ResolvedSource {
     /// The path to the resolved `.pkg.lua` or manifest file.
     pub path: PathBuf,
     /// The type of the source.
     pub source_type: SourceType,
     /// The name of the repository, if applicable.
-    pub repo_name: Option<String>,
+    pub repo_name: Option<String,>,
     /// The type of the repository (e.g. official, unofficial).
-    pub repo_type: Option<String>,
+    pub repo_type: Option<String,>,
     /// The handle of the registry.
-    pub registry_handle: Option<String>,
+    pub registry_handle: Option<String,>,
     /// An optional sharable manifest associated with the source.
-    pub sharable_manifest: Option<types::SharableInstallManifest>,
+    pub sharable_manifest: Option<types::SharableInstallManifest,>,
     /// The Git SHA if the source is from a Git repository.
-    pub git_sha: Option<String>,
+    pub git_sha: Option<String,>,
 }
 
 /// Represents a request for a package, parsed from a source string.
-#[derive(Debug, Default)]
+#[derive(Debug, Default,)]
 pub struct PackageRequest {
     /// The registry handle (e.g. 'zoidberg').
-    pub handle: Option<String>,
+    pub handle: Option<String,>,
     /// The repository name (e.g. 'core').
-    pub repo: Option<String>,
+    pub repo: Option<String,>,
     /// The name of the package.
     pub name: String,
     /// The sub-package name, if any.
-    pub sub_package: Option<String>,
+    pub sub_package: Option<String,>,
     /// The version or channel specification.
-    pub version_spec: Option<String>,
+    pub version_spec: Option<String,>,
 }
 
-use std::sync::LazyLock;
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 
 /// Regex for parsing the registry handle from a source string.
-static HANDLE_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^(?:#(?P<handle>[^@]+))?(?P<main_part>.*)$")
-        .expect("Static HANDLE_RE regex is valid")
-});
+static HANDLE_RE: LazyLock<Regex,> = LazyLock::new(|| {
+    Regex::new(r"^(?:#(?P<handle>[^@]+))?(?P<main_part>.*)$",)
+        .expect("Static HANDLE_RE regex is valid",)
+},);
 
-/// Regex for parsing the repository, package name, and version from a source string.
-static MAIN_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^@?(?P<repo_and_name>[^@]+)(?:@(?P<version>.+))?$")
-        .expect("Static MAIN_RE regex is valid")
-});
+/// Regex for parsing the repository, package name, and version from a source
+/// string.
+static MAIN_RE: LazyLock<Regex,> = LazyLock::new(|| {
+    Regex::new(r"^@?(?P<repo_and_name>[^@]+)(?:@(?P<version>.+))?$",)
+        .expect("Static MAIN_RE regex is valid",)
+},);
 
-/// A set of untrusted sources that have been confirmed by the user in the current session.
-static CONFIRMED_UNTRUSTED_SOURCES: LazyLock<Mutex<std::collections::HashSet<String>>> =
-    LazyLock::new(|| Mutex::new(std::collections::HashSet::new()));
+/// A set of untrusted sources that have been confirmed by the user in the
+/// current session.
+static CONFIRMED_UNTRUSTED_SOURCES: LazyLock<
+    Mutex<std::collections::HashSet<String,>,>,
+> = LazyLock::new(|| Mutex::new(std::collections::HashSet::new(),),);
 
 /// Splits a source string that explicitly points to a file into its components.
-fn split_explicit_file_source(source_str: &str) -> Option<(&str, Option<String>, Option<String>)> {
-    let (main_part, version_spec) = if let Some((base, version)) = source_str.rsplit_once('@') {
-        let base_path = if let Some((path, sub)) = base.rsplit_once(':') {
-            if (path.ends_with(".pkg.lua")
-                || path.ends_with(".manifest.yaml")
-                || std::path::Path::new(path)
+fn split_explicit_file_source(
+    source_str: &str,
+) -> Option<(&str, Option<String,>, Option<String,>,),> {
+    let (main_part, version_spec,) = if let Some((base, version,),) =
+        source_str.rsplit_once('@',)
+    {
+        let base_path = if let Some((path, sub,),) = base.rsplit_once(':',) {
+            if (path.ends_with(".pkg.lua",)
+                || path.ends_with(".manifest.yaml",)
+                || std::path::Path::new(path,)
                     .extension()
-                    .is_some_and(|ext| ext.eq_ignore_ascii_case("zpa"))
-                || std::path::Path::new(path)
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("zpa",),)
+                || std::path::Path::new(path,)
                     .extension()
-                    .is_some_and(|ext| ext.eq_ignore_ascii_case("zsa")))
-                && !sub.contains('/')
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("zsa",),))
+                && !sub.contains('/',)
             {
                 path
             } else {
@@ -94,68 +103,72 @@ fn split_explicit_file_source(source_str: &str) -> Option<(&str, Option<String>,
             base
         };
 
-        if base_path.ends_with(".pkg.lua")
-            || base_path.ends_with(".manifest.yaml")
-            || std::path::Path::new(base_path)
+        if base_path.ends_with(".pkg.lua",)
+            || base_path.ends_with(".manifest.yaml",)
+            || std::path::Path::new(base_path,)
                 .extension()
-                .is_some_and(|ext| ext.eq_ignore_ascii_case("zpa"))
-            || std::path::Path::new(base_path)
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("zpa",),)
+            || std::path::Path::new(base_path,)
                 .extension()
-                .is_some_and(|ext| ext.eq_ignore_ascii_case("zsa"))
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("zsa",),)
         {
-            (base, Some(version.to_string()))
+            (base, Some(version.to_string(),),)
         } else {
-            (source_str, None)
+            (source_str, None,)
         }
     } else {
-        (source_str, None)
+        (source_str, None,)
     };
 
-    let (path_part, sub_package) = if let Some((base, sub)) = main_part.rsplit_once(':') {
-        if (base.ends_with(".pkg.lua")
-            || base.ends_with(".manifest.yaml")
-            || std::path::Path::new(base)
-                .extension()
-                .is_some_and(|ext| ext.eq_ignore_ascii_case("zpa"))
-            || std::path::Path::new(base)
-                .extension()
-                .is_some_and(|ext| ext.eq_ignore_ascii_case("zsa")))
-            && !sub.contains('/')
-        {
-            (base, Some(sub.to_string()))
+    let (path_part, sub_package,) =
+        if let Some((base, sub,),) = main_part.rsplit_once(':',) {
+            if (base.ends_with(".pkg.lua",)
+                || base.ends_with(".manifest.yaml",)
+                || std::path::Path::new(base,)
+                    .extension()
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("zpa",),)
+                || std::path::Path::new(base,)
+                    .extension()
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("zsa",),))
+                && !sub.contains('/',)
+            {
+                (base, Some(sub.to_string(),),)
+            } else {
+                (main_part, None,)
+            }
         } else {
-            (main_part, None)
-        }
-    } else {
-        (main_part, None)
-    };
+            (main_part, None,)
+        };
 
-    if path_part.ends_with(".pkg.lua")
-        || path_part.ends_with(".manifest.yaml")
-        || std::path::Path::new(path_part)
+    if path_part.ends_with(".pkg.lua",)
+        || path_part.ends_with(".manifest.yaml",)
+        || std::path::Path::new(path_part,)
             .extension()
-            .is_some_and(|ext| ext.eq_ignore_ascii_case("zpa"))
-        || std::path::Path::new(path_part)
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("zpa",),)
+        || std::path::Path::new(path_part,)
             .extension()
-            .is_some_and(|ext| ext.eq_ignore_ascii_case("zsa"))
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("zsa",),)
     {
-        Some((path_part, sub_package, version_spec))
+        Some((path_part, sub_package, version_spec,),)
     } else {
         None
     }
 }
 
 /// Returns the original source or the path part if available.
-fn download_source_for_explicit_path<'a>(source: &'a str, path_part: Option<&'a str>) -> &'a str {
-    path_part.unwrap_or(source)
+fn download_source_for_explicit_path<'a,>(
+    source: &'a str,
+    path_part: Option<&'a str,>,
+) -> &'a str {
+    path_part.unwrap_or(source,)
 }
 
 /// Returns the HEAD SHA of a local Git repository.
-fn get_git_head_sha(repo_path: &Path) -> Option<String> {
-    let repo = git2::Repository::open(repo_path).ok()?;
+fn get_git_head_sha(repo_path: &Path,) -> Option<String,> {
+    let repo = git2::Repository::open(repo_path,).ok()?;
     let head = repo.head().ok()?;
     let target = head.target()?;
-    Some(target.to_string())
+    Some(target.to_string(),)
 }
 
 /// Returns the root directory of the package database.
@@ -163,21 +176,21 @@ fn get_git_head_sha(repo_path: &Path) -> Option<String> {
 /// # Errors
 ///
 /// Returns an error if the current directory cannot be retrieved.
-pub fn get_db_root() -> Result<PathBuf> {
-    if let Ok(path) = std::env::var("ZOI_DB_DIR") {
-        return Ok(PathBuf::from(path));
+pub fn get_db_root() -> Result<PathBuf,> {
+    if let Ok(path,) = std::env::var("ZOI_DB_DIR",) {
+        return Ok(PathBuf::from(path,),);
     }
 
     let local_db = std::env::current_dir()?
-        .join(".zoi")
-        .join("pkgs")
-        .join("db");
+        .join(".zoi",)
+        .join("pkgs",)
+        .join("db",);
     if local_db.exists() {
-        return Ok(local_db);
+        return Ok(local_db,);
     }
 
     // Default to user scope for normal CLI usage
-    zoi_core::utils::get_db_base_dir(zoi_core::types::Scope::User)
+    zoi_core::utils::get_db_base_dir(zoi_core::types::Scope::User,)
 }
 
 /// Returns the root directory of the package database on the host system.
@@ -185,10 +198,10 @@ pub fn get_db_root() -> Result<PathBuf> {
 /// # Errors
 ///
 /// Returns an error if the home directory cannot be found.
-pub fn get_host_db_root() -> Result<PathBuf> {
+pub fn get_host_db_root() -> Result<PathBuf,> {
     let home_dir = zoi_core::utils::get_user_home()
-        .ok_or_else(|| anyhow!("Could not find home directory."))?;
-    Ok(home_dir.join(".zoi").join("pkgs").join("db"))
+        .ok_or_else(|| anyhow!("Could not find home directory."),)?;
+    Ok(home_dir.join(".zoi",).join("pkgs",).join("db",),)
 }
 
 /// Parses a source string into a `PackageRequest`.
@@ -196,15 +209,16 @@ pub fn get_host_db_root() -> Result<PathBuf> {
 /// # Errors
 ///
 /// Returns an error if the source string format is invalid.
-pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
-    if let Some((path_part, sub_package_from_path, version_spec)) =
-        split_explicit_file_source(source_str)
+pub fn parse_source_string(source_str: &str,) -> Result<PackageRequest,> {
+    if let Some((path_part, sub_package_from_path, version_spec,),) =
+        split_explicit_file_source(source_str,)
     {
-        let path = std::path::Path::new(path_part);
+        let path = std::path::Path::new(path_part,);
         let file_stem = path.file_stem().unwrap_or_default().to_string_lossy();
-        let name = if let Some(stripped) = file_stem.strip_suffix(".manifest") {
+        let name = if let Some(stripped,) = file_stem.strip_suffix(".manifest",)
+        {
             stripped.to_string()
-        } else if let Some(stripped) = file_stem.strip_suffix(".pkg") {
+        } else if let Some(stripped,) = file_stem.strip_suffix(".pkg",) {
             stripped.to_string()
         } else {
             file_stem.to_string()
@@ -215,55 +229,58 @@ pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
             name,
             sub_package: sub_package_from_path,
             version_spec,
-        });
+        },);
     }
 
     let caps = HANDLE_RE
-        .captures(source_str)
-        .ok_or_else(|| anyhow!("Invalid source string format"))?;
-    let handle = caps.name("handle").map(|m| m.as_str().to_string());
+        .captures(source_str,)
+        .ok_or_else(|| anyhow!("Invalid source string format"),)?;
+    let handle = caps.name("handle",).map(|m| m.as_str().to_string(),);
     let main_part = caps
-        .name("main_part")
+        .name("main_part",)
         .ok_or_else(|| {
             anyhow!(
                 "Regex matched but main_part group not found in '{source_str}'"
             )
-        })?
+        },)?
         .as_str();
 
-    let caps_main = MAIN_RE
-        .captures(main_part)
-        .ok_or_else(|| anyhow!("Invalid source string format in '{main_part}'"))?;
+    let caps_main = MAIN_RE.captures(main_part,).ok_or_else(|| {
+        anyhow!("Invalid source string format in '{main_part}'")
+    },)?;
 
     let repo_and_name = caps_main
-        .name("repo_and_name")
+        .name("repo_and_name",)
         .ok_or_else(|| {
             anyhow!(
-                "Regex matched but repo_and_name group not found in '{main_part}'"
+                "Regex matched but repo_and_name group not found in \
+                 '{main_part}'"
             )
-        })?
+        },)?
         .as_str();
-    let version_spec = caps_main.name("version").map(|m| m.as_str().to_string());
+    let version_spec =
+        caps_main.name("version",).map(|m| m.as_str().to_string(),);
 
-    let (repo, name_and_sub) = if main_part.starts_with('@') {
-        if let Some(slash_pos) = repo_and_name.find('/') {
-            let (repo_str, name_str) = repo_and_name.split_at(slash_pos);
-            (Some(repo_str.to_lowercase()), &name_str[1..])
+    let (repo, name_and_sub,) = if main_part.starts_with('@',) {
+        if let Some(slash_pos,) = repo_and_name.find('/',) {
+            let (repo_str, name_str,) = repo_and_name.split_at(slash_pos,);
+            (Some(repo_str.to_lowercase(),), &name_str[1..],)
         } else {
-            return Err(anyhow!("Invalid repo format: expected @repo/name"));
+            return Err(anyhow!("Invalid repo format: expected @repo/name"),);
         }
     } else {
-        (None, repo_and_name)
+        (None, repo_and_name,)
     };
 
-    let (name, sub_package) = if let Some((n, s)) = name_and_sub.rsplit_once(':') {
-        (n, Some(s.to_string()))
-    } else {
-        (name_and_sub, None)
-    };
+    let (name, sub_package,) =
+        if let Some((n, s,),) = name_and_sub.rsplit_once(':',) {
+            (n, Some(s.to_string(),),)
+        } else {
+            (name_and_sub, None,)
+        };
 
     if name.is_empty() {
-        return Err(anyhow!("Invalid source string: package name is empty."));
+        return Err(anyhow!("Invalid source string: package name is empty."),);
     }
 
     Ok(PackageRequest {
@@ -272,12 +289,16 @@ pub fn parse_source_string(source_str: &str) -> Result<PackageRequest> {
         name: name.to_lowercase(),
         sub_package,
         version_spec,
-    })
+    },)
 }
 
 /// Searches for a package in the synced package database.
-fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedSource> {
-    /// Internal structure to hold metadata of a found package during resolution.
+fn find_package_in_db(
+    request: &PackageRequest,
+    quiet: bool,
+) -> Result<ResolvedSource,> {
+    /// Internal structure to hold metadata of a found package during
+    /// resolution.
     struct FoundPackage {
         path: PathBuf,
         source_type: SourceType,
@@ -285,7 +306,7 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
         repo_type: String,
         description: String,
         license: String,
-        size: Option<u64>,
+        size: Option<u64,>,
     }
 
     /// Processes a `.pkg.lua` file to extract its metadata.
@@ -295,30 +316,33 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
         is_default_registry: bool,
         registry_db_path: &Path,
         quiet: bool,
-    ) -> Result<FoundPackage> {
+    ) -> Result<FoundPackage,> {
         let pkg: types::Package = zoi_lua::parser::parse_lua_package(
             path.to_str().ok_or_else(|| {
                 anyhow!(
                     "Path contains invalid UTF-8 characters: {}",
                     path.display()
                 )
-            })?,
+            },)?,
             None,
             None,
             quiet,
         )?;
         let major_repo = repo_name
-            .split('/')
+            .split('/',)
             .next()
             .unwrap_or_default()
             .to_lowercase();
 
-        let repo_config = config::read_repo_config(registry_db_path).ok();
-        let repo_type = if let Some(ref cfg) = repo_config {
+        let repo_config = config::read_repo_config(registry_db_path,).ok();
+        let repo_type = if let Some(ref cfg,) = repo_config {
             cfg.repos
                 .iter()
-                .find(|r| r.name == major_repo)
-                .map_or_else(|| "unofficial".to_string(), |r| r.repo_type.clone())
+                .find(|r| r.name == major_repo,)
+                .map_or_else(
+                    || "unofficial".to_string(),
+                    |r| r.repo_type.clone(),
+                )
         } else {
             "unofficial".to_string()
         };
@@ -326,7 +350,7 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
         let source_type = if is_default_registry && repo_type == "official" {
             SourceType::OfficialRepo
         } else {
-            SourceType::UntrustedRepo(repo_name.to_string())
+            SourceType::UntrustedRepo(repo_name.to_string(),)
         };
 
         Ok(FoundPackage {
@@ -337,142 +361,156 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
             description: pkg.description,
             license: pkg.license,
             size: pkg.installed_size,
-        })
+        },)
     }
 
     let db_root = get_db_root()?;
     let config = config::read_config()?;
 
-    let (registry_db_path, search_repos, is_default_registry, registry_handle) = if let Some(h) =
-        &request.handle
-    {
-        let is_default = config
-            .default_registry
-            .as_ref()
-            .is_some_and(|reg| reg.handle == *h);
+    let (registry_db_path, search_repos, is_default_registry, registry_handle,) =
+        if let Some(h,) = &request.handle {
+            let is_default = config
+                .default_registry
+                .as_ref()
+                .is_some_and(|reg| reg.handle == *h,);
 
-        if is_default {
+            if is_default {
+                let default_registry = config
+                    .default_registry
+                    .as_ref()
+                    .ok_or_else(|| anyhow!("Default registry not found"),)?;
+                (
+                    db_root.join(&default_registry.handle,),
+                    config.repos,
+                    true,
+                    Some(default_registry.handle.clone(),),
+                )
+            } else if let Some(registry,) =
+                config.added_registries.iter().find(|r| r.handle == *h,)
+            {
+                let mut repo_path = db_root.join(&registry.handle,);
+
+                if !repo_path.exists()
+                    && zoi_core::sysroot::get_sysroot().is_some()
+                {
+                    // Fallback to host metadata for resolution
+                    let host_root = get_host_db_root()?;
+                    let host_path = host_root.join(&registry.handle,);
+                    if host_path.exists() {
+                        repo_path = host_path;
+                    }
+                }
+
+                let all_sub_repos = if repo_path.exists() {
+                    fs::read_dir(&repo_path,)?
+                        .filter_map(Result::ok,)
+                        .filter(|entry| {
+                            entry.path().is_dir() && entry.file_name() != ".git"
+                        },)
+                        .map(|entry| {
+                            entry.file_name().to_string_lossy().into_owned()
+                        },)
+                        .collect()
+                } else {
+                    Vec::new()
+                };
+                (
+                    repo_path,
+                    all_sub_repos,
+                    false,
+                    Some(registry.handle.clone(),),
+                )
+            } else {
+                return Err(anyhow!("Registry with handle '{h}' not found."),);
+            }
+        } else {
             let default_registry = config
                 .default_registry
                 .as_ref()
-                .ok_or_else(|| anyhow!("Default registry not found"))?;
-            (
-                db_root.join(&default_registry.handle),
-                config.repos,
-                true,
-                Some(default_registry.handle.clone()),
-            )
-        } else if let Some(registry) = config.added_registries.iter().find(|r| r.handle == *h) {
-            let mut repo_path = db_root.join(&registry.handle);
+                .ok_or_else(|| anyhow!("No default registry set."),)?;
 
-            if !repo_path.exists() && zoi_core::sysroot::get_sysroot().is_some() {
+            let default_handle = default_registry.handle.clone();
+            let mut default_path = db_root.join(&default_handle,);
+
+            if !default_path.exists()
+                && zoi_core::sysroot::get_sysroot().is_some()
+            {
                 // Fallback to host metadata for resolution
                 let host_root = get_host_db_root()?;
-                let host_path = host_root.join(&registry.handle);
+                let host_path = host_root.join(&default_handle,);
                 if host_path.exists() {
-                    repo_path = host_path;
+                    default_path = host_path;
                 }
             }
 
-            let all_sub_repos = if repo_path.exists() {
-                fs::read_dir(&repo_path)?
-                    .filter_map(Result::ok)
-                    .filter(|entry| entry.path().is_dir() && entry.file_name() != ".git")
-                    .map(|entry| entry.file_name().to_string_lossy().into_owned())
-                    .collect()
+            let (registry_path, effective_handle,) = if default_path.exists()
+                && (default_path.join("repo.yaml",).exists()
+                    || default_path.join("packages.json",).exists())
+            {
+                (default_path, default_handle,)
             } else {
-                Vec::new()
-            };
-            (
-                repo_path,
-                all_sub_repos,
-                false,
-                Some(registry.handle.clone()),
-            )
-        } else {
-            return Err(anyhow!("Registry with handle '{h}' not found."));
-        }
-    } else {
-        let default_registry = config
-            .default_registry
-            .as_ref()
-            .ok_or_else(|| anyhow!("No default registry set."))?;
+                let mut found_path = default_path.clone();
+                let mut found_handle = default_handle.clone();
+                let mut found = false;
 
-        let default_handle = default_registry.handle.clone();
-        let mut default_path = db_root.join(&default_handle);
+                let roots_to_check =
+                    if zoi_core::sysroot::get_sysroot().is_some() {
+                        vec![db_root.clone(), get_host_db_root()?]
+                    } else {
+                        vec![db_root.clone()]
+                    };
 
-        if !default_path.exists() && zoi_core::sysroot::get_sysroot().is_some() {
-            // Fallback to host metadata for resolution
-            let host_root = get_host_db_root()?;
-            let host_path = host_root.join(&default_handle);
-            if host_path.exists() {
-                default_path = host_path;
-            }
-        }
-
-        let (registry_path, effective_handle) = if default_path.exists()
-            && (default_path.join("repo.yaml").exists()
-                || default_path.join("packages.json").exists())
-        {
-            (default_path, default_handle)
-        } else {
-            let mut found_path = default_path.clone();
-            let mut found_handle = default_handle.clone();
-            let mut found = false;
-
-            let roots_to_check = if zoi_core::sysroot::get_sysroot().is_some() {
-                vec![db_root.clone(), get_host_db_root()?]
-            } else {
-                vec![db_root.clone()]
-            };
-
-            for root in roots_to_check {
-                if let Ok(entries) = fs::read_dir(&root) {
-                    for entry in entries.flatten() {
-                        let path = entry.path();
-                        if !path.is_dir() {
-                            continue;
-                        }
-                        let name = entry.file_name();
-                        if name == ".git" {
-                            continue;
-                        }
-                        let candidate = name.to_string_lossy().to_string();
-                        let candidate_path = root.join(&candidate);
-                        if candidate_path.join("repo.yaml").exists()
-                            || candidate_path.join("packages.json").exists()
-                        {
-                            found_path = candidate_path;
-                            found_handle = candidate;
-                            found = true;
-                            break;
+                for root in roots_to_check {
+                    if let Ok(entries,) = fs::read_dir(&root,) {
+                        for entry in entries.flatten() {
+                            let path = entry.path();
+                            if !path.is_dir() {
+                                continue;
+                            }
+                            let name = entry.file_name();
+                            if name == ".git" {
+                                continue;
+                            }
+                            let candidate = name.to_string_lossy().to_string();
+                            let candidate_path = root.join(&candidate,);
+                            if candidate_path.join("repo.yaml",).exists()
+                                || candidate_path
+                                    .join("packages.json",)
+                                    .exists()
+                            {
+                                found_path = candidate_path;
+                                found_handle = candidate;
+                                found = true;
+                                break;
+                            }
                         }
                     }
+                    if found {
+                        break;
+                    }
                 }
-                if found {
-                    break;
-                }
-            }
 
-            if !found {
-                return Err(anyhow!(
-                    "No synced registries found. Please run 'zoi sync' to download the package database."
-                ));
-            }
-            (found_path, found_handle)
+                if !found {
+                    return Err(anyhow!(
+                        "No synced registries found. Please run 'zoi sync' to \
+                         download the package database."
+                    ),);
+                }
+                (found_path, found_handle,)
+            };
+
+            (registry_path, config.repos, true, Some(effective_handle,),)
         };
-
-        (registry_path, config.repos, true, Some(effective_handle))
-    };
 
     if !registry_db_path.exists() {
         return Err(anyhow!(
-            "Registry '{}' is not synced. Please run 'zoi sync' to download the package database.",
+            "Registry '{}' is not synced. Please run 'zoi sync' to download \
+             the package database.",
             registry_handle.unwrap_or_else(|| "default".to_string())
-        ));
+        ),);
     }
 
-    let repos_to_search = if let Some(r) = &request.repo {
+    let repos_to_search = if let Some(r,) = &request.repo {
         vec![r.clone()]
     } else {
         search_repos
@@ -480,20 +518,20 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
 
     let mut found_packages = Vec::new();
 
-    if request.name.contains('/') {
-        let pkg_name = Path::new(&request.name)
+    if request.name.contains('/',) {
+        let pkg_name = Path::new(&request.name,)
             .file_name()
-            .and_then(|s| s.to_str())
-            .ok_or_else(|| anyhow!("Invalid package path: {}", request.name))?;
+            .and_then(|s| s.to_str(),)
+            .ok_or_else(|| anyhow!("Invalid package path: {}", request.name),)?;
 
         for repo_name in &repos_to_search {
             let path = registry_db_path
-                .join(repo_name)
-                .join(&request.name)
-                .join(format!("{pkg_name}.pkg.lua"));
+                .join(repo_name,)
+                .join(&request.name,)
+                .join(format!("{pkg_name}.pkg.lua"),);
 
             if path.exists()
-                && let Ok(found) = process_found_package(
+                && let Ok(found,) = process_found_package(
                     path,
                     repo_name,
                     is_default_registry,
@@ -501,16 +539,18 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
                     quiet,
                 )
             {
-                found_packages.push(found);
+                found_packages.push(found,);
             }
         }
     } else {
         for repo_name in &repos_to_search {
-            let pkg_dir_path = registry_db_path.join(repo_name).join(&request.name);
-            let pkg_file_path = pkg_dir_path.join(format!("{}.pkg.lua", request.name));
+            let pkg_dir_path =
+                registry_db_path.join(repo_name,).join(&request.name,);
+            let pkg_file_path =
+                pkg_dir_path.join(format!("{}.pkg.lua", request.name),);
 
             if pkg_file_path.exists()
-                && let Ok(found) = process_found_package(
+                && let Ok(found,) = process_found_package(
                     pkg_file_path,
                     repo_name,
                     is_default_registry,
@@ -518,56 +558,64 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
                     quiet,
                 )
             {
-                found_packages.push(found);
+                found_packages.push(found,);
             }
         }
     }
 
     if found_packages.is_empty() {
         for repo_name in &repos_to_search {
-            let repo_path = registry_db_path.join(repo_name);
+            let repo_path = registry_db_path.join(repo_name,);
             if !repo_path.is_dir() {
                 continue;
             }
-            for entry in WalkDir::new(&repo_path)
+            for entry in WalkDir::new(&repo_path,)
                 .into_iter()
-                .filter_map(std::result::Result::ok)
+                .filter_map(std::result::Result::ok,)
                 .filter(|e| {
-                    e.file_type().is_file() && e.file_name().to_string_lossy().ends_with(".pkg.lua")
-                })
+                    e.file_type().is_file()
+                        && e.file_name()
+                            .to_string_lossy()
+                            .ends_with(".pkg.lua",)
+                },)
             {
-                if let Ok(pkg) = zoi_lua::parser::parse_lua_package(
+                if let Ok(pkg,) = zoi_lua::parser::parse_lua_package(
                     entry.path().to_str().ok_or_else(|| {
                         anyhow!(
                             "Path contains invalid UTF-8 characters: {}",
                             entry.path().display()
                         )
-                    })?,
+                    },)?,
                     None,
                     None,
                     true,
-                ) && let Some(provides) = &pkg.provides
-                    && provides.iter().any(|p| p == &request.name)
+                ) && let Some(provides,) = &pkg.provides
+                    && provides.iter().any(|p| p == &request.name,)
                 {
                     let major_repo = repo_name
-                        .split('/')
+                        .split('/',)
                         .next()
                         .unwrap_or_default()
                         .to_lowercase();
-                    let repo_config = config::read_repo_config(&registry_db_path).ok();
-                    let repo_type = if let Some(ref cfg) = repo_config {
+                    let repo_config =
+                        config::read_repo_config(&registry_db_path,).ok();
+                    let repo_type = if let Some(ref cfg,) = repo_config {
                         cfg.repos
                             .iter()
-                            .find(|r| r.name == major_repo)
-                            .map_or_else(|| "unofficial".to_string(), |r| r.repo_type.clone())
+                            .find(|r| r.name == major_repo,)
+                            .map_or_else(
+                                || "unofficial".to_string(),
+                                |r| r.repo_type.clone(),
+                            )
                     } else {
                         "unofficial".to_string()
                     };
-                    let source_type = if is_default_registry && repo_type == "official" {
-                        SourceType::OfficialRepo
-                    } else {
-                        SourceType::UntrustedRepo(repo_name.clone())
-                    };
+                    let source_type =
+                        if is_default_registry && repo_type == "official" {
+                            SourceType::OfficialRepo
+                        } else {
+                            SourceType::UntrustedRepo(repo_name.clone(),)
+                        };
                     found_packages.push(FoundPackage {
                         path: entry.path().to_path_buf(),
                         source_type,
@@ -576,74 +624,78 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
                         description: pkg.description,
                         license: pkg.license,
                         size: pkg.installed_size,
-                    });
+                    },);
                 }
             }
         }
     }
 
     if found_packages.is_empty() {
-        if let Some(repo) = &request.repo {
+        if let Some(repo,) = &request.repo {
             Err(anyhow!(
                 "Package '{}' not found in repository '@{}'.",
                 request.name,
                 repo
-            ))
+            ),)
         } else {
             Err(anyhow!(
                 "Package '{}' not found in any active repositories.",
                 request.name
-            ))
+            ),)
         }
     } else if found_packages.len() == 1 {
-        let chosen = found_packages
-            .first()
-            .ok_or_else(|| anyhow!("Found packages list is unexpectedly empty"))?;
+        let chosen = found_packages.first().ok_or_else(|| {
+            anyhow!("Found packages list is unexpectedly empty")
+        },)?;
 
         Ok(ResolvedSource {
             path: chosen.path.clone(),
             source_type: chosen.source_type.clone(),
-            repo_name: Some(chosen.repo_name.clone()),
-            repo_type: Some(chosen.repo_type.clone()),
+            repo_name: Some(chosen.repo_name.clone(),),
+            repo_type: Some(chosen.repo_type.clone(),),
             registry_handle: registry_handle.clone(),
             sharable_manifest: None,
             git_sha: None,
-        })
+        },)
     } else {
         println!(
-            "Found multiple packages named or providing '{}'. Please choose one:",
+            "Found multiple packages named or providing '{}'. Please choose \
+             one:",
             request.name.cyan()
         );
 
         let mut table = Table::new();
-        table.load_preset(UTF8_FULL);
-        table.set_header(vec!["#", "Repo", "License", "Size", "Description"]);
+        table.load_preset(UTF8_FULL,);
+        table.set_header(vec!["#", "Repo", "License", "Size", "Description"],);
 
-        for (i, p) in found_packages.iter().enumerate() {
+        for (i, p,) in found_packages.iter().enumerate() {
             table.add_row(vec![
                 (i + 1).to_string(),
                 p.repo_name.clone(),
                 p.license.clone(),
-                p.size.map_or_else(|| "unknown".to_string(), zoi_core::utils::format_bytes),
+                p.size.map_or_else(
+                    || "unknown".to_string(),
+                    zoi_core::utils::format_bytes,
+                ),
                 p.description.clone(),
-            ]);
+            ],);
         }
         println!("{table}");
 
-        let items: Vec<String> = found_packages
+        let items: Vec<String,> = found_packages
             .iter()
-            .map(|p| format!("@{}", p.repo_name.bold()))
+            .map(|p| format!("@{}", p.repo_name.bold()),)
             .collect();
 
-        let selection = Select::with_theme(&ColorfulTheme::default())
-            .with_prompt("Select a provider")
-            .items(&items)
-            .default(0)
+        let selection = Select::with_theme(&ColorfulTheme::default(),)
+            .with_prompt("Select a provider",)
+            .items(&items,)
+            .default(0,)
             .interact()?;
 
         let chosen = found_packages
-            .get(selection)
-            .ok_or_else(|| anyhow!("Invalid selection"))?;
+            .get(selection,)
+            .ok_or_else(|| anyhow!("Invalid selection"),)?;
         println!(
             "Selected package '{}' from repo '{}'",
             request.name, chosen.repo_name
@@ -652,63 +704,66 @@ fn find_package_in_db(request: &PackageRequest, quiet: bool) -> Result<ResolvedS
         Ok(ResolvedSource {
             path: chosen.path.clone(),
             source_type: chosen.source_type.clone(),
-            repo_name: Some(chosen.repo_name.clone()),
-            repo_type: Some(chosen.repo_type.clone()),
+            repo_name: Some(chosen.repo_name.clone(),),
+            repo_type: Some(chosen.repo_type.clone(),),
             registry_handle: registry_handle.clone(),
             sharable_manifest: None,
             git_sha: None,
-        })
+        },)
     }
 }
 
 /// Downloads a package definition from a URL and caches it locally.
-fn download_from_url(url: &str) -> Result<ResolvedSource> {
-    let (base_url, expected_hash) = if let Some((base, hash_part)) = url.split_once('#') {
-        if hash_part.starts_with("sha256-") || hash_part.starts_with("sha512-") {
-            (base, Some(hash_part))
+fn download_from_url(url: &str,) -> Result<ResolvedSource,> {
+    let (base_url, expected_hash,) =
+        if let Some((base, hash_part,),) = url.split_once('#',) {
+            if hash_part.starts_with("sha256-",)
+                || hash_part.starts_with("sha512-",)
+            {
+                (base, Some(hash_part,),)
+            } else {
+                (url, None,)
+            }
         } else {
-            (url, None)
-        }
-    } else {
-        (url, None)
-    };
+            (url, None,)
+        };
 
     let cache_dir = cache::get_pkgdef_cache_root()?;
-    fs::create_dir_all(&cache_dir)?;
+    fs::create_dir_all(&cache_dir,)?;
 
     let mut hasher = Sha256::new();
-    hasher.update(base_url.as_bytes());
-    let url_hash = hex::encode(hasher.finalize());
-    let cache_path = cache_dir.join(format!("{url_hash}.pkg.lua"));
+    hasher.update(base_url.as_bytes(),);
+    let url_hash = hex::encode(hasher.finalize(),);
+    let cache_path = cache_dir.join(format!("{url_hash}.pkg.lua"),);
 
     if cache_path.exists() {
-        if let Some(hash) = expected_hash {
-            let mut file = fs::File::open(&cache_path)?;
+        if let Some(hash,) = expected_hash {
+            let mut file = fs::File::open(&cache_path,)?;
             let mut content = Vec::new();
-            file.read_to_end(&mut content)?;
-            if verify_content_hash(&content, hash)? {
+            file.read_to_end(&mut content,)?;
+            if verify_content_hash(&content, hash,)? {
                 return Ok(ResolvedSource {
                     path: cache_path,
                     source_type: SourceType::Url,
                     repo_name: None,
                     repo_type: None,
-                    registry_handle: Some("local".to_string()),
+                    registry_handle: Some("local".to_string(),),
                     sharable_manifest: None,
                     git_sha: None,
-                });
+                },);
             }
             println!("Cached definition hash mismatch, re-downloading...");
-            fs::remove_file(&cache_path)?;
+            fs::remove_file(&cache_path,)?;
         } else {
             return Ok(ResolvedSource {
                 path: cache_path,
                 source_type: SourceType::Url,
                 repo_name: None,
                 repo_type: None,
-                registry_handle: Some("local".to_string()),
+                registry_handle: Some("local".to_string(),),
                 sharable_manifest: None,
                 git_sha: None,
-            });
+            },);
         }
     }
 
@@ -717,21 +772,21 @@ fn download_from_url(url: &str) -> Result<ResolvedSource> {
     let mut attempt = 0u32;
     let mut response = loop {
         attempt += 1;
-        match client.get(base_url).send() {
-            Ok(resp) => break resp,
-            Err(e) => {
+        match client.get(base_url,).send() {
+            Ok(resp,) => break resp,
+            Err(e,) => {
                 if attempt < 3 {
                     eprintln!(
                         "{}: download failed ({}). Retrying...",
                         "Network".yellow(),
                         e
                     );
-                    zoi_core::utils::retry_backoff_sleep(attempt);
+                    zoi_core::utils::retry_backoff_sleep(attempt,);
                     continue;
                 }
                 return Err(anyhow!(
                     "Failed to download file after {attempt} attempts: {e}"
-                ));
+                ),);
             }
         }
     };
@@ -740,97 +795,103 @@ fn download_from_url(url: &str) -> Result<ResolvedSource> {
             "Failed to download file (HTTP {}): {}",
             response.status(),
             base_url
-        ));
+        ),);
     }
 
-    let total_size = response.content_length().unwrap_or(0);
-    let pb = ProgressBar::new(total_size);
-    pb.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec})")?
-        .progress_chars("#>-"));
+    let total_size = response.content_length().unwrap_or(0,);
+    let pb = ProgressBar::new(total_size,);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template(
+                "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] \
+                 {bytes}/{total_bytes} ({bytes_per_sec})",
+            )?
+            .progress_chars("#>-",),
+    );
 
     let mut downloaded_bytes = Vec::new();
     let mut buffer = [0; 8192];
     loop {
-        let bytes_read = response.read(&mut buffer)?;
+        let bytes_read = response.read(&mut buffer,)?;
         if bytes_read == 0 {
             break;
         }
         downloaded_bytes.extend_from_slice(
             buffer
-                .get(..bytes_read)
-                .ok_or_else(|| anyhow!("Buffer slice out of bounds"))?,
+                .get(..bytes_read,)
+                .ok_or_else(|| anyhow!("Buffer slice out of bounds"),)?,
         );
-        pb.inc(bytes_read as u64);
+        pb.inc(bytes_read as u64,);
     }
-    pb.finish_with_message("Download complete.");
+    pb.finish_with_message("Download complete.",);
 
-    if let Some(hash) = expected_hash {
-        if !verify_content_hash(&downloaded_bytes, hash)? {
+    if let Some(hash,) = expected_hash {
+        if !verify_content_hash(&downloaded_bytes, hash,)? {
             return Err(anyhow!(
                 "Integrity verification failed for remote package definition."
-            ));
+            ),);
         }
         println!("{} Integrity verified.", "::".green());
     }
 
-    fs::write(&cache_path, &downloaded_bytes)?;
+    fs::write(&cache_path, &downloaded_bytes,)?;
 
     Ok(ResolvedSource {
         path: cache_path,
         source_type: SourceType::Url,
         repo_name: None,
         repo_type: None,
-        registry_handle: Some("local".to_string()),
+        registry_handle: Some("local".to_string(),),
         sharable_manifest: None,
         git_sha: None,
-    })
+    },)
 }
 
 /// Verifies the hash of the given content against a hash specification.
-fn verify_content_hash(content: &[u8], hash_spec: &str) -> Result<bool> {
-    let (algo, expected_hex) = hash_spec
-        .split_once('-')
-        .ok_or_else(|| anyhow!("Invalid hash format"))?;
+fn verify_content_hash(content: &[u8], hash_spec: &str,) -> Result<bool,> {
+    let (algo, expected_hex,) = hash_spec
+        .split_once('-',)
+        .ok_or_else(|| anyhow!("Invalid hash format"),)?;
     let actual_hex = match algo {
         "sha256" => {
             let mut hasher = Sha256::new();
-            hasher.update(content);
-            hex::encode(hasher.finalize())
+            hasher.update(content,);
+            hex::encode(hasher.finalize(),)
         }
         "sha512" => {
             let mut hasher = sha2::Sha512::new();
-            hasher.update(content);
-            hex::encode(hasher.finalize())
+            hasher.update(content,);
+            hex::encode(hasher.finalize(),)
         }
-        _ => return Err(anyhow!("Unsupported hash algorithm: {algo}")),
+        _ => return Err(anyhow!("Unsupported hash algorithm: {algo}"),),
     };
 
-    Ok(actual_hex.eq_ignore_ascii_case(expected_hex))
+    Ok(actual_hex.eq_ignore_ascii_case(expected_hex,),)
 }
 
 /// Downloads content from a URL as a string.
-fn download_content_from_url(url: &str) -> Result<String> {
+fn download_content_from_url(url: &str,) -> Result<String,> {
     println!("Downloading from: {}", url.cyan());
     let client = zoi_core::utils::get_http_client()?;
     let mut attempt = 0u32;
     let response = loop {
         attempt += 1;
-        match client.get(url).send() {
-            Ok(resp) => break resp,
-            Err(e) => {
+        match client.get(url,).send() {
+            Ok(resp,) => break resp,
+            Err(e,) => {
                 if attempt < 3 {
                     eprintln!(
                         "{}: download failed ({}). Retrying...",
                         "Network".yellow(),
                         e
                     );
-                    zoi_core::utils::retry_backoff_sleep(attempt);
+                    zoi_core::utils::retry_backoff_sleep(attempt,);
                     continue;
                 }
                 return Err(anyhow!(
-                    "Failed to download from {url} after {attempt} attempts: {e}"
-                ));
+                    "Failed to download from {url} after {attempt} attempts: \
+                     {e}"
+                ),);
             }
         }
     };
@@ -843,10 +904,10 @@ fn download_content_from_url(url: &str) -> Result<String> {
             response
                 .text()
                 .unwrap_or_else(|_| "Could not read response body".to_string())
-        ));
+        ),);
     }
 
-    Ok(response.text()?)
+    Ok(response.text()?,)
 }
 
 /// Resolves a version from a JSON URL for a given channel.
@@ -854,7 +915,7 @@ fn download_content_from_url(url: &str) -> Result<String> {
 /// # Errors
 ///
 /// Returns an error if the request fails or the response cannot be parsed.
-pub fn resolve_version_from_url(url: &str, channel: &str) -> Result<String> {
+pub fn resolve_version_from_url(url: &str, channel: &str,) -> Result<String,> {
     println!(
         "Resolving version for channel '{}' from {}",
         channel.cyan(),
@@ -864,43 +925,54 @@ pub fn resolve_version_from_url(url: &str, channel: &str) -> Result<String> {
     let mut attempt = 0u32;
     let resp = loop {
         attempt += 1;
-        match client.get(url).send() {
-            Ok(r) => match r.text() {
-                Ok(t) => break t,
-                Err(e) => {
+        match client.get(url,).send() {
+            Ok(r,) => match r.text() {
+                Ok(t,) => break t,
+                Err(e,) => {
                     if attempt < 3 {
-                        eprintln!("{}: read failed ({}). Retrying...", "Network".yellow(), e);
-                        zoi_core::utils::retry_backoff_sleep(attempt);
+                        eprintln!(
+                            "{}: read failed ({}). Retrying...",
+                            "Network".yellow(),
+                            e
+                        );
+                        zoi_core::utils::retry_backoff_sleep(attempt,);
                         continue;
                     }
                     return Err(anyhow!(
                         "Failed to read response after {attempt} attempts: {e}"
-                    ));
+                    ),);
                 }
             },
-            Err(e) => {
+            Err(e,) => {
                 if attempt < 3 {
-                    eprintln!("{}: fetch failed ({}). Retrying...", "Network".yellow(), e);
-                    zoi_core::utils::retry_backoff_sleep(attempt);
+                    eprintln!(
+                        "{}: fetch failed ({}). Retrying...",
+                        "Network".yellow(),
+                        e
+                    );
+                    zoi_core::utils::retry_backoff_sleep(attempt,);
                     continue;
                 }
-                return Err(anyhow!("Failed to fetch after {attempt} attempts: {e}"));
+                return Err(anyhow!(
+                    "Failed to fetch after {attempt} attempts: {e}"
+                ),);
             }
         }
     };
-    let json: serde_json::Value = serde_json::from_str(&resp)?;
+    let json: serde_json::Value = serde_json::from_str(&resp,)?;
 
-    if let Some(version) = json
-        .get("versions")
-        .and_then(|v| v.get(channel))
-        .and_then(|c| c.as_str())
+    if let Some(version,) = json
+        .get("versions",)
+        .and_then(|v| v.get(channel,),)
+        .and_then(|c| c.as_str(),)
     {
-        return Ok(version.to_string());
+        return Ok(version.to_string(),);
     }
 
     Err(anyhow!(
-        "Failed to extract version for channel '{channel}' from JSON URL: {url}"
-    ))
+        "Failed to extract version for channel '{channel}' from JSON URL: \
+         {url}"
+    ),)
 }
 
 /// Resolves a channel name to a concrete version.
@@ -908,18 +980,18 @@ pub fn resolve_version_from_url(url: &str, channel: &str) -> Result<String> {
 /// # Errors
 ///
 /// Returns an error if the channel name is not found in the versions map.
-pub fn resolve_channel<S: ::std::hash::BuildHasher>(
-    versions: &HashMap<String, String, S>,
+pub fn resolve_channel<S: ::std::hash::BuildHasher,>(
+    versions: &HashMap<String, String, S,>,
     channel: &str,
-) -> Result<String> {
-    if let Some(url_or_version) = versions.get(channel) {
-        if url_or_version.starts_with("http") {
-            resolve_version_from_url(url_or_version, channel)
+) -> Result<String,> {
+    if let Some(url_or_version,) = versions.get(channel,) {
+        if url_or_version.starts_with("http",) {
+            resolve_version_from_url(url_or_version, channel,)
         } else {
-            Ok(url_or_version.clone())
+            Ok(url_or_version.clone(),)
         }
     } else {
-        Err(anyhow!("Channel '@{channel}' not found in versions map."))
+        Err(anyhow!("Channel '@{channel}' not found in versions map."),)
     }
 }
 
@@ -928,180 +1000,195 @@ pub fn resolve_channel<S: ::std::hash::BuildHasher>(
 /// # Errors
 ///
 /// Returns an error if the version cannot be determined.
-pub fn get_default_version(pkg: &types::Package, registry_handle: Option<&str>) -> Result<String> {
-    if let Some(handle) = registry_handle {
+pub fn get_default_version(
+    pkg: &types::Package,
+    registry_handle: Option<&str,>,
+) -> Result<String,> {
+    if let Some(handle,) = registry_handle {
         let source = format!("#{}@{}", handle, pkg.repo);
 
-        if let Some(pinned_version) = pin::get_pinned_version(&source)? {
+        if let Some(pinned_version,) = pin::get_pinned_version(&source,)? {
             println!(
                 "Using pinned version '{}' for {}.",
                 pinned_version.yellow(),
                 source.cyan()
             );
-            return if pinned_version.starts_with('@') {
-                let channel = pinned_version.trim_start_matches('@');
+            return if pinned_version.starts_with('@',) {
+                let channel = pinned_version.trim_start_matches('@',);
                 let versions = pkg.versions.as_ref().ok_or_else(|| {
                     anyhow!(
-                        "Package '{}' has no 'versions' map to resolve pinned channel '{}'.",
+                        "Package '{}' has no 'versions' map to resolve pinned \
+                         channel '{}'.",
                         pkg.name,
                         pinned_version
                     )
-                })?;
-                resolve_channel(versions, channel)
+                },)?;
+                resolve_channel(versions, channel,)
             } else {
-                Ok(pinned_version)
+                Ok(pinned_version,)
             };
         }
     }
 
-    if let Some(versions) = &pkg.versions {
-        if versions.contains_key("stable") {
-            return resolve_channel(versions, "stable");
+    if let Some(versions,) = &pkg.versions {
+        if versions.contains_key("stable",) {
+            return resolve_channel(versions, "stable",);
         }
-        let mut channels: Vec<_> = versions.keys().collect();
+        let mut channels: Vec<_,> = versions.keys().collect();
         channels.sort();
-        if let Some(channel) = channels.first() {
+        if let Some(channel,) = channels.first() {
             println!(
-                "No 'stable' channel found, using first available channel: '@{}'",
+                "No 'stable' channel found, using first available channel: \
+                 '@{}'",
                 channel.cyan()
             );
-            return resolve_channel(versions, channel);
+            return resolve_channel(versions, channel,);
         }
         return Err(anyhow!(
             "Package has a 'versions' map but no versions were found in it."
-        ));
+        ),);
     }
 
-    if let Some(ver) = &pkg.version {
-        if ver.starts_with("http") {
+    if let Some(ver,) = &pkg.version {
+        if ver.starts_with("http",) {
             let client = zoi_core::utils::get_http_client()?;
             let mut attempt = 0u32;
             let resp = loop {
                 attempt += 1;
-                match client.get(ver).send() {
-                    Ok(r) => match r.text() {
-                        Ok(t) => break t,
-                        Err(e) => {
+                match client.get(ver,).send() {
+                    Ok(r,) => match r.text() {
+                        Ok(t,) => break t,
+                        Err(e,) => {
                             if attempt < 3 {
                                 eprintln!(
                                     "{}: read failed ({}). Retrying...",
                                     "Network".yellow(),
                                     e
                                 );
-                                zoi_core::utils::retry_backoff_sleep(attempt);
+                                zoi_core::utils::retry_backoff_sleep(attempt,);
                                 continue;
                             }
                             return Err(anyhow!(
-                                "Failed to read response after {attempt} attempts: {e}"
-                            ));
+                                "Failed to read response after {attempt} \
+                                 attempts: {e}"
+                            ),);
                         }
                     },
-                    Err(e) => {
+                    Err(e,) => {
                         if attempt < 3 {
-                            eprintln!("{}: fetch failed ({}). Retrying...", "Network".yellow(), e);
-                            zoi_core::utils::retry_backoff_sleep(attempt);
+                            eprintln!(
+                                "{}: fetch failed ({}). Retrying...",
+                                "Network".yellow(),
+                                e
+                            );
+                            zoi_core::utils::retry_backoff_sleep(attempt,);
                             continue;
                         }
                         return Err(anyhow!(
                             "Failed to fetch after {attempt} attempts: {e}"
-                        ));
+                        ),);
                     }
                 }
             };
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&resp) {
-                if let Some(version) = json
-                    .get("versions")
-                    .and_then(|v| v.get("stable"))
-                    .and_then(|s| s.as_str())
+            if let Ok(json,) =
+                serde_json::from_str::<serde_json::Value,>(&resp,)
+            {
+                if let Some(version,) = json
+                    .get("versions",)
+                    .and_then(|v| v.get("stable",),)
+                    .and_then(|s| s.as_str(),)
                 {
-                    return Ok(version.to_string());
+                    return Ok(version.to_string(),);
                 }
 
-                if let Some(tag) = json
-                    .get("latest")
-                    .and_then(|l| l.get("production"))
-                    .and_then(|p| p.get("tag"))
-                    .and_then(|t| t.as_str())
+                if let Some(tag,) = json
+                    .get("latest",)
+                    .and_then(|l| l.get("production",),)
+                    .and_then(|p| p.get("tag",),)
+                    .and_then(|t| t.as_str(),)
                 {
-                    return Ok(tag.to_string());
+                    return Ok(tag.to_string(),);
                 }
                 return Err(anyhow!(
-                    "Could not determine a version from the JSON content at {ver}"
-                ));
+                    "Could not determine a version from the JSON content at \
+                     {ver}"
+                ),);
             }
-            return Ok(resp.trim().to_string());
+            return Ok(resp.trim().to_string(),);
         }
-        return Ok(ver.clone());
+        return Ok(ver.clone(),);
     }
 
     Err(anyhow!(
         "Could not determine a version for package '{}'.",
         pkg.name
-    ))
+    ),)
 }
 
 /// Returns the specific version to install based on a version specification.
 fn get_version_for_install(
     pkg: &types::Package,
-    version_spec: Option<&String>,
-    registry_handle: Option<&str>,
-) -> Result<String> {
-    if let Some(spec) = version_spec {
-        if spec.starts_with('@') {
-            let channel = spec.trim_start_matches('@');
+    version_spec: Option<&String,>,
+    registry_handle: Option<&str,>,
+) -> Result<String,> {
+    if let Some(spec,) = version_spec {
+        if spec.starts_with('@',) {
+            let channel = spec.trim_start_matches('@',);
             let versions = pkg.versions.as_ref().ok_or_else(|| {
                 anyhow!(
-                    "Package '{}' has no 'versions' map to resolve channel '@{}'.",
+                    "Package '{}' has no 'versions' map to resolve channel \
+                     '@{}'.",
                     pkg.name,
                     channel
                 )
-            })?;
-            return resolve_channel(versions, channel);
+            },)?;
+            return resolve_channel(versions, channel,);
         }
 
-        if let Some(versions) = &pkg.versions
-            && versions.contains_key(spec)
+        if let Some(versions,) = &pkg.versions
+            && versions.contains_key(spec,)
         {
             println!("Found '{}' as a channel, resolving...", spec.cyan());
-            return resolve_channel(versions, spec);
+            return resolve_channel(versions, spec,);
         }
 
-        return Ok(spec.clone());
+        return Ok(spec.clone(),);
     }
 
-    get_default_version(pkg, registry_handle)
+    get_default_version(pkg, registry_handle,)
 }
 
 /// Resolves the requested version specification from a source string.
 ///
 /// # Errors
 ///
-/// Returns an error if the source string format is invalid or if resolution fails.
+/// Returns an error if the source string format is invalid or if resolution
+/// fails.
 pub fn resolve_requested_version_spec(
     source_str: &str,
-    scope: Option<types::Scope>,
+    scope: Option<types::Scope,>,
     quiet: bool,
     yes: bool,
-) -> Result<Option<String>> {
-    let request = parse_source_string(source_str)?;
-    let Some(_) = request.version_spec else {
-        return Ok(None);
+) -> Result<Option<String,>,> {
+    let request = parse_source_string(source_str,)?;
+    let Some(_,) = request.version_spec else {
+        return Ok(None,);
     };
 
-    let resolved_source = resolve_source(source_str, scope, quiet, yes)?;
+    let resolved_source = resolve_source(source_str, scope, quiet, yes,)?;
     let mut pkg = zoi_lua::parser::parse_lua_package(
         resolved_source.path.to_str().ok_or_else(|| {
             anyhow!(
                 "Path contains invalid UTF-8 characters: {}",
                 resolved_source.path.display()
             )
-        })?,
+        },)?,
         None,
         scope,
         quiet,
     )?;
 
-    if let Some(repo_name) = resolved_source.repo_name {
+    if let Some(repo_name,) = resolved_source.repo_name {
         pkg.repo = repo_name;
     }
 
@@ -1110,15 +1197,18 @@ pub fn resolve_requested_version_spec(
         request.version_spec.as_ref(),
         resolved_source.registry_handle.as_deref(),
     )
-    .map(Some)
+    .map(Some,)
 }
 
-/// Resolves a source identifier into a concrete local path to a `.pkg.lua` file.
+/// Resolves a source identifier into a concrete local path to a `.pkg.lua`
+/// file.
 ///
 /// This is the primary entry point for package discovery. It handles:
 /// - Parsing the source string (e.g. #reg@repo/name@version).
-/// - Deciding if the source is a local file, a URL, or a registry-backed package.
-/// - Recursively following 'alt' references if the package definition points elsewhere.
+/// - Deciding if the source is a local file, a URL, or a registry-backed
+///   package.
+/// - Recursively following 'alt' references if the package definition points
+///   elsewhere.
 /// - Confirming trust for untrusted sources (URLs/local files).
 ///
 /// # Errors
@@ -1126,13 +1216,14 @@ pub fn resolve_requested_version_spec(
 /// Returns an error if resolution fails or if an untrusted source is rejected.
 pub fn resolve_source(
     source: &str,
-    scope: Option<types::Scope>,
+    scope: Option<types::Scope,>,
     quiet: bool,
     yes: bool,
-) -> Result<ResolvedSource> {
+) -> Result<ResolvedSource,> {
     let config = config::read_config().unwrap_or_default();
-    let max_depth = config.max_resolution_depth.unwrap_or(7);
-    let resolved = resolve_source_recursive(source, 0, max_depth, scope, quiet)?;
+    let max_depth = config.max_resolution_depth.unwrap_or(7,);
+    let resolved =
+        resolve_source_recursive(source, 0, max_depth, scope, quiet,)?;
 
     if !quiet {
         let confirmation_key = match &resolved.source_type {
@@ -1140,45 +1231,50 @@ pub fn resolve_source(
                 resolved
                     .path
                     .canonicalize()
-                    .unwrap_or_else(|_| resolved.path.clone())
+                    .unwrap_or_else(|_| resolved.path.clone(),)
                     .to_string_lossy()
                     .to_string(),
             ),
-            SourceType::Url => Some(source.to_string()),
+            SourceType::Url => Some(source.to_string(),),
             _ => None,
         };
 
-        let confirmation_key = if let Some(key) = confirmation_key {
-            let confirmed = CONFIRMED_UNTRUSTED_SOURCES
-                .lock()
-                .map_err(|e| anyhow!("Failed to lock trust confirmation cache: {e}"))?;
-            if confirmed.contains(&key) {
+        let confirmation_key = if let Some(key,) = confirmation_key {
+            let confirmed =
+                CONFIRMED_UNTRUSTED_SOURCES.lock().map_err(|e| {
+                    anyhow!("Failed to lock trust confirmation cache: {e}")
+                },)?;
+            if confirmed.contains(&key,) {
                 None
             } else {
-                Some(key)
+                Some(key,)
             }
         } else {
             None
         };
 
-        if let Some(key) = confirmation_key {
-            zoi_core::utils::confirm_untrusted_source(&resolved.source_type, yes)?;
-            let mut confirmed = CONFIRMED_UNTRUSTED_SOURCES
-                .lock()
-                .map_err(|e| anyhow!("Failed to lock trust confirmation cache: {e}"))?;
-            confirmed.insert(key);
+        if let Some(key,) = confirmation_key {
+            zoi_core::utils::confirm_untrusted_source(
+                &resolved.source_type,
+                yes,
+            )?;
+            let mut confirmed =
+                CONFIRMED_UNTRUSTED_SOURCES.lock().map_err(|e| {
+                    anyhow!("Failed to lock trust confirmation cache: {e}")
+                },)?;
+            confirmed.insert(key,);
         }
     }
 
-    if let Ok(_request) = parse_source_string(source)
+    if let Ok(_request,) = parse_source_string(source,)
         && !matches!(
             &resolved.source_type,
             SourceType::LocalFile | SourceType::Url
         )
-        && let Some(_repo_name) = &resolved.repo_name
+        && let Some(_repo_name,) = &resolved.repo_name
     {}
 
-    Ok(resolved)
+    Ok(resolved,)
 }
 
 /// Resolves a package and its version from a source string.
@@ -1188,20 +1284,20 @@ pub fn resolve_source(
 /// Returns an error if parsing or resolution fails.
 pub fn resolve_package_and_version(
     source_str: &str,
-    scope: Option<types::Scope>,
+    scope: Option<types::Scope,>,
     quiet: bool,
     yes: bool,
 ) -> Result<(
     types::Package,
     String,
-    Option<types::SharableInstallManifest>,
+    Option<types::SharableInstallManifest,>,
     PathBuf,
-    Option<String>,
-    Option<String>,
-    Option<String>,
-)> {
-    let request = parse_source_string(source_str)?;
-    let resolved_source = resolve_source(source_str, scope, quiet, yes)?;
+    Option<String,>,
+    Option<String,>,
+    Option<String,>,
+),> {
+    let request = parse_source_string(source_str,)?;
+    let resolved_source = resolve_source(source_str, scope, quiet, yes,)?;
     let registry_handle = resolved_source.registry_handle.clone();
     let repo_type = resolved_source.repo_type.clone();
     let pkg_lua_path = resolved_source.path.clone();
@@ -1213,14 +1309,14 @@ pub fn resolve_package_and_version(
                 "Path contains invalid UTF-8 characters: {}",
                 resolved_source.path.display()
             )
-        })?,
+        },)?,
         None,
         scope,
         quiet,
     )?;
 
     let mut pkg_with_repo = pkg_template;
-    if let Some(repo_name) = resolved_source.repo_name.clone() {
+    if let Some(repo_name,) = resolved_source.repo_name.clone() {
         pkg_with_repo.repo = repo_name;
     }
 
@@ -1236,15 +1332,15 @@ pub fn resolve_package_and_version(
                 "Path contains invalid UTF-8 characters: {}",
                 resolved_source.path.display()
             )
-        })?,
-        Some(&version_string),
+        },)?,
+        Some(&version_string,),
         scope,
         quiet,
     )?;
-    if let Some(repo_name) = resolved_source.repo_name.clone() {
+    if let Some(repo_name,) = resolved_source.repo_name.clone() {
         pkg.repo = repo_name;
     }
-    pkg.version = Some(version_string.clone());
+    pkg.version = Some(version_string.clone(),);
 
     let registry_handle = resolved_source.registry_handle.clone();
 
@@ -1256,7 +1352,7 @@ pub fn resolve_package_and_version(
         registry_handle,
         repo_type,
         git_sha,
-    ))
+    ),)
 }
 
 /// Recursively resolves a source identifier.
@@ -1264,28 +1360,33 @@ fn resolve_source_recursive(
     source: &str,
     depth: u8,
     max_depth: u8,
-    scope: Option<types::Scope>,
+    scope: Option<types::Scope,>,
     quiet: bool,
-) -> Result<ResolvedSource> {
+) -> Result<ResolvedSource,> {
     if max_depth > 0 && depth > max_depth {
         let msg = format!(
-            "Resolution depth {depth} exceeds limit {max_depth}. Potential circular 'alt' reference."
+            "Resolution depth {depth} exceeds limit {max_depth}. Potential \
+             circular 'alt' reference."
         );
         if quiet
-            || !zoi_core::utils::ask_for_confirmation(&format!("{msg} Continue anyway?"), false)
+            || !zoi_core::utils::ask_for_confirmation(
+                &format!("{msg} Continue anyway?"),
+                false,
+            )
         {
-            return Err(anyhow!("Exceeded max resolution depth."));
+            return Err(anyhow!("Exceeded max resolution depth."),);
         }
     }
 
-    if source.ends_with(".manifest.yaml") {
-        let path = PathBuf::from(source);
+    if source.ends_with(".manifest.yaml",) {
+        let path = PathBuf::from(source,);
         if !path.exists() {
-            return Err(anyhow!("Local file not found at '{source}'"));
+            return Err(anyhow!("Local file not found at '{source}'"),);
         }
         println!("Using local sharable manifest file: {}", path.display());
-        let content = fs::read_to_string(&path)?;
-        let sharable_manifest: types::SharableInstallManifest = serde_yaml::from_str(&content)?;
+        let content = fs::read_to_string(&path,)?;
+        let sharable_manifest: types::SharableInstallManifest =
+            serde_yaml::from_str(&content,)?;
         let new_source = format!(
             "#{}@{}/{}@{}",
             sharable_manifest.registry_handle,
@@ -1293,83 +1394,98 @@ fn resolve_source_recursive(
             sharable_manifest.name,
             sharable_manifest.version
         );
-        let mut resolved_source =
-            resolve_source_recursive(&new_source, depth + 1, max_depth, scope, quiet)?;
-        resolved_source.sharable_manifest = Some(sharable_manifest);
-        return Ok(resolved_source);
+        let mut resolved_source = resolve_source_recursive(
+            &new_source,
+            depth + 1,
+            max_depth,
+            scope,
+            quiet,
+        )?;
+        resolved_source.sharable_manifest = Some(sharable_manifest,);
+        return Ok(resolved_source,);
     }
 
-    let path_part = split_explicit_file_source(source).map(|(path, _, _)| path);
+    let path_part =
+        split_explicit_file_source(source,).map(|(path, _, _,)| path,);
 
-    let request = parse_source_string(source)?;
+    let request = parse_source_string(source,)?;
 
-    if let Some(handle) = &request.handle
-        && handle.starts_with("git:")
+    if let Some(handle,) = &request.handle
+        && handle.starts_with("git:",)
     {
         if zoi_core::offline::is_offline() {
             return Err(anyhow!(
-                "Cannot resolve remote git repo '{handle}': Zoi is in offline mode."
-            ));
+                "Cannot resolve remote git repo '{handle}': Zoi is in offline \
+                 mode."
+            ),);
         }
-        let git_source = handle
-            .strip_prefix("git:")
-            .ok_or_else(|| anyhow!("Handle '{handle}' unexpectedly missing 'git:' prefix"))?;
+        let git_source = handle.strip_prefix("git:",).ok_or_else(|| {
+            anyhow!("Handle '{handle}' unexpectedly missing 'git:' prefix")
+        },)?;
         println!(
-            "Warning: using remote git repo '{}' not from official Zoi database.",
+            "Warning: using remote git repo '{}' not from official Zoi \
+             database.",
             git_source.yellow()
         );
 
-        let (host, repo_path) = git_source
-            .split_once('/')
-            .ok_or_else(|| anyhow!("Invalid git source format. Expected host/owner/repo."))?;
+        let (host, repo_path,) =
+            git_source.split_once('/',).ok_or_else(|| {
+                anyhow!("Invalid git source format. Expected host/owner/repo.")
+            },)?;
 
-        let (base_url, branch_sep) = match host {
+        let (base_url, branch_sep,) = match host {
             "github.com" => (
                 format!("https://raw.githubusercontent.com/{repo_path}"),
                 "/",
             ),
-            "gitlab.com" => (format!("https://gitlab.com/{repo_path}/-/raw"), "/"),
-            "codeberg.org" => (
-                format!("https://codeberg.org/{repo_path}/raw/branch"),
-                "/",
-            ),
-            _ => return Err(anyhow!("Unsupported git host: {host}")),
+            "gitlab.com" => {
+                (format!("https://gitlab.com/{repo_path}/-/raw"), "/",)
+            }
+            "codeberg.org" => {
+                (format!("https://codeberg.org/{repo_path}/raw/branch"), "/",)
+            }
+            _ => return Err(anyhow!("Unsupported git host: {host}"),),
         };
 
-        let (_, branch) = {
+        let (_, branch,) = {
             let mut last_error = None;
             let mut content = None;
-            for b in ["main", "master"] {
-                let repo_yaml_url = format!("{base_url}{branch_sep}{b}/repo.yaml");
-                match download_content_from_url(&repo_yaml_url) {
-                    Ok(c) => {
-                        content = Some((c, b.to_string()));
+            for b in ["main", "master",] {
+                let repo_yaml_url =
+                    format!("{base_url}{branch_sep}{b}/repo.yaml");
+                match download_content_from_url(&repo_yaml_url,) {
+                    Ok(c,) => {
+                        content = Some((c, b.to_string(),),);
                         break;
                     }
-                    Err(e) => {
-                        last_error = Some(e);
+                    Err(e,) => {
+                        last_error = Some(e,);
                     }
                 }
             }
             content.ok_or_else(|| {
-                last_error
-                    .unwrap_or_else(|| anyhow!("Could not find repo.yaml on main or master branch"))
-            })?
+                last_error.unwrap_or_else(|| {
+                    anyhow!("Could not find repo.yaml on main or master branch")
+                },)
+            },)?
         };
 
-        let full_pkg_path = if let Some(r) = &request.repo {
+        let full_pkg_path = if let Some(r,) = &request.repo {
             format!("{}/{}", r, request.name)
         } else {
             request.name.clone()
         };
 
-        let pkg_name = Path::new(&full_pkg_path)
+        let pkg_name = Path::new(&full_pkg_path,)
             .file_name()
-            .ok_or_else(|| anyhow!("Invalid package path: {full_pkg_path}"))?
+            .ok_or_else(|| anyhow!("Invalid package path: {full_pkg_path}"),)?
             .to_str()
-            .ok_or_else(|| anyhow!("Package name contains invalid UTF-8: {full_pkg_path}"))?;
+            .ok_or_else(|| {
+                anyhow!("Package name contains invalid UTF-8: {full_pkg_path}")
+            },)?;
         let pkg_lua_filename = format!("{pkg_name}.pkg.lua");
-        let pkg_lua_path_in_repo = Path::new(&full_pkg_path).join(pkg_lua_filename);
+        let pkg_lua_path_in_repo =
+            Path::new(&full_pkg_path,).join(pkg_lua_filename,);
 
         let pkg_lua_url = format!(
             "{}{}{}/{}",
@@ -1382,149 +1498,164 @@ fn resolve_source_recursive(
                 .replace('\\', "/")
         );
 
-        let pkg_lua_content = download_content_from_url(&pkg_lua_url)?;
+        let pkg_lua_content = download_content_from_url(&pkg_lua_url,)?;
 
         let cache_dir = cache::get_pkgdef_cache_root()?;
-        fs::create_dir_all(&cache_dir)?;
+        fs::create_dir_all(&cache_dir,)?;
 
         let mut hasher = Sha256::new();
-        hasher.update(pkg_lua_url.as_bytes());
-        let hash = hex::encode(hasher.finalize());
-        let cache_path = cache_dir.join(format!("{hash}.pkg.lua"));
+        hasher.update(pkg_lua_url.as_bytes(),);
+        let hash = hex::encode(hasher.finalize(),);
+        let cache_path = cache_dir.join(format!("{hash}.pkg.lua"),);
 
-        fs::write(&cache_path, pkg_lua_content.as_bytes())?;
+        fs::write(&cache_path, pkg_lua_content.as_bytes(),)?;
 
         let repo_name = format!("git:{git_source}");
 
         return Ok(ResolvedSource {
             path: cache_path,
-            source_type: SourceType::GitRepo(repo_name.clone()),
-            repo_name: Some(repo_name),
-            repo_type: Some("unofficial".to_string()),
+            source_type: SourceType::GitRepo(repo_name.clone(),),
+            repo_name: Some(repo_name,),
+            repo_type: Some("unofficial".to_string(),),
             registry_handle: None,
             sharable_manifest: None,
             git_sha: None,
-        });
+        },);
     }
 
-    let resolved_source = if source.starts_with("#git@") {
-        let full_path_str = source.trim_start_matches("#git@");
-        let parts: Vec<&str> = full_path_str.split('/').collect();
+    let resolved_source = if source.starts_with("#git@",) {
+        let full_path_str = source.trim_start_matches("#git@",);
+        let parts: Vec<&str,> = full_path_str.split('/',).collect();
 
         if parts.len() < 2 {
             return Err(anyhow!(
                 "Invalid git source. Use #git@<repo-name>/<path/to/pkg>"
-            ));
+            ),);
         }
 
         let repo_name = parts
             .first()
-            .ok_or_else(|| anyhow!("Invalid git source"))?;
+            .ok_or_else(|| anyhow!("Invalid git source"),)?;
         let nested_path_parts = parts
-            .get(1..)
-            .ok_or_else(|| anyhow!("Invalid git source path"))?;
+            .get(1..,)
+            .ok_or_else(|| anyhow!("Invalid git source path"),)?;
         let pkg_name = nested_path_parts
             .last()
-            .ok_or_else(|| anyhow!("Empty path in git source"))?;
+            .ok_or_else(|| anyhow!("Empty path in git source"),)?;
 
         let home_dir = zoi_core::utils::get_user_home()
-            .ok_or_else(|| anyhow!("Could not find home directory."))?;
+            .ok_or_else(|| anyhow!("Could not find home directory."),)?;
         let mut path = home_dir
-            .join(".zoi")
-            .join("pkgs")
-            .join("git")
-            .join(repo_name);
+            .join(".zoi",)
+            .join("pkgs",)
+            .join("git",)
+            .join(repo_name,);
 
-        for part in nested_path_parts.iter().take(nested_path_parts.len() - 1) {
-            path = path.join(part);
+        for part in nested_path_parts.iter().take(nested_path_parts.len() - 1,)
+        {
+            path = path.join(part,);
         }
 
-        path = path.join(format!("{pkg_name}.pkg.lua"));
+        path = path.join(format!("{pkg_name}.pkg.lua"),);
 
         if !path.exists() {
-            let nested_path_str = nested_path_parts.join("/");
+            let nested_path_str = nested_path_parts.join("/",);
             return Err(anyhow!(
                 "Package '{}' not found in git repo '{}' (expected: {})",
                 nested_path_str,
                 repo_name,
                 path.display()
-            ));
+            ),);
         }
         println!(
-            "Warning: using external git repo '{}{}' not from official Zoi database.",
+            "Warning: using external git repo '{}{}' not from official Zoi \
+             database.",
             "#git@".yellow(),
             repo_name.yellow()
         );
         let git_repo_root = home_dir
-            .join(".zoi")
-            .join("pkgs")
-            .join("git")
-            .join(repo_name);
-        let git_sha = get_git_head_sha(&git_repo_root);
+            .join(".zoi",)
+            .join("pkgs",)
+            .join("git",)
+            .join(repo_name,);
+        let git_sha = get_git_head_sha(&git_repo_root,);
 
         ResolvedSource {
             path,
-            source_type: SourceType::GitRepo(repo_name.to_string()),
-            repo_name: Some(format!("git/{repo_name}")),
-            repo_type: Some("unofficial".to_string()),
-            registry_handle: Some("local".to_string()),
+            source_type: SourceType::GitRepo(repo_name.to_string(),),
+            repo_name: Some(format!("git/{repo_name}"),),
+            repo_type: Some("unofficial".to_string(),),
+            registry_handle: Some("local".to_string(),),
             sharable_manifest: None,
             git_sha,
         }
-    } else if source.starts_with("http://") || source.starts_with("https://") {
+    } else if source.starts_with("http://",) || source.starts_with("https://",)
+    {
         if zoi_core::offline::is_offline() {
             return Err(anyhow!(
-                "Cannot download package definition from URL '{source}': Zoi is in offline mode."
-            ));
+                "Cannot download package definition from URL '{source}': Zoi \
+                 is in offline mode."
+            ),);
         }
-        download_from_url(download_source_for_explicit_path(source, path_part))?
-    } else if let Some(path_part) = path_part {
-        let path = zoi_core::utils::expand_tilde(path_part);
+        download_from_url(
+            download_source_for_explicit_path(source, path_part,),
+        )?
+    } else if let Some(path_part,) = path_part {
+        let path = zoi_core::utils::expand_tilde(path_part,);
         if !path.exists() {
-            return Err(anyhow!("Local file not found at '{}'", path.display()));
+            return Err(anyhow!(
+                "Local file not found at '{}'",
+                path.display()
+            ),);
         }
         ResolvedSource {
             path,
             source_type: SourceType::LocalFile,
             repo_name: None,
             repo_type: None,
-            registry_handle: Some("local".to_string()),
+            registry_handle: Some("local".to_string(),),
             sharable_manifest: None,
             git_sha: None,
         }
     } else if zoi_core::utils::is_mini_mode() {
         let index = crate::mini_resolve::fetch_registry_index()?;
 
-        let (repo, repo_type) = if let Some(r) = &request.repo {
+        let (repo, repo_type,) = if let Some(r,) = &request.repo {
             let r_type = index
                 .packages
-                .get(&request.name)
-                .filter(|p| &p.repo == r).map_or_else(|| "unofficial".to_string(), |p| p.repo_type.clone());
-            (r.clone(), r_type)
+                .get(&request.name,)
+                .filter(|p| &p.repo == r,)
+                .map_or_else(
+                    || "unofficial".to_string(),
+                    |p| p.repo_type.clone(),
+                );
+            (r.clone(), r_type,)
         } else {
-            let pkg_info = index.packages.get(&request.name).ok_or_else(|| {
-                anyhow!(
-                    "Package '{}' not found in Zoidberg registry index",
-                    request.name
-                )
-            })?;
-            (pkg_info.repo.clone(), pkg_info.repo_type.clone())
+            let pkg_info =
+                index.packages.get(&request.name,).ok_or_else(|| {
+                    anyhow!(
+                        "Package '{}' not found in Zoidberg registry index",
+                        request.name
+                    )
+                },)?;
+            (pkg_info.repo.clone(), pkg_info.repo_type.clone(),)
         };
 
-        let lua_url = crate::mini_resolve::get_package_lua_url(&repo, &request.name);
-        let mut resolved = download_from_url(&lua_url)?;
-        resolved.repo_name = Some(repo.clone());
-        resolved.repo_type = Some(repo_type.clone());
-        resolved.registry_handle = Some("zoidberg".to_string());
+        let lua_url =
+            crate::mini_resolve::get_package_lua_url(&repo, &request.name,);
+        let mut resolved = download_from_url(&lua_url,)?;
+        resolved.repo_name = Some(repo.clone(),);
+        resolved.repo_type = Some(repo_type.clone(),);
+        resolved.registry_handle = Some("zoidberg".to_string(),);
 
         resolved.source_type = if repo_type == "official" {
             SourceType::OfficialRepo
         } else {
-            SourceType::UntrustedRepo(repo)
+            SourceType::UntrustedRepo(repo,)
         };
         resolved
     } else {
-        find_package_in_db(&request, quiet)?
+        find_package_in_db(&request, quiet,)?
     };
 
     let pkg_for_alt_check = zoi_lua::parser::parse_lua_package(
@@ -1533,80 +1664,88 @@ fn resolve_source_recursive(
                 "Path contains invalid UTF-8 characters: {}",
                 resolved_source.path.display()
             )
-        })?,
+        },)?,
         None,
         scope,
         quiet,
     )?;
 
-    if let Some(alt_source) = pkg_for_alt_check.alt {
+    if let Some(alt_source,) = pkg_for_alt_check.alt {
         println!("Found 'alt' source. Resolving from: {}", alt_source.cyan());
 
-        let alt_resolved_source =
-            if alt_source.starts_with("http://") || alt_source.starts_with("https://") {
-                println!("Downloading 'alt' source from: {}", alt_source.cyan());
-                let client = zoi_core::utils::get_http_client()?;
-                let mut attempt = 0u32;
-                let response = loop {
-                    attempt += 1;
-                    match client.get(&alt_source).send() {
-                        Ok(resp) => break resp,
-                        Err(e) => {
-                            if attempt < 3 {
-                                eprintln!(
-                                    "{}: download failed ({}). Retrying...",
-                                    "Network".yellow(),
-                                    e
-                                );
-                                zoi_core::utils::retry_backoff_sleep(attempt);
-                                continue;
-                            }
-                            return Err(anyhow!(
-                                "Failed to download file after {attempt} attempts: {e}"
-                            ));
+        let alt_resolved_source = if alt_source.starts_with("http://",)
+            || alt_source.starts_with("https://",)
+        {
+            println!("Downloading 'alt' source from: {}", alt_source.cyan());
+            let client = zoi_core::utils::get_http_client()?;
+            let mut attempt = 0u32;
+            let response = loop {
+                attempt += 1;
+                match client.get(&alt_source,).send() {
+                    Ok(resp,) => break resp,
+                    Err(e,) => {
+                        if attempt < 3 {
+                            eprintln!(
+                                "{}: download failed ({}). Retrying...",
+                                "Network".yellow(),
+                                e
+                            );
+                            zoi_core::utils::retry_backoff_sleep(attempt,);
+                            continue;
                         }
+                        return Err(anyhow!(
+                            "Failed to download file after {attempt} \
+                             attempts: {e}"
+                        ),);
                     }
-                };
-                if !response.status().is_success() {
-                    return Err(anyhow!(
-                        "Failed to download alt source (HTTP {}): {}",
-                        response.status(),
-                        alt_source
-                    ));
                 }
-
-                let content = response.text()?;
-
-                let cache_dir = cache::get_pkgdef_cache_root()?;
-                fs::create_dir_all(&cache_dir)?;
-
-                let mut hasher = Sha256::new();
-                hasher.update(alt_source.as_bytes());
-                let hash = hex::encode(hasher.finalize());
-                let cache_path = cache_dir.join(format!("{hash}.pkg.lua"));
-
-                fs::write(&cache_path, content.as_bytes())?;
-
-                resolve_source_recursive(
-                    cache_path.to_str().ok_or_else(|| {
-                        anyhow!(
-                            "Cache path contains invalid UTF-8 characters: {}",
-                            cache_path.display()
-                        )
-                    })?,
-                    depth + 1,
-                    max_depth,
-                    scope,
-                    quiet,
-                )?
-            } else {
-                resolve_source_recursive(&alt_source, depth + 1, max_depth, scope, quiet)?
             };
+            if !response.status().is_success() {
+                return Err(anyhow!(
+                    "Failed to download alt source (HTTP {}): {}",
+                    response.status(),
+                    alt_source
+                ),);
+            }
 
-        return Ok(alt_resolved_source);
+            let content = response.text()?;
+
+            let cache_dir = cache::get_pkgdef_cache_root()?;
+            fs::create_dir_all(&cache_dir,)?;
+
+            let mut hasher = Sha256::new();
+            hasher.update(alt_source.as_bytes(),);
+            let hash = hex::encode(hasher.finalize(),);
+            let cache_path = cache_dir.join(format!("{hash}.pkg.lua"),);
+
+            fs::write(&cache_path, content.as_bytes(),)?;
+
+            resolve_source_recursive(
+                cache_path.to_str().ok_or_else(|| {
+                    anyhow!(
+                        "Cache path contains invalid UTF-8 characters: {}",
+                        cache_path.display()
+                    )
+                },)?,
+                depth + 1,
+                max_depth,
+                scope,
+                quiet,
+            )?
+        } else {
+            resolve_source_recursive(
+                &alt_source,
+                depth + 1,
+                max_depth,
+                scope,
+                quiet,
+            )?
+        };
+
+        return Ok(alt_resolved_source,);
     }
 
-    Ok(resolved_source)
+    Ok(resolved_source,)
 }
 
 #[cfg(test)]
@@ -1616,7 +1755,7 @@ mod tests {
     #[test]
     fn test_download_source_for_explicit_http_channel_uses_base_url() {
         let source = "http://127.0.0.1:8000/test.pkg.lua@stable";
-        let path_part = Some("http://127.0.0.1:8000/test.pkg.lua");
+        let path_part = Some("http://127.0.0.1:8000/test.pkg.lua",);
         assert_eq!(
             download_source_for_explicit_path(source, path_part),
             "http://127.0.0.1:8000/test.pkg.lua"

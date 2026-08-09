@@ -1,7 +1,8 @@
 //! Project management and configuration for Zoi.
 //!
-//! This crate handles project-level operations, including loading configurations,
-//! managing environments, executing tasks, and handling lockfiles.
+//! This crate handles project-level operations, including loading
+//! configurations, managing environments, executing tasks, and handling
+//! lockfiles.
 
 /// Project configuration loading and structures.
 pub mod config;

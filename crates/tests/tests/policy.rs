@@ -8,11 +8,11 @@ fn graph_with_package(
     name: &str,
     repo: &str,
     license: &str,
-    sub_package: Option<&str>,
+    sub_package: Option<&str,>,
 ) -> DependencyGraph {
     let mut graph = DependencyGraph::new();
-    let sub_package_owned = sub_package.map(std::string::ToString::to_string);
-    let id = if let Some(sub) = sub_package {
+    let sub_package_owned = sub_package.map(std::string::ToString::to_string,);
+    let id = if let Some(sub,) = sub_package {
         format!("{name}@1.0.0:{sub}")
     } else {
         format!("{name}@1.0.0")
@@ -48,9 +48,9 @@ fn graph_with_package(
 
 #[test]
 fn blocks_denied_package() {
-    let graph = graph_with_package("hello", "core", "MIT", None);
+    let graph = graph_with_package("hello", "core", "MIT", None,);
     let policy = Policy {
-        denied_packages: Some(vec!["hello".to_string()]),
+        denied_packages: Some(vec!["hello".to_string()],),
         ..Default::default()
     };
 
@@ -59,9 +59,9 @@ fn blocks_denied_package() {
 
 #[test]
 fn allows_matching_allowed_package_with_subpackage() {
-    let graph = graph_with_package("hello", "core", "MIT", Some("docs"));
+    let graph = graph_with_package("hello", "core", "MIT", Some("docs",),);
     let policy = Policy {
-        allowed_packages: Some(vec!["@core/hello:docs".to_string()]),
+        allowed_packages: Some(vec!["@core/hello:docs".to_string()],),
         ..Default::default()
     };
 
@@ -70,9 +70,9 @@ fn allows_matching_allowed_package_with_subpackage() {
 
 #[test]
 fn blocks_package_not_in_allowlist() {
-    let graph = graph_with_package("hello", "core", "MIT", None);
+    let graph = graph_with_package("hello", "core", "MIT", None,);
     let policy = Policy {
-        allowed_packages: Some(vec!["other".to_string()]),
+        allowed_packages: Some(vec!["other".to_string()],),
         ..Default::default()
     };
 
@@ -81,9 +81,9 @@ fn blocks_package_not_in_allowlist() {
 
 #[test]
 fn blocks_denied_repo_segment() {
-    let graph = graph_with_package("hello", "community/editors", "MIT", None);
+    let graph = graph_with_package("hello", "community/editors", "MIT", None,);
     let policy = Policy {
-        denied_repos: Some(vec!["community".to_string()]),
+        denied_repos: Some(vec!["community".to_string()],),
         ..Default::default()
     };
 
@@ -92,9 +92,9 @@ fn blocks_denied_repo_segment() {
 
 #[test]
 fn enforces_allowed_repo_exact_path() {
-    let graph = graph_with_package("hello", "core/tools", "MIT", None);
+    let graph = graph_with_package("hello", "core/tools", "MIT", None,);
     let policy = Policy {
-        allowed_repos: Some(vec!["core/tools".to_string()]),
+        allowed_repos: Some(vec!["core/tools".to_string()],),
         ..Default::default()
     };
 
@@ -103,9 +103,10 @@ fn enforces_allowed_repo_exact_path() {
 
 #[test]
 fn blocks_denied_license_in_expression() {
-    let graph = graph_with_package("hello", "core", "MIT OR GPL-3.0-only", None);
+    let graph =
+        graph_with_package("hello", "core", "MIT OR GPL-3.0-only", None,);
     let policy = Policy {
-        denied_licenses: Some(vec!["GPL-3.0-only".to_string()]),
+        denied_licenses: Some(vec!["GPL-3.0-only".to_string()],),
         ..Default::default()
     };
 
@@ -114,9 +115,10 @@ fn blocks_denied_license_in_expression() {
 
 #[test]
 fn allows_expression_when_one_license_is_allowed() {
-    let graph = graph_with_package("hello", "core", "MIT OR GPL-3.0-only", None);
+    let graph =
+        graph_with_package("hello", "core", "MIT OR GPL-3.0-only", None,);
     let policy = Policy {
-        allowed_licenses: Some(vec!["MIT".to_string()]),
+        allowed_licenses: Some(vec!["MIT".to_string()],),
         ..Default::default()
     };
 
@@ -125,9 +127,9 @@ fn allows_expression_when_one_license_is_allowed() {
 
 #[test]
 fn blocks_license_not_in_allowlist() {
-    let graph = graph_with_package("hello", "core", "MIT", None);
+    let graph = graph_with_package("hello", "core", "MIT", None,);
     let policy = Policy {
-        allowed_licenses: Some(vec!["Apache-2.0".to_string()]),
+        allowed_licenses: Some(vec!["Apache-2.0".to_string()],),
         ..Default::default()
     };
 

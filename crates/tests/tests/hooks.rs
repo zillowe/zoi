@@ -1,9 +1,11 @@
 //! Integration tests for global package hooks and triggers.
 
 use std::fs;
+
 use tempfile::tempdir;
 use zoi::pkg::hooks::global::{
-    GlobalHook, HookTrigger, HookWhen, load_all_hooks, trigger_matches_modified_files,
+    GlobalHook, HookTrigger, HookWhen, load_all_hooks,
+    trigger_matches_modified_files,
 };
 
 mod common;
@@ -25,17 +27,30 @@ action:
   exec: echo "triggered"
 "#;
 
-    let hook: GlobalHook = serde_yaml::from_str(hook_yaml).expect("unwrap failed");
+    let hook: GlobalHook =
+        serde_yaml::from_str(hook_yaml,).expect("unwrap failed",);
     assert_eq!(hook.name, "test-hook");
-    assert_eq!(hook.trigger.dirs.first().expect("Value should exist in test"), "usr/share/icons");
-    assert_eq!(hook.trigger.paths.first().expect("Value should exist in test"), "usr/share/fonts/**");
+    assert_eq!(
+        hook.trigger
+            .dirs
+            .first()
+            .expect("Value should exist in test"),
+        "usr/share/icons"
+    );
+    assert_eq!(
+        hook.trigger
+            .paths
+            .first()
+            .expect("Value should exist in test"),
+        "usr/share/fonts/**"
+    );
     assert_eq!(hook.action.when, HookWhen::PostTransaction);
 }
 
 #[test]
 fn test_hook_loading_dirs() {
-    let dir = tempdir().expect("unwrap failed");
-    let hook_path = dir.path().join("test.hook.yaml");
+    let dir = tempdir().expect("unwrap failed",);
+    let hook_path = dir.path().join("test.hook.yaml",);
 
     let content = r#"
 name: dynamic-hook
@@ -46,9 +61,12 @@ action:
   when: PostTransaction
   exec: ls
 "#;
-    fs::write(&hook_path, content).expect("unwrap failed");
+    fs::write(&hook_path, content,).expect("unwrap failed",);
 
-    let loaded: GlobalHook = serde_yaml::from_str(&fs::read_to_string(hook_path).expect("unwrap failed")).expect("unwrap failed");
+    let loaded: GlobalHook = serde_yaml::from_str(
+        &fs::read_to_string(hook_path,).expect("unwrap failed",),
+    )
+    .expect("unwrap failed",);
     assert_eq!(loaded.name, "dynamic-hook");
 }
 
@@ -92,9 +110,9 @@ fn test_hook_dir_trigger_does_not_match_similar_prefix() {
 #[test]
 fn test_hook_trigger_matches_sysroot_relative_dir() {
     let _ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("tempdir should be created");
+    let tmp = tempdir().expect("tempdir should be created",);
     let root = tmp.path().to_path_buf();
-    common::TestContextGuard::set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone(),);
 
     let trigger = HookTrigger {
         paths: Vec::new(),
@@ -103,7 +121,7 @@ fn test_hook_trigger_matches_sysroot_relative_dir() {
         packages: Vec::new(),
     };
     let modified_files = vec![
-        root.join("usr/share/icons/hicolor/index.theme")
+        root.join("usr/share/icons/hicolor/index.theme",)
             .to_string_lossy()
             .to_string(),
     ];
@@ -135,48 +153,44 @@ fn test_hook_path_trigger_still_matches_globs() {
 #[test]
 fn test_hook_loading_is_deterministic_by_name() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("tempdir should be created");
+    let tmp = tempdir().expect("tempdir should be created",);
     let root = tmp.path().to_path_buf();
-    let home = root.join("home");
-    fs::create_dir_all(&home).expect("home dir should be created");
-    ctx.set_env_var("HOME", &home);
-    common::TestContextGuard::set_sysroot(root.clone());
+    let home = root.join("home",);
+    fs::create_dir_all(&home,).expect("home dir should be created",);
+    ctx.set_env_var("HOME", &home,);
+    common::TestContextGuard::set_sysroot(root.clone(),);
 
-    let user_hooks = home.join(".zoi").join("hooks");
-    let system_hooks = root.join("etc").join("zoi").join("hooks");
-    fs::create_dir_all(&user_hooks).expect("user hooks dir should be created");
-    fs::create_dir_all(&system_hooks).expect("system hooks dir should be created");
+    let user_hooks = home.join(".zoi",).join("hooks",);
+    let system_hooks = root.join("etc",).join("zoi",).join("hooks",);
+    fs::create_dir_all(&user_hooks,)
+        .expect("user hooks dir should be created",);
+    fs::create_dir_all(&system_hooks,)
+        .expect("system hooks dir should be created",);
 
     fs::write(
-        user_hooks.join("zz-user.hook.yaml"),
-        "name: order-test-z\n\
-description: z\n\
-trigger:\n  paths: [\"*\"]\n\
-action:\n  when: PostTransaction\n  exec: echo z\n",
+        user_hooks.join("zz-user.hook.yaml",),
+        "name: order-test-z\ndescription: z\ntrigger:\n  paths: \
+         [\"*\"]\naction:\n  when: PostTransaction\n  exec: echo z\n",
     )
-    .expect("user hook should write");
+    .expect("user hook should write",);
     fs::write(
-        system_hooks.join("aa-system.hook.yaml"),
-        "name: order-test-a\n\
-description: a\n\
-trigger:\n  paths: [\"*\"]\n\
-action:\n  when: PostTransaction\n  exec: echo a\n",
+        system_hooks.join("aa-system.hook.yaml",),
+        "name: order-test-a\ndescription: a\ntrigger:\n  paths: \
+         [\"*\"]\naction:\n  when: PostTransaction\n  exec: echo a\n",
     )
-    .expect("system hook should write");
+    .expect("system hook should write",);
     fs::write(
-        user_hooks.join("mm-user.hook.yaml"),
-        "name: order-test-m\n\
-description: m\n\
-trigger:\n  paths: [\"*\"]\n\
-action:\n  when: PostTransaction\n  exec: echo m\n",
+        user_hooks.join("mm-user.hook.yaml",),
+        "name: order-test-m\ndescription: m\ntrigger:\n  paths: \
+         [\"*\"]\naction:\n  when: PostTransaction\n  exec: echo m\n",
     )
-    .expect("user hook should write");
+    .expect("user hook should write",);
 
-    let hooks = load_all_hooks().expect("hooks should load");
-    let names: Vec<String> = hooks
+    let hooks = load_all_hooks().expect("hooks should load",);
+    let names: Vec<String,> = hooks
         .into_iter()
-        .filter(|h| h.name.starts_with("order-test-"))
-        .map(|h| h.name)
+        .filter(|h| h.name.starts_with("order-test-",),)
+        .map(|h| h.name,)
         .collect();
     assert_eq!(
         names,
@@ -191,21 +205,23 @@ action:\n  when: PostTransaction\n  exec: echo m\n",
 #[test]
 fn test_hook_loading_precedence_and_builtin_flag() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("tempdir should be created");
+    let tmp = tempdir().expect("tempdir should be created",);
     let root = tmp.path().to_path_buf();
-    let home = root.join("home");
-    fs::create_dir_all(&home).expect("home dir should be created");
+    let home = root.join("home",);
+    fs::create_dir_all(&home,).expect("home dir should be created",);
 
-    ctx.set_env_var("HOME", &home);
-    common::TestContextGuard::set_sysroot(root.clone());
+    ctx.set_env_var("HOME", &home,);
+    common::TestContextGuard::set_sysroot(root.clone(),);
 
-    let user_hooks_dir = home.join(".zoi").join("hooks");
-    let system_hooks_dir = root.join("etc").join("zoi").join("hooks");
-    fs::create_dir_all(&user_hooks_dir).expect("user hooks dir should be created");
-    fs::create_dir_all(&system_hooks_dir).expect("system hooks dir should be created");
+    let user_hooks_dir = home.join(".zoi",).join("hooks",);
+    let system_hooks_dir = root.join("etc",).join("zoi",).join("hooks",);
+    fs::create_dir_all(&user_hooks_dir,)
+        .expect("user hooks dir should be created",);
+    fs::create_dir_all(&system_hooks_dir,)
+        .expect("system hooks dir should be created",);
 
-    let hooks = load_all_hooks().expect("hooks should load");
-    let font_cache_hook = hooks.iter().find(|h| h.name == "update-font-cache");
+    let hooks = load_all_hooks().expect("hooks should load",);
+    let font_cache_hook = hooks.iter().find(|h| h.name == "update-font-cache",);
     assert!(
         font_cache_hook.is_some(),
         "builtin font-cache hook should be present"
@@ -216,16 +232,18 @@ fn test_hook_loading_precedence_and_builtin_flag() {
     );
 
     fs::write(
-        system_hooks_dir.join("font-cache-override.hook.yaml"),
-        "name: update-font-cache\ndescription: system-override\ntrigger:\n  paths: [\"*\"]\naction:\n  when: PostTransaction\n  exec: echo system\n",
+        system_hooks_dir.join("font-cache-override.hook.yaml",),
+        "name: update-font-cache\ndescription: system-override\ntrigger:\n  \
+         paths: [\"*\"]\naction:\n  when: PostTransaction\n  exec: echo \
+         system\n",
     )
-    .expect("system hook override should write");
+    .expect("system hook override should write",);
 
-    let hooks = load_all_hooks().expect("hooks should load");
+    let hooks = load_all_hooks().expect("hooks should load",);
     let font_cache_hook = hooks
         .iter()
-        .find(|h| h.name == "update-font-cache")
-        .expect("unwrap failed");
+        .find(|h| h.name == "update-font-cache",)
+        .expect("unwrap failed",);
     assert_eq!(font_cache_hook.description, "system-override");
     assert!(
         !font_cache_hook.is_builtin,
@@ -233,16 +251,17 @@ fn test_hook_loading_precedence_and_builtin_flag() {
     );
 
     fs::write(
-        user_hooks_dir.join("font-cache-user-override.hook.yaml"),
-        "name: update-font-cache\ndescription: user-override\ntrigger:\n  paths: [\"*\"]\naction:\n  when: PostTransaction\n  exec: echo user\n",
+        user_hooks_dir.join("font-cache-user-override.hook.yaml",),
+        "name: update-font-cache\ndescription: user-override\ntrigger:\n  \
+         paths: [\"*\"]\naction:\n  when: PostTransaction\n  exec: echo user\n",
     )
-    .expect("user hook override should write");
+    .expect("user hook override should write",);
 
-    let hooks = load_all_hooks().expect("hooks should load");
+    let hooks = load_all_hooks().expect("hooks should load",);
     let font_cache_hook = hooks
         .iter()
-        .find(|h| h.name == "update-font-cache")
-        .expect("unwrap failed");
+        .find(|h| h.name == "update-font-cache",)
+        .expect("unwrap failed",);
     assert_eq!(font_cache_hook.description, "user-override");
     assert!(
         !font_cache_hook.is_builtin,

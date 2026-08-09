@@ -1,6 +1,7 @@
 //! Integration tests for `ZoiOS` system detection logic.
 
 use std::fs;
+
 use tempfile::tempdir;
 use zoi::pkg::utils;
 
@@ -9,25 +10,26 @@ mod common;
 #[test]
 fn test_is_zoios_detection() {
     let _ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("failed to create temp dir");
+    let tmp = tempdir().expect("failed to create temp dir",);
     let root = tmp.path().to_path_buf();
 
-    common::TestContextGuard::set_sysroot(root.clone());
+    common::TestContextGuard::set_sysroot(root.clone(),);
 
-    let os_release_dir = root.join("etc");
-    fs::create_dir_all(&os_release_dir).expect("unwrap failed");
-    let os_release_path = os_release_dir.join("os-release");
+    let os_release_dir = root.join("etc",);
+    fs::create_dir_all(&os_release_dir,).expect("unwrap failed",);
+    let os_release_path = os_release_dir.join("os-release",);
 
     // Test 1: Not ZoiOS
-    fs::write(&os_release_path, "ID=fedora\nID_LIKE=rhel fedora\n").expect("unwrap failed");
+    fs::write(&os_release_path, "ID=fedora\nID_LIKE=rhel fedora\n",)
+        .expect("unwrap failed",);
     assert!(!utils::is_zoios());
 
     // Test 2: Parlex (ID)
-    fs::write(&os_release_path, "ID=parlex\n").expect("unwrap failed");
+    fs::write(&os_release_path, "ID=parlex\n",).expect("unwrap failed",);
     assert!(utils::is_zoios());
 
     // Test 3: ZoiOS (ID)
-    fs::write(&os_release_path, "ID=zoios\n").expect("unwrap failed");
+    fs::write(&os_release_path, "ID=zoios\n",).expect("unwrap failed",);
     assert!(utils::is_zoios());
 
     // Test 4: ZoiOS (ID_LIKE)
@@ -35,7 +37,7 @@ fn test_is_zoios_detection() {
         &os_release_path,
         "ID=custom-distro\nID_LIKE=\"zoios debian\"\n",
     )
-    .expect("unwrap failed");
+    .expect("unwrap failed",);
     assert!(utils::is_zoios());
 }
 
@@ -50,7 +52,7 @@ fn test_scope_compliance_validation() {
     // Package that only allows 'system' scope
     let pkg = Package {
         name: "kernel".to_string(),
-        scopes: Some(vec![Scope::System]),
+        scopes: Some(vec![Scope::System],),
         scope: Scope::User, // Attempting to install in 'user' scope
         ..Default::default()
     };
@@ -74,7 +76,7 @@ fn test_scope_compliance_validation() {
         },
     );
 
-    let result = check_scope_compliance(&graph);
+    let result = check_scope_compliance(&graph,);
     assert!(result.is_err(), "Should fail when scope is not allowed");
     assert!(
         result
