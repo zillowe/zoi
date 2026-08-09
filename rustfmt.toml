@@ -1,0 +1,25 @@
+unstable_features = true
+edition = "2024"
+style_edition = "2024"
+
+max_width = 80
+use_small_heuristics = "Default"
+use_try_shorthand = true
+use_field_init_shorthand = true
+normalize_doc_attributes = true
+
+format_code_in_doc_comments = true
+comment_width = 80
+wrap_comments = true
+
+newline_style = "Unix"
+error_on_line_overflow = false
+error_on_unformatted = false
+
+format_macro_bodies = true
+format_macro_matchers = true
+format_strings = true
+
+imports_granularity = "Module"
+group_imports = "StdExternalCrate"
+trailing_comma = "Always"

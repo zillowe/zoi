@@ -33,7 +33,7 @@ tasks({
 	},
 	{
 		cmd = "fmt",
-		run = "cargo fmt --all",
+		run = "cargo +nightly fmt --all",
 	},
 	{
 		cmd = "lint",

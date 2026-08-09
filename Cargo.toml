@@ -25,7 +25,7 @@ members = [
     "crates/tests",
     "crates/zoi-rs",
 ]
-default-members = ["crates/zoi-rs", "crates/mini"]
+default-members = ["crates/zoi-rs"]
 
 [workspace.package]
 version = "1.24.7"
@@ -38,6 +38,37 @@ homepage = "https://zillowe.qzz.io/zds/zoi"
 documentation = "https://docs.rs/zoi-rs/latest/zoi"
 keywords = ["cli", "package-manager", "dev-tools", "universal", "environment"]
 categories = ["command-line-utilities", "development-tools"]
+
+[workspace.lints.rust]
+unreachable_pub = "warn"
+missing_docs = "deny"
+
+[workspace.lints.clippy]
+missing_docs_in_private_items = "deny"
+undocumented_unsafe_blocks = "deny"
+
+unwrap_used = "deny"
+todo = "deny"
+indexing_slicing = "warn"
+
+cloned_instead_of_copied = "warn"
+inefficient_to_string = "warn"
+explicit_iter_loop = "warn"
+match_same_arms = "warn"
+redundant_closure_for_method_calls = "warn"
+naive_bytecount = "warn"
+
+pedantic = { level = "warn", priority = -1 }
+too_many_arguments = "allow"
+type_complexity = "allow"
+must_use_candidate = "allow"
+cast_possible_truncation = "allow"
+too_many_lines = "allow"
+struct_excessive_bools = "allow"
+fn_params_excessive_bools = "allow"
+ref_option = "allow"
+cast_precision_loss = "allow"
+cast_possible_wrap = "allow"
 
 [workspace.dependencies]
 anyhow = "1.0.104"
@@ -157,10 +188,6 @@ zoi-plugins = { path = "crates/plugins", version = "1.24.7" }
 zoi-daemon = { path = "crates/daemon", version = "1.24.7" }
 zoi-system = { path = "crates/system", version = "1.24.7" }
 zoi = { path = "crates/zoi-rs", version = "1.24.7", package = "zoi-rs" }
-
-[workspace.lints.clippy]
-too_many_arguments = "allow"
-type_complexity = "allow"
 
 [workspace.dependencies.winreg]
 version = "0.56.0"
