@@ -386,7 +386,7 @@ fn fetch_and_store_recursive(
         if let Some(runtime,) = &deps.runtime {
             match runtime {
                 zoi_core::types::DependencyGroup::Simple(d,) => {
-                    to_fetch.extend(d.clone(),);
+                    to_fetch.extend(d.clone(),)
                 }
                 zoi_core::types::DependencyGroup::Complex(c,) => {
                     to_fetch.extend(c.required.clone(),);
