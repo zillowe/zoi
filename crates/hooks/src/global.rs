@@ -22,59 +22,59 @@ include!(concat!(env!("OUT_DIR"), "/generated_builtin_hooks.rs"));
 /// Hooks are verified against a local trust database (`trusted_hashes.json`)
 /// before execution to prevent unauthorized arbitrary command execution.
 
-#[derive(Debug, Serialize, Deserialize, Clone,)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GlobalHook {
     /// The unique name of the hook.
     pub name: String,
     /// A human-readable description of what the hook does.
     pub description: String,
     /// Optional list of compatible platforms (e.g. `["linux", "macos"]`).
-    pub platforms: Option<Vec<String,>,>,
+    pub platforms: Option<Vec<String>>,
     /// The conditions that trigger this hook.
     pub trigger: HookTrigger,
     /// The action to perform when the hook is triggered.
     pub action: HookAction,
     /// Whether this is a builtin hook provided by Zoi.
     #[serde(skip)]
-    pub is_builtin: bool,
+    pub is_builtin: bool
 }
 
 /// Defines when a global hook should be triggered.
-#[derive(Debug, Serialize, Deserialize, Clone,)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct HookTrigger {
     /// Glob patterns for file paths that trigger the hook.
     #[serde(default)]
-    pub paths: Vec<String,>,
+    pub paths: Vec<String>,
     /// Directories that trigger the hook if any file within them is modified.
     #[serde(default)]
-    pub dirs: Vec<String,>,
+    pub dirs: Vec<String>,
     /// The operation types (e.g. "install", "upgrade", "remove") that trigger
     /// the hook.
     #[serde(default)]
-    pub operation: Vec<String,>,
+    pub operation: Vec<String>,
     /// Specific package names that trigger the hook when modified.
     #[serde(default)]
-    pub packages: Vec<String,>,
+    pub packages: Vec<String>
 }
 
 /// Defines the action to take when a global hook is triggered.
-#[derive(Debug, Serialize, Deserialize, Clone,)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct HookAction {
     /// When the hook should run relative to the transaction.
     pub when: HookWhen,
     /// The shell command to execute.
-    pub exec: String,
+    pub exec: String
 }
 
 /// When a global hook should run.
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq,)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
 pub enum HookWhen {
     /// Runs before any package operations in the transaction.
     #[serde(rename = "PreTransaction")]
     PreTransaction,
     /// Runs after all package operations in the transaction have completed.
     #[serde(rename = "PostTransaction")]
-    PostTransaction,
+    PostTransaction
 }
 
 /// Gets the directory where user-specific hooks are stored.
@@ -83,14 +83,14 @@ pub enum HookWhen {
 ///
 /// Returns an error if the user home directory cannot be found or if creating
 /// the hooks directory fails.
-pub fn get_user_hooks_dir() -> Result<PathBuf,> {
+pub fn get_user_hooks_dir() -> Result<PathBuf> {
     let home = utils::get_user_home()
-        .ok_or_else(|| anyhow!("Could not find home directory"),)?;
-    let dir = home.join(".zoi",).join("hooks",);
+        .ok_or_else(|| anyhow!("Could not find home directory"))?;
+    let dir = home.join(".zoi").join("hooks");
     if !dir.exists() {
-        fs::create_dir_all(&dir,)?;
+        fs::create_dir_all(&dir)?;
     }
-    Ok(dir,)
+    Ok(dir)
 }
 
 /// Gets the directory where system-wide hooks are stored.
@@ -99,13 +99,13 @@ pub fn get_user_hooks_dir() -> Result<PathBuf,> {
 ///
 /// This function is currently infallible but returns a `Result` for
 /// consistency.
-pub fn get_system_hooks_dir() -> Result<PathBuf,> {
+pub fn get_system_hooks_dir() -> Result<PathBuf> {
     if cfg!(windows) {
         Ok(sysroot::apply_sysroot(PathBuf::from(
-            "C:\\ProgramData\\zoi\\hooks",
-        ),),)
+            "C:\\ProgramData\\zoi\\hooks"
+        )))
     } else {
-        Ok(sysroot::apply_sysroot(PathBuf::from("/etc/zoi/hooks",),),)
+        Ok(sysroot::apply_sysroot(PathBuf::from("/etc/zoi/hooks")))
     }
 }
 
@@ -116,13 +116,13 @@ pub fn get_system_hooks_dir() -> Result<PathBuf,> {
 ///
 /// Returns an error if loading hooks from system, user, or package store
 /// directories fails.
-pub fn load_all_hooks() -> Result<Vec<GlobalHook,>,> {
+pub fn load_all_hooks() -> Result<Vec<GlobalHook>> {
     let mut hook_map = HashMap::new();
 
-    for (name, content,) in BUILTIN_HOOKS {
-        if let Ok(mut hook,) = serde_yaml::from_str::<GlobalHook,>(content,) {
+    for (name, content) in BUILTIN_HOOKS {
+        if let Ok(mut hook) = serde_yaml::from_str::<GlobalHook>(content) {
             hook.is_builtin = true;
-            hook_map.insert(hook.name.clone(), hook,);
+            hook_map.insert(hook.name.clone(), hook);
         } else {
             eprintln!(
                 "{}: Failed to parse builtin hook '{}'.",
@@ -138,38 +138,38 @@ pub fn load_all_hooks() -> Result<Vec<GlobalHook,>,> {
     for scope in [
         types::Scope::System,
         types::Scope::User,
-        types::Scope::Project,
+        types::Scope::Project
     ] {
-        if let Ok(store_root,) = utils::get_store_base_dir(scope,) {
+        if let Ok(store_root) = utils::get_store_base_dir(scope) {
             if !store_root.exists() {
                 continue;
             }
             // Each package has a directory: {hash}-{name}/{version}/hooks/
-            if let Ok(pkg_dirs,) = fs::read_dir(store_root,) {
+            if let Ok(pkg_dirs) = fs::read_dir(store_root) {
                 for pkg_dir_entry in pkg_dirs.flatten() {
                     let pkg_dir = pkg_dir_entry.path();
                     if !pkg_dir.is_dir() {
                         continue;
                     }
                     // Iterate over version directories
-                    if let Ok(version_dirs,) = fs::read_dir(&pkg_dir,) {
+                    if let Ok(version_dirs) = fs::read_dir(&pkg_dir) {
                         for version_dir_entry in version_dirs.flatten() {
                             let version_dir = version_dir_entry.path();
                             if !version_dir.is_dir()
                                 || version_dir
                                     .file_name()
-                                    .and_then(|s| s.to_str(),)
-                                    == Some("latest",)
+                                    .and_then(|s| s.to_str())
+                                    == Some("latest")
                                 || version_dir
                                     .file_name()
-                                    .and_then(|s| s.to_str(),)
-                                    == Some("dependents",)
+                                    .and_then(|s| s.to_str())
+                                    == Some("dependents")
                             {
                                 continue;
                             }
-                            let hooks_dir = version_dir.join("hooks",);
+                            let hooks_dir = version_dir.join("hooks");
                             if hooks_dir.exists() && hooks_dir.is_dir() {
-                                dirs.push(hooks_dir,);
+                                dirs.push(hooks_dir);
                             }
                         }
                     }
@@ -183,40 +183,40 @@ pub fn load_all_hooks() -> Result<Vec<GlobalHook,>,> {
             continue;
         }
         let mut hook_paths = Vec::new();
-        if let Ok(entries,) = fs::read_dir(dir,) {
+        if let Ok(entries) = fs::read_dir(dir) {
             for entry in entries.flatten() {
-                hook_paths.push(entry.path(),);
+                hook_paths.push(entry.path());
             }
         }
         hook_paths.sort();
         for path in hook_paths {
             if path.is_file() {
-                let is_hook = path.to_string_lossy().ends_with(".hook.yaml",)
-                    || path.extension().and_then(|s| s.to_str(),)
-                        == Some("yaml",);
+                let is_hook = path.to_string_lossy().ends_with(".hook.yaml")
+                    || path.extension().and_then(|s| s.to_str())
+                        == Some("yaml");
 
                 if is_hook
-                    && let Ok(content,) = fs::read_to_string(&path,)
-                    && let Ok(hook,) =
-                        serde_yaml::from_str::<GlobalHook,>(&content,)
+                    && let Ok(content) = fs::read_to_string(&path)
+                    && let Ok(hook) =
+                        serde_yaml::from_str::<GlobalHook>(&content)
                 {
-                    hook_map.insert(hook.name.clone(), hook,);
+                    hook_map.insert(hook.name.clone(), hook);
                 }
             }
         }
     }
 
-    let mut hooks: Vec<GlobalHook,> = hook_map.into_values().collect();
-    hooks.sort_by(|a, b| a.name.cmp(&b.name,),);
-    Ok(hooks,)
+    let mut hooks: Vec<GlobalHook> = hook_map.into_values().collect();
+    hooks.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(hooks)
 }
 
 /// Normalizes a file path to be relative to the sysroot and uses forward
 /// slashes.
-fn normalized_relative_path(file: &str, sysroot: Option<&Path,>,) -> String {
-    let file_path = Path::new(file,);
-    let relative_file = if let Some(root,) = sysroot {
-        file_path.strip_prefix(root,).unwrap_or(file_path,)
+fn normalized_relative_path(file: &str, sysroot: Option<&Path>) -> String {
+    let file_path = Path::new(file);
+    let relative_file = if let Some(root) = sysroot {
+        file_path.strip_prefix(root).unwrap_or(file_path)
     } else if file_path.is_absolute() {
         let mut components = file_path.components();
         components.next();
@@ -227,36 +227,36 @@ fn normalized_relative_path(file: &str, sysroot: Option<&Path,>,) -> String {
 
     relative_file
         .to_string_lossy()
-        .replace('\\', "/",)
-        .trim_start_matches("./",)
-        .trim_start_matches('/',)
+        .replace('\\', "/")
+        .trim_start_matches("./")
+        .trim_start_matches('/')
         .to_string()
 }
 
 /// Normalizes a hook trigger path.
-fn normalized_hook_path(path: &str,) -> String {
-    path.replace('\\', "/",)
-        .trim_start_matches("./",)
-        .trim_start_matches('/',)
-        .trim_end_matches('/',)
+fn normalized_hook_path(path: &str) -> String {
+    path.replace('\\', "/")
+        .trim_start_matches("./")
+        .trim_start_matches('/')
+        .trim_end_matches('/')
         .to_string()
 }
 
 /// Checks if a modified file matches a trigger directory.
-fn matches_trigger_dir(dir: &str, modified_file: &str,) -> bool {
-    let dir = normalized_hook_path(dir,);
+fn matches_trigger_dir(dir: &str, modified_file: &str) -> bool {
+    let dir = normalized_hook_path(dir);
     !dir.is_empty()
         && (modified_file == dir
             || modified_file
-                .strip_prefix(&dir,)
-                .is_some_and(|suffix| suffix.starts_with('/',),))
+                .strip_prefix(&dir)
+                .is_some_and(|suffix| suffix.starts_with('/')))
 }
 
 /// Checks if a hook trigger matches any of the modified files or packages.
 pub fn trigger_matches_modified_files(
     trigger: &HookTrigger,
     modified_files: &[String],
-    modified_packages: &[String],
+    modified_packages: &[String]
 ) -> bool {
     let sysroot = sysroot::get_sysroot();
 
@@ -277,10 +277,10 @@ pub fn trigger_matches_modified_files(
     }
 
     for file in modified_files {
-        let relative_file = normalized_relative_path(file, sysroot.as_deref(),);
+        let relative_file = normalized_relative_path(file, sysroot.as_deref());
 
         for dir in &trigger.dirs {
-            if matches_trigger_dir(dir, &relative_file,) {
+            if matches_trigger_dir(dir, &relative_file) {
                 return true;
             }
         }
@@ -288,20 +288,20 @@ pub fn trigger_matches_modified_files(
         for path_pattern in &trigger.paths {
             // Support treating paths ending in / as directory triggers (Arch
             // style)
-            if path_pattern.ends_with('/',) {
-                let dir_pattern = path_pattern.trim_end_matches('/',);
-                if matches_trigger_dir(dir_pattern, &relative_file,) {
+            if path_pattern.ends_with('/') {
+                let dir_pattern = path_pattern.trim_end_matches('/');
+                if matches_trigger_dir(dir_pattern, &relative_file) {
                     return true;
                 }
             }
 
-            let Ok(pattern,) = Pattern::new(path_pattern,) else {
+            let Ok(pattern) = Pattern::new(path_pattern) else {
                 continue;
             };
 
-            if pattern.matches_path(Path::new(&relative_file,),)
-                || pattern.matches(&relative_file,)
-                || pattern.matches(file,)
+            if pattern.matches_path(Path::new(&relative_file))
+                || pattern.matches(&relative_file)
+                || pattern.matches(file)
             {
                 return true;
             }
@@ -313,23 +313,23 @@ pub fn trigger_matches_modified_files(
 
 /// Checks if a hook is trusted by comparing its hash against the trusted
 /// database.
-fn is_hook_trusted(hook: &GlobalHook,) -> Result<bool,> {
+fn is_hook_trusted(hook: &GlobalHook) -> Result<bool> {
     let mut hasher = Sha256::new();
-    hasher.update(hook.action.exec.as_bytes(),);
-    let hash = hex::encode(hasher.finalize(),);
+    hasher.update(hook.action.exec.as_bytes());
+    let hash = hex::encode(hasher.finalize());
 
-    let trusted_path = get_user_hooks_dir()?.join("trusted_hashes.json",);
-    let mut trusted: HashMap<String, String,> = if trusted_path.exists() {
-        let content = fs::read_to_string(&trusted_path,)?;
-        serde_json::from_str(&content,).unwrap_or_default()
+    let trusted_path = get_user_hooks_dir()?.join("trusted_hashes.json");
+    let mut trusted: HashMap<String, String> = if trusted_path.exists() {
+        let content = fs::read_to_string(&trusted_path)?;
+        serde_json::from_str(&content).unwrap_or_default()
     } else {
         HashMap::new()
     };
 
-    if let Some(known_hash,) = trusted.get(&hook.name,)
+    if let Some(known_hash) = trusted.get(&hook.name)
         && known_hash == &hash
     {
-        return Ok(true,);
+        return Ok(true);
     }
 
     println!(
@@ -345,14 +345,14 @@ fn is_hook_trusted(hook: &GlobalHook,) -> Result<bool,> {
 
     if utils::ask_for_confirmation(
         "Do you trust this hook and want to execute it?",
-        false,
+        false
     ) {
-        trusted.insert(hook.name.clone(), hash,);
-        let content = serde_json::to_string_pretty(&trusted,)?;
-        fs::write(trusted_path, content,)?;
-        Ok(true,)
+        trusted.insert(hook.name.clone(), hash);
+        let content = serde_json::to_string_pretty(&trusted)?;
+        fs::write(trusted_path, content)?;
+        Ok(true)
     } else {
-        Ok(false,)
+        Ok(false)
     }
 }
 
@@ -375,8 +375,8 @@ pub fn run_global_hooks(
     modified_files: &[String],
     modified_packages: &[String],
     operation: &str,
-    scope: types::Scope,
-) -> Result<(),> {
+    scope: types::Scope
+) -> Result<()> {
     let all_hooks = load_all_hooks()?;
     let mut triggered_hooks = HashSet::new();
     let current_platform = utils::get_platform()?;
@@ -388,14 +388,14 @@ pub fn run_global_hooks(
             continue;
         }
 
-        if let Some(platforms,) = &hook.platforms
-            && !utils::is_platform_compatible(&current_platform, platforms,)
+        if let Some(platforms) = &hook.platforms
+            && !utils::is_platform_compatible(&current_platform, platforms)
         {
             continue;
         }
 
         if !hook.trigger.operation.is_empty()
-            && !hook.trigger.operation.iter().any(|op| op == operation,)
+            && !hook.trigger.operation.iter().any(|op| op == operation)
         {
             continue;
         }
@@ -403,10 +403,10 @@ pub fn run_global_hooks(
         if trigger_matches_modified_files(
             &hook.trigger,
             modified_files,
-            modified_packages,
-        ) && triggered_hooks.insert(hook.name.clone(),)
+            modified_packages
+        ) && triggered_hooks.insert(hook.name.clone())
         {
-            if !hook.is_builtin && !is_hook_trusted(&hook,)? {
+            if !hook.is_builtin && !is_hook_trusted(&hook)? {
                 println!("Skipping untrusted hook: {}", hook.name);
                 continue;
             }
@@ -421,13 +421,13 @@ pub fn run_global_hooks(
             #[cfg(target_os = "linux")]
             let mut command = {
                 let sysroot = zoi_core::sysroot::get_sysroot();
-                if let Some(root,) = sysroot {
+                if let Some(root) = sysroot {
                     let mut envs = HashMap::new();
-                    envs.insert("ZOI_SCOPE".to_string(), scope_str.clone(),);
+                    envs.insert("ZOI_SCOPE".to_string(), scope_str.clone());
                     // Hooks usually expect a basic PATH inside the root
                     envs.insert(
                         "PATH".to_string(),
-                        "/usr/bin:/bin:/usr/sbin:/sbin".to_string(),
+                        "/usr/bin:/bin:/usr/sbin:/sbin".to_string()
                     );
 
                     zoi_sandbox::wrap_command_in_root(
@@ -438,23 +438,23 @@ pub fn run_global_hooks(
                                 .exec
                                 .split_whitespace()
                                 .next()
-                                .unwrap_or("",),
+                                .unwrap_or("")
                         ),
                         &hook
                             .action
                             .exec
                             .split_whitespace()
-                            .skip(1,)
-                            .map(std::string::ToString::to_string,)
-                            .collect::<Vec<_,>>(),
+                            .skip(1)
+                            .map(std::string::ToString::to_string)
+                            .collect::<Vec<_>>(),
                         &envs,
                         &[], // No extra binds for standard hooks
-                        false,
+                        false
                     )?
                 } else {
-                    let mut c = Command::new("bash",);
-                    c.arg("-c",).arg(&hook.action.exec,);
-                    c.env("ZOI_SCOPE", &scope_str,);
+                    let mut c = Command::new("bash");
+                    c.arg("-c").arg(&hook.action.exec);
+                    c.env("ZOI_SCOPE", &scope_str);
                     c
                 }
             };
@@ -462,15 +462,15 @@ pub fn run_global_hooks(
             #[cfg(not(target_os = "linux"))]
             let mut command = {
                 let mut c = if cfg!(target_os = "windows") {
-                    let mut cmd = Command::new("pwsh",);
-                    cmd.arg("-Command",).arg(&hook.action.exec,);
+                    let mut cmd = Command::new("pwsh");
+                    cmd.arg("-Command").arg(&hook.action.exec);
                     cmd
                 } else {
-                    let mut cmd = Command::new("bash",);
-                    cmd.arg("-c",).arg(&hook.action.exec,);
+                    let mut cmd = Command::new("bash");
+                    cmd.arg("-c").arg(&hook.action.exec);
                     cmd
                 };
-                c.env("ZOI_SCOPE", &scope_str,);
+                c.env("ZOI_SCOPE", &scope_str);
                 c
             };
 
@@ -486,5 +486,5 @@ pub fn run_global_hooks(
         }
     }
 
-    Ok((),)
+    Ok(())
 }

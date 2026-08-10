@@ -4,14 +4,14 @@ use anyhow::Result;
 use colored::Colorize;
 
 /// Telemetry subcommands.
-#[derive(Debug, Clone, Copy,)]
+#[derive(Debug, Clone, Copy)]
 pub enum TelemetryCommand {
     /// Show telemetry status.
     Status,
     /// Enable telemetry.
     Enable,
     /// Disable telemetry.
-    Disable,
+    Disable
 }
 
 /// Run the telemetry command.
@@ -19,7 +19,7 @@ pub enum TelemetryCommand {
 /// # Errors
 ///
 /// Returns an error if the configuration cannot be read or written.
-pub fn run(cmd: TelemetryCommand,) -> Result<(),> {
+pub fn run(cmd: TelemetryCommand) -> Result<()> {
     match cmd {
         TelemetryCommand::Status => {
             let cfg = crate::pkg::config::read_config()?;
@@ -78,15 +78,15 @@ pub fn run(cmd: TelemetryCommand,) -> Result<(),> {
             );
 
             cfg.telemetry_enabled = true;
-            crate::pkg::config::write_user_config(&cfg,)?;
+            crate::pkg::config::write_user_config(&cfg)?;
             println!("{} telemetry enabled", "Success:".green());
         }
         TelemetryCommand::Disable => {
             let mut cfg = crate::pkg::config::read_user_config()?;
             cfg.telemetry_enabled = false;
-            crate::pkg::config::write_user_config(&cfg,)?;
+            crate::pkg::config::write_user_config(&cfg)?;
             println!("{} telemetry disabled", "Success:".green());
         }
     }
-    Ok((),)
+    Ok(())
 }

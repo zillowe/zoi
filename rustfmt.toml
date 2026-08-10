@@ -22,4 +22,4 @@ format_strings = true
 
 imports_granularity = "Module"
 group_imports = "StdExternalCrate"
-trailing_comma = "Always"
+trailing_comma = "Never"

@@ -7,26 +7,26 @@ use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use zoi::pkg::{offline, pkgdir, sysroot};
 
-fn test_context_mutex() -> &'static Mutex<(),> {
-    static LOCK: OnceLock<Mutex<(),>,> = OnceLock::new();
-    LOCK.get_or_init(|| Mutex::new((),),)
+fn test_context_mutex() -> &'static Mutex<()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
 }
 
 pub(crate) struct TestContextGuard {
-    _lock: MutexGuard<'static, (),>,
-    previous_env: Vec<(String, Option<OsString,>,),>,
-    captured_keys: HashSet<String,>,
-    previous_cwd: Option<PathBuf,>,
-    previous_sysroot: Option<std::path::PathBuf,>,
+    _lock: MutexGuard<'static, ()>,
+    previous_env: Vec<(String, Option<OsString>)>,
+    captured_keys: HashSet<String>,
+    previous_cwd: Option<PathBuf>,
+    previous_sysroot: Option<std::path::PathBuf>,
     previous_offline: bool,
-    previous_pkg_dirs: Vec<PathBuf,>,
+    previous_pkg_dirs: Vec<PathBuf>
 }
 
 impl TestContextGuard {
     pub(crate) fn acquire() -> Self {
         let lock = test_context_mutex()
             .lock()
-            .expect("test context lock should not be poisoned",);
+            .expect("test context lock should not be poisoned");
         let previous_sysroot = sysroot::get_sysroot();
 
         let mut guard = Self {
@@ -36,67 +36,65 @@ impl TestContextGuard {
             previous_cwd: None,
             previous_sysroot,
             previous_offline: offline::is_offline(),
-            previous_pkg_dirs: pkgdir::get_pkg_dirs(),
+            previous_pkg_dirs: pkgdir::get_pkg_dirs()
         };
 
-        guard.set_env_var("ZOI_TEST", "1",);
+        guard.set_env_var("ZOI_TEST", "1");
         guard
     }
 
-    pub(crate) fn set_env_var(
-        &mut self, key: &str, value: impl AsRef<OsStr,>,
-    ) {
-        if self.captured_keys.insert(key.to_string(),) {
+    pub(crate) fn set_env_var(&mut self, key: &str, value: impl AsRef<OsStr>) {
+        if self.captured_keys.insert(key.to_string()) {
             self.previous_env
-                .push((key.to_string(), std::env::var_os(key,),),);
+                .push((key.to_string(), std::env::var_os(key)));
         }
         // SAFETY: This is used in a test environment where we ensure thread
         // safety through other means or by running tests sequentially.
-        unsafe { std::env::set_var(key, value.as_ref(),) };
+        unsafe { std::env::set_var(key, value.as_ref()) };
     }
 
-    pub(crate) fn set_sysroot(path: std::path::PathBuf,) {
-        sysroot::set_sysroot(path,);
+    pub(crate) fn set_sysroot(path: std::path::PathBuf) {
+        sysroot::set_sysroot(path);
     }
 
-    pub(crate) fn set_current_dir(&mut self, path: &Path,) {
+    pub(crate) fn set_current_dir(&mut self, path: &Path) {
         if self.previous_cwd.is_none() {
             self.previous_cwd = std::env::current_dir().ok();
         }
-        std::env::set_current_dir(path,).expect("test cwd should be set",);
+        std::env::set_current_dir(path).expect("test cwd should be set");
     }
 
-    pub(crate) fn set_offline(enabled: bool,) {
-        offline::set_offline(enabled,);
+    pub(crate) fn set_offline(enabled: bool) {
+        offline::set_offline(enabled);
     }
 
-    pub(crate) fn set_pkg_dirs(dirs: Vec<PathBuf,>,) {
-        pkgdir::set_pkg_dirs(dirs,);
+    pub(crate) fn set_pkg_dirs(dirs: Vec<PathBuf>) {
+        pkgdir::set_pkg_dirs(dirs);
     }
 }
 
 impl Drop for TestContextGuard {
-    fn drop(&mut self,) {
-        if let Some(previous_cwd,) = &self.previous_cwd {
-            let _ = std::env::set_current_dir(previous_cwd,);
+    fn drop(&mut self) {
+        if let Some(previous_cwd) = &self.previous_cwd {
+            let _ = std::env::set_current_dir(previous_cwd);
         }
-        for (key, value,) in self.previous_env.iter().rev() {
-            if let Some(previous,) = value {
+        for (key, value) in self.previous_env.iter().rev() {
+            if let Some(previous) = value {
                 // SAFETY: Restoring environment variables in a controlled test
                 // environment.
-                unsafe { std::env::set_var(key, previous,) };
+                unsafe { std::env::set_var(key, previous) };
             } else {
                 // SAFETY: Removing temporary environment variables in a
                 // controlled test environment.
-                unsafe { std::env::remove_var(key,) };
+                unsafe { std::env::remove_var(key) };
             }
         }
-        if let Some(previous,) = &self.previous_sysroot {
-            sysroot::set_sysroot(previous.clone(),);
+        if let Some(previous) = &self.previous_sysroot {
+            sysroot::set_sysroot(previous.clone());
         } else {
             sysroot::clear_sysroot();
         }
-        offline::set_offline(self.previous_offline,);
-        pkgdir::set_pkg_dirs(self.previous_pkg_dirs.clone(),);
+        offline::set_offline(self.previous_offline);
+        pkgdir::set_pkg_dirs(self.previous_pkg_dirs.clone());
     }
 }

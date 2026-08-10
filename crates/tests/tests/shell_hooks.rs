@@ -19,9 +19,9 @@ fn test_shell_hook_output() {
 #[test]
 fn test_env_export_shell_logic() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("Failed to create temp dir",);
+    let tmp = tempdir().expect("Failed to create temp dir");
     let root = tmp.path().to_path_buf();
-    ctx.set_current_dir(&root,);
+    ctx.set_current_dir(&root);
 
     let yaml = r#"
 name: test-exports
@@ -34,9 +34,9 @@ environments:
     env:
       FOO: BAR
 "#;
-    fs::write(root.join("zoi.yaml",), yaml,).expect("unwrap failed",);
+    fs::write(root.join("zoi.yaml"), yaml).expect("unwrap failed");
 
-    let cfg = config::load().expect("unwrap failed",);
+    let cfg = config::load().expect("unwrap failed");
 
     assert!(environment::export_shell(Some("test"), &cfg, Shell::Bash).is_ok());
 }
@@ -44,21 +44,21 @@ environments:
 #[test]
 fn test_env_export_shell_local_bin_path() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("Failed to create temp dir",);
+    let tmp = tempdir().expect("Failed to create temp dir");
     let root = tmp.path().to_path_buf();
-    ctx.set_current_dir(&root,);
+    ctx.set_current_dir(&root);
 
-    let bin_dir = root.join(".zoi/pkgs/bin",);
-    fs::create_dir_all(&bin_dir,).expect("unwrap failed",);
+    let bin_dir = root.join(".zoi/pkgs/bin");
+    fs::create_dir_all(&bin_dir).expect("unwrap failed");
 
     let yaml = r"
 name: test-local-bin
 config:
   local: true
 ";
-    fs::write(root.join("zoi.yaml",), yaml,).expect("unwrap failed",);
+    fs::write(root.join("zoi.yaml"), yaml).expect("unwrap failed");
 
-    let cfg = config::load().expect("unwrap failed",);
+    let cfg = config::load().expect("unwrap failed");
 
     assert!(environment::export_shell(None, &cfg, Shell::Bash).is_ok());
 }

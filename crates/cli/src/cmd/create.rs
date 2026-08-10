@@ -7,12 +7,12 @@ use clap::Parser;
 use crate::pkg;
 
 /// Arguments for the `create` command.
-#[derive(Parser,)]
+#[derive(Parser)]
 pub struct CreateCommand {
     /// The source of the package (name, @repo/name, path to .pkg.lua, or URL)
     pub source: String,
     /// The application name and directory to create (defaults to package name)
-    pub app_name: Option<String,>,
+    pub app_name: Option<String>
 }
 
 /// Runs the `create` command.
@@ -23,7 +23,7 @@ pub struct CreateCommand {
 pub fn run(
     args: CreateCommand,
     yes: bool,
-    plugin_manager: Option<&crate::pkg::plugin::PluginManager,>,
-) -> Result<(),> {
-    pkg::create::run(&args.source, args.app_name, yes, plugin_manager,)
+    plugin_manager: Option<&crate::pkg::plugin::PluginManager>
+) -> Result<()> {
+    pkg::create::run(&args.source, args.app_name, yes, plugin_manager)
 }

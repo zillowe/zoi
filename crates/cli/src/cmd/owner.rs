@@ -14,10 +14,10 @@ use crate::pkg::local;
 ///
 /// Returns an error if the path does not exist, or if there is an error
 /// querying the package database or ownership information.
-pub fn run(path: &Path,) -> Result<(),> {
+pub fn run(path: &Path) -> Result<()> {
     let absolute_path = match path.canonicalize() {
-        Ok(p,) => p,
-        Err(_,) => path.to_path_buf(),
+        Ok(p) => p,
+        Err(_) => path.to_path_buf()
     };
 
     println!("Querying for file: {}", absolute_path.display());
@@ -28,7 +28,7 @@ pub fn run(path: &Path,) -> Result<(),> {
         if pkg
             .installed_files
             .iter()
-            .any(|f| Path::new(f,) == absolute_path,)
+            .any(|f| Path::new(f) == absolute_path)
         {
             println!(
                 "{} is owned by {} {}",
@@ -36,10 +36,10 @@ pub fn run(path: &Path,) -> Result<(),> {
                 pkg.name.cyan(),
                 pkg.version.yellow()
             );
-            return Ok((),);
+            return Ok(());
         }
     }
 
     println!("No package owns file: {}", absolute_path.display());
-    Ok((),)
+    Ok(())
 }

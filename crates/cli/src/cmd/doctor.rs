@@ -11,7 +11,7 @@ use crate::pkg;
 ///
 /// Returns an error if any system check fails or if pruning ghost dependents
 /// fails.
-pub fn run() -> Result<(),> {
+pub fn run() -> Result<()> {
     println!("{} Running Zoi doctor...", "::".bold().blue());
     println!("Checking your system for potential issues...");
 
@@ -19,7 +19,7 @@ pub fn run() -> Result<(),> {
 
     println!("\n{} Checking for broken symlinks...", "->".bold().cyan());
     match pkg::doctor::check_broken_symlinks() {
-        Ok(broken_links,) => {
+        Ok(broken_links) => {
             if broken_links.is_empty() {
                 println!("{}", "No broken symlinks found.".green());
             } else {
@@ -38,7 +38,7 @@ pub fn run() -> Result<(),> {
                 );
             }
         }
-        Err(e,) => {
+        Err(e) => {
             eprintln!(
                 "{}: Failed to check for broken symlinks: {}",
                 "Error".red(),
@@ -50,7 +50,7 @@ pub fn run() -> Result<(),> {
 
     println!("\n{} Checking PATH configuration...", "->".bold().cyan());
     match pkg::doctor::check_path_configuration() {
-        Ok(Some(warning,),) => {
+        Ok(Some(warning)) => {
             issues_found += 1;
             println!("{}: {}", "Warning".yellow(), warning);
             println!(
@@ -58,10 +58,10 @@ pub fn run() -> Result<(),> {
                  to your PATH."
             );
         }
-        Ok(None,) => {
+        Ok(None) => {
             println!("{}", "PATH configuration looks good.".green());
         }
-        Err(e,) => {
+        Err(e) => {
             eprintln!(
                 "{}: Failed to check PATH configuration: {}",
                 "Error".red(),
@@ -76,7 +76,7 @@ pub fn run() -> Result<(),> {
         "->".bold().cyan()
     );
     match pkg::doctor::check_outdated_repos() {
-        Ok(Some(warning,),) => {
+        Ok(Some(warning)) => {
             issues_found += 1;
             println!("{}: {}", "Warning".yellow(), warning);
             println!(
@@ -84,10 +84,10 @@ pub fn run() -> Result<(),> {
                  database."
             );
         }
-        Ok(None,) => {
+        Ok(None) => {
             println!("{}", "Repositories look up to date.".green());
         }
-        Err(e,) => {
+        Err(e) => {
             eprintln!("{}: Failed to check repositories: {}", "Error".red(), e);
             issues_found += 1;
         }
@@ -98,7 +98,7 @@ pub fn run() -> Result<(),> {
         "->".bold().cyan()
     );
     match pkg::doctor::check_duplicate_packages() {
-        Ok(duplicates,) => {
+        Ok(duplicates) => {
             if duplicates.is_empty() {
                 println!("{}", "No duplicate package IDs found.".green());
             } else {
@@ -108,7 +108,7 @@ pub fn run() -> Result<(),> {
                     "Warning".yellow(),
                     duplicates.len()
                 );
-                for (pkg_id, registries,) in duplicates {
+                for (pkg_id, registries) in duplicates {
                     println!(
                         "  - {} (found in: {})",
                         pkg_id.cyan(),
@@ -122,7 +122,7 @@ pub fn run() -> Result<(),> {
                 );
             }
         }
-        Err(e,) => {
+        Err(e) => {
             eprintln!(
                 "{}: Failed to check for duplicates: {}",
                 "Error".red(),
@@ -134,7 +134,7 @@ pub fn run() -> Result<(),> {
 
     println!("\n{} Checking PGP configurations...", "->".bold().cyan());
     match pkg::doctor::check_pgp_configuration() {
-        Ok(missing_keys,) => {
+        Ok(missing_keys) => {
             if missing_keys.is_empty() {
                 println!("{}", "PGP configuration looks valid.".green());
             } else {
@@ -153,7 +153,7 @@ pub fn run() -> Result<(),> {
                 );
             }
         }
-        Err(e,) => {
+        Err(e) => {
             eprintln!(
                 "{}: Failed to check PGP configuration: {}",
                 "Error".red(),
@@ -165,7 +165,7 @@ pub fn run() -> Result<(),> {
 
     println!("\n{} Validating zoi.lock integrity...", "->".bold().cyan());
     match pkg::doctor::validate_lockfile_integrity() {
-        Ok(missing_packages,) => {
+        Ok(missing_packages) => {
             if missing_packages.is_empty() {
                 println!("{}", "zoi.lock integrity is good.".green());
             } else {
@@ -184,7 +184,7 @@ pub fn run() -> Result<(),> {
                 );
             }
         }
-        Err(e,) => {
+        Err(e) => {
             eprintln!("{}: Failed to validate zoi.lock: {}", "Error".red(), e);
             issues_found += 1;
         }
@@ -192,7 +192,7 @@ pub fn run() -> Result<(),> {
 
     println!("\n{} Checking for orphaned packages...", "->".bold().cyan());
     match pkg::doctor::check_orphaned_packages() {
-        Ok(orphaned,) => {
+        Ok(orphaned) => {
             if orphaned.is_empty() {
                 println!("{}", "No orphaned packages found.".green());
             } else {
@@ -211,7 +211,7 @@ pub fn run() -> Result<(),> {
                 );
             }
         }
-        Err(e,) => {
+        Err(e) => {
             eprintln!(
                 "{}: Failed to check for orphaned packages: {}",
                 "Error".red(),
@@ -223,7 +223,7 @@ pub fn run() -> Result<(),> {
 
     println!("\n{} Checking for ghost dependents...", "->".bold().cyan());
     match pkg::doctor::check_ghost_dependents() {
-        Ok(ghost_links,) => {
+        Ok(ghost_links) => {
             if ghost_links.is_empty() {
                 println!("{}", "No ghost dependents found.".green());
             } else {
@@ -233,15 +233,15 @@ pub fn run() -> Result<(),> {
                     "Warning".yellow(),
                     ghost_links.len()
                 );
-                for (_, parent_id,) in &ghost_links {
+                for (_, parent_id) in &ghost_links {
                     println!("  - parent missing: {}", parent_id.cyan());
                 }
 
                 if crate::utils::ask_for_confirmation(
                     "\nDo you want to prune these broken links?",
-                    false,
+                    false
                 ) {
-                    pkg::doctor::prune_ghost_dependents(&ghost_links,)?;
+                    pkg::doctor::prune_ghost_dependents(&ghost_links)?;
                     println!("{}", "Successfully pruned broken links.".green());
                     issues_found -= ghost_links.len();
                 } else {
@@ -249,7 +249,7 @@ pub fn run() -> Result<(),> {
                 }
             }
         }
-        Err(e,) => {
+        Err(e) => {
             eprintln!(
                 "{}: Failed to check for ghost dependents: {}",
                 "Error".red(),
@@ -304,5 +304,5 @@ pub fn run() -> Result<(),> {
         println!("\nFound {issues_found} potential issues.");
     }
 
-    Ok((),)
+    Ok(())
 }

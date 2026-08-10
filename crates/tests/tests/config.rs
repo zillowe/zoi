@@ -32,9 +32,9 @@ fn test_jobs_policy_field_deserializes() {
     let policy: Policy = serde_yaml::from_str(
         r"
 jobs_unoverridable: true
-",
+"
     )
-    .expect("policy should deserialize",);
+    .expect("policy should deserialize");
 
     assert!(policy.jobs_unoverridable);
 }
@@ -42,23 +42,23 @@ jobs_unoverridable: true
 #[test]
 fn test_cache_mirror_config_roundtrip_and_candidates() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("tempdir should be created",);
-    ctx.set_env_var("HOME", tmp.path(),);
+    let tmp = tempdir().expect("tempdir should be created");
+    ctx.set_env_var("HOME", tmp.path());
 
     let first = "https://cache-1.example.com/zoi";
     let second = "https://cache-2.example.com/mirror";
 
-    config::add_cache_mirror(first,).expect("first mirror should be added",);
-    config::add_cache_mirror(second,).expect("second mirror should be added",);
+    config::add_cache_mirror(first).expect("first mirror should be added");
+    config::add_cache_mirror(second).expect("second mirror should be added");
 
-    let cfg = config::read_config().expect("config should read",);
+    let cfg = config::read_config().expect("config should read");
     assert_eq!(
         cfg.cache_mirrors,
         vec![first.to_string(), second.to_string()]
     );
 
     let candidates = zoi::pkg::cache::mirror_candidate_urls(
-        "https://upstream.example.com/pkgs/foo.zpa",
+        "https://upstream.example.com/pkgs/foo.zpa"
     );
     assert_eq!(
         candidates,
@@ -69,36 +69,35 @@ fn test_cache_mirror_config_roundtrip_and_candidates() {
         ]
     );
 
-    config::remove_cache_mirror(first,)
-        .expect("first mirror should be removed",);
-    let cfg = config::read_config().expect("config should read after removal",);
+    config::remove_cache_mirror(first).expect("first mirror should be removed");
+    let cfg = config::read_config().expect("config should read after removal");
     assert_eq!(cfg.cache_mirrors, vec![second.to_string()]);
 }
 
 #[test]
 fn test_remote_policy_merging() {
     let _ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("tempdir should be created",);
+    let tmp = tempdir().expect("tempdir should be created");
     let root = tmp.path().to_path_buf();
-    common::TestContextGuard::set_sysroot(root.clone(),);
+    common::TestContextGuard::set_sysroot(root.clone());
 
     let policy_dir = if cfg!(windows) {
-        root.join("ProgramData/zoi",)
+        root.join("ProgramData/zoi")
     } else {
-        root.join("etc/zoi",)
+        root.join("etc/zoi")
     };
-    std::fs::create_dir_all(&policy_dir,).expect("unwrap failed",);
+    std::fs::create_dir_all(&policy_dir).expect("unwrap failed");
 
     let remote_policy_yaml = r"
 denied_packages:
   - evil-pkg
 allow_deny_lists_unoverridable: true
 ";
-    std::fs::write(policy_dir.join("policy.cache.yaml",), remote_policy_yaml,)
-        .expect("unwrap failed",);
+    std::fs::write(policy_dir.join("policy.cache.yaml"), remote_policy_yaml)
+        .expect("unwrap failed");
 
     let cfg =
-        config::read_config().expect("config should read with remote policy",);
+        config::read_config().expect("config should read with remote policy");
 
     assert!(cfg.policy.allow_deny_lists_unoverridable);
     assert_eq!(

@@ -12,10 +12,10 @@ use zoi_resolver::local;
 ///
 /// Returns an error if the package list cannot be retrieved or uninstallation
 /// fails.
-pub fn run(yes: bool, dry_run: bool,) -> Result<(),> {
+pub fn run(yes: bool, dry_run: bool) -> Result<()> {
     println!("Checking for unused dependencies...");
     let all_installed = local::get_installed_packages()?;
-    let mut packages_to_remove: Vec<String,> = Vec::new();
+    let mut packages_to_remove: Vec<String> = Vec::new();
 
     for package in &all_installed {
         if !matches!(package.reason, InstallReason::Dependency { .. }) {
@@ -26,19 +26,18 @@ pub fn run(yes: bool, dry_run: bool,) -> Result<(),> {
             package.scope,
             &package.registry_handle,
             &package.repo,
-            &package.name,
+            &package.name
         )?;
-        let dependents = local::get_dependents(&package_dir,)?;
+        let dependents = local::get_dependents(&package_dir)?;
 
         if dependents.is_empty() {
-            packages_to_remove
-                .push(local::installed_manifest_source(package,),);
+            packages_to_remove.push(local::installed_manifest_source(package));
         }
     }
 
     if packages_to_remove.is_empty() {
         println!("{}", "No unused dependencies to remove.".green());
-        return Ok((),);
+        return Ok(());
     }
 
     if dry_run {
@@ -46,7 +45,7 @@ pub fn run(yes: bool, dry_run: bool,) -> Result<(),> {
         for pkg_name in &packages_to_remove {
             println!("    - {}", pkg_name.yellow());
         }
-        return Ok((),);
+        return Ok(());
     }
 
     println!("\nThe following packages will be REMOVED:");
@@ -54,14 +53,14 @@ pub fn run(yes: bool, dry_run: bool,) -> Result<(),> {
         println!("    - {}", pkg_name.yellow());
     }
 
-    if !core_utils::ask_for_confirmation("\nDo you want to continue?", yes,) {
+    if !core_utils::ask_for_confirmation("\nDo you want to continue?", yes) {
         println!("Operation aborted.");
-        return Ok((),);
+        return Ok(());
     }
 
     for pkg_name in &packages_to_remove {
         println!("\n{} Removing {}...", "::".bold().blue(), pkg_name.bold());
-        if let Err(e,) = crate::run(pkg_name, None, yes, false, false,) {
+        if let Err(e) = crate::run(pkg_name, None, yes, false, false) {
             eprintln!(
                 "{} Failed to remove {}: {}",
                 "Error:".red(),
@@ -71,5 +70,5 @@ pub fn run(yes: bool, dry_run: bool,) -> Result<(),> {
         }
     }
 
-    Ok((),)
+    Ok(())
 }

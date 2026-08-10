@@ -12,37 +12,37 @@ use dialoguer::theme::ColorfulTheme;
 use crate::pkg::{db, local, types};
 
 /// Represents a package candidate for display in the selection UI.
-#[derive(Clone,)]
+#[derive(Clone)]
 struct CandidateDisplay {
     /// The manifest of the installed package.
     manifest: types::InstallManifest,
     /// The description of the package.
-    description: String,
+    description: String
 }
 
 /// Returns a human-readable label for a package scope.
-fn scope_label(scope: types::Scope,) -> &'static str {
+fn scope_label(scope: types::Scope) -> &'static str {
     match scope {
         types::Scope::User => "user",
         types::Scope::System => "system",
-        types::Scope::Project => "project",
+        types::Scope::Project => "project"
     }
 }
 
 /// Looks up descriptions for all locally registered packages.
 fn lookup_descriptions()
--> HashMap<(String, String, Option<String,>, &'static str, String,), String,> {
+-> HashMap<(String, String, Option<String>, &'static str, String), String> {
     let mut descriptions = HashMap::new();
-    if let Ok(packages,) = db::list_all_packages("local",) {
+    if let Ok(packages) = db::list_all_packages("local") {
         for pkg in packages {
             let key = (
                 pkg.name.clone(),
                 pkg.repo.clone(),
                 pkg.sub_package.clone(),
-                scope_label(pkg.scope,),
-                pkg.registry_handle.unwrap_or_else(|| "local".to_string(),),
+                scope_label(pkg.scope),
+                pkg.registry_handle.unwrap_or_else(|| "local".to_string())
             );
-            descriptions.insert(key, pkg.description,);
+            descriptions.insert(key, pkg.description);
         }
     }
     descriptions
@@ -50,8 +50,8 @@ fn lookup_descriptions()
 
 /// Builds a list of display objects for the given package candidates.
 fn build_candidate_displays(
-    candidates: &[types::InstallManifest],
-) -> Vec<CandidateDisplay,> {
+    candidates: &[types::InstallManifest]
+) -> Vec<CandidateDisplay> {
     let descriptions = lookup_descriptions();
     candidates
         .iter()
@@ -62,30 +62,30 @@ fn build_candidate_displays(
                     manifest.name.clone(),
                     manifest.repo.clone(),
                     manifest.sub_package.clone(),
-                    scope_label(manifest.scope,),
-                    manifest.registry_handle.clone(),
-                ),)
+                    scope_label(manifest.scope),
+                    manifest.registry_handle.clone()
+                ))
                 .cloned()
                 .or_else(|| {
                     let source_path =
-                        local::get_package_source_path(&manifest,).ok()?;
+                        local::get_package_source_path(&manifest).ok()?;
                     let path = source_path.to_str()?;
                     let pkg = crate::pkg::lua::parser::parse_lua_package(
                         path,
-                        Some(&manifest.version,),
-                        Some(manifest.scope,),
-                        true,
+                        Some(&manifest.version),
+                        Some(manifest.scope),
+                        true
                     )
                     .ok()?;
-                    Some(pkg.description,)
-                },)
-                .unwrap_or_else(|| "Description unavailable".to_string(),);
+                    Some(pkg.description)
+                })
+                .unwrap_or_else(|| "Description unavailable".to_string());
 
             CandidateDisplay {
                 manifest,
-                description,
+                description
             }
-        },)
+        })
         .collect()
 }
 
@@ -105,25 +105,25 @@ fn build_candidate_displays(
 pub fn choose_installed_manifest(
     package_name: &str,
     candidates: &[types::InstallManifest],
-    yes: bool,
-) -> Result<types::InstallManifest,> {
+    yes: bool
+) -> Result<types::InstallManifest> {
     if candidates.is_empty() {
-        return Err(anyhow!("Package '{package_name}' is not installed."),);
+        return Err(anyhow!("Package '{package_name}' is not installed."));
     }
     if candidates.len() == 1 {
         return Ok(candidates
             .first()
-            .expect("should have at least one candidate",)
-            .clone(),);
+            .expect("should have at least one candidate")
+            .clone());
     }
     if yes {
         return Err(anyhow!(
             "Package '{package_name}' matches multiple installed packages. \
              Use an explicit source like '#handle@repo/name[:sub]@version'."
-        ),);
+        ));
     }
 
-    let displays = build_candidate_displays(candidates,);
+    let displays = build_candidate_displays(candidates);
 
     println!(
         "Found multiple installed packages matching '{}'. Please choose one:",
@@ -131,21 +131,21 @@ pub fn choose_installed_manifest(
     );
 
     let mut table = Table::new();
-    table.load_preset(UTF8_FULL,);
-    table.set_header(vec!["#", "Scope", "Source", "Version", "Description"],);
+    table.load_preset(UTF8_FULL);
+    table.set_header(vec!["#", "Scope", "Source", "Version", "Description"]);
 
-    for (i, display,) in displays.iter().enumerate() {
+    for (i, display) in displays.iter().enumerate() {
         table.add_row(vec![
             (i + 1).to_string(),
-            scope_label(display.manifest.scope,).to_string(),
-            local::installed_manifest_source(&display.manifest,),
+            scope_label(display.manifest.scope).to_string(),
+            local::installed_manifest_source(&display.manifest),
             display.manifest.version.clone(),
             display.description.clone(),
-        ],);
+        ]);
     }
     println!("{table}");
 
-    let items: Vec<String,> = displays
+    let items: Vec<String> = displays
         .iter()
         .map(|display| {
             format!(
@@ -154,18 +154,18 @@ pub fn choose_installed_manifest(
                 scope_label(display.manifest.scope),
                 display.manifest.version
             )
-        },)
+        })
         .collect();
 
-    let selection = Select::with_theme(&ColorfulTheme::default(),)
-        .with_prompt("Select an installed package",)
-        .items(&items,)
-        .default(0,)
+    let selection = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("Select an installed package")
+        .items(&items)
+        .default(0)
         .interact()?;
 
     Ok(displays
-        .get(selection,)
-        .ok_or_else(|| anyhow!("Invalid selection"),)?
+        .get(selection)
+        .ok_or_else(|| anyhow!("Invalid selection"))?
         .manifest
-        .clone(),)
+        .clone())
 }

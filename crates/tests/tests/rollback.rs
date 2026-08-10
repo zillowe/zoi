@@ -10,11 +10,11 @@ mod common;
 #[test]
 fn test_transaction_rollback_uninstall() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("Failed to create temp dir",);
+    let tmp = tempdir().expect("Failed to create temp dir");
     let root = tmp.path().to_path_buf();
 
-    ctx.set_env_var("HOME", root.clone(),);
-    common::TestContextGuard::set_sysroot(root.clone(),);
+    ctx.set_env_var("HOME", root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
     let pkg_name = "test-pkg";
     let version = "1.0.0";
@@ -26,10 +26,10 @@ fn test_transaction_rollback_uninstall() {
         handle,
         repo,
         pkg_name,
-        version,
+        version
     )
-    .expect("unwrap failed",);
-    fs::create_dir_all(&version_dir,).expect("unwrap failed",);
+    .expect("unwrap failed");
+    fs::create_dir_all(&version_dir).expect("unwrap failed");
 
     let manifest = types::InstallManifest {
         name: "test-pkg".to_string(),
@@ -53,37 +53,37 @@ fn test_transaction_rollback_uninstall() {
         dependencies_v2: None,
         chosen_options: vec![],
         chosen_optionals: vec![],
-        install_method: Some("test".to_string(),),
+        install_method: Some("test".to_string()),
         platform: zoi_core::utils::get_platform().unwrap_or_default(),
         service: None,
         installed_files: vec![],
         installed_size: None,
         sandbox: None,
-        completions: None,
+        completions: None
     };
 
-    let manifest_path = version_dir.join("manifest.yaml",);
+    let manifest_path = version_dir.join("manifest.yaml");
     fs::write(
         &manifest_path,
-        serde_yaml::to_string(&manifest,).expect("unwrap failed",),
+        serde_yaml::to_string(&manifest).expect("unwrap failed")
     )
-    .expect("unwrap failed",);
+    .expect("unwrap failed");
 
-    let mut trans = transaction::begin().expect("unwrap failed",);
+    let mut trans = transaction::begin().expect("unwrap failed");
     let id = trans.id.clone();
     transaction::record_operation(
         &mut trans,
         types::TransactionOperation::Uninstall {
-            manifest: Box::new(manifest,),
-        },
+            manifest: Box::new(manifest)
+        }
     )
-    .expect("unwrap failed",);
+    .expect("unwrap failed");
 
-    transaction::rollback(&id,).expect("unwrap failed",);
+    transaction::rollback(&id).expect("unwrap failed");
 
     let installed =
-        local::is_package_installed(pkg_name, None, types::Scope::User,)
-            .expect("unwrap failed",);
+        local::is_package_installed(pkg_name, None, types::Scope::User)
+            .expect("unwrap failed");
     assert!(installed.is_some());
     assert_eq!(installed.expect("unwrap failed").version, version);
 }
@@ -91,11 +91,11 @@ fn test_transaction_rollback_uninstall() {
 #[test]
 fn test_package_rollback_requires_explicit_source_for_ambiguous_name_matches() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("Failed to create temp dir",);
+    let tmp = tempdir().expect("Failed to create temp dir");
     let root = tmp.path().to_path_buf();
 
-    ctx.set_env_var("HOME", root.clone(),);
-    common::TestContextGuard::set_sysroot(root.clone(),);
+    ctx.set_env_var("HOME", root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
     let base_manifest = types::InstallManifest {
         name: "shared".to_string(),
@@ -119,21 +119,21 @@ fn test_package_rollback_requires_explicit_source_for_ambiguous_name_matches() {
         dependencies_v2: None,
         chosen_options: vec![],
         chosen_optionals: vec![],
-        install_method: Some("test".to_string(),),
+        install_method: Some("test".to_string()),
         platform: zoi_core::utils::get_platform().unwrap_or_default(),
         service: None,
         installed_files: vec![],
         installed_size: None,
         sandbox: None,
-        completions: None,
+        completions: None
     };
 
     let mut extra_manifest = base_manifest.clone();
     extra_manifest.repo = "extra".to_string();
 
-    local::write_manifest(&base_manifest,).expect("unwrap failed",);
-    local::write_manifest(&extra_manifest,).expect("unwrap failed",);
+    local::write_manifest(&base_manifest).expect("unwrap failed");
+    local::write_manifest(&extra_manifest).expect("unwrap failed");
 
-    let err = rollback::run("shared", true,).expect_err("unwrap_err failed",);
+    let err = rollback::run("shared", true).expect_err("unwrap_err failed");
     assert!(err.to_string().contains("ambiguous"));
 }

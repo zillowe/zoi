@@ -12,7 +12,7 @@ use zoi_project::{config, runner};
 ///
 /// Returns an error if the project configuration cannot be loaded or if the
 /// command execution fails.
-pub fn run(cmd_alias: Option<&str,>, args: &[String],) -> Result<(),> {
+pub fn run(cmd_alias: Option<&str>, args: &[String]) -> Result<()> {
     let config = config::load()?;
-    runner::run(cmd_alias, args, &config,)
+    runner::run(cmd_alias, args, &config)
 }

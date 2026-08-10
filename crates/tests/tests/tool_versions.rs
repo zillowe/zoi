@@ -11,71 +11,71 @@ mod common;
 #[test]
 fn test_shim_resolves_version_from_tool_versions() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("Failed to create temp dir",);
+    let tmp = tempdir().expect("Failed to create temp dir");
     let root = tmp.path().to_path_buf();
 
-    ctx.set_current_dir(&root,);
+    ctx.set_current_dir(&root);
 
-    fs::write(root.join(".tool-versions",), "node 20.0.0\npython 3.12.0",)
-        .expect("unwrap failed",);
+    fs::write(root.join(".tool-versions"), "node 20.0.0\npython 3.12.0")
+        .expect("unwrap failed");
 
-    let pm = PluginManager::new().expect("unwrap failed",);
+    let pm = PluginManager::new().expect("unwrap failed");
 
-    let db_dir = root.join("db",);
-    ctx.set_env_var("ZOI_DB_DIR", &db_dir,);
-    let conn = zoi::pkg::db::open_connection("local",).expect("unwrap failed",);
+    let db_dir = root.join("db");
+    ctx.set_env_var("ZOI_DB_DIR", &db_dir);
+    let conn = zoi::pkg::db::open_connection("local").expect("unwrap failed");
     let pkg = zoi::pkg::types::Package {
         name: "node".to_string(),
         repo: "core".to_string(),
-        bins: Some(vec!["node".to_string()],),
+        bins: Some(vec!["node".to_string()]),
         ..Default::default()
     };
-    zoi::pkg::db::update_package(&conn, &pkg, "local", None, None, None,)
-        .expect("unwrap failed",);
+    zoi::pkg::db::update_package(&conn, &pkg, "local", None, None, None)
+        .expect("unwrap failed");
 
-    let res = shim::resolve_to_installed_bin("node", Some(&pm,), None,);
+    let res = shim::resolve_to_installed_bin("node", Some(&pm), None);
 
     match res {
-        Err(e,) => {
+        Err(e) => {
             assert!(e.to_string().contains("DB"));
         }
-        _ => panic!("Expected error because version is not installed"),
+        _ => panic!("Expected error because version is not installed")
     }
 }
 
 #[test]
 fn test_tool_versions_traversal() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("Failed to create temp dir",);
+    let tmp = tempdir().expect("Failed to create temp dir");
     let root = tmp.path().to_path_buf();
-    let sub = root.join("sub/dir",);
-    fs::create_dir_all(&sub,).expect("unwrap failed",);
+    let sub = root.join("sub/dir");
+    fs::create_dir_all(&sub).expect("unwrap failed");
 
-    fs::write(root.join(".tool-versions",), "node 18.0.0",)
-        .expect("unwrap failed",);
+    fs::write(root.join(".tool-versions"), "node 18.0.0")
+        .expect("unwrap failed");
 
-    ctx.set_current_dir(&sub,);
+    ctx.set_current_dir(&sub);
 
-    let pm = PluginManager::new().expect("unwrap failed",);
+    let pm = PluginManager::new().expect("unwrap failed");
 
-    let db_dir = root.join("db",);
-    ctx.set_env_var("ZOI_DB_DIR", &db_dir,);
-    let conn = zoi::pkg::db::open_connection("local",).expect("unwrap failed",);
+    let db_dir = root.join("db");
+    ctx.set_env_var("ZOI_DB_DIR", &db_dir);
+    let conn = zoi::pkg::db::open_connection("local").expect("unwrap failed");
     let pkg = zoi::pkg::types::Package {
         name: "node".to_string(),
         repo: "core".to_string(),
-        bins: Some(vec!["node".to_string()],),
+        bins: Some(vec!["node".to_string()]),
         ..Default::default()
     };
-    zoi::pkg::db::update_package(&conn, &pkg, "local", None, None, None,)
-        .expect("unwrap failed",);
+    zoi::pkg::db::update_package(&conn, &pkg, "local", None, None, None)
+        .expect("unwrap failed");
 
-    let res = shim::resolve_to_installed_bin("node", Some(&pm,), None,);
+    let res = shim::resolve_to_installed_bin("node", Some(&pm), None);
 
     match res {
-        Err(e,) => {
+        Err(e) => {
             assert!(e.to_string().contains("DB"));
         }
-        _ => panic!("Expected error"),
+        _ => panic!("Expected error")
     }
 }

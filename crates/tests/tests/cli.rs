@@ -7,8 +7,8 @@ use zoi::cli::Cli;
 fn test_cli_parsing_version() {
     let mut cmd = Cli::command();
     let matches = cmd
-        .try_get_matches_from_mut(vec!["zoi", "--version"],)
-        .expect("Parsing --version failed",);
+        .try_get_matches_from_mut(vec!["zoi", "--version"])
+        .expect("Parsing --version failed");
     assert!(matches.get_flag("version_flag"));
 }
 
@@ -16,8 +16,8 @@ fn test_cli_parsing_version() {
 fn test_cli_parsing_help() {
     let mut cmd = Cli::command();
     let err = cmd
-        .try_get_matches_from_mut(vec!["zoi", "--help"],)
-        .expect_err("unwrap_err failed",);
+        .try_get_matches_from_mut(vec!["zoi", "--help"])
+        .expect_err("unwrap_err failed");
     assert_eq!(err.kind(), clap::error::ErrorKind::DisplayHelp);
     let help_text = err.to_string();
     assert!(help_text.contains("Advanced Package Manager"));
@@ -29,11 +29,11 @@ fn test_cli_parsing_install_flags() {
     let matches = cmd
         .try_get_matches_from_mut(vec![
             "zoi", "install", "--local", "--frozen", "--yes",
-        ],)
-        .expect("Parsing install flags failed",);
+        ])
+        .expect("Parsing install flags failed");
 
-    let (subcommand, sub_matches,) =
-        matches.subcommand().expect("unwrap failed",);
+    let (subcommand, sub_matches) =
+        matches.subcommand().expect("unwrap failed");
     assert_eq!(subcommand, "install");
 
     assert!(sub_matches.get_flag("local"));
@@ -45,10 +45,8 @@ fn test_cli_parsing_install_flags() {
 #[test]
 fn test_cli_parsing_conflicting_flags() {
     let mut cmd = Cli::command();
-    let err =
-        cmd.try_get_matches_from_mut(vec![
-            "zoi", "install", "--local", "--global",
-        ],)
-            .expect_err("unwrap_err failed",);
+    let err = cmd
+        .try_get_matches_from_mut(vec!["zoi", "install", "--local", "--global"])
+        .expect_err("unwrap_err failed");
     assert_eq!(err.kind(), clap::error::ErrorKind::ArgumentConflict);
 }

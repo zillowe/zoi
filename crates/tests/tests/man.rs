@@ -23,7 +23,7 @@ This is a test tool.
 .B \-\-help
 show help.
 ";
-    let md = man::parse_roff(roff,);
+    let md = man::parse_roff(roff);
     assert!(md.contains("# MYTOOL"));
     assert!(md.contains("## NAME"));
     assert!(md.contains("## SYNOPSIS"));
@@ -34,12 +34,12 @@ show help.
 #[test]
 fn test_man_resolution_by_provides() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("Failed to create temp dir",);
+    let tmp = tempdir().expect("Failed to create temp dir");
     let root = tmp.path().to_path_buf();
 
-    ctx.set_env_var("HOME", root.clone(),);
-    common::TestContextGuard::set_sysroot(root.clone(),);
-    ctx.set_env_var("ZOI_DB_DIR", root.join("db",),);
+    ctx.set_env_var("HOME", root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
+    ctx.set_env_var("ZOI_DB_DIR", root.join("db"));
 
     let handle = "testreg";
     let repo = "core";
@@ -51,55 +51,55 @@ fn test_man_resolution_by_provides() {
             handle: handle.to_string(),
             url: "http://dummy".to_string(),
             advisory_prefix: None,
-            authorities: None,
-        },),
+            authorities: None
+        }),
         repos: vec![repo.to_string()],
         ..Default::default()
     };
-    config::write_user_config(&cfg,).expect("unwrap failed",);
+    config::write_user_config(&cfg).expect("unwrap failed");
 
-    let conn = db::open_connection(handle,).expect("unwrap failed",);
+    let conn = db::open_connection(handle).expect("unwrap failed");
     let pkg = types::Package {
         name: pkg_name.to_string(),
         repo: repo.to_string(),
-        version: Some("1.0.0".to_string(),),
-        bins: Some(vec![bin_name.to_string()],),
+        version: Some("1.0.0".to_string()),
+        bins: Some(vec![bin_name.to_string()]),
         ..Default::default()
     };
     let pkg_id = db::update_package(
         &conn,
         &pkg,
         handle,
-        Some(types::Scope::User,),
+        Some(types::Scope::User),
         None,
-        None,
+        None
     )
-    .expect("unwrap failed",);
+    .expect("unwrap failed");
     db::index_package_files(
         &conn,
         pkg_id,
-        &[format!("data/pkgstore/bin/{bin_name}"),],
+        &[format!("data/pkgstore/bin/{bin_name}")]
     )
-    .expect("unwrap failed",);
+    .expect("unwrap failed");
 
     let store_base =
-        local::get_store_base_dir(types::Scope::User,).expect("unwrap failed",);
+        local::get_store_base_dir(types::Scope::User).expect("unwrap failed");
     let pkg_ident =
-        zoi::pkg::utils::generate_package_id(handle, repo, pkg_name,);
+        zoi::pkg::utils::generate_package_id(handle, repo, pkg_name);
     let pkg_dir_name =
-        zoi::pkg::utils::get_package_dir_name(&pkg_ident, pkg_name,);
-    let pkg_path = store_base.join(&pkg_dir_name,);
-    let version_dir = pkg_path.join("1.0.0",);
-    fs::create_dir_all(&version_dir,).expect("unwrap failed",);
-    fs::write(version_dir.join("man.md",), "# Manual Content",)
-        .expect("unwrap failed",);
+        zoi::pkg::utils::get_package_dir_name(&pkg_ident, pkg_name);
+    let pkg_path = store_base.join(&pkg_dir_name);
+    let version_dir = pkg_path.join("1.0.0");
+    fs::create_dir_all(&version_dir).expect("unwrap failed");
+    fs::write(version_dir.join("man.md"), "# Manual Content")
+        .expect("unwrap failed");
 
-    let latest_path = pkg_path.join("latest",);
-    zoi::utils::symlink_file(&version_dir, &latest_path,)
-        .expect("unwrap failed",);
+    let latest_path = pkg_path.join("latest");
+    zoi::utils::symlink_file(&version_dir, &latest_path)
+        .expect("unwrap failed");
 
-    let (resolved_pkg, resolved_handle,) =
-        man::resolve_package_for_man(bin_name,).expect("unwrap failed",);
+    let (resolved_pkg, resolved_handle) =
+        man::resolve_package_for_man(bin_name).expect("unwrap failed");
     assert_eq!(resolved_pkg.name, pkg_name);
     assert_eq!(resolved_handle, Some(handle.to_string()));
 }
@@ -107,11 +107,11 @@ fn test_man_resolution_by_provides() {
 #[test]
 fn test_gather_local_manual_pages() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("Failed to create temp dir",);
+    let tmp = tempdir().expect("Failed to create temp dir");
     let root = tmp.path().to_path_buf();
 
-    ctx.set_env_var("HOME", root.clone(),);
-    common::TestContextGuard::set_sysroot(root.clone(),);
+    ctx.set_env_var("HOME", root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
 
     let pkg_name = "local-man-pkg";
     let handle = "local";
@@ -121,31 +121,31 @@ fn test_gather_local_manual_pages() {
     let pkg = types::Package {
         name: pkg_name.to_string(),
         repo: repo.to_string(),
-        version: Some(version.to_string(),),
+        version: Some(version.to_string()),
         ..Default::default()
     };
 
     let store_base =
-        local::get_store_base_dir(types::Scope::User,).expect("unwrap failed",);
+        local::get_store_base_dir(types::Scope::User).expect("unwrap failed");
     let pkg_ident =
-        zoi::pkg::utils::generate_package_id(handle, repo, pkg_name,);
+        zoi::pkg::utils::generate_package_id(handle, repo, pkg_name);
     let pkg_dir_name =
-        zoi::pkg::utils::get_package_dir_name(&pkg_ident, pkg_name,);
-    let pkg_path = store_base.join(&pkg_dir_name,);
-    let version_dir = pkg_path.join(version,);
-    let share_man = version_dir.join("share",).join("man",).join("man1",);
-    fs::create_dir_all(&share_man,).expect("unwrap failed",);
+        zoi::pkg::utils::get_package_dir_name(&pkg_ident, pkg_name);
+    let pkg_path = store_base.join(&pkg_dir_name);
+    let version_dir = pkg_path.join(version);
+    let share_man = version_dir.join("share").join("man").join("man1");
+    fs::create_dir_all(&share_man).expect("unwrap failed");
 
-    fs::write(share_man.join("tool.1",), ".TH TOOL 1\n.SH NAME\ntool",)
-        .expect("unwrap failed",);
-    fs::write(share_man.join("extra.md",), "# Extra",).expect("unwrap failed",);
+    fs::write(share_man.join("tool.1"), ".TH TOOL 1\n.SH NAME\ntool")
+        .expect("unwrap failed");
+    fs::write(share_man.join("extra.md"), "# Extra").expect("unwrap failed");
 
-    let latest_path = pkg_path.join("latest",);
-    zoi::utils::symlink_file(&version_dir, &latest_path,)
-        .expect("unwrap failed",);
+    let latest_path = pkg_path.join("latest");
+    zoi::utils::symlink_file(&version_dir, &latest_path)
+        .expect("unwrap failed");
 
-    let pages = man::gather_manual_pages(&pkg, Some(handle,), false, true,)
-        .expect("unwrap failed",);
+    let pages = man::gather_manual_pages(&pkg, Some(handle), false, true)
+        .expect("unwrap failed");
     assert_eq!(pages.len(), 2);
     assert!(pages.contains_key("tool.1"));
     assert!(pages.contains_key("extra.md"));
@@ -166,12 +166,12 @@ fn test_gather_local_manual_pages() {
 #[test]
 fn test_man_run_raw() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("Failed to create temp dir",);
+    let tmp = tempdir().expect("Failed to create temp dir");
     let root = tmp.path().to_path_buf();
 
-    ctx.set_env_var("HOME", root.clone(),);
-    common::TestContextGuard::set_sysroot(root.clone(),);
-    ctx.set_env_var("ZOI_DB_DIR", root.join("db",),);
+    ctx.set_env_var("HOME", root.clone());
+    common::TestContextGuard::set_sysroot(root.clone());
+    ctx.set_env_var("ZOI_DB_DIR", root.join("db"));
 
     let handle = "testreg";
     let repo = "core";
@@ -182,46 +182,46 @@ fn test_man_run_raw() {
             handle: handle.to_string(),
             url: "http://dummy".to_string(),
             advisory_prefix: None,
-            authorities: None,
-        },),
+            authorities: None
+        }),
         repos: vec![repo.to_string()],
         ..Default::default()
     };
-    config::write_user_config(&cfg,).expect("unwrap failed",);
+    config::write_user_config(&cfg).expect("unwrap failed");
 
-    let conn = db::open_connection(handle,).expect("unwrap failed",);
+    let conn = db::open_connection(handle).expect("unwrap failed");
     let pkg = types::Package {
         name: pkg_name.to_string(),
         repo: repo.to_string(),
-        version: Some("1.0.0".to_string(),),
+        version: Some("1.0.0".to_string()),
         ..Default::default()
     };
     let _pkg_id = db::update_package(
         &conn,
         &pkg,
         handle,
-        Some(types::Scope::User,),
+        Some(types::Scope::User),
         None,
-        None,
+        None
     )
-    .expect("unwrap failed",);
+    .expect("unwrap failed");
 
     let store_base =
-        local::get_store_base_dir(types::Scope::User,).expect("unwrap failed",);
+        local::get_store_base_dir(types::Scope::User).expect("unwrap failed");
     let pkg_ident =
-        zoi::pkg::utils::generate_package_id(handle, repo, pkg_name,);
+        zoi::pkg::utils::generate_package_id(handle, repo, pkg_name);
     let pkg_dir_name =
-        zoi::pkg::utils::get_package_dir_name(&pkg_ident, pkg_name,);
-    let pkg_path = store_base.join(&pkg_dir_name,);
-    let version_dir = pkg_path.join("1.0.0",);
-    fs::create_dir_all(&version_dir,).expect("unwrap failed",);
-    fs::write(version_dir.join("man.md",), "# Manual Content",)
-        .expect("unwrap failed",);
+        zoi::pkg::utils::get_package_dir_name(&pkg_ident, pkg_name);
+    let pkg_path = store_base.join(&pkg_dir_name);
+    let version_dir = pkg_path.join("1.0.0");
+    fs::create_dir_all(&version_dir).expect("unwrap failed");
+    fs::write(version_dir.join("man.md"), "# Manual Content")
+        .expect("unwrap failed");
 
-    let latest_path = pkg_path.join("latest",);
-    zoi::utils::symlink_file(&version_dir, &latest_path,)
-        .expect("unwrap failed",);
+    let latest_path = pkg_path.join("latest");
+    zoi::utils::symlink_file(&version_dir, &latest_path)
+        .expect("unwrap failed");
 
-    let res = man::run(pkg_name, false, true, false,);
+    let res = man::run(pkg_name, false, true, false);
     assert!(res.is_ok(), "man run raw should succeed: {:?}", res.err());
 }

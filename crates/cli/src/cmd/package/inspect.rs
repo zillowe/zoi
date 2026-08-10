@@ -6,7 +6,7 @@ use anyhow::{Result, anyhow};
 use clap::Parser;
 
 /// Command to inspect a package file and display its metadata.
-#[derive(Parser, Debug,)]
+#[derive(Parser, Debug)]
 pub struct InspectCommand {
     /// Path to the package file (e.g. path/to/name.pkg.lua)
     #[arg(required = true)]
@@ -18,11 +18,11 @@ pub struct InspectCommand {
 
     /// Validate as this target platform (defaults to current platform)
     #[arg(long)]
-    pub platform: Option<String,>,
+    pub platform: Option<String>,
 
     /// Override package version while inspecting
     #[arg(long)]
-    pub version_override: Option<String,>,
+    pub version_override: Option<String>
 }
 
 /// Runs the package inspection command.
@@ -35,10 +35,10 @@ pub struct InspectCommand {
 ///
 /// Returns an error if the package definition cannot be parsed or the platform
 /// is invalid.
-pub fn run(args: InspectCommand,) -> Result<(),> {
+pub fn run(args: InspectCommand) -> Result<()> {
     let platform = match args.platform {
-        Some(p,) => p,
-        None => crate::pkg::utils::get_platform()?,
+        Some(p) => p,
+        None => crate::pkg::utils::get_platform()?
     };
 
     let file_path = args.package_file.to_str().ok_or_else(|| {
@@ -46,18 +46,18 @@ pub fn run(args: InspectCommand,) -> Result<(),> {
             "Path contains invalid UTF-8 characters: {}",
             args.package_file.display()
         )
-    },)?;
+    })?;
 
     let package = crate::pkg::lua::parser::parse_lua_package_for_platform(
         file_path,
         &platform,
         args.version_override.as_deref(),
         None,
-        true,
+        true
     )?;
 
     if args.json {
-        let json = serde_json::to_string_pretty(&package,)?;
+        let json = serde_json::to_string_pretty(&package)?;
         println!("{json}");
     } else {
         println!(
@@ -69,5 +69,5 @@ pub fn run(args: InspectCommand,) -> Result<(),> {
         println!("{}", package.description);
     }
 
-    Ok((),)
+    Ok(())
 }

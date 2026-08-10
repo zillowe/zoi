@@ -13,32 +13,32 @@ use colored::Colorize;
 ///   tool based on the current project context, environment, or plugins.
 fn main() {
     #[cfg(windows)]
-    colored::control::set_virtual_terminal(true,).ok();
+    colored::control::set_virtual_terminal(true).ok();
 
-    let args: Vec<String,> = std::env::args().collect();
+    let args: Vec<String> = std::env::args().collect();
     let program_name = args
         .first()
-        .and_then(|path| std::path::Path::new(path,).file_name(),)
-        .and_then(|s| s.to_str(),)
+        .and_then(|path| std::path::Path::new(path).file_name())
+        .and_then(|s| s.to_str())
         .unwrap_or_default();
 
     if !program_name.is_empty()
         && program_name != "zoi"
-        && !program_name.starts_with("zoi-",)
-        && !program_name.contains("target",)
+        && !program_name.starts_with("zoi-")
+        && !program_name.contains("target")
     {
         let plugin_manager = match zoi_cli::pkg::plugin::PluginManager::new() {
-            Ok(m,) => {
-                let _ = m.load_all(false,);
+            Ok(m) => {
+                let _ = m.load_all(false);
                 m
             }
-            Err(e,) => {
+            Err(e) => {
                 eprintln!(
                     "{}: Failed to initialize PluginManager: {}",
                     "Error".red().bold(),
                     e
                 );
-                std::process::exit(1,);
+                std::process::exit(1);
             }
         };
 
@@ -52,31 +52,31 @@ fn main() {
         // - Resolve the required package and its dependency tree.
         // - Install it into the appropriate store scope.
         // - Seamlessly continue the original execution.
-        let auto_install = |name: &str, version: &str| -> anyhow::Result<(),> {
+        let auto_install = |name: &str, version: &str| -> anyhow::Result<()> {
             let spec = format!("{name}@{version}");
-            let scope = if std::path::Path::new("zoi.yaml",).exists() {
+            let scope = if std::path::Path::new("zoi.yaml").exists() {
                 zoi_cli::pkg::types::Scope::Project
             } else {
                 zoi_cli::pkg::types::Scope::User
             };
             let _options = zoi_cli::SourceInstallOptions {
-                scope_override: Some(scope,),
+                scope_override: Some(scope),
                 yes: true,
                 ..Default::default()
             };
             zoi_cli::cmd::install::run(
-                &[spec,],
+                &[spec],
                 None,
                 false,
                 false,
                 true,
-                Some(zoi_cli::cli::InstallScope::User,),
+                Some(zoi_cli::cli::InstallScope::User),
                 false,
                 false,
                 false,
                 None,
                 false,
-                Some(&plugin_manager,),
+                Some(&plugin_manager),
                 false,
                 false,
                 false,
@@ -84,24 +84,24 @@ fn main() {
                 3,
                 false,
                 false,
-                None,
+                None
             )
         };
 
-        if let Err(e,) = zoi_cli::pkg::shim::run_shim(
+        if let Err(e) = zoi_cli::pkg::shim::run_shim(
             program_name,
-            args.get(1..,).unwrap_or_default().to_vec(),
-            Some(&plugin_manager,),
-            Some(&auto_install,),
+            args.get(1..).unwrap_or_default().to_vec(),
+            Some(&plugin_manager),
+            Some(&auto_install)
         ) {
             eprintln!("{}: {}", "Shim Error".red().bold(), e);
-            std::process::exit(1,);
+            std::process::exit(1);
         }
         return;
     }
 
-    if let Err(e,) = zoi_cli::cli::run() {
+    if let Err(e) = zoi_cli::cli::run() {
         eprintln!("{}: {}", "Error".red().bold(), e);
-        std::process::exit(1,);
+        std::process::exit(1);
     }
 }

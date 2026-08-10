@@ -20,7 +20,7 @@ fn default_revision() -> String {
 /// This index allows Zoi Mini to perform fast lookups and vulnerability checks
 /// without downloading individual `.pkg.lua` files or cloning entire
 /// registries.
-#[derive(Debug, Serialize, Deserialize, Clone,)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MiniPackageIndex {
     /// The repository where the package is located.
     pub repo: String,
@@ -35,32 +35,32 @@ pub struct MiniPackageIndex {
     pub description: String,
     /// A list of sub-packages provided by this package.
     #[serde(default, deserialize_with = "deserialize_sub_packages")]
-    pub sub_packages: Option<Vec<String,>,>,
+    pub sub_packages: Option<Vec<String>>,
     /// Known vulnerabilities for this package.
-    pub vuln: Option<Vec<MiniVulnerability,>,>,
+    pub vuln: Option<Vec<MiniVulnerability>>
 }
 
 /// Custom deserializer for sub-packages to handle potential null or non-array
 /// values gracefully.
-fn deserialize_sub_packages<'de, D,>(
-    deserializer: D,
-) -> Result<Option<Vec<String,>,>, D::Error,>
+fn deserialize_sub_packages<'de, D>(
+    deserializer: D
+) -> Result<Option<Vec<String>>, D::Error>
 where
-    D: serde::Deserializer<'de,>,
+    D: serde::Deserializer<'de>
 {
-    let v: serde_json::Value = serde::Deserialize::deserialize(deserializer,)?;
+    let v: serde_json::Value = serde::Deserialize::deserialize(deserializer)?;
     if v.is_array() {
-        Ok(serde_json::from_value(v,).ok(),)
+        Ok(serde_json::from_value(v).ok())
     } else {
-        Ok(None,)
+        Ok(None)
     }
 }
 
 /// A mapping of package names to their metadata in the Mini index.
-#[derive(Debug, Serialize, Deserialize, Clone,)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MiniRegistryIndex {
     /// The collection of packages in the index.
-    pub packages: HashMap<String, MiniPackageIndex,>,
+    pub packages: HashMap<String, MiniPackageIndex>
 }
 
 /// Fetches the optimized JSON index from the official Zoidberg registry.
@@ -71,18 +71,18 @@ pub struct MiniRegistryIndex {
 /// # Errors
 ///
 /// Returns an error if the index cannot be fetched or parsed.
-pub fn fetch_registry_index() -> Result<MiniRegistryIndex,> {
+pub fn fetch_registry_index() -> Result<MiniRegistryIndex> {
     let url = "https://gitlab.com/zillowe/zillwen/zusty/zoidberg/-/raw/main/packages.json";
     let client = zoi_core::utils::get_http_client()?;
-    let response = client.get(url,).send()?;
+    let response = client.get(url).send()?;
     if !response.status().is_success() {
         return Err(anyhow!(
             "Failed to fetch packages.json from Zoidberg registry: {}",
             response.status()
-        ),);
+        ));
     }
     let index: MiniRegistryIndex = response.json()?;
-    Ok(index,)
+    Ok(index)
 }
 
 /// Fetches the repository configuration from the official Zoidberg registry.
@@ -90,24 +90,24 @@ pub fn fetch_registry_index() -> Result<MiniRegistryIndex,> {
 /// # Errors
 ///
 /// Returns an error if the configuration cannot be fetched or parsed.
-pub fn fetch_registry_config() -> Result<zoi_core::types::RepoConfig,> {
+pub fn fetch_registry_config() -> Result<zoi_core::types::RepoConfig> {
     let url = "https://gitlab.com/zillowe/zillwen/zusty/zoidberg/-/raw/main/repo.yaml";
     let client = zoi_core::utils::get_http_client()?;
-    let response = client.get(url,).send()?;
+    let response = client.get(url).send()?;
     if !response.status().is_success() {
         return Err(anyhow!(
             "Failed to fetch repo.yaml from Zoidberg registry: {}",
             response.status()
-        ),);
+        ));
     }
     let content = response.text()?;
-    let config: zoi_core::types::RepoConfig = serde_yaml::from_str(&content,)?;
-    Ok(config,)
+    let config: zoi_core::types::RepoConfig = serde_yaml::from_str(&content)?;
+    Ok(config)
 }
 
 /// Returns the URL to download a package's `.pkg.lua` file from the official
 /// registry.
-pub fn get_package_lua_url(repo: &str, name: &str,) -> String {
+pub fn get_package_lua_url(repo: &str, name: &str) -> String {
     format!(
         "https://gitlab.com/zillowe/zillwen/zusty/zoidberg/-/raw/main/{repo}/{name}/{name}.pkg.lua"
     )
@@ -125,28 +125,28 @@ pub fn get_package_lua_url(repo: &str, name: &str,) -> String {
 pub fn check_vulnerabilities(
     pkg_name: &str,
     pkg_index: &MiniPackageIndex,
-    version: &str,
-) -> Result<bool,> {
-    let Some(vulns,) = &pkg_index.vuln else {
-        return Ok(true,);
+    version: &str
+) -> Result<bool> {
+    let Some(vulns) = &pkg_index.vuln else {
+        return Ok(true);
     };
 
     let target_version =
-        semver::Version::parse(version.trim_start_matches('v',),)
-            .map_err(|e| anyhow!("Failed to parse version {version}: {e}"),)?;
+        semver::Version::parse(version.trim_start_matches('v'))
+            .map_err(|e| anyhow!("Failed to parse version {version}: {e}"))?;
 
     let mut affected = Vec::new();
 
     for vuln in vulns {
-        if let Ok(req,) = semver::VersionReq::parse(&vuln.affected_range,)
-            && req.matches(&target_version,)
+        if let Ok(req) = semver::VersionReq::parse(&vuln.affected_range)
+            && req.matches(&target_version)
         {
-            affected.push(vuln,);
+            affected.push(vuln);
         }
     }
 
     if affected.is_empty() {
-        return Ok(true,);
+        return Ok(true);
     }
 
     println!("\n{}", "SECURITY WARNING".red().bold());
@@ -162,7 +162,7 @@ pub fn check_vulnerabilities(
             vuln.summary,
             vuln.severity.to_uppercase()
         );
-        if let Some(fixed,) = &vuln.fixed_in {
+        if let Some(fixed) = &vuln.fixed_in {
             println!("Fixed in version: {}", fixed.green());
         }
         println!();
@@ -170,6 +170,6 @@ pub fn check_vulnerabilities(
 
     Ok(zoi_core::utils::ask_for_confirmation(
         "Do you want to continue with the installation anyway?",
-        false,
-    ),)
+        false
+    ))
 }

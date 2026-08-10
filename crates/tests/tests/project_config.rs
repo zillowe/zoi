@@ -13,7 +13,7 @@ pkgs:
   - bat
 ";
     let cfg: config::ProjectConfig =
-        serde_yaml::from_str(yaml,).expect("unwrap failed",);
+        serde_yaml::from_str(yaml).expect("unwrap failed");
     assert_eq!(cfg.name, "my-test-project");
     assert!(cfg.config.local);
     assert_eq!(cfg.pkgs.len(), 2);
@@ -29,7 +29,7 @@ pkgs:
   - fd: "8.7.0"
 "#;
     let cfg: config::ProjectConfig =
-        serde_yaml::from_str(yaml,).expect("unwrap failed",);
+        serde_yaml::from_str(yaml).expect("unwrap failed");
     assert!(
         cfg.pkgs.contains(&"fzf@0.44.1".to_string())
             || cfg.pkgs.contains(&"fzf: 0.44.1".to_string())

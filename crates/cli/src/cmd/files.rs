@@ -13,20 +13,15 @@ use crate::pkg::{local, resolve};
 ///
 /// Returns an error if the package is not installed or if there is an issue
 /// resolving the package metadata or files.
-pub fn run(package_name: &str,) -> Result<(),> {
-    let (pkg_meta, _, _, _, _, _, _,) = resolve::resolve_package_and_version(
-        package_name,
-        None,
-        false,
-        false,
-    )?;
+pub fn run(package_name: &str) -> Result<()> {
+    let (pkg_meta, _, _, _, _, _, _) =
+        resolve::resolve_package_and_version(package_name, None, false, false)?;
 
     let installed_packages = local::get_installed_packages()?;
 
-    let Some(pkg,) =
-        installed_packages.iter().find(|p| p.name == pkg_meta.name,)
+    let Some(pkg) = installed_packages.iter().find(|p| p.name == pkg_meta.name)
     else {
-        return Err(anyhow!("Package '{package_name}' is not installed."),);
+        return Err(anyhow!("Package '{package_name}' is not installed."));
     };
 
     println!("Files for {} {}:", pkg.name.cyan(), pkg.version.yellow());
@@ -36,7 +31,7 @@ pub fn run(package_name: &str,) -> Result<(),> {
         &pkg.registry_handle,
         &pkg.repo,
         &pkg.name,
-        &pkg.version,
+        &pkg.version
     )?;
 
     if pkg.installed_files.is_empty() {
@@ -48,11 +43,11 @@ pub fn run(package_name: &str,) -> Result<(),> {
             let expanded = crate::pkg::utils::expand_placeholders(
                 file,
                 &version_dir,
-                pkg.scope,
+                pkg.scope
             )?;
             println!("{expanded}");
         }
     }
 
-    Ok((),)
+    Ok(())
 }

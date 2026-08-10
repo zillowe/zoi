@@ -13,15 +13,15 @@ use crate::pkg::install::resolver;
 /// # Errors
 ///
 /// Returns an error if the dependency tree cannot be resolved.
-pub fn run(package_names: &[String],) -> Result<(),> {
+pub fn run(package_names: &[String]) -> Result<()> {
     if package_names.is_empty() {
         println!("{}", "Please specify at least one package name.".yellow());
-        return Ok((),);
+        return Ok(());
     }
 
     println!("{} Resolving dependency tree...", "::".bold().blue());
 
-    let (graph, non_zoi_deps,) = resolver::resolve_dependency_graph(
+    let (graph, non_zoi_deps) = resolver::resolve_dependency_graph(
         package_names,
         None,
         false,
@@ -29,7 +29,7 @@ pub fn run(package_names: &[String],) -> Result<(),> {
         true,
         None,
         true,
-        None,
+        None
     )?;
 
     if !non_zoi_deps.is_empty() {
@@ -46,19 +46,19 @@ pub fn run(package_names: &[String],) -> Result<(),> {
 
     let mut visited = HashSet::new();
     for source in package_names {
-        if let Some(children,) = graph.adj.get("$root",) {
+        if let Some(children) = graph.adj.get("$root") {
             for pkg_id in children {
-                let Some(node,) = graph.nodes.get(pkg_id,) else {
+                let Some(node) = graph.nodes.get(pkg_id) else {
                     continue;
                 };
-                if source.contains(&node.pkg.name,) {
-                    print_node(&graph, pkg_id, "", true, &mut visited,)?;
+                if source.contains(&node.pkg.name) {
+                    print_node(&graph, pkg_id, "", true, &mut visited)?;
                 }
             }
         }
     }
 
-    Ok((),)
+    Ok(())
 }
 
 /// Recursively prints a node in the dependency tree.
@@ -67,17 +67,17 @@ fn print_node(
     pkg_id: &str,
     prefix: &str,
     is_last: bool,
-    visited: &mut HashSet<String,>,
-) -> Result<(),> {
+    visited: &mut HashSet<String>
+) -> Result<()> {
     let node = graph
         .nodes
-        .get(pkg_id,)
-        .ok_or_else(|| anyhow!("Package not found in graph: {pkg_id}"),)?;
-    let is_repeated = visited.contains(pkg_id,);
+        .get(pkg_id)
+        .ok_or_else(|| anyhow!("Package not found in graph: {pkg_id}"))?;
+    let is_repeated = visited.contains(pkg_id);
 
     let connector = if is_last { "└── " } else { "├── " };
 
-    let pkg_display = if let Some(sub,) = &node.sub_package {
+    let pkg_display = if let Some(sub) = &node.sub_package {
         format!("{}:{}", node.pkg.name.cyan().bold(), sub.yellow())
     } else {
         node.pkg.name.cyan().bold().to_string()
@@ -95,16 +95,16 @@ fn print_node(
     );
 
     if is_repeated {
-        return Ok((),);
+        return Ok(());
     }
-    visited.insert(pkg_id.to_string(),);
+    visited.insert(pkg_id.to_string());
 
-    if let Some(children,) = graph.adj.get(pkg_id,) {
+    if let Some(children) = graph.adj.get(pkg_id) {
         let child_count = children.len();
-        let mut sorted_children: Vec<_,> = children.iter().collect();
+        let mut sorted_children: Vec<_> = children.iter().collect();
         sorted_children.sort();
 
-        for (i, child_id,) in sorted_children.iter().enumerate() {
+        for (i, child_id) in sorted_children.iter().enumerate() {
             let new_prefix =
                 format!("{}{}", prefix, if is_last { "    " } else { "│   " });
             print_node(
@@ -112,10 +112,10 @@ fn print_node(
                 child_id,
                 &new_prefix,
                 i == child_count - 1,
-                visited,
+                visited
             )?;
         }
     }
 
-    Ok((),)
+    Ok(())
 }

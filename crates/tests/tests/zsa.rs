@@ -10,17 +10,17 @@ mod common;
 #[test]
 fn test_zsa_bundle_build_install() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("failed to create temp dir",);
+    let tmp = tempdir().expect("failed to create temp dir");
     let root = tmp.path().to_path_buf();
-    ctx.set_current_dir(&root,);
-    ctx.set_env_var("HOME", &root,);
+    ctx.set_current_dir(&root);
+    ctx.set_env_var("HOME", &root);
 
-    let pkg_dir = root.join("my-pkg",);
-    fs::create_dir_all(&pkg_dir,).expect("unwrap failed",);
+    let pkg_dir = root.join("my-pkg");
+    fs::create_dir_all(&pkg_dir).expect("unwrap failed");
 
-    let pkg_lua = pkg_dir.join("my-pkg.pkg.lua",);
-    let asset_file = pkg_dir.join("hello.txt",);
-    fs::write(&asset_file, "hello from asset",).expect("unwrap failed",);
+    let pkg_lua = pkg_dir.join("my-pkg.pkg.lua");
+    let asset_file = pkg_dir.join("hello.txt");
+    fs::write(&asset_file, "hello from asset").expect("unwrap failed");
 
     let lua_code = r#"
 metadata({
@@ -37,25 +37,25 @@ function package()
     zcp("${pkgluadir}/hello.txt", "${pkgstore}/bin/hello-bin")
 end
 "#;
-    fs::write(&pkg_lua, lua_code,).expect("unwrap failed",);
+    fs::write(&pkg_lua, lua_code).expect("unwrap failed");
 
     // Bundle
-    zoi::bundle_package(&pkg_lua, Some(&root,), None, None, None,)
-        .expect("bundling failed",);
-    let zsa_path = root.join("my-pkg-1.0.0.zsa",);
+    zoi::bundle_package(&pkg_lua, Some(&root), None, None, None)
+        .expect("bundling failed");
+    let zsa_path = root.join("my-pkg-1.0.0.zsa");
     assert!(zsa_path.exists(), ".zsa bundle should exist");
 
     // Build from .zsa
     let build_options = zoi::BuildOptions {
-        build_type: Some("source",),
-        output_dir: Some(root.clone(),),
+        build_type: Some("source"),
+        output_dir: Some(root.clone()),
         ..Default::default()
     };
-    zoi::build_with_options(&zsa_path, &build_options,)
-        .expect("build from .zsa failed",);
+    zoi::build_with_options(&zsa_path, &build_options)
+        .expect("build from .zsa failed");
 
-    let platform = zoi::utils::get_platform().expect("unwrap failed",);
-    let zpa_path = root.join(format!("my-pkg-1.0.0-{platform}.zpa"),);
+    let platform = zoi::utils::get_platform().expect("unwrap failed");
+    let zpa_path = root.join(format!("my-pkg-1.0.0-{platform}.zpa"));
     assert!(
         zpa_path.exists(),
         ".zpa archive should exist after build from .zsa"
@@ -63,34 +63,34 @@ end
 
     // Install from .zsa (end-to-end)
     let install_options = zoi::SourceInstallOptions {
-        scope_override: Some(Scope::User,),
+        scope_override: Some(Scope::User),
         yes: true,
         ..Default::default()
     };
 
     // We'll use a clean sysroot to verify installation
-    let sysroot = root.join("sysroot",);
-    fs::create_dir_all(&sysroot,).expect("unwrap failed",);
-    common::TestContextGuard::set_sysroot(sysroot.clone(),);
+    let sysroot = root.join("sysroot");
+    fs::create_dir_all(&sysroot).expect("unwrap failed");
+    common::TestContextGuard::set_sysroot(sysroot.clone());
 
     zoi::install_sources(
-        &[zsa_path.to_string_lossy().to_string(),],
-        &install_options,
+        &[zsa_path.to_string_lossy().to_string()],
+        &install_options
     )
-    .expect("install from .zsa failed",);
+    .expect("install from .zsa failed");
 
     // Verify installation
     // Path should be
     // sysroot/home/.zoi/pkgs/store/8f...-my-pkg/1.0.0/bin/hello-bin
     let mut found = false;
-    for entry in walkdir::WalkDir::new(&sysroot,) {
-        let entry = entry.expect("unwrap failed",);
+    for entry in walkdir::WalkDir::new(&sysroot) {
+        let entry = entry.expect("unwrap failed");
         let path = entry.path();
         // Skip shims which are in .../bin/ and are copies of zoi binary
-        if path.to_string_lossy().contains("store",)
+        if path.to_string_lossy().contains("store")
             && entry.file_name().to_string_lossy() == "hello-bin"
         {
-            let content = fs::read_to_string(path,).expect("unwrap failed",);
+            let content = fs::read_to_string(path).expect("unwrap failed");
             if content == "hello from asset" {
                 found = true;
                 break;

@@ -20,16 +20,16 @@ use anyhow::{Result, anyhow};
 /// - The build process fails inside the sandbox.
 pub fn run(
     package_file: &Path,
-    build_type: Option<&str,>,
+    build_type: Option<&str>,
     platforms: &[String],
-    sign_key: Option<String,>,
-    output_dir: Option<&Path,>,
-    version_override: Option<&str,>,
-    sub_packages: Option<Vec<String,>,>,
+    sign_key: Option<String>,
+    output_dir: Option<&Path>,
+    version_override: Option<&str>,
+    sub_packages: Option<Vec<String>>,
     fakeroot: bool,
     install_deps: bool,
-    test: bool,
-) -> Result<(),> {
+    test: bool
+) -> Result<()> {
     #[cfg(not(target_os = "linux"))]
     {
         let _ = (
@@ -42,11 +42,11 @@ pub fn run(
             sub_packages,
             fakeroot,
             install_deps,
-            test,
+            test
         );
         return Err(anyhow!(
             "Bubblewrap ('bwrap') is only supported on Linux."
-        ),);
+        ));
     }
 
     #[cfg(target_os = "linux")]
@@ -62,21 +62,21 @@ pub fn run(
             "::".bold().blue()
         );
 
-        if !utils::command_exists("bwrap",) {
+        if !utils::command_exists("bwrap") {
             return Err(anyhow!(
                 "Bubblewrap ('bwrap') is not installed or not in PATH. Please \
                  install it to use this method."
-            ),);
+            ));
         }
 
         let abs_package_file = package_file.canonicalize()?;
         let package_dir = abs_package_file.parent().ok_or_else(|| {
             anyhow!("Could not get parent directory of package file")
-        },)?;
+        })?;
 
-        let abs_output_dir = if let Some(dir,) = output_dir {
+        let abs_output_dir = if let Some(dir) = output_dir {
             if !dir.exists() {
-                std::fs::create_dir_all(dir,)?;
+                std::fs::create_dir_all(dir)?;
             }
             dir.canonicalize()?
         } else {
@@ -90,15 +90,15 @@ pub fn run(
         let zoi_exe = std::env::current_exe()?;
         let zoi_exe_dir = zoi_exe
             .parent()
-            .ok_or_else(|| anyhow!("Could not get zoi executable directory"),)?;
+            .ok_or_else(|| anyhow!("Could not get zoi executable directory"))?;
 
         let home_dir = zoi_core::utils::get_user_home()
-            .ok_or_else(|| anyhow!("Could not get home directory"),)?;
-        let zoi_home = home_dir.join(".zoi",);
+            .ok_or_else(|| anyhow!("Could not get home directory"))?;
+        let zoi_home = home_dir.join(".zoi");
 
         let package_filename = abs_package_file
             .file_name()
-            .ok_or_else(|| anyhow!("Invalid package file name"),)?
+            .ok_or_else(|| anyhow!("Invalid package file name"))?
             .to_string_lossy();
 
         // Construct the inner zoi command
@@ -107,7 +107,7 @@ pub fn run(
              {container_output_dir} --method native"
         );
 
-        if let Some(bt,) = build_type {
+        if let Some(bt) = build_type {
             let _ = write!(inner_cmd, " --type {bt}");
         }
 
@@ -115,30 +115,30 @@ pub fn run(
             let _ = write!(inner_cmd, " --platform {p}");
         }
 
-        if let Some(sk,) = sign_key {
+        if let Some(sk) = sign_key {
             let _ = write!(inner_cmd, " --sign {sk}");
         }
 
-        if let Some(v,) = version_override {
+        if let Some(v) = version_override {
             let _ = write!(inner_cmd, " --version-override {v}");
         }
 
-        if let Some(subs,) = sub_packages {
+        if let Some(subs) = sub_packages {
             for s in subs {
                 let _ = write!(inner_cmd, " --sub {s}");
             }
         }
 
         if fakeroot {
-            inner_cmd.push_str(" --fakeroot",);
+            inner_cmd.push_str(" --fakeroot");
         }
 
         if install_deps {
-            inner_cmd.push_str(" --install-deps",);
+            inner_cmd.push_str(" --install-deps");
         }
 
         if test {
-            inner_cmd.push_str(" --test",);
+            inner_cmd.push_str(" --test");
         }
 
         // Base bwrap arguments
@@ -147,12 +147,12 @@ pub fn run(
         let mut envs = std::collections::HashMap::new();
         envs.insert(
             "PATH".to_string(),
-            "/zoi_bin:/usr/bin:/bin:/usr/sbin:/sbin".to_string(),
+            "/zoi_bin:/usr/bin:/bin:/usr/sbin:/sbin".to_string()
         );
-        envs.insert("ZOI_SKIP_LOCK".to_string(), "1".to_string(),);
-        envs.insert("HOME".to_string(), home_dir.display().to_string(),);
+        envs.insert("ZOI_SKIP_LOCK".to_string(), "1".to_string());
+        envs.insert("HOME".to_string(), home_dir.display().to_string());
 
-        let status = if let Some(root,) = &sysroot {
+        let status = if let Some(root) = &sysroot {
             println!(
                 "{} Isolated build using sysroot: {}",
                 "::".bold().yellow(),
@@ -160,18 +160,18 @@ pub fn run(
             );
 
             let extra_binds = vec![
-                (package_dir.to_path_buf(), PathBuf::from(container_workdir,),),
-                (abs_output_dir.clone(), PathBuf::from(container_output_dir,),),
-                (zoi_exe_dir.to_path_buf(), PathBuf::from("/zoi_bin",),),
+                (package_dir.to_path_buf(), PathBuf::from(container_workdir)),
+                (abs_output_dir.clone(), PathBuf::from(container_output_dir)),
+                (zoi_exe_dir.to_path_buf(), PathBuf::from("/zoi_bin")),
             ];
 
             let mut cmd = zoi_sandbox::wrap_command_in_root(
                 root,
-                &PathBuf::from("/bin/bash",),
-                &["-c".to_string(), inner_cmd,],
+                &PathBuf::from("/bin/bash"),
+                &["-c".to_string(), inner_cmd],
                 &envs,
                 &extra_binds,
-                fakeroot,
+                fakeroot
             )?;
             cmd.status()?
         } else {
@@ -229,52 +229,52 @@ pub fn run(
             ];
 
             if zoi_home.exists() {
-                bwrap_args.push("--bind".to_string(),);
-                bwrap_args.push(zoi_home.display().to_string(),);
-                bwrap_args.push(zoi_home.display().to_string(),);
+                bwrap_args.push("--bind".to_string());
+                bwrap_args.push(zoi_home.display().to_string());
+                bwrap_args.push(zoi_home.display().to_string());
             }
 
-            let system_zoi = Path::new("/var/lib/zoi",);
+            let system_zoi = Path::new("/var/lib/zoi");
             if system_zoi.exists() {
-                bwrap_args.push("--bind".to_string(),);
-                bwrap_args.push(system_zoi.display().to_string(),);
-                bwrap_args.push(system_zoi.display().to_string(),);
+                bwrap_args.push("--bind".to_string());
+                bwrap_args.push(system_zoi.display().to_string());
+                bwrap_args.push(system_zoi.display().to_string());
             }
 
             if fakeroot {
-                bwrap_args.push("--uid".to_string(),);
-                bwrap_args.push("0".to_string(),);
-                bwrap_args.push("--gid".to_string(),);
-                bwrap_args.push("0".to_string(),);
+                bwrap_args.push("--uid".to_string());
+                bwrap_args.push("0".to_string());
+                bwrap_args.push("--gid".to_string());
+                bwrap_args.push("0".to_string());
             } else {
                 let uid = nix::unistd::getuid().as_raw();
                 let gid = nix::unistd::getgid().as_raw();
-                bwrap_args.push("--uid".to_string(),);
-                bwrap_args.push(uid.to_string(),);
-                bwrap_args.push("--gid".to_string(),);
-                bwrap_args.push(gid.to_string(),);
+                bwrap_args.push("--uid".to_string());
+                bwrap_args.push(uid.to_string());
+                bwrap_args.push("--gid".to_string());
+                bwrap_args.push(gid.to_string());
             }
 
-            bwrap_args.push("--setenv".to_string(),);
-            bwrap_args.push("HOME".to_string(),);
-            bwrap_args.push(home_dir.display().to_string(),);
+            bwrap_args.push("--setenv".to_string());
+            bwrap_args.push("HOME".to_string());
+            bwrap_args.push(home_dir.display().to_string());
 
-            bwrap_args.push("bash".to_string(),);
-            bwrap_args.push("-c".to_string(),);
-            bwrap_args.push(inner_cmd,);
+            bwrap_args.push("bash".to_string());
+            bwrap_args.push("-c".to_string());
+            bwrap_args.push(inner_cmd);
 
-            Command::new("bwrap",).args(&bwrap_args,).status()?
+            Command::new("bwrap").args(&bwrap_args).status()?
         };
 
         if !status.success() {
             return Err(anyhow!(
                 "Bubblewrap build failed with exit code {:?}",
                 status.code()
-            ),);
+            ));
         }
 
         println!("{}", "Bubblewrap build successful!".green());
 
-        Ok((),)
+        Ok(())
     }
 }

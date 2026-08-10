@@ -21,7 +21,7 @@ use crate::pkg::{config, db};
 /// # Errors
 ///
 /// Returns an error if the provides search fails.
-pub fn run(term: &str,) -> Result<(),> {
+pub fn run(term: &str) -> Result<()> {
     println!(
         "{} Searching for packages providing '{}'...",
         "::".bold().blue(),
@@ -30,16 +30,16 @@ pub fn run(term: &str,) -> Result<(),> {
 
     let config = config::read_config()?;
     let mut registries = Vec::new();
-    if let Some(default,) = &config.default_registry {
-        registries.push(default.handle.clone(),);
+    if let Some(default) = &config.default_registry {
+        registries.push(default.handle.clone());
     }
     for reg in &config.added_registries {
-        registries.push(reg.handle.clone(),);
+        registries.push(reg.handle.clone());
     }
 
-    let all_results: Vec<(crate::pkg::types::Package, String,),> = registries
+    let all_results: Vec<(crate::pkg::types::Package, String)> = registries
         .into_par_iter()
-        .filter_map(|handle| db::find_provides(&handle, term,).ok(),)
+        .filter_map(|handle| db::find_provides(&handle, term).ok())
         .flatten()
         .collect();
 
@@ -53,32 +53,32 @@ pub fn run(term: &str,) -> Result<(),> {
              file lists.",
             "Hint:".cyan()
         );
-        return Ok((),);
+        return Ok(());
     }
 
     let mut table = Table::new();
     table
-        .load_preset(UTF8_FULL,)
-        .set_content_arrangement(ContentArrangement::Dynamic,)
+        .load_preset(UTF8_FULL)
+        .set_content_arrangement(ContentArrangement::Dynamic)
         .set_header(vec![
-            Cell::new("Package",).add_attribute(Attribute::Bold,),
-            Cell::new("Version",).add_attribute(Attribute::Bold,),
-            Cell::new("Matches",).add_attribute(Attribute::Bold,),
-            Cell::new("Repo",).add_attribute(Attribute::Bold,),
-        ],);
+            Cell::new("Package").add_attribute(Attribute::Bold),
+            Cell::new("Version").add_attribute(Attribute::Bold),
+            Cell::new("Matches").add_attribute(Attribute::Bold),
+            Cell::new("Repo").add_attribute(Attribute::Bold),
+        ]);
 
-    for (pkg, matched_path,) in all_results {
+    for (pkg, matched_path) in all_results {
         let repo_display = &pkg.repo;
         table.add_row(vec![
-            Cell::new(pkg.name,).fg(comfy_table::Color::Cyan,),
-            Cell::new(pkg.version.unwrap_or_else(|| "N/A".to_string(),),)
-                .fg(comfy_table::Color::Yellow,),
-            Cell::new(matched_path,).fg(comfy_table::Color::Green,),
-            Cell::new(repo_display.clone(),).fg(comfy_table::Color::DarkGrey,),
-        ],);
+            Cell::new(pkg.name).fg(comfy_table::Color::Cyan),
+            Cell::new(pkg.version.unwrap_or_else(|| "N/A".to_string()))
+                .fg(comfy_table::Color::Yellow),
+            Cell::new(matched_path).fg(comfy_table::Color::Green),
+            Cell::new(repo_display.clone()).fg(comfy_table::Color::DarkGrey),
+        ]);
     }
 
     println!("{table}");
 
-    Ok((),)
+    Ok(())
 }

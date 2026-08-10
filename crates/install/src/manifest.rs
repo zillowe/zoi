@@ -11,15 +11,15 @@ use zoi_core::types;
 pub fn create_manifest(
     pkg: &types::Package,
     reason: types::InstallReason,
-    installed_dependencies: Vec<String,>,
-    install_method: Option<String,>,
-    installed_files: Vec<String,>,
+    installed_dependencies: Vec<String>,
+    install_method: Option<String>,
+    installed_files: Vec<String>,
     registry_handle: &str,
     repo_type: String,
     chosen_options: &[String],
     chosen_optionals: &[String],
-    sub_package: Option<String,>,
-) -> Result<types::InstallManifest,> {
+    sub_package: Option<String>
+) -> Result<types::InstallManifest> {
     let platform = zoi_core::utils::get_platform().unwrap_or_default();
 
     let mut installed_dependencies = installed_dependencies;
@@ -35,33 +35,33 @@ pub fn create_manifest(
     chosen_optionals.sort();
 
     let mut bins = pkg.bins.clone();
-    if let Some(ref mut b,) = bins {
+    if let Some(ref mut b) = bins {
         b.sort();
     }
 
     let mut conflicts = pkg.conflicts.clone();
-    if let Some(ref mut c,) = conflicts {
+    if let Some(ref mut c) = conflicts {
         c.sort();
     }
 
     let mut replaces = pkg.replaces.clone();
-    if let Some(ref mut r,) = replaces {
+    if let Some(ref mut r) = replaces {
         r.sort();
     }
 
     let mut provides = pkg.provides.clone();
-    if let Some(ref mut p,) = provides {
+    if let Some(ref mut p) = provides {
         p.sort();
     }
 
     let mut backup = pkg.backup.clone();
-    if let Some(ref mut b,) = backup {
+    if let Some(ref mut b) = backup {
         b.sort();
     }
 
     let mut dependencies_v2 =
-        pkg.dependencies.clone().map(types::to_dependencies_v2,);
-    if let Some(ref mut deps,) = dependencies_v2 {
+        pkg.dependencies.clone().map(types::to_dependencies_v2);
+    if let Some(ref mut deps) = dependencies_v2 {
         deps.runtime.sort();
         for b in &mut deps.build {
             b.packages.sort();
@@ -69,12 +69,12 @@ pub fn create_manifest(
     }
 
     let mut completions = pkg.completions.clone();
-    if let Some(ref mut c,) = completions {
+    if let Some(ref mut c) = completions {
         c.sort_by(|a, a2| {
             a.shell
-                .cmp(&a2.shell,)
-                .then_with(|| a.filename.cmp(&a2.filename,),)
-        },);
+                .cmp(&a2.shell)
+                .then_with(|| a.filename.cmp(&a2.filename))
+        });
     }
 
     Ok(types::InstallManifest {
@@ -84,7 +84,7 @@ pub fn create_manifest(
                 "Version should be resolved but was missing for package '{}'",
                 pkg.name
             )
-        },)?,
+        })?,
         epoch: pkg.epoch,
         revision: pkg.revision.clone(),
         sub_package,
@@ -110,6 +110,6 @@ pub fn create_manifest(
         installed_files,
         installed_size: pkg.installed_size,
         sandbox: pkg.sandbox.clone(),
-        completions,
-    },)
+        completions
+    })
 }
