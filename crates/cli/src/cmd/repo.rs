@@ -104,7 +104,7 @@ pub fn run(args: RepoCommand,) -> Result<(),> {
         Commands::Git(cmd,) => match cmd {
             GitCommand::List => run_list_git_only()?,
             GitCommand::Rm { repo_name, } => {
-                config::remove_git_repo(&repo_name,)?;
+                config::remove_git_repo(&repo_name,)?
             }
         },
     }

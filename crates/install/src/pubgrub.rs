@@ -76,9 +76,7 @@ impl SemVersion {
     /// Parses a version string into a `SemVersion`.
     ///
     /// Handles epoch prefixes (e.g. "1:1.2.3") and sanitizes non-standard
-    /// strings.
-    ///
-    /// # Errors
+    /// strings. # Errors
     ///
     /// Returns an error if the version string is not a valid semver.
     pub fn parse(v: &str,) -> Result<Self, anyhow::Error,> {
