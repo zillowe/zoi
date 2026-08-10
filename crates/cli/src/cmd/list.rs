@@ -531,7 +531,7 @@ fn run_list_all(
 
         for res in results {
             if let Ok(pkgs,) = res {
-                all_available.extend(pkgs,)
+                all_available.extend(pkgs,);
             } else {
                 db_failed = true;
                 break;
