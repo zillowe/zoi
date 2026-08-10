@@ -21,9 +21,9 @@ const EMAIL: &str = "contact@zillowe.qzz.io";
 const LICENSE: &str = "Apache 2.0";
 
 /// Executes the about command.
-pub fn run(branch: &str, status: &str, number: &str, commit: &str,) {
+pub fn run(branch: &str, status: &str, number: &str, commit: &str) {
     let full_version_string =
-        utils::format_version_full(branch, status, number, commit,);
+        utils::format_version_full(branch, status, number, commit);
 
     println!("\n  {}\n", DESCRIPTION.green());
 
@@ -41,17 +41,17 @@ pub fn run(branch: &str, status: &str, number: &str, commit: &str,) {
     let about_packager_email = option_env!("ZOI_ABOUT_PACKAGER_EMAIL");
     let about_packager_homepage = option_env!("ZOI_ABOUT_PACKAGER_HOMEPAGE");
 
-    let has_build_info = posthog_host.is_some_and(|s| !s.is_empty(),)
-        || zoi_registry.is_some_and(|s| !s.is_empty(),);
+    let has_build_info = posthog_host.is_some_and(|s| !s.is_empty())
+        || zoi_registry.is_some_and(|s| !s.is_empty());
 
     if has_build_info {
         println!("\n  {}", "Build Information".green());
-        if let Some(host,) = posthog_host
+        if let Some(host) = posthog_host
             && !host.is_empty()
         {
             println!("  {:<19}{}", "Telemetry Host:".cyan(), host);
         }
-        if let Some(registry,) = zoi_registry
+        if let Some(registry) = zoi_registry
             && !registry.is_empty()
         {
             println!("  {:<19}{}", "Default Registry:".cyan(), registry);
@@ -59,23 +59,23 @@ pub fn run(branch: &str, status: &str, number: &str, commit: &str,) {
     }
 
     let has_packager_info = about_packager_author
-        .is_some_and(|s| !s.is_empty(),)
-        || about_packager_email.is_some_and(|s| !s.is_empty(),)
-        || about_packager_homepage.is_some_and(|s| !s.is_empty(),);
+        .is_some_and(|s| !s.is_empty())
+        || about_packager_email.is_some_and(|s| !s.is_empty())
+        || about_packager_homepage.is_some_and(|s| !s.is_empty());
 
     if has_packager_info {
         println!("\n  {}", "Packager Information".green());
-        if let Some(author,) = about_packager_author
+        if let Some(author) = about_packager_author
             && !author.is_empty()
         {
             println!("  {:<19}{}", "Packager:".cyan(), author);
         }
-        if let Some(email,) = about_packager_email
+        if let Some(email) = about_packager_email
             && !email.is_empty()
         {
             println!("  {:<19}{}", "Email:".cyan(), email);
         }
-        if let Some(homepage,) = about_packager_homepage
+        if let Some(homepage) = about_packager_homepage
             && !homepage.is_empty()
         {
             println!("  {:<19}{}", "Homepage:".cyan(), homepage);

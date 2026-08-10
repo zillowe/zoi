@@ -6,20 +6,20 @@ use anyhow::{Result, anyhow};
 use crate::generation::Generation;
 
 pub trait BootloaderManager {
-    fn name(&self,) -> &str;
+    fn name(&self) -> &str;
     fn install_entry(
         &self,
         generation: &Generation,
         kernel_path: &Path,
         initrd_path: &Path,
-        cmdline: &str,
-    ) -> Result<(),>;
-    fn remove_entry(&self, generation_id: u32,) -> Result<(),>;
+        cmdline: &str
+    ) -> Result<()>;
+    fn remove_entry(&self, generation_id: u32) -> Result<()>;
 }
 
 pub struct SystemdBoot;
 impl BootloaderManager for SystemdBoot {
-    fn name(&self,) -> &str {
+    fn name(&self) -> &str {
         "systemd-boot"
     }
     fn install_entry(
@@ -27,8 +27,8 @@ impl BootloaderManager for SystemdBoot {
         generation: &Generation,
         kernel_path: &Path,
         initrd_path: &Path,
-        cmdline: &str,
-    ) -> Result<(),> {
+        cmdline: &str
+    ) -> Result<()> {
         let entry_content = format!(
             "title ZoiOS Generation {}\nversion {}\nlinux {}\ninitrd \
              {}\noptions zoi.generation={} {}\n",
@@ -42,29 +42,29 @@ impl BootloaderManager for SystemdBoot {
         let entry_path = PathBuf::from(format!(
             "/boot/loader/entries/zoios-gen-{}.conf",
             generation.id
-        ),);
-        if let Some(parent,) = entry_path.parent() {
-            fs::create_dir_all(parent,)?;
+        ));
+        if let Some(parent) = entry_path.parent() {
+            fs::create_dir_all(parent)?;
         }
-        fs::write(entry_path, entry_content,)?;
-        Ok((),)
+        fs::write(entry_path, entry_content)?;
+        Ok(())
     }
 
-    fn remove_entry(&self, generation_id: u32,) -> Result<(),> {
+    fn remove_entry(&self, generation_id: u32) -> Result<()> {
         let entry_path = PathBuf::from(format!(
             "/boot/loader/entries/zoios-gen-{}.conf",
             generation_id
-        ),);
+        ));
         if entry_path.exists() {
-            fs::remove_file(entry_path,)?;
+            fs::remove_file(entry_path)?;
         }
-        Ok((),)
+        Ok(())
     }
 }
 
 pub struct Grub2;
 impl BootloaderManager for Grub2 {
-    fn name(&self,) -> &str {
+    fn name(&self) -> &str {
         "grub2"
     }
     fn install_entry(
@@ -72,9 +72,9 @@ impl BootloaderManager for Grub2 {
         _generation: &Generation,
         _kernel_path: &Path,
         _initrd_path: &Path,
-        _cmdline: &str,
-    ) -> Result<(),> {
-        let script_path = PathBuf::from("/etc/grub.d/15_zoios",);
+        _cmdline: &str
+    ) -> Result<()> {
+        let script_path = PathBuf::from("/etc/grub.d/15_zoios");
 
         let script_content = r#"#!/bin/sh
 exec tail -n +3 $0
@@ -102,25 +102,25 @@ for gen_json in /var/lib/zoi/generations/*/generation.json; do
 done
 "#;
 
-        if let Some(parent,) = script_path.parent() {
-            fs::create_dir_all(parent,)?;
+        if let Some(parent) = script_path.parent() {
+            fs::create_dir_all(parent)?;
         }
-        fs::write(&script_path, script_content,)?;
+        fs::write(&script_path, script_content)?;
 
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
             fs::set_permissions(
                 &script_path,
-                fs::Permissions::from_mode(0o755,),
+                fs::Permissions::from_mode(0o755)
             )?;
         }
 
         self.update_config()?;
-        Ok((),)
+        Ok(())
     }
 
-    fn remove_entry(&self, _generation_id: u32,) -> Result<(),> {
+    fn remove_entry(&self, _generation_id: u32) -> Result<()> {
         // Since the script dynamically lists all generations in
         // /var/lib/zoi/generations, we just need to refresh the config.
         self.update_config()
@@ -128,34 +128,34 @@ done
 }
 
 impl Grub2 {
-    fn update_config(&self,) -> Result<(),> {
+    fn update_config(&self) -> Result<()> {
         println!("Updating GRUB2 configuration...");
-        let mut cmd = std::process::Command::new("grub-mkconfig",);
+        let mut cmd = std::process::Command::new("grub-mkconfig");
 
-        let output_path = if Path::new("/boot/grub2/grub.cfg",).exists() {
+        let output_path = if Path::new("/boot/grub2/grub.cfg").exists() {
             "/boot/grub2/grub.cfg"
-        } else if Path::new("/boot/grub/grub.cfg",).exists() {
+        } else if Path::new("/boot/grub/grub.cfg").exists() {
             "/boot/grub/grub.cfg"
         } else {
-            return Err(anyhow!("Could not locate grub.cfg"),);
+            return Err(anyhow!("Could not locate grub.cfg"));
         };
 
-        let status = cmd.arg("-o",).arg(output_path,).status()?;
+        let status = cmd.arg("-o").arg(output_path).status()?;
         if !status.success() {
-            return Err(anyhow!("grub-mkconfig failed"),);
+            return Err(anyhow!("grub-mkconfig failed"));
         }
-        Ok((),)
+        Ok(())
     }
 }
 
-pub fn detect_bootloader() -> Result<Box<dyn BootloaderManager,>,> {
-    if Path::new("/boot/loader/entries",).exists() {
-        Ok(Box::new(SystemdBoot,),)
-    } else if Path::new("/boot/grub2",).exists()
-        || Path::new("/boot/grub",).exists()
+pub fn detect_bootloader() -> Result<Box<dyn BootloaderManager>> {
+    if Path::new("/boot/loader/entries").exists() {
+        Ok(Box::new(SystemdBoot))
+    } else if Path::new("/boot/grub2").exists()
+        || Path::new("/boot/grub").exists()
     {
-        Ok(Box::new(Grub2,),)
+        Ok(Box::new(Grub2))
     } else {
-        Err(anyhow!("No supported bootloader detected"),)
+        Err(anyhow!("No supported bootloader detected"))
     }
 }

@@ -15,107 +15,103 @@ use zstd::stream::read::Decoder as ZstdDecoder;
 
 /// Returns the root directory where binary shims should be created for a given
 /// scope.
-fn get_bin_root(scope: types::Scope,) -> Result<PathBuf,> {
+fn get_bin_root(scope: types::Scope) -> Result<PathBuf> {
     match scope {
         types::Scope::User => {
             let home_dir = zoi_core::utils::get_user_home()
-                .ok_or_else(|| anyhow!("Could not find home directory."),)?;
+                .ok_or_else(|| anyhow!("Could not find home directory."))?;
             Ok(zoi_core::sysroot::apply_sysroot(
-                home_dir.join(".zoi/pkgs/bin",),
-            ),)
+                home_dir.join(".zoi/pkgs/bin")
+            ))
         }
         types::Scope::System => {
             if cfg!(target_os = "windows") {
                 Ok(zoi_core::sysroot::apply_sysroot(PathBuf::from(
-                    "C:\\ProgramData\\zoi\\pkgs\\bin",
-                ),),)
+                    "C:\\ProgramData\\zoi\\pkgs\\bin"
+                )))
             } else if zoi_core::utils::is_zoios() {
-                Ok(
-                    zoi_core::sysroot::apply_sysroot(
-                        PathBuf::from("/usr/bin",),
-                    ),
-                )
+                Ok(zoi_core::sysroot::apply_sysroot(PathBuf::from("/usr/bin")))
             } else {
                 Ok(zoi_core::sysroot::apply_sysroot(PathBuf::from(
-                    "/usr/local/bin",
-                ),),)
+                    "/usr/local/bin"
+                )))
             }
         }
         types::Scope::Project => {
             let current_dir = std::env::current_dir()?;
-            Ok(current_dir.join(".zoi",).join("pkgs",).join("bin",),)
+            Ok(current_dir.join(".zoi").join("pkgs").join("bin"))
         }
     }
 }
 
 /// Returns the root directory where shell completions should be installed for a
 /// given scope and shell.
-fn get_completions_root(scope: types::Scope, shell: &str,) -> Result<PathBuf,> {
+fn get_completions_root(scope: types::Scope, shell: &str) -> Result<PathBuf> {
     match scope {
         types::Scope::User => {
             let home_dir = zoi_core::utils::get_user_home()
-                .ok_or_else(|| anyhow!("Could not find home directory."),)?;
+                .ok_or_else(|| anyhow!("Could not find home directory."))?;
             Ok(zoi_core::sysroot::apply_sysroot(
-                home_dir.join(".zoi/pkgs/shell",).join(shell,),
-            ),)
+                home_dir.join(".zoi/pkgs/shell").join(shell)
+            ))
         }
         types::Scope::System => {
             if cfg!(target_os = "windows") {
                 Ok(zoi_core::sysroot::apply_sysroot(PathBuf::from(format!(
                     "C:\\ProgramData\\zoi\\pkgs\\shell\\{shell}"
-                ),),),)
+                ))))
             } else if zoi_core::utils::is_zoios() {
                 let base = match shell {
                     "bash" => "/usr/share/bash-completion/completions",
                     "zsh" => "/usr/share/zsh/site-functions",
                     "fish" => "/usr/share/fish/vendor_completions.d",
                     "elvish" => "/usr/share/elvish/lib",
-                    _ => "/usr/share/zoi/completions",
+                    _ => "/usr/share/zoi/completions"
                 };
-                Ok(zoi_core::sysroot::apply_sysroot(PathBuf::from(base,),),)
+                Ok(zoi_core::sysroot::apply_sysroot(PathBuf::from(base)))
             } else {
                 let base = match shell {
                     "bash" => "/usr/share/bash-completion/completions",
                     "zsh" => "/usr/share/zsh/site-functions",
                     "fish" => "/usr/share/fish/vendor_completions.d",
                     "elvish" => "/usr/share/elvish/lib",
-                    _ => "/usr/local/share/zoi/completions",
+                    _ => "/usr/local/share/zoi/completions"
                 };
-                Ok(zoi_core::sysroot::apply_sysroot(PathBuf::from(base,),),)
+                Ok(zoi_core::sysroot::apply_sysroot(PathBuf::from(base)))
             }
         }
         types::Scope::Project => {
             let current_dir = std::env::current_dir()?;
             Ok(current_dir
-                .join(".zoi",)
-                .join("pkgs",)
-                .join("shell",)
-                .join(shell,),)
+                .join(".zoi")
+                .join("pkgs")
+                .join("shell")
+                .join(shell))
         }
     }
 }
 
 /// Creates a symlink for a shell completion file, removing any existing file or
 /// link at the destination.
-fn create_completion_symlink(source: &Path, link: &Path,) -> Result<(),> {
+fn create_completion_symlink(source: &Path, link: &Path) -> Result<()> {
     if link.exists() || link.is_symlink() {
-        fs::remove_file(link,)?;
+        fs::remove_file(link)?;
     }
-    if let Some(parent,) = link.parent() {
-        fs::create_dir_all(parent,)?;
+    if let Some(parent) = link.parent() {
+        fs::create_dir_all(parent)?;
     }
     #[cfg(unix)]
     {
-        std::os::unix::fs::symlink(source, link,)
-            .map_err(|e| anyhow!("Failed to create completion symlink: {e}"),)?;
+        std::os::unix::fs::symlink(source, link)
+            .map_err(|e| anyhow!("Failed to create completion symlink: {e}"))?;
     }
     #[cfg(windows)]
     {
-        std::os::windows::fs::symlink_file(source, link,).map_err(|e| {
+        std::os::windows::fs::symlink_file(source, link).map_err(|e| {
             anyhow!("Failed to create completion symlink: {}", e)
-        },)?;
+        })?;
     }
-    Ok((),)
+    Ok(())
 }
 
 /// Checks for file conflicts between a source directory and a destination
@@ -123,24 +119,24 @@ fn create_completion_symlink(source: &Path, link: &Path,) -> Result<(),> {
 fn check_and_handle_file_conflicts(
     source_dir: &Path,
     dest_dir: &Path,
-    owned_files: &HashSet<String,>,
-    yes: bool,
-) -> Result<(),> {
+    owned_files: &HashSet<String>,
+    yes: bool
+) -> Result<()> {
     let mut conflicting_files = Vec::new();
 
-    for entry in WalkDir::new(source_dir,)
+    for entry in WalkDir::new(source_dir)
         .into_iter()
-        .filter_map(std::result::Result::ok,)
-        .skip(1,)
+        .filter_map(std::result::Result::ok)
+        .skip(1)
     {
         if entry.file_type().is_file() {
-            let relative_path = entry.path().strip_prefix(source_dir,)?;
-            let dest_path = dest_dir.join(relative_path,);
+            let relative_path = entry.path().strip_prefix(source_dir)?;
+            let dest_path = dest_dir.join(relative_path);
             if dest_path.exists()
                 && !owned_files
-                    .contains(&dest_path.to_string_lossy().to_string(),)
+                    .contains(&dest_path.to_string_lossy().to_string())
             {
-                conflicting_files.push(dest_path,);
+                conflicting_files.push(dest_path);
             }
         }
     }
@@ -160,15 +156,15 @@ fn check_and_handle_file_conflicts(
         if !utils::ask_for_confirmation(
             "Do you want to overwrite these files and continue with the \
              installation?",
-            yes,
+            yes
         ) {
             return Err(anyhow!(
                 "Installation aborted by user due to file conflicts."
-            ),);
+            ));
         }
     }
 
-    Ok((),)
+    Ok(())
 }
 
 /// Performs the low-level extraction and staging of a package archive.
@@ -194,22 +190,22 @@ fn check_and_handle_file_conflicts(
 /// - Filesystem operations (copying, directory creation) fail.
 pub fn run(
     package_file: &Path,
-    scope_override: Option<types::Scope,>,
+    scope_override: Option<types::Scope>,
     registry_handle: &str,
-    version_override: Option<&str,>,
+    version_override: Option<&str>,
     yes: bool,
-    sub_packages: Option<Vec<String,>,>,
+    sub_packages: Option<Vec<String>>,
     link_bins: bool,
-    pb: Option<&indicatif::ProgressBar,>,
-) -> Result<Vec<String,>,> {
-    let scope = scope_override.unwrap_or(types::Scope::User,);
+    pb: Option<&indicatif::ProgressBar>
+) -> Result<Vec<String>> {
+    let scope = scope_override.unwrap_or(types::Scope::User);
 
     // Handle meta-packages with no archive
     if package_file.as_os_str().is_empty() {
         if pb.is_none() {
             println!("Initializing meta-package...");
         }
-        return Ok(Vec::new(),);
+        return Ok(Vec::new());
     }
 
     if pb.is_none() {
@@ -219,67 +215,66 @@ pub fn run(
         );
     }
 
-    let file_metadata = fs::metadata(package_file,)
-        .map_err(|e| anyhow!("Failed to get archive metadata: {e}"),)?;
+    let file_metadata = fs::metadata(package_file)
+        .map_err(|e| anyhow!("Failed to get archive metadata: {e}"))?;
     let file_size = file_metadata.len();
 
     if pb.is_none() {
         println!("Archive size: {}", zoi_core::utils::format_bytes(file_size));
     }
 
-    let mut file = File::open(package_file,)
-        .map_err(|e| anyhow!("Failed to open package archive: {e}"),)?;
+    let mut file = File::open(package_file)
+        .map_err(|e| anyhow!("Failed to open package archive: {e}"))?;
 
     let mut magic = [0u8; 4];
-    if file.read_exact(&mut magic,).is_ok()
-        && magic != [0x28, 0xB5, 0x2F, 0xFD,]
+    if file.read_exact(&mut magic).is_ok() && magic != [0x28, 0xB5, 0x2F, 0xFD]
     {
         return Err(anyhow!(
             "Invalid archive format: expected zstd magic number 28 B5 2F FD, \
              but found {magic:02X?}. This file is likely not a valid .zst \
              archive."
-        ),);
+        ));
     }
 
     file.rewind()
-        .map_err(|e| anyhow!("Failed to rewind archive file: {e}"),)?;
+        .map_err(|e| anyhow!("Failed to rewind archive file: {e}"))?;
 
-    let decoder = ZstdDecoder::new(file,)
-        .map_err(|e| anyhow!("Failed to initialize zstd decoder: {e}"),)?;
-    let mut archive = Archive::new(decoder,);
+    let decoder = ZstdDecoder::new(file)
+        .map_err(|e| anyhow!("Failed to initialize zstd decoder: {e}"))?;
+    let mut archive = Archive::new(decoder);
 
     #[cfg(target_os = "linux")]
-    archive.set_unpack_xattrs(true,);
+    archive.set_unpack_xattrs(true);
 
-    let temp_dir = Builder::new().prefix("zoi-install-",).tempdir()?;
+    let temp_dir = Builder::new().prefix("zoi-install-").tempdir()?;
     let unpack_path = temp_dir.path().to_path_buf();
 
     for entry_res in archive
         .entries()
-        .map_err(|e| anyhow!("Failed to read archive entries: {e}"),)?
+        .map_err(|e| anyhow!("Failed to read archive entries: {e}"))?
     {
         let mut entry = entry_res.map_err(|e| {
             anyhow!(
                 "Failed to process archive entry: {e}. The archive may be \
                  truncated or corrupted."
             )
-        },)?;
+        })?;
         let path = entry
             .path()
-            .map_err(|e| anyhow!("Failed to get entry path: {e}"),)?
+            .map_err(|e| anyhow!("Failed to get entry path: {e}"))?
             .to_path_buf();
-        entry.unpack_in(&unpack_path,).map_err(|e| {
+        entry.unpack_in(&unpack_path).map_err(|e| {
             anyhow!("Failed to unpack file '{}': {}", path.display(), e)
-        },)?;
+        })?;
     }
 
     let mut pkg_lua_path = None;
-    for entry in WalkDir::new(temp_dir.path(),)
+    for entry in WalkDir::new(temp_dir.path())
         .into_iter()
-        .filter_map(std::result::Result::ok,)
+        .filter_map(std::result::Result::ok)
     {
-        if entry.file_name().to_string_lossy().ends_with(".pkg.lua",) {
-            pkg_lua_path = Some(entry.path().to_path_buf(),);
+        if entry.file_name().to_string_lossy().ends_with(".pkg.lua") {
+            pkg_lua_path = Some(entry.path().to_path_buf());
             break;
         }
     }
@@ -288,7 +283,7 @@ pub fn run(
             "Could not find .pkg.lua file in archive '{}'",
             package_file.display()
         )
-    },)?;
+    })?;
 
     let platform = utils::get_platform()?;
     let metadata = zoi_lua::parser::parse_lua_package_for_platform(
@@ -297,18 +292,18 @@ pub fn run(
                 "Path contains invalid UTF-8 characters: {}",
                 pkg_lua_path.display()
             )
-        },)?,
+        })?,
         &platform,
         version_override,
-        Some(scope,),
-        true,
+        Some(scope),
+        true
     )?;
 
-    let pooled_manifest_path = unpack_path.join("manifest.json",);
+    let pooled_manifest_path = unpack_path.join("manifest.json");
     if pooled_manifest_path.exists() {
-        let content = fs::read_to_string(&pooled_manifest_path,)?;
-        if let Ok(pooled_manifest,) =
-            serde_json::from_str::<types::PooledZpaManifest,>(&content,)
+        let content = fs::read_to_string(&pooled_manifest_path)?;
+        if let Ok(pooled_manifest) =
+            serde_json::from_str::<types::PooledZpaManifest>(&content)
         {
             return extract_pooled_zpa(
                 &pooled_manifest,
@@ -319,7 +314,7 @@ pub fn run(
                 link_bins,
                 pb,
                 yes,
-                registry_handle,
+                registry_handle
             );
         }
     }
@@ -329,7 +324,7 @@ pub fn run(
             "Package '{}' is missing version field in its metadata.",
             metadata.name
         )
-    },)?;
+    })?;
 
     if pb.is_none() {
         println!(
@@ -343,33 +338,33 @@ pub fn run(
         scope,
         registry_handle,
         &metadata.repo,
-        &metadata.name,
+        &metadata.name
     )?;
-    fs::create_dir_all(&package_dir,)?;
+    fs::create_dir_all(&package_dir)?;
 
     let staging_dir = tempfile::Builder::new()
-        .prefix(".tmp-install-",)
-        .tempdir_in(&package_dir,)?;
+        .prefix(".tmp-install-")
+        .tempdir_in(&package_dir)?;
 
-    let mut installed_files: Vec<String,> = Vec::new();
-    let version_dir = package_dir.join(version,);
+    let mut installed_files: Vec<String> = Vec::new();
+    let version_dir = package_dir.join(version);
 
-    let data_dir = temp_dir.path().join("data",);
+    let data_dir = temp_dir.path().join("data");
     if data_dir.exists() {
-        if let Some(p,) = pb {
-            p.set_message(format!("Installing {}...", metadata.name.cyan()),);
+        if let Some(p) = pb {
+            p.set_message(format!("Installing {}...", metadata.name.cyan()));
         } else {
             println!("Installing {}...", metadata.name.cyan());
         }
 
-        let subs_to_install = if let Some(subs,) = sub_packages {
+        let subs_to_install = if let Some(subs) = sub_packages {
             subs
-        } else if let Some(subs,) = &metadata.sub_packages {
-            if let Some(main_subs,) = &metadata.main_subs {
+        } else if let Some(subs) = &metadata.sub_packages {
+            if let Some(main_subs) = &metadata.main_subs {
                 main_subs.clone()
             } else {
                 let mut all = vec![String::new()];
-                all.extend(subs.clone(),);
+                all.extend(subs.clone());
                 all
             }
         } else {
@@ -383,7 +378,7 @@ pub fn run(
                 if pb.is_none() {
                     println!("Installing sub-package: {}", sub.bold());
                 }
-                data_dir.join(&sub,)
+                data_dir.join(&sub)
             };
 
             if !sub_data_dir.exists() {
@@ -400,98 +395,98 @@ pub fn run(
             let sub_opt = if sub.is_empty() {
                 None
             } else {
-                Some(sub.as_str(),)
+                Some(sub.as_str())
             };
-            if let Ok(Some(manifest,),) =
-                local::is_package_installed(&metadata.name, sub_opt, scope,)
+            if let Ok(Some(manifest)) =
+                local::is_package_installed(&metadata.name, sub_opt, scope)
             {
-                owned_files.extend(manifest.installed_files,);
+                owned_files.extend(manifest.installed_files);
             }
 
-            let pkgstore_src = sub_data_dir.join("pkgstore",);
+            let pkgstore_src = sub_data_dir.join("pkgstore");
             if pkgstore_src.exists() {
-                copy_dir_all(&pkgstore_src, staging_dir.path(),)?;
+                copy_dir_all(&pkgstore_src, staging_dir.path())?;
             }
 
-            let usrroot_src = sub_data_dir.join("usrroot",);
+            let usrroot_src = sub_data_dir.join("usrroot");
             if usrroot_src.exists() {
                 if !utils::is_admin() {
                     return Err(anyhow!(
                         "Administrator privileges required to install \
                          system-wide files. Please run with sudo or as an \
                          administrator."
-                    ),);
+                    ));
                 }
                 let root_dest =
-                    zoi_core::sysroot::apply_sysroot(PathBuf::from("/",),);
+                    zoi_core::sysroot::apply_sysroot(PathBuf::from("/"));
                 check_and_handle_file_conflicts(
                     &usrroot_src,
                     &root_dest,
                     &owned_files,
-                    yes,
+                    yes
                 )?;
-                copy_dir_all(&usrroot_src, &root_dest,)?;
-                for entry in WalkDir::new(&usrroot_src,)
+                copy_dir_all(&usrroot_src, &root_dest)?;
+                for entry in WalkDir::new(&usrroot_src)
                     .into_iter()
-                    .filter_map(std::result::Result::ok,)
+                    .filter_map(std::result::Result::ok)
                 {
                     if entry.file_type().is_file() {
                         let rel_to_root =
-                            entry.path().strip_prefix(&usrroot_src,)?;
+                            entry.path().strip_prefix(&usrroot_src)?;
                         installed_files.push(format!(
                             "${{usrroot}}/{}",
                             rel_to_root.to_string_lossy().replace('\\', "/")
-                        ),);
+                        ));
                     }
                 }
             }
 
-            let usrhome_src = sub_data_dir.join("usrhome",);
+            let usrhome_src = sub_data_dir.join("usrhome");
             if usrhome_src.exists() {
                 let home_dest = zoi_core::utils::get_user_home()
-                    .ok_or_else(|| anyhow!("Could not find home directory"),)?;
+                    .ok_or_else(|| anyhow!("Could not find home directory"))?;
                 check_and_handle_file_conflicts(
                     &usrhome_src,
                     &home_dest,
                     &owned_files,
-                    yes,
+                    yes
                 )?;
-                copy_dir_all(&usrhome_src, &home_dest,)?;
-                for entry in WalkDir::new(&usrhome_src,)
+                copy_dir_all(&usrhome_src, &home_dest)?;
+                for entry in WalkDir::new(&usrhome_src)
                     .into_iter()
-                    .filter_map(std::result::Result::ok,)
+                    .filter_map(std::result::Result::ok)
                 {
                     if entry.file_type().is_file() {
                         let rel_to_home =
-                            entry.path().strip_prefix(&usrhome_src,)?;
+                            entry.path().strip_prefix(&usrhome_src)?;
                         installed_files.push(format!(
                             "${{usrhome}}/{}",
                             rel_to_home.to_string_lossy().replace('\\', "/")
-                        ),);
+                        ));
                     }
                 }
             }
         }
     }
 
-    if let Some(p,) = pb {
-        p.set_position(60,);
+    if let Some(p) = pb {
+        p.set_position(60);
     }
 
-    for entry in WalkDir::new(staging_dir.path(),)
+    for entry in WalkDir::new(staging_dir.path())
         .into_iter()
-        .filter_map(std::result::Result::ok,)
+        .filter_map(std::result::Result::ok)
     {
         if entry.file_type().is_file() {
-            let rel_path = entry.path().strip_prefix(staging_dir.path(),)?;
+            let rel_path = entry.path().strip_prefix(staging_dir.path())?;
             installed_files.push(format!(
                 "${{pkgstore}}/{}",
                 rel_path.to_string_lossy().replace('\\', "/")
-            ),);
+            ));
         }
     }
 
-    copy_dir_all(staging_dir.path(), &version_dir,)?;
+    copy_dir_all(staging_dir.path(), &version_dir)?;
 
     finalize_installation(
         &version_dir,
@@ -499,15 +494,15 @@ pub fn run(
         scope,
         link_bins,
         pb,
-        &mut installed_files,
+        &mut installed_files
     )?;
 
-    if let Some(p,) = pb {
-        p.set_position(100,);
+    if let Some(p) = pb {
+        p.set_position(100);
     } else {
         println!("{} Installation complete.", "Success:".green());
     }
-    Ok(installed_files,)
+    Ok(installed_files)
 }
 
 /// Finalizes the installation by creating backups, linking binaries,
@@ -517,31 +512,29 @@ fn finalize_installation(
     metadata: &types::Package,
     scope: types::Scope,
     link_bins: bool,
-    pb: Option<&indicatif::ProgressBar,>,
-    _installed_files: &mut Vec<String,>,
-) -> Result<(),> {
+    pb: Option<&indicatif::ProgressBar>,
+    _installed_files: &mut Vec<String>
+) -> Result<()> {
     // Create .zoiorig copies for 3-way merge support
-    if let Some(backup_files,) = &metadata.backup {
+    if let Some(backup_files) = &metadata.backup {
         for backup_file_rel in backup_files {
             let expanded_path = utils::expand_placeholders(
                 backup_file_rel,
                 version_dir,
-                scope,
+                scope
             )?;
-            let backup_src = PathBuf::from(expanded_path,);
+            let backup_src = PathBuf::from(expanded_path);
 
             if backup_src.exists() && backup_src.is_file() {
                 let mut orig_path = backup_src.clone();
-                let ext = orig_path
-                    .extension()
-                    .and_then(|s| s.to_str(),)
-                    .map_or_else(
+                let ext =
+                    orig_path.extension().and_then(|s| s.to_str()).map_or_else(
                         || "zoiorig".to_string(),
-                        |s| format!("{s}.zoiorig"),
+                        |s| format!("{s}.zoiorig")
                     );
-                orig_path.set_extension(ext,);
+                orig_path.set_extension(ext);
 
-                if let Err(e,) = fs::copy(&backup_src, &orig_path,)
+                if let Err(e) = fs::copy(&backup_src, &orig_path)
                     && pb.is_none()
                 {
                     eprintln!(
@@ -554,32 +547,32 @@ fn finalize_installation(
         }
     }
 
-    if link_bins && let Some(bins,) = &metadata.bins {
-        let bin_root = get_bin_root(scope,)?;
-        fs::create_dir_all(&bin_root,)?;
+    if link_bins && let Some(bins) = &metadata.bins {
+        let bin_root = get_bin_root(scope)?;
+        fs::create_dir_all(&bin_root)?;
 
         let mut created_shims = Vec::new();
-        let mut link_error: Option<String,> = None;
+        let mut link_error: Option<String> = None;
 
         for bin_name in bins {
             let mut found_bin = false;
-            for entry in WalkDir::new(version_dir,)
+            for entry in WalkDir::new(version_dir)
                 .into_iter()
-                .filter_map(std::result::Result::ok,)
+                .filter_map(std::result::Result::ok)
             {
                 if entry.file_type().is_file()
                     && entry.file_name().to_string_lossy() == *bin_name
                 {
-                    let link_path = bin_root.join(bin_name,);
+                    let link_path = bin_root.join(bin_name);
 
                     let zoi_exe = std::env::current_exe()?;
-                    if let Err(e,) =
-                        zoi_core::utils::symlink_file(&zoi_exe, &link_path,)
+                    if let Err(e) =
+                        zoi_core::utils::symlink_file(&zoi_exe, &link_path)
                     {
-                        link_error = Some(e.to_string(),);
+                        link_error = Some(e.to_string());
                         break;
                     }
-                    created_shims.push(link_path,);
+                    created_shims.push(link_path);
 
                     if pb.is_none() {
                         println!("Created shim for: {}", bin_name.green());
@@ -599,35 +592,32 @@ fn finalize_installation(
             }
         }
 
-        if let Some(e,) = link_error {
+        if let Some(e) = link_error {
             for shim in created_shims {
-                let _ = fs::remove_file(shim,);
+                let _ = fs::remove_file(shim);
             }
-            return Err(anyhow!("Failed to create shims: {e}"),);
+            return Err(anyhow!("Failed to create shims: {e}"));
         }
     }
 
-    let shell_dir = version_dir.join("shell",);
+    let shell_dir = version_dir.join("shell");
     if shell_dir.exists() {
-        for shell_entry in fs::read_dir(&shell_dir,).map_err(|e| {
+        for shell_entry in fs::read_dir(&shell_dir).map_err(|e| {
             anyhow!("Failed to read shell completions directory: {e}")
-        },)?
-        {
+        })? {
             let shell_entry = shell_entry?;
             if !shell_entry.file_type()?.is_dir() {
                 continue;
             }
             let shell_name =
                 shell_entry.file_name().to_string_lossy().to_string();
-            let completions_root = get_completions_root(scope, &shell_name,)?;
-            let pkg_completions_dir = completions_root.join(&metadata.name,);
-            fs::create_dir_all(&pkg_completions_dir,)?;
+            let completions_root = get_completions_root(scope, &shell_name)?;
+            let pkg_completions_dir = completions_root.join(&metadata.name);
+            fs::create_dir_all(&pkg_completions_dir)?;
 
-            for file_entry in
-                fs::read_dir(shell_entry.path(),).map_err(|e| {
-                    anyhow!("Failed to read shell/{shell_name}/ directory: {e}")
-                },)?
-            {
+            for file_entry in fs::read_dir(shell_entry.path()).map_err(|e| {
+                anyhow!("Failed to read shell/{shell_name}/ directory: {e}")
+            })? {
                 let file_entry = file_entry?;
                 if !file_entry.file_type()?.is_file() {
                     continue;
@@ -635,8 +625,8 @@ fn finalize_installation(
                 let filename =
                     file_entry.file_name().to_string_lossy().to_string();
                 let store_path = file_entry.path();
-                let link_path = pkg_completions_dir.join(&filename,);
-                create_completion_symlink(&store_path, &link_path,)?;
+                let link_path = pkg_completions_dir.join(&filename);
+                create_completion_symlink(&store_path, &link_path)?;
                 if pb.is_none() {
                     println!(
                         "Linked {} completion: {}",
@@ -651,58 +641,58 @@ fn finalize_installation(
     #[cfg(target_os = "macos")]
     {
         let applications_dir = match scope {
-            types::Scope::System => PathBuf::from("/Applications",),
+            types::Scope::System => PathBuf::from("/Applications"),
             types::Scope::User => {
                 let home_dir = zoi_core::utils::get_user_home()
-                    .ok_or_else(|| anyhow!("Could not find home directory."),)?;
-                home_dir.join("Applications",)
+                    .ok_or_else(|| anyhow!("Could not find home directory."))?;
+                home_dir.join("Applications")
             }
             types::Scope::Project => {
-                std::env::current_dir()?.join("Applications",)
+                std::env::current_dir()?.join("Applications")
             }
         };
 
         let mut app_bundles = Vec::new();
-        for entry in WalkDir::new(version_dir,)
-            .max_depth(2,)
+        for entry in WalkDir::new(version_dir)
+            .max_depth(2)
             .into_iter()
-            .filter_map(|e| e.ok(),)
+            .filter_map(|e| e.ok())
         {
             if entry.file_type().is_dir()
-                && entry.file_name().to_string_lossy().ends_with(".app",)
+                && entry.file_name().to_string_lossy().ends_with(".app")
             {
-                app_bundles.push(entry.path().to_path_buf(),);
+                app_bundles.push(entry.path().to_path_buf());
             }
         }
 
         if !app_bundles.is_empty() {
-            fs::create_dir_all(&applications_dir,)?;
+            fs::create_dir_all(&applications_dir)?;
             for app_path in app_bundles {
-                if zoi_core::utils::command_exists("xattr",) {
-                    let _ = std::process::Command::new("xattr",)
-                        .arg("-r",)
-                        .arg("-d",)
-                        .arg("com.apple.quarantine",)
-                        .arg(&app_path,)
+                if zoi_core::utils::command_exists("xattr") {
+                    let _ = std::process::Command::new("xattr")
+                        .arg("-r")
+                        .arg("-d")
+                        .arg("com.apple.quarantine")
+                        .arg(&app_path)
                         .status();
                 }
 
                 let app_name = app_path.file_name().ok_or_else(|| {
                     anyhow!("App path has no filename: {:?}", app_path)
-                },)?;
-                let symlink_path = applications_dir.join(app_name,);
+                })?;
+                let symlink_path = applications_dir.join(app_name);
 
                 if symlink_path.exists() {
-                    let _ = fs::remove_file(&symlink_path,);
-                    let _ = fs::remove_dir_all(&symlink_path,);
+                    let _ = fs::remove_file(&symlink_path);
+                    let _ = fs::remove_dir_all(&symlink_path);
                 }
 
-                if std::os::unix::fs::symlink(&app_path, &symlink_path,).is_ok()
+                if std::os::unix::fs::symlink(&app_path, &symlink_path).is_ok()
                 {
                     _installed_files.push(format!(
                         "${{applications}}/{}",
                         app_name.to_string_lossy().replace('\\', "/")
-                    ),);
+                    ));
                     if pb.is_none() {
                         println!(
                             "Linked {} to {}",
@@ -715,7 +705,7 @@ fn finalize_installation(
         }
     }
 
-    Ok((),)
+    Ok(())
 }
 
 /// Extracts and installs a pooled ZPA package using its manifest
@@ -725,18 +715,18 @@ fn extract_pooled_zpa(
     unpack_path: &Path,
     scope: types::Scope,
     metadata: &types::Package,
-    sub_packages: Option<Vec<String,>,>,
+    sub_packages: Option<Vec<String>>,
     link_bins: bool,
-    pb: Option<&indicatif::ProgressBar,>,
+    pb: Option<&indicatif::ProgressBar>,
     yes: bool,
-    registry_handle: &str,
-) -> Result<Vec<String,>,> {
+    registry_handle: &str
+) -> Result<Vec<String>> {
     let version = metadata.version.as_ref().ok_or_else(|| {
         anyhow!(
             "Package '{}' is missing version field in its metadata.",
             metadata.name
         )
-    },)?;
+    })?;
 
     if pb.is_none() {
         println!(
@@ -751,21 +741,21 @@ fn extract_pooled_zpa(
         scope,
         registry_handle,
         &metadata.repo,
-        &metadata.name,
+        &metadata.name
     )?;
-    fs::create_dir_all(&package_dir,)?;
+    fs::create_dir_all(&package_dir)?;
 
     let staging_dir = tempfile::Builder::new()
-        .prefix(".tmp-install-",)
-        .tempdir_in(&package_dir,)?;
+        .prefix(".tmp-install-")
+        .tempdir_in(&package_dir)?;
 
-    let mut installed_files: Vec<String,> = Vec::new();
-    let version_dir = package_dir.join(version,);
+    let mut installed_files: Vec<String> = Vec::new();
+    let version_dir = package_dir.join(version);
 
-    let subs_to_install = if let Some(subs,) = sub_packages {
+    let subs_to_install = if let Some(subs) = sub_packages {
         subs
-    } else if let Some(subs,) = &metadata.sub_packages {
-        if let Some(main_subs,) = &metadata.main_subs {
+    } else if let Some(subs) = &metadata.sub_packages {
+        if let Some(main_subs) = &metadata.main_subs {
             main_subs.clone()
         } else {
             subs.clone()
@@ -774,7 +764,7 @@ fn extract_pooled_zpa(
         vec![String::new()]
     };
 
-    let pool_dir = unpack_path.join("pool",);
+    let pool_dir = unpack_path.join("pool");
 
     let mut conflicts = Vec::new();
     let mut owned_files = HashSet::new();
@@ -783,30 +773,30 @@ fn extract_pooled_zpa(
         let sub_opt = if sub.is_empty() {
             None
         } else {
-            Some(sub.as_str(),)
+            Some(sub.as_str())
         };
-        if let Ok(Some(manifest,),) =
-            local::is_package_installed(&metadata.name, sub_opt, scope,)
+        if let Ok(Some(manifest)) =
+            local::is_package_installed(&metadata.name, sub_opt, scope)
         {
-            owned_files.extend(manifest.installed_files,);
+            owned_files.extend(manifest.installed_files);
         }
 
-        if let Some(sub_mapping,) = pooled_manifest.mappings.get(sub,)
-            && let Some(scope_mapping,) = sub_mapping.scopes.get(&scope,)
+        if let Some(sub_mapping) = pooled_manifest.mappings.get(sub)
+            && let Some(scope_mapping) = sub_mapping.scopes.get(&scope)
         {
             for mapped_file in &scope_mapping.files {
                 let dest_path = expand_pooled_path(
                     &mapped_file.dest,
                     staging_dir.path(),
-                    scope,
+                    scope
                 )?;
                 // We only check conflicts for files that land outside the Zoi
                 // store's staging area
-                if !mapped_file.dest.starts_with("${pkgstore}",)
+                if !mapped_file.dest.starts_with("${pkgstore}")
                     && dest_path.exists()
-                    && !owned_files.contains(&mapped_file.dest,)
+                    && !owned_files.contains(&mapped_file.dest)
                 {
-                    conflicts.push(dest_path,);
+                    conflicts.push(dest_path);
                 }
             }
         }
@@ -827,16 +817,16 @@ fn extract_pooled_zpa(
         if !utils::ask_for_confirmation(
             "Do you want to overwrite these files and continue with the \
              installation?",
-            yes,
+            yes
         ) {
             return Err(anyhow!(
                 "Installation aborted by user due to file conflicts."
-            ),);
+            ));
         }
     }
 
     for sub in subs_to_install {
-        let Some(sub_mapping,) = pooled_manifest.mappings.get(&sub,) else {
+        let Some(sub_mapping) = pooled_manifest.mappings.get(&sub) else {
             if pb.is_none() {
                 eprintln!(
                     "Warning: mapping for sub-package '{sub}' not found in \
@@ -846,7 +836,7 @@ fn extract_pooled_zpa(
             continue;
         };
 
-        let Some(scope_mapping,) = sub_mapping.scopes.get(&scope,) else {
+        let Some(scope_mapping) = sub_mapping.scopes.get(&scope) else {
             if pb.is_none() {
                 eprintln!(
                     "Warning: mapping for scope {scope:?} not found for \
@@ -861,61 +851,61 @@ fn extract_pooled_zpa(
             let dest_path = expand_pooled_path(
                 &mapped_dir.path,
                 staging_dir.path(),
-                scope,
+                scope
             )?;
-            fs::create_dir_all(&dest_path,)?;
+            fs::create_dir_all(&dest_path)?;
 
             #[cfg(unix)]
             {
-                if let Some(mode,) = mapped_dir.mode {
+                if let Some(mode) = mapped_dir.mode {
                     use std::os::unix::fs::PermissionsExt;
                     fs::set_permissions(
                         &dest_path,
-                        fs::Permissions::from_mode(mode,),
+                        fs::Permissions::from_mode(mode)
                     )?;
                 }
-                if let (Some(owner,), Some(group,),) =
-                    (&mapped_dir.owner, &mapped_dir.group,)
+                if let (Some(owner), Some(group)) =
+                    (&mapped_dir.owner, &mapped_dir.group)
                 {
-                    let _ = utils::set_path_owner(&dest_path, owner, group,);
+                    let _ = utils::set_path_owner(&dest_path, owner, group);
                 }
             }
         }
 
         // Step 2: Extract files
         for mapped_file in &scope_mapping.files {
-            let pool_file = pool_dir.join(&mapped_file.hash,);
+            let pool_file = pool_dir.join(&mapped_file.hash);
             if !pool_file.exists() {
-                return Err(anyhow!("Pool file missing: {}", mapped_file.hash),);
+                return Err(anyhow!("Pool file missing: {}", mapped_file.hash));
             }
 
             let dest_path = expand_pooled_path(
                 &mapped_file.dest,
                 staging_dir.path(),
-                scope,
+                scope
             )?;
 
-            if let Some(parent,) = dest_path.parent() {
-                fs::create_dir_all(parent,)?;
+            if let Some(parent) = dest_path.parent() {
+                fs::create_dir_all(parent)?;
             }
 
-            fs::copy(&pool_file, &dest_path,)?;
+            fs::copy(&pool_file, &dest_path)?;
 
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
                 fs::set_permissions(
                     &dest_path,
-                    fs::Permissions::from_mode(mapped_file.mode,),
+                    fs::Permissions::from_mode(mapped_file.mode)
                 )?;
-                if let (Some(owner,), Some(group,),) =
-                    (&mapped_file.owner, &mapped_file.group,)
+                if let (Some(owner), Some(group)) =
+                    (&mapped_file.owner, &mapped_file.group)
                 {
-                    let _ = utils::set_path_owner(&dest_path, owner, group,);
+                    let _ = utils::set_path_owner(&dest_path, owner, group);
                 }
             }
 
-            installed_files.push(mapped_file.dest.clone(),);
+            installed_files.push(mapped_file.dest.clone());
         }
 
         // Step 3: Create symlinks
@@ -923,28 +913,28 @@ fn extract_pooled_zpa(
             let dest_path = expand_pooled_path(
                 &mapped_link.link,
                 staging_dir.path(),
-                scope,
+                scope
             )?;
 
-            if let Some(parent,) = dest_path.parent() {
-                fs::create_dir_all(parent,)?;
+            if let Some(parent) = dest_path.parent() {
+                fs::create_dir_all(parent)?;
             }
 
             if dest_path.exists() || dest_path.is_symlink() {
-                fs::remove_file(&dest_path,).ok();
+                fs::remove_file(&dest_path).ok();
             }
 
             // Resolve target placeholders if any
             let target = mapped_link.target.clone();
 
-            utils::symlink_file(Path::new(&target,), &dest_path,)?;
-            installed_files.push(mapped_link.link.clone(),);
+            utils::symlink_file(Path::new(&target), &dest_path)?;
+            installed_files.push(mapped_link.link.clone());
         }
     }
 
     // Finalize staging-to-store move
-    fs::create_dir_all(&version_dir,)?;
-    copy_dir_all(staging_dir.path(), &version_dir,)?;
+    fs::create_dir_all(&version_dir)?;
+    copy_dir_all(staging_dir.path(), &version_dir)?;
 
     finalize_installation(
         &version_dir,
@@ -952,35 +942,35 @@ fn extract_pooled_zpa(
         scope,
         link_bins,
         pb,
-        &mut installed_files,
+        &mut installed_files
     )?;
 
-    if let Some(p,) = pb {
-        p.set_position(100,);
+    if let Some(p) = pb {
+        p.set_position(100);
     }
 
-    Ok(installed_files,)
+    Ok(installed_files)
 }
 
 /// Expands placeholders in a pooled path to their absolute filesystem paths.
 fn expand_pooled_path(
     path: &str,
     staging_path: &Path,
-    _scope: types::Scope,
-) -> Result<PathBuf,> {
-    if let Some(rel,) = path.strip_prefix("${pkgstore}/",) {
-        Ok(staging_path.join(rel,),)
-    } else if let Some(rel,) = path.strip_prefix("${usrroot}/",) {
+    _scope: types::Scope
+) -> Result<PathBuf> {
+    if let Some(rel) = path.strip_prefix("${pkgstore}/") {
+        Ok(staging_path.join(rel))
+    } else if let Some(rel) = path.strip_prefix("${usrroot}/") {
         Ok(zoi_core::sysroot::apply_sysroot(
-            PathBuf::from("/",).join(rel,),
-        ),)
-    } else if let Some(rel,) = path.strip_prefix("${usrhome}/",) {
+            PathBuf::from("/").join(rel)
+        ))
+    } else if let Some(rel) = path.strip_prefix("${usrhome}/") {
         let home_dir = zoi_core::utils::get_user_home()
-            .ok_or_else(|| anyhow!("Home dir not found"),)?;
-        Ok(home_dir.join(rel,),)
-    } else if let Some(rel,) = path.strip_prefix("${createpkgdir}/",) {
-        Ok(std::env::current_dir()?.join(rel,),)
+            .ok_or_else(|| anyhow!("Home dir not found"))?;
+        Ok(home_dir.join(rel))
+    } else if let Some(rel) = path.strip_prefix("${createpkgdir}/") {
+        Ok(std::env::current_dir()?.join(rel))
     } else {
-        Err(anyhow!("Invalid pooled path placeholder: {path}"),)
+        Err(anyhow!("Invalid pooled path placeholder: {path}"))
     }
 }

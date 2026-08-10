@@ -20,17 +20,17 @@ use crate::pkg::{config, types};
 /// - Configuration update fails.
 /// - The installation process fails.
 /// - In project mode, 'zoi.lua' is missing.
-pub fn run(packages: &[String], global: bool,) -> Result<(),> {
+pub fn run(packages: &[String], global: bool) -> Result<()> {
     if global {
-        run_global(packages,)
+        run_global(packages)
     } else {
-        run_project(packages,)
+        run_project(packages)
     }
 }
 
 /// Updates the global configuration with the specified packages and installs
 /// them.
-fn run_global(packages: &[String],) -> Result<(),> {
+fn run_global(packages: &[String]) -> Result<()> {
     println!(
         "{} Adding packages to global configuration...",
         "::".bold().blue()
@@ -38,35 +38,34 @@ fn run_global(packages: &[String],) -> Result<(),> {
 
     let mut versions_to_add = HashMap::new();
     for pkg_spec in packages {
-        let request = crate::pkg::resolve::parse_source_string(pkg_spec,)?;
-        let version = request
-            .version_spec
-            .unwrap_or_else(|| "latest".to_string(),);
-        versions_to_add.insert(request.name, version,);
+        let request = crate::pkg::resolve::parse_source_string(pkg_spec)?;
+        let version =
+            request.version_spec.unwrap_or_else(|| "latest".to_string());
+        versions_to_add.insert(request.name, version);
     }
 
-    config::update_global_versions(versions_to_add,)?;
+    config::update_global_versions(versions_to_add)?;
 
     println!("{} Installing global packages...", "::".bold().blue());
     let options = crate::SourceInstallOptions {
-        scope_override: Some(types::Scope::User,),
+        scope_override: Some(types::Scope::User),
         yes: true,
         ..Default::default()
     };
 
-    crate::install_sources(packages, &options,)?;
+    crate::install_sources(packages, &options)?;
 
     println!("\n{}", "Global packages updated and installed.".green());
-    Ok((),)
+    Ok(())
 }
 
 /// Installs project packages and prompts to update 'zoi.lua'.
-fn run_project(packages: &[String],) -> Result<(),> {
-    if !std::path::Path::new("zoi.lua",).exists() {
+fn run_project(packages: &[String]) -> Result<()> {
+    if !std::path::Path::new("zoi.lua").exists() {
         return Err(anyhow!(
             "No 'zoi.lua' found in the current directory. Run 'zoi use \
              --global' or initialize a project first."
-        ),);
+        ));
     }
 
     println!(
@@ -83,13 +82,13 @@ fn run_project(packages: &[String],) -> Result<(),> {
 
     println!("{} Installing project packages...", "::".bold().blue());
     let options = crate::SourceInstallOptions {
-        scope_override: Some(types::Scope::Project,),
+        scope_override: Some(types::Scope::Project),
         yes: true,
         ..Default::default()
     };
 
-    crate::install_sources(packages, &options,)?;
+    crate::install_sources(packages, &options)?;
 
     println!("\n{}", "Project packages updated and installed.".green());
-    Ok((),)
+    Ok(())
 }

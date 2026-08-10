@@ -15,10 +15,10 @@ use zoi_core::types::SourceType;
 use crate::pkg::types;
 
 /// A file in a repository that contains information about a package.
-#[derive(Debug, Deserialize,)]
+#[derive(Debug, Deserialize)]
 struct RepoFile {
     /// The package source or name.
-    package: String,
+    package: String
 }
 
 /// Installs a package directly from a Git repository using its `zoi.yaml` or
@@ -39,34 +39,34 @@ pub fn run(
     force: bool,
     all_optional: bool,
     yes: bool,
-    scope: Option<crate::cli::SetupScope,>,
-    plugin_manager: Option<&crate::pkg::plugin::PluginManager,>,
-) -> Result<(),> {
+    scope: Option<crate::cli::SetupScope>,
+    plugin_manager: Option<&crate::pkg::plugin::PluginManager>
+) -> Result<()> {
     println!(
         "Installing from git repository: {}",
         repo_spec.cyan().bold()
     );
 
-    let (provider, repo_path,) = parse_repo_spec(repo_spec,)?;
+    let (provider, repo_path) = parse_repo_spec(repo_spec)?;
 
     crate::pkg::utils::confirm_untrusted_source(
-        &SourceType::GitRepo(repo_spec.to_string(),),
-        yes,
+        &SourceType::GitRepo(repo_spec.to_string()),
+        yes
     )?;
 
-    let repo_file_names = ["zoi.yaml",];
-    let mut repo_file_content: Option<String,> = None;
+    let repo_file_names = ["zoi.yaml"];
+    let mut repo_file_content: Option<String> = None;
     let mut used_url = String::new();
 
     for file_name in &repo_file_names {
-        if let Ok(url,) = get_repo_file_url(&provider, &repo_path, file_name,) {
+        if let Ok(url) = get_repo_file_url(&provider, &repo_path, file_name) {
             println!("Attempting to fetch repo config from: {url}");
             let client = crate::pkg::utils::get_http_client().ok();
-            if let Some(c,) = client
-                && let Ok(content_res,) = c.get(&url,).send()
+            if let Some(c) = client
+                && let Ok(content_res) = c.get(&url).send()
                 && content_res.status().is_success()
             {
-                repo_file_content = Some(content_res.text()?,);
+                repo_file_content = Some(content_res.text()?);
                 used_url = url;
                 break;
             }
@@ -78,52 +78,51 @@ pub fn run(
             "Could not find zoi.yaml in the repository on main/master \
              branches."
         )
-    },)?;
+    })?;
     println!("Using repo config from: {}", used_url.cyan());
 
-    let repo_file: RepoFile = serde_yaml::from_str(&repo_file_content,)?;
+    let repo_file: RepoFile = serde_yaml::from_str(&repo_file_content)?;
 
     let package_source = &repo_file.package;
 
     let scope_override = scope.map(|s| match s {
         crate::cli::SetupScope::User => types::Scope::User,
-        crate::cli::SetupScope::System => types::Scope::System,
-    },);
+        crate::cli::SetupScope::System => types::Scope::System
+    });
 
     println!("Starting installation of package from git repo...");
 
-    let source_to_install = if package_source.starts_with("http",) {
+    let source_to_install = if package_source.starts_with("http") {
         println!("Package source is a URL: {}", package_source.cyan());
         let client = crate::pkg::utils::get_http_client()?;
-        let pkg_content = client.get(package_source,).send()?.text()?;
+        let pkg_content = client.get(package_source).send()?.text()?;
         let temp_path = env::temp_dir().join(format!(
             "zoi-repo-install-{}.pkg.lua",
             chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
-        ),);
-        fs::write(&temp_path, pkg_content,)?;
+        ));
+        fs::write(&temp_path, pkg_content)?;
         temp_path
             .to_str()
-            .ok_or_else(|| anyhow!("Temporary path contains invalid UTF-8"),)?
+            .ok_or_else(|| anyhow!("Temporary path contains invalid UTF-8"))?
             .to_string()
-    } else if package_source.ends_with(".pkg.lua",)
-        || (package_source.contains('/',) && !package_source.starts_with('@',))
+    } else if package_source.ends_with(".pkg.lua")
+        || (package_source.contains('/') && !package_source.starts_with('@'))
     {
         println!(
             "Package source is a path in the repo: {}",
             package_source.cyan()
         );
-        let pkg_url =
-            get_repo_file_url(&provider, &repo_path, package_source,)?;
+        let pkg_url = get_repo_file_url(&provider, &repo_path, package_source)?;
         let client = crate::pkg::utils::get_http_client()?;
-        let pkg_content = client.get(&pkg_url,).send()?.text()?;
+        let pkg_content = client.get(&pkg_url).send()?.text()?;
         let temp_path = env::temp_dir().join(format!(
             "zoi-repo-install-{}.pkg.lua",
             chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
-        ),);
-        fs::write(&temp_path, pkg_content,)?;
+        ));
+        fs::write(&temp_path, pkg_content)?;
         temp_path
             .to_str()
-            .ok_or_else(|| anyhow!("Temporary path contains invalid UTF-8"),)?
+            .ok_or_else(|| anyhow!("Temporary path contains invalid UTF-8"))?
             .to_string()
     } else {
         println!(
@@ -134,7 +133,7 @@ pub fn run(
     };
 
     crate::cmd::install::run(
-        &[source_to_install,],
+        &[source_to_install],
         None,
         force,
         all_optional,
@@ -142,8 +141,8 @@ pub fn run(
         scope_override.map(|s| match s {
             types::Scope::User => crate::cli::InstallScope::User,
             types::Scope::System => crate::cli::InstallScope::System,
-            types::Scope::Project => crate::cli::InstallScope::Project,
-        },),
+            types::Scope::Project => crate::cli::InstallScope::Project
+        }),
         false,
         false,
         false,
@@ -157,15 +156,15 @@ pub fn run(
         3,
         false,
         false,
-        None,
+        None
     )?;
 
-    Ok((),)
+    Ok(())
 }
 
 /// Parses a repository specification string into a provider and path.
-fn parse_repo_spec(spec: &str,) -> Result<(String, String,),> {
-    if let Some((provider_alias, path,),) = spec.split_once(':',) {
+fn parse_repo_spec(spec: &str) -> Result<(String, String)> {
+    if let Some((provider_alias, path)) = spec.split_once(':') {
         let provider = match provider_alias {
             "gh" | "github" => "github",
             "gl" | "gitlab" => "gitlab",
@@ -173,12 +172,12 @@ fn parse_repo_spec(spec: &str,) -> Result<(String, String,),> {
             _ => {
                 return Err(anyhow!(
                     "Unknown provider alias: {provider_alias}"
-                ),);
+                ));
             }
         };
-        Ok((provider.to_string(), path.to_string(),),)
+        Ok((provider.to_string(), path.to_string()))
     } else {
-        Ok(("github".to_string(), spec.to_string(),),)
+        Ok(("github".to_string(), spec.to_string()))
     }
 }
 
@@ -186,9 +185,9 @@ fn parse_repo_spec(spec: &str,) -> Result<(String, String,),> {
 fn get_repo_file_url(
     provider: &str,
     repo_path: &str,
-    file_path: &str,
-) -> Result<String,> {
-    let branches = ["main", "master",];
+    file_path: &str
+) -> Result<String> {
+    let branches = ["main", "master"];
     let client = crate::pkg::utils::get_http_client()?;
     for branch in &branches {
         let url = match provider {
@@ -204,15 +203,15 @@ fn get_repo_file_url(
             _ => return Err(anyhow!("Unknown provider")),
         };
 
-        let res = client.get(&url,).send();
-        if let Ok(response,) = res
+        let res = client.get(&url).send();
+        if let Ok(response) = res
             && response.status().is_success()
         {
-            return Ok(url,);
+            return Ok(url);
         }
     }
     Err(anyhow!(
         "Could not find '{file_path}' in repo '{repo_path}' on branches main \
          or master."
-    ),)
+    ))
 }

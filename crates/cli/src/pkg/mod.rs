@@ -1,7 +1,7 @@
 pub use zoi_audit as audit;
 pub use zoi_core::{
     cache, config, dependency, frozen, hash, lock, offline, pgp, pin, pkgdir,
-    recorder, sysroot, types, utils,
+    recorder, sysroot, types, utils
 };
 pub use zoi_db as db;
 pub use zoi_deps as dependencies;
@@ -44,7 +44,7 @@ pub mod resolve {
         PackageRequest, ResolvedSource, get_db_root, get_default_version,
         parse_source_string, resolve_channel, resolve_package_and_version,
         resolve_requested_version_spec, resolve_source,
-        resolve_version_from_url,
+        resolve_version_from_url
     };
 }
 /// Minimal package resolution utilities.
@@ -52,7 +52,7 @@ pub mod mini_resolve {
     pub use zoi_core::types::MiniVulnerability;
     pub use zoi_resolver::mini_resolve::{
         MiniPackageIndex, MiniRegistryIndex, check_vulnerabilities,
-        fetch_registry_config, fetch_registry_index, get_package_lua_url,
+        fetch_registry_config, fetch_registry_index, get_package_lua_url
     };
 }
 #[cfg(target_os = "linux")]

@@ -19,7 +19,7 @@ pub use pkg::{local, mini_resolve};
 pub use zoi_core::types::{self, Scope};
 pub use zoi_core::{
     cache, config, hash, lock, offline, pgp, pin, pkgdir, recorder, sysroot,
-    upgrade,
+    upgrade
 };
 pub use zoi_hooks as hooks;
 pub use zoi_lua as lua;
@@ -30,10 +30,10 @@ pub use zoi_sandbox as sandbox;
 pub use zoi_telemetry as telemetry;
 
 /// Options for installing packages from source.
-#[derive(Debug, Clone, Default,)]
+#[derive(Debug, Clone, Default)]
 pub struct SourceInstallOptions {
     /// The repository to install from.
-    pub repo: Option<String,>,
+    pub repo: Option<String>,
     /// Whether to force the installation.
     pub force: bool,
     /// Whether to install all optional dependencies.
@@ -41,25 +41,25 @@ pub struct SourceInstallOptions {
     /// Whether to skip confirmation prompts.
     pub yes: bool,
     /// Override the installation scope.
-    pub scope_override: Option<Scope,>,
+    pub scope_override: Option<Scope>,
     /// Whether to save the installation to the project file.
     pub save: bool,
     /// The build type to use.
-    pub build_type: Option<String,>,
+    pub build_type: Option<String>,
     /// Whether to perform a dry run.
     pub dry_run: bool,
     /// Whether to build the package.
     pub build: bool,
     /// Whether to use the lockfile exactly (frozen).
-    pub frozen: bool,
+    pub frozen: bool
 }
 
 /// Converts a core `Scope` to a CLI `InstallScope`.
-fn to_install_scope(scope: Scope,) -> cli::InstallScope {
+fn to_install_scope(scope: Scope) -> cli::InstallScope {
     match scope {
         Scope::User => cli::InstallScope::User,
         Scope::System => cli::InstallScope::System,
-        Scope::Project => cli::InstallScope::Project,
+        Scope::Project => cli::InstallScope::Project
     }
 }
 
@@ -72,14 +72,14 @@ fn to_install_scope(scope: Scope,) -> cli::InstallScope {
 /// - The installation process fails.
 pub fn install_sources(
     sources: &[String],
-    options: &SourceInstallOptions,
-) -> Result<(),> {
+    options: &SourceInstallOptions
+) -> Result<()> {
     let plugin_manager = if crate::pkg::utils::is_mini_mode() {
         None
     } else {
         let pm = pkg::plugin::PluginManager::new()?;
-        let _ = pm.load_all(options.yes,);
-        Some(pm,)
+        let _ = pm.load_all(options.yes);
+        Some(pm)
     };
 
     let pm_ptr = plugin_manager.as_ref();
@@ -90,7 +90,7 @@ pub fn install_sources(
         options.force,
         options.all_optional,
         options.yes,
-        options.scope_override.map(to_install_scope,),
+        options.scope_override.map(to_install_scope),
         false,
         false,
         options.save,
@@ -104,7 +104,7 @@ pub fn install_sources(
         3,
         false,
         false,
-        None,
+        None
     )
 }
 
@@ -115,8 +115,8 @@ pub fn install_sources(
 /// Returns an error if the uninstallation process fails.
 pub fn uninstall_package(
     package_name: &str,
-    scope_override: Option<Scope,>,
-) -> Result<(),> {
-    zoi_uninstall::run(package_name, scope_override, false, false, false,)
-        .map(|_| (),)
+    scope_override: Option<Scope>
+) -> Result<()> {
+    zoi_uninstall::run(package_name, scope_override, false, false, false)
+        .map(|_| ())
 }

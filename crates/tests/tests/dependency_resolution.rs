@@ -6,7 +6,7 @@ use zoi::pkg::install::pubgrub::PkgName;
 
 #[test]
 fn test_semver_to_range_exact() {
-    let range = pubgrub::semver_to_range("1.2.3",);
+    let range = pubgrub::semver_to_range("1.2.3");
     assert!(range.contains(
         &pubgrub::SemVersion::parse("1.2.3").expect("unwrap failed")
     ));
@@ -17,7 +17,7 @@ fn test_semver_to_range_exact() {
 
 #[test]
 fn test_semver_to_range_caret() {
-    let range = pubgrub::semver_to_range("^1.2.3",);
+    let range = pubgrub::semver_to_range("^1.2.3");
     assert!(range.contains(
         &pubgrub::SemVersion::parse("1.2.3").expect("unwrap failed")
     ));
@@ -31,7 +31,7 @@ fn test_semver_to_range_caret() {
 
 #[test]
 fn test_semver_to_range_tilde() {
-    let range = pubgrub::semver_to_range("~1.2.3",);
+    let range = pubgrub::semver_to_range("~1.2.3");
     assert!(range.contains(
         &pubgrub::SemVersion::parse("1.2.3").expect("unwrap failed")
     ));
@@ -45,7 +45,7 @@ fn test_semver_to_range_tilde() {
 
 #[test]
 fn test_semver_to_range_comparison() {
-    let range = pubgrub::semver_to_range(">=1.0.0, <2.0.0",);
+    let range = pubgrub::semver_to_range(">=1.0.0, <2.0.0");
     assert!(range.contains(
         &pubgrub::SemVersion::parse("1.0.0").expect("unwrap failed")
     ));
@@ -76,9 +76,9 @@ fn test_get_versions_does_not_leak_across_distinct_explicit_sources() {
         true,
         false,
         None,
-        None,
+        None
     )
-    .expect("provider should be created",);
+    .expect("provider should be created");
 
     let versions = provider
         .get_versions(&PkgName {
@@ -86,9 +86,9 @@ fn test_get_versions_does_not_leak_across_distinct_explicit_sources() {
             sub_package: None,
             repo: String::new(),
             registry: "local".to_string(),
-            explicit_source: Some(source_a,),
-        },)
-        .expect("versions should resolve",);
+            explicit_source: Some(source_a)
+        })
+        .expect("versions should resolve");
 
     assert_eq!(versions.len(), 1);
     assert_eq!(

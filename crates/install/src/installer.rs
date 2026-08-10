@@ -34,28 +34,28 @@ use crate::{manifest, plan, prebuilt, util};
 pub fn download_and_cache_archive(
     node: &InstallNode,
     details: &plan::PrebuiltDetails,
-    pb: Option<&ProgressBar,>,
-    verbose: bool,
-) -> Result<PathBuf,> {
+    pb: Option<&ProgressBar>,
+    verbose: bool
+) -> Result<PathBuf> {
     let config = config::read_config()?;
     let signature_policy =
-        config.policy.signature_enforcement.filter(|p| p.enable,);
+        config.policy.signature_enforcement.filter(|p| p.enable);
 
     let archive_cache_root = cache::get_archive_cache_root()?;
-    fs::create_dir_all(&archive_cache_root,)?;
+    fs::create_dir_all(&archive_cache_root)?;
 
     let archive_filename = details
         .info
         .final_url
-        .split('/',)
+        .split('/')
         .next_back()
-        .unwrap_or("archive.zpa",);
-    let cached_archive_path = archive_cache_root.join(archive_filename,);
+        .unwrap_or("archive.zpa");
+    let cached_archive_path = archive_cache_root.join(archive_filename);
     let sig_filename = format!("{archive_filename}.sig");
-    let cached_sig_path = archive_cache_root.join(&sig_filename,);
+    let cached_sig_path = archive_cache_root.join(&sig_filename);
 
-    let archive_path = if let Some(path,) =
-        pkgdir::find_in_pkg_dirs(archive_filename,)
+    let archive_path = if let Some(path) =
+        pkgdir::find_in_pkg_dirs(archive_filename)
     {
         if pb.is_none() {
             println!("Found archive in pkg-dir: {}", path.display());
@@ -71,10 +71,10 @@ pub fn download_and_cache_archive(
             return Err(anyhow!(
                 "Archive not found in cache and cannot download: Zoi is in \
                  offline mode. Missing: {archive_filename}"
-            ),);
+            ));
         }
         let part_path =
-            archive_cache_root.join(format!("{archive_filename}.part"),);
+            archive_cache_root.join(format!("{archive_filename}.part"));
 
         if part_path.exists() && pb.is_none() {
             println!("Resuming partial download: {}", part_path.display());
@@ -82,75 +82,75 @@ pub fn download_and_cache_archive(
 
         let mut last_error = None;
         let candidate_urls =
-            cache::mirror_candidate_urls(&details.info.final_url,);
+            cache::mirror_candidate_urls(&details.info.final_url);
         let mut downloaded = false;
         for candidate_url in candidate_urls {
             match util::download_file_with_progress(
                 &candidate_url,
                 &part_path,
                 pb,
-                Some(details.download_size,),
+                Some(details.download_size)
             ) {
-                Ok((),) => {
+                Ok(()) => {
                     downloaded = true;
                     break;
                 }
-                Err(e,) => last_error = Some((candidate_url, e,),),
+                Err(e) => last_error = Some((candidate_url, e))
             }
         }
         if !downloaded {
-            let (url, error,) = last_error.ok_or_else(|| {
+            let (url, error) = last_error.ok_or_else(|| {
                 anyhow!("archive download failed but no error recorded")
-            },)?;
+            })?;
             return Err(anyhow!(
                 "Failed to download package archive from {url}: {error}"
-            ),);
+            ));
         }
 
-        fs::rename(&part_path, &cached_archive_path,)?;
+        fs::rename(&part_path, &cached_archive_path)?;
         cached_archive_path.clone()
     };
 
-    if let Some(hash_url,) = &details.info.hash_url {
+    if let Some(hash_url) = &details.info.hash_url {
         let hash = db::get_package_hash_from_db(
             &node.registry_handle,
             &node.pkg.name,
             node.sub_package.as_deref(),
-            &node.pkg.repo,
+            &node.pkg.repo
         )
-        .unwrap_or(None,)
-        .filter(|h| !h.is_empty(),)
+        .unwrap_or(None)
+        .filter(|h| !h.is_empty())
         .or_else(|| {
-            util::get_expected_hash(hash_url, Some(archive_filename,),).ok()
-        },);
+            util::get_expected_hash(hash_url, Some(archive_filename)).ok()
+        });
 
-        if let Some(ref hash,) = hash
-            && !util::verify_file_hash(&archive_path, hash, pb,)?
+        if let Some(ref hash) = hash
+            && !util::verify_file_hash(&archive_path, hash, pb)?
         {
-            return Err(anyhow!("Hash verification failed"),);
+            return Err(anyhow!("Hash verification failed"));
         }
     }
 
     let authorities = config
         .default_registry
         .as_ref()
-        .filter(|r| r.handle == node.registry_handle,)
-        .and_then(|r| r.authorities.as_ref(),)
+        .filter(|r| r.handle == node.registry_handle)
+        .and_then(|r| r.authorities.as_ref())
         .or_else(|| {
             config
                 .added_registries
                 .iter()
-                .find(|r| r.handle == node.registry_handle,)
-                .and_then(|r| r.authorities.as_ref(),)
-        },);
-    let has_authorities = authorities.is_some_and(|a| !a.is_empty(),);
-    let pgp_identifiers: Option<Vec<String,>,> = signature_policy
+                .find(|r| r.handle == node.registry_handle)
+                .and_then(|r| r.authorities.as_ref())
+        });
+    let has_authorities = authorities.is_some_and(|a| !a.is_empty());
+    let pgp_identifiers: Option<Vec<String>> = signature_policy
         .as_ref()
-        .map(|p| p.trusted_keys.clone(),)
-        .or_else(|| authorities.cloned(),);
+        .map(|p| p.trusted_keys.clone())
+        .or_else(|| authorities.cloned());
 
-    if let Some(pgp_url,) = &details.info.pgp_url {
-        if let Some(ref identifiers,) = pgp_identifiers
+    if let Some(pgp_url) = &details.info.pgp_url {
+        if let Some(ref identifiers) = pgp_identifiers
             && !identifiers.is_empty()
         {
             let sig_path = if cached_sig_path.exists() {
@@ -160,39 +160,38 @@ pub fn download_and_cache_archive(
                     return Err(anyhow!(
                         "Signature not found in cache and cannot download: \
                          Zoi is in offline mode."
-                    ),);
+                    ));
                 }
-                let temp_dir = tempfile::Builder::new()
-                    .prefix("zoi-sig-dl-",)
-                    .tempdir()?;
-                let temp_sig_path = temp_dir.path().join(&sig_filename,);
+                let temp_dir =
+                    tempfile::Builder::new().prefix("zoi-sig-dl-").tempdir()?;
+                let temp_sig_path = temp_dir.path().join(&sig_filename);
                 let mut last_error = None;
                 let mut downloaded = false;
-                for candidate_url in cache::mirror_candidate_urls(pgp_url,) {
+                for candidate_url in cache::mirror_candidate_urls(pgp_url) {
                     match util::download_file_with_progress(
                         &candidate_url,
                         &temp_sig_path,
                         pb,
-                        None,
+                        None
                     ) {
-                        Ok((),) => {
+                        Ok(()) => {
                             downloaded = true;
                             break;
                         }
-                        Err(e,) => last_error = Some((candidate_url, e,),),
+                        Err(e) => last_error = Some((candidate_url, e))
                     }
                 }
                 if !downloaded {
-                    let (url, error,) = last_error.ok_or_else(|| {
+                    let (url, error) = last_error.ok_or_else(|| {
                         anyhow!(
                             "signature download failed but no error recorded"
                         )
-                    },)?;
+                    })?;
                     return Err(anyhow!(
                         "Failed to download signature from {url}: {error}"
-                    ),);
+                    ));
                 }
-                fs::copy(&temp_sig_path, &cached_sig_path,)?;
+                fs::copy(&temp_sig_path, &cached_sig_path)?;
                 cached_sig_path.clone()
             };
 
@@ -200,11 +199,11 @@ pub fn download_and_cache_archive(
                 println!("Verifying signature...");
             }
             let trusted_certs =
-                pgp::get_certs_by_name_or_fingerprint(identifiers,)?;
+                pgp::get_certs_by_name_or_fingerprint(identifiers)?;
             pgp::verify_detached_signature_multi_key(
                 &archive_path,
                 &sig_path,
-                trusted_certs,
+                trusted_certs
             )?;
             if verbose {
                 println!("{}", "Signature verified successfully.".green());
@@ -216,8 +215,8 @@ pub fn download_and_cache_archive(
              claims to be secure.",
             node.pkg.name
         );
-        if let Some(p,) = pb {
-            p.println(msg.yellow().to_string(),);
+        if let Some(p) = pb {
+            p.println(msg.yellow().to_string());
         } else {
             println!("{}", msg.yellow());
         }
@@ -225,22 +224,22 @@ pub fn download_and_cache_archive(
             return Err(anyhow!(
                 "Signature enforcement is active, but no PGP URL found for \
                  package"
-            ),);
+            ));
         }
     }
 
-    Ok(archive_path,)
+    Ok(archive_path)
 }
 
 /// Information about a package that has been prepared for installation.
-#[derive(Clone,)]
+#[derive(Clone)]
 pub struct PreparedNode {
     /// Path to the downloaded or built archive.
     pub archive_path: PathBuf,
     /// The method used for installation (e.g. "pre-compiled", "source").
     pub install_method: String,
     /// Whether the archive was built from source.
-    pub is_build: bool,
+    pub is_build: bool
 }
 
 /// Performs the non-destructive first phase of installation: "Preparation".
@@ -261,24 +260,24 @@ pub struct PreparedNode {
 pub fn prepare_node(
     node: &InstallNode,
     action: &plan::InstallAction,
-    m: Option<&MultiProgress,>,
-    build_type: Option<&str,>,
-    verbose: bool,
-) -> Result<PreparedNode,> {
+    m: Option<&MultiProgress>,
+    build_type: Option<&str>,
+    verbose: bool
+) -> Result<PreparedNode> {
     let pkg = &node.pkg;
     let version = &node.version;
 
     let pb_style = ProgressStyle::default_bar()
         .template(
-            "{spinner:.green} {msg:30.cyan} [{bar:40.cyan/blue}] {percent}%",
+            "{spinner:.green} {msg:30.cyan} [{bar:40.cyan/blue}] {percent}%"
         )?
-        .progress_chars("#>-",);
+        .progress_chars("#>-");
 
     let spinner_style = ProgressStyle::default_spinner()
-        .template("{spinner:.green} {msg:30.cyan}",)?
-        .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ ",);
+        .template("{spinner:.green} {msg:30.cyan}")?
+        .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ ");
 
-    let display_name = if let Some(sub,) = &node.sub_package {
+    let display_name = if let Some(sub) = &node.sub_package {
         format!("{}:{}", pkg.name, sub)
     } else {
         pkg.name.clone()
@@ -290,36 +289,34 @@ pub fn prepare_node(
     };
     let message = format!("zoi:{display_name}@{version_display}");
 
-    let pb = if let Some(m_inner,) = m {
-        let pb = m_inner.add(ProgressBar::new(100,),);
-        pb.set_style(pb_style,);
-        pb.set_message(message.clone(),);
-        Some(pb,)
+    let pb = if let Some(m_inner) = m {
+        let pb = m_inner.add(ProgressBar::new(100));
+        pb.set_style(pb_style);
+        pb.set_message(message.clone());
+        Some(pb)
     } else {
         None
     };
 
-    let (archive_path, install_method, is_build,) = match action {
-        plan::InstallAction::DownloadAndInstall(details,) => {
-            if let Some(p,) = &pb {
-                p.set_message("Downloading package...",);
+    let (archive_path, install_method, is_build) = match action {
+        plan::InstallAction::DownloadAndInstall(details) => {
+            if let Some(p) = &pb {
+                p.set_message("Downloading package...");
             }
             let archive_path = download_and_cache_archive(
                 node,
                 details,
                 pb.as_ref(),
-                verbose,
+                verbose
             )?;
-            (archive_path, "pre-compiled".to_string(), false,)
+            (archive_path, "pre-compiled".to_string(), false)
         }
-        plan::InstallAction::InstallFromArchive(archive_path,) => {
-            if archive_path.to_string_lossy().ends_with(".zsa",) {
-                if let Some(p,) = &pb {
-                    p.set_style(spinner_style,);
-                    p.enable_steady_tick(
-                        std::time::Duration::from_millis(100,),
-                    );
-                    p.set_message(format!("Building {display_name}..."),);
+        plan::InstallAction::InstallFromArchive(archive_path) => {
+            if archive_path.to_string_lossy().ends_with(".zsa") {
+                if let Some(p) = &pb {
+                    p.set_style(spinner_style);
+                    p.enable_steady_tick(std::time::Duration::from_millis(100));
+                    p.set_message(format!("Building {display_name}..."));
                 }
                 let archive_path = prebuilt::build_archive(
                     archive_path,
@@ -327,52 +324,52 @@ pub fn prepare_node(
                     node.sub_package.as_deref(),
                     build_type,
                     pb.as_ref(),
-                    !verbose,
+                    !verbose
                 )?;
                 match archive_path {
-                    Some(path,) => (path, "source".to_string(), true,),
-                    None => (PathBuf::new(), "meta".to_string(), false,),
+                    Some(path) => (path, "source".to_string(), true),
+                    None => (PathBuf::new(), "meta".to_string(), false)
                 }
             } else {
-                if let Some(p,) = &pb {
-                    p.set_message("Using local archive...",);
+                if let Some(p) = &pb {
+                    p.set_message("Using local archive...");
                     p.finish();
                 }
-                (archive_path.clone(), "pre-compiled".to_string(), false,)
+                (archive_path.clone(), "pre-compiled".to_string(), false)
             }
         }
         plan::InstallAction::BuildAndInstall => {
-            if let Some(p,) = &pb {
-                p.set_style(spinner_style,);
-                p.enable_steady_tick(std::time::Duration::from_millis(100,),);
-                p.set_message(format!("Building {display_name}..."),);
+            if let Some(p) = &pb {
+                p.set_style(spinner_style);
+                p.enable_steady_tick(std::time::Duration::from_millis(100));
+                p.set_message(format!("Building {display_name}..."));
             }
-            let pkg_lua_path = Path::new(&node.source,);
+            let pkg_lua_path = Path::new(&node.source);
             let archive_path = prebuilt::build_archive(
                 pkg_lua_path,
                 pkg,
                 node.sub_package.as_deref(),
                 build_type,
                 pb.as_ref(),
-                !verbose,
+                !verbose
             )?;
 
             match archive_path {
-                Some(path,) => (path, "source".to_string(), true,),
-                None => (PathBuf::new(), "meta".to_string(), false,),
+                Some(path) => (path, "source".to_string(), true),
+                None => (PathBuf::new(), "meta".to_string(), false)
             }
         }
     };
 
-    if let Some(p,) = pb {
+    if let Some(p) = pb {
         p.finish_and_clear();
     }
 
     Ok(PreparedNode {
         archive_path,
         install_method,
-        is_build,
-    },)
+        is_build
+    })
 }
 
 /// Performs the destructive second phase of installation: "Execution".
@@ -397,28 +394,28 @@ pub fn prepare_node(
 pub fn install_prepared_node(
     node: &InstallNode,
     prepared: &PreparedNode,
-    m: Option<&MultiProgress,>,
+    m: Option<&MultiProgress>,
     yes: bool,
     record: bool,
     link_bins: bool,
-    _verbose: bool,
-) -> Result<types::InstallManifest,> {
+    _verbose: bool
+) -> Result<types::InstallManifest> {
     let pkg = &node.pkg;
     let version = &node.version;
     let handle = &node.registry_handle;
     let is_direct = matches!(node.reason, types::InstallReason::Direct);
 
     let pb_style = ProgressStyle::default_spinner()
-        .template("{spinner:.green} {msg:30.cyan}",)?
-        .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ ",);
+        .template("{spinner:.green} {msg:30.cyan}")?
+        .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ ");
 
-    let main_pb = if let Some(m_inner,) = m {
+    let main_pb = if let Some(m_inner) = m {
         if is_direct {
             None
         } else {
-            let pb = m_inner.add(ProgressBar::new_spinner(),);
-            pb.set_style(pb_style.clone(),);
-            let name = if let Some(sub,) = &node.sub_package {
+            let pb = m_inner.add(ProgressBar::new_spinner());
+            pb.set_style(pb_style.clone());
+            let name = if let Some(sub) = &node.sub_package {
                 format!("{}:{}", pkg.name, sub)
             } else {
                 pkg.name.clone()
@@ -428,32 +425,32 @@ pub fn install_prepared_node(
             } else {
                 format!("{}-{}", version, node.revision)
             };
-            pb.set_message(format!("zoi:{name}@{version_display}"),);
-            pb.enable_steady_tick(std::time::Duration::from_millis(100,),);
-            Some(pb,)
+            pb.set_message(format!("zoi:{name}@{version_display}"));
+            pb.enable_steady_tick(std::time::Duration::from_millis(100));
+            Some(pb)
         }
     } else {
         None
     };
 
-    let step_pb = if is_direct && let Some(m_inner,) = m {
-        let pb = m_inner.add(ProgressBar::new_spinner(),);
-        pb.set_style(pb_style,);
-        pb.enable_steady_tick(std::time::Duration::from_millis(100,),);
-        Some(pb,)
+    let step_pb = if is_direct && let Some(m_inner) = m {
+        let pb = m_inner.add(ProgressBar::new_spinner());
+        pb.set_style(pb_style);
+        pb.enable_steady_tick(std::time::Duration::from_millis(100));
+        Some(pb)
     } else {
         None
     };
 
-    if let Some(hooks,) = &pkg.hooks {
-        if let Some(pb,) = &step_pb {
-            pb.set_message("Running pre-install hooks...",);
+    if let Some(hooks) = &pkg.hooks {
+        if let Some(pb) = &step_pb {
+            pb.set_message("Running pre-install hooks...");
         }
-        hooks::run_hooks(hooks, hooks::HookType::PreInstall, pkg.scope,)?;
+        hooks::run_hooks(hooks, hooks::HookType::PreInstall, pkg.scope)?;
     }
 
     let sub_package_to_install = node.sub_package.clone();
-    let sub_packages_vec = sub_package_to_install.clone().map(|s| vec![s],);
+    let sub_packages_vec = sub_package_to_install.clone().map(|s| vec![s]);
 
     let archive_path = &prepared.archive_path;
     let install_method = &prepared.install_method;
@@ -468,38 +465,38 @@ pub fn install_prepared_node(
                     "Root privileges required for system scope installation, \
                      but neither 'sudo' nor 'doas' was found."
                 )
-            },)?;
+            })?;
 
-        if let Some(pb,) = step_pb.as_ref().or(main_pb.as_ref(),) {
+        if let Some(pb) = step_pb.as_ref().or(main_pb.as_ref()) {
             pb.set_message(format!(
                 "Waiting for {escalator} privileges to install system \
                  package..."
-            ),);
+            ));
         }
 
-        let node_json = serde_json::to_string(node,)?;
+        let node_json = serde_json::to_string(node)?;
         let mut temp_file = tempfile::NamedTempFile::new()?;
-        temp_file.write_all(node_json.as_bytes(),)?;
+        temp_file.write_all(node_json.as_bytes())?;
         let temp_path = temp_file.path();
 
-        let mut cmd = std::process::Command::new(escalator,);
-        cmd.arg(std::env::current_exe()?,);
-        cmd.arg("helper",).arg("elevate-install-node",);
-        cmd.arg("--node-json",).arg(temp_path,);
-        cmd.arg("--archive",).arg(archive_path,);
-        cmd.arg("--install-method",).arg(install_method,);
+        let mut cmd = std::process::Command::new(escalator);
+        cmd.arg(std::env::current_exe()?);
+        cmd.arg("helper").arg("elevate-install-node");
+        cmd.arg("--node-json").arg(temp_path);
+        cmd.arg("--archive").arg(archive_path);
+        cmd.arg("--install-method").arg(install_method);
         if yes {
-            cmd.arg("--yes",);
+            cmd.arg("--yes");
         }
         if link_bins {
-            cmd.arg("--link-bins",);
+            cmd.arg("--link-bins");
         }
 
         let status = cmd
             .status()
-            .map_err(|e| anyhow!("Failed to spawn privilege escalator: {e}"),)?;
+            .map_err(|e| anyhow!("Failed to spawn privilege escalator: {e}"))?;
         if !status.success() {
-            return Err(anyhow!("Escalated installation failed."),);
+            return Err(anyhow!("Escalated installation failed."));
         }
 
         let version_dir = local::get_package_version_dir(
@@ -507,60 +504,60 @@ pub fn install_prepared_node(
             &node.registry_handle,
             &pkg.repo,
             &pkg.name,
-            &node.version,
+            &node.version
         )?;
-        let manifest_filename = if let Some(sub,) = &node.sub_package {
+        let manifest_filename = if let Some(sub) = &node.sub_package {
             format!("manifest-{sub}.yaml")
         } else {
             "manifest.yaml".to_string()
         };
-        let manifest_path = version_dir.join(manifest_filename,);
-        let content = std::fs::read_to_string(&manifest_path,)?;
+        let manifest_path = version_dir.join(manifest_filename);
+        let content = std::fs::read_to_string(&manifest_path)?;
         let install_manifest: types::InstallManifest =
-            serde_yaml::from_str(&content,)?;
+            serde_yaml::from_str(&content)?;
 
         install_manifest
     } else {
-        if let Some(pb,) = step_pb.as_ref().or(main_pb.as_ref(),) {
-            pb.set_message(format!("Installing {}...", pkg.name.cyan()),);
+        if let Some(pb) = step_pb.as_ref().or(main_pb.as_ref()) {
+            pb.set_message(format!("Installing {}...", pkg.name.cyan()));
         }
 
         let installed_files = crate::pkg_install::run(
             archive_path,
-            Some(pkg.scope,),
+            Some(pkg.scope),
             &node.registry_handle,
-            Some(&node.version,),
+            Some(&node.version),
             yes,
             sub_packages_vec,
             link_bins,
-            step_pb.as_ref().or(main_pb.as_ref(),),
+            step_pb.as_ref().or(main_pb.as_ref())
         )?;
 
-        if let types::InstallReason::Dependency { ref parent, } = node.reason {
+        if let types::InstallReason::Dependency { ref parent } = node.reason {
             let package_dir = local::get_package_dir(
-                pkg.scope, handle, &pkg.repo, &pkg.name,
+                pkg.scope, handle, &pkg.repo, &pkg.name
             )?;
-            local::add_dependent(&package_dir, parent,)?;
+            local::add_dependent(&package_dir, parent)?;
         }
 
         let install_manifest = manifest::create_manifest(
             pkg,
             node.reason.clone(),
             node.dependencies.clone(),
-            Some(install_method.clone(),),
+            Some(install_method.clone()),
             installed_files,
             handle,
             node.repo_type.clone(),
             &node.chosen_options,
             &node.chosen_optionals,
-            sub_package_to_install.clone(),
+            sub_package_to_install.clone()
         )?;
 
         if record {
-            local::write_manifest(&install_manifest,)?;
+            local::write_manifest(&install_manifest)?;
             local::persist_package_source(
                 &install_manifest,
-                Path::new(&node.source,),
+                Path::new(&node.source)
             )?;
         }
 
@@ -568,29 +565,29 @@ pub fn install_prepared_node(
     };
 
     if prepared.is_build {
-        let _ = fs::remove_file(archive_path,);
+        let _ = fs::remove_file(archive_path);
     }
 
     if record {
-        if let Ok(conn,) = db::open_connection("local",)
-            && let Ok(pkg_id,) = db::update_package(
+        if let Ok(conn) = db::open_connection("local")
+            && let Ok(pkg_id) = db::update_package(
                 &conn,
                 pkg,
                 handle,
-                Some(pkg.scope,),
+                Some(pkg.scope),
                 sub_package_to_install.as_deref(),
-                Some(&node.reason,),
+                Some(&node.reason)
             )
         {
-            let _ = db::clear_package_files(&conn, pkg_id,);
+            let _ = db::clear_package_files(&conn, pkg_id);
             let _ = db::index_package_files(
                 &conn,
                 pkg_id,
-                &install_manifest.installed_files,
+                &install_manifest.installed_files
             );
         }
 
-        if let Err(e,) = recorder::record_package(
+        if let Err(e) = recorder::record_package(
             pkg,
             &node.reason,
             &node.dependencies,
@@ -598,7 +595,7 @@ pub fn install_prepared_node(
             &node.repo_type,
             &node.chosen_options,
             &node.chosen_optionals,
-            sub_package_to_install.as_deref(),
+            sub_package_to_install.as_deref()
         ) {
             eprintln!(
                 "Warning: failed to record package installation for '{}': {}",
@@ -607,23 +604,23 @@ pub fn install_prepared_node(
         }
     }
 
-    if let Some(hooks,) = &pkg.hooks {
-        if let Some(pb,) = &step_pb {
-            pb.set_message("Running post-install hooks...",);
+    if let Some(hooks) = &pkg.hooks {
+        if let Some(pb) = &step_pb {
+            pb.set_message("Running post-install hooks...");
         }
-        hooks::run_hooks(hooks, hooks::HookType::PostInstall, pkg.scope,)?;
+        hooks::run_hooks(hooks, hooks::HookType::PostInstall, pkg.scope)?;
     }
 
-    if let Some(pb,) = main_pb {
+    if let Some(pb) = main_pb {
         pb.finish();
     }
-    if let Some(pb,) = step_pb {
+    if let Some(pb) = step_pb {
         pb.finish();
     }
 
-    util::send_telemetry("install", pkg, handle, Some(install_method,),);
+    util::send_telemetry("install", pkg, handle, Some(install_method));
 
-    Ok(install_manifest,)
+    Ok(install_manifest)
 }
 
 /// Performs both preparation and execution phases for an install node.
@@ -634,13 +631,13 @@ pub fn install_prepared_node(
 pub fn install_node(
     node: &InstallNode,
     action: &plan::InstallAction,
-    m: Option<&MultiProgress,>,
-    build_type: Option<&str,>,
+    m: Option<&MultiProgress>,
+    build_type: Option<&str>,
     yes: bool,
     record: bool,
     link_bins: bool,
-    verbose: bool,
-) -> Result<types::InstallManifest,> {
-    let prepared = prepare_node(node, action, m, build_type, verbose,)?;
-    install_prepared_node(node, &prepared, m, yes, record, link_bins, verbose,)
+    verbose: bool
+) -> Result<types::InstallManifest> {
+    let prepared = prepare_node(node, action, m, build_type, verbose)?;
+    install_prepared_node(node, &prepared, m, yes, record, link_bins, verbose)
 }

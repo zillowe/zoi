@@ -18,9 +18,9 @@ use crate::pkg::cache;
 /// # Panics
 ///
 /// This function does not explicitly panic.
-pub fn add(files: &[PathBuf],) -> Result<(),> {
+pub fn add(files: &[PathBuf]) -> Result<()> {
     let archive_cache_root = cache::get_archive_cache_root()?;
-    fs::create_dir_all(&archive_cache_root,)?;
+    fs::create_dir_all(&archive_cache_root)?;
 
     for file in files {
         if !file.exists() {
@@ -42,14 +42,14 @@ pub fn add(files: &[PathBuf],) -> Result<(),> {
 
         let filename = file
             .file_name()
-            .ok_or_else(|| anyhow!("Invalid filename"),)?;
-        let dest_path = archive_cache_root.join(filename,);
+            .ok_or_else(|| anyhow!("Invalid filename"))?;
+        let dest_path = archive_cache_root.join(filename);
 
         println!("Adding {} to cache...", filename.to_string_lossy().cyan());
-        fs::copy(file, &dest_path,)?;
+        fs::copy(file, &dest_path)?;
     }
 
-    Ok((),)
+    Ok(())
 }
 
 /// Clears the local archive cache.
@@ -61,8 +61,8 @@ pub fn add(files: &[PathBuf],) -> Result<(),> {
 /// # Panics
 ///
 /// This function does not explicitly panic.
-pub fn clear(dry_run: bool,) -> Result<(),> {
-    crate::cmd::clean::run(dry_run,)
+pub fn clear(dry_run: bool) -> Result<()> {
+    crate::cmd::clean::run(dry_run)
 }
 
 /// Lists files in the local archive cache.
@@ -75,16 +75,16 @@ pub fn clear(dry_run: bool,) -> Result<(),> {
 /// # Panics
 ///
 /// This function does not explicitly panic.
-pub fn list() -> Result<(),> {
+pub fn list() -> Result<()> {
     let archive_cache_root = cache::get_archive_cache_root()?;
     if !archive_cache_root.exists() {
         println!("Cache is empty.");
-        return Ok((),);
+        return Ok(());
     }
 
     println!("{} Archives in local cache:", "::".bold().blue());
     let mut count = 0;
-    for entry in fs::read_dir(archive_cache_root,)? {
+    for entry in fs::read_dir(archive_cache_root)? {
         let entry = entry?;
         let path = entry.path();
         if path.is_file() {
@@ -93,9 +93,9 @@ pub fn list() -> Result<(),> {
                 .ok_or_else(|| {
                     let p = path.display();
                     anyhow!("Path from read_dir has no file name: {p}")
-                },)?
+                })?
                 .to_string_lossy();
-            let size = fs::metadata(&path,)?.len();
+            let size = fs::metadata(&path)?.len();
             println!(
                 "  - {:<40} ({})",
                 filename.cyan(),
@@ -114,7 +114,7 @@ Total: {count} archives"
         );
     }
 
-    Ok((),)
+    Ok(())
 }
 
 /// Adds a new cache mirror URL.
@@ -126,10 +126,10 @@ Total: {count} archives"
 /// # Panics
 ///
 /// This function does not explicitly panic.
-pub fn add_mirror(url: &str,) -> Result<(),> {
-    crate::pkg::config::add_cache_mirror(url,)?;
+pub fn add_mirror(url: &str) -> Result<()> {
+    crate::pkg::config::add_cache_mirror(url)?;
     println!("Added cache mirror '{}'.", url.cyan());
-    Ok((),)
+    Ok(())
 }
 
 /// Removes a cache mirror URL.
@@ -141,10 +141,10 @@ pub fn add_mirror(url: &str,) -> Result<(),> {
 /// # Panics
 ///
 /// This function does not explicitly panic.
-pub fn remove_mirror(url: &str,) -> Result<(),> {
-    crate::pkg::config::remove_cache_mirror(url,)?;
+pub fn remove_mirror(url: &str) -> Result<()> {
+    crate::pkg::config::remove_cache_mirror(url)?;
     println!("Removed cache mirror '{}'.", url.cyan());
-    Ok((),)
+    Ok(())
 }
 
 /// Lists all configured cache mirror URLs.
@@ -156,16 +156,16 @@ pub fn remove_mirror(url: &str,) -> Result<(),> {
 /// # Panics
 ///
 /// This function does not explicitly panic.
-pub fn list_mirrors() -> Result<(),> {
+pub fn list_mirrors() -> Result<()> {
     let config = crate::pkg::config::read_config()?;
     if config.cache_mirrors.is_empty() {
         println!("No cache mirrors configured.");
-        return Ok((),);
+        return Ok(());
     }
 
     println!("{} Configured cache mirrors:", "::".bold().blue());
     for mirror in &config.cache_mirrors {
         println!("  - {}", mirror.cyan());
     }
-    Ok((),)
+    Ok(())
 }

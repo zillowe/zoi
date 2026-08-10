@@ -23,50 +23,50 @@ use crate::pkg::{self, lock, transaction, types};
 /// - A transaction cannot be started, recorded, or committed.
 pub fn run(
     package_names: &[String],
-    scope: Option<crate::cli::InstallScope,>,
+    scope: Option<crate::cli::InstallScope>,
     local: bool,
     global: bool,
     save: bool,
     yes: bool,
     recursive: bool,
-    plugin_manager: Option<&crate::pkg::plugin::PluginManager,>,
+    plugin_manager: Option<&crate::pkg::plugin::PluginManager>,
     explain: bool,
     plan_json: bool,
-    dry_run: bool,
-) -> Result<(),> {
+    dry_run: bool
+) -> Result<()> {
     let mut scope_override = scope.map(|s| match s {
         crate::cli::InstallScope::User => types::Scope::User,
         crate::cli::InstallScope::System => types::Scope::System,
-        crate::cli::InstallScope::Project => types::Scope::Project,
-    },);
+        crate::cli::InstallScope::Project => types::Scope::Project
+    });
 
     if local {
-        scope_override = Some(types::Scope::Project,);
+        scope_override = Some(types::Scope::Project);
     } else if global || scope_override.is_none() {
-        scope_override = Some(types::Scope::User,);
+        scope_override = Some(types::Scope::User);
     }
 
-    if save && scope_override != Some(types::Scope::Project,) {
+    if save && scope_override != Some(types::Scope::Project) {
         return Err(anyhow!(
             "The --save flag can only be used with project-scoped uninstalls."
-        ),);
+        ));
     }
 
     let installed_packages = pkg::local::get_installed_packages()?;
 
-    let mut manifests_to_uninstall: Vec<types::InstallManifest,> = Vec::new();
+    let mut manifests_to_uninstall: Vec<types::InstallManifest> = Vec::new();
     let mut failed_resolution = false;
 
     let expanded_names =
-        utils::expand_split_packages(package_names, "Uninstalling",)?;
+        utils::expand_split_packages(package_names, "Uninstalling")?;
 
     for name in &expanded_names {
-        if let Err(e,) = resolve_and_add_manifest(
+        if let Err(e) = resolve_and_add_manifest(
             name,
             &installed_packages,
             &mut manifests_to_uninstall,
             scope_override,
-            yes,
+            yes
         ) {
             eprintln!("{e}");
             failed_resolution = true;
@@ -76,13 +76,13 @@ pub fn run(
     if failed_resolution {
         return Err(anyhow!(
             "Failed to resolve some packages for uninstallation."
-        ),);
+        ));
     }
 
     if recursive {
         collect_recursive_uninstalls(
             &mut manifests_to_uninstall,
-            &installed_packages,
+            &installed_packages
         )?;
     }
 
@@ -92,68 +92,68 @@ pub fn run(
             command: "uninstall".to_string(),
             success: 0,
             failed: 0,
-            skipped: 0,
-        },);
-        return Ok((),);
+            skipped: 0
+        });
+        return Ok(());
     }
 
     manifests_to_uninstall.sort_by(|a, b| {
         a.name
-            .cmp(&b.name,)
-            .then_with(|| scope_rank(a.scope,).cmp(&scope_rank(b.scope,),),)
-            .then_with(|| a.registry_handle.cmp(&b.registry_handle,),)
-            .then_with(|| a.repo.cmp(&b.repo,),)
-            .then_with(|| a.sub_package.cmp(&b.sub_package,),)
-    },);
+            .cmp(&b.name)
+            .then_with(|| scope_rank(a.scope).cmp(&scope_rank(b.scope)))
+            .then_with(|| a.registry_handle.cmp(&b.registry_handle))
+            .then_with(|| a.repo.cmp(&b.repo))
+            .then_with(|| a.sub_package.cmp(&b.sub_package))
+    });
     manifests_to_uninstall.dedup_by(|a, b| {
         a.name == b.name
             && a.sub_package == b.sub_package
             && a.repo == b.repo
             && a.registry_handle == b.registry_handle
             && a.scope == b.scope
-    },);
+    });
 
     let mut total_size_freed_bytes: u64 = 0;
     for manifest in &manifests_to_uninstall {
-        if let Some(size,) = manifest.installed_size
+        if let Some(size) = manifest.installed_size
             && size > 0
         {
             total_size_freed_bytes += size;
             continue;
         }
 
-        let Ok(version_dir,) = pkg::local::get_package_version_dir(
+        let Ok(version_dir) = pkg::local::get_package_version_dir(
             manifest.scope,
             &manifest.registry_handle,
             &manifest.repo,
             &manifest.name,
-            &manifest.version,
+            &manifest.version
         ) else {
             continue;
         };
 
         let mut package_size: u64 = 0;
         for file_path_str in &manifest.installed_files {
-            let Ok(expanded,) = pkg::utils::expand_placeholders(
+            let Ok(expanded) = pkg::utils::expand_placeholders(
                 file_path_str,
                 &version_dir,
-                manifest.scope,
+                manifest.scope
             ) else {
                 continue;
             };
-            let path = Path::new(&expanded,);
+            let path = Path::new(&expanded);
             if !path.exists() {
                 continue;
             }
             if path.is_dir() {
-                package_size += WalkDir::new(path,)
+                package_size += WalkDir::new(path)
                     .into_iter()
-                    .filter_map(std::result::Result::ok,)
-                    .filter_map(|e| e.metadata().ok(),)
-                    .filter(std::fs::Metadata::is_file,)
-                    .map(|m| m.len(),)
+                    .filter_map(std::result::Result::ok)
+                    .filter_map(|e| e.metadata().ok())
+                    .filter(std::fs::Metadata::is_file)
+                    .map(|m| m.len())
                     .sum::<u64>();
-            } else if let Ok(metadata,) = fs::metadata(path,) {
+            } else if let Ok(metadata) = fs::metadata(path) {
                 package_size += metadata.len();
             }
         }
@@ -162,7 +162,7 @@ pub fn run(
 
     println!("Packages to remove:");
     for manifest in &manifests_to_uninstall {
-        let source_str = if let Some(sub,) = &manifest.sub_package {
+        let source_str = if let Some(sub) = &manifest.sub_package {
             format!(
                 "#{}@{}/{}:{}",
                 manifest.registry_handle, manifest.repo, manifest.name, sub
@@ -181,11 +181,10 @@ pub fn run(
         crate::pkg::utils::format_bytes(total_size_freed_bytes)
     );
 
-    let removal_ids: std::collections::HashSet<String,> =
-        manifests_to_uninstall
-            .iter()
-            .map(removal_identity,)
-            .collect();
+    let removal_ids: std::collections::HashSet<String> = manifests_to_uninstall
+        .iter()
+        .map(removal_identity)
+        .collect();
     let mut dangerous = Vec::new();
     let mut impact_json = Vec::new();
     for manifest in &manifests_to_uninstall {
@@ -193,14 +192,14 @@ pub fn run(
             manifest.scope,
             &manifest.registry_handle,
             &manifest.repo,
-            &manifest.name,
+            &manifest.name
         )?;
         let external_dependents = collect_external_dependents(
             &removal_ids,
-            pkg::local::get_dependents(&package_dir,)?,
+            pkg::local::get_dependents(&package_dir)?
         );
 
-        let source = if let Some(sub,) = &manifest.sub_package {
+        let source = if let Some(sub) = &manifest.sub_package {
             format!(
                 "#{}@{}/{}:{}",
                 manifest.registry_handle, manifest.repo, manifest.name, sub
@@ -213,7 +212,7 @@ pub fn run(
         };
 
         if !external_dependents.is_empty() {
-            dangerous.push((source.clone(), external_dependents.clone(),),);
+            dangerous.push((source.clone(), external_dependents.clone()));
         }
         impact_json.push(json!({
             "source": source,
@@ -225,28 +224,28 @@ pub fn run(
             "repo": manifest.repo,
             "external_dependents": external_dependents,
             "installed_files": manifest.installed_files.len(),
-        }),);
+        }));
     }
 
-    let preflight = ux::PreflightSummary::new("Uninstall preflight",)
+    let preflight = ux::PreflightSummary::new("Uninstall preflight")
         .row(
             "Scope override",
             scope_override
-                .map_or_else(|| "None".to_string(), |s| format!("{s:?}"),),
+                .map_or_else(|| "None".to_string(), |s| format!("{s:?}"))
         )
-        .row("Recursive", recursive.to_string(),)
-        .row("Packages", manifests_to_uninstall.len().to_string(),)
-        .row("Dangerous removals", dangerous.len().to_string(),)
+        .row("Recursive", recursive.to_string())
+        .row("Packages", manifests_to_uninstall.len().to_string())
+        .row("Dangerous removals", dangerous.len().to_string())
         .row(
             "Estimated freed size",
-            crate::pkg::utils::format_bytes(total_size_freed_bytes,),
+            crate::pkg::utils::format_bytes(total_size_freed_bytes)
         );
-    ux::print_preflight(&preflight,);
+    ux::print_preflight(&preflight);
 
     if explain {
-        let mut report = ux::ExplainReport::new("Uninstall explanation",);
+        let mut report = ux::ExplainReport::new("Uninstall explanation");
         for manifest in &manifests_to_uninstall {
-            let source = if let Some(sub,) = &manifest.sub_package {
+            let source = if let Some(sub) = &manifest.sub_package {
                 format!(
                     "#{}@{}/{}:{}",
                     manifest.registry_handle, manifest.repo, manifest.name, sub
@@ -260,21 +259,21 @@ pub fn run(
             report = report.item(
                 format!("{} [{}]", source, manifest.version),
                 format!("reason={:?}", manifest.reason),
-                Vec::new(),
+                Vec::new()
             );
         }
         if !dangerous.is_empty() {
-            for (source, deps,) in &dangerous {
+            for (source, deps) in &dangerous {
                 report = report.item(
                     source.clone(),
                     format!("blocks {} dependent(s)", deps.len()),
                     deps.iter()
-                        .map(|dep| format!("dependent: {dep}"),)
-                        .collect::<Vec<_,>>(),
+                        .map(|dep| format!("dependent: {dep}"))
+                        .collect::<Vec<_>>()
                 );
             }
         }
-        ux::print_explain(&report,);
+        ux::print_explain(&report);
     }
 
     if plan_json {
@@ -288,7 +287,7 @@ pub fn run(
             },
             "packages": impact_json,
         });
-        ux::emit_plan_json_v1("uninstall", plan,)?;
+        ux::emit_plan_json_v1("uninstall", plan)?;
     }
 
     if !dangerous.is_empty() {
@@ -296,7 +295,7 @@ pub fn run(
             "\n{} Removing these packages will break dependents:",
             "Warning".yellow().bold()
         );
-        for (source, deps,) in &dangerous {
+        for (source, deps) in &dangerous {
             println!("  - {}", source.cyan());
             for dep in deps {
                 println!("    * {dep}");
@@ -304,15 +303,15 @@ pub fn run(
         }
         if !crate::utils::ask_for_confirmation(
             "Dangerous removal detected. Continue anyway?",
-            yes,
+            yes
         ) {
             ux::print_transaction_summary(&ux::TransactionSummary {
                 command: "uninstall".to_string(),
                 success: 0,
                 failed: 0,
-                skipped: manifests_to_uninstall.len(),
-            },);
-            return Ok((),);
+                skipped: manifests_to_uninstall.len()
+            });
+            return Ok(());
         }
     }
 
@@ -322,20 +321,20 @@ pub fn run(
             command: "uninstall".to_string(),
             success: 0,
             failed: 0,
-            skipped: manifests_to_uninstall.len(),
-        },);
-        return Ok((),);
+            skipped: manifests_to_uninstall.len()
+        });
+        return Ok(());
     }
 
-    if !crate::utils::ask_for_confirmation(":: Proceed with removal?", yes,) {
+    if !crate::utils::ask_for_confirmation(":: Proceed with removal?", yes) {
         let _ = lock::release_lock();
         ux::print_transaction_summary(&ux::TransactionSummary {
             command: "uninstall".to_string(),
             success: 0,
             failed: 0,
-            skipped: manifests_to_uninstall.len(),
-        },);
-        return Ok((),);
+            skipped: manifests_to_uninstall.len()
+        });
+        return Ok(());
     }
 
     let mut transaction = transaction::begin()?;
@@ -343,22 +342,22 @@ pub fn run(
     let mut failed_packages = Vec::new();
     let mut successfully_uninstalled = Vec::new();
 
-    if let Some(pm,) = plugin_manager {
-        pm.set_context(scope_override.unwrap_or_default(),)?;
+    if let Some(pm) = plugin_manager {
+        pm.set_context(scope_override.unwrap_or_default())?;
     }
 
     for manifest in &manifests_to_uninstall {
         let mut pkg_val = None;
-        if let Some(pm,) = plugin_manager {
+        if let Some(pm) = plugin_manager {
             let v = pm
                 .lua
-                .to_value(manifest,)
-                .map_err(|e: mlua::Error| anyhow!(e.to_string()),)?;
-            pm.trigger_hook("on_pre_uninstall", Some(&v.clone(),),)?;
-            pkg_val = Some(v,);
+                .to_value(manifest)
+                .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
+            pm.trigger_hook("on_pre_uninstall", Some(&v.clone()))?;
+            pkg_val = Some(v);
         }
 
-        let source_str = if let Some(sub,) = &manifest.sub_package {
+        let source_str = if let Some(sub) = &manifest.sub_package {
             format!(
                 "#{}@{}/{}:{}",
                 manifest.registry_handle, manifest.repo, manifest.name, sub
@@ -381,27 +380,24 @@ pub fn run(
             scope_override,
             yes,
             false,
-            false,
+            false
         ) {
-            Ok(uninstalled_manifest,) => {
-                if let Err(e,) = transaction::record_operation(
+            Ok(uninstalled_manifest) => {
+                if let Err(e) = transaction::record_operation(
                     &mut transaction,
                     types::TransactionOperation::Uninstall {
-                        manifest: Box::new(uninstalled_manifest,),
-                    },
+                        manifest: Box::new(uninstalled_manifest)
+                    }
                 ) {
                     eprintln!(
                         "Failed to record transaction operation for \
                          {source_str}: {e}"
                     );
-                    failed_packages.push(source_str.clone(),);
+                    failed_packages.push(source_str.clone());
                 } else {
-                    successfully_uninstalled.push(source_str.clone(),);
-                    if let (Some(pm,), Some(v,),) = (plugin_manager, pkg_val,) {
-                        pm.trigger_hook_nonfatal(
-                            "on_post_uninstall",
-                            Some(&v,),
-                        );
+                    successfully_uninstalled.push(source_str.clone());
+                    if let (Some(pm), Some(v)) = (plugin_manager, pkg_val) {
+                        pm.trigger_hook_nonfatal("on_post_uninstall", Some(&v));
                     }
                     println!(
                         "\n{} Uninstallation complete.",
@@ -409,9 +405,9 @@ pub fn run(
                     );
                 }
             }
-            Err(e,) => {
+            Err(e) => {
                 eprintln!("\nError: {e}");
-                failed_packages.push(source_str.clone(),);
+                failed_packages.push(source_str.clone());
             }
         }
     }
@@ -419,7 +415,7 @@ pub fn run(
     if !failed_packages.is_empty() {
         eprintln!("\nError: Uninstallation failed for some packages.");
         eprintln!("\n{} Rolling back changes...", "::".bold().yellow());
-        if let Err(e,) = transaction::rollback(&transaction.id,) {
+        if let Err(e) = transaction::rollback(&transaction.id) {
             eprintln!("\nCRITICAL: Rollback failed: {e}");
             eprintln!(
                 "The system may be in an inconsistent state. The transaction \
@@ -433,35 +429,34 @@ pub fn run(
             command: "uninstall".to_string(),
             success: successfully_uninstalled.len(),
             failed: failed_packages.len(),
-            skipped: 0,
-        },);
+            skipped: 0
+        });
         return Err(anyhow!(
             "Uninstallation failed for: {}",
             failed_packages.join(", ")
-        ),);
+        ));
     }
 
-    if let Ok(modified_files,) =
-        transaction::get_modified_files(&transaction.id,)
+    if let Ok(modified_files) = transaction::get_modified_files(&transaction.id)
     {
         let modified_packages =
-            transaction::get_modified_packages(&transaction.id,)
+            transaction::get_modified_packages(&transaction.id)
                 .unwrap_or_default();
         let _ = crate::pkg::hooks::global::run_global_hooks(
             crate::pkg::hooks::global::HookWhen::PostTransaction,
             &modified_files,
             &modified_packages,
             "remove",
-            scope_override.unwrap_or_default(),
+            scope_override.unwrap_or_default()
         );
     }
 
-    if let Err(e,) = transaction::commit(&transaction.id,) {
+    if let Err(e) = transaction::commit(&transaction.id) {
         eprintln!("Warning: Failed to commit transaction: {e}");
     }
 
     if save {
-        if std::path::Path::new("zoi.lua",).exists() {
+        if std::path::Path::new("zoi.lua").exists() {
             println!(
                 "\n{} Project uses zoi.lua. Automatic saving is not supported \
                  for Lua configurations.",
@@ -474,8 +469,8 @@ pub fn run(
             for pkg in &successfully_uninstalled {
                 println!("   - \"{pkg}\"");
             }
-        } else if let Err(e,) = zoi_project::config::remove_packages_from_config(
-            &successfully_uninstalled,
+        } else if let Err(e) = zoi_project::config::remove_packages_from_config(
+            &successfully_uninstalled
         ) {
             eprintln!(
                 "{}: Failed to remove packages from zoi.yaml: {}",
@@ -488,14 +483,14 @@ pub fn run(
         command: "uninstall".to_string(),
         success: successfully_uninstalled.len(),
         failed: 0,
-        skipped: 0,
-    },);
-    Ok((),)
+        skipped: 0
+    });
+    Ok(())
 }
 
 /// Generates a unique string identity for a package to be removed.
-fn removal_identity(manifest: &types::InstallManifest,) -> String {
-    if let Some(sub,) = &manifest.sub_package {
+fn removal_identity(manifest: &types::InstallManifest) -> String {
+    if let Some(sub) = &manifest.sub_package {
         format!("{}@{}:{}", manifest.name, manifest.version, sub)
     } else {
         format!("{}@{}", manifest.name, manifest.version)
@@ -503,24 +498,24 @@ fn removal_identity(manifest: &types::InstallManifest,) -> String {
 }
 
 /// Returns a rank for the scope to prioritize removal order.
-fn scope_rank(scope: types::Scope,) -> u8 {
+fn scope_rank(scope: types::Scope) -> u8 {
     match scope {
         types::Scope::Project => 0,
         types::Scope::User => 1,
-        types::Scope::System => 2,
+        types::Scope::System => 2
     }
 }
 
 /// Filters a list of dependents to find those that are NOT part of the current
 /// removal set.
 fn collect_external_dependents(
-    removal_ids: &std::collections::HashSet<String,>,
-    dependents: Vec<String,>,
-) -> Vec<String,> {
+    removal_ids: &std::collections::HashSet<String>,
+    dependents: Vec<String>
+) -> Vec<String> {
     let mut external = dependents
         .into_iter()
-        .filter(|dep| !removal_ids.contains(dep,),)
-        .collect::<Vec<_,>>();
+        .filter(|dep| !removal_ids.contains(dep))
+        .collect::<Vec<_>>();
     external.sort();
     external
 }
@@ -535,60 +530,60 @@ fn collect_external_dependents(
 fn resolve_and_add_manifest(
     name: &str,
     installed_packages: &[types::InstallManifest],
-    manifests_to_uninstall: &mut Vec<types::InstallManifest,>,
-    scope_override: Option<types::Scope,>,
-    yes: bool,
-) -> Result<(), String,> {
-    let request = match pkg::resolve::parse_source_string(name,) {
-        Ok(req,) => req,
-        Err(e,) => {
-            return Err(format!("Error: Invalid package name '{name}': {e}"),);
+    manifests_to_uninstall: &mut Vec<types::InstallManifest>,
+    scope_override: Option<types::Scope>,
+    yes: bool
+) -> Result<(), String> {
+    let request = match pkg::resolve::parse_source_string(name) {
+        Ok(req) => req,
+        Err(e) => {
+            return Err(format!("Error: Invalid package name '{name}': {e}"));
         }
     };
 
-    let mut candidates: Vec<_,> = installed_packages
+    let mut candidates: Vec<_> = installed_packages
         .iter()
         .filter(|m| {
             let name_matches = m.name == request.name;
             let sub_matches = m.sub_package == request.sub_package;
             let scope_matches =
-                scope_override.is_none_or(|scope| m.scope == scope,);
+                scope_override.is_none_or(|scope| m.scope == scope);
             name_matches && sub_matches && scope_matches
-        },)
+        })
         .collect();
 
-    if let Some(repo,) = &request.repo {
-        candidates.retain(|m| m.repo == *repo,);
+    if let Some(repo) = &request.repo {
+        candidates.retain(|m| m.repo == *repo);
     }
-    if let Some(handle,) = &request.handle {
-        candidates.retain(|m| m.registry_handle == *handle,);
+    if let Some(handle) = &request.handle {
+        candidates.retain(|m| m.registry_handle == *handle);
     }
 
     match candidates.len() {
-        0 => Err(format!("Error: Package '{name}' is not installed."),),
+        0 => Err(format!("Error: Package '{name}' is not installed.")),
         1 => {
-            if let Some(first,) = candidates.first()
+            if let Some(first) = candidates.first()
                 && !manifests_to_uninstall.iter().any(|m| {
                     m.name == first.name
                         && m.sub_package == first.sub_package
                         && m.repo == first.repo
                         && m.registry_handle == first.registry_handle
-                },)
+                })
             {
-                manifests_to_uninstall.push((*first).clone(),);
+                manifests_to_uninstall.push((*first).clone());
             }
-            Ok((),)
+            Ok(())
         }
         _ => {
             let owned_candidates =
-                candidates.into_iter().cloned().collect::<Vec<_,>>();
+                candidates.into_iter().cloned().collect::<Vec<_>>();
             let chosen =
                 crate::cmd::installed_select::choose_installed_manifest(
                     name,
                     &owned_candidates,
-                    yes,
+                    yes
                 )
-                .map_err(|e| format!("Error: {e}"),)?;
+                .map_err(|e| format!("Error: {e}"))?;
 
             if !manifests_to_uninstall.iter().any(|m| {
                 m.name == chosen.name
@@ -596,11 +591,10 @@ fn resolve_and_add_manifest(
                     && m.repo == chosen.repo
                     && m.registry_handle == chosen.registry_handle
                     && m.scope == chosen.scope
-            },)
-            {
-                manifests_to_uninstall.push(chosen,);
+            }) {
+                manifests_to_uninstall.push(chosen);
             }
-            Ok((),)
+            Ok(())
         }
     }
 }
@@ -612,9 +606,9 @@ fn resolve_and_add_manifest(
 ///
 /// Returns an error if package dependencies cannot be parsed.
 fn collect_recursive_uninstalls(
-    manifests_to_uninstall: &mut Vec<types::InstallManifest,>,
-    installed_packages: &[types::InstallManifest],
-) -> Result<(),> {
+    manifests_to_uninstall: &mut Vec<types::InstallManifest>,
+    installed_packages: &[types::InstallManifest]
+) -> Result<()> {
     let mut changed = true;
     while changed {
         changed = false;
@@ -622,12 +616,12 @@ fn collect_recursive_uninstalls(
 
         for manifest in manifests_to_uninstall.iter() {
             for dep_str in &manifest.installed_dependencies {
-                if let Ok(dep,) =
-                    pkg::dependencies::parse_dependency_string(dep_str,)
+                if let Ok(dep) =
+                    pkg::dependencies::parse_dependency_string(dep_str)
                     && dep.manager == "zoi"
                 {
-                    let Ok(dep_req,) =
-                        pkg::resolve::parse_source_string(dep.package,)
+                    let Ok(dep_req) =
+                        pkg::resolve::parse_source_string(dep.package)
                     else {
                         continue;
                     };
@@ -642,16 +636,16 @@ fn collect_recursive_uninstalls(
                                     .as_ref()
                                     .is_none_or(|repo| m.repo == *repo)
                                 && dep_req.handle.as_ref().is_none_or(
-                                    |handle| m.registry_handle == *handle,
+                                    |handle| m.registry_handle == *handle
                                 )
                                 && dep_req
                                     .version_spec
                                     .as_ref()
                                     .is_none_or(|version| m.version == *version)
-                        },)
-                        .collect::<Vec<_,>>();
+                        })
+                        .collect::<Vec<_>>();
 
-                    if let [dm,] = matching_dep_manifests.as_slice() {
+                    if let [dm] = matching_dep_manifests.as_slice() {
                         if !matches!(
                             dm.reason,
                             types::InstallReason::Dependency { .. }
@@ -661,11 +655,11 @@ fn collect_recursive_uninstalls(
 
                         if manifests_to_uninstall.iter().any(|m| {
                             m.name == dm.name && m.sub_package == dm.sub_package
-                        },) || new_to_add.iter().any(
+                        }) || new_to_add.iter().any(
                             |m: &&types::InstallManifest| {
                                 m.name == dm.name
                                     && m.sub_package == dm.sub_package
-                            },
+                            }
                         ) {
                             continue;
                         }
@@ -674,28 +668,28 @@ fn collect_recursive_uninstalls(
                             dm.scope,
                             &dm.registry_handle,
                             &dm.repo,
-                            &dm.name,
+                            &dm.name
                         )?;
-                        let dependents = pkg::local::get_dependents(&pkg_dir,)?;
+                        let dependents = pkg::local::get_dependents(&pkg_dir)?;
 
                         let all_dependents_will_be_removed =
                             dependents.iter().all(|dep_id| {
                                 manifests_to_uninstall.iter().any(|m| {
-                                    let m_id =
-                                        if let Some(sub,) = &m.sub_package {
-                                            format!(
-                                                "{}@{}:{}",
-                                                m.name, m.version, sub
-                                            )
-                                        } else {
-                                            format!("{}@{}", m.name, m.version)
-                                        };
+                                    let m_id = if let Some(sub) = &m.sub_package
+                                    {
+                                        format!(
+                                            "{}@{}:{}",
+                                            m.name, m.version, sub
+                                        )
+                                    } else {
+                                        format!("{}@{}", m.name, m.version)
+                                    };
                                     m_id == *dep_id
-                                },)
-                            },);
+                                })
+                            });
 
                         if all_dependents_will_be_removed {
-                            new_to_add.push(dm,);
+                            new_to_add.push(dm);
                             changed = true;
                         }
                     }
@@ -704,10 +698,10 @@ fn collect_recursive_uninstalls(
         }
 
         for nm in new_to_add {
-            manifests_to_uninstall.push(nm.clone(),);
+            manifests_to_uninstall.push(nm.clone());
         }
     }
-    Ok((),)
+    Ok(())
 }
 
 #[cfg(test)]
@@ -719,7 +713,7 @@ mod tests {
     #[test]
     fn dangerous_removal_ignores_dependents_in_same_removal_set() {
         let mut removal_ids = HashSet::new();
-        removal_ids.insert("foo@1.0.0".to_string(),);
+        removal_ids.insert("foo@1.0.0".to_string());
 
         let external = collect_external_dependents(
             &removal_ids,
@@ -727,7 +721,7 @@ mod tests {
                 "foo@1.0.0".to_string(),
                 "bar@2.0.0".to_string(),
                 "baz@3.0.0".to_string(),
-            ],
+            ]
         );
 
         assert_eq!(
@@ -741,7 +735,7 @@ mod tests {
         let removal_ids = HashSet::new();
         let external = collect_external_dependents(
             &removal_ids,
-            vec!["c@1".to_string(), "a@1".to_string(), "b@1".to_string()],
+            vec!["c@1".to_string(), "a@1".to_string(), "b@1".to_string()]
         );
         assert_eq!(
             external,

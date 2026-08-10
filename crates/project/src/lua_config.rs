@@ -13,7 +13,7 @@ use mlua::{Lua, LuaSerdeExt, Table, Value};
 
 use crate::config::{
     CommandSpec, EnvironmentSpec, PackageSpec, ProjectConfig,
-    ProjectLocalConfig, RegistrySpec,
+    ProjectLocalConfig, RegistrySpec
 };
 
 /// Parses and executes a `zoi.lua` file to load project-specific configuration.
@@ -34,62 +34,62 @@ use crate::config::{
 /// # Panics
 ///
 /// Panics if a mutex becomes poisoned.
-pub fn load_zoi_lua<S: ::std::hash::BuildHasher,>(
+pub fn load_zoi_lua<S: ::std::hash::BuildHasher>(
     path: &Path,
-    env: &HashMap<String, String, S,>,
-) -> Result<ProjectConfig,> {
+    env: &HashMap<String, String, S>
+) -> Result<ProjectConfig> {
     let lua = Lua::new();
-    let content = fs::read_to_string(path,)?;
+    let content = fs::read_to_string(path)?;
 
     let project_data =
-        std::sync::Arc::new(std::sync::Mutex::new(HashMap::new(),),);
+        std::sync::Arc::new(std::sync::Mutex::new(HashMap::new()));
     let packages_data =
-        std::sync::Arc::new(std::sync::Mutex::new(HashMap::new(),),);
+        std::sync::Arc::new(std::sync::Mutex::new(HashMap::new()));
     let registries_data =
-        std::sync::Arc::new(std::sync::Mutex::new(HashMap::new(),),);
-    let tasks_data = std::sync::Arc::new(std::sync::Mutex::new(Vec::new(),),);
+        std::sync::Arc::new(std::sync::Mutex::new(HashMap::new()));
+    let tasks_data = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
     let environments_data =
-        std::sync::Arc::new(std::sync::Mutex::new(Vec::new(),),);
+        std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
 
-    let env_table = lua.create_table().map_err(|e| anyhow!(e.to_string()),)?;
-    for (k, v,) in env {
+    let env_table = lua.create_table().map_err(|e| anyhow!(e.to_string()))?;
+    for (k, v) in env {
         env_table
-            .set(k.as_str(), v.as_str(),)
-            .map_err(|e| anyhow!(e.to_string()),)?;
+            .set(k.as_str(), v.as_str())
+            .map_err(|e| anyhow!(e.to_string()))?;
     }
     lua.globals()
-        .set("ENV", env_table,)
-        .map_err(|e| anyhow!(e.to_string()),)?;
+        .set("ENV", env_table)
+        .map_err(|e| anyhow!(e.to_string()))?;
 
     let p_clone = project_data.clone();
     let project_fn = lua
         .create_function(move |lua, table: Table| {
-            let mut data = p_clone.lock().expect("mutex poisoned",);
+            let mut data = p_clone.lock().expect("mutex poisoned");
             for pair in table.pairs::<String, Value>() {
-                let (k, v,) = pair?;
-                data.insert(k, lua.from_value::<serde_json::Value>(v,)?,);
+                let (k, v) = pair?;
+                data.insert(k, lua.from_value::<serde_json::Value>(v)?);
             }
-            Ok((),)
-        },)
-        .map_err(|e| anyhow!(e.to_string()),)?;
+            Ok(())
+        })
+        .map_err(|e| anyhow!(e.to_string()))?;
     lua.globals()
-        .set("project", project_fn,)
-        .map_err(|e| anyhow!(e.to_string()),)?;
+        .set("project", project_fn)
+        .map_err(|e| anyhow!(e.to_string()))?;
 
     let pkgs_clone = packages_data.clone();
     let packages_fn = lua
         .create_function(move |lua, table: Table| {
-            let mut data = pkgs_clone.lock().expect("mutex poisoned",);
+            let mut data = pkgs_clone.lock().expect("mutex poisoned");
             for pair in table.pairs::<Value, Value>() {
-                let (k, v,) = pair?;
+                let (k, v) = pair?;
                 match k {
-                    Value::String(s,) => {
+                    Value::String(s) => {
                         let key = s.to_str()?.trim().to_string();
-                        let spec = lua.from_value::<PackageSpec>(v,)?;
-                        data.insert(key, spec,);
+                        let spec = lua.from_value::<PackageSpec>(v)?;
+                        data.insert(key, spec);
                     }
-                    Value::Integer(_,) => {
-                        if let Value::String(s,) = v {
+                    Value::Integer(_) => {
+                        if let Value::String(s) = v {
                             data.insert(
                                 s.to_str()?.trim().to_string(),
                                 PackageSpec {
@@ -99,112 +99,109 @@ pub fn load_zoi_lua<S: ::std::hash::BuildHasher,>(
                                     version: None,
                                     dependencies: None,
                                     options: None,
-                                    optionals: None,
-                                },
+                                    optionals: None
+                                }
                             );
                         }
                     }
                     _ => {}
                 }
             }
-            Ok((),)
-        },)
-        .map_err(|e| anyhow!(e.to_string()),)?;
+            Ok(())
+        })
+        .map_err(|e| anyhow!(e.to_string()))?;
     lua.globals()
-        .set("packages", packages_fn,)
-        .map_err(|e| anyhow!(e.to_string()),)?;
+        .set("packages", packages_fn)
+        .map_err(|e| anyhow!(e.to_string()))?;
 
     let regs_clone = registries_data.clone();
     let registries_fn = lua
         .create_function(move |lua, table: Table| {
-            let mut data = regs_clone.lock().expect("mutex poisoned",);
+            let mut data = regs_clone.lock().expect("mutex poisoned");
             for pair in table.pairs::<String, Value>() {
-                let (k, v,) = pair?;
-                let spec = lua.from_value::<RegistrySpec>(v,)?;
-                data.insert(k, spec,);
+                let (k, v) = pair?;
+                let spec = lua.from_value::<RegistrySpec>(v)?;
+                data.insert(k, spec);
             }
-            Ok((),)
-        },)
-        .map_err(|e| anyhow!(e.to_string()),)?;
+            Ok(())
+        })
+        .map_err(|e| anyhow!(e.to_string()))?;
     lua.globals()
-        .set("registries", registries_fn,)
-        .map_err(|e| anyhow!(e.to_string()),)?;
+        .set("registries", registries_fn)
+        .map_err(|e| anyhow!(e.to_string()))?;
 
     let tasks_clone = tasks_data.clone();
     let tasks_fn = lua
         .create_function(move |lua, table: Table| {
-            let mut data = tasks_clone.lock().expect("mutex poisoned",);
+            let mut data = tasks_clone.lock().expect("mutex poisoned");
             for val in table.sequence_values::<Value>() {
-                let spec = lua.from_value::<CommandSpec>(val?,)?;
-                data.push(spec,);
+                let spec = lua.from_value::<CommandSpec>(val?)?;
+                data.push(spec);
             }
-            Ok((),)
-        },)
-        .map_err(|e| anyhow!(e.to_string()),)?;
+            Ok(())
+        })
+        .map_err(|e| anyhow!(e.to_string()))?;
     lua.globals()
-        .set("tasks", tasks_fn,)
-        .map_err(|e| anyhow!(e.to_string()),)?;
+        .set("tasks", tasks_fn)
+        .map_err(|e| anyhow!(e.to_string()))?;
 
     let envs_clone = environments_data.clone();
     let environments_fn = lua
         .create_function(move |lua, table: Table| {
-            let mut data = envs_clone.lock().expect("mutex poisoned",);
+            let mut data = envs_clone.lock().expect("mutex poisoned");
             for val in table.sequence_values::<Value>() {
-                let spec = lua.from_value::<EnvironmentSpec>(val?,)?;
-                data.push(spec,);
+                let spec = lua.from_value::<EnvironmentSpec>(val?)?;
+                data.push(spec);
             }
-            Ok((),)
-        },)
-        .map_err(|e| anyhow!(e.to_string()),)?;
+            Ok(())
+        })
+        .map_err(|e| anyhow!(e.to_string()))?;
     lua.globals()
-        .set("environments", environments_fn,)
-        .map_err(|e| anyhow!(e.to_string()),)?;
+        .set("environments", environments_fn)
+        .map_err(|e| anyhow!(e.to_string()))?;
 
-    lua.load(&content,)
+    lua.load(&content)
         .exec()
-        .map_err(|e| anyhow!("Failed to execute zoi.lua: {e}"),)?;
+        .map_err(|e| anyhow!("Failed to execute zoi.lua: {e}"))?;
 
-    let project_map = project_data.lock().expect("mutex poisoned",);
+    let project_map = project_data.lock().expect("mutex poisoned");
     let name = project_map
-        .get("name",)
-        .and_then(|v| v.as_str(),)
-        .map(std::string::ToString::to_string,)
-        .ok_or_else(|| anyhow!("zoi.lua must define project name"),)?;
+        .get("name")
+        .and_then(|v| v.as_str())
+        .map(std::string::ToString::to_string)
+        .ok_or_else(|| anyhow!("zoi.lua must define project name"))?;
 
     let local = project_map
-        .get("config",)
-        .and_then(|v| v.as_object(),)
-        .and_then(|obj| obj.get("local",),)
-        .and_then(serde_json::Value::as_bool,)
+        .get("config")
+        .and_then(|v| v.as_object())
+        .and_then(|obj| obj.get("local"))
+        .and_then(serde_json::Value::as_bool)
         .or_else(|| {
             project_map
-                .get("local",)
-                .and_then(serde_json::Value::as_bool,)
-        },)
-        .unwrap_or(false,);
+                .get("local")
+                .and_then(serde_json::Value::as_bool)
+        })
+        .unwrap_or(false);
 
     let mut pkgs = Vec::new();
-    let pkgs_v2 = packages_data.lock().expect("mutex poisoned",).clone();
-    for (k, spec,) in &pkgs_v2 {
+    let pkgs_v2 = packages_data.lock().expect("mutex poisoned").clone();
+    for (k, spec) in &pkgs_v2 {
         let mut s = k.clone();
-        if let Some(v,) = &spec.version {
+        if let Some(v) = &spec.version {
             s = format!("{s}@{v}");
         }
-        pkgs.push(s,);
+        pkgs.push(s);
     }
 
     Ok(ProjectConfig {
         name,
-        registries: registries_data.lock().expect("mutex poisoned",).clone(),
+        registries: registries_data.lock().expect("mutex poisoned").clone(),
         packages: Vec::new(),
         pkgs,
         pkgs_v2,
-        config: ProjectLocalConfig { local, },
-        commands: tasks_data.lock().expect("mutex poisoned",).clone(),
-        environments: environments_data
-            .lock()
-            .expect("mutex poisoned",)
-            .clone(),
-        shell: None,
-    },)
+        config: ProjectLocalConfig { local },
+        commands: tasks_data.lock().expect("mutex poisoned").clone(),
+        environments: environments_data.lock().expect("mutex poisoned").clone(),
+        shell: None
+    })
 }

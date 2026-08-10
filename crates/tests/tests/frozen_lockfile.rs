@@ -33,14 +33,14 @@ fn test_sources_from_lock_uses_packages_map() {
             installed_sub_packages: vec![],
             platform: "linux-amd64".to_string(),
             hash: "abc".to_string(),
-            dependencies: None,
-        },
+            dependencies: None
+        }
     );
     lock.installed_packages.insert(
         "@community/tools/fd:docs".to_string(),
         LockPackageDetailV2 {
             name: "fd".to_string(),
-            sub_package: Some("docs".to_string(),),
+            sub_package: Some("docs".to_string()),
             repo: "community/tools".to_string(),
             repo_type: "community".to_string(),
             version: "9.0.0".to_string(),
@@ -54,11 +54,11 @@ fn test_sources_from_lock_uses_packages_map() {
             installed_sub_packages: vec!["docs".to_string()],
             platform: "linux-amd64".to_string(),
             hash: "def".to_string(),
-            dependencies: None,
-        },
+            dependencies: None
+        }
     );
 
-    let mut sources = lockfile::sources_from_lock(&lock,);
+    let mut sources = lockfile::sources_from_lock(&lock);
     sources.sort();
 
     assert_eq!(sources.len(), 2);
@@ -100,9 +100,9 @@ fn test_locked_packages_preserve_direct_flags_and_metadata() {
             dependencies: Some(DependenciesV2 {
                 runtime: vec!["zoi:@core/lib@2.0.0".to_string()],
                 build: vec![],
-                test: vec![],
-            },),
-        },
+                test: vec![]
+            })
+        }
     );
     lock.installed_packages.insert(
         "@core/lib".to_string(),
@@ -122,17 +122,17 @@ fn test_locked_packages_preserve_direct_flags_and_metadata() {
             installed_sub_packages: vec![],
             platform: "linux-amd64".to_string(),
             hash: "def".to_string(),
-            dependencies: None,
-        },
+            dependencies: None
+        }
     );
 
-    let locked = lockfile::locked_packages(&lock,);
+    let locked = lockfile::locked_packages(&lock);
     assert_eq!(locked.len(), 2);
 
     let app = locked
         .iter()
-        .find(|entry| entry.source == "@core/app@1.0.0",)
-        .expect("app entry should exist",);
+        .find(|entry| entry.source == "@core/app@1.0.0")
+        .expect("app entry should exist");
     assert!(app.direct);
     assert_eq!(
         app.dependencies.as_ref().expect("unwrap failed").runtime,
@@ -141,29 +141,29 @@ fn test_locked_packages_preserve_direct_flags_and_metadata() {
 
     let lib = locked
         .iter()
-        .find(|entry| entry.source == "@core/lib@2.0.0",)
-        .expect("lib entry should exist",);
+        .find(|entry| entry.source == "@core/lib@2.0.0")
+        .expect("lib entry should exist");
     assert!(!lib.direct);
 }
 
 #[test]
 fn test_install_frozen_rejects_explicit_sources() {
     let plugin_manager =
-        PluginManager::new().expect("plugin manager should initialize",);
+        PluginManager::new().expect("plugin manager should initialize");
 
     let err = cmd::install::run(
-        &["hello".to_string(),],
+        &["hello".to_string()],
         None,
         false,
         false,
         true,
-        Some(InstallScope::Project,),
+        Some(InstallScope::Project),
         true,
         false,
         false,
         None,
         true,
-        Some(&plugin_manager,),
+        Some(&plugin_manager),
         false,
         true,
         false,
@@ -171,9 +171,9 @@ fn test_install_frozen_rejects_explicit_sources() {
         3,
         false,
         false,
-        None,
+        None
     )
-    .expect_err("frozen mode with explicit source must fail",);
+    .expect_err("frozen mode with explicit source must fail");
 
     assert!(
         err.to_string()
@@ -184,26 +184,26 @@ fn test_install_frozen_rejects_explicit_sources() {
 #[test]
 fn test_install_frozen_requires_zoi_lock() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("tempdir should be created",);
-    ctx.set_current_dir(tmp.path(),);
+    let tmp = tempdir().expect("tempdir should be created");
+    ctx.set_current_dir(tmp.path());
     std::fs::write(tmp.path().join("zoi.lua"), "project({ name = 'test' })\n")
         .expect("zoi.lua should be created");
 
     let plugin_manager =
-        PluginManager::new().expect("plugin manager should initialize",);
+        PluginManager::new().expect("plugin manager should initialize");
     let err = cmd::install::run(
         &[],
         None,
         false,
         false,
         true,
-        Some(InstallScope::Project,),
+        Some(InstallScope::Project),
         true,
         false,
         false,
         None,
         true,
-        Some(&plugin_manager,),
+        Some(&plugin_manager),
         false,
         true,
         false,
@@ -211,9 +211,9 @@ fn test_install_frozen_requires_zoi_lock() {
         3,
         false,
         false,
-        None,
+        None
     )
-    .expect_err("missing zoi.lock must fail in frozen mode",);
+    .expect_err("missing zoi.lock must fail in frozen mode");
 
     assert!(err.to_string().contains("--frozen requires zoi.lock"));
 }

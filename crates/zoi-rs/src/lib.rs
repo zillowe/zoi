@@ -40,25 +40,25 @@
 //! use anyhow::Result;
 //! use zoi::{Scope, install_package_with_options};
 //!
-//! fn main() -> Result<(),> {
+//! fn main() -> Result<()> {
 //!     let archive_path =
-//!         Path::new("path/to/your/package-1.0.0-linux-amd64.zpa",);
+//!         Path::new("path/to/your/package-1.0.0-linux-amd64.zpa");
 //!     let options = zoi::PackageInstallOptions {
-//!         scope_override: Some(Scope::User,),
+//!         scope_override: Some(Scope::User),
 //!         registry_handle: "local".to_string(),
 //!         yes: true,
 //!         ..Default::default()
 //!     };
 //!
 //!     let installed_files =
-//!         install_package_with_options(archive_path, &options,)?;
+//!         install_package_with_options(archive_path, &options)?;
 //!
 //!     println!(
 //!         "Package installed successfully. {} files were installed.",
 //!         installed_files.len()
 //!     );
 //!
-//!     Ok((),)
+//!     Ok(())
 //! }
 //! ```
 
@@ -71,19 +71,19 @@ pub use zoi_core::types::{self, Scope};
 pub use zoi_core::utils;
 
 /// Options for building a package from a `.pkg.lua` definition.
-#[derive(Debug, Clone,)]
-pub struct BuildOptions<'a,> {
+#[derive(Debug, Clone)]
+pub struct BuildOptions<'a> {
     /// Build type to use, such as `source` or `pre-compiled`.
-    pub build_type: Option<&'a str,>,
+    pub build_type: Option<&'a str>,
     /// Target platforms to build for. Use platform strings such as
     /// `linux-amd64`.
-    pub platforms: Vec<String,>,
+    pub platforms: Vec<String>,
     /// Optional PGP key name or fingerprint used to sign the output archive.
-    pub sign_key: Option<String,>,
+    pub sign_key: Option<String>,
     /// Optional directory to output the built package to.
-    pub output_dir: Option<PathBuf,>,
+    pub output_dir: Option<PathBuf>,
     /// Optional sub-packages to build.
-    pub sub_packages: Option<Vec<String,>,>,
+    pub sub_packages: Option<Vec<String>>,
     /// Whether to install build-time dependencies before building.
     pub install_deps: bool,
     /// Whether to run tests before building.
@@ -91,20 +91,20 @@ pub struct BuildOptions<'a,> {
     /// Build backend to use. Supported values are `native` and `docker`.
     pub method: &'a str,
     /// Docker image to use when `method` is `docker`.
-    pub image: Option<&'a str,>,
+    pub image: Option<&'a str>,
     /// Optional package version override.
-    pub version_override: Option<&'a str,>,
+    pub version_override: Option<&'a str>,
     /// Whether to force root ownership (UID/GID 0) in the built archive.
-    pub fakeroot: bool,
+    pub fakeroot: bool
 }
 
-impl Default for BuildOptions<'_,> {
+impl Default for BuildOptions<'_> {
     fn default() -> Self {
         Self {
             build_type: None,
             platforms: vec![
                 zoi_core::utils::get_platform()
-                    .unwrap_or_else(|_| "linux-amd64".to_string(),),
+                    .unwrap_or_else(|_| "linux-amd64".to_string()),
             ],
             sign_key: None,
             output_dir: None,
@@ -114,44 +114,44 @@ impl Default for BuildOptions<'_,> {
             method: "native",
             image: None,
             version_override: None,
-            fakeroot: false,
+            fakeroot: false
         }
     }
 }
 
 /// Options for installing a local `.zpa` archive.
-#[derive(Debug, Clone,)]
+#[derive(Debug, Clone)]
 pub struct PackageInstallOptions {
     /// Optional installation scope override.
-    pub scope_override: Option<Scope,>,
+    pub scope_override: Option<Scope>,
     /// Registry handle to record for the installed package. Use `local` for
     /// local archives.
     pub registry_handle: String,
     /// Automatically answer yes to prompts.
     pub yes: bool,
     /// Optional split-package names to install from the archive.
-    pub sub_packages: Option<Vec<String,>,>,
+    pub sub_packages: Option<Vec<String>>,
     /// Whether to create binary links for installed package binaries.
-    pub link_bins: bool,
+    pub link_bins: bool
 }
 
 impl Default for PackageInstallOptions {
     fn default() -> Self {
         Self {
-            scope_override: Some(Scope::User,),
+            scope_override: Some(Scope::User),
             registry_handle: "local".to_string(),
             yes: true,
             sub_packages: None,
-            link_bins: true,
+            link_bins: true
         }
     }
 }
 
 /// Options for installing one or more package source strings.
-#[derive(Debug, Clone, Default,)]
+#[derive(Debug, Clone, Default)]
 pub struct SourceInstallOptions {
     /// Optional git repository spec for `zoi install --repo`.
-    pub repo: Option<String,>,
+    pub repo: Option<String>,
     /// Force reinstalling packages that are already installed.
     pub force: bool,
     /// Accept all optional dependencies.
@@ -159,24 +159,24 @@ pub struct SourceInstallOptions {
     /// Automatically answer yes to prompts.
     pub yes: bool,
     /// Optional installation scope override.
-    pub scope_override: Option<Scope,>,
+    pub scope_override: Option<Scope>,
     /// Save requested packages to the current project's `zoi.yaml`.
     pub save: bool,
     /// Build type to use when building from source.
-    pub build_type: Option<String,>,
+    pub build_type: Option<String>,
     /// Print the install plan without performing the installation.
     pub dry_run: bool,
     /// Force building from source even when a prebuilt archive is available.
     pub build: bool,
     /// Enforce the current `zoi.lock` exactly for project installs.
-    pub frozen: bool,
+    pub frozen: bool
 }
 
 /// Options for resolving a dependency graph without installing packages.
-#[derive(Debug, Clone, Default,)]
+#[derive(Debug, Clone, Default)]
 pub struct DependencyResolutionOptions {
     /// Optional scope to use when resolving dependencies.
-    pub scope_override: Option<Scope,>,
+    pub scope_override: Option<Scope>,
     /// Include packages even when they appear to be installed already.
     pub force: bool,
     /// Automatically answer yes to resolver prompts.
@@ -184,45 +184,45 @@ pub struct DependencyResolutionOptions {
     /// Accept all optional dependencies.
     pub all_optional: bool,
     /// Build type used for selecting typed build dependencies.
-    pub build_type: Option<String,>,
+    pub build_type: Option<String>,
     /// Suppress non-essential resolver output.
-    pub quiet: bool,
+    pub quiet: bool
 }
 
 /// Result of resolving a single package source.
-#[derive(Debug, Clone,)]
+#[derive(Debug, Clone)]
 pub struct ResolvedPackage {
     /// Parsed package metadata.
     pub package: types::Package,
     /// Resolved package version.
     pub version: String,
     /// Portable manifest information suitable for lockfiles.
-    pub sharable_manifest: Option<types::SharableInstallManifest,>,
+    pub sharable_manifest: Option<types::SharableInstallManifest>,
     /// Local path to the resolved package definition.
     pub source_path: PathBuf,
     /// Registry handle, when the source came from a registry.
-    pub registry_handle: Option<String,>,
+    pub registry_handle: Option<String>,
     /// Registry repository type (official, community, etc.).
-    pub repo_type: Option<String,>,
+    pub repo_type: Option<String>,
     /// Git commit SHA, when the source came from a git repository.
-    pub git_sha: Option<String,>,
+    pub git_sha: Option<String>
 }
 
 /// Dependency graph resolution result.
-#[derive(Debug,)]
+#[derive(Debug)]
 pub struct DependencyResolution {
     /// Resolved Zoi package graph.
     pub graph: zoi_install::resolver::DependencyGraph,
     /// Dependencies handled by external package managers.
-    pub non_zoi_dependencies: Vec<String,>,
+    pub non_zoi_dependencies: Vec<String>
 }
 
 /// Converts a generic Zoi scope to a CLI-specific install scope.
-fn to_install_scope(scope: Scope,) -> zoi_cli::cli::InstallScope {
+fn to_install_scope(scope: Scope) -> zoi_cli::cli::InstallScope {
     match scope {
         Scope::User => zoi_cli::cli::InstallScope::User,
         Scope::System => zoi_cli::cli::InstallScope::System,
-        Scope::Project => zoi_cli::cli::InstallScope::Project,
+        Scope::Project => zoi_cli::cli::InstallScope::Project
     }
 }
 
@@ -234,8 +234,8 @@ fn to_install_scope(scope: Scope,) -> zoi_cli::cli::InstallScope {
 /// Returns an error if the build fails.
 pub fn build_with_options(
     package_file: &Path,
-    options: &BuildOptions<'_,>,
-) -> Result<(),> {
+    options: &BuildOptions<'_>
+) -> Result<()> {
     if options.install_deps {
         for platform in &options.platforms {
             let current_platform = if platform == "current" {
@@ -244,13 +244,13 @@ pub fn build_with_options(
                 platform.clone()
             };
 
-            if let Some(dep_strings,) =
+            if let Some(dep_strings) =
                 zoi_package::build::get_build_dependencies(
                     package_file,
                     options.build_type,
                     &current_platform,
                     options.version_override,
-                    false,
+                    false
                 )?
                 && !dep_strings.is_empty()
             {
@@ -259,10 +259,10 @@ pub fn build_with_options(
                     "::".bold().blue()
                 );
                 let processed =
-                    std::sync::Mutex::new(std::collections::HashSet::new(),);
+                    std::sync::Mutex::new(std::collections::HashSet::new());
                 let mut installed = Vec::new();
                 for dep_str in dep_strings {
-                    let dep = zoi_deps::parse_dependency_string(&dep_str,)?;
+                    let dep = zoi_deps::parse_dependency_string(&dep_str)?;
                     zoi_install::dep_install::install_dependency(
                         &dep,
                         "build",
@@ -271,7 +271,7 @@ pub fn build_with_options(
                         true,
                         &processed,
                         &mut installed,
-                        None,
+                        None
                     )?;
                 }
             }
@@ -291,7 +291,7 @@ pub fn build_with_options(
         options.image,
         options.fakeroot,
         options.install_deps,
-        options.test,
+        options.test
     )
 }
 
@@ -302,8 +302,8 @@ pub fn build_with_options(
 /// Returns an error if the installation fails.
 pub fn install_package_with_options(
     package_file: &Path,
-    options: &PackageInstallOptions,
-) -> Result<Vec<String,>,> {
+    options: &PackageInstallOptions
+) -> Result<Vec<String>> {
     zoi_install::pkg_install::run(
         package_file,
         options.scope_override,
@@ -312,7 +312,7 @@ pub fn install_package_with_options(
         options.yes,
         options.sub_packages.clone(),
         options.link_bins,
-        None,
+        None
     )
 }
 
@@ -326,14 +326,14 @@ pub fn install_package_with_options(
 /// Returns an error if the installation fails.
 pub fn install_sources(
     sources: &[String],
-    options: &SourceInstallOptions,
-) -> Result<(),> {
+    options: &SourceInstallOptions
+) -> Result<()> {
     let plugin_manager = if zoi_core::utils::is_mini_mode() {
         None
     } else {
         let pm = zoi_plugins::PluginManager::new()?;
-        let _ = pm.load_all(options.yes,);
-        Some(pm,)
+        let _ = pm.load_all(options.yes);
+        Some(pm)
     };
 
     let pm_ptr = plugin_manager.as_ref();
@@ -344,7 +344,7 @@ pub fn install_sources(
         options.force,
         options.all_optional,
         options.yes,
-        options.scope_override.map(to_install_scope,),
+        options.scope_override.map(to_install_scope),
         false,
         false,
         options.save,
@@ -358,7 +358,7 @@ pub fn install_sources(
         3,
         false,
         false,
-        None,
+        None
     )
 }
 
@@ -373,8 +373,8 @@ pub fn install_sources(
 pub fn update_packages(
     all: bool,
     package_names: &[String],
-    yes: bool,
-) -> Result<(),> {
+    yes: bool
+) -> Result<()> {
     zoi_cli::cmd::update::run(
         all,
         package_names,
@@ -382,7 +382,7 @@ pub fn update_packages(
         false,
         false,
         false,
-        false,
+        false
     )
 }
 
@@ -391,7 +391,7 @@ pub fn update_packages(
 /// # Errors
 ///
 /// Returns an error if resolution fails.
-pub fn resolve_package(source: &str, yes: bool,) -> Result<ResolvedPackage,> {
+pub fn resolve_package(source: &str, yes: bool) -> Result<ResolvedPackage> {
     let (
         package,
         version,
@@ -399,9 +399,9 @@ pub fn resolve_package(source: &str, yes: bool,) -> Result<ResolvedPackage,> {
         source_path,
         registry_handle,
         repo_type,
-        git_sha,
+        git_sha
     ) = zoi_resolver::resolve::resolve_package_and_version(
-        source, None, true, yes,
+        source, None, true, yes
     )?;
     Ok(ResolvedPackage {
         package,
@@ -410,8 +410,8 @@ pub fn resolve_package(source: &str, yes: bool,) -> Result<ResolvedPackage,> {
         source_path,
         registry_handle,
         repo_type,
-        git_sha,
-    },)
+        git_sha
+    })
 }
 
 /// Resolves the dependency graph for one or more package sources.
@@ -421,9 +421,9 @@ pub fn resolve_package(source: &str, yes: bool,) -> Result<ResolvedPackage,> {
 /// Returns an error if resolution fails.
 pub fn resolve_dependency_graph(
     sources: &[String],
-    options: &DependencyResolutionOptions,
-) -> Result<DependencyResolution,> {
-    let (graph, non_zoi_dependencies,) =
+    options: &DependencyResolutionOptions
+) -> Result<DependencyResolution> {
+    let (graph, non_zoi_dependencies) =
         zoi_install::resolver::resolve_dependency_graph(
             sources,
             options.scope_override,
@@ -432,12 +432,12 @@ pub fn resolve_dependency_graph(
             options.all_optional,
             options.build_type.as_deref(),
             options.quiet,
-            None,
+            None
         )?;
     Ok(DependencyResolution {
         graph,
-        non_zoi_dependencies,
-    },)
+        non_zoi_dependencies
+    })
 }
 
 /// Bundles a Zoi package and its local assets into a `.zsa` archive.
@@ -450,17 +450,17 @@ pub fn resolve_dependency_graph(
 /// Returns an error if bundling fails.
 pub fn bundle_package(
     package_file: &Path,
-    output_dir: Option<&Path,>,
-    sign: Option<String,>,
-    version_override: Option<&str,>,
-    build_type: Option<&str,>,
-) -> Result<(),> {
+    output_dir: Option<&Path>,
+    sign: Option<String>,
+    version_override: Option<&str>,
+    build_type: Option<&str>
+) -> Result<()> {
     zoi_package::bundle::run(
         package_file,
         output_dir,
         sign,
         version_override,
-        build_type,
+        build_type
     )
 }
 
@@ -491,33 +491,33 @@ pub fn bundle_package(
 /// use anyhow::Result;
 /// use zoi::build;
 ///
-/// fn main() -> Result<(),> {
-///     let package_file = Path::new("my-package.pkg.lua",);
+/// fn main() -> Result<()> {
+///     let package_file = Path::new("my-package.pkg.lua");
 ///     let platforms = vec!["linux-amd64".to_string()];
 ///     build(
 ///         package_file,
-///         Some("source",),
+///         Some("source"),
 ///         &platforms,
 ///         None,
 ///         true,
 ///         "native",
 ///         None,
-///         None,
+///         None
 ///     )?;
 ///     println!("Package built successfully!");
-///     Ok((),)
+///     Ok(())
 /// }
 /// ```
 pub fn build(
     package_file: &Path,
-    build_type: Option<&str,>,
+    build_type: Option<&str>,
     platforms: &[String],
-    sign_key: Option<String,>,
+    sign_key: Option<String>,
     install_deps: bool,
     method: &str,
-    image: Option<&str,>,
-    version_override: Option<&str,>,
-) -> Result<(),> {
+    image: Option<&str>,
+    version_override: Option<&str>
+) -> Result<()> {
     let options = BuildOptions {
         build_type,
         platforms: platforms.to_vec(),
@@ -529,9 +529,9 @@ pub fn build(
         method,
         image,
         version_override,
-        fakeroot: false,
+        fakeroot: false
     };
-    build_with_options(package_file, &options,)
+    build_with_options(package_file, &options)
 }
 
 /// Installs a Zoi package from a local package archive.
@@ -564,9 +564,10 @@ pub fn build(
 /// # Examples
 ///
 /// ```no_run
-/// use zoi::{install_package, Scope};
 /// use std::path::Path;
+///
 /// use anyhow::Result;
+/// use zoi::{Scope, install_package};
 ///
 /// fn main() -> Result<()> {
 ///     let archive_path = Path::new("my-package-1.0.0-linux-amd64.zpa");
@@ -577,19 +578,19 @@ pub fn build(
 /// ```
 pub fn install_package(
     package_file: &Path,
-    scope_override: Option<Scope,>,
+    scope_override: Option<Scope>,
     registry_handle: &str,
     yes: bool,
-    sub_packages: Option<Vec<String,>,>,
-) -> Result<Vec<String,>,> {
+    sub_packages: Option<Vec<String>>
+) -> Result<Vec<String>> {
     let options = PackageInstallOptions {
         scope_override,
         registry_handle: registry_handle.to_string(),
         yes,
         sub_packages,
-        link_bins: true,
+        link_bins: true
     };
-    install_package_with_options(package_file, &options,)
+    install_package_with_options(package_file, &options)
 }
 
 /// Uninstalls a Zoi package.
@@ -616,16 +617,16 @@ pub fn install_package(
 /// use anyhow::Result;
 /// use zoi::{Scope, uninstall_package};
 ///
-/// fn main() -> Result<(),> {
-///     uninstall_package("my-package", Some(Scope::User,),)?;
+/// fn main() -> Result<()> {
+///     uninstall_package("my-package", Some(Scope::User))?;
 ///     println!("Package uninstalled!");
-///     Ok((),)
+///     Ok(())
 /// }
 /// ```
 pub fn uninstall_package(
     package_name: &str,
-    scope_override: Option<Scope,>,
-) -> Result<(),> {
-    zoi_uninstall::run(package_name, scope_override, false, false, false,)
-        .map(|_| (),)
+    scope_override: Option<Scope>
+) -> Result<()> {
+    zoi_uninstall::run(package_name, scope_override, false, false, false)
+        .map(|_| ())
 }

@@ -6,7 +6,7 @@ use anyhow::Result;
 use walkdir::WalkDir;
 use zoi_core::hash::{HashAlgorithm, calculate_file_hash};
 use zoi_core::types::{
-    MappedDir, MappedFile, MappedSymlink, PoolFileEntry, ScopeMapping,
+    MappedDir, MappedFile, MappedSymlink, PoolFileEntry, ScopeMapping
 };
 
 /// Deduplicates and pools files from a staging directory into a central pool.
@@ -26,73 +26,73 @@ use zoi_core::types::{
 pub fn pool_files(
     virtual_staging_dir: &Path,
     pool_dir: &Path,
-    pool: &mut BTreeMap<String, PoolFileEntry,>,
+    pool: &mut BTreeMap<String, PoolFileEntry>,
     scope_mapping: &mut ScopeMapping,
-    fakeroot: bool,
-) -> Result<(),> {
+    fakeroot: bool
+) -> Result<()> {
     #[cfg(not(unix))]
     let _ = fakeroot;
 
     if !virtual_staging_dir.exists() {
-        return Ok((),);
+        return Ok(());
     }
 
-    for entry in WalkDir::new(virtual_staging_dir,).min_depth(1,) {
+    for entry in WalkDir::new(virtual_staging_dir).min_depth(1) {
         let entry = entry?;
         let path = entry.path();
-        let metadata = fs::symlink_metadata(path,)?;
-        let rel_path = path.strip_prefix(virtual_staging_dir,)?;
+        let metadata = fs::symlink_metadata(path)?;
+        let rel_path = path.strip_prefix(virtual_staging_dir)?;
         let rel_path_str = rel_path.to_string_lossy().to_string();
 
         // Determine destination placeholder based on top-level directory
-        let (dest_prefix, dest_rel,) = if let Some(stripped,) =
-            rel_path_str.strip_prefix("pkgstore/",)
+        let (dest_prefix, dest_rel) = if let Some(stripped) =
+            rel_path_str.strip_prefix("pkgstore/")
         {
-            ("${pkgstore}", stripped,)
-        } else if let Some(stripped,) = rel_path_str.strip_prefix("usrroot/",) {
-            ("${usrroot}", stripped,)
-        } else if let Some(stripped,) = rel_path_str.strip_prefix("usrhome/",) {
-            ("${usrhome}", stripped,)
-        } else if let Some(stripped,) =
-            rel_path_str.strip_prefix("createpkgdir/",)
+            ("${pkgstore}", stripped)
+        } else if let Some(stripped) = rel_path_str.strip_prefix("usrroot/") {
+            ("${usrroot}", stripped)
+        } else if let Some(stripped) = rel_path_str.strip_prefix("usrhome/") {
+            ("${usrhome}", stripped)
+        } else if let Some(stripped) =
+            rel_path_str.strip_prefix("createpkgdir/")
         {
-            ("${createpkgdir}", stripped,)
+            ("${createpkgdir}", stripped)
         } else {
             // Fallback for direct writes to staging dir
-            ("${pkgstore}", rel_path_str.as_str(),)
+            ("${pkgstore}", rel_path_str.as_str())
         };
 
         let dest = format!("{dest_prefix}/{}", dest_rel.replace('\\', "/"));
 
         #[cfg(unix)]
-        let (owner, group,) = {
+        let (owner, group) = {
             if fakeroot {
-                (Some("root".to_string(),), Some("root".to_string(),),)
+                (Some("root".to_string()), Some("root".to_string()))
             } else {
                 use std::os::unix::fs::MetadataExt;
 
                 use nix::unistd::{Gid, Group, Uid, User};
                 let uid = metadata.uid();
                 let gid = metadata.gid();
-                let owner = User::from_uid(Uid::from_raw(uid,),)
+                let owner = User::from_uid(Uid::from_raw(uid))
                     .ok()
                     .flatten()
-                    .map(|u| u.name,);
-                let group = Group::from_gid(Gid::from_raw(gid,),)
+                    .map(|u| u.name);
+                let group = Group::from_gid(Gid::from_raw(gid))
                     .ok()
                     .flatten()
-                    .map(|g| g.name,);
-                (owner, group,)
+                    .map(|g| g.name);
+                (owner, group)
             }
         };
         #[cfg(not(unix))]
-        let (owner, group,) = (None, None,);
+        let (owner, group) = (None, None);
 
         if metadata.is_dir() {
             #[cfg(unix)]
             let mode = {
                 use std::os::unix::fs::PermissionsExt;
-                Some(metadata.permissions().mode() & 0o777,)
+                Some(metadata.permissions().mode() & 0o777)
             };
             #[cfg(not(unix))]
             let mode = None;
@@ -101,10 +101,10 @@ pub fn pool_files(
                 path: dest,
                 mode,
                 owner,
-                group,
-            },);
+                group
+            });
         } else if metadata.is_symlink() {
-            let target = fs::read_link(path,)?;
+            let target = fs::read_link(path)?;
             let target_str = target.to_string_lossy().to_string();
 
             // If target starts with virtual_staging_dir, make it relative to
@@ -114,22 +114,22 @@ pub fn pool_files(
 
             scope_mapping.symlinks.push(MappedSymlink {
                 link: dest,
-                target: target_str.replace('\\', "/",),
-            },);
+                target: target_str.replace('\\', "/")
+            });
         } else {
-            let hash = calculate_file_hash(path, HashAlgorithm::Sha256,)?;
+            let hash = calculate_file_hash(path, HashAlgorithm::Sha256)?;
             let hash_key = format!("sha256-{hash}");
 
-            if !pool.contains_key(&hash_key,) {
-                let pool_path = pool_dir.join(&hash_key,);
+            if !pool.contains_key(&hash_key) {
+                let pool_path = pool_dir.join(&hash_key);
                 if !pool_path.exists() {
-                    fs::copy(path, pool_path,)?;
+                    fs::copy(path, pool_path)?;
                 }
                 pool.insert(
                     hash_key.clone(),
                     PoolFileEntry {
-                        size: metadata.len(),
-                    },
+                        size: metadata.len()
+                    }
                 );
             }
 
@@ -146,10 +146,10 @@ pub fn pool_files(
                 hash: hash_key,
                 mode,
                 owner,
-                group,
-            },);
+                group
+            });
         }
     }
 
-    Ok((),)
+    Ok(())
 }

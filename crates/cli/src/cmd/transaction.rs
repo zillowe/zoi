@@ -8,8 +8,8 @@ use comfy_table::{ContentArrangement, Table};
 use crate::pkg::{local, transaction, types};
 
 /// Returns the source of the installed manifest.
-fn manifest_source(manifest: &types::InstallManifest,) -> String {
-    local::installed_manifest_source(manifest,)
+fn manifest_source(manifest: &types::InstallManifest) -> String {
+    local::installed_manifest_source(manifest)
 }
 
 /// List all transaction logs.
@@ -17,29 +17,29 @@ fn manifest_source(manifest: &types::InstallManifest,) -> String {
 /// # Errors
 ///
 /// Returns an error if the transaction list cannot be retrieved.
-pub fn list() -> Result<(),> {
+pub fn list() -> Result<()> {
     let transactions = transaction::list_transactions()?;
     if transactions.is_empty() {
         println!("No transaction logs found.");
-        return Ok((),);
+        return Ok(());
     }
 
     let mut table = Table::new();
     table
-        .load_preset(UTF8_FULL,)
-        .set_content_arrangement(ContentArrangement::Dynamic,)
-        .set_header(vec!["ID", "Started", "Operations"],);
+        .load_preset(UTF8_FULL)
+        .set_content_arrangement(ContentArrangement::Dynamic)
+        .set_header(vec!["ID", "Started", "Operations"]);
 
     for entry in transactions {
         table.add_row(vec![
             entry.id,
             entry.start_time,
             entry.operation_count.to_string(),
-        ],);
+        ]);
     }
 
     println!("{table}");
-    Ok((),)
+    Ok(())
 }
 
 /// List modified files for a specific transaction.
@@ -48,15 +48,15 @@ pub fn list() -> Result<(),> {
 ///
 /// Returns an error if the modified files for the given transaction ID cannot
 /// be retrieved.
-pub fn files(transaction_id: &str,) -> Result<(),> {
-    let mut modified_files = transaction::get_modified_files(transaction_id,)?;
+pub fn files(transaction_id: &str) -> Result<()> {
+    let mut modified_files = transaction::get_modified_files(transaction_id)?;
     modified_files.sort();
 
     if modified_files.is_empty() {
         println!(
             "No modified files recorded for transaction '{transaction_id}'."
         );
-        return Ok((),);
+        return Ok(());
     }
 
     println!(
@@ -67,7 +67,7 @@ pub fn files(transaction_id: &str,) -> Result<(),> {
     for path in modified_files {
         println!("  - {path}");
     }
-    Ok((),)
+    Ok(())
 }
 
 /// Show details for a specific transaction.
@@ -75,8 +75,8 @@ pub fn files(transaction_id: &str,) -> Result<(),> {
 /// # Errors
 ///
 /// Returns an error if the transaction with the given ID cannot be read.
-pub fn show(transaction_id: &str,) -> Result<(),> {
-    let transaction = transaction::read_transaction(transaction_id,)?;
+pub fn show(transaction_id: &str) -> Result<()> {
+    let transaction = transaction::read_transaction(transaction_id)?;
 
     println!(
         "{} Transaction {}",
@@ -86,16 +86,16 @@ pub fn show(transaction_id: &str,) -> Result<(),> {
     println!("Started: {}", transaction.start_time);
     println!("Operations: {}", transaction.operations.len());
 
-    for (index, operation,) in transaction.operations.iter().enumerate() {
+    for (index, operation) in transaction.operations.iter().enumerate() {
         match operation {
-            types::TransactionOperation::Install { manifest, } => {
+            types::TransactionOperation::Install { manifest } => {
                 println!(
                     "{}. install {}",
                     index + 1,
                     manifest_source(manifest).green()
                 );
             }
-            types::TransactionOperation::Uninstall { manifest, } => {
+            types::TransactionOperation::Uninstall { manifest } => {
                 println!(
                     "{}. uninstall {}",
                     index + 1,
@@ -104,7 +104,7 @@ pub fn show(transaction_id: &str,) -> Result<(),> {
             }
             types::TransactionOperation::Upgrade {
                 old_manifest,
-                new_manifest,
+                new_manifest
             } => {
                 println!(
                     "{}. upgrade {} -> {}",
@@ -116,5 +116,5 @@ pub fn show(transaction_id: &str,) -> Result<(),> {
         }
     }
 
-    Ok((),)
+    Ok(())
 }

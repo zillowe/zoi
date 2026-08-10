@@ -9,7 +9,7 @@ mod common;
 
 #[test]
 fn test_parse_source_string_basic() {
-    let req = resolve::parse_source_string("hello",).expect("unwrap failed",);
+    let req = resolve::parse_source_string("hello").expect("unwrap failed");
     assert_eq!(req.name, "hello");
     assert_eq!(req.repo, None);
     assert_eq!(req.handle, None);
@@ -18,8 +18,8 @@ fn test_parse_source_string_basic() {
 
 #[test]
 fn test_parse_source_string_repo() {
-    let req = resolve::parse_source_string("@community/hello",)
-        .expect("unwrap failed",);
+    let req = resolve::parse_source_string("@community/hello")
+        .expect("unwrap failed");
     assert_eq!(req.name, "hello");
     assert_eq!(req.repo, Some("community".to_string()));
     assert_eq!(req.handle, None);
@@ -27,8 +27,8 @@ fn test_parse_source_string_repo() {
 
 #[test]
 fn test_parse_source_string_handle() {
-    let req = resolve::parse_source_string("#zoidberg@core/hello",)
-        .expect("unwrap failed",);
+    let req = resolve::parse_source_string("#zoidberg@core/hello")
+        .expect("unwrap failed");
     assert_eq!(req.name, "hello");
     assert_eq!(req.repo, Some("core".to_string()));
     assert_eq!(req.handle, Some("zoidberg".to_string()));
@@ -37,7 +37,7 @@ fn test_parse_source_string_handle() {
 #[test]
 fn test_parse_source_string_version() {
     let req =
-        resolve::parse_source_string("hello@1.2.3",).expect("unwrap failed",);
+        resolve::parse_source_string("hello@1.2.3").expect("unwrap failed");
     assert_eq!(req.name, "hello");
     assert_eq!(req.version_spec, Some("1.2.3".to_string()));
 }
@@ -45,15 +45,15 @@ fn test_parse_source_string_version() {
 #[test]
 fn test_parse_source_string_subpackage() {
     let req =
-        resolve::parse_source_string("linux:headers",).expect("unwrap failed",);
+        resolve::parse_source_string("linux:headers").expect("unwrap failed");
     assert_eq!(req.name, "linux");
     assert_eq!(req.sub_package, Some("headers".to_string()));
 }
 
 #[test]
 fn test_parse_source_string_complex() {
-    let req = resolve::parse_source_string("#my-reg@extra/pkg:sub@v2.0.0",)
-        .expect("unwrap failed",);
+    let req = resolve::parse_source_string("#my-reg@extra/pkg:sub@v2.0.0")
+        .expect("unwrap failed");
     assert_eq!(req.handle, Some("my-reg".to_string()));
     assert_eq!(req.repo, Some("extra".to_string()));
     assert_eq!(req.name, "pkg");
@@ -63,8 +63,8 @@ fn test_parse_source_string_complex() {
 
 #[test]
 fn test_parse_source_string_local_file_with_relative_prefix() {
-    let req = resolve::parse_source_string("./athas.pkg.lua",)
-        .expect("unwrap failed",);
+    let req =
+        resolve::parse_source_string("./athas.pkg.lua").expect("unwrap failed");
     assert_eq!(req.name, "athas");
     assert_eq!(req.repo, None);
     assert_eq!(req.handle, None);
@@ -73,8 +73,8 @@ fn test_parse_source_string_local_file_with_relative_prefix() {
 
 #[test]
 fn test_parse_source_string_local_file_with_version_and_subpackage() {
-    let req = resolve::parse_source_string("athas.pkg.lua:dev@1.2.3",)
-        .expect("unwrap failed",);
+    let req = resolve::parse_source_string("athas.pkg.lua:dev@1.2.3")
+        .expect("unwrap failed");
     assert_eq!(req.name, "athas");
     assert_eq!(req.sub_package, Some("dev".to_string()));
     assert_eq!(req.version_spec, Some("1.2.3".to_string()));
@@ -82,8 +82,8 @@ fn test_parse_source_string_local_file_with_version_and_subpackage() {
 
 #[test]
 fn test_parse_source_string_nested_local_file_with_version() {
-    let req = resolve::parse_source_string("tests/assets/test.pkg.lua@1.0.0",)
-        .expect("unwrap failed",);
+    let req = resolve::parse_source_string("tests/assets/test.pkg.lua@1.0.0")
+        .expect("unwrap failed");
     assert_eq!(req.name, "test");
     assert_eq!(req.sub_package, None);
     assert_eq!(req.version_spec, Some("1.0.0".to_string()));
@@ -95,9 +95,9 @@ fn test_resolve_requested_version_spec_local_channel_stable() {
         "tests/assets/test_channels.pkg.lua@stable",
         None,
         true,
-        true,
+        true
     )
-    .expect("unwrap failed",);
+    .expect("unwrap failed");
     assert_eq!(version, Some("1.0.0".to_string()));
 }
 
@@ -107,56 +107,56 @@ fn test_resolve_requested_version_spec_local_channel_alpha() {
         "tests/assets/test_channels.pkg.lua@alpha",
         None,
         true,
-        true,
+        true
     )
-    .expect("unwrap failed",);
+    .expect("unwrap failed");
     assert_eq!(version, Some("1.1.0-alpha".to_string()));
 }
 
 #[test]
 fn test_resolve_package_defaults_deterministically_without_stable() {
-    let (_, version, _, _, _, _, _,) = resolve::resolve_package_and_version(
+    let (_, version, _, _, _, _, _) = resolve::resolve_package_and_version(
         "tests/assets/test_no_stable.pkg.lua",
         None,
         true,
-        true,
+        true
     )
-    .expect("package should resolve",);
+    .expect("package should resolve");
     assert_eq!(version, "1.0.0-alpha".to_string());
 }
 
 #[test]
 fn test_resolve_requested_version_spec_registry_channel_and_exact() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("tempdir should be created",);
+    let tmp = tempdir().expect("tempdir should be created");
     let root = tmp.path().to_path_buf();
-    let home = root.join("home",);
-    fs::create_dir_all(&home,).expect("home should be created",);
+    let home = root.join("home");
+    fs::create_dir_all(&home).expect("home should be created");
 
-    let db_dir = root.join("db",);
-    ctx.set_env_var("HOME", &home,);
-    ctx.set_env_var("ZOI_DB_DIR", &db_dir,);
-    common::TestContextGuard::set_sysroot(root.clone(),);
+    let db_dir = root.join("db");
+    ctx.set_env_var("HOME", &home);
+    ctx.set_env_var("ZOI_DB_DIR", &db_dir);
+    common::TestContextGuard::set_sysroot(root.clone());
 
     let cfg = types::Config {
         default_registry: Some(types::Registry {
             handle: "testreg".to_string(),
             url: "https://example.invalid/testreg.git".to_string(),
             advisory_prefix: None,
-            authorities: None,
-        },),
+            authorities: None
+        }),
         repos: vec!["core".to_string()],
         ..Default::default()
     };
-    config::write_user_config(&cfg,).expect("config should write",);
+    config::write_user_config(&cfg).expect("config should write");
 
     let pkg_dir = db_dir
-        .join("testreg",)
-        .join("core",)
-        .join("registry-channels",);
-    fs::create_dir_all(&pkg_dir,).expect("pkg dir should be created",);
+        .join("testreg")
+        .join("core")
+        .join("registry-channels");
+    fs::create_dir_all(&pkg_dir).expect("pkg dir should be created");
     fs::write(
-        pkg_dir.join("registry-channels.pkg.lua",),
+        pkg_dir.join("registry-channels.pkg.lua"),
         r#"metadata({
   name = "registry-channels",
   repo = "core",
@@ -167,34 +167,34 @@ fn test_resolve_requested_version_spec_registry_channel_and_exact() {
   description = "Registry channel test",
   maintainer = { name = "Zoi", email = "zoi@example.com" },
   types = { "source" },
-})"#,
+})"#
     )
-    .expect("pkg.lua should write",);
+    .expect("pkg.lua should write");
 
     let stable = resolve::resolve_requested_version_spec(
         "registry-channels@stable",
         None,
         true,
-        true,
+        true
     )
-    .expect("stable should resolve",);
+    .expect("stable should resolve");
     assert_eq!(stable, Some("4.0.0".to_string()));
 
     let alpha = resolve::resolve_requested_version_spec(
         "registry-channels@alpha",
         None,
         true,
-        true,
+        true
     )
-    .expect("alpha should resolve",);
+    .expect("alpha should resolve");
     assert_eq!(alpha, Some("4.1.0-alpha".to_string()));
 
     let exact = resolve::resolve_requested_version_spec(
         "registry-channels@4.0.0",
         None,
         true,
-        true,
+        true
     )
-    .expect("exact should resolve",);
+    .expect("exact should resolve");
     assert_eq!(exact, Some("4.0.0".to_string()));
 }

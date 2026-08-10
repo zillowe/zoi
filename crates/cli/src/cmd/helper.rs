@@ -7,36 +7,36 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 /// The root helper command.
-#[derive(Parser, Debug,)]
+#[derive(Parser, Debug)]
 pub struct HelperCommand {
     /// The specific helper subcommand to execute.
     #[command(subcommand)]
-    pub command: HelperCommands,
+    pub command: HelperCommands
 }
 
 /// Available helper subcommands.
-#[derive(Subcommand, Debug,)]
+#[derive(Subcommand, Debug)]
 pub enum HelperCommands {
     /// Get a hash of a local file or a file from a URL
-    GetHash(GetHashCommand,),
+    GetHash(GetHashCommand),
 
     /// Validate a Zoi specification file (e.g. registries.json, repo.yaml,
     /// advisories.json)
     #[command(alias = "val")]
-    Validate(ValidateCommand,),
+    Validate(ValidateCommand),
 
     /// Internal: Perform escalated installation of a package node (requires
     /// root)
     #[command(hide = true)]
-    ElevateInstallNode(ElevateInstallNodeCommand,),
+    ElevateInstallNode(ElevateInstallNodeCommand),
 
     /// Internal: Perform escalated uninstallation of a package (requires root)
     #[command(hide = true)]
-    ElevateUninstall(ElevateUninstallCommand,),
+    ElevateUninstall(ElevateUninstallCommand)
 }
 
 /// Arguments for the escalated install-node command.
-#[derive(Parser, Debug,)]
+#[derive(Parser, Debug)]
 pub struct ElevateInstallNodeCommand {
     /// Path to the JSON file containing the serialized `InstallNode`
     #[arg(long)]
@@ -52,22 +52,22 @@ pub struct ElevateInstallNodeCommand {
     pub yes: bool,
     /// Whether to create shims for binaries
     #[arg(long)]
-    pub link_bins: bool,
+    pub link_bins: bool
 }
 
 /// Arguments for the escalated uninstall command.
-#[derive(Parser, Debug,)]
+#[derive(Parser, Debug)]
 pub struct ElevateUninstallCommand {
     /// Path to the JSON file containing the serialized `InstallManifest`
     #[arg(long)]
     pub manifest_json: std::path::PathBuf,
     /// Automatically answer yes to prompts
     #[arg(long)]
-    pub yes: bool,
+    pub yes: bool
 }
 
 /// Arguments for the get-hash command.
-#[derive(Parser, Debug,)]
+#[derive(Parser, Debug)]
 pub struct GetHashCommand {
     /// The local file path or URL to hash
     #[arg(required = true)]
@@ -75,24 +75,24 @@ pub struct GetHashCommand {
 
     /// The hash algorithm to use
     #[arg(long, value_enum, default_value = "sha512")]
-    pub hash: HashAlgorithm,
+    pub hash: HashAlgorithm
 }
 
 /// Arguments for the validate command.
-#[derive(Parser, Debug,)]
+#[derive(Parser, Debug)]
 pub struct ValidateCommand {
     /// The local file path to validate
     #[arg(required = true)]
-    pub file: std::path::PathBuf,
+    pub file: std::path::PathBuf
 }
 
 /// Supported hash algorithms for the get-hash command.
-#[derive(clap::ValueEnum, Clone, Debug, Copy,)]
+#[derive(clap::ValueEnum, Clone, Debug, Copy)]
 pub enum HashAlgorithm {
     /// SHA-512 algorithm.
     Sha512,
     /// SHA-256 algorithm.
-    Sha256,
+    Sha256
 }
 
 /// Run the helper command.
@@ -100,25 +100,25 @@ pub enum HashAlgorithm {
 /// # Errors
 ///
 /// Returns an error if any of the subcommands fail.
-pub fn run(args: HelperCommand,) -> Result<(),> {
+pub fn run(args: HelperCommand) -> Result<()> {
     match args.command {
-        HelperCommands::GetHash(cmd,) => {
+        HelperCommands::GetHash(cmd) => {
             let hash_type = match cmd.hash {
                 HashAlgorithm::Sha512 => crate::pkg::helper::HashType::Sha512,
-                HashAlgorithm::Sha256 => crate::pkg::helper::HashType::Sha256,
+                HashAlgorithm::Sha256 => crate::pkg::helper::HashType::Sha256
             };
-            let hash = crate::pkg::helper::get_hash(&cmd.source, hash_type,)?;
+            let hash = crate::pkg::helper::get_hash(&cmd.source, hash_type)?;
             println!("{hash}");
-            Ok((),)
+            Ok(())
         }
-        HelperCommands::Validate(cmd,) => {
-            crate::pkg::helper::validate::run(&cmd.file,)
+        HelperCommands::Validate(cmd) => {
+            crate::pkg::helper::validate::run(&cmd.file)
         }
-        HelperCommands::ElevateInstallNode(cmd,) => {
-            crate::pkg::helper::elevate_install_node(&cmd,)
+        HelperCommands::ElevateInstallNode(cmd) => {
+            crate::pkg::helper::elevate_install_node(&cmd)
         }
-        HelperCommands::ElevateUninstall(cmd,) => {
-            crate::pkg::helper::elevate_uninstall(&cmd,)
+        HelperCommands::ElevateUninstall(cmd) => {
+            crate::pkg::helper::elevate_uninstall(&cmd)
         }
     }
 }

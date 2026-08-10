@@ -10,7 +10,7 @@ use zoi::pkg::{config, types};
 
 mod common;
 
-fn test_manifest(name: &str, version: &str,) -> InstallManifest {
+fn test_manifest(name: &str, version: &str) -> InstallManifest {
     InstallManifest {
         name: name.to_string(),
         version: version.to_string(),
@@ -33,19 +33,19 @@ fn test_manifest(name: &str, version: &str,) -> InstallManifest {
         dependencies_v2: None,
         chosen_options: vec![],
         chosen_optionals: vec![],
-        install_method: Some("pre-compiled".to_string(),),
+        install_method: Some("pre-compiled".to_string()),
         platform: zoi_core::utils::get_platform().unwrap_or_default(),
         service: None,
         installed_files: vec![],
         installed_size: None,
         sandbox: None,
-        completions: None,
+        completions: None
     }
 }
 
 #[test]
 fn test_audit_entry_serialization() {
-    let manifest = test_manifest("audit-test", "2.0.0",);
+    let manifest = test_manifest("audit-test", "2.0.0");
 
     let entry = AuditEntry {
         timestamp: Utc::now(),
@@ -56,10 +56,10 @@ fn test_audit_entry_serialization() {
         repo: manifest.repo.clone(),
         package_type: manifest.package_type,
         scope: manifest.scope,
-        registry: manifest.registry_handle.clone(),
+        registry: manifest.registry_handle.clone()
     };
 
-    let json = serde_json::to_string(&entry,).expect("unwrap failed",);
+    let json = serde_json::to_string(&entry).expect("unwrap failed");
     assert!(json.contains("audit-test"));
     assert!(json.contains("test-user"));
     assert!(json.contains("Install"));
@@ -68,47 +68,47 @@ fn test_audit_entry_serialization() {
 #[test]
 fn test_audit_hash_chain_verification_and_tamper_detection() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("tempdir should be created",);
-    ctx.set_env_var("HOME", tmp.path(),);
+    let tmp = tempdir().expect("tempdir should be created");
+    ctx.set_env_var("HOME", tmp.path());
 
     let cfg = types::Config {
         audit_log_enabled: true,
         ..Default::default()
     };
-    config::write_user_config(&cfg,).expect("config should be written",);
+    config::write_user_config(&cfg).expect("config should be written");
 
-    let manifest_a = test_manifest("audit-a", "1.0.0",);
-    let manifest_b = test_manifest("audit-b", "1.1.0",);
+    let manifest_a = test_manifest("audit-a", "1.0.0");
+    let manifest_b = test_manifest("audit-b", "1.1.0");
 
-    audit::log_event(AuditAction::Install, &manifest_a,)
-        .expect("audit entry A should be logged",);
-    audit::log_event(AuditAction::Upgrade, &manifest_b,)
-        .expect("audit entry B should be logged",);
+    audit::log_event(AuditAction::Install, &manifest_a)
+        .expect("audit entry A should be logged");
+    audit::log_event(AuditAction::Upgrade, &manifest_b)
+        .expect("audit entry B should be logged");
 
     let report =
-        audit::verify_chain().expect("audit chain should be verifiable",);
+        audit::verify_chain().expect("audit chain should be verifiable");
     assert!(report.valid, "expected valid chain: {}", report.message);
     assert_eq!(report.total_entries, 2);
     assert_eq!(report.hashed_entries, 2);
 
-    let log_path = tmp.path().join(".zoi",).join("audit.json",);
+    let log_path = tmp.path().join(".zoi").join("audit.json");
     let content =
-        fs::read_to_string(&log_path,).expect("audit log should exist",);
-    let mut log: audit::AuditLog = serde_json::from_str(&content,)
-        .expect("audit log should be valid JSON",);
+        fs::read_to_string(&log_path).expect("audit log should exist");
+    let mut log: audit::AuditLog =
+        serde_json::from_str(&content).expect("audit log should be valid JSON");
     log.entries
         .first_mut()
-        .expect("Value should exist in test",)
+        .expect("Value should exist in test")
         .entry
         .package_name = "tampered-package".to_string();
     fs::write(
         &log_path,
-        serde_json::to_string_pretty(&log,).expect("unwrap failed",),
+        serde_json::to_string_pretty(&log).expect("unwrap failed")
     )
-    .expect("tampered log should write",);
+    .expect("tampered log should write");
 
     let tamper_report =
-        audit::verify_chain().expect("tampered chain should still parse",);
+        audit::verify_chain().expect("tampered chain should still parse");
     assert!(!tamper_report.valid);
     assert!(
         tamper_report.message.contains("hash mismatch"),
@@ -120,40 +120,40 @@ fn test_audit_hash_chain_verification_and_tamper_detection() {
 #[test]
 fn test_audit_export_json_and_ndjson() {
     let mut ctx = common::TestContextGuard::acquire();
-    let tmp = tempdir().expect("tempdir should be created",);
-    ctx.set_env_var("HOME", tmp.path(),);
+    let tmp = tempdir().expect("tempdir should be created");
+    ctx.set_env_var("HOME", tmp.path());
 
     let cfg = types::Config {
         audit_log_enabled: true,
         ..Default::default()
     };
-    config::write_user_config(&cfg,).expect("config should be written",);
+    config::write_user_config(&cfg).expect("config should be written");
 
-    let manifest_a = test_manifest("audit-export-a", "1.0.0",);
-    let manifest_b = test_manifest("audit-export-b", "1.1.0",);
-    audit::log_event(AuditAction::Install, &manifest_a,)
-        .expect("audit entry A should be logged",);
-    audit::log_event(AuditAction::Upgrade, &manifest_b,)
-        .expect("audit entry B should be logged",);
+    let manifest_a = test_manifest("audit-export-a", "1.0.0");
+    let manifest_b = test_manifest("audit-export-b", "1.1.0");
+    audit::log_event(AuditAction::Install, &manifest_a)
+        .expect("audit entry A should be logged");
+    audit::log_event(AuditAction::Upgrade, &manifest_b)
+        .expect("audit entry B should be logged");
 
-    let json_path = tmp.path().join("exports",).join("audit-history.json",);
-    let ndjson_path = tmp.path().join("exports",).join("audit-history.ndjson",);
+    let json_path = tmp.path().join("exports").join("audit-history.json");
+    let ndjson_path = tmp.path().join("exports").join("audit-history.ndjson");
 
-    let exported_json = audit::export_history(&json_path, false,)
-        .expect("json export should work",);
-    let exported_ndjson = audit::export_history(&ndjson_path, true,)
-        .expect("ndjson export should work",);
+    let exported_json = audit::export_history(&json_path, false)
+        .expect("json export should work");
+    let exported_ndjson = audit::export_history(&ndjson_path, true)
+        .expect("ndjson export should work");
 
     assert_eq!(exported_json, 2);
     assert_eq!(exported_ndjson, 2);
 
-    let json_content = fs::read_to_string(&json_path,)
-        .expect("json export file should exist",);
-    let parsed_json: serde_json::Value = serde_json::from_str(&json_content,)
-        .expect("json export should be valid JSON",);
+    let json_content =
+        fs::read_to_string(&json_path).expect("json export file should exist");
+    let parsed_json: serde_json::Value = serde_json::from_str(&json_content)
+        .expect("json export should be valid JSON");
     let arr = parsed_json
         .as_array()
-        .expect("json export should be an array",);
+        .expect("json export should be an array");
     assert_eq!(arr.len(), 2);
     assert!(
         arr.first()
@@ -163,13 +163,13 @@ fn test_audit_export_json_and_ndjson() {
         "json export should include hash field"
     );
 
-    let ndjson_content = fs::read_to_string(&ndjson_path,)
-        .expect("ndjson export file should exist",);
-    let lines: Vec<&str,> = ndjson_content.lines().collect();
+    let ndjson_content = fs::read_to_string(&ndjson_path)
+        .expect("ndjson export file should exist");
+    let lines: Vec<&str> = ndjson_content.lines().collect();
     assert_eq!(lines.len(), 2);
     for line in lines {
-        let value: serde_json::Value = serde_json::from_str(line,)
-            .expect("ndjson line should be valid JSON",);
+        let value: serde_json::Value = serde_json::from_str(line)
+            .expect("ndjson line should be valid JSON");
         assert!(
             value.get("hash").is_some(),
             "ndjson line should include hash field"

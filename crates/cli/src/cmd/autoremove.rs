@@ -14,7 +14,7 @@ use crate::pkg;
 /// # Panics
 ///
 /// This function does not explicitly panic.
-pub fn run(yes: bool, dry_run: bool,) -> Result<(),> {
+pub fn run(yes: bool, dry_run: bool) -> Result<()> {
     if dry_run {
         println!(
             "{} Autoremoving unused packages (Dry-run)...",
@@ -24,10 +24,10 @@ pub fn run(yes: bool, dry_run: bool,) -> Result<(),> {
         println!("{} Autoremoving unused packages...", "::".bold().blue());
     }
 
-    pkg::autoremove::run(yes, dry_run,)?;
+    pkg::autoremove::run(yes, dry_run)?;
 
     if !dry_run {
         println!("\n{}", "Cleanup complete.".green());
     }
-    Ok((),)
+    Ok(())
 }

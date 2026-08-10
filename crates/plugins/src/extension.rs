@@ -15,63 +15,63 @@ const EXTENSION_STATE_FILE: &str = "extension-state.yaml";
 
 /// Represents the persistent state of an installed extension, allowing for
 /// rollbacks.
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize,)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 struct ExtensionState {
     /// The default registry configuration before the extension was added.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    previous_default_registry: Option<types::Registry,>,
+    previous_default_registry: Option<types::Registry>,
     /// The path to the project file created by the extension, if any.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    project_file_path: Option<PathBuf,>,
+    project_file_path: Option<PathBuf>,
     /// Metadata about the installed extension itself.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    installed_extension: Option<types::ExtensionInfo,>,
+    installed_extension: Option<types::ExtensionInfo>
 }
 
 /// Returns the path to the extension state file for a given manifest.
 fn get_extension_state_path(
-    manifest: &types::InstallManifest,
-) -> Result<PathBuf,> {
+    manifest: &types::InstallManifest
+) -> Result<PathBuf> {
     let version_dir = local::get_package_version_dir(
         manifest.scope,
         &manifest.registry_handle,
         &manifest.repo,
         &manifest.name,
-        &manifest.version,
+        &manifest.version
     )?;
-    Ok(version_dir.join(EXTENSION_STATE_FILE,),)
+    Ok(version_dir.join(EXTENSION_STATE_FILE))
 }
 
 /// Writes the extension state to disk.
 fn write_extension_state(
     manifest: &types::InstallManifest,
-    extension_state: &ExtensionState,
-) -> Result<(),> {
-    let state_path = get_extension_state_path(manifest,)?;
-    fs::write(state_path, serde_yaml::to_string(extension_state,)?,)?;
-    Ok((),)
+    extension_state: &ExtensionState
+) -> Result<()> {
+    let state_path = get_extension_state_path(manifest)?;
+    fs::write(state_path, serde_yaml::to_string(extension_state)?)?;
+    Ok(())
 }
 
 /// Reads the extension state from disk, if it exists.
 fn read_extension_state(
-    manifest: &types::InstallManifest,
-) -> Result<Option<ExtensionState,>,> {
-    let state_path = get_extension_state_path(manifest,)?;
+    manifest: &types::InstallManifest
+) -> Result<Option<ExtensionState>> {
+    let state_path = get_extension_state_path(manifest)?;
     if !state_path.exists() {
-        return Ok(None,);
+        return Ok(None);
     }
-    let content = fs::read_to_string(state_path,)?;
-    Ok(Some(serde_yaml::from_str(&content,)?,),)
+    let content = fs::read_to_string(state_path)?;
+    Ok(Some(serde_yaml::from_str(&content)?))
 }
 
 /// Restores the default registry to its previous state.
 fn restore_default_registry(
-    saved_state: Option<&ExtensionState,>,
-    added_registry_url: &str,
-) -> Result<(),> {
-    if let Some(saved_state,) = saved_state {
+    saved_state: Option<&ExtensionState>,
+    added_registry_url: &str
+) -> Result<()> {
+    if let Some(saved_state) = saved_state {
         return config::set_user_default_registry(
-            saved_state.previous_default_registry.clone(),
+            saved_state.previous_default_registry.clone()
         );
     }
 
@@ -79,16 +79,16 @@ fn restore_default_registry(
     let should_clear = user_config
         .default_registry
         .as_ref()
-        .is_some_and(|registry| registry.url == added_registry_url,);
+        .is_some_and(|registry| registry.url == added_registry_url);
     if should_clear {
-        config::set_user_default_registry(None,)?;
+        config::set_user_default_registry(None)?;
     }
-    Ok((),)
+    Ok(())
 }
 
 /// Checks if the extension state contains any data that needs to be persisted.
 fn extension_state_requires_persistence(
-    extension_state: &ExtensionState,
+    extension_state: &ExtensionState
 ) -> bool {
     extension_state.previous_default_registry.is_some()
         || extension_state.project_file_path.is_some()
@@ -97,67 +97,67 @@ fn extension_state_requires_persistence(
 
 /// Returns the path to the project file, either from saved state or the
 /// default.
-fn get_project_file_path(saved_state: Option<&ExtensionState,>,) -> PathBuf {
+fn get_project_file_path(saved_state: Option<&ExtensionState>) -> PathBuf {
     saved_state
-        .and_then(|state| state.project_file_path.clone(),)
-        .unwrap_or_else(|| PathBuf::from("zoi.yaml",),)
+        .and_then(|state| state.project_file_path.clone())
+        .unwrap_or_else(|| PathBuf::from("zoi.yaml"))
 }
 
 /// Extracts the repository name from a git URL.
-fn get_repo_name_from_url(url: &str,) -> &str {
-    url.trim_end_matches('/',)
-        .split('/',)
+fn get_repo_name_from_url(url: &str) -> &str {
+    url.trim_end_matches('/')
+        .split('/')
         .next_back()
         .unwrap_or_default()
-        .trim_end_matches(".git",)
+        .trim_end_matches(".git")
 }
 
 /// Reverts a specific change made by an extension.
 fn revert_extension_change(
     change: &types::ExtensionChange,
-    saved_state: Option<&ExtensionState,>,
-) -> Result<(),> {
+    saved_state: Option<&ExtensionState>
+) -> Result<()> {
     match change {
-        types::ExtensionChange::RepoGit { add, } => {
-            let repo_name = get_repo_name_from_url(add,);
+        types::ExtensionChange::RepoGit { add } => {
+            let repo_name = get_repo_name_from_url(add);
             if !repo_name.is_empty() {
-                config::remove_git_repo(repo_name,)?;
+                config::remove_git_repo(repo_name)?;
             }
         }
-        types::ExtensionChange::RegistryRepo { add, } => {
-            restore_default_registry(saved_state, add,)?;
+        types::ExtensionChange::RegistryRepo { add } => {
+            restore_default_registry(saved_state, add)?;
         }
-        types::ExtensionChange::RegistryAdd { add, } => {
-            config::remove_added_registry(add,)?;
+        types::ExtensionChange::RegistryAdd { add } => {
+            config::remove_added_registry(add)?;
         }
-        types::ExtensionChange::RepoAdd { add, } => {
-            config::remove_repo(add,)?;
+        types::ExtensionChange::RepoAdd { add } => {
+            config::remove_repo(add)?;
         }
-        types::ExtensionChange::Project { add: _, } => {
-            let project_file_path = get_project_file_path(saved_state,);
+        types::ExtensionChange::Project { add: _ } => {
+            let project_file_path = get_project_file_path(saved_state);
             if project_file_path.exists() {
-                fs::remove_file(project_file_path,)?;
+                fs::remove_file(project_file_path)?;
             }
         }
-        types::ExtensionChange::Pgp { name, key: _, } => {
-            pgp::remove_key_by_name(name,)?;
+        types::ExtensionChange::Pgp { name, key: _ } => {
+            pgp::remove_key_by_name(name)?;
         }
-        types::ExtensionChange::Plugin { name, script: _, } => {
+        types::ExtensionChange::Plugin { name, script: _ } => {
             let plugin_dir = crate::get_plugin_dir()?;
-            let plugin_path = plugin_dir.join(format!("{name}.lua"),);
+            let plugin_path = plugin_dir.join(format!("{name}.lua"));
             if plugin_path.exists() {
-                fs::remove_file(plugin_path,)?;
+                fs::remove_file(plugin_path)?;
             }
         }
-        types::ExtensionChange::Hook { name, content: _, } => {
+        types::ExtensionChange::Hook { name, content: _ } => {
             let hooks_dir = hooks::global::get_user_hooks_dir()?;
-            let hook_path = hooks_dir.join(format!("{name}.hook.yaml"),);
+            let hook_path = hooks_dir.join(format!("{name}.hook.yaml"));
             if hook_path.exists() {
-                fs::remove_file(hook_path,)?;
+                fs::remove_file(hook_path)?;
             }
         }
     }
-    Ok((),)
+    Ok(())
 }
 
 /// Installs an extension, applying its declared changes to the system and
@@ -170,61 +170,61 @@ fn revert_extension_change(
 pub fn add(
     ext_name: &str,
     yes: bool,
-    plugin_manager: Option<&PluginManager,>,
-) -> Result<(),> {
+    plugin_manager: Option<&PluginManager>
+) -> Result<()> {
     println!("Adding extension: {ext_name}");
 
-    let (pkg, _, _, pkg_lua_path, registry_handle, repo_type, _,) =
-        resolve::resolve_package_and_version(ext_name, None, false, yes,)?;
+    let (pkg, _, _, pkg_lua_path, registry_handle, repo_type, _) =
+        resolve::resolve_package_and_version(ext_name, None, false, yes)?;
 
     if pkg.package_type != types::PackageType::Extension {
-        return Err(anyhow!("'{ext_name}' is not an extension package."),);
+        return Err(anyhow!("'{ext_name}' is not an extension package."));
     }
 
     let mut pkg_val = None;
-    if let Some(pm,) = plugin_manager {
+    if let Some(pm) = plugin_manager {
         let v = pm
             .lua
-            .to_value(&pkg,)
-            .map_err(|e: mlua::Error| anyhow!(e.to_string()),)?;
-        pm.trigger_hook("on_pre_extension_add", Some(&v.clone(),),)?;
-        pkg_val = Some(v,);
+            .to_value(&pkg)
+            .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
+        pm.trigger_hook("on_pre_extension_add", Some(&v.clone()))?;
+        pkg_val = Some(v);
     }
 
-    let Some(extension_info,) = pkg.extension else {
+    let Some(extension_info) = pkg.extension else {
         return Err(anyhow!(
             "'{ext_name}' is an extension package but contains no extension \
              data."
-        ),);
+        ));
     };
     if extension_info.extension_type != "zoi" {
         return Err(anyhow!(
             "Unsupported extension type: {}",
             extension_info.extension_type
-        ),);
+        ));
     }
     let has_registry_repo_change =
         extension_info.changes.iter().any(|change| {
             matches!(change, types::ExtensionChange::RegistryRepo { .. })
-        },);
-    let has_project_change =
-        extension_info.changes.iter().any(|change| {
-            matches!(change, types::ExtensionChange::Project { .. })
-        },);
+        });
+    let has_project_change = extension_info
+        .changes
+        .iter()
+        .any(|change| matches!(change, types::ExtensionChange::Project { .. }));
     let previous_default_registry = if has_registry_repo_change {
         config::read_user_config()?.default_registry.clone()
     } else {
         None
     };
     let project_file_path = if has_project_change {
-        Some(std::env::current_dir()?.join("zoi.yaml",),)
+        Some(std::env::current_dir()?.join("zoi.yaml"))
     } else {
         None
     };
     let extension_state = ExtensionState {
         previous_default_registry,
         project_file_path,
-        installed_extension: Some(extension_info.clone(),),
+        installed_extension: Some(extension_info.clone())
     };
 
     let manifest = types::InstallManifest {
@@ -234,7 +234,7 @@ pub fn add(
         revision: pkg.revision.clone(),
         sub_package: None,
         repo: pkg.repo.clone(),
-        repo_type: repo_type.unwrap_or_else(|| "unofficial".to_string(),),
+        repo_type: repo_type.unwrap_or_else(|| "unofficial".to_string()),
         registry_handle: registry_handle.unwrap_or_default(),
         package_type: pkg.package_type,
         description: pkg.description.clone(),
@@ -255,85 +255,84 @@ pub fn add(
         installed_files: vec![],
         installed_size: pkg.installed_size,
         sandbox: None,
-        completions: None,
+        completions: None
     };
     let mut wrote_manifest = false;
     let mut applied_changes = Vec::new();
-    let add_result = (|| -> Result<(),> {
-        if extension_state_requires_persistence(&extension_state,) {
-            local::write_manifest(&manifest,)?;
-            local::persist_package_source(&manifest, &pkg_lua_path,)?;
+    let add_result = (|| -> Result<()> {
+        if extension_state_requires_persistence(&extension_state) {
+            local::write_manifest(&manifest)?;
+            local::persist_package_source(&manifest, &pkg_lua_path)?;
             wrote_manifest = true;
-            write_extension_state(&manifest, &extension_state,)?;
+            write_extension_state(&manifest, &extension_state)?;
         }
 
         println!("Applying extension changes...");
         for change in &extension_info.changes {
             match change {
-                types::ExtensionChange::RepoGit { add, } => {
+                types::ExtensionChange::RepoGit { add } => {
                     println!("Adding git repository: {add}");
-                    config::clone_git_repo(add,)?;
+                    config::clone_git_repo(add)?;
                 }
-                types::ExtensionChange::RegistryRepo { add, } => {
+                types::ExtensionChange::RegistryRepo { add } => {
                     println!("Setting registry to: {add}");
-                    config::set_default_registry(add,)?;
+                    config::set_default_registry(add)?;
                 }
-                types::ExtensionChange::RegistryAdd { add, } => {
+                types::ExtensionChange::RegistryAdd { add } => {
                     println!("Adding registry: {add}");
-                    config::add_added_registry(add,)?;
+                    config::add_added_registry(add)?;
                 }
-                types::ExtensionChange::RepoAdd { add, } => {
+                types::ExtensionChange::RepoAdd { add } => {
                     println!("Adding repository: {add}");
-                    config::add_repo(add,)?;
+                    config::add_repo(add)?;
                 }
-                types::ExtensionChange::Project { add, } => {
+                types::ExtensionChange::Project { add } => {
                     let project_file_path =
-                        get_project_file_path(Some(&extension_state,),);
+                        get_project_file_path(Some(&extension_state));
                     println!("Creating {}...", project_file_path.display());
                     if project_file_path.exists() {
                         return Err(anyhow!(
                             "A 'zoi.yaml' file already exists at '{}'. Please \
                              remove it first.",
                             project_file_path.display()
-                        ),);
+                        ));
                     }
-                    fs::write(&project_file_path, add,)?;
+                    fs::write(&project_file_path, add)?;
                 }
-                types::ExtensionChange::Pgp { name, key, } => {
+                types::ExtensionChange::Pgp { name, key } => {
                     println!("Adding PGP key: {name} from {key}");
-                    if key.starts_with("http",) {
-                        pgp::add_key_from_url(key, name, false,)?;
+                    if key.starts_with("http") {
+                        pgp::add_key_from_url(key, name, false)?;
                     } else {
-                        pgp::add_key_from_fingerprint(key, name, false,)?;
+                        pgp::add_key_from_fingerprint(key, name, false)?;
                     }
                 }
-                types::ExtensionChange::Plugin { name, script, } => {
+                types::ExtensionChange::Plugin { name, script } => {
                     println!("Adding plugin: {name}");
                     let plugin_dir = crate::get_plugin_dir()?;
-                    let plugin_path = plugin_dir.join(format!("{name}.lua"),);
-                    fs::write(plugin_path, script,)?;
+                    let plugin_path = plugin_dir.join(format!("{name}.lua"));
+                    fs::write(plugin_path, script)?;
                 }
-                types::ExtensionChange::Hook { name, content, } => {
+                types::ExtensionChange::Hook { name, content } => {
                     println!("Adding global hook: {name}");
                     let hooks_dir = hooks::global::get_user_hooks_dir()?;
-                    let hook_path =
-                        hooks_dir.join(format!("{name}.hook.yaml"),);
-                    fs::write(hook_path, content,)?;
+                    let hook_path = hooks_dir.join(format!("{name}.hook.yaml"));
+                    fs::write(hook_path, content)?;
                 }
             }
-            applied_changes.push(change.clone(),);
+            applied_changes.push(change.clone());
         }
         if !wrote_manifest {
-            local::write_manifest(&manifest,)?;
-            local::persist_package_source(&manifest, &pkg_lua_path,)?;
+            local::write_manifest(&manifest)?;
+            local::persist_package_source(&manifest, &pkg_lua_path)?;
             wrote_manifest = true;
         }
-        Ok((),)
+        Ok(())
     })();
-    if let Err(error,) = add_result {
+    if let Err(error) = add_result {
         for change in applied_changes.iter().rev() {
-            if let Err(rollback_error,) =
-                revert_extension_change(change, Some(&extension_state,),)
+            if let Err(rollback_error) =
+                revert_extension_change(change, Some(&extension_state))
             {
                 eprintln!(
                     "Warning: failed to roll back extension change \
@@ -342,25 +341,25 @@ pub fn add(
             }
         }
         if wrote_manifest
-            && let Ok(package_dir,) = local::get_package_dir(
+            && let Ok(package_dir) = local::get_package_dir(
                 manifest.scope,
                 &manifest.registry_handle,
                 &manifest.repo,
-                &manifest.name,
+                &manifest.name
             )
         {
-            let _ = fs::remove_dir_all(package_dir,);
+            let _ = fs::remove_dir_all(package_dir);
         }
-        return Err(error,);
+        return Err(error);
     }
 
-    if let (Some(pm,), Some(v,),) = (plugin_manager, pkg_val,) {
-        pm.trigger_hook_nonfatal("on_post_extension_add", Some(&v,),);
+    if let (Some(pm), Some(v)) = (plugin_manager, pkg_val) {
+        pm.trigger_hook_nonfatal("on_post_extension_add", Some(&v));
     }
 
     println!("Successfully added extension '{ext_name}'.");
 
-    Ok((),)
+    Ok(())
 }
 
 /// Uninstalls an extension and reverts all changes it made to the system and
@@ -373,89 +372,88 @@ pub fn add(
 pub fn remove(
     ext_name: &str,
     yes: bool,
-    plugin_manager: Option<&PluginManager,>,
-) -> Result<(),> {
+    plugin_manager: Option<&PluginManager>
+) -> Result<()> {
     println!("Removing extension: {ext_name}");
 
-    let request = resolve::parse_source_string(ext_name,)?;
+    let request = resolve::parse_source_string(ext_name)?;
     let mut candidates = Vec::new();
     for scope in [
         types::Scope::Project,
         types::Scope::User,
-        types::Scope::System,
+        types::Scope::System
     ] {
-        candidates.extend(local::find_installed_manifests_matching(
-            &request, scope,
-        )?,);
+        candidates
+            .extend(local::find_installed_manifests_matching(&request, scope)?);
     }
 
     if candidates.is_empty() {
-        return Err(anyhow!("Extension '{ext_name}' is not installed."),);
+        return Err(anyhow!("Extension '{ext_name}' is not installed."));
     }
 
-    let manifest = select_candidate(ext_name, candidates, yes,)?;
+    let manifest = select_candidate(ext_name, candidates, yes)?;
     let scope = manifest.scope;
 
     let mut manifest_val = None;
-    if let Some(pm,) = plugin_manager {
+    if let Some(pm) = plugin_manager {
         let v = pm
             .lua
-            .to_value(&manifest,)
-            .map_err(|e: mlua::Error| anyhow!(e.to_string()),)?;
-        pm.trigger_hook("on_pre_extension_remove", Some(&v.clone(),),)?;
-        manifest_val = Some(v,);
+            .to_value(&manifest)
+            .map_err(|e: mlua::Error| anyhow!(e.to_string()))?;
+        pm.trigger_hook("on_pre_extension_remove", Some(&v.clone()))?;
+        manifest_val = Some(v);
     }
 
     if manifest.package_type != types::PackageType::Extension {
-        return Err(anyhow!("'{ext_name}' is not an extension package."),);
+        return Err(anyhow!("'{ext_name}' is not an extension package."));
     }
 
-    let installed_source_path = local::get_package_source_path(&manifest,)?;
+    let installed_source_path = local::get_package_source_path(&manifest)?;
     let pkg = if installed_source_path.exists() {
         let path = installed_source_path.to_str().ok_or_else(|| {
             anyhow!("Stored package source path contains invalid UTF-8")
-        },)?;
+        })?;
         zoi_lua::parser::parse_lua_package(
             path,
-            Some(&manifest.version,),
-            Some(manifest.scope,),
-            true,
+            Some(&manifest.version),
+            Some(manifest.scope),
+            true
         )?
     } else {
-        let source = local::installed_manifest_source(&manifest,);
-        let (pkg, _, _, _, _, _, _,) = resolve::resolve_package_and_version(
+        let source = local::installed_manifest_source(&manifest);
+        let (pkg, _, _, _, _, _, _) = resolve::resolve_package_and_version(
             &source,
-            Some(manifest.scope,),
+            Some(manifest.scope),
             true,
-            yes,
+            yes
         )?;
         pkg
     };
 
-    let extension_state = read_extension_state(&manifest,)?;
+    let extension_state = read_extension_state(&manifest)?;
     let extension_info = extension_state
         .as_ref()
-        .and_then(|state| state.installed_extension.clone(),)
-        .or(pkg.extension,);
+        .and_then(|state| state.installed_extension.clone())
+        .or(pkg.extension);
 
-    if let Some(extension_info,) = extension_info {
+    if let Some(extension_info) = extension_info {
         if extension_info.extension_type != "zoi" {
             return Err(anyhow!(
                 "Unsupported extension type: {}",
                 extension_info.extension_type
-            ),);
+            ));
         }
 
         println!("Reverting extension changes...");
         for change in extension_info.changes.iter().rev() {
             match change {
-                types::ExtensionChange::RepoGit { add, } => {
-                    let repo_name = get_repo_name_from_url(add,);
+                types::ExtensionChange::RepoGit { add } => {
+                    let repo_name = get_repo_name_from_url(add);
                     if !repo_name.is_empty() {
                         println!("Removing git repository: {repo_name}");
-                        if let Err(e,) = revert_extension_change(
+                        if let Err(e) = revert_extension_change(
                             change,
-                            extension_state.as_ref(),
+                            extension_state.as_ref()
                         ) {
                             eprintln!(
                                 "Warning: failed to remove git repo \
@@ -464,46 +462,46 @@ pub fn remove(
                         }
                     }
                 }
-                types::ExtensionChange::RegistryRepo { add: _, } => {
+                types::ExtensionChange::RegistryRepo { add: _ } => {
                     println!("Restoring previous default registry");
-                    if let Err(e,) = revert_extension_change(
+                    if let Err(e) = revert_extension_change(
                         change,
-                        extension_state.as_ref(),
+                        extension_state.as_ref()
                     ) {
                         eprintln!(
                             "Warning: failed to restore default registry: {e}"
                         );
                     }
                 }
-                types::ExtensionChange::RegistryAdd { add, } => {
+                types::ExtensionChange::RegistryAdd { add } => {
                     println!("Removing registry: {add}");
-                    if let Err(e,) = revert_extension_change(
+                    if let Err(e) = revert_extension_change(
                         change,
-                        extension_state.as_ref(),
+                        extension_state.as_ref()
                     ) {
                         eprintln!(
                             "Warning: failed to remove registry '{add}': {e}"
                         );
                     }
                 }
-                types::ExtensionChange::RepoAdd { add, } => {
+                types::ExtensionChange::RepoAdd { add } => {
                     println!("Removing repository: {add}");
-                    if let Err(e,) = revert_extension_change(
+                    if let Err(e) = revert_extension_change(
                         change,
-                        extension_state.as_ref(),
+                        extension_state.as_ref()
                     ) {
                         eprintln!(
                             "Warning: failed to remove repo '{add}': {e}"
                         );
                     }
                 }
-                types::ExtensionChange::Project { add: _, } => {
+                types::ExtensionChange::Project { add: _ } => {
                     let project_file_path =
-                        get_project_file_path(extension_state.as_ref(),);
+                        get_project_file_path(extension_state.as_ref());
                     println!("Removing {}...", project_file_path.display());
-                    if let Err(e,) = revert_extension_change(
+                    if let Err(e) = revert_extension_change(
                         change,
-                        extension_state.as_ref(),
+                        extension_state.as_ref()
                     ) {
                         eprintln!(
                             "Warning: failed to remove '{}': {e}",
@@ -511,33 +509,33 @@ pub fn remove(
                         );
                     }
                 }
-                types::ExtensionChange::Pgp { name, key: _, } => {
+                types::ExtensionChange::Pgp { name, key: _ } => {
                     println!("Removing PGP key: {name}");
-                    if let Err(e,) = revert_extension_change(
+                    if let Err(e) = revert_extension_change(
                         change,
-                        extension_state.as_ref(),
+                        extension_state.as_ref()
                     ) {
                         eprintln!(
                             "Warning: failed to remove PGP key '{name}': {e}"
                         );
                     }
                 }
-                types::ExtensionChange::Plugin { name, script: _, } => {
+                types::ExtensionChange::Plugin { name, script: _ } => {
                     println!("Removing plugin: {name}");
-                    if let Err(e,) = revert_extension_change(
+                    if let Err(e) = revert_extension_change(
                         change,
-                        extension_state.as_ref(),
+                        extension_state.as_ref()
                     ) {
                         eprintln!(
                             "Warning: failed to remove plugin '{name}': {e}"
                         );
                     }
                 }
-                types::ExtensionChange::Hook { name, content: _, } => {
+                types::ExtensionChange::Hook { name, content: _ } => {
                     println!("Removing global hook: {name}");
-                    if let Err(e,) = revert_extension_change(
+                    if let Err(e) = revert_extension_change(
                         change,
-                        extension_state.as_ref(),
+                        extension_state.as_ref()
                     ) {
                         eprintln!(
                             "Warning: failed to remove global hook '{name}': \
@@ -551,36 +549,36 @@ pub fn remove(
         return Err(anyhow!(
             "'{ext_name}' is an extension package but contains no extension \
              data."
-        ),);
+        ));
     }
 
     let package_dir = local::get_package_dir(
         scope,
         &manifest.registry_handle,
         &manifest.repo,
-        &manifest.name,
+        &manifest.name
     )?;
 
     if package_dir.exists() {
-        fs::remove_dir_all(&package_dir,)?;
+        fs::remove_dir_all(&package_dir)?;
     }
 
-    if let (Some(pm,), Some(v,),) = (plugin_manager, manifest_val,) {
-        pm.trigger_hook_nonfatal("on_post_extension_remove", Some(&v,),);
+    if let (Some(pm), Some(v)) = (plugin_manager, manifest_val) {
+        pm.trigger_hook_nonfatal("on_post_extension_remove", Some(&v));
     }
 
     println!("Successfully removed extension '{ext_name}'.");
 
-    Ok((),)
+    Ok(())
 }
 
 /// Prompts the user to select one extension if multiple candidates match the
 /// request.
 fn select_candidate(
     package_name: &str,
-    candidates: Vec<types::InstallManifest,>,
-    yes: bool,
-) -> Result<types::InstallManifest,> {
+    candidates: Vec<types::InstallManifest>,
+    yes: bool
+) -> Result<types::InstallManifest> {
     use colored::Colorize;
     use comfy_table::Table;
     use comfy_table::presets::UTF8_FULL;
@@ -588,43 +586,43 @@ fn select_candidate(
     use dialoguer::theme::ColorfulTheme;
 
     if candidates.is_empty() {
-        return Err(anyhow!("Package '{package_name}' is not installed."),);
+        return Err(anyhow!("Package '{package_name}' is not installed."));
     }
     if candidates.len() == 1 {
         return Ok(candidates
             .into_iter()
             .next()
-            .expect("Already checked length",),);
+            .expect("Already checked length"));
     }
     if yes {
         return Err(anyhow!(
             "Package '{package_name}' matches multiple installed packages. \
              Use an explicit source like '#handle@repo/name[:sub]@version'."
-        ),);
+        ));
     }
 
-    let displays: Vec<_,> = candidates
+    let displays: Vec<_> = candidates
         .iter()
         .map(|m| {
-            let source = local::installed_manifest_source(m,);
+            let source = local::installed_manifest_source(m);
             let scope_label = match m.scope {
                 types::Scope::User => "user",
                 types::Scope::System => "system",
-                types::Scope::Project => "project",
+                types::Scope::Project => "project"
             };
             format!("{} ({}, v{})", source, scope_label, m.version)
-        },)
+        })
         .collect();
 
     let mut table = Table::new();
-    table.load_preset(UTF8_FULL,);
-    table.set_header(vec!["#", "Source", "Version"],);
-    for (i, m,) in candidates.iter().enumerate() {
+    table.load_preset(UTF8_FULL);
+    table.set_header(vec!["#", "Source", "Version"]);
+    for (i, m) in candidates.iter().enumerate() {
         table.add_row(vec![
             (i + 1).to_string(),
-            local::installed_manifest_source(m,),
+            local::installed_manifest_source(m),
             m.version.clone(),
-        ],);
+        ]);
     }
     println!(
         "Found multiple installed packages matching '{}'. Please choose one:",
@@ -632,14 +630,14 @@ fn select_candidate(
     );
     println!("{table}");
 
-    let selection = Select::with_theme(&ColorfulTheme::default(),)
-        .with_prompt("Select an installed package",)
-        .items(&displays,)
-        .default(0,)
+    let selection = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("Select an installed package")
+        .items(&displays)
+        .default(0)
         .interact()?;
 
     Ok(candidates
-        .get(selection,)
+        .get(selection)
         .cloned()
-        .expect("Invalid selection",),)
+        .expect("Invalid selection"))
 }

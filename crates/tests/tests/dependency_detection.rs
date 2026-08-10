@@ -9,8 +9,8 @@ use zoi::pkg::types::Scope;
 
 #[test]
 fn test_parse_zoi_dependency_channel_version() {
-    let dep = parse_dependency_string("zoi:my-pkg@stable",)
-        .expect("should parse zoi channel dep",);
+    let dep = parse_dependency_string("zoi:my-pkg@stable")
+        .expect("should parse zoi channel dep");
 
     assert_eq!(dep.manager, "zoi");
     assert_eq!(dep.package, "my-pkg");
@@ -23,8 +23,8 @@ fn test_parse_zoi_dependency_channel_version() {
 
 #[test]
 fn test_parse_zoi_dependency_prerelease_channel_version() {
-    let dep = parse_dependency_string("zoi:my-pkg@alpha",)
-        .expect("should parse zoi alpha dep",);
+    let dep = parse_dependency_string("zoi:my-pkg@alpha")
+        .expect("should parse zoi alpha dep");
 
     assert_eq!(dep.manager, "zoi");
     assert_eq!(dep.package, "my-pkg");
@@ -37,8 +37,8 @@ fn test_parse_zoi_dependency_prerelease_channel_version() {
 
 #[test]
 fn test_parse_zoi_dependency_exact_version() {
-    let dep = parse_dependency_string("zoi:my-pkg@1.2.3",)
-        .expect("should parse zoi exact dep",);
+    let dep = parse_dependency_string("zoi:my-pkg@1.2.3")
+        .expect("should parse zoi exact dep");
 
     assert_eq!(dep.manager, "zoi");
     assert_eq!(dep.package, "my-pkg");
@@ -52,12 +52,12 @@ fn test_parse_zoi_dependency_exact_version() {
 #[test]
 fn test_skip_missing_package_manager() {
     let dep_str = "apk:some-pkg";
-    let dep = parse_dependency_string(dep_str,)
-        .expect("Failed to parse dependency string",);
+    let dep = parse_dependency_string(dep_str)
+        .expect("Failed to parse dependency string");
 
     assert_eq!(dep.manager, "apk");
 
-    let processed = Mutex::new(HashSet::new(),);
+    let processed = Mutex::new(HashSet::new());
     let mut installed = Vec::new();
 
     let result = install_dependency(
@@ -68,10 +68,10 @@ fn test_skip_missing_package_manager() {
         true,
         &processed,
         &mut installed,
-        None,
+        None
     );
 
-    if !zoi::utils::command_exists("apk",) {
+    if !zoi::utils::command_exists("apk") {
         assert!(
             result.is_ok(),
             "Should skip missing package manager gracefully"

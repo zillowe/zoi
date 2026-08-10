@@ -11,10 +11,10 @@ use std::io::Write;
 use std::path::PathBuf;
 
 /// Represents the shell commands needed to operate a specific package manager.
-#[derive(serde::Deserialize,)]
+#[derive(serde::Deserialize)]
 struct ManagerCommands {
     /// Command to check if a package is installed.
-    is_installed: Option<String,>,
+    is_installed: Option<String>,
     /// Command to install a package.
     install: String,
     /// Command to uninstall a package.
@@ -24,37 +24,37 @@ struct ManagerCommands {
     sudo_install: bool,
     /// Whether the uninstall command requires `sudo` privileges.
     #[serde(default)]
-    sudo_uninstall: bool,
+    sudo_uninstall: bool
 }
 
 /// Escapes a string literal so it can be safely injected into generated Rust
 /// code.
-fn escaped_string_literal(value: &str,) -> String {
+fn escaped_string_literal(value: &str) -> String {
     format!("{value:?}")
 }
 
-fn main() -> Result<(), Box<dyn Error,>,> {
-    let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR",)?,);
-    let managers_json_path = manifest_dir.join("src",).join("managers.json",);
+fn main() -> Result<(), Box<dyn Error>> {
+    let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?);
+    let managers_json_path = manifest_dir.join("src").join("managers.json");
 
     println!("cargo:rerun-if-changed={}", managers_json_path.display());
 
-    let out_dir = env::var("OUT_DIR",)?;
-    let out_dir = PathBuf::from(out_dir,);
-    let dest_path = out_dir.join("generated_managers.rs",);
-    let mut file = std::fs::File::create(dest_path,)?;
+    let out_dir = env::var("OUT_DIR")?;
+    let out_dir = PathBuf::from(out_dir);
+    let dest_path = out_dir.join("generated_managers.rs");
+    let mut file = std::fs::File::create(dest_path)?;
 
-    let json_str = std::fs::read_to_string(&managers_json_path,)?;
-    let managers: BTreeMap<String, ManagerCommands,> =
-        serde_json::from_str(&json_str,)?;
+    let json_str = std::fs::read_to_string(&managers_json_path)?;
+    let managers: BTreeMap<String, ManagerCommands> =
+        serde_json::from_str(&json_str)?;
 
     let mut map = phf_codegen::Map::new();
-    let mut values = Vec::with_capacity(managers.len(),);
+    let mut values = Vec::with_capacity(managers.len());
 
-    for (name, commands,) in &managers {
+    for (name, commands) in &managers {
         let is_installed_val = match &commands.is_installed {
-            Some(s,) => format!("Some({})", escaped_string_literal(s)),
-            None => "None".to_string(),
+            Some(s) => format!("Some({})", escaped_string_literal(s)),
+            None => "None".to_string()
         };
 
         let value = format!(
@@ -66,11 +66,11 @@ fn main() -> Result<(), Box<dyn Error,>,> {
             commands.sudo_install,
             commands.sudo_uninstall
         );
-        values.push((name.as_str(), value,),);
+        values.push((name.as_str(), value));
     }
 
-    for (name, value,) in &values {
-        map.entry(name, value,);
+    for (name, value) in &values {
+        map.entry(name, value);
     }
 
     writeln!(
@@ -95,5 +95,5 @@ fn main() -> Result<(), Box<dyn Error,>,> {
         map.build()
     )?;
 
-    Ok((),)
+    Ok(())
 }

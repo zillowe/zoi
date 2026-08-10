@@ -16,25 +16,25 @@ use zoi_resolver::resolve::{get_db_root, get_host_db_root};
 /// # Errors
 ///
 /// Returns an error if the database root directory cannot be determined.
-pub fn get_db_path(registry_handle: &str,) -> Result<PathBuf,> {
+pub fn get_db_path(registry_handle: &str) -> Result<PathBuf> {
     let target_root = get_db_root()?;
-    let target_path = target_root.join(format!("{registry_handle}.db"),);
+    let target_path = target_root.join(format!("{registry_handle}.db"));
 
     if !target_path.exists() && zoi_core::sysroot::get_sysroot().is_some() {
         // Fallback to host metadata for bootstrapping
         let host_root = get_host_db_root()?;
-        let host_path = host_root.join(format!("{registry_handle}.db"),);
+        let host_path = host_root.join(format!("{registry_handle}.db"));
 
         if host_path.exists() {
-            if let Some(parent,) = target_path.parent() {
-                std::fs::create_dir_all(parent,)?;
+            if let Some(parent) = target_path.parent() {
+                std::fs::create_dir_all(parent)?;
             }
             // Copy host registry DB to target so records are kept in target
-            let _ = std::fs::copy(&host_path, &target_path,);
+            let _ = std::fs::copy(&host_path, &target_path);
         }
     }
 
-    Ok(target_path,)
+    Ok(target_path)
 }
 
 /// Opens a connection to the registry database and ensures the schema is set
@@ -44,10 +44,10 @@ pub fn get_db_path(registry_handle: &str,) -> Result<PathBuf,> {
 ///
 /// Returns an error if the database cannot be opened or if the schema setup
 /// fails.
-pub fn open_connection(registry_handle: &str,) -> Result<Connection,> {
-    let conn = open_connection_no_setup(registry_handle,)?;
-    setup_schema(&conn,)?;
-    Ok(conn,)
+pub fn open_connection(registry_handle: &str) -> Result<Connection> {
+    let conn = open_connection_no_setup(registry_handle)?;
+    setup_schema(&conn)?;
+    Ok(conn)
 }
 
 /// Opens a raw `SQLite` connection and configures high-performance pragmas.
@@ -61,23 +61,23 @@ pub fn open_connection(registry_handle: &str,) -> Result<Connection,> {
 ///
 /// Returns an error if the database cannot be opened or if PRAGMA configuration
 /// fails.
-pub fn open_connection_no_setup(registry_handle: &str,) -> Result<Connection,> {
-    let db_path = get_db_path(registry_handle,)?;
-    if let Some(parent,) = db_path.parent() {
-        std::fs::create_dir_all(parent,)?;
+pub fn open_connection_no_setup(registry_handle: &str) -> Result<Connection> {
+    let db_path = get_db_path(registry_handle)?;
+    if let Some(parent) = db_path.parent() {
+        std::fs::create_dir_all(parent)?;
     }
-    let conn = Connection::open(db_path,)?;
-    conn.busy_timeout(std::time::Duration::from_secs(5,),)?;
+    let conn = Connection::open(db_path)?;
+    conn.busy_timeout(std::time::Duration::from_secs(5))?;
 
     conn.execute_batch(
         "
         PRAGMA foreign_keys = ON;
         PRAGMA journal_mode = WAL;
         PRAGMA synchronous = NORMAL;
-    ",
+    "
     )?;
 
-    Ok(conn,)
+    Ok(conn)
 }
 
 /// Initializes or migrates the Zoi registry metadata schema.
@@ -90,7 +90,7 @@ pub fn open_connection_no_setup(registry_handle: &str,) -> Result<Connection,> {
 ///
 /// FTS5 Search: Uses `SQLite`'s virtual tables for sub-millisecond full-text
 /// search across thousands of package descriptions and tags.
-fn setup_schema(conn: &Connection,) -> Result<(),> {
+fn setup_schema(conn: &Connection) -> Result<()> {
     conn.execute(
         "CREATE TABLE IF NOT EXISTS packages (
             id INTEGER PRIMARY KEY,
@@ -113,7 +113,7 @@ fn setup_schema(conn: &Connection,) -> Result<(),> {
             installed_size INTEGER,
             UNIQUE(name, sub_package, repo, scope, registry)
         )",
-        [],
+        []
     )?;
 
     let has_epoch: bool = conn
@@ -121,15 +121,15 @@ fn setup_schema(conn: &Connection,) -> Result<(),> {
             "SELECT count(*) FROM pragma_table_info('packages') WHERE \
              name='epoch'",
             [],
-            |row| row.get(0,),
+            |row| row.get(0)
         )
-        .unwrap_or(0,)
+        .unwrap_or(0)
         > 0;
 
     if !has_epoch {
         let _ = conn.execute(
             "ALTER TABLE packages ADD COLUMN epoch INTEGER DEFAULT 0",
-            [],
+            []
         );
     }
 
@@ -138,14 +138,14 @@ fn setup_schema(conn: &Connection,) -> Result<(),> {
             "SELECT count(*) FROM pragma_table_info('packages') WHERE \
              name='revision'",
             [],
-            |row| row.get(0,),
+            |row| row.get(0)
         )
-        .unwrap_or(0,)
+        .unwrap_or(0)
         > 0;
 
     if !has_revision {
         let _ =
-            conn.execute("ALTER TABLE packages ADD COLUMN revision TEXT", [],);
+            conn.execute("ALTER TABLE packages ADD COLUMN revision TEXT", []);
     }
 
     let has_deps: bool = conn
@@ -153,14 +153,14 @@ fn setup_schema(conn: &Connection,) -> Result<(),> {
             "SELECT count(*) FROM pragma_table_info('packages') WHERE \
              name='dependencies'",
             [],
-            |row| row.get(0,),
+            |row| row.get(0)
         )
-        .unwrap_or(0,)
+        .unwrap_or(0)
         > 0;
 
     if !has_deps {
         let _ = conn
-            .execute("ALTER TABLE packages ADD COLUMN dependencies TEXT", [],);
+            .execute("ALTER TABLE packages ADD COLUMN dependencies TEXT", []);
     }
 
     let column_exists: bool = conn
@@ -168,13 +168,13 @@ fn setup_schema(conn: &Connection,) -> Result<(),> {
             "SELECT count(*) FROM pragma_table_info('packages') WHERE \
              name='bins'",
             [],
-            |row| row.get(0,),
+            |row| row.get(0)
         )
-        .unwrap_or(0,)
+        .unwrap_or(0)
         > 0;
 
     if !column_exists {
-        let _ = conn.execute("ALTER TABLE packages ADD COLUMN bins TEXT", [],);
+        let _ = conn.execute("ALTER TABLE packages ADD COLUMN bins TEXT", []);
     }
 
     let has_archive_size: bool = conn
@@ -182,19 +182,19 @@ fn setup_schema(conn: &Connection,) -> Result<(),> {
             "SELECT count(*) FROM pragma_table_info('packages') WHERE \
              name='archive_size'",
             [],
-            |row| row.get(0,),
+            |row| row.get(0)
         )
-        .unwrap_or(0,)
+        .unwrap_or(0)
         > 0;
 
     if !has_archive_size {
         let _ = conn.execute(
             "ALTER TABLE packages ADD COLUMN archive_size INTEGER",
-            [],
+            []
         );
         let _ = conn.execute(
             "ALTER TABLE packages ADD COLUMN installed_size INTEGER",
-            [],
+            []
         );
     }
 
@@ -203,23 +203,23 @@ fn setup_schema(conn: &Connection,) -> Result<(),> {
             "SELECT count(*) FROM pragma_table_info('packages') WHERE \
              name='archive_hash'",
             [],
-            |row| row.get(0,),
+            |row| row.get(0)
         )
-        .unwrap_or(0,)
+        .unwrap_or(0)
         > 0;
 
     if !has_archive_hash {
         let _ = conn
-            .execute("ALTER TABLE packages ADD COLUMN archive_hash TEXT", [],);
+            .execute("ALTER TABLE packages ADD COLUMN archive_hash TEXT", []);
     }
 
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_packages_name ON packages(name)",
-        [],
+        []
     )?;
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_packages_repo ON packages(repo)",
-        [],
+        []
     )?;
 
     conn.execute(
@@ -229,7 +229,7 @@ fn setup_schema(conn: &Connection,) -> Result<(),> {
             path TEXT NOT NULL,
             FOREIGN KEY(package_id) REFERENCES packages(id) ON DELETE CASCADE
         )",
-        [],
+        []
     )?;
 
     conn.execute(
@@ -247,7 +247,7 @@ fn setup_schema(conn: &Connection,) -> Result<(),> {
             repo TEXT,
             registry TEXT
         )",
-        [],
+        []
     )?;
 
     let has_sub_pkg_adv: bool = conn
@@ -255,28 +255,28 @@ fn setup_schema(conn: &Connection,) -> Result<(),> {
             "SELECT count(*) FROM pragma_table_info('package_advisories') \
              WHERE name='sub_package'",
             [],
-            |row| row.get(0,),
+            |row| row.get(0)
         )
-        .unwrap_or(0,)
+        .unwrap_or(0)
         > 0;
 
     if !has_sub_pkg_adv {
         let _ = conn.execute(
             "ALTER TABLE package_advisories ADD COLUMN sub_package TEXT",
-            [],
+            []
         );
     }
 
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_package_advisories_package ON \
          package_advisories(package, sub_package)",
-        [],
+        []
     )?;
 
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_package_files_path ON \
          package_files(path)",
-        [],
+        []
     )?;
 
     let mut fts_needs_rebuild = false;
@@ -285,9 +285,9 @@ fn setup_schema(conn: &Connection,) -> Result<(),> {
             "SELECT count(*) FROM sqlite_master WHERE type='table' AND \
              name='packages_fts'",
             [],
-            |row| row.get(0,),
+            |row| row.get(0)
         )
-        .unwrap_or(0,)
+        .unwrap_or(0)
         > 0;
 
     if fts_exists {
@@ -296,9 +296,9 @@ fn setup_schema(conn: &Connection,) -> Result<(),> {
                 "SELECT count(*) FROM pragma_table_info('packages_fts') WHERE \
                  name='bins'",
                 [],
-                |row| row.get(0,),
+                |row| row.get(0)
             )
-            .unwrap_or(0,)
+            .unwrap_or(0)
             > 0;
         if !has_bins_fts {
             fts_needs_rebuild = true;
@@ -308,21 +308,21 @@ fn setup_schema(conn: &Connection,) -> Result<(),> {
     }
 
     if fts_needs_rebuild {
-        let _ = conn.execute("DROP TABLE IF EXISTS packages_fts", [],);
-        let _ = conn.execute("DROP TRIGGER IF EXISTS packages_ai", [],);
-        let _ = conn.execute("DROP TRIGGER IF EXISTS packages_ad", [],);
-        let _ = conn.execute("DROP TRIGGER IF EXISTS packages_au", [],);
+        let _ = conn.execute("DROP TABLE IF EXISTS packages_fts", []);
+        let _ = conn.execute("DROP TRIGGER IF EXISTS packages_ai", []);
+        let _ = conn.execute("DROP TRIGGER IF EXISTS packages_ad", []);
+        let _ = conn.execute("DROP TRIGGER IF EXISTS packages_au", []);
 
         let _ = conn.execute(
             "CREATE VIRTUAL TABLE packages_fts USING fts5(name, description, \
              tags, bins, content='packages', content_rowid='id')",
-            [],
+            []
         );
 
         let _ = conn.execute(
             "INSERT INTO packages_fts(rowid, name, description, tags, bins) 
              SELECT id, name, description, tags, bins FROM packages",
-            [],
+            []
         );
 
         let _ = conn.execute(
@@ -330,7 +330,7 @@ fn setup_schema(conn: &Connection,) -> Result<(),> {
                 INSERT INTO packages_fts(rowid, name, description, tags, bins) \
              VALUES (new.id, new.name, new.description, new.tags, new.bins);
             END",
-            [],
+            []
         );
         let _ = conn.execute(
             "CREATE TRIGGER packages_ad AFTER DELETE ON packages BEGIN
@@ -338,7 +338,7 @@ fn setup_schema(conn: &Connection,) -> Result<(),> {
              description, tags, bins) VALUES('delete', old.id, old.name, \
              old.description, old.tags, old.bins);
             END",
-            [],
+            []
         );
         let _ = conn.execute(
             "CREATE TRIGGER packages_au AFTER UPDATE ON packages BEGIN
@@ -348,7 +348,7 @@ fn setup_schema(conn: &Connection,) -> Result<(),> {
                 INSERT INTO packages_fts(rowid, name, description, tags, bins) \
              VALUES (new.id, new.name, new.description, new.tags, new.bins);
             END",
-            [],
+            []
         );
     }
 
@@ -357,22 +357,22 @@ fn setup_schema(conn: &Connection,) -> Result<(),> {
             "SELECT count(*) FROM sqlite_master WHERE type='table' AND \
              name='package_files_fts'",
             [],
-            |row| row.get(0,),
+            |row| row.get(0)
         )
-        .unwrap_or(0,)
+        .unwrap_or(0)
         > 0;
 
     if !files_fts_exists {
         let _ = conn.execute(
             "CREATE VIRTUAL TABLE package_files_fts USING fts5(path, \
              content='package_files', content_rowid='id')",
-            [],
+            []
         );
 
         let _ = conn.execute(
             "INSERT INTO package_files_fts(rowid, path) SELECT id, path FROM \
              package_files",
-            [],
+            []
         );
 
         let _ = conn.execute(
@@ -381,7 +381,7 @@ fn setup_schema(conn: &Connection,) -> Result<(),> {
                 INSERT INTO package_files_fts(rowid, path) VALUES (new.id, \
              new.path);
             END",
-            [],
+            []
         );
         let _ = conn.execute(
             "CREATE TRIGGER package_files_ad AFTER DELETE ON package_files \
@@ -389,7 +389,7 @@ fn setup_schema(conn: &Connection,) -> Result<(),> {
                 INSERT INTO package_files_fts(package_files_fts, rowid, path) \
              VALUES('delete', old.id, old.path);
             END",
-            [],
+            []
         );
         let _ = conn.execute(
             "CREATE TRIGGER package_files_au AFTER UPDATE ON package_files \
@@ -399,11 +399,11 @@ fn setup_schema(conn: &Connection,) -> Result<(),> {
                 INSERT INTO package_files_fts(rowid, path) VALUES (new.id, \
              new.path);
             END",
-            [],
+            []
         );
     }
 
-    Ok((),)
+    Ok(())
 }
 
 /// Updates or inserts a package in the database.
@@ -415,25 +415,25 @@ pub fn update_package(
     conn: &Connection,
     pkg: &types::Package,
     registry: &str,
-    scope: Option<types::Scope,>,
-    sub_package: Option<&str,>,
-    reason: Option<&types::InstallReason,>,
-) -> Result<i64,> {
-    let tags_json = serde_json::to_string(&pkg.tags,)?;
+    scope: Option<types::Scope>,
+    sub_package: Option<&str>,
+    reason: Option<&types::InstallReason>
+) -> Result<i64> {
+    let tags_json = serde_json::to_string(&pkg.tags)?;
     let bins_json =
-        serde_json::to_string(&pkg.bins.as_ref().unwrap_or(&vec![],),)
+        serde_json::to_string(&pkg.bins.as_ref().unwrap_or(&vec![]))
             .unwrap_or_default();
     let pkg_type = format!("{:?}", pkg.package_type).to_lowercase();
-    let scope_str = scope.map(|s| format!("{s:?}").to_lowercase(),);
+    let scope_str = scope.map(|s| format!("{s:?}").to_lowercase());
     let reason_str = reason.map(|r| match r {
         types::InstallReason::Direct => "direct".to_string(),
-        types::InstallReason::Dependency { parent, } => {
+        types::InstallReason::Dependency { parent } => {
             format!("dependency:{parent}")
         }
-    },);
+    });
 
-    let deps_json = if let Some(deps,) = &pkg.dependencies {
-        serde_json::to_string(deps,).unwrap_or_default()
+    let deps_json = if let Some(deps) = &pkg.dependencies {
+        serde_json::to_string(deps).unwrap_or_default()
     } else {
         String::new()
     };
@@ -471,7 +471,7 @@ pub fn update_package(
             reason_str,
             deps_json,
             pkg.revision,
-        ],
+        ]
     )?;
 
     let row_id = conn.query_row(
@@ -479,10 +479,10 @@ pub fn update_package(
          repo = ?3 AND (scope IS ?4 OR (scope IS NULL AND ?4 IS NULL)) AND \
          (registry IS ?5)",
         params![pkg.name, sub_package, pkg.repo, scope_str, registry],
-        |row| row.get(0,),
+        |row| row.get(0)
     )?;
 
-    Ok(row_id,)
+    Ok(row_id)
 }
 
 /// Retrieves the internal database ID for a package.
@@ -493,17 +493,17 @@ pub fn update_package(
 pub fn get_package_id(
     conn: &Connection,
     name: &str,
-    sub_package: Option<&str,>,
+    sub_package: Option<&str>,
     repo: &str,
-    registry: &str,
-) -> Result<i64,> {
+    registry: &str
+) -> Result<i64> {
     let id = conn.query_row(
         "SELECT id FROM packages WHERE name = ?1 AND (sub_package IS ?2) AND \
          repo = ?3 AND registry = ?4",
         params![name, sub_package, repo, registry],
-        |row| row.get(0,),
+        |row| row.get(0)
     )?;
-    Ok(id,)
+    Ok(id)
 }
 
 /// Updates the archive and installed sizes for a package.
@@ -515,14 +515,14 @@ pub fn set_package_sizes(
     conn: &Connection,
     package_id: i64,
     archive_size: u64,
-    installed_size: u64,
-) -> Result<(),> {
+    installed_size: u64
+) -> Result<()> {
     conn.execute(
         "UPDATE packages SET archive_size = ?1, installed_size = ?2 WHERE id \
          = ?3",
-        params![archive_size as i64, installed_size as i64, package_id],
+        params![archive_size as i64, installed_size as i64, package_id]
     )?;
-    Ok((),)
+    Ok(())
 }
 
 /// Updates the archive hash for a package.
@@ -533,13 +533,13 @@ pub fn set_package_sizes(
 pub fn set_package_hash(
     conn: &Connection,
     package_id: i64,
-    hash: &str,
-) -> Result<(),> {
+    hash: &str
+) -> Result<()> {
     conn.execute(
         "UPDATE packages SET archive_hash = ?1 WHERE id = ?2",
-        params![hash, package_id],
+        params![hash, package_id]
     )?;
-    Ok((),)
+    Ok(())
 }
 
 /// Retrieves the archive hash for a package from the database.
@@ -550,24 +550,24 @@ pub fn set_package_hash(
 pub fn get_package_hash_from_db(
     registry_handle: &str,
     name: &str,
-    sub_package: Option<&str,>,
-    repo: &str,
-) -> Result<Option<String,>,> {
-    let conn = open_connection(registry_handle,)?;
-    let Ok(pkg_id,) =
-        get_package_id(&conn, name, sub_package, repo, registry_handle,)
+    sub_package: Option<&str>,
+    repo: &str
+) -> Result<Option<String>> {
+    let conn = open_connection(registry_handle)?;
+    let Ok(pkg_id) =
+        get_package_id(&conn, name, sub_package, repo, registry_handle)
     else {
-        return Ok(None,);
+        return Ok(None);
     };
-    let hash: Option<String,> = conn
+    let hash: Option<String> = conn
         .query_row(
             "SELECT archive_hash FROM packages WHERE id = ?1 AND archive_hash \
              IS NOT NULL",
             params![pkg_id],
-            |row| row.get(0,),
+            |row| row.get(0)
         )
         .ok();
-    Ok(hash,)
+    Ok(hash)
 }
 
 /// Retrieves the archive and installed sizes for a package from the database.
@@ -579,25 +579,25 @@ pub fn get_package_hash_from_db(
 pub fn get_package_sizes_from_db(
     registry_handle: &str,
     name: &str,
-    sub_package: Option<&str,>,
-) -> Result<Option<(u64, u64,),>,> {
-    let conn = open_connection(registry_handle,)?;
+    sub_package: Option<&str>
+) -> Result<Option<(u64, u64)>> {
+    let conn = open_connection(registry_handle)?;
     let mut stmt = conn.prepare(
         "SELECT archive_size, installed_size FROM packages WHERE name = ?1 \
-         AND (sub_package IS ?2) AND archive_size IS NOT NULL LIMIT 1",
+         AND (sub_package IS ?2) AND archive_size IS NOT NULL LIMIT 1"
     )?;
-    let mut rows = stmt.query(params![name, sub_package],)?;
-    if let Some(row,) = rows.next()? {
-        let archive: Option<i64,> = row.get(0,)?;
-        let installed: Option<i64,> = row.get(1,)?;
-        match (archive, installed,) {
-            (Some(a,), Some(i,),) => {
-                Ok(Some((a.cast_unsigned(), i.cast_unsigned(),),),)
+    let mut rows = stmt.query(params![name, sub_package])?;
+    if let Some(row) = rows.next()? {
+        let archive: Option<i64> = row.get(0)?;
+        let installed: Option<i64> = row.get(1)?;
+        match (archive, installed) {
+            (Some(a), Some(i)) => {
+                Ok(Some((a.cast_unsigned(), i.cast_unsigned())))
             }
-            _ => Ok(None,),
+            _ => Ok(None)
         }
     } else {
-        Ok(None,)
+        Ok(None)
     }
 }
 
@@ -610,31 +610,31 @@ pub fn get_package_sizes_from_db(
 pub fn get_package_files_from_db(
     registry_handle: &str,
     name: &str,
-    sub_package: Option<&str,>,
-    repo: &str,
-) -> Result<Option<Vec<String,>,>,> {
-    let conn = open_connection(registry_handle,)?;
-    let Ok(pkg_id,) =
-        get_package_id(&conn, name, sub_package, repo, registry_handle,)
+    sub_package: Option<&str>,
+    repo: &str
+) -> Result<Option<Vec<String>>> {
+    let conn = open_connection(registry_handle)?;
+    let Ok(pkg_id) =
+        get_package_id(&conn, name, sub_package, repo, registry_handle)
     else {
-        return Ok(None,);
+        return Ok(None);
     };
     let mut stmt =
-        conn.prepare("SELECT path FROM package_files WHERE package_id = ?1",)?;
-    let rows = stmt.query_map(params![pkg_id], |row| row.get(0,),)?;
+        conn.prepare("SELECT path FROM package_files WHERE package_id = ?1")?;
+    let rows = stmt.query_map(params![pkg_id], |row| row.get(0))?;
     let mut files = Vec::new();
     for row in rows {
-        files.push(row?,);
+        files.push(row?);
     }
     if files.is_empty() {
-        Ok(None,)
+        Ok(None)
     } else {
-        Ok(Some(files,),)
+        Ok(Some(files))
     }
 }
 
 /// A single entry for shell completion.
-#[derive(Debug,)]
+#[derive(Debug)]
 pub struct CompletionEntry {
     /// The name of the package.
     pub name: String,
@@ -643,7 +643,7 @@ pub struct CompletionEntry {
     /// A short description of the package.
     pub description: String,
     /// The name of the sub-package, if applicable.
-    pub sub_package: Option<String,>,
+    pub sub_package: Option<String>
 }
 
 /// Retrieves a list of packages suitable for shell completion.
@@ -653,28 +653,28 @@ pub struct CompletionEntry {
 /// Returns an error if the database connection cannot be opened or the query
 /// fails.
 pub fn get_packages_for_completion(
-    registry_handle: &str,
-) -> Result<Vec<CompletionEntry,>,> {
-    let conn = open_connection(registry_handle,)?;
+    registry_handle: &str
+) -> Result<Vec<CompletionEntry>> {
+    let conn = open_connection(registry_handle)?;
     let mut stmt = conn.prepare(
         "SELECT name, repo, description, sub_package FROM packages ORDER BY \
-         name",
+         name"
     )?;
 
     let rows = stmt.query_map([], |row| {
         Ok(CompletionEntry {
-            name: row.get(0,)?,
-            repo: row.get(1,)?,
-            description: row.get(2,).unwrap_or_default(),
-            sub_package: row.get(3,)?,
-        },)
-    },)?;
+            name: row.get(0)?,
+            repo: row.get(1)?,
+            description: row.get(2).unwrap_or_default(),
+            sub_package: row.get(3)?
+        })
+    })?;
 
     let mut entries = Vec::new();
     for row in rows {
-        entries.push(row?,);
+        entries.push(row?);
     }
-    Ok(entries,)
+    Ok(entries)
 }
 
 /// Updates or inserts a security advisory in the database.
@@ -686,10 +686,10 @@ pub fn update_advisory(
     conn: &Connection,
     advisory: &types::Advisory,
     repo: &str,
-    registry: &str,
-) -> Result<(),> {
+    registry: &str
+) -> Result<()> {
     let references_json =
-        serde_json::to_string(&advisory.references,).unwrap_or_default();
+        serde_json::to_string(&advisory.references).unwrap_or_default();
     let severity_str = format!("{:?}", advisory.severity).to_lowercase();
 
     conn.execute(
@@ -722,9 +722,9 @@ pub fn update_advisory(
             references_json,
             repo,
             registry,
-        ],
+        ]
     )?;
-    Ok((),)
+    Ok(())
 }
 
 /// Lists all security advisories in the database.
@@ -734,50 +734,50 @@ pub fn update_advisory(
 /// Returns an error if the database connection cannot be opened or the query
 /// fails.
 pub fn list_all_advisories(
-    registry_handle: &str,
-) -> Result<Vec<(types::Advisory, String,),>,> {
-    let conn = open_connection(registry_handle,)?;
+    registry_handle: &str
+) -> Result<Vec<(types::Advisory, String)>> {
+    let conn = open_connection(registry_handle)?;
     let mut stmt = conn.prepare(
         "SELECT id, package, sub_package, summary, severity, cvss, \
          affected_range, fixed_in, description, references_json, repo FROM \
-         package_advisories",
+         package_advisories"
     )?;
 
     let rows = stmt.query_map([], |row| {
-        let severity_raw: String = row.get(4,)?;
+        let severity_raw: String = row.get(4)?;
         let severity = match severity_raw.as_str() {
             "medium" => types::Severity::Medium,
             "high" => types::Severity::High,
             "critical" => types::Severity::Critical,
-            _ => types::Severity::Low,
+            _ => types::Severity::Low
         };
 
-        let references_raw: String = row.get(9,)?;
-        let references: Option<Vec<String,>,> =
-            serde_json::from_str(&references_raw,).ok();
+        let references_raw: String = row.get(9)?;
+        let references: Option<Vec<String>> =
+            serde_json::from_str(&references_raw).ok();
 
         Ok((
             types::Advisory {
-                id: row.get(0,)?,
-                package: row.get(1,)?,
-                sub_package: row.get(2,)?,
-                summary: row.get(3,)?,
+                id: row.get(0)?,
+                package: row.get(1)?,
+                sub_package: row.get(2)?,
+                summary: row.get(3)?,
                 severity,
-                cvss: row.get(5,)?,
-                affected_range: row.get(6,)?,
-                fixed_in: row.get(7,)?,
-                description: row.get(8,)?,
-                references,
+                cvss: row.get(5)?,
+                affected_range: row.get(6)?,
+                fixed_in: row.get(7)?,
+                description: row.get(8)?,
+                references
             },
-            row.get::<_, String>(10,)?,
-        ),)
-    },)?;
+            row.get::<_, String>(10)?
+        ))
+    })?;
 
     let mut advisories = Vec::new();
     for row in rows {
-        advisories.push(row?,);
+        advisories.push(row?);
     }
-    Ok(advisories,)
+    Ok(advisories)
 }
 
 /// Retrieves all security advisories for a specific package.
@@ -789,19 +789,19 @@ pub fn list_all_advisories(
 pub fn get_advisories_for_package(
     registry_handle: &str,
     package_name: &str,
-    sub_package: Option<&str,>,
-) -> Result<Vec<types::Advisory,>,> {
-    let conn = open_connection(registry_handle,)?;
+    sub_package: Option<&str>
+) -> Result<Vec<types::Advisory>> {
+    let conn = open_connection(registry_handle)?;
 
-    let (query, params_vec,): (String, Vec<rusqlite::types::Value,>,) =
+    let (query, params_vec): (String, Vec<rusqlite::types::Value>) =
         match sub_package {
-            Some(sub,) => (
+            Some(sub) => (
                 "SELECT id, package, sub_package, summary, severity, cvss, \
                  affected_range, fixed_in, description, references_json 
              FROM package_advisories 
              WHERE package = ?1 AND (sub_package IS ?2 OR sub_package IS NULL)"
                     .to_string(),
-                vec![package_name.to_string().into(), sub.to_string().into()],
+                vec![package_name.to_string().into(), sub.to_string().into()]
             ),
             None => (
                 "SELECT id, package, sub_package, summary, severity, cvss, \
@@ -809,45 +809,45 @@ pub fn get_advisories_for_package(
              FROM package_advisories 
              WHERE package = ?1 AND sub_package IS NULL"
                     .to_string(),
-                vec![package_name.to_string().into()],
-            ),
+                vec![package_name.to_string().into()]
+            )
         };
 
-    let mut stmt = conn.prepare(&query,)?;
+    let mut stmt = conn.prepare(&query)?;
 
     let rows =
-        stmt.query_map(rusqlite::params_from_iter(params_vec,), |row| {
-            let severity_raw: String = row.get(4,)?;
+        stmt.query_map(rusqlite::params_from_iter(params_vec), |row| {
+            let severity_raw: String = row.get(4)?;
             let severity = match severity_raw.as_str() {
                 "medium" => types::Severity::Medium,
                 "high" => types::Severity::High,
                 "critical" => types::Severity::Critical,
-                _ => types::Severity::Low,
+                _ => types::Severity::Low
             };
 
-            let references_raw: String = row.get(9,)?;
-            let references: Option<Vec<String,>,> =
-                serde_json::from_str(&references_raw,).ok();
+            let references_raw: String = row.get(9)?;
+            let references: Option<Vec<String>> =
+                serde_json::from_str(&references_raw).ok();
 
             Ok(types::Advisory {
-                id: row.get(0,)?,
-                package: row.get(1,)?,
-                sub_package: row.get(2,)?,
-                summary: row.get(3,)?,
+                id: row.get(0)?,
+                package: row.get(1)?,
+                sub_package: row.get(2)?,
+                summary: row.get(3)?,
                 severity,
-                cvss: row.get(5,)?,
-                affected_range: row.get(6,)?,
-                fixed_in: row.get(7,)?,
-                description: row.get(8,)?,
-                references,
-            },)
-        },)?;
+                cvss: row.get(5)?,
+                affected_range: row.get(6)?,
+                fixed_in: row.get(7)?,
+                description: row.get(8)?,
+                references
+            })
+        })?;
 
     let mut advisories = Vec::new();
     for row in rows {
-        advisories.push(row?,);
+        advisories.push(row?);
     }
-    Ok(advisories,)
+    Ok(advisories)
 }
 
 /// Indexes the files provided by a package.
@@ -858,15 +858,15 @@ pub fn get_advisories_for_package(
 pub fn index_package_files(
     conn: &Connection,
     package_id: i64,
-    files: &[String],
-) -> Result<(),> {
+    files: &[String]
+) -> Result<()> {
     let mut stmt = conn.prepare(
-        "INSERT INTO package_files (package_id, path) VALUES (?1, ?2)",
+        "INSERT INTO package_files (package_id, path) VALUES (?1, ?2)"
     )?;
     for file in files {
-        stmt.execute(params![package_id, file],)?;
+        stmt.execute(params![package_id, file])?;
     }
-    Ok((),)
+    Ok(())
 }
 
 /// Clears the file index for a specific package.
@@ -874,12 +874,12 @@ pub fn index_package_files(
 /// # Errors
 ///
 /// Returns an error if the database execution fails.
-pub fn clear_package_files(conn: &Connection, package_id: i64,) -> Result<(),> {
+pub fn clear_package_files(conn: &Connection, package_id: i64) -> Result<()> {
     conn.execute(
         "DELETE FROM package_files WHERE package_id = ?1",
-        params![package_id],
+        params![package_id]
     )?;
-    Ok((),)
+    Ok(())
 }
 
 /// Checks if a file path is owned by any package other than the specified one.
@@ -890,15 +890,15 @@ pub fn clear_package_files(conn: &Connection, package_id: i64,) -> Result<(),> {
 pub fn has_other_owners(
     conn: &Connection,
     path: &str,
-    current_package_id: i64,
-) -> Result<bool,> {
+    current_package_id: i64
+) -> Result<bool> {
     let count: i64 = conn.query_row(
         "SELECT count(*) FROM package_files WHERE path = ?1 AND package_id != \
          ?2",
         params![path, current_package_id],
-        |row| row.get(0,),
+        |row| row.get(0)
     )?;
-    Ok(count > 0,)
+    Ok(count > 0)
 }
 
 /// Deletes a package from the database.
@@ -909,17 +909,17 @@ pub fn has_other_owners(
 pub fn delete_package(
     conn: &Connection,
     name: &str,
-    sub_package: Option<&str,>,
+    sub_package: Option<&str>,
     repo: &str,
-    scope: Option<types::Scope,>,
-) -> Result<(),> {
-    let scope_str = scope.map(|s| format!("{s:?}").to_lowercase(),);
+    scope: Option<types::Scope>
+) -> Result<()> {
+    let scope_str = scope.map(|s| format!("{s:?}").to_lowercase());
     conn.execute(
         "DELETE FROM packages WHERE name = ?1 AND (sub_package IS ?2) AND \
          repo = ?3 AND (scope IS ?4 OR scope IS NULL)",
-        params![name, sub_package, repo, scope_str],
+        params![name, sub_package, repo, scope_str]
     )?;
-    Ok((),)
+    Ok(())
 }
 
 /// Clears all package and advisory data from the database.
@@ -927,10 +927,10 @@ pub fn delete_package(
 /// # Errors
 ///
 /// Returns an error if the database execution fails.
-pub fn clear_registry(conn: &Connection,) -> Result<(),> {
-    conn.execute("DELETE FROM packages", [],)?;
-    conn.execute("DELETE FROM package_advisories", [],)?;
-    Ok((),)
+pub fn clear_registry(conn: &Connection) -> Result<()> {
+    conn.execute("DELETE FROM packages", [])?;
+    conn.execute("DELETE FROM package_advisories", [])?;
+    Ok(())
 }
 
 /// Finds packages that provide a specific command or file.
@@ -940,63 +940,63 @@ pub fn clear_registry(conn: &Connection,) -> Result<(),> {
 /// Returns an error if the database connection or query fails.
 pub fn find_provides(
     registry_handle: &str,
-    term: &str,
-) -> Result<Vec<(types::Package, String,),>,> {
-    let conn = open_connection(registry_handle,)?;
+    term: &str
+) -> Result<Vec<(types::Package, String)>> {
+    let conn = open_connection(registry_handle)?;
 
     let mut stmt = conn.prepare(
         "SELECT name, repo, version, description, package_type, tags, bins, \
          license, sub_package, revision, epoch 
          FROM packages 
-         WHERE name = ?1",
+         WHERE name = ?1"
     )?;
 
     let rows = stmt.query_map(params![term], |row| {
-        let tags_raw: String = row.get(5,)?;
-        let tags: Vec<String,> =
-            serde_json::from_str(&tags_raw,).unwrap_or_default();
-        let bins_raw: String = row.get::<_, String>(6,).unwrap_or_default();
-        let bins: Vec<String,> =
-            serde_json::from_str(&bins_raw,).unwrap_or_default();
-        let type_raw: String = row.get(4,)?;
-        let revision: String = row.get(9,).unwrap_or_else(|_| "1".to_string(),);
-        let epoch: u32 = row.get(10,).unwrap_or(0,);
+        let tags_raw: String = row.get(5)?;
+        let tags: Vec<String> =
+            serde_json::from_str(&tags_raw).unwrap_or_default();
+        let bins_raw: String = row.get::<_, String>(6).unwrap_or_default();
+        let bins: Vec<String> =
+            serde_json::from_str(&bins_raw).unwrap_or_default();
+        let type_raw: String = row.get(4)?;
+        let revision: String = row.get(9).unwrap_or_else(|_| "1".to_string());
+        let epoch: u32 = row.get(10).unwrap_or(0);
 
         let package_type = match type_raw.as_str() {
             "collection" => types::PackageType::Collection,
             "app" => types::PackageType::App,
             "extension" => types::PackageType::Extension,
-            _ => types::PackageType::Package,
+            _ => types::PackageType::Package
         };
 
         Ok((
             types::Package {
-                name: row.get(0,)?,
-                repo: row.get(1,)?,
-                version: row.get(2,)?,
+                name: row.get(0)?,
+                repo: row.get(1)?,
+                version: row.get(2)?,
                 epoch,
                 revision,
-                description: row.get(3,)?,
+                description: row.get(3)?,
                 package_type,
                 tags,
-                bins: Some(bins.clone(),),
-                license: row.get(7,)?,
-                sub_package: row.get(8,)?,
+                bins: Some(bins.clone()),
+                license: row.get(7)?,
+                sub_package: row.get(8)?,
                 maintainer: types::Maintainer::default(),
                 ..Default::default()
             },
-            bins,
-        ),)
-    },)?;
+            bins
+        ))
+    })?;
 
     let mut results = Vec::new();
     for row in rows {
-        let (pkg, bins,) = row?;
+        let (pkg, bins) = row?;
         if bins.is_empty() {
-            results.push((pkg, format!("bin/{term}"),),);
+            results.push((pkg, format!("bin/{term}")));
         } else {
             for bin in &bins {
-                results.push((pkg.clone(), format!("bin/{bin}"),),);
+                results.push((pkg.clone(), format!("bin/{bin}")));
             }
         }
     }
@@ -1005,50 +1005,50 @@ pub fn find_provides(
         "SELECT name, repo, version, description, package_type, tags, bins, \
          license, sub_package, revision, epoch 
          FROM packages 
-         WHERE bins IS NOT NULL",
+         WHERE bins IS NOT NULL"
     )?;
 
     let rows = stmt.query_map([], |row| {
-        let tags_raw: String = row.get(5,)?;
-        let tags: Vec<String,> =
-            serde_json::from_str(&tags_raw,).unwrap_or_default();
-        let bins_raw: String = row.get(6,)?;
-        let bins: Vec<String,> =
-            serde_json::from_str(&bins_raw,).unwrap_or_default();
-        let type_raw: String = row.get(4,)?;
-        let revision: String = row.get(9,).unwrap_or_else(|_| "1".to_string(),);
-        let epoch: u32 = row.get(10,).unwrap_or(0,);
+        let tags_raw: String = row.get(5)?;
+        let tags: Vec<String> =
+            serde_json::from_str(&tags_raw).unwrap_or_default();
+        let bins_raw: String = row.get(6)?;
+        let bins: Vec<String> =
+            serde_json::from_str(&bins_raw).unwrap_or_default();
+        let type_raw: String = row.get(4)?;
+        let revision: String = row.get(9).unwrap_or_else(|_| "1".to_string());
+        let epoch: u32 = row.get(10).unwrap_or(0);
 
         let package_type = match type_raw.as_str() {
             "collection" => types::PackageType::Collection,
             "app" => types::PackageType::App,
             "extension" => types::PackageType::Extension,
-            _ => types::PackageType::Package,
+            _ => types::PackageType::Package
         };
 
         Ok(types::Package {
-            name: row.get(0,)?,
-            repo: row.get(1,)?,
-            version: row.get(2,)?,
+            name: row.get(0)?,
+            repo: row.get(1)?,
+            version: row.get(2)?,
             epoch,
             revision,
-            description: row.get(3,)?,
+            description: row.get(3)?,
             package_type,
             tags,
-            bins: Some(bins,),
-            license: row.get(7,)?,
-            sub_package: row.get(8,)?,
+            bins: Some(bins),
+            license: row.get(7)?,
+            sub_package: row.get(8)?,
             maintainer: types::Maintainer::default(),
             ..Default::default()
-        },)
-    },)?;
+        })
+    })?;
 
     for row in rows {
         let pkg = row?;
-        if let Some(bins,) = &pkg.bins {
+        if let Some(bins) = &pkg.bins {
             for bin in bins {
-                if bin == term || bin.contains(term,) {
-                    results.push((pkg.clone(), format!("bin/{bin}"),),);
+                if bin == term || bin.contains(term) {
+                    results.push((pkg.clone(), format!("bin/{bin}")));
                 }
             }
         }
@@ -1060,7 +1060,7 @@ pub fn find_provides(
          p.epoch 
          FROM packages p
          JOIN package_files pf ON p.id = pf.package_id
-         WHERE pf.path LIKE ?1 OR pf.path LIKE ?2",
+         WHERE pf.path LIKE ?1 OR pf.path LIKE ?2"
     )?;
 
     let path_like_query = format!("%/{term}");
@@ -1068,65 +1068,65 @@ pub fn find_provides(
 
     let rows =
         stmt.query_map(params![path_like_query, exact_path_query], |row| {
-            let tags_raw: String = row.get(5,)?;
-            let tags: Vec<String,> =
-                serde_json::from_str(&tags_raw,).unwrap_or_default();
-            let bins_raw: String = row.get(6,)?;
-            let bins: Vec<String,> =
-                serde_json::from_str(&bins_raw,).unwrap_or_default();
-            let type_raw: String = row.get(4,)?;
+            let tags_raw: String = row.get(5)?;
+            let tags: Vec<String> =
+                serde_json::from_str(&tags_raw).unwrap_or_default();
+            let bins_raw: String = row.get(6)?;
+            let bins: Vec<String> =
+                serde_json::from_str(&bins_raw).unwrap_or_default();
+            let type_raw: String = row.get(4)?;
             let revision: String =
-                row.get(10,).unwrap_or_else(|_| "1".to_string(),);
-            let epoch: u32 = row.get(11,).unwrap_or(0,);
+                row.get(10).unwrap_or_else(|_| "1".to_string());
+            let epoch: u32 = row.get(11).unwrap_or(0);
 
             let package_type = match type_raw.as_str() {
                 "collection" => types::PackageType::Collection,
                 "app" => types::PackageType::App,
                 "extension" => types::PackageType::Extension,
-                _ => types::PackageType::Package,
+                _ => types::PackageType::Package
             };
 
             let pkg = types::Package {
-                name: row.get(0,)?,
-                repo: row.get(1,)?,
-                version: row.get(2,)?,
+                name: row.get(0)?,
+                repo: row.get(1)?,
+                version: row.get(2)?,
                 epoch,
                 revision,
-                description: row.get(3,)?,
+                description: row.get(3)?,
                 package_type,
                 tags,
-                bins: Some(bins,),
-                license: row.get(7,)?,
-                sub_package: row.get(8,)?,
+                bins: Some(bins),
+                license: row.get(7)?,
+                sub_package: row.get(8)?,
                 maintainer: types::Maintainer::default(),
                 ..Default::default()
             };
-            let path: String = row.get(9,)?;
-            Ok((pkg, path,),)
-        },)?;
+            let path: String = row.get(9)?;
+            Ok((pkg, path))
+        })?;
 
     for row in rows {
-        let (pkg, mut path,): (types::Package, String,) = row?;
-        if let Some(stripped,) = path.strip_prefix("data/pkgstore/",) {
+        let (pkg, mut path): (types::Package, String) = row?;
+        if let Some(stripped) = path.strip_prefix("data/pkgstore/") {
             path = format!("/{stripped}");
-        } else if let Some(stripped,) = path.strip_prefix("data/home/",) {
+        } else if let Some(stripped) = path.strip_prefix("data/home/") {
             path = format!("~/{stripped}");
         }
 
-        results.push((pkg, path,),);
+        results.push((pkg, path));
     }
 
     results.sort_by(|a, b| {
         a.0.name
-            .cmp(&b.0.name,)
-            .then(a.0.repo.cmp(&b.0.repo,),)
-            .then(a.1.cmp(&b.1,),)
-    },);
+            .cmp(&b.0.name)
+            .then(a.0.repo.cmp(&b.0.repo))
+            .then(a.1.cmp(&b.1))
+    });
     results.dedup_by(|a, b| {
         a.0.name == b.0.name && a.0.repo == b.0.repo && a.1 == b.1
-    },);
+    });
 
-    Ok(results,)
+    Ok(results)
 }
 
 /// Searches for packages matching a search term.
@@ -1137,61 +1137,61 @@ pub fn find_provides(
 /// fails.
 pub fn search_packages(
     registry_handle: &str,
-    term: &str,
-) -> Result<Vec<types::Package,>,> {
-    let conn = open_connection(registry_handle,)?;
+    term: &str
+) -> Result<Vec<types::Package>> {
+    let conn = open_connection(registry_handle)?;
     let mut stmt = conn.prepare(
         "SELECT name, repo, version, description, package_type, tags, \
          license, sub_package, revision, epoch 
          FROM packages 
          WHERE id IN (SELECT rowid FROM packages_fts WHERE packages_fts MATCH \
          ?1)
-         OR name LIKE ?2",
+         OR name LIKE ?2"
     )?;
 
     let search_query = format!("{term}*");
     let like_query = format!("%{term}%");
 
     let rows = stmt.query_map(params![search_query, like_query], |row| {
-        let tags_raw: String = row.get(5,)?;
-        let tags: Vec<String,> =
-            serde_json::from_str(&tags_raw,).unwrap_or_default();
-        let type_raw: String = row.get(4,)?;
-        let revision: String = row.get(8,).unwrap_or_else(|_| "1".to_string(),);
-        let epoch: u32 = row.get(9,).unwrap_or(0,);
+        let tags_raw: String = row.get(5)?;
+        let tags: Vec<String> =
+            serde_json::from_str(&tags_raw).unwrap_or_default();
+        let type_raw: String = row.get(4)?;
+        let revision: String = row.get(8).unwrap_or_else(|_| "1".to_string());
+        let epoch: u32 = row.get(9).unwrap_or(0);
 
         let package_type = match type_raw.as_str() {
             "collection" => types::PackageType::Collection,
             "app" => types::PackageType::App,
             "extension" => types::PackageType::Extension,
-            _ => types::PackageType::Package,
+            _ => types::PackageType::Package
         };
 
         Ok(types::Package {
-            name: row.get(0,)?,
-            repo: row.get(1,)?,
-            version: row.get(2,)?,
+            name: row.get(0)?,
+            repo: row.get(1)?,
+            version: row.get(2)?,
             epoch,
             revision,
-            description: row.get(3,)?,
+            description: row.get(3)?,
             package_type,
             tags,
-            license: row.get(6,)?,
-            sub_package: row.get(7,)?,
+            license: row.get(6)?,
+            sub_package: row.get(7)?,
             maintainer: types::Maintainer {
                 name: String::new(),
                 email: String::new(),
-                website: None,
+                website: None
             },
             ..Default::default()
-        },)
-    },)?;
+        })
+    })?;
 
     let mut pkgs = Vec::new();
     for row in rows {
-        pkgs.push(row?,);
+        pkgs.push(row?);
     }
-    Ok(pkgs,)
+    Ok(pkgs)
 }
 
 /// Searches for files matching a search term.
@@ -1202,59 +1202,59 @@ pub fn search_packages(
 /// fails.
 pub fn search_files(
     registry_handle: &str,
-    term: &str,
-) -> Result<Vec<(types::Package, String,),>,> {
-    let conn = open_connection(registry_handle,)?;
+    term: &str
+) -> Result<Vec<(types::Package, String)>> {
+    let conn = open_connection(registry_handle)?;
     let like_query = format!("%{term}%");
 
     let has_fts = conn
-        .prepare("SELECT 1 FROM package_files_fts LIMIT 0",)
+        .prepare("SELECT 1 FROM package_files_fts LIMIT 0")
         .is_ok();
 
     macro_rules! map_file_row {
         ($row:expr) => {{
-            let tags_raw: String = $row.get(5,)?;
-            let tags: Vec<String,> =
-                serde_json::from_str(&tags_raw,).unwrap_or_default();
-            let type_raw: String = $row.get(4,)?;
+            let tags_raw: String = $row.get(5)?;
+            let tags: Vec<String> =
+                serde_json::from_str(&tags_raw).unwrap_or_default();
+            let type_raw: String = $row.get(4)?;
             let revision: String =
-                $row.get(9,).unwrap_or_else(|_| "1".to_string(),);
-            let epoch: u32 = $row.get(10,).unwrap_or(0,);
+                $row.get(9).unwrap_or_else(|_| "1".to_string());
+            let epoch: u32 = $row.get(10).unwrap_or(0);
             let package_type = match type_raw.as_str() {
                 "collection" => types::PackageType::Collection,
                 "app" => types::PackageType::App,
                 "extension" => types::PackageType::Extension,
-                _ => types::PackageType::Package,
+                _ => types::PackageType::Package
             };
             let pkg = types::Package {
-                name: $row.get(0,)?,
-                repo: $row.get(1,)?,
-                version: $row.get(2,)?,
+                name: $row.get(0)?,
+                repo: $row.get(1)?,
+                version: $row.get(2)?,
                 epoch,
                 revision,
-                description: $row.get(3,)?,
+                description: $row.get(3)?,
                 package_type,
                 tags,
-                license: $row.get(6,)?,
-                sub_package: $row.get(7,)?,
+                license: $row.get(6)?,
+                sub_package: $row.get(7)?,
                 maintainer: types::Maintainer {
                     name: String::new(),
                     email: String::new(),
-                    website: None,
+                    website: None
                 },
                 ..Default::default()
             };
-            let path: String = $row.get(8,)?;
-            Ok::<_, rusqlite::Error,>((pkg, path,),)
+            let path: String = $row.get(8)?;
+            Ok::<_, rusqlite::Error>((pkg, path))
         }};
     }
 
     if has_fts {
         let search_query = term
-            .replace('/', " ",)
+            .replace('/', " ")
             .split_whitespace()
-            .collect::<Vec<_,>>()
-            .join("* ",);
+            .collect::<Vec<_>>()
+            .join("* ");
         let mut stmt = conn.prepare(
             "SELECT p.name, p.repo, p.version, p.description, p.package_type, \
              p.tags, p.license, p.sub_package, pf.path, p.revision, p.epoch
@@ -1262,32 +1262,32 @@ pub fn search_files(
              JOIN package_files pf ON p.id = pf.package_id
              WHERE pf.id IN (SELECT rowid FROM package_files_fts WHERE \
              package_files_fts MATCH ?1)
-             OR pf.path LIKE ?2",
+             OR pf.path LIKE ?2"
         )?;
         let rows = stmt
             .query_map(params![search_query, like_query], |row| {
                 map_file_row!(row)
-            },)?;
+            })?;
         let mut results = Vec::new();
         for row in rows {
-            results.push(row?,);
+            results.push(row?);
         }
-        Ok(results,)
+        Ok(results)
     } else {
         let mut stmt = conn.prepare(
             "SELECT p.name, p.repo, p.version, p.description, p.package_type, \
              p.tags, p.license, p.sub_package, pf.path, p.revision, p.epoch
              FROM packages p
              JOIN package_files pf ON p.id = pf.package_id
-             WHERE pf.path LIKE ?1",
+             WHERE pf.path LIKE ?1"
         )?;
         let rows =
-            stmt.query_map(params![like_query], |row| map_file_row!(row),)?;
+            stmt.query_map(params![like_query], |row| map_file_row!(row))?;
         let mut results = Vec::new();
         for row in rows {
-            results.push(row?,);
+            results.push(row?);
         }
-        Ok(results,)
+        Ok(results)
     }
 }
 
@@ -1297,65 +1297,62 @@ pub fn search_files(
 ///
 /// Returns an error if the database connection cannot be opened or the query
 /// fails.
-pub fn list_all_packages(
-    registry_handle: &str,
-) -> Result<Vec<types::Package,>,> {
-    let conn = open_connection(registry_handle,)?;
+pub fn list_all_packages(registry_handle: &str) -> Result<Vec<types::Package>> {
+    let conn = open_connection(registry_handle)?;
     let mut stmt = conn.prepare(
         "SELECT name, repo, version, description, package_type, tags, \
          license, sub_package, scope, registry, reason, revision, epoch FROM \
-         packages ORDER BY name",
+         packages ORDER BY name"
     )?;
 
     let rows = stmt.query_map([], |row| {
-        let tags_raw: String = row.get(5,)?;
-        let tags: Vec<String,> =
-            serde_json::from_str(&tags_raw,).unwrap_or_default();
-        let type_raw: String = row.get(4,)?;
+        let tags_raw: String = row.get(5)?;
+        let tags: Vec<String> =
+            serde_json::from_str(&tags_raw).unwrap_or_default();
+        let type_raw: String = row.get(4)?;
 
         let package_type = match type_raw.as_str() {
             "collection" => types::PackageType::Collection,
             "app" => types::PackageType::App,
             "extension" => types::PackageType::Extension,
-            _ => types::PackageType::Package,
+            _ => types::PackageType::Package
         };
 
-        let sub_package: Option<String,> = row.get(7,)?;
-        let scope_raw: Option<String,> = row.get(8,)?;
-        let registry: Option<String,> = row.get(9,)?;
-        let reason_raw: Option<String,> = row.get(10,)?;
-        let revision: String =
-            row.get(11,).unwrap_or_else(|_| "1".to_string(),);
-        let epoch: u32 = row.get(12,).unwrap_or(0,);
+        let sub_package: Option<String> = row.get(7)?;
+        let scope_raw: Option<String> = row.get(8)?;
+        let registry: Option<String> = row.get(9)?;
+        let reason_raw: Option<String> = row.get(10)?;
+        let revision: String = row.get(11).unwrap_or_else(|_| "1".to_string());
+        let epoch: u32 = row.get(12).unwrap_or(0);
 
         let scope = match scope_raw.as_deref() {
-            Some("system",) => types::Scope::System,
-            Some("project",) => types::Scope::Project,
-            _ => types::Scope::User,
+            Some("system") => types::Scope::System,
+            Some("project") => types::Scope::Project,
+            _ => types::Scope::User
         };
 
         let reason = reason_raw.map(|r| {
             if r == "direct" {
                 types::InstallReason::Direct
-            } else if let Some(parent,) = r.strip_prefix("dependency:",) {
+            } else if let Some(parent) = r.strip_prefix("dependency:") {
                 types::InstallReason::Dependency {
-                    parent: parent.to_string(),
+                    parent: parent.to_string()
                 }
             } else {
                 types::InstallReason::Direct
             }
-        },);
+        });
 
         let pkg = types::Package {
-            name: row.get(0,)?,
-            repo: row.get(1,)?,
-            version: row.get(2,)?,
+            name: row.get(0)?,
+            repo: row.get(1)?,
+            version: row.get(2)?,
             epoch,
             revision,
-            description: row.get(3,)?,
+            description: row.get(3)?,
             package_type,
             tags,
-            license: row.get(6,)?,
+            license: row.get(6)?,
             scope,
             registry_handle: registry,
             sub_package,
@@ -1363,19 +1360,19 @@ pub fn list_all_packages(
             maintainer: types::Maintainer {
                 name: String::new(),
                 email: String::new(),
-                website: None,
+                website: None
             },
             ..Default::default()
         };
 
-        Ok(pkg,)
-    },)?;
+        Ok(pkg)
+    })?;
 
     let mut pkgs = Vec::new();
     for row in rows {
-        pkgs.push(row?,);
+        pkgs.push(row?);
     }
-    Ok(pkgs,)
+    Ok(pkgs)
 }
 
 /// Retrieves all versions of a specific package from the database.
@@ -1387,18 +1384,18 @@ pub fn list_all_packages(
 pub fn get_all_versions(
     registry_handle: &str,
     name: &str,
-    repo: &str,
-) -> Result<Vec<String,>,> {
-    let conn = open_connection(registry_handle,)?;
+    repo: &str
+) -> Result<Vec<String>> {
+    let conn = open_connection(registry_handle)?;
     let mut stmt = conn.prepare(
-        "SELECT version FROM packages WHERE name = ?1 AND repo = ?2",
+        "SELECT version FROM packages WHERE name = ?1 AND repo = ?2"
     )?;
-    let rows = stmt.query_map(params![name, repo], |row| row.get(0,),)?;
+    let rows = stmt.query_map(params![name, repo], |row| row.get(0))?;
     let mut versions = Vec::new();
     for v in rows.flatten() {
-        versions.push(v,);
+        versions.push(v);
     }
-    Ok(versions,)
+    Ok(versions)
 }
 
 /// Retrieves the dependencies of a specific package version.
@@ -1411,19 +1408,19 @@ pub fn get_package_dependencies(
     registry_handle: &str,
     name: &str,
     version: &str,
-    sub_package: Option<&str,>,
-    repo: &str,
-) -> Result<Option<String,>,> {
-    let conn = open_connection(registry_handle,)?;
+    sub_package: Option<&str>,
+    repo: &str
+) -> Result<Option<String>> {
+    let conn = open_connection(registry_handle)?;
     let mut stmt = conn.prepare(
         "SELECT dependencies FROM packages 
          WHERE name = ?1 AND version = ?2 AND (sub_package IS ?3) AND repo = ?4",
     )?;
-    let mut rows = stmt.query(params![name, version, sub_package, repo],)?;
-    if let Some(row,) = rows.next()? {
-        let deps: Option<String,> = row.get(0,)?;
-        Ok(deps,)
+    let mut rows = stmt.query(params![name, version, sub_package, repo])?;
+    if let Some(row) = rows.next()? {
+        let deps: Option<String> = row.get(0)?;
+        Ok(deps)
     } else {
-        Ok(None,)
+        Ok(None)
     }
 }

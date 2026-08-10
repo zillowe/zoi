@@ -11,21 +11,21 @@ use crate::pkg::{pin, resolve};
 ///
 /// Returns an error if the package cannot be resolved or if updating the pin
 /// configuration fails.
-pub fn run(source: &str,) -> Result<(),> {
-    let (pkg, _, _, _, _registry_handle, _, _,) =
-        resolve::resolve_package_and_version(source, None, false, false,)?;
+pub fn run(source: &str) -> Result<()> {
+    let (pkg, _, _, _, _registry_handle, _, _) =
+        resolve::resolve_package_and_version(source, None, false, false)?;
     let mut pinned_packages = pin::get_pinned_packages()?;
 
     let initial_len = pinned_packages.len();
-    pinned_packages.retain(|p| p.source != pkg.name,);
+    pinned_packages.retain(|p| p.source != pkg.name);
 
     if pinned_packages.len() == initial_len {
         println!("Package '{}' was not pinned.", pkg.name);
-        return Ok((),);
+        return Ok(());
     }
 
-    pin::write_pinned_packages(&pinned_packages,)?;
+    pin::write_pinned_packages(&pinned_packages)?;
 
     println!("Unpinned {}", pkg.name.green());
-    Ok((),)
+    Ok(())
 }
