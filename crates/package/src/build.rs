@@ -897,7 +897,7 @@ fn build_for_platform(
         .sum();
     fs::write(
         &size_path,
-        format!("down: {compressed_size}\ninstall: {uncompressed_size}\n"),
+        format!("down: {compressed_size}\ninstall: {uncompressed_size}\n",),
     )?;
 
     if !quiet {
