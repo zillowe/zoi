@@ -78,9 +78,9 @@ chrono = { version = "0.4.45", default-features = false, features = [
     "clock",
     "std",
 ] }
-clap = { version = "4.6.6", features = ["derive", "color"] }
+clap = { version = "4.6.5", features = ["derive", "color"] }
 clap_complete = "4.6.8"
-clap_mangen = "0.3.2"
+clap_mangen = "0.3.0"
 colored = "3.1.1"
 comfy-table = "7.2.2"
 crossterm = "0.29.0"
@@ -148,7 +148,7 @@ zstd = "0.13.3"
 ar = "0.9.0"
 sevenz-rust = "0.6.1"
 phf = "0.14.0"
-rusqlite = { version = "0.40.1", default-features = false, features = [
+rusqlite = { version = "0.40.2", default-features = false, features = [
     "bundled",
 ] }
 glob = "0.3.4"
@@ -160,12 +160,12 @@ purl = "0.1.6"
 dotenvy = "0.15.7"
 phf_codegen = "0.14.0"
 diffy = "0.5.1"
-ignore = "0.4.33"
+ignore = "0.4.31"
 aes-gcm = "0.11.0"
 rand = { version = "0.10.2", features = ["std", "thread_rng", "sys_rng"] }
 getrandom = "0.4.3"
 argon2 = "0.5.3"
-base64 = "0.23.1"
+base64 = "0.23.0"
 
 zoi-core = { path = "crates/core", version = "1.24.7" }
 zoi-hooks = { path = "crates/hooks", version = "1.24.7" }
