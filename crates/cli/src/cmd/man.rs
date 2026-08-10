@@ -634,10 +634,10 @@ fn run_app(
             }
             Event::Mouse(mouse,) => match mouse.kind {
                 MouseEventKind::ScrollUp => {
-                    app.scroll = app.scroll.saturating_sub(3,);
+                    app.scroll = app.scroll.saturating_sub(3,)
                 }
                 MouseEventKind::ScrollDown => {
-                    app.scroll = app.scroll.saturating_add(3,);
+                    app.scroll = app.scroll.saturating_add(3,)
                 }
                 _ => {}
             },

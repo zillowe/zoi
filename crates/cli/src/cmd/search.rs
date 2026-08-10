@@ -111,7 +111,7 @@ pub fn run(
 
         for res in results {
             if let Ok(pkgs,) = res {
-                all_packages.extend(pkgs,);
+                all_packages.extend(pkgs,)
             } else {
                 db_failed = true;
                 break;
