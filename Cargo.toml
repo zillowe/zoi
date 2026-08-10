@@ -78,7 +78,7 @@ chrono = { version = "0.4.45", default-features = false, features = [
     "clock",
     "std",
 ] }
-clap = { version = "4.6.5", features = ["derive", "color"] }
+clap = { version = "4.6.6", features = ["derive", "color"] }
 clap_complete = "4.6.8"
 clap_mangen = "0.3.0"
 colored = "3.1.1"
