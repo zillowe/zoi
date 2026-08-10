@@ -78,9 +78,9 @@ chrono = { version = "0.4.45", default-features = false, features = [
     "clock",
     "std",
 ] }
-clap = { version = "4.6.5", features = ["derive", "color"] }
+clap = { version = "4.6.6", features = ["derive", "color"] }
 clap_complete = "4.6.8"
-clap_mangen = "0.3.0"
+clap_mangen = "0.3.2"
 colored = "3.1.1"
 comfy-table = "7.2.2"
 crossterm = "0.29.0"
@@ -165,7 +165,7 @@ aes-gcm = "0.11.0"
 rand = { version = "0.10.2", features = ["std", "thread_rng", "sys_rng"] }
 getrandom = "0.4.3"
 argon2 = "0.5.3"
-base64 = "0.23.0"
+base64 = "0.23.1"
 
 zoi-core = { path = "crates/core", version = "1.24.7" }
 zoi-hooks = { path = "crates/hooks", version = "1.24.7" }
