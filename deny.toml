@@ -17,6 +17,9 @@ ignore = [
     # awaiting upstream update
     "RUSTSEC-2026-0195", # quick-xml: transitive via self_update
     # awaiting upstream update
+    "RUSTSEC-2026-0245", # sevenz-rust: path traversal vulnerability
+    "RUSTSEC-2026-0246", # sevenz-rust: unmaintained
+    "RUSTSEC-2026-0249", # smartstring: unmaintained
 ]
 
 [licenses]
