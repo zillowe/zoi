@@ -622,7 +622,6 @@ fn print_build_summary(
     config: &zoi_system::config::SystemConfig,
     dry_run: bool
 ) {
-    use comfy_table::modifiers::UTF8_ROUND_CORNERS;
     use comfy_table::presets::UTF8_FULL_CONDENSED;
     use comfy_table::{Cell, Color, Table};
 
@@ -641,8 +640,7 @@ fn print_build_summary(
     // Filesystems
     let mut fs_table = Table::new();
     fs_table
-        .load_preset(UTF8_FULL_CONDENSED)
-        .apply_modifier(UTF8_ROUND_CORNERS)
+        .load_style(UTF8_FULL_CONDENSED.with_rounded_corners())
         .set_header(vec![
             Cell::new("Action").fg(Color::Yellow),
             Cell::new("Device").fg(Color::Yellow),
@@ -666,8 +664,7 @@ fn print_build_summary(
     // System Info
     let mut sys_table = Table::new();
     sys_table
-        .load_preset(UTF8_FULL_CONDENSED)
-        .apply_modifier(UTF8_ROUND_CORNERS)
+        .load_style(UTF8_FULL_CONDENSED.with_rounded_corners())
         .set_header(vec![
             Cell::new("Property").fg(Color::Yellow),
             Cell::new("Value").fg(Color::Yellow),

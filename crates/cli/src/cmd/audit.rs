@@ -127,7 +127,7 @@ pub fn run(
 fn print_advisories_table(advisories: &[(types::Advisory, String, String)]) {
     let mut table = Table::new();
     table
-        .load_preset(UTF8_FULL)
+        .load_style(UTF8_FULL)
         .set_content_arrangement(ContentArrangement::Dynamic)
         .set_header(vec![
             Cell::new("ID").add_attribute(Attribute::Bold),
@@ -182,7 +182,7 @@ fn print_vulnerable_table(
 ) {
     let mut table = Table::new();
     table
-        .load_preset(UTF8_FULL)
+        .load_style(UTF8_FULL)
         .set_content_arrangement(ContentArrangement::Dynamic)
         .set_header(vec![
             Cell::new("Package").add_attribute(Attribute::Bold),

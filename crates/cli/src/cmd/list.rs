@@ -88,7 +88,7 @@ fn run_list_outdated(
 
     let mut table = Table::new();
     table
-        .load_preset(UTF8_FULL)
+        .load_style(UTF8_FULL)
         .set_content_arrangement(ContentArrangement::Dynamic)
         .set_header(vec![
             Cell::new("Package").add_attribute(Attribute::Bold),
@@ -202,7 +202,7 @@ fn run_list_installed(
 
     let mut table = Table::new();
     table
-        .load_preset(UTF8_FULL)
+        .load_style(UTF8_FULL)
         .set_content_arrangement(ContentArrangement::Dynamic)
         .set_header(vec![
             Cell::new("Package").add_attribute(Attribute::Bold),
@@ -618,7 +618,7 @@ fn run_list_all(
 
     let mut table = Table::new();
     table
-        .load_preset(UTF8_FULL)
+        .load_style(UTF8_FULL)
         .set_content_arrangement(ContentArrangement::Dynamic)
         .set_header(vec![
             Cell::new("Status").add_attribute(Attribute::Bold),

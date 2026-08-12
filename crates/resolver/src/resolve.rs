@@ -656,7 +656,7 @@ fn find_package_in_db(
         );
 
         let mut table = Table::new();
-        table.load_preset(UTF8_FULL);
+        table.load_style(UTF8_FULL);
         table.set_header(vec!["#", "Repo", "License", "Size", "Description"]);
 
         for (i, p) in found_packages.iter().enumerate() {
