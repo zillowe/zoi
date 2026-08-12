@@ -89,7 +89,7 @@ Or you can install `zoi-rs` on Fedora from [Terra](https://terra.fyralabs.com) r
 
 ```sh
 # add terra repo
-dnf install --nogpgcheck --repofrompath 'terra,https://repos.fyralabs.com/terra$releasever' terra-release
+sudo dnf install --nogpgcheck --repofrompath 'terra,https://repos.fyralabs.com/terra$releasever' terra-release
 # install Zoi
 sudo dnf install zoi-rs
 ```
