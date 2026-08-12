@@ -31,7 +31,10 @@ These are required for Zoi to run correctly after installation.
 
 - **Essential:**
   - `git`: Required for interacting with git repositories
-  (e.g. cloning packages, syncing the database).
+  - `gpg`: Required for verifying the authority of packages.
+- **Optional:**
+  - `bubblewrap`: The `bwrap` binary is required for building pure packages
+  and running isolated apps.
 
 ## Build Process
 
@@ -46,14 +49,11 @@ influenced by environment variables (see [Environment Variables](#environment-va
 # Build zoi in release mode
 cargo build --bin zoi --release
 
-# Build zoi-mini in release mode
-cargo build --bin zoi-mini --release
-
 # Build zoid (ZoiOS daemon) in release mode
 cargo build --bin zoid --release
 ```
 
-This will produce the `zoi`, `zoi-mini`, and `zoid` binaries in `target/release/`.
+This will produce the `zoi` and `zoid` binaries in `target/release/`.
 
 ### Using the Justfile
 
@@ -63,7 +63,7 @@ and installing.
 ```sh
 # Configure build paths (creates config.just)
 # You can also specify which binaries to build: --with-bin=zoi|zoi-mini|zoid|all (default: zoi)
-./configure --prefix=/usr/local --with-bin=all
+./configure --prefix=/usr/local --with-bin=zoi
 
 # Build release binaries
 just build
@@ -249,6 +249,10 @@ directory. These can be used as a reference.
 ### Scoop
 
 - [`zoi.json`](./packages/scoop/zoi.json): Scoop manifest for Windows.
+
+### RHEL
+
+- [`zoi.spec`](./packages/rpm/zoi.spec): RPM spec file for RHEL distros.
 
 ## Packaging Status
 
