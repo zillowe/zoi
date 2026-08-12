@@ -275,30 +275,30 @@ pub fn is_admin() -> bool {
 pub fn check_license(license: &str) {
     if license.is_empty() {
         println!(
-            "{}",
-            "Warning: Package does not have a license specified.".yellow()
+            "{} Package does not have a license specified.",
+            "Warning:".yellow()
         );
         return;
     }
 
     if license.eq_ignore_ascii_case("None") {
         println!(
-            "{}",
-            "Warning: Package does not provide a license.".yellow()
+            "{} Package does not provide a license.",
+            "Warning:".yellow()
         );
         return;
     }
 
     if license.eq_ignore_ascii_case("Proprietary") {
         println!(
-            "{}",
-            "Warning: Package is using a proprietary license.".red()
+            "{} Package is using a proprietary license.",
+            "Warning:".red()
         );
         return;
     }
 
     if license.eq_ignore_ascii_case("Unknown") {
-        println!("{}", "Warning: Package license is unknown.".red());
+        println!("{} Package license is unknown.", "Warning:".red());
         return;
     }
 
@@ -309,19 +309,19 @@ pub fn check_license(license: &str) {
                 spdx::LicenseItem::Other { .. } => false
             }) {
                 println!(
-                    "{}{}{}",
-                    "Warning: License '".yellow(),
-                    license.yellow().bold(),
-                    "' is not an OSI approved license.".yellow()
+                    "{} License expression '{}' does not evaluate to an OSI \
+                     approved license.",
+                    "Warning:".yellow(),
+                    license.yellow().bold()
                 );
             }
         }
         Err(_) => {
             println!(
-                "{}{}{}",
-                "Warning: Could not parse license expression '".yellow(),
-                license.yellow().bold(),
-                "' It may not be a valid SPDX identifier.".yellow()
+                "{} Could not parse license expression '{}'. It may not be a \
+                 valid SPDX identifier.",
+                "Warning:".yellow(),
+                license.yellow().bold()
             );
         }
     }

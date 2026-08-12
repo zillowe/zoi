@@ -356,6 +356,25 @@ fn license_contains_denied(license: &str, denied: &HashSet<String>) -> bool {
     if denied.is_empty() || license.trim().is_empty() {
         return false;
     }
+
+    if let Ok(expr) = spdx::Expression::parse(license) {
+        // A package is denied if it is impossible to satisfy the expression
+        // using only non-denied licenses.
+        // expr.evaluate returns true if the expression is satisfied.
+        // We evaluate with a predicate that checks if a single license is NOT
+        // denied.
+        return !expr.evaluate(|req| match req.license {
+            spdx::LicenseItem::Spdx { id, .. } => {
+                !denied.contains(&id.name.to_ascii_lowercase())
+            }
+            spdx::LicenseItem::Other { .. } => {
+                // For custom identifiers, we treat them as denied if they are
+                // in the list
+                !denied.contains(&license.to_ascii_lowercase())
+            }
+        });
+    }
+
     let tokens = license_tokens(license);
     tokens.iter().any(|token| denied.contains(token))
 }
@@ -370,11 +389,15 @@ fn license_matches_allowed(license: &str, allowed: &HashSet<String>) -> bool {
     }
 
     if let Ok(expr) = spdx::Expression::parse(license) {
+        // A package is allowed if the expression can be satisfied using
+        // only allowed licenses.
         return expr.evaluate(|req| match req.license {
             spdx::LicenseItem::Spdx { id, .. } => {
                 allowed.contains(&id.name.to_ascii_lowercase())
             }
-            spdx::LicenseItem::Other { .. } => false
+            spdx::LicenseItem::Other { .. } => {
+                allowed.contains(&license.to_ascii_lowercase())
+            }
         });
     }
 
