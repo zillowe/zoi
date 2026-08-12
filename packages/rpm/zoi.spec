@@ -1,4 +1,4 @@
-# Maintainer: ZilloweZ <zillowez@gmail.com>
+# Maintainer: ZilloweZ <zillowez@proton.me>
 
 Name:           zoi
 Version:        __VERSION__

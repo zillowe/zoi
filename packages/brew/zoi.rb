@@ -1,4 +1,4 @@
-# Maintainer: ZilloweZ <zillowez@gmail.com>
+# Maintainer: ZilloweZ <zillowez@proton.me>
 
 class Zoi < Formula
   desc "Advanced Package Manager & Environment Orchestrator"
