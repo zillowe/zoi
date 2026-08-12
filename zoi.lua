@@ -20,10 +20,6 @@ packages({
 
 tasks({
 	{
-		cmd = "build",
-		run = "rm -rf scripts/compiled && ./scripts/build.sh",
-	},
-	{
 		cmd = "lines",
 		run = "cloc crates",
 	},
@@ -41,7 +37,7 @@ tasks({
 	},
 	{
 		cmd = "check",
-		run = "cargo check --workspace --all-targets",
+		run = "cargo check --workspace --all-targets --tests",
 	},
 	{
 		cmd = "test",
