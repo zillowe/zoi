@@ -615,7 +615,7 @@ fn select_candidate(
         .collect();
 
     let mut table = Table::new();
-    table.load_preset(UTF8_FULL);
+    table.load_style(UTF8_FULL);
     table.set_header(vec!["#", "Source", "Version"]);
     for (i, m) in candidates.iter().enumerate() {
         table.add_row(vec![

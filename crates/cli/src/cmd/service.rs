@@ -103,7 +103,7 @@ pub fn run(args: ServiceCommand) -> Result<()> {
 
             let mut table = Table::new();
             table
-                .load_preset(UTF8_FULL)
+                .load_style(UTF8_FULL)
                 .set_header(vec!["Package", "Status"]);
 
             for (pkg, status) in services {

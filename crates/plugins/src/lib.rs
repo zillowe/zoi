@@ -326,7 +326,7 @@ impl PluginManager {
             .create_function(
                 |_, (headers, rows): (Vec<String>, Vec<Vec<String>>)| {
                     let mut table = ComfyTable::new();
-                    table.load_preset(UTF8_FULL).set_header(headers);
+                    table.load_style(UTF8_FULL).set_header(headers);
                     for row in rows {
                         table.add_row(row);
                     }

@@ -121,7 +121,7 @@ fn run_list_active() -> Result<()> {
 
     println!("{} Active repositories:", "::".bold().blue());
     let mut table = Table::new();
-    table.load_preset(UTF8_FULL).set_header(vec!["Repository"]);
+    table.load_style(UTF8_FULL).set_header(vec!["Repository"]);
     for repo in config.repos {
         table.add_row(vec![repo]);
     }
@@ -140,7 +140,7 @@ fn run_list_all() -> Result<()> {
     println!("{} All available repositories:", "::".bold().blue());
     let mut table = Table::new();
     table
-        .load_preset(UTF8_FULL)
+        .load_style(UTF8_FULL)
         .set_header(vec!["Status", "Repository"]);
 
     for repo in all_repos {
@@ -188,7 +188,7 @@ fn run_list_git_only() -> Result<()> {
         "::".bold().blue()
     );
     let mut table = Table::new();
-    table.load_preset(UTF8_FULL).set_header(vec!["Repository"]);
+    table.load_style(UTF8_FULL).set_header(vec!["Repository"]);
     for repo in repos {
         table.add_row(vec![repo]);
     }

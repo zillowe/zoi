@@ -261,7 +261,7 @@ pub fn run(
 
             let mut table = Table::new();
             table
-                .load_preset(UTF8_FULL)
+                .load_style(UTF8_FULL)
                 .set_content_arrangement(ContentArrangement::Dynamic)
                 .set_header(vec![
                     Cell::new("Package").add_attribute(Attribute::Bold),
@@ -394,7 +394,7 @@ fn run_file_search(
 
     let mut table = Table::new();
     table
-        .load_preset(UTF8_FULL)
+        .load_style(UTF8_FULL)
         .set_content_arrangement(ContentArrangement::Dynamic)
         .set_header(vec![
             Cell::new("Package").add_attribute(Attribute::Bold),
