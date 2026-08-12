@@ -1,4 +1,4 @@
-# Maintainer: ZilloweZ <zillowez@gmail.com>
+# Maintainer: ZilloweZ <zillowez@proton.me>
 
 pkgname='zoi-bin'
 _tag="Prod-Release-$pkgver"
