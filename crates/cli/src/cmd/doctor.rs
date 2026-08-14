@@ -295,6 +295,57 @@ pub fn run() -> Result<()> {
         }
     }
 
+    println!("\n{} Checking for registry drift...", "->".bold().cyan());
+    match pkg::doctor::check_registry_drift() {
+        Ok(drifted) => {
+            if drifted.is_empty() {
+                println!("{}", "No registry drift detected.".green());
+            } else {
+                issues_found += drifted.len();
+                println!(
+                    "{}: Local .pkg.lua files differ from database hash:",
+                    "Warning".yellow()
+                );
+                for d in drifted {
+                    println!("  - {d}");
+                }
+                println!(
+                    "This usually means the package registry was synced but \
+                     the package wasn't updated."
+                );
+            }
+        }
+        Err(e) => {
+            eprintln!("{}: Failed to check registry drift: {e}", "Error".red());
+            issues_found += 1;
+        }
+    }
+
+    println!(
+        "\n{} Checking for lockfile mismatches...",
+        "->".bold().cyan()
+    );
+    match pkg::doctor::check_lockfile_mismatch() {
+        Ok(Some(warning)) => {
+            issues_found += 1;
+            println!("{}: {warning}", "Warning".yellow());
+            println!(
+                "This lockfile was generated for another system and may lead \
+                 to resolution failures."
+            );
+        }
+        Ok(None) => {
+            println!("{}", "No lockfile mismatches found.".green());
+        }
+        Err(e) => {
+            eprintln!(
+                "{}: Failed to check lockfile mismatch: {e}",
+                "Error".red()
+            );
+            issues_found += 1;
+        }
+    }
+
     if issues_found == 0 {
         println!(
             "\n{}",

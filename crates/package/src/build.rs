@@ -100,7 +100,7 @@ pub fn get_build_dependencies(
     if let Some(deps) = &pkg_for_meta.dependencies
         && let Some(build_deps) = &deps.build
     {
-        let group = match build_deps {
+        let group: Option<&types::DependencyGroup> = match build_deps {
             types::BuildDependencies::Group(g) => Some(g),
             types::BuildDependencies::Typed(t) => {
                 t.types.get(&resolved_build_type)

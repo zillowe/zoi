@@ -255,6 +255,17 @@ fn handle_client(
                 }
             }
         }
+        Request::PinGeneration(id, pinned) => {
+            match gen_manager.pin_generation(id, pinned) {
+                Ok(_) => {
+                    let action = if pinned { "pinned" } else { "unpinned" };
+                    Response::Success(format!(
+                        "Generation {id} {action} successfully."
+                    ))
+                }
+                Err(e) => Response::Error(e.to_string())
+            }
+        }
         Request::ApplySystemConfig(config) => {
             println!("Applying system configuration...");
 

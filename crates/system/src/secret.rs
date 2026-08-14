@@ -72,6 +72,50 @@ fn get_master_key() -> Result<[u8; 32]> {
     Ok(key)
 }
 
+/// Exports the master key as a base64-encoded string.
+pub fn export_master_key() -> Result<String> {
+    let key = get_master_key()?;
+    Ok(general_purpose::STANDARD.encode(key))
+}
+
+/// Imports a base64-encoded master key.
+pub fn import_master_key(encoded_key: &str) -> Result<()> {
+    let key_bytes = general_purpose::STANDARD
+        .decode(encoded_key)
+        .map_err(|e| anyhow!("Failed to decode base64 key: {e}"))?;
+
+    if key_bytes.len() != 32 {
+        return Err(anyhow!("Invalid master key length. Expected 32 bytes."));
+    }
+
+    let mut key_path = get_user_home()
+        .ok_or_else(|| anyhow!("Could not find home directory"))?;
+    key_path.push(".zoi/master.key");
+
+    if let Some(parent) = key_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    #[cfg(unix)]
+    {
+        use std::io::Write;
+        use std::os::unix::fs::OpenOptionsExt;
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&key_path)?;
+        file.write_all(&key_bytes)?;
+    }
+    #[cfg(not(unix))]
+    {
+        fs::write(&key_path, key_bytes)?;
+    }
+
+    Ok(())
+}
+
 /// Encrypts a string so only this Zoi installation can decrypt it.
 pub fn encrypt_secret(plaintext: &str) -> Result<String> {
     let key_bytes = get_master_key()?;

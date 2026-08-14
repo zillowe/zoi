@@ -19,6 +19,8 @@ pub mod pkg_install;
 pub mod plan;
 /// Module for handling prebuilt packages.
 pub mod prebuilt;
+/// Module for preflight checks.
+pub mod preflight;
 /// Module for the `PubGrub` dependency resolver.
 pub mod pubgrub;
 /// Module for resolving dependencies.

@@ -12,7 +12,9 @@ pub struct Generation {
     pub created_at: DateTime<Utc>,
     pub packages: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub transaction_id: Option<String>
+    pub transaction_id: Option<String>,
+    #[serde(default)]
+    pub pinned: bool
 }
 
 pub struct GenerationManager {
@@ -71,7 +73,8 @@ impl GenerationManager {
             id,
             created_at: Utc::now(),
             packages,
-            transaction_id
+            transaction_id,
+            pinned: false
         };
 
         let meta_path = gen_path.join("generation.json");
@@ -185,8 +188,8 @@ impl GenerationManager {
                 break;
             }
 
-            // Never prune the active generation
-            if generation.id == current_id {
+            // Never prune the active generation or pinned generations
+            if generation.id == current_id || generation.pinned {
                 continue;
             }
 
@@ -205,6 +208,28 @@ impl GenerationManager {
             }
 
             removed += 1;
+        }
+
+        Ok(())
+    }
+
+    pub fn pin_generation(&self, id: u32, pinned: bool) -> Result<()> {
+        let gen_path = self.root.join(id.to_string());
+        let meta_path = gen_path.join("generation.json");
+        if !meta_path.exists() {
+            return Err(anyhow!("Generation {} does not exist", id));
+        }
+
+        let content = fs::read_to_string(&meta_path)?;
+        let mut generation: Generation = serde_json::from_str(&content)?;
+        generation.pinned = pinned;
+
+        fs::write(meta_path, serde_json::to_string_pretty(&generation)?)?;
+
+        if pinned {
+            println!("Generation {id} pinned successfully.");
+        } else {
+            println!("Generation {id} unpinned successfully.");
         }
 
         Ok(())

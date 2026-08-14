@@ -89,16 +89,37 @@ Reverts the operating system to a previous generation by sequentially rolling ba
 sudo zoi system rollback 41
 ```
 
+### `zoi system pin <id>`
+
+Pins a specific system generation to prevent it from being automatically pruned. Pinned generations are ignored by the `system_generations_limit` cleanup logic.
+
+```sh
+sudo zoi system pin 42
+```
+
+### `zoi system unpin <id>`
+
+Unpins a generation, allowing it to be pruned if it exceeds the system generations limit.
+
+```sh
+sudo zoi system unpin 42
+```
+
 ### `zoi system secret`
 
-Manage sensitive information like passwords and API keys.
+Manage sensitive information like passwords, API keys, and ZoiSEC master keys.
 
 - **`zoi system secret hash <password>`**: Generates a one-way Argon2 hash of a password. Use this in your `system.lua` for user passwords.
 - **`zoi system secret encrypt <value>`**: Encrypts a string so only Zoi on this specific machine can decrypt it. It returns a `ZOISEC:v1:...` string.
+- **`zoi system secret decrypt <ZOISEC>`**: Decrypts a `ZOISEC` string back to plaintext.
+- **`zoi system secret export-key`**: Exports the machine-specific ZoiSEC master key as a base64 string. Use this to make your secrets portable to other machines.
+- **`zoi system secret import-key <key>`**: Imports a base64-encoded ZoiSEC master key.
 
-### `zoi system secret decrypt <ZOISEC>`
-
-Decrypts a `ZOISEC` string back to plaintext (useful if you forgot the value)
+<Callout type="error" title="Security Warning">
+  The ZoiSEC master key is the root of trust for all your encrypted secrets.
+  Keep it safe! If someone obtains your master key, they can decrypt all your
+  `ZOISEC` strings.
+</Callout>
 
 ---
 

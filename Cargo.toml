@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
     "crates/core",
+    "crates/common",
     "crates/cli",
     "crates/mini",
     "crates/purl",
@@ -167,6 +168,7 @@ getrandom = "0.4.3"
 argon2 = "0.5.3"
 base64 = "0.23.1"
 
+zoi-common = { path = "crates/common", version = "1.25.0-dev" }
 zoi-core = { path = "crates/core", version = "1.25.0-dev" }
 zoi-hooks = { path = "crates/hooks", version = "1.25.0-dev" }
 zoi-lua = { path = "crates/lua", version = "1.25.0-dev" }
