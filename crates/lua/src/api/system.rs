@@ -1,9 +1,8 @@
 use std::fmt::Write as _;
-use std::fs;
 use std::io::{BufRead, BufReader, Write as _};
-use std::path::PathBuf;
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use std::thread;
 
 use mlua::{self, Lua, Table, Value};
 
@@ -15,8 +14,8 @@ struct InnerSession {
     stdin: ChildStdin,
     /// The buffered standard output stream for the child process.
     stdout: BufReader<ChildStdout>,
-    /// The path to the file where standard error is redirected.
-    stderr_path: PathBuf,
+    /// The shared buffer for capturing standard error.
+    stderr_buffer: Arc<Mutex<String>>,
     /// A unique string used to identify the end of a command's output.
     sentinel: String
 }
@@ -25,9 +24,6 @@ impl Drop for InnerSession {
     fn drop(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
-        if self.stderr_path.exists() {
-            let _ = fs::remove_file(&self.stderr_path);
-        }
     }
 }
 
@@ -42,8 +38,6 @@ impl ShellSession {
     fn new(lua: &Lua, build_dir: &str) -> Result<Self, anyhow::Error> {
         let sentinel =
             format!("---ZOI_CMD_COMPLETE_{}---", uuid::Uuid::new_v4());
-        let stderr_path =
-            PathBuf::from(build_dir).join(format!(".zoi_stderr_{sentinel}"));
 
         let mut child = if cfg!(target_os = "windows") {
             Command::new("pwsh")
@@ -54,7 +48,7 @@ impl ShellSession {
                 .current_dir(build_dir)
                 .stdin(Stdio::piped())
                 .stdout(Stdio::piped())
-                .stderr(Stdio::null())
+                .stderr(Stdio::piped())
                 .spawn()?
         } else {
             Command::new("bash")
@@ -63,13 +57,29 @@ impl ShellSession {
                 .current_dir(build_dir)
                 .stdin(Stdio::piped())
                 .stdout(Stdio::piped())
-                .stderr(Stdio::null())
+                .stderr(Stdio::piped())
                 .spawn()?
         };
 
         let mut stdin = child.stdin.take().expect("Failed to open stdin");
         let stdout =
             BufReader::new(child.stdout.take().expect("Failed to open stdout"));
+        let stderr = child.stderr.take().expect("Failed to open stderr");
+
+        let stderr_buffer = Arc::new(Mutex::new(String::new()));
+        let buffer_clone = Arc::clone(&stderr_buffer);
+
+        // Spawn a thread to consume stderr continuously
+        thread::spawn(move || {
+            let mut reader = BufReader::new(stderr);
+            let mut line = String::new();
+            while reader.read_line(&mut line).unwrap_or(0) > 0 {
+                if let Ok(mut buf) = buffer_clone.lock() {
+                    buf.push_str(&line);
+                }
+                line.clear();
+            }
+        });
 
         // Inject Zoi environment variables
         let mut env_cmds = String::new();
@@ -136,7 +146,7 @@ impl ShellSession {
                 child,
                 stdin,
                 stdout,
-                stderr_path,
+                stderr_buffer,
                 sentinel
             })
         })
@@ -145,23 +155,14 @@ impl ShellSession {
 
 /// Exposes system command and patching utilities to the Lua environment.
 ///
-/// These functions provide the bridge to the host operating system's tools:
-/// - `cmd`: Executes a shell command in a persistent session and captures its
-///   output and exit code.
-/// - `zpatch`: A wrapper around the `patch` command for applying diffs.
-///
-/// All commands are executed relative to the `BUILD_DIR` and respect the
-/// user's environment and Zoi's quiet/verbose settings.
-/// Adds the `cmd` function to the Lua environment for executing shell commands.
-///
 /// # Errors
 ///
-/// Returns an error if the `BUILD_DIR` cannot be found or if the shell session
-/// fails to initialize.
+/// Returns an error if the `cmd` function cannot be registered in the Lua
+/// globals.
 ///
 /// # Panics
 ///
-/// Panics if the shell session mutex is poisoned.
+/// Panics if the internal shell session mutex is poisoned.
 pub fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let cmd_fn = lua.create_function(move |lua, command: String| {
         let build_dir: String = lua.globals().get("BUILD_DIR")?;
@@ -189,14 +190,17 @@ pub fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
             println!("Executing: {command}");
         }
 
+        // Clear stderr buffer before running command
+        if let Ok(mut buf) = inner.stderr_buffer.lock() {
+            buf.clear();
+        }
+
         let sentinel = inner.sentinel.clone();
 
         if cfg!(target_os = "windows") {
-            let stderr_path_str =
-                inner.stderr_path.to_string_lossy().replace('\'', "''");
             let cmd_text = format!(
-                "$ErrorActionPreference = 'Continue'; & {{ {command} }} 2> \
-                 '{stderr_path_str}'; \"{sentinel} $LASTEXITCODE\"\n"
+                "$ErrorActionPreference = 'Continue'; & {{ {command} }}; \
+                 \"{sentinel} $LASTEXITCODE\"\n"
             );
             inner
                 .stdin
@@ -207,10 +211,8 @@ pub fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
                 .flush()
                 .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
         } else {
-            let stderr_display = inner.stderr_path.display();
             let cmd_text = format!(
-                "{{ {command} ; }} 2>{stderr_display:?} ; printf \"\\n%s \
-                 %d\\n\" {sentinel:?} $?\n"
+                "{{ {command} ; }} ; printf \"\\n%s %d\\n\" {sentinel:?} $?\n"
             );
             inner
                 .stdin
@@ -252,10 +254,12 @@ pub fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
             stdout_accum.push_str(&line);
         }
 
-        let stderr = fs::read_to_string(&inner.stderr_path).unwrap_or_default();
-        if inner.stderr_path.exists() {
-            let _ = fs::File::create(&inner.stderr_path);
-        }
+        // Retrieve captured stderr
+        let stderr = inner
+            .stderr_buffer
+            .lock()
+            .map(|b| b.clone())
+            .unwrap_or_default();
 
         if exit_code != 0 && !quiet {
             eprintln!("[cmd] {stderr}");
@@ -271,8 +275,8 @@ pub fn add_cmd_util(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
 ///
 /// # Errors
 ///
-/// Returns an error if the `BUILD_DIR` cannot be found or if the patch command
-/// fails.
+/// Returns an error if the `zpatch` function cannot be registered in the Lua
+/// globals.
 pub fn add_zpatch(lua: &Lua, quiet: bool) -> Result<(), mlua::Error> {
     let zpatch_fn = lua.create_function(
         move |lua, (patch_file, strip): (String, Option<u32>)| {

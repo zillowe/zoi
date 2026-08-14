@@ -43,8 +43,8 @@ fn test_is_zoios_detection() {
 
 #[test]
 fn test_scope_compliance_validation() {
+    use zoi::pkg::install::preflight::check_scope_compliance;
     use zoi::pkg::install::resolver::{DependencyGraph, InstallNode};
-    use zoi::pkg::install::util::check_scope_compliance;
     use zoi::pkg::types::{InstallReason, Package, Scope};
 
     let mut graph = DependencyGraph::default();

@@ -22,4 +22,5 @@ anyhow.workspace = true
 rusqlite.workspace = true
 serde_json.workspace = true
 zoi-core.workspace = true
+zoi-deps.workspace = true
 zoi-resolver.workspace = true
