@@ -81,7 +81,7 @@ pub fn set_registry(url_or_keyword: &str) -> Result<()> {
         }
         "gitlab" => "https://gitlab.com/zillowe/zillwen/zusty/zoidberg.git",
         "github" => "https://github.com/zillowe/zoidberg.git",
-        "codeberg" => "https://codeberg.org/Zillowe/Zoidberg.git",
+        "codeberg" => "https://codeberg.org/zillowe/zoidberg.git",
         _ => url_or_keyword
     };
 

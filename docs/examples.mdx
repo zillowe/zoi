@@ -372,7 +372,7 @@ Avoid manual version bumps by fetching the latest release tag directly from the 
 
 ```lua
 -- fetch the latest release tag (e.g. "v1.2.3")
-local tag = UTILS.FETCH.GITHUB.LATEST.release({ repo = "Zillowe/Zoi" })
+local tag = UTILS.FETCH.GITHUB.LATEST.release({ repo = "zillowe/zoi" })
 -- strip "v" prefix if present
 local version = tag:gsub("^v", "")
 

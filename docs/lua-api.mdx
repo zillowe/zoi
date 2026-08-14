@@ -138,7 +138,7 @@ end
   function build()
       -- Install to STAGING_DIR/data/pkgstore (same as ${pkgstore} in zcp)
       cmd("make DESTDIR=" .. LOCATION.PKGSTORE .. " install")
-      
+
       -- Or install to full staging root
       cmd("make DESTDIR=" .. LOCATION.STAGINGDIR .. " install")
   end
@@ -312,7 +312,7 @@ Runs when the package is uninstalled to clean up external state.
 - `UTILS.FETCH.<PROVIDER>.LATEST.<TYPE>({ repo, domain, branch })`
   - **Providers**: `GITHUB`, `GITLAB`, `GITEA`, `FORGEJO`.
   - **Types**: `tag`, `release`, `commit`.
-  - **Example**: `local tag = UTILS.FETCH.GITHUB.LATEST.release({ repo = "Zillowe/Zoi" })`
+  - **Example**: `local tag = UTILS.FETCH.GITHUB.LATEST.release({ repo = "zillowe/zoi" })`
 
 ### `UTILS.PARSE`
 
