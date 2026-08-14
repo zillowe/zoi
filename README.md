@@ -361,11 +361,11 @@ Zoi is hosted on multiple forges. The primary locations and mirrors are:
 
 - Zoi Source Code (this repo)
   - Primary: [GitLab](https://gitlab.com/zillowe/zillwen/zusty/zoi)
-  - Mirrors: [GitHub](https://github.com/zillowe/zoi), [Codeberg](https://codeberg.org/Zillowe/Zoi)
+  - Mirrors: [GitHub](https://github.com/zillowe/zoi), [Codeberg](https://codeberg.org/zillowe/zoi)
 
 - Packages Database ([Zoidberg](https://zillowe.qzz.io/docs/zds/zoi/zoidberg))
   - Primary: [GitLab](https://gitlab.com/zillowe/zillwen/zusty/zoidberg)
-  - Mirrors: [GitHub](https://github.com/zillowe/zoidberg), [Codeberg](https://codeberg.org/Zillowe/Zoidberg)
+  - Mirrors: [GitHub](https://github.com/zillowe/zoidberg), [Codeberg](https://codeberg.org/zillowe/zoidberg)
 
 For details and CLI usage examples about Zoidberg registry, see the docs page:
 [Zoidberg](https://zillowe.qzz.io/docs/zds/zoi/zoidberg).
