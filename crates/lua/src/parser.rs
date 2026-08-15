@@ -148,27 +148,9 @@ fn parse_lua_package_from_file_for_platform(
     })?;
 
     lua.load(&lua_code).exec().map_err(|e| {
-        use colored::Colorize;
-        let error_msg = format!("{e}");
-        let enriched_msg = if let Some(line) = extract_line_number(&error_msg) {
-            let lines: Vec<&str> = lua_code.lines().collect();
-            if let Some(code_line) =
-                lines.get((line as usize).saturating_sub(1))
-            {
-                format!(
-                    "{}\n\n{} | {}\n   | ^",
-                    error_msg.red().bold(),
-                    format!("{line:4}").dimmed(),
-                    code_line.cyan()
-                )
-            } else {
-                error_msg
-            }
-        } else {
-            error_msg
-        };
         anyhow!(
-            "Failed to execute Lua package file '{file_path}':\n{enriched_msg}"
+            "Failed to execute Lua package file '{file_path}':
+{e}"
         )
     })?;
 
@@ -281,17 +263,4 @@ pub fn parse_lua_package(
         scope,
         quiet
     )
-}
-
-/// Extracts the line number from a Lua error message.
-fn extract_line_number(error: &str) -> Option<u32> {
-    // Lua error format: [string "code"]:10: error message
-    if let Some(idx) = error.find("]:") {
-        let after_bracket = &error[idx + 2..];
-        if let Some(colon_idx) = after_bracket.find(':') {
-            let line_str = &after_bracket[..colon_idx];
-            return line_str.parse::<u32>().ok();
-        }
-    }
-    None
 }

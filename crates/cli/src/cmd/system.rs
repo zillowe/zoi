@@ -43,16 +43,6 @@ pub enum SystemSubcommands {
         /// Generation ID to roll back to
         id: u32
     },
-    /// Pin a system generation to prevent it from being pruned
-    Pin {
-        /// Generation ID to pin
-        id: u32
-    },
-    /// Unpin a system generation
-    Unpin {
-        /// Generation ID to unpin
-        id: u32
-    },
     /// Manage secrets (hashes and encrypted strings)
     Secret {
         /// Secret subcommands.
@@ -113,13 +103,6 @@ pub enum SecretSubcommands {
     Decrypt {
         /// The encrypted ZOISEC string
         secret: String
-    },
-    /// Export the `ZoiSEC` master key as a base64 string
-    ExportKey,
-    /// Import a `ZoiSEC` master key from a base64 string
-    ImportKey {
-        /// The base64-encoded master key
-        key: String
     }
 }
 
@@ -179,25 +162,6 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
                 }
                 println!("Secret decrypted successfully:");
                 println!("\n  {}", decrypted.green());
-            }
-            SecretSubcommands::ExportKey => {
-                let key = zoi_system::secret::export_master_key()?;
-                println!("ZoiSEC Master Key (base64):");
-                println!("\n  {}", key.yellow());
-                println!(
-                    "\n{}",
-                    "Keep this key safe! Anyone with this key can decrypt \
-                     your ZoiSEC secrets."
-                        .red()
-                        .bold()
-                );
-            }
-            SecretSubcommands::ImportKey { key } => {
-                zoi_system::secret::import_master_key(&key)?;
-                println!(
-                    "{} ZoiSEC master key imported successfully.",
-                    "Success:".green()
-                );
             }
         },
         SystemSubcommands::Distro { command } => match command {
@@ -638,32 +602,6 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
                     id.to_string().yellow()
                 );
                 let response = send_request(Request::RollbackGeneration(id))?;
-                handle_response(response)?;
-            }
-            #[cfg(not(unix))]
-            let _ = id;
-            #[cfg(not(unix))]
-            return Err(anyhow!(
-                "OS management daemon commands are only supported on Unix."
-            ));
-        }
-        SystemSubcommands::Pin { id } => {
-            #[cfg(unix)]
-            {
-                let response = send_request(Request::PinGeneration(id, true))?;
-                handle_response(response)?;
-            }
-            #[cfg(not(unix))]
-            let _ = id;
-            #[cfg(not(unix))]
-            return Err(anyhow!(
-                "OS management daemon commands are only supported on Unix."
-            ));
-        }
-        SystemSubcommands::Unpin { id } => {
-            #[cfg(unix)]
-            {
-                let response = send_request(Request::PinGeneration(id, false))?;
                 handle_response(response)?;
             }
             #[cfg(not(unix))]

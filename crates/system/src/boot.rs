@@ -29,19 +29,6 @@ impl BootloaderManager for SystemdBoot {
         initrd_path: &Path,
         cmdline: &str
     ) -> Result<()> {
-        if !kernel_path.exists() {
-            return Err(anyhow!(
-                "Kernel not found at {}",
-                kernel_path.display()
-            ));
-        }
-        if !initrd_path.exists() {
-            return Err(anyhow!(
-                "Initrd not found at {}",
-                initrd_path.display()
-            ));
-        }
-
         let entry_content = format!(
             "title ZoiOS Generation {}\nversion {}\nlinux {}\ninitrd \
              {}\noptions zoi.generation={} {}\n",

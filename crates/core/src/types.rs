@@ -1395,10 +1395,7 @@ pub struct ZoiLockV2 {
     pub registries: BTreeMap<String, LockRegistryV2>,
     /// A map of package identifiers to their fully resolved installation
     /// state.
-    pub installed_packages: BTreeMap<String, LockPackageDetailV2>,
-    /// The target platform this lockfile was generated for.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub platform: Option<String>
+    pub installed_packages: BTreeMap<String, LockPackageDetailV2>
 }
 
 /// Detailed lock information for a registry.

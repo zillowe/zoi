@@ -3,7 +3,7 @@
 use std::fs;
 
 use tempfile::tempdir;
-use zoi::pkg::install::preflight::get_conflicts_from_list;
+use zoi::pkg::install::util::get_conflicts_from_list;
 use zoi::pkg::types::{Package, Scope};
 
 mod common;

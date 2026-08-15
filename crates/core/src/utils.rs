@@ -1097,28 +1097,12 @@ pub fn check_license(license: &str) {
     {
         return;
     }
-    match spdx::Expression::parse(license) {
-        Ok(expr) => {
-            if !expr.evaluate(|req| match req.license {
-                spdx::LicenseItem::Spdx { id, .. } => id.is_osi_approved(),
-                spdx::LicenseItem::Other { .. } => false
-            }) {
-                println!(
-                    "{} License '{}' is not an OSI approved license.",
-                    "Warning:".yellow(),
-                    license.yellow().bold()
-                );
-            }
-        }
-        Err(_) => {
-            println!(
-                "{} Could not parse license expression '{}'. It may not be a \
-                 valid SPDX identifier.",
-                "Warning:".yellow(),
-                license.yellow().bold()
-            );
-        }
-    }
+    if let Ok(expr) = spdx::Expression::parse(license)
+        && !expr.evaluate(|req| match req.license {
+            spdx::LicenseItem::Spdx { id, .. } => id.is_osi_approved(),
+            spdx::LicenseItem::Other { .. } => false
+        })
+    {}
 }
 
 /// Prompts the user to confirm installation from an untrusted (non-official)

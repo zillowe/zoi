@@ -11,7 +11,6 @@ pub enum Request {
     ApplySystemConfig(Box<SystemConfig>),
     ListGenerations,
     RollbackGeneration(u32),
-    PinGeneration(u32, bool),
     GetStatus,
     Shutdown
 }

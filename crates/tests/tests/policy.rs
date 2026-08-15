@@ -1,7 +1,7 @@
 //! Integration tests for installation policy compliance.
 
-use zoi::pkg::install::preflight::check_policy_compliance_with_policy;
 use zoi::pkg::install::resolver::{DependencyGraph, InstallNode};
+use zoi::pkg::install::util::check_policy_compliance_with_policy;
 use zoi::pkg::types::{InstallReason, Package, Policy};
 
 fn graph_with_package(

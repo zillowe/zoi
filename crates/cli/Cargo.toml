@@ -52,7 +52,6 @@ json5.workspace = true
 tar.workspace = true
 zstd.workspace = true
 zoi-audit.workspace = true
-zoi-common.workspace = true
 zoi-core.workspace = true
 zoi-deps.workspace = true
 zoi-install.workspace = true

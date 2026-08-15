@@ -80,22 +80,6 @@ pub fn calculate_file_hash(path: &Path, algo: HashAlgorithm) -> Result<String> {
     }
 }
 
-/// Calculates the cryptographic hash of a string.
-pub fn calculate_string_hash(input: &str, algo: HashAlgorithm) -> String {
-    match algo {
-        HashAlgorithm::Sha512 => {
-            let mut hasher = Sha512::new();
-            hasher.update(input.as_bytes());
-            hex::encode(hasher.finalize())
-        }
-        HashAlgorithm::Sha256 => {
-            let mut hasher = Sha256::new();
-            hasher.update(input.as_bytes());
-            hex::encode(hasher.finalize())
-        }
-    }
-}
-
 /// Calculates a recursive hash of an entire directory's contents.
 ///
 /// Deterministic Algorithm:

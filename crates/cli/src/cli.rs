@@ -7,7 +7,6 @@ use clap::{
 };
 use clap_complete::{Shell, generate};
 use colored::Colorize;
-use zoi_common::Runnable;
 
 use crate::pkg::lock;
 use crate::{cmd, utils};
@@ -348,7 +347,72 @@ enum Commands {
     /// Installs one or more packages from a name, local file, URL, or git
     /// repository
     #[command(aliases = ["i", "in", "add"])]
-    Install(cmd::install::args::InstallArgs),
+    Install {
+        /// The package source identifier(s).
+        #[arg(value_name = "ALL_SOURCES", help = PKG_SOURCE_HELP)]
+        sources: Vec<String>,
+        /// Install from a git repository (e.g. 'Zillowe/Hello',
+        /// 'gl:Zillowe/Hello')
+        #[arg(long, value_name = "REPO", conflicts_with = "sources")]
+        repo: Option<String>,
+        /// Force re-installation even if the package is already installed
+        #[arg(long)]
+        force: bool,
+        /// Accept all optional dependencies
+        #[arg(long)]
+        all_optional: bool,
+        /// The scope to install the package to
+        #[arg(long, value_enum, conflicts_with_all = &["local", "global"])]
+        scope: Option<InstallScope>,
+        /// Install packages to the current project (alias for --scope=project)
+        #[arg(long, conflicts_with = "global")]
+        local: bool,
+        /// Install packages globally for the current user (alias for
+        /// --scope=user)
+        #[arg(long)]
+        global: bool,
+        /// Save the package to the project's zoi.yaml
+        #[arg(long)]
+        save: bool,
+        /// The type of package to build if building from source (e.g.
+        /// 'source', 'pre-compiled').
+        #[arg(long)]
+        r#type: Option<String>,
+        /// Do not actually perform the installation, just show what would be
+        /// done
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Force building from source even if a pre-compiled archive is
+        /// available in the registry
+        #[arg(long, short = 'b')]
+        build: bool,
+
+        /// Enforce zoi.lock exactly (project install only, no lockfile
+        /// updates)
+        #[arg(long)]
+        frozen: bool,
+
+        /// Explain dependency selection and install decisions
+        #[arg(long)]
+        explain: bool,
+
+        /// Emit machine-readable install plan JSON
+        #[arg(long)]
+        plan_json: bool,
+
+        /// Retry failed downloads this many times (minimum 1)
+        #[arg(long, default_value_t = 3)]
+        retry: u32,
+
+        /// Show additional install details (package origins, preflight info)
+        #[arg(long, short)]
+        verbose: bool,
+
+        /// Use PURL (Package URL) specification for resolving packages
+        #[arg(long)]
+        purl: bool
+    },
 
     /// Add a tool to the current project or global configuration and install it
     #[command(alias = "u")]
@@ -367,7 +431,40 @@ enum Commands {
         aliases = ["un", "rm", "remove"],
         long_about = "Removes one or more packages' files from the Zoi store and deletes their symlinks from the bin directory. This command will fail if a package was not installed by Zoi."
     )]
-    Uninstall(cmd::uninstall::args::UninstallArgs),
+    Uninstall {
+        /// The package identifier(s).
+        #[arg(value_name = "INST_PACKAGES", required = true, help = PKG_SOURCE_HELP)]
+        packages: Vec<String>,
+        /// The scope to uninstall the package from
+        #[arg(long, value_enum, conflicts_with_all = &["local", "global"])]
+        scope: Option<InstallScope>,
+        /// Uninstall packages from the current project (alias for
+        /// --scope=project)
+        #[arg(long, conflicts_with = "global")]
+        local: bool,
+        /// Uninstall packages globally for the current user (alias for
+        /// --scope=user)
+        #[arg(long)]
+        global: bool,
+        /// Remove the package from the project's zoi.yaml
+        #[arg(long)]
+        save: bool,
+        /// Recursively remove dependencies that are no longer needed
+        #[arg(short, long)]
+        recursive: bool,
+
+        /// Do not actually uninstall, just show what would be done
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Explain uninstall decisions (dependency impact and safety blocks)
+        #[arg(long)]
+        explain: bool,
+
+        /// Emit machine-readable uninstall plan JSON
+        #[arg(long)]
+        plan_json: bool
+    },
 
     /// Execute a command defined in a local zoi.yaml file
     #[command(long_about = "Execute a command from zoi.yaml. If no command \
@@ -1036,15 +1133,74 @@ pub fn run() -> anyhow::Result<()> {
                 interactive
             )
             .map_err(|e| cmd::ux::with_failure_hint("update", e)),
-            Commands::Install(args) => args
-                .run(cli.yes)
-                .map_err(|e| cmd::ux::with_failure_hint("install", e)),
+            Commands::Install {
+                sources,
+                repo,
+                force,
+                all_optional,
+                scope,
+                local,
+                global,
+                save,
+                r#type,
+                dry_run,
+                build,
+                frozen,
+                explain,
+                plan_json,
+                retry,
+                verbose,
+                purl
+            } => cmd::install::run(
+                &sources,
+                repo,
+                force,
+                all_optional,
+                cli.yes,
+                scope,
+                local,
+                global,
+                save,
+                r#type.as_deref(),
+                dry_run,
+                Some(&plugin_manager),
+                build,
+                frozen,
+                explain,
+                plan_json,
+                retry,
+                verbose,
+                purl,
+                None
+            )
+            .map_err(|e| cmd::ux::with_failure_hint("install", e)),
             Commands::Use { packages, global } => {
                 cmd::use_cmd::run(&packages, global)
             }
-            Commands::Uninstall(args) => args
-                .run(cli.yes)
-                .map_err(|e| cmd::ux::with_failure_hint("uninstall", e)),
+            Commands::Uninstall {
+                packages,
+                scope,
+                local,
+                global,
+                save,
+                recursive,
+                dry_run,
+                explain,
+                plan_json
+            } => cmd::uninstall::run(
+                &packages,
+                scope,
+                local,
+                global,
+                save,
+                cli.yes,
+                recursive,
+                Some(&plugin_manager),
+                explain,
+                plan_json,
+                dry_run
+            )
+            .map_err(|e| cmd::ux::with_failure_hint("uninstall", e)),
             Commands::Run { cmd_alias, args } => {
                 cmd::run::run(cmd_alias.as_deref(), &args)
             }
