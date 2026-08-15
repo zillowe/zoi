@@ -23,6 +23,5 @@ anyhow.workspace = true
 clap = { workspace = true, features = ["derive"] }
 colored.workspace = true
 zoi-cli.workspace = true
-zoi-common.workspace = true
 zoi-core.workspace = true
 zoi-resolver.workspace = true

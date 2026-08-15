@@ -25,7 +25,6 @@ zoi-hooks.workspace = true
 zoi-lua.workspace = true
 zoi-package.workspace = true
 zoi-plugins.workspace = true
-zoi-purl.workspace = true
 zoi-project.workspace = true
 zoi-resolver.workspace = true
 zoi-telemetry.workspace = true
