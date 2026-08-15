@@ -1424,3 +1424,114 @@ pub fn get_package_dependencies(
         Ok(None)
     }
 }
+
+/// Finds all installed packages that depend on a specific package.
+///
+/// # Errors
+///
+/// Returns an error if the database connection cannot be opened or the query
+/// fails.
+pub fn get_dependents(
+    registry_handle: &str,
+    target_package_name: &str,
+    target_sub_package: Option<&str>
+) -> Result<Vec<types::Package>> {
+    let conn = open_connection(registry_handle)?;
+    let mut stmt = conn.prepare(
+        "SELECT name, repo, version, description, package_type, tags, \
+         license, sub_package, scope, registry, reason, revision, epoch, \
+         dependencies FROM packages"
+    )?;
+
+    let rows = stmt.query_map([], |row| {
+        let dependencies_raw: Option<String> = row.get(13)?;
+        let name: String = row.get(0)?;
+
+        let mut depends_on_target = false;
+        if let Some(deps_json) = dependencies_raw
+            && deps_json.contains(target_package_name)
+        {
+            // Heuristic check first for performance
+            if let Ok(deps) =
+                serde_json::from_str::<types::Dependencies>(&deps_json)
+            {
+                let resolved = deps.resolve(
+                    &[],
+                    &[],
+                    row.get::<_, Option<String>>(7)?.as_deref(),
+                    true,
+                    None
+                );
+                let all_deps = [
+                    resolved.runtime,
+                    resolved.test,
+                    resolved
+                        .build
+                        .into_iter()
+                        .flat_map(|b| b.packages)
+                        .collect()
+                ]
+                .concat();
+
+                for dep_str in all_deps {
+                    if let Ok(dep) = zoi_deps::parse_dependency_string(&dep_str)
+                        && dep.manager == "zoi"
+                        && let Ok(req) =
+                            zoi_resolver::resolve::parse_source_string(
+                                dep.package
+                            )
+                        && req.name == target_package_name
+                        && req.sub_package.as_deref() == target_sub_package
+                    {
+                        depends_on_target = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if !depends_on_target {
+            return Err(rusqlite::Error::QueryReturnedNoRows);
+        }
+
+        let tags_raw: String = row.get(5)?;
+        let tags: Vec<String> =
+            serde_json::from_str(&tags_raw).unwrap_or_default();
+        let type_raw: String = row.get(4)?;
+        let package_type = match type_raw.as_str() {
+            "collection" => types::PackageType::Collection,
+            "app" => types::PackageType::App,
+            "extension" => types::PackageType::Extension,
+            _ => types::PackageType::Package
+        };
+
+        let scope_raw: Option<String> = row.get(8)?;
+        let scope = match scope_raw.as_deref() {
+            Some("system") => types::Scope::System,
+            Some("project") => types::Scope::Project,
+            _ => types::Scope::User
+        };
+
+        Ok(types::Package {
+            name,
+            repo: row.get(1)?,
+            version: row.get(2)?,
+            description: row.get(3)?,
+            package_type,
+            tags,
+            license: row.get(6)?,
+            sub_package: row.get(7)?,
+            scope,
+            registry_handle: row.get(9)?,
+            revision: row.get(11).unwrap_or_else(|_| "1".to_string()),
+            epoch: row.get(12).unwrap_or(0),
+            ..Default::default()
+        })
+    })?;
+
+    let mut pkgs = Vec::new();
+    for pkg in rows.flatten() {
+        pkgs.push(pkg);
+    }
+    Ok(pkgs)
+}

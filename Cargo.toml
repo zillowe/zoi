@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
     "crates/core",
+    "crates/common",
     "crates/cli",
     "crates/mini",
     "crates/purl",
@@ -127,7 +128,7 @@ sequoia-openpgp = { version = "2.4.1", default-features = false, features = [
 ] }
 serde = { version = "1.0.229", default-features = false, features = ["derive"] }
 serde_json = "1.0.151"
-serde_yaml = { package = "yaml_serde", version = "0.10.4" }
+serde_yaml = { package = "yaml_serde", version = "0.10.6" }
 sha2 = "0.11.0"
 bsdiff = "0.2.1"
 spdx = "0.13.5"
@@ -167,6 +168,7 @@ getrandom = "0.4.3"
 argon2 = "0.5.3"
 base64 = "0.23.1"
 
+zoi-common = { path = "crates/common", version = "1.25.0-dev" }
 zoi-core = { path = "crates/core", version = "1.25.0-dev" }
 zoi-hooks = { path = "crates/hooks", version = "1.25.0-dev" }
 zoi-lua = { path = "crates/lua", version = "1.25.0-dev" }

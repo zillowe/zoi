@@ -138,7 +138,7 @@ end
   function build()
       -- Install to STAGING_DIR/data/pkgstore (same as ${pkgstore} in zcp)
       cmd("make DESTDIR=" .. LOCATION.PKGSTORE .. " install")
-      
+
       -- Or install to full staging root
       cmd("make DESTDIR=" .. LOCATION.STAGINGDIR .. " install")
   end
@@ -200,6 +200,7 @@ Used in the `uninstall()` function to remove files or directories outside of the
 Executes a shell command within the `BUILD_DIR`.
 
 - **Persistence**: Unlike standard shell wrappers, `cmd()` in Zoi uses a **persistent shell session**. This means state changes like directory changes (`cd`), environment variable exports (`export`), and shell function definitions **persist** across multiple `cmd()` calls within the same lifecycle phase (e.g. within `build()` or `package()`).
+- **Robustness**: The shell session uses piped standard streams and unique sentinels to ensure reliable command completion detection and accurate capture of both `stdout` and `stderr` without deadlocks.
 - **Returns**: Three values: `stdout` (string), `stderr` (string), and `exit_code` (integer).
 
 ```lua
@@ -207,7 +208,10 @@ function build()
     -- These commands share the same shell process
     cmd("cd source")
     cmd("export CFLAGS='-O3'")
-    cmd("make") -- Runs inside 'source' with 'CFLAGS' set
+    local out, err, code = cmd("make")
+    if code ~= 0 then
+        error("Build failed: " .. err)
+    end
 end
 ```
 
@@ -312,7 +316,7 @@ Runs when the package is uninstalled to clean up external state.
 - `UTILS.FETCH.<PROVIDER>.LATEST.<TYPE>({ repo, domain, branch })`
   - **Providers**: `GITHUB`, `GITLAB`, `GITEA`, `FORGEJO`.
   - **Types**: `tag`, `release`, `commit`.
-  - **Example**: `local tag = UTILS.FETCH.GITHUB.LATEST.release({ repo = "Zillowe/Zoi" })`
+  - **Example**: `local tag = UTILS.FETCH.GITHUB.LATEST.release({ repo = "zillowe/zoi" })`
 
 ### `UTILS.PARSE`
 

@@ -449,3 +449,77 @@ pub fn check_external_tools() -> ToolCheckResult {
         recommended_missing
     }
 }
+
+/// Checks for "Registry Drift" (local `.pkg.lua` differs from the database).
+///
+/// # Errors
+///
+/// Returns an error if installed packages cannot be retrieved or if
+/// a package source path cannot be determined.
+pub fn check_registry_drift() -> Result<Vec<String>> {
+    let all_installed = local::get_installed_packages()?;
+    let mut drifted = Vec::new();
+
+    for manifest in all_installed {
+        let pkg_lua_path = local::get_package_source_path(&manifest)?;
+        if !pkg_lua_path.exists() {
+            continue;
+        }
+
+        let Ok(lua_content) = fs::read_to_string(&pkg_lua_path) else {
+            continue;
+        };
+        let current_hash = zoi_core::hash::calculate_string_hash(
+            &lua_content,
+            zoi_core::hash::HashAlgorithm::Sha256
+        );
+
+        if let Ok(Some(db_hash)) = zoi_db::get_package_hash_from_db(
+            &manifest.registry_handle,
+            &manifest.name,
+            manifest.sub_package.as_deref(),
+            &manifest.repo
+        ) && current_hash != db_hash
+        {
+            let name = if let Some(sub) = manifest.sub_package {
+                format!("{}:{}", manifest.name, sub)
+            } else {
+                manifest.name
+            };
+            drifted.push(format!(
+                "{} (Database: {}, Local: {})",
+                name,
+                &db_hash[..8],
+                &current_hash[..8]
+            ));
+        }
+    }
+
+    Ok(drifted)
+}
+
+/// Checks for "Lockfile Mismatch" (zoi.lock targets a different platform).
+///
+/// # Errors
+///
+/// Returns an error if the lockfile cannot be read or if the current platform
+/// cannot be determined.
+pub fn check_lockfile_mismatch() -> Result<Option<String>> {
+    if !std::path::Path::new("zoi.lock").exists() {
+        return Ok(None);
+    }
+
+    let lockfile = zoi_project::lockfile::read_zoi_lock()?;
+    let current_platform = utils::get_platform()?;
+
+    if let Some(target_platform) = lockfile.platform
+        && target_platform != current_platform
+    {
+        return Ok(Some(format!(
+            "Lockfile targets '{target_platform}', but current host is \
+             '{current_platform}'."
+        )));
+    }
+
+    Ok(None)
+}

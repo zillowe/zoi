@@ -321,15 +321,15 @@ fn run_update_single_logic(
         None
     )?;
 
-    install::util::check_policy_compliance(&graph)?;
-    install::util::check_scope_compliance(&graph)?;
-    install::util::check_zoios_compliance(&graph)?;
+    zoi_install::preflight::check_policy_compliance(&graph)?;
+    zoi_install::preflight::check_scope_compliance(&graph)?;
+    zoi_install::preflight::check_zoios_compliance(&graph)?;
     for node in graph.nodes.values() {
         if !install::util::display_updates(&node.pkg, yes)? {
             return Err(anyhow!("Update aborted by user."));
         }
     }
-    install::util::check_for_vulnerabilities(&graph, yes)?;
+    zoi_install::preflight::check_for_vulnerabilities(&graph, yes)?;
 
     let install_plan =
         install::plan::create_install_plan(&graph.nodes, None, false)?;
@@ -878,7 +878,9 @@ fn run_update_all_logic(
                 }
             };
 
-            if let Err(e) = install::util::check_policy_compliance(&graph) {
+            if let Err(e) =
+                zoi_install::preflight::check_policy_compliance(&graph)
+            {
                 eprintln!(
                     "{}: Policy check failed for '{}': {}",
                     "Error".red().bold(),
@@ -892,7 +894,9 @@ fn run_update_all_logic(
                 return Ok(());
             }
 
-            if let Err(e) = install::util::check_scope_compliance(&graph) {
+            if let Err(e) =
+                zoi_install::preflight::check_scope_compliance(&graph)
+            {
                 eprintln!(
                     "{}: Scope check failed for '{}': {}",
                     "Error".red().bold(),
@@ -906,7 +910,9 @@ fn run_update_all_logic(
                 return Ok(());
             }
 
-            if let Err(e) = install::util::check_zoios_compliance(&graph) {
+            if let Err(e) =
+                zoi_install::preflight::check_zoios_compliance(&graph)
+            {
                 eprintln!(
                     "{}: ZoiOS check failed for '{}': {}",
                     "Error".red().bold(),
@@ -921,7 +927,7 @@ fn run_update_all_logic(
             }
 
             if let Err(e) =
-                install::util::check_for_vulnerabilities(&graph, yes)
+                zoi_install::preflight::check_for_vulnerabilities(&graph, yes)
             {
                 eprintln!(
                     "{}: Security check failed for '{}': {}",

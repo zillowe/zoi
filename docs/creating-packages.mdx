@@ -254,7 +254,7 @@ The `destination` argument uses special variables to place files in the correct 
 
 Zoi Specification v2 introduced the **Shared Pool + Mapping** architecture. This allows a single `.zpa` archive to support multiple installation scopes (`user`, `system`, `project`) perfectly, without duplicating file content.
 
-During `zoi package build`, Zoi executes your `package()` function multiple times—once for each supported scope. You can use the `ZOI.scope` variable to tailor the package structure:
+During `zoi package build`, Zoi executes your `package()` function multiple times, once for each supported scope. You can use the `ZOI.scope` variable to tailor the package structure:
 
 ```lua
 function package()

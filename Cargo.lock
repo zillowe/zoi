@@ -4370,9 +4370,9 @@ dependencies = [
 
 [[package]]
 name = "yaml_serde"
-version = "0.10.4"
+version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08c7c1b1a6a7c8a6b2741a6c21a4f8918e51899b111cfa08d1288202656e3975"
+checksum = "ad7a8266fc7ce9d77db272ca5b40b704a1753e2a2e2ab7b1f2da22672941bf93"
 dependencies = [
  "indexmap",
  "itoa",
@@ -4542,6 +4542,7 @@ dependencies = [
  "winreg",
  "yaml_serde",
  "zoi-audit",
+ "zoi-common",
  "zoi-core",
  "zoi-db",
  "zoi-deps",
@@ -4560,6 +4561,16 @@ dependencies = [
  "zoi-transaction",
  "zoi-uninstall",
  "zstd",
+]
+
+[[package]]
+name = "zoi-common"
+version = "1.25.0-dev"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+ "zoi-core",
 ]
 
 [[package]]
@@ -4620,6 +4631,7 @@ dependencies = [
  "rusqlite",
  "serde_json",
  "zoi-core",
+ "zoi-deps",
  "zoi-resolver",
 ]
 
@@ -4683,6 +4695,7 @@ dependencies = [
  "zoi-package",
  "zoi-plugins",
  "zoi-project",
+ "zoi-purl",
  "zoi-resolver",
  "zoi-sandbox",
  "zoi-telemetry",
@@ -4725,6 +4738,7 @@ dependencies = [
  "clap",
  "colored",
  "zoi-cli",
+ "zoi-common",
  "zoi-core",
  "zoi-resolver",
 ]
@@ -4749,8 +4763,10 @@ dependencies = [
  "walkdir",
  "yaml_serde",
  "zoi-core",
+ "zoi-db",
  "zoi-deps",
  "zoi-lua",
+ "zoi-project",
  "zoi-resolver",
  "zoi-sandbox",
  "zstd",

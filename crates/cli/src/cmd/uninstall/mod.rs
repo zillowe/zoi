@@ -1,7 +1,11 @@
 //! Logic for the `uninstall` command.
 
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
+
+/// Command-line arguments for the `uninstall` command.
+pub mod args;
 
 use anyhow::{Result, anyhow};
 use colored::Colorize;
@@ -670,21 +674,86 @@ fn collect_recursive_uninstalls(
                             &dm.repo,
                             &dm.name
                         )?;
-                        let dependents = pkg::local::get_dependents(&pkg_dir)?;
+                        let dependents_from_store =
+                            pkg::local::get_dependents(&pkg_dir)?;
+                        let dependents_from_db = pkg::db::get_dependents(
+                            &dm.registry_handle,
+                            &dm.name,
+                            dm.sub_package.as_deref()
+                        )?;
+
+                        let mut all_dependents = HashSet::new();
+                        for dep_id in dependents_from_store {
+                            all_dependents.insert(dep_id);
+                        }
+                        for dep_pkg in dependents_from_db {
+                            let dep_id = if let Some(sub) = &dep_pkg.sub_package
+                            {
+                                format!(
+                                    "#{}@{}/{}@{}:{}",
+                                    dep_pkg
+                                        .registry_handle
+                                        .as_deref()
+                                        .unwrap_or("local"),
+                                    dep_pkg.repo,
+                                    dep_pkg.name,
+                                    dep_pkg
+                                        .version
+                                        .as_deref()
+                                        .unwrap_or("unknown"),
+                                    sub
+                                )
+                            } else {
+                                format!(
+                                    "#{}@{}/{}@{}",
+                                    dep_pkg
+                                        .registry_handle
+                                        .as_deref()
+                                        .unwrap_or("local"),
+                                    dep_pkg.repo,
+                                    dep_pkg.name,
+                                    dep_pkg
+                                        .version
+                                        .as_deref()
+                                        .unwrap_or("unknown")
+                                )
+                            };
+                            all_dependents.insert(dep_id);
+                        }
 
                         let all_dependents_will_be_removed =
-                            dependents.iter().all(|dep_id| {
+                            all_dependents.iter().all(|dep_id| {
                                 manifests_to_uninstall.iter().any(|m| {
-                                    let m_id = if let Some(sub) = &m.sub_package
-                                    {
-                                        format!(
-                                            "{}@{}:{}",
-                                            m.name, m.version, sub
-                                        )
-                                    } else {
-                                        format!("{}@{}", m.name, m.version)
-                                    };
-                                    m_id == *dep_id
+                                    let m_id_short =
+                                        if let Some(sub) = &m.sub_package {
+                                            format!(
+                                                "{}@{}:{}",
+                                                m.name, m.version, sub
+                                            )
+                                        } else {
+                                            format!("{}@{}", m.name, m.version)
+                                        };
+                                    let m_id_full =
+                                        if let Some(sub) = &m.sub_package {
+                                            format!(
+                                                "#{}@{}/{}@{}:{}",
+                                                m.registry_handle,
+                                                m.repo,
+                                                m.name,
+                                                m.version,
+                                                sub
+                                            )
+                                        } else {
+                                            format!(
+                                                "#{}@{}/{}@{}",
+                                                m.registry_handle,
+                                                m.repo,
+                                                m.name,
+                                                m.version
+                                            )
+                                        };
+                                    *dep_id == m_id_short
+                                        || *dep_id == m_id_full
                                 })
                             });
 
