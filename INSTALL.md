@@ -130,17 +130,6 @@ You can install `zoi` directly from [crates.io](https://crates.io/crates/zoi-rs)
 cargo install zoi-rs
 ```
 
-### NPM
-
-You can install `@zillowe/zoi` from `npm` also.
-
-```sh
-npx @zillowe/zoi
-bunx @zillowe/zoi
-pnpm dlx @zillowe/zoi
-yarn dlx @zillowe/zoi
-```
-
 ## Build from Source
 
 If you prefer, you can build Zoi from source.
