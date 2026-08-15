@@ -321,7 +321,7 @@ pub fn run(
     #[cfg(not(target_os = "linux"))]
     let mut cmd = {
         let mut c = Command::new(&actual_bin_path);
-        c.args(&args);
+        c.args(args);
         c.envs(&envs);
         c
     };

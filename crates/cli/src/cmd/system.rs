@@ -587,9 +587,12 @@ pub fn run(args: SystemCommand, yes: bool) -> Result<()> {
                 handle_response(response)?;
             }
             #[cfg(not(unix))]
-            return Err(anyhow!(
-                "OS management daemon commands are only supported on Unix."
-            ));
+            {
+                let _ = file;
+                return Err(anyhow!(
+                    "OS management daemon commands are only supported on Unix."
+                ));
+            }
         }
         SystemSubcommands::List => {
             #[cfg(unix)]

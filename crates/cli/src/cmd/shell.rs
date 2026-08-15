@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Mutex;
 
@@ -573,6 +573,7 @@ pub fn enter_ephemeral_shell(
 
     #[cfg(target_os = "linux")]
     let mut shell_command = {
+        use std::path::Path;
         let sysroot = zoi_core::sysroot::get_sysroot();
         if let Some(root) = sysroot {
             if verbose {
