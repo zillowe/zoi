@@ -5,7 +5,6 @@
 //! process is isolated from the host system and has restricted access
 //! to the filesystem and network.
 
-use std::fmt::Write;
 use std::path::Path;
 
 use anyhow::{Result, anyhow};
@@ -51,6 +50,7 @@ pub fn run(
 
     #[cfg(target_os = "linux")]
     {
+        use std::fmt::Write;
         use std::path::PathBuf;
         use std::process::Command;
 
