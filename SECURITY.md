@@ -23,9 +23,6 @@ The Security Policy can be found online at
 | [Crates.io `zoi-rs`](https://crates.io/crates/zoi-rs)                                     | ✔️        |
 | [Docker Image (GitLab)](https://gitlab.com/zillowe/zillwen/zusty/zoi/container_registry)  | ✔️        |
 | [Fedora Terra](https://github.com/terrapkg/packages/tree/frawhide/anda/langs/rust/zoi)    | ❔        |
-| [NPM `@zillowe/zoi`](https://www.npmjs.com/package/@zillowe/zoi)                          | ❌        |
-
-The NPM package just runs the installer script.
 
 Fedora package is from an external [Terra](https://terra.fyralabs.com/) repo
 and is not maintained by us, updates can be late.
