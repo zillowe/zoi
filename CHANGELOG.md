@@ -4,6 +4,74 @@ You can install any of these versions: `zoi upgrade --tag --force <tag>`
 
 To install Zoi: `curl -fsSL https://zillowe.pages.dev/scripts/zoi/install.sh | bash`, [more installation methods](https://zillowe.qzz.io/docs/zds/zoi).
 
+## [Prod. Release 1.25.0] - 2026-08-15
+
+### ⏩ Merged
+
+- Branch 'renovate/clap_mangen-0.x' into 'main'
+- Branch 'renovate/serde_yaml-0.x' into 'main'
+- Branch 'renovate/comfy-table-8.x' into 'main'
+- Branch 'renovate/spdx-0.x' into 'main'
+- Branch 'renovate/thiserror-2.x' into 'main'
+- Branch 'renovate/rusqlite-0.x' into 'main'
+- Branch 'renovate/ignore-0.x' into 'main'
+- Branch 'renovate/clap-4.x' into 'main'
+- Branch 'renovate/base64-0.x' into 'main'
+
+### ♻️ Refactor
+
+- *(core)* Migrate from bsdiff to zbsdiff for delta upgrades
+
+### ✨ Features
+
+- *(system)* Add generation pinning and ZoiSEC key export/import
+- *(license)* Implement SPDX expression evaluation for license policies
+- *(core)* Implement ZoiOS-only package constraints
+
+### 🎨 Styling
+
+- Update Codeberg repo URL
+- Remove trailing comma
+- Add lint and fmt rules
+- Format using rustfmt
+- Adhere to Clippy style
+
+### 🔧 Configuration
+
+- *(gct)* Upgrade Gemini model version in configuration
+- Update .editorconfig file
+- Add .editorconfig file
+
+### 🛠️ Build
+
+- Update zoi.lua
+
+### 🛡️ Dependencies
+
+- Update
+- Update Rust crate clap_mangen to 0.3.3
+- Update Rust crate serde_yaml to 0.10.6
+- Update code to comfy_table v8
+- Update Rust crate clap_complete to 4.6.9
+- Update Rust crate comfy-table to v8
+- Update Rust crate spdx to 0.13.5
+- Update Rust crate thiserror to 2.0.20
+- Update Rust crate rusqlite to 0.40.2
+- Update Rust crate ignore to 0.4.33
+- Update Rust crate clap_mangen to 0.3.2
+- Update Rust crate clap to 4.6.6
+- Update Rust crate base64 to 0.23.1
+
+### 🧹 Cleanup
+
+- Remove NPM Zoi installer completely
+
+## [Prod. Release 1.24.3] - 2026-08-01
+
+### 🛡️ Dependencies
+
+- Update
+
 ## [Prod. Release 1.24.1] - 2026-08-01
 
 ### ⏩ Merged
