@@ -248,9 +248,9 @@ fn try_delta_upgrade(
         patch_data
     };
 
-    let mut cursor = std::io::Cursor::new(raw_patch);
     let mut new_binary = Vec::new();
-    bsdiff::patch(&old_binary, &mut cursor, &mut new_binary)?;
+    zbsdiff::Bspatch::new(&raw_patch)?
+        .apply(&old_binary, std::io::Cursor::new(&mut new_binary))?;
 
     let binary_filename = if os == "windows" { "zoi.exe" } else { "zoi" };
     let new_binary_path = temp_dir.path().join(binary_filename);

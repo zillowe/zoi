@@ -34,7 +34,8 @@ check_command "zstd"
 check_command "curl"
 check_command "jq"
 check_command "gpg"
-check_command "bsdiff"
+check_command "zbsdiff"
+check_command "zbspatch"
 
 if [ ! -d "$COMPILED_DIR" ]; then
     echo -e "${RED}Error: Compiled directory '${COMPILED_DIR}' not found.${NC}"
@@ -163,7 +164,7 @@ for binary_path in "$COMPILED_DIR"/*; do
             OLD_BIN_FILE="$OLD_BIN_DIR/$final_binary_name"
             if [ -f "$OLD_BIN_FILE" ]; then
                 BSDIFF_NAME="${archive_basename}.from-v${OLD_VERSION}-to-v${CURRENT_VERSION}.bsdiff"
-                bsdiff "$OLD_BIN_FILE" "$binary_path" "${TMP_ARCHIVE_DIR}/patch.raw"
+                zbsdiff "$OLD_BIN_FILE" "$binary_path" "${TMP_ARCHIVE_DIR}/patch.raw"
                 zstd -19 -q "${TMP_ARCHIVE_DIR}/patch.raw" -o "${ARCHIVE_DIR}/${BSDIFF_NAME}"
                 sign_file "${ARCHIVE_DIR}/${BSDIFF_NAME}"
             fi

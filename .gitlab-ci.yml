@@ -241,7 +241,9 @@ package:archive:
     - package:rpm
   before_script:
     - apt-get update -y && apt-get install -y p7zip-full tar zstd curl git jq
-      unzip gnupg coreutils bsdiff
+      unzip gnupg coreutils cargo
+    - cargo install zbsdiff-cli
+    - export PATH="$PATH:$HOME/.cargo/bin"
   script:
     - |
       set -euo pipefail
