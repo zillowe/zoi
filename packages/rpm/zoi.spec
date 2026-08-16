@@ -1,5 +1,7 @@
 # Maintainer: ZilloweZ <zillowez@proton.me>
 
+%global debug_package %{nil}
+
 Name:           zoi
 Version:        __VERSION__
 Release:        1%{?dist}
