@@ -1,6 +1,8 @@
 # Maintainer: ZilloweZ <zillowez@proton.me>
 
 %global debug_package %{nil}
+%undefine _debugsource_packages
+%global _pkgverify_level none
 
 Name:           zoi
 Version:        __VERSION__
