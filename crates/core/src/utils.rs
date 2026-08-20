@@ -831,7 +831,7 @@ pub fn format_size_diff(diff: i64) -> String {
     }
     let sign = if diff > 0 { "+" } else { "-" };
     let bytes = diff.unsigned_abs();
-    format!("{} {}", sign, format_bytes(bytes))
+    format!("{}{}", sign, format_bytes(bytes))
 }
 
 /// Verifies that a given path is "Safe" and doesn't attempt to escape the base

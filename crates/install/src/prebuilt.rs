@@ -11,11 +11,11 @@ use crate::dep_install;
 /// Builds a package archive from source.
 ///
 /// This function:
-/// 1. Resolves the appropriate build type for the current platform.
-/// 2. Resolves and installs any required build-time dependencies.
-/// 3. Spawns a build thread to execute the build process defined in the
-///    `.pkg.lua`.
-/// 4. Returns the path to the resulting `.zpa` (Zoi Package Archive) file.
+/// - Resolves the appropriate build type for the current platform.
+/// - Resolves and installs any required build-time dependencies.
+/// - Spawns a build thread to execute the build process defined in the
+///   `.pkg.lua`.
+/// - Returns the path to the resulting `.zpa` (Zoi Package Archive) file.
 /// # Errors
 ///
 /// Returns an error if the build fails, or if build-time dependencies cannot be

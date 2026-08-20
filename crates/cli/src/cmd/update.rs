@@ -1,3 +1,4 @@
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::sync::Mutex;
 
@@ -36,6 +37,7 @@ pub fn run(
     dry_run: bool,
     explain: bool,
     plan_json: bool,
+    verbose: bool,
     interactive: bool
 ) -> Result<()> {
     if all {
@@ -44,8 +46,13 @@ pub fn run(
             dry_run,
             explain,
             plan_json,
+            verbose,
             interactive
         );
+    }
+
+    if plan_json && !dry_run {
+        return Err(anyhow!("--plan-json requires --dry-run"));
     }
 
     let expanded_package_names =
@@ -62,7 +69,8 @@ pub fn run(
             yes,
             dry_run,
             explain,
-            plan_json
+            plan_json,
+            verbose
         ) {
             eprintln!(
                 "{}: Failed to update '{}': {}",
@@ -91,22 +99,23 @@ fn run_update_single_logic(
     yes: bool,
     dry_run: bool,
     explain: bool,
-    plan_json: bool
+    plan_json: bool,
+    verbose: bool
 ) -> Result<()> {
-    println!(
-        "{} Updating package '{}'...",
-        "::".bold().blue(),
-        package_name.cyan().bold()
-    );
+    if !plan_json {
+        println!("{} Resolving dependencies...", "::".bold().blue());
+    }
 
     let (new_pkg, new_version, _, _, registry_handle, _, _) =
-        resolve::resolve_package_and_version(package_name, None, false, yes)?;
+        resolve::resolve_package_and_version(package_name, None, true, yes)?;
 
     if pin::is_pinned(package_name)? {
-        println!(
-            "Package '{}' is pinned. Skipping update.",
-            package_name.yellow()
-        );
+        if !plan_json {
+            println!(
+                "Package '{}' is pinned. Skipping update.",
+                package_name.yellow()
+            );
+        }
         return Ok(());
     }
 
@@ -153,74 +162,223 @@ fn run_update_single_logic(
         }
     })?;
 
-    println!(
-        "Currently installed version: {}",
-        old_manifest.version.yellow()
-    );
-    if old_manifest.revision != "1" || new_pkg.revision != "1" {
-        println!(
-            "Currently installed revision: {}",
-            old_manifest.revision.yellow()
-        );
-    }
-    println!("Available version: {}", new_version.green());
-    if old_manifest.revision != "1" || new_pkg.revision != "1" {
-        println!("Available revision: {}", new_pkg.revision.green());
-    }
-
     if old_manifest.version == new_version
         && old_manifest.revision == new_pkg.revision
     {
-        println!("\nPackage is already up to date.");
-        ux::print_transaction_summary(&ux::TransactionSummary {
-            command: "update".to_string(),
-            success: 0,
-            failed: 0,
-            skipped: 1
-        });
+        if !plan_json {
+            println!("\nPackage is already up to date.");
+            ux::print_transaction_summary(&ux::TransactionSummary {
+                command: "update".to_string(),
+                success: 0,
+                failed: 0,
+                skipped: 1
+            });
+        }
         return Ok(());
     }
 
-    let (download_size, new_installed_size) = install::util::get_package_sizes(
-        &new_pkg,
-        registry_handle.as_deref().unwrap_or("local"),
-        &new_version
-    );
-    let old_installed_size = old_manifest.installed_size.unwrap_or(0);
-    let installed_size_diff =
-        new_installed_size as i64 - old_installed_size as i64;
+    if !plan_json {
+        println!("{} Looking for conflicts...", "::".bold().blue());
+    }
 
-    println!();
-    if download_size > 0 {
+    let (graph, non_zoi_deps) = install::resolver::resolve_dependency_graph(
+        &[package_name.to_string()],
+        Some(old_manifest.scope),
+        true,
+        yes,
+        false,
+        None,
+        true,
+        None
+    )?;
+
+    if !plan_json {
+        println!("{} Checking available disk space...", "::".bold().blue());
+    }
+
+    if !dry_run {
+        let pkgs_to_check: Vec<&types::Package> =
+            graph.nodes.values().map(|n| &n.pkg).collect();
+        install::preflight::check_for_conflicts(&pkgs_to_check, yes)?;
+        for pkg in &pkgs_to_check {
+            if !install::util::display_updates(pkg, yes)? {
+                return Err(anyhow!("Update aborted by user."));
+            }
+        }
+        install::preflight::check_policy_compliance(&graph)?;
+        install::preflight::check_scope_compliance(&graph)?;
+        install::preflight::check_zoios_compliance(&graph)?;
+        install::preflight::check_for_vulnerabilities(&graph, yes)?;
+
+        let m_for_conflict_check = MultiProgress::new();
+        install::preflight::check_file_conflicts(
+            &graph,
+            yes,
+            &m_for_conflict_check
+        )?;
+        let _ = m_for_conflict_check.clear();
+    }
+
+    let install_plan =
+        install::plan::create_install_plan(&graph.nodes, None, false)?;
+
+    let mut total_download_size: u64 = 0;
+    let mut total_installed_size_diff: i64 = 0;
+    let mut packages_to_upgrade = Vec::new();
+    let config = config::read_config().unwrap_or_default();
+
+    for (pkg_id, node) in &graph.nodes {
+        let is_requested = node.pkg.name == new_pkg.name
+            && node.sub_package == old_manifest.sub_package;
+
+        let request_source = local::package_source_string(
+            &node.registry_handle,
+            &node.pkg.repo,
+            &node.pkg.name,
+            node.sub_package.as_deref(),
+            &node.version
+        );
+        let request = resolve::parse_source_string(&request_source)?;
+        let installed = local::find_installed_manifests_matching(
+            &request,
+            old_manifest.scope
+        )?;
+
+        let (current_version_display, needs_update) = if installed.is_empty() {
+            if is_requested {
+                let display = if old_manifest.revision == "1" {
+                    old_manifest.version.clone()
+                } else {
+                    format!(
+                        "{}-{}",
+                        old_manifest.version, old_manifest.revision
+                    )
+                };
+                (Some(display), true)
+            } else {
+                (None, true)
+            }
+        } else {
+            let m = installed
+                .first()
+                .ok_or_else(|| anyhow!("installed list unexpectedly empty"))?;
+            let display = if m.revision == "1" {
+                m.version.clone()
+            } else {
+                format!("{}-{}", m.version, m.revision)
+            };
+            (
+                Some(display),
+                m.version != node.version || m.revision != node.revision
+            )
+        };
+
+        if needs_update {
+            let (down_size, inst_size) = install::util::get_package_sizes(
+                &node.pkg,
+                &node.registry_handle,
+                &node.version
+            );
+            total_download_size += down_size;
+
+            let old_size = installed
+                .first()
+                .and_then(|m| m.installed_size)
+                .unwrap_or(0);
+            total_installed_size_diff += inst_size as i64 - old_size as i64;
+
+            let display_name = ux::format_display_name(
+                &node.registry_handle,
+                &node.pkg.repo,
+                &node.pkg.name,
+                node.sub_package.as_deref(),
+                &config
+            );
+
+            let new_version_display = if node.revision == "1" {
+                node.version.clone()
+            } else {
+                format!("{}-{}", node.version, node.revision)
+            };
+
+            packages_to_upgrade.push((
+                display_name,
+                current_version_display,
+                new_version_display,
+                pkg_id.clone(),
+                !is_requested
+            ));
+        }
+    }
+
+    if !plan_json {
         println!(
-            "Total Download Size: {}",
-            crate::pkg::utils::format_bytes(download_size)
+            "\n{} Packages ({})\n",
+            "::".bold().blue(),
+            packages_to_upgrade.len()
         );
     }
-    if installed_size_diff != 0 {
-        println!(
-            "Net Upgrade Size:    {}",
-            crate::pkg::utils::format_size_diff(installed_size_diff)
-        );
+
+    for (name, old_ver, new_ver, pkg_id, is_dep) in &packages_to_upgrade {
+        let transition = if let Some(old) = old_ver {
+            format!(
+                "{} -> {}",
+                format!("{name}@{old}").cyan(),
+                format!("{name}@{new_ver}").cyan()
+            )
+        } else {
+            format!("{} (new dependency)", format!("{name}@{new_ver}").cyan())
+        };
+        if !plan_json {
+            println!("  {transition}");
+        }
+
+        if *is_dep {
+            let node = graph.nodes.get(pkg_id).ok_or_else(|| {
+                anyhow!("Package node '{pkg_id}' missing from graph")
+            })?;
+            let pkg_dir = local::get_package_dir(
+                old_manifest.scope,
+                &node.registry_handle,
+                &node.pkg.repo,
+                &node.pkg.name
+            )?;
+            if let Ok(dependents) = local::get_dependents(&pkg_dir) {
+                let external_dependents: Vec<_> = dependents
+                    .into_iter()
+                    .filter(|dep_id| !graph.nodes.contains_key(dep_id))
+                    .collect();
+
+                if !external_dependents.is_empty() && !plan_json {
+                    println!(
+                        "   {} Updating {} may affect: {}",
+                        "Warning:".bold().yellow(),
+                        node.pkg.name.cyan(),
+                        external_dependents.join(", ").dimmed()
+                    );
+                }
+            }
+        }
     }
-    println!();
 
-    let preflight = ux::PreflightSummary::new("Update preflight")
-        .row("Package", new_pkg.name.clone())
-        .row("From", old_manifest.version.clone())
-        .row("To", new_version.clone())
-        .row("Scope", format!("{:?}", old_manifest.scope))
-        .row(
-            "Download size",
-            crate::pkg::utils::format_bytes(download_size)
-        )
-        .row(
-            "Net size",
-            crate::pkg::utils::format_size_diff(installed_size_diff)
-        );
-    ux::print_preflight(&preflight);
+    let down_str = zoi_core::utils::format_bytes(total_download_size);
+    let net_str = zoi_core::utils::format_size_diff(total_installed_size_diff);
 
-    if explain {
+    if !plan_json {
+        println!("\nTotal Download Size: {down_str:>10}");
+        println!("Net Upgrade Size:    {net_str:>10}");
+    }
+
+    if verbose && !plan_json {
+        let preflight = ux::PreflightSummary::new("Update preflight")
+            .row("Candidates", packages_to_upgrade.len().to_string())
+            .row("Scope", format!("{:?}", old_manifest.scope))
+            .row("Download size", &down_str)
+            .row("Net size", &net_str);
+        ux::print_preflight(&preflight);
+    }
+
+    if explain && !plan_json {
         let mut report = ux::ExplainReport::new("Update explanation");
         report = report.item(
             new_pkg.name.clone(),
@@ -263,110 +421,121 @@ fn run_update_single_logic(
                 "scope": format!("{:?}", old_manifest.scope),
                 "from_version": old_manifest.version,
                 "to_version": new_version,
-                "download_bytes": download_size,
-                "net_size_bytes": installed_size_diff,
+                "download_bytes": total_download_size,
+                "net_size_bytes": total_installed_size_diff,
             }
         });
         ux::emit_plan_json_v1("update", plan)?;
+        return Ok(());
     }
 
     if dry_run {
         println!(
-            "{} Dry-run: would upgrade {} from {} to {}",
-            "::".bold().yellow(),
-            new_pkg.name,
-            old_manifest.version,
-            new_version
+            "\n{} Dry-run: update plan above would be executed.",
+            "::".bold().yellow()
         );
+        return Ok(());
+    }
+
+    println!();
+    let prompt = if packages_to_upgrade.len() > 1 {
+        "Do you want to upgrade these packages?".to_string()
+    } else {
+        format!("Update from {} to {}?", old_manifest.version, new_version)
+    };
+
+    if !crate::utils::ask_for_confirmation(&prompt, yes) {
         ux::print_transaction_summary(&ux::TransactionSummary {
             command: "update".to_string(),
             success: 0,
             failed: 0,
-            skipped: 1
+            skipped: packages_to_upgrade.len()
         });
         return Ok(());
     }
 
-    if !crate::utils::ask_for_confirmation(
-        &format!("Update from {} to {}?", old_manifest.version, new_version),
-        yes
-    ) {
-        ux::print_transaction_summary(&ux::TransactionSummary {
-            command: "update".to_string(),
-            success: 0,
-            failed: 0,
-            skipped: 1
-        });
-        return Ok(());
-    }
-
-    let mut transaction = transaction::begin()?;
-
-    if let Some(hooks) = &new_pkg.hooks {
-        hooks::run_hooks(
-            hooks,
-            hooks::HookType::PreUpgrade,
-            old_manifest.scope
-        )?;
-    }
-
-    let (graph, _) = install::resolver::resolve_dependency_graph(
-        &[package_name.to_string()],
-        Some(old_manifest.scope),
-        true,
+    perform_transaction(
+        &graph,
+        &install_plan,
+        &non_zoi_deps,
+        old_manifest.scope,
         yes,
-        false,
-        None,
-        false,
-        None
-    )?;
+        verbose,
+        &new_pkg.name,
+        &old_manifest,
+        &new_pkg,
+        plan_json
+    )
+}
 
-    zoi_install::preflight::check_policy_compliance(&graph)?;
-    zoi_install::preflight::check_scope_compliance(&graph)?;
-    zoi_install::preflight::check_zoios_compliance(&graph)?;
-    for node in graph.nodes.values() {
-        if !install::util::display_updates(&node.pkg, yes)? {
-            return Err(anyhow!("Update aborted by user."));
-        }
-    }
-    zoi_install::preflight::check_for_vulnerabilities(&graph, yes)?;
-
-    let install_plan =
-        install::plan::create_install_plan(&graph.nodes, None, false)?;
-
+/// Executes the transactional part of the update process.
+///
+/// This involves creating a transaction, installing new package versions,
+/// recording the operations, and committing the transaction.
+fn perform_transaction(
+    graph: &install::resolver::DependencyGraph,
+    install_plan: &HashMap<String, install::plan::InstallAction>,
+    non_zoi_deps: &[String],
+    scope: types::Scope,
+    yes: bool,
+    verbose: bool,
+    target_pkg_name: &str,
+    old_manifest_ref: &types::InstallManifest,
+    new_pkg_ref: &types::Package,
+    plan_json: bool
+) -> Result<()> {
+    let mut transaction = transaction::begin()?;
     let stages = graph.toposort()?;
     let mut new_manifest_option: Option<types::InstallManifest> = None;
+    let m = MultiProgress::new();
+    if plan_json {
+        m.set_draw_target(indicatif::ProgressDrawTarget::hidden());
+    }
+
+    // Pre-install dependencies (non-zoi)
+    if !non_zoi_deps.is_empty() {
+        let processed_deps = Mutex::new(HashSet::new());
+        let mut installed_deps_ext = Vec::new();
+        for dep_str in non_zoi_deps {
+            let dep =
+                crate::pkg::dependencies::parse_dependency_string(dep_str)?;
+            crate::pkg::install::dep_install::install_dependency(
+                &dep,
+                "update",
+                scope,
+                yes,
+                false,
+                &processed_deps,
+                &mut installed_deps_ext,
+                Some(&m)
+            )?;
+        }
+    }
 
     for stage in stages {
         for pkg_id in stage {
             let node = graph.nodes.get(&pkg_id).ok_or_else(|| {
-                anyhow!(
-                    "Package node '{pkg_id}' missing from graph during update"
-                )
+                anyhow!("Package node '{pkg_id}' missing from graph")
             })?;
             if let Some(action) = install_plan.get(&pkg_id) {
                 match install::installer::install_node(
-                    node, action, None, None, yes, true, true, false
+                    node,
+                    action,
+                    Some(&m),
+                    None,
+                    yes,
+                    true,
+                    true,
+                    verbose
                 ) {
                     Ok(m) => {
-                        if m.name == new_pkg.name {
+                        if m.name == target_pkg_name {
                             new_manifest_option = Some(m);
                         }
                     }
                     Err(e) => {
-                        eprintln!(
-                            "\nError: Update failed during installation. \
-                             Rolling back..."
-                        );
+                        eprintln!("\nError: Update failed. Rolling back...");
                         transaction::rollback(&transaction.id)?;
-                        ux::print_transaction_summary(
-                            &ux::TransactionSummary {
-                                command: "update".to_string(),
-                                success: 0,
-                                failed: 1,
-                                skipped: 0
-                            }
-                        );
                         return Err(anyhow!("Update failed: {e}"));
                     }
                 }
@@ -375,41 +544,40 @@ fn run_update_single_logic(
     }
 
     if let Some(new_manifest) = new_manifest_option {
-        if let Err(e) = transaction::record_operation(
+        // Record and commit
+        transaction::record_operation(
             &mut transaction,
             types::TransactionOperation::Upgrade {
-                old_manifest: Box::new(old_manifest.clone()),
+                old_manifest: Box::new(old_manifest_ref.clone()),
                 new_manifest: Box::new(new_manifest.clone())
             }
-        ) {
-            eprintln!("Warning: Failed to record transaction for update: {e}");
-            transaction::delete_log(&transaction.id)?;
-        } else {
-            if let Ok(modified_files) =
-                transaction::get_modified_files(&transaction.id)
-            {
-                let modified_packages =
-                    transaction::get_modified_packages(&transaction.id)
-                        .unwrap_or_default();
-                let _ = crate::pkg::hooks::global::run_global_hooks(
-                    crate::pkg::hooks::global::HookWhen::PostTransaction,
-                    &modified_files,
-                    &modified_packages,
-                    "upgrade",
-                    old_manifest.scope
-                );
-            }
-            transaction::commit(&transaction.id)?;
+        )?;
+
+        if let Ok(modified_files) =
+            transaction::get_modified_files(&transaction.id)
+        {
+            let modified_packages =
+                transaction::get_modified_packages(&transaction.id)
+                    .unwrap_or_default();
+            let _ = crate::pkg::hooks::global::run_global_hooks(
+                crate::pkg::hooks::global::HookWhen::PostTransaction,
+                &modified_files,
+                &modified_packages,
+                "upgrade",
+                scope
+            );
         }
 
-        if let Some(backup_files) = &old_manifest.backup {
+        transaction::commit(&transaction.id)?;
+
+        if let Some(backup_files) = &old_manifest_ref.backup {
             println!("Restoring configuration files...");
             let old_version_dir = local::get_package_version_dir(
-                old_manifest.scope,
-                &old_manifest.registry_handle,
-                &old_manifest.repo,
-                &old_manifest.name,
-                &old_manifest.version
+                old_manifest_ref.scope,
+                &old_manifest_ref.registry_handle,
+                &old_manifest_ref.repo,
+                &old_manifest_ref.name,
+                &old_manifest_ref.version
             )?;
             let new_version_dir = local::get_package_version_dir(
                 new_manifest.scope,
@@ -419,62 +587,47 @@ fn run_update_single_logic(
                 &new_manifest.version
             )?;
 
-            handle_backup_files(
+            crate::pkg::merge::handle_backup_files(
                 &old_version_dir,
                 &new_version_dir,
                 backup_files,
-                old_manifest.scope
+                old_manifest_ref.scope
             )?;
         }
 
+        // Cleanup and finish
         cleanup_old_versions(
-            &new_pkg.name,
-            old_manifest.scope,
-            &new_pkg.repo,
-            registry_handle.as_deref().unwrap_or("local")
+            &new_manifest.name,
+            scope,
+            &new_manifest.repo,
+            &new_manifest.registry_handle
         )?;
 
-        let handle = registry_handle.as_deref().unwrap_or("local");
         if let Ok(conn) = db::open_connection("local") {
             let _ = db::update_package(
                 &conn,
-                &new_pkg,
-                handle,
-                Some(new_pkg.scope),
-                new_pkg.sub_package.as_deref(),
+                new_pkg_ref,
+                &new_manifest.registry_handle,
+                Some(new_manifest.scope),
+                new_manifest.sub_package.as_deref(),
                 Some(&types::InstallReason::Direct)
             );
         }
 
-        if let Some(hooks) = &new_pkg.hooks {
-            hooks::run_hooks(
+        if let Some(hooks) = &new_pkg_ref.hooks {
+            crate::pkg::hooks::run_hooks(
                 hooks,
-                hooks::HookType::PostUpgrade,
-                new_pkg.scope
+                crate::pkg::hooks::HookType::PostUpgrade,
+                new_manifest.scope
             )?;
         }
 
-        println!("\n{}", "Success:".green());
-        ux::print_transaction_summary(&ux::TransactionSummary {
-            command: "update".to_string(),
-            success: 1,
-            failed: 0,
-            skipped: 0
-        });
-        Ok(())
-    } else {
-        eprintln!(
-            "\nError: Update failed to produce a new manifest. Rolling back..."
-        );
-        transaction::rollback(&transaction.id)?;
-        ux::print_transaction_summary(&ux::TransactionSummary {
-            command: "update".to_string(),
-            success: 0,
-            failed: 1,
-            skipped: 0
-        });
-        Err(anyhow!("Update failed: could not get new manifest"))
+        if !plan_json {
+            println!("\n{}", "Success:".green());
+        }
     }
+
+    Ok(())
 }
 
 /// Logic for updating all installed packages.
@@ -483,6 +636,7 @@ fn run_update_all_logic(
     dry_run: bool,
     explain: bool,
     plan_json: bool,
+    verbose: bool,
     interactive: bool
 ) -> Result<()> {
     #[derive(Clone)]
@@ -501,13 +655,18 @@ fn run_update_all_logic(
     let mut pinned_sources = Vec::new();
     let mut skipped_sources = Vec::new();
     let mut up_to_date_sources = Vec::new();
-    let mut packages_to_upgrade: Vec<UpdateCandidate> = Vec::new();
+    let mut candidates: Vec<UpdateCandidate> = Vec::new();
 
     // --- Phase 1: Upgrade Scanning ---
     // We scan all installed packages and compare them against the latest
     // registry metadata.
-    println!("{} Checking for upgrades...", "::".bold().blue());
+    if !plan_json {
+        println!("{} Checking for upgrades...", "::".bold().blue());
+    }
     let pb = ProgressBar::new(installed_packages.len() as u64);
+    if plan_json {
+        pb.set_draw_target(indicatif::ProgressDrawTarget::hidden());
+    }
     pb.set_style(
         ProgressStyle::default_bar()
             .template(
@@ -534,7 +693,7 @@ fn run_update_all_logic(
         if pin::is_pinned(&source).unwrap_or(false)
             || pin::is_pinned(&manifest.name).unwrap_or(false)
         {
-            pinned_sources.push(source.clone());
+            pinned_sources.push(source);
             pb.inc(1);
             continue;
         }
@@ -548,12 +707,6 @@ fn run_update_all_logic(
             ) {
                 Ok(result) => result,
                 Err(e) => {
-                    eprintln!(
-                        "{}: Failed to resolve '{}': {}",
-                        "Warning".yellow(),
-                        source,
-                        e
-                    );
                     skipped_sources.push(format!("{source} ({e})"));
                     pb.inc(1);
                     continue;
@@ -563,7 +716,7 @@ fn run_update_all_logic(
         if manifest.version == new_version
             && manifest.revision == new_pkg.revision
         {
-            up_to_date_sources.push(source.clone());
+            up_to_date_sources.push(source);
             pb.inc(1);
             continue;
         }
@@ -584,7 +737,7 @@ fn run_update_all_logic(
                 &new_version
             );
 
-        packages_to_upgrade.push(UpdateCandidate {
+        candidates.push(UpdateCandidate {
             source,
             new_pkg,
             new_version,
@@ -598,94 +751,15 @@ fn run_update_all_logic(
     }
     pb.finish_and_clear();
 
-    if !pinned_sources.is_empty() {
-        println!("\n{} Pinned (skipped)", "::".bold().blue());
-        for source in &pinned_sources {
-            println!("  - {}", source.yellow());
+    if candidates.is_empty() {
+        if !plan_json {
+            println!("\nAll packages are up to date.");
         }
-    }
-    if !skipped_sources.is_empty() {
-        println!("\n{} Skipped (resolve failures)", "::".bold().blue());
-        for source in &skipped_sources {
-            println!("  - {}", source.red());
-        }
-    }
-    if !packages_to_upgrade.is_empty() {
-        println!("\n{} Upgrade candidates", "::".bold().blue());
-        for candidate in &packages_to_upgrade {
-            let delta = candidate.new_advisories as i64
-                - candidate.old_advisories as i64;
-            let advisory_suffix = match delta.cmp(&0) {
-                std::cmp::Ordering::Greater => {
-                    format!(" (advisories +{delta})").red().to_string()
-                }
-                std::cmp::Ordering::Less => {
-                    format!(" (advisories {delta})").green().to_string()
-                }
-                std::cmp::Ordering::Equal => String::new()
-            };
-
-            let old_display = if candidate.old_manifest.revision == "1" {
-                candidate.old_manifest.version.clone()
-            } else {
-                format!(
-                    "{}-{}",
-                    candidate.old_manifest.version,
-                    candidate.old_manifest.revision
-                )
-            };
-
-            let new_display = if candidate.new_pkg.revision == "1" {
-                candidate.new_version.clone()
-            } else {
-                format!(
-                    "{}-{}",
-                    candidate.new_version, candidate.new_pkg.revision
-                )
-            };
-
-            println!(
-                "  - {}: {} -> {}{}",
-                candidate.source.cyan(),
-                old_display.yellow(),
-                new_display.green(),
-                advisory_suffix
-            );
-
-            let _ = install::util::display_updates(&candidate.new_pkg, true);
-        }
-    }
-
-    if packages_to_upgrade.is_empty() {
-        println!("\nAll packages are up to date.");
-        ux::print_transaction_summary(&ux::TransactionSummary {
-            command: "update".to_string(),
-            success: 0,
-            failed: 0,
-            skipped: pinned_sources.len()
-                + skipped_sources.len()
-                + up_to_date_sources.len()
-        });
         return Ok(());
     }
 
-    if explain {
-        let mut report = ux::ExplainReport::new("Update explanation");
-        for candidate in &packages_to_upgrade {
-            report = report.item(
-                candidate.source.clone(),
-                format!(
-                    "selected because {} -> {}",
-                    candidate.old_manifest.version, candidate.new_version
-                ),
-                Vec::new()
-            );
-        }
-        ux::print_explain(&report);
-    }
-
     if interactive && !dry_run {
-        let items: Vec<String> = packages_to_upgrade
+        let items: Vec<String> = candidates
             .iter()
             .map(|c| {
                 format!(
@@ -701,33 +775,84 @@ fn run_update_all_logic(
             .map_err(|e| anyhow!("Interactive selection failed: {e}"))?;
 
         if selected.is_empty() {
-            println!("No packages selected.");
-            ux::print_transaction_summary(&ux::TransactionSummary {
-                command: "update".to_string(),
-                success: 0,
-                failed: 0,
-                skipped: packages_to_upgrade.len()
-                    + pinned_sources.len()
-                    + skipped_sources.len()
-                    + up_to_date_sources.len()
-            });
+            if !plan_json {
+                println!("No packages selected.");
+            }
             return Ok(());
         }
 
-        let selected_set: std::collections::HashSet<usize> =
-            selected.into_iter().collect();
-        let mut filtered = Vec::new();
-        for (idx, candidate) in packages_to_upgrade.into_iter().enumerate() {
-            if selected_set.contains(&idx) {
-                filtered.push(candidate);
+        let selected_set: HashSet<usize> = selected.into_iter().collect();
+        candidates = candidates
+            .into_iter()
+            .enumerate()
+            .filter(|(idx, _)| selected_set.contains(idx))
+            .map(|(_, c)| c)
+            .collect();
+    }
+
+    if !plan_json {
+        println!("{} Resolving dependencies...", "::".bold().blue());
+        println!("{} Looking for conflicts...", "::".bold().blue());
+        println!("{} Checking available disk space...", "::".bold().blue());
+
+        if !pinned_sources.is_empty() {
+            println!("\n{} Pinned (skipped)", "::".bold().blue());
+            for s in &pinned_sources {
+                println!("  - {}", s.yellow());
             }
         }
-        packages_to_upgrade = filtered;
+
+        println!("\n{} Packages ({})", "::".bold().blue(), candidates.len());
+    }
+    let config = config::read_config().unwrap_or_default();
+
+    for candidate in &candidates {
+        let delta =
+            candidate.new_advisories as i64 - candidate.old_advisories as i64;
+        let advisory_suffix = match delta.cmp(&0) {
+            std::cmp::Ordering::Greater => {
+                format!(" (advisories +{delta})").red().to_string()
+            }
+            std::cmp::Ordering::Less => {
+                format!(" (advisories {delta})").green().to_string()
+            }
+            std::cmp::Ordering::Equal => String::new()
+        };
+
+        let display_name = ux::format_display_name(
+            &candidate.old_manifest.registry_handle,
+            &candidate.old_manifest.repo,
+            &candidate.old_manifest.name,
+            candidate.old_manifest.sub_package.as_deref(),
+            &config
+        );
+        let old_display = if candidate.old_manifest.revision == "1" {
+            candidate.old_manifest.version.clone()
+        } else {
+            format!(
+                "{}-{}",
+                candidate.old_manifest.version, candidate.old_manifest.revision
+            )
+        };
+        let new_display = if candidate.new_pkg.revision == "1" {
+            candidate.new_version.clone()
+        } else {
+            format!("{}-{}", candidate.new_version, candidate.new_pkg.revision)
+        };
+
+        if !plan_json {
+            println!(
+                "  {} -> {}{}",
+                format!("{display_name}@{old_display}").cyan(),
+                format!("{display_name}@{new_display}").cyan(),
+                advisory_suffix
+            );
+        }
     }
 
     let total_download_size: u64 =
-        packages_to_upgrade.iter().map(|c| c.download_size).sum();
-    let total_installed_size_diff: i64 = packages_to_upgrade
+        candidates.iter().map(|c| c.download_size).sum();
+    let total_installed_size_diff: i64 = candidates
         .iter()
         .map(|c| {
             c.new_installed_size as i64
@@ -735,23 +860,39 @@ fn run_update_all_logic(
         })
         .sum();
 
-    let preflight = ux::PreflightSummary::new("Update preflight")
-        .row("Candidates", packages_to_upgrade.len().to_string())
-        .row("Pinned skipped", pinned_sources.len().to_string())
-        .row("Other skipped", skipped_sources.len().to_string())
-        .row("Up-to-date", up_to_date_sources.len().to_string())
-        .row(
-            "Download size",
-            crate::pkg::utils::format_bytes(total_download_size)
-        )
-        .row(
-            "Net size",
-            crate::pkg::utils::format_size_diff(total_installed_size_diff)
-        );
-    ux::print_preflight(&preflight);
+    let down_str = zoi_core::utils::format_bytes(total_download_size);
+    let net_str = zoi_core::utils::format_size_diff(total_installed_size_diff);
+
+    if !plan_json {
+        println!("\nTotal Download Size: {down_str:>10}");
+        println!("Net Upgrade Size:    {net_str:>10}");
+    }
+
+    if verbose && !plan_json {
+        let preflight = ux::PreflightSummary::new("Update preflight")
+            .row("Candidates", candidates.len().to_string())
+            .row("Download size", &down_str)
+            .row("Net size", &net_str);
+        ux::print_preflight(&preflight);
+    }
+
+    if explain && !plan_json {
+        let mut report = ux::ExplainReport::new("Update explanation");
+        for candidate in &candidates {
+            report = report.item(
+                candidate.source.clone(),
+                format!(
+                    "selected because {} -> {}",
+                    candidate.old_manifest.version, candidate.new_version
+                ),
+                Vec::new()
+            );
+        }
+        ux::print_explain(&report);
+    }
 
     if plan_json {
-        let packages: Vec<_> = packages_to_upgrade
+        let packages: Vec<_> = candidates
             .iter()
             .map(|c| {
                 json!({
@@ -772,7 +913,7 @@ fn run_update_all_logic(
             "dry_run": dry_run,
             "interactive": interactive,
             "totals": {
-                "candidates": packages_to_upgrade.len(),
+                "candidates": candidates.len(),
                 "pinned_skipped": pinned_sources.len(),
                 "other_skipped": skipped_sources.len(),
                 "up_to_date": up_to_date_sources.len(),
@@ -784,6 +925,7 @@ fn run_update_all_logic(
             "packages": packages,
         });
         ux::emit_plan_json_v1("update", plan)?;
+        return Ok(());
     }
 
     if dry_run {
@@ -791,50 +933,25 @@ fn run_update_all_logic(
             "\n{} Dry-run: upgrade plan above would be executed.",
             "::".bold().yellow()
         );
-        ux::print_transaction_summary(&ux::TransactionSummary {
-            command: "update".to_string(),
-            success: 0,
-            failed: 0,
-            skipped: packages_to_upgrade.len()
-                + pinned_sources.len()
-                + skipped_sources.len()
-                + up_to_date_sources.len()
-        });
         return Ok(());
     }
 
-    println!();
     if !crate::utils::ask_for_confirmation(
         "Do you want to upgrade these packages?",
         yes
     ) {
-        ux::print_transaction_summary(&ux::TransactionSummary {
-            command: "update".to_string(),
-            success: 0,
-            failed: 0,
-            skipped: packages_to_upgrade.len()
-                + pinned_sources.len()
-                + skipped_sources.len()
-                + up_to_date_sources.len()
-        });
         return Ok(());
     }
 
     // --- Phase 2: Transactional Upgrade ---
-    // We execute the upgrade plan. Each package is processed in parallel
-    // where possible, but all are wrapped in a single machine-wide transaction.
     let transaction = Mutex::new(transaction::begin()?);
-    let transaction_id = transaction
-        .lock()
-        .expect("failed to lock transaction")
-        .id
-        .clone();
+    let transaction_id = transaction.lock().expect("mutex poisoned").id.clone();
     let failed_updates = Mutex::new(Vec::new());
     let successful_upgrades = Mutex::new(Vec::new());
 
     let m = MultiProgress::new();
 
-    packages_to_upgrade
+    candidates
         .par_iter()
         .try_for_each(|candidate| -> Result<()> {
             println!(
@@ -1029,11 +1146,10 @@ fn run_update_all_logic(
             }
 
             if let Some(new_manifest) = new_manifest_option {
-                let mut tx_lock = transaction
-                    .lock()
-                    .map_err(|e| anyhow!("mutex poisoned: {e}"))?;
                 if let Err(e) = transaction::record_operation(
-                    &mut tx_lock,
+                    &mut *transaction
+                        .lock()
+                        .map_err(|e| anyhow!("mutex poisoned: {e}"))?,
                     types::TransactionOperation::Upgrade {
                         old_manifest: Box::new(candidate.old_manifest.clone()),
                         new_manifest: Box::new(new_manifest.clone())
@@ -1114,16 +1230,20 @@ fn run_update_all_logic(
     }
     transaction::commit(&transaction_id)?;
 
-    println!("\n{}", "Success:".green());
+    if !plan_json {
+        println!("\n{}", "Success:".green());
+    }
     let successful_upgrades = successful_upgrades
         .into_inner()
         .map_err(|e| anyhow!("mutex poisoned: {e}"))?;
     for (old_manifest, new_manifest, new_pkg) in &successful_upgrades {
         if let Some(backup_files) = &old_manifest.backup {
-            println!(
-                "Restoring configuration for {}...",
-                old_manifest.name.cyan()
-            );
+            if !plan_json {
+                println!(
+                    "Restoring configuration for {}...",
+                    old_manifest.name.cyan()
+                );
+            }
             let old_version_dir = local::get_package_version_dir(
                 old_manifest.scope,
                 &old_manifest.registry_handle,
@@ -1185,15 +1305,16 @@ fn run_update_all_logic(
         }
     }
 
-    ux::print_transaction_summary(&ux::TransactionSummary {
-        command: "update".to_string(),
-        success: successful_upgrades.len(),
-        failed: 0,
-        skipped: pinned_sources.len()
-            + skipped_sources.len()
-            + up_to_date_sources.len()
-    });
-    println!("\n{}", "Success:".green());
+    if !plan_json {
+        ux::print_transaction_summary(&ux::TransactionSummary {
+            command: "update".to_string(),
+            success: successful_upgrades.len(),
+            failed: 0,
+            skipped: pinned_sources.len()
+                + skipped_sources.len()
+                + up_to_date_sources.len()
+        });
+    }
     Ok(())
 }
 
@@ -1240,7 +1361,6 @@ fn cleanup_old_versions(
 ) -> Result<()> {
     let config = config::read_config()?;
     let rollback_enabled = config.rollback_enabled;
-
     let package_dir =
         local::get_package_dir(scope, registry_handle, repo, package_name)?;
 
@@ -1262,26 +1382,20 @@ fn cleanup_old_versions(
     if versions.is_empty() {
         return Ok(());
     }
-
     versions.sort();
 
     let versions_to_keep = if rollback_enabled { 3 } else { 1 };
-
     if versions.len() > versions_to_keep {
         let num_to_delete = versions.len() - versions_to_keep;
-        let Some(versions_to_delete) = versions.get(..num_to_delete) else {
-            return Ok(());
-        };
-
         println!("Cleaning up old versions...");
-        for version in versions_to_delete {
+        let to_delete = versions
+            .get(..num_to_delete)
+            .ok_or_else(|| anyhow!("Version slice out of bounds"))?;
+        for version in to_delete {
             let version_dir_to_delete = package_dir.join(version.to_string());
             println!(" - Removing {}", version_dir_to_delete.display());
-            if version_dir_to_delete.exists() {
-                fs::remove_dir_all(version_dir_to_delete)?;
-            }
+            let _ = fs::remove_dir_all(version_dir_to_delete);
         }
     }
-
     Ok(())
 }

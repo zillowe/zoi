@@ -113,6 +113,44 @@ pub fn classify_source_origin(
     }
 }
 
+/// Formats a package identifier for display based on registry and repository
+/// configuration.
+pub fn format_display_name(
+    registry: &str,
+    repo: &str,
+    name: &str,
+    sub: Option<&str>,
+    config: &zoi_core::types::Config
+) -> String {
+    let base_name = if let Some(s) = sub {
+        format!("{name}:{s}")
+    } else {
+        name.to_string()
+    };
+
+    if registry == "local" && repo.starts_with("git/") {
+        let repo_name = &repo[4..];
+        return format!("#git@{repo_name}/{base_name}");
+    }
+
+    let default_handle = config
+        .default_registry
+        .as_ref()
+        .map_or("", |r| r.handle.as_str());
+    let active_repos = &config.repos;
+
+    if registry == default_handle || registry == "local" || registry.is_empty()
+    {
+        if active_repos.contains(&repo.to_string()) || repo.is_empty() {
+            base_name
+        } else {
+            format!("@{repo}/{base_name}")
+        }
+    } else {
+        format!("#{registry}@{repo}/{base_name}")
+    }
+}
+
 /// Wraps an error with a user-friendly hint if one is available for the given
 /// error message and command.
 #[must_use]

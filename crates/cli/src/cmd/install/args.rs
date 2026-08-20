@@ -67,7 +67,7 @@ pub struct InstallArgs {
     pub explain: bool,
 
     /// Emit machine-readable install plan JSON
-    #[arg(long)]
+    #[arg(long, requires = "dry_run")]
     pub plan_json: bool,
 
     /// Retry failed downloads this many times (minimum 1)
