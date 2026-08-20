@@ -1,0 +1,5 @@
+# Code Owners
+# This file defines individuals or teams that are responsible for code in the repository.
+# For more info: https://docs.gitlab.com/ee/user/project/code_owners.html
+
+* @zillowe/teams/rust-team @zillowe/zillwen/zusty
