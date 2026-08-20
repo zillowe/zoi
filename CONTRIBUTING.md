@@ -29,12 +29,12 @@ making our project better. Every contribution, no matter how small, is valuable 
 We welcome contributions in many forms, including bug reports, feature requests,
 documentation improvements, and code contributions.
 
-You can use two of our [mirrors](/README.md#-repositories-mirrors) for contributions.
+You can only use our main [GitLab mirror](/README.md#-repositories-mirrors) for contributions.
 
-- [GitLab](https://gitlab.com/zillowe/zillwen/zusty/zoi): Main & Preferred
+- [GitLab](https://gitlab.com/zillowe/zillwen/zusty/zoi): Main
 - [GitHub](https://github.com/zillowe/zoi) or
-[Codeberg](https://codeberg.org/zillowe/zoi): Issues and PRs are welcomed if
-you don't want to use GitLab.
+[Codeberg](https://codeberg.org/zillowe/zoi): Issues only are welcomed if
+you don't want to use GitLab but GitLab is still the preferred method.
 
 ### Reporting Bugs or Requesting Features
 
