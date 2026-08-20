@@ -14,7 +14,7 @@ use serde_json::json;
 use walkdir::WalkDir;
 
 use crate::cmd::{utils, ux};
-use crate::pkg::{self, lock, transaction, types};
+use crate::pkg::{self, transaction, types};
 
 /// Runs the `uninstall` command to remove one or more packages.
 ///
@@ -38,6 +38,9 @@ pub fn run(
     plan_json: bool,
     dry_run: bool
 ) -> Result<()> {
+    if plan_json && !dry_run {
+        return Err(anyhow!("--plan-json requires --dry-run"));
+    }
     let mut scope_override = scope.map(|s| match s {
         crate::cli::InstallScope::User => types::Scope::User,
         crate::cli::InstallScope::System => types::Scope::System,
@@ -65,6 +68,13 @@ pub fn run(
         utils::expand_split_packages(package_names, "Uninstalling")?;
 
     for name in &expanded_names {
+        if !plan_json {
+            println!(
+                "{} Resolving package '{}' for uninstallation...",
+                "::".bold().blue(),
+                name.cyan()
+            );
+        }
         if let Err(e) = resolve_and_add_manifest(
             name,
             &installed_packages,
@@ -91,13 +101,15 @@ pub fn run(
     }
 
     if manifests_to_uninstall.is_empty() {
-        println!("No packages to uninstall.");
-        ux::print_transaction_summary(&ux::TransactionSummary {
-            command: "uninstall".to_string(),
-            success: 0,
-            failed: 0,
-            skipped: 0
-        });
+        if !plan_json {
+            println!("No packages to uninstall.");
+            ux::print_transaction_summary(&ux::TransactionSummary {
+                command: "uninstall".to_string(),
+                success: 0,
+                failed: 0,
+                skipped: 0
+            });
+        }
         return Ok(());
     }
 
@@ -164,26 +176,28 @@ pub fn run(
         total_size_freed_bytes += package_size;
     }
 
-    println!("Packages to remove:");
-    for manifest in &manifests_to_uninstall {
-        let source_str = if let Some(sub) = &manifest.sub_package {
-            format!(
-                "#{}@{}/{}:{}",
-                manifest.registry_handle, manifest.repo, manifest.name, sub
-            )
-        } else {
-            format!(
-                "#{}@{}/{}",
-                manifest.registry_handle, manifest.repo, manifest.name
-            )
-        };
-        println!("  - {source_str}");
-    }
+    if !plan_json {
+        println!("Packages to remove:");
+        for manifest in &manifests_to_uninstall {
+            let source_str = if let Some(sub) = &manifest.sub_package {
+                format!(
+                    "#{}@{}/{}:{}",
+                    manifest.registry_handle, manifest.repo, manifest.name, sub
+                )
+            } else {
+                format!(
+                    "#{}@{}/{}",
+                    manifest.registry_handle, manifest.repo, manifest.name
+                )
+            };
+            println!("  - {source_str}");
+        }
 
-    println!(
-        "\nTotal size to be freed: {}",
-        crate::pkg::utils::format_bytes(total_size_freed_bytes)
-    );
+        println!(
+            "\nTotal size to be freed: {}",
+            crate::pkg::utils::format_bytes(total_size_freed_bytes)
+        );
+    }
 
     let removal_ids: std::collections::HashSet<String> = manifests_to_uninstall
         .iter()
@@ -244,9 +258,11 @@ pub fn run(
             "Estimated freed size",
             crate::pkg::utils::format_bytes(total_size_freed_bytes)
         );
-    ux::print_preflight(&preflight);
+    if !plan_json {
+        ux::print_preflight(&preflight);
+    }
 
-    if explain {
+    if explain && !plan_json {
         let mut report = ux::ExplainReport::new("Uninstall explanation");
         for manifest in &manifests_to_uninstall {
             let source = if let Some(sub) = &manifest.sub_package {
@@ -292,6 +308,7 @@ pub fn run(
             "packages": impact_json,
         });
         ux::emit_plan_json_v1("uninstall", plan)?;
+        return Ok(());
     }
 
     if !dangerous.is_empty() {
@@ -331,7 +348,6 @@ pub fn run(
     }
 
     if !crate::utils::ask_for_confirmation(":: Proceed with removal?", yes) {
-        let _ = lock::release_lock();
         ux::print_transaction_summary(&ux::TransactionSummary {
             command: "uninstall".to_string(),
             success: 0,

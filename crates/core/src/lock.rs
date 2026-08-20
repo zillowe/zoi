@@ -6,6 +6,12 @@ use anyhow::{Result, anyhow};
 use colored::Colorize;
 use fs2::FileExt;
 
+thread_local! {
+    /// A per-thread counter to track the number of active lock guards in the
+    /// current thread, allowing for re-entrant locking within the same thread.
+    static LOCK_COUNT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 /// Returns the path to the system-wide lock file.
 fn get_lock_path() -> Result<PathBuf> {
     let home_dir = crate::utils::get_user_home()
@@ -34,7 +40,19 @@ pub fn acquire_lock() -> Result<LockGuard> {
     if std::env::var("ZOI_SKIP_LOCK").is_ok_and(|v| v == "1") {
         return Ok(LockGuard::noop());
     }
+
     let lock_path = get_lock_path()?;
+
+    // Check if the current thread already holds a lock.
+    let count = LOCK_COUNT.with(|c| {
+        let val = c.get();
+        c.set(val + 1);
+        val
+    });
+
+    if count > 0 {
+        return Ok(LockGuard::recursive());
+    }
 
     if let Some(parent) = lock_path.parent()
         && let Err(e) = fs::create_dir_all(parent)
@@ -46,14 +64,23 @@ pub fn acquire_lock() -> Result<LockGuard> {
         );
     }
 
-    let file = fs::OpenOptions::new()
+    let file_res = fs::OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
         .truncate(false)
-        .open(&lock_path)?;
+        .open(&lock_path);
+
+    let file = match file_res {
+        Ok(f) => f,
+        Err(e) => {
+            LOCK_COUNT.with(|c| c.set(c.get() - 1));
+            return Err(e.into());
+        }
+    };
 
     if file.try_lock_exclusive().is_err() {
+        LOCK_COUNT.with(|c| c.set(c.get() - 1));
         let mut content = String::new();
         if let Ok(mut f) = fs::File::open(&lock_path) {
             let _ = f.read_to_string(&mut content);
@@ -86,7 +113,8 @@ pub fn acquire_lock() -> Result<LockGuard> {
 
     Ok(LockGuard {
         path: Some(lock_path),
-        file: Some(file)
+        file: Some(file),
+        is_recursive: false
     })
 }
 
@@ -100,6 +128,7 @@ pub fn release_lock() -> Result<()> {
     if lock_path.exists() {
         let _ = fs::remove_file(lock_path);
     }
+    LOCK_COUNT.with(|c| c.set(0));
     Ok(())
 }
 
@@ -108,7 +137,9 @@ pub struct LockGuard {
     /// The path to the lock file.
     path: Option<PathBuf>,
     /// The file handle holding the lock.
-    file: Option<fs::File>
+    file: Option<fs::File>,
+    /// Whether this guard is a recursive acquisition.
+    is_recursive: bool
 }
 
 impl LockGuard {
@@ -116,13 +147,28 @@ impl LockGuard {
     pub fn noop() -> Self {
         Self {
             path: None,
-            file: None
+            file: None,
+            is_recursive: false
+        }
+    }
+
+    /// Creates a recursive lock guard.
+    pub fn recursive() -> Self {
+        Self {
+            path: None,
+            file: None,
+            is_recursive: true
         }
     }
 }
 
 impl Drop for LockGuard {
     fn drop(&mut self) {
+        if self.is_recursive {
+            LOCK_COUNT.with(|c| c.set(c.get() - 1));
+            return;
+        }
+
         if let Some(path) = self.path.take() {
             self.file.take();
 
@@ -131,6 +177,7 @@ impl Drop for LockGuard {
             {
                 debug_assert!(false, "Failed to remove lock file: {e}");
             }
+            LOCK_COUNT.with(|c| c.set(0));
         }
     }
 }

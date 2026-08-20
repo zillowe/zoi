@@ -50,6 +50,7 @@ pub fn install_sources(
     sources: &[String],
     options: &SourceInstallOptions
 ) -> Result<()> {
+    let _lock = lock::acquire_lock()?;
     let plugin_manager = if crate::pkg::utils::is_mini_mode() {
         None
     } else {
@@ -93,6 +94,7 @@ pub fn uninstall_package(
     package_name: &str,
     scope_override: Option<Scope>
 ) -> Result<()> {
+    let _lock = lock::acquire_lock()?;
     zoi_uninstall::run(package_name, scope_override, false, false, false)
         .map(|_| ())
 }

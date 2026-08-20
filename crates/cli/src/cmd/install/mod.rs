@@ -35,6 +35,9 @@ pub fn run(
     purl: bool,
     project_config: Option<project::config::ProjectConfig>
 ) -> Result<()> {
+    if plan_json && !dry_run {
+        return Err(anyhow::anyhow!("--plan-json requires --dry-run"));
+    }
     let mut resolved_scope = scope.map(|s| match s {
         crate::cli::InstallScope::User => types::Scope::User,
         crate::cli::InstallScope::System => types::Scope::System,

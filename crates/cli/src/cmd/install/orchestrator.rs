@@ -10,13 +10,14 @@ use indicatif::MultiProgress;
 use mlua::LuaSerdeExt;
 use rayon::prelude::*;
 use serde_json::json;
-use zoi_core::{lock, types};
+use zoi_core::types;
 use zoi_install::{installer, lockfile, plan, preflight, resolver, util};
 use zoi_plugins::PluginManager;
 use zoi_project as project;
 use zoi_resolver::local;
 use zoi_transaction as transaction;
 
+use crate::cmd::ux;
 use crate::utils as cli_utils;
 
 /// Options for the installation orchestrator.
@@ -79,14 +80,14 @@ impl<'a> Orchestrator<'a> {
     /// etc.) are poisoned.
     pub fn run(&self, sources: &[String], repo: Option<String>) -> Result<()> {
         let options = &self.options;
+        if options.plan_json && !options.dry_run {
+            return Err(anyhow!("--plan-json requires --dry-run"));
+        }
         util::set_download_retry_attempts(options.retry);
 
         if sources.is_empty() && repo.is_none() && !options.frozen {
             return Err(anyhow!("No packages specified for installation."));
         }
-
-        // 1. Initial lock and setup
-        let _lock = lock::acquire_lock()?;
 
         let mut scope_override = Some(options.scope);
 
@@ -148,11 +149,13 @@ impl<'a> Orchestrator<'a> {
                 ));
             }
             frozen_packages = Some(locked_packages);
-            println!(
-                "{} --frozen enabled. Installing pinned lockfile sources \
-                 only...",
-                "::".bold().blue()
-            );
+            if !options.plan_json {
+                println!(
+                    "{} --frozen enabled. Installing pinned lockfile sources \
+                     only...",
+                    "::".bold().blue()
+                );
+            }
             _is_project_install = true;
         } else if sources.is_empty() && repo.is_none() {
             if std::path::Path::new("zoi.lua").exists()
@@ -165,19 +168,21 @@ impl<'a> Orchestrator<'a> {
                         } else {
                             "zoi.yaml"
                         };
-                    if lockfile_exists {
-                        println!(
-                            "{} zoi.lock found. Installing from {} then \
-                             verifying...",
-                            "::".bold().blue(),
-                            config_file
-                        );
-                    } else {
-                        println!(
-                            "{} Installing project packages from {}...",
-                            "::".bold().blue(),
-                            config_file
-                        );
+                    if !options.plan_json {
+                        if lockfile_exists {
+                            println!(
+                                "{} zoi.lock found. Installing from {} then \
+                                 verifying...",
+                                "::".bold().blue(),
+                                config_file
+                            );
+                        } else {
+                            println!(
+                                "{} Installing project packages from {}...",
+                                "::".bold().blue(),
+                                config_file
+                            );
+                        }
                     }
                     sources_to_process.clone_from(&config.pkgs);
                     if scope_override.is_none() {
@@ -212,11 +217,13 @@ impl<'a> Orchestrator<'a> {
         if options.purl {
             let mut resolved_purls = Vec::new();
             for source in &sources_to_process {
-                println!(
-                    "{} Fetching PURL package '{}'...",
-                    "::".bold().blue(),
-                    source
-                );
+                if !options.plan_json {
+                    println!(
+                        "{} Fetching PURL package '{}'...",
+                        "::".bold().blue(),
+                        source
+                    );
+                }
                 let ident = zoi_purl::fetch_and_store_purl_package(source)?;
                 resolved_purls.push(ident);
             }
@@ -259,7 +266,7 @@ impl<'a> Orchestrator<'a> {
                 resolver::build_graph_from_locked_packages(
                     locked_packages,
                     scope_override,
-                    false,
+                    options.plan_json,
                     options.yes
                 )?
             } else {
@@ -270,40 +277,77 @@ impl<'a> Orchestrator<'a> {
                     options.yes,
                     options.all_optional,
                     options.build_type,
-                    false,
+                    options.plan_json,
                     options.project_config.clone()
                 )?
             };
 
+        let config = zoi_core::config::read_config().unwrap_or_default();
         let mut skipped_existing_count = 0usize;
         if !options.force {
             let mut to_remove = Vec::new();
             for (pkg_id, node) in &graph.nodes {
-                let request_source = local::package_source_string(
-                    &node.registry_handle,
-                    &node.pkg.repo,
-                    &node.pkg.name,
-                    node.sub_package.as_deref(),
-                    &node.version
-                );
-                let request = zoi_resolver::resolve::parse_source_string(
-                    &request_source
-                )?;
-                let matches = local::find_installed_manifests_matching(
-                    &request,
+                // Check if any version of this package is already installed
+                let pkg_spec = if node.pkg.repo.is_empty() {
+                    node.pkg.name.clone()
+                } else {
+                    format!("@{}/{}", node.pkg.repo, node.pkg.name)
+                };
+
+                let request_base =
+                    zoi_resolver::resolve::parse_source_string(&pkg_spec)?;
+                let installed = local::find_installed_manifests_matching(
+                    &request_base,
                     scope_override.unwrap_or(node.pkg.scope)
                 )?;
-                if matches
-                    .iter()
-                    .any(|manifest| manifest.version == node.version)
-                {
-                    println!(
-                        "{} Package '{}' is already installed at version {}. \
-                         Skipping.",
-                        "::".bold().green(),
-                        node.pkg.name.cyan(),
-                        node.version.yellow()
+
+                if !installed.is_empty() {
+                    let already_at_target = installed.iter().any(|m| {
+                        m.version == node.version && m.revision == node.revision
+                    });
+
+                    let display_name = ux::format_display_name(
+                        &node.registry_handle,
+                        &node.pkg.repo,
+                        &node.pkg.name,
+                        node.sub_package.as_deref(),
+                        &config
                     );
+                    if !options.plan_json {
+                        if already_at_target {
+                            let full_spec =
+                                format!("{}@{}", display_name, node.version);
+                            println!(
+                                "{} Package '{}' is already installed. \
+                                 Skipping.",
+                                "::".bold().green(),
+                                full_spec.cyan()
+                            );
+                        } else {
+                            let current_version = installed
+                                .first()
+                                .map(|m| m.version.as_str())
+                                .unwrap_or_default();
+
+                            let current_spec =
+                                format!("{display_name}@{current_version}");
+                            let available_spec =
+                                format!("{}@{}", display_name, node.version);
+
+                            println!(
+                                "{} Package '{}' is already installed \
+                                 (available: {}).",
+                                "::".bold().yellow(),
+                                current_spec.cyan(),
+                                available_spec.cyan()
+                            );
+                            println!(
+                                "   {} To update to the newer version, run: {}",
+                                "Hint:".bold().blue(),
+                                format!("zoi update {pkg_spec}").italic()
+                            );
+                        }
+                    }
                     to_remove.push(pkg_id.clone());
                 }
             }
@@ -382,7 +426,9 @@ impl<'a> Orchestrator<'a> {
         }
 
         // --- Phase 3: Safety & Compliance Checks ---
-        println!("{} Looking for conflicts...", "::".bold().blue());
+        if !options.plan_json {
+            println!("{} Looking for conflicts...", "::".bold().blue());
+        }
         let packages_to_install: Vec<&types::Package> =
             graph.nodes.values().map(|n| &n.pkg).collect();
 
@@ -399,6 +445,10 @@ impl<'a> Orchestrator<'a> {
             preflight::check_for_vulnerabilities(&graph, options.yes)?;
 
             let m_for_conflict_check = MultiProgress::new();
+            if options.plan_json {
+                m_for_conflict_check
+                    .set_draw_target(indicatif::ProgressDrawTarget::hidden());
+            }
             preflight::check_file_conflicts(
                 &graph,
                 options.yes,
@@ -407,7 +457,9 @@ impl<'a> Orchestrator<'a> {
             let _ = m_for_conflict_check.clear();
         }
 
-        println!("{} Checking available disk space...", "::".bold().blue());
+        if !options.plan_json {
+            println!("{} Checking available disk space...", "::".bold().blue());
+        }
         let install_plan = plan::create_install_plan(
             &graph.nodes,
             options.build_type,
@@ -487,6 +539,7 @@ impl<'a> Orchestrator<'a> {
                 "non_zoi_dependencies": non_zoi_deps,
             });
             println!("{}", serde_json::to_string_pretty(&plan_data)?);
+            return Ok(());
         }
 
         if options.dry_run {
@@ -507,9 +560,159 @@ impl<'a> Orchestrator<'a> {
 
         if total_installed_size > available_space {
             return Err(anyhow!(
-                "Not enough disk space. Required: {total_installed_size}, \
-                 Available: {available_space}"
+                "Not enough disk space. Required: {}, Available: {}",
+                zoi_core::utils::format_bytes(total_installed_size),
+                zoi_core::utils::format_bytes(available_space)
             ));
+        }
+
+        let config = zoi_core::config::read_config().unwrap_or_default();
+
+        println!(
+            "\n{} Packages ({})",
+            "::".bold().blue(),
+            direct_packages.len()
+        );
+        let direct_list: Vec<_> = direct_packages
+            .iter()
+            .map(|n| {
+                let display_name = ux::format_display_name(
+                    &n.registry_handle,
+                    &n.pkg.repo,
+                    &n.pkg.name,
+                    n.sub_package.as_deref(),
+                    &config
+                );
+                let version_display = if n.revision == "1" {
+                    n.version.clone()
+                } else {
+                    format!("{}-{}", n.version, n.revision)
+                };
+                format!("{display_name}@{version_display}")
+                    .cyan()
+                    .to_string()
+            })
+            .collect();
+        println!(" {}", direct_list.join("  "));
+
+        if options.verbose {
+            println!("\n{} Package origins", "::".bold().blue());
+            let mut direct_entries: Vec<_> = graph
+                .nodes
+                .iter()
+                .filter(|(_, node)| {
+                    matches!(node.reason, types::InstallReason::Direct)
+                })
+                .collect();
+            direct_entries.sort_by(|a, b| a.1.pkg.name.cmp(&b.1.pkg.name));
+            for (id, node) in direct_entries {
+                let action_name = match install_plan.get(id) {
+                    Some(plan::InstallAction::DownloadAndInstall(_)) => {
+                        "download"
+                    }
+                    Some(plan::InstallAction::InstallFromArchive(_)) => {
+                        "archive"
+                    }
+                    Some(plan::InstallAction::BuildAndInstall) => "build",
+                    None => "unknown"
+                };
+                let origin = crate::cmd::ux::classify_source_origin(
+                    &node.source,
+                    action_name
+                );
+                let display_name = ux::format_display_name(
+                    &node.registry_handle,
+                    &node.pkg.repo,
+                    &node.pkg.name,
+                    node.sub_package.as_deref(),
+                    &config
+                );
+                let version_display = if node.revision == "1" {
+                    node.version.clone()
+                } else {
+                    format!("{}-{}", node.version, node.revision)
+                };
+                println!(
+                    "  - {}@{} -> {} ({})",
+                    display_name.cyan(),
+                    version_display,
+                    origin.as_str(),
+                    action_name
+                );
+            }
+        }
+
+        if !dependencies.is_empty() || !non_zoi_deps.is_empty() {
+            println!(
+                "\n{} Dependencies ({})",
+                "::".bold().blue(),
+                dependencies.len() + non_zoi_deps.len()
+            );
+            let mut dep_list = Vec::new();
+            for n in &dependencies {
+                let display_name = ux::format_display_name(
+                    &n.registry_handle,
+                    &n.pkg.repo,
+                    &n.pkg.name,
+                    n.sub_package.as_deref(),
+                    &config
+                );
+                let version_display = if n.revision == "1" {
+                    n.version.clone()
+                } else {
+                    format!("{}-{}", n.version, n.revision)
+                };
+                dep_list.push(
+                    format!("zoi:{display_name}@{version_display}")
+                        .dimmed()
+                        .to_string()
+                );
+            }
+            for d in &non_zoi_deps {
+                dep_list.push(d.dimmed().to_string());
+            }
+            println!(" {}", dep_list.join("  "));
+        }
+
+        if total_download_size > 0 {
+            println!(
+                "\nTotal Download Size:  {}",
+                zoi_core::utils::format_bytes(total_download_size)
+            );
+        }
+        if total_installed_size > 0 {
+            println!(
+                "Total Installed Size: {}",
+                zoi_core::utils::format_bytes(total_installed_size)
+            );
+        }
+
+        if options.verbose {
+            let preflight =
+                crate::cmd::ux::PreflightSummary::new("Install preflight")
+                    .row(
+                        "Scope",
+                        format!(
+                            "{:?}",
+                            scope_override.unwrap_or(types::Scope::User)
+                        )
+                    )
+                    .row("Frozen lockfile", options.frozen.to_string())
+                    .row("Retry attempts", options.retry.to_string())
+                    .row("Direct packages", direct_packages.len().to_string())
+                    .row(
+                        "Dependencies",
+                        (dependencies.len() + non_zoi_deps.len()).to_string()
+                    )
+                    .row(
+                        "Download size",
+                        zoi_core::utils::format_bytes(total_download_size)
+                    )
+                    .row(
+                        "Installed size",
+                        zoi_core::utils::format_bytes(total_installed_size)
+                    );
+            crate::cmd::ux::print_preflight(&preflight);
         }
 
         let yes = options.yes;
@@ -517,7 +720,6 @@ impl<'a> Orchestrator<'a> {
             "\nProceed with installation?",
             yes
         ) {
-            let _ = lock::release_lock();
             return Ok(());
         }
 
