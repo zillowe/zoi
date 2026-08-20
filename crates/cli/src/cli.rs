@@ -18,7 +18,7 @@ const BRANCH: &str = "Production";
 /// The release status of the current build.
 const STATUS: &str = "Release";
 /// The version number of the current build.
-const NUMBER: &str = "1.25.4";
+const NUMBER: &str = "1.25.5";
 /// Help text for package source identifiers.
 const PKG_SOURCE_HELP: &str =
     "Package identifier (e.g. @repo/name, #git@repo/name, path, or URL)";
@@ -337,8 +337,11 @@ enum Commands {
         #[arg(long)]
         explain: bool,
         /// Emit machine-readable update plan JSON
-        #[arg(long)]
+        #[arg(long, requires = "dry_run")]
         plan_json: bool,
+        /// Show additional update details
+        #[arg(long, short)]
+        verbose: bool,
         /// Interactively choose which upgradable packages to update (with
         /// --all)
         #[arg(long, requires = "all")]
@@ -1025,6 +1028,7 @@ pub fn run() -> anyhow::Result<()> {
                 dry_run,
                 explain,
                 plan_json,
+                verbose,
                 interactive
             } => cmd::update::run(
                 all,
@@ -1033,6 +1037,7 @@ pub fn run() -> anyhow::Result<()> {
                 dry_run,
                 explain,
                 plan_json,
+                verbose,
                 interactive
             )
             .map_err(|e| cmd::ux::with_failure_hint("update", e)),

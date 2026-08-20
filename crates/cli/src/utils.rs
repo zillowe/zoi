@@ -337,7 +337,7 @@ pub fn ask_for_confirmation(prompt: &str, yes: bool) -> bool {
         return false;
     }
 
-    print!("{} [y/N]: ", prompt.yellow());
+    print!("{prompt} [y/N]: ");
     let _ = stdout().flush();
     let mut input = String::new();
     if stdin().read_line(&mut input).is_err() {

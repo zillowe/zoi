@@ -45,7 +45,7 @@ pub struct UninstallArgs {
     pub explain: bool,
 
     /// Emit machine-readable uninstall plan JSON
-    #[arg(long)]
+    #[arg(long, requires = "dry_run")]
     pub plan_json: bool
 }
 

@@ -1,6 +1,9 @@
 # Maintainer: ZilloweZ <zillowez@proton.me>
+# mock_bootstrap: 0
 
 %global debug_package %{nil}
+%global _enable_debug_package 0
+%global _debuginfo_subpackages 0
 %undefine _debugsource_packages
 %global _pkgverify_level none
 

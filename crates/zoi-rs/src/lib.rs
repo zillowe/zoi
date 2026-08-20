@@ -236,6 +236,7 @@ pub fn build_with_options(
     package_file: &Path,
     options: &BuildOptions<'_>
 ) -> Result<()> {
+    let _lock = zoi_core::lock::acquire_lock()?;
     if options.install_deps {
         for platform in &options.platforms {
             let current_platform = if platform == "current" {
@@ -304,6 +305,7 @@ pub fn install_package_with_options(
     package_file: &Path,
     options: &PackageInstallOptions
 ) -> Result<Vec<String>> {
+    let _lock = zoi_core::lock::acquire_lock()?;
     zoi_install::pkg_install::run(
         package_file,
         options.scope_override,
@@ -328,6 +330,7 @@ pub fn install_sources(
     sources: &[String],
     options: &SourceInstallOptions
 ) -> Result<()> {
+    let _lock = zoi_core::lock::acquire_lock()?;
     let plugin_manager = if zoi_core::utils::is_mini_mode() {
         None
     } else {
@@ -375,10 +378,12 @@ pub fn update_packages(
     package_names: &[String],
     yes: bool
 ) -> Result<()> {
+    let _lock = zoi_core::lock::acquire_lock()?;
     zoi_cli::cmd::update::run(
         all,
         package_names,
         yes,
+        false,
         false,
         false,
         false,
@@ -627,6 +632,7 @@ pub fn uninstall_package(
     package_name: &str,
     scope_override: Option<Scope>
 ) -> Result<()> {
+    let _lock = zoi_core::lock::acquire_lock()?;
     zoi_uninstall::run(package_name, scope_override, false, false, false)
         .map(|_| ())
 }
