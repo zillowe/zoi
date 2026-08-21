@@ -110,10 +110,10 @@ fi
 cd ..
 
 echo "--- Fedora COPR ---"
-git clone "ssh://git@github.com/zillowe/rpm-copr.git" rpm_copr
-mkdir -p rpm_copr/zoi
-cp "$TMP_PACKAGES/rpm/zoi.spec" rpm_copr/zoi/
-cd rpm_copr/
+git clone "ssh://git@github.com/zillowe/copr.git" copr
+mkdir -p copr/zoi
+cp "$TMP_PACKAGES/rpm/zoi.spec" copr/zoi/
+cd copr/
 if [[ -n $(git status --porcelain) ]]; then
   git add .
   git commit -m "Release(Zoi): $VERSION"

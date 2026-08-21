@@ -17,7 +17,7 @@ The Security Policy can be found online at
 | [AUR `zoi-bin`](https://aur.archlinux.org/packages/zoi-bin)                               | ✔️        |
 | [Debian / Ubuntu (`.deb`)](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases)       | ✔️        |
 | [Fedora / RHEL (`.rpm`)](https://gitlab.com/zillowe/zillwen/zusty/zoi/-/releases)         | ✔️        |
-| [Fedora (COPR)](https://copr.fedorainfracloud.org/coprs/zillowez/zoi/)                    | ✔️        |
+| [COPR `zillowe/zoi`](https://copr.fedorainfracloud.org/coprs/zillowe/zoi/)                    | ✔️        |
 | [Homebrew](https://github.com/zillowe/homebrew-tap)                                       | ✔️        |
 | [Scoop](https://github.com/zillowe/scoop)                                                 | ✔️        |
 | [Crates.io `zoi-rs`](https://crates.io/crates/zoi-rs)                                     | ✔️        |

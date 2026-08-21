@@ -77,11 +77,11 @@ sudo rpm -i zoi-*.rpm
 ```
 
 Or you can install Zoi from Fedora
-[COPR](https://copr.fedorainfracloud.org/coprs/zillowez/zoi/)
+[COPR](https://copr.fedorainfracloud.org/coprs/zillowe/zoi/)
 (Supports Fedora 43, 44, Rawhide, CentOS Stream 9/10, EPEL 9, and openSUSE Tumbleweed):
 
 ```sh
-sudo dnf copr enable zillowez/zoi
+sudo dnf copr enable zillowe/zoi
 sudo dnf install zoi
 ```
 
